@@ -9,3 +9,4 @@ export function amberLine(verdict:AmberVerdict,run:string|null|undefined):string
 export function parseAmber(text:string):{file:string;ms:number;budget:number}[];
 export function nextLedger(previous:AmberLedger|undefined,files:readonly {file:string;durationMs:number}[],options:{run:string;at:number;inventory:Set<string>|null;budget?:number}):AmberLedger;
 export function judgeWall(shard:string,ms:number,budget:number,limits?:AmberLimits):AmberVerdict;
+export function parseAudioAmber(text:string):{shard:string;tier:string;bytes:number;budget:number;red:number;level:string}[];

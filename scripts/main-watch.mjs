@@ -14,14 +14,15 @@
 // (~/.cache/wildshard/main-watch.json) keeps the judged run ids, so a run is reported once however often this runs.
 // A green run that carries AMBER files (J295: a test file over its time budget, scripts/test-amber.mjs) also gives
 // one `main AMBER <sha> <file> <ms>/<budget>` receipt per file: the coordinator hands each out as a queue-skipping
-// fix row the same day (meta HOW-WE-BUILD-PLAN.md).
+// fix row the same day (meta HOW-WE-BUILD-PLAN.md). AUDIO AU6 (J303): a shard whose audio is over 6 MB gives the same
+// kind of receipt, `main AMBER <sha> audio <shard> <tier> <MB>/6.00 MB`, from the cook report's test; never a red main.
 import {execFileSync} from 'node:child_process';
 import {appendFileSync,existsSync,mkdirSync,readFileSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {setTimeout} from 'node:timers/promises';
 import {pathToFileURL} from 'node:url';
-import {AMBER,parseAmber} from './test-amber.mjs';
+import {AMBER,parseAmber,parseAudioAmber} from './test-amber.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
@@ -134,10 +135,10 @@ export function liveIo(env=process.env){
       .filter((/** @type {Run} */row)=>row.event==='push'||row.event==='workflow_dispatch')),
     failed:(/** @type {number} */id)=>/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(run('gh',['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
       .filter(job=>job.conclusion==='failure'||job.conclusion==='timed_out').map(job=>job.name),
-    // The AMBER warnings on a run's blocking tests and its timings job; quarantine's are its own (J193).
-    ambers:(/** @type {number} */id)=>parseAmber(/** @type {{id:number,name:string}[]} */(JSON.parse(run('gh',['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
+    // The annotations (their AMBER lines) on a run's blocking tests and its timings job; quarantine's are its own (J193).
+    annotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(run('gh',['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
       .filter(job=>job.name.startsWith('tests')||job.name==='timings')
-      .map(job=>/** @type {{message:string}[]} */(JSON.parse(run('gh',['api',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`]))).map(row=>row.message).join('\n')).join('\n')),
+      .map(job=>/** @type {{message:string}[]} */(JSON.parse(run('gh',['api',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`]))).map(row=>row.message).join('\n')).join('\n'),
     tip:()=>{run('git',['fetch','--quiet','origin','main']);return run('git',['rev-parse','origin/main']).trim();},
     commits:(/** @type {string|null} */from,/** @type {string} */to)=>{
       try{return run('git',['rev-list','--max-count=200',from===null?to:`${from}..${to}`]).trim().split('\n').filter(Boolean);}catch{return [to];}
@@ -185,8 +186,11 @@ export function sweep(io,hint={}){
         if(verdict.kind==='green'){
           lines.push(`main green ${short(run.head_sha)} (run ${run.id}; ${range}; landed by ${named})`);
           /** @type {{file:string,ms:number,budget:number}[]} */let ambers=[];
-          try{ambers=io.ambers(run.id);}catch(error){lines.push(`main AMBER ${short(run.head_sha)} unknown (run ${run.id}; its annotations were unreadable: ${error instanceof Error?error.message.split('\n')[0]:String(error)})`);}
+          /** @type {ReturnType<typeof parseAudioAmber>} */let audio=[];
+          try{const text=io.annotations(run.id);ambers=parseAmber(text);audio=parseAudioAmber(text);}catch(error){lines.push(`main AMBER ${short(run.head_sha)} unknown (run ${run.id}; its annotations were unreadable: ${error instanceof Error?error.message.split('\n')[0]:String(error)})`);}
           for(const row of ambers)lines.push(`main AMBER ${short(run.head_sha)} ${row.file} ${row.ms}/${row.budget} (run ${run.id}; J295: a queue-skipping fix row today; red at ${AMBER.redFactor}x, after ${AMBER.redAfterHours} h or ${AMBER.redAfterRuns} amber main runs)`);
+          const mb=(/** @type {number} */bytes)=>(bytes/1e6).toFixed(2);
+          for(const row of audio)lines.push(`main AMBER ${short(run.head_sha)} audio ${row.shard} ${row.tier} ${mb(row.bytes)} MB/${mb(row.budget)} MB (run ${run.id}; J303${row.level==='red'?`, over the ${mb(row.red)} MB red line`:''}: its AUDIO-PLAN source pass; never a red main)`);
         }
         else{
           const failed=io.failed(run.id).join(' | ')||'see the run',url=`https://github.com/${io.repo}/actions/runs/${run.id}`,panes=io.panes();

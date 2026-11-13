@@ -88,3 +88,13 @@ export function nextLedger(previous,files,options){
  * from run to run; the files that made it slow carry their own. Pure.
  * @param {string} shard @param {number} ms @param {number} budget @param {typeof AMBER} [limits] @returns {Verdict} */
 export const judgeWall=(shard,ms,budget,limits=AMBER)=>judgeFile(`shard-${shard}-wall`,ms,budget,undefined,0,limits);
+
+/** AUDIO AU6 (J303): every shard-audio AMBER line in some text (`audioAmberLine` in src/cook/game/audioReport.ts, which
+ * CI's budget reporter annotates), one per shard and tier. Never red on main: `level=red` says only how far over (J295).
+ * @param {string} text @returns {{shard:string,tier:string,bytes:number,budget:number,red:number,level:string}[]} */
+export function parseAudioAmber(text){
+  const out=new Map();
+  for(const match of text.matchAll(/\bAMBER audio shard=(\S+) tier=(\S+) bytes=(\d+) budget=(\d+) red=(\d+) level=(\S+)/gu))
+    out.set(`${match[1]} ${match[2]}`,{shard:match[1],tier:match[2],bytes:Number(match[3]),budget:Number(match[4]),red:Number(match[5]),level:match[6]});
+  return [...out.values()];
+}

@@ -21,6 +21,7 @@ import {BrotliSizeCache} from './brotliSizeCache.mjs';
 import {defaultBootAudio, ENGINE_MUSIC_STYLE, missingEngineMusic, musicDir} from '@wildshard/engine/audio/bootAudio';
 import {withAssetTables, type AssetTables} from '@wildshard/engine/boot/tables';
 import type {AudioData} from '@wildshard/format/audio';
+import {audioReport, audioReportTable, isAudioUrl} from './audioReport';
 
 const size = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 const files = v.array(v.tuple([v.string(), size]));
@@ -30,7 +31,6 @@ const schema = v.object({common: files, client: files, grid: files,
   extras: v.record(v.string(), v.tuple([v.string(), size, size, v.string()])),
 });
 interface Address {readonly url: string; readonly bytes: number}
-const AUDIO_URL = /^\/assets\/(?:music|sfx)\/[^?]+\.(?:m4a|mp3|ogg|opus|wav|webm|flac)(?:\?|$)/u;
 /** AUDIO AU1 (J299): the recordings a shard's LOAD reads, so DOWNLOAD fetches, counts and caches them: a new player's
  *  boot set (the default music style and sound-effect set, through the client's own selection) and the audio its
  *  recorded fence names. `tables` is the build's common boot table, the one the page installs. */
@@ -46,7 +46,7 @@ export function shardBootAudio(sections: ReadonlyMap<string, unknown>, tables: A
     catch (error) { throw new Error(`${shard}: its boot audio does not select (${error instanceof Error ? error.message : String(error)})`, {cause: error}); }
   }
   const shipped = (url: string): boolean => Object.hasOwn(tables.bytes, url.split('?')[0] ?? url);
-  return [...new Set([...boot, ...fenceMounts.filter(url => AUDIO_URL.test(url)).map(url => url.split('?')[0] ?? url)])].filter(shipped);
+  return [...new Set([...boot, ...fenceMounts.filter(url => isAudioUrl(url)).map(url => url.split('?')[0] ?? url)])].filter(shipped);
 }
 /** AU18: the build log's line for a shard's derived engine music (its boot set's files under the engine style). */
 export function engineMusicLine(shard: string, bootAudio: readonly string[], tables: AssetTables): string {
@@ -313,6 +313,9 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
       (packsGridAt[mode] ??= {})[directory] = {phone: write('phone', 'grid', homes[directory], mode, true), desktop: write('desktop', 'grid', homes[directory], mode, true)};
     }
   }
+  // AU6 (J303): each shard's recordings and their share of its client DOWNLOAD, per tier; an overrun says AMBER, never fails.
+  const entries = pending.filter(row => !row.packed && row.manifest.flow === 'client').map(row => row.manifest);
+  if (entries.some(manifest => manifest.files.some(row => isAudioUrl(row.url)))) console.info(audioReportTable(audioReport(entries)));
   if (Object.keys(preparations).length > 0) console.info(`cook preparation: ${(['current', 'stale', 'none'] as const).map(state => `${preparations[state]?.length ?? 0} ${state}`).join(', ')}`);
   // DL5: every manifest is known, so pack their files into shared parts, then write each manifest with its own table.
   const packed = pending.flatMap((row, index) => row.packed ? [index] : []);

@@ -81,10 +81,10 @@ test('main\'s timings job carries the ledger forward in the table and names the 
   expect(readTimings()?.amber).toEqual({ 'test/a.test.ts': { since: 1, runs: 2, ms: 61_000, run: '6' } });
 });
 
-const fakeModule = (file: string, ms: number): TestModule => ({
+const fakeModule = (file: string, ms: number, notes: string[] = []): TestModule => ({
   moduleId: resolve(file), state: () => 'passed', errors: () => [],
   diagnostic: () => ({ duration: ms, collectDuration: 0, setupDuration: 0, prepareDuration: 0, environmentSetupDuration: 0 }),
-  children: { allTests: function* () { yield { fullName: 't', result: () => ({ state: 'passed' }), options: { mode: 'run' } }; } },
+  children: { allTests: function* () { yield { fullName: 't', result: () => ({ state: 'passed' }), options: { mode: 'run' }, annotations: () => notes.map(message => ({ message, type: 'warning' })) }; } },
 }) as unknown as TestModule;
 
 test('the real reporter: amber warns and exits green, 2x and an escalated amber exit red', () => {
@@ -108,4 +108,12 @@ test('the real reporter: amber warns and exits green, 2x and an escalated amber 
   const escalated = report('escalated', [fakeModule('test/old.test.ts', 61_000)]);
   expect(escalated.exit).toBe(1);
   expect(escalated.json.budget.red[0]).toMatch(/^RED file=test\/old\.test\.ts .*streak=3 why=amber_on_main_since/u);
+  // AU6 (J303): the cook report's AMBER audio annotation becomes a ::warning main-watch reads, and the run stays green.
+  errors.mockClear();
+  const line = 'AMBER audio shard=pine-like tier=phone bytes=7250000 budget=6000000 red=10000000 level=amber';
+  const other = line.replace('pine-like', 'nalati-like'), audio = report('audio', [fakeModule('test/audio-report.test.ts', 10, [line, 'an ordinary note', other])]);
+  expect(audio.exit).not.toBe(1);
+  // One warning for them all (GitHub keeps 10 a step), and the report keeps them for the timings job to repeat on a reused run.
+  expect(errors.mock.calls.flat()).toEqual([`::warning title=AMBER shard audio over 6 MB (J303)::${line}%0A${other}`]);
+  expect(audio.json.budget.amber).toEqual([line, other]);
 });

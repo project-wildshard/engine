@@ -1081,6 +1081,7 @@
     "src/client/host/online/voice.ts": "client",
     "src/client/host/online/voiceUi.ts": "client",
     "src/client/host/standalone/shell.ts": "client",
+    "src/cook/game/audioReport.ts": "cook",
     "src/cook/game/brotliSizeCache.d.mts": "cook",
     "src/cook/game/brotliSizeCache.mjs": "cook",
     "src/cook/game/contentNamed.ts": "cook",

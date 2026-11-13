@@ -3,7 +3,7 @@ export interface State {judged:number[];dispatched:string[]}
 export interface Verdict {kind:'green'|'red'|'superseded'|'dispatch';run:Run;from?:string|null;by?:string}
 export interface Pane {pane_id:string;label?:string;cwd?:string;foreground_cwd?:string}
 export interface Io {
-  repo:string;state:string;runs:()=>Run[];failed:(id:number)=>string[];ambers:(id:number)=>{file:string;ms:number;budget:number}[];tip:()=>string;
+  repo:string;state:string;runs:()=>Run[];failed:(id:number)=>string[];annotations:(id:number)=>string;tip:()=>string;
   commits:(from:string|null,to:string)=>string[];contains:(ancestor:string,descendant:string)=>boolean;
   receipts:()=>string;receipt:(line:string)=>void;panes:()=>Pane[];send:(pane:string,text:string)=>boolean;dispatch:()=>void;
 }

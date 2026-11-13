@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
 import { follow, judge, landers, liveIo, paneFor, reached, sweep, verdictFor } from '../scripts/main-watch.mjs';
-import { parseAmber } from '../scripts/test-amber.mjs';
+import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
 
 mkdirSync(resolve('tmp'), { recursive: true });
 const scratch = mkdtempSync(resolve('tmp/main-watch-'));
@@ -26,7 +26,7 @@ const contains = (ancestor: string, descendant: string): boolean => order.indexO
 interface World { runs: ReturnType<typeof run>[]; receipts: string[]; sent: [string, string][]; dispatched: number; log: string; tip: string; ambers?: Record<number, string> }
 const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
   repo: 'project-wildshard/engine', state: join(scratch, `${name}.json`),
-  runs: () => world.runs, failed: () => ['tests (3)'], ambers: id => parseAmber(world.ambers?.[id] ?? ''), tip: () => world.tip,
+  runs: () => world.runs, failed: () => ['tests (3)'], annotations: id => world.ambers?.[id] ?? '', tip: () => world.tip,
   commits: (from, to) => order.slice(from === null ? 0 : order.indexOf(from) + 1, order.indexOf(to) + 1).reverse(),
   contains, receipts: () => world.log, receipt: line => { world.receipts.push(line); },
   panes: () => [{ pane_id: 'w1:p2', label: 'engine plan/red-plan' }, { pane_id: 'w1:p3', cwd: '/x/engine/.worktrees/other' }],
@@ -167,6 +167,21 @@ test('J295: a green run carrying AMBER files gives one main AMBER receipt per fi
   expect(w.receipts.filter(row => row.startsWith('main green'))).toHaveLength(2);
   // Unreadable annotations never stop the sweep: the green is reported and the AMBER check says it couldn't look.
   w.runs = [...w.runs, run(42970000011, 'bbbb2222', 'success', 54)];w.receipts.length = 0;
-  sweep({ ...io, ambers: () => { throw new Error('HTTP 502'); } });
+  sweep({ ...io, annotations: () => { throw new Error('HTTP 502'); } });
   expect(w.receipts).toEqual([expect.stringMatching(/^main green bbbb222200/u), 'main AMBER bbbb222200 unknown (run 42970000011; its annotations were unreadable: HTTP 502)']);
+});
+
+test('AU6 (J303): a green run whose cook report has a shard over 6 MB gives a main AMBER audio receipt, never MAIN RED', () => {
+  const w = world(replay), io = fake('audio', w);
+  sweep(io);
+  w.runs = [...replay, run(42970000012, 'aaaa1111', 'success', 50)];w.tip = sha('aaaa1111');
+  // The cook report's own lines for synthetic shards over each line (the budget reporter annotates them in two jobs).
+  const row = (shard: string, audioBytes: number) => audioAmberLine({ shard, tier: 'phone', files: 9, audioBytes, downloadBytes: 20e6, level: audioLevel(audioBytes) });
+  w.ambers = { 42970000012: [row('pine-like', 7_250_000), row('pine-like', 7_250_000), row('huge', 12_000_000)].join('\n') };
+  sweep(io);
+  expect(w.receipts.filter(line => line.startsWith('main AMBER')).map(line => line.split(' (')[0])).toEqual([
+    'main AMBER aaaa111100 audio pine-like phone 7.25 MB/6.00 MB', 'main AMBER aaaa111100 audio huge phone 12.00 MB/6.00 MB']);
+  expect(w.receipts.find(line => line.includes('audio huge'))).toContain('over the 10.00 MB red line');
+  expect(w.receipts.filter(line => line.startsWith('MAIN RED'))).toEqual([]);
+  expect(w.receipts.filter(line => line.startsWith('main green'))).toHaveLength(1);
 });

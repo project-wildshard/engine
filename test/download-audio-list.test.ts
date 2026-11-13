@@ -2,22 +2,17 @@
 // and `/assets/sfx/**` rows of its cooked `client-phone` and `grid-phone` manifests are AU18's derived engine music, the
 // engine's default sound-effect boot set, and the shard's own audio mounts: nothing more, nothing missing, no row twice,
 // and no engine style but the one. A shard with no recorded music (Dunes, Far Reach) has no engine music row.
-// oxlint-disable-next-line import/no-nodejs-modules -- Bake this checkout's boot tables, as the app build does.
-import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the pinned products and own the cook's folder.
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-// oxlint-disable-next-line import/no-nodejs-modules -- Keep the cook's folder inside the repository's tmp/.
-import { resolve } from 'node:path';
+import { existsSync, rmSync } from 'node:fs';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import type { AudioData } from '@wildshard/format/audio';
-import { writeSpawnManifests, type BuildHalf, type SpawnManifestBook } from '../src/cook/game/entryTotals';
+import type { SpawnManifestBook } from '../src/cook/game/entryTotals';
 import { readBuiltSpawnManifest } from '../src/cook/game/engineHalf';
 import { openShardfile, shardHalf } from '../src/cook/game/shardCook';
 import { productTarball } from '../src/cook/game/productTarball';
 import { DEFAULT_SFX_SET, defaultBootAudio, ENGINE_MUSIC_STYLE, engineMusicFiles, musicDir, sfxDir } from '../src/shared/engine/audio/bootAudio';
 import { withAssetTables, type AssetTables } from '../src/shared/engine/boot/tables';
-import { ASSET_TABLES, assetTableAddresses, readAssetTables, writeAssetTables } from '../scripts/app-build/assetTables.mjs';
-import { GPU_FILES } from '../src/client/engine/boot/ktx2.generated';
+import { cookFilesOnly } from './filesOnlyCook';
 
 // Driftwood, Pine, Nalati, Nine Dragon, one Open Plot, Dunes and Far Reach, each with its engine music's file count
 // (AU18's derived list: title, its base slot's calm and tension, its stings). Counts, not names: a re-encode renames.
@@ -50,30 +45,11 @@ function expected(shard: string, common: AssetTables): { want: string[]; engineM
   return { want: [...new Set([...engineMusic, ...engineSfx, ...own])].sort(), engineMusic: engineMusic.sort() };
 }
 
-let root = '', book: SpawnManifestBook | undefined, common: AssetTables | undefined;
+let root = '', output = '', book: SpawnManifestBook | undefined, common: AssetTables | undefined;
 beforeAll(async () => {
   if (!have) return;
-  mkdirSync('tmp/download-audio-list', { recursive: true });
-  root = mkdtempSync(resolve('tmp/download-audio-list/cook-'));
   // A build root: this checkout's boot tables, baked as scripts/app-build/assetTables.mjs does, the products and public/.
-  const baked = spawnSync(process.execPath, ['--import', './scripts/bake-loader.mjs', 'scripts/serialize-asset-tables.mjs'],
-    { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'inherit'] });
-  if (baked.status !== 0) throw new Error(`boot tables did not bake (${String(baked.status)})`);
-  mkdirSync(resolve(root, 'out/.app'), { recursive: true });
-  writeFileSync(resolve(root, ASSET_TABLES), baked.stdout);
-  for (const [shard] of SHARDS) symlinkSync(resolve('out', shard), resolve(root, 'out', shard));
-  symlinkSync(resolve('public'), resolve(root, 'public'));
-  // A shard's recorded fence (src/shards/<slug>/fence-reads.json) is the cook's other way to list audio.
-  if (existsSync('src/shards')) { mkdirSync(resolve(root, 'src'), { recursive: true }); symlinkSync(resolve('src/shards'), resolve(root, 'src/shards')); }
-  common = JSON.parse(readAssetTables(root).common.source) as AssetTables;
-  const output = resolve(root, 'dist');
-  mkdirSync(resolve(output, 'assets'), { recursive: true });
-  writeAssetTables(output, root);
-  const build: BuildHalf = { cacheName: 'au19', gpuFiles: GPU_FILES, filesOnly: true, tables: readAssetTables,
-    tableAddresses: at => assetTableAddresses(readAssetTables(at)), seams: () => { throw new Error('no grid seams in this root'); } };
-  const input = { common: [], client: [], grid: [], optional: { files: [], groups: {} }, extras: {},
-    products: Object.fromEntries(SHARDS.map(([shard]) => [`/shardfiles/${shard}/`, [0, 0]])) };
-  book = await writeSpawnManifests(output, input, { '000': {} }, root, build);
+  ({ root, output, book, common } = await cookFilesOnly(SHARDS.map(([shard]) => shard), 'download-audio-list'));
 }, 120_000);
 afterAll(() => { if (root !== '') rmSync(root, { recursive: true, force: true }); });
 
@@ -82,7 +58,6 @@ for (const [shard, engineFiles] of SHARDS) {
     if (common === undefined) throw new Error('no boot tables');
     const tables = common, { want, engineMusic } = expected(shard, tables);
     expect(engineMusic).toHaveLength(engineFiles);
-    const output = resolve(root, 'dist');
     for (const address of [book?.client[shard]?.phone, book?.grid['000']?.[shard]?.phone]) {
       if (address === undefined) throw new Error(`${shard}: no phone manifest`);
       const listed = readBuiltSpawnManifest(output, address).files.map(row => row.url);
