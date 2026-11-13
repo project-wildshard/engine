@@ -3,6 +3,7 @@ import { generateKeyPairSync, sign } from 'node:crypto';
 import { afterEach, expect, test, vi } from 'vitest';
 import type { LinkState } from '../src/client/engine/net/redial';
 import { readSignedRelease } from '../src/client/host/online/release';
+import { browserErrorLevel } from '../src/client/engine/telemetry/browserErrors';
 import { connectOnline, worldHostsGrid, worldWord, type OnlineShell } from '../src/client/host/online/shell';
 import { hostsGrid } from '../src/client/game/shardfile/serverRoute';
 // oxlint-disable-next-line import/no-nodejs-modules -- The release file's own origin.
@@ -36,7 +37,11 @@ test('a page believes a release file only on its signature', async () => {
 test('a browser with no Ed25519 tells the player what to do', async () => {
   const { text, publicKey } = signedFile(RELEASE);
   vi.spyOn(crypto.subtle, 'importKey').mockRejectedValueOnce(new DOMException('Algorithm: Unrecognized name', 'NotSupportedError'));
-  await expect(readSignedRelease(text, publicKey)).rejects.toThrow('Update it to Chrome 137');
+  const refusal: unknown = await readSignedRelease(text, publicKey).catch((error: unknown) => error);
+  expect(refusal).toBeInstanceOf(Error);
+  expect((refusal as Error).message).toContain('Update it to Chrome 137');
+  // Working as designed (J171), so Sentry gets a warning, not a fatal (WILDSHARD-GAME-8F).
+  expect(browserErrorLevel(refusal, true)).toBe('warning');
 });
 
 test('the door seats a loaded page, a countdown reaches it, and another build of this wire is not refused', { timeout: 30_000 }, async () => {

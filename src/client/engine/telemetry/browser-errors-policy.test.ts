@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
 import type {ErrorEvent} from '@sentry/browser';
-import {browserErrorDeliveryAllowed,browserErrorEnvironment,browserErrorNoise,browserErrorRelease,browserErrorDist} from './browserErrors';
+import {browserErrorDeliveryAllowed,browserErrorEnvironment,browserErrorLevel,browserErrorNoise,browserErrorRelease,browserErrorDist} from './browserErrors';
 
 const origins=['https://play.example.invalid'] as const;
 test.each([
@@ -73,4 +73,15 @@ test('S5: the build id is the dist up to Sentry\'s 64 characters, else none',()=
   expect(browserErrorDist('a'.repeat(64))).toBe('a'.repeat(64));
   expect(browserErrorDist('a'.repeat(65))).toBeUndefined();
   expect(browserErrorDist('')).toBeUndefined();
+});
+
+test('a designed old-browser refusal reports as a warning, never fatal (WILDSHARD-GAME-8F)',()=>{
+  const tooOld=new Error('This browser is too old for the online world. Update it to Chrome 137 or Safari 17, or newer.');
+  expect(browserErrorLevel(tooOld,true)).toBe('warning');
+  expect(browserErrorLevel(tooOld,false)).toBe('warning');
+  expect(browserErrorLevel({message:tooOld.message},true)).toBe('warning');
+  expect(browserErrorLevel(new Error('A release file has a bad signature'),true)).toBe('fatal');
+  expect(browserErrorLevel(new Error('A release file has a bad signature'),false)).toBe('error');
+  expect(browserErrorLevel(new Error(`Online failed: ${tooOld.message}`),true)).toBe('warning');
+  expect(browserErrorLevel(new Error('This browser is too slow'),true)).toBe('fatal');
 });

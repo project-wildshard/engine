@@ -91,6 +91,21 @@ export function browserErrorNoise(event: ErrorEvent, page: { readonly environmen
   return null;
 }
 
+/**
+ * Known, designed refusals of an old browser: the player was told what to do, so they are warnings, never fatal (SENTRY-TRIAGE,
+ * WILDSHARD-GAME-8F). J171 keeps signature code out of the page, so a browser with no WebCrypto Ed25519 can't join the online world.
+ */
+const UNSUPPORTED_BROWSER = ['This browser is too old for the online world'] as const;
+
+/** The Sentry level an error reports at: `warning` for a designed old-browser refusal, else `fatal` or `error`. Pure, so it is tested. */
+export function browserErrorLevel(error: unknown, fatal: boolean): 'warning' | 'error' | 'fatal' {
+  const message = error instanceof Error ? error.message
+    : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string' ? error.message : String(error);
+  // includes, not startsWith: a title drop reports it as `<what>: <reason>` (src/client/app/entry.ts showDrop).
+  if (UNSUPPORTED_BROWSER.some((phrase) => message.includes(phrase))) return 'warning';
+  return fatal ? 'fatal' : 'error';
+}
+
 function productionPage(): boolean {
   if (typeof location === 'undefined' || typeof navigator === 'undefined') return false;
   return browserErrorDeliveryAllowed({origin: location.origin, automated: navigator.webdriver, harness: harnessPins() !== undefined},
@@ -146,7 +161,7 @@ async function send(error: unknown, tags: BrowserErrorTags): Promise<void> {
   try {
     sentry.withScope((scope) => {
       scope.setTags(tagsOf(tags));
-      scope.setLevel(tags.fatal ? 'fatal' : 'error');
+      scope.setLevel(browserErrorLevel(error, tags.fatal));
       if (tags.diagnostic) scope.setContext('boot_diagnostic', tags.diagnostic);
       sentry.captureException(asError(error));
     });
@@ -197,7 +212,7 @@ export async function deliverBrowserError(error: Error, tags: BrowserErrorTags, 
     try {
       sentry.withScope((scope) => {
         scope.setTags(tagsOf(tags));
-        scope.setLevel(tags.screen !== undefined && tags.fatal ? 'fatal' : 'error');
+        scope.setLevel(browserErrorLevel(error, tags.screen !== undefined && tags.fatal));
         if (tags.diagnostic) scope.setContext('boot_diagnostic', tags.diagnostic);
         sentId = sentry.captureException(error, eventId === undefined ? undefined : { event_id: eventId });
       });
