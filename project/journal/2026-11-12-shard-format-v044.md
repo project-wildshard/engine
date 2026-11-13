@@ -11,3 +11,6 @@ The wire pins move to the new repo name at the same commits; pnpm rewrote their 
 `path` resolutions are restored by hand (WR2). `format-lock.mjs` now reads pnpm's codeload-tarball lock shape (it only
 knew the `git+ssh` shape, so on the old commit pin it had been reporting "found 0" rows) and checks the tag's
 package.json names `@wildshard/shard-format`.
+
+`test/pins/cooked.json` is re-recorded from a ring-cook of template, blender-template and sunscar-dunes on this tree
+(revision `f1cf2c1d`). It still named shardfile `v0.4.2` and an old revision; the size moves are drift since that record.
