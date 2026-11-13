@@ -51,10 +51,10 @@ if (command === 'serve') {
   // J30: what a missed notice left behind. A catalogue that can't be read waits for the next notice.
   try { await cook.recook(['live', 'preview', 'staging']); } catch (error) { console.error(`boot list failed: ${String(error)}`); }
 } else if (command === 'recook') {
-  const cook = worker(), rows = await cook.recook(['live']), preview = await cook.recook(['preview']);
+  const cook = worker(), rows = await cook.recook(['live']), preview = await cook.recook(['preview', 'staging']);
   console.log(JSON.stringify([...rows, ...preview]));
   // J29: a build takes no traffic with a live shard it couldn't cook. A refused head is already live, so it stops a deploy
-  // too. A preview head has players on no build, so its verdict is the author's and stops nothing.
+  // too. A preview or staging head's verdict is the author's and stops nothing (MS2.4: staging is where a new author uploads).
   process.exit(rows.every(row => row.state === 'cooked' || row.state === 'present') ? 0 : 1);
 } else if (command === 'bake') {
   // A deploy's step after `recook`: a page reads each head's packs from the store (J138), with no client rebuild.

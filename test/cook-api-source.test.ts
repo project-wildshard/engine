@@ -10,6 +10,8 @@ const catalogue = {shards: [
     channels: {preview: migration(hash(2)), staging: migration(hash(3)), production: migration(hash(1))}},
   {slug: 'new-author', name: 'New', channels: {staging: migration(hash(4))}},
   {slug: 'old-row', name: 'Old', live: {revision: 1, hash: hash(5)}},
+  // api-server sends every channel's block and leaves `raw` out where the channel has no pointer.
+  {slug: 'live-only', name: 'Live only', live: {revision: 2, hash: hash(6)}, channels: {staging: {formatVersion: '0.1', migrations: []}, production: migration(hash(6))}},
 ]};
 const source = apiSource('https://api.example', (async () => Response.json(catalogue)) as unknown as typeof fetch);
 
@@ -18,7 +20,7 @@ describe('the cook reads every channel it cooks for', () => {
     expect(await source.heads('staging')).toEqual([{slug: 'pinned', hash: hash(3)}, {slug: 'new-author', hash: hash(4)}]);
   });
   it('keeps the old stages as they were', async () => {
-    expect(await source.heads('live')).toEqual([{slug: 'pinned', revision: 3, hash: hash(1)}, {slug: 'old-row', revision: 1, hash: hash(5)}]);
+    expect(await source.heads('live')).toEqual([{slug: 'pinned', revision: 3, hash: hash(1)}, {slug: 'old-row', revision: 1, hash: hash(5)}, {slug: 'live-only', revision: 2, hash: hash(6)}]);
     expect(await source.heads('preview')).toEqual([{slug: 'pinned', revision: 4, hash: hash(2)}]);
   });
   it('refuses a staging pointer that is not a hash', async () => {

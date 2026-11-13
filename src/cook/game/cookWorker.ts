@@ -52,9 +52,10 @@ const NoticeSchema: v.GenericSchema<CookNotice> = v.strictObject({
 interface RevisionRef {readonly revision: number; readonly hash: string}
 const RevisionSchema: v.GenericSchema<RevisionRef> = v.object({revision: RevisionNumberSchema, hash: ShardfileHashSchema});
 /** `GET /api/catalogue`: it answers before a grid is set, unlike the `catalogue.json` a build bakes. */
-/** J275 (AC17): a channel's pointer names the raw upload (`raw`); the cook downloads and migrates that, as for `live`. */
-const ChannelHeadSchema: v.GenericSchema<{readonly raw: string}> = v.object({raw: ShardfileHashSchema});
-const CatalogueSchema: v.GenericSchema<{readonly shards: readonly {readonly slug: string; readonly live?: RevisionRef | undefined; readonly preview?: RevisionRef | undefined; readonly channels?: {readonly staging?: {readonly raw: string} | undefined} | undefined}[]}> = v.object({shards: v.array(v.object({slug: ShardSlugSchema, live: v.optional(RevisionSchema), preview: v.optional(RevisionSchema), channels: v.optional(v.object({staging: v.optional(ChannelHeadSchema)}))}))});
+/** J275 (AC17): a channel's pointer names the raw upload (`raw`); the cook downloads and migrates that, as for `live`. The API
+ *  sends every channel's block for every slug and leaves `raw` out where the channel has no pointer. */
+const ChannelHeadSchema: v.GenericSchema<{readonly raw?: string | undefined}> = v.object({raw: v.optional(ShardfileHashSchema)});
+const CatalogueSchema: v.GenericSchema<{readonly shards: readonly {readonly slug: string; readonly live?: RevisionRef | undefined; readonly preview?: RevisionRef | undefined; readonly channels?: {readonly staging?: {readonly raw?: string | undefined} | undefined} | undefined}[]}> = v.object({shards: v.array(v.object({slug: ShardSlugSchema, live: v.optional(RevisionSchema), preview: v.optional(RevisionSchema), channels: v.optional(v.object({staging: v.optional(ChannelHeadSchema)}))}))});
 
 /** What a request needs from a cook: one shard of one build, by the two things packs are keyed by. */
 export interface CookIndex {
