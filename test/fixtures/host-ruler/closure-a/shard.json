@@ -1,0 +1,11 @@
+{
+ "identity": {
+  "slug": "closure-a"
+ },
+ "sections": [
+  {
+   "name": "client/plan",
+   "path": "sections/client/plan.json"
+  }
+ ]
+}

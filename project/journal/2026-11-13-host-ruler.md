@@ -30,3 +30,10 @@
   `encounter.patrol`. A name it cannot place, or an id with no case, is
   unmeasured; import(), helper recursion and value-emitting TS refuse.
   Pine 17 ids and Driftwood 14 resolve all (35 modules each).
+- HR3 (opus-hrm1): `scripts/host-ruler.mjs` walks each product's HR1/HR2
+  roots through static imports and ordinary import()s, but never through a
+  dispatch table (TABLES: clientPlan's CLIENT_FEATURES, nativeAssemblyHosts'
+  switch, nativeAssembly's gated imports, discovery's `$call` rows): their
+  entries are rooted per declaration, so a table is not a user. Prints a
+  per-shard one-user-lines table. Explorer dispatch and the chapter facets
+  the plan named are no longer tables in this tree.
