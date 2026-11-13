@@ -56,9 +56,11 @@ export type RoomNews =
   | { readonly kind: 'chat'; readonly line: WorldLine }
   /** GC15: this seat's feet left for cell `to`, standing at `at` in its frame: the door reads their save there and orders the `cross`. */
   | { readonly kind: 'crossing'; readonly device: string; readonly to: string; readonly at: ResumeAt };
+/** ROAD-RESIDENT RR2: what a worker holds in memory: its open cells, whether its road is open, and the strips that road stands on. */
+export interface WorkerResident { readonly cells: number; readonly road: boolean; readonly strips: number }
 /** What a worker says to the door. */
 export type WorkerNews =
-  | { readonly kind: 'booted'; readonly ms: number }
+  | { readonly kind: 'booted'; readonly ms: number; readonly resident?: WorkerResident }
   | { readonly kind: 'failed'; readonly reason: string }
   | { readonly kind: 'found'; readonly id: number; readonly held: boolean; readonly spawn: ResumeAt }
   | { readonly kind: 'report'; readonly slug: string; readonly report: ChatReport }
@@ -66,7 +68,7 @@ export type WorkerNews =
   | { readonly kind: 'cell'; readonly slug: string; readonly ms: number }
   | { readonly kind: 'drained' }
   /** SA34a: a `place` order's end: the cells this worker opened, or why it opened none. Its other cells and its road play on either way. */
-  | { readonly kind: 'placed'; readonly id: number; readonly opened: readonly string[]; readonly error?: string }
+  | { readonly kind: 'placed'; readonly id: number; readonly opened: readonly string[]; readonly error?: string; readonly resident?: WorkerResident }
   /** GC15: a `cross` order's end. Moved, the seat and its link are in `to` (as `body`) and `from` has let it go; else it `stays` in `from`, or neither holds it. */
   | { readonly kind: 'crossed'; readonly device: string; readonly name: string; readonly body: string; readonly from: string; readonly to: string; readonly moved: boolean; readonly stays: boolean }
   | (RoomNews & { readonly slug: string });

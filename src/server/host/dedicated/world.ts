@@ -19,7 +19,7 @@ import { encodeCountdown, type WorldWord } from '@wildshard/engine/net/socketFra
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
 import type {PlaytestRow} from './playtest';
 import type { ChatReport } from '@wildshard/engine/net/chat';
-import type { CellOrder, ResumeAt, SavedCheckpoint, SeatEntry, WorkerNews, WorkerReading } from './cellProtocol';
+import type { CellOrder, ResumeAt, SavedCheckpoint, SeatEntry, WorkerNews, WorkerReading, WorkerResident } from './cellProtocol';
 import { bodyId } from './seats';
 import { SaveNewerError, type PlayerDoc } from './playerDoc';
 import { LEAVE_FLAG, LEFT, pumpSocket } from './socketPump';
@@ -164,6 +164,8 @@ export class World {
   private readonly booting = new Set<string>();
   /** SA34a: workers that have said `booted`, the only ones a `place` order may reach. */
   private readonly up = new Set<WorkerLink>();
+  /** RR2: what each booted worker holds (its `booted` news, then each `placed`), for `/health`. */
+  private readonly resident = new Map<WorkerLink, WorkerResident>();
   /** SA34a: `place` orders waiting on the worker that opens their cells. */
   private readonly placings = new Map<number, (news: { readonly opened: readonly string[]; readonly error?: string }) => void>();
   private draining = false;
@@ -191,12 +193,12 @@ export class World {
     let up = false;
     return new Promise((resolve, reject) => {
       const ended = (reason: string): void => {
-        this.options.log({ at: 'worker.ended', index, slugs, reason }); reject(new Error(reason)); this.up.delete(link);
+        this.options.log({ at: 'worker.ended', index, slugs, reason }); reject(new Error(reason)); this.up.delete(link); this.resident.delete(link);
         if (late && !up) { link.stop(); if (this.workers.at(-1) === link) this.workers.pop(); return; }
         this.options.crashed(new Error(reason));
       };
       link.listen(news => {
-        if (news.kind === 'booted') { up = true; this.up.add(link); if (late) for (const slug of slugs) this.links.set(slug, link); this.options.log({ at: 'worker.booted', index, slugs, ms: news.ms }); resolve(); }
+        if (news.kind === 'booted') { up = true; this.up.add(link); if (news.resident !== undefined) this.resident.set(link, news.resident); if (late) for (const slug of slugs) this.links.set(slug, link); this.options.log({ at: 'worker.booted', index, slugs, ms: news.ms }); resolve(); }
         else if (news.kind === 'failed') ended(news.reason); else this.heard(index, news);
       }, ended);
     });
@@ -254,6 +256,8 @@ export class World {
     else if (news.kind === 'cell') this.options.log({ at: 'cell.booted', index, slug: news.slug, ms: news.ms });
     else if (news.kind === 'reading') { this.options.log({ at: 'worker', index, ...news.reading, refusals: this.refusals, connections: this.connectionStats, saves: this.options.saves.stats?.() }); this.options.reading?.(index, news.reading); }
     else if (news.kind === 'placed') {
+      const link = this.workers[index];
+      if (news.resident !== undefined && link !== undefined) this.resident.set(link, news.resident);
       const answer = this.placings.get(news.id);
       if (answer !== undefined) { this.placings.delete(news.id); answer(news); }
       if (news.error !== undefined) this.options.log({ at: 'cells.place-refused', index, error: news.error });
@@ -471,10 +475,15 @@ export class World {
     for (const end of this.ends) this.sayCountdown(end);
     this.scope.timeout(ms, () => { this.options.restart(); });
   }
-  /** What `/health` says: no player data. `table` is each open cell and the worker it runs on (GO3, MP1.4). */
-  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number; readonly table: Readonly<Record<string, number>> } {
+  /**
+   * What `/health` says: no player data. `table` is each open cell and the worker it runs on (GO3, MP1.4). `resident` (ROAD-RESIDENT RR2) is
+   * what the booted workers say they hold: cells open in memory, roads open, and the strips those roads stand on.
+   */
+  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number; readonly table: Readonly<Record<string, number>>; readonly resident: { readonly cells: number; readonly roads: number; readonly strips: number } } {
     const table = Object.fromEntries([...this.links].map(([cell, link]) => [cell, this.workers.indexOf(link)]));
-    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size, table };
+    const rows = [...this.resident.values()];
+    const resident = { cells: rows.reduce((sum, row) => sum + row.cells, 0), roads: rows.filter(row => row.road).length, strips: rows.reduce((sum, row) => sum + row.strips, 0) };
+    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size, table, resident };
   }
   /** Stop: everyone is saved and told `restart`, and the queue gets its time. */
   async drain(): Promise<boolean> {

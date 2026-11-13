@@ -36,3 +36,29 @@ test('a cell nobody entered keeps its boot world, however long it waits', { time
   expect(room(SHARD), 'J320: resident since the boot').toBe(first);
   expect(boots(lines), 'J320: the first visit boots nothing').toBe(booted);
 });
+
+// RR2: `/health` says what the workers hold, from each one's `booted` news, so staging can see the road resident (RR7).
+const CELLS = ['driftwood-isle', 'far-reach', 'nalati-grasslands'];
+test('health names the resident cells, roads and strips: crossing on, each worker has its road; off, none', { timeout: 120_000 }, async () => {
+  bench = await roomBench({ cells: CELLS, workers: 2, crossing: true });
+  const on = bench.world.health().resident;
+  expect(on.cells).toBe(3);
+  expect(on.roads).toBe(2);
+  expect(on.strips).toBeGreaterThan(0);
+  await bench.close(); bench = undefined;
+  bench = await roomBench({ cells: CELLS, workers: 2 });
+  expect(bench.world.health().resident).toEqual({ cells: 3, roads: 0, strips: 0 });
+});
+
+test('the door opens only once every worker has said booted: one that never does leaves World.open pending', async () => {
+  const { World } = await import('../src/server/host/dedicated/world');
+  const { memoryPlayerSaves } = await import('../src/server/host/dedicated/playerSaves');
+  let workers = 0;
+  const opening = World.open({ build: 'bench', cells: CELLS, workers: 2, seats: 8, secret: 'bench', saves: memoryPlayerSaves(), log: () => undefined,
+    crashed: () => undefined, restart: () => undefined,
+    // the first worker boots at once; the second never says it has
+    boot: () => { const first = workers++ === 0; return { listen: heard => { if (first) queueMicrotask(() => { heard({ kind: 'booted', ms: 0, resident: { cells: 2, road: false, strips: 0 } }); }); }, send: () => undefined, stop: () => undefined }; } });
+  const state = await Promise.race([opening.then(() => 'open'), wait(300).then(() => 'pending')]);
+  expect(workers).toBe(2);
+  expect(state, 'RR2: World.open waits for the last booted').toBe('pending');
+});

@@ -13,7 +13,7 @@ import { RoadRoom } from './roadRoom';
 import { placedStrips } from '@wildshard/engine/game/grid/voidFloor';
 import { openRoad } from '../standalone/roadWorld';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
-import type { CellOrder, WorkerNews, WorkerReading } from './cellProtocol';
+import type { CellOrder, WorkerNews, WorkerReading, WorkerResident } from './cellProtocol';
 import { SeatTransport } from './socketPump';
 
 /** How often a worker reads itself (E7.8). */
@@ -47,7 +47,7 @@ export interface CellHostOptions {
   readonly playtest?:boolean;
   /**
    * GC15 (`WORLD_CROSSING=worker`): the grid pack's road strips. Given, this worker hosts the road between its cells, each of its grid
-   * cells opens onto it instead of standing in lone walls, and a seat walks cell, road, cell on one socket. Left out, or no strips, every cell is lone.
+   * cells opens onto it instead of standing lone (no road, no walls: GC36), and a seat walks cell, road, cell on one socket. Left out, or no strips, every cell is lone.
    */
   readonly road?: () => Promise<readonly GridCollisionStrip[]>;
 }
@@ -162,6 +162,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
    * thrown: the other cells and the road play on.
    */
   let placing: Promise<void> = Promise.resolve();
+  /** RR2: what this worker holds, for the door's `/health`: a road counts its strips only once it is open */
+  const resident = (): WorkerResident => ({ cells: cells.size, road: road !== undefined, strips: road === undefined ? 0 : crossing?.strips.length ?? 0 });
   const place = async (order: Extract<CellOrder, { kind: 'place' }>): Promise<void> => {
     const opened: string[] = [];
     let laid: (() => void) | undefined;
@@ -179,7 +181,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
         if (disposed) { room.dispose(); post({ kind: 'placed', id: order.id, opened, error: 'The worker closed' }); return; }
         cells.set(slug, { slug, room, emptySince: diagnosticNow(), used: false, waking: null }); opened.push(slug);
       }
-      post({ kind: 'placed', id: order.id, opened });
+      post({ kind: 'placed', id: order.id, opened, resident: resident() });
     } catch (error) { post({ kind: 'placed', id: order.id, opened, error: error instanceof Error ? error.message : String(error) }); }
     finally { if (!disposed) laid?.(); }
   };
@@ -231,7 +233,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     clock = new ServerClock({ now: diagnosticNow, wait: (ms, run) => { const timer = scope.timeout(ms, run); return () => { scope.cancelTimer(timer); }; }, step });
     clock.start();
     scope.interval(READING_MS, reading);
-    post({ kind: 'booted', ms: diagnosticNow() - started });
+    post({ kind: 'booted', ms: diagnosticNow() - started, resident: resident() });
   })().catch(fail);
   return { dispose };
 }
