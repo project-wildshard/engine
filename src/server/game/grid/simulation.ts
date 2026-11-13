@@ -4,6 +4,7 @@ import { CharacterMotor } from '@wildshard/engine/physics/CharacterMotor';
 import { snapshotSimHost, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
 import { prepareFrameMotors, type FrameMember } from '@wildshard/engine/physics/frame';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
+import { entrywayStands } from '@wildshard/engine/physics/query';
 import type { GridAssembly, GridCell, GridPoint } from '../../../shared/game/grid/assembly';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { GridContinuationCache, GRID_CONTINUATION_CACHE_BYTES } from '../../../shared/game/grid/continuations';
@@ -262,6 +263,7 @@ export class GridSimulation {
         arrival.health.restore({ ...health, lastHurt: health.lastHurt + (destination.clock.now - source.clock.now) * 1000 });
         transaction.commit(); traveller.releaseMotor(); arrival.attachMotor(rider.motor);
         arrival.position.copy(rider.position); arrival.yaw = traveller.yaw;
+        if (to !== null) landOnGround(destination, arrival);
         this.sites.set(player, to);
         if (player !== this.owner) source.removePlayer(player);
         if (this.occupied(from)) { if (player === this.owner) this.parkOwner(source); } else this.unparkOwner(source);
@@ -342,4 +344,22 @@ export class GridSimulation {
     this.residents.clear(); this.cancelFrames.clear(); this.snapshots.clear();
     if (this.cleanupIssues.length > 0) throw new AggregateError(this.cleanupIssues, 'Grid simulation disposal failed');
   }
+}
+
+/**
+ * GRID-CROSSING GC30b (QA-FEEDBACK-2026-11-13 row 11, J322 "there should never be any walls"): a walker who crosses into a cell whose
+ * entryway on that side has no ground of its own (Far Reach's sky islands: Jake walked south off the road at y 0 and fell) is set down
+ * on the first ground they can stand on, the cell's own spawn, never left hanging in the air. Its solids may be held near its lead
+ * (`NearColliders`), so they are brought up at the entryway before the probe and at the spawn after the move.
+ */
+export function landOnGround(host: SimHost, seat: PlayerSim): boolean {
+  const { position } = seat, near = host.physics.near;
+  // only a walker at the cell's edge, off the road: an `enter` sets down a saved pose inside the cell, where it stood before
+  if (Math.max(Math.abs(position.x), Math.abs(position.z)) < CHUNK_HALF - 10) return false;
+  near?.update(position.x, position.z);
+  if (entrywayStands(host.physics, position.x, position.z)) return false;
+  const { at } = host.level.player;
+  seat.resetPose(at, host.level.player.yaw);
+  near?.update(at.x, at.z);
+  return true;
 }

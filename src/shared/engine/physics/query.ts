@@ -170,7 +170,19 @@ export const CELL_ENTRYWAYS: readonly (readonly [number, number])[] = [[0, CHUNK
  * into the cell (its seams) don't count. Far Reach's sky islands have none, and a walker set down there fell out of the world.
  */
 export function entrywaysStand(physics: Physics, reach = 8): boolean {
+  const stands = entrywayProbe(physics, reach);
+  return CELL_ENTRYWAYS.every(([x, z]) => stands(x, z));
+}
+/**
+ * GC30b: the same probe at the one entryway on the side nearest `x`, `z` (a cell's own frame): whether a walker crossing in there
+ * from the road stands. Held solids (`NearColliders`) must be up around that entryway first.
+ */
+export function entrywayStands(physics: Physics, x: number, z: number, reach = 8): boolean {
+  const side = Math.abs(x) > Math.abs(z) ? (x > 0 ? 2 : 3) : (z > 0 ? 0 : 1), [ex, ez] = CELL_ENTRYWAYS[side] ?? [0, 0];
+  return entrywayProbe(physics, reach)(ex, ez);
+}
+function entrywayProbe(physics: Physics, reach: number): (x: number, z: number) => boolean {
   const ray = new physics.R.Ray({ x: 0, y: reach, z: 0 }, { x: 0, y: -1, z: 0 }), world: Collider[] = [];
   physics.world.forEachCollider(collider => { if (!collider.isSensor() && ((collider.collisionGroups() >>> 16) & GROUP.WORLD) !== 0 && tagOf(collider)?.owner !== PLATFORM_COLLIDER_OWNER) world.push(collider); });
-  return CELL_ENTRYWAYS.every(([x, z]) => { ray.origin = { x, y: reach, z }; return world.some(collider => collider.castRay(ray, reach * 2, true) >= 0); });
+  return (x, z) => { ray.origin = { x, y: reach, z }; return world.some(collider => collider.castRay(ray, reach * 2, true) >= 0); };
 }
