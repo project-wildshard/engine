@@ -8,6 +8,8 @@ import { enterByShard, oneWayIn, shardCell, worldHosted } from '../src/client/ga
 import { gridIntents, pageGridIntents } from '../src/client/game/grid/intent';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { bootPageMode } from '../src/client/game/grid/pageEntry';
+import { titlePrefetchChoice } from '../src/client/game/grid/titlePrefetchChoice';
+import { saves } from '../src/shared/engine/saves/runtime';
 import { gridEntryShown } from '../src/client/game/grid/menu';
 import { gotoSocket } from '../src/client/host/online/shell';
 import { gotoCell } from '../src/server/host/dedicated/world';
@@ -55,6 +57,22 @@ test('J311: a solo build (preview) enters its in-page grid at the shard\'s cell,
   expect(readFileSync('src/client/app/entry.ts', 'utf8')).toContain("(online || pendingTitleArrival(requested ?? '') !== null) && requested !== null");
   // the in-page server is handed the chosen cell (gridServer.ts starts there: test/standalone-grid-goto.test.ts)
   expect(readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8')).toContain('const goto = lone ? null : chosenCell();');
+});
+
+test('OF5: the title reads ahead by the route the pick booted: a deck tap that became a grid entry reads the grid manifest next time', async () => {
+  const choice = titlePrefetchChoice(saves);
+  choice.remember('driftwood-isle'); // Shard select's tap, before the page knows its route
+  expect(await enterByShard({ online: true, slug: 'driftwood-isle', kept: false }, WORLD, async () => true)).toBe('driftwood-isle');
+  expect(bootPageMode('driftwood-isle')).toBe('grid');
+  expect([choice.read(), choice.flow()], 'the world hosts the grid: the grid manifest, the one the device keeps').toEqual(['driftwood-isle', 'grid']);
+  // prod's one-cell world: the same pick boots a one-shard page, so the read-ahead takes the one-shard (client) manifest
+  expect(await enterByShard({ online: true, slug: 'driftwood-isle', kept: false }, WORLD, async () => false)).toBeNull();
+  expect(bootPageMode('driftwood-isle')).toBe('shard');
+  expect(choice.flow()).toBe('client');
+  // a page for a shard the player didn't pick (a deep link, a harness URL) leaves the last pick alone
+  choice.remember('nalati-grasslands', 'grid');
+  expect(bootPageMode('driftwood-isle')).toBe('shard');
+  expect([choice.read(), choice.flow()]).toEqual(['nalati-grasslands', 'grid']);
 });
 
 test('a world that hosts only its home cell (production until WORLD_CELLS=grid) keeps today\'s one-shard page', async () => {

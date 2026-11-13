@@ -8,7 +8,11 @@ const ASSETS = '__ASSET_CACHE__';
 const BOOKS = 'ws-builds-v1';
 const SHELL_PREFIX = 'ws-shell-v3-';
 const SHELL = `${SHELL_PREFIX}${BUILD}`;
-const FILES = JSON.parse('__FILES__');
+/** OFFLINE OF5 (J298): a world build (its document stamped with `__WS_WORLD__`; play, staging) never runs the in-page solo
+ *  server, so it never precaches the solo server's code or its server book. Read at run time: a deploy stamps the document. */
+const WORLD = /\bglobalThis\.__WS_WORLD__=/u.test(DOCUMENT);
+const SOLO_ONLY = /\/standalone\/(?:serverWorker|serverRuntime)-[^/]+\.js$|\/assets\/spawn\/server-[^/]+\.json$/u;
+const FILES = JSON.parse('__FILES__').filter(path => !WORLD || !SOLO_ONLY.test(path));
 const SHELL_FILES = JSON.parse('__SHELL_FILES__');
 const NAMED = new Set(FILES);
 const MATCH = { ignoreVary: true };
@@ -16,8 +20,11 @@ const abs = path => new URL(path, self.registration.scope).href;
 const bookKey = build => abs(`/__ws_build__/${encodeURIComponent(build)}`);
 const CONTENT = /-[a-f0-9]{8,64}\.[a-z0-9]+$|\/[a-f0-9]{64}\.[a-z0-9]+$/;
 const HASH = /\/([a-f0-9]{64})\.[a-z0-9]+$/;
+/** OF5: a spawn manifest's code list (`code/<sha16>.json`) is named by its own bytes too, so it is kept across builds: an
+ *  update's first offline launch still reads the route's code list. */
+const OWN_NAMED = /^\/assets\/spawn\/code\/[a-f0-9]{16}\.json$/;
 /** @param {URL} url */
-const immutable = url => NAMED.has(url.pathname) || url.pathname.startsWith('/b/') || CONTENT.test(url.pathname)
+const immutable = url => NAMED.has(url.pathname) || url.pathname.startsWith('/b/') || CONTENT.test(url.pathname) || OWN_NAMED.test(url.pathname)
   || /^[a-f0-9]{8,64}$/.test(url.searchParams.get('v') ?? '');
 const isHtml = response => /\btext\/html\b/i.test(response.headers.get('content-type') ?? '');
 /* PAGE-SIZE PZ10 (J276): content on the content base (`https://packs.wildshard.io/content/<set>/`, baked from the boot
@@ -25,7 +32,9 @@ const isHtml = response => /\btext\/html\b/i.test(response.headers.get('content-
  * there is content-named, so a copy is good for every build that names it, and no activate touches it. Only a CORS 200 is
  * kept: an opaque body cannot be checked and is padded against quota, and a range never stands for the whole file. */
 /** @type {{ base: string, files: string[] }} one parsed value: the bundler would fold a literal base into its origin */
-const { base: CONTENT_BASE, files: CONTENT_FILES } = JSON.parse('__CONTENT__');
+const { base: CONTENT_BASE, files: BOOKS_ON_BASE } = JSON.parse('__CONTENT__');
+/** OF5: the server book on the content base is solo-only too (a URL there, its path under the base's folder). */
+const CONTENT_FILES = BOOKS_ON_BASE.filter(href => !WORLD || !SOLO_ONLY.test(new URL(href).pathname));
 const CONTENT_CACHE = 'ws-content-v1';
 const CONTENT_URL = CONTENT_BASE === '' ? undefined : new URL(CONTENT_BASE);
 /** A base on the page's own origin (contentBase.ts allows one) owns its folder only; the rest of the origin is the page's. */
@@ -216,7 +225,8 @@ function precacheGeneration() {
  *  deletes. Copy them into this build's shell first, so the first offline launch after an update still has them; a copy this
  *  shell holds wins, and the newest older shell wins over older ones. Online they are still read from the network first.
  *  Chosen over content-naming those files (OF7's other fix): this changes no URL, no cook and no reader. */
-const NETWORK_FIRST = /^\/(?:programs|shardfiles)\//;
+/** OF5: the deck's draft cards (`/drafts/`, named by their source art, not their bytes) are read the same way. */
+const NETWORK_FIRST = /^\/(?:programs|shardfiles|drafts)\//;
 async function carryNetworkFirst() {
   const shell = await store(SHELL);
   for (const name of (await caches.keys()).reverse()) {

@@ -56,7 +56,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
   const caches = { open, keys: () => Promise.resolve([...books.keys()]), delete: (name: string) => Promise.resolve(books.delete(name)) };
   const fetch = vi.fn((input: Request | string) => read?.(typeof input === 'string' ? new Request(input) : input)
     ?? Promise.resolve(new Response(`body:${typeof input === 'string' ? input : input.url}`)));
-  const load = (build: string, files: string[], shellFiles = shell, content: { base?: string; files?: string[] } = {}) => {
+  const load = (build: string, files: string[], shellFiles = shell, content: { base?: string; files?: string[] } = {}, page = document) => {
     const listeners = new Map<string, ((event: WorkerEvent) => void)[]>();
     const claim = vi.fn(() => Promise.resolve()), skipWaiting = vi.fn(() => Promise.resolve());
     const routes = vi.fn<(rules: NativeRoute[]) => Promise<void>>(() => Promise.resolve());
@@ -65,7 +65,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
     const self = { location: new URL(origin), registration: { scope: `${origin}/` }, clients: { claim, get }, skipWaiting,
       addEventListener: (kind: string, listener: (event: WorkerEvent) => void) => { listeners.set(kind, [...listeners.get(kind) ?? [], listener]); } };
     const source = bundled.replaceAll('__BUILD_ID__', build)
-      .replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME).replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(document)).replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
+      .replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME).replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(page)).replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
       .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shellFiles)))
       .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base: content.base ?? '', files: content.files ?? [] })));
     // Deliberately no crypto, scheduler or accounting ports; timers only for the precache's bounded pause.
@@ -675,4 +675,39 @@ test('OF7: an update carries the last build\'s /programs/ and /shardfiles/ copie
   // Online, B still reads the network first: the carried copy only answers when the network can't.
   offline = false;
   expect(await (await next.dispatch('fetch', { request: new Request(url(files[0] ?? '')) }))?.text()).toBe(`net:${url(files[0] ?? '')}`);
+});
+
+test('OF5: a world build never precaches the solo server (its code and its server book); a build with no world does', async () => {
+  const solo = ['/b/B/standalone/serverWorker-aaaaaaaa.js', '/b/B/standalone/serverRuntime-bbbbbbbb.js', '/assets/spawn/server-B.json'];
+  const kept = ['/b/B/standalone/online.js', '/b/B/standalone/identity.js', '/assets/a-aaaaaaaa.js'];
+  const world = '<!doctype html><html><head><script>globalThis.__WS_WORLD__={"release":"https://packs.test/releases/staging.json","key":"ab"};globalThis.__WS_BUILD_ID__="B";</script></head></html>';
+  const read = (f: ReturnType<typeof fixture>): string[] => f.fetch.mock.calls.map(([input]) => new URL(typeof input === 'string' ? input : input.url).pathname);
+  const staged = fixture(), worker = staged.load('B', [...solo, ...kept], [], {}, world);
+  await worker.dispatch('install'); await worker.dispatch('activate'); await worker.dispatch('message', precached);
+  expect(read(staged).sort()).toEqual([...kept].sort());
+  const record = await (await staged.open('ws-builds-v1')).match(url('/__ws_build__/B'));
+  expect((await record?.json() as { files: string[] }).files.map(file => new URL(file).pathname).sort(), 'the generation is complete without them').toEqual([...kept].sort());
+  const preview = fixture(), solo2 = preview.load('B', [...solo, ...kept], []);
+  await solo2.dispatch('install'); await solo2.dispatch('activate'); await solo2.dispatch('message', precached);
+  expect(read(preview).sort()).toEqual([...solo, ...kept].sort());
+  // with a content base the server book is precached there: a world build skips it on the base too
+  const based = fixture(), onBase = based.load('B', kept, [], { base: 'https://packs.test/content/s1/', files: ['https://packs.test/content/s1/assets/spawn/server-B.json', 'https://packs.test/content/s1/assets/spawn/packs-B.json'] }, world);
+  await onBase.dispatch('install'); await onBase.dispatch('activate'); await onBase.dispatch('message', precached);
+  expect(read(based).filter(path => path.startsWith('/content/'))).toEqual(['/content/s1/assets/spawn/packs-B.json']);
+});
+
+test('OF5: a spawn code list is content-named and the deck\'s draft art is network first: both answer offline after an update', async () => {
+  let offline = false;
+  const f = fixture(request => offline ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(new Response(`net:${request.url}`)));
+  const first = f.load('A', [], []); await first.dispatch('install'); await first.dispatch('activate');
+  const files = ['/assets/spawn/code/0123456789abcdef.json', '/drafts/thin-ice/50ecc454e23ed708-thumb.webp'];
+  for (const path of files) await first.dispatch('fetch', { request: new Request(url(path)) });
+  expect(await (await f.open(ASSET_CACHE_NAME)).match(url(files[0] ?? '')), 'the code list in the cross-build cache').toBeDefined();
+  expect(await (await f.open('ws-shell-v3-A')).match(url(files[1] ?? '')), 'the draft card in the build\'s shell, carried on update').toBeDefined();
+  const next = f.load('B', [], []); await next.dispatch('install'); await next.dispatch('activate');
+  offline = true;
+  for (const path of files) expect(await (await next.dispatch('fetch', { request: new Request(url(path)) }))?.text(), `${path} offline after the update`).toBe(`net:${url(path)}`);
+  // a plain name in the same folders is not content: it still goes to the build's shell, so an update drops it
+  offline = false; await next.dispatch('fetch', { request: new Request(url('/assets/spawn/code/index.json')) });
+  expect(await (await f.open(ASSET_CACHE_NAME)).match(url('/assets/spawn/code/index.json'))).toBeUndefined();
 });

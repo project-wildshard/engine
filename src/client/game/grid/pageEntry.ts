@@ -149,6 +149,13 @@ export function bootPageMode(slug: string): PageMode {
   if (recovery !== null && [slug].includes(recovery.slug)) intent = { instance: recovery.instance, slug: recovery.slug, at: recovery.at };
   const mode: PageMode = intent === null ? 'shard' : 'grid';
   setPageMode(mode);
+  // OFFLINE OF5: the title's read-ahead (S2) takes the route this pick booted. A deck tap remembers the one-shard flow before the
+  // page knows its route; a world that hosts the grid turns it into a grid entry, and a read-ahead of the one-shard manifest is a
+  // file this device never keeps (offline, it fails). Only the last pick's own page corrects it.
+  try {
+    const choice = titlePrefetchChoice(saves);
+    if ([slug].includes(choice.read() ?? '')) choice.remember(slug, mode === 'grid' ? 'grid' : 'client');
+  } catch { /* the read-ahead hint is optional: blocked storage keeps the page's flow */ }
   // GO7: a goto, or a recovery reload (the cell this page stood in, the goto's cell if it reloaded before the door placed it), asks the
   // world for that cell; a title tap's PLAY takes the seat the world keeps (GO5).
   const chosen = intent !== null && recovery === null && 'goto' in intent && intent.goto;
