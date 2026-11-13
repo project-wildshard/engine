@@ -84,6 +84,8 @@ export function questFigure(row: QuestFigureRows, ports: QuestFigurePorts): KitF
   const figure = new KitFigure(ports.sky, row.kit, ports.catalogue.rows(row.kit), ports.catalogue.kit(row.kit),
     { geometry, objects, channels: ports.channels }, ports.resources, ports.scope);
   figure.group.position.set(feet.x, feet.y, feet.z); figure.group.rotation.y = yaw;
+  // its body box was read at the origin, before the figure stood at its feet
+  figure.presentation.syncAnchors();
   return figure;
 }
 

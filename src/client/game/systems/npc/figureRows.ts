@@ -14,6 +14,7 @@ import { standingFigure, type FigureSkinState } from './standingFigure';
 import { skinEnvelope } from '../../grid/skinEnvelope';
 
 const skins = new FigureSkins();
+const rootAt = new THREE.Vector3();
 const entered = new WeakMap<Scope, Map<string, Set<FigureRows>>>();
 function sourceId(ref: ScenePointRef): string {
   if (!('part' in ref)) throw new Error('Figure object requires a scene part');
@@ -139,6 +140,14 @@ export class FigureRows {
   private refreshPoint(): void {
     this.group.updateWorldMatrix(true, false);
     this.talkPoint.set(0, this.row.talkHeight, 0).applyMatrix4(this.group.matrixWorld);
+    // A figure on a borrowed root is placed after it is built (a kit figure's group goes to its feet once made): its body
+    // stands where the root is now, so a registry piece that follows the root holds it at the feet, not at the origin
+    // (SERVER-PARITY SS10b, Driftwood's Wendell). A standing person keeps its own collider (`update`).
+    if (this.person === undefined) {
+      const at = rootAt.setFromMatrixPosition(this.group.matrixWorld), box = this.row.collider;
+      this.collider.x = at.x; this.collider.z = at.z;
+      this.collider.yTop = at.y + (box?.kind === 'box' ? box.top : 0); this.collider.yBottom = at.y - (box?.kind === 'box' ? box.bottom : 0);
+    }
   }
   /** Refresh a borrowed pivot figure's world prompt without advancing its law. */
   syncAnchors(): void { if (this.live) this.refreshPoint(); }
