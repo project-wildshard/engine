@@ -22,6 +22,8 @@ export const PREDICTION_TOLERANCE = 0.02;
  * phase with nothing wrong: the same spot on the deck. Correcting that would chase the deck for ever.
  */
 const DECK_PHASE_TICKS = 3;
+/** NET-LAG NL12 (a): a grounded Y-only gap up to this, on matching XZ, is the same floor (J282: 150 to 200 ms is the design target). */
+export const GROUND_Y_SLACK = 0.05;
 /** A correction this far is a teleport: it snaps rather than glides. */
 export const PREDICTION_SNAP = 3;
 /** Room for a ride's words and its capsule's in a saved move. */
@@ -205,8 +207,10 @@ export class Predictor {
     }
     const x = this.value(table.x, owner) - (states[at + CAPTURED.x] ?? 0), y = this.value(table.y, owner) - (states[at + CAPTURED.y] ?? 0), z = this.value(table.z, owner) - (states[at + CAPTURED.z] ?? 0);
     const reach = PREDICTION_TOLERANCE + DECK_PHASE_TICKS * (states[at + CAPTURED.carried] ?? 0), grounded = this.flag(table.grounded, owner) !== states[at + CAPTURED.grounded];
-    if (grounded || x * x + y * y + z * z > reach * reach) this.keepMiss(slot, owner);
-    if (x * x + y * y + z * z > reach * reach) { missed.position++; missed.gap = Math.max(missed.gap, Math.hypot(x, y, z)); return false; }
+    // NL12 (a): both on the ground, the ground decides Y; a few cm there alone is the same floor, not a miss
+    const floorY = !grounded && this.flag(table.grounded, owner) === 1 && Math.abs(y) <= GROUND_Y_SLACK ? 0 : y, gap = x * x + floorY * floorY + z * z;
+    if (grounded || gap > reach * reach) this.keepMiss(slot, owner);
+    if (gap > reach * reach) { missed.position++; missed.gap = Math.max(missed.gap, Math.hypot(x, y, z)); return false; }
     if (grounded) { missed.grounded++; return false; }
     if (this.flag(table.board, owner) !== states[at + CAPTURED.board]) { missed.board++; return false; }
     if (this.flag(table.swim, owner) !== states[at + CAPTURED.swim]) { missed.swim++; return false; }
