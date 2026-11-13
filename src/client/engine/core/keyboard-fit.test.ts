@@ -132,3 +132,31 @@ test('MK5: the game re-fits when iOS gives innerHeight back after the keyboard c
     expect(fits.length).toBe(before);
   } finally { window.removeEventListener('resize', game); Object.defineProperty(window, 'innerHeight', { configurable: true, value: 714 }); }
 });
+
+// MK8 (meta MOBILE-KEYBOARD): a Bluetooth keyboard on the phone. The chat field takes focus and Enter sends, but iOS shows no
+// on-screen keyboard, so the visual viewport keeps the whole page: a 0 px inset. Nothing may change: no false open, no docked
+// chat, no game re-fit.
+test('MK8: a hardware keyboard (0 px inset) with the chat field in focus leaves the page calm', () => {
+  expect(keyboardFit({ layoutHeight: PHONE, viewHeight: PHONE, viewTop: 0, scale: 1, reserve: 150 })).toEqual({ open: false, top: 0, bottom: PHONE, gameHeight: PHONE });
+  const view = { height: PHONE, offsetTop: 0, scale: 1 };
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 440 });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: PHONE });
+  syncKeyboardView(view);
+  let resized = 0;
+  const count = (): void => { resized++; };
+  window.addEventListener('resize', count);
+  try {
+    const field = typeIn(); root.dataset['wsKbReserve'] = '150';
+    expect(syncKeyboardView(view)).toBe(false); // focus in the chat field
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(syncKeyboardView(view)).toBe(false); // Enter sent the line; the field keeps focus
+    expect(root.dataset['wsKeyboard']).toBeUndefined();
+    expect(root.style.getPropertyValue('--ws-kb-top')).toBe('');
+    expect(root.style.getPropertyValue('--ws-kb-bottom')).toBe('');
+    expect(viewportHeight()).toBe(PHONE);
+    field.blur();
+    expect(syncKeyboardView(view)).toBe(false);
+    expect(root.dataset['wsKeyboard']).toBeUndefined();
+    expect(resized).toBe(0);
+  } finally { window.removeEventListener('resize', count); }
+});
