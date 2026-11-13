@@ -10,7 +10,7 @@ export const DECK_SHARDS = Object.freeze([
   { slug: 'pastel-plain', card: 'Pastel Plain' }, { slug: 'ink-cel-valley', card: 'Ink & Cel Valley' },
 ]);
 /** Open Plots have no deck card (the open-plots audit): a player reaches them by a deep link with Developer on, or a resume. */
-export const OPEN_PLOTS = Object.freeze(['open-plot-showcase-template', 'open-plot-night-market', 'open-plot-mosslight-ruins']);
+export const OPEN_PLOTS = Object.freeze(['open-plot-thin-ice', 'open-plot-night-market', 'open-plot-mosslight-ruins']);
 /** Every shard the proof covers, in run order. */
 export const ALL_SHARDS = Object.freeze([...DECK_SHARDS.map(shard => shard.slug), ...OPEN_PLOTS]);
 

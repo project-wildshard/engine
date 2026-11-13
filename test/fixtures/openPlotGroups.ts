@@ -4,4 +4,4 @@
 export const OPEN_PLOTS_2:ReadonlySet<string>=new Set(['open-plot-patchwork-fairground','open-plot-desert-ruin','open-plot-sky-harbor',
   'open-plot-starfall-observatory','open-plot-thin-ice','open-plot-clockwork-canyon']);
 export const OPEN_PLOTS_3:ReadonlySet<string>=new Set(['open-plot-saltwind-lighthouse','open-plot-jungle-ziggurat','open-plot-sky-race',
-  'open-plot-alien-plain','open-plot-showcase-template']);
+  'open-plot-alien-plain']);

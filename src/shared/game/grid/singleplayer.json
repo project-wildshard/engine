@@ -132,19 +132,6 @@
       ]
     },
     {
-      "instance": "open-plot-showcase-template-solo",
-      "slug": "open-plot-showcase-template",
-      "cell": [
-        -7,
-        8
-      ],
-      "size": [
-        500,
-        500,
-        500
-      ]
-    },
-    {
       "instance": "open-plot-thin-ice-solo",
       "slug": "open-plot-thin-ice",
       "cell": [

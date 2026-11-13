@@ -33,7 +33,7 @@ test('no stored answer and a timed-out check: the grid, never a one-shard page (
   expect(await worldHosted(WORLD, 1000, memory(), async () => null), 'a socket that closed with no word').toBe(true);
 });
 
-test('GC20: on a world build with no word and no kept answer, every grid shard\'s card enters its cell; the three off-grid shards do not', async () => {
+test('GC20: on a world build with no word and no kept answer, every grid shard\'s card enters its cell; the two off-grid shards do not', async () => {
   const assembly = new GridAssembly({ developer: false, devserver: false });
   expect(assembly.cells, 'the 5 × 5 grid').toHaveLength(25);
   for (const cell of assembly.cells) {
@@ -44,7 +44,7 @@ test('GC20: on a world build with no word and no kept answer, every grid shard\'
   }
   const placed = new Set(assembly.cells.map(cell => cell.slug));
   const off = catalogueDocument().placements.map(row => row.slug).filter(slug => !placed.has(slug));
-  expect(off).toEqual(['open-plot-showcase-template', 'open-plot-thin-ice', 'open-plot-desert-ruin']);
+  expect(off).toEqual(['open-plot-thin-ice', 'open-plot-desert-ruin']);
   for (const slug of off) expect(await enterByShard({ online: true, slug, kept: false }, WORLD, world => worldHosted(world, 10, memory(), silent)), slug).toBeNull();
 });
 

@@ -153,21 +153,6 @@
       "status": "hidden"
     },
     {
-      "instance": "open-plot-showcase-template-solo",
-      "slug": "open-plot-showcase-template",
-      "cell": [
-        -7,
-        8
-      ],
-      "size": [
-        500,
-        500,
-        500
-      ],
-      "order": 11,
-      "status": "earlyAccess"
-    },
-    {
       "instance": "open-plot-thin-ice-solo",
       "slug": "open-plot-thin-ice",
       "cell": [
@@ -869,12 +854,6 @@
       "name": "Open Plot · Saltwind Lighthouse",
       "revision": 1,
       "hash": "2e37a04b0c9e7f6c0463f12b5cfce96d7e7c2f83868bc6341948d779dcbe5207"
-    },
-    {
-      "slug": "open-plot-showcase-template",
-      "name": "Open Plot · Showcase Template",
-      "revision": 1,
-      "hash": "e85d7d7d09befda606a4fe8f4b0236bd623485478ed63a31b5a9a85502fa2fff"
     },
     {
       "slug": "open-plot-sky-harbor",
