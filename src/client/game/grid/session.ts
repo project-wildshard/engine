@@ -108,7 +108,7 @@ import { GAME_STRINGS } from '../../../shared/game/strings';
 import { GridCellWaitingError, classifyRefusal, pageShardRefusals, refusalReason, type ShardRefusal } from './refusal';
 import { tileRing } from '../shardfile/tileDriver';
 import { CellLoading, type CellLoadingInput } from './cellLoading';
-import { CellScreen, facingEdge } from './cellScreens';
+import { CellLoadingCard } from './cellScreens';
 import { readGridSeamData, type GridSeamAddress } from '../../../shared/game/grid/seamData';
 import { readCompiledGridStrips } from '../../../shared/game/grid/compiledStrips';
 import { startRoadGrain } from './roadGrainPreparation';
@@ -673,14 +673,8 @@ export class GridSession {
         return cell.edgeLook === undefined ? look : Object.assign(look, { height: cell.edgeLook.height });
       })),
       ports: { closed: (id) => this.live === null || !this.live.live.ready(id) } });
-    // G578: a waiting cell's loading steps on an in-world screen at the edge the traveller faces; the world stays live
-    const screen = new CellScreen(host.scene, host.scope);
-    this.cellLoading = new CellLoading(screen, (waiting) => {
-      const cell = this.neighbours.find(row => row.instance === waiting); if (cell === undefined) return null;
-      const centre = { x: cell.origin.x - home.origin.x, z: cell.origin.z - home.origin.z }, world = this.world();
-      const edge = facingEdge(neighbourEdges(cell, home), centre, world.x - cell.origin.x, world.z - cell.origin.z);
-      return edge === undefined ? null : { edge: { instance: waiting, x: edge.x, z: edge.z, axis: edge.axis, halfLength: edge.halfLength }, cell: centre, ground: edge.floor };
-    });
+    // QA 2026-11-13: a waiting cell's loading steps on SHARD SELECT's loading card, inset over the live world
+    this.cellLoading = new CellLoading(new CellLoadingCard(), (waiting) => this.neighbours.some(row => row.instance === waiting));
     setParkedMatricesFrozen(true); // G580 T2: a hidden parked world skips matrix updates during its warm-up
     host.scope.onDispose(() => { this.cellLoading.close(); if (host.heldFrame !== undefined) host.heldFrame.enabled = false; setWarmUpHeld(false); setParkedMatricesFrozen(false); setBuildHeldTimed(false); });
     // G78: a shimmer line at every shard border on its real ground; G119: SAVING… / SAVE FAILED, RETRY while a crossing waits

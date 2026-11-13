@@ -7,9 +7,10 @@
  * `cellLoadingStep` is the pure part: a cell's live state to its current step and detail, a refusal's reason, or done.
  * `CellLoading` owns the one scoped screen: it opens on the cell the traveller waits at (or has entered before it is
  * gameplay-ready), steps it at most a few times a second, and fades it out when the cell is ready or left.
+ *
+ * QA 2026-11-13 (Jake: "make it look the same as the one for Shard Select"): G578's in-world canvas panel is gone; the
+ * screen is SHARD SELECT's own card again, drawn as a screen-space inset over the live world (`cellScreens.ts`).
  */
-import type { CellScreen, CellScreenView } from './cellScreens';
-import type { SoftWallEdge } from './softWallLook';
 import { loadingPath } from '../boot/loadingPaths';
 
 /** One waiting cell's live admission, read through the grid session's read-only port. */
@@ -57,33 +58,43 @@ export function cellLoadingStep(input: CellLoadingInput): CellLoadingStep {
   return { kind: 'step', key: input.hook === 'activate' ? 'enter' : 'warm', detail: `preparing its first frame${running}` };
 }
 
-/** Where the waiting cell's screen stands: the edge the traveller meets, the cell's centre and the ground there (home frame). */
-export interface CellScreenPlace { readonly edge: SoftWallEdge; readonly cell: { readonly x: number; readonly z: number }; readonly ground: number }
-/** G578: the waiting cell's steps on its in-world screen (`CellScreen`); the 3D world, the road and the other cells stay live. */
+/** One row of the screen: its label and whether it is done, running now (with the detail) or still to come. */
+export interface CellLoadingRow { readonly label: string; readonly state: 'done' | 'now' | 'next' }
+/** What the screen shows: whose cell, the step running now (a key of the `cell` path), its rows and detail, or the refusal. */
+export interface CellLoadingView { readonly instance: string; readonly name: string; readonly step: string; readonly rows: readonly CellLoadingRow[];
+  readonly detail: string; readonly failed: string | null }
+/** The screen a waiting cell's steps draw on: shown (or stepped) per poll, hidden when the cell is entered or left. */
+export interface CellLoadingScreen { readonly show: (view: CellLoadingView) => void; readonly hide: (entered: boolean) => void }
+/** The waiting cell's steps on the loading card (`CellLoadingScreen`); the 3D world, the road and the other cells stay live. */
 export class CellLoading {
   private instance: string | null = null;
   /** the step shown: a running hook's own step, else the furthest reached (a region learns it has hooks only when they
    *  start, so between hooks a row never goes back) */
   private reached = -1;
-  constructor(private readonly screen: Pick<CellScreen, 'show' | 'hide'>, private readonly place: (instance: string) => CellScreenPlace | null) {}
+  /** `known`: whether the waiting cell is one of this session's neighbours (no screen for one that is not) */
+  constructor(private readonly screen: CellLoadingScreen, private readonly known: (instance: string) => boolean) {}
   /** Show, step or hide the screen from this cell's live state (null: no cell is waiting). */
   step(input: CellLoadingInput | null): void {
     if (input === null || input.instance !== this.instance) this.close();
     if (input === null) return;
-    const step = cellLoadingStep(input), at = this.place(input.instance);
-    if (step.kind === 'done' || at === null) { this.close(); return; }
+    const step = cellLoadingStep(input);
+    if (step.kind === 'done' || !this.known(input.instance)) { this.close(step.kind === 'done'); return; }
     this.instance = input.instance;
     const path = loadingPath('cell').steps;
     if (step.kind === 'step') {
       const index = path.findIndex(row => row.key === step.key);
       this.reached = input.hook === null ? Math.max(this.reached, index) : index;
     }
-    const rows = path.map((row, i): CellScreenView['rows'][number] => ({ label: row.label, state: i < this.reached ? 'done' : i === this.reached ? 'now' : 'next' }));
+    const rows = path.map((row, i): CellLoadingRow => ({ label: row.label, state: i < this.reached ? 'done' : i === this.reached ? 'now' : 'next' }));
     const detail = step.kind === 'step' ? step.detail : '';
-    this.screen.show(at.edge, at.cell, at.ground, { name: input.name, rows, detail, failed: step.kind === 'failed' ? step.reason : null });
+    this.screen.show({ instance: input.instance, name: input.name, step: path[Math.max(0, this.reached)]?.key ?? '', rows, detail,
+      failed: step.kind === 'failed' ? step.reason : null });
   }
   /** The screen's cell (null: none shown). */
   get open(): string | null { return this.instance; }
-  /** Hide the screen. */
-  close(): void { this.instance = null; this.reached = -1; this.screen.hide(); }
+  /** Hide the screen: `entered`, the cell is ready (the card completes and fades); else it was left or cancelled. */
+  close(entered = false): void {
+    const was = this.instance; this.instance = null; this.reached = -1;
+    if (was !== null) this.screen.hide(entered);
+  }
 }

@@ -1,11 +1,9 @@
 import { expect, test } from 'vitest';
-import { CellLoading, type CellLoadingInput } from './cellLoading';
-import type { CellScreenView } from './cellScreens';
+import { CellLoading, type CellLoadingInput, type CellLoadingView } from './cellLoading';
 
 test('an actual hook corrects an inferred row and warm-up names its own work', () => {
-  const shown: CellScreenView[] = [];
-  const screen = new CellLoading({ show: (_edge, _cell, _ground, view) => { shown.push(view); }, hide: () => undefined },
-    () => ({ edge: { instance: 'target', x: 256, z: 0, axis: 'x', halfLength: 256 }, cell: { x: 0, z: 0 }, ground: 0 }));
+  const shown: CellLoadingView[] = [];
+  const screen = new CellLoading({ show: (view) => { shown.push(view); }, hide: () => undefined }, () => true);
   const initial: CellLoadingInput = { instance: 'target', slug: 'far-reach', name: 'Sky Reach', refusal: null,
     product: true, claimedMB: 226, requested: true, runtime: false, colliders: false, sim: false,
     hooks: new Set(), hook: null, hybrid: false, entered: false, gameplayReady: false };

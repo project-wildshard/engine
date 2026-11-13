@@ -164,10 +164,12 @@ export class Loading {
   private slowGpu = false;
   private timeLeftShown = false;
 
-  constructor(chunk: { id: string; name: string; trace?: boolean }, mode: { readonly scoped?: boolean } = {}) {
-    bootMark('app:loading-adopt', {scoped: mode.scoped === true, chunk: chunk.id});
-    app.ui.bindPresentation(this.scope);app.ui.holdCovered(this.scope);
-    this.scoped = mode.scoped === true;
+  /** QA 2026-11-13 (Jake: "make it look the same as the one for Shard Select"): `inset`, a scoped card drawn over the live
+   *  world (a grid cell's preparation): the same panel, no backdrop, head or foot; it never covers the world or takes input. */
+  constructor(chunk: { id: string; name: string; trace?: boolean }, mode: { readonly scoped?: boolean; readonly inset?: boolean } = {}) {
+    bootMark('app:loading-adopt', {scoped: mode.scoped === true || mode.inset === true, chunk: chunk.id});
+    if (mode.inset !== true) { app.ui.bindPresentation(this.scope); app.ui.holdCovered(this.scope); }
+    this.scoped = mode.scoped === true || mode.inset === true;
     if (!this.scoped) startBoot({ id: chunk.id, name: chunk.name }, TIER === 'phone' && chunk.trace === true);
     // LS4: a fatal load screen covers this card; it copies the same report through this source.
     if (!this.scoped) setDiagnosticsSource(() => this.diagnosticsText());
@@ -177,6 +179,7 @@ export class Loading {
     else {
       this.root = document.createElement('div');
       this.root.className = 'ws-load';
+      if (mode.inset === true) this.root.dataset['inset'] = '';
       this.root.innerHTML = loadShellTemplate();
       mountUi(this.root, this.scope, document.body);
     }
@@ -216,7 +219,8 @@ export class Loading {
     if (shell === null || this.els.slug.textContent === '') this.els.slug.textContent = chunk.name;
     const key = 'loadAttempt';
     let attempt = 1;
-    try {
+    // a scoped (mid-play) load is not a page boot: it keeps the boot's attempt count
+    if (!this.scoped) try {
       const previous: unknown = JSON.parse(savedStorage.getItem(key) ?? 'null');
       if (typeof previous === 'object' && previous !== null && Reflect.get(previous, 'slug') === chunk.id) {
         const when: unknown = Reflect.get(previous, 'at');
@@ -226,7 +230,7 @@ export class Loading {
       savedStorage.setItem(key, JSON.stringify({ slug: chunk.id, at: Date.now(), count: attempt }));
     } catch { /* a storage-denied PWA still gets the loader */ }
     this.attempt = attempt;
-    const earlyTiming = bootTiming(); if (earlyTiming !== undefined) earlyTiming.attemptCount = attempt;
+    const earlyTiming = this.scoped ? undefined : bootTiming(); if (earlyTiming !== undefined) earlyTiming.attemptCount = attempt;
     set(this.els.tier, this.tierText());
     this.rowsEl = this.els.suRows;
     // Start ends here: the game's own code owns the card. A scoped (mid-play) load has no Start.
