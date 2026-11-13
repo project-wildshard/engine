@@ -469,6 +469,21 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       .ws-launch-hero { position: absolute; inset: 0; background: url('/assets/title/main-crossroads-landscape-9437ac10c599548a.jpg') center / cover no-repeat; }
       .ws-launch-brand { position: relative; margin: calc(24px + env(safe-area-inset-top, 0px)) 24px 0; font-size: 44px; font-weight: 700; line-height: 1; letter-spacing: .16em; text-shadow: 0 0 18px #8fe3ff73; }
       @media (orientation: portrait) { .ws-launch-hero { top: 50%; bottom: auto; width: 100%; aspect-ratio: 1; transform: translateY(-50%); background-image: url('/assets/title/main-crossroads-square-24abf23d2606ae3f.jpg'); } }
+      /* QA 11-13 (Jake: "is it broken? Is it doing something?"): before any bundle the static title wears the build pill
+         (update.css's .ws-update, copied, 5 px higher so it clears the wordmark: no module may be needed to see or tap it) and a bar that moves until StartTitle removes it */
+      .ws-launch-pill { position: absolute; right: 16px; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateY(-50%); z-index: 1; display: flex; align-items: center; gap: 6px; box-sizing: border-box; height: 19px; max-width: calc(100vw - 32px); margin: 0; padding: 0 8px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); color: var(--ws-text-dim); font: 8px/1 var(--ws-mono); letter-spacing: .14em; text-transform: uppercase; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+      .ws-launch-pill::before { content: ''; position: absolute; inset: -13px -6px; }
+      .ws-launch-pill i { flex: none; width: 4px; height: 4px; background: rgba(196, 220, 232, .35); }
+      .ws-launch-pill span { min-width: 0; margin-right: -.14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ws-launch-pill[data-reloading] { color: var(--ws-cyan); border-color: var(--ws-cyan); }
+      @media (min-width: 701px) { .ws-launch-pill { right: 44px; } }
+      .ws-launch-load { position: relative; margin: 0 24px calc(28px + env(safe-area-inset-bottom, 0px)); font: 10px var(--ws-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--ws-text-dim); }
+      .ws-launch[data-stalled] .ws-launch-load, .ws-launch[data-stalled] .ws-launch-pill { color: var(--ws-amber); border-color: var(--ws-amber); }
+      .ws-launch-bar { position: relative; height: 3px; margin-bottom: 10px; background: var(--ws-cyan-faint); overflow: hidden; }
+      .ws-launch-bar i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--ws-cyan); box-shadow: 0 0 10px rgba(143, 227, 255, .6); transition: width .25s ease-out; }
+      .ws-launch-bar::after { content: ''; position: absolute; top: 0; bottom: 0; left: -30%; width: 30%; background: linear-gradient(90deg, transparent, rgba(143, 227, 255, .6), transparent); animation: ws-launch-sweep 1.2s linear infinite; }
+      @keyframes ws-launch-sweep { to { left: 100%; } }
+      @media (prefers-reduced-motion: reduce) { .ws-launch-bar::after { animation: none; } }
       @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/jetbrains-mono-cyrillic-ext.woff2) format('woff2');unicode-range:U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F}
       @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/jetbrains-mono-cyrillic.woff2) format('woff2');unicode-range:U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116}
       @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/jetbrains-mono-greek.woff2) format('woff2');unicode-range:U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF}
@@ -524,7 +539,45 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
     <div class="ws-launch" data-title-shell>
       <div class="ws-launch-hero" aria-hidden="true"></div>
       <div class="ws-launch-brand">WILDSHARD</div>
+      <!-- plain HTML: a reload that works when every bundle failed; pointerup too, as iOS drops a jittered tap's click (Update.ts) -->
+      <button type="button" class="ws-launch-pill" data-launch-reload onclick="this.dataset.reloading='';location.reload()" onpointerup="this.dataset.reloading='';location.reload()"><i></i><span data-launch-version>reload</span></button>
+      <div class="ws-launch-load" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" data-launch-load><div class="ws-launch-bar"><i data-launch-fill></i></div><span data-launch-step>Loading</span></div>
     </div><!-- /title-shell -->
+    <script data-launch-progress>
+      // QA 11-13: the static title names its build (buildIdentity.mjs stamps __WS_BUILD_LABEL__, the build pill's git describe)
+      // and counts the code and style files this document names, from __bootTiming (LS1), then the entry's own steps, with
+      // the seconds ticking, until StartTitle removes it. Nothing new for 8 s turns the line and the pill amber, the pill saying reload.
+      (() => {
+        const shell = document.querySelector('[data-title-shell]'), at = name => shell?.querySelector('[data-launch-' + name + ']');
+        if (!shell) return;
+        const id = String(globalThis.__WS_BUILD_ID__ || ''), sha = /^([0-9a-f]{7})[0-9a-f]*-/iu.exec(id)?.[1] || '';
+        const label = typeof globalThis.__WS_BUILD_LABEL__ === 'string' ? globalThis.__WS_BUILD_LABEL__ : sha;
+        const version = at('version'), name = stalled => label === '' ? 'reload' : stalled || !matchMedia('(max-width: 700px)').matches ? label + ' · reload' : label;
+        version.textContent = name(false);
+        const fill = at('fill'), step = at('step'), load = at('load');
+        let seen = '', changed = performance.now();
+        const tick = () => {
+          // StartTitle removed it, or a world's Loading adopted its card (no title on this page): stop. The entry may still turn a
+          // world page into the title (a player reload, an unlisted shard), so a hidden shell waits for title-first.
+          if (!shell.isConnected || document.querySelector('.ws-load:not([data-shell])')) { clearInterval(timer); return; }
+          if (!document.documentElement.classList.contains('title-first')) return;
+          const files = new Set([...document.querySelectorAll('script[type="module"][src],link[rel="modulepreload"],link[rel="stylesheet"]')]
+            .map(node => new URL(node.getAttribute('src') || node.getAttribute('href'), location.href).href));
+          const t = window.__bootTiming, ops = new Set((t?.entries || []).map(row => row.operation));
+          const got = new Set((t?.resources || []).filter(row => files.has(row.url) && row.responseStatus !== 0).map(row => row.url)).size;
+          const opening = ops.has('app:page-entry-import'), started = ops.has('app:entry-body');
+          const pct = Math.round((files.size ? Math.min(got, files.size) / files.size * 80 : 0) + (started ? 10 : 0) + (opening ? 5 : 0));
+          const now = performance.now(), key = got + '/' + started + opening;
+          if (key !== seen) { seen = key; changed = now; }
+          const stalled = now - changed > 8000;
+          fill.style.width = pct + '%'; load.setAttribute('aria-valuenow', String(pct));
+          if (shell.hasAttribute('data-stalled') !== stalled) { shell.toggleAttribute('data-stalled', stalled); version.textContent = name(stalled); }
+          step.textContent = (stalled ? 'Still waiting · tap reload' : opening ? 'Opening the menu' : started ? 'Starting'
+            : got > 0 ? 'Loading · ' + got + ' of ' + files.size + ' files' : 'Loading') + ' · ' + (now / 1000).toFixed(1) + ' s';
+        };
+        const timer = setInterval(tick, 100); tick();
+      })();
+    </script>
     <canvas id="game"></canvas>
     <div id="hud"></div>
     <div id="ws-top-edge" aria-hidden="true"></div>

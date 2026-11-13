@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the fixture's declared document entries.
 import { join, resolve } from 'node:path';
 import { expect, test, vi } from 'vitest';
-import { BUILD_ID_EXPRESSION, newBuildId, sourceBuildId, stampBuildDocuments, stampBuildHtml } from '../scripts/app-build/buildIdentity.mjs';
+import { BUILD_ID_EXPRESSION, buildLabelOf, newBuildId, sourceBuildId, stampBuildDocuments, stampBuildHtml } from '../scripts/app-build/buildIdentity.mjs';
+import { buildLabel } from '../src/client/engine/ui/buildCheck';
 
 test('deploy identities change the document while its module URLs and runtime expression stay stable', () => {
   const html = '<!doctype html><html><head><meta charset="utf-8"><script type="module" src="/assets/main-aaaaaaaa.js"></script></head></html>';
@@ -68,4 +69,13 @@ test('the build id comes from WS_BUILD_ID only, never VERCEL_GIT_COMMIT_SHA (OFF
     expect(sourceBuildId('c'.repeat(40), 36)).toBe('ccccccc-10');
     expect(sourceBuildId('', 35)).toBe('b-z');
   } finally { vi.unstubAllEnvs(); }
+});
+
+test('QA 11-13: the stamped label is the build pill\'s own words, and rides the identity script', () => {
+  for (const [id, version, describe] of [['f2a636b3-mx1', '0.1.13', 'v0.1.13-100-gf2a636b3'], ['f2a636b3-mx1', '0.1.13', ''], ['b-mx1', '', ''], ['8d02487d6ce0e5d3c0e8f3f1d1a24d1e0c9f3b21', '0.2.0', '']] as const) {
+    expect(buildLabelOf(id, { version, describe })).toBe(buildLabel(id, version, describe));
+  }
+  const html = '<!doctype html><html><head><meta charset="utf-8"></head></html>';
+  expect(stampBuildHtml(html, 'f2a636b3-mx1', { validator: 'a'.repeat(64), verdicts: [], label: 'v0.1.13 · f2a636b' }))
+    .toContain('globalThis.__WS_BUILD_LABEL__="v0.1.13 · f2a636b";</script>');
 });

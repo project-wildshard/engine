@@ -5,6 +5,7 @@ import { Window } from 'happy-dom';
 import { afterEach, expect, test, vi } from 'vitest';
 import { showStartTitle } from '../ui/StartTitle';
 import type { TitleDeckView } from '../ui/HUD';
+import { stampBuildHtml } from '../../../../scripts/app-build/buildIdentity.mjs';
 
 const html = readFileSync('index.html', 'utf8');
 // The real HTML runs before runtime identity installation (test/setup is epoch
@@ -63,10 +64,10 @@ test('plain launch paints only the approved hero and WILDSHARD, the launch image
   expect(window.document.documentElement.classList.contains('title-first')).toBe(true);
   expect(window.getComputedStyle(panel).display).toBe('flex');
   expect(window.getComputedStyle(panel).position).toBe('fixed');
-  // RL3: no boat, no bar, no wait box, no Retry
+  // RL3: no boat, no wait box, no Retry; QA 11-13 (Jake): the build pill (it reloads) and a moving bar
   const hero = panel.querySelector('.ws-launch-hero');
   if (hero === null) throw new Error('Missing title art');
-  expect([...panel.children].map(child => child.className)).toEqual(['ws-launch-hero', 'ws-launch-brand']);
+  expect([...panel.children].map(child => child.className)).toEqual(['ws-launch-hero', 'ws-launch-brand', 'ws-launch-pill', 'ws-launch-load']);
   expect(window.getComputedStyle(hero).backgroundImage).toMatch(/main-crossroads-square-[a-f0-9]{16}\.jpg/u);
   expect(window.document.querySelector('link[as="image"]')?.getAttribute('href')).toMatch(/^\/assets\/title\/main-crossroads-square-[a-f0-9]{16}\.jpg$/u);
   expect(window.document.querySelector('#hud')?.childElementCount).toBe(0);
@@ -190,4 +191,67 @@ test('DL21: the title page and an arrival for another shard leave the card\'s cl
   expect(startedOf(firstDocument('', undefined, false, 1500))).toBeUndefined();
   const other = firstDocument('?chunk=pine-hollow', { now: 0, callbacks: [] }, false, 1500);
   expect(startedOf(other)).toBe('0'); expect(other.document.querySelector('[data-el="slug"]')?.textContent).toBe('');
+});
+
+// QA 11-13 (Jake, preview at 09:58: "Whenever I see this frozen screen I'm like, is it broken? ... show the version at top
+// right, and have that reload button top right work, at least")
+const stampedDocument = (stamped: string): Window => {
+  const window = new Window({ url: 'https://launch.test/', width: 402, height: 874, settings: { enableJavaScriptEvaluation: true,
+    disableJavaScriptFileLoading: true, disableCSSFileLoading: true, enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true } });
+  windows.push(window); window.document.write(stamped); return window;
+};
+const facts = { validator: 'a'.repeat(64), verdicts: [] };
+test('QA 11-13: the static title shows the stamped build label at top right, before any module', () => {
+  const pill = (window: Window): string => window.document.querySelector('[data-title-shell] .ws-launch-pill [data-launch-version]')?.textContent ?? '';
+  expect(pill(stampedDocument(stampBuildHtml(html, 'f2a636b3-mx1', { ...facts, label: 'v0.1.13-100-gf2a636b3' })))).toBe('v0.1.13-100-gf2a636b3');
+  expect(pill(stampedDocument(stampBuildHtml(html, 'f2a636b3-mx1')))).toBe('f2a636b'); // an older stamp: the short commit
+  expect(pill(firstDocument(''))).toBe('reload'); // a dev page: no stamp, still the reload pill
+  expect(() => stampBuildHtml(html, 'f2a636b3-mx1', { ...facts, label: '</script>' })).toThrow('Invalid document build label');
+});
+
+test('QA 11-13: the top-right pill reloads with every bundle missing (plain HTML, no module ran)', () => {
+  const window = firstDocument(''), reload = vi.spyOn(window.location, 'reload').mockImplementation(() => undefined);
+  const button = window.document.querySelector('[data-title-shell] button[data-launch-reload]');
+  if (!(button instanceof window.HTMLButtonElement)) throw new Error('Missing static reload pill');
+  expect(window.document.documentElement.dataset['booted']).toBeUndefined();
+  expect(button.getAttribute('onclick')).toContain('location.reload()');
+  button.click();
+  expect(reload).toHaveBeenCalled();
+  expect(button.dataset['reloading']).toBe('');
+});
+
+test('QA 11-13: the static bar moves from the boot record: files, then the entry, ticking seconds, amber when stuck', async () => {
+  const frames: Frames = { now: 0, callbacks: [] }, window = firstDocument('', frames);
+  const shell = window.document.querySelector('[data-title-shell]'), load = shell?.querySelector('[data-launch-load]');
+  const text = (): string => shell?.querySelector('[data-launch-step]')?.textContent ?? '';
+  const width = (): string => (shell?.querySelector('[data-launch-fill]') as unknown as HTMLElement | null)?.style.width ?? '';
+  const settle = (): Promise<void> => new Promise(resolve => { setTimeout(resolve, 150); });
+  const timing = (window as unknown as { __bootTiming: { resources: { url: string; responseStatus: number | null }[]; mark: (op: string) => void } }).__bootTiming;
+  frames.now = 300; await settle();
+  expect(text()).toBe('Loading · 0.3 s'); expect(width()).toBe('0%');
+  const files = [...window.document.querySelectorAll('script[type="module"][src],link[rel="modulepreload"],link[rel="stylesheet"]')]
+    .map(node => new URL(node.getAttribute('src') ?? node.getAttribute('href') ?? '', 'https://launch.test/').href);
+  expect(files.length).toBeGreaterThan(4);
+  timing.resources.push({ url: files[0] ?? '', responseStatus: 200 }, { url: files[1] ?? '', responseStatus: 0 }); // a failed fetch counts nothing
+  frames.now = 1200; await settle();
+  expect(text()).toBe(`Loading · 1 of ${files.length} files · 1.2 s`); expect(width()).toBe(`${Math.round(80 / files.length)}%`);
+  timing.mark('app:entry-body'); frames.now = 1500; await settle();
+  expect(text()).toBe('Starting · 1.5 s');
+  frames.now = 9600; await settle();
+  expect(text()).toBe('Still waiting · tap reload · 9.6 s');
+  expect(shell instanceof window.HTMLElement ? shell.dataset['stalled'] : undefined).toBe('');
+  expect(shell?.querySelector('[data-launch-version]')?.textContent).toBe('reload');
+  expect(load?.getAttribute('aria-valuenow')).toBe(String(Math.round(80 / files.length + 10)));
+  shell?.remove(); frames.now = 9900; await settle();
+  expect(text()).toBe('Still waiting · tap reload · 9.6 s'); // StartTitle removed it: the timer stopped
+});
+
+test('QA 11-13: a page the entry turns into the title later (a player reload, an unlisted shard) gets the moving bar too', async () => {
+  const frames: Frames = { now: 0, callbacks: [] }, window = firstDocument('?chunk=driftwood-isle', frames);
+  const text = (): string => window.document.querySelector('[data-launch-step]')?.textContent ?? '';
+  const settle = (): Promise<void> => new Promise(resolve => { setTimeout(resolve, 150); });
+  frames.now = 400; await settle();
+  expect(text()).toBe('Loading'); // a world page: the hidden shell is left alone
+  window.document.documentElement.classList.add('title-first'); frames.now = 700; await settle();
+  expect(text()).toBe('Loading · 0.7 s');
 });

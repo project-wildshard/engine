@@ -18,7 +18,8 @@ import {
   copyDeferredPublic,
   pruneLooseCopies,
 } from "./app-build/outputProducts.mjs";
-import { stampBuildDocuments } from "./app-build/buildIdentity.mjs";
+import { buildLabelOf, stampBuildDocuments } from "./app-build/buildIdentity.mjs";
+import { engineRelease } from "./changelog.mjs";
 import { homeIconChannel, writeHomeIcons } from "./app-build/homeIcons.mjs";
 import { carryPreviousDeploy, channelOrigin, previousDeployOptional } from "./app-build/previousDeploy.mjs";
 import { assertAssetLimits, describeAssetLimits } from "./app-build/assetLimits.mjs";
@@ -183,6 +184,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
     validator,
     verdicts: buildValidationReceipts(validator),
     ...(world === undefined ? {} : { world }),
+    // QA 11-13: the static title's build pill, before any bundle (index.html data-launch-progress)
+    label: buildLabelOf(buildId, engineRelease(process.cwd())),
   });
   // J236: production plain, staging the S, the solo build the P; before the worker reads the final document.
   writeHomeIcons(outDir, homeIconChannel(world));

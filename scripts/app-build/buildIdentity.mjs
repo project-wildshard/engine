@@ -37,9 +37,20 @@ export const codeDirectory = (build) => `b/${build}`;
  * in its own folder, and the deploy carries the old builds' graphs (MF2, J79) as before. */
 export const SHARED_CODE_DIRECTORY = 'b/c';
 
-/** Stamp before executable module scripts, without changing the bundle's URLs.
+/** The build pill's words for a build (src/client/engine/ui/buildCheck.ts buildLabel, which test/build-identity.test.ts
+ * keeps equal): its `git describe`, else "v0.1.5 · a8144a5", either half alone when the other is unknown.
+ * @param {string} build @param {{version: string, describe?: string}} release */
+export function buildLabelOf(build, { version, describe = '' }) {
+  if (describe !== '' && /^[\w .·+-]{1,80}$/u.test(describe)) return describe; // an odd tag never fails a build over a label
+  const [gitSha = '', stamp = ''] = build.split('-');
+  const short = /^[0-9a-f]{7,40}$/iu.test(gitSha) ? gitSha.slice(0, 7) : gitSha.length >= 7 ? gitSha : stamp;
+  return [version === '' ? '' : `v${version}`, short].filter(part => part !== '').join(' · ');
+}
+
+/** Stamp before executable module scripts, without changing the bundle's URLs. `label` (QA 11-13) is the build pill's
+ * words, which index.html's static title shows before any bundle runs.
  * @param {string} html @param {string} build
- * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string,recordTag?:string}}} [facts] */
+ * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string,recordTag?:string}, label?: string}} [facts] */
 export function stampBuildHtml(html, build, facts) {
   if (build.length === 0 || !/^[\w.-]+$/u.test(build)) throw new Error('Invalid document build identity');
   if (html.includes('globalThis.__WS_BUILD_ID__=')) throw new Error('Duplicate document build identity');
@@ -53,14 +64,16 @@ export function stampBuildHtml(html, build, facts) {
   if (facts !== undefined && (!/^[a-f0-9]{64}$/u.test(facts.validator) || !Array.isArray(facts.verdicts))) throw new Error('Invalid document admission facts');
   const admission = facts === undefined ? '' : `globalThis.__WS_SHARDFILE_VALIDATOR__=${JSON.stringify(facts.validator)};globalThis.__WS_SHARDFILE_VERDICTS__=${JSON.stringify(facts.verdicts).replaceAll('<', String.raw`\u003c`)};`;
   const world = facts?.world === undefined ? '' : `globalThis.__WS_WORLD__=${JSON.stringify(facts.world).replaceAll('<', String.raw`\u003c`)};`;
-  return `${source.slice(0, end)}<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};${admission}${world}</script>${source.slice(end)}`;
+  if (facts?.label !== undefined && !/^[\w .·+-]{1,80}$/u.test(facts.label)) throw new Error('Invalid document build label');
+  const label = facts?.label === undefined ? '' : `globalThis.__WS_BUILD_LABEL__=${JSON.stringify(facts.label)};`;
+  return `${source.slice(0, end)}<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};${admission}${world}${label}</script>${source.slice(end)}`;
 }
 
 /** Plain post-bundle step, before the service worker hashes the final HTML.
  * Every document entry gets the same version.json identity, including native
  * index.html and the calibration entry. No new Vite plugin or fetched module.
  * @param {string} directory
- * @param {{validator: string, verdicts: readonly unknown[]}} [facts] */
+ * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string,recordTag?:string}, label?: string}} [facts] */
 export function stampBuildDocuments(directory, facts) {
   /** @type {unknown} */
   const version = JSON.parse(readFileSync(resolve(directory, 'version.json'), 'utf8'));

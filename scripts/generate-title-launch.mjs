@@ -14,7 +14,8 @@ const source = readFileSync(resolve(root, 'index.html'), 'utf8');
 const style = /<style>([\s\S]*?)<\/style>/u.exec(source)?.[1];
 const shell = /<div class="ws-launch" data-title-shell>[\s\S]*?<\/div><!-- \/title-shell -->/u.exec(source)?.[0];
 if (style === undefined || shell === undefined) throw new Error('Missing first-document title shell');
-// Standalone content starts below the 62 px phone status area (index.html E58).
+// Standalone content starts below the 62 px phone status area (index.html E58). The pill and bar (QA 11-13) are live
+// elements a script fills; iOS's still image before the document keeps the approved hero and wordmark only.
 const nativeInset = 62;
 const previous = /rel="apple-touch-startup-image" href="([^"]+)"/u.exec(source)?.[1];
 if (previous === undefined) throw new Error('Missing native launch image link');
@@ -27,7 +28,7 @@ try {
     await context.route('http://launch.test/**', async route => {
       const path = new URL(route.request().url()).pathname;
       if (path === '/') {
-        await route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="title-first"><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>${style} html.title-first .ws-launch { top: ${nativeInset}px; }</style></head><body>${shell}</body></html>` });
+        await route.fulfill({ contentType: 'text/html', body: `<!doctype html><html class="title-first"><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>${style} html.title-first .ws-launch { top: ${nativeInset}px; } .ws-launch-pill, .ws-launch-load { visibility: hidden; }</style></head><body>${shell}</body></html>` });
       } else if (path.startsWith('/assets/title/') || path.startsWith('/fonts/')) {
         const asset = resolve(root, 'public', `.${titleSources.get(path) ?? path}`);
         if (!asset.startsWith(`${resolve(root, 'public')}/`)) throw new Error('Invalid launch asset');
