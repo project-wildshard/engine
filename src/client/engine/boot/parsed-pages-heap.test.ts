@@ -42,3 +42,16 @@ test('the live parser carries numbers as binary: the decode allocates no string 
   expect(perNumber, JSON.stringify({ perNumber, wire })).toBeLessThan(48);
   expect(wire, JSON.stringify({ perNumber, wire })).toBeLessThan(10);
 });
+
+test('repeated keys and short strings cross once: the decode allocates no view or string for a repeat', async () => {
+  // 8,192 rows of the same six keys and a few repeated kinds, like a placement or roster table
+  const rows = Array.from({ length: 8192 }, (_row, i) => ({ kind: ['palm', 'rock', 'shell'][i % 3], x: i, z: -i, yaw: 0, scale: 1, lod: 'near' }));
+  const transfer = encodeParsedPages({ rows });
+  let least = Infinity;
+  for (let run = 0; run < 3; run++) least = Math.min(least, await allocated(() => decodeParsedPages(transfer, () => Promise.resolve())));
+  const perRow = least / rows.length, wire = transfer.byteLength / rows.length;
+  // every key and kind as its own string measured 1,584 bytes allocated and 114 wire bytes a row; repeats as references
+  // measure 622 and 81 (what is left is the row object itself and its numbers)
+  expect(perRow, JSON.stringify({ perRow, wire })).toBeLessThan(800);
+  expect(wire, JSON.stringify({ perRow, wire })).toBeLessThan(90);
+});

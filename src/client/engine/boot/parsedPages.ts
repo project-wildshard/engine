@@ -11,8 +11,11 @@ export function parseJsonPages(bytes: Uint8Array): Uint8Array {
  * first minute on Driftwood). Little-endian, after one version byte:
  *   OBJECT u32 count · ARRAY u32 count · NUMBER f64 · NULL · FALSE · TRUE
  *   UTF8 u8 last, u32 bytes, UTF-8 · UTF16 u8 last, u32 units, UTF-16 units (a string that is not well formed: a lone
- *   surrogate survives JSON.parse, never UTF-8). A string goes in parts of at most PART code units. */
-const VERSION = 0x57, OBJECT = 1, ARRAY = 2, UTF8 = 3, UTF16 = 4, NUMBER = 5, NULL = 6, FALSE = 7, TRUE = 8;
+ *   surrogate survives JSON.parse, never UTF-8). A string goes in parts of at most PART code units.
+ *   REF u32 index: a short string sent before (at most SHORT code units: keys, names, kinds), the index-th such string in
+ *   send order, so a repeated key costs the page thread no view and no decode. */
+const VERSION = 0x57, OBJECT = 1, ARRAY = 2, UTF8 = 3, UTF16 = 4, NUMBER = 5, NULL = 6, FALSE = 7, TRUE = 8, REF = 9;
+const SHORT = 64;
 /** A string part's code units, and a decode step's bounds: at most STEP_TOKENS tokens or STEP_BYTES transfer bytes. */
 const PART = 4096, STEP_TOKENS = 32, STEP_BYTES = 16_384;
 
@@ -21,6 +24,7 @@ class Writer {
   view = new DataView(this.bytes.buffer);
   at = 0;
   private readonly encoder = new TextEncoder();
+  private readonly short = new Map<string, number>();
   room(n: number): void {
     if (this.at + n <= this.bytes.length) return;
     let size = this.bytes.length * 2;
@@ -32,6 +36,11 @@ class Writer {
   count(tag: number, n: number): void { this.room(5); this.bytes[this.at] = tag; this.view.setUint32(this.at + 1, n, true); this.at += 5; }
   number(value: number): void { this.room(9); this.bytes[this.at] = NUMBER; this.view.setFloat64(this.at + 1, value, true); this.at += 9; }
   string(value: string): void {
+    if (value.length <= SHORT) {
+      const index = this.short.get(value);
+      if (index !== undefined) { this.count(REF, index); return; }
+      this.short.set(value, this.short.size);
+    }
     // in a Unicode-mode class a whole pair is one code point, so only a lone surrogate matches
     const utf8 = !/[\uD800-\uDFFF]/u.test(value);
     if (value.length === 0) { this.part(UTF8, 1, 0); return; }
@@ -94,6 +103,7 @@ export async function decodeParsedPages(bytes: Uint8Array, pause: () => Promise<
   const frames: Frame[] = [], decoder = new TextDecoder('utf-8', {fatal: true});
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let root: unknown, hasRoot = false, string: string | undefined;
+  const short: string[] = [];
   const put = (value: unknown): void => {
     const frame = frames.at(-1);
     if (frame === undefined) {
@@ -128,11 +138,17 @@ export async function decodeParsedPages(bytes: Uint8Array, pause: () => Promise<
         // oxlint-disable-next-line unicorn/prefer-code-point -- UTF-16 units, not code points: a lone surrogate crosses as it is
         else for (let i = 0; i < length; i++) part += String.fromCharCode(view.getUint16(at + i * 2, true));
         at += size;
-        string = (string ?? '') + part;
-        if (last === 1) { put(string); string = undefined; complete(); }
+        string = string === undefined ? part : string + part;
+        if (last === 1) { if (string.length <= SHORT) short.push(string); put(string); string = undefined; complete(); }
         continue;
       }
       if (string !== undefined) throw new Error('Incomplete parsed string');
+      if (tag === REF) {
+        need(at, 4);
+        const value = short[view.getUint32(at, true)]; at += 4;
+        if (value === undefined) throw new Error('Invalid parsed reference');
+        put(value); complete(); continue;
+      }
       if (tag === OBJECT || tag === ARRAY) {
         need(at, 4);
         const count = view.getUint32(at, true); at += 4;
