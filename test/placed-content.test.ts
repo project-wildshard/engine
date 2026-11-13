@@ -7,7 +7,7 @@
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- the catalogue pin.
 import { readFileSync } from 'node:fs';
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { installCatalogue, installedCatalogue } from '../src/shared/game/grid/catalogueSlot';
 import { learnPlacedCells } from '../src/client/game/grid/placedCells';
 import { placedContent, type PlacedContentPorts } from '../src/client/game/grid/placedContent';
@@ -99,14 +99,14 @@ test('SA48: the spawn download reads a placed slug\'s rows on both flows, from t
   window.fetch = (url: string | URL | Request): Promise<Response> => { read.push(String(url instanceof Request ? url.url : url)); return new Promise(() => undefined); };
   try {
     setSpawnPacks(false);
-    for (const flow of ['client', 'grid'] as const) {
-      const download = startSpawnDownload(SLUG, flow, 'phone');
-      expect(download, flow).not.toBeNull();
-      await new Promise(resolve => { setTimeout(resolve, 20); });
-      download?.cancel();
-    }
+    // a grid entry (no build has its grid manifest) reads the cook's entry manifest from the store
+    const download = startSpawnDownload(SLUG, 'grid', 'phone');
+    expect(download).not.toBeNull();
+    await vi.waitFor(() => { expect(read, 'the entry manifest from the store').toContain(`${PACKS}${ROWS[0]?.url.slice(1) ?? ''}`); }, { timeout: 5000 });
+    // the same manifest is the same download on the client flow (its key is the address)
+    expect(startSpawnDownload(SLUG, 'client', 'phone')).toBe(download);
+    download?.cancel();
     expect(startSpawnDownload('no-such-shard', 'grid', 'phone'), 'a slug neither the build nor the cook has').toBeNull();
-    expect(read.some(at => at === `${PACKS}${ROWS[0]?.url.slice(1) ?? ''}`), `the entry manifest from the store: ${read.join(', ')}`).toBe(true);
   } finally { window.fetch = parked; }
 });
 
