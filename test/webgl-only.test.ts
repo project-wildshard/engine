@@ -1,4 +1,4 @@
-// J322 (Jake, 2026-11-13): "Let's only do WebGL renderer. Let's not do any WebGPU renderer." The lint rule refuses every
+// J326 (Jake, 2026-11-13): "Let's only do WebGL renderer. Let's not do any WebGPU renderer." The lint rule refuses every
 // way back to WebGPU, and the client constructs no renderer but three's WebGLRenderer, on a WebGL2 context.
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the real linter on isolated fixture files.
 import { spawnSync } from 'node:child_process';

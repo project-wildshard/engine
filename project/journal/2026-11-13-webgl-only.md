@@ -1,4 +1,4 @@
-# WebGL renderer only, no WebGPU (opus-webglonly, J322)
+# WebGL renderer only, no WebGPU (opus-webglonly, J326)
 
 > Written by: Claude (opus-webglonly), 2026-11-13
 
@@ -17,3 +17,6 @@ WebGL1 context) even where WebGL2, the only thing the game draws with, was missi
   and asks for no 3D context kind but `webgl2`.
 
 Removed rather than gated: there was no WebGPU renderer code to drop, so the hard gate is the lint rule plus the census.
+
+Renumbered J322 to J326: J322 was taken by "No walls" while this lane ran
+(commit 9442252c says J322).

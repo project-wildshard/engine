@@ -265,7 +265,7 @@ async function checkBrowser(config: DoctorConfig, scope: Scope, ms: number): Pro
   } catch { ed25519 = false; }
   parts.push(ed25519 ? 'Ed25519' : 'no Ed25519');
   if (!ed25519) { failed = true; problems.push(`Update ${chrome === undefined ? 'this browser' : `Chrome (${chrome})`} to Chrome 137+ or Safari 17+.`); }
-  // J322 (Jake, 2026-11-13): the game draws with WebGL2 only (core/webglStartup.ts), so the doctor asks for exactly that;
+  // J326 (Jake, 2026-11-13): the game draws with WebGL2 only (core/webglStartup.ts), so the doctor asks for exactly that;
   // a WebGPU adapter or a WebGL1 context is no pass, since neither draws the game
   const probe = document.createElement('canvas').getContext('webgl2');
   const gpu = probe === null ? '' : 'WebGL2';

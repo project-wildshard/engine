@@ -25,7 +25,7 @@
     "wildshard/no-generated-import": "error",
     "wildshard/no-generated-json-import": "error",
     "wildshard/no-base64": "error",
-    // J322 (Jake, 2026-11-13): WebGL renderer only; no three/webgpu, three/tsl, WebGPURenderer or navigator.gpu anywhere
+    // J326 (Jake, 2026-11-13): WebGL renderer only; no three/webgpu, three/tsl, WebGPURenderer or navigator.gpu anywhere
     "wildshard/no-webgpu": "error",
     // ── kept on, but configured ──────────────────────────────────────────────────────────────────
     "typescript/no-explicit-any": "error",

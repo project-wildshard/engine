@@ -545,13 +545,13 @@ const noRendererType = rule('Renderer types stay inside rendering (E357)', (cont
   if (/^src\/(?:client|cook|server|shared)\/engine\/(?:render\/|core\/(?:Game|bootstrap)\.ts$)/u.test(pathOf(context))) return {};
   return { Identifier(node) { if (node.name === 'WebGLRenderer') report(context, node, 'Renderer types belong in engine/render'); } };
 });
-// J322 (Jake, 2026-11-13): "Let's only do WebGL renderer. Let's not do any WebGPU renderer." Nothing imports three's
+// J326 (Jake, 2026-11-13): "Let's only do WebGL renderer. Let's not do any WebGPU renderer." Nothing imports three's
 // WebGPU or TSL builds, names WebGPURenderer, or asks the browser for a WebGPU adapter; renderer.ts makes the one
 // WebGLRenderer on a WebGL2 context (core/webglStartup.ts).
 const WEBGPU_SOURCE = /^three\/(?:webgpu|tsl)(?:$|\/)|^three\/(?:examples\/jsm|addons)\/(?:renderers\/webgpu|nodes|tsl)(?:$|\/)|^three\/(?:examples\/jsm|addons)\/capabilities\/WebGPU(?:\.js)?$|three\.webgpu/u;
-const WEBGPU_MESSAGE = 'WebGL renderer only, no WebGPU (J322)';
+const WEBGPU_MESSAGE = 'WebGL renderer only, no WebGPU (J326)';
 const isNavigator = (node) => { const x = unwrap(node); return (x?.type === 'Identifier' && x.name === 'navigator') || (x?.type === 'MemberExpression' && propName(x) === 'navigator'); };
-const noWebgpu = rule('WebGL renderer only, no WebGPU (J322)', (context) => ({
+const noWebgpu = rule('WebGL renderer only, no WebGPU (J326)', (context) => ({
   ...importsVisitor((node) => { const source = importPrefix(node.source); if (typeof source === 'string' && WEBGPU_SOURCE.test(source)) report(context, node, WEBGPU_MESSAGE); }),
   Identifier(node) { if (node.name === 'WebGPURenderer') report(context, node, WEBGPU_MESSAGE); },
   MemberExpression(node) {
