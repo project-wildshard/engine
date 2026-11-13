@@ -9,25 +9,31 @@ class Worker extends EventTarget {
 }
 afterEach(async () => {
   (await import('../../../shared/engine/app/resources')).pageScope.dispose();
-  Reflect.deleteProperty(window, '__ws_sw'); Reflect.deleteProperty(navigator, 'serviceWorker');
+  delete document.documentElement.dataset['wsTitleSettled']; Reflect.deleteProperty(window, '__ws_sw'); Reflect.deleteProperty(navigator, 'serviceWorker');
   vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
 
-test('OF5a: a settled title asks the active and the waiting worker for an update precache, once', async () => {
+test('OF5a: a settled title asks the active and the waiting worker for an update precache once, even when its registration lands late', async () => {
   vi.stubGlobal('__BUILD_ID__', 'fixture');
   vi.stubGlobal('fetch', () => Promise.resolve(Response.json({ build: 'fixture' })));
   vi.stubGlobal('location', new URL('https://example.com/?sw=1'));
   const active = new Worker(), waiting = new Worker();
   waiting.state = 'installed';
   const registration = Object.assign(new EventTarget(), { installing: null, waiting, active, update: () => Promise.resolve() });
-  const container = Object.assign(new EventTarget(), { controller: active, getRegistration: () => Promise.resolve(registration), register: () => Promise.resolve(registration) });
+  let land = (_value: typeof registration): void => undefined;
+  const pending = new Promise<typeof registration>(resolve => { land = resolve; });
+  const container = Object.assign(new EventTarget(), { controller: active, getRegistration: () => pending, register: () => pending });
   Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: container });
   await import('./sw');
-  await vi.waitFor(() => { expect(waiting.messages).toContainEqual({ type: 'PAUSE' }); }); // registered: this page is loading
   const update = { type: 'PRECACHE', update: true };
-  expect(active.messages).not.toContainEqual(update);
+  const asked = (worker: Worker): number => worker.messages.filter(message => JSON.stringify(message) === JSON.stringify(update)).length;
+  // a slow registration (WebKit): the title settles first, and its ask waits for the registration
+  document.documentElement.dataset['wsTitleSettled'] = '1'; document.dispatchEvent(new Event('ws:title-settled'));
+  expect(asked(active)).toBe(0);
+  land(registration);
+  await vi.waitFor(() => { expect(waiting.messages).toContainEqual({ type: 'PAUSE' }); }); // registered: this page is loading
+  await vi.waitFor(() => { expect(asked(active)).toBe(1); });
+  expect(asked(waiting)).toBe(1);
   document.dispatchEvent(new Event('ws:title-settled'));
-  document.dispatchEvent(new Event('ws:title-settled'));
-  expect(active.messages.filter(message => JSON.stringify(message) === JSON.stringify(update))).toHaveLength(1);
-  expect(waiting.messages.filter(message => JSON.stringify(message) === JSON.stringify(update))).toHaveLength(1);
+  expect([asked(active), asked(waiting)], 'once a page').toEqual([1, 1]);
 });

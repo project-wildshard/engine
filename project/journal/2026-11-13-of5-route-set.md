@@ -30,3 +30,12 @@ A title page never reaches control, so the worker's code precache (DL1) never ra
 that stays 10 s now sends `ws:title-settled` (`mainMenu.ts`); `boot/sw.ts` asks the active and the waiting worker for an
 update precache, and the worker does it only when it holds another build's generation, so a first visit still reads nothing
 (S2). A tap within the 10 s cancels it, and any later navigation pauses it as before.
+
+Review fix: a title's ask that the worker turns down (a first visit) no longer marks the title as past loading or resumes
+another page's pause; only an accepted ask does. A title that settles before its registration lands (slow WebKit
+registration) asks once the registration arrives.
+
+CI fix (8d02487d broke two `test/pwa-update-cache.test.ts` cases): the baked `const FILES = JSON.parse(...)` line is read by
+the build's tests, so it stays plain; the world filter is a separate `PRECACHE_FILES` (and `CONTENT_PRECACHE`).
+The title's settle listener starts with the registration, not at boot (a host-blocked registration installs nothing); a
+title that settled first sets `data-ws-title-settled` on the document, which the registration reads.

@@ -12,7 +12,9 @@ const SHELL = `${SHELL_PREFIX}${BUILD}`;
  *  server, so it never precaches the solo server's code or its server book. Read at run time: a deploy stamps the document. */
 const WORLD = /\bglobalThis\.__WS_WORLD__=/u.test(DOCUMENT);
 const SOLO_ONLY = /\/standalone\/(?:serverWorker|serverRuntime)-[^/]+\.js$|\/assets\/spawn\/server-[^/]+\.json$/u;
-const FILES = JSON.parse('__FILES__').filter(path => !WORLD || !SOLO_ONLY.test(path));
+const FILES = JSON.parse('__FILES__');
+/** What this build precaches and records as its generation: its files, less the solo server's on a world build. */
+const PRECACHE_FILES = FILES.filter(path => !WORLD || !SOLO_ONLY.test(path));
 const SHELL_FILES = JSON.parse('__SHELL_FILES__');
 const NAMED = new Set(FILES);
 const MATCH = { ignoreVary: true };
@@ -32,9 +34,9 @@ const isHtml = response => /\btext\/html\b/i.test(response.headers.get('content-
  * there is content-named, so a copy is good for every build that names it, and no activate touches it. Only a CORS 200 is
  * kept: an opaque body cannot be checked and is padded against quota, and a range never stands for the whole file. */
 /** @type {{ base: string, files: string[] }} one parsed value: the bundler would fold a literal base into its origin */
-const { base: CONTENT_BASE, files: BOOKS_ON_BASE } = JSON.parse('__CONTENT__');
+const { base: CONTENT_BASE, files: CONTENT_FILES } = JSON.parse('__CONTENT__');
 /** OF5: the server book on the content base is solo-only too (a URL there, its path under the base's folder). */
-const CONTENT_FILES = BOOKS_ON_BASE.filter(href => !WORLD || !SOLO_ONLY.test(new URL(href).pathname));
+const CONTENT_PRECACHE = CONTENT_FILES.filter(href => !WORLD || !SOLO_ONLY.test(new URL(href).pathname));
 const CONTENT_CACHE = 'ws-content-v1';
 const CONTENT_URL = CONTENT_BASE === '' ? undefined : new URL(CONTENT_BASE);
 /** A base on the page's own origin (contentBase.ts allows one) owns its folder only; the rest of the origin is the page's. */
@@ -212,10 +214,10 @@ function precacheGeneration() {
   precaching ??= (async () => {
     try {
       const [assets, books] = await Promise.all([store(ASSETS), caches.open(BOOKS)]);
-      await precacheQueue(assets, FILES);
+      await precacheQueue(assets, PRECACHE_FILES);
       // PZ10: this build's books on the content base; a build is a generation (and adoptable) only once they are held
-      if (CONTENT_FILES.length > 0) await precacheQueue(await store(CONTENT_CACHE), CONTENT_FILES, true);
-      await books.put(bookKey(BUILD), Response.json({ files: FILES.map(abs) }));
+      if (CONTENT_PRECACHE.length > 0) await precacheQueue(await store(CONTENT_CACHE), CONTENT_PRECACHE, true);
+      await books.put(bookKey(BUILD), Response.json({ files: PRECACHE_FILES.map(abs) }));
     } catch (error) { precaching = undefined; throw error; }
   })();
   return precaching;
@@ -414,16 +416,17 @@ workerScope.listen(self, 'message', event => {
     // Adoption waits on this reply: a build is offered as the next document's worker only once its code is held.
     // A page asks once it reaches control, so it no longer counts as loading, and the precache resumes.
     const port = event.ports?.[0], client = event.source?.id;
-    if (typeof client === 'string') controlled.add(client);
-    resumePrecache();
     // OF5a: a title asks too (`update`), so a build update seen only on the title holds its code before the first offline
-    // launch. Only on a device that holds another build's generation: a first visit's title still reads nothing (S2, DL1).
+    // launch. Only on a device that holds another build's generation: a first visit's title still reads nothing (S2, DL1),
+    // and a title that is turned down neither counts as a page past loading nor resumes another page's pause.
     const update = event.data?.update === true;
+    const settle = () => { if (typeof client === 'string') controlled.add(client); resumePrecache(); };
+    if (!update) settle();
     event.waitUntil((async () => {
       let ok = true;
       try {
         if (update && (await (await caches.open(BOOKS)).keys()).every(key => key.url === bookKey(BUILD))) ok = false;
-        else await precacheGeneration();
+        else { if (update) settle(); await precacheGeneration(); }
       } catch { ok = false; }
       port?.postMessage({ type, ok, build: BUILD });
     })());
