@@ -5,7 +5,7 @@
 // are read off `console.info` as they are written, and still written. Nothing leaves loopback; nothing here alters a reply or a tick.
 import { createServer } from 'node:http';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
-import { isMainThread, threadId } from 'node:worker_threads';
+import { BroadcastChannel, isMainThread, threadId } from 'node:worker_threads';
 
 const port = Number(process.env.METRICS_PORT ?? 0);
 if (Number.isInteger(port) && port > 0) {
@@ -23,7 +23,7 @@ if (Number.isInteger(port) && port > 0) {
     const threads = new Map();
     /** @type {Map<number, Record<string, number>>} */
     const workers = new Map();
-    channel.onmessage = event => { const row = event.data; threads.set(row.thread, row); };
+    channel.onmessage = event => { const row = /** @type {ReturnType<typeof own>} */ (/** @type {{ data: unknown }} */ (event).data); threads.set(row.thread, row); };
     channel.unref();
     const info = console.info.bind(console);
     console.info = (...args) => {
