@@ -10,6 +10,7 @@ import { lateAudioGroups } from '../scripts/app-build/audioPacks';
 import { createCatalogueAudio } from '@wildshard/engine/audio/levelAudio';
 import { parseAudioData } from '@wildshard/format/audio';
 import * as settings from '@wildshard/engine/ui/Settings';
+import { MUSIC_STYLES } from '@wildshard/engine/audio/bootAudio';
 import source from '../src/shards/driftwood-isle/data/audioSource.json' with { type: 'json' };
 
 await installAssetFixture();
@@ -25,7 +26,7 @@ test('native audio packs contain exactly the original late clips for every style
     writeFileSync(resolve(directory, 'shard.json'), JSON.stringify({ format: 'wildshard.shardfile', formatVersion: 2, runtime: null, schemas: [], files: [],
       sections: [{ name: 'audio/audio', path: 'audio.json', bytes: Buffer.byteLength(wire), hash }] }));
     const groups = await lateAudioGroups(root, 'fixture'), profile = await createCatalogueAudio(parseAudioData(source.audio));
-    for (const style of settings.MUSIC_STYLES) {
+    for (const style of MUSIC_STYLES) {
       const boot = profile.bootFiles(style), control = new Set(profile.controlFiles?.(style) ?? boot);
       expect(groups[`fixture-audio-${style}`]).toEqual([...new Set(boot)].filter(path => !control.has(path)));
       expect(groups[`fixture-audio-${style}`]?.every(path => !control.has(path))).toBe(true);

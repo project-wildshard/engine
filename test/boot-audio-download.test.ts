@@ -68,7 +68,9 @@ test.skipIf(!existsSync(`${driftwood}/shard.json`) || !existsSync(bootTables))('
   expect(fence.length).toBeGreaterThanOrEqual(18);
   expect(listed).toEqual(expect.arrayContaining(fence));
   const row = half.shard.sections.get('audio/audio') as { audio: AudioData };
+  installAssetTables(common);
   const page = await pageBootAudio(row.audio);
+  installAssetTables(tables);
   expect(page.length).toBeGreaterThan(50);
   expect(listed).toEqual(expect.arrayContaining(page));
 });

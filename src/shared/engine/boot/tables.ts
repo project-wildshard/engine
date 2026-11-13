@@ -30,6 +30,12 @@ export interface AssetTables {
 const SLOT = Symbol.for('engine.asset-tables');
 const isTables = (v: unknown): v is AssetTables => typeof v === 'object' && v !== null && 'bytes' in v && 'packs' in v;
 export function installAssetTables(value: AssetTables): void { Reflect.set(globalThis, SLOT, value); }
+/** Run `read` against `value`, then put back whatever the slot held (the cook reads one build's tables, AUDIO AU1). */
+export function withAssetTables<T>(value: AssetTables, read: () => T): T {
+  const previous: unknown = Reflect.get(globalThis, SLOT);
+  Reflect.set(globalThis, SLOT, value);
+  try { return read(); } finally { Reflect.set(globalThis, SLOT, previous); }
+}
 function tables(): AssetTables {
   const v: unknown = Reflect.get(globalThis, SLOT);
   if (!isTables(v)) throw new Error('No asset tables installed: selected-entry preparation installs them first');

@@ -19,7 +19,7 @@ import {homedir} from 'node:os';
 import {productTarball} from './productTarball';
 import {BrotliSizeCache} from './brotliSizeCache.mjs';
 import {defaultBootAudio} from '@wildshard/engine/audio/bootAudio';
-import {installAssetTables, type AssetTables} from '@wildshard/engine/boot/tables';
+import {withAssetTables, type AssetTables} from '@wildshard/engine/boot/tables';
 import type {AudioData} from '@wildshard/format/audio';
 
 const size = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
@@ -34,11 +34,14 @@ const AUDIO_URL = /^\/assets\/(?:music|sfx)\/[^?]+\.(?:m4a|mp3|ogg|opus|wav|webm
 /** AUDIO AU1 (J299): the recordings a shard's LOAD reads, so DOWNLOAD fetches, counts and caches them: a new player's
  *  boot set (the default music style and sound-effect set, through the client's own selection) and the audio its
  *  recorded fence names. `tables` is the build's common boot table, the one the page installs. */
-export function shardBootAudio(sections: ReadonlyMap<string, unknown>, tables: AssetTables, fenceMounts: readonly string[]): readonly string[] {
-  installAssetTables(tables);
+export function shardBootAudio(sections: ReadonlyMap<string, unknown>, tables: AssetTables, fenceMounts: readonly string[], shard = 'shard'): readonly string[] {
   const row = sections.get('audio/audio'), data = typeof row === 'object' && row !== null && 'audio' in row ? row.audio as AudioData : undefined;
   // A level with no music or sample rows boots with no recordings (NO_AUDIO); anything else must select, as on the page.
-  const boot = data === undefined || data.music === undefined || data.samples === undefined ? [] : defaultBootAudio(data);
+  let boot: readonly string[] = [];
+  if (data !== undefined && data.music !== undefined && data.samples !== undefined) {
+    try { boot = withAssetTables(tables, () => defaultBootAudio(data)); }
+    catch (error) { throw new Error(`${shard}: its boot audio does not select (${error instanceof Error ? error.message : String(error)})`, {cause: error}); }
+  }
   const shipped = (url: string): boolean => Object.hasOwn(tables.bytes, url.split('?')[0] ?? url);
   return [...new Set([...boot, ...fenceMounts.filter(url => AUDIO_URL.test(url)).map(url => url.split('?')[0] ?? url)])].filter(shipped);
 }
@@ -238,11 +241,10 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
         + `(${unresolved.slice(0, 3).join(', ')}); re-record with scripts/record-fence-reads.mjs`);
     }
     // AUDIO AU1: the same recordings on every tier and flow: LOAD reads them before control on all of them.
-    const bootAudio = assetTables === undefined ? [] : shardBootAudio(sections, assetTables, half.mountRows('phone', 'entry').map(row => row.url));
+    const bootAudio = assetTables === undefined ? [] : shardBootAudio(sections, assetTables, half.mountRows('phone', 'entry').map(row => row.url), directory);
     const write = (tier: 'phone' | 'desktop', flow: 'client' | 'grid', addresses: readonly Address[] = [], mode = '000', whole = false): number => {
       const selected = new Map<string, SpawnFile>(), add = (row: SpawnFile): void => {selected.set(row.url, row);};
       for (const row of shardRows[tier][whole ? 'whole' : 'entry']) add(row);
-      for (const url of bootAudio) add(asset(url));
       for (const url of tier === 'phone' ? fenceAssets : desktopFence(fenceAssets, publicAssets())) add(asset(url));
       // S3: the desktop's own packs. A one-file pack is read by its member's URL (texturePack.ts), so that member is the row.
       if (whole && tier === 'desktop' && tables !== undefined) for (const [url, part] of packParts()) {
@@ -250,6 +252,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
       }
       for (const row of common) add(row);
       for (const [url, bytes] of [...bank.common, ...bank[flow]]) add(asset(url, bytes));
+      for (const url of bootAudio) add(asset(url));
       if (flow === 'grid') for (const row of discoveries) add(row);
       for (const member of bank.optional.groups[`home:${prefix}`] ?? []) {
         const row = bank.optional.files[member]; if (row === undefined) throw new Error('Invalid spawn module index'); add(asset(row[0], row[1]));
