@@ -1,9 +1,11 @@
 import {describe, expect, it} from 'vitest';
+// oxlint-disable-next-line import/no-nodejs-modules -- Hash the fixture's mount bytes as a product names them.
+import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare actual public and product files in owned Node fixtures.
 import {cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the owned fixture and output directories.
 import {dirname, join, resolve} from 'node:path';
-import {copyDeferredPublic, deferredPublicCopy, copyOutputProducts, pruneLooseCopies} from '../scripts/app-build/outputProducts.mjs';
+import {checkPublishedMounts, copyDeferredPublic, deferredPublicCopy, copyOutputProducts, pruneLooseCopies} from '../scripts/app-build/outputProducts.mjs';
 import {checkBakedTextures} from '../scripts/app-build/bakedTextures.mjs';
 import {pinnedPublicAssets} from '../scripts/pin-assets.ts';
 
@@ -141,4 +143,25 @@ it('DL20: a file only parts need leaves; what a default manifest lists, a homed 
     for (const name of ['neighbour', 'homed', 'unpacked', 'fence-off']) expect(existsSync(join(out, url(name))), name).toBe(true);
     expect(existsSync(join(out, 'assets/kept.bin'))).toBe(true);
   } finally { rmSync(out, {recursive: true, force: true}); }
+});
+
+// Meta QA 2026-11-13 row 34: a hand-placed candidate whose re-encoded recording kept its URL, over the old head's copy in
+// public/, made a preparation preview serve the old bytes and the fence lose every recording.
+it('refuses a build whose public copy of a product mount has other bytes',()=>{
+  const root=mkdtempSync(resolve('tmp/app-mounts-'));
+  const sha=(text: string): string=>createHash('sha256').update(text).digest('hex');
+  const url='/assets/music/piano/island-calm-05125ed8.m4a';
+  try{
+    write(root,'out/dawn/cook.json',JSON.stringify({mounts:[{url,path:`mounts${url}`,hash:sha('new encode'),bytes:10},
+      {url:'/shardfiles/dawn/discovery.json',path:'mounts/shardfiles/dawn/discovery.json',hash:sha('elsewhere'),bytes:9},
+      {url:'/assets/sfx/dawn/gone.m4a',path:'mounts/assets/sfx/dawn/gone.m4a',hash:sha('absent'),bytes:6}]}));
+    write(root,`public${url}`,'new encode');
+    write(root,'out/.hidden/cook.json','not json');write(root,'out/bare/shard.json','{}');
+    expect(checkPublishedMounts(root)).toBe(1);
+    write(root,'out/broken/cook.json','not json');
+    expect(()=>checkPublishedMounts(root)).toThrow('out/broken/cook.json does not parse');
+    rmSync(join(root,'out/broken'),{recursive:true});
+    write(root,`public${url}`,'old encode');
+    expect(()=>checkPublishedMounts(root)).toThrow(`public/ holds 1 mount with other bytes than their product in out/ (dawn ${url})`);
+  }finally{rmSync(root,{recursive:true,force:true});}
 });

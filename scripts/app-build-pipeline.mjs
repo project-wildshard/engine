@@ -15,6 +15,7 @@ import { nameChunksByFinalBytes } from "./app-build/finalChunkNames.mjs";
 import { writeTitleAssets } from "./title-assets.mjs";
 import {
   copyOutputProducts,
+  checkPublishedMounts,
   copyDeferredPublic,
   pruneLooseCopies,
 } from "./app-build/outputProducts.mjs";
@@ -55,6 +56,8 @@ export function prepareAppBuild() {
   // C3: a tree with no shard source (the lifted engine) has no list or bake to run; it builds from a catalogue and its packs.
   const shardSource = existsSync("src/shards");
   checkBakedTextures(process.cwd(), resolve("public"));
+  // A shard-source tree rebuilds out/ from public/ below; only a tree that builds from placed products can hold a stale copy.
+  if (!shardSource) checkPublishedMounts(process.cwd());
   if (shardSource) {
     step(["scripts/gen-shards.mjs"]);
     for (const baker of ["bake-chunk", "bake-sky"]) {

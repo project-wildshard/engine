@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
@@ -22,6 +23,36 @@ export function copyOutputProducts(root, outDir) {
     const own = resolve(source, 'mounts/shardfiles', entry.name);
     if (existsSync(own)) cpSync(own, resolve(shardfiles, entry.name), { recursive: true });
   }
+}
+
+/** A product's mounts serve from `public/` (`pins.ts install` publishes them), so a product dropped into `out/` by hand keeps
+ *  whatever an older head left there. AUDIO AU7 re-encodes a recording under its old URL, so a new revision and its
+ *  predecessor share URLs with different bytes: a preparation preview then serves the old head's audio, its manifests
+ *  name the old hashes, and `wildshard prepare` records no audio in the new head's fence (meta QA 2026-11-13 row 34).
+ *  Refuse a build whose `public/` copy of a product's mount differs from the product's own bytes; a missing copy is the
+ *  cook's to refuse. Under 0.5 s over every pinned product.
+ * @param {string} root @returns {number} the mounts checked */
+export function checkPublishedMounts(root) {
+  const products = resolve(root, 'out'), stale = [];
+  if (!existsSync(products)) return 0;
+  let checked = 0;
+  for (const entry of readdirSync(products, { withFileTypes: true })) {
+    const cook = resolve(products, entry.name, 'cook.json');
+    if (!entry.isDirectory() || entry.name.startsWith('.') || !existsSync(cook)) continue;
+    let parsed;
+    try { parsed = JSON.parse(readFileSync(cook, 'utf8')); } catch (error) { throw new Error(`out/${entry.name}/cook.json does not parse`, { cause: error }); }
+    const { mounts } = /** @type {{mounts?: {url: string, hash: string}[]}} */ (parsed);
+    for (const row of mounts ?? []) {
+      const copy = resolve(root, `public${row.url}`);
+      if (!/^\/(?:assets|programs)\/(?!.*(?:^|\/)\.\.(?:\/|$))/u.test(row.url) || !existsSync(copy)) continue;
+      checked++;
+      if (createHash('sha256').update(readFileSync(copy)).digest('hex') !== row.hash) stale.push(`${entry.name} ${row.url}`);
+    }
+  }
+  if (stale.length > 0) throw new Error(`public/ holds ${stale.length} ${stale.length === 1 ? 'mount' : 'mounts'} with other bytes than their product in out/ `
+    + `(${stale.slice(0, 3).join(', ')}): publish that product's mounts (node scripts/pins.ts install for a pin, or copy a candidate's `
+    + 'mounts/ into public/), or remove its out/ folder if nothing pins it any more, and build again');
+  return checked;
 }
 
 /** DL20: a level file leaves the deploy when a part holds it and nothing reads its URL directly. Every default manifest's file
