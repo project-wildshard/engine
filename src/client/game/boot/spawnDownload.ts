@@ -3,6 +3,7 @@ import {jsonSlot} from '@wildshard/engine/saves/slots';
 import { bootMark,bootProgress,bootTiming,downloadShown } from '@wildshard/engine/boot/timing';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
+import {placedSpawn} from './placedSpawn';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -155,7 +156,10 @@ function installMemberLayer(): boolean {
     if (!isContentOrigin(url.origin) || !url.pathname.startsWith('/shardfiles/')) return network(input, init);
     const held = await heldPartMember(url);
     if (held !== null) return held;
-    const response = await network(input, init);
+    // SA48: a slug placed after the build keeps its loose files (its header, DL18) in the cook's store, as a J138 home's are
+    const placed = placedSpawn(url.pathname.split('/')[2] ?? '');
+    const response = placed === undefined ? await network(input, init)
+      : await native(new URL(`.${url.pathname}${url.search}`, placed.base).href, {...init, ...(request === undefined ? {} : {signal: request.signal})});
     if (response.status !== 404 && !/\btext\/html\b/iu.test(response.headers.get('content-type') ?? '')) return response;
     return await partMember(url) ?? response;
   };
@@ -175,7 +179,7 @@ let partTier: 'phone' | 'desktop' = 'phone';
 async function partTable(slug: string): Promise<PartMembers | null> {
   const selected = spawnSelection(slug, 'client', partTier, '000');
   if (selected === null || typeof selected.cacheName !== 'string' || typeof caches === 'undefined') return null;
-  const address = bookSelection(await readPacksBook(), slug, 'client', partTier, '000');
+  const address = packsSelection(await readPacksBook(), slug, 'client', partTier, '000');
   if (address === null) return null;
   const [response, code] = await Promise.all([downloadFetch()(onPacks(address.url, selected.base)),
     address.code === undefined ? undefined : downloadFetch()(contentURL(new URL(address.code.url, document.baseURI).href))]);
@@ -789,6 +793,10 @@ function bookSelection(book: unknown, slug: string, flow: 'client' | 'grid', tie
   const roots = flow === 'grid' ? get(get(book, flow), mode) : get(book, flow), pair = get(get(roots, slug), tier);
   return pair === undefined ? null : readSpawnManifestAddress(pair);
 }
+/** The packs book's row, or SA48's whole-level row for a slug placed after the build (`placedSpawn.ts`): the book never has one. */
+function packsSelection(book: unknown, slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): SpawnManifestAddress | null {
+  return bookSelection(book, slug, flow, tier, mode) ?? placedSpawn(slug)?.whole[tier] ?? null;
+}
 /** A book's page path (`/assets/spawn/…`) on the packs base. The content base mirrors page paths under its own folder (PZ13:
  * `content/<set>/`), so a path keeps that folder; a J138 home or the page resolves it as a URL path, as it always did. */
 function onPacks(path: string, packs: string): string {
@@ -808,6 +816,9 @@ function packBase(home: unknown, slug: string): string {
 export function shardPackBase(slug: string): string | null {
   const text = document.getElementById('boot-module-files')?.textContent;
   if (!text) return document.baseURI;
+  // SA48: a slug placed after the build has the cook's own inventory
+  const placed = placedSpawn(slug);
+  if (placed !== undefined) return placed.programs ? placed.base : null;
   const bank: unknown = JSON.parse(text), recorded = get(bank, 'entryPrograms');
   if (get(recorded, slug) === false || get(recorded, bareSlug(slug)) === false) return null;
   return packBase(get(get(bank, 'spawnManifests'), 'home'), slug);
@@ -821,7 +832,11 @@ export function entryProgramsURL(slug: string): string | null {
 function spawnSelection(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): {address: SpawnManifestAddress; cacheName: unknown; base: string} | null {
   const text = document.getElementById('boot-module-files')?.textContent; if (!text) return null;
   const manifests = get(JSON.parse(text), 'spawnManifests'), address = bookSelection(manifests, slug, flow, tier, mode);
-  return address === null ? null : {address, cacheName: get(manifests, 'cacheName'), base: packBase(get(manifests, 'home'), slug)};
+  if (address !== null) return {address, cacheName: get(manifests, 'cacheName'), base: packBase(get(manifests, 'home'), slug)};
+  // SA48: a slug placed after the build reads the cook's entry rows from the store, on either flow (no build has its grid manifest;
+  // the grid's own code and seams are this page's and load as they always do)
+  const placed = placedSpawn(slug), cooked = placed?.entry[tier];
+  return placed === undefined || cooked === undefined ? null : {address: cooked, cacheName: get(manifests, 'cacheName'), base: placed.base};
 }
 /** DL16: the packs book (the whole level with its parts) is this build's own file, fetched only with Runtime packs on,
  * so the default page carries nothing for an off row. */
@@ -949,7 +964,7 @@ function spawnDownload(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'd
   // reports it complete, which would break the whole-level rule (sp-x9's review of 40bc516d5c).
   const download = !packsOn ? downloadSpawnManifest(selected.address, downloadPorts(selected.cacheName, false), document.baseURI, selected.base)
     : lateDownload(async signal => {
-      const address = bookSelection(await readPacksBook(), slug, flow, tier, mode);
+      const address = packsSelection(await readPacksBook(), slug, flow, tier, mode);
       signal.throwIfAborted();
       if (address === null) throw new Error(`Packs book has no ${flow} entry for ${slug} (${tier}, ${mode})`);
       if (address.url === selected.address.url) throw new Error('Packs book names the default manifest');

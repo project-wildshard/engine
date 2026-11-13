@@ -100,6 +100,16 @@ interface SlugRequest {
   readonly slug: string
 }
 
+/** The page's own tags for `slug`, else SA49's for a slug the API placed after this build, else undefined (a 404). */
+async function pageMeta(html: string, slug: string, url: Readonly<URL>): Promise<ReturnType<typeof slugMeta>> {
+  const found = slugMeta(html, slug, url.origin)
+  if (found !== undefined) {
+    return found
+  }
+  const name = await placedName(url.hostname, slug)
+  return name === undefined ? undefined : placedMeta(html, url.origin, { slug, name })
+}
+
 // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
 async function slugPage({ request, url, slug }: SlugRequest, env: Env): Promise<Response> {
   // The page itself, whole: a HEAD's empty body or a conditional request's 304 would hide which shards it names (review)
@@ -108,9 +118,7 @@ async function slugPage({ request, url, slug }: SlugRequest, env: Env): Promise<
     return uncachedMiss(asset)
   }
   const html = await asset.text()
-  const found = slugMeta(html, slug, url.origin)
-  const name = found === undefined ? await placedName(url.hostname, slug) : undefined
-  const meta = found ?? (name === undefined ? undefined : placedMeta(html, slug, url.origin, name))
+  const meta = await pageMeta(html, slug, url)
   const head = request.method === 'HEAD'
   if (meta === undefined) {
     return new Response(head ? undefined : `No shard is named ${slug}.\n`, { status: NOT_FOUND, headers: PLAIN })

@@ -131,8 +131,8 @@ function slugMeta(html: string, slug: string, origin: string): SlugMeta | undefi
 }
 
 /** SA49: a slug the API placed after this build (placed-slug.ts found its cell and name): plain tags, the site icon. */
-function placedMeta(html: string, slug: string, origin: string, name: string): SlugMeta {
-  return { title: name, description: ON_GRID, image: siteIcon(html, origin), url: new URL(`/slug/${slug}`, origin).href }
+function placedMeta(html: string, origin: string, placed: Readonly<{ slug: string, name: string }>): SlugMeta {
+  return { title: placed.name, description: ON_GRID, image: siteIcon(html, origin), url: new URL(`/slug/${placed.slug}`, origin).href }
 }
 
 const escape = (text: string): string => text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')

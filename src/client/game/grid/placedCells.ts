@@ -12,6 +12,7 @@ import { PLACEMENT_PUBLIC_KEY, PlacementSchema, SignedPlacementSchema, placement
 import { installCatalogue, installedCatalogue, type CatalogueDocument } from '../../../shared/game/grid/catalogueSlot';
 import { findTitleManifest, installTitleManifests, titleManifests } from '../shard/titleList';
 import { catalogueCards } from './placedCards';
+import { installPlacedContent, placedContent, type PlacedContent } from './placedContent';
 import { parseGridCatalogue } from '../../../shared/game/grid/catalogue';
 
 /** How long a page's boot waits for the file: GO4's 3 s, the world word's own deadline. A slower answer leaves the build's grid. */
@@ -88,7 +89,16 @@ export interface PlacedPorts {
   readonly api?: string;
   /** The catalogue lookups' own deadline (`placedCards.ts` `CARD_DEADLINE_MS`). */
   readonly cardDeadlineMs?: number;
+  /** SA48: a carded slug's content from the cook (`placedContent.ts`), by the hash its cell names; default: this page's build's index in
+   *  the store at the placement file's origin. A slug with none stays out. */
+  readonly content?: (slug: string, hash: string | undefined, signal: AbortSignal) => Promise<PlacedContent | undefined>;
 }
+/** The cook's content for a placed slug, from the store the placement file is in, for this page's build under its own validator. */
+const cookContent = (url: string, read: typeof fetch): NonNullable<PlacedPorts['content']> => (slug, hash, signal) => {
+  const build: unknown = Reflect.get(globalThis, '__WS_BUILD_ID__'), validator: unknown = Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__');
+  return hash === undefined || typeof build !== 'string' ? Promise.resolve(undefined)
+    : placedContent(slug, hash, { fetch: read, signal, packs: new URL('/', url).href, build, validator: typeof validator === 'string' ? validator : null });
+};
 /** After every row's `order`, so a carded shard is last in the deck. */
 const nextOrder = (rows: readonly { readonly order?: number }[]): number => rows.reduce((top, row) => Math.max(top, row.order ?? 0), rows.length) + 1;
 /** Read the file at `url` and install the build's catalogue with its cells. Never throws: anything but a believed file keeps the build's
@@ -119,11 +129,19 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     const unknown = addPlacedCells(placed.document, file).added.map(cell => cell.slug);
     const built = { added: placed.added, left: placed.left, serial: file.serial, carded: [] };
     if (unknown.length === 0) return built;
-    const cards = await catalogueCards(unknown, { fetch: ports.fetch ?? fetch, signal: abort.signal, order: nextOrder(titleManifests()), ...(ports.api === undefined ? {} : { api: ports.api }),
-      ...(ports.cardDeadlineMs === undefined ? {} : { deadlineMs: ports.cardDeadlineMs }) });
+    // SA48: its content from the cook beside its card, so ENTER WORLD loads it; a card with no content would only fail at the door
+    const hashes = new Map(file.cells.map(cell => [cell.slug, cell.hash])), content = ports.content ?? cookContent(url, ports.fetch ?? fetch);
+    const [cards, contents] = await Promise.all([
+      catalogueCards(unknown, { fetch: ports.fetch ?? fetch, signal: abort.signal, order: nextOrder(titleManifests()), ...(ports.api === undefined ? {} : { api: ports.api }),
+        ...(ports.cardDeadlineMs === undefined ? {} : { deadlineMs: ports.cardDeadlineMs }) }),
+      Promise.all(unknown.map(slug => content(slug, hashes.get(slug), abort.signal).catch(() => undefined))),
+    ]);
+    const cooked = new Map<string, PlacedContent>();
+    unknown.forEach((slug, n) => { const found = contents[n]; if (found !== undefined) cooked.set(slug, found); });
     if (cards.length === 0 || wentOn()) return built;
-    const carded = new Set(cards.map(row => row.slug)), more = addPlacedCells(placed.document, file, slug => carded.has(slug));
+    const carded = new Set(cards.filter(row => cooked.has(row.slug)).map(row => row.slug)), more = addPlacedCells(placed.document, file, slug => carded.has(slug));
     const opened = new Set(more.added.map(cell => cell.slug)), rows = cards.filter(row => opened.has(row.slug));
+    for (const slug of opened) { const found = cooked.get(slug); if (found !== undefined) installPlacedContent(found); }
     if (more.added.length > 0) installCatalogue(more.document);
     if (rows.length > 0) installTitleManifests([...titleManifests(), ...rows]);
     return { added: [...placed.added, ...more.added], left: more.left, serial: file.serial, carded: rows.map(row => row.slug) };

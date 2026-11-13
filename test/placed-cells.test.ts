@@ -16,6 +16,7 @@ import { installTitleManifests, titleManifests, type TitleManifest } from '../sr
 import { titleCards } from '../src/client/game/titleDeck';
 import { oneWayIn, shardCell } from '../src/client/game/grid/oneWayIn';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
+import type { PlacedContent } from '../src/client/game/grid/placedContent';
 
 const URL_AT = 'https://packs.example/releases/staging-placements.json';
 const pair = (): { readonly privateKey: KeyObject; readonly hex: string } => {
@@ -50,6 +51,9 @@ const routes = (table: Record<string, (init?: RequestInit) => Response | Promise
   };
   return Object.assign(answer, { asked }) as typeof fetch & { readonly asked: string[] };
 };
+/** SA48: a carded slug enters only with the cook's content; these SA46 tests are about its card, so its content is a stand-in. */
+const STAND_IN: PlacedContent = { spawn: { slug: 'new-author-shard', entry: {}, whole: {}, base: 'https://packs.example/', programs: false }, verdict: null };
+const cooked = (): Promise<PlacedContent> => Promise.resolve(STAND_IN);
 const PIN = JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as { grid: { cells: Cells } };
 const ART = { thumb: '/t.jpg', portrait: '/p.jpg', landscape: '/l.jpg' };
 // the live title rows' Thin Ice: an open plot, `shardSelect: false`, its art in the build
@@ -149,7 +153,7 @@ test('a slug neither this build nor the API\'s catalogue cards stays out, and an
 test('SA46: a placed slug the build has no card for is carded from its catalogue entry, and `?chunk=` enters its cell', async () => {
   let init: RequestInit | undefined;
   const fetch = routes({ [ENTRY_AT]: asked => { init = asked; return json(ENTRY); } });
-  const read = await learnPlacedCells(URL_AT, { fetch, publicKey: api.hex, api: API });
+  const read = await learnPlacedCells(URL_AT, { fetch, publicKey: api.hex, api: API, content: cooked });
   expect(read).toEqual({ added: FRESH, left: [], serial: 1, carded: ['new-author-shard'] });
   expect(fetch.asked).toEqual([URL_AT, ENTRY_AT]);
   expect(init).toMatchObject({ cache: 'no-store', credentials: 'omit', redirect: 'error' });
@@ -207,7 +211,7 @@ test('SA46: the build\'s own cells go in before the catalogue is asked: a page t
   expect(cards()).toEqual(['driftwood-isle', 'open-plot-thin-ice']);
 
   installCatalogue(PIN); installTitleManifests(ROWS.map((row, n) => ({ ...row, order: 40 + n })));
-  const ok = await learnPlacedCells(URL_AT, { fetch: routes({ [ENTRY_AT]: () => json(ENTRY) }, signed(both)), publicKey: api.hex, api: API });
+  const ok = await learnPlacedCells(URL_AT, { fetch: routes({ [ENTRY_AT]: () => json(ENTRY) }, signed(both)), publicKey: api.hex, api: API, content: cooked });
   expect(ok).toEqual({ added: both, left: [], serial: 1, carded: ['new-author-shard'] });
   expect(titleManifests().find(row => row.slug === 'new-author-shard')?.order).toBe(42);
 });

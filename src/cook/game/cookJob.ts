@@ -48,19 +48,42 @@ export interface CookJobReport {
   readonly header: string;
   readonly server: ServerPackReport;
   readonly seconds: number;
+  /** SA48: what a page's admission row needs of these bytes, from the receipt the validator just held (`cookReceipt`). */
+  readonly receipt?: CookReceipt;
 }
+/** SHARD-AUTHORING SA48: the facts a bake's `productVerdict` stamps on a page, read here from a product the format's validator has
+ *  just admitted, so a page whose build never saw the shard can admit it from the cook's index. The worker stamps its validator
+ *  revision beside them (`CookIndex.verdict`), and a page believes them only under its own. */
+export interface CookReceipt {readonly sourceHash: string; readonly indexHash: string; readonly residentBytes: number; readonly postCost: unknown; readonly worst?: unknown}
 
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
-function admit(tarball: Uint8Array, cap: number): ValidatedProduct {
+function admit(tarball: Uint8Array, cap: number): {readonly product: ValidatedProduct; readonly receipt?: CookReceipt} {
   if (tarball.length > cap) throw new ShardfileRefusedError(`Shardfile is ${tarball.length} bytes, past the ${cap} cap`);
   try {
     const files = readTar(tarball);
-    return validateShardfileProduct({
+    const product = validateShardfileProduct({
       read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path} within ${maximum} bytes`); return bytes; },
       paths: () => files.keys(),
     }, {hash: sha256});
+    const receipt = cookReceipt(files);
+    return {product, ...(receipt === undefined ? {} : {receipt})};
   } catch (error) { throw new ShardfileRefusedError(error instanceof Error ? error.message : 'Shardfile refused', {cause: error}); }
+}
+const object = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === 'object' && value !== null && !Array.isArray(value);
+/** The receipt's facts, held as `buildValidationReceipts` holds a build's own: its index hash is this header's, its source hash the
+ *  header's, its residency and post cost present. Anything else is no receipt: the cook still runs, and a page leaves the shard out. */
+export function cookReceipt(files: ReadonlyMap<string, Uint8Array>): CookReceipt | undefined {
+  const receipt = files.get('validation.json'), header = files.get('shard.json');
+  if (receipt === undefined || header === undefined) return undefined;
+  try {
+    const row: unknown = JSON.parse(new TextDecoder().decode(receipt)), index: unknown = JSON.parse(new TextDecoder().decode(header));
+    const indexHash = sha256(header), build = object(index) ? index['build'] : undefined, sourceHash = object(build) ? build['sourceHash'] : undefined;
+    if (!object(row) || typeof sourceHash !== 'string' || row['sourceHash'] !== sourceHash || row['indexHash'] !== indexHash) return undefined;
+    const {residentBytes, postCost, worst} = row;
+    if (typeof residentBytes !== 'number' || !Number.isSafeInteger(residentBytes) || residentBytes <= 0 || !object(postCost)) return undefined;
+    return {sourceHash, indexHash, residentBytes, postCost, ...(worst === undefined ? {} : {worst})};
+  } catch { return undefined; }
 }
 
 /** A failed proof is a verdict on these bytes: another try walks the same lanes. A dead child never reaches this. */
@@ -87,7 +110,7 @@ function writeServerPack(shard: OpenShardfile, out: string): ServerPackReport {
 export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJobPorts): Promise<CookJobReport> {
   const started = ports.now();
   await prepareAssetDecoders();
-  const product = admit(tarball, ports.maxBytes ?? MAX_SHARDFILE_BYTES);
+  const {product, receipt} = admit(tarball, ports.maxBytes ?? MAX_SHARDFILE_BYTES);
   // Match the transport's generic identity allowlist, without shard behavior branches.
   if (ports.expectedSlug !== undefined && !new Set([ports.expectedSlug]).has(product.index.identity.slug)) {
     throw new ShardfileRefusedError(`A shardfile for ${product.index.identity.slug} under ${ports.expectedSlug}`);
@@ -99,5 +122,6 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   // Each manifest names the header at its product URL, and no part holds it (DL18); its `?v=` is what caches it.
   const shard = openShardfile(tarball, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
   mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, shard.header);
-  return {slug: product.index.identity.slug, hash: sha256(tarball), proof, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000};
+  return {slug: product.index.identity.slug, hash: sha256(tarball), proof, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000,
+    ...(receipt === undefined ? {} : {receipt})};
 }

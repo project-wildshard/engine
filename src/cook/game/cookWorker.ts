@@ -74,6 +74,9 @@ export interface CookIndex {
   readonly seconds: number;
   /** J262 (SP1a): which author preparation the cook went by; an index from before it has none. */
   readonly preparation?: CookJobReport['cook']['preparation'];
+  /** SA48: the page's admission row for these bytes (`productVerdict`'s, but for its path), under the validator revision the worker
+   *  cooks with (`CookWorkerOptions.validator`). A page whose validator differs, or an index with none, leaves the shard out. */
+  readonly verdict?: NonNullable<CookJobReport['receipt']> & {readonly revision: string};
 }
 
 /** SA47: a box reads the same key (`serverProduct.ts`), so it lives with the server pack's paths. */
@@ -286,6 +289,9 @@ export interface CookWorkerOptions {
   readonly budgetBytes?: number;
   readonly log?: (line: string) => void;
   readonly now?: () => number;
+  /** SA48: this engine's shardfile validator revision (`shardfileValidationRevision`), the one each job validates with; with it an
+   *  index carries the page's admission row (`CookIndex.verdict`). */
+  readonly validator?: string;
 }
 export interface CookRow {
   readonly slug: string; readonly hash: string; readonly state: 'cooked' | 'present' | 'refused' | 'failed'; readonly detail?: string; readonly seconds?: number; readonly peakMB?: number;
@@ -329,7 +335,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
     const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys, server: report.server, serverPack: report.cook.server, proof: report.proof === 'unmeasured' ? 'unmeasured' : 'proved', seconds: report.seconds,
-      ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation})};
+      ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
+      ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}})};
     await store.put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});
   };
   const attempt = async (head: {readonly slug: string; readonly hash: string}, tarball: Uint8Array, work: string): Promise<CookRow> => {

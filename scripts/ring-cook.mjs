@@ -11,6 +11,7 @@ const { createCookWorker, indexKey } = await import('../src/cook/game/cookWorker
 const { folderStore } = await import('../src/cook/game/packStore.ts');
 const { cookRevision } = await import('./cook-revision.ts');
 const { rendererRevision } = await import('./renderer-revision.mjs');
+const { shardfileValidationRevision } = await import('./shardfile-validation-revision.mjs');
 const { values } = parseArgs({ options: { out: {type:'string',default:'tmp/ring-cook'}, build: {type:'string',default:'ring-local'},
   only: {type:'string'}, ring2: {type:'boolean',default:false}, 'timeout-ms': {type:'string',default:'120000'} } });
 const timeout = Number(values['timeout-ms']);
@@ -31,7 +32,7 @@ const heads = selected.map(slug => {
 });
 const store = folderStore(join(out,'store'));
 // A fresh run owns its empty cache. At least its first product always encodes cold.
-const worker = createCookWorker({ build: values.build, store, serverPacks: join(out,'server'), scratch: join(out,'jobs'),
+const worker = createCookWorker({ build: values.build, store, serverPacks: join(out,'server'), scratch: join(out,'jobs'), validator: shardfileValidationRevision(root),
   source: { heads: () => Promise.resolve(heads.map(row => ({...row, revision:1}))), download: hash => Promise.resolve(readFileSync(join(cache,`${hash}.tar`))) },
   launcher: { root, execPath: process.execPath, loader:join(root,'scripts/bake-loader.mjs'), script:join(root,'scripts/cook-job.mjs'),
     wrap:[], limits:{seconds:timeout/1000,memoryMB:4096,heapMB:2048}, renderer: rendererRevision(root) } });
