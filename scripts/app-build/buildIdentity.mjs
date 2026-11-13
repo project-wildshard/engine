@@ -50,7 +50,7 @@ export function buildLabelOf(build, { version, describe = '' }) {
 /** Stamp before executable module scripts, without changing the bundle's URLs. `label` (QA 11-13) is the build pill's
  * words, which index.html's static title shows before any bundle runs.
  * @param {string} html @param {string} build
- * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string,recordTag?:string}, label?: string}} [facts] */
+ * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string,recordTag?:string}, label?: string, builtAt?: number}} [facts] */
 export function stampBuildHtml(html, build, facts) {
   if (build.length === 0 || !/^[\w.-]+$/u.test(build)) throw new Error('Invalid document build identity');
   if (html.includes('globalThis.__WS_BUILD_ID__=')) throw new Error('Duplicate document build identity');
@@ -66,7 +66,11 @@ export function stampBuildHtml(html, build, facts) {
   const world = facts?.world === undefined ? '' : `globalThis.__WS_WORLD__=${JSON.stringify(facts.world).replaceAll('<', String.raw`\u003c`)};`;
   if (facts?.label !== undefined && !/^[\w .·+-]{1,80}$/u.test(facts.label)) throw new Error('Invalid document build label');
   const label = facts?.label === undefined ? '' : `globalThis.__WS_BUILD_LABEL__=${JSON.stringify(facts.label)};`;
-  return `${source.slice(0, end)}<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};${admission}${world}${label}</script>${source.slice(end)}`;
+  // STALE-BUILD SB1 (J321): the build time, as a meta a person can read and a number index.html's data-stale-build reads
+  const at = facts?.builtAt;
+  if (at !== undefined && !(Number.isSafeInteger(at) && at > 0)) throw new Error('Invalid document build time');
+  const built = at === undefined ? ['', ''] : [`<meta name="ws-built-at" content="${new Date(at).toISOString()}">`, `globalThis.__WS_BUILT_AT__=${at};`];
+  return `${source.slice(0, end)}${built[0]}<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};${built[1]}${admission}${world}${label}</script>${source.slice(end)}`;
 }
 
 /** Plain post-bundle step, before the service worker hashes the final HTML.
@@ -79,6 +83,9 @@ export function stampBuildDocuments(directory, facts) {
   const version = JSON.parse(readFileSync(resolve(directory, 'version.json'), 'utf8'));
   if (typeof version !== 'object' || version === null || !('build' in version) || typeof version.build !== 'string') throw new Error('Missing document build identity');
   if (version.rendererRevision !== undefined && (typeof version.rendererRevision !== 'string' || !/^[a-f0-9]{64}$/u.test(version.rendererRevision))) throw new Error('Invalid renderer identity');
+  // STALE-BUILD SB1: version.json's `time` is the build's one time (build-app's WS_BUILT_AT)
+  const time = 'time' in version && typeof version.time === 'string' ? Date.parse(version.time) : Number.NaN;
+  const builtAt = Number.isFinite(time) ? time : undefined;
   const documents = new Set(['index.html']);
   // E7.5 prep: the Connection doctor's page is built on its own (doctorOutput.mjs), so no manifest names it
   if (existsSync(resolve(directory, 'doctor/index.html'))) documents.add('doctor/index.html');
@@ -96,7 +103,7 @@ export function stampBuildDocuments(directory, facts) {
   }
   for (const name of documents) {
     const path = resolve(directory, name);
-    const html=stampBuildHtml(readFileSync(path, 'utf8'), version.build, facts);
+    const html=stampBuildHtml(readFileSync(path, 'utf8'), version.build, builtAt === undefined ? facts : { ...facts, builtAt });
     writeFileSync(path, version.rendererRevision === undefined ? html : html.replace('<script>globalThis.__WS_BUILD_ID__=',`<script>globalThis.__WS_RENDERER_REVISION__=${JSON.stringify(version.rendererRevision)};globalThis.__WS_BUILD_ID__=`));
   }
 }

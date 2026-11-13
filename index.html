@@ -505,6 +505,49 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       @font-face{font-family:'Rajdhani';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/rajdhani-700-latin-ext.woff2) format('woff2');unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
       @font-face{font-family:'Rajdhani';font-style:normal;font-weight:700;font-display:swap;src:url(/fonts/rajdhani-700-latin.woff2) format('woff2');unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
     </style>
+    <script data-stale-build>
+      // STALE-BUILD SB2/SB4/SB5 (J321, Jake 11-13: "more than 3 weeks old ... just a forced update path"): a document stamped over
+      // 21 days before the clock stops here, before the entry's <script>, and only updates. The entry's own stamp
+      // (app-build/builtAt.mjs entryStamp) calls the same screen. A clock behind the stamp, or a server Date that says the build is fresh, never traps.
+      (() => {
+        const root = document.documentElement, LIMIT = 1814400000, build = String(globalThis.__WS_BUILD_ID__ || '');
+        const keep = (store, key, value) => { try { return value === undefined ? store.getItem(key) : value === null ? store.removeItem(key) : store.setItem(key, value); } catch { return null; } };
+        const old = at => at > 0 && Date.now() - at > LIMIT && keep(sessionStorage, 'ws-stale-pass') !== build;
+        globalThis.__wsStaleBuild = at => {
+          if (root.dataset.staleBuild !== undefined) return true;
+          if (!old(at)) return false;
+          root.dataset.staleBuild = ''; root.classList.add('title-first');
+          const box = document.createElement('div'), date = new Date(at).toLocaleDateString(undefined, {year: 'numeric', month: 'long', day: 'numeric'});
+          box.className = 'ws-launch'; box.dataset.staleScreen = '';
+          box.innerHTML = '<div class="ws-launch-hero" aria-hidden="true"></div><div class="ws-launch-brand">WILDSHARD</div><div style="position:relative;margin:0 24px calc(28px + env(safe-area-inset-bottom,0px));font:16px/1.4 system-ui,sans-serif"><p role="status" style="margin:0 0 14px;padding:12px 14px;background:rgba(6,10,18,.88);border:1px solid #8fe3ff"></p><button type="button" style="padding:12px 18px;background:rgba(6,10,18,.88);border:1px solid #8fe3ff;color:#8fe3ff;font:600 14px system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase">Update now</button></div>';
+          const line = box.querySelector('p'), say = text => { line.textContent = 'This version is from ' + date + ', too old' + text; };
+          const update = async manual => {
+            if (manual) keep(sessionStorage, 'ws-stale-tries', null);
+            if (navigator.onLine === false) return say(' to play. Connect to the internet to update.');
+            say('. Updating…');
+            let server, fresh = {};
+            try { server = await fetch('/version.json?ws-fresh=' + Date.now(), {cache: 'no-store'}); fresh = await server.json(); }
+            catch { if (!server) return say(' to play. Connect to the internet to update.'); }
+            if (Date.parse(server.headers.get('date') || '') - at <= LIMIT) { keep(sessionStorage, 'ws-stale-pass', build); return location.reload(); }
+            const tries = Number(keep(sessionStorage, 'ws-stale-tries')) || 0, same = fresh.build === build;
+            keep(localStorage, 'ws-stale-build', JSON.stringify({build, at, server: String(fresh.build || ''), tries, seen: Date.now()}));
+            if (same || tries >= 2) return say(same ? ', and this address still serves it. Open play.wildshard.io.' : ', and updating did not replace it. Close the app fully and open it again.');
+            keep(sessionStorage, 'ws-stale-tries', String(tries + 1));
+            try { for (const worker of await navigator.serviceWorker.getRegistrations()) await worker.unregister(); } catch {}
+            try { for (const name of await caches.keys()) if (name.startsWith('ws-')) await caches.delete(name); } catch {}
+            const url = new URL(location.href); url.searchParams.set('ws-fresh', String(Date.now())); location.replace(url);
+          };
+          box.querySelector('button').onclick = () => update(true);
+          addEventListener('online', () => update(false));
+          (document.body || root.appendChild(document.createElement('body'))).append(box);
+          update(false);
+          return true;
+        };
+        if (root.dataset.secureDoor === 'moving' || root.dataset.doctor !== undefined) return;
+        const page = Number(globalThis.__WS_BUILT_AT__) || 0;
+        if (old(page)) { window.stop(); globalThis.__wsStaleBuild(page); } else keep(sessionStorage, 'ws-stale-tries', null);
+      })();
+    </script>
     <!-- UI styles: base first (tokens + shared primitives), then one sheet per screen with its own class prefix (scripts/check-css.mjs) -->
     <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/styles/base.css" />
     <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/loading.css" />

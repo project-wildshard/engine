@@ -15,3 +15,8 @@ different path, just a forced update path." (J321, meta `docs/plans/STALE-BUILD-
 - **Proof** (headless Chromium on a local build, the clock moved): 22 days shows the screen, unregisters the worker,
   clears `ws-*`, reloads with `?ws-fresh`, stops after two stale reloads; 20 days boots; a clock 22 days ahead with a
   server `Date` of today boots; an address serving the old build says so; offline says connect.
+
+**The document half.** `index.html`'s `data-stale-build` script sits after the head `<style>` and before the entry's
+`<script>`, so `window.stop()` ends parsing before the bundle is ever named; the screen is built from the already
+parsed `.ws-launch` rules. The server's `Date` header is the clock check, the `ws-stale-tries` session count the loop
+guard, and the `ws-stale-build` localStorage note is for SB6's Sentry report from the next build that boots.

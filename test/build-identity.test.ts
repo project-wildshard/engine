@@ -79,3 +79,13 @@ test('QA 11-13: the stamped label is the build pill\'s own words, and rides the 
   expect(stampBuildHtml(html, 'f2a636b3-mx1', { validator: 'a'.repeat(64), verdicts: [], label: 'v0.1.13 · f2a636b' }))
     .toContain('globalThis.__WS_BUILD_LABEL__="v0.1.13 · f2a636b";</script>');
 });
+
+test('STALE-BUILD SB1 (J321): the document carries its build time as a meta and a number, before every other script', () => {
+  const html = '<!doctype html><html><head><meta charset="utf-8"><script>inline()</script></head></html>';
+  const at = Date.parse('2026-11-13T15:30:00.000Z');
+  const stamped = stampBuildHtml(html, 'f2a636b3-mx1', { validator: 'a'.repeat(64), verdicts: [], builtAt: at });
+  expect(stamped).toContain('<head><meta name="ws-built-at" content="2026-11-13T15:30:00.000Z"><script>globalThis.__WS_BUILD_ID__="f2a636b3-mx1";globalThis.__WS_BUILT_AT__=1794583800000;');
+  expect(stamped.indexOf('__WS_BUILT_AT__')).toBeLessThan(stamped.indexOf('inline()'));
+  expect(() => stampBuildHtml(html, 'f2a636b3-mx1', { validator: 'a'.repeat(64), verdicts: [], builtAt: -1 })).toThrow('Invalid document build time');
+  expect(stampBuildHtml(html, 'f2a636b3-mx1')).not.toContain('ws-built-at');
+});
