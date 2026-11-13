@@ -49,3 +49,9 @@
   back after, charged by silly, and charged and printed as "one-user host,
   no register row" with no row. Binding rows decide their declaration's
   lines. A platform verdict without a decision refuses. Report-only.
+- HR7 (opus-hrm1): `OPTIONS` names the client-plan options that change what
+  a kind installs: species.program `catalogue`, debug.expose's dressing
+  `source` (no longer roots sceneDressing for every user), quest.composition
+  `figures` (its branch imports are held back without it). A binding only
+  one product's option reaches, and nothing else uses, is charged to that
+  product even in a shared module. Every other option prints as unmeasured.

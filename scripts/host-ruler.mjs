@@ -14,9 +14,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'vite';
-import { CLIENT_PLAN, ENGINE_ROOT, clientPlanRoots, productRoots, resolveModule } from './host-ruler/roots.mjs';
+import { CLIENT_PLAN, ENGINE_ROOT, clientPlanRoots, modulePath, productRoots, resolveModule } from './host-ruler/roots.mjs';
 import { NATIVE_ASSEMBLY, NATIVE_HOSTS, nativeAssemblyRoots, productServerRoots } from './host-ruler/server-roots.mjs';
-import { REGISTER, readHostRegister } from './host-ruler/register.mjs';
+import { REGISTER, namesBinding, readHostRegister } from './host-ruler/register.mjs';
 
 /** Dispatch tables: a module whose entries a product reaches one by one through its declarations. The module itself
  * runs (its lines count for every product that reaches it); `static` and `dynamic` say which of its own imports are
@@ -214,8 +214,10 @@ export const layerOf = module => module.startsWith(`${FORMAT}/`) ? 'format' : /^
 
 /** Every module reached from `roots`: static imports and import()s, except the ones a dispatch table holds back.
  * Modules the reader does not follow (npm packages) end the walk and are not listed.
- * @param {Iterable<string>} roots @param {ReturnType<typeof createTreeReader>} reader @param {Readonly<Record<string, { static: boolean, dynamic: boolean }>>} [tables] */
-export function reach(roots, reader, tables = TABLES) {
+ * `held` names edges (`from\0to`) a product's options hold back (HR7).
+ * @param {Iterable<string>} roots @param {ReturnType<typeof createTreeReader>} reader @param {Readonly<Record<string, { static: boolean, dynamic: boolean }>>} [tables]
+ * @param {ReadonlySet<string>} [held] */
+export function reach(roots, reader, tables = TABLES, held = new Set()) {
   /** @type {Set<string>} */
   const seen = new Set();
   const stack = [...roots].filter(module => reader.followed(module));
@@ -225,30 +227,101 @@ export function reach(roots, reader, tables = TABLES) {
     seen.add(module);
     const row = reader.read(module), table = Object.hasOwn(tables, module) ? tables[module] : undefined;
     const next = [...(table?.static === false ? [] : row.imports), ...(table?.dynamic === false ? [] : row.dynamic)];
-    for (const target of next) if (!seen.has(target) && reader.followed(target)) stack.push(target);
+    for (const target of next) if (!seen.has(target) && reader.followed(target) && !held.has(`${module}\0${target}`)) stack.push(target);
   }
   return seen;
 }
 
-/** The roots of one built product: its page and section roots, its server roots, and the tables it enters.
- * @param {string} dir @param {{ plan?: ReturnType<typeof clientPlanRoots>, native?: ReturnType<typeof nativeAssemblyRoots> }} [tables] */
-export function productRootModules(dir, tables = {}) {
-  const page = productRoots(dir, tables.plan), server = productServerRoots(dir, tables.native);
-  const modules = new Set([...page.modules, ...server.modules].map(row => row.module));
+/** HR7 (HA0 c): the options that change what a client-plan kind installs. A row without `from` names a binding of the
+ * kind's own CLIENT_FEATURES entry that runs only when the option is set: a product that declares the kind without
+ * the option is not rooted at it, and when exactly one product sets the option, the binding's lines are charged to it
+ * even when the kind (and the module) has two users. A row with `from` names imports of `from` that only the option's
+ * branch uses: a product without the option does not follow those edges. Every other option a product sets prints as
+ * unmeasured, never as free. `when` narrows an option to some values. Each binding here is used only by its option
+ * (the test checks it). */
+export const OPTIONS = Object.freeze([
+  // clientPlan.ts: species.program's `world` hook runs only `when: row.catalogue !== undefined`.
+  { kind: 'species.program', option: 'catalogue', bindings: ['src/client/game/shardfile/clientSpeciesProgram.ts#prepareClientSpeciesCatalogue'] },
+  // clientPlan.ts: debug.expose imports sceneDressing only for `source.kind === 'dressing'` (HR1's open note).
+  { kind: 'debug.expose', option: 'source', when: (/** @type {any} */ value) => value?.kind === 'dressing', bindings: ['src/client/game/shardfile/sceneDressing.ts#SceneDressing'] },
+  // clientQuestComposition.ts: a composition's figures (Pine's and Driftwood's people) load only when `figures` is set.
+  { kind: 'quest.composition', option: 'figures', from: 'src/client/game/shardfile/clientQuestComposition.ts', bindings: [
+    'src/client/game/quest/figures.ts#installQuestFigures', 'src/client/game/models/figureCatalogue.ts#ProductFigureCatalogue',
+    'src/client/game/models/worldSceneCatalogue.ts#defineWorldSceneCatalogue', '@wildshard/format/src/format/questFigures.ts#parseQuestFiguresDocument',
+    'src/client/game/shardfile/worldScenes.ts#installWorldScenes'] },
+]);
+/** Read a product's client-plan feature rows (kind plus options), or none.
+ * @param {string} dir */
+function featureRows(dir) {
+  const shard = JSON.parse(readFileSync(join(dir, 'shard.json'), 'utf8'));
+  const row = (Array.isArray(shard.sections) ? shard.sections : []).find((/** @type {any} */ section) => section.name === 'client/plan');
+  return row === undefined ? [] : /** @type {Record<string, unknown>[]} */ (JSON.parse(readFileSync(join(dir, row.path), 'utf8')).features);
+}
+/** @param {{ kind: string, option: string, when?: (value: unknown) => boolean }} entry @param {Record<string, unknown>} feature */
+const sets = (entry, feature) => feature.kind === entry.kind && feature[entry.option] !== undefined && (entry.when === undefined || entry.when(feature[entry.option]));
+
+/** The roots of one built product: its page and section roots, its server roots, the tables it enters, and the edges
+ * its unset options hold back.
+ * @param {string} dir @param {{ plan?: ReturnType<typeof clientPlanRoots>, native?: ReturnType<typeof nativeAssemblyRoots> }} [tables]
+ * @param {typeof OPTIONS} [options] */
+export function productRootModules(dir, tables = {}, options = OPTIONS) {
+  const page = productRoots(dir, tables.plan), server = productServerRoots(dir, tables.native), features = featureRows(dir);
+  const setOptions = options.filter(entry => features.some(feature => sets(entry, feature)));
+  // A kind root binding gated on an unset option roots nothing; a module root keeps any binding left.
+  const gated = new Set(options.filter(entry => entry.from === undefined && !setOptions.includes(entry)).flatMap(entry => entry.bindings));
+  /** @type {Set<string>} */
+  const modules = new Set(server.modules.map(row => row.module));
+  for (const root of page.roots) if (!root.from.startsWith('kind:') || root.bindings.some(binding => !gated.has(`${root.module}#${binding}`))) modules.add(root.module);
   if (page.sections.includes('client/plan')) modules.add(CLIENT_PLAN);
   if (server.roots.length > 0 || server.unmeasured.length > 0) { modules.add(NATIVE_ASSEMBLY); modules.add(NATIVE_HOSTS); }
-  return { slug: page.slug, roots: [...modules].sort(), unmeasured: server.unmeasured };
+  const held = new Set(options.filter(entry => entry.from !== undefined && !setOptions.includes(entry)).flatMap(entry => entry.bindings.map(binding => `${entry.from}\0${binding.split('#')[0]}`)));
+  /** @type {string[]} */
+  const unmeasuredOptions = [];
+  for (const feature of features) for (const key of Object.keys(feature)) {
+    if (key === 'kind' || options.some(entry => entry.kind === feature.kind && entry.option === key)) continue;
+    const name = `${String(feature.kind)}.${key}`;
+    if (!unmeasuredOptions.includes(name)) unmeasuredOptions.push(name);
+  }
+  // Every binding rooted other than through an option row's own kind: an option binding found here is not the option's alone.
+  const own = new Set(options.filter(entry => entry.from === undefined).flatMap(entry => entry.bindings.map(key => `kind:${entry.kind}\0${key}`)));
+  const rootKeys = [...new Set([...page.roots, ...server.roots].flatMap(root => root.bindings.map(binding => `${root.module}#${binding}`).filter(key => !own.has(`${root.from}\0${key}`))))].sort();
+  return { slug: page.slug, roots: [...modules].sort(), rootKeys, unmeasured: server.unmeasured, held, options: setOptions.map(entry => `${entry.kind}.${entry.option}`), unmeasuredOptions: unmeasuredOptions.sort() };
+}
+
+/** HR7: a binding only one product's option reaches is charged to that product, even in a shared module. Only rows
+ * without `from` charge bindings, and only when nothing else uses the binding: no product roots it through another
+ * kind or section, and no module the products reach imports its module and names it. A module only that product reaches
+ * is already charged whole, so it adds nothing here.
+ * @param {ReturnType<typeof measure>} modules @param {readonly { slug: string, options?: readonly string[], rootKeys?: readonly string[] }[]} products
+ * @param {ReturnType<typeof createTreeReader>} reader @param {typeof OPTIONS} [options] */
+export function optionCharges(modules, products, reader, options = OPTIONS) {
+  const out = [];
+  for (const entry of options) {
+    if (entry.from !== undefined) continue;
+    const setters = products.filter(product => product.options?.includes(`${entry.kind}.${entry.option}`)).map(product => product.slug);
+    if (setters.length !== 1) continue;
+    for (const key of entry.bindings) {
+      const [module = '', binding = ''] = key.split('#'), use = modules.get(module);
+      if (use === undefined || use.users.length < 2 || products.some(product => product.rootKeys?.includes(key))) continue;
+      const importers = [...modules.keys()].filter(other => other !== module && other !== CLIENT_PLAN
+        && (reader.read(other).imports.includes(module) || reader.read(other).dynamic.includes(module)));
+      if (importers.some(other => namesBinding(readFileSync(/** @type {string} */ (modulePath(other, reader.root)), 'utf8'), binding))) continue;
+      const lines = reader.read(module).declarations.filter(d => d.names.includes(binding)).reduce((sum, d) => sum + d.lines, 0);
+      out.push({ key, user: setters[0], option: `${entry.kind}.${entry.option}`, lines });
+    }
+  }
+  return out;
 }
 
 /** Per module, its code lines, layer and the users that reach it. The shell, when given, is a user only of the
  * `control` modules it reaches (HR4).
- * @param {readonly { slug: string, roots: Iterable<string> }[]} users @param {ReturnType<typeof createTreeReader>} reader
+ * @param {readonly { slug: string, roots: Iterable<string>, held?: ReadonlySet<string> }[]} users @param {ReturnType<typeof createTreeReader>} reader
  * @param {{ tables?: Readonly<Record<string, { static: boolean, dynamic: boolean }>>, shell?: { roots: Iterable<string>, control: readonly string[] } }} [options] */
 export function measure(users, reader, options = {}) {
   const tables = options.tables ?? TABLES;
   /** @type {Map<string, { lines: number, layer: string, users: string[] }>} */
   const modules = new Map();
-  for (const user of users) for (const module of reach(user.roots, reader, tables)) {
+  for (const user of users) for (const module of reach(user.roots, reader, tables, user.held)) {
     const row = modules.get(module) ?? { lines: reader.read(module).lines, layer: layerOf(module), users: [] };
     if (!row.users.includes(user.slug)) row.users.push(user.slug);
     modules.set(module, row);
@@ -340,9 +413,13 @@ export function applyRegister(modules, reader, rows, options) {
 }
 
 /** Per product: one-user lines without register credit, and what the register credits or charges of them.
- * @param {ReturnType<typeof applyRegister>} ruled @param {readonly string[]} slugs */
-export function shardTotals(ruled, slugs) {
-  const out = new Map(slugs.map(slug => [slug, { modules: 0, lines: 0, format: 0, ...Object.fromEntries(STATUSES.map(status => [status, 0])), charged: 0 }]));
+ * @param {ReturnType<typeof applyRegister>} ruled @param {readonly string[]} slugs @param {readonly { user: string, lines: number }[]} [options] HR7 option charges */
+export function shardTotals(ruled, slugs, options = []) {
+  const out = new Map(slugs.map(slug => [slug, { modules: 0, lines: 0, format: 0, ...Object.fromEntries(STATUSES.map(status => [status, 0])), option: 0, charged: 0 }]));
+  for (const row of options) {
+    const total = /** @type {Record<string, number> | undefined} */ (out.get(row.user));
+    if (total !== undefined) { total.option += row.lines; total.charged += row.lines; }
+  }
   for (const row of ruled.modules.values()) {
     const total = /** @type {Record<string, number> | undefined} */ (out.get(row.user));
     if (total === undefined) continue;
@@ -375,13 +452,14 @@ export function rule(dirs, options = {}) {
   const reader = createTreeReader({ root });
   const modules = measure(products, reader, { shell: { roots: SHELL_ROOTS, control: SHELL_CONTROL } });
   const ruled = applyRegister(modules, reader, options.register ?? readHostRegister(root).rows, { today });
-  return { products, format: reader.format.version, today, modules, ruled, oneUser: oneUserLines(modules, slugs), totals: shardTotals(ruled, slugs) };
+  const charges = optionCharges(modules, products, reader);
+  return { products, format: reader.format.version, today, modules, ruled, options: charges, oneUser: oneUserLines(modules, slugs), totals: shardTotals(ruled, slugs, charges) };
 }
 
 /** @param {ReturnType<typeof rule>} report */
 export function formatTable(report) {
   const columns = /** @type {const} */ ([['modules', 'one-user modules'], ['lines', 'one-user lines'], ['format', 'of which format'], ['platform', 'credited'],
-    ['pending', 'pending'], ['no-row', 'no row'], ['charged-back', 'charged back'], ['silly', 'silly'], ['charged', 'charged']]);
+    ['pending', 'pending'], ['no-row', 'no row'], ['charged-back', 'charged back'], ['silly', 'silly'], ['option', 'option'], ['charged', 'charged']]);
   const rows = [...report.totals].map(([slug, total]) => [slug].concat(columns.map(([key]) => String(/** @type {Record<string, number>} */ (total)[key]))));
   const head = ['shard', ...columns.map(([, name]) => name)];
   const width = head.map((h, i) => Math.max(h.length, ...rows.map(row => row[i].length)));
@@ -389,10 +467,15 @@ export function formatTable(report) {
   const noRow = [...report.ruled.modules.values()].filter(row => row.spans['no-row'] > 0)
     .sort((a, b) => a.user.localeCompare(b.user) || a.module.localeCompare(b.module))
     .map(row => `one-user host, no register row: ${row.user} ${row.module} (${row.spans['no-row']} lines)`);
+  const option = report.options.map(row => `option-charged: ${row.user} ${row.key} (${row.lines} lines, only it sets ${row.option})`);
   const unmeasured = report.products.flatMap(p => p.unmeasured.map(u => `unmeasured: ${p.slug} host ${u.host}: ${u.reason}`));
+  /** @type {Map<string, string[]>} */
+  const byOption = new Map();
+  for (const product of report.products) for (const name of product.unmeasuredOptions) byOption.set(name, [...byOption.get(name) ?? [], product.slug]);
+  const options = [...byOption].sort(([a], [b]) => a.localeCompare(b)).map(([name, slugs]) => `unmeasured option: ${name} (${slugs.join(', ')})`);
   return [`format package ${FORMAT} ${report.format}; register ${REGISTER}; today ${report.today}`,
-    'one-user lines without register credit: "one-user lines"; with it: "charged" (no row + charged back + silly)',
-    line(head), `|${width.map((w, i) => i === 0 ? '-'.repeat(w + 2) : `${'-'.repeat(w + 1)}:`).join('|')}|`, ...rows.map(line), ...noRow, ...unmeasured].join('\n');
+    'one-user lines without register credit: "one-user lines"; with it: "charged" (no row + charged back + silly + option)',
+    line(head), `|${width.map((w, i) => i === 0 ? '-'.repeat(w + 2) : `${'-'.repeat(w + 1)}:`).join('|')}|`, ...rows.map(line), ...noRow, ...option, ...unmeasured, ...options].join('\n');
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
@@ -402,6 +485,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.fi
   if (dirs.length === 0) { console.error('usage: node scripts/host-ruler.mjs --products <product-dir>... [--today YYYY-MM-DD] [--json]'); process.exit(2); }
   const report = rule(dirs, todayAt === -1 ? {} : { today: args[todayAt + 1] });
   if (json) console.log(JSON.stringify({ format: report.format, today: report.today, products: report.products, modules: Object.fromEntries(report.modules),
-    oneUser: Object.fromEntries(report.ruled.modules), sillyShared: report.ruled.sillyShared, totals: Object.fromEntries(report.totals) }, null, 2));
+    oneUser: Object.fromEntries(report.ruled.modules), sillyShared: report.ruled.sillyShared, options: report.options, totals: Object.fromEntries(report.totals) },
+    (key, value) => value instanceof Set ? [...value] : value, 2));
   else console.log(formatTable(report));
 }

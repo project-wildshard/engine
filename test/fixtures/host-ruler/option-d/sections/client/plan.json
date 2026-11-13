@@ -1,0 +1,21 @@
+{
+ "version": 1,
+ "features": [
+  {
+   "kind": "species.program"
+  },
+  {
+   "kind": "quest.composition",
+   "file": "q.json",
+   "id": "q"
+  },
+  {
+   "kind": "debug.expose",
+   "name": "x",
+   "source": {
+    "kind": "runtime-object",
+    "id": "a"
+   }
+  }
+ ]
+}

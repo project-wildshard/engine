@@ -1,0 +1,11 @@
+{
+ "identity": {
+  "slug": "option-c"
+ },
+ "sections": [
+  {
+   "name": "client/plan",
+   "path": "sections/client/plan.json"
+  }
+ ]
+}

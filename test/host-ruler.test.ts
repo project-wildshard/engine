@@ -1,8 +1,9 @@
 // HOST-RULER HR3 (meta docs/plans/HOST-RULER-PLAN.md): a product's closure, and the modules only it reaches.
 // oxlint-disable-next-line import/no-nodejs-modules -- Runs the ruler's CLI as a user would.
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { applyRegister, codeLines, createTreeReader, formatTable, layerOf, shardTotals, measure, oneUserLines, productRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
+import { applyRegister, codeLines, createTreeReader, formatTable, layerOf, OPTIONS, optionCharges, shardTotals, measure, oneUserLines, productRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
 import { CLIENT_PLAN, clientPlanRoots } from '../scripts/host-ruler/roots.mjs';
 import { NATIVE_ASSEMBLY, NATIVE_HOSTS } from '../scripts/host-ruler/server-roots.mjs';
 
@@ -136,7 +137,7 @@ describe('the platform rule and the register\'s gates (HR6, HA0 f)', () => {
   });
   test('one user and no row: charged, printed as one-user host, no register row', () => {
     expect(spans('src/client/game/feature/a.ts')).toEqual({ 'no-row': 4 });
-    const report = { products: [], format: '0.0.0', today, modules, ruled, oneUser: oneUserLines(modules, ['a', 'b']), totals: shardTotals(ruled, ['a', 'b']) };
+    const report = { products: [], format: '0.0.0', today, modules, ruled, options: [], oneUser: oneUserLines(modules, ['a', 'b']), totals: shardTotals(ruled, ['a', 'b']) };
     expect(formatTable(report)).toContain('one-user host, no register row: a src/client/game/feature/a.ts (4 lines)');
   });
   test('a pending row past recheck charges back; a binding row before recheck stays credited', () => {
@@ -148,8 +149,8 @@ describe('the platform rule and the register\'s gates (HR6, HA0 f)', () => {
   test('a silly row on a shared module charges its lines to the row\'s users; totals add up', () => {
     expect(ruled.sillyShared).toEqual([{ module: '@wildshard/format/src/format/shared.ts', users: ['b'], lines: 1, key: '@wildshard/format/src/format/shared.ts' }]);
     const totals = shardTotals(ruled, ['a', 'b']);
-    expect(totals.get('a')).toEqual({ modules: 3, lines: 13, format: 5, platform: 4, pending: 3, 'no-row': 4, 'charged-back': 2, silly: 0, charged: 6 });
-    expect(totals.get('b')).toEqual({ modules: 1, lines: 3, format: 0, platform: 0, pending: 0, 'no-row': 3, 'charged-back': 0, silly: 1, charged: 4 });
+    expect(totals.get('a')).toEqual({ modules: 3, lines: 13, format: 5, platform: 4, pending: 3, 'no-row': 4, 'charged-back': 2, silly: 0, option: 0, charged: 6 });
+    expect(totals.get('b')).toEqual({ modules: 1, lines: 3, format: 0, platform: 0, pending: 0, 'no-row': 3, 'charged-back': 0, silly: 1, option: 0, charged: 4 });
   });
   test('a platform verdict without a decision id refuses', () => {
     expect(() => applyRegister(modules, tree, [{ key: 'src/client/game/feature/a.ts', verdict: 'engine', users: [] }], { today })).toThrow(/without a decision id/u);
@@ -159,5 +160,53 @@ describe('the platform rule and the register\'s gates (HR6, HA0 f)', () => {
     const report = rule(['test/fixtures/host-ruler/closure-a', 'test/fixtures/host-ruler/pine-hollow'], { today });
     expect(report.totals.get('pine-hollow')!.lines).toBe(report.oneUser.get('pine-hollow')!.lines);
     expect(formatTable(report)).toMatch(/\| pine-hollow +\|/u);
+  });
+});
+
+describe('optional sub-rows (HR7, HA0 c)', () => {
+  const c = productRootModules('test/fixtures/host-ruler/option-c', { plan });
+  const d = productRootModules('test/fixtures/host-ruler/option-d', { plan });
+  const modules = measure([c, d], reader);
+  const charges = optionCharges(modules, [c, d], reader);
+
+  test('two products declare species.program; the one setting catalogue alone is charged its binding', () => {
+    expect(modules.get('src/client/game/shardfile/clientSpeciesProgram.ts')?.users).toEqual(['option-c', 'option-d']);
+    expect(c.options).toEqual(['species.program.catalogue', 'quest.composition.figures']);
+    expect(charges).toEqual([{ key: 'src/client/game/shardfile/clientSpeciesProgram.ts#prepareClientSpeciesCatalogue', user: 'option-c', option: 'species.program.catalogue', lines: expect.any(Number) }]);
+    expect(charges[0]!.lines).toBeGreaterThan(5);
+    const totals = shardTotals(applyRegister(modules, reader, [], { today: '2026-11-13' }), ['option-c', 'option-d'], charges);
+    expect(totals.get('option-c')!.option).toBe(charges[0]!.lines);
+    expect(totals.get('option-d')!.option).toBe(0);
+  });
+  test('a branch\'s imports are held back for a product without the option', () => {
+    expect([...d.held].map(edge => edge.split('\0')[1])).toContain('src/client/game/quest/figures.ts');
+    expect(c.held.size).toBe(0);
+    // A held edge cuts only that import: figures.ts is still shared through other paths today.
+    const tree = createTreeReader({ root: 'test/fixtures/host-ruler/tree', formatDir: 'test/fixtures/host-ruler/tree/format' });
+    const edge = new Set(['src/client/game/feature/a.ts\0src/client/game/session/hudExtra.ts']);
+    expect(reach(['src/client/game/feature/a.ts'], tree, TABLES, edge).has('src/client/game/session/hudExtra.ts')).toBe(false);
+    expect(reach(['src/client/game/feature/a.ts'], tree, TABLES).has('src/client/game/session/hudExtra.ts')).toBe(true);
+  });
+  test('an option row\'s kind binding roots nothing without its option: debug.expose without a dressing source', () => {
+    expect(d.roots).not.toContain('src/client/game/shardfile/sceneDressing.ts');
+  });
+  test('every option the table does not name prints as unmeasured, never free', () => {
+    expect(d.unmeasuredOptions).toEqual(['debug.expose.name', 'quest.composition.file', 'quest.composition.id']);
+    const report = rule(['test/fixtures/host-ruler/option-c', 'test/fixtures/host-ruler/option-d'], { today: '2026-11-13', register: [] });
+    const out = formatTable(report);
+    expect(out).toContain('unmeasured option: quest.composition.file (option-c, option-d)');
+    expect(out).toContain('option-charged: option-c src/client/game/shardfile/clientSpeciesProgram.ts#prepareClientSpeciesCatalogue');
+  });
+  test('each option binding is used only by its option', () => {
+    const source = (path: string) => readFileSync(path, 'utf8');
+    for (const entry of OPTIONS) for (const key of entry.bindings) {
+      const [module, binding] = key.split('#') as [string, string];
+      expect(reader.read(module).declarations.some(row => row.names.includes(binding)), key).toBe(true);
+      const where = entry.from ?? CLIENT_PLAN;
+      // A branch import is named twice in `from`: its import and its one use. A kind binding is named by clientPlan.ts.
+      const count = source(where).split(new RegExp(String.raw`\b${binding}\b`, 'u')).length - 1;
+      if (entry.from === undefined) expect(count, key).toBeGreaterThan(0);
+      else expect(count, key).toBe(2);
+    }
   });
 });
