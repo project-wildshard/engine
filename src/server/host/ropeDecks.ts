@@ -5,6 +5,7 @@ import { rideable } from '@wildshard/engine/physics/CharacterMotor';
 import { RopeChain } from '@wildshard/engine/physics/ropeChain';
 import { tagOf } from '@wildshard/engine/physics/surface';
 import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import { registerInstalled } from '@wildshard/engine/game/shardfile/installedSides';
 
 type RopeDeckStage = Extract<WorldAssemblyStage, { kind: 'rope-deck' }>;
 type RopeChainStage = Extract<WorldAssemblyStage, { kind: 'rope-chain' }>;
@@ -45,6 +46,7 @@ export function installRopeDecks(host: SimHost, product: ShardProduct | undefine
   const stages = ropeChainStages(product), owners = stages.map(({ deck }) => JSON.stringify(deck.site.deck.owner));
   // a saved chain is found by its planks' owner: two decks of one site would each find both chains
   if (new Set(owners).size !== owners.length) throw new Error('Native rope decks need an owner each');
+  if (stages.length > 0) registerInstalled(host, 'ropeDecks'); // SS3
   for (const { stage, deck, facts } of stages) {
     const rows = deck.site.deck;
     const build = (): void => {

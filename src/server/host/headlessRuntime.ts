@@ -7,6 +7,7 @@ import { prepareAssetDecoders } from '@wildshard/format/product';
 import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
 import { MoverScriptDriver, type MoverRuntime } from '@wildshard/engine/game/plugin/mover';
 import { installRopeDecks } from './ropeDecks';
+import { registerInstalled } from '@wildshard/engine/game/shardfile/installedSides';
 import type { NearColliders } from '@wildshard/engine/physics/nearColliders';
 import { installCableModes } from '@wildshard/engine/player/modes';
 import { createNativeCombatFrame, nativeRangedItem, otherCombatFrame, readNativeRangedItem, type NativeCombatFrame, type NativeRangedItem } from '@wildshard/engine/game/plugin/nativeItems';
@@ -201,6 +202,7 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
   if (plan.level.id !== identity.id || plan.level.seed !== identity.seed) throw new Error('Trusted runtime simulation identity mismatch');
   return { ...plan, install: (host, context) => {
     installRoomRespawn(host, places);
+    if (places.length > 0) registerInstalled(host, 'places'); // SS3: a room respawns its players at the page's named places
     installRopeDecks(host, decks, context.restoring); // NL5: the planks the page stands on
     installCableModes(host.scope, source.modes?.traverse ?? [], host.flags).bindNative(host);
     const declared = source.runtime?.binds?.includes('movers') === true || hasDeclaredClientPage(source) ? source.movers : [];
@@ -220,11 +222,13 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
       { id: 'movers.carried', restoring: context.restoring, restoreFlags: new Set(host.flags.all), drive: true });
     }
     plan.install(host, context);
+    if (carried.length > 0) registerInstalled(host, 'movers'); // SS3
     // SERVER-PARITY HS2: every other declared mover the page stands on (Driftwood's moored boat, a `platform` on the swell), when
     // the plan has no mover motion of its own. A plan that drives movers (Far Reach's recipe) owns them all, its skipped rows too.
     // Rope chains stay with the rope decks above (NL5). Its own step, joined: a room saved before HS2 has none and builds them.
     const rows = shardRows(host).bodies, planMoves = declared.some(row => rows.has(`script:${row.id}`) && row.carry === undefined);
     const moored = planMoves ? [] : declared.filter(row => row.carry === undefined && row.kind !== 'chain');
+    if (planMoves || moored.length > 0) registerInstalled(host, 'movers');
     if (moored.length > 0) new MoverScriptDriver(moored, host).install(host, { content: { identity: source.identity,
       sim: { ...source.sim, bindings: [] }, state: source.state }, assets: new Map(), rules: { fields: {}, archetypes: [], events: [], maxEntities: 32 } },
     { id: 'movers.moored', restoring: context.restoring, restoreFlags: new Set(host.flags.all), drive: true, joined: true });
@@ -259,6 +263,7 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
   const lead = leadPlayer(host);
   // ENG-18: a room catches its seats' falls itself (cellWorld's FallFloor); a resident alone catches its own, or nobody does.
   const caught = world?.room === true ? null : residentFallNet(host, shardPlayArea(preparation.shard.manifest?.bounds, preparation.product), host.level.player.at);
+  if (caught !== null && preparation.product !== undefined) registerInstalled(host, 'fallFloor'); // SS3: the page's play area, read off its rows
   const routes = actRoutes(host), held = routes.launcher;
   routes.launcher = (slot, reload, fire) => launcherTakes(nativeRangedItem(host, slot)?.kind, reload, fire) || held?.(slot, reload, fire) === true;
   const lend = (input: readonly HeadlessCommand[]): void => {

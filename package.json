@@ -929,6 +929,7 @@
     "./game/quest/serverPlaces": "./src/server/game/quest/serverPlaces.ts",
     "./game/loadout/itemCatalogue": "./src/shared/game/loadout/itemCatalogue.ts",
     "./game/shardfile/nativePlan": "./src/server/game/shardfile/nativePlan.ts",
+    "./game/shardfile/installedSides": "./src/server/game/shardfile/installedSides.ts",
     "./game/shardfile/worldTargets": "./src/shared/game/shardfile/worldTargets.ts",
     "./game/shardfile/decisions": "./src/server/game/shardfile/decisions.ts",
     "./game/shardfile/outputDescriptor": "./src/shared/game/shardfile/outputDescriptor.ts",

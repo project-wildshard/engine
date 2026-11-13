@@ -83,6 +83,7 @@ import { installEntrySockets } from "@wildshard/engine/physics/entrySockets";
 import { addPiece, type AddedPiece } from "@wildshard/engine/physics/pieces";
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 import { scriptSeats, type ScriptSeats } from './scriptSeats';
+import { registerInstalled } from '../shardfile/installedSides';
 
 type Physics = SimHost['physics'];
 type PropColliderPort = NonNullable<ReturnType<ReturnType<typeof installShardfileColliders>['get']>>;
@@ -274,6 +275,9 @@ export async function prepareRuntimePlan(shard: Shardfile, assets: ReadonlyMap<s
         encounters: new Map([[parseBossOwnerRow(recipe.population.owner).actor, encounter]]) },
     });
     if (ownsTargets) bindNativeWorldTargets(host, melee, questRuntime, targets, context.emit);
+    // SS3: the runtime plan's world holds the scenes' solids and the boss; its held melee and quest host are the page's halves.
+    // Its one-slot loadout is no catalogue kit, so it registers no `loadout`.
+    for (const key of ['collision', 'heldBoss', 'melee', 'questHost'] as const) registerInstalled(host, key);
     if (row.columns) bindPlayerColumns(host, shard.modes?.traverse ?? []);
     keeper.settle();
   } };

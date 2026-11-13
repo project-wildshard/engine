@@ -4,6 +4,7 @@ import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { publishOwned, sayFightView } from '@wildshard/engine/sim/shardRows';
 import { hasNativeInventory, nativeInventoryKeeps, creditNativeInventory } from '../../../shared/game/inventoryLaw';
 import { harvestDrops } from '../../../shared/game/harvest';
+import { registerInstalled } from '../shardfile/installedSides';
 
 const finite = v.pipe(v.number(), v.finite());
 const corpse = v.strictObject({ id: v.string(), kind: v.string(), variant: v.string(), x: finite, y: finite, z: finite });
@@ -11,6 +12,7 @@ const corpse = v.strictObject({ id: v.string(), kind: v.string(), variant: v.str
  * Pending carcasses survive a world save; consumed claims are absent from it. */
 export function installNativeHarvest(host: SimHost): void {
   if(!hasNativeInventory(host,'pack'))return;
+  registerInstalled(host, 'harvest'); // SS3: the page's ambient life drops carcasses the server pays out
   publishOwned(host,'harvest',(_player,out)=>{out.set('harvest.enabled',1);});
   const pending = new Map<string, v.InferOutput<typeof corpse>>(), routes = actRoutes(host);
   const bind = (row: v.InferOutput<typeof corpse>): void => {

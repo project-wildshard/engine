@@ -64,6 +64,7 @@ import { nativeDecisionAuthority } from './borrowedDecisions';
 import { installNativeGroupRows } from './groupRuntime';
 import { need, readAssemblyInput, type AssemblyPrepared, type NativeAssemblyContext } from './nativeAssemblyInput';
 import { installBodyScripts, installCombatMotion } from './nativeRuntimeLoans';
+import { registerInstalled } from './installedSides';
 
 /** What one install's hosts hand each other, in the plan's order. A later host reads what an earlier one left. */
 export interface AssemblyRun<C extends NativeAssemblyContext> {
@@ -93,7 +94,7 @@ async function prepareQuest<C extends NativeAssemblyContext>(row: Extract<Native
   const props = row.props === undefined ? undefined : await read<unknown>(row.props);
   const trades = row.barter === true ? parseBarterEconomy(need(shard.rows.loot[0], 'Missing barter row').economy).exchange : undefined;
   const secret = content === undefined ? undefined : await readNativeQuestSecret(product);
-  return run => { run.quest = installNativeQuestComposition(run.host, { source: shard, table, rows, spots: row.readSpots === true ? readNativeQuestSpots(spots) : spots, counters: native,
+  return run => { registerInstalled(run.host, 'questComposition'); run.quest = installNativeQuestComposition(run.host, { source: shard, table, rows, spots: row.readSpots === true ? readNativeQuestSpots(spots) : spots, counters: native,
     ...(content === undefined ? {} : { steps: content.steps, deaths: content.deaths, readings: content.readings, lead: content.lead }),
     ...(contracts === undefined ? {} : { contracts: ownContractCatalogue(contracts, run.host.scope) }), ...(trades === undefined ? {} : { trades }), ...(director === undefined ? {} : { director }),
     ...(props === undefined ? {} : { props }), ...(secret === undefined ? {} : { secret }), ...(row.restoring === true ? { restoring: run.context.restoring } : {}) }); };
@@ -154,7 +155,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     }
     case 'boss.arena': {
       const input = await readAssemblyInput<unknown>(product, { file: row.file }), spec = arenaSpecies(await readAssemblyInput<unknown>(product, { file: 'server/arena-species.json' }));
-      return run => { if (run.context.room === true) installArenaEntry(run.host, input, row, { spec, grantItem: at.ports.grantItem(run.context), snapshot: run.context.snapshot }); };
+      return run => { if (run.context.room === true) { installArenaEntry(run.host, input, row, { spec, grantItem: at.ports.grantItem(run.context), snapshot: run.context.snapshot }); registerInstalled(run.host, 'arenaRoom'); } };
     }
     case 'held.arms': {
       const arms = await prepareHeldArms(product, { ...row, weather: await readAssemblyInput<unknown>(product, row.weather) }), stealth = prepareNativeStealth(product);
@@ -163,7 +164,9 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
           contacts: (host, from, direction, distance, hit) => patrolOf(host)?.target(from, direction, distance, hit) ?? hit });
         // SS4: the sneak shot the page doubles, decided here from each player's own Hidden state. Installed after the arms so
         // exportSeats keeps its indexes; a shot therefore reads the state one tick old, where the page reads the same frame's.
-        stealth?.(run.host, { tick, groups: run.groups }); } };
+        // SS3: the held arms own the room's equip swap, the server half of the page's catalogue kit
+        registerInstalled(run.host, 'heldArms'); registerInstalled(run.host, 'loadout');
+        if (stealth !== null) { stealth(run.host, { tick, groups: run.groups }); registerInstalled(run.host, 'stealth'); } } };
     }
     case 'encounter.patrol': {
       if (at.ports.room !== true) return () => undefined;
@@ -175,12 +178,14 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
         let captain: NativeCaptain | null = null, windElite: NativeWindElite | null = null;
         const finish = patrol.begin(run.host, { eliteDamage: (host, actor, request) => captain?.scale(actor, request.point) ?? run.arena?.eliteDamage(host, actor, request) ?? 1, beforePatrol: (host, dt) => { slots?.advance(host, dt); captain?.advance(dt); windElite?.advance(dt); }, afterPatrol: (host, dt) => { run.arena?.advance(host, dt); } });
         run.patrol = () => {
-          finish(); slots?.install(run.host, need(run.bindings, 'Slots need their bindings'), run.context.restoring);
+          finish();
+          if (slots !== null) { slots.install(run.host, need(run.bindings, 'Slots need their bindings'), run.context.restoring); registerInstalled(run.host, 'slots'); registerInstalled(run.host, 'poseViews'); }
           if (ride !== null && elites !== undefined) { captain = ride(run.host, decisions => nativeEliteCore(run.host, elites.conditions, decisions, dayOf(run), need(run.wild, 'A captain needs his environment')), `${row.step}.captain`); if (captain.lair.record !== undefined) need(run.eliteCore, 'A captain needs the world\'s lairs').share(captain.lair.id, captain.lair.record); }
           if (fly !== null && elites !== undefined) {
             const env = need(run.wild, 'A wind elite needs its environment'), world = need(run.eliteCore, 'A wind elite needs the world\'s lairs');
             windElite = fly(run.host, need(run.bindings, 'A wind elite needs its bindings'), () => nativeEliteCore(run.host, elites.conditions, ReturnProgram.native(run.host, bootOf(at).admission), dayOf(run), env), `${row.step}.wind`, () => env.wind);
             if (windElite.lair.record !== undefined) world.share(windElite.lair.id, windElite.lair.record);
+            registerInstalled(run.host, 'windElite');
           }
         };
       };
@@ -192,6 +197,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
         const { host, context } = run; run.arena = arena;
         arena.observeWeather(host, need(run.weather, 'An open arena needs its weather')); arena.cover(host); need(run.patrol, 'An open arena needs its patrol')();
         arena.install(host, { presentation: need(at.ports.arena, 'An open arena needs its presentation'), commands: at.ports.heldTick(context).commands, ledger: at.ports.ledger(context), restoring: context.restoring, grantItem: at.ports.grantItem(context) });
+        registerInstalled(host, 'poseViews');
       };
     }
     case 'grapple': {
@@ -201,6 +207,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
       return run => {
         const { context } = run, guard = context.restoring ? [] : run.host.physics.world.colliders.getAll().filter(collider => tagOf(collider)?.owner === row.guard).map(collider => collider.handle);
         installGrapple(run.host, at.ports.grappleTick(context), profile, mode, hooks, guard, row.rise === true);
+        registerInstalled(run.host, 'grapple');
       };
     }
     case 'riding.taming': {
@@ -217,12 +224,12 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     case 'collision': {
       const collision = need(plan.collision, 'Native collision needs its settings'); need(plan.bake, 'Native collision needs its bake');
       // GC15: a cell open onto the road leaves out the shard's own page walls, as a cell held near its player does (`nativeBake.ts`).
-      return run => { if (row.skipOnRestore !== true || !run.context.restoring) installNativeCollision(run.host, at.bake, (run.context.road === true ? { ...collision, omit: [...(collision as { omit?: readonly string[] }).omit ?? [], 'edge'] } : collision) as Parameters<typeof installNativeCollision>[2]); };
+      return run => { registerInstalled(run.host, 'collision'); if (row.skipOnRestore !== true || !run.context.restoring) installNativeCollision(run.host, at.bake, (run.context.road === true ? { ...collision, omit: [...(collision as { omit?: readonly string[] }).omit ?? [], 'edge'] } : collision) as Parameters<typeof installNativeCollision>[2]); };
     }
-    case 'collision.pieces': { const pieces = await readAssemblyInput<unknown>(product, row.rows); return run => { if (!run.context.restoring) addBakedPieces(run.host.physics, pieces); }; }
+    case 'collision.pieces': { const pieces = await readAssemblyInput<unknown>(product, row.rows); return run => { registerInstalled(run.host, 'collision'); if (!run.context.restoring) addBakedPieces(run.host.physics, pieces); }; }
     case 'portal.ride': {
       const ride = await readAssemblyInput<PortalRideRows>(product, row.rows);
-      return run => { installHostPortalRide(run.host, row.step, shard, ride, at.ports.ledger(run.context).fact); };
+      return run => { installHostPortalRide(run.host, row.step, shard, ride, at.ports.ledger(run.context).fact); registerInstalled(run.host, 'portalRide'); };
     }
     case 'day.keyed-sky': { const spec = keyedSkyDaySpec(product.section('look/keyed-sky')); return run => { run.day = run.host.useDayClock(new DayCycle(spec)); }; }
     case 'day.toon': {
@@ -248,12 +255,13 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
         if (row.kind === 'bolt') installNativeItems(run.host, combat, { kind: 'bolt', policy, profile });
         else if (row.kind === 'cycle') installNativeItems(run.host, combat, { kind: 'cycle', policy, profile });
         else installNativeItems(run.host, combat, { kind: 'bow', policy, profile });
+        registerInstalled(run.host, 'heldRanged');
       };
     }
-    case 'item.swept': { const policy = await readAssemblyInput(product, row.policy); return run => { installNativeItems(run.host, combatOf(run), { kind: 'swept', items: shard.items.rows, policy }); }; }
+    case 'item.swept': { const policy = await readAssemblyInput(product, row.policy); return run => { installNativeItems(run.host, combatOf(run), { kind: 'swept', items: shard.items.rows, policy }); registerInstalled(run.host, 'heldArms'); registerInstalled(run.host, 'loadout'); }; }
     case 'loadout': {
       const policy = need(shard.items.loadout.native, 'Missing native loadout'), input = need(policy.input, 'Missing native equipment input policy');
-      return run => { const combat = combatOf(run); bindNativeLoadout(run.host, policy, { flags: run.host.flags, frame: combat,
+      return run => { const combat = combatOf(run); registerInstalled(run.host, 'loadout'); bindNativeLoadout(run.host, policy, { flags: run.host.flags, frame: combat,
         locked: () => run.boss?.locked() === true || run.quest?.riding() === true || run.quest?.talking() === true,
         others: { frame: player => otherCombatFrame(combat, player.id), locked: () => run.boss?.locked() === true },
         step: { id: input.step, phase: input.phase, pick: (player, first) => {

@@ -35,6 +35,7 @@ import { commandsOf } from '@wildshard/engine/game/grid/roomNet';
 import { pageSavedFlags } from '@wildshard/engine/world/interact/flags';
 import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput } from '../headlessRuntime';
+import { registerInstalled } from '@wildshard/engine/game/shardfile/installedSides';
 import { productHeadlessSections } from '@wildshard/engine/host/headlessSections';
 import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
 import { FallFloor, shardFallFloor, shardPlayArea } from './fallFloor';
@@ -83,8 +84,10 @@ const leadSeat = (host: SimHost): PlayerSim => {
 /** A cell's fall recovery, off what its shard declares. */
 /** SS6: the same area the page reads, the manifest's bounds under its `client/plan` rows. An input with no product can't read
  *  those rows, so it keeps the manifest's floor alone and no x/z edge, rather than an edge the page may not have. */
-const fallFloorOf = (input: HeadlessRuntimeInput, host: SimHost, lone: boolean): FallFloor => new FallFloor(input.product === undefined
-  ? shardFallFloor(input.shard.manifest?.bounds?.floor) : shardPlayArea(input.shard.manifest?.bounds, input.product), lone, host.level.player.at);
+function fallFloorOf(input: HeadlessRuntimeInput, host: SimHost, lone: boolean): FallFloor {
+  if (input.product !== undefined) registerInstalled(host, 'fallFloor'); // SS3: the page's own `player.enter` / `world.runtime-hooks` area
+  return new FallFloor(input.product === undefined ? shardFallFloor(input.shard.manifest?.bounds?.floor) : shardPlayArea(input.shard.manifest?.bounds, input.product), lone, host.level.player.at);
+}
 
 /** A lone cell has the walls a shard's own page stands inside; a native bake that holds them already keeps its own (SS10). */
 function addLoneWalls(host: SimHost): void { withOwner(host.scope, () => { addEdgeWalls(host.physics, { reuse: true }); }); }
@@ -102,12 +105,14 @@ async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimS
   const kitOf = (sim: ShardfileSimulation): DeclaredKitItems | null => installDeclaredKitItems(sim.host, shard, sim.itemHooks);
   if (snapshot === undefined) {
     const fresh = createShardfileSim(shard, assets, ports), kit = kitOf(fresh);
+    // SS3: a data shard's simulation builds its declared prop solids; a shard with none built has no server half to claim
+    if (fresh.colliders.size > 0) registerInstalled(fresh.host, 'collision');
     if (lone) addLoneWalls(fresh.host);
     return { host: fresh.host, sim: () => fresh, kit: () => kit, dispose: () => { fresh.dispose(); } };
   }
   const probe = createShardfileSim(shard, assets, ports), { level } = probe.host; probe.dispose();
   const installed: { value?: ReturnType<typeof bindShardfileSim>; kit?: DeclaredKitItems | null } = {};
-  const host = restoreSimHost(level, { rapier }, typeof snapshot === 'string' ? decodeSimSnapshot(snapshot) : snapshot, restored => { installed.value = bindShardfileSim(restored, shard, assets, { ...ports, restoring: true }); installed.kit = kitOf(installed.value); });
+  const host = restoreSimHost(level, { rapier }, typeof snapshot === 'string' ? decodeSimSnapshot(snapshot) : snapshot, restored => { installed.value = bindShardfileSim(restored, shard, assets, { ...ports, restoring: true }); installed.kit = kitOf(installed.value); if (installed.value.colliders.size > 0) registerInstalled(restored, 'collision'); });
   return { host, sim: () => installed.value, kit: () => installed.kit ?? null, dispose: () => { (installed.value ?? { dispose: () => { host.dispose(); } }).dispose(); } };
 }
 
@@ -116,6 +121,7 @@ const SEEN_SLACK = 1.5;
 /** A named place is the page's to notice, and the server's to check. One the page resolves against a placed object has no world position here, so its word stands: a `seen:` flag draws a map, and pays nothing. */
 function bindDiscovery(host: SimHost, places: readonly { readonly id: string; readonly area: PlaceArea | null }[]): void {
   const areas = new Map(places.map(place => [`seen:${place.id}`, place.area]));
+  if (places.length > 0) registerInstalled(host, 'places'); // SS3: the server checks a player's word for each named place
   actRoutes(host).seen = (player, flag) => {
     const area = areas.get(flag), feet = host.players.get(player)?.position;
     if (area === undefined || feet === undefined || (area !== null && Math.hypot(feet.x - area.x, feet.z - area.z) > area.r * SEEN_SLACK)) return;
