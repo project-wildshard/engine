@@ -1223,6 +1223,19 @@ export class Game {
   }
 
   /**
+   * RP4: link the road (exterior) variants of an entered grid cell's content, as the boot's entry roots' are
+   * (`warmDeferredEntryRoots`: nearest first, spaced by drawn frames, dropped once `owner` leaves). Past its sky layer's half
+   * weight the road draws the cell with the page's own environment (none on a grid page), not the cell's PMREM: without
+   * these, every program of the cell linked in one frame 2 m before its edge (Driftwood's west edge: about 17 links, 2.5 to
+   * 4.3 s in Chromium). `roots` are not registered exterior roots (those are left out of the road's variants).
+   */
+  async warmExteriorRoots(owner: Scope, roots: readonly THREE.Object3D[], current: () => boolean): Promise<void> {
+    this.deferredEntryRoots.push({ owner, roots });
+    if (this.frameCount === 0) return; // the boot's own in-play warm-up takes it (finish.ts)
+    await this.warmDeferredEntryRoots(current);
+  }
+
+  /**
    * D188 (G815): after an arrival's reveal, what it left (`rest`, gated out of live draws) is linked and first-drawn
    * nearest the player first: the whole remaining program inventory under the live slice budget, then the rest's 1×1
    * draws a live budget a completed frame, each slice released to the live draw as it lands. The owner leaving (or a

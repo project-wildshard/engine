@@ -445,6 +445,12 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
                 performance.measure(name, { start: stage.endAt - stage.elapsedMs, end: stage.endAt, detail: { units: stage.units } });
               }
               restored = true;
+              // RP4: this cell's road variants (no PMREM), linked in play before the player can reach its edge
+              const warmRoad = async (): Promise<void> => {
+                try { await request.page.world.game.warmExteriorRoots(owner, [...view.root.children], () => !owner.disposed && !owner.disposing); }
+                catch (error: unknown) { if (!owner.disposed && !owner.disposing) console.warn('[grid] road variant warm-up stopped', error); }
+              };
+              void warmRoad();
               // js-heap H6 for a grid region, as the solo page's finish.ts does: the entry has built and warmed everything
               // its admitted transport fed, so keep none of it (Nalati's 45 MB of product files stayed in a Simulator
               // interior's JS heap, T10). A later read rechecks the immutable cache or the network, as a released tile does;
