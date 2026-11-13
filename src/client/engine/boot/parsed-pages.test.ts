@@ -29,7 +29,9 @@ test('large trees and long keys/strings cross bounded steps without publishing p
 
 test('a string that is not well formed and a pair at a part boundary cross unchanged', async () => {
   const lone = 'a\uD800b'.repeat(3000), pair = `${'x'.repeat(4095)}🐟${'y'.repeat(5000)}`;
-  expect(await decodeParsedPages(encodeParsedPages([lone, pair, '']), () => Promise.resolve())).toEqual([lone, pair, '']);
+  const bom = '\uFEFFkey', bomPart = `${'z'.repeat(4096)}\uFEFF${'w'.repeat(10)}`;
+  const tree = [lone, pair, '', bom, bomPart, {[bom]: bom}];
+  expect(await decodeParsedPages(encodeParsedPages(tree), () => Promise.resolve())).toEqual(tree);
 });
 
 test('truncated, oversized, invalid and extra transfers refuse without partial trees', async () => {
@@ -38,7 +40,7 @@ test('truncated, oversized, invalid and extra transfers refuse without partial t
   for (const bytes of [new Uint8Array(), encoded.subarray(1), encoded.subarray(0, 3), encoded.subarray(0, -1),
     raw(6, 6), raw(1, 1, 0, 0, 0, 8), raw(1, 1, 0, 0, 0, 6, 6), raw(3, 0, 1, 0, 0, 0, 120), raw(3, 2, 0, 0, 0, 0),
     raw(3, 0, 1, 0, 0, 0, 120, 6), raw(9), raw(2, 255, 255, 255, 255, 6), raw(5, 0, 0, 0, 0, 0, 0, 248, 127),
-    raw(3, 1, 1, 0, 0, 0, 0xff), raw(5, 0, 0), raw(9, 0, 0, 0, 0)]) {
+    raw(3, 1, 1, 0, 0, 0, 0xff), raw(5, 0, 0), raw(9, 0, 0, 0, 0), raw(2, 9, 0, 0, 0, 2, 8, 0, 0, 0, 6, 6, 6)]) {
     await expect(decodeParsedPages(bytes, () => Promise.resolve())).rejects.toThrow();
   }
   expect(await decodeParsedPages(raw(5, 0, 0, 0, 0, 0, 0, 240, 127), () => Promise.resolve())).toBe(Infinity);

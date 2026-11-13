@@ -269,11 +269,12 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
     const level = ports.level === undefined ? toLevelSpec(hasDeclaredClientPage(request.admitted.source) ? { ...request.manifest, ground: clientPageGround(request.admitted.source, request.admitted.assets) } : request.manifest, product) : ports.level(request.manifest);
     const { slug: identity } = request.manifest;
     if (level.id !== identity) throw new Error('Regional level identity differs from its trusted manifest');
+    // PZ22: the table goes in before Auto resolves, and before the resident's scope exists to leak on a refusal
+    if (request.textures === undefined) await registerRegionalTextureTable(request.manifest);
     const resident = request.scope.child(`grid.world:${cell.instance}`), left = (): boolean => resident.disposed;
     const pausePoint = regionalBuildCheckpoint(resident, ports.pause);
     let pauses = clientPreparationBatch(identity, 'native.checkpoints', ['pause']);
     const checkpoint = (): Promise<void> => (pauses === undefined ? pausePoint() : pauses.run('pause', pausePoint));
-    if (request.textures === undefined) await registerRegionalTextureTable(request.manifest);
     const textures = request.textures ?? resolveRegionalRuntimeTextures(request.manifest);
     // Exclusive runtime construction has retired the source. Keep the destination's policy through asynchronous
     // setup, then restore the page on the road. Entered frame scopes reinstall this same resolved policy for hooks.

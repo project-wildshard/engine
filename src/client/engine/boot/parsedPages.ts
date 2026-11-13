@@ -100,7 +100,9 @@ type Frame = {readonly value: unknown[]; remaining: number; next: number}
 /** Yield before every bounded decode step (at most 32 tokens or 16 KiB of transfer) and once at the end.
  * Nothing caller-visible is published until the entire transfer is checked. */
 export async function decodeParsedPages(bytes: Uint8Array, pause: () => Promise<void>): Promise<unknown> {
-  const frames: Frame[] = [], decoder = new TextDecoder('utf-8', {fatal: true});
+  // ignoreBOM: each part is decoded alone, and a string may start with U+FEFF
+  const frames: Frame[] = [], decoder = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true});
+  let slots = 0;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let root: unknown, hasRoot = false, string: string | undefined;
   const short: string[] = [];
@@ -152,8 +154,9 @@ export async function decodeParsedPages(bytes: Uint8Array, pause: () => Promise<
       if (tag === OBJECT || tag === ARRAY) {
         need(at, 4);
         const count = view.getUint32(at, true); at += 4;
-        // every element or entry takes at least one more byte, so a count never sizes past the transfer
-        if (count > bytes.length - at) throw new Error('Invalid parsed count');
+        // every element or entry takes at least one more byte, so no count, nor all of them together, sizes past the transfer
+        slots += count;
+        if (count > bytes.length - at || slots > bytes.length) throw new Error('Invalid parsed count');
         if (tag === ARRAY) {
           // sized once: a pushed array regrows and leaves its old backing stores behind
           // oxlint-disable-next-line unicorn/no-new-array -- a length: the decode fills every slot before anything is published
