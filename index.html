@@ -553,17 +553,20 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
         if (old(page)) { window.stop(); globalThis.__wsStaleBuild(page); }
       })();
     </script>
-    <!-- UI styles: base first (tokens + shared primitives), then one sheet per screen with its own class prefix (scripts/check-css.mjs) -->
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/styles/base.css" />
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/loading.css" />
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/styles/game.css" />
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/styles/menu.css" />
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/styles/gmenu.css" />
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/styles/touch.css" />
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/styles/update.css" />
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/styles/feedback.css" />
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/styles/minimap.css" />
-    <link rel="stylesheet" media="print" onload="this.media='all'" href="/src/client/engine/ui/styles/rotate.css" />
+    <!-- UI styles: base first (tokens + shared primitives), then one sheet per screen with its own class prefix (scripts/check-css.mjs).
+         Plain links on purpose (Jake 11-13, J323 follow-up: "compact the 10 style sheets into one ... minify"): the build bundles them,
+         in this order and ahead of the code's own CSS, into the one minified stylesheet, and stampBuildHtml (buildIdentity.mjs) makes
+         that one non-blocking (media=print onload). A print-media link here would ship as its own unminified file. -->
+    <link rel="stylesheet" href="/src/client/engine/ui/styles/base.css" />
+    <link rel="stylesheet" href="/src/client/engine/ui/loading.css" />
+    <link rel="stylesheet" href="/src/client/engine/ui/styles/game.css" />
+    <link rel="stylesheet" href="/src/client/engine/ui/styles/menu.css" />
+    <link rel="stylesheet" href="/src/client/engine/ui/styles/gmenu.css" />
+    <link rel="stylesheet" href="/src/client/engine/ui/styles/touch.css" />
+    <link rel="stylesheet" href="/src/client/engine/ui/styles/update.css" />
+    <link rel="stylesheet" href="/src/client/engine/ui/styles/feedback.css" />
+    <link rel="stylesheet" href="/src/client/engine/ui/styles/minimap.css" />
+    <link rel="stylesheet" href="/src/client/engine/ui/styles/rotate.css" />
   </head>
   <body>
     <script>

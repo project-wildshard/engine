@@ -93,7 +93,9 @@ test('a selected shard keeps its existing loader and does not preload the title 
   if (!(root instanceof window.HTMLElement)) throw new Error('Missing loading shell');
   expect(window.getComputedStyle(root).position).toBe('fixed');
   expect(window.getComputedStyle(root).display).toBe('flex');
-  expect([...html.matchAll(/<link rel="stylesheet"[^>]*>/gu)].every(([link]) => link.includes('media="print"') && link.includes('onload='))).toBe(true);
+  // J323 follow-up: the source names plain links, which the build bundles into one sheet; the stamped document never blocks on it
+  const stamped = stampBuildHtml(html, 'f2a636b3-mx1');
+  expect([...stamped.matchAll(/<link rel="stylesheet"[^>]*>/gu)].every(([link]) => link.includes('media="print"') && link.includes('onload='))).toBe(true);
 });
 
 test('public first paint and admitted loading keep every detailed progress field visible', () => {
