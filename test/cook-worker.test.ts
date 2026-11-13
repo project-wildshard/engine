@@ -21,6 +21,12 @@ describe('the cook worker', () => {
     expect(index.manifests).toHaveLength(4);
     for (const key of index.keys) expect(await h.store.has(key), key).toBe(true);
     expect(index.keys.filter(key => key.endsWith('.pack.br')).length).toBeGreaterThan(0);
+    // SA48: the loose files again under this upload, the header's bytes the slug's own key holds, and named by the index for GC
+    expect(index.loose).toBe(`loose/${hash}/`);
+    const header = await h.store.get(`loose/${hash}/${index.header}`);
+    expect(header !== undefined && Buffer.from(header).equals(Buffer.from((await h.store.get(index.header)) ?? []))).toBe(true);
+    expect(index.keys).toContain(`loose/${hash}/${index.header}`);
+    expect(objectHeaders(`loose/${hash}/${index.header}`).cache).toMatch(/immutable/u);
     const room = join(h.scratch, 'server', slug, hash), held = readdirSync(room, {recursive: true}).map(String);
     expect(held).toContain('shard.json');
     expect(index.server.bytes).toBeLessThan(h.real.length / 4);

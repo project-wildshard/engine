@@ -67,7 +67,7 @@ async function placed(channel: 'production' | 'staging', slug: string): Promise<
   if (!record(body) || body['kind'] !== 'placement' || body['channel'] !== channel || !Array.isArray(body['cells'])) {
     return false
   }
-  return body['cells'].some((cell: unknown): boolean => record(cell) && cell['slug'] === slug)
+  return body['cells'].some((cell: unknown): boolean => record(cell) && typeof cell['slug'] === 'string' && cell['slug'].replace(/^_/u, '') === slug.replace(/^_/u, ''))
 }
 
 /** A placed slug's name from the API's catalogue row, for a host that plays a channel; undefined for any other slug. */

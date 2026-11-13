@@ -100,10 +100,11 @@ export async function readGridCollisionPack(root: string, build: string, read: S
  *  of them, and reading one again is a cache hit. */
 function serverPackReader(root: string, slug: string, build: () => string, source: ServerRead, hash?: string): (path: string) => Promise<Uint8Array> {
   const opening = new Map<string, Promise<Uint8Array>>(), opened = new Map<string, WeakRef<Uint8Array>>();
-  let pack: Promise<ServerPack> | undefined;
-  // SA47: the book wins; only a slug it has no row for, with the shardfile hash its placement names, reads the cook's index.
+  let pack: Promise<ServerPack> | undefined, book: Promise<ServerPackBook> | undefined;
+  // SA47: the book wins; only a slug it has no row for, with the shardfile hash its placement names, reads the cook's index. The book
+  // is read once, as before SA47; only a refused index is asked again (review)
   const packOf = async (): Promise<ServerPack> => {
-    const row = (await serverBook(root, build(), source)).shards[slug];
+    const row = (await (book ??= serverBook(root, build(), source))).shards[slug];
     if (row !== undefined) return row;
     if (hash === undefined) throw new Error(`No server pack for ${slug}`);
     return cookedPack(root, slug, { build: build(), hash }, source);

@@ -11,7 +11,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest';
 import { installCatalogue, installedCatalogue } from '../src/shared/game/grid/catalogueSlot';
 import { learnPlacedCells } from '../src/client/game/grid/placedCells';
 import { placedContent, type PlacedContentPorts } from '../src/client/game/grid/placedContent';
-import { clearPlacedSpawns, placedSpawn } from '../src/client/game/boot/placedSpawn';
+import { clearPlacedSpawns, placedLoose, placedSpawn } from '../src/client/game/boot/placedSpawn';
 import { entryProgramsURL, setSpawnPacks, startSpawnDownload } from '../src/client/game/boot/spawnDownload';
 import { installTitleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
 import { cookReceipt } from '../src/cook/game/cookJob';
@@ -36,7 +36,7 @@ const ROWS = (['phone', 'desktop'] as const).flatMap(tier => (['entry', 'whole']
 const VERDICT = { revision: VALIDATOR, sourceHash: 'e'.repeat(64), indexHash: 'c'.repeat(64), residentBytes: 4096, postCost: { passes: 0, instructions: 0, inputs: { colour: false, depth: false, normal: false } },
   worst: { playing: 1, loading: 1, accounted: 1, location: [0, 0] } };
 const INDEX = { version: 1, build: BUILD, slug: SLUG, hash: HASH, header: `shardfiles/${SLUG}/shard.json`, manifests: ROWS.map(({ body: _body, ...row }) => row),
-  keys: [`shardfiles/${SLUG}/shard.json`, `programs/${SLUG}.json`], server: { files: 1, bytes: 1 }, proof: 'proved', seconds: 1, verdict: VERDICT };
+  keys: [`shardfiles/${SLUG}/shard.json`, `programs/${SLUG}.json`, `loose/${HASH}/shardfiles/${SLUG}/shard.json`, `loose/${HASH}/programs/${SLUG}.json`], loose: `loose/${HASH}/`, server: { files: 1, bytes: 1 }, proof: 'proved', seconds: 1, verdict: VERDICT };
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
 /** The placement file, the API's entry and the store; `index` and `body` stand in for what the store holds. */
@@ -79,7 +79,11 @@ test('SA48: a carded slug takes the cook\'s content from the store beside the pl
   expect(fetch.asked.filter(at => at.startsWith(INDEX_AT))).toHaveLength(1);
   expect(fetch.asked.filter(at => at.includes('/assets/spawn/')).sort()).toEqual(ROWS.map(row => `${PACKS}${row.url.slice(1)}`).sort());
   const spawn = placedSpawn(SLUG);
-  expect(spawn).toMatchObject({ slug: SLUG, base: PACKS, programs: true });
+  expect(spawn).toMatchObject({ slug: SLUG, base: PACKS, loose: `${PACKS}loose/${HASH}/`, programs: true });
+  // its loose files are this upload's, never the slug's own keys (the last cook's, perhaps another channel's upload)
+  expect(placedLoose(`/shardfiles/${SLUG}/shard.json`, '?v=0123abcd')).toBe(`${PACKS}loose/${HASH}/shardfiles/${SLUG}/shard.json?v=0123abcd`);
+  expect(placedLoose('/shardfiles/driftwood-isle/shard.json'), 'a shard the build has').toBeUndefined();
+  expect(placedLoose(`/assets/spawn/${SLUG}-entry-phone-1111111111111111.json`), 'not a loose path').toBeUndefined();
   expect(spawn?.entry.phone).toEqual({ url: ROWS[0]?.url, bytes: ROWS[0]?.body.length, totalBytes: 12, files: 1, wireBytes: 0 });
   expect(spawn?.whole.desktop).toMatchObject({ url: ROWS[3]?.url, totalBytes: 17, files: 2 });
   expect(placedSpawn(`_${SLUG}`), 'a grid slug finds its product').toBe(spawn);
@@ -89,7 +93,7 @@ test('SA48: a carded slug takes the cook\'s content from the store beside the pl
 
 test('SA48: the spawn download reads a placed slug\'s rows on both flows, from the store, with its programs', async () => {
   await learn(store());
-  expect(entryProgramsURL(SLUG)).toBe(`${PACKS}programs/${SLUG}.json`);
+  expect(entryProgramsURL(SLUG)).toBe(`${PACKS}loose/${HASH}/programs/${SLUG}.json`);
   const read: string[] = [];
   const parked = window.fetch;
   window.fetch = (url: string | URL | Request): Promise<Response> => { read.push(String(url instanceof Request ? url.url : url)); return new Promise(() => undefined); };
@@ -114,6 +118,8 @@ test('SA48: no hash, no index yet, junk, another build\'s, slug\'s or bytes\' in
     ['another build\'s index', store(() => json({ ...INDEX, build: 'b0' }))],
     ['another slug\'s index', store(() => json({ ...INDEX, slug: 'driftwood-isle', header: 'shardfiles/driftwood-isle/shard.json' }))],
     ['other bytes\' index', store(() => json({ ...INDEX, hash: 'b'.repeat(64) }))],
+    ['an index from before SA48\'s loose copies', store(() => json({ ...INDEX, loose: undefined }))],
+    ['another upload\'s loose copies', store(() => json({ ...INDEX, loose: `loose/${'b'.repeat(64)}/` }))],
     ['another validator', store(() => json({ ...INDEX, verdict: { ...VERDICT, revision: '0'.repeat(64) } }))],
     ['a cook with no verdict', store(() => json({ ...INDEX, verdict: undefined }))],
     ['a manifest that is not its row', store(undefined, row => row.body.replace('"totalBytes":17', '"totalBytes":18'))],

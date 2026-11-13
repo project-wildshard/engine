@@ -52,7 +52,7 @@ const routes = (table: Record<string, (init?: RequestInit) => Response | Promise
   return Object.assign(answer, { asked }) as typeof fetch & { readonly asked: string[] };
 };
 /** SA48: a carded slug enters only with the cook's content; these SA46 tests are about its card, so its content is a stand-in. */
-const STAND_IN: PlacedContent = { spawn: { slug: 'new-author-shard', entry: {}, whole: {}, base: 'https://packs.example/', programs: false }, verdict: null };
+const STAND_IN: PlacedContent = { spawn: { slug: 'new-author-shard', entry: {}, whole: {}, base: 'https://packs.example/', loose: 'https://packs.example/loose/x/', programs: false }, verdict: null };
 const cooked = (): Promise<PlacedContent> => Promise.resolve(STAND_IN);
 const PIN = JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as { grid: { cells: Cells } };
 const ART = { thumb: '/t.jpg', portrait: '/p.jpg', landscape: '/l.jpg' };

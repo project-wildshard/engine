@@ -37,6 +37,7 @@ const maxBytes = Number(env.COOK_MAX_SHARDFILE_BYTES ?? MAX_SHARDFILE_BYTES);
 const renderer = (() => { try { return rendererRevision(root); } catch { return undefined; } })();
 /** SA48: the validator each job validates with; an index stamped with it lets a page of the same validator admit the shard. */
 const validator = (() => { try { return shardfileValidationRevision(root); } catch { return undefined; } })();
+if (validator === undefined) console.warn('cook-worker: no shardfile validator revision, so no index carries a verdict and no page enters a placed slug from it (SA48)');
 const worker = () => createCookWorker({
   build: need('WILDSHARD_BUILD'), store, source: apiSource(need('WILDSHARD_API_URL'), fetch, maxBytes), log: line => { console.log(line); },
   serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch: resolve(env.COOK_SCRATCH ?? 'tmp/cook/scratch'),

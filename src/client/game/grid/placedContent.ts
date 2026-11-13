@@ -18,7 +18,7 @@ const hex = v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u));
 const ManifestRow = v.object({ url: v.pipe(v.string(), v.regex(/^\/assets\/spawn\/[a-z0-9_-]+-(?:entry|whole)-(?:phone|desktop)-[a-f0-9]{16}\.json$/u)),
   tier: v.picklist(['phone', 'desktop']), set: v.picklist(['entry', 'whole']), files: size, totalBytes: size, wireBytes: size });
 const IndexSchema = v.object({ version: v.literal(1), build: v.string(), slug: v.pipe(v.string(), v.regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u)), hash: hex, header: v.string(),
-  manifests: v.pipe(v.array(ManifestRow), v.maxLength(8)), keys: v.pipe(v.array(v.string()), v.maxLength(100_000)),
+  manifests: v.pipe(v.array(ManifestRow), v.maxLength(8)), keys: v.pipe(v.array(v.string()), v.maxLength(100_000)), loose: v.string(),
   verdict: v.optional(v.looseObject({ revision: hex, sourceHash: v.string(), indexHash: hex, residentBytes: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
     postCost: v.looseObject({}), worst: v.optional(v.unknown()) })) });
 
@@ -49,10 +49,12 @@ export async function placedContent(slug: string, hash: string, ports: PlacedCon
     if (!/^[a-f0-9]{64}$/u.test(hash) || !/^[\w.-]{1,64}$/u.test(ports.build) || !ports.packs.endsWith('/')) return undefined;
     const read = ports.fetch, at = (path: string): string => new URL(path.replace(/^\//u, ''), ports.packs).href;
     // past the CDN's cached 404 (a query of its own, as the box reads it, SA47): an index missing now may be written a minute later
-    const indexAt = `${at(cookIndexPath(ports.build, hash))}?t=${String(Date.now())}`;
+    // (to the minute, so the edge still takes a busy page's repeats)
+    const indexAt = `${at(cookIndexPath(ports.build, hash))}?t=${String(Math.floor(Date.now() / 60_000))}`;
     const index = v.parse(IndexSchema, decode(await bounded(await read(indexAt, { cache: 'no-store', credentials: 'omit', redirect: 'error', signal: ports.signal }), INDEX_BYTES)));
     const product = index.slug;
-    if (index.build !== ports.build || index.hash !== hash || product !== bareSlug(slug) || index.header !== `shardfiles/${product}/shard.json`) return undefined;
+    if (index.build !== ports.build || index.hash !== hash || product !== bareSlug(slug) || index.header !== `shardfiles/${product}/shard.json`
+      || index.loose !== `loose/${hash}/`) return undefined;
     // a page that checks admission admits only a header its own validator's revision passed; a page with none asks nothing
     if (ports.validator !== null && index.verdict?.revision !== ports.validator) return undefined;
     // each manifest's own length is its address's (`readSpawnManifestAddress`); it is content-named, so this read is the download's
@@ -67,7 +69,8 @@ export async function placedContent(slug: string, hash: string, ports: PlacedCon
     const entry = pick('entry');
     if (entry.phone === undefined || entry.desktop === undefined) return undefined;
     const verdict = index.verdict === undefined ? null : { ...index.verdict, path: `/${index.header}` };
-    return { spawn: { slug: product, entry, whole: pick('whole'), base: ports.packs, programs: index.keys.includes(`programs/${product}.json`) }, verdict };
+    return { spawn: { slug: product, entry, whole: pick('whole'), base: ports.packs, loose: at(index.loose),
+      programs: index.keys.includes(`${index.loose}programs/${product}.json`) }, verdict };
   } catch { return undefined; }
 }
 
@@ -75,5 +78,8 @@ export async function placedContent(slug: string, hash: string, ports: PlacedCon
 export function installPlacedContent(content: PlacedContent): void {
   installPlacedSpawn(content.spawn);
   const verdicts: unknown = Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__');
-  if (content.verdict !== null && Array.isArray(verdicts) && !verdicts.some((row: unknown) => typeof row === 'object' && row !== null && Reflect.get(row, 'path') === content.verdict?.['path'])) verdicts.push(content.verdict);
+  if (content.verdict === null || !Array.isArray(verdicts)) return;
+  // one row a path: a later learn of another upload replaces this page's earlier one (the build's own paths are never placed slugs)
+  const at = verdicts.findIndex((row: unknown) => typeof row === 'object' && row !== null && Reflect.get(row, 'path') === content.verdict?.['path']);
+  if (at === -1) verdicts.push(content.verdict); else verdicts.splice(at, 1, content.verdict);
 }

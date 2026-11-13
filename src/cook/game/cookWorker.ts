@@ -74,6 +74,8 @@ export interface CookIndex {
   readonly seconds: number;
   /** J262 (SP1a): which author preparation the cook went by; an index from before it has none. */
   readonly preparation?: CookJobReport['cook']['preparation'];
+  /** SA48: where this upload's loose files are again (`looseFolder`); an index from before SA48 names none. */
+  readonly loose?: string;
   /** SA48: the page's admission row for these bytes (`productVerdict`'s, but for its path), under the validator revision the worker
    *  cooks with (`CookWorkerOptions.validator`). A page whose validator differs, or an index with none, leaves the shard out. */
   readonly verdict?: NonNullable<CookJobReport['receipt']> & {readonly revision: string};
@@ -83,12 +85,16 @@ export interface CookIndex {
 export const indexKey: (build: string, hash: string) => string = cookIndexPath;
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 const CONTENT_NAMED = /(?:^|\/)[a-f0-9]{16,64}\.[a-z0-9.]+$|-[a-f0-9]{16}\.json$/u;
+/** SA48: a cook's loose files (its header, its programs, its mounts' loose rows) again by upload, `loose/<hash>/<key>`: the slug's own
+ *  keys are the last cook's, whichever upload that was, so a page that never baked the shard reads these (`CookIndex.loose`). */
+const LOOSE = 'loose/';
+export const looseFolder = (hash: string): string => `${LOOSE}${hash}/`;
 
 /** J84: a part is q11 Brotli once and a browser decodes it; a store must say so. */
 export function objectHeaders(key: string): ObjectHeaders {
   if (key.endsWith('.pack.br')) return {type: 'application/octet-stream', encoding: 'br', cache: IMMUTABLE};
   const type = key.endsWith('.json') ? 'application/json' : key.endsWith('.webp') ? 'image/webp' : key.endsWith('.jpg') ? 'image/jpeg' : key.endsWith('.png') ? 'image/png' : 'application/octet-stream';
-  return {type, cache: CONTENT_NAMED.test(key) ? IMMUTABLE : 'public, max-age=300'};
+  return {type, cache: CONTENT_NAMED.test(key) || key.startsWith(LOOSE) ? IMMUTABLE : 'public, max-age=300'};
 }
 
 export interface CookLimits {
@@ -320,8 +326,11 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   const verdicts = new Map<string, CookRow>();
   const publish = async (work: string, report: CookJobReport, hash: string): Promise<void> => {
     const client = join(work, 'out/client'), keys = filesUnder(client);
+    // SA48: the loose files again under this upload's own folder (`looseFolder`)
+    const folder = looseFolder(hash), loose = keys.filter(key => key.startsWith('shardfiles/') || key.startsWith('programs/'));
     const rows = await store.list(''), held = new Map(rows.map(row => [row.key, row.modified]));
-    const fresh = keys.reduce((sum, key) => sum + (held.has(key) ? 0 : statSync(join(client, key)).size), 0);
+    const fresh = keys.reduce((sum, key) => sum + (held.has(key) ? 0 : statSync(join(client, key)).size), 0)
+      + loose.reduce((sum, key) => sum + (held.has(folder + key) ? 0 : statSync(join(client, key)).size), 0);
     const used = usageOf(rows, budget).bytes;
     if (used + fresh > budget) throw new Error(`Over the pack budget: ${used} + ${fresh} of ${budget}`);
     // CF-8: skipping a PUT keeps a part's old date, so GC could take it before this index lands. A part past half the grace
@@ -331,10 +340,11 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     for (const key of [...keys].sort((a, b) => order(a) - order(b))) {
       if (!CONTENT_NAMED.test(key) || !current(key)) await store.put(key, readFileSync(join(client, key)), objectHeaders(key));
     }
+    for (const key of loose) if (!current(folder + key)) await store.put(folder + key, readFileSync(join(client, key)), {...objectHeaders(key), cache: IMMUTABLE});
     const target = join(serverPacks, report.slug, hash), parked = `${target}.${process.pid}.tmp`;
     rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
-    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys, server: report.server, serverPack: report.cook.server, proof: report.proof === 'unmeasured' ? 'unmeasured' : 'proved', seconds: report.seconds,
+    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys: [...keys, ...loose.map(key => folder + key)], loose: folder, server: report.server, serverPack: report.cook.server, proof: report.proof === 'unmeasured' ? 'unmeasured' : 'proved', seconds: report.seconds,
       ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
       ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}})};
     await store.put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});

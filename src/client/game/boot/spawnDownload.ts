@@ -3,7 +3,7 @@ import {jsonSlot} from '@wildshard/engine/saves/slots';
 import { bootMark,bootProgress,bootTiming,downloadShown } from '@wildshard/engine/boot/timing';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
-import {placedSpawn} from './placedSpawn';
+import {placedLoose, placedSpawn} from './placedSpawn';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -156,10 +156,9 @@ function installMemberLayer(): boolean {
     if (!isContentOrigin(url.origin) || !url.pathname.startsWith('/shardfiles/')) return network(input, init);
     const held = await heldPartMember(url);
     if (held !== null) return held;
-    // SA48: a slug placed after the build keeps its loose files (its header, DL18) in the cook's store, as a J138 home's are
-    const placed = placedSpawn(url.pathname.split('/')[2] ?? '');
-    const response = placed === undefined ? await network(input, init)
-      : await native(new URL(`.${url.pathname}${url.search}`, placed.base).href, {...init, ...(request === undefined ? {} : {signal: request.signal})});
+    // SA48: a slug placed after the build keeps its loose files (its header, DL18) in the cook's store, under its upload
+    const loose = placedLoose(url.pathname, url.search);
+    const response = loose === undefined ? await network(input, init) : await native(loose, {...(request === undefined ? {} : {signal: request.signal}), ...init});
     if (response.status !== 404 && !/\btext\/html\b/iu.test(response.headers.get('content-type') ?? '')) return response;
     return await partMember(url) ?? response;
   };
@@ -563,8 +562,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
                 // this manifest lives beside its parts, including authored mounts.
                 // PZ3: on the content base only content moves; code and rapier stay with the page (a J138 home holds all of it).
                 const source = new URL(url), page = new URL(base);
-                const target = source.origin !== page.origin ? url : packs === contentBase() ? contentURL(url)
-                  : new URL(source.pathname + source.search, packs).href;
+                // SA48: a slug placed after the build reads its loose files from its upload's own folder in the store
+                const target = source.origin !== page.origin ? url : placedLoose(source.pathname, source.search) ?? (packs === contentBase() ? contentURL(url)
+                  : new URL(source.pathname + source.search, packs).href);
                 return ports.fetch(target, signal, init);
               },
             }, controller.signal, size => {
@@ -818,7 +818,7 @@ export function shardPackBase(slug: string): string | null {
   if (!text) return document.baseURI;
   // SA48: a slug placed after the build has the cook's own inventory
   const placed = placedSpawn(slug);
-  if (placed !== undefined) return placed.programs ? placed.base : null;
+  if (placed !== undefined) return placed.programs ? placed.loose : null;
   const bank: unknown = JSON.parse(text), recorded = get(bank, 'entryPrograms');
   if (get(recorded, slug) === false || get(recorded, bareSlug(slug)) === false) return null;
   return packBase(get(get(bank, 'spawnManifests'), 'home'), slug);

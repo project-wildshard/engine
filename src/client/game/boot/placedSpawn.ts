@@ -12,8 +12,11 @@ export interface PlacedSpawn {
   readonly entry: Tiers;
   /** The packs book's whole-level rows. */
   readonly whole: Tiers;
-  /** The store's root, where its manifests, parts and header are (a J138 home). */
+  /** The store's root, where its manifests and parts are (a J138 home). */
   readonly base: string;
+  /** This upload's loose files (its header, programs, its mounts' loose rows) in the store (`loose/<hash>/`): the slug's own keys are
+   *  whichever upload the cook last cooked, which may be another channel's. */
+  readonly loose: string;
   /** Whether the cook published its recorded entry programs. */
   readonly programs: boolean;
 }
@@ -23,3 +26,10 @@ export function installPlacedSpawn(row: PlacedSpawn): void { placed.set(bare(row
 /** A placed slug's rows, by its grid slug or its product's; undefined for every slug the build has. */
 export function placedSpawn(slug: string): PlacedSpawn | undefined { return placed.get(bare(slug)); }
 export function clearPlacedSpawns(): void { placed.clear(); }
+const LOOSE_PATH = /^\/(?:shardfiles\/([a-z0-9_-]+)\/|programs\/([a-z0-9_-]+)\.json$)/u;
+/** Where a placed slug's loose file is read, by its page path (`/shardfiles/<slug>/…`, `/programs/<slug>.json`): this upload's own copy.
+ *  Undefined for every other path, and for every slug the build has. */
+export function placedLoose(pathname: string, search = ''): string | undefined {
+  const match = LOOSE_PATH.exec(pathname), named = match?.[1] ?? match?.[2], row = named === undefined ? undefined : placed.get(bare(named));
+  return row === undefined ? undefined : new URL(`.${pathname}${search}`, row.loose).href;
+}
