@@ -17,7 +17,7 @@ import type { CellOrder, WorkerNews, WorkerReading, WorkerResident } from './cel
 import { SeatTransport } from './socketPump';
 
 /** How often a worker reads itself (E7.8). */
-const READING_MS = 10_000;
+export const READING_MS = 10_000;
 /** Enough ticks for a 10 s reading, at the worker's rate. */
 const TICKS_KEPT = 720;
 /** The save prefix a cell's stores share. Nothing outside a cell ever reads it. */
@@ -36,9 +36,11 @@ export interface CellHostOptions {
   /** A shard's server inputs, by its slug. */
   readonly load: (slug: string) => Promise<HeadlessRuntimeInput>;
   /** A proof's overrides. `roomNow` is the rooms' hold and checkpoint clock; ticks keep real time. */
-  readonly holdMs?: number; readonly emptyMs?: number; readonly roomNow?: () => number;
-  /** What this process has resident, for the reading. */
-  readonly memory: () => { readonly rss: number; readonly heapUsed: number };
+  readonly holdMs?: number; readonly emptyMs?: number; readonly roomNow?: () => number; readonly readingMs?: number;
+  /** What this process has resident, and this thread's own heap and buffers, for the reading. */
+  readonly memory: () => { readonly rss: number; readonly heapUsed: number; readonly external?: number; readonly arrayBuffers?: number };
+  /** SC1: this thread's event-loop lag since the last reading (`loopLag`), for `/metrics`. */
+  readonly lag?: () => { readonly p50: number; readonly p99: number; readonly max: number };
   /** The worker has closed: a worker exits here. */
   readonly closed?: () => void;
   /** A proof's look at each room it opens, and at its road. */
@@ -115,9 +117,12 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   const reading = (): void => {
     const now = diagnosticNow(), sorted = ticks.slice().sort((a, b) => a - b), rooms = [...cells.values()].map(cell => cell.room), memory = options.memory();
     const sum = (read: (room: DedicatedRoom) => number): number => rooms.reduce((total, room) => total + read(room), 0);
-    const row: WorkerReading = { cells: rooms.length, awake: rooms.filter(room => room.taken > 0).length, players: sum(room => room.taken - room.holding), held: sum(room => room.holding), ticks: ticked, ticksPerSecond: ticks.length / ((now - readAt) / 1000),
+    // SC1: a seat on this worker's road is a player too, though the road is no cell.
+    const onRoad = road === undefined ? 0 : road.taken - road.holding, heldOnRoad = road?.holding ?? 0;
+    const row: WorkerReading = { cells: rooms.length, awake: rooms.filter(room => room.taken > 0).length, players: sum(room => room.taken - room.holding) + onRoad, held: sum(room => room.holding) + heldOnRoad, ticks: ticked, ticksPerSecond: ticks.length / ((now - readAt) / 1000),
       p50: percentile(sorted, 0.5), p95: percentile(sorted, 0.95), p99: percentile(sorted, 0.99), max: sorted.at(-1) ?? 0, drops: (clock?.drops ?? 0) - dropsAt, rss: memory.rss, heap: memory.heapUsed,
-      refused: sum(room => room.net.stats.refused), dropped: sum(room => room.net.stats.dropped), frameBytes: sum(room => room.net.stats.frameBytes), eventBytes: sum(room => room.net.stats.eventBytes) };
+      refused: sum(room => room.net.stats.refused), dropped: sum(room => room.net.stats.dropped), frameBytes: sum(room => room.net.stats.frameBytes), eventBytes: sum(room => room.net.stats.eventBytes),
+      ...(memory.external === undefined ? {} : { external: memory.external }), ...(memory.arrayBuffers === undefined ? {} : { arrayBuffers: memory.arrayBuffers }), ...(options.lag === undefined ? {} : { lag: options.lag() }) };
     readAt = now; dropsAt = clock?.drops ?? 0; ticks = [];
     post({ kind: 'reading', reading: row });
   };
@@ -233,7 +238,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     ready = true; readAt = diagnosticNow();
     clock = new ServerClock({ now: diagnosticNow, wait: (ms, run) => { const timer = scope.timeout(ms, run); return () => { scope.cancelTimer(timer); }; }, step });
     clock.start();
-    scope.interval(READING_MS, reading);
+    scope.interval(options.readingMs ?? READING_MS, reading);
     post({ kind: 'booted', ms: diagnosticNow() - started, resident: resident() });
   })().catch(fail);
   return { dispose };

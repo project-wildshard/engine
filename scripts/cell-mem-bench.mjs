@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // SERVER-CELLS (draft, opus-cellmem): what one dedicated server costs per resident cell, dormant (nobody in it) and with one bot in
 // each. It runs a kept `mmo-bots.mjs replica --keep` folder's release bundle on loopback with production's shape (4 workers), once per
-// cell count, and reads it through scripts/cell-mem/metrics-preload.mjs (Prometheus text on a loopback port): RSS, CPU, heap and
-// external per thread, event-loop lag per thread, and the workers' own tick readings. Nothing leaves this Mac but the book GET.
+// cell count, and reads the server's own `/metrics` (SC1: Prometheus text on 127.0.0.1:METRICS_PORT): RSS, CPU, heap and external per
+// thread, event-loop lag per thread, and the workers' own tick readings. Nothing leaves this Mac but the book GET. A bundle from before
+// SC1 serves no `/metrics`: build the kept run from engine main.
 //   node scripts/mmo-bots.mjs replica --bots 1 --seconds 15 --cells grid --keep          (once: bundle, bots tree, pack cache)
 //   (cd tmp/mmo-bots/<stamp>/src && node scripts/build-server.mjs --build <build> --out ../cmbuild --entry cellMemBots=test/fixtures/dedicated/cellMemBotsEntry.ts)
 //   node scripts/cell-mem-bench.mjs --from tmp/mmo-bots/<stamp> [--counts 1,2,8,16,25] [--dormant 30] [--active 40] [--workers 4]
@@ -14,7 +15,6 @@ import { join, resolve as absolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
-const ROOT = absolute(import.meta.dirname, '..');
 const { values } = parseArgs({ options: { from: { type: 'string' }, counts: { type: 'string', default: '1,2,8,16,25' }, dormant: { type: 'string', default: '30' }, active: { type: 'string', default: '40' },
   workers: { type: 'string', default: '4' }, port: { type: 'string', default: '18896' }, origin: { type: 'string', default: 'https://packs.wildshard.io' } } });
 if (values.from === undefined) throw new Error('--from <kept mmo-bots folder>');
@@ -35,6 +35,8 @@ async function scrape() {
 }
 const sum = (/** @type {Record<string, number>} */ rows, /** @type {string} */ prefix) => Object.entries(rows).filter(([name]) => name.startsWith(prefix)).reduce((total, [, value]) => total + value, 0);
 const most = (/** @type {Record<string, number>} */ rows, /** @type {RegExp} */ match) => Math.max(0, ...Object.entries(rows).filter(([name]) => match.test(name)).map(([, value]) => value));
+/** One thread-memory kind summed over every thread (the server's `wildshard_thread_memory_bytes{thread,kind}`). */
+const threads = (/** @type {Record<string, number>} */ rows, /** @type {RegExp} */ kind) => Object.entries(rows).filter(([name]) => name.startsWith('wildshard_thread_memory_bytes{') && kind.test(name)).reduce((total, [, value]) => total + value, 0);
 const median = (/** @type {number[]} */ list) => { const sorted = list.slice().sort((a, b) => a - b); return sorted[Math.floor(sorted.length / 2)] ?? 0; };
 
 /** macOS RSS drops as the kernel compresses a quiet process's pages; `footprint` counts those too, as Activity Monitor's Memory does. Elsewhere, RSS. */
@@ -54,15 +56,15 @@ async function phase(/** @type {number} */ seconds, /** @type {string[]} */ work
   return {
     footprintMB: footprints.length === 0 ? null : Math.round(median(footprints)), footprintMaxMB: footprints.length === 0 ? null : Math.round(Math.max(...footprints)),
     rssMB: mb(median(samples.map(row => row.process_resident_memory_bytes ?? 0))), rssMaxMB: mb(Math.max(...samples.map(row => row.process_resident_memory_bytes ?? 0))),
-    heapMB: mb(median(samples.map(row => sum(row, 'nodejs_heap_used_bytes')))), externalMB: mb(median(samples.map(row => sum(row, 'nodejs_external_bytes')))), arrayBuffersMB: mb(median(samples.map(row => sum(row, 'nodejs_array_buffers_bytes')))),
+    heapMB: mb(median(samples.map(row => threads(row, /kind="heap"/u)))), externalMB: mb(median(samples.map(row => threads(row, /kind="external"/u)))), arrayBuffersMB: mb(median(samples.map(row => threads(row, /kind="arrayBuffers"/u)))),
     cpuCores: Number((((last.process_cpu_seconds_total ?? 0) - (first.process_cpu_seconds_total ?? 0)) / wall).toFixed(3)),
-    mainLagP50: Number(median(samples.map(row => row['nodejs_eventloop_lag_seconds{thread="main",quantile="0.5"}'] ?? 0)).toFixed(5)) * 1000,
-    mainLagP99: Number(Math.max(...samples.map(row => row['nodejs_eventloop_lag_seconds{thread="main",quantile="0.99"}'] ?? 0)).toFixed(5)) * 1000,
-    workerLagP99: Number(Math.max(...samples.map(row => most(row, /^nodejs_eventloop_lag_seconds\{thread="\d+",quantile="0.99"\}/u))).toFixed(5)) * 1000,
+    mainLagP50: Number(median(samples.map(row => row['wildshard_eventloop_lag_seconds{thread="main",quantile="0.5"}'] ?? 0)).toFixed(5)) * 1000,
+    mainLagP99: Number(Math.max(...samples.map(row => row['wildshard_eventloop_lag_seconds{thread="main",quantile="0.99"}'] ?? 0)).toFixed(5)) * 1000,
+    workerLagP99: Number(Math.max(...samples.map(row => most(row, /^wildshard_eventloop_lag_seconds\{thread="worker-\d+",quantile="0.99"\}/u))).toFixed(5)) * 1000,
     tickP50: Math.max(0, ...ticks.map(row => row.p50)), tickP95: Math.max(0, ...ticks.map(row => row.p95)), tickP99: Math.max(0, ...ticks.map(row => row.p99)), tickMax: Math.max(0, ...ticks.map(row => row.max)),
     drops: ticks.reduce((total, row) => total + row.drops, 0), minTicksPerSecond: Math.min(60, ...ticks.map(row => row.ticksPerSecond)),
     awake: Math.max(0, ...samples.map(row => sum(row, 'wildshard_cells_awake'))), players: Math.max(0, ...samples.map(row => sum(row, 'wildshard_players'))),
-    perThreadHeapMB: Object.fromEntries(Object.entries(last).filter(([name]) => name.startsWith('nodejs_heap_used_bytes')).map(([name, value]) => [name.slice(name.indexOf('{')), mb(value)])),
+    perThreadHeapMB: Object.fromEntries(Object.entries(last).filter(([name]) => name.startsWith('wildshard_thread_memory_bytes') && name.includes('kind="heap"')).map(([name, value]) => [/thread="([^"]+)"/u.exec(name)?.[1] ?? name, mb(value)])),
   };
 }
 
@@ -75,7 +77,7 @@ async function run(/** @type {number} */ count) {
     HOST: '127.0.0.1', PORT: String(port), RELEASE_CHANNEL: 'production', RELEASE_URL: pathToFileURL(file).href, RELEASE_PUBLIC_KEY: publicKey.export({ type: 'spki', format: 'der' }).toString('hex'),
     WORLD_CELLS: cells.join(','), WORLD_WORKERS: values.workers, WORLD_SEATS: '64', TELEMETRY_URL: '', ERRORS_URL: '', SENTRY_DSN: '', RECORD_TAG: '', METRICS_PORT: String(metricsPort) };
   const began = performance.now(), workerLines = /** @type {string[]} */ ([]), booted = /** @type {Record<string, number>} */ ({});
-  const child = spawn(process.execPath, ['--import', pathToFileURL(join(ROOT, 'scripts/cell-mem/metrics-preload.mjs')).href, join(server, 'main.mjs')], { cwd: server, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: server, env, stdio: ['ignore', 'pipe', 'pipe'] });
   /** Set by the log reader as lines arrive. */
   const seen = { listening: 0 };
   let buffer = '';

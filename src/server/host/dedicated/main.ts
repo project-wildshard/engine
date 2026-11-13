@@ -20,6 +20,7 @@ import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { fetchReleaseFile, servingRelease, ReleaseWatch } from './releaseFile';
 import { savesUrl } from './saves/pgDatabase';
 import { ServerReports } from './serverReports';
+import { ServerMetrics, metricsPort } from './serverMetrics';
 import { sendSentryTest, serverSentry } from './serverSentry';
 import {PlaytestFile} from './playtest';
 import { World, type PlayerSaves, type WorkerLink } from './world';
@@ -71,11 +72,13 @@ const crossing = worldCrossing(setting('WORLD_CROSSING'));
 // SA33: where the API's signed placement file is, and its own key's public half. Both or neither; only a whole-grid world grows.
 const placementAt = setting('PLACEMENT_URL'), placementKey = setting('PLACEMENT_PUBLIC_KEY');
 if ((placementAt === undefined) !== (placementKey === undefined)) throw new Error('PLACEMENT_URL and PLACEMENT_PUBLIC_KEY go together');
+// SERVER-CELLS SC1: `/metrics` on 127.0.0.1:METRICS_PORT, unset off. Made before the world opens, so every cell's boot is counted.
+const metricsAt = metricsPort(process.env), metrics = metricsAt === undefined ? undefined : new ServerMetrics(log);
 const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting('PLAYTEST_DIR')??'/var/log/wildshard',build,log,...(recordTag===undefined?{}:{tag:recordTag})}):undefined;
 
 /** One row of the table is one worker thread, started once (J182). */
 function bootWorker(slugs: readonly string[]): WorkerLink {
-  const data: CellWorkerData = { slugs, build, origin, cache, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), ...(crossing ? { crossing } : {}),...(playtest===undefined?{}:{playtest:true}) };
+  const data: CellWorkerData = { slugs, build, origin, cache, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), ...(crossing ? { crossing } : {}), ...(metrics === undefined ? {} : { metrics: true }),...(playtest===undefined?{}:{playtest:true}) };
   const worker = new Worker(new URL('cellWorker.mjs', import.meta.url), { workerData: data });
   let stopped = false;
   return { send: (order, transfer = []) => { worker.postMessage(order, transfer as never); },
@@ -97,7 +100,8 @@ process.on('uncaughtException', failed);
 const trust = doorTrust(process.env);
 const world: World = await World.open({ build, cells, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, secret: need('SEAT_SECRET'), saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
-  crashed: failed, reading: (index, row) => { reports.heard(index, row); },
+  crashed: failed, reading: (index, row) => { reports.heard(index, row); metrics?.reading(index, row); },
+  ...(metrics === undefined ? {} : { booted: (_index: number, _slug: string, ms: number) => { metrics.booted(ms); }, crossed: (ms: number, moved: boolean) => { metrics.crossed(ms, moved); } }),
   ...(playtest===undefined?{}:{playtest:row=>{playtest.append(row);}}),
   // J218: phones on 4G need TURN to reach each other's voice. Without the key, voice falls back to public STUN.
   ...(turnKey === undefined || turnToken === undefined ? {} : { voiceIce: cloudflareTurn(turnKey, turnToken) }),
@@ -119,7 +123,10 @@ stop = (code): void => { void (async (): Promise<void> => {
   process.exit(written ? code : 1);
 })(); };
 await new Promise<void>(resolve => { server.listen(port, host, resolve); });
-log({ at: 'server.listening', host, port, build, cells, crossing, trustProxy: trust.trustProxy, origins: trust.allowedOrigins ?? '*', serial: release.serial, epoch: release.saveEpoch, node: process.version });
+metrics?.watch(world);
+// A metrics port already taken never stops the game: the line says so, and the alarms see no scrape (SC3).
+const metricsListening = metrics === undefined || metricsAt === undefined ? undefined : await metrics.listen(metricsAt).catch((error: unknown) => { log({ at: 'metrics.refused', port: metricsAt, error: String(error) }); return undefined; });
+log({ at: 'server.listening', ...(metricsListening === undefined ? {} : { metrics: metricsListening }), host, port, build, cells, crossing, trustProxy: trust.trustProxy, origins: trust.allowedOrigins ?? '*', serial: release.serial, epoch: release.saveEpoch, node: process.version });
 // The door keeps Rapier only to read a new build's packs, so this costs no worker a tick.
 const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 }, wasm = new URL('rapier.wasm', import.meta.url), rapier = async (): Promise<Awaited<ReturnType<typeof loadRapier>>> => loadRapier(await readFile(wasm));
 // The bundle and its packs reach disk before anyone hears a countdown, so the move costs a restart and no download. A bad hash stops here, with

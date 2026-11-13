@@ -9,3 +9,14 @@
   `footprint`, since RSS drops when the kernel compresses a quiet process.
 - First numbers (staging build `6d11b137`, 4 workers, a Mac at load ~40): 25 cells resident at boot, about 1 GB; with a bot
   in all 25, the worker holding 22 cells falls to 30 ticks/s.
+
+## SC1: `/metrics` in the server (opus-sc1)
+
+- `src/server/host/dedicated/serverMetrics.ts`: `METRICS_PORT` (unset: off) serves Prometheus text on 127.0.0.1 only, so the
+  preload above is retired and `cell-mem-bench.mjs` reads any bundle built from here with no `--import`. The client is
+  `@prometheus-io/client` 0.16.1, the Prometheus org's successor to the deprecated `prom-client` (same API, same defaults).
+- Worker rows gain their own lag, external and array-buffer bytes, when the door asks for metrics; the door times crossings
+  (`wildshard_crossing_seconds`) and counts `cell.booted` (`wildshard_cell_boot_seconds`). Seats on a worker's road now
+  count as players in its reading.
+- Proof: `test/dedicated-metrics.test.ts` (a two-cell world, a crossing, every family); a bench run on staging's build
+  `c5359cb4`, counts 1 and 2, read straight off the bundled server's `/metrics`.

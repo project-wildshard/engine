@@ -107,8 +107,12 @@ export interface WorldOptions {
   readonly crashed: (error: unknown) => void;
   /** The grace ran out: stop, and let systemd start what is on disk. */
   readonly restart: () => void;
-  /** One worker's 10 s reading, for what leaves the box (E7.8a). */
+  /** One worker's 10 s reading, for what leaves the box (E7.8a) and `/metrics` (SC1). */
   readonly reading?: (index: number, reading: WorkerReading) => void;
+  /** SERVER-CELLS SC1: a cell (or a worker's road) opened in `ms`, as `cell.booted` logs it. */
+  readonly booted?: (index: number, slug: string, ms: number) => void;
+  /** SC1: a crossing's time from its source's ask to its worker's answer, and whether the seat moved. */
+  readonly crossed?: (ms: number, moved: boolean) => void;
   readonly playtest?:(row:PlaytestRow)=>void;
   /** J218: the ICE servers voice chat hands a player who joins; public STUN when absent. */
   readonly voiceIce?: () => Promise<readonly VoiceIceServer[]>;
@@ -158,8 +162,8 @@ export class World {
   private readonly voiceBodies = new Map<string, (body: string) => void>();
   private readonly finds = new Map<number, (found: { held: boolean; spawn: ResumeAt }) => void>();
   private readonly drains = new Map<number, () => void>();
-  /** GC15: devices whose crossing the door is reading a save for, or whose `cross` order a worker has not answered. */
-  private readonly crossings = new Set<string>();
+  /** GC15: devices whose crossing the door is reading a save for, or whose `cross` order a worker has not answered, and when it began (SC1). */
+  private readonly crossings = new Map<string, number>();
   /** GC15: devices whose source said `left` while their crossing was in flight: applied if the crossing is abandoned before `cross`. */
   private readonly leftCrossing = new Set<string>();
   private asked = 0;
@@ -256,7 +260,7 @@ export class World {
     else if (news.kind === 'report') { if (!this.options.saves.report(news.report, cellShard(news.slug))) this.refuse('report-backlog'); }
     else if (news.kind === 'chat') { for (const link of this.workers) link.send({ kind: 'chat', from: news.slug, line: news.line }); }
     else if(news.kind==='playtest')this.options.playtest?.(news.row);
-    else if (news.kind === 'cell') this.options.log({ at: 'cell.booted', index, slug: news.slug, ms: news.ms });
+    else if (news.kind === 'cell') { this.options.log({ at: 'cell.booted', index, slug: news.slug, ms: news.ms }); this.options.booted?.(index, news.slug, news.ms); }
     else if (news.kind === 'reading') { this.options.log({ at: 'worker', index, ...news.reading, refusals: this.refusals, connections: this.connectionStats, saves: this.options.saves.stats?.() }); this.options.reading?.(index, news.reading); }
     else if (news.kind === 'placed') {
       const link = this.workers[index];
@@ -268,6 +272,8 @@ export class World {
     else if (news.kind === 'drained') { this.drains.get(index)?.(); this.drains.delete(index); }
     else if (news.kind === 'crossing') void this.crossing(news.slug, news.device, news.to, news.at);
     else if (news.kind === 'crossed') {
+      const begun = this.crossings.get(news.device);
+      if (begun !== undefined) this.options.crossed?.(diagnosticNow() - begun, news.moved);
       this.crossings.delete(news.device); this.leftCrossing.delete(news.device);
       // A moved seat stands in the target, on the same link; one the target refused after the source let it go is in neither.
       if (this.seated.get(news.device) === news.from) {
@@ -444,7 +450,7 @@ export class World {
   private async crossing(from: string, device: string, to: string, at: ResumeAt): Promise<void> {
     const link = this.linkOf(to), name = this.names.get(device);
     if (link === undefined || link !== this.linkOf(from) || this.seated.get(device) !== from || name === undefined || this.draining || this.crossings.has(device)) return;
-    this.crossings.add(device);
+    this.crossings.set(device, diagnosticNow());
     try {
       // The road keeps no progress: a seat walks onto it with nothing to read.
       const saved: SavedPlayer = roadHome(to) === null ? await this.options.saves.read(device, cellShard(to)) : { doc: null, seq: 0 };

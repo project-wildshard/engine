@@ -43,6 +43,9 @@ export interface WorkerReading {
   readonly players: number; readonly held: number; readonly ticks: number; readonly ticksPerSecond: number;
   readonly p50: number; readonly p95: number; readonly p99: number; readonly max: number; readonly drops: number;
   readonly rss: number; readonly heap: number; readonly refused: number; readonly dropped: number; readonly frameBytes: number; readonly eventBytes: number;
+  /** SERVER-CELLS SC1: this worker thread's own memory beyond its heap, and its event-loop lag in ms (`loopLag`), when it measures them. */
+  readonly external?: number; readonly arrayBuffers?: number;
+  readonly lag?: { readonly p50: number; readonly p99: number; readonly max: number };
 }
 /** What a cell tells the worker it runs on. */
 export type RoomNews =

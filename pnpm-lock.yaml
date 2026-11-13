@@ -20,6 +20,9 @@ importers:
       '@hono/node-server':
         specifier: 2.1.5
         version: 2.1.5(hono@4.13.13)
+      '@prometheus-io/client':
+        specifier: 0.16.1
+        version: 0.16.1
       '@sentry/browser':
         specifier: 11.0.0
         version: 11.0.0
@@ -152,7 +155,7 @@ importers:
         version: 8.3.0(@types/node@24.13.6)(esbuild@0.28.2)
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@24.13.6)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2))
+        version: 5.0.1(@opentelemetry/api@1.10.0)(@types/node@24.13.6)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2))
       wrangler:
         specifier: 4.160.1
         version: 4.160.1(@types/node@24.13.6)
@@ -528,6 +531,10 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
+  '@opentelemetry/api@1.10.0':
+    resolution: {integrity: sha512-lMkyes8iHrG+mk6WH7X70MdCLI2RS0FwNBY1PyQ8UemaijE2m5mv5A0Niy3HtbYTFrgkUEQjFMXmSAk2hQDuPQ==}
+    engines: {node: '>=8.0.0'}
+
   '@oxc-project/types@0.156.0':
     resolution: {integrity: sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw==}
 
@@ -560,6 +567,10 @@ packages:
 
   '@pre-bundled/binaryen@131.0.0-nightly.20260721-patch-1':
     resolution: {integrity: sha512-XZAgKcfkdLTD1gpjolotDgAAUrMrrv+V40QiG9tesgrkT+MSBY4eC0aRcwVk2gqxUvTo2dhqviDr7o47TrSmow==}
+
+  '@prometheus-io/client@0.16.1':
+    resolution: {integrity: sha512-XkFPsGFGoSs/UMg/vh0QLDpanl/tsrOV5PLHdpGe8Ho+ir/Llhytr15j6y8ZwLrpIGzK9gTVVpIalA6C4UjUZw==}
+    engines: {node: ^22 || ^24 || >=26}
 
   '@rolldown/binding-android-arm-eabi@1.2.16':
     resolution: {integrity: sha512-ia3DwAs0OsMGS7+IConptSiyk9pEXkOx/AbJ2n/lAGxH3QkWQus1t8d7gnAT38FCU2sQu8lUbeR6AiZFv4JxaA==}
@@ -785,7 +796,7 @@ packages:
     hasBin: true
 
   '@wildshard/wire@https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire':
-    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
+    resolution: {gitHosted: true, path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
     version: 0.0.0
     hasBin: true
 
@@ -800,6 +811,9 @@ packages:
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
     engines: {node: '>=12'}
+
+  bintrees@1.0.2:
+    resolution: {integrity: sha512-VOMgTMwjAaUG580SXn3LacVgjurrbMme7ZZNYGSSV7mmtY6QQRh0Eg3pwIcntQ77DErK1L0NxkbetjcoXzVwKw==}
 
   blake3-wasm@2.1.5:
     resolution: {integrity: sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g==}
@@ -1167,6 +1181,9 @@ packages:
   supports-color@10.2.2:
     resolution: {integrity: sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==}
     engines: {node: '>=18'}
+
+  tdigest@0.1.3:
+    resolution: {integrity: sha512-zbRt+lT+/H4fRItHshczHErVCQnitJk8MfMT24MqFJf3YL7SJJPqGIGeuOdvxXxM/AHFzKBl7WoyaYwqO9s3Kw==}
 
   three@0.186.0:
     resolution: {integrity: sha512-cr/fIM2ddMSVbYVgkfD4jLJv7Fh/8ZTjvo+7gQeSVGUZHxpx9FDwoL5iC7hUz/LiRA8wMbqfnb90xKfm1/HHkQ==}
@@ -1811,6 +1828,8 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
+  '@opentelemetry/api@1.10.0': {}
+
   '@oxc-project/types@0.156.0': {}
 
   '@oxlint/binding-darwin-arm64@1.89.0':
@@ -1836,6 +1855,11 @@ snapshots:
   '@poppinss/exception@1.2.3': {}
 
   '@pre-bundled/binaryen@131.0.0-nightly.20260721-patch-1': {}
+
+  '@prometheus-io/client@0.16.1':
+    dependencies:
+      '@opentelemetry/api': 1.10.0
+      tdigest: 0.1.3
 
   '@rolldown/binding-android-arm-eabi@1.2.16':
     optional: true
@@ -2046,6 +2070,8 @@ snapshots:
       long: 5.3.2
 
   assertion-error@2.0.1: {}
+
+  bintrees@1.0.2: {}
 
   blake3-wasm@2.1.5: {}
 
@@ -2352,6 +2378,10 @@ snapshots:
 
   supports-color@10.2.2: {}
 
+  tdigest@0.1.3:
+    dependencies:
+      bintrees: 1.0.2
+
   three@0.186.0: {}
 
   tinybench@6.1.4: {}
@@ -2395,7 +2425,7 @@ snapshots:
       esbuild: 0.28.2
       fsevents: 2.3.3
 
-  vitest@5.0.1(@types/node@24.13.6)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)):
+  vitest@5.0.1(@opentelemetry/api@1.10.0)(@types/node@24.13.6)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.1(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2))
@@ -2412,6 +2442,7 @@ snapshots:
       vite: 8.3.0(@types/node@24.13.6)(esbuild@0.28.2)
       why-is-node-running: 2.3.0
     optionalDependencies:
+      '@opentelemetry/api': 1.10.0
       '@types/node': 24.13.6
       happy-dom: 20.14.5
     transitivePeerDependencies:
