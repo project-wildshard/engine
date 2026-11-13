@@ -525,7 +525,8 @@ class Landing{
    if(!/couldn't find remote ref/u.test(fetched.stderr))throw new StopError(`git fetch origin ${this.branch} failed: ${fetched.stderr.trim()}`);
    tryGitLocked(this.root,['update-ref','-d',tracking],process.env,this.retry);
   }
-  const tip=tryGit(this.root,['rev-parse','--verify','--quiet',`${tracking}^{commit}`]).stdout.trim()||null;
+  const tipOut=tryGit(this.root,['rev-parse','--verify','--quiet',`${tracking}^{commit}`]).stdout.trim();
+  const tip=tipOut===''?null:tipOut;
   if(tip===sha){this.say('pushed',`${this.branch} already at ${short(sha)}`);this.planTip=sha;return;}
   const rewrite=tip!==null&&!isAncestor(this.root,tip,sha);
   if(rewrite&&!this.reached(tip)){
