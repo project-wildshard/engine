@@ -871,11 +871,12 @@ export class GridSession {
     // (rings.step's tile choice and its per-frame upload budget twice a frame, on Driftwood's road entry ~1.6k Simulator
     // samples); headless hosts keep it in the fixed step
     host.onFixed((dt) => { this.step(dt, host.frame === undefined); this.life.fixed(); });
-    const homeResidency = { instance: residency.home().instance, bytes: residency.home().bytes };
+    // read at call time: a desktop images-first home settles its claim's bytes at the handoff (GC21 row 53)
+    const homeClaim = residency.home(), homeResidency = (): { instance: string; bytes: number } => ({ instance: homeClaim.instance, bytes: homeClaim.bytes });
     host.scope.onDispose(app.debug.scopedExpose('grid', { state: () => this.state(), roadView: () => this.roadBudget.view(), roadResident: () => this.roadBudget.resident(),
       roadTileResidency: () => this.roadTiles?.state() ?? null,
       // G144 admission receipts read the same allocator, without reserving or changing any claim.
-      residency: () => ({ cost: this.allocator.cost(), claims: this.allocator.entries(), home: homeResidency }),
+      residency: () => ({ cost: this.allocator.cost(), claims: this.allocator.entries(), home: homeResidency() }),
       // Per-frame travel needs the same fresh live/crossing facts, without the
       // full debug view's cells, ring accounting, skies, grades and post rows.
       travelState: (): { inside: string | null; live: ReturnType<LiveGridSession['travelState']> | null } => ({

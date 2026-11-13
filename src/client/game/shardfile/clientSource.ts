@@ -68,8 +68,11 @@ export function preparePageResidency(manifest: Pick<ShardManifest, 'slug' | 'sha
         measured: { webContentBytes: Math.ceil(row.webContentMB * 1_000_000), glBytes: Math.ceil(row.glMB * 1_000_000), engineBaseBytes: Math.ceil(row.engineBaseMB * 1_000_000),
           ...(row.residentBaseMB === undefined ? {} : { residentBaseBytes: Math.ceil(row.residentBaseMB * 1_000_000) }),
           rev: row.rev, device: row.device, evidence: row.evidence } })) throw new Error('Home residency admission deferred by the shared budget');
-      // A matched increment subtracts the persistent composer; it cannot cover that page component again.
-      residency.admitHome(instance, bytes, row.residentBaseMB === undefined);
+      // A matched increment subtracts the persistent composer; it cannot cover that page component again. Its images-first
+      // reading rides beside it: the texture mode is resolved only at the grid entry (GC21, QA 11-12 row 53).
+      const images = row.imagesFirst;
+      residency.admitHome(instance, bytes, row.residentBaseMB === undefined,
+        images === undefined ? undefined : { bytes: runtimeAccountedBytes(images), measuredPage: images.residentBaseMB === undefined });
     }
     const recovery = mode === 'grid' ? pageGridRecovery() : null;
     return { mode, instance, residency, memory, ...(recovery === null ? {} : { recovery }) };
