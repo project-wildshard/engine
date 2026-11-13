@@ -53,7 +53,7 @@ jobs:
             echo "the live preview was built $(( ($(date +%s) - built) / 60 )) minutes ago: under the hour, no deploy"
             echo "deploy=false" >> "$GITHUB_OUTPUT"
           else
-            echo "the live preview was built ${built:+$(( ($(date +%s) - built) / 60 )) minutes ago}${built:-at an unknown time}: deploy"
+            if [ -n "$built" ]; then echo "the live preview was built $(( ($(date +%s) - built) / 60 )) minutes ago: deploy"; else echo "the live preview's build time is unknown: deploy"; fi
             echo "deploy=true" >> "$GITHUB_OUTPUT"
           fi
       - name: The newest green main

@@ -21,3 +21,4 @@
   fetches tags so `git describe` sees v0.1.x.
 - The plan (PCD1 to PCD5) is docs/plans/opus-2026-11-12-preview-cd.md; PCD3 (a 75-minute lag watchdog), PCD4 (proof) and PCD5 (meta architecture) stay open.
 - PCD3: scripts/preview-lag.mjs finds the oldest green main past the live preview that changes a client input (preview.yml's list); over 75 min it checks in error to Sentry Crons preview-lag and dispatches preview.yml. First run 22:57 Cancún: BEHIND 240 min (243820b7), the hand run was already going.
+- First workflow_run run 43364023216 (23:12 Cancún) passed the gate (live 269 min old), named itself v0.1.13-112-g13d0d1fd and failed on the shard-size phone ceilings, like the 22:48 hand run. The gate's deploy message printed the epoch after the minutes; fixed.
