@@ -17,7 +17,7 @@ import { chatLines } from './chatLines';
 import { VoiceChat, type VoiceHeard, type VoiceLink } from './voice';
 import { voiceUi } from './voiceUi';
 import { jsonSlot, type Json } from '@wildshard/engine/saves/slots';
-import { fetchSignedRelease } from './release';
+import { fetchSignedRelease, releaseToDial, type ReleaseKeep } from './release';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
 
@@ -32,6 +32,8 @@ export interface SeatPlace { readonly x: number; readonly y: number; readonly z:
 export interface OnlineConfig {
   /** The address the release file names. */
   readonly socket: string;
+  /** OF4: the address each later dial takes, when a fresh release file can name another after the first dial. */
+  readonly address?: () => string;
   /** This page's build: the door refuses another one (J54). */
   readonly build: string;
   /** The cell this page has loaded. */
@@ -125,7 +127,8 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   const first = hear(new WebSocketTransport(config.socket)), client = new NetClient(first);
   const records=config.record===undefined?undefined:new NetRecords(client,{...config.record,build:config.build,level:config.loaded,
     correction:(row:NetCorrection)=>{if(playtest)link?.control('playtest',new TextEncoder().encode(JSON.stringify(row)).buffer);}});
-  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(config.socket));}, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); }, onCut: reason => { view.cut?.(reason); } });
+  const address = config.address ?? ((): string => config.socket);
+  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(address()));}, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); }, onCut: reason => { view.cut?.(reason); } });
   // A held seat comes straight back with no `resume`: a tab reloaded inside J114's 30 s.
   // GO4: on a grid page, a held seat in another cell than the page booted re-enters the grid there, as a `resume` would say.
   const offFirst = client.onFrame(() => {
@@ -148,7 +151,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
       const say = (again: boolean): Promise<void> => {
         let quitting = link;
         // A retry always dials: the link it follows is closed, whether or not `hear` was watching it.
-        if (quitting === null || down || !again) { quitting = new WebSocketTransport(config.socket); link = quitting; down = false; client.rejoin(quitting); }
+        if (quitting === null || down || !again) { quitting = new WebSocketTransport(address()); link = quitting; down = false; client.rejoin(quitting); }
         const gone = new Promise<void>(resolve => { quitting.onClose(reason => { if (again && reason === 'stalled') void say(false).then(resolve); else resolve(); }); });
         quitting.control('ready', new Uint8Array([LEAVE_FLAG]).buffer);
         return gone;
@@ -188,6 +191,9 @@ export interface StartOnline {
     readonly goto?: boolean };
   /** The signed release file, and the key that signed it. */
   readonly release: string; readonly key: string;
+  /** OF4: where the page keeps the last verified release file. The page's own saves hold it: this bundle's saves have no storage, and
+   *  a second store writing the page's device save would drop the keys it doesn't define. */
+  readonly keep?: ReleaseKeep;
   readonly recordTag?:string;
 }
 /** E7.5 prep: ask the page to leave for the Connection doctor, saying which screen asked. The page's own bundle answers
@@ -233,6 +239,8 @@ export async function worldWord(config: { readonly release: string; readonly key
   return word;
 }
 const GATE_KEEP_MS = 60_000;
+/** A page that lends no keep reads the release file every time. */
+const NO_KEEP: ReleaseKeep = { read: () => null, write: () => undefined };
 /** The tab's kept word (a session save), made on first use so a page that never asks defines nothing. The release is under `of`, not
  *  `release`: an older build in the same tab kept only a yes there and reads any fresh `release` entry as one. */
 const gateSlot = (): ReturnType<typeof jsonSlot> => jsonSlot('gridGate', 'session');
@@ -269,13 +277,17 @@ async function askWorld(config: { readonly release: string; readonly key: string
 
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
 export async function startOnline(config: StartOnline): Promise<OnlineShell> {
-  const { release: at, key, identity, recordTag, grid, ...link } = config, release = await fetchSignedRelease(at, key), { socket } = release;
+  // OF4: a verified kept release file dials at once (offline too), and the fresh read follows; with none, the page waits for the read
+  const { release: at, key, keep, identity, recordTag, grid, ...link } = config, { file: release, fresh } = await releaseToDial(at, key, { keep: keep ?? NO_KEEP }), { socket } = release;
   // QA row 16: a level page enters only from a tap. A reload this page makes itself carries the tap that brought it here.
   const entering = (slug: string): void => { setTitleArrival({ slug, mode: 'enter' }, { tab: true }); };
   const stale = async (): Promise<boolean> => { entering(link.loaded); const going = await reloadStale(); if (!going) dropTabArrival(); return going; };
-  if (release.engineBuild !== link.build) await stale();
+  // only a fresh read says the world moved on: a kept copy's build is the past, and an offline page can't reload anyway
+  if (fresh === null && release.engineBuild !== link.build) await stale();
   if (socket === undefined) throw new Error('The release file names no address');
   const scope = new Scope('online.page');
+  const goto = grid?.goto === true ? grid.cell : undefined;
+  let dialing = socket;
   // MP2.4: the page asked for the Name before it got here (namePrompt.ts, once per device); Skip keeps the device's own (Guest)
   const named = identity();
   let shellNow: OnlineShell | null = null, waitingForSeat = false;
@@ -290,7 +302,7 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
   const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
-  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, grid?.goto === true ? grid.cell : undefined), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
+  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto), address: () => gotoSocket(dialing, goto), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); if (state === 'ended' && reason === 'reload') void ended(); },
     // The cut (5.5): an old server refused a v1 hello. Reload only into another build; on this one, the server is updating.
     cut: () => { void reloadStale(); },
@@ -301,6 +313,15 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
     elsewhere: seat => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); markUnload(`online seat elsewhere (${seat})`); location.replace(url); },
   });
   shellNow = shell;
+  // the fresh read behind a kept copy: another build reloads into it, as a fresh read before the dial would (two reloads share one
+  // durable claim, chunkRecovery.ts); another address takes the next dial: now if the link is down and waiting, else after the dial
+  // under way, or the player's Retry once the link has given up
+  void fresh?.then(read => {
+    if (read === null || scope.disposed) return undefined;
+    if (read.engineBuild !== link.build) return stale();
+    if (read.socket !== undefined && read.socket !== dialing) { dialing = read.socket; shell.dialNow(); }
+    return undefined;
+  });
   // a tap the world must hear waits for the link: the hold card says so, and the tap is never sent late
   shell.client.gateActions(what => screens.allow(what));
   void settled(shell.booted);

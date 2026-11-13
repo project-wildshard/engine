@@ -10,6 +10,7 @@ import { appIdentity } from '@wildshard/engine/app/identity';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { importPageSaves, openIndexedSaves, serverSaveDatabase, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
 import { saveEnvironment } from '@wildshard/engine/saves/environment';
+import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { syncPageRewards } from '../../../shared/game/saves';
 import type { SaveStorage } from '@wildshard/engine/saves/store';
 import { atMostLeaveWait, holdLeaving } from '@wildshard/engine/boot/lastEnd';
@@ -110,8 +111,22 @@ export interface WorkerClientPorts {
 interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; name?: string; lone?: true; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell }
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
+/** OF4: the page's keep for the last verified release file, in its own device saves (online.js's store has no storage). */
+interface ReleaseKeep { readonly read: () => { of: string; at: number; text: string } | null; readonly write: (kept: { of: string; at: number; text: string }) => void }
+function releaseKeep(): ReleaseKeep {
+  const slot = jsonSlot('release.kept', 'device');
+  return {
+    read: () => {
+      const kept = slot.read();
+      if (typeof kept !== 'object' || kept === null || Array.isArray(kept)) return null;
+      const { of, at, text } = kept;
+      return typeof of === 'string' && typeof at === 'number' && typeof text === 'string' ? { of, at, text } : null;
+    },
+    write: kept => { slot.write({ of: kept.of, at: kept.at, text: kept.text }); },
+  };
+}
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
-interface OnlineModule { readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean } }) => Promise<Shell> }
+interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean } }) => Promise<Shell> }
 interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
 
 const SAVE_EVERY_MS = 30_000;
@@ -334,7 +349,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     // a page that left while it asked never joins (Codex review): a cancelled load must not take the device's seat
     if (!answered || scope.disposed) throw new Error('The page left before it joined the world');
     const { grid } = ports, booted = grid?.booted;
-    return startOnline({ ...world, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name),
+    return startOnline({ ...world, keep: releaseKeep(), loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name),
       ...(grid === null || booted === undefined ? {} : { grid: { cell: booted, cells: grid.cells.map(cell => cell.instance), placed: (cell, at) => { grid.serverPlace?.(cell, at); }, reenter: cell => { grid.reenter?.(cell); },
         ...(pageGoto() === booted ? { goto: true } : {}) } }) });
   };
