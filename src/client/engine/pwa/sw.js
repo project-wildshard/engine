@@ -140,15 +140,24 @@ const inflight = new Set(), controlled = new Set(), loading = new Set(), nonLoad
 const isDoctorDocument = url => url.origin === self.location.origin
   && (url.pathname === '/doctor' || url.pathname === '/doctor/' || url.pathname === '/doctor/index.html'
     || (url.pathname === '/' || url.pathname === '/index.html') && url.searchParams.has('doctor'));
+// OF6: only a page we can see loads. A client `clients.get` doesn't list (a dedicated worker some browsers don't) is not one.
 function isNonLoadingClient(id) {
   if (typeof self.clients?.get !== 'function') return Promise.resolve(false);
   let known = nonLoadingClients.get(id);
-  if (known === undefined) { known = self.clients.get(id).then(client => client?.type === 'worker'
-    || client?.type === 'window' && isDoctorDocument(new URL(client.url)), () => false); nonLoadingClients.set(id, known); }
+  if (known === undefined) {
+    known = self.clients.get(id).then(client => {
+      // unseen now may be a page a browser lists late: not kept, so its next read asks again
+      if (client === undefined) { nonLoadingClients.delete(id); return true; }
+      return client.type === 'worker' || client.type === 'sharedworker' || client.type === 'window' && isDoctorDocument(new URL(client.url));
+    }, () => false);
+    nonLoadingClients.set(id, known);
+  }
   return known;
 }
+// OF6: a read with no client id (a worker's own script) is no loading page; a navigation pauses through its own branch. Before,
+// such reads paused the precache and aborted its fetches on every read, so a page's workers held it paused while they read.
 async function pauseForClient(id) {
-  if (typeof id === 'string' && id !== '' && await isNonLoadingClient(id)) return;
+  if (typeof id !== 'string' || id === '' || await isNonLoadingClient(id)) return;
   pausePrecache(id);
 }
 function pausePrecache(client) {

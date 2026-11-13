@@ -112,7 +112,8 @@ test('the post-control precache yields to a loading page and resumes at that pag
   const source = (id: string) => ({ id, postMessage: () => undefined });
   const first = worker.dispatch('message', { ...precached, source: source('page-1') });
   await vi.waitFor(() => { expect(f.fetch).toHaveBeenCalledTimes(6); }); // a few lanes, not every file at once
-  // A new document loads (its client has not reported control): the precache steps aside and frees the link.
+  // A new document loads (its client has not reported control, and `clients.get` lists it, OF6): the precache steps aside and frees the link.
+  worker.live.add('page-2');
   await worker.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-2' });
   holding = false; await new Promise(resolve => { setTimeout(resolve, 0); });
   expect(f.fetch).toHaveBeenCalledTimes(6);
@@ -182,6 +183,21 @@ test('a worker\'s reads neither pause the precache nor stand as a loader', async
   again.release(); second.live.delete('page-2');
   await second.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-1' }); await run;
   expect(again.f.fetch).toHaveBeenCalledTimes(15);
+});
+
+// OFFLINE OF6: audits saw `ws-builds-v1` empty after a minute of play. A worker's own script fetch carries no client id, and a client
+// `clients.get` can't see (a dedicated worker some browsers don't list) is no page loading: before, each read paused the precache
+// and aborted its fetches, so the page's workers held it paused for as long as they read.
+test('a read with no client id, or from a client the worker cannot see, never pauses the precache', async () => {
+  const held = heldPrecache(), worker = held.f.load('A', held.files, []);
+  await worker.dispatch('install'); await worker.dispatch('activate');
+  void worker.dispatch('message', { ...precached, source: held.source('page-1') });
+  await vi.waitFor(() => { expect(held.f.fetch).toHaveBeenCalledTimes(6); });
+  // the held network keeps both reads in flight; the pause, if any, is decided in their own turn
+  void worker.dispatch('fetch', { request: new Request(url('/b/c/worker-a1b2c3d4.js')), clientId: '' });
+  void worker.dispatch('fetch', { request: new Request(url('/shardfiles/nine/server/a.bin')), clientId: 'unlisted-worker' });
+  await new Promise(resolve => { setTimeout(resolve, 20); });
+  expect(held.f.fetch.mock.calls.filter(([request]) => typeof request !== 'string' && request.signal.aborted)).toEqual([]);
 });
 
 test('the precache takes a part\'s member from under its `?v=`, and downloads nothing', async () => {
