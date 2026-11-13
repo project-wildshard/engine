@@ -9,7 +9,7 @@
 // on the deck, the title arrival, so it is no way round a missing card.) One HTML report, 25 rows × 2 layouts, load ms and shots.
 // J205: staging only, never production. At most 3 pages at once (`WORLD_SEATS` 32).
 //   node scripts/grid-spawn-proof.mjs <out dir> [--layouts=desktop,phone] [--cells=<instance,…>] [--parallel=3] [--no-dev]
-//   node scripts/grid-spawn-proof.mjs <out dir> --report-only   (redraws report.html from <out dir>/runs.json)
+//   node scripts/grid-spawn-proof.mjs <out dir> --report-only [--again=<a second run's runs.json>]   (redraws report.html from <out dir>/runs.json)
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { basename, join, resolve as absolute } from 'node:path';
@@ -42,7 +42,7 @@ const CARD = /** @type {Record<string, string>} */ ({ 'driftwood-isle': 'Driftwo
 const cells = catalogue.grid.cells.filter(cell => only.length === 0 || only.includes(cell.instance)).sort((a, b) => b.cell[1] - a.cell[1] || a.cell[0] - b.cell[0]);
 
 /** @typedef {{ instance: string, slug: string, cell: [number, number] }} Cell */
-/** @typedef {{ instance: string, slug: string, xy: [number, number], layout: string, path: 'card' | 'dev', card: string, ok: boolean, why: string, loadMs: number | null, walkedM: number | null, jumpM: number | null, inside: string | null, seat: string | null, mode: string, url: string, errors: string[], shots: string[], at: string }} Run */
+/** @typedef {{ instance: string, slug: string, xy: [number, number], layout: string, path: 'card' | 'dev', card: string, ok: boolean, why: string, loadMs: number | null, walkedM: number | null, jumpM: number | null, inside: string | null, seat: string | null, mode: string, url: string, errors: string[], shots: string[], at: string, again?: { ok: boolean, why: string, loadMs: number | null } }} Run */
 
 /** One run: a fresh profile, one way in, control, walk, jump, seat. @param {import('playwright').Browser} browser @param {Cell} cell @param {string} layout @param {'card' | 'dev'} path @returns {Promise<Run>} */
 async function runOne(browser, cell, layout, path) {
@@ -124,7 +124,7 @@ async function runOne(browser, cell, layout, path) {
     // 10 m by input: W held on desktop; on the phone a finger on the stick, pushed up
     let walked = 0;
     const deadline = Date.now() + 25_000;
-    let stuck = 0, last = from;
+    let stuck = 0, last = from, back = false;
     if (phone) {
       const ring = await page.locator('.ws-touch-stick').boundingBox();
       if (ring === null) throw new Error('no touch stick on the phone layout');
@@ -133,7 +133,8 @@ async function runOne(browser, cell, layout, path) {
       for (let dy = 0; dy <= 60; dy += 10) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx, y: cy - dy, id: 1 }] });
       while (Date.now() < deadline && walked < 10) {
         await page.waitForTimeout(250);
-        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx + (stuck > 8 ? 30 : 0), y: cy - 60, id: 1 }] });
+        if (stuck > 8) back = true;
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx, y: back ? cy + 60 : cy - 60, id: 1 }] });
         const at = await where(); walked = Math.hypot(at.x - from.x, at.z - from.z);
         stuck = Math.hypot(at.x - last.x, at.z - last.z) < 0.05 ? stuck + 1 : 0; last = at;
       }
@@ -145,9 +146,9 @@ async function runOne(browser, cell, layout, path) {
         const at = await where(); walked = Math.hypot(at.x - from.x, at.z - from.z);
         stuck = Math.hypot(at.x - last.x, at.z - last.z) < 0.05 ? stuck + 1 : 0; last = at;
         if (stuck === 6) await page.keyboard.press('Space');
-        if (stuck === 10) { await page.keyboard.down('KeyA'); await page.waitForTimeout(600); await page.keyboard.up('KeyA'); }
+        if (stuck === 10 && !back) { back = true; await page.keyboard.up('KeyW'); await page.keyboard.down('KeyS'); }
       }
-      await page.keyboard.up('KeyW');
+      await page.keyboard.up('KeyW'); await page.keyboard.up('KeyS');
     }
     run.walkedM = Number(walked.toFixed(1));
     await page.waitForTimeout(600);
@@ -183,6 +184,16 @@ const developerCard = cell => cell.slug === '_template';
 const runsFile = join(out, 'runs.json');
 /** @type {{ runs: Run[], staging: Record<string, unknown> }} */
 const state = existsSync(runsFile) ? JSON.parse(readFileSync(runsFile, 'utf8')) : { runs: [], staging: {} };
+const againFile = flag('again', '');
+if (againFile !== '') {
+  const again = /** @type {{ runs: Run[] }} */ (JSON.parse(readFileSync(againFile, 'utf8')));
+  for (const row of again.runs) {
+    const first = state.runs.find(run => run.instance === row.instance && run.layout === row.layout && run.path === row.path);
+    // only runs that got as far as ENTER WORLD: a missing or locked card is the same every time
+    if (first !== undefined && !/^(no card|card is locked)/u.test(row.why)) first.again = { ok: row.ok, why: row.why, loadMs: row.loadMs };
+    else if (first === undefined && row.path === 'dev') state.runs.push(row); // a Developer card the first pass didn't try
+  }
+}
 if (!process.argv.includes('--report-only')) {
   const health = await fetch(HEALTH, { signal: AbortSignal.timeout(15_000) }).then(found => found.json()).catch(() => ({}));
   const release = await fetch(RELEASE, { signal: AbortSignal.timeout(15_000) }).then(async found => JSON.parse((await found.json()).body)).catch(() => ({}));
@@ -229,13 +240,14 @@ const find = (/** @type {string} */ instance, /** @type {string} */ layout, /** 
 const table = /** @type {Record<string, number>} */ (state.staging.table ?? {});
 const cardRuns = state.runs.filter(row => row.path === 'card'), green = cardRuns.filter(row => row.ok).length;
 const chunkRuns = state.runs.filter(row => row.path === 'dev'), chunkGreen = chunkRuns.filter(row => row.ok).length;
+const againRuns = state.runs.filter(row => row.again !== undefined), againGreen = againRuns.filter(row => row.again?.ok === true).length;
 /** @param {Run | undefined} run */
 const cellHtml = async run => {
   if (run === undefined) return '<td class="run"><span class="chip none">not run</span></td>';
   const pick = run.shots.find(file => file.endsWith('-after.png')) ?? run.shots.find(file => file.endsWith('-control.png')) ?? run.shots.at(-1) ?? '';
   const img = pick === '' ? '' : `<img src="${await thumb(pick)}" alt="${esc(run.instance)} ${esc(run.layout)}" loading="lazy">`;
   const facts = run.loadMs === null ? '' : `<dl><dt>load</dt><dd>${String(run.loadMs)} ms</dd><dt>walk</dt><dd>${String(run.walkedM)} m</dd><dt>jump</dt><dd>${String(run.jumpM)} m</dd><dt>seat</dt><dd>${esc(String(run.seat))}</dd></dl>`;
-  return `<td class="run"><div class="runbox"><span class="chip ${run.ok ? 'ok' : 'bad'}">${run.ok ? 'GREEN' : 'RED'}</span>${facts}${run.why === '' ? '' : `<p class="why">${esc(run.why)}</p>`}${img}</div></td>`;
+  return `<td class="run"><div class="runbox"><span class="chip ${run.ok ? 'ok' : 'bad'}">${run.ok ? 'GREEN' : 'RED'}</span>${facts}${run.why === '' ? '' : `<p class="why">${esc(run.why)}</p>`}${run.again === undefined ? '' : `<p class="again">again, one page at a time: <b class="${run.again.ok ? 'okt' : 'badt'}">${run.again.ok ? 'GREEN' : 'RED'}</b>${run.again.loadMs === null ? '' : ` ${String(run.again.loadMs)} ms`}${run.again.why === '' ? '' : ` · ${esc(run.again.why)}`}</p>`}${img}</div></td>`;
 };
 const rows = [];
 for (const cell of all) {
@@ -276,15 +288,17 @@ td.direct { background: color-mix(in srgb, var(--bg) 60%, var(--panel)); }
 .runbox img { width: 220px; height: auto; border-radius: 4px; border: 1px solid var(--line); }
 dl { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; font-variant-numeric: tabular-nums; } dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
 .why { margin: 0; color: var(--bad); overflow-wrap: anywhere; }
+.again { margin: 0; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); overflow-wrap: anywhere; } .okt { color: var(--ok); } .badt { color: var(--bad); }
 .chip { display: inline-block; font-family: var(--mono); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 3px; width: max-content; }
 .chip.ok { color: var(--ok); background: var(--ok-bg); } .chip.bad { color: var(--bad); background: var(--bad-bg); } .chip.none, .muted { color: var(--muted); font-size: 0.75rem; }
 code { font-family: var(--mono); font-size: 0.85em; }
 </style>
 <h1>Grid spawn proof, GC21</h1>
-<p class="sub">Staging, every cell of the 5×5 grid, each in a fresh headless Chromium profile: title → SHARD SELECT → the shard's card → ENTER WORLD, then control, a 10 m walk by input, a jump, and the seat's cell from the server's own snapshot. A run is green only if the page is the grid, inside that cell, the server seats it there, it walks 10 m and jumps. The Shard Select columns are a fresh player (Developer off). Where that card is locked, the grey column tries the same card with Developer on, to show whether the cell itself spawns; the open plots have no card with Developer on either. Finished ${esc(when)} Cancún.</p>
+<p class="sub">Staging, every cell of the 5×5 grid, each in a fresh headless Chromium profile: title → SHARD SELECT → the shard's card → ENTER WORLD, then control, a 10 m walk by input, a jump, and the seat's cell from the server's own snapshot. A run is green only if the page is the grid, inside that cell, the server seats it there, it walks 10 m and jumps. The Shard Select columns are a fresh player (Developer off). Where that card is locked, the grey column tries the same card with Developer on, to show whether the cell itself spawns; the open plots have no card with Developer on either. ${againRuns.length === 0 ? '' : 'The first pass ran three pages at once, and the staging door refused some of their sockets (429: it allows 4 sockets and 10 connects a minute per address, and every agent on this Mac shares one), so every carded cell ran again one page at a time; that result is the line under each run.'} Finished ${esc(when)} Cancún.</p>
 <div class="strip">
 <div class="stat"><b>${String(green)} / ${String(cardRuns.length)}</b><span>Shard Select runs green</span></div>
 <div class="stat"><b>${String(chunkGreen)} / ${String(chunkRuns.length)}</b><span>Developer-on retries green</span></div>
+${againRuns.length === 0 ? '' : `<div class="stat"><b>${String(againGreen)} / ${String(againRuns.length)}</b><span>carded runs green, one page at a time</span></div>`}
 <div class="stat"><b>${esc(String(s.serial))}</b><span>staging serial</span></div>
 <div class="stat"><b class="mono">${esc(String(s.build).slice(0, 10))}</b><span>build</span></div>
 <div class="stat"><b>${esc(String(s.cells))} on ${esc(String(s.workers))}</b><span>cells on workers</span></div>

@@ -8,3 +8,7 @@
   title's deck.
 - The first run on staging serial 76 (b3e9a56, before GC20) was 3 of 50 green: 18 cells have no card at all (the open plots
   and `_template`), and four are Coming soon or Draft for a player.
+- The first pass ran three pages at once and the staging door answered 429 to some of their sockets (4 sockets and 10
+  connects a minute per address; every agent on this Mac shares one). A refused page fell back to a one-shard page or
+  ended on the title with no word, so carded cells run again one page at a time (`--parallel=1`), and `--again=` lays that
+  second run under the first in the report. A walk blocked by a wall now backs up: the 10 m is measured from the start.
