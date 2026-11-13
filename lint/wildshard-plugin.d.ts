@@ -11,3 +11,7 @@ export const VIEW_PATHS: readonly string[];
 
 /** G645 product-surface rules that do not apply to colocated test fixtures. */
 export const TEST_DOMAIN_RUNTIME_RULES: readonly string[];
+
+/** The oxlint JS plugin: its name and every rule, keyed without the `wildshard/` prefix. */
+declare const plugin: { readonly meta: { readonly name: string }; readonly rules: Readonly<Record<string, unknown>> };
+export default plugin;

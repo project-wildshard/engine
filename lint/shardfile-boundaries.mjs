@@ -2,10 +2,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { parseSync } from 'vite';
+import { shardFile } from './shard-source.mjs';
 
 const BUILD = /^(?:data|generators|bake|behaviour|assets|blender)(?:\/|$)|^shard\.config(?:\.[cm]?[jt]s)?$/u;
 const PLAY = /^(?:runtime|world|look|models|weapons|quest|quests|combat|species|creatures|npc|loadout|ride|vm|grapple|life|compendium|boot|debug|dev|playground|explore|audio|loot|onboarding)(?:\/|$)/u;
-const shard = path => /^src\/shards\/([^/]+)\/(.+)$/u.exec(path);
+/** [source path, slug, shard-local path] for `path` (relative to `root`, either layout, SA45), or null. */
+const shard = (root, path) => { const found = shardFile(root, path); return found === null ? null : [found.path, found.slug, found.local]; };
 const text = node => node?.type === 'Literal' && typeof node.value === 'string' ? node.value
   : node?.type === 'TemplateLiteral' && node.expressions.length === 0 ? node.quasis[0]?.value.cooked ?? null : null;
 const prefix = node => text(node) ?? (node?.type === 'TemplateLiteral' ? node.quasis[0]?.value.cooked
@@ -34,8 +36,8 @@ function target(root, file, source) {
 }
 
 function violation(root, file, source, computed, glob, rule) {
-  const own = shard(file), dest = source === null ? null : target(root, file, source);
-  const other = dest === null ? null : shard(dest);
+  const own = shard(root, file), dest = source === null ? null : target(root, file, source);
+  const other = dest === null ? null : shard(root, dest);
   const build = own !== null && BUILD.test(own[2]);
   if (rule === 'runtime-standalone') {
     if (own === null || !own[2].startsWith('runtime/')) return null;
@@ -43,14 +45,14 @@ function violation(root, file, source, computed, glob, rule) {
     if (/[?#]/u.test(source)) return 'runtime/ cannot import assets, JSON, ?raw or ?url; read the admitted product instead';
     if (/\.[^/]+$/u.test(source) && !/\.[cm]?[jt]sx?$/u.test(source)) return `runtime/ cannot import JSON or assets: ${source}; read the admitted product instead`;
     if (dest === null) return publicPackage(root, source) ? null : `runtime/ imports only its own files and public engine/game/SDK/format, three or valibot modules: ${source}`;
-    if (!dest.startsWith(`src/shards/${own[1]}/runtime/`)) return `runtime/ is standalone: ${source} leaves its own runtime/; read a built section or move play code into runtime/`;
+    if (other?.[1] !== own[1] || !other[2].startsWith('runtime/')) return `runtime/ is standalone: ${source} leaves its own runtime/; read a built section or move play code into runtime/`;
     if (/\.[^/]+$/u.test(dest) && !/\.[cm]?tsx?$/u.test(dest) || glob && !/\.[cm]?tsx?$/u.test(dest)) return `runtime/ cannot import JSON or assets: ${source}; read the admitted product instead`;
     return null;
   }
   if (rule === 'no-build-time-import') {
     if (!file.startsWith('src/') || file.startsWith('src/commons/') || /^src\/sharddev\/(?:cli|bake)\//u.test(file)) return null;
     if (other === null || !BUILD.test(other[2])) {
-      return computed && dest?.startsWith('src/shards/') && !build ? `Play code cannot compute a path into shard build-time folders: ${source}` : null;
+      return computed && (other !== null || dest?.startsWith('src/shards/') === true) && !build ? `Play code cannot compute a path into shard build-time folders: ${source}` : null;
     }
     if (build && own[1] === other[1]) return null;
     return `Play code cannot import build-time code: ${source}; read it from the built shard's sections or blobs`;
@@ -64,7 +66,7 @@ function violation(root, file, source, computed, glob, rule) {
 
 /** Same AST visitors for the linter and copier. Type-only, lazy and resource imports are all boundaries. */
 export function shardfileBoundaryVisitors(root, file, rule, report) {
-  const own = shard(file);
+  const own = shard(root, file);
   if (rule === 'runtime-standalone' && !own?.[2].startsWith('runtime/')) return {};
   if (rule === 'no-runtime-in-build' && (own === null || !BUILD.test(own[2]))) return {};
   const check = (node, raw, glob = false) => {
@@ -83,7 +85,7 @@ export function shardfileBoundaryVisitors(root, file, rule, report) {
       if (node.callee.type === 'Identifier' && node.callee.name === 'require') check(node, node.arguments[0]);
       if ((member(node.callee, 'glob') || member(node.callee, 'globEager')) && importMeta(node.callee.object)) {
         const raw = node.arguments[0], patterns = raw?.type === 'ArrayExpression' ? raw.elements : [raw];
-        if (rule === 'runtime-standalone' && shard(file)?.[2].startsWith('runtime/') && node.arguments[1]?.type === 'ObjectExpression'
+        if (rule === 'runtime-standalone' && own?.[2].startsWith('runtime/') && node.arguments[1]?.type === 'ObjectExpression'
           && node.arguments[1].properties.some(property => ['query', 'as'].includes(property.key?.name ?? text(property.key)))) {
           report(node, 'runtime/ globs cannot transform modules into assets with query/as');
         }
@@ -99,7 +101,7 @@ export function shardfileBoundaryVisitors(root, file, rule, report) {
   };
 }
 
-/** Raw violations, without migration allowances. `file` is the source-relative src/shards/... path.
+/** Raw violations, without migration allowances. `file` is relative to `root`: src/shards/<slug>/... or a single-shard src/... (SA45).
  * @returns {{rule: string, message: string, start: number, end: number}[]} */
 export function shardfileBoundaryViolations(root, file, source) {
   const parsed = parseSync(file, source);

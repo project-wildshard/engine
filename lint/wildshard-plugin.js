@@ -23,7 +23,7 @@ import { declarationConfigProgram } from './declaration-config.mjs';
 //     parameter it is (`num('scale', 1)`) — anything else is an error;
 //   · raw parsing of `location.search` (`.includes`, `.match`, regex `.test`, …) that dodges the above.
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { simClosure, simRoot } from './sim-closure.mjs';
 import { authoredHtmlSites } from './authored-html.mjs';
@@ -32,6 +32,7 @@ import { shardGameImport, shardEngineImport, sharddevRuntimeImport, generatorImp
 import { shardfileBoundaryVisitors } from './shardfile-boundaries.mjs';
 import { hostCallbackSites } from './host-callback-syntax.mjs';
 import { hostPlayFile } from './host-files.mjs';
+import { lintFile } from './shard-source.mjs';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url));
 /** E432: the layers are workspace packages, `@wildshard/<layer>[/<sub>]` → `src/<layer>/<sub | index>`. Whether a
@@ -289,23 +290,23 @@ const noUrlSwitch = {
 
 // E357 F4: syntactic ratchets; their scope and patterns are 01 §24 / 02 F4's contract.
 // Filenames and lexical import paths are immutable during one plugin process.
+// SA45: a single-shard repo's `src/<local>` reads as `src/shards/<slug>/<local>` (lint/shard-source.mjs), so every shard
+// rule below matches one layout; `fileOf` keeps the real repo root and path for the rules that open files on disk.
 const filenamePaths = new Map(), modulePaths = new Map();
-const pathOf = (context) => {
+const fileOf = (context) => {
   const cached = filenamePaths.get(context.filename);
   if (cached !== undefined) return cached;
-  const path = relative(REPO, context.filename).replaceAll('\\', '/');
-  const index = path.lastIndexOf('/src/');
-  const normalized = index === -1 ? path : path.slice(index + 1);
-  filenamePaths.set(context.filename, normalized);
-  return normalized;
+  const file = lintFile(context.filename, REPO);
+  filenamePaths.set(context.filename, file);
+  return file;
 };
+const pathOf = (context) => fileOf(context).path;
 const modulePath = (filename, source) => {
   let paths = modulePaths.get(filename);
   if (paths === undefined) { paths = new Map(); modulePaths.set(filename, paths); }
   if (paths.has(source)) return paths.get(source);
   const target = packageTarget(source);
-  const path = target ?? (!source.startsWith('.') ? source
-    : relative(REPO, resolve(dirname(filename), source)).replaceAll('\\', '/').replace(/^.*\/src\//u, 'src/'));
+  const path = target ?? (!source.startsWith('.') ? source : lintFile(resolve(dirname(filename), source), REPO).path);
   paths.set(source, path);
   return path;
 };
@@ -579,9 +580,8 @@ const simAllow = JSON.parse(readFileSync(new URL('sim-closure.json', import.meta
 const simNoRender = rule('Headless simulation checks its complete runtime import closure (SF3a)', (context) => {
   if (!simRoot(pathOf(context))) return {};
   return { Program(node) {
-    const marker = context.filename.replaceAll('\\', '/').lastIndexOf('/src/');
-    const root = marker === -1 ? REPO : context.filename.slice(0, marker);
-    for (const item of simClosure(root, [pathOf(context)])) {
+    const { root, file } = fileOf(context);
+    for (const item of simClosure(root, [file])) {
       const allowance = root === REPO.replace(/\/$/u, '') ? simAllow[item.id]?.count ?? 0 : 0;
       if (item.count > allowance) report(context, node, `Simulation closure: ${item.id} (${item.count} > ${allowance}); ${item.trace.join(' → ')}`);
     }
@@ -976,14 +976,12 @@ const shardHostCallback = {
   meta: { type: 'problem', docs: { description: 'Shard host APIs take data, not TS callbacks (G454)' },
     schema: [{ type: 'object', properties: { count: { type: 'boolean' } }, additionalProperties: false }] },
   create(context) {
-    const file = pathOf(context);
+    const { root, file: real, path: file } = fileOf(context);
     if (!file.startsWith('src/shards/')) return {};
-    const index = context.filename.replaceAll('\\', '/').lastIndexOf('/src/');
-    const root = index === -1 ? REPO : context.filename.slice(0, index);
-    if (!hostPlayFile(root, file)) return {};
+    if (!hostPlayFile(root, real)) return {};
     const limit = context.options[0]?.count === true ? 0 : shardfileDebt['wildshard/no-shard-host-callback']?.[file] ?? 0;
     return { 'Program:exit'(program) {
-      for (const issue of hostCallbackSites(root, file, program).slice(limit)) context.report({
+      for (const issue of hostCallbackSites(root, real, program).slice(limit)) context.report({
         loc: { start: context.sourceCode.getLocFromIndex(issue.start), end: context.sourceCode.getLocFromIndex(issue.end) }, message: issue.message,
       });
     } };
@@ -993,15 +991,13 @@ const shardfileBoundaryRule = name => ({
   meta: { type: 'problem', docs: { description: `Shardfile source boundary: ${name} (G450)` },
     schema: [{ type: 'object', properties: { count: { type: 'boolean' }, closedShards: { type: 'array', items: { type: 'string' }, uniqueItems: true } }, additionalProperties: false }] },
   create(context) {
-    const file = pathOf(context);
+    const { root, file: real, path: file } = fileOf(context);
     if (name === 'runtime-standalone') return {};
-    const index = context.filename.replaceAll('\\', '/').lastIndexOf('/src/');
-    const root = index === -1 ? REPO : context.filename.slice(0, index);
     const slug = /^src\/shards\/([^/]+)\//u.exec(file)?.[1];
     const closed = context.options[0]?.closedShards?.includes(slug) === true;
     const limit = closed || context.options[0]?.count === true ? 0 : shardfileDebt[`wildshard/${name}`]?.[file] ?? 0;
     let count = 0;
-    return shardfileBoundaryVisitors(root, file, name, (node, message) => {
+    return shardfileBoundaryVisitors(root, real, name, (node, message) => {
       count += 1;
       if (count > limit) report(context, node, message);
     });
@@ -1014,8 +1010,11 @@ const shardfileBoundaryRule = name => ({
 const blenderTargetsFile = resolve(process.cwd(), 'scripts/blender/targets.json'); // Shard lint: blender sources left with the shards.
 const blenderTargets = existsSync(blenderTargetsFile) ? JSON.parse(readFileSync(blenderTargetsFile, 'utf8')).targets : [];
 const blenderSources = new Set();
-for (const target of Object.values(blenderTargets)) for (const file of [target.script, target.post, ...(target.sources ?? [])])
-  if (typeof file === 'string' && /^src\/shards\/[^/]+\/blender\/.+\.[cm]?[jt]sx?$/u.test(file)) blenderSources.add(file);
+for (const target of Object.values(blenderTargets)) for (const entry of [target.script, target.post, ...(target.sources ?? [])]) {
+  // SA45: an entry names the real file (`src/blender/…` in a single-shard repo) or already the source path.
+  const file = typeof entry !== 'string' ? null : entry.startsWith('src/shards/') ? entry : lintFile(resolve(process.cwd(), entry), REPO).path;
+  if (file !== null && /^src\/shards\/[^/]+\/blender\/.+\.[cm]?[jt]sx?$/u.test(file)) blenderSources.add(file);
+}
 
 // F3: hard structural boundary. No count option or debt allowance exists.
 const noShardRuntime = rule('Primary shards contain authoring and declarations only (G694 F3)', context => {

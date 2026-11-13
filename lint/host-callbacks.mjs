@@ -3,12 +3,12 @@ import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import ts from '@typescript/typescript6';
 import { hostPlayFile } from './host-files.mjs';
+import { shardFile, shardSourceDirs } from './shard-source.mjs';
 import { formatSource } from '../scripts/format-package.mjs';
 
 const projects = new Map();
 const localPath = (root, file) => relative(root, file).replaceAll('\\', '/');
 const platform = file => /^src\/(?:engine|game|sdk|sharddev)\//u.test(file);
-const shard = file => /^src\/shards\/([^/]+)\/(.+)$/u.exec(file);
 /** One compiler/checker per immutable tree; no diagnostics or emit, only binding/signature resolution. */
 export function hostAnalysis(inputRoot) {
   const root = resolve(inputRoot);
@@ -16,7 +16,7 @@ export function hostAnalysis(inputRoot) {
   const configFile = resolve(root, 'tsconfig.json');
   const config = existsSync(configFile) ? ts.readConfigFile(configFile, file => ts.sys.readFile(file)).config : {};
   const parsed = ts.parseJsonConfigFileContent(config, ts.sys, root);
-  const files = ts.sys.readDirectory(resolve(root, 'src/shards'), ['.ts', '.tsx', '.mts', '.cts'], ['**/node_modules/**', '**/dist/**'])
+  const files = shardSourceDirs(root).flatMap(dir => ts.sys.readDirectory(resolve(root, dir), ['.ts', '.tsx', '.mts', '.cts'], ['**/node_modules/**', '**/dist/**']))
     .filter(file => hostPlayFile(root, localPath(root, file)));
   const sectionRegistry = formatSource(root, 'sections.ts');
   const program = ts.createProgram([...files, ...existsSync(sectionRegistry) ? [sectionRegistry] : []], { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext,
@@ -49,7 +49,7 @@ export function hostAnalysis(inputRoot) {
     if (type.getCallSignatures().length > 0) return [label];
     return checker.getPropertiesOfType(type).flatMap(property => {
       const decl = property.valueDeclaration;
-      if (!decl || !shard(pathOf(decl))) return [];
+      if (!decl || shardFile(root, pathOf(decl)) === null) return [];
       return typeLeaves(checker.getTypeOfSymbolAtLocation(property, node), node, `${label}.${property.name}`, next);
     });
   }

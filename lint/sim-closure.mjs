@@ -4,6 +4,7 @@ import { currentSources, sourceStamp } from './source-stamps.mjs';
 import { existsSync, readFileSync, globSync, statSync } from 'node:fs';
 import { dirname, resolve, relative } from 'node:path';
 import { parseSync } from 'vite';
+import { shardFile } from './shard-source.mjs';
 
 const VIEW = /^src\/(?:client|cook|server|shared)\/engine\/(?:app\/view\/|ai\/view\/|combat\/view\/|quest\/view(?:\/|\.ts$)|saves\/view\/|entities\/AnimalView\.ts$)/u;
 const FORBIDDEN = /^src\/(?:client|cook|server|shared)\/engine\/(?:app\/runtime(?:\.ts)?$|core\/(?:tier|frameCost)(?:\.ts)?$|render\/|ui\/|fx\/|anim\/)/u;
@@ -61,7 +62,9 @@ export function reference(node, parent) {
   return true;
 }
 const closureResults = new Map();
-export function simClosure(root, entries = globSync('src/**/*.ts', { cwd: root }).filter(simRoot)) {
+/** simRoot of `path` (relative to `root`) read in the one shard layout, so a single-shard repo's src/data/ counts (SA45). */
+const simRootIn = (root, path) => simRoot(shardFile(root, path)?.path ?? path);
+export function simClosure(root, entries = globSync('src/**/*.ts', { cwd: root }).filter(path => simRootIn(root, path))) {
   const key = JSON.stringify([root, entries]), cached = closureResults.get(key);
   const copy = rows => rows.map(row => ({ ...row, trace: [...row.trace] }));
   if (cached !== undefined && currentSources(cached.observed)) return copy(cached.rows);
@@ -78,7 +81,7 @@ export function simClosure(root, entries = globSync('src/**/*.ts', { cwd: root }
     };
     const inspect = (node, parent) => {
       if (['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration', 'ImportExpression'].includes(node.type)) {
-        if (simRoot(path) && value(node.source) === 'three' && node.importKind === 'type' && node.specifiers?.some((s) => s.type !== 'ImportSpecifier' || !MATH.has(s.imported.name))) add('import', 'three');
+        if (simRootIn(root, path) && value(node.source) === 'three' && node.importKind === 'type' && node.specifiers?.some((s) => s.type !== 'ImportSpecifier' || !MATH.has(s.imported.name))) add('import', 'three');
         if (node.importKind === 'type' || node.exportKind === 'type' || (node.specifiers?.length && node.specifiers.every((s) => s.importKind === 'type'))) return;
         const source = value(node.source);
         if (source === null) { if (node.source) add('import', 'dynamic'); return; }
@@ -97,7 +100,7 @@ export function simClosure(root, entries = globSync('src/**/*.ts', { cwd: root }
         if (FORBIDDEN.test(destPath) || VIEW.test(destPath)) add('import', destPath);
         else if (/\.[cm]?[jt]s$/u.test(destPath)) next.push(destPath);
       }
-      if (simRoot(path) && node.type === 'Identifier' && ['HTMLElement', 'HTMLCanvasElement'].includes(node.name) && parent?.type === 'TSTypeReference') add('global', node.name);
+      if (simRootIn(root, path) && node.type === 'Identifier' && ['HTMLElement', 'HTMLCanvasElement'].includes(node.name) && parent?.type === 'TSTypeReference') add('global', node.name);
       if (node.type === 'MemberExpression' && ['window', 'globalThis'].includes(node.object?.name) && DOM.has(node.property?.name) && node.property?.name !== 'window') add('global', node.property.name);
       if (node.type === 'Identifier' && reference(node, parent) && DOM.has(node.name)) add('global', node.name);
     };

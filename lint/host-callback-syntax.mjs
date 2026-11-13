@@ -1,10 +1,10 @@
 // G642: callback admission from syntax; the typed catalogue is a separate build tool.
 import { hostPlayFile } from './host-files.mjs';
+import { shardFile } from './shard-source.mjs';
 import { createSyntaxGraph, syntaxChild as child,
   syntaxFunctions as functions, syntaxClasses as classes } from './syntax-values.mjs';
 
 const platform = file => /^src\/(?:engine|game|sdk|sharddev)\//u.test(file);
-const shard = file => file.startsWith('src/shards/');
 const keyOf = node => node?.type === 'Identifier' ? node.name : node?.type === 'Literal' ? String(node.value) : null;
 const unwrap = input => {
   let node = input;
@@ -16,6 +16,7 @@ const unwrap = input => {
 export function hostCallbackSites(root, file, program) {
   if (!hostPlayFile(root, file)) return [];
   const { primary, make, values } = createSyntaxGraph(root, file, program);
+  const shard = path => shardFile(root, path) !== null;
   function leaves(ref, label, seen = new Set()) {
     const node = unwrap(ref.node);
     if (!node || seen.has(node)) return [];

@@ -1,5 +1,6 @@
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { shardOfFilename } from './shard-source.mjs';
 
 /** The file Node loads for relative `source` (a URL resolve, query and hash dropped), without a trailing slash; null when it cannot. */
 const nodePath = (filename, source) => {
@@ -25,8 +26,7 @@ export function shardGameImport(filename, source) {
 
 /** G307: a game's exports map is its plugin surface, never a parallel SDK facade allowlist. */
 export function gamePluginImportViolation(filename, source, exports) {
-  const path = filename.replaceAll('\\', '/');
-  const local = /(?:^|\/)src\/shards\/[^/]+\/(.+)$/u.exec(path)?.[1];
+  const local = shardOfFilename(filename)?.local;
   if (local === undefined || !shardGameImport(filename, source)) return null;
   if (!local.startsWith('runtime/')) return 'game imports belong only in runtime/';
   if (!source.startsWith('@wildshard/game/')) return 'use the defining @wildshard/game package export';
@@ -72,12 +72,12 @@ function encodedImportViolation(filename, rawSource) {
  * (bake commands, Blender sources, declarations) imports by a plain relative path or a package name: an escaped,
  * absolute or file: path would slip past the layer rules, which read it with path.resolve. */
 export function generatorImportViolation(filename, rawSource) {
-  const path=resolve(filename).replaceAll('\\','/'), match=/(?:^|\/)src\/shards\/([^/]+)\/(.+)$/u.exec(path);
-  if(match===null || typeof rawSource!=='string')return null;
+  const path=resolve(filename).replaceAll('\\','/'), shard=shardOfFilename(path);
+  if(shard===null || typeof rawSource!=='string')return null;
   const encoded=encodedImportViolation(filename,rawSource);
   if(encoded!==null)return encoded;
   const source=pathPart(rawSource);
-  if(!(/^(?:generators|data|quests)\//u.test(match[2]) || match[2]==='shard.config.ts'))
+  if(!(/^(?:generators|data|quests)\//u.test(shard.local) || shard.local==='shard.config.ts'))
     return isAbsolute(source) || source.startsWith('file:') ? 'shard files import by relative path or package name, never an absolute path or file: URL' : null;
   // Test runners and Node fixture tools never become producer imports.
   if(path.endsWith('.test.ts') && source!=='<computed>' && !source.startsWith('.')
@@ -85,7 +85,6 @@ export function generatorImportViolation(filename, rawSource) {
   if(/^@wildshard\/sharddev\/runtime(?:\/|$)/u.test(source))return 'trusted SDK runtime code is not an authoring import';
   if(source==='three' || source.startsWith('three/') || /^@wildshard\/(?:engine\/host|sdk|sharddev|commons)(?:\/|$)/u.test(source))return null;
   const local=source.startsWith('.') ? resolve(dirname(filename),source).replaceAll('\\','/') : '';
-  const boundary=path.slice(0,path.length-match[2].length);
-  if(local.startsWith(boundary))return null;
+  if(local.startsWith(shard.dir))return null;
   return 'author folders import only three, sdk, commons or their own shard files';
 }
