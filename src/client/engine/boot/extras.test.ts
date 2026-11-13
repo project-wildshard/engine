@@ -7,27 +7,25 @@ import {declareTotals,installByteCounter,releaseByteCounter,type ChunkFiles} fro
 import {installAssetTables,type AssetTables} from '../../../shared/engine/boot/tables';
 import {NO_AUDIO,type LevelAudioProfile,type LevelAudioBank} from '../audio/levelAudio';
 import {createBootPlan,type StepProgress} from './plan';
-import * as settings from '../ui/Settings';
 import {LoadingTimeline,installLoadingTimeline} from '../../../shared/engine/boot/timeline';
 import {loadingWaitState} from '../../../shared/engine/boot/loadingWaits';
 import {STEP_INFO} from '../../../shared/engine/boot/steps';
 import { TIER, initializeTier } from '../core/tier';
 
-const music='/assets/music/folk/title.m4a',sfx='/assets/sfx/field/step.m4a';
+const music='/assets/music/piano/title.m4a',sfx='/assets/sfx/field/step.m4a';
 const foreignMusic='/assets/music/electronic/other.m4a',foreignSfx='/assets/sfx/other/unused.m4a';
 const all={music:[foreignMusic,music],sfx:[foreignSfx,sfx]};
 const blank:ChunkFiles={sky:[],baked:[],terrain:[],trees:[],cabins:[],props:[],physics:[],art:[],music:[],sfx:[]};
 const level:BootLevel={slug:'fixture',card:{thumb:'data:,',portrait:'data:,',landscape:'data:,'},
   boot:{files:[],sources:()=>blank,audio:[...all.music,...all.sfx]}};
 const bank:LevelAudioBank={title:undefined,score:{slots:new Map(),stings:new Map()},cues:{loops:new Map(),shots:new Map()}};
-const profile:LevelAudioProfile={files:()=>all,bootFiles:genre=>genre==='folk'?[music,sfx]:[foreignMusic,foreignSfx],decode:()=>Promise.resolve(bank)};
+const profile:LevelAudioProfile={files:()=>all,bootFiles:genre=>{expect(genre).toBe('piano');return [music,sfx];},decode:()=>Promise.resolve(bank)};
 const priorTables:AssetTables={bytes:{},versions:{},music:{},sfx:{},packs:{}};
 const tableSlot = Symbol.for('engine.asset-tables');
 const previousTables = Object.getOwnPropertyDescriptor(globalThis, tableSlot);
 beforeEach(()=>{
   setBootCatalog({levels:[level],playable:[level],find:()=>level,artBytes:{}});
   installAssetTables({...priorTables,bytes:{[music]:3,[sfx]:3,[foreignMusic]:100,[foreignSfx]:100}});
-  vi.spyOn(settings,'getMusicStyle').mockReturnValue('folk');
 });
 afterEach(() => {
   if (previousTables === undefined) Reflect.deleteProperty(globalThis, tableSlot);
@@ -43,8 +41,6 @@ test('boot declares only selected profile audio while background inventory retai
   expect(declareTotals(active)).toMatchObject({music:{bytes:3,files:1},sfx:{bytes:3,files:1}});
   expect(declareTotals(background)).toMatchObject({music:{bytes:103,files:2},sfx:{bytes:103,files:2}});
   expect(bootFiles(level,'img',NO_AUDIO)).toMatchObject({music:[],sfx:[]});
-  vi.mocked(settings.getMusicStyle).mockReturnValue('piano');
-  expect(bootFiles(level,'img',profile)).toMatchObject({music:[foreignMusic],sfx:[foreignSfx]});
 });
 
 test('selected extras retain their exact source totals without foreign styles',()=>{
@@ -122,7 +118,7 @@ test('active phone menu art follows orientation while background and desktop ret
 test('preload ignores foreign inventory and decodes selected compressed bytes offline without another fetch',async()=>{
   const fetch=vi.spyOn(globalThis,'fetch').mockImplementation(()=>Promise.resolve(new Response(new Uint8Array([1,2,3]))));
   const seen:string[]=[],decode=vi.fn<LevelAudioProfile['decode']>(async(style,read)=>{
-    expect(style).toBe('folk');
+    expect(style).toBe('piano');
     for(const url of [music,sfx]){
       seen.push(url);const first=await read(url);
       expect(new Uint8Array(first)).toEqual(new Uint8Array([1,2,3]));new Uint8Array(first).fill(9);
@@ -155,7 +151,7 @@ test('QA 11-12 row 36: an unreachable network retries once, then waits on RETRY 
   await vi.waitFor(()=>{expect([...loadingWaitState().pending.values()].filter(row=>row.retry!==undefined&&row.retry!==null).map(row=>row.resource)).toEqual(expect.arrayContaining([music,sfx]));});
   expect(fetch,'one attempt and the one retry each').toHaveBeenCalledTimes(4);
   const wait=[...loadingWaitState().pending.values()].find(row=>row.resource===music);
-  expect(wait?.label).toContain('/assets/music/folk/title.m4a');expect(wait?.label).toContain('connection unavailable');
+  expect(wait?.label).toContain('/assets/music/piano/title.m4a');expect(wait?.label).toContain('connection unavailable');
   offline=false;wait?.retry?.();
   await preload.wait({set:()=>undefined,detail:()=>undefined});expect((await preload.decode()).profile).toBe(bank);
   expect(fetch).toHaveBeenCalledTimes(6);

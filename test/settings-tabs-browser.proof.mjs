@@ -22,7 +22,7 @@ const TABS = ['graphics', 'sound', 'controls', 'saves', 'system'];
 /** where each row must be: `data-setting` keys (switches, sliders, pickers) and `data-gfx` ids (Graphics), by tab */
 const EXPECT = {
   graphics: { phone: ['gfx:mode', 'gfx:tier', 'gfx:aa', 'gfx:firstPlay'], desk: ['gfx:deskNote', 'gfx:tier', 'gfx:scale', 'gfx:aa'] },
-  sound: ['volume', 'music', 'musicStyle'],
+  sound: ['volume', 'music'],
   controls: ['look', 'lockCam', 'autoLock', 'aimAssist'],
 };
 
@@ -126,9 +126,7 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
       await open('sound');
       await slide('[data-setting="volume"] input', 30); assert.equal(await read("s.getNumber('volume')"), 0.3, `${kind}: master volume`);
       await slide('[data-setting="music"] input', 40); assert.equal(await read("s.getNumber('music')"), 0.4, `${kind}: music volume`);
-      await tap('[data-setting="musicStyle"] .ws-gmenu-segbtn:last-child');
-      const style = await page.$eval('[data-setting="musicStyle"] .ws-gmenu-segbtn:last-child', b => /** @type {HTMLElement} */ (b).dataset['v'] ?? b.textContent?.toLowerCase());
-      assert.equal(await read('s.getMusicStyle()'), style, `${kind}: music style`);
+      assert.equal(await page.$('[data-setting="musicStyle"]'), null, `${kind}: no music-style choice (AUDIO AU16)`);
 
       // CONTROLS
       await open('controls');
@@ -203,7 +201,7 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
       }
       const bootSeen = async (/** @type {string} */ tab) => page.$$eval(`${boot} .ws-gmenu-svpane[data-sv-pane="${tab}"] [data-setting], ${boot} .ws-gmenu-svpane[data-sv-pane="${tab}"] [data-gfx]`,
         els => els.map(e => { const d = /** @type {HTMLElement} */ (e).dataset; return d['gfx'] === undefined ? String(d['setting']) : `gfx:${d['gfx']}`; }));
-      for (const key of ['volume', 'music', 'musicStyle']) assert.ok((await bootSeen('sound')).includes(key), `${kind}: the title's Sound has ${key}`);
+      for (const key of ['volume', 'music']) assert.ok((await bootSeen('sound')).includes(key), `${kind}: the title's Sound has ${key}`);
       for (const key of ['look', 'lockCam', 'autoLock', 'aimAssist']) assert.ok((await bootSeen('controls')).includes(key), `${kind}: the title's Controls has ${key}`);
       assert.ok((await bootSeen('graphics')).includes('gfx:tier'), `${kind}: the title's Graphics has Quality`);
       if (phone) assert.ok((await bootSeen('graphics')).includes('gfx:mode'), `${kind}: the title's Graphics has Low · High`);

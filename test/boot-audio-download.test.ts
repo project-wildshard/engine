@@ -10,7 +10,7 @@ import * as settings from '../src/client/engine/ui/Settings';
 import { shardBootAudio } from '../src/cook/game/entryTotals';
 import { openShardfile, shardHalf } from '../src/cook/game/shardCook';
 import { productTarball } from '../src/cook/game/productTarball';
-import { DEFAULT_MUSIC_STYLE, MUSIC_STYLES, defaultBootAudio } from '../src/shared/engine/audio/bootAudio';
+import { defaultBootAudio } from '../src/shared/engine/audio/bootAudio';
 import { installAssetTables, type AssetTables } from '../src/shared/engine/boot/tables';
 import { PUBLIC_BYTES } from '../src/client/game/boot/bytes.generated';
 import { ASSET_VERSIONS } from '../src/client/game/boot/versions.generated';
@@ -20,7 +20,6 @@ const blank = { sky: [], baked: [], terrain: [], trees: [], cabins: [], props: [
 const level = { slug: 'fixture', card: { thumb: 'data:,', portrait: 'data:,', landscape: 'data:,' }, boot: { files: [], sources: () => blank } } as never;
 /** What the page's LOAD reads for `data` under a new player's settings (session/data.ts → extras `bootFiles`). */
 async function pageBootAudio(data: AudioData): Promise<string[]> {
-  settings.setMusicStyle(DEFAULT_MUSIC_STYLE);
   const files = bootFiles(level, 'img', await createCatalogueAudio(data), false);
   return [...files.music, ...files.sfx];
 }
@@ -44,18 +43,13 @@ test('the cook lists the boot recordings the page reads, plus the fence audio, a
   expect(shardBootAudio(new Map(), tables, fence)).toEqual(shippedSfx === undefined ? [] : [shippedSfx]);
 });
 
-test('a player who keeps the default style reads only what the download listed, on every style the cook does not', async () => {
+test('a player reads only what the download listed (one music style, AU16)', async () => {
   const set = vi.spyOn(settings, 'getSfxSet').mockReturnValue('best');
   try {
     const listed = new Set(defaultBootAudio(catalogue));
-    for (const style of MUSIC_STYLES) {
-      settings.setMusicStyle(style);
-      const files = bootFiles(level, 'img', await createCatalogueAudio(catalogue), false), reads = [...files.music, ...files.sfx];
-      // The default style is all listed; another style's music downloads when the player picks it (AU3).
-      if (style === DEFAULT_MUSIC_STYLE) expect(reads.filter(url => !listed.has(url))).toEqual([]);
-      else expect(reads.filter(url => !listed.has(url)).every(url => url.startsWith(`/assets/music/${style}/`))).toBe(true);
-    }
-  } finally { set.mockRestore(); settings.setMusicStyle(DEFAULT_MUSIC_STYLE); }
+    const files = bootFiles(level, 'img', await createCatalogueAudio(catalogue), false), reads = [...files.music, ...files.sfx];
+    expect(reads.filter(url => !listed.has(url))).toEqual([]);
+  } finally { set.mockRestore(); }
 });
 
 // The pinned products (`node scripts/pins.ts install`) and this build's boot table, when the checkout has them.

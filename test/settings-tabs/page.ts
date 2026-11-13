@@ -11,7 +11,7 @@ import { legacyDouble } from '../../src/test/engine/FakeGame';
 import { bindFlatTerrain } from '../../src/test/engine/terrain';
 import { GameMenu } from '../../src/client/engine/ui/Menu';
 import type { FullMap } from '../../src/client/engine/ui/Map';
-import { getMusicStyle, getNumber, getSetting, savedSetting } from '../../src/client/engine/ui/Settings';
+import { getNumber, getSetting, savedSetting } from '../../src/client/engine/ui/Settings';
 import { gfxPrefs } from '../../src/client/engine/core/tier';
 import { graphicsMode } from '../../src/client/engine/core/graphicsMode';
 import { isDev } from '../../src/client/engine/core/devMode';
@@ -31,5 +31,5 @@ menu.addSettingsSection('saves.game', [cards], { first: true });
 // SR13: the composer System ▸ Feedback opens (the game's Feedback.mountTab draws into the slot it's handed)
 let composed = 0;
 menu.onFeedbackTab = (slot) => { composed++; const c = document.createElement('div'); c.dataset['proof'] = 'composer'; c.textContent = 'Composer'; slot.replaceChildren(c); };
-Object.assign(window, { __settings: { menu, held, getSetting, getNumber, savedSetting, getMusicStyle, gfxPrefs, graphicsMode, isDev, registerGraphicsControl, openBootSettings, reviewUnlocked, composed: () => composed } });
+Object.assign(window, { __settings: { menu, held, getSetting, getNumber, savedSetting, gfxPrefs, graphicsMode, isDev, registerGraphicsControl, openBootSettings, reviewUnlocked, composed: () => composed } });
 (window as unknown as { settingsReady: boolean }).settingsReady = true;

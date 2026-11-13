@@ -49,6 +49,13 @@ test('first settings open synchronously keeps early sections and omits removed r
   expect(menu.root.textContent?.match(/Early first/gu)).toHaveLength(1);
 });
 
+test('AUDIO AU16 (J304): Sound has its volumes and no music-style choice',()=>{
+  const {menu}=fixture();menu.open('settings');
+  expect(menu.root.querySelector('[data-setting="volume"]')).not.toBeNull();
+  expect(menu.root.querySelector('[data-setting="musicStyle"]')).toBeNull();
+  expect(menu.root.textContent).not.toMatch(/Music style|Orchestral|Folk/u);
+});
+
 test('closing never reopens the menu or changes the resumed app state',()=>{
   const {menu}=fixture();app.setState('play');
   menu.open('settings');menu.close();

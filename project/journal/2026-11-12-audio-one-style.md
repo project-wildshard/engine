@@ -13,3 +13,4 @@
 - Commit 2: bootAudio.ts and the cook's pack list read ENGINE_MUSIC_STYLE; the per-style lists go.
 - Commit 3: Music, the level profiles, boot extras and the session read the one style; synth is the failure fallback only.
 - Commit 4: Settings drops musicStyle; musicStyleRow.ts and the five style strings go.
+- Commit 5: tests, red on 05f18f79 (old folk save plays piano, no folk/orchestral manifest, no Settings style row); claude -p review had no MUSTs.
