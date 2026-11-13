@@ -70,7 +70,7 @@ try {
   result.download = { entryBytes: entry.reduce((sum, row) => sum + row.bytes, 0), files: entry.length,
     roadBytes: road.reduce((sum, row) => sum + row.bytes, 0), road: road.map(row => ({ url: row.url, bytes: row.bytes })),
     largest: [...entry].sort((a, b) => b.bytes - a.bytes).slice(0, 12).map(row => ({ url: row.url.slice(0, 120), bytes: row.bytes })) };
-  console.log(`control after ${String(result.playToControlMs)} ms; entry ${String(entry.length)} files; road ${JSON.stringify(result.download.road)}`);
+  console.log(`control after ${String(result.playToControlMs)} ms; entry ${String(entry.length)} files; road ${String(road.length)} page-visible files`);
   await sleep(1500);
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
   await page.evaluate(() => {
@@ -133,7 +133,7 @@ try {
   await page.screenshot({ path: join(out, `${engineName}-on-road.png`) });
   const moving = window_.samples.findIndex((row, at) => at > 0 && Math.abs(row.x - (window_.samples[at - 1]?.x ?? row.x)) >= 0.05);
   const page100 = window_.samples.slice(Math.max(0, moving - 1)), start = page100[0]?.t ?? pageFrom;
-  /** @type {{ from: number, ms: number, x: number }[]} */
+  /** @type {{ from: number, ms: number, x: number, open?: true }[]} */
   const stops = [];
   let since = 0;
   for (let at = 1; at < page100.length; at++) {
