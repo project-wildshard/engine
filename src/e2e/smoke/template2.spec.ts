@@ -115,16 +115,17 @@ test('Template 2: title, walk, door, guardian, reload', async ({
     await hideAndSave(page)
     await page.reload()
     await enter(page)
+    // The server's flags reach the page with its first frames
+    await Promise.all(
+      ['blender.door', 'blender.guardian', 'blender.complete'].map(
+        async (flag): Promise<void> => {
+          await earned(page, flag)
+        },
+      ),
+    )
     const back = await snapshot(page)
     expect(back.door).toBe(1)
     expect(back.solid).toBe(false)
-    expect(back.flags).toEqual(
-      expect.arrayContaining([
-        'blender.door',
-        'blender.guardian',
-        'blender.complete',
-      ]),
-    )
     lap('reload')
   })
 

@@ -12,9 +12,10 @@ import type { Group, Object3D } from 'three';
 import type { ClientTileViews } from '../shardfile/clientViews';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { GridCell } from '../../../shared/game/grid/assembly';
+import type { ProbeAreaTarget } from '@wildshard/engine/debug/probe';
 
 /** What the panels read of a cell the live host has admitted: the solids of its world, and a field's row where this page has one. */
-export interface PanelRegion { readonly colliders: ReadonlyMap<string, { readonly setActive: (active: boolean) => void }>; readonly field: (name: string) => number | undefined }
+export interface PanelRegion { readonly colliders: ReadonlyMap<string, { readonly active: () => boolean; readonly setActive: (active: boolean) => void }>; readonly field: (name: string) => number | undefined }
 /** The page scope the panels live and die with (the views' own scope type). */
 type PageScope = Parameters<ClientTileViews['panels']>[3];
 export interface NeighbourPanelPorts {
@@ -71,6 +72,14 @@ export class NeighbourPanels {
   /** The drawn panels' visibility per cell (tests and the probe). */
   state(): ReadonlyMap<string, readonly { panel: string; visible: boolean }[]> {
     return new Map([...this.cells].map(([id, cell]) => [id, cell.bindings.map((b) => ({ panel: b.row.panel, visible: b.panel.visible }))]));
+  }
+
+  /** A cell's door panels as the probe reads them (T2E-1b): drawn, and solid while every collider stands in its admitted
+   *  region (a panel with no colliders reads solid, as `shardfile.targets()` does). */
+  targets(instance: string): readonly ProbeAreaTarget[] {
+    const cell = this.cells.get(instance), region = this.ports.region(instance);
+    return cell?.bindings.map(({ row, panel }) => ({ panel: row.panel, visible: panel.visible,
+      solid: region !== undefined && row.colliders.every(id => region.colliders.get(id)?.active() === true) })) ?? [];
   }
 
   private sync(cell: CellPanels): void {

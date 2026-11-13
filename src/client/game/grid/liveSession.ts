@@ -170,6 +170,8 @@ export interface LiveGridWire {
   readonly rebound: (physics: Physics) => void;
   /** The server's creatures in the world the page stands in, for a cell whose creatures no manager holds. */
   readonly rows: NeighbourRegion;
+  /** Every quest flag the server says this player holds in the world the page stands in (T2E-1b, the probe's area). */
+  readonly flags?: () => readonly string[];
 }
 /** The readout: the live host's crossing telemetry, the crossing coordinator and the safe-zone state. */
 export interface LiveGridSessionState {
@@ -986,6 +988,8 @@ export class LiveGridSession {
     const region = this.regions.get(instance);
     return region === undefined ? undefined : { colliders: region.colliders, field: name => this.wire?.site() === instance ? wirePage.row(name) : undefined };
   }
+  /** A cell's quest flags, as the server holds them: only where the wire stands. */
+  areaFlags(instance: string): readonly string[] { return this.wire?.site() === instance ? this.wire.flags?.() ?? [] : []; }
   /** What draws a cell's life: the server's rows, which exist only where the page stands. */
   lifeRegion(instance: string): NeighbourRegion | undefined { return this.wire?.site() === instance ? this.wire.rows : undefined; }
 

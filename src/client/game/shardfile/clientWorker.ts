@@ -433,7 +433,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   let opened: number | undefined, renderTick = 0;
   if (grid === null) net.inCell = cell => (opened ??= cell) === cell;
   else {
-    grid.bindWire({ site: () => { const cell = client.latest?.cell; return cell === undefined ? undefined : siteOf(cell); }, rebound: next => { net.world.rebind(next); }, rows: netNeighbourRegion(client, () => renderTick) });
+    grid.bindWire({ site: () => { const cell = client.latest?.cell; return cell === undefined ? undefined : siteOf(cell); }, rebound: next => { net.world.rebind(next); }, rows: netNeighbourRegion(client, () => renderTick),
+      flags: () => [...client.phased, ...client.flags()] });
     net.inCell = cell => siteOf(cell) === grid.frame();
   }
   scope.onDispose(() => { player.link = null; ports.weapons.bindWire(null); net.dispose(); });

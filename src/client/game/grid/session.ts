@@ -116,6 +116,8 @@ import { startRoadSigns } from './roadSignPreparation';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
 
 import { admittedRuntimeProduct } from '../shardfile/runtimeProduct';
+import { gridArea } from './area';
+import type { ProbeArea } from '@wildshard/engine/debug/probe';
 
 /** D12: the A1 outer ring's share of a drawn frame (ms). On the phone tier its strips, colliders and road stop 4 ms after
  *  the last drawn frame (every other build keeps WORK_SLICE_MS): streamed at the shared 8 ms it held the grid's spawn
@@ -1207,6 +1209,13 @@ export class GridSession {
   /** Publish the current feet's existing sky/grade owners before boot shader preparation.
    * This runs only the presentation frame; no neighbour tick, input, physics or simulation is advanced. */
   prepareFrame(): void { this.frame?.frame(); }
+
+  /** T2E-1b: the cell the player is in, as the test probe reads it (its shard, door panels and the server's flags there).
+   *  Without a live host no region is admitted, so no panel reads solid. */
+  area(): ProbeArea | null {
+    return gridArea({ current: this.live === null ? this.home.instance : this.live.live.current(), cells: this.assembly.cells,
+      targets: id => this.panels.targets(id), flags: id => this.live?.areaFlags(id) ?? [] });
+  }
 
   /** The readout: what each cell shows, the rings and the allocator. */
   state(): GridSessionState {

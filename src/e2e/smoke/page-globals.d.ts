@@ -5,19 +5,20 @@
 type SmokeVec3 = Readonly<Record<'x' | 'y' | 'z', number>>
 
 interface SmokeProbe {
-  readonly shard: {
+  /** The area the player is in: on a grid page the current cell (T2E-1b), null between cells. */
+  readonly area: () => {
     readonly slug: string
-    readonly shardfile?: {
-      readonly targets: () => readonly { readonly solid: boolean }[]
-    }
-  }
+    readonly instance: string | null
+    readonly targets: readonly {
+      readonly panel: string
+      readonly solid: boolean
+    }[]
+    readonly flags: readonly string[]
+  } | null
   readonly app: { readonly state: string }
   readonly world?: { readonly game: { readonly frameCount: number } }
   readonly state: () => {
     readonly player: { readonly pos: SmokeVec3; readonly health: number }
-    readonly quest: {
-      readonly adventure?: { readonly quest?: readonly string[] }
-    }
   }
 }
 

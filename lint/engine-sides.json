@@ -613,6 +613,7 @@
     "src/client/game/grid/admissionPriority.ts": "client",
     "src/client/game/grid/admissionYield.ts": "client",
     "src/client/game/grid/approachProductInputs.ts": "client",
+    "src/client/game/grid/area.ts": "client",
     "src/client/game/grid/assetResidency.ts": "client",
     "src/client/game/grid/borderShimmer.ts": "client",
     "src/client/game/grid/budgetOverlay.ts": "client",

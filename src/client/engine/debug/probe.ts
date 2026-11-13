@@ -123,8 +123,22 @@ export interface Fingerprint {
   facade?: { multiDraw: boolean; batches: number; instances: number };
   playMs: number; heapMB: number;
 }
+/** A door or gate panel the area declares: drawn, and whether its colliders stand. */
+export interface ProbeAreaTarget { readonly panel: string; readonly visible: boolean; readonly solid: boolean }
+/** T2E-1b: the area the player is in. On a grid page that is the current cell, not the page shell (`platform.grid`). */
+export interface ProbeArea {
+  /** the area's shard slug */
+  readonly slug: string;
+  /** the grid cell's instance; null on a one-shard page */
+  readonly instance: string | null;
+  readonly targets: readonly ProbeAreaTarget[];
+  /** every quest flag the player holds in this area, sorted */
+  readonly flags: readonly string[];
+}
 export interface ProbeDeps {
   health: () => number; quest: () => unknown;
+  /** The area the player is in; null between areas (a grid page's road). */
+  area: () => ProbeArea | null;
   /** The retained level world used for leak counts when active frame worlds can be replaced and freed. */
   leakPhysics?: World['physics'];
 }
@@ -162,6 +176,8 @@ export interface EngineProbe<W extends ProbeWorld = ProbeWorld> {
     hold: (animal: CombatTarget, on: boolean) => void; hits: { kind: string; amount: number }[]; kills: string[] };
   arena: () => void;
   state: () => GameplayState;
+  /** T2E-1b: the area the player is in, with its door targets and quest flags; null between areas. */
+  area: () => ProbeArea | null;
   onResume: (fn: () => void) => void;
   saves: Saves;
   sounds: () => SoundLog;
@@ -510,6 +526,7 @@ export function installProbe<W extends ProbeWorld>(world: W, deps: ProbeDeps): E
       creatures: world.animals.animals.map((a, i) => ({ id: `${a.kind}:${i}`, kind: a.kind, pos: point(a.position), hp: a.hp, brain: a.state })).sort((a, b) => a.id.localeCompare(b.id)),
       quest: { adventure: deps.quest(), level: authoredQuestFlags(world) },
     }),
+    area: () => deps.area(),
     onResume: (fn) => { requireHarness(); resume = fn; }, saves,
     sounds: () => { const log = { event: events, ambient: [...ambient].sort() }; events = {}; ambient.clear(); return log; },
     used: () => labels.splice(0),
@@ -545,7 +562,7 @@ function scopedProbe<W extends ProbeWorld>(source: EngineProbe<W>, scope: Scope)
     get app() { return read().app; },
     fingerprint: () => read().fingerprint(), pose: (value) => read().pose(value),
     walkLeg: (leg) => read().walkLeg(leg), arena: () => { read().arena(); },
-    state: () => read().state(), onResume: (fn) => { read().onResume(fn); },
+    state: () => read().state(), area: () => read().area(), onResume: (fn) => { read().onResume(fn); },
     sounds: () => read().sounds(), used: () => read().used(), budgets: (poses) => read().budgets(poses),
     leak: async () => {
       if (live === undefined) {

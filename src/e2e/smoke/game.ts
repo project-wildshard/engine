@@ -73,22 +73,26 @@ async function snapshot(page: Page): Promise<Snapshot> {
     if (probe === undefined) {
       throw new Error('no game probe')
     }
-    const state = probe.state()
+    const area = probe.area()
     return {
-      pos: state.player.pos,
+      pos: probe.state().player.pos,
       door: globalThis.__workerClientRow?.('blender.door.open'),
-      solid:
-        probe.shard.shardfile
-          ?.targets()
-          .some((target): boolean => target.solid) ?? false,
-      flags: state.quest.adventure?.quest ?? [],
+      solid: area?.targets.some((target): boolean => target.solid) ?? false,
+      flags: area?.flags ?? [],
     }
   })
 }
 
-/** Title, Shard Select, Blender Template, Enter: the way a player starts (J233). */
+/** Title, Shard Select, Blender Template, Enter: the way a player starts (J233). A preview's Shard Select enters the grid
+ * (J311), so the page is `platform.grid` and the probe's area is the cell the player is in (T2E-1b). */
 async function enter(page: Page): Promise<void> {
   await page.locator('.ws-main-select').waitFor()
+  // A reload in play lands on the title under the drop card ("Unexpectedly back at the title", dropModal.ts): a player
+  // dismisses it, as here
+  const dismiss = page.locator('#wsdrop .dismiss')
+  if ((await dismiss.count()) > 0) {
+    await dismiss.click()
+  }
   // Blender Template is a Developer shard. The switch is remembered across a reload.
   const developer = page.locator('.ws-main-dev')
   if ((await developer.getAttribute('aria-checked')) !== 'true') {
@@ -119,7 +123,9 @@ async function enter(page: Page): Promise<void> {
   await page.waitForFunction((): boolean => {
     const probe = globalThis.__wildshard
     return (
-      probe?.shard.slug === 'blender-template' &&
+      probe?.area()?.slug === 'blender-template' &&
+      // The cell's door panels are drawn: its targets are what steps 2, 3 and 7 read
+      (probe.area()?.targets.length ?? 0) > 0 &&
       probe.app.state === 'play' &&
       (probe.world?.game.frameCount ?? 0) > 5
     )
@@ -160,9 +166,9 @@ async function doorOpens(page: Page): Promise<void> {
   await page.waitForFunction(
     (): boolean =>
       globalThis.__workerClientRow?.('blender.door.open') === 1 &&
-      globalThis.__wildshard?.shard.shardfile
-        ?.targets()
-        .every((target): boolean => !target.solid) === true,
+      globalThis.__wildshard
+        ?.area()
+        ?.targets.every((target): boolean => !target.solid) === true,
     undefined,
     STEP,
   )
@@ -172,8 +178,7 @@ async function doorOpens(page: Page): Promise<void> {
 async function earned(page: Page, flag: string): Promise<void> {
   await page.waitForFunction(
     (name): boolean =>
-      globalThis.__wildshard?.state().quest.adventure?.quest?.includes(name) ===
-      true,
+      globalThis.__wildshard?.area()?.flags.includes(name) === true,
     flag,
     STEP,
   )
