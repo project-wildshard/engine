@@ -37,6 +37,9 @@ for (const [name, cells] of grids) {
     expect(new Set(plots).size).toBe(plots.length);
     for (const slug of ring) expect(slug.startsWith('open-plot-') || PICK.includes(slug) || TEMPLATES.includes(slug)).toBe(true);
     for (const slug of [...MAIN, ...PICK]) expect(cells.filter(row => row.slug === slug)).toHaveLength(1);
+    // a template copy takes a ring slot only once no catalogue open plot is left off the grid
+    const unplaced = catalogue.placements.map(row => row.slug).filter(slug => slug.startsWith('open-plot-') && !LEGACY.includes(slug) && !plots.includes(slug));
+    if (unplaced.length > 0) expect(ring.filter(slug => TEMPLATES.includes(slug))).toEqual([]);
   });
   test(`J305 ${name}: no legacy grey template on the grid`, () => {
     for (const slug of LEGACY) expect(cells.map(row => row.slug)).not.toContain(slug);

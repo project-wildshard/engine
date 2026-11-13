@@ -31,7 +31,7 @@ test('G972: no alternate Developer catalogue swaps remain in the shipped grid', 
   for (const [slug, cell] of [
     ['open-plot-fossil-badlands', [-1, -2]], ['open-plot-patchwork-fairground', [-2, -2]],
     ['open-plot-saltwind-lighthouse', [0, 2]], ['open-plot-jungle-ziggurat', [-2, 2]],
-    // G993 (Jake 11-03): the centre 3x3 as before G986, the Showcase Template in Frostline's old (-1, -1); Frostline,
+    // G993 (Jake 11-03), then J305 (Jake 11-12): the centre 3x3 holds both new templates, Brasscap in (-1, -1); Frostline,
     // Coral Drift and Lantern Bayou hold the back line (x = -2), Mosslight and Ember Forge their east cells
     ['pine-hollow', [0, 1]], ['nalati-grasslands', [1, 0]], ['pastel-plain', [-1, 1]],
     ['driftwood-isle', [0, 0]], ['sunscar-dunes', [-1, 0]], ['far-reach', [0, -1]], ['nine-dragon-stack', [1, -1]],
