@@ -1,11 +1,15 @@
 #!/usr/bin/env node
-// HOST-RULER HR3 (meta docs/plans/HOST-RULER-PLAN.md): the closure each built product reaches, and the modules it alone
+// HOST-RULER (meta docs/plans/HOST-RULER-PLAN.md): the closure each built product reaches, and the modules it alone
 // reaches. A product's roots are its HR1 page/section roots (scripts/host-ruler/roots.mjs) and its HR2 server roots
-// (scripts/host-ruler/server-roots.mjs). From them the ruler follows static imports and ordinary import()s, but never
-// through a dispatch table (TABLES): a table's entries are already rooted per declared kind or host id, so following
-// the whole table would make every product a user of every entry (HA0 a, b). Engine self-imports
-// (`@wildshard/engine/*`) resolve through engine's package.json exports map. Lines are code lines: nonblank once
-// comments are blanked (the old census's codeLines unit). Report-only: nothing here fails a commit.
+// (scripts/host-ruler/server-roots.mjs).
+// HR3: from them the ruler follows static imports and ordinary import()s, but never through a dispatch table (TABLES):
+// a table's entries are already rooted per declared kind or host id, so following the whole table would make every
+// product a user of every entry (HA0 a, b). Engine self-imports (`@wildshard/engine/*`) resolve through engine's
+// package.json exports map. Lines are code lines: nonblank once comments are blanked (the old census's codeLines unit).
+// HR4: the shell (the app entry with no product loaded) is a user only of the modules SHELL_CONTROL names, not of
+// whole folders (HA0 d); `@wildshard/format/*` modules resolve through the pinned format package's exports map and are
+// charged like any host, reported under `format`, published files only (HA0 e).
+// Report-only: nothing here fails a commit.
 // Usage: node scripts/host-ruler.mjs --products <product-dir>... [--json]
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
@@ -27,6 +31,34 @@ export const TABLES = Object.freeze({
   // CALLS: the `{$call}` rows a discovery document may name; each look loads only when a product names it.
   'src/client/game/shard/discovery.ts': { static: true, dynamic: false },
 });
+
+/** The shell: the app entry with no product loaded. */
+export const SHELL = '@shell';
+export const SHELL_ROOTS = Object.freeze(['src/client/app/entry.ts']);
+/** The modules the shell is a user of: orchestration it runs for every shard (grid, session, shard loading, travel).
+ * Named one by one, replacing SHELL_CONTROL_PREFIXES' seven folders (shard-platform.mjs:634): a new module in those
+ * folders is charged to its shard until someone adds it here. Seeded 2026-11-13 from the folder rule's reach: the
+ * modules in those folders (and plugin/ui.ts, whose bridge declarations the old rule named) that the shell reaches and a
+ * built product reaches. Never add species, models, looks or gameplay. The test checks the shell reaches each one. */
+export const SHELL_CONTROL = Object.freeze([
+  'src/client/game/grid/assetResidency.ts', 'src/client/game/grid/entryDownloads.ts', 'src/client/game/grid/farImpostorView.ts',
+  'src/client/game/grid/farView.ts', 'src/client/game/grid/frameLook.ts', 'src/client/game/grid/intent.ts', 'src/client/game/grid/menu.ts',
+  'src/client/game/grid/nearGrain.ts', 'src/client/game/grid/nearPlaceholderPlan.ts', 'src/client/game/grid/nearPlaceholderView.ts',
+  'src/client/game/grid/pageEntry.ts', 'src/client/game/grid/pageResidency.ts', 'src/client/game/grid/productInputs.ts',
+  'src/client/game/grid/skinEnvelope.ts', 'src/client/game/grid/tileDecoder.ts', 'src/client/game/grid/titlePrefetchChoice.ts',
+  'src/client/game/plugin/ui.ts',
+  'src/client/game/session/clockSettings.ts', 'src/client/game/session/hudAccent.ts',
+  'src/client/game/shard/declaredPlumbing.ts', 'src/client/game/shard/declaredTargets.ts', 'src/client/game/shard/declaredUi.ts',
+  'src/client/game/shard/list.ts', 'src/client/game/shard/manifest.ts', 'src/client/game/shard/registry.ts',
+  'src/client/game/shard/retainedHooks.ts', 'src/client/game/shard/scopedRuntime.ts', 'src/client/game/shard/spec.ts',
+  'src/client/game/shard/titleList.ts',
+  'src/client/game/travel/travel.ts',
+  'src/shared/game/grid/allocator.ts', 'src/shared/game/grid/assembly.ts', 'src/shared/game/grid/catalogue.ts',
+  'src/shared/game/grid/catalogueDocument.ts', 'src/shared/game/grid/catalogueSlot.ts', 'src/shared/game/grid/cellEvents.ts',
+  'src/shared/game/grid/farProxy.ts', 'src/shared/game/grid/instances.ts', 'src/shared/game/grid/pageMode.ts',
+  'src/shared/game/grid/recovery.ts', 'src/shared/game/grid/roadLayout.ts', 'src/shared/game/grid/roadRecovery.ts',
+  'src/shared/game/grid/rules.ts',
+]);
 
 /** Per line of `source`, whether it holds code once comment spans are blanked.
  * @param {string} source @param {readonly { start: number, end: number }[]} comments */
@@ -72,65 +104,102 @@ function declarations(program) {
   return out;
 }
 
-const FORMAT = '@wildshard/format';
+export const FORMAT = '@wildshard/format';
+/** A glob of package.json `files` as a regex over package paths: `**` any depth, `*` one segment. @param {string} glob */
+const globRegex = glob => new RegExp(`^${glob.replace(/\/$/u, '/**').replaceAll(/[.+^${}()|[\]\\]/gu, String.raw`\$&`).replaceAll('**', '\0').replaceAll('*', '[^/]*').replaceAll('\0', '.*')}$`, 'u');
+/** The pinned format package: its dir, its exports map and its published `files` (HR4: only published files count).
+ * @param {string} dir */
+export function formatPackage(dir) {
+  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+  const files = /** @type {string[]} */ (manifest.files ?? []);
+  const include = files.filter(glob => !glob.startsWith('!')).map(globRegex), exclude = files.filter(glob => glob.startsWith('!')).map(glob => globRegex(glob.slice(1)));
+  return {
+    dir,
+    version: /** @type {string} */ (manifest.version),
+    exports: /** @type {Record<string, unknown>} */ (manifest.exports ?? {}),
+    /** Whether a package path (`src/format/stealth.ts`) is a published file. */
+    published: (/** @type {string} */ path) => include.some(re => re.test(path)) && !exclude.some(re => re.test(path)),
+  };
+}
+
 /** A module id: an engine path `src/...`, a format id `@wildshard/format/<package path>`, `npm:<name>`, or a non-code
- * file (`.json`, `?raw`), which is data and counts no lines.
- * @param {string} specifier @param {string} from @param {string} root */
-function resolveFrom(specifier, from, root) {
+ * file (`.json`, `.css`, `?raw`), which is data and counts no lines. Engine self-imports and format imports resolve
+ * through their package's exports map; a format file the package does not publish refuses.
+ * @param {string} specifier @param {string} from @param {string} root @param {ReturnType<typeof formatPackage>} format */
+function resolveFrom(specifier, from, root, format) {
   const bare = specifier.replace(/\?.*$/u, '');
+  /** @param {string} file */
+  const id = file => {
+    const inFormat = relative(format.dir, file);
+    if (inFormat.startsWith('..')) return relative(root, file);
+    if (!format.published(inFormat)) throw new Error(`${from} imports ${specifier}: ${inFormat} is not a published file of ${FORMAT}`);
+    return `${FORMAT}/${inFormat}`;
+  };
   if (bare.startsWith('.')) {
-    const fromFile = from.startsWith(`${FORMAT}/`) ? join('node_modules', from) : from;
-    const base = resolve(root, dirname(fromFile), bare);
+    const fromFile = from.startsWith(`${FORMAT}/`) ? join(format.dir, from.slice(FORMAT.length + 1)) : join(root, from);
+    const base = resolve(dirname(fromFile), bare);
     const candidates = [base, `${base}.ts`, `${base}.tsx`, `${base}.mts`, join(base, 'index.ts')];
     if (/\.[cm]?js$/u.test(base)) candidates.push(base.replace(/\.[cm]?js$/u, '.ts'));
     const file = candidates.find(candidate => existsSync(candidate) && extname(candidate) !== '');
     if (file === undefined) throw new Error(`Unresolved import ${specifier} from ${from}`);
-    const path = relative(root, file);
-    return path.startsWith(`node_modules/${FORMAT}/`) ? path.slice('node_modules/'.length) : path;
+    return id(file);
+  }
+  if (bare.startsWith(`${FORMAT}/`)) {
+    const target = format.exports[`./${bare.slice(FORMAT.length + 1)}`];
+    if (typeof target !== 'string') throw new Error(`Unresolved import ${specifier} from ${from}: not in ${FORMAT} exports`);
+    return id(join(format.dir, target));
   }
   return resolveModule(bare, from, root);
 }
 
-const CODE = /\.(?:[cm]?[jt]sx?)$/u;
-/** Read engine's tree (and the pinned format package's) one module at a time, cached.
- * @param {{ root?: string, format?: boolean }} [options] `format` follows `@wildshard/format/*` modules (HR4). */
+/** @typedef {{ lines: number, imports: string[], dynamic: string[], opaque: string[], declarations: { names: string[], lines: number }[] }} ModuleFacts */
+const CODE = /\.[cm]?[jt]sx?$/u;
+/** Read engine's tree and the pinned format package one module at a time, cached.
+ * @param {{ root?: string, format?: boolean, formatDir?: string }} [options] `format: false` stops at format modules
+ * (HR3's reading); by default they are followed and charged like any host (HR4). */
 export function createTreeReader(options = {}) {
-  const root = options.root ?? ENGINE_ROOT, followFormat = options.format ?? false;
-  /** @type {Map<string, { lines: number, imports: string[], dynamic: string[], declarations: { names: string[], lines: number }[] }>} */
+  const root = options.root ?? ENGINE_ROOT, followFormat = options.format ?? true;
+  const format = formatPackage(options.formatDir ?? join(root, 'node_modules', FORMAT));
+  /** @type {Map<string, ModuleFacts>} */
   const cache = new Map();
   /** @param {string} module */
   const followed = module => module.startsWith('src/') || (followFormat && module.startsWith(`${FORMAT}/`));
   return {
     root,
+    format,
     followed,
-    /** @param {string} module */
+    /** @param {string} module @returns {ModuleFacts} */
     read(module) {
       const known = cache.get(module);
       if (known !== undefined) return known;
-      const file = module.startsWith(`${FORMAT}/`) ? join(root, 'node_modules', module) : join(root, module);
-      if (!CODE.test(module)) { const row = { lines: 0, imports: [], dynamic: [], declarations: [] }; cache.set(module, row); return row; }
+      if (!CODE.test(module)) { const row = { lines: 0, imports: [], dynamic: [], opaque: [], declarations: [] }; cache.set(module, row); return row; }
+      const file = module.startsWith(`${FORMAT}/`) ? join(format.dir, module.slice(FORMAT.length + 1)) : join(root, module);
       const source = readFileSync(file, 'utf8');
       const parsed = parseSync(module, source);
       if (parsed.errors.length > 0) throw new Error(`${module}: parse errors`);
       const mask = codeLineMask(source, parsed.comments);
       const lineStarts = [0];
-      for (let i = 0; i < source.length; i++) if (source[i] === "\n") lineStarts.push(i + 1);
+      for (let i = 0; i < source.length; i++) if (source[i] === '\n') lineStarts.push(i + 1);
       const lineOf = (/** @type {number} */ offset) => { let lo = 0, hi = lineStarts.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (lineStarts[mid] <= offset) lo = mid; else hi = mid - 1; } return lo; };
       const spanLines = (/** @type {number} */ start, /** @type {number} */ end) => { let n = 0; for (let line = lineOf(start); line <= lineOf(Math.max(start, end - 1)); line++) if (mask[line]) n++; return n; };
+      const to = (/** @type {string} */ specifier) => resolveFrom(specifier, module, root, format);
       /** @type {Set<string>} */
       const imports = new Set();
       // A type-only import or re-export never runs; a side-effect import does.
-      for (const row of parsed.module.staticImports) if (row.entries.length === 0 || row.entries.some((/** @type {any} */ e) => !e.isType)) imports.add(resolveFrom(row.moduleRequest.value, module, root));
-      for (const row of parsed.module.staticExports) for (const entry of row.entries) if (entry.moduleRequest !== null && !entry.isType) imports.add(resolveFrom(entry.moduleRequest.value, module, root));
+      for (const row of parsed.module.staticImports) if (row.entries.length === 0 || row.entries.some((/** @type {any} */ e) => !e.isType)) imports.add(to(row.moduleRequest.value));
+      for (const row of parsed.module.staticExports) for (const entry of row.entries) if (entry.moduleRequest !== null && !entry.isType) imports.add(to(entry.moduleRequest.value));
       /** @type {Set<string>} */
       const dynamic = new Set();
+      /** @type {string[]} */
+      const opaque = [];
       for (const row of parsed.module.dynamicImports) {
         const text = source.slice(row.moduleRequest.start, row.moduleRequest.end);
         const literal = /^(['"`])([^'"`$]*)\1$/u.exec(text);
-        if (literal === null) throw new Error(`${module}: a non-literal import() the ruler cannot follow: import(${text})`);
-        dynamic.add(resolveFrom(literal[2], module, root));
+        // A computed import() (a built bundle's URL, a page's own script) loads no source module: listed, not followed.
+        if (literal === null) opaque.push(text);
+        else dynamic.add(to(literal[2]));
       }
-      const row = { lines: mask.filter(Boolean).length, imports: [...imports].sort(), dynamic: [...dynamic].sort(),
+      const row = { lines: mask.filter(Boolean).length, imports: [...imports].sort(), dynamic: [...dynamic].sort(), opaque,
         declarations: declarations(parsed.program).map(d => ({ names: d.names, lines: spanLines(d.start, d.end) })) };
       cache.set(module, row);
       return row;
@@ -138,8 +207,12 @@ export function createTreeReader(options = {}) {
   };
 }
 
+/** The report layer of a module: `format` for the format package, else its side-first layer (`client/game`, ...).
+ * @param {string} module */
+export const layerOf = module => module.startsWith(`${FORMAT}/`) ? 'format' : /^src\/(\w+\/\w+)\//u.exec(module)?.[1] ?? 'other';
+
 /** Every module reached from `roots`: static imports and import()s, except the ones a dispatch table holds back.
- * Modules the reader does not follow (npm packages; format until HR4) end the walk and are not listed.
+ * Modules the reader does not follow (npm packages) end the walk and are not listed.
  * @param {Iterable<string>} roots @param {ReturnType<typeof createTreeReader>} reader @param {Readonly<Record<string, { static: boolean, dynamic: boolean }>>} [tables] */
 export function reach(roots, reader, tables = TABLES) {
   /** @type {Set<string>} */
@@ -166,33 +239,42 @@ export function productRootModules(dir, tables = {}) {
   return { slug: page.slug, roots: [...modules].sort(), unmeasured: server.unmeasured };
 }
 
-/** Per module, its code lines and the users that reach it.
+/** Per module, its code lines, layer and the users that reach it. The shell, when given, is a user only of the
+ * `control` modules it reaches (HR4).
  * @param {readonly { slug: string, roots: Iterable<string> }[]} users @param {ReturnType<typeof createTreeReader>} reader
- * @param {Readonly<Record<string, { static: boolean, dynamic: boolean }>>} [tables] */
-export function measure(users, reader, tables = TABLES) {
-  /** @type {Map<string, { lines: number, users: string[] }>} */
+ * @param {{ tables?: Readonly<Record<string, { static: boolean, dynamic: boolean }>>, shell?: { roots: Iterable<string>, control: readonly string[] } }} [options] */
+export function measure(users, reader, options = {}) {
+  const tables = options.tables ?? TABLES;
+  /** @type {Map<string, { lines: number, layer: string, users: string[] }>} */
   const modules = new Map();
   for (const user of users) for (const module of reach(user.roots, reader, tables)) {
-    const row = modules.get(module) ?? { lines: reader.read(module).lines, users: [] };
+    const row = modules.get(module) ?? { lines: reader.read(module).lines, layer: layerOf(module), users: [] };
     if (!row.users.includes(user.slug)) row.users.push(user.slug);
     modules.set(module, row);
+  }
+  if (options.shell !== undefined) {
+    const shell = reach(options.shell.roots, reader, tables);
+    for (const module of options.shell.control) if (shell.has(module)) modules.get(module)?.users.push(SHELL);
   }
   for (const row of modules.values()) row.users.sort();
   return new Map([...modules].sort(([a], [b]) => a.localeCompare(b)));
 }
 
-/** Per user: the modules only it reaches, and their lines.
+/** Per product: the modules only it reaches, their lines, and how many of those lines are format modules.
  * @param {ReturnType<typeof measure>} modules @param {readonly string[]} slugs */
 export function oneUserLines(modules, slugs) {
-  const out = new Map(slugs.map(slug => [slug, { modules: 0, lines: 0 }]));
+  const out = new Map(slugs.map(slug => [slug, { modules: 0, lines: 0, format: 0 }]));
   for (const row of modules.values()) if (row.users.length === 1) {
     const total = out.get(row.users[0]);
-    if (total !== undefined) { total.modules++; total.lines += row.lines; }
+    if (total === undefined) continue;
+    total.modules++;
+    total.lines += row.lines;
+    if (row.layer === 'format') total.format += row.lines;
   }
   return out;
 }
 
-/** Measure built product dirs end to end.
+/** Measure built product dirs end to end, with the shell and the pinned format package.
  * @param {readonly string[]} dirs @param {{ root?: string }} [options] */
 export function rule(dirs, options = {}) {
   const root = options.root ?? ENGINE_ROOT;
@@ -201,18 +283,18 @@ export function rule(dirs, options = {}) {
   const slugs = products.map(product => product.slug);
   if (new Set(slugs).size !== slugs.length) throw new Error(`two products share a slug: ${slugs.join(', ')}`);
   const reader = createTreeReader({ root });
-  const modules = measure(products, reader);
-  return { products, modules, oneUser: oneUserLines(modules, slugs) };
+  const modules = measure(products, reader, { shell: { roots: SHELL_ROOTS, control: SHELL_CONTROL } });
+  return { products, format: reader.format.version, modules, oneUser: oneUserLines(modules, slugs) };
 }
 
 /** @param {ReturnType<typeof rule>} report */
 export function formatTable(report) {
-  const rows = [...report.oneUser].map(([slug, total]) => [slug, String(total.modules), String(total.lines)]);
-  const head = ['shard', 'one-user modules', 'one-user lines'];
+  const rows = [...report.oneUser].map(([slug, total]) => [slug, String(total.modules), String(total.lines), String(total.format)]);
+  const head = ['shard', 'one-user modules', 'one-user lines', 'of which format'];
   const width = head.map((h, i) => Math.max(h.length, ...rows.map(row => row[i].length)));
   const line = (/** @type {string[]} */ cells) => `| ${cells.map((cell, i) => i === 0 ? cell.padEnd(width[i]) : cell.padStart(width[i])).join(' | ')} |`;
   const unmeasured = report.products.flatMap(p => p.unmeasured.map(u => `unmeasured: ${p.slug} host ${u.host}: ${u.reason}`));
-  return [line(head), `|${width.map((w, i) => i === 0 ? '-'.repeat(w + 2) : `${'-'.repeat(w + 1)}:`).join('|')}|`, ...rows.map(line), ...unmeasured].join('\n');
+  return [`format package ${FORMAT} ${report.format}`, line(head), `|${width.map((w, i) => i === 0 ? '-'.repeat(w + 2) : `${'-'.repeat(w + 1)}:`).join('|')}|`, ...rows.map(line), ...unmeasured].join('\n');
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
@@ -221,6 +303,6 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.fi
   const dirs = at === -1 ? [] : args.slice(at + 1).filter(arg => !arg.startsWith('--'));
   if (dirs.length === 0) { console.error('usage: node scripts/host-ruler.mjs --products <product-dir>... [--json]'); process.exit(2); }
   const report = rule(dirs);
-  if (json) console.log(JSON.stringify({ products: report.products, modules: Object.fromEntries(report.modules) }, null, 2));
+  if (json) console.log(JSON.stringify({ format: report.format, products: report.products, modules: Object.fromEntries(report.modules) }, null, 2));
   else console.log(formatTable(report));
 }

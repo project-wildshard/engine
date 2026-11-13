@@ -37,3 +37,9 @@
   entries are rooted per declaration, so a table is not a user. Prints a
   per-shard one-user-lines table. Explorer dispatch and the chapter facets
   the plan named are no longer tables in this tree.
+- HR4 (opus-hrm1): the shell (`src/client/app/entry.ts`, no product) is a
+  user only of the modules `SHELL_CONTROL` names, seeded from what the old
+  seven folders exempted and a product reaches today; a new module in those
+  folders is charged to its shard. Format modules resolve through the
+  pinned package's exports map and `files` (an unpublished file refuses) and
+  are charged like any host, reported as layer `format`.

@@ -1,0 +1,13 @@
+{
+  "name": "@wildshard/shard-format",
+  "version": "0.0.0-fixture",
+  "files": [
+    "src/format/*.ts",
+    "!src/format/*.test.ts"
+  ],
+  "exports": {
+    "./oneUser": "./src/format/oneUser.ts",
+    "./shared": "./src/format/shared.ts",
+    "./unpublished": "./src/tools/unpublished.ts"
+  }
+}

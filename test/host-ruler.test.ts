@@ -2,7 +2,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Runs the ruler's CLI as a user would.
 import { execFileSync } from 'node:child_process';
 import { describe, expect, test } from 'vitest';
-import { codeLines, createTreeReader, formatTable, measure, oneUserLines, productRootModules, reach, rule, TABLES } from '../scripts/host-ruler.mjs';
+import { codeLines, createTreeReader, formatTable, layerOf, measure, oneUserLines, productRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
 import { CLIENT_PLAN, clientPlanRoots } from '../scripts/host-ruler/roots.mjs';
 import { NATIVE_ASSEMBLY, NATIVE_HOSTS } from '../scripts/host-ruler/server-roots.mjs';
 
@@ -70,5 +70,44 @@ describe('a product is charged exactly its declared kind', () => {
     const report = rule(['test/fixtures/host-ruler/closure-a', 'test/fixtures/host-ruler/closure-b']);
     expect(out.trim()).toBe(formatTable(report));
     expect(out).toMatch(new RegExp(String.raw`\| closure-a +\| +${only('closure-a').length} \| +${report.oneUser.get('closure-a')!.lines} \|`, 'u'));
+  });
+});
+
+describe('the shell by name, format charged (HR4, HA0 d, e)', () => {
+  const tree = createTreeReader({ root: 'test/fixtures/host-ruler/tree', formatDir: 'test/fixtures/host-ruler/tree/format' });
+  const products = [{ slug: 'a', roots: ['src/client/game/feature/a.ts'] }, { slug: 'b', roots: ['src/client/game/feature/b.ts'] }];
+  const shell = { roots: ['src/client/app/entry.ts'], control: ['src/client/game/session/play.ts'] };
+  const modules = measure(products, tree, { shell });
+
+  test('a one-user module under session/ is charged, though the shell reaches it; a named control module is not', () => {
+    expect(reach(shell.roots, tree).has('src/client/game/session/hudExtra.ts')).toBe(true);
+    expect(modules.get('src/client/game/session/hudExtra.ts')?.users).toEqual(['a']);
+    expect(modules.get('src/client/game/session/play.ts')?.users).toEqual([SHELL, 'a', 'b']);
+  });
+  test('format imports resolve through the pinned package\'s exports map and a one-user schema is charged under format', () => {
+    expect(modules.get('@wildshard/format/src/format/oneUser.ts')).toEqual({ lines: 5, layer: 'format', users: ['a'] });
+    // Its relative import inside the package resolves to the same package id.
+    expect(modules.get('@wildshard/format/src/format/shared.ts')?.users).toEqual(['a', 'b']);
+    const lines = oneUserLines(modules, ['a', 'b']);
+    expect(lines.get('a')).toEqual({ modules: 3, lines: 4 + 4 + 5, format: 5 });
+    expect(lines.get('b')).toEqual({ modules: 1, lines: 3, format: 0 });
+  });
+  test('a format file the package does not publish refuses; HR3\'s reading stops at format', () => {
+    expect(() => tree.read('src/client/game/feature/leak.ts')).toThrow(/is not a published file of @wildshard\/format/u);
+    expect([...reach(['src/client/game/feature/a.ts'], createTreeReader({ root: 'test/fixtures/host-ruler/tree', formatDir: 'test/fixtures/host-ruler/tree/format', format: false }))].sort())
+      .toEqual(['src/client/game/feature/a.ts', 'src/client/game/session/hudExtra.ts', 'src/client/game/session/play.ts']);
+  });
+  test('the real pinned format package: its published files are what the ruler follows', () => {
+    expect(reader.format.published('src/format/stealth.ts')).toBe(true);
+    expect(reader.format.published('src/format/stealth.test.ts')).toBe(false);
+    const stealth = reader.read('@wildshard/format/src/format/stealth.ts');
+    expect(stealth.lines).toBeGreaterThan(0);
+    expect(stealth.imports.every(module => !module.startsWith('node_modules/'))).toBe(true);
+    expect(layerOf('@wildshard/format/src/format/stealth.ts')).toBe('format');
+  });
+  test('every named shell control module exists and the app entry reaches it', () => {
+    const shellReach = reach(SHELL_ROOTS, reader);
+    expect(SHELL_CONTROL.filter(module => !shellReach.has(module))).toEqual([]);
+    expect(new Set(SHELL_CONTROL).size).toBe(SHELL_CONTROL.length);
   });
 });
