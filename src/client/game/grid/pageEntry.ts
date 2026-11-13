@@ -94,6 +94,18 @@ export function reenterGrid(instance: string): void {
   travel({ to: target.slug, mode: 'enter', shown: gridDestination({ slug: target.slug }, target) });
 }
 
+/** OFFLINE OF2 (J298): a grid page on a build whose world is known to host one cell (production before GC16) re-enters as that cell's
+ *  one-shard page, online, never the solo grid. The page that boots is a `?chunk=` page with no grid intent; Shard select's one way in
+ *  keeps it a one-shard page, since the same word (kept a minute, and in the device's route memory) says the world opens one cell. */
+export function reenterShard(instance: string): void {
+  const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
+  if (cell === undefined || target === undefined) {
+    recordDrop({ reason: `The world hosts one place, and this build can't open ${cell?.slug ?? instance} on its own, so the game went back to the title.`, code: instance });
+    location.replace(new URL(location.pathname, location.origin)); return;
+  }
+  travel({ to: target.slug, mode: 'enter', shown: gridDestination({ slug: target.slug }, target) });
+}
+
 /** GO5: set once the world's door has placed this device in the grid, so its hint is the server's; a solo grid's hint boots home, as before. */
 export const SERVER_PLACED: SaveKeyDef<boolean> = { key: 'grid.server-placed', scope: 'device', version: 1, schema: v.boolean(), initial: () => false };
 

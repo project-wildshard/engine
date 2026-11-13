@@ -52,8 +52,8 @@ import type { EncounterRow } from '../boss/barFeed';
 import { wirePage, type DayFollower } from './wirePage';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
-import { earlyStandalone, hostsGrid, opensShard, serverRoute } from './serverRoute';
-import { shardCell } from '../grid/oneWayIn';
+import { earlyStandalone, serverRoute } from './serverRoute';
+import { worldHosted } from '../grid/oneWayIn';
 
 type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'onWindup' | 'presentHit' | 'presentDeath' | 'presentReward'>;
 /** What a grid page lends: its crossing follows the server, and its creatures are the entered cell's. */
@@ -70,6 +70,8 @@ export interface WorkerClientGrid {
   readonly serverPlace?: (instance: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void;
   /** GO4: the seat is in another cell than this page booted: enter the grid again there (a grid entry, never a `?chunk=` page). */
   readonly reenter?: (instance: string) => void;
+  /** OF2: the world hosts one cell: enter this cell again as its one-shard online page, never the solo grid. */
+  readonly reshard?: (instance: string) => void;
   /** The cell (instance) this page booted in. */
   readonly booted?: string;
 }
@@ -109,7 +111,7 @@ interface ShellModule { readonly startStandalone: (config: { slug: string; base:
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
-interface OnlineModule { readonly worldHostsGrid: (world: BuildWorld, hosts: (world: unknown) => boolean) => Promise<boolean>; readonly worldWord: (world: BuildWorld) => Promise<unknown>; readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean } }) => Promise<Shell> }
+interface OnlineModule { readonly startOnline: (config: BuildWorld & { loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean } }) => Promise<Shell> }
 interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
 
 const SAVE_EVERY_MS = 30_000;
@@ -283,7 +285,7 @@ async function leaveEarly(shell: Promise<Shell>): Promise<void> {
  *  that step instead, as before. A level left before adoption saves and stops this server as an adopted one would. */
 export function startWorkerServerEarly(options: { readonly slug: string; readonly lone: boolean; readonly scope: Scope }): void {
   // GO4: a build with a world puts every page in it, a grid page too: no in-page server to start early.
-  if (!earlyStandalone((globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__, !options.lone || shardCell(options.slug) !== undefined)) return;
+  if (!earlyStandalone((globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__)) return;
   if (early !== null && !early.adopted) return;
   const reads: EarlyServer['reads'] = { count: 0, card: null };
   const shell = bootStandalone(options.slug, options.lone, () => { if (reads.card === null) reads.count++; else reads.card.add(); });
@@ -304,6 +306,12 @@ export function startWorkerServerEarly(options: { readonly slug: string; readonl
     started.adopted = true;
     closing = leaveEarly(shell);
   });
+}
+/** A device id's storage for a page whose browser keeps nothing (OF2: such a page still joins the world, as a new device each time). */
+function pageOnlyStorage(): SaveStorage {
+  const items = new Map<string, string>();
+  return { get length() { return items.size; }, key: index => [...items.keys()][index] ?? null, getItem: key => items.get(key) ?? null,
+    setItem: (key, value) => { items.set(key, value); }, removeItem: key => { items.delete(key); } };
 }
 async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<typeof countedWait>): Promise<void> {
   const { slug, player, physics, scope, system } = ports, { savePrefix } = appIdentity(), page = saveEnvironment().storage('shard');
@@ -331,13 +339,19 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
         ...(pageGoto() === booted ? { goto: true } : {}) } }) });
   };
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
-  // GO4 gate: a grid page joins the world only once the world hosts the grid; until then, today's solo grid.
-  const hosted = world !== undefined && page !== null && ports.grid !== null && (gotoHosted() || await bootTask('server:grid-hosted', async () => (await onlineModule()).worldHostsGrid(world, hostsGrid)));
-  // A one-shard page joins only a world whose door names its shard (opus-route2): a shard the grid doesn't place, or one this world leaves
-  // closed (prod opens Driftwood alone), plays solo. Shard select's one-way-in read keeps the word a minute, so this rarely dials again.
-  const catalogued = ports.grid === null && shardCell(slug) !== undefined, asks = catalogued && world !== undefined && page !== null;
-  const placed = ports.grid !== null || opensShard(await (asks ? bootTask('server:opens-shard', async () => (await onlineModule()).worldWord(world)).catch(() => null) : null), slug, catalogued);
-  const shell = await (world !== undefined && page !== null && serverRoute(world, page, { page: ports.grid !== null, hosted }, placed) === 'online' ? online(world, page) : standalone()), { client } = shell;
+  // OFFLINE OF2 (J298): a build with a world sends every page online; the world's word never picks the server. A grid page whose world
+  // is known to host one cell (a word in time, or the device's kept answer; no word takes the grid, J300) re-enters as that cell's
+  // one-shard online page, never the solo grid. Shard select's goto already asked, so its grid page doesn't ask again.
+  const bootedCell = ports.grid?.booted, reshard = ports.grid?.reshard;
+  if (world !== undefined && bootedCell !== undefined && reshard !== undefined && !gotoHosted() && !await bootTask('server:grid-hosted', () => worldHosted(world))) {
+    // a page the player left while it asked (back to the title) goes nowhere: the title keeps the document (review MUST)
+    if (scope.disposed) throw new Error('The page left before it joined the world');
+    reshard(bootedCell);
+    // the page is leaving for the one-shard page (or the title): this boot never goes on, as a GO4 regrid's never arrives
+    await new Promise<never>(() => { /* settles never: the page unloads */ });
+  }
+  // A page that can keep nothing still joins, with a device id for this page only.
+  const shell = await (world !== undefined && serverRoute(world) === 'online' ? online(world, page ?? pageOnlyStorage()) : standalone()), { client } = shell;
   void shell.booted.catch(() => undefined);
   // QA row 16: a navigation the game chose leaves the world's seat from the moment there is a shell, even mid-load (a returning held
   // body may already be back). Once the page can save, the hold below replaces this one.

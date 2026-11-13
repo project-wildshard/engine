@@ -207,8 +207,8 @@ export function gotoSocket(socket: string, cell: string | undefined): string {
 const asking = new Map<string, { word: Promise<unknown>; done: number | null }>();
 /** How long a page answers from a read that heard nothing before it dials again. */
 const SILENT_KEEP_MS = 10_000;
-/** GO4 gate: whether the world this build names hosts the grid, by `hosts` on the door's word (`worldWord`). Any failure answers false,
- *  and the grid page keeps today's solo grid. A word is kept a minute, a no as well as a yes, so a `WORLD_CELLS` change reaches a tab
+/** GO4 gate: whether the world this build names hosts the grid, by `hosts` on the door's word (`worldWord`). Any failure answers false.
+ *  No page picks its server by it any more (OFFLINE OF2: a world build's pages all go online). A word is kept a minute, a no as well as a yes, so a `WORLD_CELLS` change reaches a tab
  *  within that minute. */
 export async function worldHostsGrid(config: { readonly release: string; readonly key: string }, hosts: (world: unknown) => boolean, waitMs = 3000): Promise<boolean> {
   const word = await worldWord(config, waitMs);
