@@ -290,6 +290,9 @@ function reportScreen(error: unknown, tags: BrowserErrorTags): void {
   if (kept) flushScreenReports(); else void sendOnce(e, report.tags, report.id);
 }
 
+/** S13: whether this build can deliver a screen report at all (a DSN is built in), so a build or test without one arms no flush timer */
+export function screenReportsEnabled(): boolean { return dsn !== ''; }
+
 /** Send what this page or an earlier one still owes (every document, off the boot's hot path), and again when the network is back. */
 export function flushScreenReports(): void {
   if (!dsn || !productionPage()) return;
