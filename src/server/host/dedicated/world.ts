@@ -16,6 +16,7 @@ import { NetIdentitySchema } from '@wildshard/engine/net/identity';
 import { decodeFirstMessage } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
 import { encodeCountdown, type WorldWord } from '@wildshard/engine/net/socketFrames';
+import { deviceLine, readDeviceWord, type DeviceSnapshot } from '@wildshard/engine/net/deviceWord';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
 import type {PlaytestRow} from './playtest';
 import type { ChatReport } from '@wildshard/engine/net/chat';
@@ -145,6 +146,8 @@ export class World {
   private readonly ends = new Set<SocketTransport>();
   /** Links whose player quit (`ready` with `LEAVE_FLAG`) before a body was theirs. */
   private readonly quits = new WeakSet<SocketTransport>();
+  /** DEVICE-TELEMETRY DT4: each socket's device word and the player its hello named, until the one `client.device` line is written. */
+  private readonly devices = new WeakMap<SocketTransport, { said?: DeviceSnapshot; player?: string; done: boolean }>();
   /** Clients loading: each holds a seat, and has no body yet. */
   private readonly pending = new Map<string, PendingSeat>();
   /** Who has a body, by link or by hold, and in which cell. */
@@ -324,10 +327,34 @@ export class World {
     // GO4: the door's first word, before any hello: how many cells it hosts, and (opus-route2) the shard each runs, so a one-shard
     // page joins only a world that opens its shard. D7 keeps `/health` private on the rooms address, and a
     // grid page asks this on a socket of its own (`worldWord`). No build, serial or player data.
-    end.control('world', new TextEncoder().encode(JSON.stringify({ cells: this.links.size, shards: [...new Set([...this.links.keys()].map(cellShard))] } satisfies WorldWord)).buffer);
+    // DEVICE-TELEMETRY DT3: `device: 1` says this door reads the client's device word; a client sends it only then.
+    end.control('world', new TextEncoder().encode(JSON.stringify({ cells: this.links.size, shards: [...new Set([...this.links.keys()].map(cellShard))], device: 1 } satisfies WorldWord)).buffer);
+    end.onControl((control, bytes) => { if (control === 'device') this.deviceWord(end, bytes); });
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { this.refuse('hello-timeout'); end.close('refused'); });
     const off = end.onMessage((_channel, bytes) => { off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto); });
     end.onClose(() => { off(); this.scope.cancelTimer(timer); });
+  }
+  /** DT4: a client's device word, untrusted: one per socket, read and bounded by `readDeviceWord`. A junk or oversized word is counted
+   *  and dropped, and the connect goes on. */
+  private deviceWord(end: SocketTransport, bytes: ArrayBuffer): void {
+    const seen = this.devices.get(end) ?? { done: false };
+    if (seen.said !== undefined || seen.done) return;
+    const said = readDeviceWord(bytes);
+    if (said === null) { this.refuse('device-word'); this.options.log({ at: 'client.device-refused', bytes: bytes.byteLength }); seen.done = true; this.devices.set(end, seen); return; }
+    seen.said = said; this.devices.set(end, seen); this.deviceSeen(end);
+  }
+  /** DT4: the hello named this socket's player. */
+  private devicePlayer(end: SocketTransport, player: string): void {
+    const seen = this.devices.get(end) ?? { done: false };
+    seen.player ??= player; this.devices.set(end, seen); this.deviceSeen(end);
+  }
+  /** DT4: one `client.device` journal line per connect, once both the word and the hello's player are in. Privacy: the player id the
+   *  hello already carries and device characteristics only; never the address, which the door keeps for its limits alone. */
+  private deviceSeen(end: SocketTransport): void {
+    const seen = this.devices.get(end);
+    if (seen === undefined || seen.done || seen.said === undefined || seen.player === undefined) return;
+    seen.done = true;
+    this.options.log(deviceLine(seen.player, seen.said));
   }
   private async joining(end: SocketTransport, bytes: ArrayBuffer, goto: string | null): Promise<void> {
     try { await this.hello(end, bytes, goto); }
@@ -368,6 +395,7 @@ export class World {
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.refuse('identity'); end.close('refused'); return; }
     const device = said.output.player, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
+    this.devicePlayer(end, device);
     // GC15: a seat mid-crossing is in neither cell for the door to ask: the client dials again in a moment.
     if (this.crossings.has(device)) { end.close('retry'); return; }
     if (holding !== undefined) {

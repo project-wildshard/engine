@@ -117,7 +117,7 @@ function productionPage(): boolean {
 
 function loadSdk(): Promise<BrowserSdk | null> {
   if (!productionPage()) return Promise.resolve(null);
-  sdk ??= import('@sentry/browser').then((sentry) => {
+  sdk ??= import('@sentry/browser').then(async (sentry) => {
     const environment = browserErrorEnvironment(location.origin, installedIdentity()?.errorReportEnvironments ?? {});
     const version = typeof __ENGINE_RELEASE__ === 'object' ? __ENGINE_RELEASE__.version : undefined;
     sentry.init({
@@ -148,6 +148,9 @@ function loadSdk(): Promise<BrowserSdk | null> {
         return event;
       },
     });
+    // DEVICE-TELEMETRY DT2: the device's snapshot as the `device` context and `device.*` tags, loaded with the SDK (never on the title)
+    try { const { applySentryDevice, deviceSnapshot } = await import('./deviceSnapshot'); applySentryDevice(sentry, await deviceSnapshot(), dsn); }
+    catch { /* a report goes without it */ }
     return sentry;
   // S13: a failed chunk load (a stale page, the network) must not silence every later report on this page; the next one tries again
   }).catch(() => { sdk = null; return null; });

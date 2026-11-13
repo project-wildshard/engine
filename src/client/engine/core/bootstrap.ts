@@ -5,6 +5,7 @@ import { app } from '../app/runtime';
 import type * as THREE from 'three';
 import { Game } from './Game';
 import { applyLevelTier, TIER } from './tier';
+import { noteDeviceGpu } from '../telemetry/deviceSnapshot';
 import { readyWebGLContext } from './webglStartup';
 import { recordBootCheckpoint } from '../boot/bootTrace';
 import { issueBakedPrograms } from '../boot/earlyPrograms';
@@ -74,7 +75,9 @@ export async function bootstrap(step: StepRunner, level: LevelSpec, inputContext
       progress.detail('Waiting for graphics to recover');
       recordBootCheckpoint('renderer:waiting', { ...state });
     });
-    return new Game(canvas, context, level);
+    const made = new Game(canvas, context, level);
+    noteDeviceGpu(context); // DEVICE-TELEMETRY DT1: the game's own context names its GPU for the device snapshot
+    return made;
   });
   game.app.clock.setCapture(harnessPins()?.capture ?? null);
   issueBakedPrograms(game); // DL10 (Debug 'Early shader compile'): a queued list of the level's entry programs starts linking

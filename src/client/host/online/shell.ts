@@ -7,6 +7,7 @@ import { NetClient } from '@wildshard/engine/net/client';
 import type { NetIdentity } from '@wildshard/engine/net/identity';
 import { Redial, type LinkCause, type LinkProgress, type LinkState } from '@wildshard/engine/net/redial';
 import { decodeCountdown, type Countdown } from '@wildshard/engine/net/socketFrames';
+import { encodeDeviceWord, worldReadsDevice } from '@wildshard/engine/net/deviceWord';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
 import {NetRecords} from '@wildshard/engine/net/netRecord';
 import {onlineTelemetry} from '@wildshard/engine/telemetry/runtime';
@@ -90,6 +91,17 @@ export interface OnlineShell {
   dispose: () => void;
 }
 
+/** DT3: how long a socket's device word waits for the renderer to name its GPU before it goes without it. */
+const DEVICE_GPU_WAIT_MS = 10_000;
+/** DT3: this page's device snapshot on `transport` (a closed one drops it). Telemetry: never throws, never holds the link. */
+function sendDevice(transport: WebSocketTransport, build: string): void {
+  const send = async (): Promise<void> => {
+    const { deviceSnapshot } = await import('@wildshard/engine/telemetry/deviceSnapshot');
+    transport.control('device', encodeDeviceWord({ ...await deviceSnapshot(DEVICE_GPU_WAIT_MS), build }));
+  };
+  void send().catch(() => undefined);
+}
+
 /** The link alone, with no page around it. `startOnline` is this with the strips. */
 export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShell {
   let playtest=false;
@@ -103,6 +115,8 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     transport.onClose(() => { if (link === transport) down = true; });
     transport.onControl((control, bytes) => {
       if(control==='playtest'){playtest=true;return;}
+      // DEVICE-TELEMETRY DT3: a door whose first word says it reads the device word hears this page's snapshot, once per socket
+      if (control === 'world') { if (worldReadsDevice(bytes)) sendDevice(transport, config.build); return; }
       if (control === 'voice') {
         let word: VoiceHeard;
         try { word = JSON.parse(decoder.decode(bytes)) as VoiceHeard; } catch { return; }

@@ -4,6 +4,7 @@ import { BitWriter } from '../src/shared/engine/net/bits';
 import { encodeHello } from '../src/shared/engine/net/messages';
 import { NET_SCHEMA_HASH } from '../src/shared/engine/net/netSchemas';
 import { closeReason, decodeCountdown, framed, SOCKET_RELIABLE } from '../src/shared/engine/net/socketFrames';
+import { DEVICE_WORD_MAX_BYTES, encodeDeviceWord } from '../src/shared/engine/net/deviceWord';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
@@ -108,4 +109,43 @@ test('a tick that throws ends the process, not one cell', { timeout: 60_000 }, a
   // A real event-loop stall makes the clock catch up more than one tick.
   const until = performance.now() + 50; while (performance.now() < until) { /* keep real elapsed time */ }
   await vi.waitFor(() => { expect(bench?.crashes).toHaveLength(1); }, { timeout: 2000, interval: 10 });
+});
+
+// DEVICE-TELEMETRY DT3/DT4: one client.device line per connect; a word the door can't read is refused and the connect goes on.
+const deviceLines = (lines: readonly Record<string, unknown>[]): Record<string, unknown>[] => lines.filter(line => line['at'] === 'client.device');
+test('an old client with no device word still joins, and no device line is written', { timeout: 60_000 }, async () => {
+  bench = await roomBench();
+  const old = bot(bench.url, 'bench', 'device:old');
+  expect(await old.arrived()).toBe(true);
+  expect(deviceLines(bench.lines)).toEqual([]);
+  expect(bench.world.refusals).toEqual({});
+});
+
+test('a device word makes one client.device line with its fields; a second word on the socket is ignored', { timeout: 60_000 }, async () => {
+  bench = await roomBench();
+  const phone = bot(bench.url, 'bench', 'device:friend');
+  expect(await phone.arrived()).toBe(true);
+  const word = { model: 'SM-S918B', platform: 'Android', platformVersion: '14.0.0', gpu: 'Adreno (TM) 740', screenW: 384, screenH: 832, dpr: 2.8, memory: 8, cores: 8, fullVersionList: ['Google Chrome 141.0.7390.122'], build: 'bench' };
+  phone.transport.control('device', encodeDeviceWord(word));
+  phone.transport.control('device', encodeDeviceWord({ ...word, model: 'second' }));
+  await vi.waitFor(() => { expect(deviceLines(bench?.lines ?? [])).toHaveLength(1); });
+  await new Promise(resolve => { setTimeout(resolve, 100); });
+  expect(deviceLines(bench.lines)).toEqual([{ at: 'client.device', player: 'device:friend', model: 'SM-S918B', platform: 'Android', platformVersion: '14.0.0', browser: 'Google Chrome 141.0.7390.122',
+    gpu: 'Adreno (TM) 740', screen: '384x832', dpr: 2.8, memory: 8, cores: 8, build: 'bench' }]);
+});
+
+test.each([
+  ['junk', new TextEncoder().encode('{not json').buffer],
+  ['oversized', new TextEncoder().encode(JSON.stringify({ model: 'x'.repeat(DEVICE_WORD_MAX_BYTES) })).buffer.slice(0, DEVICE_WORD_MAX_BYTES + 20)],
+] as const)('a %s device word is refused, and the player plays on', { timeout: 60_000 }, async (_kind, bytes) => {
+  bench = await roomBench();
+  const phone = bot(bench.url, 'bench', 'device:junk');
+  expect(await phone.arrived()).toBe(true);
+  phone.transport.control('device', bytes);
+  await vi.waitFor(() => { expect(bench?.world.refusals).toEqual({ 'device-word': 1 }); });
+  expect(bench.lines.filter(line => line['at'] === 'client.device-refused')).toHaveLength(1);
+  expect(deviceLines(bench.lines)).toEqual([]);
+  const tick = phone.client.latest?.tick ?? 0;
+  await vi.waitFor(() => { expect(phone.client.latest?.tick ?? 0).toBeGreaterThan(tick); });
+  expect(phone.closed).toBeNull();
 });

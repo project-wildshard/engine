@@ -15,6 +15,7 @@ import { World } from '../src/server/host/dedicated/world';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { cellFrame } from '../src/server/host/dedicated/gridCells';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
+import { noteDeviceGpu } from '../src/client/engine/telemetry/deviceSnapshot';
 
 // E7.2d: the page's half of the one world, on the real door and a real socket, as a page calls it. Only the strips are left out.
 const SHARD = 'driftwood-isle', IDENTITY = { player: 'device:online', name: 'Jake' };
@@ -63,6 +64,19 @@ test('the door seats a loaded page, a countdown reaches it, and another build of
   bench.world.beginGrace('next-build');
   await vi.waitFor(() => { expect(countdowns).toEqual(['next-build']); });
   expect(places, 'this page has the cell its seat is in').toEqual([]);
+});
+
+test('DEVICE-TELEMETRY DT3: the page sends its device once per socket, and the door writes one client.device line', { timeout: 30_000 }, async () => {
+  bench = await roomBench();
+  const params: Record<number, unknown> = { 1: 'Bench GPU', 2: 'Bench Vendor', 3: 8192 };
+  noteDeviceGpu({ RENDERER: 1, VENDOR: 2, MAX_TEXTURE_SIZE: 3, getExtension: () => null, getParameter: (p: number) => params[p] } as never);
+  shell = connectOnline({ socket: bench.url, build: 'bench', loaded: SHARD, identity: IDENTITY }, { link: () => undefined, countdown: () => undefined, elsewhere: () => undefined });
+  await shell.booted;
+  await vi.waitFor(() => { expect(bench?.lines.filter(line => line['at'] === 'client.device')).toHaveLength(1); }, { timeout: 5000 });
+  const line = bench.lines.find(entry => entry['at'] === 'client.device');
+  expect(line).toMatchObject({ player: IDENTITY.player, gpu: 'Bench GPU', gpuVendor: 'Bench Vendor', maxTexture: 8192, build: 'bench' });
+  expect(Object.keys(line ?? {}).some(key => /ip|addr/iu.test(key)), 'never an address').toBe(false);
+  expect(bench.world.refusals).toEqual({});
 });
 
 test('a seat in a cell the page has not loaded says so, and takes no body', { timeout: 30_000 }, async () => {
@@ -213,8 +227,8 @@ test('GO4 gate: a world with Driftwood alone does not host the grid; one with mo
   };
   try {
     // opus-route2 (QA row 28): the word names the shards the world opens, so a one-shard page of any other shard plays in-page.
-    expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid, Driftwood alone').toEqual({ hosts: false, word: { cells: 1, shards: [SHARD] } });
-    expect(await asked([SHARD, 'template-2']), 'the world hosts the grid, each cell named by its shard').toEqual({ hosts: true, word: { cells: 2, shards: [SHARD, '_template'] } });
+    expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid, Driftwood alone').toEqual({ hosts: false, word: { cells: 1, shards: [SHARD], device: 1 } });
+    expect(await asked([SHARD, 'template-2']), 'the world hosts the grid, each cell named by its shard').toEqual({ hosts: true, word: { cells: 2, shards: [SHARD, '_template'], device: 1 } });
     expect(await worldWord({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, 500), 'unreachable: no word').toBeNull();
     expect(await worldHostsGrid({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, hostsGrid, 500), 'unreachable: solo').toBe(false);
     const stalled = createServer(() => undefined);
