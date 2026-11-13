@@ -1,0 +1,71 @@
+# NPM-PUBLISH (meta docs/plans/NPM-PUBLISH-PLAN.md; Jake 2026-11-12: "publish stuff to npm so it can be installed
+# without git links"). A vX.Y.Z release tag publishes @wildshard/engine to npm by trusted publishing (OIDC): no
+# token is stored anywhere, and npm attaches the provenance itself. npm adds a trusted publisher only to a package
+# that already exists, so the first version is published by hand (plan row NP4); until then this job skips with a
+# notice.
+name: npm-publish
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+      # Trusted publishing needs npm 11.5.1 or later.
+      - name: Use an npm that can publish by OIDC
+        run: |
+          node -e 'const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$(npm --version)" ||
+            npm install --global npm@11.16.0
+          npm --version
+      - name: The tag matches package.json, and every bin and export is in the tarball
+        run: |
+          # shellcheck disable=SC2016 # the quoted script is JavaScript with template literals
+          node -e '
+          const { execFileSync } = require("node:child_process");
+          const pkg = JSON.parse(require("node:fs").readFileSync("package.json", "utf8"));
+          const version = process.argv[1].replace(/^v/, "");
+          if (pkg.version !== version) throw new Error(`tag says ${version}, package.json says ${pkg.version}`);
+          if (pkg.private) throw new Error(`${pkg.name} is private`);
+          const packed = JSON.parse(execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { encoding: "utf8", maxBuffer: 1 << 28 }))[0];
+          const files = new Set(packed.files.map((file) => file.path));
+          const targets = [];
+          const walk = (value) => typeof value === "string" ? targets.push(value) : Object.values(value ?? {}).forEach(walk);
+          walk(pkg.exports); walk(pkg.bin);
+          const missing = [...new Set(targets)].filter((target) => !target.includes("*")).map((target) => target.replace(/^\.\//, "")).filter((target) => !files.has(target));
+          if (missing.length > 0) throw new Error(`not in the tarball: ${missing.join(", ")}`);
+          console.log(`${pkg.name}@${pkg.version}: ${files.size} files, ${packed.size} bytes packed, every bin and export inside`);
+          ' "$GITHUB_REF_NAME"
+      # Every engine version carries a changelog (Jake, 2026-11-10); changelog-tag.yml checks the same, but a
+      # separate workflow cannot stop this one.
+      - name: Require the tag's changelog section at its commit
+        run: node scripts/changelog.mjs check "$GITHUB_REF_NAME" --at="$GITHUB_SHA"
+      - name: Publish, unless this is the package's first version or it is already out
+        run: |
+          name=$(node -p 'require("./package.json").name')
+          version=$(node -p 'require("./package.json").version')
+          if ! npm view "$name" version >/dev/null 2>&1; then
+            echo "::notice::$name is not on npm yet: its first version is published by hand (NPM-PUBLISH NP4), then trusted publishing takes over."
+            exit 0
+          fi
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "::notice::$name@$version is already on npm."
+            exit 0
+          fi
+          npm publish --provenance --access public --ignore-scripts

@@ -1,8 +1,15 @@
 {
   "name": "@wildshard/engine",
   "version": "0.1.14",
-  "private": true,
   "description": "The Wildshard engine: one repo with shared, client, server and cook code and three build targets (client, dedicated server, standalone listen server), shaped like Unreal or Source.",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/project-wildshard/engine.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "engine": "./src/cli/main.ts"
@@ -227,7 +234,7 @@
     "./boot/liveJsonParser": "./src/client/engine/boot/liveJsonParser.ts",
     "./boot/download": "./src/client/engine/boot/download.ts",
     "./boot/loadingWaits": "./src/shared/engine/boot/loadingWaits.ts",
-            "./render/lightmaps": "./src/client/engine/render/lightmaps.ts",
+    "./render/lightmaps": "./src/client/engine/render/lightmaps.ts",
     "./render/layeredMaps": "./src/client/engine/render/layeredMaps.ts",
     "./ai/director": "./src/shared/engine/ai/director.ts",
     "./fx/effectField": "./src/client/engine/fx/effectField.ts",
