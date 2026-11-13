@@ -7,7 +7,7 @@ import { PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import type { DummyJoint, DummyJoints } from '../practice/TrainingDummy';
 import { castawayBody, groundContact, type CastawayBody } from '../models/castawayBody';
 import { AnimMachine } from '../anim/machine';
-import { buildHoverboard } from '../render/hoverboardGeometry';
+import { BoardUnder, DECK_LIFT } from './remoteBoard';
 import type { NetClient } from './client';
 import { othersOnMap } from './othersOnMap';
 import { talkerKey, voiceNear, type Talker } from './voiceNear';
@@ -25,8 +25,8 @@ const SETTLE = 8;
 const NAME_HEIGHT = 2.05, NAME_WIDTH = 1.5, NAME_RATIO = 4;
 /** VOICE-POLISH V8: the ring over a talking player's Name, its size in metres, and how fast and far it breathes. */
 const TALK_HEIGHT = 2.62, TALK_SIZE = 0.5, TALK_PULSE = 9, TALK_SWELL = 0.1;
-/** How far a board floats, with its rider on it. */
-const BOARD_LIFT = 0.22;
+/** How far a board floats, with its rider on it (RP8: the deck's own lift). */
+const BOARD_LIFT = DECK_LIFT;
 /** How high a rider's feet sit over the row, which stands at the horse's own feet. */
 const SADDLE_LIFT = 0.85;
 /** A blade's length and where it sits along the hand. */
@@ -74,7 +74,8 @@ export interface OtherShown { readonly name: string; readonly x: number; readonl
 /** One other player on screen. */
 class OtherBody {
   readonly group: THREE.Group = new THREE.Group();
-  private readonly board = new THREE.Group();
+  /** RP8: the world-scale board under it while its row hovers, banking into turns. */
+  private readonly board = new BoardUnder();
   private readonly tag: THREE.Sprite;
   private readonly ring: THREE.Sprite = talkRing();
   private talkPhase = 0;
@@ -97,9 +98,8 @@ class OtherBody {
     this.id = id;
     this.shown = { ...this.shown, name };
     this.tag = nameTag(name);
-    buildHoverboard(this.board);
-    this.board.visible = false; this.board.position.y = BOARD_LIFT; this.group.name = `Player · ${name}`;
-    this.group.add(this.tag, this.ring, this.board);
+    this.group.name = `Player · ${name}`;
+    this.group.add(this.tag, this.ring, this.board.deck);
   }
   /** Stops its idle, when the body goes. */
   undress(): void { this.anim?.dispose(); this.anim = null; }
@@ -111,6 +111,7 @@ class OtherBody {
     this.blade = blade; blade.position.y = BLADE / 2; blade.visible = false; model.mounts.rightHand.add(blade);
     for (const joint of SWUNG) { const bone = model.joints[joint]; if (bone !== undefined) this.rest.set(joint, bone.quaternion.clone()); }
     this.anim = new AnimMachine({ states: {}, loops: ['idle'] }, model.rig); this.anim.base('idle');
+    this.board.fit(model.joints);
   }
   /** Where the row is now, and the limbs that go with it. */
   show(row: Float64Array, dt: number, mounted: boolean): void {
@@ -121,12 +122,12 @@ class OtherBody {
     // A row's yaw is where a player looks, down -z at 0, and the figure faces +z.
     group.position.set(x, y, z); group.rotation.y = (row[YAW] ?? 0) + Math.PI;
     const riding = row[BOARD] === 1, gait = this.speed < WALKS || riding || mounted ? 'idle' : this.speed < RUNS ? 'walk' : 'run';
-    this.board.visible = riding;
     if (this.blade !== null) this.blade.visible = !riding && !mounted;
     if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : 0);
     this.anim?.update(dt);
     this.pose(gait, this.speed, dt);
     if (mounted) { this.bend('leftThigh', SEAT); this.bend('rightThigh', SEAT); this.bend('leftShin', -SEAT); this.bend('rightShin', -SEAT); }
+    this.board.show(riding, row[YAW] ?? 0, this.speed, dt, this.figure, this.joints); // RP8: the deck, banked, the rider side-on on it
     const { talking: keys } = voiceNear, talking = keys.has(this.id) || keys.has(talkerKey({ body: null, name: this.shown.name }));
     this.ring.visible = talking;
     if (talking) { this.talkPhase = (this.talkPhase + dt * TALK_PULSE) % (Math.PI * 2); this.ring.scale.setScalar(TALK_SIZE * (1 + TALK_SWELL * Math.sin(this.talkPhase))); }
