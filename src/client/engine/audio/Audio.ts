@@ -142,6 +142,21 @@ export class Audio extends PlayerVoices {
     scope.onDispose(() => { this.levelBankFns.delete(fn); });
     if (this.levelBank) fn(this.levelBank);
   }
+  /** Lend `bank` as the level bank while `scope` lives (AU20: an Open Plot cell's own bank on the grid page). When the scope
+   *  ends, unless another bank was installed meanwhile, what the lend replaced comes back: the level bank, the sample maps
+   *  and the music's title bank (a page with no level bank, or a bank with no title, keeps its own). */
+  lendLevelBank(bank: LevelAudioBank, scope: Scope): void {
+    if (scope.disposed) return;
+    const previous = this.levelBank, loops = this.loops, shots = this.shots, title = this.music?.residentBank();
+    this.useLevelBank(bank);
+    scope.onDispose(() => {
+      if (this.levelBank !== bank) return;
+      this.levelBank = previous;
+      if (bank.samples !== undefined) this.applySamples(loops, shots);
+      if (bank.title !== undefined && title !== undefined) this.music?.useBank(title);
+      if (previous !== undefined) for (const fn of this.levelBankFns) fn(previous);
+    });
+  }
   useLevelBank(bank: LevelAudioBank): void {
     this.levelBank = bank;
     if (bank.samples) this.useSamples(bank.samples);
@@ -268,9 +283,12 @@ export class Audio extends PlayerVoices {
    *  set) where they sound; before the first gesture it only fills the maps, and resume() starts the bed from them */
   useSamples(bank: SfxBank): void {
     if (bank.set !== this.sfxSet) return; // another set was picked while this one decoded
-    const hadBed = this.sampleBed, hadUnder = this.underSample, hadHum = this.hum?.sample === true;
-    this.loops = new Map(bank.loops); this.shots = new Map(bank.shots);
     if (bank.credit !== undefined) setSfxCredit(this.sfxSet, bank.credit);
+    this.applySamples(new Map(bank.loops), new Map(bank.shots));
+  }
+  private applySamples(loops: Map<LoopName, SampleLoop>, shots: Map<string, { bufs: AudioBuffer[]; gain: number }>): void {
+    const hadBed = this.sampleBed, hadUnder = this.underSample, hadHum = this.hum?.sample === true;
+    this.loops = loops; this.shots = shots;
     if (!this.g) return;
     if (this.started && (hadBed || this.loops.has(this.bed))) { this.stopBed(); this.startBed(); }
     if (this.underGain && (hadUnder || this.loops.has('underwater'))) this.feedUnder();

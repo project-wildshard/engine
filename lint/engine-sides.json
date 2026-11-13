@@ -664,6 +664,7 @@
     "src/client/game/grid/preparationAdmission.ts": "client",
     "src/client/game/grid/productInputs.ts": "client",
     "src/client/game/grid/productLeases.ts": "client",
+    "src/client/game/grid/plotAudio.ts": "client",
     "src/client/game/grid/products.ts": "client",
     "src/client/game/grid/refusal.ts": "client",
     "src/client/game/grid/regionalBuildCheckpoint.ts": "client",

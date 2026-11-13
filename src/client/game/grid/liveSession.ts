@@ -78,6 +78,8 @@ import { copyPrompts, enteredCopy } from './copyPrompts';
 import { yieldGridAdmission, yieldGridConstruction } from './admissionYield';
 import { HybridRuntimeSession, type HybridResident } from '../shardfile/hybrid';
 
+import { enterPlotAudio, pagePlotAudioPorts, plotAudioScene, type PlotAudioPorts, type PlotAudioScene } from './plotAudio';
+import { shardProductFromAdmission } from '../shardfile/runtimeProduct';
 import { createRegionalRuntimeFactory, regionalRuntimeAccountedBytes, type PreparedRegionalRuntime, type RegionalRuntimePage, type RegionalRuntimeTextures } from './regionalRuntime';
 import { bindHomeBuildCache } from '../shardfile/homeBuildCache';
 import type { ClientTileRegistration } from '../shardfile/tileContent';
@@ -230,7 +232,10 @@ export class LiveGridSession {
   private readonly applied = new Vector3();
   private readonly roadWallet: GridWallet;
   /** each admitted region's authored spawn (its level's player start) and its ground / water queries, local */
-  private readonly regions = new Map<string, { readonly spawn: LiveGridSpawn; readonly items: Shardfile['items']['rows']; readonly queries: PlayerFrameQueries; readonly colliders: PanelRegion['colliders']; readonly prompts: ReturnType<typeof copyPrompts> }>();
+  private readonly regions = new Map<string, { readonly spawn: LiveGridSpawn; readonly items: Shardfile['items']['rows']; readonly queries: PlayerFrameQueries; readonly colliders: PanelRegion['colliders']; readonly prompts: ReturnType<typeof copyPrompts>; readonly audio: PlotAudioScene | null }>();
+  /** AU20: the entered data cell's own audio scene (an Open Plot's score, bed and loops), live while the feet are in it. */
+  private plotAudio: { readonly instance: string; readonly scope: Scope } | null = null;
+  private readonly plotBanks = new Map<string, ReturnType<PlotAudioPorts['bank']>>();
   private readonly runtimeScope: Scope;
   private readonly runtimeRegions = new Map<string, PreparedRegionalRuntime>();
   private readonly leaveTiming: { instance: string; leaveMs: number }[] = [];
@@ -261,8 +266,9 @@ export class LiveGridSession {
     this.runtimeScope = scope.child('grid.runtime.residents');
     this.hybrid = new HybridRuntimeSession(this.runtimeResidents, scope, { pause: yieldGridConstruction });
     scope.onDispose(gridCells.onLeave(() => { this.hybrid.leave(); }));
+    scope.onDispose(gridCells.onLeave(() => { this.leavePlotAudio(); }));
     scope.onDispose(gridCells.onEnter(cell => {
-      if (!this.runtimeResidents.has(cell.instance)) { ports.lightingSettled?.(); return; }
+      if (!this.runtimeResidents.has(cell.instance)) { this.enterPlotAudio(cell.instance); ports.lightingSettled?.(); return; }
       this.startedRuntimes.add(cell.instance);
       const activation = this.hybrid.enter(cell);
       this.activation = activation;
@@ -696,7 +702,9 @@ export class LiveGridSession {
         transfer.sync(); this.transferWalls.set(cell.instance, transfer);
         this.regions.set(cell.instance, { spawn: { x: start.at.x, y: undefined, z: start.at.z, yaw: start.yaw },
           // the admitted terrain inside the cell (one source of truth); its strips are road level (the terrain tile ends at the cell edge)
-          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: copyPrompts(copySource) });
+          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: copyPrompts(copySource),
+          // AU20: the cell's declared audio scene, bound only while the feet stand in it (no entered hooks run here)
+          audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(shardProductFromAdmission(retained.admitted, shell.scope))) : null });
         this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: source.entryways });
         // G321: its own sky inside its cell (its data look's dome and light), laid while it is resident
         {
@@ -705,7 +713,7 @@ export class LiveGridSession {
             try { await hangCellDataSky(request); } catch (error) { console.warn(`[region sky] ${cell.instance}`, error); }
           })();
         }
-        const unlist = (): void => { this.regions.delete(cell.instance); this.transferWalls.delete(cell.instance); };
+        const unlist = (): void => { if (this.plotAudio?.instance === cell.instance) this.leavePlotAudio(); this.plotBanks.delete(cell.instance); this.regions.delete(cell.instance); this.transferWalls.delete(cell.instance); };
         return { host: shell, shell, dispose: () => {
           unlist();
           try { shell.dispose(); } finally { retained.release(); }
@@ -811,6 +819,29 @@ export class LiveGridSession {
         forget();
       }, ...(retireSteps === undefined ? {} : { *retire(): ReturnType<typeof retireSteps> { yield* retireSteps(); forget(); } }) };
     } };
+  }
+
+  /** AU20: the feet entered a data cell; bind its declared audio scene to the page's mixer until they leave. */
+  private enterPlotAudio(instance: string): void {
+    this.leavePlotAudio();
+    const scene = this.regions.get(instance)?.audio ?? null, page = this.page.runtimePage?.() ?? null;
+    if (scene === null || page === null) return;
+    const own = pagePlotAudioPorts(page.context.app, page.world.player, instance);
+    if (own === null) return;
+    // one bank read per resident cell: dropped with the region (unlist), so a re-entry lends the bank it already decoded
+    const ports: PlotAudioPorts = { ...own, bank: (data) => {
+      let read = this.plotBanks.get(instance);
+      if (read === undefined) { read = own.bank(data); this.plotBanks.set(instance, read); void read.catch(() => { if (this.plotBanks.get(instance) === read) this.plotBanks.delete(instance); }); }
+      return read;
+    } };
+    const owner = this.ports.scope.child(`grid.plot-audio.${instance}`);
+    this.plotAudio = { instance, scope: owner };
+    try { enterPlotAudio(scene, owner, ports); }
+    catch (error) { this.leavePlotAudio(); ports.fault(error); }
+  }
+  private leavePlotAudio(): void {
+    const entered = this.plotAudio; this.plotAudio = null;
+    entered?.scope.dispose();
   }
 
   /** Live scalar warm-up progress for this destination, never the last trace of a different region. */

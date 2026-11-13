@@ -37,7 +37,9 @@
 //                   or unhushes the world; its peaks are in the receipt, the bar is the deck entries')
 //   no-cross        a `cross` visit that reached play never stood inside the plot
 //   plot-score      a `cross` visit crossed in, but the music's score never became the plot's own in the 10 s after
-//   cross-audio     a `cross` visit fetched audio from the network during the crossing (the download should hold it all)
+//   cross-audio     a `cross` visit fetched audio from the network on the road, between leaving the neighbour and standing in
+//                   the plot (the download should hold it all). Once in the plot, its own takes and loops are a play-time
+//                   read (AU20: never in LOAD, and the neighbour's DOWNLOAD keeps only its own audio): reported, not red
 //   no-play         the warm visit doesn't reach play (a slow visit or a bench deep link that stops short of play is reported,
 //                   not red: its LOAD is still judged).
 //                   On the local build rooms-staging refuses the loopback origin's socket, so its load ends at the seat (LOAD
@@ -744,7 +746,10 @@ async function judge(target, entry, mode, result, earlier) {
   // the crossing starts where the feet leave the neighbour's cell; reads before it are the neighbour's own play
   const leftAt = crossing?.leftTs ?? crossing?.startTs ?? Number.POSITIVE_INFINITY;
   const crossAudio = crossing === null ? [] : audioRows.filter(row => row.ts >= leftAt);
-  const crossNetAudio = crossing === null ? [] : netAudio.filter(row => row.t >= leftAt);
+  // AU20: from the moment the feet stand in the plot, its scene reads its own bank at play time (reported, not judged)
+  const inPlotAt = crossing?.ts ?? Number.POSITIVE_INFINITY;
+  const crossNetAudio = crossing === null ? [] : netAudio.filter(row => row.t >= leftAt && row.t < inPlotAt);
+  const plotNetAudio = crossing === null ? [] : netAudio.filter(row => row.t >= inPlotAt);
   const walkNetAudio = crossing === null ? [] : netAudio.filter(row => row.t >= crossing.startTs && row.t < leftAt);
   /** @type {Record<string, number>} the crossing's audio reads by who served them */
   const bySource = {};
@@ -773,7 +778,7 @@ async function judge(target, entry, mode, result, earlier) {
       crossedMsAfterPlay: crossing.at === undefined ? null : Math.round(crossing.at - result.playAt), walkSeconds: crossing.at === undefined || crossing.ts === undefined ? null : Math.round((crossing.ts - crossing.startTs) / 100) / 10,
       plotScore: plan?.musicId ?? null, scoreMsAfterCrossing: scoreRow === undefined || crossing.at === undefined ? null : Math.round(scoreRow.t - crossing.at), heardMsAfterScore: result.afterScore,
       audioRequests: crossAudio.length, audioBySource: bySource,
-      networkAudioFetches: crossNetAudio.length, audioUrls: crossAudio.map(one => new URL(one.url).pathname).slice(0, 30),
+      networkAudioFetches: crossNetAudio.length, plotPlayNetworkAudio: plotNetAudio.map(one => new URL(one.url).pathname), audioUrls: crossAudio.map(one => new URL(one.url).pathname).slice(0, 30),
       neighbourPlayNetworkAudio: walkNetAudio.map(one => new URL(one.url).pathname),
       track: crossing.track.map(({ t, ...reading }) => Object.assign(reading, { ms: Math.round(t - (crossing.at ?? result.playAt)) })),
     },
