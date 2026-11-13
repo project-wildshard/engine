@@ -7,7 +7,9 @@
 //   `_headers` can't do it: the runtime brotli-encodes the stored bytes a second time. `encodeBody: "manual"` sends them
 //   as they are. Its other headers (cache, content type) still come from `_headers` via the assets.
 // `/index.html` is served as `/`: the old host answered it 200, and the assets' default HTML handling would 307 it to `/`.
-// A path with no asset also reaches the Worker; it goes straight back to the assets, untouched, to 404.
+// A path with no asset also reaches the Worker; the assets answer it 404, and the Worker makes that miss `no-store`
+// (AUDIO AU4, J299): the assets would send the path's year-long `immutable` from `_headers`, so one miss during a
+// deploy would stay on phones and at the edge for a year. Any answer but a 2xx or a 304 is no-store; those keep theirs.
 
 interface Fetcher {
   // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request, only passed through
@@ -28,6 +30,17 @@ function doctor(search: string): string {
 const PAGE = new Set(['/', '/index.html'])
 const OK = 200
 const PART = /^\/assets\/spawn\/(?:parts|server)\/[^/]+\.pack\.br$/u
+const NOT_MODIFIED = 304
+
+/** A 2xx or a 304 as the assets sent it; any other answer (a 404 above all) with `Cache-Control: no-store`. */
+function uncachedMiss(asset: Response): Response {
+  if (asset.ok || asset.status === NOT_MODIFIED) {
+    return asset
+  }
+  const response = new Response(asset.body, asset)
+  response.headers.set('cache-control', 'no-store')
+  return response
+}
 
 // The Workers runtime's ResponseInit: `manual` means the body is already encoded as its Content-Encoding says.
 interface EncodedInit extends ResponseInit {
@@ -38,7 +51,7 @@ interface EncodedInit extends ResponseInit {
 async function part(request: Request, env: Env): Promise<Response> {
   const asset = await env.ASSETS.fetch(request)
   if (asset.status !== OK) {
-    return asset
+    return uncachedMiss(asset)
   }
   const headers = new Headers(asset.headers)
   headers.set('content-encoding', 'br')
@@ -68,7 +81,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
   if (PART.test(url.pathname)) {
     return await part(request, env)
   }
-  return await env.ASSETS.fetch(request)
+  return uncachedMiss(await env.ASSETS.fetch(request))
 }
 
 const worker = { fetch: handle }

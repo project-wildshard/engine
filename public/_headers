@@ -4,6 +4,7 @@
 # overrides a broader one first detaches it (`! Name`). The old host let the later rule win; the detach gives the same
 # result. scripts/preview-server.mjs replays this file for local runs.
 # pages/worker.ts answers / and /index.html itself and sets their no-store; the two rules below keep the list whole.
+# These rules shape hits only: a miss reaches pages/worker.ts, which sends its 404 with no-store (AUDIO AU4).
 # test/page-headers.test.ts serves this file with wrangler dev and checks every rule.
 
 /*

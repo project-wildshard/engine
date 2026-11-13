@@ -172,6 +172,25 @@ test('the page: no-store, ?doctor 307 as the old host answered, a missing chunk 
   expect(missing.headers['content-type'] ?? '').not.toContain('text/html');
 }, 30_000);
 
+// AUDIO AU4 (J299): a miss is never cached. The assets answer a missing file with the year-long `immutable` its path's
+// _headers rule names, so a 404 during a deploy would stay on phones and at the edge for a year; pages/worker.ts says
+// no-store on every miss, and a hit keeps its long cache.
+test('a missing hashed asset is a 404 with no-store; a hit keeps its long cache', async () => {
+  const misses = ['/assets/gone-1234.js', '/assets/sfx/driftwood-isle/nope-00000000.m4a', '/b/gone/main-x.js',
+    '/assets/tex/bark/gone.jpg', '/sw-core/00000000.js', `/shardfiles/driftwood-isle/blobs/glb/${'c'.repeat(64)}.glb`,
+    '/assets/spawn/parts/cccccccccccccccc.pack.br', '/gone-1234.js'];
+  for (const path of misses) {
+    for (const method of ['GET', 'HEAD']) {
+      const response = await wire(new URL(path, served()), { 'accept-encoding': 'br' }, method);
+      expect([response.status, response.headers['cache-control']], `${method} ${path}`).toEqual([404, 'no-store']);
+    }
+  }
+  for (const path of ['/assets/a-1234.js', '/b/04e1/main-Ab_3.js', '/assets/spawn/parts/aaaaaaaaaaaaaaaa.pack.br']) {
+    const response = await wire(new URL(path, served()), { 'accept-encoding': 'br' });
+    expect([response.status, response.headers['cache-control']], path).toEqual([200, 'public, max-age=31536000, immutable']);
+  }
+}, 30_000);
+
 test('version URLs say noindex; the channel hosts do not', async () => {
   for (const path of ['/', '/assets/a-1234.js']) {
     const version = await wire(new URL(path, served()), { host: '0f1e2d3c-wildshard-play.raynos.workers.dev' });
