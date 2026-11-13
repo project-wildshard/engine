@@ -1123,44 +1123,6 @@ export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = {
    }
   ]
  },
- "folk": {
-  "style": "folk",
-  "model": "MiniMax-Music3",
-  "credit": "Music: MiniMax-Music3",
-  "slots": {
-   "pine": {
-    "calm": "pine-calm-10905c79.m4a",
-    "tension": "pine-tension-180bc197.m4a",
-    "bpm": 86.403,
-    "beatsPerBar": 4,
-    "loopStart": 25.542,
-    "loopEnd": 69.9849,
-    "duration": 72.768
-   },
-   "island": {
-    "calm": "island-calm-d7d189f9.m4a",
-    "tension": "island-tension-bb05ab64.m4a",
-    "bpm": 85.186,
-    "beatsPerBar": 4,
-    "loopStart": 16.9738,
-    "loopEnd": 42.33,
-    "duration": 45.1627
-   },
-   "title": {
-    "full": "title-50001128.m4a",
-    "bpm": 104.908,
-    "beatsPerBar": 4,
-    "loopStart": 15.6735,
-    "loopEnd": 63.7156,
-    "duration": 66.0053
-   }
-  },
-  "stings": {
-   "death": "sting-death-67f54fe8.m4a",
-   "chunk": "sting-chunk-31c10eaf.m4a",
-   "pickup": "sting-pickup-332f81db.m4a"
-  }
- },
  "fossil-badlands": {
   "genre": "fossil-badlands",
   "model": "MiniMax Music 3",
@@ -2612,44 +2574,6 @@ export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = {
    "death": "sting-death-bf5c76c6.m4a",
    "chunk": "sting-chunk-d9289a49.m4a",
    "pickup": "sting-pickup-8516b7e3.m4a"
-  }
- },
- "orchestral": {
-  "style": "orchestral",
-  "model": "MiniMax-Music3",
-  "credit": "Music: MiniMax-Music3",
-  "slots": {
-   "pine": {
-    "calm": "pine-calm-fbc4a99e.m4a",
-    "tension": "pine-tension-525d8c6d.m4a",
-    "bpm": 95.925,
-    "beatsPerBar": 4,
-    "loopStart": 22.384,
-    "loopEnd": 42.3996,
-    "duration": 44.9067
-   },
-   "island": {
-    "calm": "island-calm-27861d1b.m4a",
-    "tension": "island-tension-73116f36.m4a",
-    "bpm": 86.299,
-    "beatsPerBar": 4,
-    "loopStart": 16.1611,
-    "loopEnd": 52.3146,
-    "duration": 55.104
-   },
-   "title": {
-    "full": "title-b47c8a52.m4a",
-    "bpm": 116.041,
-    "beatsPerBar": 4,
-    "loopStart": 14.7911,
-    "loopEnd": 43.7464,
-    "duration": 45.824
-   }
-  },
-  "stings": {
-   "death": "sting-death-771d34f7.m4a",
-   "chunk": "sting-chunk-a639b19e.m4a",
-   "pickup": "sting-pickup-65f7ac5b.m4a"
   }
  },
  "patchwork-fairground": {
