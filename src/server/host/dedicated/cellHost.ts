@@ -155,7 +155,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     for (const slug of options.slugs) { const room = await open(slug); if (disposed) return; cells.set(slug, { slug, room, emptySince: diagnosticNow(), waking: null }); }
     if (crossing !== undefined && rapier !== undefined) {
       const { name, assembly, strips } = crossing, begun = diagnosticNow();
-      road = new RoadRoom({ name, build: options.build, assembly, host: openRoad(rapier, assembly.cells.filter(cell => !cells.has(cell.instance)), strips), hosts: instance => cells.has(instance),
+      road = new RoadRoom({ name, build: options.build, assembly, host: openRoad(rapier, assembly.cells.filter(cell => !cells.has(cell.instance)), strips, assembly.cells), hosts: instance => cells.has(instance),
         now: options.roomNow ?? diagnosticNow, post: news => { post({ ...news, slug: name }); }, reports: { file: report => { post({ kind: 'report', slug: name, report }); } },
         ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }) });
       post({ kind: 'cell', slug: name, ms: diagnosticNow() - begun });

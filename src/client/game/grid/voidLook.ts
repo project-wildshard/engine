@@ -1,20 +1,21 @@
 /**
  * The VR void past the outer road (SHARD-PLATFORM SF17b look, G77 / G89 "A: Tron grid + rail"): a black unlit floor with
- * cyan grid lines to the horizon, starting at the rail on the outer road's shoulder, and the thin glowing cyan rail itself
- * on short posts. The rail is where the grid's closed rim walls stand (`session.ts` `rimEdges`), so the wall you bump is
- * the rail you see.
+ * cyan grid lines to the horizon, starting on the outer road's shoulder, and the thin glowing cyan rail itself on short
+ * posts. SA34: the floor is walkable out to the rail on the 7 × 7's outer shoulder (`voidFloor.ts`), and an empty cell inside
+ * the placed rectangle is a square of the same floor. The rail is where the grid's closed rim walls stand (`session.ts`
+ * `rimEdges`), so the wall you bump is the rail you see.
  *
- * Cheap by construction: the floor is one square annulus (8 triangles) with a grid shader (no textures, no lights, no fog);
+ * Cheap by construction: the floor is one square annulus (8 triangles) plus two per empty-cell square, with a grid shader (no textures, no lights, no fog);
  * the rail and posts are part of the road system's one solid material (`roadSolid.ts`). Lines are anti-aliased with screen derivatives and fade
  * as they shrink under a pixel, so the horizon stays clean instead of shimmering.
  */
 import { BufferAttribute, BufferGeometry, Color, Group, Mesh, type Object3D, ShaderMaterial } from 'three';
 import { uniformPart, type SolidPart } from './roadSolid';
 import type { GridCell } from '../../../shared/game/grid/assembly';
-import type { LookScope, RailBox } from '../../../shared/game/grid/roadLayout';
+import type { CellSquare, LookScope, RailBox } from '../../../shared/game/grid/roadLayout';
 import type { PlatformRenderAdmission, PlatformRenderBytePlan } from './renderResidency';
 
-/** The void floor's reach past the rail (well beyond the camera's 2.6 km far plane). */
+/** The void floor's reach past its edge (to the grid camera's 6 km far plane, `FAR_RING.drawDistance`). */
 const REACH = 6000;
 /** The floor sits a hair above road level so it covers the outer strip beyond the rail. */
 const FLOOR_Y = 0.04;
@@ -75,28 +76,33 @@ function voidFloorMaterial(home: GridCell, rail: readonly [number, number, numbe
   return material;
 }
 
-/** The void floor: a square annulus from the rail box out to REACH, in the home frame. */
-function floorGeometry(box: RailBox, home: GridCell): BufferGeometry {
+/** The void floor: a square annulus from the floor's edge box out to REACH, and one square per empty cell (SA34), in the home frame. */
+function floorGeometry(box: RailBox, holes: readonly CellSquare[], home: GridCell): BufferGeometry {
   const x0 = box.minX - home.origin.x, x1 = box.maxX - home.origin.x, z0 = box.minZ - home.origin.z, z1 = box.maxZ - home.origin.z;
   const X0 = x0 - REACH, X1 = x1 + REACH, Z0 = z0 - REACH, Z1 = z1 + REACH;
-  // inner ring 0..3 (sw, se, ne, nw), outer ring 4..7
+  // inner ring 0..3 (sw, se, ne, nw), outer ring 4..7, then four corners per hole
   const p = [x0, z0, x1, z0, x1, z1, x0, z1, X0, Z0, X1, Z0, X1, Z1, X0, Z1];
-  const position = new Float32Array(24);
-  for (let k = 0; k < 8; k++) { position[k * 3] = p[k * 2] ?? 0; position[k * 3 + 1] = FLOOR_Y; position[k * 3 + 2] = p[k * 2 + 1] ?? 0; }
+  for (const hole of holes) {
+    const hx0 = hole.x - hole.hx - home.origin.x, hx1 = hole.x + hole.hx - home.origin.x, hz0 = hole.z - hole.hz - home.origin.z, hz1 = hole.z + hole.hz - home.origin.z;
+    p.push(hx0, hz0, hx1, hz0, hx1, hz1, hx0, hz1);
+  }
+  const count = p.length / 2, position = new Float32Array(count * 3);
+  for (let k = 0; k < count; k++) { position[k * 3] = p[k * 2] ?? 0; position[k * 3 + 1] = FLOOR_Y; position[k * 3 + 2] = p[k * 2 + 1] ?? 0; }
   // each side a quad between inner edge (a, b) and outer edge (A, B), wound to face up
-  const index = new Uint16Array([0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0].map((n) => n));
-  for (let k = 0; k < index.length; k += 3) { const b = index[k + 1] ?? 0; index[k + 1] = index[k + 2] ?? 0; index[k + 2] = b; }
+  const ring = [0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0];
+  for (let k = 0; k < ring.length; k += 3) { const b = ring[k + 1] ?? 0; ring[k + 1] = ring[k + 2] ?? 0; ring[k + 2] = b; }
+  // a hole's square (sw, se, ne, nw), wound to face up
+  for (let h = 0; h < holes.length; h++) { const o = 8 + h * 4; ring.push(o, o + 2, o + 1, o, o + 3, o + 2); }
+  const index = new Uint16Array(ring);
   const g = new BufferGeometry().setAttribute('position', new BufferAttribute(position, 3)).setIndex(new BufferAttribute(index, 1));
   g.computeBoundingSphere();
   return g;
 }
 
-/** The floor's vertices and Uint16 indices (`floorGeometry`: a square annulus, 8 corners, 4 quads). */
-const FLOOR_VERTICES = 8, FLOOR_INDICES = 24;
-/** G144's preflight for the void: the floor's retained position and index buffers (CPU + GPU; no texture). The rail and its
- *  posts belong to the deck's plan. */
-export function voidFloorPlan(): PlatformRenderBytePlan {
-  const bytes = FLOOR_VERTICES * 3 * Float32Array.BYTES_PER_ELEMENT + FLOOR_INDICES * Uint16Array.BYTES_PER_ELEMENT;
+/** G144's preflight for the void: the floor's retained position and index buffers (CPU + GPU; no texture): the annulus's 8
+ *  corners and 24 indices, and 4 corners and 6 indices per empty-cell square. The rail and its posts belong to the deck's plan. */
+export function voidFloorPlan(holes = 0): PlatformRenderBytePlan {
+  const bytes = (8 + 4 * holes) * 3 * Float32Array.BYTES_PER_ELEMENT + (24 + 6 * holes) * Uint16Array.BYTES_PER_ELEMENT;
   return { id: 'road.void', jsBytes: bytes, gpuBytes: bytes };
 }
 
@@ -140,21 +146,21 @@ class SolidMesher {
  * (unlit cyan, in ≤ 50 m beams so the per-view cull can drop what is out of view) and its posts go to `solid`, the road
  * system's one solid material (SF17b per-view budget).
  */
-export function installVoidLook(input: { readonly rail: RailBox; readonly home: GridCell; readonly scene: Object3D; readonly scope: LookScope; readonly solid: (part: SolidPart) => void; readonly admission?: PlatformRenderAdmission }): VoidLookState {
-  const { rail: box, home, scene, scope } = input, group = new Group();
+export function installVoidLook(input: { readonly rail: RailBox; readonly edge: RailBox; readonly holes: readonly CellSquare[]; readonly home: GridCell; readonly scene: Object3D; readonly scope: LookScope; readonly solid: (part: SolidPart) => void; readonly admission?: PlatformRenderAdmission }): VoidLookState {
+  const { rail: box, edge, holes, home, scene, scope } = input, group = new Group();
   group.name = 'grid-void';
   const x0 = box.minX - home.origin.x, x1 = box.maxX - home.origin.x, z0 = box.minZ - home.origin.z, z1 = box.maxZ - home.origin.z;
   const owned = { value: 0 };
   let drawn: Mesh | null = null;
   const build = (owner: LookScope): void => {
     const floorMaterial = voidFloorMaterial(home, [x0, x1, z0, z1], owned);
-    const floor = new Mesh(floorGeometry(box, home), floorMaterial);
+    const floor = new Mesh(floorGeometry(edge, holes, home), floorMaterial);
     floor.visible = owned.value < 1; drawn = floor;
     floor.name = 'grid-void-floor'; floor.frustumCulled = false;
     floor.castShadow = false; floor.receiveShadow = false; floor.matrixAutoUpdate = false; floor.updateMatrix(); group.add(floor);
     owner.onDispose(() => { if (drawn === floor) drawn = null; floor.removeFromParent(); floor.geometry.dispose(); floorMaterial.dispose(); });
   };
-  if (input.admission === undefined) build(scope); else input.admission.allocate(voidFloorPlan(), build);
+  if (input.admission === undefined) build(scope); else input.admission.allocate(voidFloorPlan(holes.length), build);
   // the rail: thin beams along the four sides (unlit, the HUD's cyan); short dark posts carry it
   const sides: readonly [number, number, number, number][] = [[x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]];
   const rail = new SolidMesher(), posts = new SolidMesher(), cyan = CYAN.clone().multiplyScalar(1.6), dark = new Color(0x2b3036);

@@ -5,12 +5,11 @@ import { AccentSchema } from '@wildshard/format/accent';
 
 const id = v.pipe(v.string(), v.regex(/^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u));
 /**
- * The grid radius the engine places and draws: the 5 × 5 (J305's 25 cells). shard-format v0.4.7 grew the format's
- * `GRID_RADIUS` to 3 (the 7 × 7, SA29), but the far view, the road sky and the void floor are still sized for ring 2, so
- * a catalogue naming a ring-3 cell is refused here exactly as before the pin. SA34 (the client's 7 × 7 and its void
- * floor) moves this to `GRID_RADIUS`, and with it the sightline, the far ring's reach and the road sky's dome.
+ * The grid radius the engine places and draws: the format's 7 × 7 (shard-format v0.4.7 `GRID_RADIUS` 3, SA29). SA34 drew it:
+ * the sightline, the far ring's reach and the road sky's dome are sized from it (`farProxy.ts`), the rail stands on its outer
+ * shoulder and every empty cell is walkable void floor (`voidFloor.ts`). J305's 25 keep their cells; ring 3 starts empty.
  */
-export const DRAWN_GRID_RADIUS = 2;
+export const DRAWN_GRID_RADIUS: number = GRID_RADIUS;
 if (DRAWN_GRID_RADIUS > GRID_RADIUS) throw new RangeError('DRAWN_GRID_RADIUS exceeds the format grid');
 const signed = v.pipe(v.number(), v.integer(), v.minValue(-DRAWN_GRID_RADIUS), v.maxValue(DRAWN_GRID_RADIUS));
 const local = v.pipe(v.number(), v.finite(), v.minValue(-250), v.maxValue(250));

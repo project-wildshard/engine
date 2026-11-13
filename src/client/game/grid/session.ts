@@ -77,7 +77,9 @@ import { ApproachInputsDeferredError } from './productInputs';
 import { GridViewAdmissions } from './viewAdmissions';
 import { loadShardfileFar, loadShardfileNear } from './shardfileFar';
 import { jsonResidentBytes } from '../shardfile/productCost';
-import { RAIL_OFFSET, roadLayout } from '../../../shared/game/grid/roadLayout';
+import { withOwner } from '@wildshard/engine/app/ownership';
+import { roadLayout } from '../../../shared/game/grid/roadLayout';
+import { installVoidFloor, rimWalls } from '../../../shared/game/grid/voidFloor';
 import type { RoadLookState } from './roadLook';
 import { combinePlatformRoads, installPlatformRoad, installPlatformRoadSliced, type PlatformRoad } from './roadLookPlatform';
 import { collisionStrips, type CollisionStrip } from '../../../shared/game/grid/collisionStrips';
@@ -287,15 +289,9 @@ function farLook(row: unknown): FarLookRuntime { return v.parse(FarRow, row).loo
 function farImpostorRow(row: unknown): FarImpostor | undefined { return v.parse(FarRow, row).far.impostor; }
 function farBytes(row: unknown): number { const { far } = v.parse(FarRow, row); return Math.round(far.gpu + far.decoded); }
 
-/** The closed outer rim on the outer road's shoulder: the void's rail (G89; the empty neighbour has no sim to wait for). */
+/** The closed outer rim on the 7 × 7's outer road shoulder (SA34): the void's rail (G89; the empty neighbour has no sim to wait for). */
 function rimEdges(assembly: GridAssembly, home: Readonly<{ origin: Readonly<{ x: number; z: number }> }>): ReadinessEdge[] {
-  const xs = assembly.cells.map((c) => c.cell[0]), zs = assembly.cells.map((c) => c.cell[1]), p = assembly.pitch;
-  const minX = Math.min(...xs) * p - p / 2 - RAIL_OFFSET, maxX = Math.max(...xs) * p + p / 2 + RAIL_OFFSET, minZ = Math.min(...zs) * p - p / 2 - RAIL_OFFSET, maxZ = Math.max(...zs) * p + p / 2 + RAIL_OFFSET;
-  const cx = (minX + maxX) / 2 - home.origin.x, cz = (minZ + maxZ) / 2 - home.origin.z, hx = (maxX - minX) / 2, hz = (maxZ - minZ) / 2;
-  return [
-    { instance: null, x: minX - home.origin.x, z: cz, axis: 'x', halfLength: hz, floor: 0 }, { instance: null, x: maxX - home.origin.x, z: cz, axis: 'x', halfLength: hz, floor: 0 },
-    { instance: null, x: cx, z: minZ - home.origin.z, axis: 'z', halfLength: hx, floor: 0 }, { instance: null, x: cx, z: maxZ - home.origin.z, axis: 'z', halfLength: hx, floor: 0 },
-  ];
+  return rimWalls(assembly.pitch).map(wall => ({ instance: null, x: wall.x - home.origin.x, z: wall.z - home.origin.z, axis: wall.axis, halfLength: wall.halfLength, floor: 0 }));
 }
 
 type ConstructorPhase = 'fields' | 'lights' | 'home' | 'frame' | 'road' | 'presentation' | 'physics' | 'roots' | 'streaming';
@@ -697,6 +693,8 @@ export class GridSession {
     this.constructorTiming?.('presentation');
     const nativeOrigin = { origin: { x: 0, z: 0 } };
     if (preparedRoad?.collidersInstalled !== true) for (const { mesh } of this.strips) installStripCollider(host.physics, mesh, host.scope);
+    // SA34: the 7 × 7's empty cells and the band to the rail are walkable void floor at road level, never a fall
+    withOwner(host.scope, () => installVoidFloor(host.physics, this.assembly.cells, this.assembly.pitch, false));
     // The normal world stage owns the home's sockets; this scope adds only rebased neighbours.
     installEntrySockets(host.physics, host.scope, this.neighbours.map((cell) => ({ x: cell.origin.x - nativeOrigin.origin.x, z: cell.origin.z - nativeOrigin.origin.z })));
     this.walls = new ReadinessWalls(host.physics, [...this.neighbours.flatMap((cell) => neighbourEdges(cell, nativeOrigin)), ...rimEdges(this.assembly, nativeOrigin)], host.scope);

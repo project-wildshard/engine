@@ -5,13 +5,15 @@
  *
  * The deck's shape is the generator's (`@wildshard/engine/sim/strips`): between two cells a 62.5 m gap, a 15 m road on the
  * gap's centre line and a 23.75 m strip each side; a junction where four gaps meet. The outer ring is the gap past the
- * outermost cells, and the rail (the void's collision wall) sits on its outer shoulder.
+ * outermost cells; past it lies the void's walkable floor, and the rail (the void's collision wall) stands on the 7 × 7's
+ * outer road shoulder (SA34), whatever the catalogue places.
  *
  * Every road segment between two junctions has one turn-in at its midpoint (G93: a shard's four entryways sit at its edge
  * midpoints), so the kerb opens there on each side that has a cell. Sign text is a cell's shard name from the catalogue's
  * slug, never a name written here (an open plot's is its open-plots output's name, G538).
  */
 import type { GridAssembly, GridCell } from './assembly';
+import { DRAWN_GRID_RADIUS } from './catalogue';
 import { CHUNK_SIZE, CONTENT_CAPS, ENTRY_WIDTH, ENTRY_ASPHALT as entryAsphalt } from '@wildshard/engine/core/config';
 
 /** The road's half width (the generator's flat road band, `STRIP_OFFSETS` ±7.5). */
@@ -64,6 +66,27 @@ export interface RoadLayout {
   readonly signs: readonly RoadSign[];
   readonly lights: readonly RoadLight[];
   readonly rail: RailBox;
+  /** SA34: where the void's drawn floor begins, the old rail line round the placed cells (the 7 × 7's empty cells past it are void floor) */
+  readonly edge: RailBox;
+  /** SA34: the empty cells inside the placed rectangle, each a square of void floor */
+  readonly holes: readonly CellSquare[];
+}
+/** A cell's content square in grid metres: its centre and half size. */
+export interface CellSquare { readonly x: number; readonly z: number; readonly hx: number; readonly hz: number }
+
+/** SA34: the empty cells of the placed cells' rectangle (the roads run round them, their strips at road level on that side). */
+export function emptyCellSquares(cells: readonly { readonly cell: readonly [number, number] }[], pitch: number): readonly CellSquare[] {
+  if (cells.length === 0) return [];
+  const xs = cells.map((c) => c.cell[0]), zs = cells.map((c) => c.cell[1]), placed = new Set(cells.map((c) => c.cell.join(','))), out: CellSquare[] = [];
+  for (let x = Math.min(...xs); x <= Math.max(...xs); x++) for (let z = Math.min(...zs); z <= Math.max(...zs); z++)
+    if (!placed.has(`${String(x)},${String(z)}`)) out.push({ x: x * pitch, z: z * pitch, hx: CHUNK_SIZE / 2, hz: CHUNK_SIZE / 2 });
+  return out;
+}
+
+/** SA34: the rail's square, the 7 × 7's outer road shoulder (`DRAWN_GRID_RADIUS`), the same for every catalogue. */
+export function gridRail(pitch: number): RailBox {
+  const reach = DRAWN_GRID_RADIUS * pitch + pitch / 2 + RAIL_OFFSET;
+  return { minX: -reach, maxX: reach, minZ: -reach, maxZ: reach };
 }
 
 const ARM: Readonly<Record<ArmSide, { readonly x: number; readonly z: number }>> = { east: { x: 1, z: 0 }, west: { x: -1, z: 0 }, north: { x: 0, z: 1 }, south: { x: 0, z: -1 } };
@@ -158,8 +181,8 @@ export function roadLayout(assembly: GridAssembly, name: (slug: string) => strin
     for (let s = -225; s <= 225; s += 50) lights.push({ at: segmentPoint(segment, s, t * (ROAD_HALF + 1.1)), reach });
   }
   for (const junction of junctions) if (junction.roundabout) lights.push({ at: junction.centre, reach: { x: 0, z: 0 } });
-  const rail: RailBox = { minX: minX * pitch - pitch / 2 - RAIL_OFFSET, maxX: maxX * pitch + pitch / 2 + RAIL_OFFSET, minZ: minZ * pitch - pitch / 2 - RAIL_OFFSET, maxZ: maxZ * pitch + pitch / 2 + RAIL_OFFSET };
-  return { segments, junctions, signs, lights, rail };
+  const edge: RailBox = { minX: minX * pitch - pitch / 2 - RAIL_OFFSET, maxX: maxX * pitch + pitch / 2 + RAIL_OFFSET, minZ: minZ * pitch - pitch / 2 - RAIL_OFFSET, maxZ: maxZ * pitch + pitch / 2 + RAIL_OFFSET };
+  return { segments, junctions, signs, lights, rail: gridRail(pitch), edge, holes: emptyCellSquares(assembly.cells, pitch) };
 }
 
 /** Is the segment's `t` side the void (past the outermost cells)? */

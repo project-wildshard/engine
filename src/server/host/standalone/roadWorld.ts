@@ -1,7 +1,7 @@
 // The grid's road as a world of its own: the solo grid server's highway (`gridServer.ts`), and since GC15 a dedicated worker's road room
 // (`dedicated/roadRoom.ts`). Its frame is the world's; the ground lies far below the road's strips, which C2's grid pack carries.
 import { withOwner } from '@wildshard/engine/app/ownership';
-import { CHUNK_HALF } from '@wildshard/engine/core/config';
+import { CHUNK_HALF, CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { groups } from '@wildshard/engine/physics/groups';
 import { stripCollider } from '@wildshard/engine/physics/stripColliders';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
@@ -10,6 +10,7 @@ import { SIM_API_VERSION } from '@wildshard/engine/sim/apiVersion';
 import type { GridCell } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { HOST_PROBE } from '@wildshard/engine/game/plugin/simulation';
+import { installVoidFloor } from '@wildshard/engine/game/grid/voidFloor';
 import { FALL_FLOOR } from './fallFloor';
 
 /** Ground under the whole grid, far below the road's strips, and a player's pace on them. */
@@ -33,17 +34,22 @@ export function addCellWalls(road: SimHost, cells: readonly Pick<GridCell, 'orig
       world.createCollider(R.ColliderDesc.cuboid(hx, WALL_HEIGHT, hz).setTranslation(origin.x + x, WALL_HEIGHT, origin.z + z).setCollisionGroups(groups('WORLD')));
   });
 }
+/** SA34: the 7 × 7's void, walkable: a road-level floor over every empty cell and out to the rail, and the rim on the rail. */
+export function addVoidFloor(road: SimHost, cells: readonly Pick<GridCell, 'cell'>[]): void {
+  withOwner(road.scope, () => { installVoidFloor(road.physics, cells, CONTENT_CAPS.pitch); });
+}
 /** C6: a room's world builds every strip at once, since no one list can follow every player. */
 export function buildStrips(host: SimHost, meshes: readonly GridCollisionStrip['mesh'][]): void {
   withOwner(host.scope, () => { for (const mesh of meshes) stripCollider(host.physics, mesh); });
 }
 /**
- * GC15: a dedicated worker's road, with nobody on it yet: every strip built, and walls only round `walled`, the cells it can't hand a
+ * GC15: a dedicated worker's road, with nobody on it yet: every strip built, the void's floor round `placed` (SA34), and walls only round `walled`, the cells it can't hand a
  * seat to (those on another worker: GC7's one line). Its lead seat is the room's to park.
  */
-export function openRoad(rapier: Rapier, walled: readonly Pick<GridCell, 'origin'>[], strips: readonly GridCollisionStrip[]): SimHost {
+export function openRoad(rapier: Rapier, walled: readonly Pick<GridCell, 'origin'>[], strips: readonly GridCollisionStrip[], placed: readonly Pick<GridCell, 'cell'>[]): SimHost {
   const road = createSimHost(ROAD, { rapier });
   addCellWalls(road, walled);
+  addVoidFloor(road, placed);
   buildStrips(road, strips.map(strip => strip.mesh));
   return road;
 }

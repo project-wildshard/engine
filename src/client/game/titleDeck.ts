@@ -36,7 +36,7 @@ import { readSummary, summaryView } from './summary';
 import { GAME_STRINGS } from '../../shared/game/strings';
 import { menuMode, selectEnters, selectExplores, type MenuMode } from './grid/menu';
 import { pageShardRefusals, refusalReason, type ShardRefusal } from './grid/refusal';
-import { playerHidden, titleStatus } from '../../shared/game/grid/catalogueSlot';
+import { autoPlaced, playerHidden, titleStatus } from '../../shared/game/grid/catalogueSlot';
 import './summary.css';
 import './upgrade.css';
 
@@ -76,7 +76,8 @@ const sessionRefusals: RefusedShard = (slug) => pageShardRefusals().read(slug);
 export function titleCards(showHidden: boolean = isDev(), upgradeNeeded: UpgradeNeeded = noUpgrades, refused: RefusedShard = sessionRefusals): readonly TitleCard[] {
   // a `_` prototype stays Developer only unless its catalogue placement opens it (J313: Mossgate)
   const hidden = (m: TitleManifest): boolean => playerHidden(m);
-  const ordinary = titleManifests().filter(m => m.shardSelect !== false);
+  // SA34 (Q12): an auto-placed shard has no card, even for Developer: you cross in from a neighbour
+  const ordinary = titleManifests().filter(m => m.shardSelect !== false && !autoPlaced(m));
   const visible = ordinary.filter((m) => !hidden(m));
   const manifests = showHidden ? [...visible, ...ordinary.filter(hidden)] : visible;
   return manifests.map((m): TitleCard => {

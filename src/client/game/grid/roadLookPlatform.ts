@@ -110,7 +110,7 @@ export async function installPlatformRoadSliced(input: PlatformRoadInput, pause:
 /** the layout's pieces standing at points `within` accepts (the rail stays: it belongs to the void floor) */
 function layoutWithin(layout: RoadLayout, within: (x: number, z: number) => boolean): RoadLayout {
   return { segments: layout.segments.filter(s => within(s.centre.x, s.centre.z)), junctions: layout.junctions.filter(j => within(j.centre.x, j.centre.z)),
-    signs: layout.signs.filter(s => within(s.at.x, s.at.z)), lights: layout.lights.filter(l => within(l.at.x, l.at.z)), rail: layout.rail };
+    signs: layout.signs.filter(s => within(s.at.x, s.at.z)), lights: layout.lights.filter(l => within(l.at.x, l.at.z)), rail: layout.rail, edge: layout.edge, holes: layout.holes };
 }
 
 /** Two builds of one road system (A1's ring-first halves) as one: their readouts summed, roots joined, hooks shared. */
@@ -153,7 +153,7 @@ function* platformRoadSteps(input: PlatformRoadInput): Generator<void, PlatformR
   const road = yield* installRoadLookSteps({ layout, home, scene, scope, solid, cull: culler, admission, overlayLight, retireGeometry,
     ...(input.grain === undefined ? {} : { grain: input.grain }),
     ...(input.signs === undefined ? {} : { signs: input.signs }) });
-  const voidLook = input.voidFloor === false ? null : installVoidLook({ rail: layout.rail, home, scene, scope, solid, admission });
+  const voidLook = input.voidFloor === false ? null : installVoidLook({ rail: layout.rail, edge: layout.edge, holes: layout.holes, home, scene, scope, solid, admission });
   // this build's own boulevard group (a split road adds one per build)
   let boulevard: Object3D | undefined;
   for (const child of scene.children) if (child.name === 'grid-boulevard') boulevard = child;

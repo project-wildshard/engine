@@ -51,3 +51,14 @@ export function titleStatus(row: {readonly slug: string; readonly status?: strin
 export function playerHidden(row: {readonly slug: string; readonly status?: string}): boolean {
   return titleStatus(row) === 'hidden' || (row.slug.startsWith('_') && placedStatus(row) === undefined);
 }
+/**
+ * SA34 (J314, grill Q12): an auto-placed shard gets no Shard Select card; you cross in from a neighbour. Auto-placed means the
+ * installed catalogue's grid places the slug and its `placements` (the title's rows) don't name it: api-server's first-upload
+ * placement (SA30, `grid-autoplace.ts`) writes only a `grid.cells` row, never a placement, while every carded shard (J305's
+ * grid shards and the off-grid ones) has a placement row. A page with no installed catalogue has nothing auto-placed.
+ */
+export function autoPlaced(row: {readonly slug: string}): boolean {
+  const catalogue = installedCatalogue();
+  if (catalogue === undefined || catalogue.placements.some(placed => bareSlug(placed.slug) === bareSlug(row.slug))) return false;
+  return catalogue.grid.cells.some(cell => bareSlug(cell.slug) === bareSlug(row.slug));
+}

@@ -1,8 +1,8 @@
 /**
  * The far view (SHARD-PLATFORM SF23): one baked low-poly proxy per shard, drawn in the render rings' bounded far ring
  * (`RenderRings`, at most `CONTENT_CAPS.farCount` proxies, charged through the one `ResidencyAllocator` as category `far`).
- * The drawn 5 × 5 grid's longest sightline is ≈ 3.9 km (`GRID_SIGHTLINE`, from `DRAWN_GRID_RADIUS`; SA34 grows it to the
- * 7 × 7); every cell keeps its proxy across it (SF88c).
+ * The drawn 7 × 7 grid's longest sightline is ≈ 5.6 km (`GRID_SIGHTLINE`, from `DRAWN_GRID_RADIUS`, SA34); every cell keeps
+ * its proxy across it (SF88c).
  *
  * A proxy is the shard's baked terrain (its `terrain.bin` heights and splat) resampled onto 4 × 4 regions, one per L1
  * footprint (125 m), each a 12 × 12 quad lattice with skirts on all four sides, plus a water sheet where the ground dips
@@ -98,11 +98,11 @@ export const FAR_SKIRT = 8;
  * Nalati's snow-ring berm) reads as a solid cliff down past road level from a neighbour, never as ground over a void.
  */
 export const FAR_EDGE_FLOOR = -20;
-/** SF88c (G526): the platform's corner-to-corner sightline across its outer road (`DRAWN_GRID_RADIUS`, the 5 × 5: ≈ 3.9 km). */
+/** SF88c (G526): the platform's corner-to-corner sightline across its outer road (`DRAWN_GRID_RADIUS`, the 7 × 7: ≈ 5.6 km). */
 export const GRID_SIGHTLINE: number = 2 * (DRAWN_GRID_RADIUS + 0.5) * CONTENT_CAPS.pitch * Math.SQRT2;
 /**
  * The far ring (SF23 owns its parameters; SF18b's `RenderRings` owns the scheduler). SF88c: the ring wants a proxy for
- * every cell within `reach` (the grid's whole sightline, so no cell of the 5 × 5 pops in or out while you drive the
+ * every cell within `reach` (the grid's whole sightline, so no cell of the 7 × 7 pops in or out while you drive the
  * outer road), nearest first while the proxies' own bytes fit `count` charges of `CONTENT_CAPS.far.resident` (14.4 MB;
  * a baked proxy is ≈ 0.48–0.71 MB, so every cell fits). `viewDistance` (1.5 pitches) is still what the loader waits for.
  * `drawDistance` is the grid camera's far plane (G607, Jake's round-36 D: 6 km, every cell drawn near and unhazed) and
