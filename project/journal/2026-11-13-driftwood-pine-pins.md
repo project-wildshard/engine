@@ -12,3 +12,11 @@
   (0.83 MB). Fence 266, 113 programs. Ring 1's step chain is unchanged;
   the slice is re-cut (`a02e44c7`) and both tarballs are on the `pins`
   release. The v0.1.1 save resumes on it.
+- Pine Hollow revision 3 (`e3d45004`, v0.0.2, shard-pine-hollow
+  `eeb8fec`): AU17's audio cut (7.15 MB of folk and orchestral music,
+  phone audio now 5.24 MB, green), opus-pinehero's spawn-road card, and
+  a fresh hero capture after SA11's renames, which had left ring-2's pack
+  refusing a stale hero. Fence 505, 116 programs. Ring 1's step chain is
+  unchanged; the slice is re-cut (`931b62c4`) and both tarballs are on
+  the `pins` release. The v0.1.1 save resumes on it. Players need an
+  engine with `93e50340` for its spawn ground (v0.1.17 and later).
