@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.17 (2026-11-13)
+
+- Crossing is on: walk off one shard's edge into the next at full speed, with no invisible walls at chunk edges or seams.
+- On phones, touch play never locks the pointer, a back swipe keeps you in the game, and the death card has a Respawn now button.
+- Quest markers and other pins sit on their targets in every grid cell, and Driftwood's near scenery stays drawn up to its edge.
+- The title shows the build and a reload button at once, a stale build makes you update, and a loading shard shows its own card.
+- Android phones without half-float textures fall back instead of failing, a lost GPU returns you to the world, and errors reach us.
+
 ## v0.1.16 (2026-11-13)
 
 - Pine Hollow's spawn shows its own textured ground, no longer bare tan slopes.
