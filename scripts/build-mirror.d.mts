@@ -2,6 +2,8 @@ export interface Mirror {
   dir: string;
   sha: string;
   release: () => void;
+  /** The slot's git index, at the synced commit (the slot has no .git; tracked-public.mjs reads it). */
+  index: string;
 }
 
 export interface MirrorOptions {

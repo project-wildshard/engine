@@ -196,7 +196,7 @@ function sourceOverlay(git, generated) {
     .some(file => file && !generated.has(file) && !file.split('/').includes('node_modules'));
 }
 
-/** Lock the slot, bring its tree to `rev`, return { dir, sha, release }. The lock also releases at process exit. */
+/** Lock the slot, bring its tree to `rev`, return { dir, sha, release, index } (index: the slot's git index, at `rev`). The lock also releases at process exit. */
 /** Any check name requests the shared five-slot pool. No reserved slots. */
 export function defaultSlot(env = process.env) {
   return env.WILDSHARD_MIRROR_SLOT ?? 'check';
@@ -343,7 +343,8 @@ function prepareMirror(rev, candidateTree, { repo = REPO, slot = 'check', full =
     // Children of this process inherit it; git run from the checkout itself is unaffected.
     const ceilings = (env.GIT_CEILING_DIRECTORIES ?? '').split(':').filter(Boolean);
     if (!ceilings.includes(root)) process.env.GIT_CEILING_DIRECTORIES = [...ceilings, root].join(':');
-    return { dir, sha, release };
+    // pins.ts reads the tracked public files from this index (tracked-public.mjs): the slot has no .git of its own
+    return { dir, sha, release, index: join(root, 'index') };
   } catch (error) {
     release();
     throw error;
@@ -376,8 +377,8 @@ if (isMain) {
       throw new Error('G612: build-mirror run is reserved for serve-build re-execution; use types, lint and focused tests in the working tree');
     }
     mainMirrorRevision(rev);
-    const { dir, sha, release } = openMirror(rev, { slot, full });
-    const result = spawnSync(command[0], command.slice(1), { cwd: dir, stdio: 'inherit', env: { ...process.env, WS_BUILD_ID: sourceBuildId(sha) } });
+    const { dir, sha, release, index } = openMirror(rev, { slot, full });
+    const result = spawnSync(command[0], command.slice(1), { cwd: dir, stdio: 'inherit', env: { ...process.env, WS_BUILD_ID: sourceBuildId(sha), WS_MIRROR_REPO: REPO, WS_MIRROR_INDEX: index } });
     release();
     process.exit(result.status ?? 1);
   } else {

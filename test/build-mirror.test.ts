@@ -89,7 +89,9 @@ it('staged checks use the private candidate and restore ordinary landed admissio
     expect(()=>mainMirrorRevision(tree,repo)).toThrow('only landed main commits');
   }finally{mirror.release();}
   const landed=openMirror(parent,{repo,env});
-  try{expect(readFileSync(join(landed.dir,'src/value.ts'),'utf8')).toBe('export const value=1;');}
+  try{expect(readFileSync(join(landed.dir,'src/value.ts'),'utf8')).toBe('export const value=1;');
+    // the slot names its index, which lists the synced commit's files: pins.ts reads tracked public/ from it (tracked-public.mjs)
+    expect(execFileSync('git',['ls-files','src'],{cwd:repo,env:{...processEnv,GIT_INDEX_FILE:landed.index},encoding:'utf8'}).split('\n')).toContain('src/value.ts');}
   finally{landed.release();}
 });
 

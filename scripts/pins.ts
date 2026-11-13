@@ -32,7 +32,6 @@
 // mirror serves it. Coverage rows 4 and 5.
 // oxlint-disable-next-line import/no-unassigned-import -- Its hooks are the point, and they must run first.
 import './bake-loader.mjs';
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -44,6 +43,7 @@ import { dropManifest, folderName, insideTree, lockPins, mountPath, pinsKey, reu
 import type { PackedIndex } from './pin-packs.ts';
 import { fetchPinnedPublicAssets, pinnedPublicAssets } from './pin-assets.ts';
 import { assertKtx2TableTargets } from '../src/shared/game/shardfile/ktx2Targets.ts';
+import { trackedPublic } from './tracked-public.mjs';
 import { catalogueSlugs, documentSlugs, pinnedSlugs, releaseNamed, unlistedMessage, unlistedSlugs } from './pins-catalogue.ts';
 import { servedSlug } from './server-release/served-slug.mjs';
 
@@ -193,13 +193,6 @@ function preparationOf(files: ReadonlyMap<string, Uint8Array>, root: string): 'c
   return cook.renderer === ownRenderer ? 'current' : 'stale';
 }
 
-function tracked(): ReadonlySet<string> {
-  try {
-    return new Set(execFileSync('git', ['ls-files', '-z', 'public'], { encoding: 'utf8', maxBuffer: 1 << 28 }).split('\0'));
-  } catch {
-    return new Set();
-  }
-}
 
 /** The public paths an installed product published: its files under mounts/assets|programs and its cook.json rows. */
 function mountsOf(folder: string): Set<string> {
@@ -273,7 +266,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     insideTree(root, dirname(path));
     rmSync(path, { force: true });
   }
-  const shared = tracked(), published = new Map<string, string>(), publicUrls = new Set(publicAssets.map(asset => asset.url));
+  const shared = trackedPublic(), published = new Map<string, string>(), publicUrls = new Set(publicAssets.map(asset => asset.url));
   const publish = (url: string, body: Uint8Array): void => {
     if (!mountPath(url)) throw new Error(`A pin publishes ${url}, outside public/`);
     const hash = digest(body), held = published.get(url);
