@@ -7,20 +7,15 @@ import { PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import type { DummyJoint, DummyJoints } from '../practice/TrainingDummy';
 import { castawayBody, groundContact, type CastawayBody } from '../models/castawayBody';
 import { AnimMachine } from '../anim/machine';
-import { HeldInHand } from './heldOnOthers';
+import { gaitMix, gaitOf, STRIDE_JOINTS, stridePose, stridePoseAtRest } from './remoteGait';
 import { BoardUnder, DECK_LIFT } from './remoteBoard';
+import { HeldInHand } from './heldOnOthers';
 import type { NetClient } from './client';
 import { othersOnMap } from './othersOnMap';
 import { talkerKey, voiceNear, type Talker } from './voiceNear';
 
 const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => entry.name === name);
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), BOARD = column('board'), HELD = column('held'), HP = column('hp'), SWIM = column('swim');
-/** Over this a row's body is walking, and over this it runs, in m/s. */
-const WALKS = 0.4, RUNS = 5;
-/** Metres a whole stride covers, walking and running. */
-const STRIDE = 1.6, RUN_STRIDE = 2.6;
-/** How far a leg and an arm swing at a walk and a run, in radians. */
-const WALK_SWING = 0.55, RUN_SWING = 0.95;
 /** A body's speed settles at this rate, so one late row is no stumble. */
 const SETTLE = 8;
 const NAME_HEIGHT = 2.05, NAME_WIDTH = 1.5, NAME_RATIO = 4;
@@ -32,7 +27,6 @@ const BOARD_LIFT = DECK_LIFT;
 const SADDLE_LIFT = 0.85;
 /** A rider's knees, in radians. The row it rides moves the body. */
 const SEAT = 1.2;
-const SWUNG: readonly DummyJoint[] = ['leftThigh', 'rightThigh', 'leftShin', 'rightShin', 'leftUpperArm', 'rightUpperArm', 'spine'];
 const AXIS = new THREE.Vector3(1, 0, 0), turn = new THREE.Quaternion();
 
 /** A Name as a sprite: it reads the same on any shard, and it needs no DOM over the canvas. */
@@ -90,7 +84,9 @@ class OtherBody {
   /** Where the figure stands so its soles are on the ground. */
   private feet = 0;
   private speed = 0;
+  /** RP4: where the body is in its stride (0 to 1, the left foot down at 0), and its pose there. */
   private phase = 0;
+  private readonly stride = stridePoseAtRest();
   /** Whether a row has put it anywhere yet. */
   placed = false;
   shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '' };
@@ -110,7 +106,7 @@ class OtherBody {
     this.figure = model.root; this.joints = model.joints; this.feet = 0; model.root.position.y = 0;
     this.group.add(model.root, groundContact()); this.shown = { ...this.shown, modelled: true, model: model.id };
     this.hand = new HeldInHand({ right: model.mounts.rightHand, left: model.mounts.leftHand });
-    for (const joint of SWUNG) { const bone = model.joints[joint]; if (bone !== undefined) this.rest.set(joint, bone.quaternion.clone()); }
+    for (const joint of STRIDE_JOINTS) { const bone = model.joints[joint]; if (bone !== undefined) this.rest.set(joint, bone.quaternion.clone()); }
     this.anim = new AnimMachine({ states: {}, loops: ['idle'] }, model.rig); this.anim.base('idle');
     this.board.fit(model.joints);
   }
@@ -122,12 +118,13 @@ class OtherBody {
     this.placed = true;
     // A row's yaw is where a player looks, down -z at 0, and the figure faces +z.
     group.position.set(x, y, z); group.rotation.y = (row[YAW] ?? 0) + Math.PI;
-    const riding = row[BOARD] === 1, gait = this.speed < WALKS || riding || mounted ? 'idle' : this.speed < RUNS ? 'walk' : 'run';
+    // RP4: a rider's legs stand still whatever the row's speed; on foot the speed picks and blends the clip.
+    const riding = row[BOARD] === 1, onFoot = riding || mounted ? 0 : this.speed, gait = gaitOf(onFoot);
     const held = row[HELD] ?? 0;
     this.hand?.show(held, !riding && !mounted && row[SWIM] !== 1, dt); // RP5: nothing in hand on a board, in a saddle or swimming
-    if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : 0);
     this.anim?.update(dt);
-    this.pose(gait, this.speed, dt);
+    const drop = this.pose(onFoot, dt);
+    if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : -drop);
     if (mounted) { this.bend('leftThigh', SEAT); this.bend('rightThigh', SEAT); this.bend('leftShin', -SEAT); this.bend('rightShin', -SEAT); }
     this.board.show(riding, row[YAW] ?? 0, this.speed, dt, this.figure, this.joints); // RP8: the deck, banked, the rider side-on on it
     const { talking: keys } = voiceNear, talking = keys.has(this.id) || keys.has(talkerKey({ body: null, name: this.shown.name }));
@@ -139,14 +136,13 @@ class OtherBody {
     const bone = this.joints[joint], rest = this.rest.get(joint);
     if (bone !== undefined && rest !== undefined) bone.quaternion.copy(rest).multiply(turn.setFromAxisAngle(AXIS, angle));
   }
-  private pose(gait: string, speed: number, dt: number): void {
-    const running = gait === 'run', swing = gait === 'idle' ? 0 : running ? RUN_SWING : WALK_SWING;
-    this.phase = (this.phase + (speed * dt) / (running ? RUN_STRIDE : STRIDE)) % 1;
-    const stride = Math.sin(this.phase * Math.PI * 2) * swing, knee = Math.max(0, -stride);
-    this.bend('leftThigh', stride); this.bend('rightThigh', -stride);
-    this.bend('leftShin', knee); this.bend('rightShin', Math.max(0, stride));
-    this.bend('leftUpperArm', -stride * 0.7); this.bend('rightUpperArm', stride * 0.7);
-    this.bend('spine', running ? 0.18 : 0);
+  /** RP4: the walk and run clips (remoteGait.ts), at a cadence matched to `speed` so a planted foot stays put; the hips' drop. */
+  private pose(speed: number, dt: number): number {
+    const mix = gaitMix(speed);
+    this.phase = (this.phase + (speed * dt) / mix.stride) % 1;
+    const { bends, drop } = stridePose(this.phase, mix, this.stride);
+    for (const joint of STRIDE_JOINTS) this.bend(joint, bends[joint]);
+    return drop;
   }
 }
 
