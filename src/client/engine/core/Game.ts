@@ -1232,8 +1232,13 @@ export class Game {
   async warmExteriorRoots(owner: Scope, roots: readonly THREE.Object3D[], current: () => boolean): Promise<void> {
     this.deferredEntryRoots.push({ owner, roots });
     if (this.frameCount === 0) return; // the boot's own in-play warm-up takes it (finish.ts)
-    await this.warmDeferredEntryRoots(current);
+    // one loop at a time: a second entry joins the queue behind the first, never a parallel warm-up in the same frames
+    const run = this.exteriorWarm.catch(() => undefined).then(() => this.warmDeferredEntryRoots(current));
+    this.exteriorWarm = run;
+    await run;
   }
+  /** RP4: the running road-variant warm-up (`warmExteriorRoots`), which the next one waits behind */
+  private exteriorWarm: Promise<void> = Promise.resolve();
 
   /**
    * D188 (G815): after an arrival's reveal, what it left (`rest`, gated out of live draws) is linked and first-drawn
