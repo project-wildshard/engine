@@ -73,7 +73,7 @@ async function pageServer(): Promise<NonNullable<typeof page>> {
   mkdirSync(resolve('tmp'), { recursive: true });
   const root = mkdtempSync(resolve('tmp/page-headers-'));
   mkdirSync(join(root, 'pages'));
-  for (const file of ['wrangler.jsonc', 'worker.ts', 'slug-meta.ts']) copyFileSync(resolve('pages', file), join(root, 'pages', file));
+  for (const file of ['wrangler.jsonc', 'worker.ts', 'slug-meta.ts', 'placed-slug.ts']) copyFileSync(resolve('pages', file), join(root, 'pages', file));
   for (const path of PATHS) {
     const file = join(root, 'dist', path === '/' ? 'index.html' : path);
     mkdirSync(dirname(file), { recursive: true });
