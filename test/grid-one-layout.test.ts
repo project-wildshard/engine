@@ -19,10 +19,12 @@ for (const developer of [false, true]) for (const devserver of [false, true]) fo
   });
 }
 
-test('G972: no alternate Developer catalogue or template swaps remain in the shipped grid', () => {
+test('G972: no alternate Developer catalogue swaps remain in the shipped grid', () => {
   expect(Object.hasOwn(catalogue.grid, 'developer')).toBe(false);
   const slugs = catalogue.grid.cells.map(cell => cell.slug);
-  for (const slug of ['blender-template', 'pastel-plain', 'ink-cel-valley']) expect(slugs).not.toContain(slug);
+  // J305 (Jake 11-12): Brasscap and Pastel join the centre, Ink & Cel the ring; the grey Showcase Template, Thin Ice and
+  // Desert Ruin leave the grid
+  for (const slug of ['open-plot-showcase-template', 'open-plot-thin-ice', 'open-plot-desert-ruin']) expect(slugs).not.toContain(slug);
   expect(catalogue.grid.cells.filter(cell => cell.slug === 'open-plot-lantern-bayou').map(cell => cell.cell)).toEqual([[-2, -1]]);
   // NU3: changing any cell to an already used slug fails this shipped-grid invariant.
   expect(new Set(slugs).size).toBe(25);
@@ -31,9 +33,9 @@ test('G972: no alternate Developer catalogue or template swaps remain in the shi
     ['open-plot-saltwind-lighthouse', [0, 2]], ['open-plot-jungle-ziggurat', [-2, 2]],
     // G993 (Jake 11-03): the centre 3x3 as before G986, the Showcase Template in Frostline's old (-1, -1); Frostline,
     // Coral Drift and Lantern Bayou hold the back line (x = -2), Mosslight and Ember Forge their east cells
-    ['pine-hollow', [0, 1]], ['nalati-grasslands', [1, 0]], ['open-plot-night-market', [-1, 1]],
+    ['pine-hollow', [0, 1]], ['nalati-grasslands', [1, 0]], ['pastel-plain', [-1, 1]],
     ['driftwood-isle', [0, 0]], ['sunscar-dunes', [-1, 0]], ['far-reach', [0, -1]], ['nine-dragon-stack', [1, -1]],
-    ['_template', [1, 1]], ['open-plot-showcase-template', [-1, -1]],
+    ['_template', [1, 1]], ['blender-template', [-1, -1]], ['ink-cel-valley', [-1, 2]], ['open-plot-night-market', [1, -2]],
     ['open-plot-frostline-peaks', [-2, 1]], ['open-plot-coral-drift', [-2, 0]],
     ['open-plot-mosslight-ruins', [2, 0]], ['open-plot-ember-forge', [2, -1]],
   ]) expect(catalogue.grid.cells.find(row => row.slug === slug)?.cell).toEqual(cell);

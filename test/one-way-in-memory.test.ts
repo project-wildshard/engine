@@ -44,7 +44,7 @@ test('GC20: on a world build with no word and no kept answer, every grid shard\'
   }
   const placed = new Set(assembly.cells.map(cell => cell.slug));
   const off = catalogueDocument().placements.map(row => row.slug).filter(slug => !placed.has(slug));
-  expect(off).toEqual(['blender-template', 'pastel-plain', 'ink-cel-valley']);
+  expect(off).toEqual(['open-plot-showcase-template', 'open-plot-thin-ice', 'open-plot-desert-ruin']);
   for (const slug of off) expect(await enterByShard({ online: true, slug, kept: false }, WORLD, world => worldHosted(world, 10, memory(), silent)), slug).toBeNull();
 });
 

@@ -21,11 +21,11 @@ test('the gate, both sides: a grid page joins the world only once the world host
 // grid cells, so a one-shard page of a shard the grid doesn't place joined it, the door seated the device in Driftwood, and the page left
 // for the title. That page plays solo; a placed shard's page and every grid page still join the world.
 test('a one-shard page of a shard the grid does not place plays solo on a build with a world', () => {
-  expect(serverRoute(WORLD, STORAGE, { page: false, hosted: true }, false), 'Brasscap: off the grid, solo').toBe('standalone');
+  expect(serverRoute(WORLD, STORAGE, { page: false, hosted: true }, false), 'Thin Ice: off the grid (J305), solo').toBe('standalone');
   expect(serverRoute(WORLD, STORAGE, { page: false, hosted: true }, true), 'a grid shard\'s one-shard page joins').toBe('online');
   expect(serverRoute(WORLD, STORAGE, { page: true, hosted: true }, false), 'a grid page is never asked').toBe('online');
   expect([earlyStandalone(WORLD, false), earlyStandalone(WORLD, true)], 'the early server starts for the solo page only').toEqual([true, false]);
-  expect([shardCell('blender-template'), shardCell('driftwood-isle')?.instance], 'the pinned catalogue: Brasscap off the grid, Driftwood on it').toEqual([undefined, 'driftwood-isle']);
+  expect([shardCell('open-plot-thin-ice'), shardCell('driftwood-isle')?.instance], 'the pinned catalogue: Thin Ice off the grid (J305), Driftwood on it').toEqual([undefined, 'driftwood-isle']);
   const source = readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8');
   expect(source).toMatch(/earlyStandalone\([^\n]*, !options\.lone \|\| shardCell\(options\.slug\) !== undefined\)/u);
 });
@@ -41,7 +41,7 @@ test('a one-shard page of a grid shard the world does not open plays in-page; on
   expect(route(grid, 'nalati-grasslands'), 'a world that opens Nalati: online').toBe('online');
   expect(route({ cells: 1 }, 'nalati-grasslands'), 'an older door with no list: the catalogue\'s answer').toBe('online');
   expect(route(null, 'nalati-grasslands'), 'no answer (unreachable, stalled): the catalogue\'s answer').toBe('online');
-  expect(route(grid, 'blender-template'), 'off the grid: in-page whatever the word, its early server already runs').toBe('standalone');
+  expect(route(grid, 'open-plot-thin-ice'), 'off the grid: in-page whatever the word, its early server already runs').toBe('standalone');
   expect([opensShard({ cells: 1, shards: 'driftwood-isle' }, 'driftwood-isle', true), opensShard({ cells: 1, shards: [1] }, '1', true)], 'nonsense is no word').toEqual([true, true]);
   const source = readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8');
   expect(source, 'a one-shard page of a placed shard asks the door\'s word').toMatch(/const catalogued = ports\.grid === null && shardCell\(slug\) !== undefined, asks = catalogued && world !== undefined && page !== null;/u);

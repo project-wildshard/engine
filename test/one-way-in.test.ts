@@ -59,7 +59,7 @@ test('EXPLORE WORLD, a page already entering the grid, and shards the grid doesn
   expect(await enterByShard({ online: true, slug: 'driftwood-isle', kept: true }, WORLD, hosted)).toBeNull();
   const placed = new Set(assembly.cells.map(cell => cell.slug));
   const off = catalogueDocument().placements.map(row => row.slug).filter(slug => !placed.has(slug));
-  expect(off, 'the shards Shard select still opens alone').toEqual(['blender-template', 'pastel-plain', 'ink-cel-valley']);
+  expect(off, 'the shards Shard select still opens alone').toEqual(['open-plot-showcase-template', 'open-plot-thin-ice', 'open-plot-desert-ruin']);
   for (const slug of off) expect(await enterByShard({ online: true, slug, kept: false }, WORLD, hosted), slug).toBeNull();
   expect(hosted, 'a shard that cannot turn never waits on the world').not.toHaveBeenCalled();
 });

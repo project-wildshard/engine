@@ -506,11 +506,8 @@
         ]
       },
       {
-        "instance": "open-plot-nw",
-        "slug": "open-plot-night-market",
-        "edgeLook": {
-          "height": 1.2
-        },
+        "instance": "pastel-plain",
+        "slug": "pastel-plain",
         "cell": [
           -1,
           1
@@ -518,8 +515,8 @@
         "speedClass": "road"
       },
       {
-        "instance": "open-plot-sw",
-        "slug": "open-plot-showcase-template",
+        "instance": "blender-template",
+        "slug": "blender-template",
         "cell": [
           -1,
           -1
@@ -563,7 +560,10 @@
       },
       {
         "instance": "open-plot-3-0",
-        "slug": "open-plot-desert-ruin",
+        "slug": "open-plot-night-market",
+        "edgeLook": {
+          "height": 1.2
+        },
         "cell": [
           1,
           -2
@@ -643,8 +643,8 @@
         "speedClass": "road"
       },
       {
-        "instance": "open-plot-1-4",
-        "slug": "open-plot-thin-ice",
+        "instance": "ink-cel-valley",
+        "slug": "ink-cel-valley",
         "cell": [
           -1,
           2

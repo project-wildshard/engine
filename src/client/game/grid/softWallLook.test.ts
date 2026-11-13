@@ -9,7 +9,7 @@ import { installSoftWallLook } from './softWallLook';
 
 test('layout curtain height is admitted separately from unchanged readiness edges', () => {
   const assembly = new GridAssembly({ developer: false, devserver: false });
-  const market = assembly.cell('open-plot-nw');
+  const market = assembly.cell('open-plot-3-0');
   expect(market.edgeLook).toEqual({ height: 1.2 });
   expect(Object.isFrozen(market.edgeLook)).toBe(true);
   const { edgeLook: _look, ...original } = market;
