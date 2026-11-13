@@ -1,5 +1,6 @@
 import { Mesh, type BufferGeometry, type Object3D } from 'three';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
+import { workSlice } from '@wildshard/engine/core/workSlice';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { NEAR_COLOUR, NEAR_LIGHT, nearPlaceholderCost, type NearPlaceholder } from '@wildshard/format/nearPlaceholder';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -63,16 +64,21 @@ export async function loadShardfileNear(rows: ShardfileNearRows, read: (ref: str
   const near = rows.near;
   if (near.content.length === 0) throw new Error('Shardfile declares no near content');
   const cost = nearPlaceholderCost(near, rows.inventory), loader = (await prepareRigLoader()).createRigLoader(), parts: BufferGeometry[] = [], lights: BufferGeometry[] = [], colours: BufferGeometry[] = [];
+  // GC36 / RP4: a neighbour's near placeholder loads while the traveller walks to its edge. Baking every mesh's pose in one
+  // go held the frame 60 to 170 ms per content file (Chromium, Driftwood to Sunscar); it now lets a frame through between meshes.
+  const slice = workSlice();
   try {
     for (const ref of near.content) {
       const gltf = await loader.parseAsync((await read(ref)).slice().buffer, '');
       gltf.scene.updateMatrixWorld(true);
-      gltf.scene.traverse(node => {
-        if (!isMesh(node)) return;
+      const meshes: Mesh[] = [];
+      gltf.scene.traverse(node => { if (isMesh(node)) meshes.push(node); });
+      for (const node of meshes) {
+        await slice.check();
         for (const material of Array.isArray(node.material) ? node.material : [node.material]) material.dispose();
         // NM13: the light layer stays apart from the lit draw (drawn additively, unlit)
         (node.name === NEAR_LIGHT ? lights : node.name === NEAR_COLOUR ? colours : parts).push(node.geometry.applyMatrix4(node.matrixWorld));
-      });
+      }
     }
   } catch (error) { for (const part of [...parts, ...lights, ...colours]) part.dispose(); throw error; }
   const [first] = parts;

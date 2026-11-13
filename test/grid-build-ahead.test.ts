@@ -14,7 +14,9 @@ const level: SimLevel = { version: 3, id: 'platform', seed: 1, ground: { size: 5
   weapon: { id: 'none', shape: { kind: 'point', radius: 0 }, windup: 0, active: 0, recover: 0, cooldown: 0, range: 0, damage: 0, tags: [] } };
 
 for (const [axis, side] of [['x', 1], ['x', -1], ['z', 1], ['z', -1]] as const) {
-  test(`build ${axis} ${side} destination only on actual entry demand`, async () => {
+  // GC36 (J322): a world is built on the road ahead of the traveller heading into its mouth, never inside the source, so
+  // the entry at the line finds it ready (it used to be built there, a 2 to 5 s hold at the neighbour's edge).
+  test(`build ${axis} ${side} destination ahead on the road, never from inside the source`, async () => {
     const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
     const assembly = new GridAssembly({ developer: false, devserver: false });
     const home = assembly.cell('driftwood-isle');
@@ -27,9 +29,9 @@ for (const [axis, side] of [['x', 1], ['x', -1], ['z', 1], ['z', -1]] as const) 
     const live = new LiveGridHost(assembly, {
       home: { mode: 'owned', instance: home.instance, bytes: 1000, residency: residency.admitHome(home.instance, 1000) },
       player, allocator: residency.allocator,
-      bindFrame: () => undefined, gameplayReady: () => true,
+      bindFrame: () => undefined, gameplayReady: () => true, buildAhead: true,
       highway: { bytes: 1000, create: () => ({ physics: page.physics, dispose: () => undefined }) },
-      prefetchable: cell => cell.instance === target.instance,
+      prefetchable: () => true,
       readiness: { link: { speed: 30, linkBitsPerSecond: 5_000_000, requestLatencySeconds: 0.25, maxStallSeconds: 3 },
         bundle: () => ({ criticalWireBytes: 1000, hybridWireBytes: 1000, decodeSeconds: 0, runtimeParseSeconds: 0 }) },
       admit: cell => Promise.resolve({ bytes: 1000, exclusiveRuntime: true, prepareRuntime: () => Promise.resolve(),
@@ -49,10 +51,20 @@ for (const [axis, side] of [['x', 1], ['x', -1], ['z', 1], ['z', -1]] as const) 
       expect(live.unload(home.instance)).toBe(true);
       player.position[axis] = side * (CHUNK_HALF + 0.5);
       live.beforeFixed();
-      // Proximity admits immutable metadata; only real entry constructs a world.
-      expect(created).toEqual([home.instance]);
-      expect(live.state().pending).toEqual([]);
-      expect(live.ready(target.instance)).toBe(false);
+      // On the road, heading into the destination's mouth: its world is built now, before the line.
+      await expect.poll(() => live.ready(target.instance), { timeout: 5000, interval: 10 }).toBe(true);
+      expect(created).toEqual([home.instance, target.instance]);
+      // It stays built while the traveller is still on the road (a stop, then on toward it): never retired and rebuilt.
+      for (let tick = 0; tick < 3; tick++) live.beforeFixed();
+      player.position[axis] = side * (CHUNK_HALF + 1.5); live.beforeFixed();
+      await new Promise(resolve => { setTimeout(resolve, 50); });
+      expect(live.ready(target.instance)).toBe(true); expect(created).toEqual([home.instance, target.instance]);
+      // Past its line, before the entry: the heading now names the cell beyond, which must not take its place.
+      player.position[axis] = side * (assembly.pitch - CHUNK_HALF + 0.5); live.beforeFixed();
+      player.position[axis] = side * (assembly.pitch - CHUNK_HALF + 1.5); live.beforeFixed();
+      await new Promise(resolve => { setTimeout(resolve, 50); });
+      expect(live.ready(target.instance)).toBe(true); expect(created).toEqual([home.instance, target.instance]);
+      // The entry finds it resident: no second world.
       const enter = await live.prepare(null, target.instance); enter.commit();
       expect(created).toEqual([home.instance, target.instance]);
       expect(live.state().issues).toEqual({});

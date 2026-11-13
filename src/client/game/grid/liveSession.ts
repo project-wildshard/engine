@@ -305,6 +305,7 @@ export class LiveGridSession {
         return { physics: ports.physics, walls: ports.walls, dispose: () => { highwayScope.dispose(); } };
       } },
       admit: (cell, required) => this.admit(cell, required),
+      buildAhead: true, // GC5 / GC36: the road builds the world ahead of its line
       prepareTransport: (cell, signal) => prepareApproachProductInputs(cell.slug, { allocator: ports.allocator, scope }, signal, assembly.local(traveller.position, cell)),
       ...(ports.prepareNeighbourTiles === undefined ? {} : { prepareNeighbour: ports.prepareNeighbourTiles }),
       prioritize: (cell) => prioritizeGridProduct(cell.slug, { allocator: ports.allocator, scope }),
@@ -732,7 +733,8 @@ export class LiveGridSession {
       const region = build();
       try {
         const feet = this.live.worldFeet();
-        await this.ports.prepareDataTiles?.(cell, region.shell.scope, { x: feet.x - cell.origin.x, z: feet.z - cell.origin.z });
+        const inside = (offset: number): number => Math.max(-CHUNK_HALF, Math.min(CHUNK_HALF, offset));
+        await this.ports.prepareDataTiles?.(cell, region.shell.scope, { x: inside(feet.x - cell.origin.x), z: inside(feet.z - cell.origin.z) });
         return region;
       } catch (error) {
         try { region.dispose(); }
@@ -785,7 +787,9 @@ export class LiveGridSession {
       try {
         if (cell.instance === this.ports.home.instance) bindHomeBuildCache(retained.admitted.source);
         const feet = this.live.worldFeet();
-        const entryPoint = { x: feet.x - cell.origin.x, z: feet.z - cell.origin.z };
+        // A world built from the road (GC36) takes its entry at the cell's edge, the nearest point the feet will arrive at
+        const inside = (offset: number): number => Math.max(-CHUNK_HALF, Math.min(CHUNK_HALF, offset));
+        const entryPoint = { x: inside(feet.x - cell.origin.x), z: inside(feet.z - cell.origin.z) };
         prepared = await factory({ cell, admitted: retained.admitted, manifest, page, textures, allocator: this.ports.allocator, claim, scope: this.runtimeScope, entryPoint });
       }
       catch (error) { this.transferWalls.delete(cell.instance); throw error; }

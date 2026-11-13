@@ -68,6 +68,9 @@ export interface LiveGridPorts {
   /** Metadata-only prefetch eligibility. Unsupported far proxies do not consume cold request slots; explicit transfers
    *  still run normal admission and readiness. Absent: every cell is a candidate, as in standalone Node drivers. */
   prefetchable?: (cell: GridCell) => boolean;
+  /** GC5 / GC36 (J322: no hold at the line): on the road, build the world of the cell the traveller heads into, ahead of
+   *  its line, so its entry finds it resident. Absent (standalone drivers): only actual entry builds a world (T7). */
+  buildAhead?: boolean;
   /** Product-only prefetch waits while this is false (T10: the page's spawn settle); required entry never waits. Absent: always. */
   backgroundReady?: () => boolean;
   bindFrame: (frame: LiveGridFrame) => void;
@@ -278,6 +281,9 @@ export class LiveGridHost {
     })();
     this.productRequests.set(instance, { work: request, required, trigger }); return request;
   }
+  /** GC5 / GC36: the cell whose world the road is building or built ahead of its line (`buildAhead`), kept until the
+   *  traveller enters a cell or heads into another's mouth. */
+  private ahead: string | null = null;
   private tileApproach: { instance: string; tile: CellTile; controller: AbortController } | null = null;
   private transportApproach: { instance: string; controller: AbortController; work: Promise<void> } | null = null;
   private retiredTransport: Promise<void> = Promise.resolve();
@@ -460,7 +466,7 @@ export class LiveGridHost {
       || this.active !== null || destination !== undefined && destination !== last.instance)) this.forgetLastCell();
     let released = true;
     for (const [instance, resident] of this.residents) {
-      const needed = instance === this.active || instance === destination || this.requests.has(instance) || resident.reservations > 0;
+      const needed = instance === this.active || instance === destination || instance === this.ahead || this.requests.has(instance) || resident.reservations > 0;
       resident.lease.update({ distance: this.distance(this.assembly.cell(instance)), needed: needed || resident.disposalFailed === true });
       if (needed || this.lastCell?.instance === instance) continue;
       if (resident.disposalFailed === true || resident.evicting || this.coldUnloadRefused.has(instance)) { released = false; continue; }
@@ -506,7 +512,9 @@ export class LiveGridHost {
     candidates.sort((a,b) => (this.candidateDistances.get(a) ?? Infinity) - (this.candidateDistances.get(b) ?? Infinity) || a.instance.localeCompare(b.instance));
     // Immutable products are selected by distance, without a whole-world count cap.
     const nearby = candidates;
-    // The frame-transfer reservation protects an actual entry; inactive whole worlds retire in steps.
+    // The frame-transfer reservation protects an actual entry; inactive whole worlds retire in steps. A world built ahead
+    // (`buildAhead`) stays while the traveller is on the road and has not turned into another mouth (below).
+    if (this.active !== null) this.ahead = null;
     this.retireInactiveRegions();
     for (const cell of nearby) {
       const estimate = readinessModel(this.ports.readiness.bundle(cell), this.ports.readiness.link), distance = this.distance(cell, feet);
@@ -561,6 +569,21 @@ export class LiveGridHost {
       const named = moving ?? predicted, outsideSource = sourceDistance >= CHUNK_HALF;
       if (named !== undefined && outsideSource && !this.residents.has(named.instance) && !this.issues.has(named.instance)
         && this.distance(named, feet) < this.assembly.pitch) this.prepareApproachTransport(named);
+      // GC5 / GC36 (J322: no walls, no hold at the line): on the road, a traveller heading into a cell's mouth builds that
+      // cell's world now, not at the line. Built on demand there, the walk stood 2 to 5 s at the neighbour's closed edge
+      // while its world was made (2 to 4 s in Chromium). The entry's own preparation then finds it resident. The departed
+      // cell retires first, as the entry would retire it; a U-turn builds it again, as any entry does.
+      // Only from the road itself: past a cell's line (inside its square, before the 6 m entry) the heading names the cell
+      // beyond it, which would retire the world just built for the one underfoot.
+      if (this.ports.buildAhead === true && moving !== undefined && this.active === null && this.assembly.at(feet.x, feet.z) === undefined) {
+        // a turn into another mouth lets the earlier one go (it retires on the next tick, as any unentered world does)
+        if (moving.instance !== this.ahead) this.ahead = null;
+        if (!this.residents.has(moving.instance) && !this.issues.has(moving.instance)
+          && this.distance(moving, feet) < this.assembly.pitch && this.retireInactiveRegions(moving.instance)) {
+          this.ahead = moving.instance;
+          void background(moving.instance, this.ensure(moving.instance), () => !this.disposed);
+        }
+      }
       if (approach !== undefined && this.ports.prepareNeighbour !== undefined && this.tileMetadata.has(approach.instance)
         && !this.residents.has(approach.instance) && !this.issues.has(approach.instance)
         && (this.active === null || moving === approach)
