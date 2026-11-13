@@ -25,6 +25,19 @@ import {SPAWN_PART_ALIGN, spawnCodeListPath, splitSpawnManifest, type SpawnCodeA
   type SpawnPart} from '../../shared/game/shardfile/spawnManifest';
 
 export const PART_BYTES = 12_000_000, PART_TARGET = 10, OVER_FETCH = 0.1;
+/** A part's size rule: at most `max` raw unless one file alone is bigger, which then stands alone (never past
+ *  PART_BYTES), and about `target` on average (DL18's key boundaries). */
+export interface PartLimits {readonly max: number; readonly target: number}
+/** A part's average decoded size: a key boundary falls after a member with probability size / PART_TARGET_BYTES (DL18). */
+export const PART_TARGET_BYTES = 9_000_000;
+/** Files no public (phone) entry reads keep the 12 MB rule: a desktop's whole level (Pine 333 MB) in 4 MiB parts would
+ *  pass the manifest's 128 parts. */
+export const WHOLE_PART_LIMITS: PartLimits = {max: PART_BYTES, target: PART_TARGET_BYTES};
+/** S12e: what a phone entry reads goes in parts of at most 4 MiB, about 3 MiB on average, the boot pack's own cap
+ *  (`boot-pack-parts.mjs` PART_MAX). Measured on Pine rev2 with the phone tier on: a one-texture edit re-downloads
+ *  3.28 MB of phone parts on average (9.19 MB at 12 MB, 3.77 at 5 MB), for 45 phone parts instead of 17 and the same
+ *  wire bytes (69.24 MB against 69.20). */
+export const PART_LIMITS: PartLimits = {max: 4 << 20, target: 3 << 20};
 export interface SpawnPartInput {readonly rows: readonly SpawnFile[]; readonly public: boolean; readonly desktop?: boolean}
 /** `desktop`: a desktop list holds these files too. S3: it never shares a part with a phone's own, or it fetches them all. */
 interface Group {readonly key: string; readonly members: ReadonlySet<number>; readonly desktop: boolean; readonly urls: string[]; bytes: number}
@@ -40,7 +53,7 @@ export const packable = (url: string): boolean => !/\.(?:js|mjs|css)(?:\?|$)/u.t
   // shard's discovery document, so one kept in its shard's part costs that whole part: 59 MB of 80 on a grid entry.
   && !/\/(?:shard|discovery)\.json(?:\?|$)/u.test(url);
 /** The groups after the steered merge (exported for the census and tests). */
-export function spawnPartGroups(manifests: readonly SpawnPartInput[]): Group[] {
+export function spawnPartGroups(manifests: readonly SpawnPartInput[], limits: PartLimits = PART_LIMITS): Group[] {
   const need = new Map<string, Set<number>>(), size = new Map<string, number>(), order: string[] = [];
   manifests.forEach((manifest, index) => {
     for (const row of manifest.rows) {
@@ -63,7 +76,7 @@ export function spawnPartGroups(manifests: readonly SpawnPartInput[]): Group[] {
   const publicIndices = manifests.flatMap((manifest, index) => manifest.public ? [index] : []);
   const own = new Map(publicIndices.map(index => [index, manifests[index]?.rows.reduce((sum, row) => sum + (packable(row.url) ? row.bytes : 0), 0) ?? 0]));
   const over = new Map(publicIndices.map(index => [index, 0]));
-  const partsOf = (group: Group): number => Math.max(1, Math.ceil(group.bytes / PART_BYTES));
+  const partsOf = (group: Group): number => Math.max(1, Math.ceil(group.bytes / limits.max));
   const needs = (index: number): number => [...groups.values()].reduce((sum, group) => sum + (group.members.has(index) ? partsOf(group) : 0), 0);
   for (;;) {
     const worst = publicIndices.reduce<number | undefined>((best, index) => best === undefined || needs(index) > needs(best) ? index : best, undefined);
@@ -91,8 +104,6 @@ export function spawnPartGroups(manifests: readonly SpawnPartInput[]): Group[] {
   return [...groups.values()];
 }
 
-/** A part's average decoded size: a key boundary falls after a member with probability size / PART_TARGET_BYTES (DL18). */
-export const PART_TARGET_BYTES = 9_000_000;
 /** DL18 (sp-x2's real pair 5adf2b0 -> fe210797ab: one Nine edit rewrote 41 bodies, and hashed placement scattered them
  * over 20 of 25 parts). Members are ordered by their readable stable key, so the files one generator writes (keys under
  * one section path or name prefix) sit together, and a part ends where the keys say: after a member whose key hash falls
@@ -101,7 +112,7 @@ export const PART_TARGET_BYTES = 9_000_000;
  * cut moves) instead of a scatter. Sections and schemas (`section|` keys) and build assets (`volatile|`) each form their
  * own run, so a rebuild's restamped files never share a part with content, and setup's first reads never sit behind
  * the build assets. */
-export function placeByKey(urls: readonly string[], size: (url: string) => number, key: (url: string) => string): string[][] {
+export function placeByKey(urls: readonly string[], size: (url: string) => number, key: (url: string) => string, limits: PartLimits = WHOLE_PART_LIMITS): string[][] {
   const order = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
   const sorted = [...urls].sort((a, b) => order(key(a), key(b)) || order(a, b));
   const parts: string[][] = []; let current: string[] = [], bytes = 0, run = '';
@@ -109,9 +120,9 @@ export function placeByKey(urls: readonly string[], size: (url: string) => numbe
   for (const url of sorted) {
     const name = key(url), kind = name.slice(0, name.indexOf('|') + 1);
     if (kind !== run) { cut(); run = kind; }
-    if (current.length > 0 && align(bytes) + size(url) > PART_BYTES) cut();
+    if (current.length > 0 && align(bytes) + size(url) > limits.max) cut();
     current.push(url); bytes = align(bytes) + size(url);
-    if (Number.parseInt(createHash('sha256').update(name).digest('hex').slice(0, 8), 16) / 2 ** 32 < size(url) / PART_TARGET_BYTES) cut();
+    if (bytes >= limits.max || Number.parseInt(createHash('sha256').update(name).digest('hex').slice(0, 8), 16) / 2 ** 32 < size(url) / limits.target) cut();
   }
   cut();
   return parts;
@@ -136,7 +147,7 @@ export interface CookedMember {readonly url: string; readonly bytes: number; rea
  * stay what they were; a cooked file only stops being written twice. */
 export async function writeSpawnParts(outDir: string, manifests: readonly SpawnPartInput[], read: (url: string) => Uint8Array,
   stableKey: (url: string) => string | undefined = () => undefined, encoder: PartEncoder = createPartEncoder(),
-  cooked: ReadonlyMap<string, CookedMember> = new Map()): Promise<SpawnPart[][]> {
+  cooked: ReadonlyMap<string, CookedMember> = new Map(), limits: PartLimits = PART_LIMITS): Promise<SpawnPart[][]> {
   const placed = new Map<string, {url: string; bytes: number; hash: string; offset: number}>(cooked), wire = new Map<string, number>();
   for (const member of cooked.values()) wire.set(member.url, member.wireBytes);
   mkdirSync(join(outDir, 'assets/spawn/parts'), {recursive: true});
@@ -175,12 +186,13 @@ export async function writeSpawnParts(outDir: string, manifests: readonly SpawnP
     inflight.add(job); void job.finally(() => { inflight.delete(job); }).catch(() => undefined);
   };
   try {
-    for (const group of spawnPartGroups(manifests)) {
+    for (const group of spawnPartGroups(manifests, limits)) {
       for (const url of group.urls) {
         const bytes = sizes.get(url) ?? 0;
         if (bytes > PART_BYTES) throw new Error(`Spawn file larger than a part (${bytes} > ${PART_BYTES}): ${url}`);
       }
-      for (const batch of placeByKey(group.urls.filter(url => !cooked.has(url)), url => sizes.get(url) ?? 0, keyOf)) await write(batch);
+      const rule = group.key.startsWith('P:') ? limits : WHOLE_PART_LIMITS;
+      for (const batch of placeByKey(group.urls.filter(url => !cooked.has(url)), url => sizes.get(url) ?? 0, keyOf, rule)) await write(batch);
     }
     await Promise.all(inflight);
   } finally { await encoder.close(); }

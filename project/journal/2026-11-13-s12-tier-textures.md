@@ -43,3 +43,10 @@ Pine's phone table (`scripts/tier-textures.mjs out/pine-hollow --astc6`): today 
 "stay 4×4" call) now 6×6 too. Cooking the rev2 shardfile: phone entry 90.29 → 88.75 MB; phone whole 90.29 → 95.50,
 because 51 phone files a fence shard reads past its fence (viewmodel maps and the like, read from desktop parts today)
 now ride in the phone whole set, S12b's birds case at scale. A warm recook: 0 encoded, 57 reused.
+
+## S12e: the content-part cap (opus-shardsize)
+
+A one-texture edit re-downloads the whole part holding it (DL18). Measured on Pine rev2 with the phone tier on: at the
+12 MB rule an edit costs a phone 9.19 MB on average (10.09 for a real byte-flip of a 0.15 MB texture); at 5 MB 3.77; at
+4 MiB 3.28 (1.14 real), with phone wire unchanged (69.20 → 69.24 MB) and 17 → 45 parts. Phone-read groups take 4 MiB;
+desktop-only groups keep 12 MB, because Pine's desktop level in 4 MiB parts is 151 parts and a manifest holds 128.

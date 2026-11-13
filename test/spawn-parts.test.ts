@@ -7,7 +7,7 @@ import { brotliDecompressSync } from 'node:zlib';
 // oxlint-disable-next-line import/no-nodejs-modules -- Part hashes.
 import { createHash } from 'node:crypto';
 import { afterAll, expect, test } from 'vitest';
-import { PART_BYTES, createPartEncoder, packable, placeByKey, placementKey, spawnPartGroups, writeSpawnParts, type SpawnPartInput } from '../src/cook/game/spawnParts';
+import { PART_BYTES, PART_LIMITS, WHOLE_PART_LIMITS, createPartEncoder, packable, placeByKey, placementKey, spawnPartGroups, writeSpawnParts, type SpawnPartInput } from '../src/cook/game/spawnParts';
 import { readSpawnManifest, type SpawnFile, type SpawnPart } from '../src/shared/game/shardfile/spawnManifest';
 import { SERVER_PART_BYTES, cookServerPack, cookServerRows } from '../src/cook/game/shardCook';
 import { serverPackFile, serverPackPart } from '../src/shared/game/shardfile/serverPack';
@@ -86,7 +86,8 @@ test('a resized named file changes only its own part', async () => {
     return Uint8Array.from({ length: rows.find(row => row.url === url)?.bytes ?? 0 }, (_, at) => (value + at) % 251);
   };
   const pack = async (rows: SpawnFile[]): Promise<Map<string, string>> => {
-    const [parts] = await writeSpawnParts(out, [manifest(rows)], read(rows), keyOf, encoder());
+    // The 12 MB rule: 4 MiB cuts every four models, and a forced cut moves with a resize (S12e measured that on Pine).
+    const [parts] = await writeSpawnParts(out, [manifest(rows)], read(rows), keyOf, encoder(), new Map(), WHOLE_PART_LIMITS);
     return new Map((parts ?? []).flatMap(part => part.members.map(([member]) => [rows[member]?.url ?? '', part.url] as const)));
   };
   const first = await pack(before), second = await pack(after);
@@ -185,7 +186,8 @@ test('a manifest lists section parts, then build-asset parts, then content parts
   const asset = file('/assets/boot-tables-aaaaaaaa.json', 300_000), section = file('/shardfiles/s/sections/world.json', 200_000);
   const rows = [...content, asset, section];
   const keyOf = (url: string): string | undefined => url.includes('/sections/') ? '/shardfiles/s/section:world/world' : undefined;
-  const [table] = await writeSpawnParts(out, [manifest(rows)], url => body(url, rows.find(row => row.url === url)?.bytes ?? 0), keyOf, encoder());
+  // One 6 MB content part (the 12 MB rule): in 4 MiB parts a 2 MB run of this test's bodies compresses below the asset.
+  const [table] = await writeSpawnParts(out, [manifest(rows)], url => body(url, rows.find(row => row.url === url)?.bytes ?? 0), keyOf, encoder(), new Map(), WHOLE_PART_LIMITS);
   const kindOf = (part: SpawnPart): string[] => part.members.map(([index]) => rows[index]?.url ?? '');
   const order = (table ?? []).map(part => kindOf(part).some(url => url.includes('/sections/')) ? 'section'
     : kindOf(part).some(url => url.startsWith('/assets/')) ? 'asset' : 'content');
@@ -256,4 +258,25 @@ test('S3: a file a desktop list holds never shares a group with a phone\'s own, 
   const groups = spawnPartGroups([{ rows: [shared, ...own], public: true }, { rows: [shared], public: false, desktop: true }]);
   expect(groups.find(group => group.urls.includes(shared.url))?.urls).toEqual([shared.url]);
   expect(groups.find(group => group.urls.includes(own[0]?.url ?? ''))?.urls).toHaveLength(40);
+});
+
+test('S12e: a part stays within its cap; a file over the cap stands alone', async () => {
+  const limits = PART_LIMITS, sizes = new Map<string, number>();
+  const urls = Array.from({ length: 30 }, (_, at) => {
+    const url = `/shardfiles/s/blobs/ktx2/${String(at).padStart(2, '0')}.ktx2`;
+    sizes.set(url, at === 7 ? 5_100_000 : 900_000 + at * 10_000); return url;
+  });
+  const parts = placeByKey(urls, url => sizes.get(url) ?? 0, url => placementKey(url, undefined), limits);
+  expect(parts.flat().sort()).toEqual([...urls].sort());
+  for (const part of parts) {
+    const bytes = part.reduce((sum, url) => Math.ceil(sum / 16) * 16 + (sizes.get(url) ?? 0), 0);
+    if (part.length > 1) expect(bytes).toBeLessThanOrEqual(limits.max); else expect(bytes).toBeLessThanOrEqual(PART_BYTES);
+  }
+  expect(parts.find(part => part.includes(urls[7] ?? ''))).toEqual([urls[7]]);
+  // A phone entry's files take the 4 MiB rule; files only a desktop list holds keep the 12 MB rule.
+  const rows = urls.map(url => file(url, sizes.get(url) ?? 0));
+  const [phone, desktop] = await writeSpawnParts(out, [manifest(rows.slice(0, 15)), { rows: rows.slice(15), public: false }],
+    url => new Uint8Array(sizes.get(url) ?? 0).fill(url.length), undefined, encoder());
+  for (const part of phone ?? []) if (part.members.length > 1) expect(part.bytes).toBeLessThanOrEqual(PART_LIMITS.max);
+  expect(Math.max(...(desktop ?? []).map(part => part.bytes))).toBeGreaterThan(PART_LIMITS.max);
 });
