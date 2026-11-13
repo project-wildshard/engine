@@ -6,3 +6,9 @@ hand-made 6×6 / 512 sets. Trimming the desktop masters to 512 instead gives 30.
 over, because the masters are UASTC (4×4) and the hand sets are 6×6. So retiring the hand sets needs the cook's own
 6×6 encode (S12b); trim gives the size, 6×6 gives the format. Not wired into shardCook yet: tiers share mount URLs, so
 per-tier bytes need per-tier names and table rows (S12a).
+
+Browser proof (`scripts/tier-textures-proof.mjs`, local build, phone tier, n=1 each): Pine reaches play with every loose
+GLB and KTX2 answered trimmed to 512, on Chromium (`--use-angle=metal`) and WebKit, 0 errors, KTX2 mode, 289 textures.
+The loose KTX2 reads go 11.12 → 9.65 MB; scene textures decode 17.83 → 17.60 MB; screenshots differ by 1.4–1.8 of 255
+on average (moving sky and grass included). Most of Pine's phone bytes ride in pack parts, which the proof can't
+rewrite: that waits for the cook wiring (S12a).

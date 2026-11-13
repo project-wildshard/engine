@@ -46,7 +46,8 @@ export function trimKtx2(bytes: Uint8Array, maxSize: number): Uint8Array {
   if (!isKtx2(bytes)) return bytes;
   const view = viewOf(bytes), info = ktx2Info(bytes);
   const depth = view.getUint32(28, true), layers = view.getUint32(32, true), faces = view.getUint32(36, true);
-  if (info.scheme === BASIS_LZ || info.levels <= 1 || depth > 1 || layers > 1 || faces !== 1) return bytes;
+  // Only block formats whose 16-byte blocks keep a level's alignment: UASTC (`vkFormat` 0) and ASTC.
+  if ((info.vkFormat !== 0 && ASTC_BLOCKS[info.vkFormat] === undefined) || info.scheme === BASIS_LZ || info.levels <= 1 || depth > 1 || layers > 1 || faces !== 1) return bytes;
   let drop = 0;
   while (drop < info.levels - 1 && Math.max(info.width >> drop, info.height >> drop) > maxSize) drop++;
   if (drop === 0) return bytes;
@@ -91,7 +92,7 @@ export function trimKtx2(bytes: Uint8Array, maxSize: number): Uint8Array {
 }
 
 interface GltfView {buffer: number; byteOffset?: number; byteLength: number; extensions?: {EXT_meshopt_compression?: {buffer: number; byteOffset?: number; byteLength: number}}}
-interface Gltf {bufferViews?: GltfView[]; buffers?: {byteLength: number; uri?: string}[]; images?: {bufferView?: number; mimeType?: string; uri?: string}[]}
+interface Gltf {accessors?: {bufferView?: number; sparse?: {indices: {bufferView: number}; values: {bufferView: number}}}[]; bufferViews?: GltfView[]; buffers?: {byteLength: number; uri?: string}[]; images?: {bufferView?: number; mimeType?: string; uri?: string}[]}
 interface Glb {readonly json: Gltf; readonly bin: Uint8Array}
 
 function readGlb(bytes: Uint8Array): Glb | undefined {
@@ -152,7 +153,8 @@ export function withImages(bytes: Uint8Array, replace: (image: GlbImage) => Uint
   const imageViews = (glb.json.images ?? []).map(image => image.bufferView);
   for (const viewIndex of cuts.keys()) {
     const cut = ranges.find(range => range.index === viewIndex);
-    const shared = imageViews.filter(view => view === viewIndex).length > 1;
+    const shared = imageViews.filter(view => view === viewIndex).length > 1
+      || (glb.json.accessors ?? []).some(accessor => accessor.bufferView === viewIndex || accessor.sparse?.indices.bufferView === viewIndex || accessor.sparse?.values.bufferView === viewIndex);
     if (cut === undefined || shared || ranges.some(range => range !== cut && range.at < cut.end && cut.at < range.end)) cuts.delete(viewIndex);
   }
   if (cuts.size === 0) return bytes;

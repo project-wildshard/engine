@@ -75,10 +75,12 @@ describe('S12: per-tier texture sizes from one master', () => {
     expect(phone.subarray(LEVEL_INDEX + 24 * 10, LEVEL_INDEX + 24 * 10 + 44)).toEqual(new Uint8Array(44).fill(7));
   });
 
-  it('keeps a texture already at or under the size, and a BasisLZ one it cannot cut', () => {
+  it('keeps a texture already at or under the size, and a BasisLZ or non-block one it cannot cut', () => {
     const small = ktx2(256), etc1s = ktx2(1024, {scheme: 1});
     expect(trimKtx2(small, 512)).toBe(small);
     expect(trimKtx2(etc1s, 512)).toBe(etc1s);
+    const rgb8 = ktx2(1024, {vkFormat: 23, scheme: 0});
+    expect(trimKtx2(rgb8, 512)).toBe(rgb8);
   });
 
   it('trims ASTC 6×6 masters too', () => {

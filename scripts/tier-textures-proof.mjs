@@ -33,8 +33,20 @@ const READ = `(() => {
   const rows = Array.isArray(mem?.allocations) ? mem.allocations : [], kinds = {};
   for (const r of rows) { const k = r.domain + ' ' + r.kind; kinds[k] = (kinds[k] ?? 0) + r.bytes; }
   let three = null; try { const r = api.requireWorld().game.renderer; three = { textures: r.info.memory.textures, geometries: r.info.memory.geometries }; } catch {}
+  // Decoded texture bytes, once per texture the scene draws: a compressed texture's transcoded levels as uploaded, an
+  // image's RGBA8 levels (a third more for mips). What the GPU holds for the page's textures, not counting render targets.
+  let textureBytes = null; try {
+    const world = api.requireWorld(), scene = world.game?.scene ?? world.scene, seen = new Set(); let total = 0;
+    scene.traverse(object => { for (const material of [object.material ?? []].flat()) for (const value of Object.values(material)) {
+      if (value === null || typeof value !== 'object' || value.isTexture !== true || seen.has(value)) continue;
+      seen.add(value);
+      if (value.isCompressedTexture === true) total += (value.mipmaps ?? []).reduce((sum, level) => sum + (level.data?.byteLength ?? 0), 0);
+      else { const image = value.image; if (image?.width > 0) total += image.width * image.height * 4 * (value.generateMipmaps === false ? 1 : 4 / 3); }
+    } });
+    textureBytes = { total, textures: seen.size };
+  } catch (e) { textureBytes = { error: String(e).slice(0, 160) }; }
   let mode = null; try { mode = api.textures?.()?.mode ?? null; } catch {}
-  return { totals: mem?.totals ?? null, kinds, three, mode };
+  return { totals: mem?.totals ?? null, kinds, three, mode, textureBytes };
 })()`;
 
 const result = { engine: engineName, base, slug, max, label, at: new Date().toISOString(), outcome: 'none', errors: /** @type {string[]} */ ([]),
@@ -51,7 +63,10 @@ try {
   await context.route(/\.(?:glb|ktx2)(?:\?.*)?$/u, async route => {
     const response = await route.fetch(), body = new Uint8Array(await response.body());
     const glb = /\.glb(?:\?|$)/u.test(route.request().url()), row = glb ? result.glb : result.ktx2;
-    const read = max === 0 || response.status() !== 200 ? body : glb ? tierGlb(body, max) : trimKtx2(body, max);
+    /** @type {Uint8Array} */
+    let read = body;
+    try { if (max !== 0 && response.status() === 200) read = glb ? tierGlb(body, max) : trimKtx2(body, max); }
+    catch (error) { result.errors.push(`trim ${route.request().url()}: ${String(error).slice(0, 160)}`); }
     row.files++; row.served += body.length; row.read += read.length;
     const headers = { ...response.headers() };
     delete headers['content-length']; delete headers['content-encoding']; delete headers.etag;
@@ -82,6 +97,5 @@ try {
 }
 writeFileSync(join(out, `${label}.json`), `${JSON.stringify(result, null, 2)}\n`);
 const page = /** @type {any} */ (result.page);
-const gpuTex = page ? Object.entries(page.kinds ?? {}).filter(([k]) => /^gpu .*tex/iu.test(k)).reduce((total, [, bytes]) => total + Number(bytes), 0) : 0;
-console.log(`${label}: ${result.outcome}, mode ${page?.mode ?? '?'}, glb ${result.glb.files} files ${(result.glb.served / MB).toFixed(2)} -> ${(result.glb.read / MB).toFixed(2)} MB, ktx2 ${result.ktx2.files} files ${(result.ktx2.served / MB).toFixed(2)} -> ${(result.ktx2.read / MB).toFixed(2)} MB, GPU textures ${(gpuTex / MB).toFixed(1)} MB, GPU total ${((page?.totals?.gpu ?? 0) / MB).toFixed(1)} MB, three textures ${page?.three?.textures ?? '?'}, errors ${result.errors.length}`);
+console.log(`${label}: ${result.outcome}, mode ${page?.mode ?? '?'}, glb ${result.glb.files} files ${(result.glb.served / MB).toFixed(2)} -> ${(result.glb.read / MB).toFixed(2)} MB, ktx2 ${result.ktx2.files} files ${(result.ktx2.served / MB).toFixed(2)} -> ${(result.ktx2.read / MB).toFixed(2)} MB, decoded textures ${((page?.textureBytes?.total ?? 0) / MB).toFixed(2)} MB in ${page?.textureBytes?.textures ?? page?.textureBytes?.error ?? '?'}, three textures ${page?.three?.textures ?? '?'}, errors ${result.errors.length}`);
 process.exit(code);
