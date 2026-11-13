@@ -46,6 +46,10 @@ export interface RulerReport {
   readonly format: string;
   readonly modules: ReadonlyMap<string, ModuleUse>;
   readonly oneUser: ReadonlyMap<string, OneUserTotal>;
+  readonly root: string;
+  readonly reader: TreeReader;
+  readonly tables: { readonly plan: ClientPlanRoots; readonly native: NativeAssemblyRoots };
+  readonly register: readonly RegisterRule[];
 }
 export interface MeasureOptions {
   readonly tables?: Readonly<Record<string, TableRule>>;
@@ -82,3 +86,6 @@ export interface OptionRow {
 export declare const OPTIONS: readonly OptionRow[];
 export interface OptionCharge { readonly key: string; readonly user: string; readonly option: string; readonly lines: number }
 export function optionCharges(modules: ReadonlyMap<string, ModuleUse>, products: readonly { readonly slug: string; readonly options?: readonly string[]; readonly rootKeys?: readonly string[] }[], reader: TreeReader, options?: readonly OptionRow[]): OptionCharge[];
+export interface InventoryRow { readonly module: string; readonly layer: string; readonly lines: number; readonly users: readonly string[]; readonly register: string; readonly entry: string }
+export function inventory(report: RulerReport, options?: { readonly sharddev?: string }): InventoryRow[];
+export function formatInventory(rows: readonly InventoryRow[]): string;

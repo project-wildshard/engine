@@ -55,3 +55,8 @@
   `figures` (its branch imports are held back without it). A binding only
   one product's option reaches, and nothing else uses, is charged to that
   product even in a shared module. Every other option prints as unmeasured.
+- HR8 (opus-hrm1): `--inventory [--sharddev <dir>]` prints every module of
+  engine's layers, the pinned format package's published `src/format/` and
+  sharddev's sdk (build-time): layer, lines, users, register row and the
+  entry table naming it. The honest run over the origin/main builds is in
+  meta `docs/plans/host-ruler/inventory-2026-11-13.md`.

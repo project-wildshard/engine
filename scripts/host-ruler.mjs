@@ -11,11 +11,11 @@
 // charged like any host, reported under `format`, published files only (HA0 e).
 // Report-only: nothing here fails a commit.
 // Usage: node scripts/host-ruler.mjs --products <product-dir>... [--json]
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'vite';
-import { CLIENT_PLAN, ENGINE_ROOT, clientPlanRoots, modulePath, productRoots, resolveModule } from './host-ruler/roots.mjs';
-import { NATIVE_ASSEMBLY, NATIVE_HOSTS, nativeAssemblyRoots, productServerRoots } from './host-ruler/server-roots.mjs';
+import { CLIENT_PLAN, CLIENT_PLAN_ROOT, ENGINE_ROOT, SECTION_HOSTS, clientPlanRoots, modulePath, productRoots, resolveModule } from './host-ruler/roots.mjs';
+import { NATIVE_ASSEMBLY, NATIVE_ASSEMBLY_ROOT, NATIVE_HOSTS, nativeAssemblyRoots, productServerRoots } from './host-ruler/server-roots.mjs';
 import { REGISTER, namesBinding, readHostRegister } from './host-ruler/register.mjs';
 
 /** Dispatch tables: a module whose entries a product reaches one by one through its declarations. The module itself
@@ -451,9 +451,75 @@ export function rule(dirs, options = {}) {
   if (new Set(slugs).size !== slugs.length) throw new Error(`two products share a slug: ${slugs.join(', ')}`);
   const reader = createTreeReader({ root });
   const modules = measure(products, reader, { shell: { roots: SHELL_ROOTS, control: SHELL_CONTROL } });
-  const ruled = applyRegister(modules, reader, options.register ?? readHostRegister(root).rows, { today });
+  const register = options.register ?? readHostRegister(root).rows;
+  const ruled = applyRegister(modules, reader, register, { today });
   const charges = optionCharges(modules, products, reader);
-  return { products, format: reader.format.version, today, modules, ruled, options: charges, oneUser: oneUserLines(modules, slugs), totals: shardTotals(ruled, slugs, charges) };
+  return { products, format: reader.format.version, today, modules, ruled, options: charges, oneUser: oneUserLines(modules, slugs), totals: shardTotals(ruled, slugs, charges),
+    root, reader, tables, register };
+}
+
+/** Every `.ts` file under `dir` (relative to `base`), tests and declaration files left out.
+ * @param {string} base @param {string} dir @returns {string[]} */
+function sourceFiles(base, dir) {
+  const full = join(base, dir);
+  if (!existsSync(full)) return [];
+  return readdirSync(full, { recursive: true, encoding: 'utf8' }).filter(path => /\.tsx?$/u.test(path) && !/\.(?:test|spec)\.tsx?$/u.test(path) && !path.endsWith('.d.ts'))
+    .map(path => join(dir, path)).sort();
+}
+/** HR8 (HA1): every module in engine `src/{client,shared,server,cook}/{engine,game,host,app}`, the pinned format
+ * package's published `src/format/`, and sharddev's `src/sharddev/` (the sdk: build-time, never a runtime host): its
+ * layer, lines, runtime users, register row and the entry table that names it.
+ * @param {ReturnType<typeof rule>} report @param {{ sharddev?: string }} [options] */
+export function inventory(report, options = {}) {
+  const { root, reader, tables, register } = report;
+  /** @type {Map<string, Set<string>>} */
+  const entries = new Map();
+  const name = (/** @type {string} */ module, /** @type {string} */ entry) => entries.set(module, (entries.get(module) ?? new Set()).add(entry));
+  for (const [kind, rows] of tables.plan.kinds) for (const row of rows) name(row.module, `kind ${kind}`);
+  for (const row of tables.plan.shared) if (!row.typeOnly) name(row.module, CLIENT_PLAN_ROOT);
+  for (const [section, selectors] of Object.entries(SECTION_HOSTS)) for (const selector of selectors) {
+    if (selector === CLIENT_PLAN_ROOT) continue;
+    const module = selector.split('#')[0] ?? '';
+    name(module.startsWith(`${FORMAT}/`) ? resolveModule(module, CLIENT_PLAN, root) : module, `section ${section}`);
+  }
+  for (const [id, host] of tables.native.hosts) for (const row of host.roots) name(row.module, `native ${id}`);
+  for (const row of tables.native.shared) name(row.module, NATIVE_ASSEMBLY_ROOT);
+  /** @type {Map<string, string[]>} */
+  const rows = new Map();
+  for (const row of register) {
+    const [module = '', binding] = row.key.split('#');
+    rows.set(module, [...rows.get(module) ?? [], binding === undefined ? `${row.verdict} ${row.decision ?? ''}`.trim() : `#${binding} ${row.verdict}`]);
+  }
+  const registerOf = (/** @type {string} */ module) => {
+    const found = rows.get(module) ?? [];
+    const own = found.filter(row => !row.startsWith('#')), bindings = found.length - own.length;
+    return [...own, ...bindings > 0 ? [`${bindings} binding row${bindings === 1 ? '' : 's'}`] : []].join('; ') || '-';
+  };
+  const entryOf = (/** @type {string} */ module) => {
+    const found = [...entries.get(module) ?? []].sort();
+    return found.length === 0 ? 'none' : found.length > 3 ? `${found.slice(0, 3).join(', ')} +${found.length - 3}` : found.join(', ');
+  };
+  const out = [];
+  for (const side of ['client', 'shared', 'server', 'cook']) for (const layer of ['engine', 'game', 'host', 'app']) for (const module of sourceFiles(root, `src/${side}/${layer}`)) {
+    const use = report.modules.get(module);
+    out.push({ module, layer: `${side}/${layer}`, lines: use?.lines ?? codeLines(readFileSync(join(root, module), 'utf8'), module), users: use?.users ?? [], register: registerOf(module), entry: entryOf(module) });
+  }
+  for (const path of sourceFiles(reader.format.dir, 'src/format')) {
+    if (!reader.format.published(path)) continue;
+    const module = `${FORMAT}/${path}`, use = report.modules.get(module);
+    out.push({ module, layer: 'format', lines: use?.lines ?? codeLines(readFileSync(join(reader.format.dir, path), 'utf8'), path), users: use?.users ?? [], register: registerOf(module), entry: entryOf(module) });
+  }
+  if (options.sharddev !== undefined) for (const path of sourceFiles(options.sharddev, 'src/sharddev')) {
+    out.push({ module: `sharddev/${path}`, layer: 'sdk', lines: codeLines(readFileSync(join(options.sharddev, path), 'utf8'), path), users: ['build-time'], register: '-', entry: 'none' });
+  }
+  return out;
+}
+
+/** @param {ReturnType<typeof inventory>} rows */
+export function formatInventory(rows) {
+  const users = (/** @type {readonly string[]} */ list) => list.length === 0 ? '-' : list.length > 4 ? `${list.length} users` : list.join(', ');
+  return ['| Module | Layer | Lines | Users | Register | Entry |', '|---|---|---:|---|---|---|',
+    ...rows.map(row => `| \`${row.module}\` | ${row.layer} | ${row.lines} | ${users(row.users)} | ${row.register} | ${row.entry} |`)].join('\n');
 }
 
 /** @param {ReturnType<typeof rule>} report */
@@ -479,13 +545,14 @@ export function formatTable(report) {
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
-  const args = process.argv.slice(2), json = args.includes('--json');
+  const args = process.argv.slice(2), json = args.includes('--json'), sharddevAt = args.indexOf('--sharddev');
   const at = args.indexOf('--products'), todayAt = args.indexOf('--today');
   const dirs = at === -1 ? [] : args.slice(at + 1).filter((arg, i, all) => !arg.startsWith('--') && all.slice(0, i).every(prev => !prev.startsWith('--')));
-  if (dirs.length === 0) { console.error('usage: node scripts/host-ruler.mjs --products <product-dir>... [--today YYYY-MM-DD] [--json]'); process.exit(2); }
+  if (dirs.length === 0) { console.error('usage: node scripts/host-ruler.mjs --products <product-dir>... [--today YYYY-MM-DD] [--json] [--inventory [--sharddev <dir>]]'); process.exit(2); }
   const report = rule(dirs, todayAt === -1 ? {} : { today: args[todayAt + 1] });
   if (json) console.log(JSON.stringify({ format: report.format, today: report.today, products: report.products, modules: Object.fromEntries(report.modules),
     oneUser: Object.fromEntries(report.ruled.modules), sillyShared: report.ruled.sillyShared, options: report.options, totals: Object.fromEntries(report.totals) },
     (key, value) => value instanceof Set ? [...value] : value, 2));
   else console.log(formatTable(report));
+  if (args.includes('--inventory')) console.log(`\n${formatInventory(inventory(report, sharddevAt === -1 ? {} : { sharddev: args[sharddevAt + 1] }))}`);
 }

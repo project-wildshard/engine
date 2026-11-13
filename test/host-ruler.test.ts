@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { applyRegister, codeLines, createTreeReader, formatTable, layerOf, OPTIONS, optionCharges, shardTotals, measure, oneUserLines, productRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
+import { applyRegister, codeLines, createTreeReader, formatInventory, formatTable, inventory, layerOf, OPTIONS, optionCharges, shardTotals, measure, oneUserLines, productRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
 import { CLIENT_PLAN, clientPlanRoots } from '../scripts/host-ruler/roots.mjs';
 import { NATIVE_ASSEMBLY, NATIVE_HOSTS } from '../scripts/host-ruler/server-roots.mjs';
 
@@ -208,5 +208,28 @@ describe('optional sub-rows (HR7, HA0 c)', () => {
       if (entry.from === undefined) expect(count, key).toBeGreaterThan(0);
       else expect(count, key).toBe(2);
     }
+  });
+});
+
+describe('the inventory (HR8, HA1)', () => {
+  const report = rule(['test/fixtures/host-ruler/closure-a', 'test/fixtures/host-ruler/pine-hollow'], { today: '2026-11-13' });
+  const rows = inventory(report, { sharddev: 'test/fixtures/host-ruler/tree' });
+  const byModule = new Map(rows.map(row => [row.module, row]));
+
+  test('every engine layer module, every published format module and the sdk, once each', () => {
+    expect(new Set(rows.map(row => row.module)).size).toBe(rows.length);
+    expect(rows.filter(row => row.layer === 'format').every(row => reader.format.published(row.module.slice('@wildshard/format/'.length)))).toBe(true);
+    expect(rows.some(row => row.module.endsWith('.test.ts'))).toBe(false);
+    expect(byModule.get('sharddev/src/sharddev/bake/run.ts')).toEqual({ module: 'sharddev/src/sharddev/bake/run.ts', layer: 'sdk', lines: 1, users: ['build-time'], register: '-', entry: 'none' });
+    expect(rows.filter(row => row.layer.endsWith('/engine')).length).toBeGreaterThan(500);
+    // Every TypeScript module a product reaches is in the inventory with the same users (data files count no lines).
+    for (const [module, use] of report.modules) if (/\.tsx?$/u.test(module)) expect(byModule.get(module)?.users, module).toEqual(use.users);
+  });
+  test('it names the entry table, the register row and the users', () => {
+    expect(byModule.get('src/client/game/shardfile/clientMeadow.ts')).toMatchObject({ users: ['closure-a'], entry: 'kind world.meadow' });
+    expect(byModule.get('src/client/game/shardfile/worldScenes.ts')?.entry).toContain('section world/scenes');
+    expect(byModule.get('src/client/game/shardfile/clientForestPage.ts')?.register).toBe('pending G571');
+    expect(byModule.get('src/server/game/shardfile/nativeAssemblyHosts.ts')?.entry).toBe('none');
+    expect(formatInventory(rows.slice(0, 2)).split('\n')).toHaveLength(4);
   });
 });
