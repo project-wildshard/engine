@@ -61,7 +61,8 @@ function legalCeiling(slug, row, raises) {
 export function checkShardSizes(baseline, downloads, { cooksAfter = false } = {}) {
   const errors = [], notes = [], { limits, shards, raises } = baseline;
   for (const raise of raises) {
-    if (!/^[GE]\d+$/u.test(raise.decision) || raise.why.trim() === '') errors.push(`shard size: the raise of ${raise.shard} names no decision (G### or E###) and why`);
+    // J-numbers are Jake's decisions since the split (meta MULTI-REPO-PLAN section 2); G and E are the singleplayer-era logs.
+    if (!/^[GEJ]\d+$/u.test(raise.decision) || raise.why.trim() === '') errors.push(`shard size: the raise of ${raise.shard} names no decision (G###, E### or J###) and why`);
   }
   for (const [slug, row] of Object.entries(shards)) {
     const legal = legalCeiling(slug, row, raises);

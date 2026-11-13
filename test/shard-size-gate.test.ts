@@ -68,6 +68,7 @@ test('a ceiling edited upward is refused until a raise names Jake\'s decision', 
   expect(errors({ held: 20_000_000, over: 95_000_000 }, edited([]))[0]).toContain('"raises"');
   expect(errors({ held: 20_000_000, over: 95_000_000 }, edited([{ shard: 'over', toBytes: 95_000_000, decision: 'soon', why: 'x' }]))[0]).toContain('names no decision');
   expect(errors({ held: 20_000_000, over: 95_000_000 }, edited([{ shard: 'over', toBytes: 95_000_000, decision: 'G1100', why: 'the new forest' }]))).toEqual([]);
+  expect(errors({ held: 20_000_000, over: 95_000_000 }, edited([{ shard: 'over', toBytes: 95_000_000, decision: 'J299', why: 'audio in DOWNLOAD' }]))).toEqual([]);
 });
 
 test('the book read is this build\'s own, never one a deploy carried in, and no book means nothing to check', () => {
