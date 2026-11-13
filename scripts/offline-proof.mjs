@@ -32,7 +32,7 @@
 // when START, DOWNLOAD and LOAD finish from the cache, the player is in the world, and then the connection card shows.
 //
 //   scripts/browser-lane.sh node scripts/offline-proof.mjs [--channel=staging|preview|both] [--mode=offline|slow|nobackend]
-//       [--shard=<slug>[,<slug>]] [--entry=deck|resume|both] [--jobs=<n>] [--base=<served build>] [--out=<dir>] [--require-world] [--report]
+//       [--shard=<slug>[,<slug>]] [--entry=deck|resume|both] [--jobs=<n>] [--base=<served build>] [--out=<dir>] [--require-world] [--staging-port=<n>] [--report]
 //   scripts/browser-lane.sh node scripts/offline-proof.mjs --walkthrough <slug> [--base=…] [--out=…] [--report]
 // With no `--base` it builds this working tree with scripts/serve-build.sh and stops that server at the end. `--jobs` above 1
 // gives each shard its own profile (one profile can't hold two browsers), which trades the shared-device shape for time.
@@ -150,7 +150,10 @@ async function stamp(request, response) {
   }
 }
 const stamper = createServer((request, response) => { void stamp(request, response); });
-await new Promise(resolve => { stamper.listen(0, '127.0.0.1', () => { resolve(null); }); });
+// A fixed port per build server (`--staging-port`, else 5400 + the build port's last three digits): the origin is the profile's
+// key to its service worker and caches, so a rerun on a kept `--out` must see the same one.
+const stagingPort = Number(option('staging-port') ?? 5400 + Number(upstream.port || '80') % 1000);
+await new Promise((resolve, reject) => { stamper.once('error', reject); stamper.listen(stagingPort, '127.0.0.1', () => { resolve(null); }); });
 const stamperAddress = stamper.address();
 if (stamperAddress === null || typeof stamperAddress === 'string') throw new Error('offline-proof: the stamping server has no port');
 /** @type {Record<Channel, string>} */
@@ -375,7 +378,8 @@ async function installApp(profile) {
  * @param {Channel} channel @param {Mode} mode @param {string} slug @param {string} profile
  */
 async function proveShard(channel, mode, slug, profile) {
-  const warmFile = join(profile, `..`, `warm-${channel}-${slug}.json`);
+  // beside its own profile, so a different --jobs layout (a cold profile) warms again
+  const warmFile = join(`${profile}.warm-${slug}.json`);
   const results = [];
   /** @type {Set<string> | undefined} */
   let warm;
