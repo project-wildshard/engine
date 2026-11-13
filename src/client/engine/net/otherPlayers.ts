@@ -8,6 +8,7 @@ import type { DummyJoint, DummyJoints } from '../practice/TrainingDummy';
 import { castawayBody, groundContact, type CastawayBody } from '../models/castawayBody';
 import { AnimMachine } from '../anim/machine';
 import { gaitMix, gaitOf, STRIDE_JOINTS, stridePose, stridePoseAtRest } from './remoteGait';
+import { AirPose, type AirPhase } from './remoteAir';
 import { BoardUnder, DECK_LIFT } from './remoteBoard';
 import { NameTag, type NameTagShown } from './nameTag';
 import { HeldInHand } from './heldOnOthers';
@@ -17,6 +18,8 @@ import { talkerKey, voiceNear, type Talker } from './voiceNear';
 
 const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => entry.name === name);
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), BOARD = column('board'), HELD = column('held'), HP = column('hp'), SWIM = column('swim');
+/** RP9: the row's airborne bit (RP6); a build without the column reads no data. */
+const AIR = column('air');
 /** A body's speed settles at this rate, so one late row is no stumble. */
 const SETTLE = 8;
 /** VOICE-POLISH V8: the ring over a talking player's Name, its size in metres, and how fast and far it breathes. */
@@ -54,6 +57,8 @@ function talkRing(): THREE.Sprite {
 
 /** What a page drew of another player. */
 export interface OtherShown { readonly name: string; readonly x: number; readonly y: number; readonly z: number; readonly speed: number; readonly gait: string; readonly board: boolean; readonly mounted: boolean; readonly held: number; readonly hp: number; readonly modelled: boolean; readonly model: string; readonly talking: boolean;
+  /** RP9: its jump, fall or landing ('jump', 'fall', 'land'), or '' on the ground. */
+  readonly air: AirPhase;
   /** RP5: the item drawn in the hand for `held` (its row), or '' for an empty hand. */
   readonly item: string }
 
@@ -79,9 +84,11 @@ class OtherBody {
   /** RP4: where the body is in its stride (0 to 1, the left foot down at 0), and its pose there. */
   private phase = 0;
   private readonly stride = stridePoseAtRest();
+  /** RP9: its jump, fall and landing, over the gait (remoteAir.ts). */
+  private readonly air = new AirPose();
   /** Whether a row has put it anywhere yet. */
   placed = false;
-  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '' };
+  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '', air: '' };
   /** Its player row's id, which voice names its talker by. */
   readonly id: string;
   constructor(name: string, id: string) {
@@ -115,6 +122,8 @@ class OtherBody {
     const held = row[HELD] ?? 0;
     this.hand?.show(held, !riding && !mounted && row[SWIM] !== 1, dt); // RP5: nothing in hand on a board, in a saddle or swimming
     this.anim?.update(dt);
+    const air = this.air.update(AIR < 0 || Number.isNaN(row[AIR] ?? Number.NaN) ? undefined : row[AIR] === 1, y, dt, riding || mounted); // RP9
+    if (this.shown.air !== air) this.shown = { ...this.shown, air };
     const drop = this.pose(onFoot, dt);
     if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : -drop);
     if (mounted) { this.bend('leftThigh', SEAT); this.bend('rightThigh', SEAT); this.bend('leftShin', -SEAT); this.bend('rightShin', -SEAT); }
@@ -132,8 +141,9 @@ class OtherBody {
   private pose(speed: number, dt: number): number {
     const mix = gaitMix(speed);
     this.phase = (this.phase + (speed * dt) / mix.stride) % 1;
-    const { bends, drop } = stridePose(this.phase, mix, this.stride);
+    const { bends, drop } = this.air.layer(stridePose(this.phase, mix, this.stride)); // RP9: the air pose over the gait
     for (const joint of STRIDE_JOINTS) this.bend(joint, bends[joint]);
+    this.air.spreadArms(this.joints);
     return drop;
   }
 }
