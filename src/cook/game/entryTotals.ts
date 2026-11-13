@@ -18,7 +18,7 @@ import {contentNamed} from './contentNamed';
 import {homedir} from 'node:os';
 import {productTarball} from './productTarball';
 import {BrotliSizeCache} from './brotliSizeCache.mjs';
-import {defaultBootAudio} from '@wildshard/engine/audio/bootAudio';
+import {defaultBootAudio, ENGINE_MUSIC_STYLE, missingEngineMusic, musicDir} from '@wildshard/engine/audio/bootAudio';
 import {withAssetTables, type AssetTables} from '@wildshard/engine/boot/tables';
 import type {AudioData} from '@wildshard/format/audio';
 
@@ -38,12 +38,21 @@ export function shardBootAudio(sections: ReadonlyMap<string, unknown>, tables: A
   const row = sections.get('audio/audio'), data = typeof row === 'object' && row !== null && 'audio' in row ? row.audio as AudioData : undefined;
   // A level with no music or sample rows boots with no recordings (NO_AUDIO); anything else must select, as on the page.
   let boot: readonly string[] = [];
+  // AU18 (J304): the rows name the engine music they play; a name this build's style lacks fails the cook, never drops.
+  const music = data?.music, missing = music === undefined ? [] : withAssetTables(tables, () => missingEngineMusic(music));
+  if (missing.length > 0) throw new Error(`${shard}: its audio rows name engine music the ${ENGINE_MUSIC_STYLE} style lacks: ${missing.join(', ')}`);
   if (data !== undefined && data.music !== undefined && data.samples !== undefined) {
     try { boot = withAssetTables(tables, () => defaultBootAudio(data)); }
     catch (error) { throw new Error(`${shard}: its boot audio does not select (${error instanceof Error ? error.message : String(error)})`, {cause: error}); }
   }
   const shipped = (url: string): boolean => Object.hasOwn(tables.bytes, url.split('?')[0] ?? url);
   return [...new Set([...boot, ...fenceMounts.filter(url => AUDIO_URL.test(url)).map(url => url.split('?')[0] ?? url)])].filter(shipped);
+}
+/** AU18: the build log's line for a shard's derived engine music (its boot set's files under the engine style). */
+export function engineMusicLine(shard: string, bootAudio: readonly string[], tables: AssetTables): string {
+  const dir = musicDir(ENGINE_MUSIC_STYLE), music = bootAudio.filter(url => url.startsWith(dir));
+  const bytes = music.reduce((sum, url) => sum + (tables.bytes[url] ?? 0), 0);
+  return `${shard}: engine music: ${music.length} files, ${(bytes / 1e6).toFixed(2)} MB${music.length === 0 ? '' : ` (${music.map(url => url.slice(dir.length)).join(', ')})`}`;
 }
 /** What a build's half of the manifests needs from the app: the page's own tables and names, which no cook owns. */
 export interface BuildHalf {
@@ -242,6 +251,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     }
     // AUDIO AU1: the same recordings on every tier and flow: LOAD reads them before control on all of them.
     const bootAudio = assetTables === undefined ? [] : shardBootAudio(sections, assetTables, half.mountRows('phone', 'entry').map(row => row.url), directory);
+    if (assetTables !== undefined && sections.has('audio/audio')) console.info(engineMusicLine(directory, bootAudio, assetTables));
     const write = (tier: 'phone' | 'desktop', flow: 'client' | 'grid', addresses: readonly Address[] = [], mode = '000', whole = false): number => {
       const selected = new Map<string, SpawnFile>(), add = (row: SpawnFile): void => {selected.set(row.url, row);};
       for (const row of shardRows[tier][whole ? 'whole' : 'entry']) add(row);

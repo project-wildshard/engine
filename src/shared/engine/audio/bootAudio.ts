@@ -314,3 +314,36 @@ export function defaultBootAudio(data: AudioData): string[] {
   const selection = audioSelection(data, () => DEFAULT_SFX_SET), files = selectedBootAudio(selection.files(), new Set(selection.bootFiles(ENGINE_MUSIC_STYLE)));
   return [...files.music, ...files.sfx];
 }
+
+// ---- AU18 (J304): the engine music a level names, and the files the cook derives from those names ----
+
+type LevelMusic = NonNullable<AudioData['music']>;
+/** The engine style's slots and stings a level's audio rows name. Slots: `title` when it boots one or plays a score set
+ *  (whose `setCatalogue.inventory`, `title` or `base`, plays the engine title), and each score slot whose set is `base`
+ *  (unset means `base`), as shard-format's `engineMusicSlots` reads them (a bank-mode score decodes its boot slots from
+ *  the engine style; every shard today sets those `base`). Stings: each of `catalogue.extraStings` with no `stingSets`
+ *  row, when the score's stings come from the engine (`SetScore.sting`: bank mode, or a base slot set `base`). */
+export function engineMusicNames(music: LevelMusic): { slots: string[]; stings: StemSting[] } {
+  const base = music.setCatalogue === undefined ? music.slots.filter(slot => (music.sets[slot] ?? 'base') === 'base') : [];
+  const title = music.bootSlots.includes('title') || music.setCatalogue !== undefined ? ['title'] : [];
+  const catalogue = music.catalogue, engineStings = catalogue !== undefined && (catalogue.mode === 'bank' || (music.sets[music.base] ?? 'base') === 'base');
+  const stings = engineStings ? catalogue.extraStings.filter(sting => catalogue.stingSets[sting] === undefined) : [];
+  return { slots: [...new Set([...title, ...base])], stings: [...new Set(stings)] };
+}
+/** The names `engineMusicNames` reads that this build's engine style lacks, or ships without one of their files (a slot's
+ *  calm, tension or layer stem, as the client drops the whole slot to the synth): `slot harbor`, `sting dawn`. Empty when
+ *  every name resolves. The selection would drop them silently through `shipped`. */
+export function missingEngineMusic(music: LevelMusic): string[] {
+  const manifest = musicManifest(ENGINE_MUSIC_STYLE), dir = musicDir(ENGINE_MUSIC_STYLE), { slots, stings } = engineMusicNames(music);
+  const has = (files: readonly string[]): boolean => files.every(file => shipped(`${dir}${file}`));
+  return [...slots.filter(slot => { const spec = manifest?.slots[slot]; return spec === undefined || !has([spec.calm, ...(spec.tension === undefined ? [] : [spec.tension]), ...spec.layers]); }).map(slot => `slot ${slot}`),
+    ...stings.filter(sting => { const file = manifest?.stings[sting]; return file === undefined || !has([file]); }).map(sting => `sting ${sting}`)];
+}
+/** AU18: the engine music a level's DOWNLOAD carries, derived from its names: the files of its default boot set
+ *  (`defaultBootAudio`) under the engine style. Throws, naming each, when the rows name engine music this build lacks. */
+export function engineMusicFiles(data: AudioData): string[] {
+  if (data.music === undefined) return [];
+  const missing = missingEngineMusic(data.music);
+  if (missing.length > 0) throw new Error(`its audio rows name engine music the ${ENGINE_MUSIC_STYLE} style lacks: ${missing.join(', ')}`);
+  return data.samples === undefined ? [] : defaultBootAudio(data).filter(url => url.startsWith(musicDir(ENGINE_MUSIC_STYLE)));
+}

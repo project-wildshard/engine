@@ -26,7 +26,7 @@ async function pageBootAudio(data: AudioData): Promise<string[]> {
 const tables: AssetTables = { bytes: PUBLIC_BYTES, versions: ASSET_VERSIONS, music: MUSIC_MANIFESTS, sfx: SFX_MANIFESTS, packs: {} };
 installAssetTables(tables);
 // A Driftwood-shaped catalogue: the title and one theme slot, an island bed, sample overlay.
-const catalogue = { music: { bootSlots: ['title', 'island'], controlTension: 'late' },
+const catalogue = { music: { slots: ['island'], bootSlots: ['title', 'island'], sets: { island: 'base' }, controlTension: 'late' },
   samples: { bed: 'island', set: 'fixture-isle', loopGains: { island: 0.5 },
     catalogue: { inventoryOmitSlots: [], loopOrder: [], overlaySamples: true, ownMusic: false, priorityOwn: false } } } as unknown as AudioData;
 
