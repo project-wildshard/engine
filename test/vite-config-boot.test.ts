@@ -16,7 +16,7 @@ test('the bundled Vite generator config imports discovery without loading the pr
     const loaded = await loadConfigFromFile({ command: 'build', mode: 'production' }, path, root, 'silent', undefined, 'bundle');
     expect(loaded?.config.define?.['GENERATOR_EXPORTS']).toBe(JSON.stringify([
       'assetIndex', 'assetVersionRows', 'audioTableSource',
-      'bootTableSources', 'bootTransportTableSources', 'generateBootTables',
+      'bootTableSources', 'bootTransportTableSources', 'changedContentNamed', 'generateBootTables',
     ]));
     expect(loaded?.dependencies.some(file => /(?:build-shardfiles|bake-data-maps|gen-programs)\.mjs$/u.test(file))).toBe(false);
   } finally { rmSync(root, { recursive: true, force: true }); }
