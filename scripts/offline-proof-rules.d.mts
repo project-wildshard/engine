@@ -15,6 +15,7 @@ export const RAW_STRINGS: readonly string[];
 export const CRITICAL_PHASES: readonly string[];
 export function mayFail(url: string): boolean;
 export function pathOf(url: string): string;
+export function textureForm(path: string): { name: string; form: 'img' | 'ktx2' } | undefined;
 export function judge(run: {
   shard: string; channel: 'staging' | 'preview'; mode: string; entry: string; rows: readonly RequestRow[];
   samples: readonly ScreenSample[]; outcome: Outcome; warm?: ReadonlySet<string>; layout?: boolean; walkthrough?: boolean;

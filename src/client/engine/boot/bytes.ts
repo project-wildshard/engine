@@ -23,7 +23,7 @@ import { pageScope } from '../../../shared/engine/app/resources';
 import { presenting } from '../../../shared/engine/core/framePacing';
 import { workSlice } from '../../../shared/engine/core/workSlice';
 import { demandTextureResponse } from './texturePack';
-import { readContent } from './contentRead';
+import { readContent, type ContentReadOptions } from './contentRead';
 import { contentURL } from './contentBase';
 
 export type ChunkFiles = Readonly<Record<ByteKey, readonly string[]>>;
@@ -218,11 +218,12 @@ function installCounter(): void {
  * ImageBitmapLoader (then texture.flipY must be false); pass false for canvas work that keeps the
  * file's orientation.
  */
-export async function fetchImage(file: string, maxSize: typeof Infinity = Infinity, flip = true, exact = false): Promise<ImageBitmap | HTMLImageElement> {
+export async function fetchImage(file: string, maxSize: typeof Infinity = Infinity, flip = true, exact = false, instead?: ContentReadOptions['instead']): Promise<ImageBitmap | HTMLImageElement> {
   const url = tierUrl(file);
   let type = '';
+  // `instead` (OF17, core/assets.ts loadTexture): a failed read may throw rather than wait on RETRY (contentRead.ts)
   const bytes = await readContent(url, 25_000_000, {fetch: (address, init) => fetch(address, init),
-    response: response => {type = response.headers.get('content-type') ?? '';}});
+    response: response => {type = response.headers.get('content-type') ?? '';}, ...(instead === undefined ? {} : {instead})});
   const blob = new Blob([bytes], {type});
   if (typeof createImageBitmap === 'function') {
     try {

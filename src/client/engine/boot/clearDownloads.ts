@@ -91,7 +91,7 @@ export async function clearDownloads(): Promise<ClearReport> {
   try {
     const slot = jsonSlot('ktx2set', 'device');
     const value = slot.read();
-    markers = typeof value === 'object' && value !== null ? Object.keys(value).length : 0;
+    markers = typeof value === 'object' && value !== null ? Object.keys(value).filter(key => !key.endsWith('.read')).length : 0; // OF17's notes are not markers
     slot.write({});
   } catch { /* storage off: no markers were written either */ }
   // 5. the HTTP cache (Clear-Site-Data: "cache"): offline this fails, and the reload is cold for Cache Storage only

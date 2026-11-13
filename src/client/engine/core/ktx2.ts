@@ -22,7 +22,9 @@ import { pageScope } from '../../../shared/engine/app/resources';
 import * as THREE from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { texMode, gpuFile, standIn, retireGpuFile } from '../boot/gpuFiles';
+import { texMode, gpuFile, standIn, retireGpuFile, rawAstcVeto, texturePin, type TexMode } from '../boot/gpuFiles';
+import { phoneUrl, versionedUrl } from '../boot/bytes';
+import type { ContentReadError, ContentReadOptions } from '../boot/contentRead';
 import { emitFault } from '../../../shared/engine/core/faults';
 import { markGpuOnly } from './gpuOnly';
 import { type Renderer, probeRenderer } from '../render/renderer';
@@ -33,7 +35,7 @@ import { uploadCompressedTexture } from '../render/compressedUpload';
 import { installGltfMaterialOrder } from '../render/gltfMaterialOrder';
 import { registerCompressedMipmaps, compressedMipmapsUploaded } from '../render/compressedMipmaps';
 import { harnessPins } from '../../../shared/engine/app/identity';
-import { applyKtx2Probe, ktx2ProbeResult, linearAstcSurvives } from '../render/ktx2Probe';
+import { applyKtx2Probe, ktx2Probe, ktx2ProbeResult, linearAstcSurvives, type Ktx2Probe } from '../render/ktx2Probe';
 import { workSlice } from '../../../shared/engine/core/workSlice';
 import { TIER } from './tier';
 import { prepareKtx2Zstd, unsupercompressKtx2 } from './ktx2Zstd';
@@ -252,22 +254,32 @@ export function installGltfKtx2(type: typeof GLTFLoader): void {
       configurable: true, writable: true,
       value(this: GLTFLoader, ...args: Parameters<GLTFLoader['load']>): void {
         const [url, onLoad, onProgress, onError] = args;
-        Reflect.apply(fetchGltf, this, [url, onLoad, onProgress, (error: unknown): void => {
-          const missing = missingStandIn(error), retired = missing === undefined ? undefined : retireGpuFile(missing);
-          if (retired === undefined) {
-            if (onError !== undefined) onError(error); else console.error(error);
-            return;
-          }
+        const fail = (failure: unknown): void => { if (onError !== undefined) onError(failure); else console.error(failure); };
+        const again = (): void => { Reflect.apply(fetchGltf, this, [url, onLoad, onProgress, onError]); };
+        Reflect.apply(fetchGltf, this, [url, onLoad, onProgress, (failure: unknown): void => {
+          const missing = missingStandIn(failure), retired = missing === undefined ? undefined : retireGpuFile(missing);
+          if (retired === undefined) { void heldModelRetry(url, failure, again, fail); return; }
           if (retired === 'new') {
             console.warn(`[ktx2] stand-in ${String(missing)} answered 404; loading ${url} instead`);
             emitFault({ system: 'assets.gpu', error: new Error(`KTX2 stand-in not served: ${String(missing)} (for ${url})`), verdict: 'retry' });
           }
-          Reflect.apply(fetchGltf, this, [url, onLoad, onProgress, onError]);
+          again();
         }]);
       },
     });
   }
   configuredGltfLoaders.add(type);
+}
+/** OF17: a model whose KTX2 stand-in failed to read while the cache holds the tier's own file: retire the stand-in for the
+ *  page and load again (the tier's file), else fail as before. */
+async function heldModelRetry(url: string, failure: unknown, again: () => void, fail: (failure: unknown) => void): Promise<void> {
+  let file: string | undefined;
+  try {
+    const served = texMode() === 'ktx2' ? phoneUrl(new URL(url.replace(/[?#].*$/u, ''), location.href).pathname) : undefined;
+    file = served === undefined ? undefined : standIn(served, 'ktx2');
+    if (served === undefined || file === undefined || await heldForm(served, 'ktx2', cacheHolds) !== 'img') file = undefined;
+  } catch { file = undefined; }
+  if (file === undefined || retireGpuFile(file) === undefined) fail(failure); else again();
 }
 /** The URL of a three HttpError's 404 (FileLoader passes the failed Response as `response`), else undefined. */
 function missingStandIn(error: unknown): string | undefined {
@@ -351,9 +363,11 @@ export function parseKtx2Bytes(input: Uint8Array): Promise<THREE.Texture> {
  * remain on every returned texture until upload, including after disposal or for a different sampler.
  * `maxSize` (the tier's texture cap, as loadImage applies it to a decode): a larger file starts at the first mip that fits.
  */
-export async function ktx2Texture(served: string, maxSize: typeof Infinity = Infinity): Promise<THREE.CompressedTexture | null> {
-  const url = gpuFile(served);
+export async function ktx2Texture(served: string, maxSize: typeof Infinity = Infinity, tex?: TexMode): Promise<THREE.CompressedTexture | null> {
+  // `tex` (OF17): a form other than the page's, read because the cache holds it (core/assets.ts loadTexture)
+  const url = tex === undefined ? gpuFile(served) : standIn(served, tex);
   if (url === undefined) return null;
+  if (tex === 'ktx2' && texMode() !== 'ktx2') markGpuOnly('KTX2 stand-ins read on the image path because the cache held them (OF17)');
   const base = await load(url, true);
   const skip = base.mipmaps.findIndex((m) => Math.max(m.width, m.height) <= maxSize);
   let t: THREE.CompressedTexture;
@@ -508,4 +522,63 @@ function topRowsFirst(out: Uint8Array, w: number, h: number): Uint8Array {
   const rows = new Uint8Array(out.length), stride = w * 4;
   for (let y = 0; y < h; y++) rows.set(out.subarray((h - 1 - y) * stride, (h - y) * stride), y * stride);
   return rows;
+}
+
+// OF17 (one texture form per device and tier): a texture read in its page's form gives way to the other form when its
+// read fails and the cache holds the other one. Nine Dragon's grid page read `scroll.phone-<h>.ktx2` and its offline one-shard
+// page asked for `scroll.phone.webp`, which nothing had cached, so the read parked LOAD on RETRY for good. A stand-in's read
+// fails at once offline; an image's read fails twice and then, instead of waiting on RETRY (boot/contentRead.ts `instead`),
+// turns to the stand-in. Models (the GLTF load hook above) and terrain arrays (core/assets.ts loadPBRArray) do the same.
+
+/**
+ * The form of `served` (a path, after tierUrl) to read when its `failed` form could not be read: the other form, when this
+ * tier has both, no harness pin holds the page to one form, this GPU may sample the KTX2 one, and `held` (the cache) holds
+ * it; else undefined (the read waits on RETRY as before). `held` gets the path of the form it asks about: the stand-in, or
+ * `served` itself.
+ */
+export async function heldForm(served: string, failed: TexMode, held: (path: string) => Promise<boolean>, probe: () => Ktx2Probe = ktx2Probe): Promise<TexMode | undefined> {
+  const ktx2 = standIn(served, 'ktx2');
+  if (ktx2 === undefined || texturePin() !== 'auto') return undefined; // a test or capture's pin keeps its one form
+  if (failed === 'img') {
+    const verdict = probe();
+    if ((verdict.veto ?? rawAstcVeto(verdict)) !== null) return undefined;
+  }
+  const other: TexMode = failed === 'ktx2' ? 'img' : 'ktx2';
+  try { return await held(other === 'ktx2' ? ktx2 : served) ? other : undefined; }
+  catch { return undefined; } // storage denied: no held form to know of
+}
+
+const CONTENT_ADDRESSED = /-[a-f0-9]{8,64}\.[a-z0-9]+$|\/[a-f0-9]{64}\.[a-z0-9]+$/u;
+/** Whether the cache holds `path` as the service worker would answer it: the exact versioned URL, or a content-addressed
+ *  name under any query (sw.js's own rule). A missing Cache Storage holds nothing. */
+export async function cacheHolds(path: string): Promise<boolean> {
+  if (typeof caches === 'undefined') return false;
+  const href = new URL(versionedUrl(path), location.href).href;
+  return await caches.match(href, { ignoreVary: true, ignoreSearch: CONTENT_ADDRESSED.test(path) }) !== undefined;
+}
+/** failed image reads whose KTX2 stand-in the cache holds: every caller sharing that read turns to the stand-in */
+const heldKtx2 = new WeakSet<Error>();
+
+/**
+ * `ktx2()` (the page's form: the stand-in in KTX2 mode, else null) or `image(instead)`. `ktx2('ktx2')` reads the stand-in
+ * whatever the page's form; `image` passes `instead` to its read (fetchImage).
+ */
+export async function readHeldForm<T>(served: string, ktx2: (tex?: TexMode) => Promise<THREE.CompressedTexture | null>,
+  image: (instead?: ContentReadOptions['instead']) => Promise<T>, held: (path: string) => Promise<boolean> = cacheHolds): Promise<THREE.CompressedTexture | T> {
+  const triedKtx2 = texMode() === 'ktx2';
+  let k: THREE.CompressedTexture | null = null;
+  try { k = await ktx2(); }
+  catch (error) { if (!triedKtx2 || await heldForm(served, 'ktx2', held) !== 'img') throw error; }
+  if (k !== null) return k;
+  const instead = async (error: ContentReadError): Promise<boolean> => {
+    const switched = await heldForm(served, 'img', held) === 'ktx2';
+    if (switched) heldKtx2.add(error);
+    return switched;
+  };
+  try { return await image(triedKtx2 ? undefined : instead); }
+  catch (error) {
+    const stand = error instanceof Error && heldKtx2.has(error) ? await ktx2('ktx2') : null;
+    if (stand === null) throw error;
+    return stand;
+  }
 }

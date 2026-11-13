@@ -5,7 +5,8 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { prepareRigLoader } from '../anim/rig';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { fetchImage, tierUrl } from '../boot/bytes';
-import { initKtx2, ktx2Layers, ktx2Texture, linearKtx2Texture, prepareCompressedTexture, releaseAfterUpload } from './ktx2';
+import type { ContentReadOptions } from '../boot/contentRead';
+import { cacheHolds, heldForm, initKtx2, ktx2Layers, ktx2Texture, linearKtx2Texture, prepareCompressedTexture, readHeldForm, releaseAfterUpload } from './ktx2';
 import { TIER_CONFIG } from './tier';
 import { workSlice } from '../../../shared/engine/core/workSlice';
 import type { Renderer } from '../render/renderer';
@@ -61,13 +62,14 @@ export function decodedImageCount(): number {
   for (const [key, image] of images) if (image.deref() === undefined) images.delete(key);
   return images.size + imageLoads.size;
 }
-export function loadImage(url: string, maxSize: number = TIER_CONFIG.maxTexture): Promise<ImageBitmap | HTMLImageElement> {
+/** `instead` (OF17): see fetchImage — a failed read may throw rather than wait on RETRY */
+export function loadImage(url: string, maxSize: number = TIER_CONFIG.maxTexture, instead?: ContentReadOptions['instead']): Promise<ImageBitmap | HTMLImageElement> {
   const key = imageKey(url, maxSize);
   const image = images.get(key)?.deref();
   if (image !== undefined) return Promise.resolve(image);
   const pending = imageLoads.get(key);
   if (pending !== undefined) return pending;
-  const load = fetchImage(url, maxSize).then(decoded => {
+  const load = fetchImage(url, maxSize, true, false, instead).then(decoded => {
     images.set(key, new WeakRef(decoded));
     return decoded;
   }).finally(() => { imageLoads.delete(key); });
@@ -108,7 +110,7 @@ function shareSource(owned: THREE.TextureSource<unknown>, flipY: boolean, key: s
 /** Register all source users before their awaiting callers may upload. A warm
  * image is acquired synchronously, so no caller can borrow a bitmap closed
  * during an intervening await. In-flight source ownership ends on settlement. */
-function loadTextureSource(url: string, srgb: boolean, maxSize: number): Promise<SharedSource> {
+function loadTextureSource(url: string, srgb: boolean, maxSize: number, instead?: ContentReadOptions['instead']): Promise<SharedSource> {
   const key = imageKey(url, maxSize), shared = sourceKey(key, srgb);
   const make = (image: ImageBitmap | HTMLImageElement): SharedSource => {
     const source = new THREE.TextureSource(image), flipY = !(typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap);
@@ -119,7 +121,7 @@ function loadTextureSource(url: string, srgb: boolean, maxSize: number): Promise
   if (pending !== undefined) return pending;
   const decoding = imageLoads.get(key), image = images.get(key)?.deref();
   if (decoding === undefined && image !== undefined) return Promise.resolve(make(image));
-  const loading = (decoding ?? loadImage(url, maxSize)).then(make);
+  const loading = (decoding ?? loadImage(url, maxSize, instead)).then(make);
   sourceLoads.set(shared, loading);
   const settled = (): void => { if (sourceLoads.get(shared) === loading) sourceLoads.delete(shared); };
   void loading.then(settled, settled);
@@ -133,9 +135,8 @@ function loadTextureSource(url: string, srgb: boolean, maxSize: number): Promise
  */
 export async function loadTexture(url: string, srgb = false, repeat = 1, maxSize: number = TIER_CONFIG.maxTexture,
   configure?: (texture: THREE.Texture) => void): Promise<THREE.Texture> {
-  // E157: the KTX2 stand-in, when the build has one and KTX2 is on; on the image fallback, a linear file's ASTC stand-in (src/client/engine/core/ktx2.ts)
-  const k = await ktx2Texture(tierUrl(url), maxSize) ?? (srgb ? null : await linearKtx2Texture(tierUrl(url), maxSize));
-  if (k) {
+  const served = tierUrl(url);
+  const compressed = (k: THREE.CompressedTexture): Promise<THREE.Texture> => {
     k.wrapS = k.wrapT = THREE.RepeatWrapping;
     k.repeat.set(repeat, repeat);
     k.anisotropy = maxAniso;
@@ -143,19 +144,17 @@ export async function loadTexture(url: string, srgb = false, repeat = 1, maxSize
     k.needsUpdate = true;
     configure?.(k);
     return prepareCompressedTexture(labelAsset(k, 'engine/loadTexture', url));
-  }
+  };
+  // E157: the KTX2 stand-in, when the build has one and KTX2 is on; on the image fallback, a linear file's ASTC stand-in (src/client/engine/core/ktx2.ts)
+  // OF17: a form that fails to read gives way to the other when the cache holds it (a form the warm visit never read)
   const key = imageKey(url, maxSize);
   const shared = sharedSources.get(sourceKey(key, srgb));
   const source = shared?.source.deref();
-  let t: THREE.Texture;
-  if (shared === undefined || source === undefined) {
-    const decoded = await loadTextureSource(url, srgb, maxSize);
-    t = new THREE.Texture(); t.source = decoded.source; t.flipY = decoded.flipY;
-  } else {
-    t = new THREE.Texture();
-    t.source = source;
-    t.flipY = shared.flipY;
-  }
+  const read = await readHeldForm(served, async tex => tex !== undefined ? ktx2Texture(served, maxSize, tex)
+    : await ktx2Texture(served, maxSize) ?? (srgb ? null : await linearKtx2Texture(served, maxSize)),
+  instead => shared === undefined || source === undefined ? loadTextureSource(url, srgb, maxSize, instead) : Promise.resolve({ source, flipY: shared.flipY }));
+  if (read instanceof THREE.CompressedTexture) return compressed(read);
+  const t = new THREE.Texture(); t.source = read.source; t.flipY = read.flipY;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(repeat, repeat);
   t.anisotropy = maxAniso;
@@ -166,6 +165,7 @@ export async function loadTexture(url: string, srgb = false, repeat = 1, maxSize
   configure?.(t);
   return labelAsset(t, 'engine/loadTexture', url);
 }
+
 
 /**
  * URL of one map of a Poly Haven set. The phone tier gets the `_1k.jpg` sibling
@@ -285,8 +285,15 @@ export async function loadPBRArray(ids: string[], size: number = TIER_CONFIG.lay
     t.needsUpdate = true;
     return prepareCompressedTexture(labelAsset(t, 'engine/loadPBRArray', arrayLabel(kind)));
   };
-  const build = async (kind: (typeof kinds)[number], srgb: boolean): Promise<THREE.DataArrayTexture | THREE.CompressedArrayTexture> =>
-    (await buildKtx2(kind, srgb)) ?? (gpu ? buildGPU(kind, srgb, gpu) : buildCPU(kind, srgb));
+  const build = async (kind: (typeof kinds)[number], srgb: boolean): Promise<THREE.DataArrayTexture | THREE.CompressedArrayTexture> => {
+    let k: THREE.CompressedArrayTexture | null = null;
+    try { k = await buildKtx2(kind, srgb); }
+    catch (error) { // OF17: stand-ins that failed to read while the cache holds every layer's image build from the images
+      const forms = await Promise.all(ids.map(id => heldForm(tierUrl(texUrl(id, kind)), 'ktx2', cacheHolds)));
+      if (!forms.every(form => form === 'img')) throw error;
+    }
+    return k ?? (gpu ? buildGPU(kind, srgb, gpu) : buildCPU(kind, srgb));
+  };
   const [map, normalMap, armMap] = await Promise.all([build('diffuse', true), build('nor_gl', false), build('arm', false)]);
   return { map, normalMap, armMap };
 }

@@ -81,6 +81,15 @@ describe('offline proof rules (OF1)', () => {
     const oneShard = greenLog.filter(entry => !/grid/u.test(entry.url));
     expect(judge({ ...base, rows: oneShard, samples: inPlay, outcome: 'play', layout: true }).map(failure => failure.rule)).toEqual(['grid-layout-not-read']);
   });
+  it('OF17: no image is read where the warm visit read only its KTX2 stand-in', () => {
+    const warm = new Set(['/assets/gpu/nine-dragon/lab/organic/scroll.phone-580f21aa.ktx2', '/assets/nine-dragon/lab/organic/lion.webp']);
+    const offline = (path: string) => judge({ ...base, shard: 'nine-dragon-stack', rows: [...greenLog, row(path)], samples: inPlay, outcome: 'play', warm }).map(failure => failure.rule);
+    expect(offline('/assets/nine-dragon/lab/organic/scroll.phone.webp?v=1963d344')).toEqual(['texture-form-not-warm']);
+    // the form the warm visit read, an image it read as an image, and a texture it never read are all fine here
+    expect(offline('/assets/gpu/nine-dragon/lab/organic/scroll.phone-580f21aa.ktx2')).toEqual([]);
+    expect(offline('/assets/nine-dragon/lab/organic/lion.webp')).toEqual([]);
+    expect(offline('/assets/nine-dragon/lab/organic/leaf-atlas.webp?v=01f4261a')).toEqual([]);
+  });
   it('OF21: the walk-through needs the world and then the connection card', () => {
     expect(judge({ ...base, rows: greenLog, samples: inPlay, outcome: 'play', walkthrough: true }).map(failure => failure.rule)).toEqual(['walkthrough-no-connection-card']);
     const carded = [...inPlay, screen({ t: 4000, phase: 'page', card: false, player: true, failCard: 'Can’t reach the world', text: '' })];

@@ -39,7 +39,7 @@ import { bootCatalog, type BootLevel } from './catalog';
 import { bootFiles } from './extras';
 import { bootParts, packFor } from './pack';
 import { gpuUrl, versionedUrl } from './bytes';
-import { isRegisteredGpuFile, registerGpuFiles, setAutoKtx2Check, texMode, texModeWhy, texturePin, type TexMode } from './gpuFiles';
+import { isRegisteredGpuFile, registerGpuFiles, setAutoKtx2Check, setDeviceTexForm, texMode, texModeWhy, texturePin, type TexMode } from './gpuFiles';
 import { BASIS_PATH } from '../core/ktx2';
 import { ktx2ProbeResult } from '../render/ktx2Probe';
 import { TIER } from '../core/tier';
@@ -110,6 +110,12 @@ function markKtx2(def: BootLevel, complete: boolean, hash: string): void {
 }
 // DL17: Auto boots a shard's KTX2 set from the first visit (no images-then-KTX2 swap); the marker still records the cached set
 setAutoKtx2Check((slug) => { const def = bootCatalog().find(slug); return def !== undefined && ktx2Set(def).length > 0; });
+/** OF17: the device's note that it read `slug` as KTX2 on this tier, kept beside the set markers (Clear downloads drops both) */
+export const ktx2ReadKey = (slug: string): string => `ktx2set:${slug}.${TIER}.read`;
+setDeviceTexForm({
+  read: (slug) => { try { return savedStorage.getItem(ktx2ReadKey(slug)) !== null; } catch { return false; } },
+  keep: (slug) => { try { savedStorage.setItem(ktx2ReadKey(slug), '1'); } catch { /* private mode: each page keeps its own rule */ } },
+});
 
 export interface PrefetchEnv {
   /** a service worker controls the page (its caches are where the files go) */

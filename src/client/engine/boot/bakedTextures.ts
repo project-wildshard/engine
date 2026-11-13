@@ -17,7 +17,7 @@ import { bootFileList } from './filePolicy';
 import * as THREE from 'three';
 import { fetchImage, tierUrl, versionedUrl } from './bytes';
 import { TIER } from '../core/tier';
-import { ktx2Texture } from '../core/ktx2';
+import { ktx2Texture, readHeldForm } from '../core/ktx2';
 import { activeLevel } from '../../../shared/engine/level/selection';
 import { levelBakedId } from '../../../shared/engine/level/spec';
 import { labelAsset, labelClone } from '../render/gpuLabels';
@@ -59,7 +59,8 @@ export async function preloadBakedTextures(): Promise<number> {
     } catch (e) { console.warn(`[baked] ${u}: ${(e as Error).message}`); }
   }), ...urls.map(async (u) => {
     // E157: the KTX2 stand-in when there is one (Y-flipped at encode, like fetchImage's bitmap)
-    try { loaded.set(u, (await ktx2Texture(tierUrl(u))) ?? await fetchImage(u, Infinity, true)); }
+    // OF17: a form that fails to read gives way to the other when the cache holds it
+    try { const served = tierUrl(u); loaded.set(u, await readHeldForm(served, tex => ktx2Texture(served, Infinity, tex), instead => fetchImage(u, Infinity, true, false, instead))); }
     catch (e) { console.warn(`[baked] ${u}: ${(e as Error).message}`); }
   })]);
   return urls.length + common.length;

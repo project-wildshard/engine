@@ -5,7 +5,7 @@
  * its own look and the frame rows that write time, buffer size, pixel ratio and projection into the looks. Rows are
  * admitted before any rig, look or texture is borrowed; Model Explorer cards settle the same rigs. Client-only.
  */
-import { BackSide, type BufferGeometry, ClampToEdgeWrapping, DataTexture, DoubleSide, LinearMipmapLinearFilter, type Material, Mesh, NoColorSpace,
+import { BackSide, type BufferGeometry, ClampToEdgeWrapping, CompressedTexture, DataTexture, DoubleSide, LinearMipmapLinearFilter, type Material, Mesh, NoColorSpace,
   type Object3D, type PerspectiveCamera, Quaternion, RedFormat, RepeatWrapping, SkinnedMesh, Texture, UnsignedByteType, Vector2, Vector3 } from 'three';
 import type { RigBake, RigContract } from '@wildshard/engine/anim/rig';
 import { retainCachedResources } from '@wildshard/engine/app/cachedAssets';
@@ -14,7 +14,7 @@ import { resourceScope } from '@wildshard/engine/app/resources';
 import { app } from '@wildshard/engine/app/runtime';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { fetchImage, phoneUrl } from '@wildshard/engine/boot/bytes';
-import { ktx2Texture } from '@wildshard/engine/core/ktx2';
+import { ktx2Texture, readHeldForm } from '@wildshard/engine/core/ktx2';
 import { loadTextureRow } from '@wildshard/engine/core/assets';
 import { SlashTrail } from '@wildshard/engine/combat/view/slashTrail';
 import type { ModelContext } from '@wildshard/engine/models/model';
@@ -82,7 +82,10 @@ function loadMap(path: string, anisotropy: number): Promise<Texture> {
   let loading = images.get(path);
   if (loading === undefined) {
     loading = (async () => {
-      const value = await ktx2Texture(phoneUrl(path)) ?? new Texture(await fetchImage(path, Infinity, false));
+      // OF17: a form that fails to read gives way to the other when the cache holds it
+      const served = phoneUrl(path);
+      const read = await readHeldForm(served, tex => ktx2Texture(served, Infinity, tex), instead => fetchImage(path, Infinity, false, false, instead));
+      const value = read instanceof CompressedTexture ? read : new Texture(read);
       value.colorSpace = NoColorSpace; value.flipY = false; value.minFilter = LinearMipmapLinearFilter; value.anisotropy = anisotropy; value.needsUpdate = true;
       resolved.set(path, value);
       return retainCachedResources(value);

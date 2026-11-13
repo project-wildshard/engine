@@ -26,6 +26,9 @@ export interface ContentReadOptions {
   response?: (response: Response) => void;
   /** An optional file: a server that answers it is not there (404, the HTML fallback) throws at once instead of RETRY. */
   missingThrows?: boolean;
+  /** OF17: asked when the read has failed twice, before it waits on RETRY. True throws the error instead: the caller has
+   *  another copy to read (a texture's other form, held in the cache). */
+  instead?: (error: ContentReadError) => Promise<boolean>;
 }
 
 function html(bytes: Uint8Array): boolean {
@@ -139,6 +142,7 @@ export async function readContent(url: string, maximum: number, options: Content
       if (error.missing && options.missingThrows === true) throw error;
       if (!retried) { retried = true; }
       else {
+        if (options.instead !== undefined && await options.instead(error)) throw error;
         // RL8 (Jake's phone, 2026-11-09: an old cached build sat at "0.00 MB of 28.4 MB"): a deploy keeps only the live
         // build's hashed files, so a missing first-party file on a build the server no longer serves can never arrive.
         // Instead of RETRY forever, the page reloads past its worker into the live build (once per build and tab).

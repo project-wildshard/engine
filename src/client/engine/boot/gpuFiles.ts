@@ -29,6 +29,11 @@
  * A harness pin still wins; desktop is unchanged.
  * Whatever picks KTX2, the KTX2 capability probe (src/client/engine/render/ktx2Probe.ts) runs once first and turns it into Images
  * when this GPU samples mipmapped compressed textures wrong in every compressed format the transcoder could target.
+ * OF17 (one form per device and tier): a shard this device has read as KTX2 stays KTX2 on every page of this tier, where the
+ * page's own rule would pick images (a grid page's over-cap estimate counts its residents, a one-shard page's doesn't, so
+ * the two disagreed on Nine Dragon and the offline page asked for images it never cached). Only towards KTX2: it is never
+ * the bigger form. And when one form of a file fails to read and the cache holds the other, the loader reads the held
+ * one (core/ktx2.ts `readHeldForm`), so a form the warm visit never read can't park LOAD on RETRY.
  * Resolved once per SHARD BUILD, on the build's first question (`texMode()`), and never changed inside it: no swap in a
  * running resident. A grid page can build multiple residents, each with its own TexturePolicyBinding.
  * The harness pin applies to that page's build. The
@@ -80,6 +85,8 @@ interface TexturePolicyState {
   readonly level: string | undefined;
   readonly policy: { mode: TexMode; why: string } | undefined;
   resolved: { mode: TexMode; why: string } | null;
+  /** OF17: this build's KTX2 read is already in the device's memory */
+  kept?: boolean;
 }
 let pagePolicy: TexturePolicyState = { level: undefined, policy: undefined, resolved: null };
 const policyFrames: { state: TexturePolicyState }[] = [];
@@ -90,6 +97,11 @@ export function texturePin(): TexMode | 'auto' { return harnessPins()?.textures 
 let autoReady: ((slug: string) => boolean) | null = null;
 /** shardPrefetch.ts: how Auto learns that a shard's KTX2 set is cached (the marker check) */
 export function setAutoKtx2Check(fn: (slug: string) => boolean): void { autoReady = fn; }
+
+/** OF17: the device's memory of the shards it has read as KTX2 on this tier (shardPrefetch.ts keeps it with the markers) */
+export interface DeviceTexForm { read: (slug: string) => boolean; keep: (slug: string) => void }
+let deviceForm: DeviceTexForm | null = null;
+export function setDeviceTexForm(memory: DeviceTexForm | null): void { deviceForm = memory; }
 
 /** G188's automatic tier policy: measured over-cap phone builds use KTX2 before the first visit, never desktop. */
 export function autoTexturePolicy(mode: TexMode | undefined, imagesFirstPlayingBytes?: number): { mode: TexMode; why: string } | undefined {
@@ -124,7 +136,7 @@ let resolving = false;
  *  zeroes sRGB mips). No verdict (no page, or a measurement pin) changes nothing. The transcoder reads this same probe. */
 const noRawAstc = (probe: Ktx2Probe): boolean => probe.ran && probe.families.astc !== true;
 /** S4: an overlay's raw ASTC 6×6 files have no transcode, so a phone-tier GPU that can't sample ASTC loads images. */
-function rawAstcVeto(probe: Ktx2Probe): string | null {
+export function rawAstcVeto(probe: Ktx2Probe): string | null {
   if (TIER !== 'phone' || !noRawAstc(probe) || ![...registered.phone].some(url => url.includes('/astc6/'))) return null;
   return 'this table names raw ASTC 6×6 and the GPU has no ASTC';
 }
@@ -147,6 +159,8 @@ export function texModeWhy(): { mode: TexMode; why: string } {
       // DL17 (G1000): textures are in their final format at control, so a shard with a KTX2 set boots with it from the first
       // visit (its stand-ins download with the boot) instead of drawing images and swapping on the next visit
       else state.resolved = autoReady?.(slug) === true ? { mode: 'ktx2', why: `auto: ${slug} has a KTX2 set (its final format from the first visit)` } : { mode: 'img', why: `auto: ${slug} has no KTX2 set for this tier` };
+      // OF17: a shard this device has read as KTX2 keeps that form on this page too (the grid's choice on a one-shard page)
+      if (state.resolved.mode === 'img' && deviceForm?.read(slug) === true) state.resolved = { mode: 'ktx2', why: `auto: this device read ${slug} as KTX2 (OF17)` };
     }
     // last, whatever picked KTX2 (a harness pin included): a GPU that samples the transcoder's only compressed targets
     // wrong when mipmapped loads images (render/ktx2Probe.ts — the iOS Simulator's zeroed sRGB ASTC / ETC2 mips; a
@@ -172,5 +186,14 @@ export function standIn(served: string, tex: TexMode): string | undefined {
 }
 /** the KTX2 stand-in of a file this tier fetches, when this page loads KTX2 */
 export function gpuFile(served: string): string | undefined {
-  return standIn(served, texMode());
+  const file = standIn(served, texMode());
+  if (file !== undefined) keepKtx2Read();
+  return file;
+}
+/** OF17: this build reads a KTX2 stand-in under Auto: the device remembers the shard's form (once per build) */
+function keepKtx2Read(): void {
+  const state = activePolicy();
+  if (state.kept === true || deviceForm === null || texturePin() !== 'auto') return;
+  state.kept = true;
+  deviceForm.keep(state.level ?? PAGE_LEVEL);
 }

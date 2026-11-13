@@ -45,6 +45,16 @@ export function mayFail(url) {
     || host === 'api.wildshard.io' || host.endsWith('.sentry.io') || host.endsWith('.ingest.sentry.io');
 }
 
+/** OF17: a texture's name in either form, `/assets/<name>.<webp|jpg|png>` (the image) or `/assets/gpu/<name>-<hash8>.ktx2`
+ *  (its KTX2 stand-in), or undefined for any other path. @param {string} path
+ *  @returns {{ name: string, form: 'img' | 'ktx2' } | undefined} */
+export function textureForm(path) {
+  const ktx2 = /^\/assets\/gpu\/(.+)-[0-9a-f]{8}\.ktx2$/u.exec(path);
+  if (ktx2?.[1] !== undefined) return { name: ktx2[1], form: 'ktx2' };
+  const image = /^\/assets\/(?!gpu\/)(.+)\.(?:webp|jpe?g|png)$/u.exec(path);
+  return image?.[1] === undefined ? undefined : { name: image[1], form: 'img' };
+}
+
 /** A URL's path, the key the warm visit's read set holds. @param {string} url */
 export const pathOf = url => new URL(url).pathname;
 
@@ -110,6 +120,17 @@ export function judge(run) {
   if (run.walkthrough === true) {
     if (run.outcome !== 'play') out.push({ shard, rule: 'walkthrough-not-in-world', detail: run.outcome });
     if (!samples.some(sample => sample.player && sample.failCard !== '')) out.push({ shard, rule: 'walkthrough-no-connection-card' });
+  }
+  // 9. OF17: one texture form per device and tier. An image the warm visit read only as its KTX2 stand-in is never held.
+  if (warm !== undefined) {
+    /** @type {Record<'img' | 'ktx2', Set<string>>} */
+    const read = { img: new Set(), ktx2: new Set() };
+    for (const path of warm) { const texture = textureForm(path); if (texture !== undefined) read[texture.form].add(texture.name); }
+    for (const row of rows) {
+      const texture = row.origin === 'page' ? textureForm(pathOf(row.url)) : undefined;
+      if (texture?.form === 'img' && read.ktx2.has(texture.name) && !read.img.has(texture.name))
+        out.push({ shard, rule: 'texture-form-not-warm', url: row.url, detail: `${row.phase}/${row.step}: the warm visit read its KTX2 stand-in` });
+    }
   }
   return out;
 }
