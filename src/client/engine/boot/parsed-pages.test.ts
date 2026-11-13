@@ -16,34 +16,30 @@ test('paged native parsing retains every scalar, property, array and numerical b
   expect(bytes).toEqual(before); expect(pauses).toBeGreaterThan(1);
 });
 
-test('large trees and long keys/strings cross bounded pages without publishing partial output', async () => {
+test('large trees and long keys/strings cross bounded steps without publishing partial output', async () => {
   const source = {['key'.repeat(5000)]: '森林\\\"🐟'.repeat(2000), rows: Array.from({length: 1000}, (_, i) => ({i, name: `row-${i}`, children: [i, null, false]}))};
-  const encoded = encodeParsedPages(source), view = new DataView(encoded.buffer);
-  let pages = 0;
-  for (let at = 0; at < encoded.length;) {
-    const length = view.getUint32(at, true); expect(length).toBeLessThanOrEqual(16_384);
-    const tokens: unknown = JSON.parse(new TextDecoder().decode(encoded.subarray(at + 4, at + 4 + length)));
-    if (!Array.isArray(tokens)) throw new Error('Missing token page');
-    expect(tokens.length).toBeLessThanOrEqual(32); at += 4 + length; pages++;
-  }
+  const encoded = encodeParsedPages(source);
   let pauses = 0;
   expect(await decodeParsedPages(encoded, () => {pauses++; return Promise.resolve();})).toEqual(source);
-  expect(pauses).toBe(pages + 1); expect(pages).toBeGreaterThan(200);
+  // one pause a step of at most 32 tokens or 16 KiB, and one at the end: 10,010 tokens here (the long key and string go in
+  // 4,096-unit parts), so 313 steps, and two more where a step of long parts reaches 16 KiB first
+  expect(pauses).toBeGreaterThanOrEqual(Math.ceil(10_010 / 32) + 1); expect(pauses).toBeLessThanOrEqual(Math.ceil(10_010 / 32) + 4);
   await expect(decodeParsedPages(encoded, () => Promise.reject(new Error('owner ended')))).rejects.toThrow('owner ended');
+});
+
+test('a string that is not well formed and a pair at a part boundary cross unchanged', async () => {
+  const lone = 'a\uD800b'.repeat(3000), pair = `${'x'.repeat(4095)}🐟${'y'.repeat(5000)}`;
+  expect(await decodeParsedPages(encodeParsedPages([lone, pair, '']), () => Promise.resolve())).toEqual([lone, pair, '']);
 });
 
 test('truncated, oversized, invalid and extra transfers refuse without partial trees', async () => {
   const encoded = encodeParsedPages({a: [1, 2, 3]});
-  const malformed = (text: string): Uint8Array => {
-    const body = new TextEncoder().encode(text), output = new Uint8Array(4 + body.length);
-    new DataView(output.buffer).setUint32(0, body.length, true); output.set(body, 4); return output;
-  };
-  for (const bytes of [encoded.subarray(0, 3), encoded.subarray(0, -1),
-    malformed('[["a",2],["v",null]]'), malformed('[["v",null],["v",false]]'),
-    malformed('[["o",1],["v",true]]'), malformed('[["s","unfinished",false]]'),
-    malformed('[["n",""]]'), malformed('[["s","x",false],["v",null]]'), malformed('[]')]) {
+  const raw = (...bytes: number[]): Uint8Array => Uint8Array.from([0x57, ...bytes]);
+  for (const bytes of [new Uint8Array(), encoded.subarray(1), encoded.subarray(0, 3), encoded.subarray(0, -1),
+    raw(6, 6), raw(1, 1, 0, 0, 0, 8), raw(1, 1, 0, 0, 0, 6, 6), raw(3, 0, 1, 0, 0, 0, 120), raw(3, 2, 0, 0, 0, 0),
+    raw(3, 0, 1, 0, 0, 0, 120, 6), raw(9), raw(2, 255, 255, 255, 255, 6), raw(5, 0, 0, 0, 0, 0, 0, 248, 127),
+    raw(3, 1, 1, 0, 0, 0, 0xff), raw(5, 0, 0)]) {
     await expect(decodeParsedPages(bytes, () => Promise.resolve())).rejects.toThrow();
   }
-  const oversized = new Uint8Array(4); new DataView(oversized.buffer).setUint32(0, 16_385, true);
-  await expect(decodeParsedPages(oversized, () => Promise.resolve())).rejects.toThrow('Invalid parsed page');
+  expect(await decodeParsedPages(raw(5, 0, 0, 0, 0, 0, 0, 240, 127), () => Promise.resolve())).toBe(Infinity);
 });
