@@ -10,3 +10,6 @@ four styles.
 Still open: on a local preview, a second visit with audio network loads blocked (CDP) stalls in LOAD's audio step. The
 91 files are in `ws-assets-v1` after the first visit, but the worker fetched them from the network again during LOAD.
 That belongs to AU2.
+
+The real-product test now covers Driftwood, Pine, Nalati and Nine Dragon. For each one, the cooked boot audio equals the
+page's default-style boot reads plus the shard's fence audio.

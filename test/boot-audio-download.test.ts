@@ -58,19 +58,24 @@ test('a player who keeps the default style reads only what the download listed, 
   } finally { set.mockRestore(); settings.setMusicStyle(DEFAULT_MUSIC_STYLE); }
 });
 
-// The pinned Driftwood product (`node scripts/pins.ts install`) and this build's boot table, when the checkout has them.
-const driftwood = 'out/driftwood-isle', bootTables = 'out/.app/boot-tables.json';
-test.skipIf(!existsSync(`${driftwood}/shard.json`) || !existsSync(bootTables))('Driftwood: its fence audio and its default boot set are on the download', async () => {
-  const common = JSON.parse((JSON.parse(readFileSync(bootTables, 'utf8')) as { common: string }).common) as AssetTables;
-  const half = shardHalf(openShardfile(productTarball(driftwood)), (_url, bytes) => bytes.length);
-  const fence = half.mountRows('phone', 'entry').map(row => row.url.split('?')[0] ?? row.url).filter(url => /^\/assets\/(?:music|sfx)\//u.test(url));
-  const listed = shardBootAudio(half.shard.sections, common, half.mountRows('phone', 'entry').map(row => row.url));
-  expect(fence.length).toBeGreaterThanOrEqual(18);
-  expect(listed).toEqual(expect.arrayContaining(fence));
-  const row = half.shard.sections.get('audio/audio') as { audio: AudioData };
-  installAssetTables(common);
-  const page = await pageBootAudio(row.audio);
-  installAssetTables(tables);
-  expect(page.length).toBeGreaterThan(50);
-  expect(listed).toEqual(expect.arrayContaining(page));
-});
+// The pinned products (`node scripts/pins.ts install`) and this build's boot table, when the checkout has them.
+const bootTables = 'out/.app/boot-tables.json';
+for (const [shard, fenceAudio, pageAudio] of [['driftwood-isle', 18, 91], ['pine-hollow', 0, 1], ['nalati-grasslands', 0, 1], ['nine-dragon-stack', 0, 1]] as const) {
+  const product = `out/${shard}`;
+  test.skipIf(!existsSync(`${product}/shard.json`) || !existsSync(bootTables))(`${shard}: its fence audio and its default boot set are on the download`, async () => {
+    const common = JSON.parse((JSON.parse(readFileSync(bootTables, 'utf8')) as { common: string }).common) as AssetTables;
+    const half = shardHalf(openShardfile(productTarball(product)), (_url, bytes) => bytes.length);
+    const mounts = half.mountRows('phone', 'entry').map(row => row.url);
+    const fence = mounts.map(url => url.split('?')[0] ?? url).filter(url => /^\/assets\/(?:music|sfx)\//u.test(url));
+    const listed = shardBootAudio(half.shard.sections, common, mounts, shard);
+    expect(fence.length).toBeGreaterThanOrEqual(fenceAudio);
+    expect(listed).toEqual(expect.arrayContaining(fence));
+    const row = half.shard.sections.get('audio/audio') as { audio: AudioData };
+    installAssetTables(common);
+    const page = await pageBootAudio(row.audio);
+    installAssetTables(tables);
+    // The page's default-style boot reads are exactly the cooked boot set; the fence adds its own on top.
+    expect(page.length).toBeGreaterThanOrEqual(pageAudio);
+    expect(listed).toEqual([...new Set([...page, ...fence])].filter(url => Object.hasOwn(common.bytes, url)));
+  });
+}
