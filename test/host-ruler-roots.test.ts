@@ -95,7 +95,7 @@ describe('product roots', () => {
     ]);
     // Every declared section with an executable host appears; metadata-only sections root nothing.
     const listed = new Set(roots.roots.map(root => root.from));
-    for (const name of roots.sections) expect(listed.has(`section:${name}`) || name === 'client/plan' || SECTION_HOSTS[name].length === 0).toBe(true);
+    for (const name of roots.sections) expect(listed.has(`section:${name}`) || name === 'client/plan' || SECTION_HOSTS[name]?.length === 0).toBe(true);
     expect(unresolvedRoots(roots.modules)).toEqual([]);
   });
   test('an unknown kind or section refuses', () => {
