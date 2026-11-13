@@ -1,21 +1,26 @@
 # SHELL-CUTOVER SC1 (meta docs/plans/multi-repo/SHELL-CUTOVER-PLAN.md; J172, J209, J210): preview.wildshard.io is the
-# solo build of engine's newest green main. Once an hour the newest green main `ci` run's commit builds the game with no world stamp
-# (the solo preview: no __WS_WORLD__, so the in-page server runs).
+# solo build of engine's newest green main, with no world stamp (the solo preview: no __WS_WORLD__, so the in-page server runs).
 # OFF-VERCEL OV6 (meta docs/plans/OFF-VERCEL-PLAN.md; J272, J274): the page is the Cloudflare Worker wildshard-play-preview
 # (pages/wrangler.jsonc --env preview), released by scripts/page-release.mjs in its four phases: build, upload (a
 # version, never deployed), check (the version URL's bytes equal the local build), go-live (`wrangler versions deploy`,
 # then preview.wildshard.io must serve this build). Workers dedupes assets by hash, so an hour uploads only changed files.
 # An hour whose newest green main changed no client input since the live preview's commit releases nothing.
+# PREVIEW-CD (docs/plans/opus-2026-11-12-preview-cd.md; Jake, 2026-11-12 ~23:08 Cancún): "on every green CI on main, we
+# attempt to do an hourly deploy as a dependent github action, but that github action checks the last deploy, and if the
+# last deploy is within the last 60 minutes it ends early". GitHub's cron was best effort (3 runs in the 24 h to 22:41
+# Cancún, 2026-11-12), so the schedule is gone: every green main `ci` push run triggers this, and a hand dispatch
+# deploys at once. The page names itself by `git describe` ("v0.1.13-100-g5a43d1c4"), so the checkout fetches every tag.
 name: preview
 
 on:
-  # Hourly, not per push (J274: preview stays hourly at :17)
-  schedule:
-    - cron: '17 * * * *'
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       sha:
-        description: A main commit whose ci run is green (default the newest green main)
+        description: A main commit whose ci run is green (default the newest green main); a dispatch skips the hourly gate
         type: string
         required: false
         default: ''
@@ -24,18 +29,35 @@ permissions:
   contents: read
   actions: read # the newest green main ci run
 
+# One release at a time; a newer green main replaces a waiting run, never one mid-release
 concurrency:
   group: preview
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    # a green main push ci, or a hand dispatch
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
-    # Under the hourly cadence (the next run cancels this one): the build is about 20 minutes and a warm upload a few.
-    # The one cold upload (about 2.4 GB) ran by hand in OV6.
+    # The build is about 20 minutes and a warm upload a few. The one cold upload (about 2.4 GB) ran by hand in OV6.
     timeout-minutes: 55
     steps:
+      # Jake's hourly gate: the live preview's version.json `time` (its build time) under 60 minutes old ends the run;
+      # an unreadable one deploys. The next green main ci after the hour deploys whatever is newest then.
+      - name: At most hourly
+        id: due
+        if: github.event_name == 'workflow_run'
+        run: |
+          built=$(curl -fsS -m 20 "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const t=Date.parse(JSON.parse(s).time);console.log(Number.isFinite(t)?Math.floor(t/1000):'')}catch{console.log('')}})" || true)
+          if [ -n "$built" ] && [ $(( $(date +%s) - built )) -lt 3600 ]; then
+            echo "the live preview was built $(( ($(date +%s) - built) / 60 )) minutes ago: under the hour, no deploy"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "the live preview was built ${built:+$(( ($(date +%s) - built) / 60 )) minutes ago}${built:-at an unknown time}: deploy"
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: The newest green main
+        if: steps.due.outputs.deploy != 'false'
         id: pick
         env:
           GH_TOKEN: ${{ github.token }}
@@ -45,15 +67,20 @@ jobs:
           [ -n "$sha" ] || sha=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --status success --limit 1 --json headSha --jq '.[0].headSha')
           [ -n "$sha" ] || { echo "::error::no green main ci run"; exit 1; }
           echo "sha=$sha" >> "$GITHUB_OUTPUT"; echo "newest green main: $sha"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # the whole history and every tag: the client inputs' diff against the live commit, and `git describe` for the label
+      - if: steps.due.outputs.deploy != 'false'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ steps.pick.outputs.sha }}
           fetch-depth: 0
+          fetch-tags: true
           filter: blob:none
           persist-credentials: false
       - name: Skip when the client is unchanged since the live preview
         id: changed
+        if: steps.due.outputs.deploy != 'false'
         run: |
+          echo "this build names itself $(git describe --tags --match 'v[0-9]*' 2>/dev/null || echo '(no version tag)')"
           live=$(curl -fsS "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(String(JSON.parse(s).build).split('-')[0])}catch{console.log('')}})" || true)
           # every input of the client build: the game's code (the solo page bundles the server worker), its shards (the pins), the build tooling, the lockfile and the page host
           inputs=(src/client src/shared src/server types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins scripts/app-build scripts/build-app.mjs scripts/app-build-pipeline.mjs scripts/gen.mjs scripts/pins.ts pages scripts/page-release scripts/page-release.mjs)

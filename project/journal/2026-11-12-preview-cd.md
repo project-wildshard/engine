@@ -15,3 +15,7 @@
   (`v0.1.13-100-g5a43d1c4`, Jake: "make the preview version use git
   describe"), baked into `__ENGINE_RELEASE__.describe` and version.json's
   `describe`. Plan: docs/plans/opus-2026-11-12-preview-cd.md.
+- preview.yml: `workflow_run` on `ci` (main, push, success) plus the
+  dispatch; the "At most hourly" step reads the live version.json `time`;
+  concurrency `preview` no longer cancels a run mid-release; the checkout
+  fetches tags so `git describe` sees v0.1.x.
