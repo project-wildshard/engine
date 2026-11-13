@@ -64,9 +64,13 @@ test('EXPLORE WORLD, a page already entering the grid, and shards the grid doesn
   expect(hosted, 'a shard that cannot turn never waits on the world').not.toHaveBeenCalled();
 });
 
-test('Infinite Wildshard shows without Developer once the world hosts the grid (DG4)', () => {
+test('Infinite Wildshard stays Developer-only, even on a world that hosts the grid (J300, amends DG4)', () => {
   const player = { developer: false, devserver: false };
-  expect([gridEntryShown(player, false), gridEntryShown(player, false, true), gridEntryShown({ ...player, developer: true }, false)]).toEqual([false, true, true]);
+  expect([gridEntryShown(player, false), gridEntryShown({ ...player, developer: true }, false), gridEntryShown(player, true)]).toEqual([false, true, true]);
+  const withWord = gridEntryShown as (...args: readonly unknown[]) => boolean;
+  expect(withWord(player, false, true), 'no hosted input: a world that hosts the grid never shows it to a player').toBe(false);
+  const title = readFileSync('src/client/game/mainMenu.ts', 'utf8');
+  expect(title, 'the title never reveals the grid card from the world\'s word').not.toMatch(/worldHosted/u);
 });
 
 test('the dial names the goto cell; the door reads only a well-formed one', () => {
@@ -105,7 +109,7 @@ test('a slow boot keeps the page\'s own goto: it is held in the document, never 
 
 test('the hosting read answers within its deadline, the module import included', async () => {
   const started = Date.now();
-  expect(await worldHosted(WORLD, 50)).toBe(false);
+  expect(await worldHosted(WORLD, 50), 'no word in time and nothing kept: the grid (J300)').toBe(true);
   expect(Date.now() - started).toBeLessThan(2000);
   expect(await worldHosted(undefined)).toBe(false);
 });

@@ -124,8 +124,8 @@ async function enterPage(): Promise<unknown> {
     document.documentElement.classList.add('title-first');
     return showPageTitle();
   }
-  // GO7 (ZS5): on a world that hosts the grid, a grid shard's page (Shard select, a seat elsewhere, a stale-build reload) enters the
-  // grid at that shard's cell, so this page boots as a grid page; anything else stays a one-shard page.
+  // GO7 (ZS5), J300: on a world build, a grid shard's page (Shard select, a seat elsewhere, a stale-build reload) enters the grid at
+  // that shard's cell, so this page boots as a grid page, unless the world is known to open one cell; anything else stays a one-shard page.
   if (online && requested !== null && document.getElementById('ws-shardfile') === null) {
     const { enterByShard } = await bootTask('app:one-way-in-import', () => import('@wildshard/engine/game/grid/oneWayIn'));
     await bootTask('app:one-way-in', () => enterByShard({ online, slug: requested, kept: search.has('explore') || pendingGridEntry(requested) }, (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__));

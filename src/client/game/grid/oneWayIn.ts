@@ -1,7 +1,8 @@
-// GO7 (meta MMO-PLAN MP1G, DG4; MMO-ZONE-SELECT ZS4's goto and ZS5's retirement): one way in. On a build with a world whose server
-// hosts the grid (GO4's gate), Shard select → a grid shard enters the grid at that shard's cell, so Shard select and Infinite Wildshard
-// land in the same online world, and no online page boots a bordered `'shard'` page for a grid shard. A shard the grid doesn't place,
-// a build with no world (preview, sharddev), and a world that hosts only its home cell keep today's one-shard page.
+// GO7 (meta MMO-PLAN MP1G, DG4; MMO-ZONE-SELECT ZS4's goto and ZS5's retirement): one way in. On a build with a world (GO4's gate),
+// Shard select → a grid shard enters the grid at that shard's cell, so Shard select only changes the spawn cell of the one online
+// world, and no online page boots a bordered `'shard'` page for a grid shard. J300 (GRID-CROSSING GC20): that holds when the world's
+// word is missing, late or never kept; only a world known to host one cell (production before GC16) keeps GO4's one-shard page. A
+// shard the grid doesn't place (OFFLINE OF3's) and a build with no world (preview, sharddev) keep today's one-shard page.
 import { pageScope } from '@wildshard/engine/app/resources';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
@@ -18,7 +19,7 @@ export function shardCell(slug: string, assembly: GridAssembly = new GridAssembl
 export interface OneWayIn {
   /** the build is stamped with a world (play, staging) */
   readonly online: boolean;
-  /** the door's `world` word counts more than the home cell (GO4's gate) */
+  /** the world may host the grid: false only once its door's word (heard now or kept) says it opens one cell (`worldHosted`) */
   readonly hosted: boolean;
   /** the shard the URL names */
   readonly slug: string;
@@ -65,8 +66,9 @@ const HOSTED_MS = 3000;
 /** How long the read may go on after the deadline, so a late answer is still kept for the next launch. */
 const KEEP_LATE_MS = 10_000;
 /** Whether this build's world hosts the grid, within `HOSTED_MS`. An answer in time decides and is kept (`memory`). No answer (a
- *  failure, a late answer) takes the device's kept answer; only a device with none gets today's one-shard page. A build with no world
- *  answers false. Whether the page then reaches the world is the online shell's business: it never waits here. */
+ *  failure, a late answer) takes the device's kept answer; a device with none takes the grid (J300, GC20): a world build never drops
+ *  a grid shard to a one-shard page for want of a word, so only a world known to open one cell does. A build with no world answers
+ *  false. Whether the page then reaches the world is the online shell's business: it never waits here. */
 export async function worldHosted(world: unknown, waitMs: number = HOSTED_MS, memory: RouteMemory = deviceRouteMemory(),
   read: (world: unknown, waitMs: number) => Promise<boolean | null> = readHosted): Promise<boolean> {
   const release = typeof world === 'object' && world !== null && 'release' in world && typeof world.release === 'string' ? world.release : null;
@@ -79,7 +81,7 @@ export async function worldHosted(world: unknown, waitMs: number = HOSTED_MS, me
   let heard: boolean | null;
   try { heard = await Promise.race([reading, late]); } finally { scope.dispose(); }
   if (heard !== null) return heard;
-  return memory.read(release) ?? false;
+  return memory.read(release) ?? true;
 }
 /** The door's word read as grid or not, or null when no word came (unreachable, stalled, closed before its word). */
 async function readHosted(world: unknown, waitMs: number): Promise<boolean | null> {

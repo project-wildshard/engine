@@ -13,7 +13,8 @@ export function setPageMode(next: PageMode): void { mode = next; }
 let goto: string | null = null, hosted = false;
 /** GO7: the grid cell (instance) this page asks the world to seat it in (Shard select's goto, or a recovery reload's cell); null otherwise. */
 export function pageGoto(): string | null { return goto; }
-/** GO7: this document already read that its world hosts the grid (Shard select's goto), so its grid page doesn't ask again. */
+/** GO7: this document's Shard select goto already took the grid (a word in time, a kept answer, or J300's no-word default), so its
+ *  grid page goes online without asking again. */
 export function gotoHosted(): boolean { return hosted; }
 /** @internal grid/pageEntry.ts bootPageMode only */
 export function setPageGoto(cell: string | null, read = false): void { goto = cell; hosted = cell !== null && read; }
