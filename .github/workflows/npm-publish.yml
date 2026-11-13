@@ -2,12 +2,23 @@
 # without git links"). A vX.Y.Z release tag publishes @wildshard/engine to npm by trusted publishing (OIDC): no
 # token is stored anywhere, and npm attaches the provenance itself. npm adds a trusted publisher only to a package
 # that already exists, so the first version is published by hand (plan row NP4); until then this job skips with a
-# notice.
+# notice. A manual run with placeholder=true publishes a README-only 0.0.x from this same file, so it proves the
+# trusted publisher end to end without a release (NPM-PUBLISH smoke row).
 name: npm-publish
 
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+    inputs:
+      placeholder:
+        description: Publish a README-only placeholder of the package (no repo files)
+        type: boolean
+        default: false
+      version:
+        description: The placeholder version, always 0.0.x
+        type: string
+        default: 0.0.1
 
 permissions:
   contents: read
@@ -19,6 +30,7 @@ concurrency:
 
 jobs:
   publish:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -69,3 +81,60 @@ jobs:
             exit 0
           fi
           npm publish --provenance --access public --ignore-scripts
+
+  placeholder:
+    # Only main's copy of this file: the trusted publisher is bound to the file name, not the branch.
+    if: github.event_name == 'workflow_dispatch' && inputs.placeholder && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: '@wildshard/engine'
+            description: 'The Wildshard engine: game client and MMO server.'
+    env:
+      NAME: ${{ matrix.name }}
+      DESCRIPTION: ${{ matrix.description }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+      # Trusted publishing needs npm 11.5.1 or later.
+      - name: Use an npm that can publish by OIDC
+        run: |
+          node -e 'const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$(npm --version)" ||
+            npm install --global npm@11.16.0
+          npm --version
+      - name: Write a package.json and README only
+        run: |
+          mkdir "$RUNNER_TEMP/placeholder"
+          # shellcheck disable=SC2016 # the quoted script is JavaScript with template literals
+          node -e '
+          const fs = require("node:fs");
+          const [dir, name, version, description, repo] = process.argv.slice(1);
+          if (!/^0\.0\.[0-9]+$/.test(version)) throw new Error(`a placeholder version is 0.0.x, not ${version}`);
+          const pkg = { name, version, description: `Placeholder. ${description}`, license: "UNLICENSED",
+            repository: { type: "git", url: `git+https://github.com/${repo}.git` }, publishConfig: { access: "public" } };
+          fs.writeFileSync(`${dir}/package.json`, `${JSON.stringify(pkg, null, 2)}\n`);
+          fs.writeFileSync(`${dir}/README.md`, [`# ${name}`, "", "Placeholder. The first real release publishes from CI.", "", description, "",
+            `This ${version} was published by GitHub Actions with provenance from https://github.com/${repo}`,
+            "(`npm-publish.yml`) to prove trusted publishing before a real release depends on it. Don\x27t install 0.0.x.", ""].join("\n"));
+          ' "$RUNNER_TEMP/placeholder" "$NAME" "$VERSION" "$DESCRIPTION" "$GITHUB_REPOSITORY"
+          cat "$RUNNER_TEMP/placeholder/package.json" "$RUNNER_TEMP/placeholder/README.md"
+      - name: Publish the placeholder, unless it is already out
+        working-directory: ${{ runner.temp }}/placeholder
+        run: |
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::$NAME@$VERSION is already on npm."
+            exit 0
+          fi
+          # A placeholder becomes latest (so the npm page shows its README) only while latest is a placeholder too.
+          latest=$(npm view "$NAME" dist-tags.latest)
+          tag=latest
+          [[ "$latest" =~ ^0\.0\.[0-9]+$ ]] || tag=placeholder
+          npm publish --provenance --access public --ignore-scripts --tag "$tag"
