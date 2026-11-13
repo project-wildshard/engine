@@ -122,6 +122,29 @@ walk('stale-build', "the next build that boots reports an earlier page's stale-b
   expect(String((reports[0]?.error as Error).message)).toContain('23 days old');
 });
 
+walk('loading-stall', "a content read past its own retry offers the card's RETRY and reports that once, at warning level (S18)", async () => {
+  const { readContent } = await import('../src/client/engine/boot/contentRead');
+  const { loadingWaitState } = await import('../src/shared/engine/boot/loadingWaits');
+  const { browserErrorLevel } = await import('../src/client/engine/telemetry/browserErrors');
+  const url = 'https://example.test/shardfiles/island/shape.bin', other = 'https://example.test/shardfiles/island/sky.bin';
+  let calls = 0;
+  // each read tries twice before it parks: two rounds of two reads fail, then everything answers
+  const failing = (): Promise<Response> => { calls++; return Promise.resolve(calls <= 8 ? new Response(null, { status: 503 }) : new Response(new Uint8Array([1, 2, 3]))); };
+  const first = readContent(url, 3, { fetch: failing }), second = readContent(other, 3, { fetch: failing });
+  const offered = (resource: string) => [...loadingWaitState().pending.values()].find(row => row.resource === resource);
+  await vi.waitFor(() => { expect(offered(url)?.retry).toBeTypeOf('function'); expect(offered(other)?.retry).toBeTypeOf('function'); });
+  // two reads stalled behind one RETRY: one screen, one report
+  expect(opened()).toEqual(['loading-stall']);
+  expect(reports[0]?.tags).toMatchObject({ system: 'content-read', fatal: false, diagnostic: { url } });
+  expect(browserErrorLevel(reports[0]?.error, false, 'loading-stall')).toBe('warning');
+  // a RETRY while still offline parks them again: the page reported its stall already
+  offered(url)?.retry?.();
+  await vi.waitFor(() => { expect(calls).toBe(8); expect(offered(url)?.retry).toBeTypeOf('function'); expect(offered(other)?.retry).toBeTypeOf('function'); });
+  offered(url)?.retry?.();
+  expect(await first).toEqual(new Uint8Array([1, 2, 3])); expect(await second).toEqual(new Uint8Array([1, 2, 3]));
+  expect(opened()).toEqual(['loading-stall']);
+});
+
 test('a stale-build note that is not the inline script\'s shape is dropped, never reported', async () => {
   const { parseStaleBuildNote, takeStaleBuildNote } = await import('../src/client/engine/saves/staleBuildNote');
   for (const raw of [null, '', 'junk', '[]', '{"build":"b"}', JSON.stringify({ build: 1, at: 0, server: '', tries: 0, seen: 0 }), '{"build":"b","at":1e300,"server":"","tries":0,"seen":0}']) expect(parseStaleBuildNote(raw)).toBeNull();

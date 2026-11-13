@@ -1,4 +1,5 @@
 import { Scope } from '../../../shared/engine/app/scope';
+import { captureBrowserError, engineScreenTags } from '../telemetry/browserErrors';
 import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot/loadingWaits';
 import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
 import { bootProgress } from '../../../shared/engine/boot/timing';
@@ -97,6 +98,15 @@ function shellRetry(scope: Scope, error: ContentReadError, retry: () => void): v
   button.hidden = false;
   scope.listen(button, 'click', retry);
 }
+/** pages whose card has offered RETRY once already: RETRY rounds while still offline must not fill the screen outbox (8 kept) */
+const stallReported = new WeakSet<Document>();
+/** SENTRY-TRIAGE S18: the card's RETRY is a screen of a fault; its first offer on this page reports, once, at warning level */
+function reportStall(target: Document, error: ContentReadError, step: string | null): void {
+  if (stallReported.has(target)) return;
+  stallReported.add(target);
+  try { captureBrowserError(error, engineScreenTags('loading-stall', 'content-read', step ?? 'loading', { url: error.url })); }
+  catch { /* a report never holds the retry */ }
+}
 async function retryFromCard(error: ContentReadError, signal?: AbortSignal): Promise<void> {
   if (typeof document === 'undefined') throw error;
   const target = document, timeline = currentLoadingTimeline(), scope = new Scope('content-read-button');
@@ -109,6 +119,7 @@ async function retryFromCard(error: ContentReadError, signal?: AbortSignal): Pro
       if (signal?.aborted === true) { reject(abortReason(signal)); return; }
       if (signal !== undefined) scope.listen(signal, 'abort', () => { reject(abortReason(signal)); }, { once: true });
       resume = resolve; pending.add(resolve);
+      reportStall(target, error, timeline?.snapshot().current ?? null);
       id = beginLoadingWait(error.message, { kind: 'file', resource: error.url,
         owner: timeline?.waitOwner ?? null, step: timeline?.snapshot().current ?? null,
         retry: () => {for (const retry of pending) retry();}, retryNavigation: false });

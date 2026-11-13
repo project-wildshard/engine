@@ -34,10 +34,15 @@ export interface BrowserErrorTags {
  *   link-refused  the online stop card "The world turned this connection away" (the same file)
  *   stale-build   the stale-build screen (index.html data-stale-build, STALE-BUILD SB6), reported by the next build that boots
  *                 (telemetry/staleBuildReport.ts) since that page stops before Sentry can load
+ *   loading-stall the loading card's RETRY for a content read that failed past its own retry (boot/contentRead.ts
+ *                 retryFromCard, SENTRY-TRIAGE S18), once per stall; a common screen, so it reports at warning level
  * Not screens of a fault, so never reported: the player's own reload, back or exit (QA 11-12 row 35), "Playing somewhere else",
  * "The world is full", the reconnect banner (counted in `net` telemetry), title refusal lines and the Connection doctor.
  */
-export const ERROR_SCREENS = ['error-modal', 'stuck-step', 'glitch-chip', 'load-failure', 'title-drop', 'link-lost', 'link-refused', 'stale-build'] as const;
+export const ERROR_SCREENS = ['error-modal', 'stuck-step', 'glitch-chip', 'load-failure', 'title-drop', 'link-lost', 'link-refused', 'stale-build',
+  'loading-stall'] as const;
+/** S18: screens common enough on a bad network that each is a Sentry warning, never an error */
+export const WARNING_SCREENS: readonly ErrorScreen[] = ['loading-stall'];
 export type ErrorScreen = typeof ERROR_SCREENS[number];
 
 // A DSN is a public browser endpoint, not an auth token. Only real production pages report.
@@ -101,7 +106,8 @@ export function browserErrorNoise(event: ErrorEvent, page: { readonly environmen
 const UNSUPPORTED_BROWSER = ['This browser is too old for the online world'] as const;
 
 /** The Sentry level an error reports at: `warning` for a designed old-browser refusal, else `fatal` or `error`. Pure, so it is tested. */
-export function browserErrorLevel(error: unknown, fatal: boolean): 'warning' | 'error' | 'fatal' {
+export function browserErrorLevel(error: unknown, fatal: boolean, screen?: ErrorScreen): 'warning' | 'error' | 'fatal' {
+  if (screen !== undefined && WARNING_SCREENS.includes(screen)) return 'warning';
   const message = error instanceof Error ? error.message
     : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string' ? error.message : String(error);
   // includes, not startsWith: a title drop reports it as `<what>: <reason>` (src/client/app/entry.ts showDrop).
@@ -190,6 +196,12 @@ function asError(error: unknown): Error {
  * the outbox only once Sentry acknowledges it, so a page that reloads, goes to the title or dies right after still delivers it
  * (the next page sends it with the same event id, so Sentry keeps one).
  */
+/** S18: the tags for a screen engine code opens outside any level (the loading card's RETRY): this page's build, no level */
+export function engineScreenTags(screen: ErrorScreen, system: string, bootStage: string, diagnostic?: Record<string, unknown>): BrowserErrorTags {
+  let build = ''; try { build = __BUILD_ID__; } catch { /* under Node */ }
+  return { system, build, shard: '', bootStage, fatal: false, screen, ...(diagnostic === undefined ? {} : { diagnostic }) };
+}
+
 export function captureBrowserError(error: unknown, tags: BrowserErrorTags): void {
   if (!dsn || !productionPage()) return;
   if (tags.screen !== undefined) { reportScreen(error, tags); return; }
@@ -218,7 +230,7 @@ export async function deliverBrowserError(error: Error, tags: BrowserErrorTags, 
     try {
       sentry.withScope((scope) => {
         scope.setTags(tagsOf(tags));
-        scope.setLevel(browserErrorLevel(error, tags.screen !== undefined && tags.fatal));
+        scope.setLevel(browserErrorLevel(error, tags.screen !== undefined && tags.fatal, tags.screen));
         if (tags.diagnostic) scope.setContext('boot_diagnostic', tags.diagnostic);
         sentId = sentry.captureException(error, eventId === undefined ? undefined : { event_id: eventId });
       });
