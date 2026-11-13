@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.15 (2026-11-13)
+
+- Music plays piano only now; the music style choice is gone from Settings (this came in v0.1.14, whose notes missed it).
+- Shard select opens Sky Reach, Signal Dunes, Nine Dragon and Mossgate to every player; open plots are reached by walking the world.
+- Nalati and Sky Reach open on desktop in the world grid again, and Brasscap Mesa opens beside Driftwood without an error.
+- Finishing a quest no longer freezes your camera and controls for several seconds.
+- You can swim back up out of the Mossgate pond, and the Developer tab has an Unstuck button.
+
 ## v0.1.14 (2026-11-12)
 
 - Online, other players look like players: their body, held item, moves, attacks, health bars, Name and a dot on your minimap.
