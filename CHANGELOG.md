@@ -9,6 +9,13 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.16 (2026-11-13)
+
+- Pine Hollow's spawn shows its own textured ground, no longer bare tan slopes.
+- The world grid has room for 7 by 7 shards (the same 25 for now), and the empty spots between them are flat ground you can walk on.
+- The engine's command line tool, which crashed when installed from npm in v0.1.15, now runs.
+- Behind the scenes: the server can open a newly placed shard without a restart (off for now).
+
 ## v0.1.15 (2026-11-13)
 
 - Music plays piano only now; the music style choice is gone from Settings (this came in v0.1.14, whose notes missed it).
