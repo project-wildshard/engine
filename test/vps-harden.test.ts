@@ -178,3 +178,19 @@ test("a Hetzner firewall on another server, or one that lets in more, is not thi
   const wide = check(HARDENED, { HARDEN_TEST_FIREWALLS: '[{"name":"edge","applied_to":[{"server":{"id":1}}],"rules":[{"direction":"in","protocol":"tcp","port":"22"},{"direction":"in","protocol":"tcp","port":"443"}]}]' });
   expect(wide.out).toContain('fail    VH4   Hetzner Cloud Firewall edge lets in tcp/22 tcp/443; want tcp/443 udp/41641');
 });
+
+test('SC2: a metrics port off loopback, a remote_write or a missing drop-in fails; the loopback install passes', () => {
+  const loopback = '--web.listen-address=127.0.0.1:9090\n', node = '--web.listen-address=127.0.0.1:9100\n';
+  const good = { 'etc/prometheus/wildshard.yml': 'global:\n  scrape_interval: 15s\n', 'etc/systemd/system/prometheus.service.d/90-wildshard.conf': loopback,
+    'etc/systemd/system/prometheus-node-exporter.service.d/90-wildshard.conf': node };
+  const listening = { ...HARDENED, ss: `printf 'LISTEN 0 4096 127.0.0.1:9090 0.0.0.0:*\\nLISTEN 0 4096 127.0.0.1%%lo:9100 0.0.0.0:*\\nLISTEN 0 511 127.0.0.1:9791 0.0.0.0:*\\n'` };
+  const fine = check(listening, {}, ['--check'], good);
+  expect(fine.failed('SC2')).toEqual([]);
+  for (const want of ['ok      SC2   Prometheus and metrics ports listen on loopback only', 'ok      SC2   wildshard.yml sends nothing off the box', 'ok      SC2   prometheus.service active']) expect(fine.out).toContain(want);
+  const wide = check({ ...HARDENED, ss: `printf 'LISTEN 0 4096 *:9100 *:*\\nLISTEN 0 4096 100.64.0.9:9791 0.0.0.0:*\\n'` }, {}, ['--check'], good);
+  expect(wide.failed('SC2')).toEqual(['fail    SC2   metrics port off loopback: *:9100 100.64.0.9:9791']);
+  const out = check(listening, {}, ['--check'], { ...good, 'etc/prometheus/wildshard.yml': 'remote_write:\n  - url: https://example.invalid\n',
+    'etc/systemd/system/prometheus-node-exporter.service.d/90-wildshard.conf': '' });
+  expect(out.failed('SC2')).toEqual(['fail    SC2   wildshard.yml has a remote_write or remote_read', 'fail    SC2   prometheus-node-exporter.service.d/90-wildshard.conf is missing or not loopback']);
+  expect(check(HARDENED).out).toContain("info    SC2   no box Prometheus yet (harden.sh installs it)");
+});

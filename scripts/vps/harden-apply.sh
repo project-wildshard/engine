@@ -34,7 +34,7 @@ need_packages() {
   for name in "$@"; do installed "$name" || missing+=("$name"); done
   if [ "${#missing[@]}" = 0 ]; then return; fi
   say doing VH1 "install ${missing[*]}"
-  apt-get update -qq; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}"
+  apt-get update -qq; NEEDRESTART_MODE=l NEEDRESTART_SUSPEND=1 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}"
 }
 
 # Cloudflare's published ranges (https://www.cloudflare.com/ips-v4 and ips-v6, read 2026-11-11). 443 opens to these alone,

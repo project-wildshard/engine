@@ -10,3 +10,6 @@
   it off and back.
 - Reading needs no sudo: `curl -s 127.0.0.1:9090/api/v1/targets` on the box. `harden.sh --check` fails a metrics port off
   loopback.
+- Review (one claude -p, one MUST): Ubuntu's needrestart would restart a game server holding an old library after an
+  apt install, so installs here (and harden's need_packages) only list. put now stops on any failure and promtool checks
+  a new config before it replaces the old one; the settings step takes wildshard-config's lock.
