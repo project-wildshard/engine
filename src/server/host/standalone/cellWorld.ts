@@ -1,10 +1,9 @@
 // E7.3: opening one cell's world, shared by the phone's grid (`gridServer.ts`) and a dedicated room (`DedicatedRoom`). What differs
 // between them is in `CellWorldOptions`: who keeps a player's goods and facts, and whether solids stay near one player.
 import { bootTask } from '@wildshard/engine/boot/timing';
-import { withOwner } from '@wildshard/engine/app/ownership';
 import type { NetTickInput } from '@wildshard/engine/net/room';
 import { NearColliders } from '@wildshard/engine/physics/nearColliders';
-import { addEdgeWalls } from '@wildshard/engine/physics/terrain';
+import { removeChunkEdgeWalls } from '@wildshard/engine/physics/terrain';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
@@ -63,6 +62,8 @@ export interface CellWorld extends GridResident {
 /** What a host lends a cell it opens. */
 export interface CellWorldOptions {
   readonly saves: SaveStore;
+  /** A cell with no road around it (a one-shard page, `WORLD_CROSSING=off`): its fall floor sets a player back on the ground they last
+   *  stood on instead of a death. It has no edge walls (GC36, J322), so past its edge a player falls to that floor. */
   readonly lone: boolean;
   /** C6: a room holds every solid, since no one list can follow every player. Left out, a native world keeps its solids near its lead. */
   readonly wholeSolids?: boolean;
@@ -89,11 +90,8 @@ function fallFloorOf(input: HeadlessRuntimeInput, host: SimHost, lone: boolean):
   return new FallFloor(input.product === undefined ? shardFallFloor(input.shard.manifest?.bounds?.floor) : shardPlayArea(input.shard.manifest?.bounds, input.product), lone, host.level.player.at);
 }
 
-/** A lone cell has the walls a shard's own page stands inside; a native bake that holds them already keeps its own (SS10). */
-function addLoneWalls(host: SimHost): void { withOwner(host.scope, () => { addEdgeWalls(host.physics, { reuse: true }); }); }
-
 /** A cell with no native plan: a data shard, which any host can run from its output. */
-async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, effects: HeadlessEffect[], lone: boolean): Promise<Pick<CellWorld, 'host' | 'dispose'> & { readonly sim: () => ShardfileSimulation | undefined; readonly kit: () => DeclaredKitItems | null }> {
+async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, effects: HeadlessEffect[]): Promise<Pick<CellWorld, 'host' | 'dispose'> & { readonly sim: () => ShardfileSimulation | undefined; readonly kit: () => DeclaredKitItems | null }> {
   await Promise.resolve();
   const { shard, assets, rapier } = input;
   // A data shard's decisions, moves and targets ride its product sections (TE-ENG1's boss rows): without them the
@@ -107,7 +105,6 @@ async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimS
     const fresh = createShardfileSim(shard, assets, ports), kit = kitOf(fresh);
     // SS3: a data shard's simulation builds its declared prop solids; a shard with none built has no server half to claim
     if (fresh.colliders.size > 0) registerInstalled(fresh.host, 'collision');
-    if (lone) addLoneWalls(fresh.host);
     return { host: fresh.host, sim: () => fresh, kit: () => kit, dispose: () => { fresh.dispose(); } };
   }
   const probe = createShardfileSim(shard, assets, ports), { level } = probe.host; probe.dispose();
@@ -147,15 +144,14 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
   if (nativeCell(input)) {
     // J68: a native assembly keeps its ground whole and its solids as data. A saved world holds none of them, so a throwaway fresh one lists them.
     const near = options.wholeSolids !== true && input.product !== undefined && hasNativeAssembly(input.product) ? new NearColliders() : undefined;
-    // GC15: a cell that isn't lone opens onto its worker's road, so its baked page walls don't stand at its edge either.
-    const around = { room: true, ...(lone ? {} : { road: true }), ...(near === undefined ? {} : { near }) };
+    const around = { room: true, ...(near === undefined ? {} : { near }) };
     if (near !== undefined && snapshot !== undefined) (await bootTask('server:restore-collision-inventory', () => createTrustedHeadlessResident(input, undefined, around))).dispose();
     // A world with no save of its own takes the page's: the flags and records its fights read as they install.
     const seeded = snapshot === undefined && options.pageless !== true;
     const page = seeded ? { flags: [...new Set([...new Set([input.shard.identity.slug, cell.instance])].flatMap(level => pageSavedFlags(level)).concat(refused?.flags ?? []))], state: pageRuntimeState(options.saves, cell.instance) } : undefined;
     const resident = await bootTask(snapshot === undefined ? 'server:simulation-and-collision-create' : 'server:continuation-restore', () => createTrustedHeadlessResident(input, snapshot, page === undefined ? around : { ...around, page })), { host } = resident;
+    if (snapshot !== undefined) removeChunkEdgeWalls(host.physics); // GC36: a world saved while lone cells had walls
     bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product)); await installServerChapters(host, input.product, input.shard, resident.fact); await installServerDoors(host, input.product, seeded ? pageOpenDoors(options.saves, placed) : undefined);
-    if (snapshot === undefined && lone) addLoneWalls(host);
     host.respawn.served = true; actRoutes(host).introLocks = true;
     const owned = ownedOf(host, input, options.owned, options.profiles), fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
     return { host, owned, fallFloor, fall: fallFloor(), dispose: () => { resident.dispose(); }, fact, effects: () => resident.effects,
@@ -165,7 +161,8 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
       stepResident(resident, player.id, inputs);
     } };
   }
-  const effects: HeadlessEffect[] = [], { host, dispose, sim, kit } = await bootTask(snapshot === undefined ? 'server:data-simulation-and-collision' : 'server:data-continuation-restore', () => openDataCell(input, snapshot, effects, lone));
+  const effects: HeadlessEffect[] = [], { host, dispose, sim, kit } = await bootTask(snapshot === undefined ? 'server:data-simulation-and-collision' : 'server:data-continuation-restore', () => openDataCell(input, snapshot, effects));
+  if (snapshot !== undefined) removeChunkEdgeWalls(host.physics); // GC36: a world saved while lone cells had walls
   installRoomRespawn(host, []);
   installDeclaredClimate(host, input.shard.rows);
   bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product));

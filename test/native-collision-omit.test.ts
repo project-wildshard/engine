@@ -26,3 +26,20 @@ test('a native bake install leaves out exactly the solids of its omitted materia
   expect(materials()).toEqual(['edge', 'edge', 'ground', 'untagged', 'wood']);
   expect(materials(['edge'])).toEqual(['ground', 'untagged', 'wood']);
 });
+
+// GRID-CROSSING GC36 (J322, no walls): an older bake holds its page's four chunk-edge walls, Nalati's with no material; an `edge` omit
+// names them by their shape too, and keeps a box of any other shape or place.
+test('an edge omit leaves out a bake\'s untagged chunk-edge walls and nothing else', async () => {
+  const R = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
+  const wall = (at: [number, number, number], half: [number, number, number]): NativeCollisionSolid => ({ shape: 1, groups: 0xffff, friction: 0.5, at, rot: [0, 0, 0, 1], half });
+  const bake = { ground: { heights: new Float32Array(4), friction: 0.5, groups: 0xffff, scale: { x: 10, y: 1, z: 10 }, at: { x: 0, y: 0, z: 0 } },
+    solids: [wall([250.2, 170, 0], [1, 230, 252]), wall([-250.2, 170, 0], [1, 230, 252]), wall([0, 170, 250.2], [252, 230, 1]), wall([0, 170, -250.2], [252, 230, 1]),
+      wall([240, 170, 0], [1, 230, 252]), wall([250.2, 1, 0], [1, 1, 1])] };
+  const scope = new Scope('native-collision'), physics = new Physics(R);
+  try {
+    installNativeCollision({ physics, scope, onStep: () => () => undefined }, bake, { resolution: 2, omit: ['edge'] });
+    const xs: number[] = [];
+    physics.world.forEachCollider(collider => { if (tagOf(collider)?.material !== 'ground') xs.push(Math.round(collider.translation().x)); });
+    expect(xs.sort((a, b) => a - b)).toEqual([240, 250]);
+  } finally { scope.dispose(); }
+});

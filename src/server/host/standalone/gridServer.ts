@@ -57,7 +57,8 @@ export interface GridServerOptions {
   /** A world's tick finished, in how many milliseconds. */
   readonly stepped: (host: SimHost, ms: number) => void;
   readonly now: () => number;
-  /** A one-shard page: this cell alone, inside its own walls, with no crossing out of it, whether the grid places it or not. */
+  /** A one-shard page: this cell alone, with no crossing out of it, whether the grid places it or not. It has no walls (GC36, J322): past
+   *  its edge a player falls and is set back on the ground they last stood on. */
   readonly lone?: boolean;
   /** A proof's way in: start on the road at this world point, as no player can, rather than in the home cell. */
   readonly arrival?: Readonly<GridPoint>;
@@ -132,7 +133,7 @@ export class StandaloneGrid {
     if (home === undefined) throw new Error(`Standalone needs a grid cell: ${options.slug}`);
     const { saves, storage, savePrefix } = options, worlds = new Map<string, CellWorld>(), cells = new Map<string, ContinuationSlots<SavedContinuation>>();
     let settle: (held: ContinuationSlots<SavedContinuation>) => void = () => undefined;
-    // A lone cell's world has walls and a grid cell's has a rim, so neither can restore the other's continuation. Facts and page progress they share.
+    // A lone cell's world stands alone and a grid cell's has a rim, so neither can restore the other's continuation. Facts and page progress they share.
     const documents = options.lone === true ? (instance: string): readonly [string, string] => cellDocuments(`lone-${instance}`) : cellDocuments;
     const continuation = saves.define(CONTINUATION), sites = new ContinuationSlots(saves.define(SITE), siteDocuments(options.lone === true ? `lone-${home.instance}` : 'grid'), storage, savePrefix);
     const slots = (instance: string): ContinuationSlots<SavedContinuation> => {

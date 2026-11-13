@@ -29,9 +29,6 @@ export function toColumnMajor(grid: Float32Array, res: number): Float32Array {
   return out;
 }
 
-/** Inner faces of the edge walls sit here; with the player's 0.4 m capsule the centre stops 1.2 m inside the chunk. */
-export const EDGE_WALL_INSET = 0.8;
-
 interface Ground { collider: Collider; grid: Float32Array; res: number; size: number; declared?: true }
 const grounds = new WeakMap<Physics, Ground>();
 
@@ -126,30 +123,24 @@ export function cutTerrain(physics: Physics, cuts: readonly TerrainCut[]): numbe
   return changed;
 }
 
-/** Four walls a little inside the chunk edge — the chunk floats; there is nothing to walk onto. `reuse` (SERVER-PARITY SS10):
- *  a wall the world already holds (a native bake's own copy of these walls) stands as that wall, tagged `edge`, not twice. */
-export function addEdgeWalls(physics: Physics, options: { readonly reuse?: boolean } = {}): Collider[] {
-  const { R, world } = physics;
-  const t = 1, reach = CHUNK_HALF - EDGE_WALL_INSET + t, lo = -60, hi = 400;
-  const cy = (lo + hi) / 2, hy = (hi - lo) / 2, span = CHUNK_HALF + 2;
-  const walls: [number, number, number, number][] = [[reach, 0, t, span], [-reach, 0, t, span], [0, reach, span, t], [0, -reach, span, t]];
-  const same = (a: number, b: number): boolean => Math.abs(a - b) < 1e-3;
-  const held = (x: number, z: number, hx: number, hz: number): Collider | undefined => {
-    let found: Collider | undefined;
-    if (options.reuse === true) world.forEachCollider(c => {
-      const material = tagOf(c)?.material;
-      if (found !== undefined || (material !== undefined && material !== 'edge') || c.isSensor() || !c.isEnabled() || c.collisionGroups() !== groups('WORLD')
-        || c.shapeType() !== R.ShapeType.Cuboid || c.parent()?.isDynamic() === true) return;
-      const at = c.translation(), h = c.halfExtents(), q = c.rotation();
-      if (h !== null && same(at.x, x) && same(at.y, cy) && same(at.z, z) && same(h.x, hx) && same(h.y, hy) && same(h.z, hz) && same(Math.abs(q.w), 1)) found = c;
-    });
-    return found;
-  };
-  return walls.map(([x, z, hx, hz]) => {
-    const old = held(x, z, hx, hz);
-    if (old !== undefined) { if (tagOf(old) === undefined) tagCollider(old, 'edge'); return old; }
-    const c = world.createCollider(R.ColliderDesc.cuboid(hx, hy, hz).setTranslation(x, cy, z).setCollisionGroups(groups('WORLD')));
-    tagCollider(c, 'edge');
-    return c;
+/** GRID-CROSSING GC36 (J322, no walls): whether a box is one of the four chunk-edge walls a page used to stand inside (the retired
+ *  `addEdgeWalls`: 1 m thick, inner face 0.8 m inside the edge, y -60 to 400, unrotated at the cell's own origin). An older bake or
+ *  a saved world still holds them, some with no material (Nalati's bake), so they are known by their shape. */
+export function isChunkEdgeWall(at: readonly [number, number, number], half: readonly [number, number, number], w: number): boolean {
+  const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-2, reach = CHUNK_HALF - 0.8 + 1, span = CHUNK_HALF + 2;
+  if (!near(Math.abs(w), 1) || !near(at[1], 170) || !near(half[1], 230)) return false;
+  return near(Math.abs(at[0]), reach) && near(at[2], 0) && near(half[0], 1) && near(half[2], span)
+    || near(Math.abs(at[2]), reach) && near(at[0], 0) && near(half[2], 1) && near(half[0], span);
+}
+
+/** GC36: take out the chunk-edge walls a restored world brought back from a save made while lone cells had them. Returns how many. */
+export function removeChunkEdgeWalls(physics: Physics): number {
+  const { R, world } = physics, walls: Collider[] = [];
+  world.forEachCollider(c => {
+    const material = tagOf(c)?.material, h = c.halfExtents(), at = c.translation();
+    if ((material !== undefined && material !== 'edge') || c.isSensor() || c.shapeType() !== R.ShapeType.Cuboid || c.parent()?.isDynamic() === true || h === null) return;
+    if (isChunkEdgeWall([at.x, at.y, at.z], [h.x, h.y, h.z], c.rotation().w)) walls.push(c);
   });
+  for (const wall of walls) world.removeCollider(wall, false);
+  return walls.length;
 }

@@ -20,10 +20,7 @@ import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 /** What a server host hands one install. The tick protocol belongs to the SDK: `ports` adapts it. */
 export interface NativeAssemblyContext { readonly combat?: NativeCombatFrame; readonly restoring: boolean; readonly snapshot?: Readonly<Omit<SimSnapshot, 'physics'>>;
   /** A net room's world: it also runs the fights a page or a tape keeps to itself. */
-  readonly room?: boolean;
-  /** GC15: a grid cell that opens onto its worker's road (`WORLD_CROSSING=worker`): the edge is the platform's, so the shard's
-   *  own page walls in its baked collision don't stand there, as for a cell held near its player. */
-  readonly road?: boolean }
+  readonly room?: boolean }
 /** The SDK's tick-protocol loans. No module URL or shard code crosses this boundary. */
 export interface NativeAssemblyPorts<C extends NativeAssemblyContext> {
   readonly rapier: Rapier;

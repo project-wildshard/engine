@@ -28,5 +28,5 @@ export function gridPage(): boolean { return mode === 'grid'; }
 /** Grid-owned walls and horizon yield to the platform; standalone keeps the original spec identity. */
 export function gridLevel(spec: LevelSpec): LevelSpec {
   if (currentPageMode() !== 'grid') return spec;
-  return { ...spec, boundary: { ...spec.boundary, visible: false, walls: false }, ...(spec.horizon === undefined ? {} : { horizon: { rings: [], cloudSea: false } }) };
+  return { ...spec, boundary: { ...spec.boundary, visible: false }, ...(spec.horizon === undefined ? {} : { horizon: { rings: [], cloudSea: false } }) };
 }

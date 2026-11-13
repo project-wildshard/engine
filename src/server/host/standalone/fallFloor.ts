@@ -30,8 +30,8 @@ export const RESIDENT_FALL_GRACE = 0.25;
 
 type Body = Pick<PlayerSim, 'yaw' | 'led' | 'resetPose'> & { readonly position: { x: number; y: number; z: number }; readonly fall: { readonly grounded: boolean }; readonly board: { readonly on: boolean } };
 /** One cell's fall recovery. `soft` takes a player back; a hard floor is a death. `start` is where they go with no safe ground yet.
- *  The floor is the area's at the player's x/z. Its x/z edge is not enforced here: a lone cell's walls hold the player (P1-E3.9's
- *  lone-cell test walks Dunes past its ±200 area to the wall at 250), so the page's offline x/z reset stays the page's. */
+ *  The floor is the area's at the player's x/z. Its x/z edge is not enforced here: a lone cell has no walls (GC36, J322), so a
+ *  player who walks off its edge falls below the floor and comes back (`standalone-grid-lone.test.ts`); the page's x/z reset stays the page's. */
 export class FallFloor {
   private since = 0;
   private spot: { x: number; y: number; z: number } | null = null;

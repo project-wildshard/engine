@@ -34,7 +34,7 @@ export interface StandaloneConfig {
   readonly identity?: NetIdentity;
   /** MP2.4: the Name the page keeps (the Name prompt), sent with this device's own id. Solo shows it only on this page. */
   readonly name?: string;
-  /** A one-shard page: the server runs this cell alone, inside its own walls and with no road. */
+  /** A one-shard page: the server runs this cell alone, with no road and no walls (GC36). */
   readonly lone?: true;
   /** J311: a grid page's Shard select pick (a cell instance): the server starts the session in that cell. */
   readonly goto?: string;

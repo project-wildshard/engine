@@ -52,8 +52,6 @@ const reviewedW2Owners = new Map([
   ['src/format/lootEconomy.ts#ClaimedPickupSchema', 'C6'],
   ['src/shared/engine/combat/effects/EffectService.ts#playerBindings', 'C6'],
   ['src/shared/engine/combat/effects/EffectService.ts#bindPlayerEffects', 'C6'],
-  ['src/shared/engine/physics/terrain.ts#EDGE_WALL_INSET', 'C1'],
-  ['src/shared/engine/physics/terrain.ts#isStandaloneEdgeWall', 'C1'],
   ['src/shared/game/bag/itemCatalog.ts#isItemId', 'C6'],
   ['src/client/game/plugin/ui.ts#STARTER_EFFECTS', 'C6'],
   ['src/client/game/plugin/ui.ts#StatusMovement', 'C6'],

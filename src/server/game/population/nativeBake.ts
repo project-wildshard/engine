@@ -5,6 +5,7 @@ import type { Collider } from '@dimforge/rapier3d-simd';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { solidReach } from '@wildshard/engine/physics/nearColliders';
 import type { Physics } from '@wildshard/engine/physics/Physics';
+import { isChunkEdgeWall } from '@wildshard/engine/physics/terrain';
 import { tagCollider, tagOf, type Material } from '@wildshard/engine/physics/surface';
 import type { SimHost } from '@wildshard/engine/sim';
 
@@ -70,7 +71,7 @@ export function installNativeCollision(host:Pick<SimHost,'physics'|'scope'|'onSt
   options:{readonly resolution:number;readonly omit?:readonly Material[];
     readonly provenance?:{readonly field:string;readonly step:string;readonly fallback:Material}}):ReadonlyMap<string,object|string> {
   const owners=new Map<string,object|string>(),policy=options.provenance,omit=new Set(options.omit);
-  const omitted=(solid:NativeCollisionSolid):boolean=>solid.material!==undefined&&omit.has(solid.material);
+  const omitted=(solid:NativeCollisionSolid):boolean=>solid.material!==undefined&&omit.has(solid.material)||omit.has('edge')&&solid.shape===1&&solid.half!==undefined&&(solid.material===undefined||solid.material==='edge')&&isChunkEdgeWall(solid.at,solid.half,solid.rot[3]);
   if(policy!==undefined){
     if(!/^[a-z][a-zA-Z0-9]{0,63}$/u.test(policy.field))throw new Error('Invalid native owner field');
     bake.solids.forEach(solid=>{const id=solid.ownerId;if(omitted(solid)||id===undefined||owners.has(id))return;

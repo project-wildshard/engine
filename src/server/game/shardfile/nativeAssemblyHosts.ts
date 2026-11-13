@@ -223,8 +223,9 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     case 'commands': return run => { run.input = at.ports.bindCommands(run.context, run.host); };
     case 'collision': {
       const collision = need(plan.collision, 'Native collision needs its settings'); need(plan.bake, 'Native collision needs its bake');
-      // GC15: a cell open onto the road leaves out the shard's own page walls, as a cell held near its player does (`nativeBake.ts`).
-      return run => { registerInstalled(run.host, 'collision'); if (row.skipOnRestore !== true || !run.context.restoring) installNativeCollision(run.host, at.bake, (run.context.road === true ? { ...collision, omit: [...(collision as { omit?: readonly string[] }).omit ?? [], 'edge'] } : collision) as Parameters<typeof installNativeCollision>[2]); };
+      // GC36 (J322, no walls): an older bake still holds its page's chunk-edge walls (`edge`); no world stands them, as a cell held near
+      // its player never did (`nativeBake.ts`).
+      return run => { registerInstalled(run.host, 'collision'); if (row.skipOnRestore !== true || !run.context.restoring) installNativeCollision(run.host, at.bake, { ...collision, omit: [...(collision as { omit?: readonly string[] }).omit ?? [], 'edge'] } as Parameters<typeof installNativeCollision>[2]); };
     }
     case 'collision.pieces': { const pieces = await readAssemblyInput<unknown>(product, row.rows); return run => { registerInstalled(run.host, 'collision'); if (!run.context.restoring) addBakedPieces(run.host.physics, pieces); }; }
     case 'portal.ride': {

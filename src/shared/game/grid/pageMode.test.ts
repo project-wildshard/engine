@@ -12,20 +12,20 @@ function level(): LevelSpec {
     loadout: { weapons: [], tools: [], start: [] }, species: [], spawns: [], minimap: {}, kitLook: 'pbr' };
 }
 test('standalone policy keeps the original level and its authored bounds', () => {
-  const original = level(); original.boundary = { visible: true, walls: true };
+  const original = level(); original.boundary = { visible: true };
   original.horizon = { rings: [], cloudSea: true };
   expect(gridLevel(original)).toBe(original);
-  expect(original.boundary).toEqual({ visible: true, walls: true });
+  expect(original.boundary).toEqual({ visible: true });
   expect(original.horizon.cloudSea).toBe(true);
 });
-test('grid policy replaces only walls and an existing horizon without mutating authored data', () => {
+test('grid policy hides only the edge and an existing horizon without mutating authored data', () => {
   setPageMode('grid');
-  const original = level(); original.boundary = { visible: true, walls: true };
+  const original = level(); original.boundary = { visible: true };
   const absent = gridLevel(original);
   expect(Object.hasOwn(absent, 'horizon')).toBe(false);
   original.horizon = { rings: [], cloudSea: true };
   const next = gridLevel(original);
-  expect(next).toEqual({ ...original, boundary: { visible: false, walls: false }, horizon: { rings: [], cloudSea: false } });
+  expect(next).toEqual({ ...original, boundary: { visible: false }, horizon: { rings: [], cloudSea: false } });
   expect(next.ground).toBe(original.ground); expect(next.spawn).toBe(original.spawn); expect(next.sky).toBe(original.sky);
-  expect(original.boundary).toEqual({ visible: true, walls: true }); expect(original.horizon.cloudSea).toBe(true);
+  expect(original.boundary).toEqual({ visible: true }); expect(original.horizon.cloudSea).toBe(true);
 });

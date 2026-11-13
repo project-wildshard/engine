@@ -23,8 +23,10 @@
    ]
   },
   "nine-dragon-stack": {
-   "row": "SERVER-PARITY SS10 (closed: the standalone deck caps stand inside the server edge walls)",
-   "known": []
+   "row": "SERVER-PARITY SS10, GRID-CROSSING GC36 (J322: no edge walls, so the page's standalone deck caps at the edge, 1 m slivers at |x| or |z| 249 to 250 that stood inside the server's walls, have no server twin; a re-recorded page half (scripts/side-parity.mjs --record) drops them once the bake does)",
+   "known": [
+    "nds-floors (stone): 16 page collider(s) with no server match, e.g. [-250, 0, -5, -249, 3, -4]"
+   ]
   },
   "pine-hollow": {
    "row": "SERVER-PARITY SS10 (closed: the three owner names are declared the same below; the solids agree)",

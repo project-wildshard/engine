@@ -105,10 +105,10 @@ export interface LevelSpec {
   species: readonly string[]; spawns: readonly HerdPlan[]; spawnTables?: readonly string[];
   faunaTuning?: Partial<Record<string, Partial<HuntTuning>>>;
   /**
-   * Edge dressing and containment. `visible` hides the drawing only; `walls: false` leaves out the four chunk-edge walls,
-   * for a level placed inside a larger platform that owns what lies past its edge (absent = walls).
+   * Edge dressing. `visible` hides the drawing only. No level has chunk-edge walls (GRID-CROSSING GC36, J322): past its edge a
+   * one-shard page falls to its fall floor, and a grid cell opens onto the road.
    */
-  boundary?: { visible?: boolean; walls?: boolean };
+  boundary?: { visible?: boolean };
   trees?: TreeSpec; forest?: ForestSpec; horizon?: HorizonSpec; horizonStrips?: HorizonStrips;
   minimap: MinimapSpec; hud?: HudSpec; pois?: readonly PoiSpec[];
   groundColor?: (x: number, z: number, h: number, slope: number, terrain: TerrainField, out: RGB) => RGB;

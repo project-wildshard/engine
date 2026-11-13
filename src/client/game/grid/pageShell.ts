@@ -46,7 +46,7 @@ export function gridPageShell(source: ShardManifest): ShardManifest {
 
 /** The neutral page cannot read a home terrain/navmesh bake merely because it keeps the picker's identity. */
 export function gridPageShellLevel(shell: ShardManifest): LevelSpec {
-  return { ...toLevelSpec(shell), id: 'platform.grid', boundary: { visible: false, walls: false } };
+  return { ...toLevelSpec(shell), id: 'platform.grid', boundary: { visible: false } };
 }
 
 /** Select the neutral engine level before its staged boot; catalogue identity and each resident's frame stay separate. */
