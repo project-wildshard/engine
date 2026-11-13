@@ -27,9 +27,28 @@ export function assetIndex(): string {
 
 // src/client/game/boot/bytes.generated.ts: the same table as a committed TS module, so the boot plan's declared
 // denominators need no fetch and `pnpm tsc` fails when a file a chunk declares disappears.
+const BYTES_TABLE = 'src/client/game/boot/bytes.generated.ts';
 function bytesModule(): string {
-  const rows = JSON.parse(assetIndex()) as Record<string, number>;
-  return publicBytesTableSource(Object.fromEntries(Object.entries(rows).filter(([name]) => !name.endsWith('.DS_Store'))));
+  const rows = Object.fromEntries(Object.entries(JSON.parse(assetIndex()) as Record<string, number>).filter(([name]) => !name.endsWith('.DS_Store')));
+  // The committed table is the baseline, not the file a local run last wrote (it may hold an older public/'s sizes).
+  let committed = '';
+  try { committed = execFileSync('git', ['show', `HEAD:${BYTES_TABLE}`], { encoding: 'utf8', maxBuffer: 16_000_000, stdio: ['ignore', 'pipe', 'ignore'] }); }
+  catch { /* no git history here (an installed package): nothing to compare */ }
+  const changed = changedContentNamed(committed, rows);
+  if (changed.length > 0) throw new Error(`${changed.length} content-named file(s) changed bytes under one URL, which players keep for a year (AUDIO AU21): ${changed.slice(0, 5).join(', ')}. A changed file needs a new name (sharddev 0.2.10 renames a re-encoded recording); a stale public/ copy needs \`pnpm pins\``);
+  return publicBytesTableSource(rows);
+}
+
+/** AUDIO AU21: a content-named file (`contentNamed`: no `?v=`, kept by the worker, `/assets/*` immutable) is served for a
+ *  year under its URL, so a new byte table may not give one of the previous table's content-named paths another size.
+ *  A renamed file is a new row and passes; same size with other bytes slips past (the table holds sizes only). */
+export function changedContentNamed(previous: string, rows: Readonly<Record<string, number>>): string[] {
+  const out: string[] = [];
+  for (const [, name, size] of previous.matchAll(/^\s*"([^"]+)": (\d+),?$/gmu)) {
+    const now = name === undefined ? undefined : rows[name];
+    if (name !== undefined && now !== undefined && contentNamed(name) && now !== Number(size)) out.push(`${name} (${size} to ${now} bytes)`);
+  }
+  return out;
 }
 
 // src/client/game/boot/versions.generated.ts: a content hash per file under public/assets (E160; NALATI-MERGE F4 started it for
