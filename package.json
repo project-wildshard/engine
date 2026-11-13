@@ -29,6 +29,7 @@
     "format:check": "npr oxfmt -c src/.oxfmtrc.json --check src/cli src/tools src/e2e src/scripts",
     "test": "pnpm test:kit && pnpm test:fast",
     "test:e2e": "playwright test --config src/e2e/playwright.config.ts",
+    "test:e2e:faults": "node scripts/e2e-faults.mjs",
     "check:sides": "node src/scripts/check-sides.mjs && node scripts/check-engine-sides.mjs",
     "check:asks": "node src/scripts/asks.mjs check",
     "check:agents": "node .githooks/agents-md.mjs lint",
