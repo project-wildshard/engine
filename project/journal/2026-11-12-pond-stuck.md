@@ -8,3 +8,7 @@ Jake, 2026-11-12, preview 243820b7: "glitched into the pond cant use shift to su
   step to act in. Now the mask's edge over deep ground is a wall; over a shore it is still the way out (swim.ts).
   `test/pond-surface.test.ts` is red without it (300 ticks under, 38 swim/foot flips on one bearing).
 - The pit itself is shard geometry: a swimmer held at the edge still has no beach. Template's bowl is graded in sharddev.
+- Unstuck (Jake, same evening: "Need a button in <dev> to unstuck in settings, unstuck will respawn me like the death
+  behavior but gets me unstuck"): a DEV-tab tools row (`ui/unstuck.ts`). A local page goes where a death would put it (last
+  place, else spawn), menu closed, no sting or fade or fall. On a world the page sends `interact` `unstuck` (no new wire
+  kind) and roomRespawn's `actRoutes.unstuck` places the player the way a fall does, in both cell kinds.

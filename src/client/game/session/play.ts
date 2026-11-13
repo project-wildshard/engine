@@ -105,6 +105,8 @@ import { WindupWarn } from '@wildshard/engine/ui/WindupWarn';
 import { HAPTIC, buzz } from '@wildshard/engine/ui/haptics';
 import { hudSlots } from '@wildshard/engine/ui/hudSlots';
 import { installPlayerDeath } from '@wildshard/engine/ui/playerDeath';
+import { installUnstuck } from '@wildshard/engine/ui/unstuck';
+import { UNSTUCK_ACT } from '@wildshard/engine/net/acts';
 import { PlayerHurt } from '@wildshard/engine/ui/playerHurt';
 import { onReview, queuedCount, quickNote } from '@wildshard/engine/ui/review';
 import { installBounds, playBounds } from '@wildshard/engine/world/bounds';
@@ -467,6 +469,8 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     serverRespawn = resume;
     app.events.emit('player.died', { actor: playerHealth, checkpoint: event.checkpoint, ...(event.cause === undefined ? {} : { cause: event.cause }) });
   };
+  /** Where a death puts a local player: the last named place reached (the pier is the spawn), else the spawn. */
+  const deathStand = () => { const stand = gridLive !== null && !gridLive.ownsHomeRecovery() ? null : lastPlace?.stand ?? null; return stand !== null && stand.id !== 'pier' ? stand : null; };
   const die = (by: DeathCause | undefined): void => {
     const stand = gridLive !== null && !gridLive.ownsHomeRecovery() ? null : lastPlace?.stand ?? null;
     music.sting('death');
@@ -480,6 +484,13 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     });
   };
   playerHealth.bindLifecycle({ fading: () => deathFade.active, updateFade: (dt) => deathFade.update(dt) });
+  // the DEV tab's Unstuck (ui/unstuck.ts): a death's respawn with no death; on a world the server places the player
+  installUnstuck(game.levelScope, {
+    busy: () => deathFade.active || !hud.entered || app.player !== playerHealth, online: () => player.link !== null,
+    send: () => { weapons.interact(UNSTUCK_ACT); }, close: () => { hud.setPaused(false); },
+    place: () => { const stand = deathStand(); if (stand !== null) player.spawn(stand.x, stand.z, stand.yaw, stand.y); else toSpawn(); },
+    respawned: () => { app.events.emit('player.respawned', { at: player.position.clone(), checkpoint: false }); },
+  });
   installPlayerDeath(app.events, game.levelScope, playerHealth, {
     active: () => app.player === playerHealth, position: () => player.position,
     died: (cause, checkpoint) => {

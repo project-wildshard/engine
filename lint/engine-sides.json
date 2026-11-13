@@ -477,6 +477,7 @@
     "src/client/engine/ui/perfProbe.ts": "client",
     "src/client/engine/ui/pinKeepOut.ts": "client",
     "src/client/engine/ui/playerDeath.ts": "client",
+    "src/client/engine/ui/unstuck.ts": "client",
     "src/client/engine/ui/playerHurt.ts": "client",
     "src/client/engine/ui/playerReload.ts": "client",
     "src/client/engine/ui/reloadChip.ts": "client",

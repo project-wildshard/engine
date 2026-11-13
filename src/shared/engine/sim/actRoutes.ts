@@ -38,6 +38,8 @@ export interface ActRoutes {
   board: ((player: string, op: 'claim' | 'tear', slot: number) => void) | null;
   /** A player puts on or takes off a cosmetic. */
   wear: ((player: string, id: string) => void) | null;
+  /** A player's Unstuck (UNSTUCK_ACT): back to their last place or the spawn, as a fall would put them, with no fall. */
+  unstuck: ((player: string) => void) | null;
   /** A boss's intro holds whoever stands in its arena. Only a page's session asks: a tape's steps run on through one. */
   introLocks?: boolean;
   /** A Developer asked that a fight's blows not land: a lair's script sees it, as a page's did. */
@@ -65,6 +67,6 @@ const routes = new WeakMap<SimHost, ActRoutes>();
 /** One host's routes (P1-E5.2c). */
 export function actRoutes(host: SimHost): ActRoutes {
   let held = routes.get(host);
-  if (held === undefined) { held = { identities: new Map(), interactions: new Map(), poseInputs: new Set<string>(), time: null, equip: null, lock: null, ride: null, mountable: null, lean: null, launcher: null, seen: null, story: null, bonded: null, inside: null, tied: null, buy: null, board: null, wear: null, climate: null, claims: new Map(), skipHeld: false, refused: 0 }; routes.set(host, held); }
+  if (held === undefined) { held = { identities: new Map(), interactions: new Map(), poseInputs: new Set<string>(), time: null, equip: null, lock: null, ride: null, mountable: null, lean: null, launcher: null, seen: null, story: null, bonded: null, inside: null, tied: null, buy: null, board: null, wear: null, unstuck: null, climate: null, claims: new Map(), skipHeld: false, refused: 0 }; routes.set(host, held); }
   return held;
 }

@@ -13,6 +13,8 @@ export interface NetChatReport { readonly kind: 'report'; readonly seq: number; 
 /** A lone player's word on the sky: their weather setting, or a dev's phase jump. A room shares its sky, so with others in it this does nothing. `at` is a phase's fraction, -1 for the mode's own. */
 /** How an `interact` names a story flag on a shard whose page runs its story. */
 export const STORY_ACT = 'story:';
+/** The `interact` a page's DEV tab Unstuck sends (Jake, 2026-11-12): the server puts its player back where a fall would, with no fall. */
+export const UNSTUCK_ACT = 'unstuck';
 export interface NetClimateAct { readonly kind: 'climate'; readonly seq: number; readonly op: typeof CLIMATE_OPS[number]; readonly name: string; readonly at: number }
 /** Buy one of the shard's goods, by its place in the shard's exchange. The server checks it and takes the price. */
 export interface NetBuyAct { readonly kind: 'buy'; readonly seq: number; readonly good: number }

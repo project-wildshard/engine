@@ -1,5 +1,5 @@
 import type { NetCommand } from '@wildshard/wire/netCommand';
-import { STORY_ACT, type NetTickAct } from '@wildshard/engine/net/acts';
+import { STORY_ACT, UNSTUCK_ACT, type NetTickAct } from '@wildshard/engine/net/acts';
 import type { NetTickInput } from '@wildshard/engine/net/room';
 import { actRoutes, lockValue, type ActRoutes } from '@wildshard/engine/sim/actRoutes';
 import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
@@ -38,6 +38,7 @@ export function netInteractCommands(routes: ActRoutes, acts: readonly NetTickAct
     if (act.kind !== 'interact') return [];
     if (act.id.startsWith('seen:') && routes.seen !== null) { routes.seen(player, act.id); return []; }
     if (act.id.startsWith(STORY_ACT)) { routes.story?.(player, act.id.slice(STORY_ACT.length)); return []; }
+    if (act.id === UNSTUCK_ACT) { if (routes.unstuck === null) routes.refused++; else routes.unstuck(player); return []; }
     const claim = routes.claims.get(act.id);
     if (claim !== undefined) { claim(player); return []; }
     // A page names the person it talks to; a quest with one person calls that row `talk`.

@@ -607,6 +607,7 @@
     "./ui/ownership": "./src/client/engine/ui/ownership.ts",
     "./ui/perfDock": "./src/client/engine/ui/perfDock.ts",
     "./ui/playerDeath": "./src/client/engine/ui/playerDeath.ts",
+    "./ui/unstuck": "./src/client/engine/ui/unstuck.ts",
     "./ui/playerHurt": "./src/client/engine/ui/playerHurt.ts",
     "./ui/review": "./src/client/engine/ui/review.ts",
     "./ui/roomMap": "./src/client/engine/ui/roomMap.ts",

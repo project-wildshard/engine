@@ -2,6 +2,7 @@ import { floorBelow } from '@wildshard/engine/physics/query';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
+import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { mountedPlayerOf } from './riding/native';
 
 /** Ticks between two reads of the feet: the page reads them four times a second. */
@@ -28,14 +29,27 @@ export function installRoomRespawn(host: SimHost, places: readonly PlaceArea[]):
     book.keep(host.players);
     for (const player of host.players.values()) if (player.hasMotor && !player.borrowed && !host.parked.has(player.id) && !book.fading(player.id)) book.observe(player.id, feetOf(host, player));
   });
+  /** Where a fall puts a player: their own last place, else the shard's spawn, off any mount. */
+  const respawn = (id: string): void => {
+    const player = host.players.get(id);
+    if (player === undefined) return;
+    const stand = book.stand(id), { at, yaw } = host.level.player;
+    mountedPlayerOf(host, id)?.dismount();
+    player.resetPose(stand ?? at, stand?.yaw ?? yaw);
+    host.events.emit('player.respawned', { at: player.position.clone(), checkpoint: false, player: id });
+  };
   host.events.on('player.died', ({ actor, checkpoint }) => {
     const player = host.players.get(actor.id);
     if (player === undefined || !serves() || player.borrowed || !player.hasMotor) return;
     book.fell(player.id, player.health);
     if (checkpoint) return;
-    const stand = book.stand(player.id), { at, yaw } = host.level.player;
-    mountedPlayerOf(host, player.id)?.dismount();
-    player.resetPose(stand ?? at, stand?.yaw ?? yaw);
-    host.events.emit('player.respawned', { at: player.position.clone(), checkpoint: false, player: player.id });
+    respawn(player.id);
   }, host.scope);
+  // Jake, 2026-11-12: "Need a button in <dev> to unstuck in settings, unstuck will respawn me like the death behavior but gets
+  // me unstuck". The page's Unstuck (UNSTUCK_ACT) lands here: the fall's place, no fall counted, no fade, health as it stands.
+  actRoutes(host).unstuck = id => {
+    const player = host.players.get(id);
+    if (player === undefined || player.borrowed || !player.hasMotor || book.fading(id)) return;
+    respawn(id);
+  };
 }

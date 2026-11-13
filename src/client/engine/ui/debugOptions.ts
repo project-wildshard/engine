@@ -28,6 +28,7 @@ import { OPTION_VALUES, saveSetting, setting, settingsReloadUrl } from './Settin
 import type { DebugRowSpec } from '../../../server/engine/level/context';
 import { isDev, onDev } from '../core/devMode';
 import { lookLightSaved, setLookLight } from './lookLightOption';
+import { pressUnstuck } from './unstuck';
 
 /** what "applies" reads: the shard you are in and the weapons you hold (re-read every time the menu opens) */
 export interface DebugCtx { chunk: LevelSpec; weapons: ReadonlySet<string> }
@@ -185,6 +186,9 @@ const clearDownloadsRow = action('clearDownloads', 'tools', engineString('s_59cb
 const failScreensRow = action('failScreens', 'tools', engineString('s_debug_fail_screens'), engineString('s_debug_fail_screens_open'), () => {
   document.dispatchEvent(new CustomEvent('ws:failscreen', { detail: 'gallery' }));
 }, { purpose: 'developer', ask: 'E133', reviewBy: '2026-12-30', note: engineString('s_debug_fail_screens_note') });
+/** Jake, 2026-11-12: "Need a button in <dev> to unstuck in settings" (ui/unstuck.ts): a death's respawn with no death. */
+const unstuckRow = action('unstuck', 'tools', engineString('s_debug_unstuck'), engineString('s_debug_unstuck_go'), pressUnstuck,
+  { purpose: 'developer', ask: 'E295', reviewBy: '2026-12-30', note: engineString('s_debug_unstuck_note') });
 
 export const DEBUG_ROWS: readonly DebugRow[] = [
   // ── Look ──
@@ -205,6 +209,7 @@ export const DEBUG_ROWS: readonly DebugRow[] = [
   // ── Developer tools ──
   weatherRow,
   failScreensRow,
+  unstuckRow,
 
 ];
 
