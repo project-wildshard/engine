@@ -57,6 +57,10 @@ export function engineMusicLine(shard: string, bootAudio: readonly string[], tab
 /** What a build's half of the manifests needs from the app: the page's own tables and names, which no cook owns. */
 export interface BuildHalf {
   readonly preparationOnly?: boolean;
+  /** AUDIO AU19: write each manifest's file list alone: no part or server pack is cooked, and a row's wire size is its
+   *  raw size. The lists are the build's own (the rows don't depend on packing); a test reads them without the
+   *  minutes the parts' q11 encode takes over every product. Tests only: a build never sets it. */
+  readonly filesOnly?: boolean;
   readonly rendererRevision?: string;
   readonly cacheName: string;
   readonly gpuFiles: Parameters<typeof standInRefs>[0];
@@ -113,6 +117,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
   const precompressed = new BrotliSizeCache(process.env['WILDSHARD_WIRE_SIZE_CACHE'] ?? resolve(homedir(), '.cache/wildshard/gen/served-bytes/1'), 'precompressed');
   const wireSizes = new Map<string, number>();
   const wireBytes = (url: string, bytes: Uint8Array, hash: string): number => {
+    if (build.filesOnly === true) return bytes.length;
     const key = `${hash}:${url}`, previous = wireSizes.get(key); if (previous !== undefined) return previous;
     // Match the deployed/preview representation; Rapier retains its precompressed native body.
     const length = servedAsIs(url, bytes) ? bytes.length
@@ -217,8 +222,10 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     if (half.shard.preparation === 'stale') console.warn(stalePreparationLine(directory));
     const shardRows = {phone: {entry: half.productRows('phone', 'entry'), whole: half.productRows('phone', 'whole')},
       desktop: {entry: half.productRows('desktop', 'entry'), whole: half.productRows('desktop', 'whole')}};
-    for (const [url, member] of await cookParts(output, half, [{tier: 'phone', rows: shardRows.phone.whole}, {tier: 'desktop', rows: shardRows.desktop.whole}], encoder)) cooked.set(url, member);
-    serverPacks[directory] = await cookShardServerPack(half.shard, output, encoder);
+    if (build.filesOnly !== true) {
+      for (const [url, member] of await cookParts(output, half, [{tier: 'phone', rows: shardRows.phone.whole}, {tier: 'desktop', rows: shardRows.desktop.whole}], encoder)) cooked.set(url, member);
+      serverPacks[directory] = await cookShardServerPack(half.shard, output, encoder);
+    }
     for (const table of [shardRows.phone, shardRows.desktop]) for (const row of [...table.entry, ...table.whole]) {
       const stable = half.stableKey(row.url); if (stable !== undefined) stableKeys.set(row.url, stable);
     }
@@ -309,7 +316,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
   if (Object.keys(preparations).length > 0) console.info(`cook preparation: ${(['current', 'stale', 'none'] as const).map(state => `${preparations[state]?.length ?? 0} ${state}`).join(', ')}`);
   // DL5: every manifest is known, so pack their files into shared parts, then write each manifest with its own table.
   const packed = pending.flatMap((row, index) => row.packed ? [index] : []);
-  const packedTables = await writeSpawnParts(output, packed.map(index => ({rows: pending[index]?.manifest.files ?? [], public: pending[index]?.public === true, desktop: pending[index]?.manifest.tier === 'desktop'})), url => {
+  const packedTables = build.filesOnly === true ? [] : await writeSpawnParts(output, packed.map(index => ({rows: pending[index]?.manifest.files ?? [], public: pending[index]?.public === true, desktop: pending[index]?.manifest.tier === 'desktop'})), url => {
     const read = sources.get(url); if (read === undefined) throw new Error(`Spawn file has no source: ${url}`); return read();
   }, url => stableKeys.get(url), encoder, cooked);
   // DL15: each part's q11 body is written before the manifests, so every part row carries its exact wire size.
