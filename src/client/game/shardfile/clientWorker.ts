@@ -25,6 +25,7 @@ import { NetPlayer, type NetWeapons } from '@wildshard/engine/net/netPlayer';
 import type { PredictedRow } from '@wildshard/engine/net/predictionWorld';
 import { ANIMAL_CLASS } from '@wildshard/engine/net/netSchemas';
 import type { OtherPlayers } from '@wildshard/engine/net/otherPlayers';
+import { hurtOther } from '@wildshard/engine/net/hurtOther';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { RowBodiesView } from '@wildshard/engine/entities/RowBodies';
 import type { Animal } from '@wildshard/engine/entities/AnimalView';
@@ -431,6 +432,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   scope.onDispose(client.onCombat(event => {
     contacts.push(event);
     if (event.kind === 'hit' && event.target === client.welcome?.handle) ports.hurt(event.amount, new Vector3(...event.at), event.blow === true);
+    else hurtOther(event, client.welcome?.handle, others); // REMOTE-PLAYERS RP10: a hit on another player flashes their body
     if (event.kind === 'hit' && event.confirmFor !== 0) { report.hits++; if (event.killed) report.kills++; }
     if (event.kind === 'reward') report.paid += event.coins;
   }));

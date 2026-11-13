@@ -1259,6 +1259,7 @@
     "./net/socketFrames": "./src/shared/engine/net/socketFrames.ts",
     "./net/webSocketTransport": "./src/client/engine/net/webSocketTransport.ts",
     "./net/otherPlayers": "./src/client/engine/net/otherPlayers.ts",
+    "./net/hurtOther": "./src/client/engine/net/hurtOther.ts",
     "./game/plugin/playerSeats": "./src/server/game/plugin/playerSeats.ts"
   },
   "sideEffects": [

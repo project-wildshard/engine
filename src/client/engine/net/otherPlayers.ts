@@ -12,6 +12,7 @@ import { AirPose, type AirPhase } from './remoteAir';
 import { BoardUnder, DECK_LIFT } from './remoteBoard';
 import { RemoteStrike } from './remoteStrike';
 import { NameTag, type NameTagShown } from './nameTag';
+import { RemoteHurt, type HurtShown } from './remoteHurt';
 import { HeldInHand } from './heldOnOthers';
 import type { NetClient } from './client';
 import { othersOnMap } from './othersOnMap';
@@ -91,6 +92,8 @@ class OtherBody {
   private readonly air = new AirPose();
   /** RP7: its swings, on its arms and spine over the gait. */
   private readonly strike = new RemoteStrike();
+  /** RP10: its red flash and numbers when something hits it. */
+  readonly hurt = new RemoteHurt(this.group);
   /** Whether a row has put it anywhere yet. */
   placed = false;
   shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '', air: '', attack: '' };
@@ -103,8 +106,8 @@ class OtherBody {
     this.group.name = `Player · ${name}`;
     this.group.add(this.tag, this.ring, this.board.deck);
   }
-  /** Stops its idle and lets go of its item (the page's own, never freed with the body), when the body goes. */
-  undress(): void { this.anim?.dispose(); this.anim = null; this.hand?.drop(); }
+  /** Stops its idle and lets go of its item (the page's own, never freed with the body), when the body goes; RP10: frees its flash copy. */
+  undress(): void { this.anim?.dispose(); this.anim = null; this.hand?.drop(); this.hurt.dispose(); }
   /** RP2: the castaway's body, standing on the ground (its soles are at its root), its hands ready for the held item (RP5), its idle playing. */
   dress(model: CastawayBody): void {
     this.figure = model.root; this.joints = model.joints; this.feet = 0; model.root.position.y = 0;
@@ -134,6 +137,7 @@ class OtherBody {
     if (mounted) { this.bend('leftThigh', SEAT); this.bend('rightThigh', SEAT); this.bend('leftShin', -SEAT); this.bend('rightShin', -SEAT); }
     this.strike.show(row, !riding && !mounted && row[SWIM] !== 1, dt, this.joints, this.rest); // RP7: after the gait and air poses
     this.board.show(riding, row[YAW] ?? 0, this.speed, dt, this.figure, this.joints); // RP8: the deck, banked, the rider side-on on it
+    this.hurt.update(dt); // RP10
     const { talking: keys } = voiceNear, talking = keys.has(this.id) || keys.has(talkerKey({ body: null, name: this.shown.name }));
     this.ring.visible = talking;
     if (talking) { this.talkPhase = (this.talkPhase + dt * TALK_PULSE) % (Math.PI * 2); this.ring.scale.setScalar(TALK_SIZE * (1 + TALK_SWELL * Math.sin(this.talkPhase))); }
@@ -181,10 +185,16 @@ export class OtherPlayers {
     return nearest;
   }
   /** What a proof reads. */
-  get shown(): readonly (OtherShown & { readonly tag: NameTagShown })[] {
-    const shown: (OtherShown & { readonly tag: NameTagShown })[] = [];
-    for (const body of this.bodies.values()) shown.push({ ...body.shown, tag: body.tag.report }); // RP12: what its Name drew
+  get shown(): readonly (OtherShown & { readonly tag: NameTagShown; readonly hurt: HurtShown })[] {
+    const shown: (OtherShown & { readonly tag: NameTagShown; readonly hurt: HurtShown })[] = [];
+    for (const body of this.bodies.values()) shown.push({ ...body.shown, tag: body.tag.report, hurt: body.hurt.report }); // RP12: what its Name drew; RP10: its hurt
     return shown;
+  }
+  /** RP10: something hit the player at `handle` for `amount`: its body flashes and a red number pops; false when none is drawn. */
+  hurt(handle: number, amount: number): boolean {
+    const body = this.bodies.get(handle);
+    body?.hurt.hit(amount);
+    return body !== undefined;
   }
   frame(renderTick: number, dt: number): void {
     const { client, bodies, row } = this, own = client.welcome?.handle ?? 0;

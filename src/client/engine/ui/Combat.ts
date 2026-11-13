@@ -57,6 +57,13 @@ const BOLT_SPEED_EST = 50;                 // m/s: bolt speed after drag, for th
 const PENDING_GRACE = 0.25;                // s: past that deadline with no hit → MISS over the target
 const MELEE_DEADLINE = 0.75;               // s: a swing's blade reaches its targets through the whole active window (+ hit-stop), not at once
 
+/** How a damage float looks: this page's own blow in full (a headshot bigger, a kill labelled), another player's smaller and paler
+ *  with no label (REMOTE-PLAYERS RP10), so a shared fight reads whose number is whose. `cls` is its class in combat.css. */
+export function floatLook(own: boolean, head: boolean, died: boolean): { readonly cls: string; readonly label: string; readonly kill: boolean } {
+  if (!own) return { cls: 'other', label: '', kill: false };
+  return { cls: head ? 'head' : '', label: died ? (head ? engineString('s_9ca42a3b84d2') : engineString('s_448dd87e3774')) : head ? engineString('s_a3de28c1f757') : '', kill: died };
+}
+
 interface BarSlot { el: HTMLElement; fill: HTMLElement; kind: HTMLElement; animal: Animal | null; lastHp: number; shown: boolean; }
 interface FloatSlot { el: HTMLElement; num: HTMLElement; label: HTMLElement; x: number; y: number; t: number; active: boolean; }
 interface Pending { animal: Animal | null; t: number; deadline: number; active: boolean }
@@ -119,6 +126,7 @@ export class Combat {
     tap(weapon, 'onFire', () => { this.fired(); });
     tap(weapon, 'onImpact', (surface, point) => { this.impact(surface as string, point as THREE.Vector3); });
     tap(animals, 'onDamage', (a, amount, point, headshot, died) => { this.damage(a as Animal, amount as number, point as THREE.Vector3, headshot as boolean, died as boolean); });
+    tap(animals, 'onOthersHit', (a, amount, point, died) => { this.othersHit(a as Animal, amount as number, point as THREE.Vector3, died as boolean); });
     game.onUpdate((dt, t) => { this.update(dt, t); }, 'hud.combat');
   }
 
@@ -140,8 +148,23 @@ export class Combat {
   private damage(a: Animal, amount: number, point: THREE.Vector3, headshot: boolean, died: boolean): void {
     // this bolt landed on flesh: it is no longer a candidate for MISS
     this.resolveOldest();
-    if (!this.project(point)) { a.headWorld(_v); _v.y += 0.3; if (!this.project(_v)) return; }
-    this.float(String(Math.round(amount)), died ? (headshot ? engineString('s_9ca42a3b84d2') : engineString('s_448dd87e3774')) : headshot ? engineString('s_a3de28c1f757') : '', headshot ? 'head' : '', died);
+    if (!this.projectHit(a, point)) return;
+    const look = floatLook(true, headshot, died);
+    this.float(String(Math.round(amount)), look.label, look.cls, look.kill);
+  }
+
+  /** RP10: another player's blow on a creature in view: its number, smaller and paler than this page's own. No MISS bookkeeping. */
+  private othersHit(a: Animal, amount: number, point: THREE.Vector3, died: boolean): void {
+    if (!this.projectHit(a, point)) return;
+    const look = floatLook(false, false, died);
+    this.float(String(Math.round(amount)), look.label, look.cls, look.kill);
+  }
+
+  /** The hit point on screen, or over the creature's head when the point is off it. */
+  private projectHit(a: Animal, point: THREE.Vector3): boolean {
+    if (this.project(point)) return true;
+    a.headWorld(_v); _v.y += 0.3;
+    return this.project(_v);
   }
 
   private impact(surface: string, point: THREE.Vector3): void {

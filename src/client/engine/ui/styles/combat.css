@@ -23,12 +23,15 @@
 .ws-combat-float.kill b { color: #ffd2cc; text-shadow: 0 0 14px rgba(255, 90, 74, 0.75), 0 0 2px rgba(0, 0, 0, 1), 0 2px 3px rgba(0, 0, 0, 0.9); }
 .ws-combat-float.kill i { color: var(--ws-red); }
 .ws-combat-float.head.kill b { color: #fff4c2; }
+/* REMOTE-PLAYERS RP10: another player's blow: smaller and paler than your own, no glow */
+.ws-combat-float.other b { font-size: 18px; font-weight: 600; color: rgba(214, 226, 234, 0.7); text-shadow: 0 0 2px rgba(0, 0, 0, 1), 0 1px 2px rgba(0, 0, 0, 0.85); }
 .ws-combat-float.miss b { font-size: 20px; font-weight: 600; letter-spacing: 0.18em; color: rgba(196, 220, 232, 0.75); text-shadow: 0 0 2px rgba(0, 0, 0, 1), 0 2px 3px rgba(0, 0, 0, 0.9); }
 
 @media (max-width: 720px) {
   .ws-combat-hp { left: -36px; width: 72px; top: -26px; }
   .ws-combat-float b { font-size: 22px; }
   .ws-combat-float.head b { font-size: 30px; }
+  .ws-combat-float.other b { font-size: 16px; }
 }
 
 /* ── hurt direction (src/client/engine/ui/HurtArc.ts): a red tapered arc on a ring round the crosshair, turned toward the attacker ── */

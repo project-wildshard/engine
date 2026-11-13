@@ -83,6 +83,8 @@ export class RowBodies {
   onWindup?: ((animal: Animal, dur: number) => void) | undefined;
   /** Own confirmed contacts (or local practice): amount, point, headshot and lethal marker. */
   onDamage?: (animal: Animal, amount: number, hitPoint: Vector3, headshot: boolean, died: boolean) => void;
+  /** REMOTE-PLAYERS RP10: another player's confirmed contact, which this page draws smaller and paler than its own. */
+  onOthersHit?: (animal: Animal, amount: number, hitPoint: Vector3, died: boolean) => void;
   /** a dev's word and a room's: nothing on this page acts on it, and a view reads it back */
   calm = false;
   /** The shard's pieces a look reads. */
@@ -240,7 +242,7 @@ export class RowBodies {
     }
     return bestA;
   }
-  /** Present an authoritative contact. Rows own health; only this player's contact gets numbers. */
+  /** Present an authoritative contact. Rows own health; this player's contact gets its numbers, another's its paler ones (RP10). */
   presentHit(a: Animal, amount: number, point: Vector3, head: boolean, killed: boolean, own: boolean): void {
     this.damaged(a, amount, point, point.clone().sub(this.playerPos).normalize(), killed, own, head, false);
   }
@@ -266,6 +268,7 @@ export class RowBodies {
     this.onSound?.(sp.sounds?.hurt ?? fallbackSound(a.aggressive, 'hurt'), a.position);
     a.headWorld(_p);
     if (own) this.onDamage?.(a, amount, hitPoint, head ?? _p.distanceToSquared(hitPoint) < (a.dims.headRadius * a.scale + 0.06) ** 2, died);
+    else this.onOthersHit?.(a, amount, hitPoint, died);
     if (died && kill) this.onKill?.(a);
   };
 }
