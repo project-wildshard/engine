@@ -1,7 +1,8 @@
 /**
  * The far view (SHARD-PLATFORM SF23): one baked low-poly proxy per shard, drawn in the render rings' bounded far ring
  * (`RenderRings`, at most `CONTENT_CAPS.farCount` proxies, charged through the one `ResidencyAllocator` as category `far`).
- * The 5 × 5 grid's longest sightline is ≈ 3.9 km (`GRID_SIGHTLINE`); every cell keeps its proxy across it (SF88c).
+ * The drawn 5 × 5 grid's longest sightline is ≈ 3.9 km (`GRID_SIGHTLINE`, from `DRAWN_GRID_RADIUS`; SA34 grows it to the
+ * 7 × 7); every cell keeps its proxy across it (SF88c).
  *
  * A proxy is the shard's baked terrain (its `terrain.bin` heights and splat) resampled onto 4 × 4 regions, one per L1
  * footprint (125 m), each a 12 × 12 quad lattice with skirts on all four sides, plus a water sheet where the ground dips
@@ -15,7 +16,7 @@
  */
 import { Color } from 'three';
 import { CHUNK_HALF, CONTENT_CAPS } from '@wildshard/engine/core/config';
-import { GRID_RADIUS } from '@wildshard/format/contentBounds';
+import { DRAWN_GRID_RADIUS } from './catalogue';
 
 /** Linear RGB, 0..1. */
 export type FarRgb = readonly [number, number, number];
@@ -97,8 +98,8 @@ export const FAR_SKIRT = 8;
  * Nalati's snow-ring berm) reads as a solid cliff down past road level from a neighbour, never as ground over a void.
  */
 export const FAR_EDGE_FLOOR = -20;
-/** SF88c (G526): the platform's corner-to-corner sightline across its outer road (the 5 × 5: ≈ 3.9 km). */
-export const GRID_SIGHTLINE: number = 2 * (GRID_RADIUS + 0.5) * CONTENT_CAPS.pitch * Math.SQRT2;
+/** SF88c (G526): the platform's corner-to-corner sightline across its outer road (`DRAWN_GRID_RADIUS`, the 5 × 5: ≈ 3.9 km). */
+export const GRID_SIGHTLINE: number = 2 * (DRAWN_GRID_RADIUS + 0.5) * CONTENT_CAPS.pitch * Math.SQRT2;
 /**
  * The far ring (SF23 owns its parameters; SF18b's `RenderRings` owns the scheduler). SF88c: the ring wants a proxy for
  * every cell within `reach` (the grid's whole sightline, so no cell of the 5 × 5 pops in or out while you drive the

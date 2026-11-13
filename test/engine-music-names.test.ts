@@ -6,8 +6,8 @@ import * as v from 'valibot';
 import { expect, test } from 'vitest';
 import type { AudioData } from '@wildshard/format/audio';
 import { AudioMusicSchema } from '@wildshard/format/audioProfiles';
-// shard-format keeps the engine slot names in a module it does not export; read the pinned copy so the two can't drift.
-import { ENGINE_MUSIC_SLOTS } from '../node_modules/@wildshard/format/src/format/engine-music';
+// shard-format exports the engine slot names (`./engineMusic`, v0.4.5); read the pinned copy so the two can't drift.
+import { ENGINE_MUSIC_SLOTS } from '@wildshard/format/engineMusic';
 import { engineMusicLine, shardBootAudio } from '../src/cook/game/entryTotals';
 import { openShardfile, shardHalf } from '../src/cook/game/shardCook';
 import { productTarball } from '../src/cook/game/productTarball';

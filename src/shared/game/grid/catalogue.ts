@@ -4,7 +4,15 @@ import { GRID_RADIUS, GRID_CELL_COUNT } from '@wildshard/format/contentBounds';
 import { AccentSchema } from '@wildshard/format/accent';
 
 const id = v.pipe(v.string(), v.regex(/^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u));
-const signed = v.pipe(v.number(), v.integer(), v.minValue(-GRID_RADIUS), v.maxValue(GRID_RADIUS));
+/**
+ * The grid radius the engine places and draws: the 5 × 5 (J305's 25 cells). shard-format v0.4.7 grew the format's
+ * `GRID_RADIUS` to 3 (the 7 × 7, SA29), but the far view, the road sky and the void floor are still sized for ring 2, so
+ * a catalogue naming a ring-3 cell is refused here exactly as before the pin. SA34 (the client's 7 × 7 and its void
+ * floor) moves this to `GRID_RADIUS`, and with it the sightline, the far ring's reach and the road sky's dome.
+ */
+export const DRAWN_GRID_RADIUS = 2;
+if (DRAWN_GRID_RADIUS > GRID_RADIUS) throw new RangeError('DRAWN_GRID_RADIUS exceeds the format grid');
+const signed = v.pipe(v.number(), v.integer(), v.minValue(-DRAWN_GRID_RADIUS), v.maxValue(DRAWN_GRID_RADIUS));
 const local = v.pipe(v.number(), v.finite(), v.minValue(-250), v.maxValue(250));
 /** one number panel: a cell-local spot (metres, x east, y up, z north) on the copy's own structures, facing `yaw` (0 = +z) */
 const mark = v.strictObject({ x: local, y: v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(250)), z: local, yaw: v.pipe(v.number(), v.finite()), size: v.pipe(v.number(), v.minValue(0.5), v.maxValue(12)) });
@@ -30,10 +38,10 @@ export const GridCatalogueSchema: v.GenericSchema<BoundedGridCatalogueInput, Bou
     fog: v.pipe(v.strictObject({ colour, near: distance, far: distance }), v.check((row) => row.far > row.near, 'increasing fog distance')) }),
 }), v.check((rows) => {
   const valid = (entries: readonly { instance: string; cell: readonly [number, number] }[]): boolean => new Set(entries.map((row) => row.instance)).size === entries.length && new Set(entries.map((row) => row.cell.join(','))).size === entries.length;
-  // One complete layout fills every cell for every audience (G972).
-  const base = rows.cells;
-  return valid(base) && base.length === GRID_CELL_COUNT;
-}, 'unique stable instance identities and complete signed cell layout'));
+  // One layout for every audience (G972). shard-format v0.4.7 (SA29) made GRID_CELL_COUNT the 7 × 7's 49 as a maximum
+  // and lets any cell stay empty, so J305's 25 still reads; `maxLength` above and `signed` cap the count.
+  return valid(rows.cells);
+}, 'unique stable instance identities and cells'));
 /** Admitted assembly input; a cell remains a mutable placement attribute, never a save namespace. */
 export type GridCatalogue = v.InferOutput<typeof GridCatalogueSchema>;
 /** A copy's declared identity: its accent and its number panels (copyIdentity.ts). */
