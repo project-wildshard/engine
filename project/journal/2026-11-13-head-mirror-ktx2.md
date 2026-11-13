@@ -19,3 +19,12 @@ mirror names: `build-mirror.mjs run` passes `WS_MIRROR_REPO` and
 `WS_MIRROR_INDEX` (the slot's index, at exactly the synced commit) to
 the build, and `openMirror` returns `index`. In a checkout, nothing
 changes. `test/tracked-public.test.ts`, red first.
+
+## Follow-up: the pins reuse key
+
+Main went red on `test/tooling/pins-reuse.test.mjs`: every local
+module `pins.ts` imports must be in `KEY_SOURCES` (its bytes decide
+what a full install writes) or `KEY_EXEMPT`. `tracked-public.mjs`
+decides which KTX2 targets admit a product, so it is a key source; a
+change to it now invalidates reused pins. I had run the build-mirror
+and tracked-public tests, not this one.
