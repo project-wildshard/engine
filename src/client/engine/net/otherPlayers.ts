@@ -12,6 +12,7 @@ import { AirPose, type AirPhase } from './remoteAir';
 import { BoardUnder, DECK_LIFT } from './remoteBoard';
 import { RemoteStrike } from './remoteStrike';
 import { NameTag, type NameTagShown } from './nameTag';
+import { RemoteDeath, type DeathPhase } from './remoteDeath';
 import { RemoteHurt, type HurtShown } from './remoteHurt';
 import { HeldInHand } from './heldOnOthers';
 import type { NetClient } from './client';
@@ -64,7 +65,9 @@ export interface OtherShown { readonly name: string; readonly x: number; readonl
   /** RP5: the item drawn in the hand for `held` (its row), or '' for an empty hand. */
   readonly item: string;
   /** RP7: the strike playing on its arms ('tap', 'heavy', a bow's 'draw'), or ''. */
-  readonly attack: string }
+  readonly attack: string;
+  /** RP11: its death ('fall', 'lie', 'fade', 'gone') and return ('rise'), or '' alive. */
+  readonly death: DeathPhase }
 
 /** One other player on screen. */
 class OtherBody {
@@ -92,11 +95,13 @@ class OtherBody {
   private readonly air = new AirPose();
   /** RP7: its swings, on its arms and spine over the gait. */
   private readonly strike = new RemoteStrike();
+  /** RP11: its death where it fell and its return at its checkpoint, last over every other pose. */
+  private readonly death = new RemoteDeath();
   /** RP10: its red flash and numbers when something hits it. */
   readonly hurt = new RemoteHurt(this.group);
   /** Whether a row has put it anywhere yet. */
   placed = false;
-  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '', air: '', attack: '' };
+  shown: OtherShown = { name: '', x: 0, y: 0, z: 0, speed: 0, gait: 'idle', board: false, mounted: false, held: 0, hp: 0, modelled: false, model: '', talking: false, item: '', air: '', attack: '', death: '' };
   /** Its player row's id, which voice names its talker by. */
   readonly id: string;
   constructor(name: string, id: string) {
@@ -119,30 +124,35 @@ class OtherBody {
   }
   /** Where the row is now, and the limbs that go with it. */
   show(row: Float64Array, dt: number, mounted: boolean): void {
-    const x = row[X] ?? 0, y = row[Y] ?? 0, z = row[Z] ?? 0, { group } = this;
-    const moved = this.placed && dt > 0 ? Math.hypot(x - group.position.x, z - group.position.z) / dt : 0;
+    // RP11: a dead body holds where it fell and a return or a teleport snaps (remoteDeath.ts), so neither slides nor runs.
+    const at = this.death.place(row[X] ?? 0, row[Y] ?? 0, row[Z] ?? 0, row[YAW] ?? 0, row[HP] ?? 0, dt), { x, y, z } = at, { group } = this, alive = this.death.phase === '';
+    const moved = this.placed && dt > 0 && !at.snap ? Math.hypot(x - group.position.x, z - group.position.z) / dt : 0;
+    if (at.snap) this.speed = 0;
     this.speed += (moved - this.speed) * Math.min(1, dt * SETTLE);
     this.placed = true;
     // A row's yaw is where a player looks, down -z at 0, and the figure faces +z.
-    group.position.set(x, y, z); group.rotation.y = (row[YAW] ?? 0) + Math.PI;
+    group.position.set(x, y, z); group.rotation.y = at.yaw + Math.PI;
     // RP4: a rider's legs stand still whatever the row's speed; on foot the speed picks and blends the clip.
-    const riding = row[BOARD] === 1, onFoot = riding || mounted ? 0 : this.speed, gait = gaitOf(onFoot);
+    const riding = alive && row[BOARD] === 1, onFoot = riding || mounted ? 0 : this.speed, gait = gaitOf(onFoot);
     const held = row[HELD] ?? 0;
-    this.hand?.show(held, !riding && !mounted && row[SWIM] !== 1, dt); // RP5: nothing in hand on a board, in a saddle or swimming
+    this.hand?.show(held, alive && !riding && !mounted && row[SWIM] !== 1, dt); // RP5: nothing in hand on a board, in a saddle or swimming
     this.anim?.update(dt);
-    const air = this.air.update(AIR < 0 || Number.isNaN(row[AIR] ?? Number.NaN) ? undefined : row[AIR] === 1, y, dt, riding || mounted); // RP9
+    const air = this.air.update(AIR < 0 || Number.isNaN(row[AIR] ?? Number.NaN) ? undefined : row[AIR] === 1, y, dt, riding || mounted || !alive); // RP9
     if (this.shown.air !== air) this.shown = { ...this.shown, air };
     const drop = this.pose(onFoot, dt);
     if (this.figure !== null) this.figure.position.y = this.feet + (riding ? BOARD_LIFT : mounted ? SADDLE_LIFT : -drop);
     if (mounted) { this.bend('leftThigh', SEAT); this.bend('rightThigh', SEAT); this.bend('leftShin', -SEAT); this.bend('rightShin', -SEAT); }
-    this.strike.show(row, !riding && !mounted && row[SWIM] !== 1, dt, this.joints, this.rest); // RP7: after the gait and air poses
-    this.board.show(riding, row[YAW] ?? 0, this.speed, dt, this.figure, this.joints); // RP8: the deck, banked, the rider side-on on it
+    this.strike.show(row, alive && !riding && !mounted && row[SWIM] !== 1, dt, this.joints, this.rest); // RP7: after the gait and air poses
+    this.board.show(riding, at.yaw, this.speed, dt, this.figure, this.joints); // RP8: the deck, banked, the rider side-on on it
+    this.death.layer(group, this.figure, this.tag); // RP11: last, laid down, faded, its Name dimmed
     this.hurt.update(dt); // RP10
-    const { talking: keys } = voiceNear, talking = keys.has(this.id) || keys.has(talkerKey({ body: null, name: this.shown.name }));
+    const { talking: keys } = voiceNear, talking = alive && (keys.has(this.id) || keys.has(talkerKey({ body: null, name: this.shown.name })));
     this.ring.visible = talking;
     if (talking) { this.talkPhase = (this.talkPhase + dt * TALK_PULSE) % (Math.PI * 2); this.ring.scale.setScalar(TALK_SIZE * (1 + TALK_SWELL * Math.sin(this.talkPhase))); }
-    this.shown = { ...this.shown, x, y, z, speed: this.speed, gait, board: riding, mounted, held, hp: row[HP] ?? 0, talking, item: this.hand?.row ?? '', attack: this.strike.playing };
+    this.shown = { ...this.shown, x, y, z, speed: this.speed, gait, board: riding, mounted, held, hp: row[HP] ?? 0, talking, item: this.hand?.row ?? '', attack: this.strike.playing, death: this.death.phase };
   }
+  /** RP11: the server says a blow killed it. */
+  killed(): void { this.death.killed(); }
   private bend(joint: DummyJoint, angle: number): void {
     const bone = this.joints[joint], rest = this.rest.get(joint);
     if (bone !== undefined && rest !== undefined) bone.quaternion.copy(rest).multiply(turn.setFromAxisAngle(AXIS, angle));
@@ -190,10 +200,12 @@ export class OtherPlayers {
     for (const body of this.bodies.values()) shown.push({ ...body.shown, tag: body.tag.report, hurt: body.hurt.report }); // RP12: what its Name drew; RP10: its hurt
     return shown;
   }
-  /** RP10: something hit the player at `handle` for `amount`: its body flashes and a red number pops; false when none is drawn. */
-  hurt(handle: number, amount: number): boolean {
+  /** RP10: something hit the player at `handle` for `amount`: its body flashes and a red number pops; false when none is drawn.
+   *  RP11: a blow that `killed` lays it down where it stands. */
+  hurt(handle: number, amount: number, killed = false): boolean {
     const body = this.bodies.get(handle);
     body?.hurt.hit(amount);
+    if (killed) body?.killed();
     return body !== undefined;
   }
   frame(renderTick: number, dt: number): void {
