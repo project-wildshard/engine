@@ -26,29 +26,28 @@ import { tap, ambientTick } from '../../../shared/engine/core/harnessTap';
 // music bus runs through a 600 Hz low-pass and a slow chorus. `renderOffline` runs the identical scheduler on an
 // OfflineAudioContext — the trailer render and the live playback are one code path.
 //
-// v3 (project/archive/2026-09-23-music.md rows 7–8): a STEM PLAYER beside the synth (src/client/engine/audio/Stems.ts). Settings 'musicStyle' picks
-// piano / orchestral / folk (MiniMax-Music3 stems in public/assets/music/<genre>/) or synth. Every genre's files are downloaded
-// at the loading bar and the selected genre's title + this shard's slot + stings are decoded there (project/archive/2026-09-23-preload-offline.md;
-// `useBank`), so play() starts the stems at once; the synth plays for a genre / slot the build lacks or that failed to decode.
+// v3 (project/archive/2026-09-23-music.md rows 7–8): a STEM PLAYER beside the synth (src/client/engine/audio/Stems.ts). The engine
+// plays one style, piano (MiniMax-Music3 stems in public/assets/music/piano/; J304, AUDIO AU16: no style choice). Its files are
+// downloaded at the loading bar and its title + this shard's slot + stings are decoded there (project/archive/2026-09-23-preload-offline.md;
+// `useBank`), so play() starts the stems at once; the synth plays only for a slot the build lacks or that failed to decode.
 // Slots: menu → 'title' (main.ts starts the music on the title screen's first gesture), Pine Hollow → 'pine', Driftwood → 'island';
 // ENTER WORLD / exit-to-menu crossfade between them over a bar. calm / alert / combat drive the tension stem's gain (0 / 0.5 / 1)
-// on the deck's bar grid. Underwater is the same low-pass (the stems run through the engine's bus). A slot or genre change
-// crossfades over at least a bar; one genre is resident at a time (a genre switch decodes the new one from the offline cache —
-// Cache Storage, never the network — while the old one plays on, then crossfades on a bar and drops the old buffers; the menu
-// shows a spinner only past 300 ms, src/client/engine/audio/preload.ts). `music.duck(k)` scales the whole bus
+// on the deck's bar grid. Underwater is the same low-pass (the stems run through the engine's bus). A slot change crossfades
+// over at least a bar; a retired title is decoded again from the offline cache (Cache Storage, never the network) while the
+// deck plays on. `music.duck(k)` scales the whole bus
 // (the Driftwood shrine's −3 dB, src/shards/driftwood-isle/audio/shrineHum.ts).
 //
 import type { Audio } from './Audio';
 import { audioUnlocked, whenAudioUnlocked } from './unlock';
 import type { Scope } from '../../../shared/engine/app/scope';
-import { getNumber, setNumber, onNumber, getMusicStyle, onMusicStyle } from '../ui/Settings';
+import { getNumber, setNumber, onNumber } from '../ui/Settings';
 import { Deck, decodeStyle, type SlotAudio, type StyleBank } from './Stems';
 import { AacTrack } from './aacTrack';
 import { cachedBytes, decodeBytes, trackBusy } from './preload';
 import { audioLog } from './audioLog';
 import type { ScoreSource } from './SetScore';
 import { score, type Arrangement, type ChordName, type LayerId, type MixKey, type NoteEv, type Segment } from './score/score';
-import type { MusicStyle as MusicGenre, BossPhase, SlotName } from '../../../shared/engine/audio/bootAudio';
+import { ENGINE_MUSIC_STYLE, type MusicStyle as MusicGenre, type BossPhase, type SlotName } from '../../../shared/engine/audio/bootAudio';
 
 /** an arrangement's name in the installed score (the game's: theme, trailer30, trailer15) */
 type ArrangementName = string;
@@ -511,19 +510,19 @@ export class Music {
   private playing: ArrangementName | undefined;
   private combatTimer: ReturnType<Scope['timeout']> = 0;
   // ── v3: the stems ──
-  private _genre: MusicGenre = getMusicStyle();
-  /** the resident genre: decoded at the loading bar (useBank), or from the offline cache after a menu switch */
+  private readonly _genre: MusicGenre = ENGINE_MUSIC_STYLE;
+  /** the resident bank: decoded at the loading bar (useBank), or from the offline cache when the title comes back */
   private bank: StyleBank | undefined;
   private titleRetired = false;
-  /** the genre being decoded for a switch (the old one plays on meanwhile) */
+  /** the genre being decoded from the offline cache (the deck plays on meanwhile) */
   private decoding: MusicGenre | undefined;
   private deck: Deck | undefined;
   private readonly resolvingTracks = new WeakSet<AacTrack>();
   /** the synth sequencer is scheduling (its timer runs); `synthGen` voids a pending stop when it is restarted mid-fade */
   private synthOn = false;
   private synthGen = 0;
-  /** styles that failed to decode this session — the synth plays them; picking a genre again retries */
-  private failed = new Set<MusicGenre>();
+  /** a style that failed to decode this session: the synth plays in its place */
+  private failed = new Set<SlotAudio['genre']>();
   private _duck = 1;
   private source: ScoreSource | undefined;
   /** silent scores asked for before the rig existed (`silence`): applied as `build` makes the music bus */
@@ -535,7 +534,6 @@ export class Music {
     this.audio = audio;
     this._volume = getNumber('music');
     onNumber('music', (v) => { this._volume = v; if (this.rig) this.rig.out.gain.setTargetAtTime(v, this.rig.ctx.currentTime, 0.05); });
-    onMusicStyle((v) => { this._genre = v; this.failed.clear(); if (!this.rig || !this.playing) this.prepare(v); this.sync(); });
   }
 
   private build(): NonNullable<Music['rig']> {
@@ -680,7 +678,7 @@ export class Music {
   private stemsReady(): boolean {
     // Pine Hollow's night / boss live in their own set: the base bank must hold the theme they fall back to
     const b = this.bank, slot = this.source ? this.baseSlot() : this.wantSlot();
-    return this._genre !== 'synth' && b !== undefined && b.genre === this._genre && slot !== null && b.slots.has(slot);
+    return b !== undefined && b.genre === this._genre && slot !== null && b.slots.has(slot);
   }
   private pump() {
     const spb = this.engine.currentSpb();
@@ -733,7 +731,7 @@ export class Music {
     if (!this.rig || !this.playing) return;
     const now = this.rig.ctx.currentTime, genre = this._genre;
     const source = this.state.mode !== 'menu' ? this.scoreSource() : undefined;
-    if (((genre === 'synth' || this.failed.has(genre)) && source?.styleIndependent !== true) || this.wantSlot() === null) { this.toSynth(now); return; }
+    if ((this.failed.has(genre) && source?.styleIndependent !== true) || this.wantSlot() === null) { this.toSynth(now); return; }
     this.deck?.setTension(this.tension(), now); // a deck of another slot / genre plays on (at the right level) until the new one is in
     if (source) {
       const playing = this.deck && source.slots.includes(this.deck.slot) ? this.deck.slot : undefined;
@@ -754,9 +752,9 @@ export class Music {
     if (a === undefined) { this.toSynth(now); return; } // this genre has no such slot in the build (or it failed to decode)
     this.startDeck(a);
   }
-  /** decode `genre` from the offline cache (a menu switch; the bar already downloaded every genre) — the old genre plays on */
+  /** decode `genre`'s title from the offline cache (the bar already downloaded it) — the deck plays on */
   private prepare(genre: MusicGenre): void {
-    if (genre === 'synth' || (this.bank?.genre === genre && !this.titleRetired) || this.decoding === genre || this.failed.has(genre)) return;
+    if ((this.bank?.genre === genre && !this.titleRetired) || this.decoding === genre || this.failed.has(genre)) return;
     this.decoding = genre;
     void this.decodeFor(genre);
   }
@@ -769,7 +767,6 @@ export class Music {
       this.sync();
       return;
     } finally { if (this.decoding === genre) this.decoding = undefined; }
-    if (this._genre !== genre) return; // picked something else meanwhile
     this.titleRetired = false; // A missing/malformed title is one completed attempt, not an endless reload.
     this.useBank(bank); // A late menu decode must not retain the title after gameplay starts.
   }
@@ -896,11 +893,11 @@ export class Music {
   }
 
   /** the quest's reward sting (PH-A1): the dawn take's resolve over the score, which dips under it (a beat down, back over 2 bars
-   *  after); the synth's discovery chord when the genre is synth or the file is not in the build / will not decode */
+   *  after); the synth's discovery chord when no deck plays or the file is not in the build / will not decode */
   private dawn(): void {
     const genre = this._genre;
     if (!this.rig) return;
-    if (genre === 'synth' || !this.deck) { this.rig.engine.sting('dawn', this.rig.ctx.currentTime + 0.02); return; }
+    if (!this.deck) { this.rig.engine.sting('dawn', this.rig.ctx.currentTime + 0.02); return; }
     void (async () => {
       const buf = await this.source?.sting?.('dawn');
       if (!this.rig) return;

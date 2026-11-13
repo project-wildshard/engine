@@ -1,4 +1,4 @@
-import { scoreManifest, shipped, type ScoreSet, type StemSting, type BossPhase, type MusicStyle } from '../../../shared/engine/audio/bootAudio';
+import { SCORE_GENRE, scoreManifest, shipped, type ScoreSet, type StemSting, type BossPhase, type MusicStyle } from '../../../shared/engine/audio/bootAudio';
 import type { SlotAudio, StyleBank } from './Stems';
 import type { Audio } from './Audio';
 import type { Music, MusicState } from './Music';
@@ -53,7 +53,7 @@ export async function decodeScore(set: ScoreSet, slots: readonly string[], read:
         if (spec.loopEnd > calm.duration + 0.05) throw new Error(`${slot}: loopEnd ${spec.loopEnd} past the file (${calm.duration.toFixed(2)} s)`);
         const aligned = (b: AudioBuffer | undefined): b is AudioBuffer => b !== undefined && Math.abs(b.duration - calm.duration) < 0.05;
         if (!layers.every(aligned)) throw new Error(`${slot}: a layer's length differs from the base`);
-        bank.slots.set(slot, { genre: 'folk', slot, spec, calm, tension: aligned(tension) ? tension : undefined, layers });
+        bank.slots.set(slot, { genre: SCORE_GENRE, slot, spec, calm, tension: aligned(tension) ? tension : undefined, layers });
       } catch (error) { console.info(`[music] ${set.manifestKey}/${slot}: ${error instanceof Error ? error.message : String(error)} — the synth or another slot plays`); }
     }),
     ...(withStings ? STINGS : []).map(async (key) => {
@@ -229,14 +229,13 @@ export class CatalogueScore implements ScoreSource {
     if(this.retired)return undefined;
     const genre=this.music.genre;
     if(this.profile.catalogue?.mode==='bank') {
-      if(genre==='synth'||this.scope?.disposed)return undefined;
+      if(this.scope?.disposed)return undefined;
       if(this.bank?.genre===genre)return this.bank.slots.get(this.base);
       if(this.bankDecoding===genre||this.failures.has(genre))return undefined;
       this.bankDecoding=genre; void this.prepareBank(genre); return undefined;
     }
     const want=this.target(this.music.state);
     if(genre!==this.genre){this.genre=genre;this.failures.clear();}
-    if(genre==='synth')return undefined;
     if(want!==this.base){const slot=this.extra?.genre===genre?this.extra.slot:undefined;if(slot?.slot===want)return slot;this.prepare(genre,want);}
     if(this.theme?.genre===genre)return this.theme;
     this.prepare(genre,this.base);return undefined;

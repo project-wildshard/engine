@@ -57,12 +57,12 @@ export async function createCatalogueAudio(data: AudioData, extras?: AudioCatalo
   }
   const samples = data.samples, music = data.music, policy = samples?.catalogue;
   if (samples === undefined || music === undefined || policy === undefined) throw new Error('Missing declared audio catalogue');
-  const [{ audioSelection }, { getMusicStyle, getSfxSet }, { decodeStyle }, { decodeSfxSet }] = await Promise.all([
+  const [{ audioSelection }, { getSfxSet }, { decodeStyle }, { decodeSfxSet }] = await Promise.all([
     import('../../../shared/engine/audio/bootAudio'), import('../ui/Settings'), import('./Stems'), import('./preload'),
   ]);
   const levels = { loopGains: samples.loopGains };
   // AUDIO AU1: which files each list holds is the shared selection's, the one the cook puts in DOWNLOAD.
-  const selection = audioSelection(data, getMusicStyle, getSfxSet, catalogueExtras === undefined ? undefined : () => catalogueExtras.files());
+  const selection = audioSelection(data, getSfxSet, catalogueExtras === undefined ? undefined : () => catalogueExtras.files());
   const decodeSamples = async (read: AudioRead, decode: AudioDecode, onFile?: () => void): Promise<SfxBank> => {
     if (!policy.overlaySamples) return decodeSfxSet(getSfxSet(), samples.bed, read, onFile, decode, levels);
     const set = getSfxSet(), [base, own] = await Promise.all([
@@ -101,14 +101,13 @@ export async function createCatalogueAudio(data: AudioData, extras?: AudioCatalo
 async function createScoreSetAudio(data:AudioData):Promise<LevelAudioProfile> {
   const music=data.music,samples=data.samples,policy=music?.setCatalogue,set=music?.source;
   if(music===undefined||samples===undefined||policy===undefined||set===undefined||set===null)throw new Error('Missing score set catalogue');
-  const [{audioSelection},{decodeStyle},{decodeScore},{decodeCueSet},{decodeSfxSet},{getMusicStyle,getSfxSet}]=await Promise.all([
+  const [{audioSelection},{decodeStyle},{decodeScore},{decodeCueSet},{decodeSfxSet},{getSfxSet}]=await Promise.all([
     import('../../../shared/engine/audio/bootAudio'),import('./Stems'),import('./SetScore'),import('./Cues'),import('./preload'),import('../ui/Settings'),
   ]);
   const slots=music.bootSlots.filter(slot=>slot!=='title');
-  const scoreSlots=(genre:MusicStyle):readonly string[]=>genre==='synth'&&!policy.bootSynth?[]:slots;
   const useCues=():boolean=>!policy.cueOverlay||getSfxSet()!=='synth';
   // AUDIO AU1: which files each list holds is the shared selection's, the one the cook puts in DOWNLOAD.
-  const selection=audioSelection(data,getMusicStyle,getSfxSet);
+  const selection=audioSelection(data,getSfxSet);
   return {
     files:selection.files,
     ...(selection.priorityFiles===undefined?{}:{priorityFiles:selection.priorityFiles}),
@@ -118,7 +117,7 @@ async function createScoreSetAudio(data:AudioData):Promise<LevelAudioProfile> {
     decode:async(genre,read,decode,onFile)=>{
       const [title,score,cues,bank]=await Promise.all([
         decodeStyle(genre,['title'],read,decode,onFile,'base',policy.titleStings?undefined:[]).catch(()=>undefined),
-        decodeScore(set,scoreSlots(genre),read,decode,policy.bootSynth||genre!=='synth',onFile),
+        decodeScore(set,slots,read,decode,true,onFile),
         useCues()?decodeCueSet(samples.set,read,decode,onFile):Promise.resolve<CueBank>({loops:new Map(),shots:new Map()}),
         policy.baseSamples?decodeSfxSet(getSfxSet(),samples.bed,read,onFile,decode):Promise.resolve(undefined),
       ]);

@@ -39,13 +39,13 @@ import { whenPrefetched } from './prefetch';
 import { readContent } from './contentRead';
 import { decodeBytes, type SfxBank } from '../audio/preload';
 import type { StyleBank } from '../audio/Stems';
-import { getMusicStyle, getSfxSet } from '../ui/Settings';
+import { getSfxSet } from '../ui/Settings';
 import { TIER } from '../core/tier';
 import { NO_AUDIO, type LevelAudioProfile, type LevelAudioBank } from '../audio/levelAudio';
 import { bootAudioFiles } from './audioInventory';
 import { loadingUnits, waitFor } from '../../../shared/engine/boot/waits';
 import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
-import { musicDir, sfxDir } from '../../../shared/engine/audio/bootAudio';
+import { ENGINE_MUSIC_STYLE, musicDir, sfxDir, type MusicStyle } from '../../../shared/engine/audio/bootAudio';
 
 
 const pathOf = (url: string): string => { try { return new URL(url, location.href).pathname; } catch { return url; } };
@@ -90,10 +90,10 @@ export function bootFiles(def: BootLevel, tex: TexMode = texMode(), profile?: Le
   const art = artFor(def, profile === undefined, menuArt);
   addBytes(art.bytes);
   const inventory = profile?.files() ?? bootAudioFiles(def.boot) ?? audioFiles();
-  const boot = profile?.bootFiles(getMusicStyle());
+  const boot = profile?.bootFiles(ENGINE_MUSIC_STYLE);
   // G1000 (DL17, root's ruling over I7): the level's audio is downloaded and loaded at full fidelity before control, so
   // the phone's bar reads the whole boot set too (I7 held all but its first seconds back until after control)
-  const title = TIER === 'phone' && lateTitleMusic ? new Set(profile?.titleFiles?.(getMusicStyle())) : new Set<string>();
+  const title = TIER === 'phone' && lateTitleMusic ? new Set(profile?.titleFiles?.(ENGINE_MUSIC_STYLE)) : new Set<string>();
   const selected = boot === undefined ? undefined : new Set(boot.filter(url => !title.has(url)));
   // Omitting a profile retains the complete inventory used by background shard prefetch.
   const audio = selected === undefined ? inventory : {
@@ -118,7 +118,7 @@ export function startLateAudio(files: ChunkFiles): Promise<AudioBanks> | undefin
 /** the art and the audio for the prefetch queue: the selected style + set (decoded in the bar) ahead of the others (downloaded only) */
 export function extraFetches(files: ChunkFiles): string[] {
   const own = audioPriority.get(files);
-  const mine = (url: string): boolean => url.startsWith(musicDir(getMusicStyle())) || url.startsWith(sfxDir(getSfxSet())) || own?.has(url) === true;
+  const mine = (url: string): boolean => url.startsWith(musicDir(ENGINE_MUSIC_STYLE)) || url.startsWith(sfxDir(getSfxSet())) || own?.has(url) === true;
   const audio = [...files.music, ...files.sfx];
   return [...files.art, ...audio.filter(mine), ...audio.filter((p) => !mine(p))];
 }
@@ -210,8 +210,8 @@ function serialDecoder(decoded?: (bytes: ArrayBuffer) => void): (bytes: ArrayBuf
 export interface AudioBanks { music: StyleBank | undefined; sfx: SfxBank; profile?: LevelAudioBank }
 
 /** Count/cache this profile's selected files, then decode its banks at the original boot/deferred boundary. */
-export function startDeferredAudioPreload(files: ChunkFiles, def: BootLevel, profile?: LevelAudioProfile): Preload<void> & { readonly style: ReturnType<typeof getMusicStyle>; decode: () => Promise<AudioBanks> } {
-  const style = getMusicStyle(), set = getSfxSet();
+export function startDeferredAudioPreload(files: ChunkFiles, def: BootLevel, profile?: LevelAudioProfile): Preload<void> & { readonly style: MusicStyle; decode: () => Promise<AudioBanks> } {
+  const style = ENGINE_MUSIC_STYLE, set = getSfxSet();
   // E357 G19: an asset-free level omits audio.preload (ENGINE §15)
   const selected = new Set((profile ?? NO_AUDIO).bootFiles(style));
   const urls = [...new Set([...files.music, ...files.sfx])].filter(url => selected.has(url));

@@ -23,10 +23,10 @@ import { AacSource } from './aacSource';
 // carries `layers` (bass, drums) and `phases` (each boss phase's layer gains). `decodeStyle(genre, slots, …, set)` reads it.
 // A deck of the boss plays its layers at the current phase's gains (Deck.setPhase), moved on the bar like the tension stem.
 
-import { STINGS, musicManifest, musicSetDir, shipped, type MusicStyle as MusicGenre, type BossPhase, type MusicSet, type SlotName, type SlotSpec, type StemSting } from '../../../shared/engine/audio/bootAudio';
+import { STINGS, musicManifest, musicSetDir, shipped, type SCORE_GENRE, type MusicStyle as MusicGenre, type BossPhase, type MusicSet, type SlotName, type SlotSpec, type StemSting } from '../../../shared/engine/audio/bootAudio';
 
 /** a decoded slot: its spec and the stems (tension absent for the title cut; layers only on the boss) */
-export interface SlotAudio { genre: MusicGenre; slot: SlotName; spec: SlotSpec; calm: AudioBuffer | AacTrack; tension: AudioBuffer | AacTrack | undefined; layers: AudioBuffer[] }
+export interface SlotAudio { genre: MusicGenre | typeof SCORE_GENRE; slot: SlotName; spec: SlotSpec; calm: AudioBuffer | AacTrack; tension: AudioBuffer | AacTrack | undefined; layers: AudioBuffer[] }
 
 /** one genre, decoded: the slots this shard can play and the stings, plus what each file cost */
 export type StyleBank = GenreBank;
@@ -108,7 +108,7 @@ export class Deck {
   private heldAudio: SlotAudio | undefined;
   private readonly spec: SlotSpec;
   readonly slot: SlotName;
-  readonly genre: MusicGenre;
+  readonly genre: SlotAudio['genre'];
   readonly t0: number;
   private readonly ctx: BaseAudioContext;
   private readonly failed: ((error: unknown) => void) | undefined;
