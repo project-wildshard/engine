@@ -711,3 +711,19 @@ test('OF5: a spawn code list is content-named and the deck\'s draft art is netwo
   offline = false; await next.dispatch('fetch', { request: new Request(url('/assets/spawn/code/index.json')) });
   expect(await (await f.open(ASSET_CACHE_NAME)).match(url('/assets/spawn/code/index.json'))).toBeUndefined();
 });
+
+test('OF5a: a title\'s update PRECACHE fills a new build\'s code only on a device that held an older build, never a first visit', async () => {
+  const update = { data: { type: 'PRECACHE', update: true }, source: { id: 'title', postMessage: () => undefined } };
+  const fresh = fixture(), first = fresh.load('A', ['/b/A/standalone/identity.js']);
+  await first.dispatch('install'); await first.dispatch('activate'); fresh.fetch.mockClear();
+  await first.dispatch('message', update);
+  expect(fresh.fetch, 'S2: a first visit\'s title reads nothing').not.toHaveBeenCalled();
+  expect(await (await fresh.open('ws-builds-v1')).keys()).toHaveLength(0);
+  // A device that played build A: A's generation is held. B arrives on the title only.
+  const f = fixture(), a = f.load('A', ['/b/A/standalone/identity.js']);
+  await a.dispatch('install'); await a.dispatch('activate'); await a.dispatch('message', precached);
+  const b = f.load('B', ['/b/B/standalone/identity.js']); await b.dispatch('install'); await b.dispatch('activate');
+  await b.dispatch('message', update);
+  expect(await (await f.open(ASSET_CACHE_NAME)).match(url('/b/B/standalone/identity.js')), 'B\'s code, before any shard visit on B').toBeDefined();
+  expect(await (await f.open('ws-builds-v1')).match(url('/__ws_build__/B'))).toBeDefined();
+});

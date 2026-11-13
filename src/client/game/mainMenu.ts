@@ -204,6 +204,9 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const startPrefetch = (): void => {
     if (started || opts.active !== null) return;
     started = true;
+    // OFFLINE OF5a: a title that stays 10 s asks the worker to hold this build's code, so an update seen only here still
+    // launches offline; the worker does it only on a device that held an older build (a first visit reads nothing, S2)
+    owner.timeout(10_000, () => { if (!leavingTitle) document.dispatchEvent(new Event('ws:title-settled')); });
     owner.raf(() => {
       const choice = titlePrefetchChoice(saves), selectedMode = gridMode(mode().devserver, mode());
       const target = titlePrefetchTarget(choice.read(), titleManifests(), mode().developer);

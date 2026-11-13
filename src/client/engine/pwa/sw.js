@@ -416,9 +416,15 @@ workerScope.listen(self, 'message', event => {
     const port = event.ports?.[0], client = event.source?.id;
     if (typeof client === 'string') controlled.add(client);
     resumePrecache();
+    // OF5a: a title asks too (`update`), so a build update seen only on the title holds its code before the first offline
+    // launch. Only on a device that holds another build's generation: a first visit's title still reads nothing (S2, DL1).
+    const update = event.data?.update === true;
     event.waitUntil((async () => {
       let ok = true;
-      try { await precacheGeneration(); } catch { ok = false; }
+      try {
+        if (update && (await (await caches.open(BOOKS)).keys()).every(key => key.url === bookKey(BUILD))) ok = false;
+        else await precacheGeneration();
+      } catch { ok = false; }
       port?.postMessage({ type, ok, build: BUILD });
     })());
     return;

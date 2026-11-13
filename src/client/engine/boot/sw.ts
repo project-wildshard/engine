@@ -319,6 +319,7 @@ function boot(): Promise<void> {
   // to the old activation-blocked readiness. Existing registrations still take
   // PR2's non-job lookup/watch path; no document is claimed.
   pageScope.listen(document, 'ws:control-ready', () => { controlEvent = true; afterControl(); }, { once: true });
+  pageScope.listen(document, 'ws:title-settled', askUpdatePrecache, { once: true });
   void register(s);
   return Promise.resolve();
 }
@@ -349,6 +350,19 @@ function askPrecache(): void {
   const installing = reg.installing;
   ask(installing); // it may have activated while the control frames ran
   if (!precacheAsked && installing !== null) pageScope.listen(installing, 'statechange', () => { ask(installing); });
+}
+
+/** OFFLINE OF5a: a title page never reaches control, so a build update seen only on the title held none of its code, and the
+ *  first offline launch failed on it. A settled title (mainMenu.ts) asks the active and the waiting worker for an update
+ *  precache; each does it only on a device that holds an older build's generation (sw.js), so a first visit reads nothing. */
+function askUpdatePrecache(): void {
+  const reg = precacheTarget;
+  if (reg === null || controlReached || pageScope.disposed || pageScope.disposing) return;
+  for (const w of [reg.active, reg.waiting]) {
+    if (w === null || w.state !== 'activated' && w.state !== 'installed') continue;
+    // oxlint-disable-next-line unicorn/require-post-message-target-origin -- ServiceWorker.postMessage has no targetOrigin parameter.
+    try { w.postMessage({ type: 'PRECACHE', update: true }); } catch { /* a retired worker is asked on the next title */ }
+  }
 }
 
 async function register(s: ServiceWorkerContainer): Promise<void> {

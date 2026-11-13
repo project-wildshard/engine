@@ -23,3 +23,10 @@ green with only telemetry and the release read failing, and the draft card comes
 `no-resume`: a staging-like page waits at the seat, never plays, so the site has nothing to resume (OF9). A title-only update
 from A to B (two local preview builds, one origin) now passes DOWNLOAD offline on B's code list, which B's title read-ahead
 fetched; the entry then fails at `standalone/identity.js`, because B precaches its code only once a page reaches control (DL1).
+
+## OF5a: a title-only update holds the new build's code
+
+A title page never reaches control, so the worker's code precache (DL1) never ran for a build seen only on the title. A title
+that stays 10 s now sends `ws:title-settled` (`mainMenu.ts`); `boot/sw.ts` asks the active and the waiting worker for an
+update precache, and the worker does it only when it holds another build's generation, so a first visit still reads nothing
+(S2). A tap within the 10 s cancels it, and any later navigation pauses it as before.
