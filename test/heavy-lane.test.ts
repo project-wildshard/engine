@@ -258,3 +258,31 @@ with tempfile.TemporaryDirectory(prefix='cpu-reservation-test-', dir=repo/'tmp')
 `], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
   expect(JSON.parse(result)).toEqual({ waited: true, ran: true });
 }, 120_000);
+
+// A SIGKILLed push gate leaves its `full-test-<checkout>.active.json` behind with both pids dead. Its flock went with it, so the slot
+// is free, but the timeout named it as the holder (2.8 h on 2026-11-13, hiding the real one). Both pids dead and the lock free: free,
+// and the file is reaped. A lock an orphaned grandchild still holds (it inherited the fd) stays named.
+test('a lease whose runner and child are both dead counts as free and is reaped', () => {
+  const result = execFileSync('python3', ['-c', `
+import fcntl, importlib.util, json, os, pathlib, subprocess, sys, tempfile, time
+spec = importlib.util.spec_from_file_location('heavy_lane', 'scripts/heavy-lane.py')
+module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+gone = subprocess.Popen([sys.executable, '-c', '0']); gone.wait()
+dead = gone.pid
+with tempfile.TemporaryDirectory(prefix='dead-lease-test-', dir='tmp') as temporary:
+ root = pathlib.Path(temporary).resolve()
+ lease = lambda pid, child, name: {'token': name, 'pid': pid, 'runnerPid': pid, 'childPid': child, 'resources': ['full-test'],
+   'command': ['node', name + '.mjs'], 'startedAt': time.time(), 'lane': name}
+ (root/'full-test-dead.active.json').write_text(json.dumps(lease(dead, dead, 'killed-gate')))
+ (root/'full-test-live.active.json').write_text(json.dumps(lease(os.getpid(), os.getpid(), 'live-gate')))
+ (root/'full-test-orphan.active.json').write_text(json.dumps(lease(dead, dead, 'orphan-gate')))
+ with (root/'full-test-live.lock').open('a+') as live, (root/'full-test-orphan.lock').open('a+') as orphan:
+  fcntl.flock(live, fcntl.LOCK_EX); fcntl.flock(orphan, fcntl.LOCK_EX)
+  entry = {'token': 'me', 'ticket': 1, 'resources': ['full-test'], 'checkout': '/elsewhere'}
+  (root/'queue.json').write_text(json.dumps({'next': 2, 'queue': []}))
+  message = str(module.queue_timeout(root, entry))
+ print(json.dumps({'named': [name for name in ('killed-gate', 'live-gate', 'orphan-gate') if name in message],
+   'kept': sorted(path.name for path in root.glob('full-test-*.active.json'))}))
+`], { encoding: 'utf8', timeout: 10_000 });
+  expect(JSON.parse(result)).toEqual({ named: ['live-gate', 'orphan-gate'], kept: ['full-test-live.active.json', 'full-test-orphan.active.json'] });
+});

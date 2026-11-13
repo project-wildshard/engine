@@ -162,11 +162,35 @@ def wait_label(seconds):
     return '5 min' if seconds == 5 * 60 else '%gs' % seconds
 
 
+def reap_dead(root, slot):
+    """True (and the lease file removed) when a slot's lease names a runner and child that both exited and its lock is free.
+
+    A SIGKILLed owner never runs its cleanup, so its `.active.json` outlives it; its flock went with it, so the slot is free.
+    A lock still held with both pids dead is an orphaned grandchild that inherited the fd: a real holder, kept and named.
+    The check and the unlink run under the slot's own lock, so a new owner's lease is never removed."""
+    path = root / (slot + '.active.json')
+    try:
+        with (root / (slot + '.lock')).open('a+') as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return False
+            entry = read_entry(path)
+            pids = [entry.get(key) for key in ('runnerPid', 'childPid') if entry.get(key) is not None]
+            if not pids or not all(isinstance(pid, int) and 0 < pid < 2**31 for pid in pids) or any(alive(pid) for pid in pids):
+                return False
+            path.unlink(missing_ok=True)
+            return True
+    except OSError:
+        return False
+
+
 def queue_timeout(root, entry):
     slots = set(slot for resource in entry['resources'] for slot in (BUILD_SLOTS if resource == 'build' else (resource,)))
     if 'full-test' in slots:
         slots.update(path.name[:-len('.active.json')] for path in root.glob('full-test-*.active.json'))
-    holders = [holder(slot, read_entry(root / (slot + '.active.json'))) for slot in sorted(slots)]
+    # 2026-11-13: a killed push gate's lease was named as the holder for 2.8 h and hid the real one
+    holders = [holder(slot, read_entry(root / (slot + '.active.json'))) for slot in sorted(slots) if not reap_dead(root, slot)]
     queued = read_entry(root / 'queue.json').get('queue', [])
     holders.extend('queue head ' + holder('/'.join(row['resources']), row) for row in queued
                    if row['token'] != entry['token'] and row['ticket'] < entry['ticket']
