@@ -60,3 +60,18 @@ it('retains root-only permissions for a standalone launcher with no package mani
     expect(JSON.parse(result.reason)).toEqual([`--allow-fs-read=${root}`,`--allow-fs-read=${join(scratch,'work')}`]);
   }finally{rmSync(scratch,{recursive:true,force:true});}
 });
+
+// NP6: engine's optional `@types/three` peer declares a dependency engine's overrides remove. Types are never runtime, so the
+// closure skips them: a cook still starts (it said `Missing installed runtime dependency` and failed every job).
+it('leaves type packages, and the dependencies they declare, out of the runtime closure',async()=>{
+  const scratch=mkdtempSync(join(tmpdir(),'cook-types-runtime-')),root=join(scratch,'root'),work=join(scratch,'work','job'),types=join(root,'node_modules','@types','fixture');
+  try{
+    mkdirSync(types,{recursive:true});mkdirSync(work,{recursive:true});
+    writeFileSync(join(root,'package.json'),JSON.stringify({type:'module',peerDependencies:{'@types/fixture':'*'},peerDependenciesMeta:{'@types/fixture':{optional:true}}}));
+    writeFileSync(join(types,'package.json'),JSON.stringify({name:'@types/fixture',dependencies:{'fixture-overridden-away':'1'}}));
+    const loader=join(root,'loader.mjs'),script=join(root,'job.mjs');writeFileSync(loader,'');
+    writeFileSync(script,`console.log(JSON.stringify({refused:'ran'}));process.exitCode=3;`);
+    const result=await runJob({root,execPath:process.execPath,loader,script,wrap:[],limits:{seconds:3,memoryMB:512,heapMB:256}},join(work,'input.tar'),join(work,'out'));
+    expect(result.kind,result.kind==='refused'?'':JSON.stringify(result)).toBe('refused');
+  }finally{rmSync(scratch,{recursive:true,force:true});}
+});

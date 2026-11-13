@@ -35,3 +35,15 @@ for `wire-released` only.
 Checked with a frozen install in a clean copy: both packages resolve
 from the registry at the expected versions. The publish half of the
 row (attestations on npm) waits for the next engine release.
+
+## The cook red it caused
+
+Main's CI went red on abc08b38 (run 43466503617): every cook job
+failed with `Missing installed runtime dependency:
+@dimforge/rapier3d-compat`. The cook worker's runtime closure walks a
+manifest's dependencies and peers, and the new optional `@types/three`
+peer led it into `@types/three`, whose own rapier dependency engine's
+`pnpm.overrides` removes on purpose. My NP6 checks ran the lockfile
+tests, not the cook. A type package is never loaded at run time, so
+the closure now skips `@types/*` names (and grants them no read).
+`cook-installed-runtime.test.ts` has the case, red first.

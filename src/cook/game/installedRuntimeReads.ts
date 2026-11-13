@@ -36,6 +36,9 @@ export function installedRuntimeReads(launcher:object,root:string):readonly stri
     const optional=new Set(Object.keys(manifest.optionalDependencies??{}));
     const names=new Set([...Object.keys(manifest.dependencies??{}),...optional,...Object.keys(manifest.peerDependencies??{})]);
     for(const name of names){
+      // NP6: a type package (engine's optional `@types/three` peer) is never loaded at run time, and its own
+      // dependencies may be overridden away (`@types/three>@dimforge/rapier3d-compat`): not part of the closure.
+      if(name.startsWith('@types/'))continue;
       const target=installed(name,directory);
       if(target!==undefined){
         pending.push(target.directory);
