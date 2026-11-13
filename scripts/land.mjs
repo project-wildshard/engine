@@ -98,8 +98,8 @@ const LOCK_WAITS_MS=[200,400,800,1600];
 export function tryGitLocked(cwd,args,env,onRetry){
  for(let attempt=0;;attempt++){
   const result=tryGit(cwd,args,env),wait=LOCK_WAITS_MS[attempt];
-  if(result.status===0||wait===undefined||!REF_LOCK.test(String(result.stderr)))return result;
-  onRetry?.(`git ${args[0]??''} lost a ref lock (${String(result.stderr).trim().split('\n')[0]??''}); retrying in ${String(wait)} ms`);
+  if(result.status===0||wait===undefined||!REF_LOCK.test(result.stderr))return result;
+  onRetry?.(`git ${args[0]??''} lost a ref lock (${result.stderr.trim().split('\n')[0]??''}); retrying in ${String(wait)} ms`);
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,wait+Math.floor(Math.random()*wait/2));
  }
 }

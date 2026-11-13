@@ -1,3 +1,5 @@
+import type { SpawnSyncReturns } from 'node:child_process';
+
 export const LAND_WORKFLOWS: readonly string[];
 export function githubSlug(remote: string): string | null;
 export function parseArgs(argv: string[]): { pollSeconds: number; timeoutMinutes: number; appearMinutes: number; rounds: number; watchMain: boolean };
@@ -12,4 +14,4 @@ export function quarantineFile(path: string, file: string, owner: string, reason
 export const STAMPS: readonly string[];
 export function prePushCause(output: string): string;
 export const REF_LOCK: RegExp;
-export function tryGitLocked(cwd: string, args: string[], env: NodeJS.ProcessEnv, onRetry?: (why: string) => void): import('node:child_process').SpawnSyncReturns<string>;
+export function tryGitLocked(cwd: string, args: string[], env: NodeJS.ProcessEnv, onRetry?: (why: string) => void): SpawnSyncReturns<string>;
