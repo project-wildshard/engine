@@ -2,7 +2,7 @@
 // largest size. No re-encode: every level the phone keeps is the master's own bytes, so the look is the master's at
 // any distance the phone draws.
 import {describe, expect, it} from 'vitest';
-import {glbImages, ktx2Info, phoneTier, tierGlb, trimKtx2} from '../src/cook/game/tierTextures';
+import {glbImages, ktx2Info, phoneTier, tierGlb, tierKtx2, trimKtx2, type TextureRole} from '../src/cook/game/tierTextures';
 
 const LEVEL_INDEX = 80;
 
@@ -154,5 +154,68 @@ describe('phoneTier (S12b)', () => {
     const both = phoneTier(discovery({'/assets/rock.png': '/assets/gpu/rock-c9b1bd73.ktx2', '/assets/horizon/day.webp': '/assets/gpu/rock-c9b1bd73.ktx2'}), read);
     expect(both?.kept.has('/assets/gpu/rock-c9b1bd73.ktx2')).toBe(true);
     expect(both?.files.get('/assets/gpu/rock-c9b1bd73.ktx2')).toHaveLength(1);
+  });
+});
+
+describe('S12c: the phone tier as ASTC 6×6', () => {
+  /** A stand-in encoder: records what it was asked and answers a smaller file, so no basisu runs in a test. */
+  const encoder = (): {calls: {width: number; role: TextureRole}[]; encode: (bytes: Uint8Array, role: TextureRole) => Uint8Array} => {
+    const calls: {width: number; role: TextureRole}[] = [];
+    return {calls, encode: (bytes, role) => { calls.push({width: ktx2Info(bytes).width, role}); return bytes.subarray(0, 96); }};
+  };
+
+  it('encodes a UASTC texture after the trim, and only trims ASTC or keeps BasisLZ', () => {
+    const {calls, encode} = encoder();
+    expect(tierKtx2(ktx2(1024), 512, encode)).toHaveLength(96);
+    expect(tierKtx2(ktx2(1024), 512, encode, true)).toHaveLength(96);
+    expect(calls).toEqual([{width: 512, role: 'linear'}, {width: 512, role: 'normal'}]);
+    expect(ktx2Info(tierKtx2(ktx2(1024, {vkFormat: 166}), 512, encode)).width).toBe(512);
+    const etc1s = ktx2(1024, {scheme: 1});
+    expect(tierKtx2(etc1s, 512, encode)).toBe(etc1s);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('encodes the images inside a GLB', () => {
+    const {calls, encode} = encoder();
+    expect(glbImages(tierGlb(glb(ktx2(1024)), 512, encode))[0]?.bytes).toHaveLength(96);
+    expect(calls).toEqual([{width: 512, role: 'linear'}]);
+  });
+
+  it('cooks a phone row from its desktop master, in place of the hand-made file', () => {
+    const files: Readonly<Record<string, Uint8Array>> = {
+      '/assets/gpu/rock-c9b1bd73.ktx2': ktx2(2048), '/assets/x/astc6/rock-44444444.ktx2': ktx2(512, {vkFormat: 166}),
+      '/assets/x/astc6/ground-22222222.ktx2': ktx2(1024, {vkFormat: 166}),
+    };
+    const phone = {'/assets/rock.phone.png': '/assets/x/astc6/rock-44444444.ktx2', '/assets/ground.webp#layer': '/assets/x/astc6/ground-22222222.ktx2'};
+    const document = new TextEncoder().encode(JSON.stringify({native: {ktx2: {shard: {phone, desktop: {'/assets/rock.png': '/assets/gpu/rock-c9b1bd73.ktx2'}}}}}));
+    const {calls, encode} = encoder();
+    const tier = phoneTier(document, url => files[url], undefined, encode);
+    const rock = tier?.files.get('/assets/x/astc6/rock-44444444.ktx2')?.[0];
+    expect(rock?.url).toMatch(/^\/assets\/x\/astc6\/rock\.t512-[a-f0-9]{8}\.ktx2$/u);
+    expect(rock?.bytes).toHaveLength(96);
+    expect(calls).toEqual([{width: 512, role: 'linear'}]);
+    // An author's `#layer` row keeps its file; without an encoder the master is never read.
+    expect(tier?.kept.has('/assets/x/astc6/ground-22222222.ktx2')).toBe(true);
+    expect(phoneTier(document, url => files[url])?.files.get('/assets/x/astc6/rock-44444444.ktx2')).toBeUndefined();
+  });
+
+  it('takes a master only when the encode ran, and never a desktop GLB for a .phone GLB', () => {
+    const files: Readonly<Record<string, Uint8Array>> = {
+      '/assets/gpu/rock-c9b1bd73.ktx2': ktx2(2048), '/assets/x/astc6/rock-44444444.ktx2': ktx2(512, {vkFormat: 166}),
+      '/assets/gpu/deer-55555555.glb': glb(ktx2(1024)), '/assets/gpu/deer.phone-66666666.glb': glb(ktx2(512, {vkFormat: 166})),
+    };
+    const phone = {'/assets/rock.png': '/assets/x/astc6/rock-44444444.ktx2', '/assets/deer.phone.glb': '/assets/gpu/deer.phone-66666666.glb'};
+    const desktop = {'/assets/rock.png': '/assets/gpu/rock-c9b1bd73.ktx2', '/assets/deer.glb': '/assets/gpu/deer-55555555.glb'};
+    const document = new TextEncoder().encode(JSON.stringify({native: {ktx2: {shard: {phone, desktop}}}}));
+    const {calls, encode} = encoder();
+    // The deer's phone GLB is already 6×6 at 512: nothing to cook, and its desktop GLB is never read.
+    expect(phoneTier(document, url => files[url], undefined, encode)?.files.has('/assets/gpu/deer.phone-66666666.glb')).toBe(false);
+    expect(calls).toEqual([{width: 512, role: 'linear'}]);
+    // A failed encode leaves the hand-made file, which is already at its size.
+    expect(phoneTier(document, url => files[url], undefined, () => undefined)).toBeUndefined();
+    // A one-level master over the size isn't encoded at full size.
+    const flat = ktx2(1024);
+    new DataView(flat.buffer).setUint32(40, 1, true);
+    expect(tierKtx2(flat, 512, encode)).toBe(flat);
   });
 });

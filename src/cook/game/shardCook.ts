@@ -23,7 +23,7 @@ import {readTar} from '@wildshard/format/tar';
 import type {ServerPack, ServerPackPart} from '../../shared/game/shardfile/serverPack';
 import {serverReadsFile} from '../../shared/game/shardfile/outputDescriptor';
 import {entryReadSet} from './entryReadSet';
-import {phoneTier} from './tierTextures';
+import {phoneTier, type Astc6Encode} from './tierTextures';
 import {createPartEncoder, packable, writeSpawnParts, type CookedMember, type PartEncoder} from './spawnParts';
 
 export type CookTier = 'phone' | 'desktop';
@@ -167,8 +167,9 @@ export interface ShardHalf {
 
 /** S12b: what the cook does with a shard's textures per tier. `phone`: give each phone row of the KTX2 table its own
  *  trimmed file (`phoneTier`), listed in the phone manifests in place of the file it stands in for. Off by default until
- *  the cook's own 6×6 encode (S12c) can replace the hand-made sets. */
-export interface CookTiers {readonly phone?: boolean}
+ *  the cook's own 6×6 encode (S12c) can replace the hand-made sets. `encode` (S12c): cook each phone row from its desktop
+ *  master as ASTC 6×6 (`basisuAstc6`), what the phone reads once the hand-made sets are gone. */
+export interface CookTiers {readonly phone?: boolean; readonly encode?: Astc6Encode}
 
 /** The shard half of every manifest: what the app build's `write` and the standalone cook share. `folder` is where the
  *  product is served; a catalogue names it by slug, and today's `_template` folder is the one that differs (`template`). */
@@ -198,7 +199,7 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
   const document = shard.cook?.mounts.find(row => row.url === `${prefix}discovery.json`), mounts = downloaded(shard);
   // S12b: the phone tier's files, made from the KTX2 table's own targets; the discovery document names them.
   const onTier = mountTiers(new Set(mounts.map(row => row.url))), mountByURL = new Map(mounts.map(row => [row.url, row])), mountOf = (url: string): Uint8Array | undefined => { const row = mountByURL.get(url); return row === undefined ? undefined : shard.read(row.path); };
-  const phone = tiers.phone === true && document !== undefined ? phoneTier(shard.read(document.path), mountOf) : undefined;
+  const phone = tiers.phone === true && document !== undefined ? phoneTier(shard.read(document.path), mountOf, undefined, tiers.encode) : undefined;
   const documentBytes = phone?.discovery ?? (document === undefined ? undefined : shard.read(document.path));
   const discovery: readonly SpawnFile[] = document === undefined || documentBytes === undefined ? [] : [(() => {
     const hash = phone === undefined ? document.hash : sha256(documentBytes);

@@ -18,9 +18,9 @@
 // and turns the board back on. ON_FOOT: a board that shows in the frame. It stows Sky's fan and fills its hover decks, and
 // its goldens have neither, so a player hovering there for its streaming steps off for the shot.
 import {chromium,webkit,devices} from 'playwright';
-import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {existsSync,readFileSync,statSync,writeFileSync,mkdirSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
-import {saveFixture,developerSettings,hideDeveloperOverlays,levelDownloadFixtures} from '../debug-settings.mjs';
+import {saveFixture,developerSettings,hideDeveloperOverlays,levelDownloadFixtures,NAME_ASKED} from '../debug-settings.mjs';
 import {loadingCardIndex} from '../loading-benchmark/catalogue.mjs';
 import {pressEscape} from '../parity/browser-escape.mjs';
 import {KEYCHAIN_ARGS} from '../chromium-keychain.mjs';
@@ -49,6 +49,10 @@ const hideAstc=()=>{const ext='WEBGL_compressed_texture_astc';for(const gl of [W
  gl.prototype.getSupportedExtensions=function(){return getSupportedExtensions.call(this)?.filter(name=>name!==ext)??null;};}};
 // --level-download=packs|shardfile (DL16): Debug ▸ Loading & memory ▸ Level download for every capture (default: the build's)
 const LEVEL_DOWNLOAD=arg('level-download','');if(!['','packs','shardfile'].includes(LEVEL_DOWNLOAD))throw Error(`--level-download=${LEVEL_DOWNLOAD}`);
+// --serve-over=<dir> (S12c): answer a request whose path is a file under <dir> from that file, so a cook's phone textures (laid
+// out at the URLs they stand in for) are judged on a served build. Pair it with --level-download=shardfile: a pack part is not a request.
+const SERVE_OVER=arg('serve-over',''),overHits=new Set();
+const DIRECT=process.argv.includes('--direct');
 mkdirSync(root,{recursive:true});
 
 // --engine=webkit: Playwright's WebKit (muted by the game's volume 0; its Escape is a plain key press)
@@ -90,6 +94,7 @@ try{for(const slug of slugs){
   await developerSettings(context,{tier:'phone',volume:0,time:'midday',weather:'clear'});
   await saveFixture(context,{scope:'global',key:'gfx',data:{dpr:'2',aa:'auto'}});
   await saveFixture(context,{scope:'device',key:'debug.global.holdLoading',data:'off'});
+  await saveFixture(context,NAME_ASKED);// MP2.4: the Name prompt otherwise covers SHARD SELECT
   if (LEVEL_DOWNLOAD!=='') for (const fixture of levelDownloadFixtures(LEVEL_DOWNLOAD)) await saveFixture(context,fixture);
   // --device-save=<key>=<value>: a Debug row's device slot for a look A / B (D227's debug.gltfMips=on); repeatable
   for (const pair of process.argv.filter(x=>x.startsWith('--device-save=')).map(x=>x.slice(14))) {
@@ -98,6 +103,8 @@ try{for(const slug of slugs){
   }
   await context.addInitScript(hideDeveloperOverlays);
   if(NO_ASTC)await context.addInitScript(hideAstc);
+  if(SERVE_OVER)await context.route(()=>true,async route=>{const path=new URL(route.request().url()).pathname,file=`${SERVE_OVER}${decodeURIComponent(path)}`;
+   if(!path.includes('..')&&existsSync(file)&&statSync(file).isFile()){overHits.add(path);await route.fulfill({status:200,body:readFileSync(file),headers:{'content-type':'application/octet-stream'}});}else await route.fallback();});
   await context.addInitScript(textures=>{window.__wildshardHarness={seed:357,capture:null,...(textures===''?{}:{textures})};},TEXTURES);
   if (slug==='nine-dragon-stack'&&nativeBinding!==null) await context.addInitScript(`window.__installGoldenResidency=()=>window.__goldenResidencyPromise??=(async()=>{
     try {
@@ -120,7 +127,9 @@ try{for(const slug of slugs){
   const version=await(await page.request.get(new URL('/version.json',base).href)).json();
   const actual=goldenPreviewIdentity(version,arg('sha',''));
   if(actual.build!==source.build)throw Error(`Preview changed from ${source.build} to ${actual.build}`);row.build=actual.build;
-  await page.goto(base,{waitUntil:'load'});
+  // --direct (S12c): enter by the shard's own URL (`?chunk=<slug>`), as scripts/tier-textures-proof.mjs does. Since J300's Shard select
+  // enters the grid at a shard's cell (a42f92b6), the title's card no longer reaches a grid-hosted shard's one-shard page.
+  await page.goto(DIRECT?`${base.replace(/\/$/u,'')}/?chunk=${slug}&skipintro&mute=1&nolock=1`:base,{waitUntil:'load'});
   if (slug==='nine-dragon-stack'&&nativeBinding!==null) {
     // The per-document DOM-ready hook also covers SHARD SELECT's fresh-page
     // navigation. The title's explicit handshake precedes every menu action.
@@ -129,13 +138,16 @@ try{for(const slug of slugs){
     const failure=await page.evaluate(()=>window.__goldenResidencyFailure);if(failure)throw new Error(failure);
     row.nativeBinding={...nativeBinding,installed:'per-document-dom-ready-before-world-entry'};
   }
+  let clicker;if(DIRECT)clicker=setInterval(()=>{void page.locator('.ws-load-play').click({timeout:500}).catch(()=>undefined);},1000);else{
   await page.locator('.ws-main-select').click();
   const names=await page.locator('.ws-menu-card b').allTextContents();
   await page.locator(`.ws-menu-dots i[data-i="${loadingCardIndex(names,slug)}"]`).click();
   // ENTER WORLD, the one entry (the shardfile, G531; QD7 LD5 removed the LEGACY / SHARDFILE pair)
   const button=page.locator('.ws-menu-play');
   if(await button.isDisabled())throw Error(`${mode} entry disabled`);await button.click();
+  }
   await page.waitForFunction(()=>!!window.__wildshard?.world?.hud?.entered&&!document.querySelector('.ws-load')&&window.__wildshard.world.game.frameGate(),undefined,{timeout:180000});
+  clearInterval(clicker);
   if (slug==='nine-dragon-stack'&&nativeBinding!==null) {
     await page.waitForFunction(()=>window.__goldenResidency!==undefined||window.__goldenResidencyFailure!==undefined);
     const failure=await page.evaluate(()=>window.__goldenResidencyFailure);if(failure)throw new Error(failure);
@@ -208,7 +220,7 @@ try{for(const slug of slugs){
   }
   row.status=row.errors.length===0?'complete':'errors';
  }catch(error){row.status='failed';row.failure=String(error);if(page)await page.screenshot({path:`${dir}/failure.jpg`,type:'jpeg',quality:80,scale:'css'}).catch(()=>{});}
- finally{rows.push(row);writeFileSync(`${root}/receipts-${slug}.json`,JSON.stringify(row,null,1));writeFileSync(`${root}/receipts.json`,JSON.stringify(rows,null,2));await context.close();
-  console.log(JSON.stringify({slug,status:row.status,poses:row.poses.length,idle:row.poses.map(p=>p.idle.settled),failure:row.failure,errors:row.errors.slice(0,3),warnings:Object.values(row.warnings).reduce((n,c)=>n+c,0)}));}
+ finally{if(SERVE_OVER)row.servedOver=[...overHits].sort();rows.push(row);writeFileSync(`${root}/receipts-${slug}.json`,JSON.stringify(row,null,1));writeFileSync(`${root}/receipts.json`,JSON.stringify(rows,null,2));await context.close();
+  console.log(JSON.stringify({slug,status:row.status,poses:row.poses.length,idle:row.poses.map(p=>p.idle.settled),failure:row.failure,errors:row.errors.slice(0,3),warnings:Object.values(row.warnings).reduce((n,c)=>n+c,0),...(SERVE_OVER?{servedOver:overHits.size}:{})}));}
  if(row.status==='failed')process.exitCode=1;
 }}finally{try{await browser.close();}finally{await owner?.close();}}

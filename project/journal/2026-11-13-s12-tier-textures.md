@@ -25,3 +25,21 @@ Pine from today's product (`out/pine-hollow`), cooked both ways: phone entry 90.
 90.06 MB (birds.phone.glb 630 -> 297 kB now rides there instead of a desktop part); trimmed planet, tree cards and
 impostors (KTX2) and birds (GLB). Desktop manifests list the same files with the same bytes except discovery.json, the
 one document both tiers read: it now carries the phone rows. Not run: goldens on a cooked Pine (no local Pine build).
+
+## S12c: the cook's own ASTC 6×6 (opus-s12c)
+
+`cook --phone-astc6` (implies `--phone-textures`; still off by default) gives `phoneTier` an encoder: each phone row is
+cooked from its desktop master (the same source key, or its name without `.phone`), trimmed to its tier size, then
+re-encoded as ASTC 6×6 by `basisuAstc6` (`src/cook/game/astc6Encode.ts`): basisu's own transcoder decodes the trimmed
+UASTC master to RGBA levels (`-export_dds RGBA32`) and S4's flags encode them (`-ldr_6x6 -effort 4`, sRGB / linear from
+the DFD, `-normal_map` for a material's normal or a `nor` name). S4 baked from source JPEGs; a cook has only UASTC, so this
+re-encodes lossy data and goldens judge it. A master stands in only when the encode ran; a GLB takes only the same
+source's desktop file, because Pine's `.phone` GLBs hold lighter meshes (creatures, NPCs, weapons: 30–45% fewer vertices).
+Raw ASTC is only trimmed, ETC1S kept, a one-level, array or cube master never encoded. Cached by input hash in
+`~/.cache/wildshard/gen/astc6/1`.
+
+Pine's phone table (`scripts/tier-textures.mjs out/pine-hollow --astc6`): today 28.31 MB file / 32.21 GPU; the cook's
+6×6 table 22.44 / 22.59, 21% under. The rest of the drop is rows S4 left UASTC (creature and viewmodel maps, the
+"stay 4×4" call) now 6×6 too. Cooking the rev2 shardfile: phone entry 90.29 → 88.75 MB; phone whole 90.29 → 95.50,
+because 51 phone files a fence shard reads past its fence (viewmodel maps and the like, read from desktop parts today)
+now ride in the phone whole set, S12b's birds case at scale. A warm recook: 0 encoded, 57 reused.

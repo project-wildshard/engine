@@ -95,7 +95,8 @@ export function trimKtx2(bytes: Uint8Array, maxSize: number): Uint8Array {
 }
 
 interface GltfView {buffer: number; byteOffset?: number; byteLength: number; extensions?: {EXT_meshopt_compression?: {buffer: number; byteOffset?: number; byteLength: number}}}
-interface Gltf {accessors?: {bufferView?: number; sparse?: {indices: {bufferView: number}; values: {bufferView: number}}}[]; bufferViews?: GltfView[]; buffers?: {byteLength: number; uri?: string}[]; images?: {bufferView?: number; mimeType?: string; uri?: string}[]}
+interface GltfTexture {source?: number; extensions?: {KHR_texture_basisu?: {source?: number}}}
+interface Gltf {materials?: {normalTexture?: {index: number}}[]; textures?: GltfTexture[]; accessors?: {bufferView?: number; sparse?: {indices: {bufferView: number}; values: {bufferView: number}}}[]; bufferViews?: GltfView[]; buffers?: {byteLength: number; uri?: string}[]; images?: {bufferView?: number; mimeType?: string; uri?: string}[]}
 interface Glb {readonly json: Gltf; readonly bin: Uint8Array}
 
 function readGlb(bytes: Uint8Array): Glb | undefined {
@@ -195,9 +196,46 @@ export function withImages(bytes: Uint8Array, replace: (image: GlbImage) => Uint
   return writeGlb(glb.json, bin);
 }
 
-/** A GLB at one tier: each embedded KTX2 image at most `maxSize` on its largest side. */
-export function tierGlb(bytes: Uint8Array, maxSize: number): Uint8Array {
-  return withImages(bytes, image => (image.mimeType === 'image/ktx2' ? trimKtx2(image.bytes, maxSize) : image.bytes));
+/** S12c: how a texture's texels read, so a re-encode keeps them: colour (sRGB), linear data, or a normal map. */
+export type TextureRole = 'srgb' | 'linear' | 'normal';
+/** S12c: a UASTC KTX2, already at its tier size, as ASTC 6×6 with the same levels; undefined when it can't. Injected, so
+ *  this module stays bytes in, bytes out: the cook's is `basisuAstc6` (`astc6Encode.ts`), cached by input hash. */
+export type Astc6Encode = (ktx2: Uint8Array, role: TextureRole) => Uint8Array | undefined;
+
+/** The KTX2's DFD transfer function: 2 is sRGB, 1 linear. */
+function transferOf(bytes: Uint8Array): number {
+  const view = viewOf(bytes), dfdAt = view.getUint32(48, true), dfdLength = view.getUint32(52, true);
+  return dfdLength >= 16 && dfdAt + 15 <= bytes.length ? (bytes[dfdAt + 14] ?? 0) : 0;
+}
+
+/** A KTX2 at one tier: trimmed to `maxSize`, then, with `encode`, a UASTC one re-encoded as ASTC 6×6 (S4's phone format,
+ *  16/36 of 4×4's GPU bytes). Raw ASTC is only trimmed; BasisLZ (ETC1S) keeps its bytes, as S4's data planes did. */
+export function tierKtx2(bytes: Uint8Array, maxSize: number, encode?: Astc6Encode, normal = false): Uint8Array {
+  const trimmed = trimKtx2(bytes, maxSize);
+  if (encode === undefined || !isKtx2(trimmed)) return trimmed;
+  const info = ktx2Info(trimmed);
+  // Only a plain 2D texture the trim brought to its tier size: a one-level master stays as large as it was, and an array or cube
+  // map would lose its layers in a 2D encode.
+  const view = viewOf(trimmed), plain = view.getUint32(28, true) <= 1 && view.getUint32(32, true) <= 1 && view.getUint32(36, true) === 1;
+  if (info.vkFormat !== 0 || info.scheme === BASIS_LZ || !plain || Math.max(info.width, info.height) > maxSize) return trimmed;
+  return encode(trimmed, normal ? 'normal' : transferOf(trimmed) === 2 ? 'srgb' : 'linear') ?? trimmed;
+}
+
+/** The images a GLB's materials sample as normal maps. */
+function normalImages(json: Gltf): ReadonlySet<number> {
+  const out = new Set<number>();
+  for (const material of json.materials ?? []) {
+    const texture = material.normalTexture === undefined ? undefined : json.textures?.[material.normalTexture.index];
+    const source = texture?.source ?? texture?.extensions?.KHR_texture_basisu?.source;
+    if (source !== undefined) out.add(source);
+  }
+  return out;
+}
+
+/** A GLB at one tier: each embedded KTX2 image at most `maxSize` on its largest side, and 6×6 with `encode` (`tierKtx2`). */
+export function tierGlb(bytes: Uint8Array, maxSize: number, encode?: Astc6Encode): Uint8Array {
+  const normals = encode === undefined ? new Set<number>() : normalImages(readGlb(bytes)?.json ?? {});
+  return withImages(bytes, image => (image.mimeType === 'image/ktx2' ? tierKtx2(image.bytes, maxSize, encode, normals.has(image.index)) : image.bytes));
 }
 
 /** GPU memory a KTX2 takes once transcoded, mips included: ASTC 4×4 or BC7 for UASTC (1 byte a texel), its own block
@@ -235,37 +273,64 @@ export interface PhoneTier {
 type Json = null | boolean | number | string | readonly Json[] | {readonly [key: string]: Json};
 const isMap = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const hex8 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex').slice(0, 8);
+/** S4's normal-map names (`bake-ktx2.mjs` classOf): a loose KTX2 row the 6×6 encode reads as a normal map. */
+const NORMAL_NAME = /(?:^|[_\-.])(?:nor|nor_gl|normal|nrm)(?:[_\-.]|$)/iu;
+
+/** The desktop target that holds a phone row's master: the same source, or its name without the `.phone` / `-phone` mark. */
+export function masterOf(desktop: Readonly<Record<string, unknown>> | undefined, source: string): string | undefined {
+  if (desktop === undefined) return undefined;
+  for (const key of [source, source.replace(/\.phone\./u, '.'), source.replace(/-phone\./u, '.')]) {
+    const target = desktop[key];
+    if (typeof target === 'string') return target;
+  }
+  return undefined;
+}
 
 /** The phone tier of a shard's KTX2 table (`discovery.json` `native.ktx2`, any shape: `pageModeKtx2` args, `GPU_FILES`, a bare
  *  tier map). Every `phone` map's GLB and KTX2 target that `read` can read is trimmed to its row's size; a target that gets
  *  smaller moves to `<name>.t<size>-<hash8>.<ext>` beside it. Undefined when nothing gets smaller, so the cook keeps every
- *  byte of today's product. */
-export function phoneTier(discovery: Uint8Array, read: (url: string) => Uint8Array | undefined, size: (source: string) => number | undefined = phoneTierSize): PhoneTier | undefined {
+ *  byte of today's product.
+ *
+ *  S12c: with `encode`, a row is cooked from its desktop master (`masterOf`, the sibling `desktop` map) when it has one,
+ *  trimmed and re-encoded as ASTC 6×6 (`tierKtx2`, `tierGlb`): what the phone reads once the hand-made 512 sets are gone
+ *  (S12d). That file stands in for the row's target whatever its size against today's hand-made file. */
+export function phoneTier(discovery: Uint8Array, read: (url: string) => Uint8Array | undefined, size: (source: string) => number | undefined = phoneTierSize, encode?: Astc6Encode): PhoneTier | undefined {
   const document = JSON.parse(new TextDecoder().decode(discovery)) as Json;
   const native = isMap(document) && isMap(document['native']) ? document['native'] : undefined;
   if (native?.['ktx2'] === undefined) return undefined;
-  const phoneMaps: Record<string, unknown>[] = [];
+  const phoneMaps: {phone: Record<string, unknown>; desktop: Record<string, unknown> | undefined}[] = [];
+  const stringMap = (item: unknown): item is Record<string, unknown> => isMap(item) && Object.values(item).every(target => typeof target === 'string');
   const walk = (value: unknown): void => {
     if (Array.isArray(value)) { for (const item of value) walk(item); return; }
     if (!isMap(value)) return;
     for (const [key, item] of Object.entries(value)) {
-      if (key === 'phone' && isMap(item) && Object.values(item).every(target => typeof target === 'string')) phoneMaps.push(item);
+      if (key === 'phone' && stringMap(item)) phoneMaps.push({phone: item, desktop: stringMap(value['desktop']) ? value['desktop'] : undefined});
       else walk(item);
     }
   };
   walk(native['ktx2']);
   const made = new Map<string, TierFile | null>(), files = new Map<string, TierFile[]>(), kept = new Set<string>();
-  for (const map of phoneMaps) for (const [source, target] of Object.entries(map)) {
+  let encodes = 0;
+  const counted: Astc6Encode | undefined = encode === undefined ? undefined : (bytes, role) => { const out = encode(bytes, role); if (out !== undefined) encodes++; return out; };
+  // A GLB's master is the same source's desktop file only: a `.phone` GLB holds a lighter mesh, not just smaller images.
+  const sameMaster = (desktop: Readonly<Record<string, unknown>> | undefined, source: string): string | undefined => { const target = desktop?.[source]; return typeof target === 'string' ? target : undefined; };
+  for (const {phone: map, desktop} of phoneMaps) for (const [source, target] of Object.entries(map)) {
     if (typeof target !== 'string') continue;
     const max = size(source), match = /^(.*?)(?:-[a-f0-9]{8})?\.(glb|ktx2)$/u.exec(target), bytes = max === undefined || match === null ? undefined : read(target);
     if (max === undefined || match === null || bytes === undefined) { kept.add(target); continue; }
-    const key = `${target}@${max}`;
+    const ext = match[2] ?? '', master = encode === undefined ? undefined : (ext === 'glb' ? sameMaster(desktop, source) : masterOf(desktop, source));
+    const masterBytes = master?.endsWith(`.${ext}`) === true ? read(master) : undefined;
+    const key = `${target}<${masterBytes === undefined ? target : master ?? target}@${max}`;
     let file = made.get(key);
     if (file === undefined) {
       // A file the trim can't read keeps today's bytes: one odd texture never stops a cook.
-      let trimmed = bytes;
-      try { trimmed = match[2] === 'glb' ? tierGlb(bytes, max) : trimKtx2(bytes, max); } catch { trimmed = bytes; }
-      file = trimmed.length < bytes.length ? {from: target, url: `${match[1] ?? ''}.t${max}-${hex8(trimmed)}.${match[2] ?? ''}`, bytes: trimmed} : null;
+      const normal = NORMAL_NAME.test(source.split('/').pop() ?? '');
+      const cook = (input: Uint8Array): Uint8Array => { try { return ext === 'glb' ? tierGlb(input, max, counted) : tierKtx2(input, max, counted, normal); } catch { return input; } };
+      // A master stands in only when the 6×6 encode ran on it; else the row's own file is cooked, as S12b does.
+      const encodedBefore = encodes;
+      const cookedMaster = masterBytes === undefined ? undefined : cook(masterBytes);
+      const trimmed = cookedMaster !== undefined && encodes > encodedBefore ? cookedMaster : cook(bytes), fromMaster = trimmed === cookedMaster;
+      file = fromMaster || trimmed.length < bytes.length ? {from: target, url: `${match[1] ?? ''}.t${max}-${hex8(trimmed)}.${ext}`, bytes: trimmed} : null;
       made.set(key, file);
       if (file !== null) files.set(target, [...files.get(target) ?? [], file]);
     }
