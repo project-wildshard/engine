@@ -706,6 +706,7 @@
     "src/client/game/grid/shardfileFar.ts": "client",
     "src/client/game/grid/skinEnvelope.ts": "client",
     "src/client/game/grid/softWallLook.ts": "client",
+    "src/client/game/grid/spawnGround.ts": "client",
     "src/client/game/grid/tileDecoder.ts": "client",
     "src/client/game/grid/tileDecodeWorker.ts": "client",
     "src/client/game/grid/titleOrder.ts": "client",

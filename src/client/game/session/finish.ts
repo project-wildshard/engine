@@ -14,6 +14,7 @@ import { releaseByteCounter } from '@wildshard/engine/boot/bytes';
 import { hasLateAudio, startAudioPreload, startLateAudio, type AudioBanks } from '@wildshard/engine/boot/extras';
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { loadingStage, loadingUnits, waitFor } from '@wildshard/engine/boot/waits';
+import { beginLoadingWait, finishLoadingWait } from '@wildshard/engine/boot/loadingWaits';
 import { currentLoadingTimeline } from '@wildshard/engine/boot/timeline';
 import { startShardPrefetch } from '@wildshard/engine/boot/shardPrefetch';
 import { afterControl, reachControl } from '@wildshard/engine/boot/prefetch';
@@ -58,6 +59,17 @@ const BOOT_SHADER_SLICE_MS = 48;
  *  frame starts with narrow slices (Game FIRST_DRAW_NARROW). Measured on Driftwood at 4x CPU, 2026-11-09: SwiftShader 34 ms,
  *  this Mac's Metal GPU 7 ms, WebKit 2.4 ms a program. */
 const SLOW_SHADER_MS_PER_PROGRAM = 15;
+/** PINE-FLASH: the spawn ground hold, named on the loading card while it waits; its outcome and time go in a boot mark. */
+async function holdSpawnGround(grid: Awaited<ReturnType<typeof playStage>>['grid']): Promise<void> {
+  if (grid === null) return;
+  const timeline = currentLoadingTimeline(), at = diagnosticNow();
+  const wait = beginLoadingWait('Spawn ground', { kind: 'work', step: timeline?.snapshot().current ?? null, owner: timeline?.waitOwner ?? null });
+  // best-effort: a hold that throws leaves the ground to the rings in play, as before it, and never fails the load
+  try { const outcome = await grid.prepareSpawnGround(); bootMark('app:spawn-ground', { outcome, ms: Math.round(diagnosticNow() - at) }); }
+  catch (error: unknown) { console.warn('[grid] spawn ground hold stopped', error); bootMark('app:spawn-ground', { outcome: 'failed', ms: Math.round(diagnosticNow() - at) }); }
+  finally { finishLoadingWait(wait); }
+}
+
 /** QA8: link the world's programs the spawn view did not draw before the reveal, nearest first, at the in-play pace (a few
  *  programs a frame, each link polled). Only completion or owner retirement ends this loading step. */
 async function linkWorldUnderLoader(game: Awaited<ReturnType<typeof playStage>>['game'], unbuilt = false): Promise<void> {
@@ -137,7 +149,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // so the shaders below link the fine pieces and the reveal shows them; only what lies outside it refines in play
   // The camera is posed by the shader step below. Keep the player reference
   // for this first fence; the final readyFrame fence uses the posed camera.
-  await loadingStage('spawnDetail', () => prepareSpawnView(undefined, undefined, 'player'));
+  // PINE-FLASH (grid/spawnGround.ts): first the entered cell's own ground where its ring tiles are that ground (Pine), so
+  // control never arrives over its far proxy; bounded, and nothing for a cell that draws its own ground (Nalati)
+  await loadingStage('spawnDetail', async () => { await holdSpawnGround(ctx.grid); await prepareSpawnView(undefined, undefined, 'player'); });
   try {
     // LS8 (J204): the shaders step's measured cost per program decides how the first frame slices its draws
     const shadersAt = diagnosticNow(), programsBefore = game.renderer.info.programs?.length ?? 0;

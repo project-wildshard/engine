@@ -55,7 +55,8 @@ import { neighbourEdges } from '../../../shared/game/grid/readinessEdges';
 import { DEVSERVER, gridMode } from './menu';
 import { gridCells, pageGridInstance } from '../plugin/context';
 import { prepareHomeMetadata, withInitialHomeMetadata } from './homeMetadata';
-import { bootSteppedTiles } from './loadingRings';
+import { bootSteppedTiles, stepRingsUntil } from './loadingRings';
+import { holdSpawnGround, spawnGroundCell, type SpawnGround } from './spawnGround';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { PageResidency } from './pageResidency';
 import { PlatformRenderResidency } from './renderResidency';
@@ -1176,6 +1177,28 @@ export class GridSession {
   ringsReady(): boolean { return this.roadSettled && this.rings.ready(); }
   /** Settles once the road system has landed (or failed): the entry's shader warm-up waits for it, so its programs are warmed. */
   roadLanded(): Promise<void> { return this.roadLanding; }
+
+  /** PINE-FLASH (spawnGround.ts): the loader's `spawnDetail` step holds until the entered cell's ground covers its far
+   *  proxy (Pine: its ring tiles, admitted now rather than after T10's background opens), or the ceiling. A cell that
+   *  draws its own ground, or none drawn by a runtime, holds nothing. */
+  async prepareSpawnGround(limitMs?: number): Promise<SpawnGround> {
+    const live = this.live, render = this.admitNeighbourRender, drawn = live?.runtimeDrawnCell() ?? null;
+    if (live === null || render === undefined || drawn === null) return 'none';
+    const cell = this.assembly.cell(drawn);
+    const instance = spawnGroundCell(drawn, this.clientTiles.owns(drawn), findShard(cell.slug)?.cellGround === 'world');
+    if (instance === null) return 'none';
+    const feet = live.worldFeet(), start = { x: feet.x - cell.origin.x, z: feet.z - cell.origin.z };
+    const owner = this.host.scope.child(`grid.spawn-ground.${instance}`), prepareOffered = this.clientTiles.prepareOffered;
+    try {
+      return await holdSpawnGround({ instance, admit: () => render(cell), require: (id, keys, level) => this.rings.require(id, keys, level),
+        ...(prepareOffered === undefined ? {} : { spawn: () => prepareOffered(instance, owner, start) }),
+        pump: entry => stepRingsUntil(entry, { frames: () => this.lateFrames,
+          step: () => { if (!this.host.scope.disposed) { const at = this.world(); this.rings.step({ x: at.x, z: at.z, vx: 0, vz: 0 }); } },
+          wait: () => new Promise<void>(resolve => { if (!this.host.scope.disposed) this.host.scope.timeout(16, resolve); }) }),
+        after: ms => new Promise<void>(resolve => { owner.timeout(ms, resolve); }), ...(limitMs === undefined ? {} : { limitMs }) },
+      requirement => { owner.onDispose(requirement.release); });
+    } finally { owner.dispose(); }
+  }
 
   /** Hold the loading screen until every visible neighbour is drawn (or the time limit: the soft walls hold anyway). */
   async ready(limitMs = 20_000): Promise<boolean> {
