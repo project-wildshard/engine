@@ -73,6 +73,11 @@ const DODGE_ROLL = 0.122;             // rad of camera lean into a fully sideway
 const DODGE_FOV_KICK = 5;             // ° wider while a dodge runs …
 const LUNGE_FOV_KICK = 7;             // … and a lunge (Sword.ts reads `fovKick`)
 
+/** touch play: the touch layer is up (`#hud.touch`, from a coarse pointer or `?touch`) or the primary pointer is coarse.
+ *  Pointer lock is a mouse feature; a touch device never asks for it (QA-FEEDBACK-2026-11-13 row 6). */
+export const touchPlay = (): boolean => (typeof document !== 'undefined' && document.getElementById('hud')?.classList.contains('touch') === true)
+  || (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches);
+
 export class Player {
   /** The step's plain state (player/motionState.ts). The fields below that read and write it are the Player's public view:
    *  weapons, shards and the camera read them, and a predictor captures and restores the state itself. */
@@ -333,8 +338,11 @@ export class Player {
       y: Math.max(-1, Math.min(1, Number(k.has('KeyW')) - Number(k.has('KeyS')) + this.touchMove.y)) };
   }
   // absent on iOS Safari; present but rejecting ("UnknownError") in the Android WebView — touch input never needs it,
-  // and an unhandled rejection would raise the uncaught-exception modal on ENTER WORLD
-  lock(): void { if ('requestPointerLock' in this.canvas) this.canvas.requestPointerLock().catch(() => { /* no pointer lock here: touch play */ }); }
+  // and an unhandled rejection would raise the uncaught-exception modal on ENTER WORLD. Never asked for in touch play:
+  // Chrome on Android grants it, then sends every touch to the canvas (stick, Jump and Look go dead and their
+  // setPointerCapture throws, WILDSHARD-GAME-2M), and Chrome 145 can crash the whole app in requestPointerLock
+  // (QA-FEEDBACK-2026-11-13 row 6).
+  lock(): void { if (!touchPlay() && 'requestPointerLock' in this.canvas) this.canvas.requestPointerLock().catch(() => { /* refused: the pause menu takes over */ }); }
 
   /** step on / off the hoverboard. Off: the board fades and gravity lands you; on: the spring lifts you to ride height. */
   setHover(on: boolean): void {
