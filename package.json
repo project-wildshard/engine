@@ -574,6 +574,7 @@
     "./saves/store": "./src/shared/engine/saves/store.ts",
     "./saves/shape": "./src/shared/engine/saves/shape.ts",
     "./strings": "./src/shared/engine/strings.ts",
+    "./ui/backGuard": "./src/client/engine/ui/backGuard.ts",
     "./ui/BossBar": "./src/client/engine/ui/BossBar.ts",
     "./ui/namePrompt": "./src/client/engine/ui/namePrompt.ts",
     "./ui/offlineDownload": "./src/client/engine/ui/offlineDownload.ts",

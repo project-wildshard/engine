@@ -1,4 +1,5 @@
 import { bagMenu } from '../bag/tabs';
+import { guardPlayBack } from '@wildshard/engine/ui/backGuard';
 import { wirePage } from '../shardfile/wirePage';
 import * as THREE from 'three';
 import { type LevelSequence, bootLevel } from '@wildshard/engine/boot';
@@ -115,6 +116,7 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
     };
     app.levelAdapters.residentMemory = memory;
     markDropStep({ step: PLAYING });
+    guardPlayBack(); // QA 11-13 row 20: iOS's edge swipe (any back) stays in play
     setAliveSource((): AliveInfo<PageMode> => ({ slug: selected, resident: `${selected} (playing) ~${Math.round(memory(60_000).levels[0]?.textureMB ?? 0)} MB`, mode }));
   } catch (error) {
     options.residency?.dispose(); // Pre-bootstrap failures have no consumers; runShardLoad disposes allocated ones first.

@@ -300,13 +300,19 @@ export function holdLeaving(save: () => Promise<unknown>): () => void {
   saver = save;
   return () => { if (saver === save) saver = null; };
 }
+let leaveFirst: (() => Promise<void>) | null = null;
+/** A step a navigation the game chose waits for, beside the save (play's back guard steps off its history entry, ui/backGuard.ts). */
+export function beforeLeaving(first: (() => Promise<void>) | null): void { leaveFirst = first; }
 /** Run a navigation the game chose, once what a held session has made is durable. With nothing held this is the navigation, now. */
 export function leaveSaved(go: () => void): void {
-  if (saver === null) { go(); return; }
+  const first = leaveFirst;
+  leaveFirst = null;
+  if (saver === null && first === null) { go(); return; }
   const save = saver;
   saver = null; // a second tap goes the same way, and doesn't save or wait twice
-  void atMostLeaveWait(save()).then(go);
+  void Promise.all([save === null ? undefined : atMostLeaveWait(save()), first?.()]).then(() => go());
 }
+
 export function lastEnd(): LastEnd { return page.lastEnd(); }
 export function lastRecordedEnd(): LastEnd | null { return page.lastRecordedEnd(); }
 export function lastEndLine(now: number = Date.now()): string { return page.lastEndLine(now); }

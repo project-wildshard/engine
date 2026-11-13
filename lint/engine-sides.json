@@ -425,6 +425,7 @@
     "src/client/engine/telemetry/runtime.ts": "client",
     "src/client/engine/ui/authoredDebugRows.ts": "client",
     "src/client/engine/ui/BootSettings.ts": "client",
+    "src/client/engine/ui/backGuard.ts": "client",
     "src/client/engine/ui/graphicsBlock.ts": "client",
     "src/client/engine/ui/BossBar.ts": "client",
     "src/client/engine/ui/buildCheck.ts": "client",
