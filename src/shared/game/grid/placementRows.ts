@@ -10,13 +10,16 @@ export interface PlacementFile {
   readonly channel: 'production' | 'staging';
   /** Rises with every write; an older file is never believed (J179). */
   readonly serial: number;
-  readonly cells: readonly { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number] }[];
+  /** SA47: `hash` is the channel pointer's shardfile (the raw upload), so a box whose build's book lacks the slug opens it from the
+   *  cook's `index/<build>/<hash>.json`. A file from before SA47 names none. */
+  readonly cells: readonly { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number]; readonly hash?: string }[];
 }
 const placedId = v.pipe(v.string(), v.regex(/^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u), v.maxLength(64));
 const placedSpot = v.pipe(v.number(), v.integer());
+const placedHash = v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u));
 /** A placement file's body, once its signature has held. The spot's bounds are `placeCell`'s. */
 export const PlacementSchema: v.GenericSchema<PlacementFile> = v.object({ kind: v.literal('placement'), channel: v.picklist(['production', 'staging']), serial: v.pipe(v.number(), v.integer(), v.minValue(0)),
-  cells: v.pipe(v.array(v.object({ instance: placedId, slug: placedId, cell: v.tuple([placedSpot, placedSpot]) })), v.maxLength(49)) });
+  cells: v.pipe(v.array(v.object({ instance: placedId, slug: placedId, cell: v.tuple([placedSpot, placedSpot]), hash: v.exactOptional(placedHash) })), v.maxLength(49)) });
 /** The file on R2: the body as signed, and its signature in hex (as the release file's, `releaseRows.ts`). */
 export const SignedPlacementSchema: v.GenericSchema<{ readonly body: string; readonly signature: string }> = v.object({ body: v.string(), signature: v.string() });
 /** The API's placement key (SA33a, `~/.config/wildshard/placement-signing-key.pub.pem`), SPKI DER in hex: the box's PLACEMENT_PUBLIC_KEY. */

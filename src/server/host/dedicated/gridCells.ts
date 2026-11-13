@@ -14,11 +14,14 @@ const UNPLACED_FRAME = 1;
 interface GridNames { readonly instances: readonly string[]; readonly frames: ReadonlyMap<string, number>; readonly shards: ReadonlyMap<string, string>; readonly cells: ReadonlyMap<string, string>; readonly home: string | undefined;
   /** Each taken spot (`x,z`), and the instance on it. */
   readonly spots: ReadonlyMap<string, string> }
-/** SA33: one cell a signed placement file names: the API's placement of a new slug (SA30), on a spot the catalogue leaves empty. */
-export interface PlacedCell { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number] }
+/** SA33: one cell a signed placement file names: the API's placement of a new slug (SA30), on a spot the catalogue leaves empty. SA47:
+ *  `hash` is its shardfile, for a pack the build's book lacks. */
+export interface PlacedCell { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number]; readonly hash?: string }
 /** SA33: the cells placed on this running server, in the placement file's order, after the catalogue's. A restart forgets them; the
  *  placement watch's first look places them again. */
 const placed: PlacedCell[] = [];
+/** SA47: each placed slug's shardfile hash, when its placement named one. */
+const hashes = new Map<string, string>();
 let read: { readonly from: unknown; readonly placed: number; readonly names: GridNames } | null = null;
 /** Parsed once per installed catalogue, the way a grid page assembles it, then the placed cells: frame `catalogue count + n`. */
 function gridNames(): GridNames {
@@ -47,9 +50,12 @@ export function placeCell(row: PlacedCell): boolean {
   if (cells.has(row.instance)) throw new Error(`${row.instance} is a placed shard's name`);
   const taken = spots.get(spot);
   if (taken !== undefined) throw new Error(`${spot} is ${taken}'s`);
-  placed.push({ instance: row.instance, slug: row.slug, cell: [x, z] });
+  placed.push({ instance: row.instance, slug: row.slug, cell: [x, z], ...(row.hash === undefined ? {} : { hash: row.hash }) });
+  if (row.hash !== undefined) hashes.set(row.slug, row.hash);
   return true;
 }
+/** SA47: the shardfile hash the placement named for a placed slug, so its room can open from the cook's index; undefined for any other. */
+export function placedHash(slug: string): string | undefined { return hashes.get(slug); }
 let assembled: { readonly from: unknown; readonly placed: number; readonly assembly: GridAssembly } | null = null;
 /**
  * SA34a: the grid a road walks: the installed catalogue's cells and then the placed ones, so a road and its cells know a placed cell's
@@ -65,7 +71,7 @@ export function gridAssembly(placedToo = true): GridAssembly {
 /** What a worker thread is booted with, so its rooms name, frame and load a placed cell as the door does. */
 export function placedCells(): readonly PlacedCell[] { return [...placed]; }
 /** Tests only: forget every placed cell. */
-export function forgetPlacedCells(): void { placed.length = 0; read = null; assembled = null; }
+export function forgetPlacedCells(): void { placed.length = 0; hashes.clear(); read = null; assembled = null; }
 
 /** The instance a name means: an instance stands, a grid shard's slug becomes its cell, and anything else is its own name. */
 export function cellName(name: string): string { const { shards, cells } = gridNames(); return shards.has(name) ? name : cells.get(name) ?? name; }

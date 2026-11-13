@@ -7,7 +7,7 @@ import { nodeNamedJsonCheck, nodeOutputDescriptorChecks } from '@wildshard/engin
 import { carryOutputDescriptor, isBuildValidatedOutput, outputDescriptor, resolveOutputDescriptor, serverReadsFile } from '@wildshard/engine/game/shardfile/outputDescriptor';
 import { shardProductData } from '@wildshard/engine/game/shardfile/productData';
 import { GRID_COLLISION_BODY, GRID_COLLISION_HEADER, readGridCollision, type GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
-import { readServerPackBook, serverPackBookPath, serverPackFile, serverPackPart, type ServerPackBook, type ServerPackPart } from '@wildshard/engine/game/shardfile/serverPack';
+import { cookIndexPath, readCookedServerIndex, readServerPack, readServerPackBook, serverPackBookPath, serverPackFile, serverPackPart, type ServerPack, type ServerPackBook, type ServerPackPart } from '@wildshard/engine/game/shardfile/serverPack';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { HeldRead } from '../../../shared/host/standalone/heldReads';
 
@@ -51,10 +51,26 @@ function besideShard(path: string, root: string): URL {
   if (!path.startsWith('/') || path.startsWith('//') || at === -1) return new URL(path, base);
   return new URL(`.${path}`, new URL(base.pathname.slice(0, at + 1), base));
 }
+/** A JSON file beside a shard's base, by its path from the origin's root. */
+async function originJson(root: string, path: string, read: ServerRead): Promise<unknown> {
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read(besideShard(`/${path}`, root), path)));
+}
 /** This build's server book. */
 async function serverBook(root: string, build: string, read: ServerRead): Promise<ServerPackBook> {
-  const path = serverPackBookPath(build);
-  return readServerPackBook(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read(besideShard(`/${path}`, root), path))));
+  return readServerPackBook(await originJson(root, serverPackBookPath(build), read));
+}
+/** The leading `_` a grid slug may carry is not the shard's (shard-format `shardSlugOf`). */
+const shardOf = (slug: string): string => slug.replace(/^_/u, '');
+/**
+ * SA47: a placed slug this build's book has no row for (a new author's, uploaded after the build), from the cook's index for this build
+ * and these bytes (MMO-SERVER MS2.4): `index/<build>/<hash>.json` names the pack the cook wrote beside its parts. The parts are read by
+ * their hash as a book's are, so the index only says where they are. A missing index throws, as a missing row does.
+ */
+async function cookedPack(root: string, slug: string, cooked: Readonly<{ build: string; hash: string }>, read: ServerRead): Promise<ServerPack> {
+  const { build, hash } = cooked, path = cookIndexPath(build, hash), index = readCookedServerIndex(await originJson(root, path, read));
+  if (index.build !== build || index.hash !== hash || shardOf(index.slug) !== shardOf(slug)) throw new Error(`The cook's ${path} is not ${slug}'s`);
+  if (index.serverPack === undefined) throw new Error(`No server pack for ${slug} in the cook's ${path}`);
+  return readServerPack(await originJson(root, index.serverPack.index.slice(1), read));
 }
 
 /** C2: the road's collision from this build's grid pack: nothing a page reads, and no shard's. */
@@ -79,9 +95,20 @@ export async function readGridCollisionPack(root: string, build: string, read: S
 /** C2: reads a server file from its product's pack, fetching the book once and a part only for a file it holds. The browser
  *  undoes `br`. A read file is copied out and its part left to the collector: a phone's worker shouldn't hold a level's worth
  *  of them, and reading one again is a cache hit. */
-function serverPackReader(root: string, slug: string, build: () => string, source: ServerRead): (path: string) => Promise<Uint8Array> {
+function serverPackReader(root: string, slug: string, build: () => string, source: ServerRead, hash?: string): (path: string) => Promise<Uint8Array> {
   const opening = new Map<string, Promise<Uint8Array>>(), opened = new Map<string, WeakRef<Uint8Array>>();
-  let book: Promise<ServerPackBook> | undefined;
+  let pack: Promise<ServerPack> | undefined;
+  // SA47: the book wins; only a slug it has no row for, with the shardfile hash its placement names, reads the cook's index.
+  const packOf = async (): Promise<ServerPack> => {
+    const row = (await serverBook(root, build(), source)).shards[slug];
+    if (row !== undefined) return row;
+    if (hash === undefined) throw new Error(`No server pack for ${slug}`);
+    return cookedPack(root, slug, { build: build(), hash }, source);
+  };
+  // A refusal is not kept: the next read (the next look, SA33) asks again.
+  const packOnce = async (): Promise<ServerPack> => {
+    try { return await packOf(); } catch (error) { pack = undefined; throw error; }
+  };
   const body = (part: ServerPackPart): Promise<Uint8Array> => {
     const kept = opened.get(part.url)?.deref();
     if (kept !== undefined) return Promise.resolve(kept);
@@ -92,9 +119,7 @@ function serverPackReader(root: string, slug: string, build: () => string, sourc
     return read;
   };
   return async path => {
-    const pack = (await (book ??= serverBook(root, build(), source))).shards[slug];
-    if (pack === undefined) throw new Error(`No server pack for ${slug}`);
-    const part = serverPackPart(pack, path), bytes = part === undefined ? undefined : serverPackFile(part, await body(part), path);
+    const part = serverPackPart(await (pack ??= packOnce()), path), bytes = part === undefined ? undefined : serverPackFile(part, await body(part), path);
     if (bytes === undefined) throw new Error(`Missing server input ${path}`);
     return bytes.slice();
   };
@@ -107,12 +132,13 @@ function serverPackReader(root: string, slug: string, build: () => string, sourc
 export function fetchServerProduct(base: string, rapier: Rapier, held?: HeldRead): Promise<HeadlessRuntimeInput> {
   return readServerProduct(new URL(base, globalThis.location.href).href, workerBuild, serverBytes, rapier, held);
 }
-/** A shard's server inputs under `root`, whichever server is reading: `source` is what differs. */
-export async function readServerProduct(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead): Promise<HeadlessRuntimeInput> {
+/** A shard's server inputs under `root`, whichever server is reading: `source` is what differs. `hash`, a placed slug's shardfile (SA47),
+ *  lets a slug the build's book lacks open from the cook's index. */
+export async function readServerProduct(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead, hash?: string): Promise<HeadlessRuntimeInput> {
   const slug = new URL('.', root).pathname.split('/').at(-2) ?? '';
   // C2: all of it is in the pack this build's book names, the server class only there (J91). The page lends what it holds
   // (DL25), so that moves no bytes. A host with no book, or one offline after a new build, reads what the device kept.
-  const serverFile = serverPackReader(root, slug, build, source);
+  const serverFile = serverPackReader(root, slug, build, source, hash);
   const read = async (path: string): Promise<Uint8Array> => {
     if (path.startsWith('server/')) return serverFile(path);
     const url = new URL(path, root), lent = await held?.(url.href);

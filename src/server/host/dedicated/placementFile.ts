@@ -1,7 +1,8 @@
 // SA33 (meta SHARD-AUTHORING, J314): a new slug's cell reaches a running server with no engine release. The API places a new slug (SA30) and
 // writes this file, signed with its own placement key; the release key stays engine CI's, because it vouches for the server bundle the box
-// runs. A placement can only add a cell on an empty spot, for a shard whose server pack this build's book already holds: it never moves the
-// build, the bundle or the save epoch, and a new serial here starts no grace, so players in every other cell stay connected.
+// runs. A placement can only add a cell on an empty spot, for a shard whose server pack this build's book holds or (SA47) the cook's index
+// of the cell's shardfile `hash` names: it never moves the build, the bundle or the save epoch, and a new serial here starts no grace, so
+// players in every other cell stay connected.
 import { Scope } from '@wildshard/engine/app/scope';
 import { fetchSignedText, readSigned } from './releaseFile';
 import { PlacementSchema, type PlacementFile } from '@wildshard/engine/game/grid/placementRows';

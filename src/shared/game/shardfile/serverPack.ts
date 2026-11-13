@@ -14,6 +14,15 @@ const ServerPackSchema: v.GenericSchema<ServerPack> = v.strictObject({...partEnt
 const ServerPackBookSchema: v.GenericSchema<ServerPackBook> = v.strictObject({book: v.literal('server'), build: v.string(), shards: v.record(v.string(), ServerPackSchema), grid: v.exactOptional(ServerPackSchema)});
 export const serverPackBookPath = (build: string): string => `assets/spawn/server-${build}.json`;
 export const readServerPackBook = (input: unknown): ServerPackBook => v.parse(ServerPackBookSchema, input);
+/** One shard's pack, as the cook writes it beside its parts (`assets/spawn/server-<slug>-<hash16>.json`). */
+export const readServerPack = (input: unknown): ServerPack => v.parse(ServerPackSchema, input);
+/** J83, MS2.4: the cook's index of one shard's bytes (its shardfile hash) for one build, written last, so a shard is cooked when it exists. */
+export const cookIndexPath = (build: string, hash: string): string => `index/${build}/${hash}.json`;
+/** SA47: what a server reads of a cook index: whose it is, and where its server pack is (an index from before C2 names none). */
+export interface CookedServerIndex {readonly build: string; readonly slug: string; readonly hash: string; readonly serverPack?: {readonly index: string}}
+const CookedServerIndexSchema: v.GenericSchema<CookedServerIndex> = v.object({build: v.string(), slug: v.string(), hash: v.string(),
+  serverPack: v.exactOptional(v.object({index: v.pipe(v.string(), v.regex(/^\/assets\/spawn\/server-[a-z0-9_-]+-[a-f0-9]{16}\.json$/u))}))});
+export const readCookedServerIndex = (input: unknown): CookedServerIndex => v.parse(CookedServerIndexSchema, input);
 /** The part of a pack that holds a file. */
 export const serverPackPart = (pack: ServerPack, path: string): ServerPackPart | undefined => [pack, ...pack.more ?? []].find(part => part.files.some(file => file[0] === path));
 /** One file's bytes inside its part's decoded body. */

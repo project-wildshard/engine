@@ -143,7 +143,8 @@ const watch = new ReleaseWatch({ read: readRelease, serving: release, cells: sha
     world.beginGrace(next.engineBuild);
   } });
 // SA33: a cell the API placed opens on this running server within a look, on a worker of its own, with no grace and no restart. Its shard's
-// server pack must already be in this build's book: one that isn't is refused here, before any worker boots, and asked for again next look.
+// server pack must be in this build's book or, SA47, in the cook's index of the shardfile hash the placement names: one in neither is
+// refused here, before any worker boots, and asked for again next look.
 placements = placementAt === undefined || placementKey === undefined || listed.trim() !== WHOLE_GRID ? null : new PlacementWatch({
   read: () => fetchPlacementFile(placementAt, placementKey), channel: release.channel, ...(poll === undefined ? {} : { everyMs: Number(poll) }),
   failed: error => { log({ at: 'placement.failed', error: String(error) }); },
@@ -151,7 +152,7 @@ placements = placementAt === undefined || placementKey === undefined || listed.t
     const ready: string[] = [];
     for (const row of rows) {
       // SA34a: the pack first, so the door's placed list (and so every worker's frame numbers) holds only cells it opens.
-      try { await readPackProduct(row.slug, build, await rapier(), { origin, cache }, reads); placeCell(row); ready.push(row.instance); }
+      try { await readPackProduct(row.slug, build, await rapier(), { origin, cache }, reads, row.hash); placeCell(row); ready.push(row.instance); }
       catch (error) { log({ at: 'placement.refused', instance: row.instance, slug: row.slug, error: String(error) }); }
     }
     return ready.length === 0 ? [] : world.openCells(ready);

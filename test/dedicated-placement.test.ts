@@ -1,11 +1,22 @@
+// oxlint-disable-next-line import/no-nodejs-modules -- The cook's origin is written by its own Node process, as the rig runs it.
+import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- A placement is signed by a real key.
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { afterEach, expect, test, vi } from 'vitest';
-import { cellFrame, cellName, cellShard, forgetPlacedCells, placeCell, placedCells, type PlacedCell } from '../src/server/host/dedicated/gridCells';
+// oxlint-disable-next-line import/no-nodejs-modules -- A throwaway origin on disk, laid out as the cook's store.
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- A throwaway origin on disk, laid out as the cook's store.
+import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
+import { cellFrame, cellName, cellShard, forgetPlacedCells, placeCell, placedCells, placedHash, type PlacedCell } from '../src/server/host/dedicated/gridCells';
+import { readPackProduct, type PackReaderOptions, type PackReads } from '../src/server/host/dedicated/packReader';
 import { PlacementWatch, readPlacementFile } from '../src/server/host/dedicated/placementFile';
 import type { PlacementFile } from '../src/shared/game/grid/placementRows';
+import { cookIndexPath, serverPackBookPath, type ServerPack } from '../src/shared/game/shardfile/serverPack';
+import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
-import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
+import { builtProduct } from './fixtures/builtProduct';
+import { roomBench, serverInput, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
 
 // SA33 (meta SHARD-AUTHORING, J314): a cell the API places for a new slug opens on a running server with no engine release. The API signs a
@@ -24,6 +35,9 @@ afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await benc
 test('a placement file signed by the placement key reads back; the release key, an edit or another channel word is refused', () => {
   const text = signed(JSON.stringify(file(3)));
   expect(readPlacementFile(text, KEY)).toEqual(file(3));
+  const hashed = file(3, [{ ...PLACED, hash: 'a'.repeat(64) }]);
+  expect(readPlacementFile(signed(JSON.stringify(hashed)), KEY), 'SA47: a cell names its shardfile').toEqual(hashed);
+  expect(() => readPlacementFile(signed(JSON.stringify(file(3, [{ ...PLACED, hash: 'not-a-hash' }]))), KEY)).toThrow();
   expect(() => readPlacementFile(text.replace(String.raw`"serial\":3`, String.raw`"serial\":9`), KEY)).toThrow(/bad signature/u);
   expect(() => readPlacementFile(signed(JSON.stringify(file(3)), generateKeyPairSync('ed25519').privateKey), KEY), 'another key, such as the release key').toThrow(/bad signature/u);
   expect(() => readPlacementFile(signed(JSON.stringify({ ...file(3), channel: 'preview' })), KEY), 'preview has no MMO').toThrow();
@@ -105,4 +119,62 @@ test('a placed cell whose worker fails to boot opens nothing and ends nobody', {
   await expect(bench.world.openCells(['sa33-no-pack'])).rejects.toThrow();
   expect(bench.world.health()).toMatchObject({ cells: 1, workers: 1, table: { [home]: 0 } });
   expect(bench.crashes).toEqual([]);
+});
+
+// SA47: a new author's slug is in no build's book; the cook (MMO-SERVER MS2.4) writes its server pack beside its parts and names it in
+// `index/<build>/<hash>.json`. The origin here is the cook's store on disk: Thin Ice's pack cooked by the rig's own writer
+// (`scripts/server-origin.mjs`, the cook's `cookShardServerPack`), moved out of the book and into an index, as the cook lays it out.
+const BUILD = 'sa47', HASH = 'c'.repeat(64), ROOT = resolve(import.meta.dirname, '..');
+let work = '', origin = '', thinIce: ServerPack | undefined;
+const fresh = (): PackReads => ({ fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 });
+const write = (path: string, value: unknown): void => { mkdirSync(dirname(join(origin, path)), { recursive: true }); writeFileSync(join(origin, path), JSON.stringify(value)); };
+/** This build's book: Thin Ice's row only when `withSlug`. */
+const book = (withSlug: boolean): void => { write(serverPackBookPath(BUILD), { book: 'server', build: BUILD, shards: withSlug && thinIce !== undefined ? { [PLACED.slug]: thinIce } : {} }); };
+const options = (): PackReaderOptions => ({ origin: pathToFileURL(`${origin}/`).href, cache: join(work, 'cache') });
+beforeAll(() => {
+  work = mkdtempSync(join(ROOT, 'tmp', 'sa47-')); origin = join(work, 'origin');
+  const made = spawnSync(process.execPath, ['scripts/server-origin.mjs', origin, BUILD, `${PLACED.slug}=${builtProduct(PLACED.slug)}`, `--grid=${join(work, 'no-grid')}`], { cwd: ROOT, encoding: 'utf8' });
+  expect(made.status, made.stderr).toBe(0);
+  const cooked = JSON.parse(readFileSync(join(origin, serverPackBookPath(BUILD)), 'utf8')) as { shards: Record<string, ServerPack> };
+  thinIce = cooked.shards[PLACED.slug];
+  const index = `/assets/spawn/server-${PLACED.slug}-0123456789abcdef.json`;
+  write(index.slice(1), thinIce);
+  write(cookIndexPath(BUILD, HASH), { version: 1, build: BUILD, slug: PLACED.slug, hash: HASH, header: '/x.json', manifests: {}, keys: [], server: {}, serverPack: { url: thinIce?.url, index, wireBytes: 0, files: 0 }, proof: 'proved', seconds: 1 });
+  book(false);
+}, 120_000);
+afterAll(() => { if (work !== '') rmSync(work, { recursive: true, force: true }); });
+
+test('SA47: a placed slug its build\'s book lacks opens from the cook\'s index of its hash; with no hash, or no index for it, it is refused', { timeout: 120_000 }, async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), reads = fresh();
+  const input = await readPackProduct(PLACED.slug, BUILD, rapier, options(), reads, HASH);
+  expect(input.shard.identity.slug).toBe(PLACED.slug);
+  expect(reads.fetched + reads.cached, 'its parts, read by their hash').toBeGreaterThan(0);
+  await expect(readPackProduct(PLACED.slug, BUILD, rapier, options(), fresh()), 'no hash: refused, as before SA47').rejects.toThrow();
+  await expect(readPackProduct(PLACED.slug, BUILD, rapier, options(), fresh(), 'd'.repeat(64)), 'bytes the cook has not cooked').rejects.toThrow();
+  await expect(readPackProduct('sa47-other', BUILD, rapier, options(), fresh(), HASH), 'another slug\'s index').rejects.toThrow();
+});
+
+test('SA47: the book still wins when it has the slug', { timeout: 120_000 }, async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  book(true);
+  try {
+    // An index that names a pack no one wrote: only the book's row can open it.
+    write(cookIndexPath(BUILD, 'e'.repeat(64)), { version: 1, build: BUILD, slug: PLACED.slug, hash: 'e'.repeat(64), serverPack: { index: `/assets/spawn/server-${PLACED.slug}-ffffffffffffffff.json` } });
+    expect((await readPackProduct(PLACED.slug, BUILD, rapier, options(), fresh(), 'e'.repeat(64))).shard.identity.slug).toBe(PLACED.slug);
+  } finally { book(false); }
+});
+
+test('SA47: a placed cell whose pack only the cook has opens on a running world, read through its placement\'s hash', { timeout: 120_000 }, async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), reads = fresh();
+  const home = cellName('open-plot-night-market');
+  // As `cellWorker.ts` loads a room: the placed slug's hash from its placement, every other shard as a build's product.
+  bench = await roomBench({ cells: [home], workers: 1, saves: memoryPlayerSaves(), load: slug => (slug === PLACED.slug ? readPackProduct(slug, BUILD, rapier, options(), reads, placedHash(slug)) : serverInput(slug)) });
+  expect(placeCell({ ...PLACED, hash: HASH })).toBe(true);
+  expect(placedHash(PLACED.slug)).toBe(HASH);
+  expect(await bench.world.openCells([PLACED.instance])).toEqual([PLACED.instance]);
+  const comer = bot(`${bench.url}?chunk=${PLACED.instance}`, 'bench', 'device:comer');
+  expect(await comer.arrived()).toBe(true);
+  expect(JSON.parse(comer.resume ?? '{}')).toMatchObject({ shard: PLACED.slug, cell: PLACED.instance });
+  expect(reads.fetched + reads.cached, 'the room read the cooked parts').toBeGreaterThan(0);
+  expect([bench.restarts, bench.crashes]).toEqual([0, []]);
 });

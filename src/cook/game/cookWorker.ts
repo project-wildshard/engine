@@ -28,7 +28,7 @@ import {MAX_SHARDFILE_BYTES, type CookJobReport} from './cookJob';
 import {stalePreparationLine} from './shardCook';
 import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
 import {installedRuntimeReads} from './installedRuntimeReads';
-import {readServerPackBook, serverPackBookPath} from '../../shared/game/shardfile/serverPack';
+import {cookIndexPath, readServerPackBook, serverPackBookPath} from '../../shared/game/shardfile/serverPack';
 
 export interface CatalogueRow {readonly slug: string; readonly revision?: number; readonly hash: string}
 /** A head the cook can be asked for. `live` is production and `preview` the preview channel (the old two stages); MS2.4:
@@ -76,7 +76,8 @@ export interface CookIndex {
   readonly preparation?: CookJobReport['cook']['preparation'];
 }
 
-export const indexKey = (build: string, hash: string): string => `index/${build}/${hash}.json`;
+/** SA47: a box reads the same key (`serverProduct.ts`), so it lives with the server pack's paths. */
+export const indexKey: (build: string, hash: string) => string = cookIndexPath;
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 const CONTENT_NAMED = /(?:^|\/)[a-f0-9]{16,64}\.[a-z0-9.]+$|-[a-f0-9]{16}\.json$/u;
 
