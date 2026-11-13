@@ -581,7 +581,7 @@ export class SweptMelee extends Melee {
     const held = (this.mouseHeld || this.adsHeld) && this.enabled;
     this.wire?.hold(held);
     const charged = this.clock.chargingHeavy, { move, active } = this.stepClock(dt, t, held);
-    if (charged && !this.clock.chargingHeavy && move !== null) this.wire?.press(true);
+    if (charged && !this.clock.chargingHeavy && move !== null) this.wire?.press(true, true);
     // the camera leans along the swing as the blade comes through (C3), the heavy punches the FOV in
     if (move && active && !this.kicked && this.model.visible) { this.kicked = true; this.fx.kick(move.kick.pitch, move.kick.roll); if (move.kick.fov !== undefined) this.fx.fovPunch(move.kick.fov); }
     // the melee lock (HUD brackets, touch lunge camera turn): the lunge's target while a swing runs, else what a swing would take
