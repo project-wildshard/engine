@@ -44,7 +44,12 @@ The server reads it at `PLACEMENT_URL` with `PLACEMENT_PUBLIC_KEY` (both or
 neither) at boot and each minute, places each new cell on an empty spot,
 preloads its pack from this build's book (a cell with none waits for the
 next look) and opens it on a worker of its own: no grace, no restart, and
-no other cell is touched. `/health` says `placements: <serial>`.
+no other cell is touched. `/health` says `placements: <serial>`. With
+roads on (`WORLD_CROSSING=worker`, SA34a) it opens instead on the worker of
+the open cell nearest it, since a seat crosses only inside one worker, and
+every worker's road is told: no void floor over its square, road-level
+strips round the grown grid, and walls on the roads that can't hand a seat
+in.
 
 ## Page release
 

@@ -97,7 +97,7 @@ const failed = (error: unknown): void => { if (ending) return; ending = true; lo
 process.on('uncaughtException', failed);
 // VH10: which forwarded header the door believes, and which pages may open a socket. A word it doesn't know stops here.
 const trust = doorTrust(process.env);
-const world: World = await World.open({ build, cells, ...worldSettings(release.channel, process.env), ...trust, secret: need('SEAT_SECRET'), saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
+const world: World = await World.open({ build, cells, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, secret: need('SEAT_SECRET'), saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
   crashed: failed, reading: (index, row) => { reports.heard(index, row); },
   ...(playtest===undefined?{}:{playtest:row=>{playtest.append(row);}}),
@@ -145,7 +145,8 @@ placements = placementAt === undefined || placementKey === undefined || listed.t
   open: async rows => {
     const ready: string[] = [];
     for (const row of rows) {
-      try { placeCell(row); await readPackProduct(row.slug, build, await rapier(), { origin, cache }, reads); ready.push(row.instance); }
+      // SA34a: the pack first, so the door's placed list (and so every worker's frame numbers) holds only cells it opens.
+      try { await readPackProduct(row.slug, build, await rapier(), { origin, cache }, reads); placeCell(row); ready.push(row.instance); }
       catch (error) { log({ at: 'placement.refused', instance: row.instance, slug: row.slug, error: String(error) }); }
     }
     return ready.length === 0 ? [] : world.openCells(ready);

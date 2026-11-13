@@ -7,13 +7,15 @@ import { SimNetWorld } from '@wildshard/engine/net/simWorld';
 import type { Transport } from '@wildshard/engine/net/transport';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
-import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
+import type { GridAssembly, GridCell } from '@wildshard/engine/game/grid/assembly';
+import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 import { commandsOf } from '@wildshard/engine/game/grid/roomNet';
 import { LEAD_SEAT } from '../standalone/cellWorld';
 import { HOLD_MS, type ResumeAt, type RoomNews, type SeatEntry } from './cellProtocol';
 import { crossedTo, finite, type CrossArrival, type CrossTarget } from './crossing';
 import { FallFloor } from '../standalone/fallFloor';
+import { placeOnRoad } from '../standalone/roadWorld';
 import { LEFT } from './socketPump';
 
 /** How often a seat whose crossing is asked for asks again, and how often holds are looked at, in ticks. */
@@ -51,8 +53,10 @@ export class RoadRoom implements CrossTarget {
   readonly host: SimHost;
   private readonly options: RoadRoomOptions;
   private readonly seats = new Map<string, RoadSeat>();
+  /** The grid the trigger reads: the options' until a placement grows it (SA34a). */
+  private assembly: GridAssembly;
   constructor(options: RoadRoomOptions) {
-    this.options = options; this.host = options.host;
+    this.options = options; this.host = options.host; this.assembly = options.assembly;
     // The road's level has a lead seat of its own, which nobody takes: every crossing seat is a body of its own.
     const lead = this.host.players.get(LEAD_SEAT);
     if (lead !== undefined) { lead.motor.setEnabled(false); this.host.parked.add(lead.id); }
@@ -107,6 +111,15 @@ export class RoadRoom implements CrossTarget {
     this.release(seat);
     return arrived.land(client);
   }
+  /**
+   * SA34a: cells placed on the running world (SA33). The trigger reads the grown grid, so feet inside a placed cell this worker hosts ask
+   * to cross into it; the void floor is laid again without their squares, their strips go in, and `walled` (placed cells on other workers)
+   * get the walls every other worker's cell has.
+   */
+  place(assembly: GridAssembly, strips: readonly GridCollisionStrip[], walled: readonly Pick<GridCell, 'origin'>[]): void {
+    this.assembly = assembly;
+    placeOnRoad(this.host, assembly.cells, strips, walled);
+  }
   private bind(seat: RoadSeat, transport: Transport, client: number): void {
     seat.closeOff?.();
     seat.transport = transport; seat.client = client;
@@ -137,7 +150,7 @@ export class RoadRoom implements CrossTarget {
     for (const seat of this.seats.values()) {
       const player = this.host.players.get(seat.body);
       if (seat.transport === null || player === undefined || !finite(player.position)) continue;
-      const crossed = crossedTo(this.options.assembly, null, player.position);
+      const crossed = crossedTo(this.assembly, null, player.position);
       const to = crossed?.cell?.instance ?? null;
       if (crossed === undefined || to === null || !this.options.hosts(to)) { seat.asked = null; continue; }
       if (seat.asked === to && this.host.state.tick - seat.askedAt < ASK_TICKS) continue;

@@ -34,7 +34,7 @@ export async function roomBench(options: Partial<WorldOptions> & { readonly hold
     return { send: (order, transfer = []) => { port1.postMessage(order, transfer as Transferable[]); },
       listen: (news, _ended) => { port1.onmessage = (event: MessageEvent<WorkerNews>): void => { if (newsDelayMs === 0) news(event.data); else delivery.timeout(newsDelayMs, () => { news(event.data); }); }; }, stop };
   };
-  const world = await World.open({ build: 'bench', cells: ['driftwood-isle'], workers: 4, seats: 32, secret: 'bench', boot, saves: memoryPlayerSaves(), log: line => { lines.push(line); }, crashed: error => { crashes.push(error); }, restart: () => { bench.restarts++; }, ...door });
+  const world = await World.open({ build: 'bench', cells: ['driftwood-isle'], workers: 4, seats: 32, secret: 'bench', boot, saves: memoryPlayerSaves(), log: line => { lines.push(line); }, crashed: error => { crashes.push(error); }, restart: () => { bench.restarts++; }, ...(crossing === true ? { roads: true } : {}), ...door });
   const server: Server = createServer();
   server.on('upgrade', (request, socket, head) => { world.upgrade(request, socket, head); });
   await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', resolve); });

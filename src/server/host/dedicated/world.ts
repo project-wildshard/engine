@@ -26,7 +26,7 @@ import { LEAVE_FLAG, LEFT, pumpSocket } from './socketPump';
 import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
 import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
 import { workerTable } from './workerTable';
-import { cellName, cellShard, roadHome } from './gridCells';
+import { cellName, cellShard, gridAssembly, placedCells, roadHome } from './gridCells';
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
 import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, trustedAddress, type TrustProxy } from './doorTrust';
 
@@ -115,6 +115,11 @@ export interface WorldOptions {
   readonly trustProxy?: TrustProxy;
   /** VH10: the pages a browser may open a socket from; `null` is any. The game's own hosts when absent. */
   readonly allowedOrigins?: readonly string[] | null;
+  /**
+   * GC15 (`WORLD_CROSSING=worker`): each worker hosts a road. SA34a: a placed cell then opens on the worker of its nearest open cell, whose
+   * road hands a seat into it, and every worker's road is told of it; without roads it boots on a worker of its own (SA33).
+   */
+  readonly roads?: boolean;
   /** A proof's overrides. */
   readonly helloMs?: number; readonly readyMs?: number; readonly connectsPerMinute?: number; readonly socketsPerIp?: number; readonly graceMs?: number;
   /** Monotonic connection-budget clock, overridable by local boundary tests. */
@@ -157,6 +162,10 @@ export class World {
   private asked = 0;
   /** SA33: cells whose late worker is booting, so a second open of the same cell boots nothing. */
   private readonly booting = new Set<string>();
+  /** SA34a: workers that have said `booted`, the only ones a `place` order may reach. */
+  private readonly up = new Set<WorkerLink>();
+  /** SA34a: `place` orders waiting on the worker that opens their cells. */
+  private readonly placings = new Map<number, (news: { readonly opened: readonly string[]; readonly error?: string }) => void>();
   private draining = false;
   private grace: { readonly endsAt: number; readonly build: string } | null = null;
   /** J218: who is on voice in each cell, and their signalling. */
@@ -182,12 +191,12 @@ export class World {
     let up = false;
     return new Promise((resolve, reject) => {
       const ended = (reason: string): void => {
-        this.options.log({ at: 'worker.ended', index, slugs, reason }); reject(new Error(reason));
+        this.options.log({ at: 'worker.ended', index, slugs, reason }); reject(new Error(reason)); this.up.delete(link);
         if (late && !up) { link.stop(); if (this.workers.at(-1) === link) this.workers.pop(); return; }
         this.options.crashed(new Error(reason));
       };
       link.listen(news => {
-        if (news.kind === 'booted') { up = true; if (late) for (const slug of slugs) this.links.set(slug, link); this.options.log({ at: 'worker.booted', index, slugs, ms: news.ms }); resolve(); }
+        if (news.kind === 'booted') { up = true; this.up.add(link); if (late) for (const slug of slugs) this.links.set(slug, link); this.options.log({ at: 'worker.booted', index, slugs, ms: news.ms }); resolve(); }
         else if (news.kind === 'failed') ended(news.reason); else this.heard(index, news);
       }, ended);
     });
@@ -201,9 +210,33 @@ export class World {
     const fresh = [...new Set(cells)].filter(cell => !this.links.has(cell) && !this.booting.has(cell));
     if (fresh.length === 0 || this.draining) return [];
     for (const cell of fresh) this.booting.add(cell);
-    try { await this.bootWorker(fresh, true); } finally { for (const cell of fresh) this.booting.delete(cell); }
-    this.options.log({ at: 'cells.opened', cells: fresh, total: this.links.size });
-    return fresh;
+    let opened: readonly string[] = fresh;
+    try {
+      if (this.options.roads !== true) await this.bootWorker(fresh, true);
+      else { const done: string[] = []; for (const cell of fresh) done.push(...await this.placeOnRoads(cell)); opened = done; }
+    } finally { for (const cell of fresh) this.booting.delete(cell); }
+    this.options.log({ at: 'cells.opened', cells: opened, total: this.links.size });
+    return opened;
+  }
+  /**
+   * SA34a: with roads, a placed cell opens on the worker of the open cell nearest it, so that worker's road hands a seat in (GC15 crosses
+   * only inside one worker), and every booted worker's road lays it out. Every order carries the door's whole placed list, in its order, so
+   * each worker numbers the placed cells' frames as the door does. Rejects, with nothing opened, when its worker can't open it.
+   */
+  private async placeOnRoads(fresh: string): Promise<readonly string[]> {
+    const grid = gridAssembly(), spot = (cell: string): readonly [number, number] | undefined => grid.cells.find(row => row.instance === cell)?.cell;
+    const [fx, fz] = spot(fresh) ?? [0, 0];
+    const distance = (cell: string): number => { const at = spot(cell); return at === undefined ? Infinity : Math.abs(at[0] - fx) + Math.abs(at[1] - fz); };
+    const nearest = [...this.links.keys()].reduce<string | undefined>((best, cell) => best === undefined || distance(cell) < distance(best) ? cell : best, undefined);
+    const host = nearest === undefined ? undefined : this.links.get(nearest);
+    if (host === undefined) throw new Error('No worker to open a placed cell on');
+    const id = ++this.asked, cells = placedCells();
+    const answer = new Promise<{ readonly opened: readonly string[]; readonly error?: string }>(resolve => { this.placings.set(id, resolve); });
+    for (const link of this.up) link.send({ kind: 'place', id: link === host ? id : 0, cells, open: link === host ? [fresh] : [] });
+    const { opened, error } = await answer;
+    for (const cell of opened) this.links.set(cell, host);
+    if (error !== undefined) throw new Error(error);
+    return opened;
   }
   private heard(index: number, news: WorkerNews): void {
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
@@ -220,6 +253,11 @@ export class World {
     else if(news.kind==='playtest')this.options.playtest?.(news.row);
     else if (news.kind === 'cell') this.options.log({ at: 'cell.booted', index, slug: news.slug, ms: news.ms });
     else if (news.kind === 'reading') { this.options.log({ at: 'worker', index, ...news.reading, refusals: this.refusals, connections: this.connectionStats, saves: this.options.saves.stats?.() }); this.options.reading?.(index, news.reading); }
+    else if (news.kind === 'placed') {
+      const answer = this.placings.get(news.id);
+      if (answer !== undefined) { this.placings.delete(news.id); answer(news); }
+      if (news.error !== undefined) this.options.log({ at: 'cells.place-refused', index, error: news.error });
+    }
     else if (news.kind === 'drained') { this.drains.get(index)?.(); this.drains.delete(index); }
     else if (news.kind === 'crossing') void this.crossing(news.slug, news.device, news.to, news.at);
     else if (news.kind === 'crossed') {

@@ -4,12 +4,13 @@ import { installAppIdentity } from '@wildshard/engine/app/identity';
 import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { ServerClock } from '@wildshard/engine/net/serverClock';
-import { GridAssembly } from '@wildshard/engine/game/grid/assembly';
+import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { DedicatedRoom, type DedicatedRoomRoad } from './dedicatedRoom';
-import { cellShard, roadName } from './gridCells';
+import { cellShard, gridAssembly, placeCell, roadName } from './gridCells';
 import { RoadRoom } from './roadRoom';
+import { placedStrips } from '@wildshard/engine/game/grid/voidFloor';
 import { openRoad } from '../standalone/roadWorld';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { CellOrder, WorkerNews, WorkerReading } from './cellProtocol';
@@ -66,10 +67,11 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   const post = (news: WorkerNews): void => { port.postMessage(news); };
   const fail = (error: unknown): void => { clock?.pause(); post({ kind: 'failed', reason: error instanceof Error ? error.message : String(error) }); };
   // GC15: the road this worker hosts, once its cells are open, and what its cells need of it.
-  let road: RoadRoom | undefined, rapier: Rapier | undefined, crossing: { readonly name: string; readonly assembly: GridAssembly; readonly strips: readonly GridCollisionStrip[] } | undefined;
+  // SA34a: `seams` are placed cells' own copies of the pack's strips beside them, which the pack baked with no row for a cell it never saw.
+  let road: RoadRoom | undefined, rapier: Rapier | undefined, crossing: { readonly name: string; readonly assembly: GridAssembly; readonly strips: readonly GridCollisionStrip[]; readonly seams: readonly GridCollisionStrip['duplicates'][number][] } | undefined;
   const seams = (instance: string): DedicatedRoomRoad | undefined => {
     if (crossing === undefined || !crossing.assembly.cells.some(cell => cell.instance === instance)) return undefined;
-    return { name: crossing.name, assembly: crossing.assembly, seams: crossing.strips.flatMap(strip => strip.duplicates.filter(row => row.instance === instance).map(row => row.mesh)) };
+    return { name: crossing.name, assembly: crossing.assembly, seams: [...crossing.strips.flatMap(strip => strip.duplicates), ...crossing.seams].filter(row => row.instance === instance).map(row => row.mesh) };
   };
   /** A cell on this worker, or its road, by name. */
   const named = (name: string): Cell | RoadRoom | undefined => road !== undefined && road.name === name ? road : cells.get(name);
@@ -120,6 +122,33 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const transport = new SeatTransport(order.port), hello = (): void => { transport.deliver('reliable', order.hello); };
     if (cell instanceof RoadRoom) cell.seat(order, transport, hello); else cell.room.seat(order, transport, hello);
   };
+  /**
+   * SA34a: cells placed on the running world, one order at a time. The road's grid grows first (a cell opened here builds its seams from
+   * it), then this worker opens the ones it hosts, then its road lays the grown grid out, whatever opened. A failure is answered, never
+   * thrown: the other cells and the road play on.
+   */
+  let placing: Promise<void> = Promise.resolve();
+  const place = async (order: Extract<CellOrder, { kind: 'place' }>): Promise<void> => {
+    const opened: string[] = [];
+    let laid: (() => void) | undefined;
+    try {
+      for (const row of order.cells) placeCell(row);
+      const was = crossing?.assembly, grown = gridAssembly();
+      if (crossing !== undefined && was !== undefined && was !== grown) {
+        const { strips, seams: more } = placedStrips(grown, was), fresh = grown.cells.slice(was.cells.length);
+        crossing = { name: crossing.name, assembly: grown, strips: [...crossing.strips, ...strips], seams: [...crossing.seams, ...more] };
+        laid = () => { road?.place(grown, strips, fresh.filter(cell => !cells.has(cell.instance))); };
+      }
+      for (const slug of order.open) {
+        if (cells.has(slug)) continue;
+        const room = await open(slug);
+        if (disposed) { room.dispose(); post({ kind: 'placed', id: order.id, opened, error: 'The worker closed' }); return; }
+        cells.set(slug, { slug, room, emptySince: diagnosticNow(), waking: null }); opened.push(slug);
+      }
+      post({ kind: 'placed', id: order.id, opened });
+    } catch (error) { post({ kind: 'placed', id: order.id, opened, error: error instanceof Error ? error.message : String(error) }); }
+    finally { if (!disposed) laid?.(); }
+  };
   /** GC15: a seat walks from one of this worker's cells into another, or onto or off its road, the target woken first if it slept long enough to start over. */
   const cross = async (order: Extract<CellOrder, { kind: 'cross' }>): Promise<void> => {
     const { kind: _kind, from: fromSlug, to: toSlug, at, ...entry } = order, from = named(fromSlug), to = named(toSlug);
@@ -142,6 +171,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     if (!ready) { fail(new Error('A worker was told something before it booted')); return; }
     if (order.kind === 'drain') { clock?.pause(); for (const { room } of cells.values()) room.drain(); road?.drain(); post({ kind: 'drained' }); return; }
     if (order.kind === 'cross') { cross(order).catch(fail); return; }
+    if (order.kind === 'place') { placing = placing.then(() => place(order)); return; }
     const cell = named(order.slug);
     if (cell === undefined) { fail(new Error(`${order.slug} is not on this worker`)); return; }
     (order.kind === 'find' ? find(cell, order.id, order.device) : seat(cell, order)).catch(fail);
@@ -151,7 +181,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   installCellIdentity();
   void (async (): Promise<void> => {
     const first = options.slugs[0];
-    if (options.road !== undefined && first !== undefined) crossing = { name: roadName(first), assembly: new GridAssembly({ developer: false, devserver: false }), strips: await options.road() };
+    // SA34a: a worker booted after a placement (its `placed`) lays the placed cells out from the start.
+    if (options.road !== undefined && first !== undefined) { const assembly = gridAssembly(), strips = await options.road(), placed = placedStrips(assembly, gridAssembly(false)); crossing = { name: roadName(first), assembly, strips: [...strips, ...placed.strips], seams: placed.seams }; }
     for (const slug of options.slugs) { const room = await open(slug); if (disposed) return; cells.set(slug, { slug, room, emptySince: diagnosticNow(), waking: null }); }
     if (crossing !== undefined && rapier !== undefined) {
       const { name, assembly, strips } = crossing, begun = diagnosticNow();

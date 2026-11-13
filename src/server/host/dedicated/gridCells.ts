@@ -50,10 +50,22 @@ export function placeCell(row: PlacedCell): boolean {
   placed.push({ instance: row.instance, slug: row.slug, cell: [x, z] });
   return true;
 }
+let assembled: { readonly from: unknown; readonly placed: number; readonly assembly: GridAssembly } | null = null;
+/**
+ * SA34a: the grid a road walks: the installed catalogue's cells and then the placed ones, so a road and its cells know a placed cell's
+ * square. `placedToo` false: the catalogue's alone, the grid the build's road pack was baked for.
+ */
+export function gridAssembly(placedToo = true): GridAssembly {
+  const { grid } = catalogueDocument(), count = placedToo ? placed.length : 0;
+  if (assembled?.from === grid && assembled.placed === count) return assembled.assembly;
+  const assembly = new GridAssembly({ developer: false, devserver: false }, count === 0 ? grid : { ...grid, cells: [...grid.cells, ...placed.map(({ instance, slug, cell }) => ({ instance, slug, cell: [...cell] }))] });
+  assembled = { from: grid, placed: count, assembly };
+  return assembly;
+}
 /** What a worker thread is booted with, so its rooms name, frame and load a placed cell as the door does. */
 export function placedCells(): readonly PlacedCell[] { return [...placed]; }
 /** Tests only: forget every placed cell. */
-export function forgetPlacedCells(): void { placed.length = 0; }
+export function forgetPlacedCells(): void { placed.length = 0; read = null; assembled = null; }
 
 /** The instance a name means: an instance stands, a grid shard's slug becomes its cell, and anything else is its own name. */
 export function cellName(name: string): string { const { shards, cells } = gridNames(); return shards.has(name) ? name : cells.get(name) ?? name; }

@@ -1,5 +1,6 @@
 // The grid's road as a world of its own: the solo grid server's highway (`gridServer.ts`), and since GC15 a dedicated worker's road room
 // (`dedicated/roadRoom.ts`). Its frame is the world's; the ground lies far below the road's strips, which C2's grid pack carries.
+import type { Collider } from '@dimforge/rapier3d-simd';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { CHUNK_HALF, CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { groups } from '@wildshard/engine/physics/groups';
@@ -35,9 +36,23 @@ export function addCellWalls(road: SimHost, cells: readonly Pick<GridCell, 'orig
       world.createCollider(R.ColliderDesc.cuboid(hx, WALL_HEIGHT, hz).setTranslation(origin.x + x, WALL_HEIGHT, origin.z + z).setCollisionGroups(groups('WORLD')));
   });
 }
+/** Each road world's void floor colliders, so a placement can lift them (SA34a). */
+const floors = new WeakMap<SimHost, readonly Collider[]>();
 /** SA34: the 7 × 7's void, walkable: a road-level floor over every empty cell and out to the rail, and the rim on the rail. */
-export function addVoidFloor(road: SimHost, cells: readonly Pick<GridCell, 'cell'>[]): void {
-  withOwner(road.scope, () => { installVoidFloor(road.physics, cells, CONTENT_CAPS.pitch); });
+export function addVoidFloor(road: SimHost, cells: readonly Pick<GridCell, 'cell'>[], rim = true): void {
+  withOwner(road.scope, () => { floors.set(road, installVoidFloor(road.physics, cells, CONTENT_CAPS.pitch, rim)); });
+}
+/**
+ * SA34a: a running road is told of cells placed after it opened (SA33). The void floor is laid again for the grown grid, so none lies over a
+ * new cell's square; the new strips go in; and a new cell this worker can't hand a seat to gets the walls every other worker's cell has.
+ * The rim stays: it stands on the 7 × 7's rail whatever is placed.
+ */
+export function placeOnRoad(road: SimHost, cells: readonly Pick<GridCell, 'cell'>[], strips: readonly GridCollisionStrip[], walled: readonly Pick<GridCell, 'origin'>[]): void {
+  const { world } = road.physics;
+  for (const collider of floors.get(road) ?? []) world.removeCollider(collider, false);
+  addVoidFloor(road, cells, false);
+  buildStrips(road, strips.map(strip => strip.mesh));
+  addCellWalls(road, walled);
 }
 /**
  * SA34: a restored road's save holds the void floor and rim the saving build made (strips are held as data and out of every save,

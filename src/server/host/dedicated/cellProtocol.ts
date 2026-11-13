@@ -2,6 +2,7 @@ import type { ChatReport, WorldLine } from '@wildshard/engine/net/chat';
 import type { PlayerDoc } from './playerDoc';
 import type { SaveReceipt, SaveWrite } from './saves/saveStore';
 import type {PlaytestHit} from './playtest';
+import type { PlacedCell } from './gridCells';
 
 // J182: what the door and a cell worker say to each other. Sockets stay with the door, and a seat's bytes go through its own port.
 
@@ -30,6 +31,11 @@ export type CellOrder =
   | { readonly kind: 'chat'; readonly from: string; readonly line: WorldLine }
   /** GC15: a seat in cell `from` walks into `to` on the same worker. The entry is the door's read of their save on `to`'s shard. */
   | ({ readonly kind: 'cross'; readonly from: string; readonly to: string; readonly at: ResumeAt } & SeatEntry)
+  /**
+   * SA34a: cells placed on the running world (SA33), told to every booted worker so its road lays them out: no void floor over their
+   * squares, their strips, and walls round any it can't hand a seat to. `open` names the ones this worker opens and hosts.
+   */
+  | { readonly kind: 'place'; readonly id: number; readonly cells: readonly PlacedCell[]; readonly open: readonly string[] }
   | { readonly kind: 'close' };
 /** One 10 s reading of a worker (E7.8). */
 export interface WorkerReading {
@@ -59,6 +65,8 @@ export type WorkerNews =
   | { readonly kind: 'reading'; readonly reading: WorkerReading }
   | { readonly kind: 'cell'; readonly slug: string; readonly ms: number }
   | { readonly kind: 'drained' }
+  /** SA34a: a `place` order's end: the cells this worker opened, or why it opened none. Its other cells and its road play on either way. */
+  | { readonly kind: 'placed'; readonly id: number; readonly opened: readonly string[]; readonly error?: string }
   /** GC15: a `cross` order's end. Moved, the seat and its link are in `to` (as `body`) and `from` has let it go; else it `stays` in `from`, or neither holds it. */
   | { readonly kind: 'crossed'; readonly device: string; readonly name: string; readonly body: string; readonly from: string; readonly to: string; readonly moved: boolean; readonly stays: boolean }
   | (RoomNews & { readonly slug: string });

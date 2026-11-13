@@ -7,10 +7,15 @@
  * on the floor and comes back. Each road world (the page's highway, the in-page server's road, a dedicated worker's road room)
  * installs the same floor and rim with `installVoidFloor`; the look draws the floor from the same layout (`voidLook.ts`).
  */
+import type { Collider } from '@dimforge/rapier3d-simd';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import { groups } from '@wildshard/engine/physics/groups';
 import { PLATFORM_COLLIDER_OWNER } from '@wildshard/engine/physics/stripColliders';
 import { tagCollider } from '@wildshard/engine/physics/surface';
+import { generatePlatform } from '@wildshard/engine/sim/strips';
+import type { GridAssembly } from './assembly';
+import { collisionStrips, type CollisionStrip } from './collisionStrips';
+import { platformInputs } from './platformInputs';
 import { emptyCellSquares, GAP_HALF, gridRail, type CellSquare } from './roadLayout';
 
 /** A floor box's footprint in grid metres: its centre and half sizes. Its top is at road level, y 0. */
@@ -78,21 +83,40 @@ const RIM_HALF_HEIGHT = 30, RIM_HALF_THICK = 0.25;
 /**
  * Install the void's floor (one tiled trimesh per box) and, with `rim`, its rim in a road world in the grid's frame (the page's highway keeps its
  * rim as readiness walls instead). The caller's owner holds the colliders. Tagged as platform ground, so regional hashes
- * leave them out.
+ * leave them out. Answers the floor's colliders (not the rim's), so a road told of a new cell can lift them (SA34a).
  */
-export function installVoidFloor(physics: Pick<Physics, 'R' | 'world'>, cells: readonly { readonly cell: readonly [number, number] }[], pitch: number, rim = true): number {
-  const { R, world } = physics;
-  let made = 0;
+export function installVoidFloor(physics: Pick<Physics, 'R' | 'world'>, cells: readonly { readonly cell: readonly [number, number] }[], pitch: number, rim = true): readonly Collider[] {
+  const { R, world } = physics, floor: Collider[] = [];
   for (const box of voidFloorBoxes(cells, pitch)) {
     const { positions, indices } = voidFloorMesh(box);
     const collider = world.createCollider(R.ColliderDesc.trimesh(positions, indices, R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(box.x, 0, box.z).setCollisionGroups(groups('WORLD')));
-    tagCollider(collider, 'stone', PLATFORM_COLLIDER_OWNER); made++;
+    tagCollider(collider, 'stone', PLATFORM_COLLIDER_OWNER); floor.push(collider);
   }
   if (rim) for (const wall of rimWalls(pitch)) {
     const acrossX = wall.axis === 'x';
     const collider = world.createCollider(R.ColliderDesc.cuboid(acrossX ? RIM_HALF_THICK : wall.halfLength, RIM_HALF_HEIGHT, acrossX ? wall.halfLength : RIM_HALF_THICK)
       .setTranslation(wall.x, RIM_HALF_HEIGHT - VOID_FLOOR_DEPTH, wall.z).setCollisionGroups(groups('WORLD')));
-    tagCollider(collider, 'edge', PLATFORM_COLLIDER_OWNER); made++;
+    tagCollider(collider, 'edge', PLATFORM_COLLIDER_OWNER);
   }
-  return made;
+  return floor;
+}
+
+/**
+ * SA34a: the strips `grown` (a grid with newly placed cells) has at spots where `base` (the grid the build's pack was baked for) has none:
+ * the roads round the grown rectangle. The server reads no shard's edge rows, so they are generated at road level on every side, the
+ * page's own fallback (`platformInputs`' `flat`). A spot `base` has keeps the pack's strip, which has no copy for a cell the pack never
+ * saw: `seams` are those copies, for the new cells only, so a new cell's own world stands on the road past each of its edges.
+ * Every worker generates the same strips.
+ */
+export function placedStrips(grown: GridAssembly, base: GridAssembly): { readonly strips: readonly CollisionStrip[]; readonly seams: CollisionStrip['duplicates'] } {
+  const key = (x: number, z: number): string => `${String(Math.round(x * 100))},${String(Math.round(z * 100))}`, had = new Set<string>();
+  const known = new Set(base.cells.map(cell => cell.instance)), added = grown.cells.filter(cell => !known.has(cell.instance));
+  if (added.length === 0) return { strips: [], seams: [] };
+  const beside = (x: number, z: number): boolean => added.some(cell => Math.abs(x - cell.origin.x) <= grown.pitch / 2 + 1 && Math.abs(z - cell.origin.z) <= grown.pitch / 2 + 1);
+  // `within` is asked for every spot before anything is generated, so a pass that answers no only lists the base grid's spots.
+  const { flat: before, empty } = platformInputs(base, undefined), { flat } = platformInputs(grown, undefined);
+  generatePlatform(before, empty, undefined, (x, z) => { had.add(key(x, z)); return false; });
+  const made = collisionStrips(generatePlatform(flat, empty, undefined, (x, z) => !had.has(key(x, z)) || beside(x, z)));
+  const fresh = new Set(added.map(cell => cell.instance)), kept = (strip: CollisionStrip): boolean => had.has(key(strip.mesh.origin.x, strip.mesh.origin.z));
+  return { strips: made.filter(strip => !kept(strip)), seams: made.filter(kept).flatMap(strip => strip.duplicates.filter(row => fresh.has(row.instance))) };
 }
