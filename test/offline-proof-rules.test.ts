@@ -1,6 +1,7 @@
 // OFFLINE OF1: the offline proof's pass and fail rules (scripts/offline-proof-rules.mjs) on a saved request log.
 import { describe, expect, it } from 'vitest';
-import { ALL_SHARDS, judge, mayFail, servedCounts, type RequestRow, type ScreenSample } from '../scripts/offline-proof-rules.mjs';
+import { ALL_SHARDS, gridPlaces, judge, mayFail, screenKey, servedCounts, type RequestRow, type ScreenSample } from '../scripts/offline-proof-rules.mjs';
+import catalogue from '../src/shared/game/grid/singleplayer.json' with { type: 'json' };
 
 const at = 'http://127.0.0.1:4401';
 let n = 0;
@@ -64,6 +65,24 @@ describe('offline proof rules (OF1)', () => {
     expect(judge({ ...base, rows: greenLog, samples: [screen({ phase: 'start', step: 'start.app:code' })], outcome: 'stalled' })).toEqual([
       { shard: 'nalati-grasslands', rule: 'stalled', detail: 'start/start.app:code' }]);
     expect(judge({ ...base, rows: greenLog, samples: [screen({ step: 'server' })], outcome: 'seat-wait' })).toEqual([]);
+  });
+  it('OF5b: the card\'s clock and HUD text never count as the screen changing; its step, error and progress do', () => {
+    const waiting = { phase: 'load', step: 'server', error: '', failCard: '', title: false, player: false, progress: '86|20408822|295' };
+    expect(screenKey(waiting)).toBe(screenKey({ ...waiting }));
+    // buddy-engine's run: Template's card ticked "LOADING TEMPLATE SHARD 00:38.3" inside the old 200-character text key
+    expect(screenKey({ ...waiting, text: 'LOADING TEMPLATE SHARD 00:38.3' } as typeof waiting)).toBe(screenKey({ ...waiting, text: 'LOADING TEMPLATE SHARD 00:38.6' } as typeof waiting));
+    for (const change of [{ step: 'audio' }, { error: 'Failed to fetch' }, { failCard: 'No connection' }, { title: true }, { player: true }, { progress: '87|20408822|295' }])
+      expect(screenKey({ ...waiting, ...change })).not.toBe(screenKey(waiting));
+  });
+  it('OF3, OF5b: "Not in this world yet" is green only for a shard a world build\'s grid doesn\'t place', () => {
+    const title = [screen({ phase: 'title', card: false, title: true, text: 'Thin Ice: Not in this world yet' })];
+    const end = (extra: Partial<Parameters<typeof judge>[0]>) => judge({ ...base, shard: 'open-plot-thin-ice', rows: greenLog, samples: title, outcome: 'outside-world', ...extra }).map(failure => failure.rule);
+    expect(gridPlaces('open-plot-thin-ice', catalogue)).toBe(false);
+    expect(gridPlaces('open-plot-night-market', catalogue)).toBe(true);
+    expect(end({ placed: false })).toEqual([]);
+    expect(end({ placed: false, requireWorld: true })).toEqual([]);
+    expect(end({ placed: true })).toEqual(['outside-world']);
+    expect(end({ placed: false, channel: 'preview' })).toEqual(['outside-world']);
   });
   it('fails the load error screen, the proof\'s own error, a resume never offered, a leak, and (OF5, OF9) any end outside the world', () => {
     const rules = (extra: Partial<Parameters<typeof judge>[0]>) => judge({ ...base, rows: greenLog, samples: inPlay, outcome: 'play', ...extra }).map(failure => failure.rule);

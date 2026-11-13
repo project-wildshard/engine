@@ -11,6 +11,10 @@ export const DECK_SHARDS = Object.freeze([
 ]);
 /** Open Plots have no deck card (the open-plots audit): a player reaches them by a deep link with Developer on, or a resume. */
 export const OPEN_PLOTS = Object.freeze(['open-plot-thin-ice', 'open-plot-night-market', 'open-plot-mosslight-ruins']);
+/** OF3, OF5b: whether the grid catalogue (`src/shared/game/grid/singleplayer.json`, its `grid.cells`) places a shard, so a world
+ *  build may enter it. Thin Ice is a draft with no cell: a world build answers "Not in this world yet" for it.
+ * @param {string} slug @param {{ grid?: { cells?: readonly { slug?: unknown }[] } }} catalogue */
+export const gridPlaces = (slug, catalogue) => (catalogue.grid?.cells ?? []).some(cell => cell.slug === slug);
 /** Every shard the proof covers, in run order. */
 export const ALL_SHARDS = Object.freeze([...DECK_SHARDS.map(shard => shard.slug), ...OPEN_PLOTS]);
 
@@ -33,7 +37,14 @@ export const CRITICAL_PHASES = Object.freeze(['start', 'download', 'load', 'none
  *   text: string }} ScreenSample */
 /** One reason a run is red.
  * @typedef {{ shard: string, rule: string, url?: string, detail?: string }} Failure */
-/** @typedef {'play' | 'seat-wait' | 'title' | 'stalled' | 'error' | 'no-resume'} Outcome */
+/** @typedef {'play' | 'seat-wait' | 'title' | 'stalled' | 'error' | 'no-resume' | 'outside-world'} Outcome */
+
+/** OF5b: what counts as the screen changing, for the seat wait (10 s still at LOAD `server`) and the stall (45 s still). The card's
+ *  own state and its progress counters, never its free text: the card's clock and time-left tick every frame, and on a shard whose
+ *  HUD has no quest lines (Template, Brasscap, Pastel Plain, Ink & Cel, the Open Plots) they fall inside any text prefix, so the
+ *  screen never held still and those shards ran to the time limit instead of reaching the seat wait (buddy-engine's run, OF5b).
+ * @param {{ phase: string, step: string, error: string, failCard: string, title: boolean, player: boolean, progress: string }} screen */
+export const screenKey = screen => JSON.stringify([screen.phase, screen.step, screen.error, screen.failCard, screen.title, screen.player, screen.progress]);
 
 /** A request that may fail without the run going red (OF5: telemetry, `/version.json` and the release read). Telemetry is
  *  `/api/telemetry` and the error report `/api/errors`; the release read is the CDN's `/releases/<channel>.json` or the proof's
@@ -65,7 +76,7 @@ const failed = row => (row.servedBy === 'failed' && row.fail !== 'net::ERR_ABORT
  * The red rules of one entry. `warm` is the paths the warm visit read (undefined for the warm visit itself).
  * @param {{ shard: string, channel: 'staging' | 'preview', mode: string, entry: string, rows: readonly RequestRow[],
  *   samples: readonly ScreenSample[], outcome: Outcome, warm?: ReadonlySet<string>, layout?: boolean, walkthrough?: boolean,
- *   requireWorld?: boolean, proofError?: string, leaks?: number }} run
+ *   requireWorld?: boolean, proofError?: string, leaks?: number, placed?: boolean }} run
  * @returns {Failure[]}
  */
 export function judge(run) {
@@ -104,7 +115,11 @@ export function judge(run) {
   }
   if (run.outcome === 'no-resume') out.push({ shard, rule: 'no-resume', detail: 'reopening the page showed the title, not the shard' });
   if ((run.leaks ?? 0) > 0) out.push({ shard, rule: 'offline-leak', detail: `${String(run.leaks)} reads reached the server while offline (the URLs are in the run's screens log)` });
-  if (run.requireWorld === true && run.outcome !== 'play') out.push({ shard, rule: 'not-in-world', detail: run.outcome });
+  if (run.requireWorld === true && run.outcome !== 'play' && !(run.outcome === 'outside-world' && run.placed === false)) out.push({ shard, rule: 'not-in-world', detail: run.outcome });
+  // OF3: a world build never enters a shard its grid doesn't place (a draft such as Thin Ice): the title's "Not in this world yet"
+  // is the right end there, and wrong for a placed shard or a build with no world (preview opens every shard).
+  if (run.outcome === 'outside-world' && !(channel === 'staging' && run.placed === false))
+    out.push({ shard, rule: 'outside-world', detail: channel === 'staging' ? 'the grid places this shard, yet the page said it is not in this world' : 'a build with no world opens every shard' });
   // 6. A load that never finished with nothing else to blame.
   if (run.outcome === 'stalled' && out.length === 0) {
     const last = samples.at(-1);
