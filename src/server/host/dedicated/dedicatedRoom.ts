@@ -24,7 +24,7 @@ import { LEFT } from './socketPump';
 import type {PlaytestHit} from './playtest';
 import { cellFrame, cellName } from './gridCells';
 import {hitHistoryOf} from '@wildshard/engine/combat/rewind';
-import { floorBelow } from '@wildshard/engine/physics/query';
+import { entrywaysStand, floorBelow } from '@wildshard/engine/physics/query';
 import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { buildStrips } from '../standalone/roadWorld';
@@ -227,6 +227,8 @@ export class DedicatedRoom implements CrossTarget {
     }
     return seat;
   }
+  /** GC30: whether a walker off the road stands at this cell's entryways (`entrywaysStand`); else its worker's road walls it. */
+  entrywaysStand(): boolean { return entrywaysStand(this.host.physics, ARRIVAL_LIFT); }
   /** GC15: this seat's feet left for cell `to`, standing at `at` in that cell's own frame. The door reads their save there and orders `handOver`. */
   crossing(device: string, to: string, at: ResumeAt): void {
     if ((this.seats.get(device)?.transport ?? null) !== null) this.options.post({ kind: 'crossing', device, to, at });

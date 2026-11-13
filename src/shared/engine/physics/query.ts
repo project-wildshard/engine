@@ -8,6 +8,8 @@ import type { Ball, Collider, Ray } from '@dimforge/rapier3d-simd';
 import type { Physics } from './Physics';
 import { GROUP, queryGroups, type GroupName } from './groups';
 import { tagOf, type Material } from './surface';
+import { PLATFORM_COLLIDER_OWNER } from './stripColliders';
+import { CHUNK_HALF } from '../core/config';
 
 interface Vec3 { x: number; y: number; z: number }
 
@@ -158,4 +160,17 @@ export function hasStaticGround(physics: Physics): boolean {
       && tagOf(collider)?.material === 'ground') found = true;
   });
   return found;
+}
+
+/** GC30: the middle of each cell edge, 1 m in (a cell's own frame), where every platform edge has its 8 m entryway. */
+export const CELL_ENTRYWAYS: readonly (readonly [number, number])[] = [[0, CHUNK_HALF - 1], [0, 1 - CHUNK_HALF], [CHUNK_HALF - 1, 0], [1 - CHUNK_HALF, 0]];
+/**
+ * GC30: whether a cell's world has its own ground within `reach` of road height (y 0) at all four entryways, so a walker coming off the
+ * road stands. Asked of each collider, not the broad phase: a world that has never stepped has an empty one. The road's strips copied
+ * into the cell (its seams) don't count. Far Reach's sky islands have none, and a walker set down there fell out of the world.
+ */
+export function entrywaysStand(physics: Physics, reach = 8): boolean {
+  const ray = new physics.R.Ray({ x: 0, y: reach, z: 0 }, { x: 0, y: -1, z: 0 }), world: Collider[] = [];
+  physics.world.forEachCollider(collider => { if (!collider.isSensor() && ((collider.collisionGroups() >>> 16) & GROUP.WORLD) !== 0 && tagOf(collider)?.owner !== PLATFORM_COLLIDER_OWNER) world.push(collider); });
+  return CELL_ENTRYWAYS.every(([x, z]) => { ray.origin = { x, y: reach, z }; return world.some(collider => collider.castRay(ray, reach * 2, true) >= 0); });
 }
