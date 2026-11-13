@@ -97,16 +97,28 @@ export function stepSwim(p: Vec3, v: Vec3, want: Vec3, state: SwimState, move: S
   v.x += (mx * swimSpeed - v.x) * Math.min(1, SWIM_ACCEL * dt);
   v.z += (mz * swimSpeed - v.z) * Math.min(1, SWIM_ACCEL * dt);
   want.x = v.x * dt; want.y = 0; want.z = v.z * dt;
+  const x0 = p.x, z0 = p.z;
   const r = ports.move(p, want);
   // pinned against a piling / bollard while hauling out: let go of the climb (and don't grab again for a beat) so we
   // sink back to the float height instead of hanging in the air beside the deck
   const blocked = r.horizontalFreedom < 0.25;
   if (state.climbTo !== null && blocked) { state.climbTo = null; state.climbCooldown = 0.6; }
   state.climbCooldown = Math.max(0, state.climbCooldown - dt);
-  const ws = ports.water(p.x, p.z);
-  const g = ports.ground();
+  let ws = ports.water(p.x, p.z);
+  let g = ports.ground();
+  if (ws === null) {
+    // drifted off the water's mask. Over a shore (ground within SWIM_OUT of the surface just left) that is the way out:
+    // back on foot. Over a deep hole it is not: a pond whose mask ends before its bowl does would drop the swimmer into a
+    // dry pit under the waterline, feet on foot, head under, flipping back into the swim every few ticks (Jake, 2026-11-12:
+    // "glitched into the pond cant use shift to surface"). There the mask's edge is a wall: back to where the step began.
+    const left = ports.water(x0, z0);
+    if (left === null || g >= left - SWIM_OUT) { out.water = null; ports.leave(); return 'dry'; }
+    want.x = x0 - p.x; want.y = 0; want.z = z0 - p.z;
+    ports.move(p, want);
+    v.x = 0; v.z = 0;
+    ws = ports.water(p.x, p.z) ?? left; g = ports.ground();
+  }
   out.water = ws;
-  if (ws === null) { ports.leave(); return 'dry'; } // drifted off the water (the pond's mask edge): back on foot
   const groundDepth = ws - g;
   // climbing out: moving toward a platform (the pier deck) whose top is within reach above the surface — and we are
   // not already under it — latches a pull-up to its level; the ground port then accepts it and we stand up on the deck
