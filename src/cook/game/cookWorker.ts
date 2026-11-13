@@ -30,7 +30,10 @@ import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
 import {installedRuntimeReads} from './installedRuntimeReads';
 import {readServerPackBook, serverPackBookPath} from '../../shared/game/shardfile/serverPack';
 
-export interface CatalogueRow {readonly slug: string; readonly revision: number; readonly hash: string}
+export interface CatalogueRow {readonly slug: string; readonly revision?: number; readonly hash: string}
+/** A head the cook can be asked for. `live` is production and `preview` the preview channel (the old two stages); MS2.4:
+ *  `staging` is the staging channel's pointer, which is where `upload --channel staging` puts a new author's shard. */
+export type CookStage = 'live' | 'preview' | 'staging';
 /** The shape `api-server` POSTs (its `ShardfileNoticeSchema`, J30). */
 export interface CookNotice {
   readonly event: 'shardfile.new' | 'catalogue.flip';
@@ -49,7 +52,9 @@ const NoticeSchema: v.GenericSchema<CookNotice> = v.strictObject({
 interface RevisionRef {readonly revision: number; readonly hash: string}
 const RevisionSchema: v.GenericSchema<RevisionRef> = v.object({revision: RevisionNumberSchema, hash: ShardfileHashSchema});
 /** `GET /api/catalogue`: it answers before a grid is set, unlike the `catalogue.json` a build bakes. */
-const CatalogueSchema: v.GenericSchema<{readonly shards: readonly {readonly slug: string; readonly live?: RevisionRef | undefined; readonly preview?: RevisionRef | undefined}[]}> = v.object({shards: v.array(v.object({slug: ShardSlugSchema, live: v.optional(RevisionSchema), preview: v.optional(RevisionSchema)}))});
+/** J275 (AC17): a channel's pointer names the raw upload (`raw`); the cook downloads and migrates that, as for `live`. */
+const ChannelHeadSchema: v.GenericSchema<{readonly raw: string}> = v.object({raw: ShardfileHashSchema});
+const CatalogueSchema: v.GenericSchema<{readonly shards: readonly {readonly slug: string; readonly live?: RevisionRef | undefined; readonly preview?: RevisionRef | undefined; readonly channels?: {readonly staging?: {readonly raw: string} | undefined} | undefined}[]}> = v.object({shards: v.array(v.object({slug: ShardSlugSchema, live: v.optional(RevisionSchema), preview: v.optional(RevisionSchema), channels: v.optional(v.object({staging: v.optional(ChannelHeadSchema)}))}))});
 
 /** What a request needs from a cook: one shard of one build, by the two things packs are keyed by. */
 export interface CookIndex {
@@ -188,7 +193,7 @@ export async function readCapped(response: Response, maximum: number): Promise<U
 }
 
 export interface ShardfileSource {
-  readonly heads: (stage: 'live' | 'preview') => Promise<readonly CatalogueRow[]>;
+  readonly heads: (stage: CookStage) => Promise<readonly CatalogueRow[]>;
   readonly download: (hash: string) => Promise<Uint8Array>;
 }
 
@@ -198,7 +203,10 @@ export function apiSource(base: string, read: typeof fetch = fetch, maxBytes: nu
     heads: async stage => {
       const response = await read(`${base}/api/catalogue`, {signal: AbortSignal.timeout(30_000)});
       if (!response.ok) throw new Error(`Catalogue answered ${response.status}`);
-      return v.parse(CatalogueSchema, await response.json()).shards.flatMap(row => { const head = row[stage]; return head === undefined ? [] : [{slug: row.slug, ...head}]; });
+      return v.parse(CatalogueSchema, await response.json()).shards.flatMap(row => {
+        if (stage === 'staging') { const raw = row.channels?.staging?.raw; return raw === undefined ? [] : [{slug: row.slug, hash: raw}]; }
+        const head = row[stage]; return head === undefined ? [] : [{slug: row.slug, ...head}];
+      });
     },
     download: async hash => {
       const response = await read(`${base}/api/shardfiles/${hash}`, {signal: AbortSignal.timeout(300_000)});
@@ -290,7 +298,7 @@ export interface CookWorker {
   /** Cook one head unless this build already has it. Never throws: the row says what happened. */
   readonly cook: (head: {readonly slug: string; readonly hash: string}) => Promise<CookRow>;
   /** J29, and J30's list: every head of the catalogue at the stages asked for. */
-  readonly recook: (stages: readonly ('live' | 'preview')[]) => Promise<readonly CookRow[]>;
+  readonly recook: (stages: readonly CookStage[]) => Promise<readonly CookRow[]>;
   readonly enqueue: (notice: CookNotice) => void;
   readonly idle: () => Promise<void>;
   readonly rows: () => readonly CookRow[];

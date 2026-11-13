@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // C4 (J28, J29, J30): the cook worker.
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs serve     notify endpoint; lists the catalogue at boot
+//     (production, preview and staging heads: MS2.4, a new author's `upload --channel staging` is a staging head only)
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs recook    every live and preview head, then exit; a deploy's step
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs bake <dist> <origin>   the live heads this build cooked, onto its built client
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs gc <build>...   keep those builds and every build a channel's
@@ -48,7 +49,7 @@ if (command === 'serve') {
   const cook = worker(), port = Number(env.COOK_PORT ?? 8792), host = env.COOK_HOST ?? '127.0.0.1';
   notifyServer(cook, need('COOK_NOTIFY_TOKEN')).listen(port, host, () => { console.log(`cook worker on ${host}:${port}`); });
   // J30: what a missed notice left behind. A catalogue that can't be read waits for the next notice.
-  try { await cook.recook(['live', 'preview']); } catch (error) { console.error(`boot list failed: ${String(error)}`); }
+  try { await cook.recook(['live', 'preview', 'staging']); } catch (error) { console.error(`boot list failed: ${String(error)}`); }
 } else if (command === 'recook') {
   const cook = worker(), rows = await cook.recook(['live']), preview = await cook.recook(['preview']);
   console.log(JSON.stringify([...rows, ...preview]));
