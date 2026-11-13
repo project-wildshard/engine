@@ -16,7 +16,10 @@ test('a walker keeps their speed across a crossing from the road into a cell', {
     const grid = running()?.grid, seat = grid?.host().players.get('actor.player');
     if (grid !== undefined && seat !== undefined) speeds.push({ site: grid.current(), speed: Math.hypot(seat.velocity.x, seat.velocity.z) });
   }, 1);
-  try { await walk(shell, -Math.PI / 2, () => travels.length === 1); } finally { clearInterval(sample); }
+  // Keep walking past the travel event until the cell side has been sampled: the server switches the site and sends `travel` in
+  // one tick, so stopping at the event left at most one sample past the line, and none on a slow CI runner (expected -1 > 0).
+  const past = (): number => speeds.filter(row => row.site !== null).length;
+  try { await walk(shell, -Math.PI / 2, () => travels.length === 1 && past() >= 20); } finally { clearInterval(sample); }
   expect(travels[0]).toMatchObject({ from: 0, to: cell(NEIGHBOUR) });
   const first = speeds.findIndex(row => row.site !== null);
   expect(first, 'sampled both sides of the crossing').toBeGreaterThan(0);
