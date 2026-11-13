@@ -16,3 +16,11 @@ The floor is now a flat trimesh per box, squares of at most 125 m (`VOID_FLOOR_T
 with `FIX_INTERNAL_EDGES`, the way the strips are built. One collider per box, so the count doesn't change. The rim (a wall
 nobody stands on) stays a cuboid. `test/grid-void-walk.test.ts` walks the in-page server's road from the outer road into
 [0, 3], on to the rail and back: red on the slab, green on the tiles.
+
+**Restore.** The review found a second way to keep the slab: a road's save holds its whole Rapier world, floor and rim
+included, and the restore path installed the floor again on top. Each save and restore stacked one more set, and a save
+made with the one-slab floor kept the slab. `renewVoidFloor` (`roadWorld.ts`) now takes every platform collider out of a
+restored road (strips are held as data and never saved, so those are all the void's), installs the tiles, and lifts feet
+the slab had sunk (over the void, between −1 m and road level) back to the road skin. The second test in
+`grid-void-walk.test.ts` saves a player stuck at y −0.17 and restores twice: one floor's worth of colliders each time,
+feet at 0.02, and a walk on it.

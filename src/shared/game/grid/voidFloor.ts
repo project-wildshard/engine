@@ -5,7 +5,7 @@
  * (y 0, the height an empty neighbour's strip edge ends at, `assembly.ts` `emptyNeighbour`). The rail, the void's closed
  * rim, stands on the 7 × 7's outer road shoulder whatever is placed, so a walk from ring 2 into an empty ring-3 cell stays
  * on the floor and comes back. Each road world (the page's highway, the in-page server's road, a dedicated worker's road room)
- * installs the same slabs and rim with `installVoidFloor`; the look draws the floor from the same layout (`voidLook.ts`).
+ * installs the same floor and rim with `installVoidFloor`; the look draws the floor from the same layout (`voidLook.ts`).
  */
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import { groups } from '@wildshard/engine/physics/groups';
@@ -13,7 +13,7 @@ import { PLATFORM_COLLIDER_OWNER } from '@wildshard/engine/physics/stripCollider
 import { tagCollider } from '@wildshard/engine/physics/surface';
 import { emptyCellSquares, GAP_HALF, gridRail, type CellSquare } from './roadLayout';
 
-/** A floor slab's footprint in grid metres: its centre and half sizes. Its top is at road level, y 0. */
+/** A floor box's footprint in grid metres: its centre and half sizes. Its top is at road level, y 0. */
 export type VoidBox = CellSquare;
 /** How far the floor runs on past the rail, so a capsule pressed to the rim still stands on it. */
 export const VOID_FLOOR_PAST_RAIL = 20;
@@ -76,7 +76,7 @@ export function rimWalls(pitch: number): readonly { readonly x: number; readonly
 const RIM_HALF_HEIGHT = 30, RIM_HALF_THICK = 0.25;
 
 /**
- * Install the void's floor slabs and, with `rim`, its rim in a road world in the grid's frame (the page's highway keeps its
+ * Install the void's floor (one tiled trimesh per box) and, with `rim`, its rim in a road world in the grid's frame (the page's highway keeps its
  * rim as readiness walls instead). The caller's owner holds the colliders. Tagged as platform ground, so regional hashes
  * leave them out.
  */

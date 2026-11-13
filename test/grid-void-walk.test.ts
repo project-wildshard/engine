@@ -11,6 +11,8 @@ import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { CONTENT_CAPS } from '../src/shared/engine/core/config';
+import { PLATFORM_COLLIDER_OWNER } from '../src/shared/engine/physics/stripColliders';
+import { tagOf } from '../src/shared/engine/physics/surface';
 import { gridRail } from '../src/shared/game/grid/roadLayout';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import type { SaveStorage } from '../src/shared/engine/saves/store';
@@ -35,26 +37,30 @@ async function product(slug: string): Promise<HeadlessRuntimeInput> {
   return { shard: loaded.shardfile, assets: runtimeAssets(loaded, directory), rapier, product: loaded };
 }
 const turn = (): Promise<void> => new Promise(resolve => { setImmediate(resolve); });
-
-test('the server walks the player off the outer road onto the void floor of an empty ring-3 cell, and back', { timeout: 60_000 }, async () => {
+interface Standing { readonly site: string | null; readonly x: number; readonly y: number; readonly z: number }
+interface Page { readonly shell: StandaloneShell; readonly grid: () => StandaloneGrid; readonly at: () => Standing;
+  /** Walk facing `yaw` (the page's: π faces +z, north; 0 faces -z) until `done`. */
+  readonly walk: (yaw: number, done: (here: Standing) => boolean) => Promise<Standing>;
+  /** The road world's void colliders: its floor (platform trimeshes that are no strip's) and its rim. */
+  readonly voidColliders: () => number }
+/** A page and its worker on `storage`, booted, with its clock paused: the test ticks it. */
+async function page(storage: PageStorage, arrival?: typeof ARRIVAL): Promise<Page> {
   const strips = await bakedGridCollision(), control = new MessageChannel(), game = new MessageChannel();
   let running: StandaloneGrid | undefined;
   const server = runStandaloneServer({ control: control.port1, game: game.port1, load: (_boot, slug) => product(slug), strips: () => Promise.resolve(strips),
-    onSaveRefused: error => { throw error; }, proof: { arrival: ARRIVAL, booted: grid => { running = grid; } } });
-  const shell: StandaloneShell = connectStandalone({ slug: SLUG, base: `/shards/${SLUG}/`, build: 'test', savePrefix: 'wildshard.', storage: new PageStorage() },
-    control.port2, game.port2, () => { server.dispose(); });
+    onSaveRefused: error => { throw error; }, proof: { ...(arrival === undefined ? {} : { arrival }), booted: grid => { running = grid; } } });
+  const shell = connectStandalone({ slug: SLUG, base: `/shards/${SLUG}/`, build: 'test', savePrefix: 'wildshard.', storage }, control.port2, game.port2, () => { server.dispose(); });
   onTestFinished(() => { shell.dispose(); });
   await shell.booted;
   shell.ready(); shell.pause(); await turn(); await turn();
   const grid = (): StandaloneGrid => { if (running === undefined) throw new Error('No booted server'); return running; };
   for (let tick = 0; tick < 32 && shell.client.latest === null; tick++) { grid().tick(); await turn(); }
-  const at = (): { site: string | null; x: number; y: number; z: number } => {
+  const at = (): Standing => {
     const player = grid().host.players.get(PLAYER);
     if (player === undefined) throw new Error('No session player');
     return { site: grid().grid.current(), x: player.position.x, y: player.position.y, z: player.position.z };
   };
-  // the page's yaw: π faces +z (north), 0 faces -z (south)
-  const walk = async (yaw: number, done: (here: ReturnType<typeof at>) => boolean): Promise<ReturnType<typeof at>> => {
+  const walk = async (yaw: number, done: (here: Standing) => boolean): Promise<Standing> => {
     for (let tick = 0; tick < 60 * 240; tick++) {
       const here = at();
       if (done(here)) return here;
@@ -63,6 +69,16 @@ test('the server walks the player off the outer road onto the void floor of an e
     }
     return at();
   };
+  // the strips are held near the player and are no tile: a void tile's collider sits at road level on a box's centre
+  const voidColliders = (): number => {
+    let count = 0;
+    grid().host.physics.world.forEachCollider(collider => { if (tagOf(collider)?.owner === PLATFORM_COLLIDER_OWNER && !strips.some(strip => strip.mesh.origin.x === collider.translation().x && strip.mesh.origin.z === collider.translation().z)) count++; });
+    return count;
+  };
+  return { shell, grid, at, walk, voidColliders };
+}
+test('the server walks the player off the outer road onto the void floor of an empty ring-3 cell, and back', { timeout: 60_000 }, async () => {
+  const { at, walk } = await page(new PageStorage(), ARRIVAL);
   const start = at();
   expect(start.site).toBeNull();
   expect(start.z).toBeCloseTo(ARRIVAL.z, 0);
@@ -82,4 +98,23 @@ test('the server walks the player off the outer road onto the void floor of an e
   expect(back.z).toBeLessThanOrEqual(ARRIVAL.z);
   expect(Math.abs(back.y - 0.02)).toBeLessThan(0.05);
   expect(lowest).toBeGreaterThan(-0.02);
+});
+
+test('a restored road holds one void floor, and feet the old slab had sunk stand back on it', { timeout: 60_000 }, async () => {
+  const storage = new PageStorage(), first = await page(storage, ARRIVAL), fresh = first.voidColliders();
+  expect(fresh).toBeGreaterThan(4);
+  // the one-slab floor's stuck player: over the void in [0, 3], 0.17 m below road level
+  first.grid().place({ x: 0, y: -0.17, z: 3 * P, yaw: Math.PI });
+  expect(await first.shell.save()).toMatchObject({ ok: true });
+  first.shell.dispose();
+  for (let boot = 0; boot < 2; boot++) {
+    const next = await page(storage);
+    expect(next.at().site).toBeNull();
+    expect(next.voidColliders()).toBe(fresh);
+    expect(next.at().y).toBeCloseTo(0.02, 2);
+    const walked = await next.walk(Math.PI, here => here.z >= 3 * P + 20);
+    expect(Math.abs(walked.y - 0.02)).toBeLessThan(0.05);
+    expect(await next.shell.save()).toMatchObject({ ok: true });
+    next.shell.dispose();
+  }
 });

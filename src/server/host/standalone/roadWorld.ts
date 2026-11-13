@@ -3,14 +3,15 @@
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { CHUNK_HALF, CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { groups } from '@wildshard/engine/physics/groups';
-import { stripCollider } from '@wildshard/engine/physics/stripColliders';
+import { PLATFORM_COLLIDER_OWNER, stripCollider } from '@wildshard/engine/physics/stripColliders';
+import { tagOf } from '@wildshard/engine/physics/surface';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { createSimHost, type SimHost, type SimLevel } from '@wildshard/engine/sim';
 import { SIM_API_VERSION } from '@wildshard/engine/sim/apiVersion';
 import type { GridCell } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { HOST_PROBE } from '@wildshard/engine/game/plugin/simulation';
-import { installVoidFloor } from '@wildshard/engine/game/grid/voidFloor';
+import { installVoidFloor, voidFloorBoxes } from '@wildshard/engine/game/grid/voidFloor';
 import { FALL_FLOOR } from './fallFloor';
 
 /** Ground under the whole grid, far below the road's strips, and a player's pace on them. */
@@ -37,6 +38,21 @@ export function addCellWalls(road: SimHost, cells: readonly Pick<GridCell, 'orig
 /** SA34: the 7 × 7's void, walkable: a road-level floor over every empty cell and out to the rail, and the rim on the rail. */
 export function addVoidFloor(road: SimHost, cells: readonly Pick<GridCell, 'cell'>[]): void {
   withOwner(road.scope, () => { installVoidFloor(road.physics, cells, CONTENT_CAPS.pitch); });
+}
+/**
+ * SA34: a restored road's save holds the void floor and rim the saving build made (strips are held as data and out of every save,
+ * `gridServer.ts` `capture`, so each platform collider in it is the void's). Take them out and install this build's, so a restore
+ * never stacks a second floor and a save from the one-slab floor gets the tiles. Feet the slab had sunk below road level over the
+ * void stand back on it at `skin`.
+ */
+export function renewVoidFloor(road: SimHost, cells: readonly Pick<GridCell, 'cell'>[], feet: { x: number; y: number; z: number }, skin: number): boolean {
+  const { world } = road.physics, saved: Parameters<typeof world.removeCollider>[0][] = [];
+  world.forEachCollider(collider => { if (tagOf(collider)?.owner === PLATFORM_COLLIDER_OWNER) saved.push(collider); });
+  for (const collider of saved) world.removeCollider(collider, false);
+  addVoidFloor(road, cells);
+  const overVoid = voidFloorBoxes(cells, CONTENT_CAPS.pitch).some(box => Math.abs(feet.x - box.x) <= box.hx && Math.abs(feet.z - box.z) <= box.hz);
+  if (!overVoid || feet.y >= skin || feet.y < -1) return false;
+  feet.y = skin; return true;
 }
 /** C6: a room's world builds every strip at once, since no one list can follow every player. */
 export function buildStrips(host: SimHost, meshes: readonly GridCollisionStrip['mesh'][]): void {

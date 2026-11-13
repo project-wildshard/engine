@@ -33,7 +33,7 @@ import { landedBy } from '@wildshard/engine/combat/damageBook';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { openCellWorld, type CellWorld, type CellWorldOptions } from './cellWorld';
-import { addCellWalls, addVoidFloor, ROAD } from './roadWorld';
+import { addCellWalls, addVoidFloor, renewVoidFloor, ROAD } from './roadWorld';
 import { netBuys, netWorldInput } from '../../../shared/host/standalone/netInput';
 import { cellDocuments, CONTINUATION, ContinuationSlots, SITE, siteDocuments, type SavedContinuation, type SavedSite } from './continuation';
 import { ledgerFilings } from './ledgerFilings';
@@ -195,9 +195,9 @@ export class StandaloneGrid {
   private static road(rapier: Rapier, cells: readonly GridCell[], strips: readonly GridCollisionStrip[], saved: string | undefined, arrival: Readonly<GridPoint> | undefined, refused: GridServerOptions['refused']): SimHost {
     if (saved !== undefined) {
       try {
-        const restored = restoreSimHost(ROAD, { rapier }, decodeSimSnapshot(saved));
+        const restored = restoreSimHost(ROAD, { rapier }, decodeSimSnapshot(saved)), player = sessionPlayer(restored);
+        if (renewVoidFloor(restored, cells, player.position, ROAD_SKIN)) player.motor.resetAt(player.position);
         holdStrips(restored, strips.map(strip => strip.mesh));
-        addVoidFloor(restored, cells);
         return restored;
       } catch (error) { refused?.(error); } // a road holds no progress but where the player stood
     }
