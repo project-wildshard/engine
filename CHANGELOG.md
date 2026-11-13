@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.18 (2026-11-13)
+
+- Share a shard with a link: play.wildshard.io/slug/driftwood-isle opens that shard and shows its name and picture in chat previews.
+- New shards placed on the world grid after a release, like Thin Ice, get their own card in Shard select and you can walk in.
+- iPhones use less memory: Driftwood loads compressed textures, and the world file loads with far fewer allocations.
+- Walking off a shard's edge no longer stalls while the next shard builds, and Driftwood Isle and Pine Hollow have their sounds back.
+- Behind the scenes: we log each player's device to find crashes, and shard authors can prepare a release without the engine source.
+
 ## v0.1.17 (2026-11-13)
 
 - Crossing is on: walk off one shard's edge into the next at full speed, with no invisible walls at chunk edges or seams.
