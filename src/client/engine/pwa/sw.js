@@ -300,6 +300,26 @@ async function cached(request, name, event) {
   return delivery(response);
 }
 
+/** QA 11-12 row 36: a build's own unhashed reads (`/programs/<slug>.json`, the recorded shader programs, and `/shardfiles/**`: a
+ *  neighbour's tiles, collision, props and look) carry no hash, so they are not `immutable`. Network first, so a deploy's copy is
+ *  always read online; each 200 is kept in this build's shell, which answers when the network can't (offline, a dropped link).
+ *  The page gets the response at once; the copy is written behind it.
+ *  @param {Request} request @param {string} name @param {{ waitUntil: (work: Promise<unknown>) => void }} event */
+async function networkFirst(request, name, event) {
+  try {
+    const response = await fetch(request);
+    if (response.status === 200 && !isHtml(response)) {
+      const copy = response.clone();
+      event.waitUntil(store(name).then(cache => cache.put(request, copy)).catch(() => undefined));
+    }
+    return response;
+  } catch (error) {
+    const held = await store(name).then(cache => cache.match(request, MATCH)).catch(() => undefined);
+    if (held !== undefined && !isHtml(held)) return held;
+    throw error;
+  }
+}
+
 /** PZ10: a read on the content base's origin, cache-first by exact URL. A miss is fetched as asked and kept only as a CORS
  *  200. A no-cors read (an image, a CSS background) is asked again in CORS mode, so it can be kept; if the CDN will not answer
  *  that, it still loads, as itself, unkept. Any other mode (cors, same-origin, an only-if-cached probe) goes as it came.
@@ -352,7 +372,7 @@ workerScope.listen(self, 'fetch', event => {
   }
   if (/^\/(?:assets|basis|fonts)\//.test(url.pathname) || url.pathname === '/manifest.webmanifest') {
     event.respondWith(cached(request, SHELL, event));
-  }
+  } else if (/^\/(?:programs|shardfiles)\//.test(url.pathname)) event.respondWith(networkFirst(request, SHELL, event));
 });
 
 workerScope.listen(self, 'message', event => {

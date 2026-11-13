@@ -168,7 +168,8 @@ test('a worker\'s reads neither pause the precache nor stand as a loader', async
   await vi.waitFor(() => { expect(held.f.fetch).toHaveBeenCalledTimes(6); });
   // The page at control starts its server: the worker lives on, and never reports control. Nothing it reads stops the precache.
   worker.workers.add('server');
-  await worker.dispatch('fetch', { request: new Request(url('/shardfiles/nine/server/a.bin')), clientId: 'server' });
+  // Row 36: the worker's /shardfiles/ read now goes network first through this worker; the held network keeps it in flight.
+  void worker.dispatch('fetch', { request: new Request(url('/shardfiles/nine/server/a.bin')), clientId: 'server' });
   expect(held.f.fetch.mock.calls.filter(([request]) => typeof request !== 'string' && request.signal.aborted)).toEqual([]);
   // A loading document does pause it, and a worker read in that pause doesn't keep it paused once the document has gone.
   const again = heldPrecache(), second = again.f.load('A', again.files, []);
@@ -177,10 +178,10 @@ test('a worker\'s reads neither pause the precache nor stand as a loader', async
   await vi.waitFor(() => { expect(again.f.fetch).toHaveBeenCalledTimes(6); });
   second.workers.add('server'); second.live.add('page-2');
   await second.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-2' });
-  await second.dispatch('fetch', { request: new Request(url('/shardfiles/nine/server/a.bin')), clientId: 'server' });
+  void second.dispatch('fetch', { request: new Request(url('/shardfiles/nine/server/a.bin')), clientId: 'server' });
   again.release(); second.live.delete('page-2');
   await second.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-1' }); await run;
-  expect(again.f.fetch).toHaveBeenCalledTimes(14);
+  expect(again.f.fetch).toHaveBeenCalledTimes(15);
 });
 
 test('the precache takes a part\'s member from under its `?v=`, and downloads nothing', async () => {
@@ -636,4 +637,22 @@ test('PZ10: a content base on the page\'s own origin owns its folder only, and k
   for (const path of ['/version.json', '/api/telemetry']) expect(await worker.dispatch('fetch', { request: new Request(url(path)) })).toBeUndefined();
   f.fetch.mockClear(); f.fetch.mockRejectedValue(new Error('offline'));
   expect(await (await worker.dispatch('fetch', { request: new Request(book) }))?.text()).toBe(`body:${book}`);
+});
+
+test('QA 11-12 row 36: /programs/ and /shardfiles/ go network first, are kept per build, and answer from the cache offline', async () => {
+  let offline = false;
+  const f = fixture(request => offline ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(new Response(`net:${request.url}`)));
+  const worker = f.load('A', [], []);
+  await worker.dispatch('install'); await worker.dispatch('activate');
+  const files = ['/programs/driftwood-isle.json', '/shardfiles/far-reach/sections/world/tiles.json'];
+  for (const path of files) expect(await (await worker.dispatch('fetch', { request: new Request(url(path)) }))?.text()).toBe(`net:${url(path)}`);
+  const shellCache = await f.open('ws-shell-v3-A');
+  for (const path of files) expect(await (await shellCache.match(url(path)))?.text(), 'kept in this build\'s shell').toBe(`net:${url(path)}`);
+  // Online, a deploy's new copy is read first, never the kept one.
+  await shellCache.put(url(files[0] ?? ''), new Response('old'));
+  expect(await (await worker.dispatch('fetch', { request: new Request(url(files[0] ?? '')) }))?.text()).toBe(`net:${url(files[0] ?? '')}`);
+  offline = true;
+  for (const path of files) expect(await (await worker.dispatch('fetch', { request: new Request(url(path)) }))?.text(), 'offline: the kept copy').toBe(`net:${url(path)}`);
+  // A file this device never read still fails at once offline, as the network does.
+  await expect(worker.dispatch('fetch', { request: new Request(url('/programs/nalati-grasslands.json')) })).rejects.toThrow('Failed to fetch');
 });

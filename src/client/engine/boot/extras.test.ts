@@ -9,6 +9,7 @@ import {NO_AUDIO,type LevelAudioProfile,type LevelAudioBank} from '../audio/leve
 import {createBootPlan,type StepProgress} from './plan';
 import * as settings from '../ui/Settings';
 import {LoadingTimeline,installLoadingTimeline} from '../../../shared/engine/boot/timeline';
+import {loadingWaitState} from '../../../shared/engine/boot/loadingWaits';
 import {STEP_INFO} from '../../../shared/engine/boot/steps';
 import { TIER, initializeTier } from '../core/tier';
 
@@ -138,13 +139,26 @@ test('preload ignores foreign inventory and decodes selected compressed bytes of
 });
 
 test('missing audio retains synth fallback and an asset-free profile reads nothing',async()=>{
-  const fetch=vi.spyOn(globalThis,'fetch').mockImplementation(()=>Promise.reject(new Error('Offline')));
+  const fetch=vi.spyOn(globalThis,'fetch').mockImplementation(()=>Promise.resolve(new Response(null,{status:404})));
   const missing=startDeferredAudioPreload({...blank,...all},level,profile);
   await missing.wait({set:()=>undefined,detail:()=>undefined});expect((await missing.decode()).profile).toBe(bank);
   expect(fetch).toHaveBeenCalledTimes(2);
   const empty=startDeferredAudioPreload({...blank,...all},level,NO_AUDIO);
   await empty.wait({set:()=>undefined,detail:()=>undefined});await empty.decode();
   expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+test('QA 11-12 row 36: an unreachable network retries once, then waits on RETRY naming the file, never in flight for good',async()=>{
+  let offline=true;
+  const fetch=vi.spyOn(globalThis,'fetch').mockImplementation(()=>offline?Promise.reject(new TypeError('Failed to fetch')):Promise.resolve(new Response(new Uint8Array([1]))));
+  const preload=startDeferredAudioPreload({...blank,...all},level,profile);
+  await vi.waitFor(()=>{expect([...loadingWaitState().pending.values()].filter(row=>row.retry!==undefined&&row.retry!==null).map(row=>row.resource)).toEqual(expect.arrayContaining([music,sfx]));});
+  expect(fetch,'one attempt and the one retry each').toHaveBeenCalledTimes(4);
+  const wait=[...loadingWaitState().pending.values()].find(row=>row.resource===music);
+  expect(wait?.label).toContain('/assets/music/folk/title.m4a');expect(wait?.label).toContain('connection unavailable');
+  offline=false;wait?.retry?.();
+  await preload.wait({set:()=>undefined,detail:()=>undefined});expect((await preload.decode()).profile).toBe(bank);
+  expect(fetch).toHaveBeenCalledTimes(6);
 });
 
 test('G1000: the phone bar reads and decodes the whole boot audio set before control, with no late load',async()=>{

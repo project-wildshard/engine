@@ -36,6 +36,7 @@ import { addBytes, type ChunkFiles } from './bytes';
 import { macrotask, type StepProgress } from './plan';
 import { audioFiles, musicDir, sfxDir } from './audioFiles';
 import { whenPrefetched } from './prefetch';
+import { readContent } from './contentRead';
 import { decodeBytes, type SfxBank } from '../audio/preload';
 import type { StyleBank } from '../audio/Stems';
 import { getMusicStyle, getSfxSet } from '../ui/Settings';
@@ -184,6 +185,8 @@ export function startMenuPreload(files: ChunkFiles, def: BootLevel): Preload<voi
   };
 }
 
+/** One boot audio file's wire cap (the largest music stem is a few MB). */
+const AUDIO_FILE_CAP = 25_000_000;
 /** audio files this page already read to the end once */
 const downloaded = new Set<string>();
 /** A decoder that runs one file at a time. decodeStyle and decodeSfxSet both start every file at once; gating their
@@ -222,13 +225,13 @@ export function startDeferredAudioPreload(files: ChunkFiles, def: BootLevel, pro
   onOwnerDispose(() => { lifetime.abort(); selectedBytes.clear(); });
   const downloads = urls.map((url, index) => waitFor(`Read audio ${index + 1} / ${urls.length}`, (async () => {
     try {
-      await whenPrefetched(url);
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`${response.status} ${url}`);
-      const bytes = await response.arrayBuffer();
+      // QA 11-12 row 36: a read the network can't answer retries once, then waits on RETRY with the file named, never in flight
+      // for good; a file the server doesn't have keeps its synth fallback, as before.
+      const bytes = (await readContent(url, AUDIO_FILE_CAP, { signal: lifetime.signal, missingThrows: true,
+        fetch: async (address, init) => { await whenPrefetched(address); return fetch(address, init); } })).buffer;
       if (selected.has(url)) selectedBytes.set(url, bytes);
       downloaded.add(url);
-    } catch { downloaded.delete(url); /* a missing sound keeps its synth fallback */ }
+    } catch { downloaded.delete(url); /* a missing sound, or a page that left, keeps its synth fallback */ }
     c.tick();
     fileProgress(++completedFiles, url);
   })(), 'file'));

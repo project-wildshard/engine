@@ -24,6 +24,8 @@ export interface ContentReadOptions {
   expectedBytes?: number;
   /** Header-admitted native response before reading; the caller owns any clone. */
   response?: (response: Response) => void;
+  /** An optional file: a server that answers it is not there (404, the HTML fallback) throws at once instead of RETRY. */
+  missingThrows?: boolean;
 }
 
 function html(bytes: Uint8Array): boolean {
@@ -81,6 +83,17 @@ function abortReason(signal?: AbortSignal): Error {
   return reason instanceof Error ? reason : new DOMException('Content read cancelled', 'AbortError');
 }
 const retryGroups = new WeakMap<Document, Set<() => void>>();
+/** QA 11-12 row 36 (the Open Plots offline audit): at START the card is still the boot shell, and nothing paints a wait's RETRY
+ *  until Loading takes it over, so an offline START read waited on a button nobody could see. The shell's own button shows, with
+ *  the failed file on its foot line; once Loading owns the card it repaints both from the same wait. */
+function shellRetry(scope: Scope, error: ContentReadError, retry: () => void): void {
+  const button = document.querySelector<HTMLButtonElement>('.ws-load .ws-load-retry');
+  if (button === null) return;
+  const foot = document.querySelector<HTMLElement>('.ws-load [data-el="foot"]');
+  if (foot !== null) foot.textContent = error.message;
+  button.hidden = false;
+  scope.listen(button, 'click', retry);
+}
 async function retryFromCard(error: ContentReadError, signal?: AbortSignal): Promise<void> {
   if (typeof document === 'undefined') throw error;
   const target = document, timeline = currentLoadingTimeline(), scope = new Scope('content-read-button');
@@ -96,6 +109,7 @@ async function retryFromCard(error: ContentReadError, signal?: AbortSignal): Pro
       id = beginLoadingWait(error.message, { kind: 'file', resource: error.url,
         owner: timeline?.waitOwner ?? null, step: timeline?.snapshot().current ?? null,
         retry: () => {for (const retry of pending) retry();}, retryNavigation: false });
+      shellRetry(scope, error, () => {for (const retry of pending) retry();});
     });
   } finally {
     if (id !== undefined) finishLoadingWait(id);
@@ -122,6 +136,7 @@ export async function readContent(url: string, maximum: number, options: Content
     } catch (error) {
       options.signal?.throwIfAborted();
       if (!(error instanceof ContentReadError)) throw error;
+      if (error.missing && options.missingThrows === true) throw error;
       if (!retried) { retried = true; }
       else {
         // RL8 (Jake's phone, 2026-11-09: an old cached build sat at "0.00 MB of 28.4 MB"): a deploy keeps only the live

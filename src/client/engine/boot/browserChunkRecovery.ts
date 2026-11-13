@@ -20,12 +20,15 @@ let worldRunning = false;
 let documentLeaving = false;
 const recoveryAllowed = (): boolean => !worldRunning && !documentLeaving;
 let recover: ((error: unknown) => Promise<boolean>) | undefined;
-async function latestVersion(allowed: () => boolean): Promise<string | null> {
+/** How long a failed chunk's newer-build check waits for `/version.json`. */
+const VERSION_MS = 5000;
+async function latestVersion(allowed: () => boolean, limitMs?: number): Promise<string | null> {
   if (!allowed()) return null;
   const owner = pageScope.child('chunk-version'), controller = new AbortController();
   const url = new URL('/version.json', location.href);
   const wait = beginLoadingWait('Checking updated application', { kind: 'file', resource: url.href });
   owner.onDispose(() => { controller.abort(); });
+  if (limitMs !== undefined) owner.timeout(limitMs, () => { controller.abort(); });
   owner.listen(window, 'beforeunload', () => { controller.abort(); });
   owner.listen(window, 'pagehide', () => { controller.abort(); });
   try {
@@ -37,8 +40,8 @@ async function latestVersion(allowed: () => boolean): Promise<string | null> {
   } catch { return null; }
   finally { finishLoadingWait(wait); owner.dispose(); }
 }
-const recoveryPorts = (allowed: () => boolean, reason: ReloadReason = 'reload'): ChunkRecoveryPorts => ({allowed, base: location.href, runningBuild: __BUILD_ID__,
-  version: () => latestVersion(allowed), claimed: bootSelfReloadClaimed, claim: claimBootSelfReload,
+const recoveryPorts = (allowed: () => boolean, reason: ReloadReason = 'reload', limitMs?: number): ChunkRecoveryPorts => ({allowed, base: location.href, runningBuild: __BUILD_ID__,
+  version: () => latestVersion(allowed, limitMs), claimed: bootSelfReloadClaimed, claim: claimBootSelfReload,
   prepare: async build => {
     const wait = beginLoadingWait('Activating updated application', {kind: 'worker', resource: '/sw.js'});
     try { return await (await import('./sw')).refreshWorkerForChunkRecovery(build, allowed); }
@@ -50,7 +53,8 @@ const recoveryPorts = (allowed: () => boolean, reason: ReloadReason = 'reload'):
 export function recoverChunkFailure(error: unknown): Promise<boolean> {
   if (typeof window === 'undefined' || typeof __BUILD_ID__ !== 'string') return Promise.resolve(false);
   // QA 11-12 row 35: the engine's own reload into the newer build resumes the world it was loading, never a title nobody asked for
-  recover ??= createChunkRecovery(recoveryPorts(recoveryAllowed, 'background'));
+  // QA 11-12 row 36: a link that never answers is no newer build; the failed read surfaces instead of waiting on it
+  recover ??= createChunkRecovery(recoveryPorts(recoveryAllowed, 'background', VERSION_MS));
   return recover(error);
 }
 /** The old worker can't be shown to step aside, so the page leaves it: the next document comes from the network. */
