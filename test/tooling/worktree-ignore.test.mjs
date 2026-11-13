@@ -88,13 +88,17 @@ describe('the parent checkout never sees a planted worktree', () => {
   });
 
   test("the kit lint (the whole root, pnpm lint:kit's own arguments) reports nothing from it", () => {
+    // J329: one run per config, kit's on the root and src/'s on src/.
     const script = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).scripts['lint:kit'];
-    const args = [...script.matchAll(/'([^']*)'|(\S+)/gu)].map(match => match[1] ?? match[2]).slice(1);
-    expect(args[0]).toBe('scripts/lint-cli.mjs');
-    const lint = run(process.execPath, [...args, '-f', 'json']);
-    const report = JSON.parse(lint.stdout);
-    expect(report.number_of_files).toBeGreaterThan(0);
-    expect(seen(lint.stdout)).toEqual([]);
+    let files = 0;
+    for (const command of script.split(' && ')) {
+      const args = [...command.matchAll(/'([^']*)'|(\S+)/gu)].map(match => match[1] ?? match[2]).slice(1);
+      expect(args[0]).toBe('scripts/lint-cli.mjs');
+      const lint = run(process.execPath, [...args, '-f', 'json']);
+      files += JSON.parse(lint.stdout).number_of_files;
+      expect(seen(lint.stdout)).toEqual([]);
+    }
+    expect(files).toBeGreaterThan(0);
   });
 
   test('the game lint skips planted paths, and the root config ignores the folder even when named', () => {
@@ -107,7 +111,7 @@ describe('the parent checkout never sees a planted worktree', () => {
   });
 
   test('a whole-root format check lists nothing from it', () => {
-    const format = run(join(ROOT, 'node_modules/.bin/npr'), ['oxfmt', '-c', 'src/.oxfmtrc.json', '--list-different', '.']);
+    const format = run(join(ROOT, 'node_modules/.bin/npr'), ['oxfmt', '-c', 'kit/.oxfmtrc.json', '--list-different', '.']);
     // --list-different exits 1 when some file differs; anything else, or any stderr, is a broken run.
     expect(format.error).toBeUndefined();
     expect([0, 1]).toContain(format.status);

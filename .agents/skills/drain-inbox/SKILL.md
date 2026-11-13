@@ -49,11 +49,11 @@ on it.
 
 ## 2. One ask per note, before any work
 
-`src/scripts/ask-new.sh "<the note's words, shortened> (review note <id>)"`
+`kit/scripts/ask-new.sh "<the note's words, shortened> (review note <id>)"`
 for each note. Status `open`, evidence `.review/handled/<id>`. The rules
 are in `docs/tasks/asks/README.md` (done = on origin/main with green
 CI). A note about one shard's content gets its ask in that shard repo
-(`../shard-<name>/src/scripts/ask-new.sh`).
+(`../shard-<name>/kit/scripts/ask-new.sh`).
 
 ## 3. Reproduce on the spot
 

@@ -99,7 +99,7 @@ function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
     {name:'lint (kit + game)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(lintThreads)],['pnpm','run','--silent','lint:game']]},
     {name:'format:check',commands:[['pnpm','run','--silent','format:check']]},
     {name:'check:sides',commands:[['pnpm','run','--silent','check:sides']]},
-    {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/asks.mjs','check','--all']]},
+    {name:'check:asks',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'kit/scripts/asks.mjs','check','--all']]},
     {name:'check:page-events',commands:[['pnpm','run','--silent','check:page-events']]},
     // WIRE-STABILITY WR6: the bound wire's lock is current against v0, under 1 s (release rules come with a newer pin).
     {name:'check:wire',commands:[['pnpm','run','--silent','check:wire']]},
@@ -154,7 +154,7 @@ async function main(){
     const result=await parallelChecks([
       {name:'lint (docs-only)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(PUSH_BUDGET.lintThreads)],['pnpm','run','--silent','lint:game']]},
       {name:'format:check (docs-only; history scan already green)',commands:[['pnpm','run','--silent','format:check']]},
-      {name:'check:asks (committed docs)',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'src/scripts/asks.mjs','check','--all']]},
+      {name:'check:asks (committed docs)',commands:[['pnpm','run','--silent','check:asks'],[process.execPath,'kit/scripts/asks.mjs','check','--all']]},
       // EV9: agent-parity reads AGENTS.md and CLAUDE.md; a test that reads a changed doc runs too.
       {name:'check:parity (docs-only)',commands:[['pnpm','run','--silent','check:parity']]},
       ...(selection.tests?.length?[{name:`vitest (docs readers: ${selection.tests.length})`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests',...selection.tests]]}]:[]),

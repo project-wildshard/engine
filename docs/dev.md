@@ -37,7 +37,7 @@ Run from the repo root.
 - `node src/cli/main.ts --help`: the CLI without installing it. `serve [--port n]` starts the server (default 4402).
   The npm bin is `src/cli/engine.mjs`: it loads the format hook so `main.ts` runs from `node_modules`.
 - `pnpm md:wrap`: rewraps Markdown prose to ~72 columns.
-- `src/scripts/ask-new.sh "<Jake's words>"`: opens an ask (`docs/tasks/asks/README.md`).
+- `kit/scripts/ask-new.sh "<Jake's words>"`: opens an ask (`docs/tasks/asks/README.md`).
 - `scripts/browser-lane.sh node scripts/hud-worst.mjs --base=<url>`: the worst-case HUD, every
   element any shard shows on at once, screenshotted per browser, size and
   Developer mode, with the layout check (`--check`, `--menu`; A14). The
@@ -73,7 +73,7 @@ goes in `tmp/<task>/` and is deleted when done.
 - `src/e2e/`: Playwright: the status page, and `smoke/`, the Template 2 smoke.
 - `src/cook/`: shardfile to runtime packs.
 - `src/scripts/check-sides.mjs`: the side rule (`pnpm check:sides`).
-- `src/scripts/`: repo tooling (asks, md-wrap), plain JS.
+- `kit/scripts/`: repo tooling (asks, md-wrap, lint), plain JS (J329).
 - `docs/`: living docs. `docs/plans/` is the queue, `docs/tasks/asks/`
   the receipts.
 - `project/`: history. `journal/`, `origins/` (the meta-repo plans this
@@ -82,7 +82,7 @@ goes in `tmp/<task>/` and is deleted when done.
 ## Code rules
 
 - TypeScript only, imports with explicit `.ts`/`.tsx` extensions.
-- Every function has an explicit return type. `src/.oxlintrc.json` denies
+- Every function has an explicit return type. `kit/.oxlintrc.json` denies
   every category (D28); disable a rule only with a one-line reason beside it.
 - Pin dependencies exactly (`.npmrc` has `save-exact=true`).
 - Other Wildshard repos are git dependencies pinned by tag

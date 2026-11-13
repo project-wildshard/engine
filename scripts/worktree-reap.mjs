@@ -103,21 +103,21 @@ export function stopWorktreeProcesses(tree,options={}){
 }
 
 /** Newest change in the worktree's own Git state, in ms. @param {string} tree @param {string} gitDir */
-function lastActivity(tree,gitDir){
+export function lastActivity(tree,gitDir){
  let newest=Number(git(tree,['log','-1','--format=%ct','HEAD']).trim())*1000;
  for(const file of ['index','HEAD','logs/HEAD'])try{newest=Math.max(newest,statSync(join(gitDir,file)).mtimeMs);}catch{/* Not there. */}
  return newest;
 }
 
 /** Is `sha` on origin/main itself? @param {string} canonical @param {string} sha */
-const onMain=(canonical,sha)=>sha!==''&&tryGit(canonical,['merge-base','--is-ancestor',sha,'origin/main']).status===0;
+export const onMain=(canonical,sha)=>sha!==''&&tryGit(canonical,['merge-base','--is-ancestor',sha,'origin/main']).status===0;
 /** Commits of `sha` that origin/main lacks. @param {string} canonical @param {string} sha */
 const aheadOfMain=(canonical,sha)=>Number(tryGit(canonical,['rev-list','--count',`origin/main..${sha}`]).stdout.trim()||'0');
 
 /** @typedef {{path:string,head:string,branch:string}} Worktree */
 
 /** Linked worktrees of the repo from `git worktree list --porcelain -z`. @param {string} canonical @returns {Worktree[]} */
-function linkedWorktrees(canonical){
+export function linkedWorktrees(canonical){
  /** @type {Worktree[]} */const trees=[];
  /** @type {Partial<Worktree>} */let current={};
  for(const field of [...git(canonical,['worktree','list','--porcelain','-z']).split('\0'),'']){
@@ -157,7 +157,7 @@ export function reap(canonical,options,env,say){
   if(!existsSync(tree.path)){keep('its folder is gone; `git worktree prune` clears it');continue;}
   // Landed means the tip is on main itself (land fast-forwards): \`git cherry\` would miss a merge's own changes.
   if(!onMain(canonical,tree.head)){keep(`${String(aheadOfMain(canonical,tree.head))} commit(s) not on main`);continue;}
-  const dirty=git(tree.path,['status','--porcelain','--untracked-files=all']).split('\n').filter(Boolean);
+  const dirty=git(tree.path,['--no-optional-locks','status','--porcelain','--untracked-files=all']).split('\n').filter(Boolean);
   if(dirty.length>0){keep(`${String(dirty.length)} uncommitted path(s), first ${dirty[0]?.slice(3)}`);continue;}
   const gitDir=git(tree.path,['rev-parse','--absolute-git-dir']).trim();
   const busy=(/** @type {Map<number,string>|undefined} */ seen)=>seen===undefined?'cannot list process working directories'
@@ -180,7 +180,7 @@ export function reap(canonical,options,env,say){
     if(stopped.length>0)say(`${options.dryRun?'would stop':'stopped '} ${slug}: orphaned pid ${stopped.join(', ')}`);
    }
    const head=tryGit(tree.path,['rev-parse','HEAD']).stdout.trim();
-   const now2=git(tree.path,['status','--porcelain','--untracked-files=all']).trim();
+   const now2=git(tree.path,['--no-optional-locks','status','--porcelain','--untracked-files=all']).trim();
    const seen2=processDirectories();
    const using2=busy(seen2===undefined||!options.dryRun?seen2:new Map([...seen2].filter(([pid])=>!orphans.has(pid))));
    const why=head!==tree.head?`HEAD moved to ${head.slice(0,10)} during the check`:now2!==''?'edited during the check':using2!==''?`in use during the check (${using2})`

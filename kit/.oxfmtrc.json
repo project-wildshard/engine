@@ -30,7 +30,7 @@
   },
   "ignorePatterns": [
     // Plain-JS repo scripts, outside the TS project; covered by
-    // `pnpm test:hooks` instead. (.githooks/ sits outside src/.)
+    // `pnpm test:hooks` instead. (.githooks/ sits outside kit/.)
     "scripts/**",
     "dist/**",
     "node_modules/**",

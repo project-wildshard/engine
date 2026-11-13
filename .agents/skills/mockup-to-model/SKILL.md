@@ -30,7 +30,7 @@ model a place, split it first.
 
 ## 0. Before you start
 
-- Claim the ask: run `src/scripts/ask-new.sh "<Jake's words>"` in the
+- Claim the ask: run `kit/scripts/ask-new.sh "<Jake's words>"` in the
   owning repo's checkout and read its output (parallel sessions claim
   ids in the same second). Keep its Status line true.
 - Read the shard repo's plans (`../shard-<name>/docs/plans/`) and its

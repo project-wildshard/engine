@@ -37,7 +37,7 @@ if [ "$mode" = code ]; then
   check native-item-frame proof sim-node-loader.mjs test/ci/native-item-frame.proof.mjs
   check declared-input bash -c 'node scripts/pins.ts install nine-dragon-stack && node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/declared-input.proof.mjs'
 fi
-check asks node src/scripts/asks.mjs check --all
+check asks node kit/scripts/asks.mjs check --all
 if [ "$mode" = docs ]; then
   check parity pnpm check:parity
   # Space-separated repo paths from scripts/ci-selection.mjs. A file the config excludes (lift-pending, quarantine)

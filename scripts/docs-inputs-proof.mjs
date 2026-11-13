@@ -10,14 +10,14 @@ const root=mkdtempSync(join(directory,'run-'));
 /** @param {string[]} args */
 const git=args=>execFileSync('git',['-c','user.name=Docs proof','-c','user.email=proof@example.test',...args],{cwd:root,encoding:'utf8'}).trim();
 try{
- git(['init','--quiet','--initial-branch=main']);mkdirSync(join(root,'src/scripts'),{recursive:true});mkdirSync(join(root,'docs/tasks/asks'),{recursive:true});mkdirSync(join(root,'docs/plans'),{recursive:true});
- copyFileSync('src/scripts/asks.mjs',join(root,'src/scripts/asks.mjs'));
+ git(['init','--quiet','--initial-branch=main']);mkdirSync(join(root,'kit/scripts'),{recursive:true});mkdirSync(join(root,'docs/tasks/asks'),{recursive:true});mkdirSync(join(root,'docs/plans'),{recursive:true});
+ copyFileSync('kit/scripts/asks.mjs',join(root,'kit/scripts/asks.mjs'));
  writeFileSync(join(root,'docs/plans/actual.md'),'# Real plan');
  writeFileSync(join(root,'docs/tasks/asks/A1.md'),'# A1\n\n**Status:** folded into actual\n\n**Ask:** Original recorded request\n');
  git(['add','src','docs']);git(['commit','--quiet','-m','valid docs']);
- assert.equal(spawnSync(process.execPath,['src/scripts/asks.mjs','check','--all'],{cwd:root}).status,0);
+ assert.equal(spawnSync(process.execPath,['kit/scripts/asks.mjs','check','--all'],{cwd:root}).status,0);
  unlinkSync(join(root,'docs/plans/actual.md'));git(['add','docs/plans/actual.md']);git(['commit','--quiet','-m','remove referenced plan']);
- const invalid=spawnSync(process.execPath,['src/scripts/asks.mjs','check','--all'],{cwd:root,encoding:'utf8'});
+ const invalid=spawnSync(process.execPath,['kit/scripts/asks.mjs','check','--all'],{cwd:root,encoding:'utf8'});
  assert.notEqual(invalid.status,0,'An empty Git index must not hide a committed dead ask target');
  assert.match(invalid.stderr,/existing ask|plan/u);
  writeFileSync(join(root,'docs/HOST-BAR.md'),'lint/listed-view-code.json');
