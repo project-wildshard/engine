@@ -162,11 +162,13 @@ jobs:
   # release as the dedicated bundle (`server-staging-<sha>` or `vX.Y.Z`), so sharddev fetches it at its engine pin
   # (sharddev src/sharddev/devClient.ts). After publish, which makes the release; a held or failed publish leaves the release
   # in place, so the client still goes up (no release skips with a warning; any other read failure is red). The first upload wins: a rerun keeps the asset already there.
+  # SHARD-AUTHORING SA43: the same job packs the preparation client `wildshard prepare` serves (`preparation-client.tar.gz`,
+  # a WILDSHARD_PREPARATION_ONLY production build); a source from before SA43 has no `--kind` and packs only the first.
   devserver-client:
     needs: [source, publish]
     if: ${{ !cancelled() && needs.source.outputs.ready == 'true' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 50
     permissions:
       contents: write
     env:
@@ -179,7 +181,9 @@ jobs:
           persist-credentials: false
       - name: Skip a source from before ENG-16
         id: has
-        run: if [ -f scripts/devserver-client.mjs ]; then echo "build=true" >> "$GITHUB_OUTPUT"; else echo "::notice::$SOURCE_SHA has no scripts/devserver-client.mjs"; fi
+        run: |
+          if [ -f scripts/devserver-client.mjs ]; then echo "build=true" >> "$GITHUB_OUTPUT"; else echo "::notice::$SOURCE_SHA has no scripts/devserver-client.mjs"; fi
+          if grep -q PREPARATION_CLIENT_ASSET scripts/devserver-client.mjs 2>/dev/null; then echo "preparation=true" >> "$GITHUB_OUTPUT"; fi
       - if: steps.has.outputs.build == 'true'
         uses: ./.github/actions/ring-setup
         with:
@@ -190,6 +194,9 @@ jobs:
           node scripts/pins.ts install
           node scripts/gen.mjs --inputs-only
           python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --out "$RUNNER_TEMP/devserver-client.tar.gz"
+      - name: Build the preparation client
+        if: steps.has.outputs.preparation == 'true'
+        run: python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --kind preparation --out "$RUNNER_TEMP/preparation-client.tar.gz"
       - name: Upload it to the release, once
         if: steps.has.outputs.build == 'true'
         env:
@@ -199,5 +206,8 @@ jobs:
             if grep -qi 'release not found' "$RUNNER_TEMP/view.err"; then echo "::warning::no release $RELEASE_TAG for $SOURCE_SHA: publish made none"; exit 0; fi
             cat "$RUNNER_TEMP/view.err"; exit 1
           fi
-          if grep -qx 'devserver-client.tar.gz' "$RUNNER_TEMP/assets.txt"; then echo "::notice::$RELEASE_TAG already has its devserver client"; exit 0; fi
-          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/devserver-client.tar.gz" --repo "$GITHUB_REPOSITORY"
+          for asset in devserver-client.tar.gz preparation-client.tar.gz; do
+            [ -f "$RUNNER_TEMP/$asset" ] || continue
+            if grep -qx "$asset" "$RUNNER_TEMP/assets.txt"; then echo "::notice::$RELEASE_TAG already has $asset"; continue; fi
+            gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/$asset" --repo "$GITHUB_REPOSITORY"
+          done

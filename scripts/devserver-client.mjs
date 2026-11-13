@@ -9,6 +9,11 @@
 // programs, drafts, trailers and source maps. The author's own shard comes from `wildshard dev`'s build.
 //
 //   python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --out <devserver-client.tar.gz> [--keep <folder>]
+//
+// SHARD-AUTHORING SA43: `--kind preparation` packs the client `wildshard prepare` records in, `preparation-client.tar.gz`:
+// the production build (DEVSERVER off, the production renderer and its revision) made with `WILDSHARD_PREPARATION_ONLY=1`,
+// so it owns the author's inline draft as `wildshard dev`'s page does, pruned the same way. check-devserver refuses to
+// release it; it is only ever a release asset beside the devserver client.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
@@ -17,16 +22,25 @@ import { pathToFileURL } from 'node:url';
 const ROOT = resolve(import.meta.dirname, '..');
 /** The release asset's name; sharddev's `DEV_CLIENT_ASSET` reads the same. */
 export const DEV_CLIENT_ASSET = 'devserver-client.tar.gz';
+/** SA43: the preparation client's asset; sharddev's `PREPARATION_CLIENT_ASSET` reads the same. */
+export const PREPARATION_CLIENT_ASSET = 'preparation-client.tar.gz';
+/** @typedef {'devserver' | 'preparation'} ClientKind */
 /** Top-level paths (and `assets/` folders) a devserver page never reads. */
 const DROP_TOP = ['programs', 'drafts', 'trailer-15.mp4', 'trailer-30.mp4'];
 const DROP_ASSETS = ['driftwood-isle', 'far-reach', 'nalati', 'nine-dragon', 'pine-hollow', 'sunscar-dunes', 'practice'];
 /** `assets/gpu/` (KTX2 stand-ins): the shards' own folders go; the engine's `tex`, `models` and `horizon` stay. */
 const DROP_GPU = ['baked', 'far-reach', 'nalati', 'nine-dragon', 'pine-hollow'];
 
-/** Prune a devserver build in place to the client an author's page reads. @param {string} client */
-export function pruneDevserverClient(client) {
+/** Prune a devserver build (or, SA43, a preparation-only production build) in place to the client an author's page reads.
+ *  @param {string} client @param {ClientKind} [kind] */
+export function pruneDevserverClient(client, kind = 'devserver') {
   const flags = JSON.parse(readFileSync(join(client, 'build-flags.json'), 'utf8'));
-  if (flags?.devserver !== true) throw new Error('devserver-client: the build is not in devserver mode');
+  if (kind === 'devserver' && flags?.devserver !== true) throw new Error('devserver-client: the build is not in devserver mode');
+  if (kind === 'preparation') {
+    const versionFile = join(client, 'version.json');
+    const version = existsSync(versionFile) ? JSON.parse(readFileSync(versionFile, 'utf8')) : undefined;
+    if (flags?.devserver !== false || version?.preparationOnly !== true) throw new Error('devserver-client: the build is not a preparation-only production build');
+  }
   for (const name of DROP_TOP) rmSync(join(client, name), { recursive: true, force: true });
   for (const name of DROP_ASSETS) rmSync(join(client, 'assets', name), { recursive: true, force: true });
   for (const name of DROP_GPU) rmSync(join(client, 'assets', 'gpu', name), { recursive: true, force: true });
@@ -47,15 +61,18 @@ const bytesOf = folder => readdirSync(folder, { recursive: true, withFileTypes: 
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const args = process.argv.slice(2), option = (/** @type {string} */ name) => { const at = args.indexOf(`--${name}`); return at === -1 ? undefined : args[at + 1]; };
-  const out = resolve(option('out') ?? join('tmp', 'devserver-client', DEV_CLIENT_ASSET));
+  const kind = /** @type {ClientKind} */ (option('kind') ?? 'devserver');
+  if (kind !== 'devserver' && kind !== 'preparation') throw new Error(`devserver-client: --kind is devserver or preparation, not ${String(kind)}`);
+  const out = resolve(option('out') ?? join('tmp', 'devserver-client', kind === 'devserver' ? DEV_CLIENT_ASSET : PREPARATION_CLIENT_ASSET));
   const client = resolve(option('keep') ?? join(ROOT, 'tmp', 'devserver-client', 'client'));
   if (relative(ROOT, client).startsWith('..')) throw new Error('devserver-client: the build folder must be inside this checkout (build-app defers its public copy there)');
   rmSync(client, { recursive: true, force: true });
-  const built = spawnSync(process.execPath, ['scripts/build-app.mjs', '--mode', 'devserver', '--outDir', client], {
-    cwd: ROOT, stdio: 'inherit', env: { ...process.env, WILDSHARD_CATALOGUE: process.env.WILDSHARD_CATALOGUE ?? 'test/pins/catalogue.json' } });
+  const built = spawnSync(process.execPath, ['scripts/build-app.mjs', '--mode', kind === 'devserver' ? 'devserver' : 'production', '--outDir', client], {
+    cwd: ROOT, stdio: 'inherit', env: { ...process.env, WILDSHARD_CATALOGUE: process.env.WILDSHARD_CATALOGUE ?? 'test/pins/catalogue.json',
+      ...(kind === 'preparation' ? { WILDSHARD_PREPARATION_ONLY: '1' } : {}) } });
   if (built.status !== 0) throw new Error(`devserver-client: build-app exited ${String(built.status)}`);
   const before = bytesOf(client);
-  pruneDevserverClient(client);
+  pruneDevserverClient(client, kind);
   mkdirSync(resolve(out, '..'), { recursive: true });
   // the same bytes for the same tree: sorted names, no owners or times (as the dedicated bundle is packed in server-release.yml)
   const tar = spawnSync('tar', ['--version'], { encoding: 'utf8' }).stdout.includes('GNU') ? 'tar' : 'gtar';
@@ -63,6 +80,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   execFileSync('bash', ['-c', gnu
     ? `set -euo pipefail; ${tar} --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf - -C "$1" . | gzip -n > "$2"`
     : 'set -euo pipefail; tar -cf - -C "$1" . | gzip -n > "$2"', 'pack', client, out], { stdio: 'inherit' });
-  console.log(`devserver-client: ${(before / 1e6).toFixed(0)} MB built, ${(bytesOf(client) / 1e6).toFixed(0)} MB kept, ${(statSync(out).size / 1e6).toFixed(1)} MB packed: ${out}`);
+  console.log(`devserver-client (${kind}): ${(before / 1e6).toFixed(0)} MB built, ${(bytesOf(client) / 1e6).toFixed(0)} MB kept, ${(statSync(out).size / 1e6).toFixed(1)} MB packed: ${out}`);
   if (option('keep') === undefined) rmSync(client, { recursive: true, force: true });
 }

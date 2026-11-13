@@ -30,7 +30,7 @@ test('the title keeps a big hero, a short build label clear of the logo, and the
   mkdirSync(SHOTS, { recursive: true });
   const release = engineRelease(process.cwd());
   await build({ configFile: false, root: resolve('test/title-layout'), logLevel: 'warn', publicDir: false,
-    define: { __TITLE_ASSET_URLS__: '{}', __BUILD_ID__: '(globalThis.__WS_BUILD_ID__ ?? "")', __DEVSERVER__: 'false', __ENGINE_RELEASE__: JSON.stringify(release) },
+    define: { __TITLE_ASSET_URLS__: '{}', __BUILD_ID__: '(globalThis.__WS_BUILD_ID__ ?? "")', __DEVSERVER__: 'false', __PREPARATION_ONLY__: 'false', __ENGINE_RELEASE__: JSON.stringify(release) },
     build: { outDir: OUT, emptyOutDir: true, target: 'es2022', minify: false } });
   const fonts = (readFileSync('index.html', 'utf8').match(/@font-face\{[^}]*\}/gu) ?? []).join('\n');
   const server = createServer((request, response) => {

@@ -16,7 +16,7 @@ export function assertProductionBuild(directory) {
       if (file.isDirectory()) walk(full);
       else if (file.name.endsWith('.js')) {
         const code = readFileSync(full, 'utf8');
-        if (code.includes('__DEVSERVER__')) throw new Error('Production bundle contains an unsubstituted DEVSERVER define');
+        if (code.includes('__DEVSERVER__') || code.includes('__PREPARATION_ONLY__')) throw new Error('Production bundle contains an unsubstituted DEVSERVER or PREPARATION_ONLY define');
       }
     }
   };

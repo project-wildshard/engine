@@ -31,3 +31,17 @@ test('a build not in devserver mode is refused untouched', () => {
   expect(() => { pruneDevserverClient(root); }).toThrow(/devserver mode/u);
   expect(existsSync(join(root, 'programs/a.json'))).toBe(true);
 });
+
+test('SA43: the preparation client is a preparation-only production build, pruned the same way', () => {
+  const root = client({ devserver: false }, ['index.html', 'programs/driftwood-isle.json', 'shardfiles/driftwood-isle/shard.json', 'shardfiles/driftwood-isle/discovery.json']);
+  writeFileSync(join(root, 'version.json'), JSON.stringify({ preparationOnly: true }));
+  pruneDevserverClient(root, 'preparation');
+  expect(existsSync(join(root, 'index.html'))).toBe(true);
+  expect(existsSync(join(root, 'shardfiles/driftwood-isle/discovery.json'))).toBe(true);
+  expect(existsSync(join(root, 'programs/driftwood-isle.json'))).toBe(false);
+  expect(existsSync(join(root, 'shardfiles/driftwood-isle/shard.json'))).toBe(false);
+  const released = client({ devserver: false }, ['programs/a.json']);
+  writeFileSync(join(released, 'version.json'), JSON.stringify({ preparationOnly: false }));
+  expect(() => { pruneDevserverClient(released, 'preparation'); }).toThrow(/preparation-only/u);
+  expect(() => { pruneDevserverClient(client({ devserver: true }, []), 'preparation'); }).toThrow(/preparation-only/u);
+});

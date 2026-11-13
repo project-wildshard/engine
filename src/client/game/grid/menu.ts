@@ -2,6 +2,7 @@ import { isDev } from '@wildshard/engine/core/devMode';
 import type { GridMode } from '../../../shared/game/grid/catalogue';
 
 declare const __DEVSERVER__: boolean;
+declare const __PREPARATION_ONLY__: boolean;
 /**
  * The main menu's two entries (SHARD-PLATFORM §3.3, G58, G61, SF21a): **Select a shard** (today's one-shard flow) and
  * **Infinite Wildshard** (the 5 × 5 grid). What each mode lets the player enter is the §3.3 table:
@@ -19,6 +20,9 @@ export const GRID_GATES_PASSED = false;
 
 /** The author's build-time switch (`vite build --mode devserver`, SF8c); a unit test's Node has no define, so false */
 export const DEVSERVER: boolean = typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__;
+/** SHARD-AUTHORING SA43: a production-renderer build made with `WILDSHARD_PREPARATION_ONLY=1` (never released:
+ *  check-devserver refuses it), the client `wildshard prepare` serves with the author's draft inline */
+export const PREPARATION_ONLY: boolean = typeof __PREPARATION_ONLY__ === 'boolean' && __PREPARATION_ONLY__;
 
 /** what the title is allowed to show and enter right now */
 export interface MenuMode { readonly developer: boolean; readonly devserver: boolean }

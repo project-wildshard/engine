@@ -220,7 +220,10 @@ async function enterPage(): Promise<unknown> {
         import('@wildshard/engine/game/grid/menu'), import('@wildshard/engine/game/boot/spawnDownload')]));
       await tier.initializeTier();
       const slug = search.get('chunk');
-      if (typeof slug === 'string') {
+      // SA43: a page that owns its inline shard (`wildshard dev`, `wildshard prepare` at `?chunk=`) has no catalogue download
+      // for it: that shard's spawn set isn't its download (as startSelected's `authored`)
+      const inlineShard = (menu.DEVSERVER || menu.PREPARATION_ONLY) && document.getElementById('ws-shardfile') !== null;
+      if (typeof slug === 'string' && !inlineShard) {
         const mode = menu.gridMode(menu.DEVSERVER), flow = pageGridRecovery() !== null || pendingGridEntry(slug) ? 'grid' : 'client';
         spawn.setSpawnPacks(runtimePacksOn());
         // LD2 (J208): a Start read this download holds (selected discovery behind the warm check) is named from the tap
@@ -371,7 +374,7 @@ async function startSelected(): Promise<void> {
   const moduleRows: unknown = moduleText === undefined ? undefined : JSON.parse(moduleText);
   const gridEntryModule = import('@wildshard/engine/game/grid/pageEntry');
   const gridMenuModule = import('@wildshard/engine/game/grid/menu');
-  const [gridSelection, { gridMode, DEVSERVER }] = await Promise.all([gridEntryModule, gridMenuModule]);
+  const [gridSelection, { gridMode, DEVSERVER, PREPARATION_ONLY }] = await Promise.all([gridEntryModule, gridMenuModule]);
   const earlyPath = gridSelection.pageGridRecovery() !== null || gridSelection.pendingGridEntry(arrival.slug)
     ? 'grid' : 'shardfile';
   // MF4: one spawn manifest per shard / tier / flow (grid: per menu mode) is the whole download; the bar reads only it and
@@ -381,8 +384,9 @@ async function startSelected(): Promise<void> {
   setSpawnPacks(runtimePacksOn()); // DL16: Debug ▸ Loading & memory ▸ Level download
   // DL21: a read the whole-set hold stalls is named on the card as the spawn download, in its step
   observeSpawnHolds((held, path) => waitFor('Spawn download', held, 'file', `spawn-download:${path}`));
-  // SA15: `wildshard dev`'s page carries the author's shard inline; the catalogue shard's spawn set isn't its download
-  const authored = DEVSERVER && document.getElementById('ws-shardfile') !== null;
+  // SA15: `wildshard dev`'s page carries the author's shard inline; the catalogue shard's spawn set isn't its download.
+  // SA43: so does `wildshard prepare`'s, a preparation-only production build; only those two builds own an inline shard
+  const inlineOwner = DEVSERVER || PREPARATION_ONLY, authored = inlineOwner && document.getElementById('ws-shardfile') !== null;
   const spawnMode = gridMode(DEVSERVER), spawnJob = authored ? null : startSpawnDownload(arrival.slug, earlyPath === 'grid' ? 'grid' : 'client', TIER,
     `${Number(spawnMode.developer)}${Number(spawnMode.devserver)}${Number(spawnMode.nineDragon)}`);
   if (spawnJob !== null) void loading.setDownloadSource(spawnJob);
@@ -436,7 +440,7 @@ async function startSelected(): Promise<void> {
   try {
     imports.check();
     loading.setPrefetchSource(gridPrefetchStatus);
-    const source = pageGridRecovery() === null ? await bootTask('app:product-source-and-read', () => configuredShardfile(document, browserShardfileOptions(document.baseURI, DEVSERVER))) : null;
+    const source = pageGridRecovery() === null ? await bootTask('app:product-source-and-read', () => configuredShardfile(document, browserShardfileOptions(document.baseURI, inlineOwner))) : null;
     page = preparePageResidency(arrival, source?.identity.slug);
     // The script memory bank, sized by route: each reserve can cost JSC a full GC (e472f34069), so a grid page reserves
     // the full-ALL route's demand for its cell activations in play, and a standalone page, which builds its one world under
@@ -476,7 +480,7 @@ async function startSelected(): Promise<void> {
     if (spawnJob !== null) await waitFor('Spawn download', spawnJob.listed ?? spawnJob.ready, 'file');
     const manifest = await bootAwait('app:product-admission', source === null
       ? installManifestShardfile(arrival, { ...browserShardfileOptions(document.baseURI, true), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready)
-      : installShardfileProduct(source, { ...browserShardfileOptions(document.baseURI, DEVSERVER), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready));
+      : installShardfileProduct(source, { ...browserShardfileOptions(document.baseURI, inlineOwner), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready));
     // Keep the seam out of code and descriptor admission; world construction
     // can overlap this read and retains its original full-geometry barrier.
     if (page.mode === 'grid') gridSelection.startGridEntryContent(page.instance ?? pageGridRecovery()?.instance ?? gridSelection.gridHome().instance);

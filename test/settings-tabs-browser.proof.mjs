@@ -29,7 +29,7 @@ const EXPECT = {
 test('Settings: five tabs (six in Developer mode), every row in its tab, every control works', { timeout: 240_000 }, async () => {
   mkdirSync(SHOTS, { recursive: true });
   await build({ configFile: false, root: resolve('test/settings-tabs'), logLevel: 'warn', publicDir: false,
-    define: { __TITLE_ASSET_URLS__: '{}', __BUILD_ID__: '(globalThis.__WS_BUILD_ID__ ?? "")', __DEVSERVER__: 'false', __ENGINE_RELEASE__: '"v0.0.0"' },
+    define: { __TITLE_ASSET_URLS__: '{}', __BUILD_ID__: '(globalThis.__WS_BUILD_ID__ ?? "")', __DEVSERVER__: 'false', __PREPARATION_ONLY__: 'false', __ENGINE_RELEASE__: '"v0.0.0"' },
     build: { outDir: OUT, emptyOutDir: true, target: 'es2022', minify: false } });
   const fonts = (readFileSync('index.html', 'utf8').match(/@font-face\{[^}]*\}/gu) ?? []).join('\n');
   const server = createServer((request, response) => {
