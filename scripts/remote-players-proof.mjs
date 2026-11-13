@@ -109,7 +109,7 @@ async function board() {
   const rows = Math.ceil(tiles.length / COLS), width = COLS * (W + GAP) + GAP, height = 90 + rows * (H + BAND + GAP) + GAP;
   const passed = results.filter(result => result.ok).length;
   const head = `<svg width="${String(width)}" height="90" xmlns="http://www.w3.org/2000/svg"><text x="${String(GAP)}" y="40" font-family="Helvetica" font-weight="bold" font-size="30" fill="#ffffff">Remote players: every row in one Driftwood room, seen from Jake's phone</text><text x="${String(GAP)}" y="74" font-family="Helvetica" font-size="22" fill="${passed === results.length ? '#7ee08a' : '#ff8a80'}">${String(passed)} of ${String(results.length)} checks pass · ${esc(new Date().toLocaleString('sv-SE', { timeZone: 'America/Cancun' }).slice(0, 16))} Cancún · REMOTE-PLAYERS RP13</text></svg>`;
-  const layers = [{ input: Buffer.from(head), left: 0, top: 0 }];
+  const layers = /** @type {{ input: Buffer, left: number, top: number }[]} */ ([{ input: Buffer.from(head), left: 0, top: 0 }]);
   for (const [at, tile] of tiles.entries()) {
     const left = GAP + (at % COLS) * (W + GAP), top = 90 + Math.floor(at / COLS) * (H + BAND + GAP);
     const band = `<svg width="${String(W)}" height="${String(BAND)}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="${tile.ok ? '#1f4d2b' : '#5c1f1f'}"/><text x="10" y="27" font-family="Helvetica" font-weight="bold" font-size="20" fill="#ffffff">${esc(tile.label.split(' ')[0] ?? '')} ${tile.ok ? 'PASS' : 'FAIL'}</text><text x="10" y="52" font-family="Helvetica" font-size="17" fill="#e8eef4">${esc(tile.label.split(' ').slice(1).join(' ').slice(0, 30))}</text></svg>`;

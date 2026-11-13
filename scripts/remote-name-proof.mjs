@@ -115,7 +115,7 @@ export async function proveName({ jake, jimmy, note, shots }) {
   note(`at ${String(GONE)} m Jake's __onlinePlayers() reports Jimmy's Name hidden`, gone.shown !== null && gone.shown.tag?.shown === false && gone.gap > 60, { gap: gone.gap, tag: gone.shown?.tag });
   await jake.page.screenshot({ path: join(shots, `${String(GONE)}m.png`) });
   await jake.page.evaluate(() => { cancelAnimationFrame(/** @type {any} */ (window).__rp12Aim); });
-  await bars.evaluate(style => { style.remove(); }); // the bars back for what follows
+  await bars.evaluate(style => { /** @type {Element} */ (style).remove(); }); // the bars back for what follows
 
   return [...STOPS.flatMap(metres => [`${String(metres)}m.png`, `${String(metres)}m-tag.png`]), `${String(GONE)}m.png`];
 }
