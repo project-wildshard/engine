@@ -3,6 +3,7 @@ import { saves } from '@wildshard/engine/saves/runtime';
 import type { SaveStore } from '@wildshard/engine/saves/store';
 import { progressSave } from '../../shared/game/saves';
 import { titleManifests } from './shard/titleList';
+import { playerHidden } from '../../shared/game/grid/catalogueSlot';
 import type { ShardSlug } from '../../shared/game/shard/slug';
 
 const count = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0));
@@ -16,15 +17,16 @@ export interface SummaryView { lines: readonly SummaryLine[]; earned: number; vi
 /** Rebuild from validated save documents only: no world builder or plugin is loaded. */
 export function buildSummary(shards: readonly { slug: string; status?: string }[], read: (slug: string) => SummaryProgress | null, at: number = Date.now()): WildshardSummary {
   const result: WildshardSummary = { v: 1, shards: {} };
-  for (const { slug, status } of shards) {
-    if (status === 'hidden') continue;
+  for (const row of shards) {
+    const { slug } = row;
+    if (playerHidden(row)) continue;
     const progress = read(slug);
     if (progress !== null) result.shards[slug] = { earned: new Set(progress.earned).size, total: null, playS: progress.playS, at };
   }
   return result;
 }
 export function summaryView(summary: WildshardSummary, shards: readonly { slug: string; name: string; status?: string }[]): SummaryView {
-  const lines = shards.filter((shard) => shard.status !== 'hidden').map(({ slug, name }): SummaryLine => {
+  const lines = shards.filter((shard) => !playerHidden(shard)).map(({ slug, name }): SummaryLine => {
     const line = summary.shards[slug];
     return { slug, name, earned: line?.earned ?? 0, total: line?.total ?? null, playS: line?.playS ?? 0, visited: line !== undefined };
   });
@@ -36,7 +38,7 @@ export function summaryStore(store: SaveStore, read: (slug: string) => SummaryPr
   const current = (): WildshardSummary => {
     const saved = slot.peek();
     if (saved !== null) return saved;
-    const rebuilt = buildSummary(titleManifests().filter((shard) => shard.status !== 'hidden'), read); slot.write(rebuilt); return rebuilt;
+    const rebuilt = buildSummary(titleManifests().filter((shard) => !playerHidden(shard)), read); slot.write(rebuilt); return rebuilt;
   };
   return {
     read: current,

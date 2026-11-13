@@ -7,7 +7,7 @@ declare const __DEVSERVER__: boolean;
  * **Infinite Wildshard** (the 5 × 5 grid). What each mode lets the player enter is the §3.3 table:
  *
  *   | mode      | Select a shard enters                        | Infinite Wildshard           |
- *   | shipped   | the live and early-access shards             | hidden until SF22's gates pass   |
+ *   | shipped   | every shard but the hidden ones (J313)       | hidden until SF22's gates pass   |
  *   | developer | every shard, as today (Jake, G58: Select a shard is the existing flow) | shown: the same 25 cells as shipped |
  *   | DEVSERVER | every shard                                  | + the `devserver` cell           |
  *
@@ -31,8 +31,8 @@ export function gridEntryShown(mode: MenuMode = menuMode(), gatesPassed: boolean
   return gatesPassed || mode.developer;
 }
 
-/** Select a shard's ENTER WORLD, per §3.3's table: `restricted` is a card the shipped game shows locked (experimental,
- *  hidden or a `_` prototype) */
+/** Select a shard's ENTER WORLD, per §3.3's table: `restricted` is a card the shipped game shows locked, one badged Developer
+ *  only (hidden, or a `_` prototype the catalogue doesn't open; J313 opens experimental and partial cards to every player) */
 export function selectEnters(_slug: string, restricted: boolean, mode: MenuMode = menuMode()): boolean {
   // Developer mode unlocks every card, Nine Dragon included, exactly as today: Select a shard stays the existing flow (G58)
   return !restricted || mode.developer || mode.devserver;

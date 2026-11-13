@@ -36,11 +36,16 @@ import { readSummary, summaryView } from './summary';
 import { GAME_STRINGS } from '../../shared/game/strings';
 import { menuMode, selectEnters, selectExplores, type MenuMode } from './grid/menu';
 import { pageShardRefusals, refusalReason, type ShardRefusal } from './grid/refusal';
+import { playerHidden, titleStatus } from '../../shared/game/grid/catalogueSlot';
 import './summary.css';
 import './upgrade.css';
 
 
-export type TitleBadge = 'Early access' | 'Experimental' | 'Developer only';
+export type TitleBadge = 'Early access' | 'Experimental' | 'Partial' | 'Developer only';
+
+/* J313 (Jake, 2026-11-12 ~23:05 Cancún): a card's status is its catalogue placement's (`titleStatus`), so the catalogue decides
+ * what Shard Select shows a player; `partial` is J313's PARTIAL label. With no catalogue installed a card keeps its shard's own
+ * status. Open plots keep no card (`shardSelect: false`): a player reaches them by crossing the grid. */
 
 /** one shard card. The standalone title art fields are swapped alongside the manifests: src/client/engine/boot/extras.ts points them at their in-memory copies */
 export interface TitleCard {
@@ -69,7 +74,8 @@ const sessionRefusals: RefusedShard = (slug) => pageShardRefusals().read(slug);
 
 /** Developer mode reveals hidden levels after every player-facing card. */
 export function titleCards(showHidden: boolean = isDev(), upgradeNeeded: UpgradeNeeded = noUpgrades, refused: RefusedShard = sessionRefusals): readonly TitleCard[] {
-  const hidden = (m: TitleManifest): boolean => m.status === 'hidden' || m.slug.startsWith('_');
+  // a `_` prototype stays Developer only unless its catalogue placement opens it (J313: Mossgate)
+  const hidden = (m: TitleManifest): boolean => playerHidden(m);
   const ordinary = titleManifests().filter(m => m.shardSelect !== false);
   const visible = ordinary.filter((m) => !hidden(m));
   const manifests = showHidden ? [...visible, ...ordinary.filter(hidden)] : visible;
@@ -78,8 +84,10 @@ export function titleCards(showHidden: boolean = isDev(), upgradeNeeded: Upgrade
     slug: m.slug, name: m.name, label: m.biome,
     thumbnail: m.card.thumb, heroPortrait: m.card.portrait, heroLandscape: m.card.landscape,
     };
-    if (m.status === 'earlyAccess') card.badge = 'Early access';
-    if (m.status === 'experimental') card.badge = 'Experimental';
+    const status = titleStatus(m);
+    if (status === 'earlyAccess') card.badge = 'Early access';
+    if (status === 'experimental') card.badge = 'Experimental';
+    if (status === 'partial') card.badge = 'Partial';
     if (hidden(m)) card.badge = 'Developer only';
     const built = upgradeNeeded(m.slug);
     if (built !== null) card.upgrade = { built };
@@ -148,8 +156,10 @@ function required(root: ParentNode, selector: string): HTMLElement {
   return found;
 }
 
-/** a card the shipped game shows locked: experimental, hidden or a `_` prototype */
-const restricted = (card: DeckEntry): boolean => card.badge === 'Experimental' || card.badge === 'Developer only' || card.slug.startsWith('_');
+/** a card the shipped game shows locked: a hidden shard or a `_` prototype (`titleCards` badges both Developer only). J313
+ *  (Jake, 2026-11-12) opens EXPERIMENTAL and PARTIAL cards to every player, which replaces E386's "experimental enters only in
+ *  Developer" */
+const restricted = (card: DeckEntry): boolean => card.badge === 'Developer only';
 
 /** ENTER WORLD for a card: Select a shard enters what §3.3's table allows in this mode (SF21a: shipped, Developer, DEVSERVER) */
 function canEnter(card: DeckEntry, mode: MenuMode = menuMode()): boolean {
@@ -165,7 +175,7 @@ function canExplore(card: DeckEntry, mode: MenuMode = menuMode()): boolean {
 
 /** the tape over a card's image: a world that can't be entered reads COMING SOON, not EXPERIMENTAL (Jake, E386) */
 function ribbonFor(card: DeckEntry, mode: MenuMode = menuMode()): string {
-  if (card.draft) return isDev() ? GAME_STRINGS.drafts.ribbon(card.draft.stage) : GAME_STRINGS.drafts.comingSoon;
+  if (card.draft) return mode.developer || mode.devserver ? GAME_STRINGS.drafts.ribbon(card.draft.stage) : GAME_STRINGS.drafts.comingSoon;
   if (card.upgrade !== undefined || card.unavailable !== undefined) return ''; // G86 / G167: the amber badge says it, not a tape
   if (!canEnter(card, mode)) return 'Coming soon';
   return card.badge === 'Developer only' ? GAME_STRINGS.developer.ribbon : card.badge ?? '';
@@ -179,11 +189,11 @@ function dotTag(card: DeckEntry, mode: MenuMode): 'soon' | 'developer' | '' {
 }
 
 function hintFor(card: DeckEntry, active: boolean, mode: MenuMode = menuMode()): string {
-  if (card.draft) return isDev() ? card.draft.stageName : GAME_STRINGS.drafts.notPlayable;
+  if (card.draft) return mode.developer || mode.devserver ? card.draft.stageName : GAME_STRINGS.drafts.notPlayable;
   if (card.upgrade !== undefined || card.unavailable !== undefined) return GAME_STRINGS.upgrade.saveKept;
   if (!canEnter(card, mode)) return '';
   if (!active) return `Loads ${card.name}`;
-  return card.badge === 'Early access' ? 'Early access' : card.badge === 'Experimental' ? 'Developer only' : 'Play'; // Jake: experimental shards enter only in developer mode
+  return card.badge === 'Early access' || card.badge === 'Experimental' || card.badge === 'Partial' ? card.badge : 'Play';
 }
 
 export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
@@ -191,7 +201,9 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   const scope = pageScope.child('title-deck');
   const onTap = (el: HTMLElement, fn: () => void): void => { listenTap(scope, el, fn); };
   const { cards } = opts;
-  const entries: readonly DeckEntry[] = [...cards.map(fromShard), ...DRAFT_TITLES.map(fromDraft)];
+  // J313: a draft's card (Thin Ice, off the grid by J305) never loads, so only Developer sees it
+  const drafts = mode().developer || mode().devserver ? DRAFT_TITLES : [];
+  const entries: readonly DeckEntry[] = [...cards.map(fromShard), ...drafts.map(fromDraft)];
   const activeIndex = entries.map((card): string => card.slug).indexOf(opts.active ?? '');
   const root = document.createElement('div');
   root.className = 'ws-menu';
@@ -216,7 +228,8 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     if (canEnter(card, mode())) image.append(words('i', `ws-menu-card-tag${active ? ' ok' : ''}`, active ? 'Loaded' : 'Load'));
     // G238: the port badge, Developer on only (the public card is unchanged)
     const ribbon = ribbonFor(card, mode());
-    if (ribbon !== '') image.append(words('i', `ws-menu-card-exp${card.badge === 'Early access' && canEnter(card, mode()) ? ' ws-menu-card-ea' : ''}`, ribbon));
+    const tone = !canEnter(card, mode()) ? '' : card.badge === 'Early access' ? ' ws-menu-card-ea' : card.badge === 'Partial' ? ' ws-menu-card-partial' : '';
+    if (ribbon !== '') image.append(words('i', `ws-menu-card-exp${tone}`, ribbon));
     const sub = card.upgrade !== undefined ? GAME_STRINGS.upgrade.built(card.upgrade.built) : card.unavailable !== undefined ? refusalReason(card.unavailable) : card.label;
     button.append(image, words('b', '', card.name), words('small', card.unavailable !== undefined ? 'ws-menu-card-reason' : '', sub)); cardTrack.append(button);
     const dot = document.createElement('i'); dot.dataset['i'] = String(index); dot.dataset['tag'] = dotTag(card, mode()); dot.style.setProperty('--thumb', `url('${titleAssetURL(card.thumbnail)}')`); dotTrack.append(dot);

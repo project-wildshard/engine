@@ -12,6 +12,7 @@ import { exitSessionToTitle } from './session/exitToTitle';
 import { appIdentity } from '@wildshard/engine/app/identity';
 import { markReload } from '@wildshard/engine/boot/lastEnd';
 import { isDev } from '@wildshard/engine/core/devMode';
+import { playerHidden } from '../../shared/game/grid/catalogueSlot';
 import { forgetServerInstance, openIndexedSaves, serverSaveDatabase } from '@wildshard/engine/saves/indexed';
 import { SaveStore } from '@wildshard/engine/saves/store';
 import type { GameMenu } from '@wildshard/engine/ui/Menu';
@@ -76,7 +77,7 @@ type CardManifest = Pick<ShardManifest, 'slug' | 'name' | 'status' | 'card'> & {
 export function saveCards(list: readonly CardManifest[], developer: boolean): SaveCardSpec[] {
   const bare = (slug: string): string => slug.replace(/^_/u, '');
   const bySlug = new Map(list.map((m) => [bare(m.slug), m]));
-  const listed = (m: CardManifest): boolean => developer || (m.status !== 'hidden' && !m.slug.startsWith('_'));
+  const listed = (m: CardManifest): boolean => developer || !playerHidden(m); // J313: the catalogue can open a hidden shard
   const seen = new Set<string>(), out: SaveCardSpec[] = [];
   const add = (instance: string, slug: string, copy: string | null): void => {
     const m = bySlug.get(bare(slug));

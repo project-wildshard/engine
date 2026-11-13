@@ -38,3 +38,16 @@ export function installInlineCatalogue(page: Pick<Document, 'getElementById'>): 
 }
 /** A product's slug for a placement's or cell's, which keep the authored spelling (`_template`). */
 export const bareSlug = (slug: string): string => slug.replace(/^_/u, '');
+/** J313 (Jake, 2026-11-12 ~23:05 Cancún): a shard's player-facing status is its catalogue placement's when the installed
+ *  catalogue gives one (api-server's grid; `test/pins/catalogue.json` in a release build), else its own. The title deck, the
+ *  summary, the saves list and the title prefetch all read it, so the catalogue opens a shard with no shard upload. */
+export function placedStatus(row: {readonly slug: string}): string | undefined {
+  return installedCatalogue()?.placements.find(placed => bareSlug(placed.slug) === bareSlug(row.slug))?.status;
+}
+export function titleStatus(row: {readonly slug: string; readonly status?: string}): string | undefined {
+  return placedStatus(row) ?? row.status;
+}
+/** Hidden from a player: a `hidden` status, or a `_` prototype whose catalogue placement doesn't open it (J313: Mossgate). */
+export function playerHidden(row: {readonly slug: string; readonly status?: string}): boolean {
+  return titleStatus(row) === 'hidden' || (row.slug.startsWith('_') && placedStatus(row) === undefined);
+}

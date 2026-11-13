@@ -1,6 +1,7 @@
 import * as v from 'valibot';
 import type {SaveStore} from '@wildshard/engine/saves/store';
 import type {TitleManifest} from '../shard/titleList';
+import {playerHidden} from '../../../shared/game/grid/catalogueSlot';
 
 /** A scheduling preference only; it cannot select a world or admit a file. */
 export interface TitlePrefetchChoice {
@@ -30,5 +31,5 @@ export function titlePrefetchChoice(store: Pick<SaveStore, 'define'>): TitlePref
 export function titlePrefetchTarget(last: string | null, rows: readonly TitleManifest[], developer: boolean): string | undefined {
   const row = last === null ? undefined : new Map(rows.map(candidate => [candidate.slug, candidate])).get(last);
   if (row === undefined || row.shardfile === undefined && row.gridShardfile === undefined) return undefined;
-  return developer || row.status !== 'experimental' && row.status !== 'hidden' ? row.slug : undefined;
+  return developer || !playerHidden(row) ? row.slug : undefined; // J313: experimental and partial shards are player picks
 }

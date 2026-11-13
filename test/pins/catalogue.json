@@ -15,7 +15,7 @@
         500
       ],
       "order": 1000,
-      "status": "hidden"
+      "status": "live"
     },
     {
       "instance": "driftwood-isle",
@@ -75,7 +75,7 @@
         500
       ],
       "order": 4,
-      "status": "experimental"
+      "status": "partial"
     },
     {
       "instance": "pine-hollow",
