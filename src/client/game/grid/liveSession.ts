@@ -83,7 +83,7 @@ import { shardProductFromAdmission } from '../shardfile/runtimeProduct';
 import { createRegionalRuntimeFactory, regionalRuntimeAccountedBytes, type PreparedRegionalRuntime, type RegionalRuntimePage, type RegionalRuntimeTextures } from './regionalRuntime';
 import { bindHomeBuildCache } from '../shardfile/homeBuildCache';
 import type { ClientTileRegistration } from '../shardfile/tileContent';
-import { createRegionalWorldFoundation, hangCellDataSky, resolveRegionalRuntimeTextures } from './regionalWorld';
+import { createRegionalWorldFoundation, hangCellDataSky, registerRegionalTextureTable, resolveRegionalRuntimeTextures } from './regionalWorld';
 import { regionalDataCellBytes } from './runtimeCost';
 import { resolveLevelBounds } from '../../../shared/game/shard/runtime';
 import { declaredPlayArea, type PlayArea } from '@wildshard/engine/game/shardfile/playArea';
@@ -753,6 +753,9 @@ export class LiveGridSession {
     if (manifest === undefined || !dataPage && declaration === null) throw new GridCellWaitingError('Missing declared regional page owner');
     const page = this.page.runtimePage?.();
     if (page === undefined || page === null) throw new GridCellWaitingError('Regional page services are not ready');
+    // PZ22 (WILDSHARD-GAME-8G): Auto picks KTX2 only for a shard whose table is registered (DL17), so the table goes in
+    // before the one texture choice is made; resolved first, Driftwood read "no KTX2 set" and drew images on an iPhone.
+    if (choice.textures === undefined) await registerRegionalTextureTable(manifest);
     const textures = choice.textures ??= resolveRegionalRuntimeTextures(manifest, this.ports.allocator.cost().input), bytes = regionalRuntimeAccountedBytes(retained.admitted, manifest, textures.mode);
     const prepareEntry = async (): Promise<void> => {
       if (declaration === null) return;

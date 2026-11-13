@@ -59,6 +59,8 @@ const PAGE_READ = `(() => {
     totalsMB: mem?.totals ? { gpu: Math.round(mem.totals.gpu / 1048576), ram: Math.round(mem.totals.ram / 1048576) } : null,
     unattributedMB: mem?.unattributed ? { gpu: Math.round(mem.unattributed.gpu / 1048576), ram: Math.round(mem.unattributed.ram / 1048576) } : null,
     byOwner: group(rows, r => r.domain + ' ' + r.owner), byKind: group(rows, r => r.domain + ' ' + r.kind), byAsset: group(rows, r => r.domain + ' ' + r.owner + ' ' + r.asset),
+    // PZ22: each texture of 1 MB or more, whole, so a texture form change is read per texture, not only in the total
+    texRows: rows.filter(r => r.domain === 'gpu' && r.kind === 'texture' && r.bytes >= 1048576).sort((a, b) => b.bytes - a.bytes).slice(0, 40).map(r => JSON.parse(JSON.stringify(r))),
     three, textures, grid, audio };
 })()`;
 

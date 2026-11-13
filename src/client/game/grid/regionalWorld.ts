@@ -240,6 +240,12 @@ async function slicedTerrainGrid(run: (rows: () => number) => number, left: () =
 
 const regionLevel = ({ id, spawn }: LevelSpec): RegionLevel => ({ id, player: { at: { x: spawn.x, y: spawn.y ?? 0, z: spawn.z }, yaw: spawn.yaw } });
 
+/** PZ22: install the shard's KTX2 table (once per manifest) before its texture policy resolves: Auto reads KTX2 from
+ *  the registered table (gpuFiles.ts, DL17), so a choice made first stays on images for the resident's whole life. */
+export function registerRegionalTextureTable(manifest: ShardManifest): Promise<void> {
+  return prepareShardAssets(manifest, registerGpuFiles);
+}
+
 /** Resolve the existing texture policy once before memory admission. The resident enters this SAME policy for
  * asynchronous construction and each frame, so a capability-probe image fallback cannot retain a compressed claim. */
 export function resolveRegionalRuntimeTextures(manifest: Pick<ShardManifest, 'slug' | 'tiers' | 'runtimeCost'>, residents?: Parameters<typeof imagesFirstPlayingBytes>[1]): RegionalRuntimeTextures {
@@ -267,6 +273,7 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
     const pausePoint = regionalBuildCheckpoint(resident, ports.pause);
     let pauses = clientPreparationBatch(identity, 'native.checkpoints', ['pause']);
     const checkpoint = (): Promise<void> => (pauses === undefined ? pausePoint() : pauses.run('pause', pausePoint));
+    if (request.textures === undefined) await registerRegionalTextureTable(request.manifest);
     const textures = request.textures ?? resolveRegionalRuntimeTextures(request.manifest);
     // Exclusive runtime construction has retired the source. Keep the destination's policy through asynchronous
     // setup, then restore the page on the road. Entered frame scopes reinstall this same resolved policy for hooks.
@@ -280,7 +287,7 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
     let rendering: Promise<[PromiseSettledResult<void>]> | undefined;
     ownSceneTree(scene, resident, app.assets);
     try {
-      await timeClientPreparation(identity, 'native.shard-assets', () => prepareShardAssets(request.manifest, registerGpuFiles));
+      await timeClientPreparation(identity, 'native.shard-assets', () => registerRegionalTextureTable(request.manifest));
       if (left()) throw new Error('Regional world left while registering its texture stand-ins');
       // M3 tiles-swap: the admitted product's reader for the resident runtime (a painter that binds its compiled tiles reads
       // it), handed over first: the level's declared navigation and a required manifest ground are that product's own files
