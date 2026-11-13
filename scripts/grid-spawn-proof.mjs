@@ -94,7 +94,7 @@ async function runOne(browser, cell, layout, path) {
     const ready = await page.waitForFunction(() => {
       const W = /** @type {any} */ (window), grid = W.__wildshard?.shard?.grid, wire = W.__workerClient?.();
       // oxlint-disable-next-line unicorn/prefer-dom-node-text-content -- the text a player sees, not hidden templates
-      if ([...document.querySelectorAll('h1, h2')].some(head => head.getClientRects().length > 0 && /could not load|couldn.t enter/iu.test(head.innerText))) return 'error';
+      if ([...document.querySelectorAll('h1, h2')].some(head => head instanceof HTMLElement && head.getClientRects().length > 0 && /could not load|couldn.t enter/iu.test(head.innerText))) return 'error';
       if (W.__wildshard?.world?.player === undefined || (wire?.frames ?? 0) < 20) return false;
       if (grid === undefined) return 'one-shard';
       const st = grid.state(); return st.live?.live?.gameplayReady === true && typeof st.inside === 'string' ? 'grid' : false;
@@ -104,7 +104,7 @@ async function runOne(browser, cell, layout, path) {
       // what the screen says: the error page's own words, or the title
       const said = await page.evaluate(() => {
         // oxlint-disable-next-line unicorn/prefer-dom-node-text-content -- the text a player sees, not hidden templates
-        const head = [...document.querySelectorAll('h1, h2')].find(row => row.getClientRects().length > 0 && /could not load|couldn.t enter/iu.test(row.innerText));
+        const head = [...document.querySelectorAll('h1, h2')].find(row => row instanceof HTMLElement && row.getClientRects().length > 0 && /could not load|couldn.t enter/iu.test(row.innerText));
         // oxlint-disable-next-line unicorn/prefer-dom-node-text-content -- the text a player sees, not hidden templates
         return (head?.parentElement ?? document.body).innerText.replaceAll(/\s+/gu, ' ').trim().slice(0, 260);
       }).catch(() => '');
