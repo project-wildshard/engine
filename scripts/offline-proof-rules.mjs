@@ -39,7 +39,8 @@ export const CRITICAL_PHASES = Object.freeze(['start', 'download', 'load', 'none
  * @typedef {{ shard: string, rule: string, url?: string, detail?: string }} Failure */
 /** @typedef {'play' | 'seat-wait' | 'title' | 'stalled' | 'error' | 'no-resume' | 'outside-world'} Outcome */
 
-/** OF5b: what counts as the screen changing, for the seat wait (10 s still at LOAD `server`) and the stall (45 s still). The card's
+/** OF5b: what counts as the screen changing, for the seat wait (10 s still at LOAD `server`) and the stall (60 s still, the game's
+ *  own stuck watch, `stuckStep.ts`). The card's
  *  own state and its progress counters, never its free text: the card's clock and time-left tick every frame, and on a shard whose
  *  HUD has no quest lines (Template, Brasscap, Pastel Plain, Ink & Cel, the Open Plots) they fall inside any text prefix, so the
  *  screen never held still and those shards ran to the time limit instead of reaching the seat wait (buddy-engine's run, OF5b).

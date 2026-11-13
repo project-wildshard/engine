@@ -77,9 +77,10 @@ const report = argv.includes('--report');
 const out = resolvePath(ROOT, option('out') ?? join('tmp', 'offline-proof', new Date().toISOString().replaceAll(/[:.]/gu, '-')));
 mkdirSync(out, { recursive: true });
 const STAGING = CHANNELS.staging;
-/** The stand-in door's world word: every proof shard on staging's grid. */
-/** The build's grid catalogue: a world build enters only the shards it places (OF3). */
+/** The grid catalogue: a world build enters only the shards it places (OF3). It is this checkout's, so it matches a build of this
+ *  tree (the default, or a `--base` served from it), not a build of another commit. */
 const CATALOGUE = JSON.parse(readFileSync(join(ROOT, 'src/shared/game/grid/singleplayer.json'), 'utf8'));
+/** The stand-in door's world word: every proof shard on staging's grid. */
 const WORLD_WORD = Buffer.concat([Buffer.from([9]), Buffer.from(JSON.stringify({ cells: 20, shards: [...ALL_SHARDS] }))]);
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 /** @param {number} ms */
@@ -203,7 +204,7 @@ const readScreen = () => {
     phase: card ? (on instanceof HTMLElement ? on.dataset.phase ?? 'none' : 'none') : title ? 'title' : 'page',
     step: load instanceof HTMLElement ? load.dataset.step ?? '' : '',
     // OF5b: the card's progress counters, which hold still while it waits on the seat (its clock and time-left never do)
-    progress: load instanceof HTMLElement ? [load.dataset.setup, load.dataset.readBytes, load.dataset.spawnFilesDone, load.dataset.serverFiles].join('|') : '',
+    progress: load instanceof HTMLElement ? [load.dataset.setup, load.dataset.readBytes, load.dataset.streamedBytes, load.dataset.spawnFilesDone, load.dataset.serverFiles].join('|') : '',
     error: (document.querySelector('.ws-load-error')?.textContent ?? '').replaceAll(/\s+/gu, ' ').slice(0, 300),
     // oxlint-disable-next-line unicorn/prefer-dom-node-text-content -- the text a player sees, not hidden templates
     failCard: fail instanceof HTMLElement ? fail.innerText.replaceAll(/\s+/gu, ' ').slice(0, 300) : '',
@@ -307,7 +308,8 @@ async function enter(run) {
     try {
       const open = OPEN_PLOTS.includes(slug) && entry === 'deck' ? `/?chunk=${slug}&skipintro&mute=1` : '/?mute=1';
       // a deep link is the entry itself: its reads are the card's from the first one
-      if (open !== '/?mute=1') phase = 'none';
+      let linked = open !== '/?mute=1';
+      if (linked) phase = 'none';
       const hitsBefore = stamperHits;
       proxyOffline = mode === 'offline' && channel === 'staging' && jobs === 1;
       leakFrom = () => stamperHits - hitsBefore;
@@ -325,7 +327,7 @@ async function enter(run) {
         if (index === -1) {
           // a shard this build's deck doesn't show (Pastel Plain, Ink & Cel): the deep link with Developer on, as for Open Plots
           consoleLines.push(`no deck card "${card}" (deck: ${names.join(', ')}): entered by ?chunk=`);
-          phase = 'none';
+          phase = 'none'; linked = true;
           await page.goto(new URL(`/?chunk=${slug}&skipintro&mute=1`, ORIGINS[channel]).href, { waitUntil: 'commit', timeout: 60_000 });
         } else {
           await page.locator(`.ws-menu-dots i[data-i="${String(index)}"]`).click();
@@ -349,10 +351,11 @@ async function enter(run) {
         if (cardSeen && screen.title) { outcome = 'title'; break; }
         if (!cardSeen && screen.title && entry === 'resume' && at() - tappedAt > 20_000) { outcome = 'no-resume'; break; }
         // OF3: a world build's title after a link to a shard its grid doesn't place (judged against the catalogue)
-        if (!cardSeen && screen.title && /not in this world yet/iu.test(screen.text) && at() - tappedAt > 5000) { outcome = 'outside-world'; break; }
+        // (a link's answer only: a closed deck card shows the same badge)
+        if (linked && !cardSeen && screen.title && /not in this world yet/iu.test(screen.text) && at() - tappedAt > 5000) { outcome = 'outside-world'; break; }
         // a staging-like page waits on the seat, which the stand-in door never gives
         if (channel === 'staging' && screen.phase === 'load' && screen.step === 'server' && Date.now() - changed > 10_000) { outcome = 'seat-wait'; break; }
-        if (Date.now() - changed > (mode === 'slow' ? 90_000 : 45_000) || at() - tappedAt > limit) { outcome = 'stalled'; break; }
+        if (Date.now() - changed > (mode === 'slow' ? 90_000 : 60_000) || at() - tappedAt > limit) { outcome = 'stalled'; break; }
       }
       outcomeMs = at() - tappedAt;
       await shot(outcome);

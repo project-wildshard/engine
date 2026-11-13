@@ -67,11 +67,12 @@ describe('offline proof rules (OF1)', () => {
     expect(judge({ ...base, rows: greenLog, samples: [screen({ step: 'server' })], outcome: 'seat-wait' })).toEqual([]);
   });
   it('OF5b: the card\'s clock and HUD text never count as the screen changing; its step, error and progress do', () => {
-    const waiting = { phase: 'load', step: 'server', error: '', failCard: '', title: false, player: false, progress: '86|20408822|295' };
-    expect(screenKey(waiting)).toBe(screenKey({ ...waiting }));
-    // buddy-engine's run: Template's card ticked "LOADING TEMPLATE SHARD 00:38.3" inside the old 200-character text key
+    // setup | readBytes | streamedBytes | spawnFilesDone | serverFiles, as readScreen joins them
+    const waiting = { phase: 'load', step: 'server', error: '', failCard: '', title: false, player: false, progress: '86|20408822|34504377|295|0' };
+    // buddy-engine's run: Template's card ticked "LOADING TEMPLATE SHARD 00:38.3" inside the old 200-character text key; text is no input now
     expect(screenKey({ ...waiting, text: 'LOADING TEMPLATE SHARD 00:38.3' } as typeof waiting)).toBe(screenKey({ ...waiting, text: 'LOADING TEMPLATE SHARD 00:38.6' } as typeof waiting));
-    for (const change of [{ step: 'audio' }, { error: 'Failed to fetch' }, { failCard: 'No connection' }, { title: true }, { player: true }, { progress: '87|20408822|295' }])
+    for (const change of [{ step: 'audio' }, { error: 'Failed to fetch' }, { failCard: 'No connection' }, { title: true }, { player: true },
+      { progress: '87|20408822|34504377|295|0' }, { progress: '86|20408822|34600000|295|0' }])
       expect(screenKey({ ...waiting, ...change })).not.toBe(screenKey(waiting));
   });
   it('OF3, OF5b: "Not in this world yet" is green only for a shard a world build\'s grid doesn\'t place', () => {
