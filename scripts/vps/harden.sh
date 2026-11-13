@@ -212,6 +212,9 @@ if [ "$LISTENERS_OK" = 1 ]; then
   # ss writes a device suffix (`%tailscale0`) inside or after the brackets; it is dropped before the address is judged.
   exposed=$(printf '%s\n' "$LISTENERS" | grep -E ':(8790|8791|8792)$' | sed -E 's/%[^]:]+//' | grep -Ev "^(127\.0\.0\.1|\[::1\]${tails:+|\[?($tails)\]?}):" | tr '\n' ' ' | sed 's/ $//')
   if [ -z "$exposed" ]; then ok VH8 'game and cook ports listen on loopback or the tailnet only'; else bad VH8 "game or cook port on a public address: $exposed"; fi
+  # SERVER-CELLS SC2: Prometheus, the node exporter and both channels' /metrics answer on loopback alone, not even the tailnet.
+  metrics=$(printf '%s\n' "$LISTENERS" | grep -E ':(9090|9100|9790|9791)$' | grep -Ev '^(127\.0\.0\.1|\[::1\]):' | tr '\n' ' ' | sed 's/ $//')
+  if [ -z "$metrics" ]; then ok SC2 'Prometheus and metrics ports listen on loopback only'; else bad SC2 "metrics port off loopback: $metrics"; fi
 fi
 
 # --- VH9: the proxy.

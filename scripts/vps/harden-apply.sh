@@ -483,6 +483,9 @@ if [ "$units_changed" = 1 ]; then
   say next VH7 'unit sandboxes changed: they take effect at each unit'"'"'s next restart (a deploy, or systemctl restart)'
 fi
 
+# --- SERVER-CELLS SC2: a box-local Prometheus on loopback, and each channel's METRICS_PORT (Jake, 2026-11-13, grill Q9).
+"$HERE/harden-prometheus.sh"
+
 # --- VH9: the proxy (J264: Caddy behind Cloudflare, Full (strict) with an Origin CA certificate, mTLS from Cloudflare only).
 "$HERE/harden-caddy.sh"
 

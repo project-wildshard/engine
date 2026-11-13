@@ -14,7 +14,8 @@
 # Installed root-owned as /usr/local/sbin/wildshard-config by harden.sh; the sudo allowlist names that path only.
 import os, re, subprocess, sys, tempfile, time, urllib.request
 
-CHANNELS = {'production': {'port': 8790, 'cpus': 9, 'host': 0}, 'staging': {'port': 8791, 'cpus': 4, 'host': 1}}
+# 'metrics' is the channel's METRICS_PORT (SC1's /metrics on 127.0.0.1), the one harden-prometheus.sh scrapes (SC2).
+CHANNELS = {'production': {'port': 8790, 'cpus': 9, 'host': 0, 'metrics': 9790}, 'staging': {'port': 8791, 'cpus': 4, 'host': 1, 'metrics': 9791}}
 # The pages that open the game (engine doorTrust DEFAULT_ALLOWED_ORIGINS); each channel's own is at its 'host' index.
 GAME_HOSTS = ('https://play.wildshard.io', 'https://staging.wildshard.io', 'https://preview.wildshard.io')
 CELL = r'[a-z0-9][a-z0-9-]{0,63}'
@@ -44,6 +45,8 @@ SETTINGS = {
     'WORLD_CROSSING': lambda value, channel: value in ('off', 'worker'),
     'PLACEMENT_URL': lambda value, channel: value in ('', placements(channel)),
     'PLACEMENT_PUBLIC_KEY': lambda value, channel: value in ('', PLACEMENT_PUBLIC_KEY),
+    # SC2: the channel's own port, which the box's Prometheus scrapes, or blank (off). The server binds it on 127.0.0.1 only.
+    'METRICS_PORT': lambda value, channel: value in ('', str(CHANNELS[channel]['metrics'])),
 }
 RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), none twice",
          'WORLD_WORKERS': 'a whole number from 1 to the channel\'s pinned CPUs (production 9, staging 4)',
@@ -52,7 +55,8 @@ RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), non
                             "https://preview.wildshard.io, keeping the channel's own (production play, staging staging)",
          'WORLD_CROSSING': 'off or worker',
          'PLACEMENT_URL': "https://packs.wildshard.io/releases/<channel>-placements.json for this channel, or blank",
-         'PLACEMENT_PUBLIC_KEY': f'the API placement key {PLACEMENT_PUBLIC_KEY}, or blank'}
+         'PLACEMENT_PUBLIC_KEY': f'the API placement key {PLACEMENT_PUBLIC_KEY}, or blank',
+         'METRICS_PORT': "the channel's own metrics port (production 9790, staging 9791), or blank (off)"}
 
 # The engine's tests hand it a made-up /etc and no systemctl; never as root, so sudo (which drops the environment anyway) cannot.
 TEST = os.geteuid() != 0 and os.environ.get('WILDSHARD_CONFIG_TEST_ROOT')
