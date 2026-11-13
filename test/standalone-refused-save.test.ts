@@ -92,3 +92,22 @@ test('a page\'s continuation with a lane from another build, holding a page\'s i
   expect(refused).toEqual([]);
   expect(running?.host.flags.has('imported.flag')).toBe(true);
 });
+
+// EV5: the late write behind the nalati case's flake. A progress save the worker posted just before the page ended the session
+// still reached the page's port, and landed after the next session had read storage, with a world tick that outranked its save.
+test('a write the worker posted before the page ended its session never lands', async () => {
+  const storage = new PageStorage(), control = new MessageChannel(), game = new MessageChannel(), key = `${PREFIX}standalonealt-lone-pastel-plain`;
+  const shell = connectStandalone({ slug: 'pastel-plain', base: '/shards/pastel-plain/', build: 'test', savePrefix: PREFIX, storage, lone: true }, control.port2, game.port2, () => undefined);
+  // The server answers the page's save, and the progress save queued behind it posts its write in the same turn. Node runs
+  // the microtasks after `saved` (the dispose) before it hands over `write`, which is the order the flake hit.
+  control.port1.onmessage = (event: MessageEvent<{ readonly kind: string; readonly id?: number }>): void => {
+    if (event.data.kind !== 'save') return;
+    control.port1.postMessage({ kind: 'saved', id: event.data.id, tick: 1, ok: true });
+    control.port1.postMessage({ kind: 'write', seq: 1, key, value: '{"keys":{}}' });
+  };
+  expect((await shell.save()).ok).toBe(true);
+  shell.dispose();
+  await new Promise(resolve => { setTimeout(resolve, 50); });
+  control.port1.close(); game.port1.close();
+  expect(storage.items.has(key)).toBe(false);
+});

@@ -99,7 +99,7 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
   transport.onClose(reason => { if (reason === 'reload') config.refused?.(); });
   const post = (message: ShellMessage): void => { control.postMessage(v.parse(ShellMessageSchema, message), []); };
   const waits = new Map<number, (message: ServerMessage) => void>();
-  let held = false, requests = 0, booted: (value: { tick: number; restored: boolean }) => void = () => undefined, failed: (reason: Error) => void = () => undefined;
+  let held = false, disposed = false, requests = 0, booted: (value: { tick: number; restored: boolean }) => void = () => undefined, failed: (reason: Error) => void = () => undefined;
   const bootPromise = new Promise<{ tick: number; restored: boolean }>((resolve, reject) => { booted = resolve; failed = reject; });
   const request = <T>(send: (id: number) => ShellMessage, read: (message: ServerMessage) => T | null): Promise<T> => new Promise(resolve => {
     const id = ++requests;
@@ -111,7 +111,11 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
     if (value === null) workerDocuments.delete(key); else workerDocuments.set(key, value);
     post({ kind: 'written', seq, ok: await (config.write?.(key, merged) ?? applyWrite(config.storage, key, merged)) });
   };
+  // EV5: a port can still hand over what the worker posted before `dispose`, such as a progress save's write. That session
+  // is over: its write would land in storage the next session already read, beside saves that session can't see, and its
+  // world's tick could outrank the next session's save. The page drops it, as a reload drops a terminated worker's.
   control.onmessage = (event: MessageEvent<unknown>): void => {
+    if (disposed) return;
     const message = v.parse(ServerMessageSchema, event.data);
     if (message.kind === 'booted') { bootMark('server:booted-receive'); booted({ tick: message.tick, restored: message.restored }); bootMark('server:hello-send'); client.hello(config.build, config.identity ?? deviceIdentity(config.storage, config.savePrefix, config.name)); }
     else if (message.kind === 'write') void write(message.seq, message.key, message.value);
@@ -138,7 +142,7 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
       second.hello(config.build, { player: id, name: id });
       return { client: second, move: (mx, my, mz) => { harness?.postMessage({ move: id, x: mx, y: my, z: mz, yaw: 0 } satisfies HarnessMove, []); } };
     },
-    dispose: () => { scope.dispose(); client.dispose(); transport.close('disposed'); control.close(); end(); } };
+    dispose: () => { disposed = true; scope.dispose(); client.dispose(); transport.close('disposed'); control.close(); end(); } };
 }
 
 /** Start the standalone target: the server always in a module worker, with no main-thread fallback (J49). */
