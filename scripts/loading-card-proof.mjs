@@ -40,8 +40,11 @@ function recordBars() {
     const inventory=/** @type {{common?:[string,number][]}} */(JSON.parse(text===undefined||text===null||text===''?'{}':text)).common??[];
     const modules=new Map(inventory.map(([url,bytes])=>[new URL(url,location.href).href,bytes]));
     const received=new Map();
-    for(const row of t?.resources??[])if(row.realm==='page'&&typeof row.url==='string'&&typeof row.decodedBodySize==='number'&&row.decodedBodySize>0){
-      const size=modules.get(row.url);if(size!==undefined)received.set(row.url,Math.min(size,row.decodedBodySize));
+    // index.html's Start painter: a row with no body size (WebKit's cached or service-worker answer) counts its compiler
+    // size, unless it says responseStatus 0 (Chromium's failed fetch)
+    for(const row of t?.resources??[])if(row.realm==='page'&&typeof row.url==='string'&&(Number(row.decodedBodySize)>0||row.responseStatus!==0)){
+      const size=modules.get(row.url),decoded=typeof row.decodedBodySize==='number'?row.decodedBodySize:0;
+      if(size!==undefined)received.set(row.url,decoded>0?Math.min(size,decoded):size);
     }
     return {kind:'start',adopted:(t?.entries??[]).some(row=>row.operation==='app:loading-adopt'),
       done:startSteps.filter(op=>(t?.entries??[]).some(row=>row.operation===op&&row.end!==null&&row.result==='complete')).length,

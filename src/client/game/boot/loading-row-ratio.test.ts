@@ -20,30 +20,57 @@ function expectRowAgrees(fact: string, pct: string): void {
   }
 }
 
+// 31 code files, 3.1 MB: two big ones (2.5 MB) and 29 small
+const codeFiles: [string, number][] = [['/assets/three.js', 1_500_000], ['/assets/main.js', 1_000_000],
+  ...Array.from({ length: 29 }, (_, i): [string, number] => [`/assets/chunk-${i}.js`, 20_690])];
+const startOperations = ['app:document-and-module-graph', 'app:page-entry-import', 'app:tables-import-and-prepare', 'app:tier-menu-download-imports', 'app:three-import', 'app:main-import'];
+
 describe('START: the first document\'s painter', () => {
   const windows: Window[] = [];
   afterEach(async () => { for (const window of windows.splice(0)) await window.happyDOM.close(); });
-  it('prints code bytes and its percent is those bytes (Jake\'s shot: "2 / 31 code files" beside 80 %)', async () => {
-    // 31 code files, 3.1 MB; two big ones (2.5 MB) are in, five of the seven boundaries done
-    const files: [string, number][] = [['/assets/three.js', 1_500_000], ['/assets/main.js', 1_000_000],
-      ...Array.from({ length: 29 }, (_, i): [string, number] => [`/assets/chunk-${i}.js`, 20_690])];
+  /** The real index.html's Start painter after `steps` LS1 boundaries and these code rows of the resource timeline. */
+  async function startRow(steps: number, rows: { url: string; decodedBodySize: number; responseStatus?: number | null }[]): Promise<{ fact: string; pct: string; bar: string }> {
     const html = readFileSync('index.html', 'utf8').replace('<script data-loading-clock>',
-      `<script type="application/json" id="boot-module-files">${JSON.stringify({ common: files })}</script><script data-loading-clock>`);
+      `<script type="application/json" id="boot-module-files">${JSON.stringify({ common: codeFiles })}</script><script data-loading-clock>`);
     const window = new Window({ url: 'https://launch.test/?chunk=_template&tier=phone', width: 402, height: 874, settings: {
       enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true,
       enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true } });
     windows.push(window);
     window.document.write(html);
     const timing = Reflect.get(window, '__bootTiming') as { entries: object[]; resources: object[] };
-    for (const operation of ['app:document-and-module-graph', 'app:page-entry-import', 'app:tables-import-and-prepare', 'app:tier-menu-download-imports', 'app:three-import'])
-      timing.entries.push({ operation, end: 1, result: 'complete' });
-    for (const [url, bytes] of files.slice(0, 2)) timing.resources.push({ realm: 'page', url: `https://launch.test${url}`, decodedBodySize: bytes, transferSize: bytes / 3 });
+    for (const operation of startOperations.slice(0, steps)) timing.entries.push({ operation, end: 1, result: 'complete' });
+    for (const row of rows) timing.resources.push({ realm: 'page', url: `https://launch.test${row.url}`, decodedBodySize: row.decodedBodySize, transferSize: 0, responseEnd: 5, responseStatus: row.responseStatus ?? null });
     await new Promise(resolve => { setTimeout(resolve, 250); });
-    const fact = window.document.querySelector('[data-el="stFact"]')?.textContent ?? '', pct = window.document.querySelector('[data-el="stPct"]')?.textContent ?? '';
+    const read = (name: string): string => window.document.querySelector(`[data-el="${name}"]`)?.textContent ?? '';
+    return { fact: read('stFact'), pct: read('stPct'), bar: window.document.querySelector('[data-el="stBar"]')?.getAttribute('style') ?? '' };
+  }
+  it('prints code bytes and its percent is those bytes (Jake\'s shot: "2 / 31 code files" beside 80 %)', async () => {
+    const { fact, pct, bar } = await startRow(5, codeFiles.slice(0, 2).map(([url, bytes]) => ({ url, decodedBodySize: bytes })));
     expect(fact).toBe('2.5 of 3.1 MB');
     expect(pct).toBe('80');
-    expect(window.document.querySelector('[data-el="stBar"]')?.getAttribute('style')).toContain('width: 80%');
+    expect(bar).toContain('width: 80%');
     expectRowAgrees(fact, pct);
+  });
+  // Jake (2026-11-12, 20:04 Cancún, v0.1.13 on LTE, Nalati): "At the start, it says like 75%, this is 0 to 31." Six of the
+  // seven boundaries done and no code byte counted read 75 % (25 % after a reload, two done): steps were in the mix.
+  it('at 0 code bytes reads 0 % with an empty bar, however many boundaries are done', async () => {
+    for (const steps of [2, 6]) {
+      const { fact, pct, bar } = await startRow(steps, []);
+      expect({ steps, fact, pct }).toEqual({ steps, fact: '0.0 of 3.1 MB', pct: '0' });
+      expect(bar).toContain('width: 0%');
+    }
+  });
+  // WebKit reports decodedBodySize 0 for a response its service worker answers (the precached `/b/c/` code on a repeat
+  // visit), so code that had arrived counted as none: v0.1.13 read "0 / 31 code files · 0.0" with six boundaries done.
+  it('counts a code file the timeline shows arrived even when the browser gives no body size', async () => {
+    const { fact, pct, bar } = await startRow(6, codeFiles.slice(1).map(([url]) => ({ url, decodedBodySize: 0 })));
+    expect(fact).toBe('1.6 of 3.1 MB');
+    expect(pct).toBe('51');
+    expect(bar).toContain('width: 51%');
+    expectRowAgrees(fact, pct);
+    expect(await startRow(6, codeFiles.map(([url]) => ({ url, decodedBodySize: 0 })))).toMatchObject({ fact: '3.1 of 3.1 MB', pct: '99' });
+    // Chromium's row for a fetch that failed outright: no size and responseStatus 0. It never arrived, so it counts nothing.
+    expect(await startRow(6, [{ url: '/assets/three.js', decodedBodySize: 0, responseStatus: 0 }])).toMatchObject({ fact: '0.0 of 3.1 MB', pct: '0' });
   });
 });
 

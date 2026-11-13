@@ -63,7 +63,7 @@
           row.loaded += delta; row.events++; row.at = now(); if (row.total !== null && row.loaded > row.total) row.total = null;
           for (const listener of subscribers) listener();
         };
-        const fields = ['startTime','workerStart','fetchStart','redirectStart','redirectEnd','domainLookupStart','domainLookupEnd','connectStart','connectEnd','secureConnectionStart','requestStart','responseStart','responseEnd','duration','transferSize','encodedBodySize','decodedBodySize','nextHopProtocol','unloadEventStart','unloadEventEnd','domInteractive','domContentLoadedEventStart','domContentLoadedEventEnd','domComplete','loadEventStart','loadEventEnd','type','redirectCount'];
+        const fields = ['startTime','workerStart','fetchStart','redirectStart','redirectEnd','domainLookupStart','domainLookupEnd','connectStart','connectEnd','secureConnectionStart','requestStart','responseStart','responseEnd','duration','transferSize','encodedBodySize','decodedBodySize','nextHopProtocol','unloadEventStart','unloadEventEnd','domInteractive','domContentLoadedEventStart','domContentLoadedEventEnd','domComplete','loadEventStart','loadEventEnd','type','redirectCount','responseStatus'];
         const plain = entry => Object.fromEntries(fields.map(key => [key, typeof entry[key] === 'number' || typeof entry[key] === 'string' ? entry[key] : null]));
         const navigation = () => { const entry = performance.getEntriesByType('navigation')[0]; if (entry) data.navigation = plain(entry); };
         data.read = () => {
@@ -573,7 +573,10 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
         // 100 until Loading adopts the card; with no inventory, the completed LS1 boundaries of START_STEPS (shell.ts).
         const steps = ['app:document-and-module-graph', 'app:page-entry-import', 'app:tables-import-and-prepare', 'app:tier-menu-download-imports', 'app:three-import', 'app:main-import', 'app:selected-discovery'];
         const startFact = field('stFact'), startPct = field('stPct'), startBar = field('stBar');
-        // Compiler-owned decoded body sizes, not transfer sizes or a timing estimate.
+        // Compiler-owned decoded body sizes, not transfer sizes or a timing estimate. WebKit gives decodedBodySize 0 (and no
+        // responseStatus) for a cached or service-worker answer, the precached code of a repeat visit, so a row with no size
+        // counts its compiler size; Chromium's row for a failed fetch says responseStatus 0 and counts nothing (v0.1.13,
+        // Jake 2026-11-12: "0 / 31 code files · 0.0" with six boundaries done).
         const moduleRows = JSON.parse(document.getElementById('boot-module-files')?.textContent || '{}').common || [];
         const modules = new Map(moduleRows.map(([url, bytes]) => [new URL(url, location.href).href, bytes]));
         const moduleTotal = [...modules.values()].reduce((sum, bytes) => sum + bytes, 0);
@@ -581,7 +584,7 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
           const t = window.__bootTiming; if (!t) return;
           const done = steps.filter(op => t.entries.some(e => e.operation === op && e.end !== null && e.result === 'complete'));
           const received = new Map();
-          for (const row of t.resources) if (row.realm === 'page' && modules.has(row.url) && row.decodedBodySize > 0) received.set(row.url, Math.min(modules.get(row.url), row.decodedBodySize));
+          for (const row of t.resources) if (row.realm === 'page' && modules.has(row.url) && (row.decodedBodySize > 0 || row.responseStatus !== 0)) received.set(row.url, row.decodedBodySize > 0 ? Math.min(modules.get(row.url), row.decodedBodySize) : modules.get(row.url));
           const moduleBytes = [...received.values()].reduce((sum, bytes) => sum + bytes, 0);
           const shown = moduleTotal > 0 ? [moduleBytes, moduleTotal] : [done.length, steps.length];
           const pct = String(Math.min(99, Math.floor(shown[0] / shown[1] * 100)));
