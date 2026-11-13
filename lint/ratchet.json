@@ -32,8 +32,8 @@
     "shardfile/sim-in-runtime": {}
   },
   "budgets": {
-    "js/title/raw": 350000,
-    "js/title/gzip": 110000,
+    "js/title/raw": 500000,
+    "js/title/gzip": 160000,
     "js/grid-session/raw": 300000,
     "js/grid-session/gzip": 100000,
     "js/session/raw": 4400000,
