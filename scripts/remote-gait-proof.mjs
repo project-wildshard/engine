@@ -6,29 +6,14 @@
 // folds backwards (the shin behind the line of the thigh, never ahead of it); stopped, his legs are back at rest. Captures:
 // idle, mid-stride walking, mid-stride running and stopped, each side-on from Jake's page.
 //   scripts/browser-lane.sh --max 15 node scripts/remote-gait-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--shots=<dir>]
-import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
-import { enterPage, intoWorld, openRig } from './online-rig.mjs';
-import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { isMain, runAlone } from './remote-room.mjs';
 
-const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-gait-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
-const keep = process.argv.find(value => value.startsWith('--shots='))?.slice('--shots='.length) ?? '';
 /** Jimmy's lane: this far in front of Jake, and this far either side of him. */
-const SHARD = 'driftwood-isle', shots = join(work, 'shots-remote-gait'), AHEAD = 7, ACROSS = 9;
+const AHEAD = 7, ACROSS = 9;
 /** The castaway's thigh and shin lean forward from straight down at rest (castawayBody.ts), radians. */
 const THIGH_REST = Math.atan2(0.01, 0.43), SHIN_REST = Math.atan2(-0.02, 0.42);
-mkdirSync(shots, { recursive: true });
-const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
-/** @param {string} step @param {boolean} ok @param {unknown} [detail] */
-const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 400)}`}`); };
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: SHARD }), url = `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
-const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro']; // 402×874
-/** @param {string} name */
-const enter = async name => { const entered = await enterPage(launched, phone, url, name); await intoWorld(entered.page); return entered; };
 /** @param {import('playwright').Page} page @returns {Promise<{ x: number, y: number, z: number, yaw: number }>} */
 const where = page => page.evaluate(() => { const { player } = /** @type {any} */ (window).__wildshard.world; return { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw }; });
 /** Face a spot, the eye tipped down onto a body's middle. @param {import('playwright').Page} page @param {{ x: number, z: number }} at */
@@ -76,8 +61,9 @@ const midStride = (page, spread) => page.waitForFunction(apart => {
 /** Keep a page in its lane: whenever it is past either end and still heading out, it lets go of the stick, so a slow wait on
  *  the other page never walks it off the strip that was checked dry and level. @param {import('playwright').Page} page @param {number} min @param {number} max */
 const brake = (page, min, max) => page.evaluate(([low, high]) => {
-  const { player } = /** @type {any} */ (window).__wildshard.world;
-  const tick = () => { const heading = -Math.sin(player.yaw); if ((player.position.x > high && heading > 0) || (player.position.x < low && heading < 0)) { player.touchMove.y = 0; player.touchSprint = false; } requestAnimationFrame(tick); };
+  const w = /** @type {any} */ (window), { player } = w.__wildshard.world;
+  w.__rp4Brake = true;
+  const tick = () => { if (w.__rp4Brake !== true) return; const heading = -Math.sin(player.yaw); if ((player.position.x > high && heading > 0) || (player.position.x < low && heading < 0)) { player.touchMove.y = 0; player.touchSprint = false; } requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
 }, /** @type {const} */ ([min, max]));
 /** What a stretch of samples says of the legs. @param {any[]} samples */
@@ -91,9 +77,9 @@ const legs = samples => {
   };
 };
 
-let code = 1;
-try {
-  const jake = await enter('Jake'), jimmy = await enter('Jimmy');
+/** @param {import('./remote-room.mjs').Room} room @returns {Promise<string[]>} */
+export async function proveGait({ jake, jimmy, note, shots }) {
+  if (jimmy === null) throw new Error('Jimmy is not in the room');
   // Off the pier (spawn faces down it, +z) to the first stretch of dry beach that is dry and level 2 × ACROSS wide at Jimmy's lane.
   const start = await where(jake.page);
   const lane = await jake.page.evaluate(([x, z, ahead, across]) => {
@@ -145,17 +131,9 @@ try {
   const atRest = last !== undefined && [last.left, last.right].every(side => Math.abs(side.thigh - THIGH_REST) < 0.05 && Math.abs(side.shin - SHIN_REST) < 0.05);
   note('stopped, Jake reads Jimmy idle with his legs at rest', still.gaits.length === 1 && still.gaits[0] === 'idle' && atRest, { ...still, last });
   await capture('4-stopped.png');
+  await jimmy.page.evaluate(() => { /** @type {any} */ (window).__rp4Brake = false; }); // the brake lets go: the room goes on
 
-  if (keep !== '') { mkdirSync(keep, { recursive: true }); for (const shot of ['1-idle.png', '2-walk-mid-stride.png', '3-run-mid-stride.png', '4-stopped.png']) copyFileSync(join(shots, shot), join(keep, `rp4-${shot}`)); }
-  /** @param {string} line */
-  const quiet = line => !/WebSocket connection|ERR_CONNECTION|Failed to load resource/u.test(line), faults = [...jake.errors, ...jimmy.errors].filter(quiet);
-  note('no page error', faults.length === 0, faults.slice(0, 6));
-  code = steps.every(row => row.ok) ? 0 : 1;
-} catch (error) {
-  note('the proof stopped', false, String(error).slice(0, 400));
-} finally {
-  await launched.close();
-  await rig.close();
+  return ['1-idle.png', '2-walk-mid-stride.png', '3-run-mid-stride.png', '4-stopped.png'];
 }
-console.log(code === 0 ? 'PASS' : 'FAIL');
-process.exit(code);
+
+if (isMain(import.meta.url)) await runAlone('remote-gait', 'rp4', proveGait);

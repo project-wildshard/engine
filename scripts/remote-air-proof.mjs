@@ -6,28 +6,13 @@
 // holds its frame (the game's frame gate) on the pose `__onlinePlayers()` reports, reads Jimmy's bones and shoots it: tucked
 // going up (a thigh well forward, a knee folded deep), arms out and legs reaching coming down, the hips low in the landing.
 //   WS_RIG_PORTS=<base> scripts/browser-lane.sh --max 15 node scripts/remote-air-proof.mjs <app dist stamped with http://127.0.0.1:<base + 3>/release.json> <work dir> <key.json> [--shots=<dir>]
-import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
-import { enterPage, intoWorld, openRig } from './online-rig.mjs';
-import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { isMain, runAlone } from './remote-room.mjs';
 
-const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-air-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
-const keep = process.argv.find(value => value.startsWith('--shots='))?.slice('--shots='.length) ?? '';
 /** How far in front of Jake Jimmy jumps on the beach, and how far behind him Jake watches on the pier. */
-const SHARD = 'driftwood-isle', shots = join(work, 'shots-remote-air'), AHEAD = 6, BEHIND = 5;
+const AHEAD = 6, BEHIND = 5;
 const SHOTS = ['1-pier-fall.png', '2-pier-land.png', '3-sand-jump.png', '4-sand-fall.png'];
-mkdirSync(shots, { recursive: true });
-const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
-/** @param {string} step @param {boolean} ok @param {unknown} [detail] */
-const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 500)}`}`); };
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: SHARD }), url = `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
-const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro']; // 402×874
-/** @param {string} name */
-const enter = async name => { const entered = await enterPage(launched, phone, url, name); await intoWorld(entered.page); return entered; };
 /** @param {import('playwright').Page} page @returns {Promise<{ x: number, y: number, z: number, yaw: number }>} */
 const where = page => page.evaluate(() => { const { player } = /** @type {any} */ (window).__wildshard.world; return { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw }; });
 /** Face a spot, the eye tipped down onto a body's middle. @param {import('playwright').Page} page @param {{ x: number, y?: number, z: number }} at */
@@ -77,12 +62,12 @@ const hold = (page, want, frames) => page.evaluate(([label, count]) => new Promi
 const thaw = page => page.evaluate(() => { /** @type {any} */ (window).__rp9Thaw?.(); });
 /** @param {any} pose */
 const round = pose => Object.fromEntries(Object.entries(pose).map(([key, value]) => [key, typeof value === 'number' ? Math.round(value * 100) / 100 : value]));
-/** Jake holds on `want`, shoots it and lets go. @param {import('playwright').Page} page @param {string} want @param {number} frames @param {string} shot */
-const capture = async (page, want, frames, shot) => { const pose = await hold(page, want, frames); await page.screenshot({ path: join(shots, shot) }); await thaw(page); return round(pose); };
+/** Jake holds on `want`, shoots it and lets go. @param {string} shots @param {import('playwright').Page} page @param {string} want @param {number} frames @param {string} shot */
+const capture = async (shots, page, want, frames, shot) => { const pose = await hold(page, want, frames); await page.screenshot({ path: join(shots, shot) }); await thaw(page); return round(pose); };
 
-let code = 1;
-try {
-  const jake = await enter('Jake'), jimmy = await enter('Jimmy');
+/** @param {import('./remote-room.mjs').Room} room @returns {Promise<string[]>} */
+export async function proveAir({ jake, jimmy, note, shots }) {
+  if (jimmy === null) throw new Error('Jimmy is not in the room');
   const start = await where(jake.page);
   // The standing pose's hands and hips, from Jake's page, before anything moves.
   await jimmy.page.waitForTimeout(500);
@@ -105,12 +90,12 @@ try {
   note('Jake and Jimmy on the pier\'s deck, Jimmy at its side over the shallows', Math.abs(jimmyDeck.y - start.y) < 0.3 && Math.abs(onDeck.y - start.y) < 0.3, { ledge, start, jimmyDeck });
   await face(jake.page, { x: start.x + ledge.side * ledge.out * 0.5, y: (start.y + ledge.ground) / 2, z: edge.z }); await face(jimmy.page, off);
   await jake.page.waitForTimeout(1200);
-  const standing = await capture(jake.page, '', 10, '0-standing.png');
+  const standing = await capture(shots, jake.page, '', 10, '0-standing.png');
   await record(jake.page);
   await walk(jimmy.page, 0.6);
-  const pierFall = await capture(jake.page, 'fall', 7, SHOTS[0] ?? '');
+  const pierFall = await capture(shots, jake.page, 'fall', 7, SHOTS[0] ?? '');
   await walk(jimmy.page, 0);
-  const pierLand = await capture(jake.page, 'land', 3, SHOTS[1] ?? '');
+  const pierLand = await capture(shots, jake.page, 'land', 3, SHOTS[1] ?? '');
   await jake.page.waitForTimeout(1500);
   const pierAirs = await airs(jake.page), below = await where(jimmy.page);
   note('off the pier Jake reads Jimmy fall, then land, then nothing; never jump', pierAirs.join(',') === ',fall,land,', { pierAirs, below });
@@ -134,28 +119,19 @@ try {
   await face(jake.page, { ...him, y: him.y + 0.6 }); await jake.page.waitForTimeout(1500);
   await record(jake.page);
   await jimmy.page.evaluate(() => { /** @type {any} */ (window).__wildshard.world.player.touchJump = true; });
-  const sandJump = await capture(jake.page, 'jump', 6, SHOTS[2] ?? '');
+  const sandJump = await capture(shots, jake.page, 'jump', 6, SHOTS[2] ?? '');
   await jake.page.waitForTimeout(2000);
   const jumpAirs = await airs(jake.page);
   note('a jump on the sand: Jake reads jump, fall, land, then nothing', jumpAirs.join(',') === ',jump,fall,land,', { jumpAirs });
   note('going up, his legs tuck: the thigh well forward and the knee folded deep', sandJump.thigh > 0.7 && sandJump.fold < -1, { sandJump });
   await record(jake.page);
   await jimmy.page.evaluate(() => { /** @type {any} */ (window).__wildshard.world.player.touchJump = true; });
-  const sandFall = await capture(jake.page, 'fall', 6, SHOTS[3] ?? '');
+  const sandFall = await capture(shots, jake.page, 'fall', 6, SHOTS[3] ?? '');
   await jake.page.waitForTimeout(2000);
   note('coming down on the sand, his arms are out and his legs reach', sandFall.hands - standing.hands > 0.15 && sandFall.thigh < sandJump.thigh - 0.3, { sandFall });
   note('the second jump reads the same', (await airs(jake.page)).join(',') === ',jump,fall,land,', await airs(jake.page));
 
-  if (keep !== '') { mkdirSync(keep, { recursive: true }); for (const shot of ['0-standing.png', ...SHOTS]) copyFileSync(join(shots, shot), join(keep, `rp9-${shot}`)); }
-  /** @param {string} line */
-  const quiet = line => !/WebSocket connection|ERR_CONNECTION|Failed to load resource/u.test(line), faults = [...jake.errors, ...jimmy.errors].filter(quiet);
-  note('no page error', faults.length === 0, faults.slice(0, 6));
-  code = steps.every(row => row.ok) ? 0 : 1;
-} catch (error) {
-  note('the proof stopped', false, String(error).slice(0, 400));
-} finally {
-  await launched.close();
-  await rig.close();
+  return ['0-standing.png', ...SHOTS];
 }
-console.log(code === 0 ? 'PASS' : 'FAIL');
-process.exit(code);
+
+if (isMain(import.meta.url)) await runAlone('remote-air', 'rp9', proveAir);

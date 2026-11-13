@@ -5,26 +5,11 @@
 // 1.75 to 1.85 m tall with its soles within 5 cm of where his row stands, and drawing the two bodies costs Jake's page under 1 ms
 // a frame (the scene rendered and finished with them shown, against hidden).
 //   scripts/browser-lane.sh --max 15 node scripts/remote-body-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--shots=<dir>]
-import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
-import { enterPage, intoWorld, openRig } from './online-rig.mjs';
-import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { isMain, runAlone } from './remote-room.mjs';
 
-const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-body-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
-const keep = process.argv.find(value => value.startsWith('--shots='))?.slice('--shots='.length) ?? '';
-const SHARD = 'driftwood-isle', shots = join(work, 'shots-remote-body'), AWAY = 4;
-mkdirSync(shots, { recursive: true });
-const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
-/** @param {string} step @param {boolean} ok @param {unknown} [detail] */
-const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 300)}`}`); };
+const AWAY = 4;
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: SHARD }), url = `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
-const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro']; // 402×874
-/** @param {string} name */
-const enter = async name => { const entered = await enterPage(launched, phone, url, name); await intoWorld(entered.page); return entered; };
 /** @param {import('playwright').Page} page @returns {Promise<{ x: number, y: number, z: number, yaw: number }>} */
 const where = page => page.evaluate(() => { const { player } = /** @type {any} */ (window).__wildshard.world; return { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw }; });
 /** Face a spot, the eye tipped down onto a body's middle `away` metres off. @param {import('playwright').Page} page @param {{ x: number, z: number }} at */
@@ -56,9 +41,10 @@ const cost = (page, names) => page.evaluate(({ who, frames }) => {
   return { bodies: groups.length, shownMs: median(samples.shown), hiddenMs: median(samples.hidden), costMs: median(samples.shown) - median(samples.hidden) };
 }, { who: names, frames: 30 });
 
-let code = 1;
-try {
-  const jake = await enter('Jake'), jimmy = await enter('Jimmy'), ana = await enter('Ana');
+/** @param {import('./remote-room.mjs').Room} room @returns {Promise<string[]>} */
+export async function proveBody({ jake, jimmy, note, shots, enter }) {
+  if (jimmy === null) throw new Error('Jimmy is not in the room');
+  const ana = await enter('Ana');
   // Jimmy walks on ahead along the way he spawned facing (the pier, so all three stand on one floor) until he is AWAY metres from
   // Jake; Ana follows him a little and steps to his side; then Jimmy turns to Jake, and Jake looks at him.
   let gap = 0;
@@ -108,16 +94,8 @@ try {
   const timed = await cost(jake.page, ['Jimmy', 'Ana']);
   note('two castaways in view cost Jake\'s page under 1 ms a frame', both.every(other => other.shown?.model === 'castaway') && timed.bodies === 2 && timed.costMs < 1, timed);
   await jake.page.screenshot({ path: join(shots, '4-jake-sees-two.png') });
-  if (keep !== '') { mkdirSync(keep, { recursive: true }); for (const shot of ['1-jake-sees-jimmy-4m.png', '2-jimmy-side-on.png', '3-jimmy-from-behind.png', '4-jake-sees-two.png']) copyFileSync(join(shots, shot), join(keep, `rp2-${shot}`)); }
-  /** @param {string} line */
-  const quiet = line => !/WebSocket connection|ERR_CONNECTION|Failed to load resource/u.test(line), faults = [...jake.errors, ...jimmy.errors, ...ana.errors].filter(quiet);
-  note('no page error', faults.length === 0, faults.slice(0, 6));
-  code = steps.every(row => row.ok) ? 0 : 1;
-} catch (error) {
-  note('the proof stopped', false, String(error).slice(0, 400));
-} finally {
-  await launched.close();
-  await rig.close();
+  await ana.context.close(); // the room is two pages again
+  return ['1-jake-sees-jimmy-4m.png', '2-jimmy-side-on.png', '3-jimmy-from-behind.png', '4-jake-sees-two.png'];
 }
-console.log(code === 0 ? 'PASS' : 'FAIL');
-process.exit(code);
+
+if (isMain(import.meta.url)) await runAlone('remote-body', 'rp2', proveBody);

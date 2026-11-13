@@ -6,27 +6,12 @@
 // end of the slash, measured from Jimmy's bones on Jake's page) must be wider than the tap's. Captures: Jake's page with
 // each strike held at 150 ms, plus Jimmy standing before them.
 //   WS_RIG_PORTS=18856 scripts/browser-lane.sh --max 15 node scripts/remote-strike-proof.mjs <app dist stamped with http://127.0.0.1:18859/release.json> <work dir> <key.json> [--shots=<dir>]
-import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
-import { enterPage, intoWorld, openRig } from './online-rig.mjs';
-import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { isMain, runAlone } from './remote-room.mjs';
 
-const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-strike-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
-const keep = process.argv.find(value => value.startsWith('--shots='))?.slice('--shots='.length) ?? '';
 /** How far in front of Jake Jimmy stands, and how far he turns from facing Jake (radians): side-on, so the arc shows. */
-const SHARD = 'driftwood-isle', shots = join(work, 'shots-remote-strike'), AHEAD = 3.5, TURN = Math.PI / 2, AT = 0.15;
-mkdirSync(shots, { recursive: true });
-const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
-/** @param {string} step @param {boolean} ok @param {unknown} [detail] */
-const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 400)}`}`); };
+const AHEAD = 3.5, TURN = Math.PI / 2, AT = 0.15;
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: SHARD }), url = `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
-const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro']; // 402×874
-/** @param {string} name */
-const enter = async name => { const entered = await enterPage(launched, phone, url, name); await intoWorld(entered.page); return entered; };
 /** @param {import('playwright').Page} page @returns {Promise<{ x: number, y: number, z: number, yaw: number }>} */
 const where = page => page.evaluate(() => { const { player } = /** @type {any} */ (window).__wildshard.world; return { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw }; });
 /** Face a spot, turned `turn` radians off it, the eye tipped down onto a body's middle. @param {import('playwright').Page} page @param {{ x: number, z: number }} at @param {number} [turn] */
@@ -104,9 +89,9 @@ const angle = (a, b) => Math.acos(Math.max(-1, Math.min(1, (a[0] ?? 0) * (b[0] ?
 const arc = (samples, from, to) => { const span = samples.filter(sample => sample.t >= from && sample.t <= to); return span.reduce((sum, sample, at) => at === 0 ? 0 : sum + angle(sample.blade, span[at - 1]?.blade ?? sample.blade), 0); };
 /**
  * A strike recorded on Jake's page: shot while his page holds it `AT` in, then sampled to its end; the sample at the shot.
- * @param {import('playwright').Page} page @param {any} paused @param {string} file
+ * @param {string} shots @param {import('playwright').Page} page @param {any} paused @param {string} file
  */
-const shoot = async (page, paused, file) => {
+const shoot = async (shots, page, paused, file) => {
   const at = paused.shot ? paused.samples.at(-1) : undefined;
   if (paused.shot) { await page.waitForTimeout(150); await page.screenshot({ path: join(shots, file) }); }
   const still = paused.shot ? await page.evaluate(() => /** @type {any} */ (window).__rp7.blade()?.d ?? null) : null;
@@ -114,9 +99,9 @@ const shoot = async (page, paused, file) => {
   return { ...done, at, held: at !== undefined && still !== null && angle(at.blade, still) < 0.01 };
 };
 
-let code = 1;
-try {
-  const jake = await enter('Jake'), jimmy = await enter('Jimmy');
+/** @param {import('./remote-room.mjs').Room} room @returns {Promise<string[]>} */
+export async function proveStrike({ jake, jimmy, note, shots }) {
+  if (jimmy === null) throw new Error('Jimmy is not in the room');
   // Down the pier (spawn faces down it, +z): Jake a few steps on, Jimmy AHEAD further, turned so his right side faces Jake.
   const start = await where(jake.page), jakeSpot = { x: start.x, z: start.z + 3 }, jimmySpot = { x: start.x, z: start.z + 3 + AHEAD };
   await Promise.all([walkTo(jake.page, jakeSpot), walkTo(jimmy.page, jimmySpot)]);
@@ -130,7 +115,7 @@ try {
   // 1. a tap
   const tapping = record(jake.page, 'tap');
   await press(jimmy.page, 'attack');
-  const tap = await shoot(jake.page, await tapping, '1-tap-150ms.png');
+  const tap = await shoot(shots, jake.page, await tapping, '1-tap-150ms.png');
   const tapRest = tap.samples[0]?.blade ?? [0, 0, 0];
   note('Jake reads Jimmy\'s tap', !tap.timedOut && tap.samples.some((/** @type {any} */ sample) => sample.attack === 'tap'), { frames: tap.samples.length });
   note('150 ms into the tap his sword is in his hand and mid-arc, held there for the shot', tap.held && tap.at !== undefined && tap.at.held && tap.at.t < AT + 0.03 && angle(tap.at.blade, tapRest) > 0.5, { t: tap.at?.t, out: tap.at === undefined ? null : angle(tap.at.blade, tapRest) });
@@ -149,7 +134,7 @@ try {
     await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await touch.detach();
   }
-  const heavy = await shoot(jake.page, await heaving, '2-heavy-150ms.png');
+  const heavy = await shoot(shots, jake.page, await heaving, '2-heavy-150ms.png');
   const heavyRest = heavy.samples[0]?.blade ?? [0, 0, 0];
   note('Jake reads Jimmy\'s heavy', !heavy.timedOut && heavy.samples.some((/** @type {any} */ sample) => sample.attack === 'heavy'), { frames: heavy.samples.length, seen: heavy.seen });
   note('150 ms into the heavy his sword is in his hand and mid-arc, held there for the shot', heavy.held && heavy.at !== undefined && heavy.at.held && heavy.at.t < AT + 0.03 && angle(heavy.at.blade, heavyRest) > 0.5, { t: heavy.at?.t, out: heavy.at === undefined ? null : angle(heavy.at.blade, heavyRest) });
@@ -157,16 +142,7 @@ try {
   const tapArc = arc(tap.samples, 0.07, 0.235), heavyArc = arc(heavy.samples, 0.06, 0.3);
   note('the heavy\'s arc is wider than the tap\'s', tapArc > 0.8 && heavyArc > tapArc * 1.2, { tapArc, heavyArc });
 
-  if (keep !== '') { mkdirSync(keep, { recursive: true }); for (const shot of ['0-before.png', '1-tap-150ms.png', '2-heavy-150ms.png']) copyFileSync(join(shots, shot), join(keep, `rp7-${shot}`)); }
-  /** @param {string} line */
-  const quiet = line => !/WebSocket connection|ERR_CONNECTION|Failed to load resource/u.test(line), faults = [...jake.errors, ...jimmy.errors].filter(quiet);
-  note('no page error', faults.length === 0, faults.slice(0, 6));
-  code = steps.every(row => row.ok) ? 0 : 1;
-} catch (error) {
-  note('the proof stopped', false, String(error).slice(0, 400));
-} finally {
-  await launched.close();
-  await rig.close();
+  return ['0-before.png', '1-tap-150ms.png', '2-heavy-150ms.png'];
 }
-console.log(code === 0 ? 'PASS' : 'FAIL');
-process.exit(code);
+
+if (isMain(import.meta.url)) await runAlone('remote-strike', 'rp7', proveStrike);

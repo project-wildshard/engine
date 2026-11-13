@@ -7,27 +7,12 @@
 // back, and its speed never passes 20 m/s. Captures from Jake's page: the fallen body, then nothing, then Jimmy at the
 // checkpoint (from where Jake stood, and up close).
 //   WS_RIG_PORTS=18880 scripts/browser-lane.sh --max 15 node scripts/remote-death-proof.mjs <app dist stamped with http://127.0.0.1:18883/release.json> <work dir> <key.json> [--shots=<dir>]
-import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
-import { enterPage, intoWorld, openRig } from './online-rig.mjs';
-import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { isMain, runAlone } from './remote-room.mjs';
 
-const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-death-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
-const keep = process.argv.find(value => value.startsWith('--shots='))?.slice('--shots='.length) ?? '';
 /** How far behind Jimmy Jake keeps, metres; the fastest the drawn body may move, m/s. */
-const SHARD = 'driftwood-isle', shots = join(work, 'shots-remote-death'), BEHIND = 7, FASTEST = 20;
-mkdirSync(shots, { recursive: true });
-const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
-/** @param {string} step @param {boolean} ok @param {unknown} [detail] */
-const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 500)}`}`); };
+const BEHIND = 7, FASTEST = 20;
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: SHARD }), url = `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
-const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro']; // 402×874
-/** @param {string} name */
-const enter = async name => { const entered = await enterPage(launched, phone, url, name); await intoWorld(entered.page); return entered; };
 /** @param {import('playwright').Page} page @returns {Promise<{ x: number, y: number, z: number }>} */
 const where = page => page.evaluate(() => { const { player } = /** @type {any} */ (window).__wildshard.world; return { x: player.position.x, y: player.position.y, z: player.position.z }; });
 /** Face a spot, the eye tipped down onto a body's middle (or onto the ground, for one lying). @param {import('playwright').Page} page @param {{ x: number, z: number }} at @param {number} [lift] */
@@ -64,9 +49,9 @@ const record = page => page.evaluate(() => {
 /** Wait on Jake's page for Jimmy's death phase to be `phase`. @param {import('playwright').Page} page @param {string} phase @param {number} ms */
 const phaseIs = (page, phase, ms) => page.waitForFunction(want => (/** @type {any} */ (window).__onlinePlayers?.() ?? []).some((/** @type {any} */ other) => other.name === 'Jimmy' && other.death === want), phase, { timeout: ms, polling: 16 }).then(() => true, () => false);
 
-let code = 1;
-try {
-  const jake = await enter('Jake'), jimmy = await enter('Jimmy');
+/** @param {import('./remote-room.mjs').Room} room @returns {Promise<string[]>} */
+export async function proveDeath({ jake, jimmy, note, shots }) {
+  if (jimmy === null) throw new Error('Jimmy is not in the room');
   const start = await report(jimmy.page), seen = await biters(jimmy.page);
   note('Jimmy has creatures near', seen.length > 0, seen.slice(0, 6));
   await record(jake.page);
@@ -143,16 +128,7 @@ try {
   note('no frame draws him between where he fell and the checkpoint', fell !== undefined && between === 0, { between, frames: span.length, fell, back });
   note(`__onlinePlayers() never reads a speed over ${String(FASTEST)} m/s`, fastest < FASTEST, { fastest, frames: frames.length });
 
-  if (keep !== '') { mkdirSync(keep, { recursive: true }); for (const shot of ['1-fallen.png', '2-gone.png', '3-rise.png', '4-at-checkpoint.png']) copyFileSync(join(shots, shot), join(keep, `rp11-${shot}`)); }
-  /** @param {string} line */
-  const quiet = line => !/WebSocket connection|ERR_CONNECTION|Failed to load resource/u.test(line), faults = [...jake.errors, ...jimmy.errors].filter(quiet);
-  note('no page error', faults.length === 0, faults.slice(0, 6));
-  code = steps.every(row => row.ok) ? 0 : 1;
-} catch (error) {
-  note('the proof stopped', false, String(error).slice(0, 400));
-} finally {
-  await launched.close();
-  await rig.close();
+  return ['1-fallen.png', '2-gone.png', '3-rise.png', '4-at-checkpoint.png'];
 }
-console.log(code === 0 ? 'PASS' : 'FAIL');
-process.exit(code);
+
+if (isMain(import.meta.url)) await runAlone('remote-death', 'rp11', proveDeath);

@@ -6,27 +6,12 @@
 // the first flash and number stay where they are for the shot), the creature hits Jimmy and Jake's page must report Jimmy's
 // body flashed and a red number over him (`__onlinePlayers()` `hurt`), and the shot shows both.
 //   WS_RIG_PORTS=18870 scripts/browser-lane.sh --max 15 node scripts/remote-hurt-proof.mjs <app dist stamped with http://127.0.0.1:18873/release.json> <work dir> <key.json> [--shots=<dir>]
-import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
-import { enterPage, intoWorld, openRig } from './online-rig.mjs';
-import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { isMain, runAlone } from './remote-room.mjs';
 
-const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-hurt-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
-const keep = process.argv.find(value => value.startsWith('--shots='))?.slice('--shots='.length) ?? '';
 /** How far behind Jimmy Jake keeps. */
-const SHARD = 'driftwood-isle', shots = join(work, 'shots-remote-hurt'), BEHIND = 5;
-mkdirSync(shots, { recursive: true });
-const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
-/** @param {string} step @param {boolean} ok @param {unknown} [detail] */
-const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 400)}`}`); };
+const BEHIND = 5;
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: SHARD }), url = `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
-const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro']; // 402×874
-/** @param {string} name */
-const enter = async name => { const entered = await enterPage(launched, phone, url, name); await intoWorld(entered.page); return entered; };
 /** @param {import('playwright').Page} page @returns {Promise<{ x: number, y: number, z: number }>} */
 const where = page => page.evaluate(() => { const { player } = /** @type {any} */ (window).__wildshard.world; return { x: player.position.x, y: player.position.y, z: player.position.z }; });
 /** @typedef {{ x: number, z: number, away: number, kind: string, aggressive: boolean }} Seen */
@@ -77,9 +62,9 @@ const watchFloats = page => page.evaluate(() => {
 });
 const PACE = 'wildshard.remoteHurt.pace';
 
-let code = 1;
-try {
-  const jake = await enter('Jake'), jimmy = await enter('Jimmy');
+/** @param {import('./remote-room.mjs').Room} room @returns {Promise<string[]>} */
+export async function proveHurt({ jake, jimmy, note, shots }) {
+  if (jimmy === null) throw new Error('Jimmy is not in the room');
   await watchFloats(jake.page);
   const first = await quarry(jimmy.page);
   note('Jimmy has a creature to fight', first !== null, first);
@@ -106,8 +91,9 @@ try {
 
   // 2. Jake's hurt held at its first frame; Jimmy stays at the creature, not swinging, until it hits him.
   await jake.page.evaluate(key => { /** @type {any} */ (globalThis)[Symbol.for(key)] = 0; }, PACE);
-  const before = await jimmyOn(jake.page);
-  note('before anything hits Jimmy, Jake reads him unhurt', before !== null && before.hurt.hits === 0 && before.hurt.flash === 0, before?.hurt);
+  // the hits Jake's page has routed to Jimmy so far (none in a fresh room; in RP13's room a creature may have bitten him before): this blow is the next
+  const before = await jimmyOn(jake.page), earlier = before?.hurt.hits ?? 0;
+  note('before this blow, Jake reads no flash on Jimmy', before !== null && before.hurt.flash < 0.05, before?.hurt);
   let hurt = null;
   for (let i = 0; i < 240; i++) {
     const body = await quarry(jimmy.page);
@@ -115,13 +101,13 @@ try {
     await follow(jake.page, await where(jimmy.page));
     await jimmy.page.waitForTimeout(250);
     hurt = (await jimmyOn(jake.page))?.hurt ?? null;
-    if (hurt !== null && hurt.hits > 0) break;
+    if (hurt !== null && hurt.hits > earlier) break;
   }
   await Promise.all([stop(jimmy.page), stop(jake.page)]);
   await jake.page.waitForTimeout(120);
   await jake.page.screenshot({ path: join(shots, '2-jake-sees-jimmy-hurt.png') });
   hurt = (await jimmyOn(jake.page))?.hurt ?? hurt;
-  note('something hits Jimmy, and Jake\'s page routes it to his body', hurt !== null && hurt.hits > 0, hurt);
+  note('something hits Jimmy, and Jake\'s page routes it to his body', hurt !== null && hurt.hits > earlier, hurt);
   note('Jake sees Jimmy flash (held) and a red number over him', hurt !== null && hurt.flash > 0.9 && hurt.numbers.length > 0 && hurt.numbers[0] === String(hurt.last), hurt);
   await jake.page.evaluate(key => { /** @type {any} */ (globalThis)[Symbol.for(key)] = 1; }, PACE);
   await jake.page.waitForTimeout(1500);
@@ -129,16 +115,7 @@ try {
   note('let go, the flash and number are gone within a second and a half', after !== null && after.flash < 0.05 || (after !== null && after.hits > (hurt?.hits ?? 0)), after);
   await jimmy.page.screenshot({ path: join(shots, '3-jimmy-own-view.png') });
 
-  if (keep !== '') { mkdirSync(keep, { recursive: true }); for (const shot of ['1-jake-sees-jimmys-number.png', '2-jake-sees-jimmy-hurt.png', '3-jimmy-own-view.png']) copyFileSync(join(shots, shot), join(keep, `rp10-${shot}`)); }
-  /** @param {string} line */
-  const quiet = line => !/WebSocket connection|ERR_CONNECTION|Failed to load resource/u.test(line), faults = [...jake.errors, ...jimmy.errors].filter(quiet);
-  note('no page error', faults.length === 0, faults.slice(0, 6));
-  code = steps.every(row => row.ok) ? 0 : 1;
-} catch (error) {
-  note('the proof stopped', false, String(error).slice(0, 400));
-} finally {
-  await launched.close();
-  await rig.close();
+  return ['1-jake-sees-jimmys-number.png', '2-jake-sees-jimmy-hurt.png', '3-jimmy-own-view.png'];
 }
-console.log(code === 0 ? 'PASS' : 'FAIL');
-process.exit(code);
+
+if (isMain(import.meta.url)) await runAlone('remote-hurt', 'rp10', proveHurt);

@@ -5,27 +5,12 @@
 // (about 1.4 m) under Jimmy's feet, banked left into the turn (non-zero while turning) at two points of the circle, coming at
 // Jake and going away, and level (|bank| < 0.01 rad) within 0.5 s of Jimmy's drawn yaw going straight.
 //   scripts/browser-lane.sh --max 15 node scripts/remote-board-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--shots=<dir>]
-import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
-import { enterPage, intoWorld, openRig } from './online-rig.mjs';
-import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { isMain, runAlone } from './remote-room.mjs';
 
-const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-board-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
-const keep = process.argv.find(value => value.startsWith('--shots='))?.slice('--shots='.length) ?? '';
 /** Both walk OFF metres off the pier; Jimmy walks GAP metres on, then carves a circle of RADIUS metres whose near side passes Jake there. */
-const SHARD = 'driftwood-isle', shots = join(work, 'shots-remote-board'), OFF = 30, GAP = 5, RADIUS = 6;
-mkdirSync(shots, { recursive: true });
-const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
-/** @param {string} step @param {boolean} ok @param {unknown} [detail] */
-const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 400)}`}`); };
+const OFF = 30, GAP = 5, RADIUS = 6;
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: SHARD }), url = `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
-const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro']; // 402×874
-/** @param {string} name */
-const enter = async name => { const entered = await enterPage(launched, phone, url, name); await intoWorld(entered.page); return entered; };
 /** @param {import('playwright').Page} page @returns {Promise<{ x: number, y: number, z: number, yaw: number }>} */
 const where = page => page.evaluate(() => { const { player } = /** @type {any} */ (window).__wildshard.world; return { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw }; });
 /** @param {import('playwright').Page} page @param {number} forward */
@@ -55,9 +40,9 @@ const board = page => page.evaluate(() => {
   };
 });
 
-let code = 1;
-try {
-  const jake = await enter('Jake'), jimmy = await enter('Jimmy');
+/** @param {import('./remote-room.mjs').Room} room @returns {Promise<string[]>} */
+export async function proveBoard({ jake, jimmy, note, shots }) {
+  if (jimmy === null) throw new Error('Jimmy is not in the room');
   // Both walk down the pier onto the sand (OFF metres from spawn), so the carve is over open ground, clear of the pier's posts.
   const start = await where(jake.page);
   for (let i = 0; i < 200; i++) {
@@ -138,16 +123,7 @@ try {
   await jimmy.page.evaluate(() => { const w = /** @type {any} */ (window); cancelAnimationFrame(w.__rp8Carve); w.__wildshard.world.player.touchMove.y = 0; });
   await jake.page.evaluate(() => { cancelAnimationFrame(/** @type {any} */ (window).__rp8Aim); });
 
-  if (keep !== '') { mkdirSync(keep, { recursive: true }); for (const shot of ['1-jimmy-on-board.png', '2-carving-toward.png', '3-carving-away.png', '4-straight-level.png']) { try { copyFileSync(join(shots, shot), join(keep, `rp8-${shot}`)); } catch { note(`capture ${shot} kept`, false); } } }
-  /** @param {string} line */
-  const quiet = line => !/WebSocket connection|ERR_CONNECTION|Failed to load resource/u.test(line), faults = [...jake.errors, ...jimmy.errors].filter(quiet);
-  note('no page error', faults.length === 0, faults.slice(0, 6));
-  code = steps.every(row => row.ok) ? 0 : 1;
-} catch (error) {
-  note('the proof stopped', false, String(error).slice(0, 400));
-} finally {
-  await launched.close();
-  await rig.close();
+  return ['1-jimmy-on-board.png', '2-carving-toward.png', '3-carving-away.png', '4-straight-level.png'];
 }
-console.log(code === 0 ? 'PASS' : 'FAIL');
-process.exit(code);
+
+if (isMain(import.meta.url)) await runAlone('remote-board', 'rp8', proveBoard);

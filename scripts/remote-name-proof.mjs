@@ -7,29 +7,14 @@
 // and Jake's `__onlinePlayers()` must report the tag hidden.
 //   scripts/browser-lane.sh --max 15 node scripts/remote-name-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--shots=<dir>]
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
 import sharp from 'sharp';
-import { enterPage, intoWorld, openRig } from './online-rig.mjs';
-import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { isMain, runAlone } from './remote-room.mjs';
 
-const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-name-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
-const keep = process.argv.find(value => value.startsWith('--shots='))?.slice('--shots='.length) ?? '';
 /** Both walk OFF metres off the pier; Jimmy stops at each of STOPS metres from Jake, then walks on to GONE. The clamps are nameTag.ts's. */
-const SHARD = 'driftwood-isle', shots = join(work, 'shots-remote-name'), OFF = 30, STOPS = [3, 15, 40], GONE = 70, MIN_PX = 16, MAX_PX = 28;
-mkdirSync(shots, { recursive: true });
-const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
-/** @param {string} step @param {boolean} ok @param {unknown} [detail] */
-const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 400)}`}`); };
+const OFF = 30, STOPS = [3, 15, 40], GONE = 70, MIN_PX = 16, MAX_PX = 28;
 const ocr = spawnSync('tesseract', ['--version'], { encoding: 'utf8' }).status === 0;
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: SHARD }), url = `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
-const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro']; // 402×874 at 3×, the iPhone 17 Pro's points and density
-/** @param {string} name */
-const enter = async name => { const entered = await enterPage(launched, phone, url, name); await intoWorld(entered.page); return entered; };
 /** @param {import('playwright').Page} page @returns {Promise<{ x: number, y: number, z: number }>} */
 const where = page => page.evaluate(() => { const { player } = /** @type {any} */ (window).__wildshard.world; return { x: player.position.x, y: player.position.y, z: player.position.z }; });
 /** @param {import('playwright').Page} page @param {number} forward @param {boolean} [sprint] */
@@ -70,15 +55,19 @@ async function read(file, box, out) {
   if (ocr) {
     const big = `${out}.ocr.png`;
     await inner.clone().greyscale().resize({ height: 160, kernel: 'lanczos3' }).threshold(150).negate().extend({ top: 40, bottom: 40, left: 40, right: 40, background: '#fff' }).png().toFile(big);
-    text = spawnSync('tesseract', [big, '-', '--psm', '7'], { encoding: 'utf8' }).stdout.trim();
+    // One line (psm 7), then one word (psm 8): on a clean "Jimmy" at 16 px, psm 7 once split it into "Jim" (RP13's run, 40 m).
+    for (const psm of ['7', '8']) {
+      text = spawnSync('tesseract', [big, '-', '--psm', psm], { encoding: 'utf8' }).stdout.trim();
+      if (/jimmy/iu.test(text)) break;
+    }
   }
   const pixels = info.width * info.height;
   return { device: { width, height }, light: light / pixels, dark: dark / pixels, text };
 }
 
-let code = 1;
-try {
-  const jake = await enter('Jake'), jimmy = await enter('Jimmy');
+/** @param {import('./remote-room.mjs').Room} room @returns {Promise<string[]>} */
+export async function proveName({ jake, jimmy, note, shots }) {
+  if (jimmy === null) throw new Error('Jimmy is not in the room');
   const start = await where(jake.page);
   for (let i = 0; i < 200; i++) {
     const at = await where(jake.page);
@@ -86,6 +75,9 @@ try {
     await Promise.all([walk(jake.page, 1), walk(jimmy.page, 1)]); await jake.page.waitForTimeout(100);
   }
   await Promise.all([walk(jake.page, 0), walk(jimmy.page, 0)]);
+  // A creature behind Jimmy, under Jake's crosshair, raises its bar, and its label can land on the tag (RP13's room: "BLACK
+  // BEAR" over "Jimmy" at 40 m): creature bars stay hidden on Jake's page while this proof reads the Name.
+  const bars = await jake.page.addStyleTag({ content: '.ws-combat-hp { visibility: hidden !important; }' });
   // Jake keeps Jimmy in frame every frame, his eye on Jimmy's middle, so the tag sits over the crosshair, clear of it.
   await jake.page.evaluate(() => {
     const w = /** @type {any} */ (window), { player, game } = w.__wildshard.world;
@@ -123,20 +115,9 @@ try {
   note(`at ${String(GONE)} m Jake's __onlinePlayers() reports Jimmy's Name hidden`, gone.shown !== null && gone.shown.tag?.shown === false && gone.gap > 60, { gap: gone.gap, tag: gone.shown?.tag });
   await jake.page.screenshot({ path: join(shots, `${String(GONE)}m.png`) });
   await jake.page.evaluate(() => { cancelAnimationFrame(/** @type {any} */ (window).__rp12Aim); });
+  await bars.evaluate(style => { style.remove(); }); // the bars back for what follows
 
-  if (keep !== '') {
-    mkdirSync(keep, { recursive: true });
-    for (const shot of [...STOPS.flatMap(metres => [`${String(metres)}m.png`, `${String(metres)}m-tag.png`]), `${String(GONE)}m.png`]) { try { copyFileSync(join(shots, shot), join(keep, `rp12-${shot}`)); } catch { note(`capture ${shot} kept`, false); } }
-  }
-  /** @param {string} line */
-  const quiet = line => !/WebSocket connection|ERR_CONNECTION|Failed to load resource/u.test(line), faults = [...jake.errors, ...jimmy.errors].filter(quiet);
-  note('no page error', faults.length === 0, faults.slice(0, 6));
-  code = steps.every(row => row.ok) ? 0 : 1;
-} catch (error) {
-  note('the proof stopped', false, String(error).slice(0, 400));
-} finally {
-  await launched.close();
-  await rig.close();
+  return [...STOPS.flatMap(metres => [`${String(metres)}m.png`, `${String(metres)}m-tag.png`]), `${String(GONE)}m.png`];
 }
-console.log(code === 0 ? 'PASS' : 'FAIL');
-process.exit(code);
+
+if (isMain(import.meta.url)) await runAlone('remote-name', 'rp12', proveName);

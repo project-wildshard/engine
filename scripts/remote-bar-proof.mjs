@@ -5,26 +5,10 @@
 // near it but not at it, so his crosshair never raises its bar. It fails unless Jake's page shows no bar before Jimmy's blow and
 // that creature's bar, below full, after it.
 //   scripts/browser-lane.sh --max 15 node scripts/remote-bar-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--shots=<dir>]
-import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium, devices } from 'playwright';
-import { enterPage, intoWorld, openRig } from './online-rig.mjs';
-import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { isMain, runAlone } from './remote-room.mjs';
 
-const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-bar-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
-const keep = process.argv.find(value => value.startsWith('--shots='))?.slice('--shots='.length) ?? '';
-const SHARD = 'driftwood-isle', shots = join(work, 'shots-remote-bar');
-mkdirSync(shots, { recursive: true });
-const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
-/** @param {string} step @param {boolean} ok @param {unknown} [detail] */
-const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 300)}`}`); };
 
-const rig = await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: SHARD }), url = `${rig.base}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-const launched = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
-const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro']; // 402×874
-/** @param {string} name */
-const enter = async name => { const entered = await enterPage(launched, phone, url, name); await intoWorld(entered.page); return entered; };
 /** @typedef {{ x: number, z: number, away: number, kind: string, hp: number, maxHp: number, lastHitT: number, now: number }} Seen */
 /** The live creature nearest `to` (or this page's player) on this page. @param {import('playwright').Page} page @param {{ x: number, z: number } | null} to @returns {Promise<Seen | null>} */
 const nearest = (page, to) => page.evaluate(spot => {
@@ -44,9 +28,9 @@ const lookNear = (page, at, side) => page.evaluate(([x, z, off]) => { const { pl
 /** @param {import('playwright').Page} page */
 const report = page => page.evaluate(() => (/** @type {any} */ (window)).__workerClient());
 
-let code = 1;
-try {
-  const jake = await enter('Jake'), jimmy = await enter('Jimmy');
+/** @param {import('./remote-room.mjs').Room} room @returns {Promise<string[]>} */
+export async function proveBar({ jake, jimmy, note, shots }) {
+  if (jimmy === null) throw new Error('Jimmy is not in the room');
   const first = await nearest(jimmy.page, null);
   note('Jimmy has a creature to fight', first !== null, first);
   if (first === null) throw new Error('no creature on Driftwood near the spawn');
@@ -85,16 +69,7 @@ try {
   note('Jake sees its health bar, below full, though Jimmy struck it', drained !== undefined, after);
   await jake.page.screenshot({ path: join(shots, '2-jake-sees-jimmys-hit.png') });
   await jimmy.page.screenshot({ path: join(shots, '3-jimmy-swinging.png') });
-  if (keep !== '') { mkdirSync(keep, { recursive: true }); for (const shot of ['1-jake-before.png', '2-jake-sees-jimmys-hit.png', '3-jimmy-swinging.png']) copyFileSync(join(shots, shot), join(keep, `rp1-${shot}`)); }
-  /** @param {string} line */
-  const quiet = line => !/WebSocket connection|ERR_CONNECTION|Failed to load resource/u.test(line), faults = [...jake.errors, ...jimmy.errors].filter(quiet);
-  note('no page error', faults.length === 0, faults.slice(0, 6));
-  code = steps.every(row => row.ok) ? 0 : 1;
-} catch (error) {
-  note('the proof stopped', false, String(error).slice(0, 400));
-} finally {
-  await launched.close();
-  await rig.close();
+  return ['1-jake-before.png', '2-jake-sees-jimmys-hit.png', '3-jimmy-swinging.png'];
 }
-console.log(code === 0 ? 'PASS' : 'FAIL');
-process.exit(code);
+
+if (isMain(import.meta.url)) await runAlone('remote-bar', 'rp1', proveBar);
