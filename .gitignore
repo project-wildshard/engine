@@ -36,7 +36,7 @@ public/assets/packs/
 public/assets/physics/
 # the Basis Universal transcoder for KTX2 textures: copied from three by every build (vite/basis.ts, E157)
 public/basis/
-# Python bytecode from the pipeline scripts (scripts/horizon-matte/config.py, fit-lut.py loading palette-delta.py)
+# Python bytecode from the pipeline scripts (scripts/horizon-matte/config.py, scripts/look-loop/targets.py)
 __pycache__/
 
 # Raw local benchmark runs and rendered scorecard frames stay on disk; commit selected summaries explicitly.

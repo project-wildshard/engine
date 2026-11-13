@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-// oxlint-disable-next-line import/no-nodejs-modules -- Run the look loop's Python checks (ΔE00, globbing, target jobs).
+// oxlint-disable-next-line import/no-nodejs-modules -- Run the look loop's Python checks (capture finding, target jobs).
 import { spawnSync } from 'node:child_process';
 import { captureName, contextOptions, facing, parseCameraFile, parseFlags, resolveCameras, resolveMissing, SHOTS, yawTo } from '../scripts/look-loop/cameras.mjs';
 
@@ -49,7 +49,7 @@ test('the file is checked and flags are strict', () => {
   expect(captureName('', { n: 1, id: 'fp-front' })).toBe('capture-1-fp-front.jpg');
 });
 
-test('the Python side: CIEDE2000 reference pairs, capture globbing, seed-mode target jobs', () => {
+test('the Python side: capture finding and seed-mode target jobs', () => {
   const run = spawnSync('python3', ['scripts/look-loop/test_look_loop.py'], { encoding: 'utf8', timeout: 30000 });
   expect(run.stderr).toMatch(/OK/u);
   expect(run.status).toBe(0);

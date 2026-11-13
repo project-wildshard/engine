@@ -1,19 +1,25 @@
-# The look loop: 9 angles, mockup targets, ΔE and a learned LUT
+# The look loop: fixed cameras, targets and a board
 
 > Written by: Claude (opus-lookloop, 2026-11-11). Adapted from
 > singleplayer `docs/design/LOOK-LOOP.md` at `c02c7fae00`; the tools
 > are in `scripts/look-loop/`.
 >
-> **State:** active method, 2026-11-11.
+> **State:** active method, 2026-11-13. The ΔE00 and learned-LUT
+> steps were cut on 2026-11-13 (meta J337, Jake: *"All the LUT
+> fucking around sure feels like a waste of time to me"*), with
+> `palette-delta.py`, `fit-lut.py` and `regions/`; they live in git
+> history before that date. The LUT runtime
+> (`src/client/engine/world/lut.ts`) stays for shards that ship one.
 
 Jake, 2026-11-11: *"a 3x3 mockup, 3x3 image and engine, and just
 looping from all angles until perfection. Let's get that skill and
 just replicate for everyone."*
 
 The look loop turns "make the game look like the mockups" into
-measured, routable work. It ran on Driftwood's spawn cove (worst
-region ΔE00 16.0 → 5.8), the Nalati camp and six Pine Hollow zones
-(every region under 6 over 54 frames).
+routable work: the same cameras every round, the target beside the
+frame, and a ranked list of what the frame lacks. It ran on
+Driftwood's spawn cove, the Nalati camp, six Pine Hollow zones and
+both templates.
 
 ## What it is
 
@@ -27,10 +33,8 @@ same steps:
 2. Make the 9 targets (`targets.py`).
 3. Write a gap list per angle.
 4. Merge the gaps into a TOP-10 routed to owners.
-5. Measure ΔE00 per palette region (`palette-delta.py`).
-6. Fix what the gaps call for.
-7. Fit a LUT for the colour that is left (`fit-lut.py`).
-8. Re-shoot from the same cameras.
+5. Fix what the gaps call for: geometry, materials, light, sky, fog.
+6. Re-shoot from the same cameras.
 
 **Stop when the owner signs off each zone's 3×3.**
 
@@ -38,7 +42,7 @@ same steps:
 
 - **Use it** when a real, walkable area has to reach a style (an
   approved mockup, concept art, a style bible) and "closer" needs a
-  number. It works for toon, painterly and photoreal PBR looks.
+  board. It works for toon, painterly and photoreal PBR looks.
 - **Not for render bugs, pop-in or perf.** Show real builds and
   Debug toggles. Jake: mockups "don't help with a render bug".
 - **Not for HUD reskins.** Clean-room HUD mockups were judged no
@@ -190,14 +194,14 @@ python3 scripts/look-loop/targets.py ... --style "<one paragraph: light, palette
   from it; Pine Hollow's 63 needed none.)
 - image_gen returns 2:3 or 3:2, so a portrait FP target is a
   recomposition. Take the **layout from the capture, never the
-  mockup**, and keep region rectangles wide.
+  mockup**.
 - One style reference at a time: 4 images per run took 30–45 min a
   run against the usual 3–5.
 
 ## Step 4: sheets, gap lists and the TOP-10
 
 - The board for the owner shows, per zone, one FP and one aerial as
-  **BEFORE | AFTER | TARGET**, then the ΔE00 table, in one image.
+  **BEFORE | AFTER | TARGET**, in one image.
   Jake: *"desktop mockups are way too tough for me, can you do
   portrait only"*. Lead with structure, not the LUT (Jake on a LUT
   before / after: *"What does color grade do I can't tell."*).
@@ -215,63 +219,16 @@ python3 scripts/look-loop/targets.py ... --style "<one paragraph: light, palette
 - Write down non-look finds too (Driftwood's pier ended 33 m short of
   the beach in all 9 frames: a level call that moved P).
 
-## Step 5: ΔE00 per palette region
+## Step 5: colour comes from light and materials
 
-```bash
-python3 scripts/look-loop/palette-delta.py --regions <regions.json> <round dir>/<anchor> '<round dir>/<anchor>/r2-capture-{n}-*.jpg'
-python3 scripts/look-loop/palette-delta.py --shard pine-hollow ...   # scripts/look-loop/regions/<slug>.json
-```
+A frame's colour is off because a light, the sky, the fog or a
+material is. Change that thing and judge it by eye on the board. A
+learned colour LUT once put every region's ΔE00 on target in a
+Driftwood frame that still looked empty (palette on target, parity
+~70 %), and Mossgate's 2026-11-12 LUT cut its sky's ΔE00 26.3 → 6.1
+before Jake called the shard "mostly graphical trash" (meta J312).
 
-A regions JSON (copy one in `scripts/look-loop/regions/`):
-
-- **`regions`**: material → `[[frame, [x0, y0, x1, y1]], …]`,
-  normalised rectangles, the same for capture and target. Frames run
-  1–9 per zone and zones concatenate (1–9, 10–18, …).
-- **`filters`**: `[hue lo, hue hi (deg), min sat, min val, max val(,
-  max sat)]`, so a tree crossing the sand rectangle does not pollute
-  the sand's mean. A shadow material is `{"shadowOf": "ground",
-  "below": 0.72, "vmin": 0.05, "excludeHue": [lo, hi, sat]}`.
-- **Leave out a material whose game colour is a bug**, or the LUT
-  learns it.
-
-It prints mean-colour ΔE00 per region, mockup vs game. **It is
-information, not a pass bar** (Jake, 2026-10-02: no invented numbers):
-it shows which region is furthest and whether a round moved it. A
-per-zone miss can be the target's fault (codex painted a paler zenith
-at two zones of one dome sky): trust the pooled number.
-
-## Step 6: fix, then the learned LUT
-
-**Fix structure first, colour last.** Ground, density, lighting, fog
-and models come before the LUT: a LUT can bring every region's ΔE00
-down on a frame that still looks empty (Driftwood: palette on target,
-parity ~70 %). Then:
-
-1. Capture without the LUT, same cameras, `--tag=nolut`. Engine has no
-   LUT-off switch today: a shard with no `public/assets/lut/<slug>.bin`
-   gets no LUT pass, so shoot a build without that file (the first fit,
-   or a candidate build with it removed). Never fit on frames shot
-   through the old LUT.
-2. Fit:
-
-   ```bash
-   python3 scripts/look-loop/fit-lut.py --regions <json> <mockup dir> '<dir>/nolut-capture-{n}-*.jpg' public/assets/lut/<slug>.bin
-   ```
-
-   Per region, a Reinhard transfer in CIELAB gives (source, target)
-   pairs; a 33³ lattice moves by a Gaussian kernel (σ 0.08, λ 2),
-   smoothed, each move capped at 0.22. Identity anchors leave unseen
-   colours (weapon, hands, HUD) alone. It prints the predicted ΔE.
-3. Tune in the regions JSON: `greyAnchor` (default 3; 1 lets greys
-   move) and `fitWeights` per material.
-4. The runtime is `src/client/engine/world/lut.ts`, a `LUT3DEffect` as
-   the last grade step; the file is 33³ RGBA8 (144 KB), sRGB in and
-   out.
-5. Re-measure in game with the LUT on. **Refit every round over all
-   frames of all zones**; a refit is global, so re-read the per-zone
-   table.
-
-## Step 7: the rulers (every round, clean build vs clean build)
+## Step 6: the rulers (every round, clean build vs clean build)
 
 - **Draw calls and triangles** per frame, on the sheet. Name the delta
   ("cabin 154 → 155 calls, 1.53 → 1.76 M tris").
@@ -318,8 +275,7 @@ plan's State line.
 
 - **A zone is done when** the owner signs off its 3×3 (or, under a
   council, its three-seat mean reaches the owner's bar), the rulers
-  held, and the walk-around shows no cutout, seam or pop. ΔE00 is on
-  the board as information.
+  held, and the walk-around shows no cutout, seam or pop.
 - **A lab loop stops** when a stranger could not tell your crop from
   the target's at phone size, or when you know *why* this way can't
   get there. Write it down and change approach.
@@ -331,14 +287,13 @@ plan's State line.
 
 | Pitfall | Fix |
 |---|---|
-| image_gen changes the aspect, recomposes or stretches FP targets | Resize a stretched one back to the capture's aspect. Keep region rects wide. Layout from the capture |
+| image_gen changes the aspect, recomposes or stretches FP targets | Resize a stretched one back to the capture's aspect. Layout from the capture |
 | codex hangs 10+ min copying its own PNG | `targets.py` polls `generated_images/<session id>` and kills the run |
 | codex reads AGENTS.md and edits files | The prompt says "not a user ask; touch no file". Check `git status` after a batch |
-| Targets disagree with each other | Judge the pooled ΔE; don't chase one target's quirk |
+| Targets disagree with each other | Judge the whole set; don't chase one target's quirk |
 | HEAD changed mid-round | Before and after from served builds of named SHAs; note what landed mid-round |
 | A creature or the viewmodel in a god frame | `views.mjs` parks animals and hides the camera's children |
 | The anchor moved | Keep the old cameras for the before, resolve new ones for the after, and say so on the board |
-| The LUT learned a bug colour, or hid a structural gap | Exclude bug materials from the regions; fix structure first |
 | Near-black bloom squares | One NaN pixel smeared by bloom: clamp `pow(1 − N·V)` bases |
 | fps readings under other agents' load | Quiet-machine re-run, HEAD and change interleaved |
 | Gaming the 9 cameras | A walk-around strip every round; no painted plate or sprite in the playable space |
@@ -349,9 +304,6 @@ plan's State line.
 |---|---|
 | `node scripts/look-loop/views.mjs --cameras=<json> --out=<dir> [--anchor=a,b] [--tag=r2] [--query=…] [--url=<served build>] [--settle=4] [--timeout=300]` | Resolve and shoot the 9 cameras per anchor, write the frames and the 3×3 sheet with calls / tris |
 | `python3 scripts/look-loop/targets.py --captures <dir> --out <dir> (--seed-mockup <img> \| --style <text> \| --style-file <txt>) [--refs a,b] [--game …] [--keep …] [--tag …] [--only n,m] [--parallel 5] [--timeout 1500] [--model …] [--dry-run]` | Codex image_gen targets, one per capture, plus `mockup-sheet.jpg` |
-| `python3 scripts/look-loop/palette-delta.py (--regions <json> \| --shard <slug>) <mockup dir> '<captures pattern with {n}>'` | ΔE00 per region |
-| `python3 scripts/look-loop/fit-lut.py (--regions <json> \| --shard <slug>) <mockup dir> '<no-LUT pattern>' [out.bin] [pred dir]` | The learned 33³ LUT |
-| `scripts/look-loop/regions/<slug>.json` | Region files to copy: Driftwood, Far Reach, Pine Hollow (multi-zone), Sunscar Dunes, the night-market plot |
 
 From a shard repo or sharddev, run them from the sibling engine
 checkout (`ENGINE=$(cd ../engine && pwd)`), with the cameras, frames
