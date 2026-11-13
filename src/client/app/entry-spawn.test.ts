@@ -84,12 +84,12 @@ test('original table failure wins over concurrent tier setup failure', async () 
 
 /** Execute the actual selected-entry body with finite service/admission ports.
  * These gates exercise its order without constructing a browser or renderer. */
-function selectedEntry(admissionFailure?: Error, packs = false) {
+function selectedEntry(admissionFailure?: Error, packs = false, authored = false) {
   const source = readFileSync(new URL('entry.ts', import.meta.url), 'utf8');
   const start = source.indexOf('async function startSelected(): Promise<void> {');
   if (start === -1) throw new Error('Missing selected entry');
   const body = source.slice(start).replaceAll(/\bimport\(([^)]+)\)/gu, 'load($1)');
-  const events: string[] = [], transport: unknown[] = [], memory = deferred(), memoryStarted = deferred(), admission = deferred(), admissionStarted = deferred();
+  const events: string[] = [], transport: unknown[] = [], firstParties: boolean[] = [], memory = deferred(), memoryStarted = deferred(), admission = deferred(), admissionStarted = deferred();
   let acceptSession = (): void => {throw new Error('Missing session import');};
   let rejectSession = (_error: Error): void => {throw new Error('Missing session import');};
   const session = new Promise<unknown>((resolve, reject) => {
@@ -113,7 +113,7 @@ function selectedEntry(admissionFailure?: Error, packs = false) {
     '@wildshard/engine/ui/Loading': {beginLoading: () => ({waiting: noop, setPrefetchSource: noop, setPath: noop})},
     '@wildshard/engine/core/tier': {TIER: 'phone'},
     '@wildshard/engine/game/grid/pageEntry': grid,
-    '@wildshard/engine/game/grid/menu': {DEVSERVER: false, gridMode: () => ({})},
+    '@wildshard/engine/game/grid/menu': {DEVSERVER: authored, gridMode: () => ({})},
     '@wildshard/engine/game/boot/spawnDownload': {setSpawnPacks: (enabled: boolean) => {transport.push(enabled);},
       startSpawnDownload: () => {transport.push('start'); return null;}, observeSpawnHolds: () => undefined},
     '@wildshard/engine/game/shardfile/clientSource': {configuredShardfile: () => Promise.resolve(null), preparePageResidency: () => page,
@@ -122,7 +122,7 @@ function selectedEntry(admissionFailure?: Error, packs = false) {
         if (admissionFailure !== undefined) throw admissionFailure;
         events.push('admission:end'); return shard;
       }},
-    '@wildshard/engine/game/shardfile/runtimeProduct': {browserShardfileOptions: () => ({})},
+    '@wildshard/engine/game/shardfile/runtimeProduct': {browserShardfileOptions: (_base: string, firstParty = false) => {firstParties.push(firstParty); return {};}},
     '@wildshard/engine/game/boot/loadingPaths': {loadingPath: noop},
     '@wildshard/engine/game/grid/prefetch': {gridPrefetchStatus: noop},
     '@wildshard/engine/script/moduleV2': {prepareScriptMemoryBank: async () => {
@@ -142,7 +142,7 @@ function selectedEntry(admissionFailure?: Error, packs = false) {
   const result: unknown = runInNewContext(stripTypeScriptTypes(`${body}; startSelected();`), {
     runtimePacksOn: () => packs, search: new URLSearchParams('chunk=example'), unloadedTitleRow: () => undefined,
     prepareBootImports, bootAwait, bootMark, bootTask, bootTiming, entryScope: {child: () => imageOwner}, selectedImages: undefined, crashResume: null,
-    document: {getElementById: () => null, baseURI: 'https://example.invalid/', documentElement: {classList: {remove: noop}}},
+    document: {getElementById: (id: string) => authored && id === 'ws-shardfile' ? {} : null, baseURI: 'https://example.invalid/', documentElement: {classList: {remove: noop}}},
     performance: {measure: noop},
     load: (name: string): Promise<unknown> => {
       if (name === '@wildshard/engine/game/session/session') {events.push('session:import'); return session;}
@@ -151,7 +151,7 @@ function selectedEntry(admissionFailure?: Error, packs = false) {
     },
   });
   if (!(typeof result === 'object' && result !== null && 'then' in result && typeof result.then === 'function')) throw new Error('Missing selected work');
-  return {run: Promise.resolve(result), events, transport, memory, memoryStarted, admission, admissionStarted, acceptSession, rejectSession};
+  return {run: Promise.resolve(result), events, transport, firstParties, memory, memoryStarted, admission, admissionStarted, acceptSession, rejectSession};
 }
 
 test.each([false, true])('early session code waits for the original memory, admission and kit barrier before starting (packs %s)', async packs => {
@@ -164,6 +164,16 @@ test.each([false, true])('early session code waits for the original memory, admi
   f.admission.finish(); await f.run;
   expect(f.events).toEqual(['session:import', 'memory:start', 'memory:end', 'admission:start', 'admission:end',
     'kit:species', 'kit:icons', 'kit:pickup:prepare', 'kit:pickup:install', 'kit:props', 'session:start']);
+});
+
+// SA15: `wildshard dev`'s page (a devserver build with the author's shard inline) reads and installs that shard as the
+// build's own product, and starts no catalogue shard's spawn download.
+test('a devserver page with an inline author shard reads it first-party and starts no spawn download', async () => {
+  const f = selectedEntry(undefined, false, true);
+  await beforeCompletion(f.memoryStarted.ready, f.run); f.acceptSession(); await Promise.resolve();
+  expect(f.transport).toEqual([false]);
+  f.memory.finish(); await beforeCompletion(f.admissionStarted.ready, f.run); f.admission.finish(); await f.run;
+  expect(f.firstParties).toEqual([true, true]);
 });
 
 test('an admission failure still wins over an early session import failure', async () => {
