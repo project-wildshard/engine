@@ -243,6 +243,11 @@
       "shape": "0180a3cec9d631b6",
       "migrations": []
     },
+    "session/life.hid": {
+      "version": 1,
+      "shape": "0180a3cec9d631b6",
+      "migrations": []
+    },
     "session/loadAttempt": {
       "version": 1,
       "shape": "0180a3cec9d631b6",

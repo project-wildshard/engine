@@ -98,7 +98,7 @@ test('a crash with no word from the game (iOS kills the page) restarts onto the 
 
 test('a reload the game made by itself, with no recorded reason, says so', () => {
   const t = tab(), world = enterWorld(t);
-  world.life.markReload('stale deployment code'); // browserChunkRecovery: the game's own reload, which lands on the title
+  world.life.markReload('stale deployment code'); // a game reload with RELOAD's reason: it lands on the title
   const { drop } = title(t, false);
   expect(drop).toMatchObject({ kind: 'restart', what: 'Unexpectedly back at the title', reason: 'The game sent you here by itself: stale deployment code.' });
 });

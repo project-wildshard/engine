@@ -15,7 +15,7 @@ const strings = new Set(['perf.probe', 'perf.rec', 'perf.lap', 'resume.shot', 'b
 const records = new Set(['settings', 'gfx', 'ui.fold', 'ktx2set', 'boot.times']);
 const arrays = new Set(['hints', 'debug.open', 'boot.reports', 'err.queue', 'err.reloads', 'gpu.reloads', 'review.queue']);
 const global = ['settings', 'gfx', 'hints', 'review', 'review.queue'];
-const session = ['life.alive', 'err.session', 'err.reloads', 'gpu.reloads', 'resume.shot', 'resume.brand', 'clearDownloads.report', 'titleArrival', 'loadAttempt', 'boot.selfReload', 'boot.staleBuild', 'boot.lowPower'];
+const session = ['life.alive', 'life.hid', 'err.session', 'err.reloads', 'gpu.reloads', 'resume.shot', 'resume.brand', 'clearDownloads.report', 'titleArrival', 'loadAttempt', 'boot.selfReload', 'boot.staleBuild', 'boot.lowPower'];
 const device = ['devMode', 'debug.open', 'ui.fold', 'perf.probe', 'perf.rec', 'perf.lap', 'ktx2set', 'boot.times', 'life.lastUnload', 'life.lastEnd', 'life.alive.once', 'boot.trace', 'boot.reports', 'err.queue', 'titleArrival.once', 'storage.persisted'];
 for (const [scope, keys] of [['global', global], ['session', session], ['device', device]] as const) for (const key of keys) {
   const schema = strings.has(key) ? v.nullable(v.string()) : records.has(key) ? jsonRecord : arrays.has(key) ? v.array(jsonSchema) : key === 'devMode' || key === 'storage.persisted' ? v.boolean() : jsonSchema;

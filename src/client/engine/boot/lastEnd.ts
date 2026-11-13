@@ -13,6 +13,11 @@ import { saveStorage } from '../saves/slots';
  *   lastEnd()                      read once at import (the boot's first module): how the previous page in this tab ended
  *     intentional   a `life.lastUnload` younger than INTENT_MS: the game navigated, and says why
  *     unexpected    no recent reason but a stale `life.alive`: the page ended without a pagehide; browser/system cause unknown
+ *     intentional   (player) neither, on a `reload` navigation of a page that ended VISIBLE moments ago (session `life.hid`,
+ *                   written at pagehide): the player reloaded (browser button, pull-to-refresh); it carries `reload` and
+ *                   `player`, so it lands on a quiet title (QA 11-12 row 35). A system reload is not one: a discarded tab, or an
+ *                   iOS tab killed in the background (its pagehide ran hidden). index.html's 12 s self-reload (`boot.selfReload`,
+ *                   claimed just before this document) is the engine's and resumes, unless it retried a hung player reload
  *     fresh         neither: a cold launch
  *   `document.wasDiscarded` rides along (Chrome's tab discarding; iOS never sets it).
  *
@@ -35,6 +40,16 @@ const END_KEY = 'life.lastEnd';
 const INTENT_MS = 10_000;
 /** the alive beat's period */
 const BEAT_MS = 3000;
+/** index.html's 12 s self-reload claims session `boot.selfReload` (a timestamp) just before it reloads: that young, it is the engine's */
+const SELF_RELOAD_KEY = 'boot.selfReload';
+/** a claim this long before this document's start is the reload that started it (it is written in the same turn as the reload) */
+const SELF_RELOAD_MS = 3000;
+/** the last pagehide in this tab: when, visible or hidden, and the address (session) */
+const HID_KEY = 'life.hid';
+/** a reload button or pull-to-refresh boots the next page this soon after the old one's pagehide */
+const PLAYER_RELOAD_MS = 30_000;
+/** index.html's self-reload of a hung player reload: its own 12 s on top */
+const PLAYER_RETRY_MS = 60_000;
 
 /** what the running page is: its level, the resident list and the game's page mode (SF21a: the game's `'grid' | 'shard'`,
  *  src/client/game/plugin/context.ts), so the next boot knows which way in ended */
@@ -64,6 +79,9 @@ export interface LastEnd {
   nav: string;
   /** Explicit RELOAD returns to the title; GPU/background recovery is separate. */
   reload?: true;
+  /** QA 11-12 row 35 (Jake: "I expected reload to go back to main menu"): the player reloaded the page themselves (the browser's
+   *  reload button, pull-to-refresh), with no word from the game. It lands on the title, and the title shows no drop modal. */
+  player?: true;
 }
 /** Content supplies persistence at explicit reload boundaries, never at ordinary navigation. `settings`: a Settings pick
  *  reloads back into the world where the player stands (SETTINGS-REDESIGN SR12); unlike `reload` it does not return to the title. */
@@ -79,6 +97,16 @@ const num = (o: unknown, k: string): number => { const v: unknown = typeof o ===
 
 /** a page (not a unit test's node, which imports the modules that import this one) */
 const inPage = (): boolean => typeof document !== 'undefined' && typeof window !== 'undefined';
+/** this document's navigation type (navigate / reload / back_forward), '' unknown; WebKit before Navigation Timing 2 has only
+ *  the legacy `performance.navigation.type` (1 = reload) */
+function navigationType(): string {
+  try {
+    const entry: unknown = performance.getEntriesByType('navigation')[0];
+    if (entry !== undefined) return str(entry, 'type');
+    const legacy: unknown = Reflect.get(performance, 'navigation');
+    return num(legacy, 'type') === 1 ? 'reload' : '';
+  } catch { return ''; }
+}
 
 /**
  * One page's life record: built at boot, it reads how the previous page ended, then beats while this one lives. The page
@@ -90,9 +118,15 @@ export class PageLife {
   private readonly thisEnd: LastEnd;
   private beforeReload: ((reason: ReloadReason) => boolean) | undefined;
   private readonly storage: typeof store;
+  private readonly nav: () => string;
 
-  constructor(scope: Scope, storage: typeof store = store) {
+  private readonly page: () => { href: string; startedAt: number };
+
+  constructor(scope: Scope, storage: typeof store = store, nav: () => string = navigationType,
+    page: () => { href: string; startedAt: number } = () => ({ href: inPage() ? location.href : '', startedAt: typeof performance === 'undefined' ? Date.now() : performance.timeOrigin })) {
     this.storage = storage;
+    this.nav = nav;
+    this.page = page;
     this.thisEnd = this.classify();
     inspectPreviousBoot();
     if (this.thisEnd.kind !== 'fresh' || this.thisEnd.discarded) writeJson(this.storage('local'), END_KEY, this.thisEnd);
@@ -104,7 +138,11 @@ export class PageLife {
       // back on screen after a pagehide that did not end the page (iOS can send one on an app switch): beating again
       scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') this.alive = true; this.beat(); });
       // a page that ends normally takes its marker with it; a bfcache return (pageshow persisted) puts it back
-      scope.listen(window, 'pagehide', () => { this.alive = false; this.clearAlive(); });
+      scope.listen(window, 'pagehide', () => {
+        this.alive = false; this.clearAlive();
+        // QA 11-12 row 35: how this page ended, for telling the player's reload (a visible page) from a system one (hidden)
+        writeJson(this.storage('session'), HID_KEY, { t: Date.now(), vis: document.visibilityState, href: location.href });
+      });
       scope.listen(window, 'pageshow', (e) => { if (e.persisted) { this.alive = true; this.beat(); } });
     }
   }
@@ -171,8 +209,8 @@ export class PageLife {
     try { local?.removeItem(ALIVE_BACKUP_KEY); } catch { /* consumed by this page's classification */ }
     try { local?.removeItem(UNLOAD_KEY); } catch { /* read once either way */ }
     const discarded = inPage() && Reflect.get(document, 'wasDiscarded') === true;
-    let nav = '';
-    try { const e: unknown = performance.getEntriesByType('navigation')[0]; nav = str(e, 'type'); } catch { /* old WebKit */ }
+    const nav = this.nav(), hid = readJson(session, HID_KEY);
+    try { session?.removeItem(HID_KEY); } catch { /* read once either way */ }
     const base = { bootedAt: now, discarded, nav, ...(typeof u === 'object' && u !== null && Reflect.get(u, 'reload') === true ? { reload: true as const } : {}) };
     const ut = num(u, 't');
     if (u !== null && now - ut < INTENT_MS) return { kind: 'intentional', reason: str(u, 'reason'), at: ut, resident: str(u, 'resident'), slug: str(u, 'slug'), mode: str(u, 'mode'), build: str(u, 'build'), ...base };
@@ -181,7 +219,28 @@ export class PageLife {
       return { kind: 'unexpected', reason: `page ended unexpectedly ${where} (browser or system cause unknown)`, at: num(a, 't'), resident: str(a, 'resident'), slug: str(a, 'slug'), mode: str(a, 'mode'), build: str(a, 'build'), ...base };
     }
     if (u !== null) return { kind: 'intentional', reason: `${str(u, 'reason')} (${Math.round((now - ut) / 1000)} s before this load)`, at: ut, resident: str(u, 'resident'), slug: str(u, 'slug'), mode: str(u, 'mode'), build: str(u, 'build'), ...base };
+    // no word from the game and no crash, on a reload: the player's own (browser button, pull-to-refresh), unless index.html's self-reload claimed it
+    if (this.playerReload(nav, hid, discarded, now)) return { kind: 'intentional', reason: 'player reload (the browser reload button or pull-to-refresh)', at: now, resident: '', slug: '', mode: '', build: '', ...base, reload: true, player: true };
     return { kind: 'fresh', reason: 'fresh launch', at: 0, resident: '', slug: '', mode: '', build: '', ...base };
+  }
+
+  /** QA 11-12 row 35: the player reloaded this page (no word from the game, no crash). The page before ended visible, moments ago
+   *  (a system reload ends a hidden page, or a discarded one). A reload index.html made by itself retries the page before it: a
+   *  player reload whose boot hung (same address) stays the player's; any other hung boot it retried resumes. */
+  private playerReload(nav: string, hid: unknown, discarded: boolean, now: number): boolean {
+    if (discarded || nav !== 'reload' || str(hid, 'vis') !== 'visible') return false;
+    const age = now - num(hid, 't');
+    if (!this.selfReloaded()) return age >= 0 && age < PLAYER_RELOAD_MS;
+    return age >= 0 && age < PLAYER_RETRY_MS && str(hid, 'href') !== '' && str(hid, 'href') === this.page().href;
+  }
+
+  /** index.html's self-reload claimed `boot.selfReload` just before this document started (blocked storage: it could not claim,
+   *  and index.html does not reload without one) */
+  private selfReloaded(): boolean {
+    try {
+      const at = Number(this.storage('session')?.getItem(SELF_RELOAD_KEY) ?? Number.NaN), started = this.page().startedAt;
+      return Number.isFinite(at) && at <= started + 50 && started - at < SELF_RELOAD_MS;
+    } catch { return false; }
   }
 
   /** how the previous page in this tab ended (this boot's reading) */
@@ -197,6 +256,7 @@ export class PageLife {
       kind: kind === 'intentional' || kind === 'unexpected' ? kind : 'fresh', reason: str(e, 'reason'), at: num(e, 'at'), resident: str(e, 'resident'), slug: str(e, 'slug'), mode: str(e, 'mode'),
       build: str(e, 'build'), bootedAt: num(e, 'bootedAt'), discarded: Reflect.get(e as object, 'discarded') === true, nav: str(e, 'nav'),
       ...(Reflect.get(e as object, 'reload') === true ? { reload: true } : {}),
+      ...(Reflect.get(e as object, 'player') === true ? { player: true } : {}),
     };
   }
 

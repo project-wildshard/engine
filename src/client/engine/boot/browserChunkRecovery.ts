@@ -49,7 +49,8 @@ const recoveryPorts = (allowed: () => boolean, reason: ReloadReason = 'reload'):
 /** Only a confirmed newer deployment can replace a rejected boot/lazy module or stylesheet. */
 export function recoverChunkFailure(error: unknown): Promise<boolean> {
   if (typeof window === 'undefined' || typeof __BUILD_ID__ !== 'string') return Promise.resolve(false);
-  recover ??= createChunkRecovery(recoveryPorts(recoveryAllowed));
+  // QA 11-12 row 35: the engine's own reload into the newer build resumes the world it was loading, never a title nobody asked for
+  recover ??= createChunkRecovery(recoveryPorts(recoveryAllowed, 'background'));
   return recover(error);
 }
 /** The old worker can't be shown to step aside, so the page leaves it: the next document comes from the network. */

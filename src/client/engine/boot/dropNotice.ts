@@ -16,6 +16,7 @@ import type { LastEnd } from './lastEnd';
  *   noteDropRoute(reason)                every navigation the game makes (lastEnd's markUnload) leaves its words and call site
  *   recordDrop({ what, reason, error })  code that sends the page to the title by itself says why, first
  *   leftByPlayer()                       the player's own exit: the token the next title needs to stay quiet
+ *   (a browser reload)                   lastEnd's `player`: the player reloaded the page themselves, also a quiet title
  *   takeDrop(lastEnd())                  the title, once: the drop to show, or null
  *
  * Quiet titles: the token, the first boot of a visit (no world page before it in this tab) and a title after a title. The device
@@ -179,6 +180,8 @@ export class DropNotes {
     for (const key of unexpected ? ['step', 'pending', 'expect', 'stepOnce', 'pendingOnce'] as const : ['step', 'pending', 'expect'] as const) {
       try { this.store.clear(key); } catch { /* storage blocked */ }
     }
+    // QA 11-12 row 35: the player's own browser reload is their token: a quiet title, no modal and no report
+    if (end.player === true) return null;
     const said = end.kind === 'fresh' ? '' : end.reason;
     if (pending !== null && time(pending, 'at') >= time(expected, 't')) {
       return { kind: 'error', what: text(pending, 'what'), reason: text(pending, 'reason'), step: text(pending, 'step'), world: text(pending, 'world'),

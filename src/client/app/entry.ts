@@ -32,7 +32,7 @@ import { startShellClock, waitForLoadingStyles } from '@wildshard/engine/boot/sh
 import { inspectPreviousBoot, previousBootLine, previousBootLevel } from '@wildshard/engine/boot/bootTrace';
 import { Scope } from '@wildshard/engine/app/scope';
 import { bootRoute, onlineTitleFirst } from './bootRoute';
-import { pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
+import { consumeTitleArrival, pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import { lastEnd } from '@wildshard/engine/boot/lastEnd';
 import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
@@ -108,6 +108,16 @@ async function enterPage(): Promise<unknown> {
   const { consumeGridRecovery, gridRecoveryRefused, pageGridRecovery, pendingGridEntry } = await bootTask('app:page-entry-import', () => import('@wildshard/engine/game/grid/pageEntry'));
   // QA row 16 (GO1): an online level seats a body the world sees, so only a tap enters one. Crash resume is the solo build's.
   const online = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined;
+  // QA 11-12 row 35 (Jake, 20:04: "I expected reload to go back to main menu"): the player's own browser reload lands on the title,
+  // before a tap still pending from this load (or the grid's one way in) can enter the world again; the title stays quiet
+  // (dropNotice). A reload the engine makes marks itself first (lastEnd), so it resumes; harness flags keep their world.
+  if (lastEnd().player === true && document.getElementById('ws-shardfile') === null && !search.has('skipintro') && !search.has('tour')) {
+    if (requested !== null) consumeTitleArrival(requested);
+    consumeGridRecovery({ previous: lastEnd(), search });
+    history.replaceState(history.state, '', new URL('/', location.origin));
+    document.documentElement.classList.add('title-first');
+    return showPageTitle();
+  }
   const tapped = requested !== null && (pendingTitleArrival(requested) !== null || pendingGridEntry(requested));
   if (document.getElementById('ws-shardfile') === null && onlineTitleFirst(search, online, tapped)) {
     history.replaceState(history.state, '', new URL('/', location.origin));
