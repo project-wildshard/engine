@@ -12,6 +12,8 @@
 //   --after-staging-proofs   production go-live: the strict staging proofs passed on this exact build
 //   --content                upload: publish the page's content set to packs.wildshard.io first (PAGE-SIZE PZ2,
 //                            page-release/content.mjs); off until PZ4 and PZ6 stamp contentBase into the page
+//   --catalogue=<file>       preview build: bake this catalogue, the grid borrowed from staging (SHARD-AUTHORING SA35,
+//                            scripts/preview-grid.ts); default test/pins/catalogue.json. Refused on staging and production
 //
 // The flow and its gates are scripts/page-release/flow.mjs; the page hosts are scripts/page-release/hosts/*.mjs.
 // Phase results go to <root>/tmp/page-release/<channel>-<sha>.json, which the next phase reads.
@@ -31,7 +33,7 @@ const value = (/** @type {string} */ name) => flag(name)?.split('=').slice(1).jo
 const [channel, phaseList] = args.filter(arg => !arg.startsWith('--'));
 const hostName = value('host') ?? 'workers';
 if (channel === undefined || phaseList === undefined || hostName !== 'workers') {
-  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--content]');
+  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--content] [--catalogue=<file>]');
   process.exit(2);
 }
 const git = (/** @type {string[]} */ argv, /** @type {string} */ cwd) => execFileSync('git', argv, {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
@@ -90,6 +92,8 @@ try {
       dryRun: flag('dry-run') !== undefined,
       waitMs: Number(value('wait') ?? 45) * 60_000,
       afterStagingProofs: flag('after-staging-proofs') !== undefined,
+      // the build runs in `root`, so a relative path is the caller's
+      ...(value('catalogue') === undefined ? {} : {catalogue: resolve(value('catalogue') ?? '')}),
     });
     if (refusals.length > 0) log(`DRY-RUN ${channel} ${phase}: ${refusals.length} gate(s) would refuse today`);
   }

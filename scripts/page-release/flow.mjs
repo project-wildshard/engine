@@ -106,6 +106,8 @@ export class RefusedError extends Error {
  * @property {number} [pollMs]
  * @property {boolean} [afterStagingProofs]  Production go-live: the strict staging proofs passed on this build.
  * @property {string} [releaseKey]  Defaults to RELEASE_PUBLIC_KEY; tests sign with their own.
+ * @property {string} [catalogue]  Preview only (SA35): the catalogue the page bakes, staging's borrowed grid (scripts/preview-grid.ts);
+ *   default the pinned `test/pins/catalogue.json`.
  */
 
 const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -136,13 +138,14 @@ export async function runPhase(phase, deps) {
   if (deps.git.head() !== deps.build) refuse(`HEAD ${deps.git.head()} is not build ${deps.build}`);
   if (!deps.git.clean()) refuse('the release tree is not clean (one clean clone per channel)');
   if (!(deps.manifest.saveEpoch >= 1)) refuse('save-epoch.json must be at least 1');
+  if (deps.catalogue !== undefined && !channel.solo) refuse(`--catalogue is preview's (SA35): ${channel.channel} bakes the pinned catalogue`);
   deps.log(`${channel.channel} ${phase} ${deps.build} v${deps.manifest.version} epoch ${deps.manifest.saveEpoch} on ${deps.host.name}${dry ? ' (dry run)' : ''}`);
 
   if (phase === 'build') {
     const env = buildEnv(channel, deps);
     for (const line of deps.host.describe('prepare', context)) plan(line);
     if (!dry) await deps.host.prepare(context);
-    plan(`run pnpm build:game with ${channel.solo ? 'no release file (solo)' : `WILDSHARD_RELEASE_URL=${env.WILDSHARD_RELEASE_URL}`} WS_BUILD_ID=${deps.build} WS_CHANNEL=${channel.channel}`);
+    plan(`run pnpm build:game with ${channel.solo ? 'no release file (solo)' : `WILDSHARD_RELEASE_URL=${env.WILDSHARD_RELEASE_URL}`} WILDSHARD_CATALOGUE=${env.WILDSHARD_CATALOGUE} WS_BUILD_ID=${deps.build} WS_CHANNEL=${channel.channel}`);
     if (!dry) deps.run('pnpm', ['build:game'], {...env, ...deps.host.buildEnv(context)});
     // PAGE-SIZE PZ4: build:game splits the page (dist/) from its content (dist-content/). No channel stamps a contentBase
     // yet, so each page still serves its own content: join the two before packaging, until PZ8 ships the split.
@@ -247,7 +250,8 @@ export async function runPhase(phase, deps) {
 /** @param {ChannelConfig} channel @param {Deps} deps @returns {Record<string, string>} */
 export function buildEnv(channel, deps) {
   const common = {
-    WS_BUILD_ID: deps.build, WILDSHARD_CATALOGUE: 'test/pins/catalogue.json',
+    // SA35: preview bakes the grid it borrowed from staging when the workflow names one; staging and production bake the pin.
+    WS_BUILD_ID: deps.build, WILDSHARD_CATALOGUE: (channel.solo ? deps.catalogue : undefined) ?? 'test/pins/catalogue.json',
     WS_PREVIOUS_DEPLOY_ORIGIN: channel.origin, WS_RELEASE: '1', WS_CHANNEL: channel.channel,
     // API-CLOUDFLARE AC11: errors, telemetry and the inbox go to the api-server Worker on every channel.
     VITE_API_ORIGIN: API_ORIGIN,

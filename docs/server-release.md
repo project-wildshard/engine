@@ -70,6 +70,15 @@ default. `preview.yml` runs preview hourly for the newest green main (OV6).
 Preview is the solo game: no release file, no packs and no gate, so
 its `check` compares bytes and its `go-live` moves the alias.
 
+Preview borrows staging's grid (SHARD-AUTHORING SA35): before the build,
+`scripts/preview-grid.ts` reads staging's signed placement file (the one
+the staging MMO reads at `PLACEMENT_URL`) under the placement key with
+engine's `readPlacementFile`, adds its cells after the pinned 25 in
+`tmp/preview-grid/catalogue.json`, and `page-release.mjs preview
+--catalogue=<file>` bakes that. No file (404) is the pinned grid. Staging
+unreadable keeps the live preview's grid and the run warns. A new
+staging placement deploys preview even when no client input changed.
+
 | Phase | Does | Never |
 | --- | --- | --- |
 | `build` | `pnpm build:game` with `WS_BUILD_ID=<sha>`, `WS_RELEASE=1`, `WS_CHANNEL=<channel>` (old builds carry from the channel's own domain, OFF-VERCEL OV3) and `WILDSHARD_RELEASE_URL=https://packs.wildshard.io/releases/<channel>.json` (PACKS-CDN PC3), then the host's packaging. The build fails above 90,000 files or any file over 25 MiB (Workers static-asset limits; source maps not counted). Checks the output names this build, this channel's release file and key, and not the other channel's file. | uploads |

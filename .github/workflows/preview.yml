@@ -10,6 +10,11 @@
 # last deploy is within the last 60 minutes it ends early". GitHub's cron was best effort (3 runs in the 24 h to 22:41
 # Cancún, 2026-11-12), so the schedule is gone: every green main `ci` push run triggers this, and a hand dispatch
 # deploys at once. The page names itself by `git describe` ("v0.1.13-100-g5a43d1c4"), so the checkout fetches every tag.
+# SHARD-AUTHORING SA35 (meta J314, grill Q11; Jake, 2026-11-12: "every deploy of preview in the github actions for deploy borrows the grid
+# placement from staging by asking the staging mmo in the github action"): preview has no MMO, so each deploy asks for staging's grid, the
+# API-signed placement file the staging MMO reads (scripts/preview-grid.ts), and bakes those cells into the page. Staging unreadable: the
+# live preview's grid stays and the run warns. A new staging placement deploys even when no client input changed, on the next green
+# main ci after the hourly gate (a placement alone starts no run; a hand dispatch deploys at once).
 name: preview
 
 on:
@@ -76,6 +81,11 @@ jobs:
           fetch-tags: true
           filter: blob:none
           persist-credentials: false
+      # SA35's grid check below is TypeScript run by Node (package.json's version), before ring-setup's install
+      - if: steps.due.outputs.deploy != 'false'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
       - name: Skip when the client is unchanged since the live preview
         id: changed
         if: steps.due.outputs.deploy != 'false'
@@ -83,10 +93,17 @@ jobs:
           echo "this build names itself $(git describe --tags --match 'v[0-9]*' 2>/dev/null || echo '(no version tag)')"
           live=$(curl -fsS "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(String(JSON.parse(s).build).split('-')[0])}catch{console.log('')}})" || true)
           # every input of the client build: the game's code (the solo page bundles the server worker), its shards (the pins), the build tooling, the lockfile and the page host
-          inputs=(src/client src/shared src/server types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins scripts/app-build scripts/build-app.mjs scripts/app-build-pipeline.mjs scripts/gen.mjs scripts/pins.ts pages scripts/page-release scripts/page-release.mjs)
+          inputs=(src/client src/shared src/server types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins scripts/app-build scripts/build-app.mjs scripts/app-build-pipeline.mjs scripts/gen.mjs scripts/pins.ts pages scripts/page-release scripts/page-release.mjs scripts/preview-grid.ts)
           if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null && git diff --quiet "$live" HEAD -- "${inputs[@]}"; then
-            echo "preview.wildshard.io already serves $live, and no client input changed since: no deploy"
-            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            # SA35: staging's grid is an input too. Node built-ins only (before install); it writes news=true|false.
+            node scripts/preview-grid.ts --news || echo "::warning title=preview grid::the staging grid check failed: no grid-only deploy this time"
+            if grep -q '^news=true$' "$GITHUB_OUTPUT"; then
+              echo "no client input changed since $live, but staging placed a cell preview doesn't show: deploy"
+              echo "deploy=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "preview.wildshard.io already serves $live, and no client input or staging cell changed since: no deploy"
+              echo "deploy=false" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "live preview is '${live:-unknown}'; client inputs changed: deploy"
             echo "deploy=true" >> "$GITHUB_OUTPUT"
@@ -95,6 +112,11 @@ jobs:
         uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
+      # SA35: staging's grid, signature checked by engine's own placement reader (the staging MMO's), into tmp/ (the release tree stays clean).
+      # Staging unreadable keeps the live preview's grid with a ::warning::; the job summary says which grid this page bakes.
+      - name: Borrow staging's grid
+        if: steps.changed.outputs.deploy == 'true'
+        run: node --import ./scripts/bake-loader.mjs scripts/preview-grid.ts tmp/preview-grid/catalogue.json
       # SENTRY-TRIAGE S5: the Workers host's package step sends the hidden maps to Sentry (release wildshard@<version>,
       # dist the build) with node scripts/sentry-maps.mjs dist --environment preview, then strips every map from dist/
       # (PZ1, OV4): a Sentry outage or a missing token never stops the preview, and no map reaches the CDN.
@@ -104,4 +126,4 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: node scripts/page-release.mjs preview build,upload,check,go-live --host=workers
+        run: node scripts/page-release.mjs preview build,upload,check,go-live --host=workers --catalogue=tmp/preview-grid/catalogue.json

@@ -274,6 +274,23 @@ test('preview is the solo game: no release file, no packs, no gate, and the alia
   expect(lines.some(line => line.includes('solo, no gate'))).toBe(true);
 });
 
+test('SA35: preview bakes the grid it borrowed from staging; staging and production refuse a borrowed catalogue', async () => {
+  const preview = rig('preview'), seen: Record<string, string>[] = [], run = preview.deps.run;
+  preview.deps.run = (file, args, env) => { seen.push(env); run(file, args, env); };
+  preview.deps.catalogue = 'tmp/preview-grid/catalogue.json';
+  await runPhase('build', preview.deps);
+  expect(seen[0]?.['WILDSHARD_CATALOGUE']).toBe('tmp/preview-grid/catalogue.json');
+  const pinned = rig('preview'), plain: Record<string, string>[] = [], runPinned = pinned.deps.run;
+  pinned.deps.run = (file, args, env) => { plain.push(env); runPinned(file, args, env); };
+  await runPhase('build', pinned.deps);
+  expect(plain[0]?.['WILDSHARD_CATALOGUE']).toBe('test/pins/catalogue.json');
+  for (const channel of ['staging', 'production'] as const) {
+    const {deps} = rig(channel);
+    deps.catalogue = 'tmp/preview-grid/catalogue.json';
+    await expect(runPhase('build', deps)).rejects.toThrow(/--catalogue is preview's/);
+  }
+});
+
 test('a preview page stamped with a world never builds', async () => {
   const {deps, files} = rig('preview');
   files.set('/out/index.html', page('staging'));

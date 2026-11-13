@@ -48,6 +48,7 @@ export interface Deps {
   pollMs?: number;
   afterStagingProofs?: boolean;
   releaseKey?: string;
+  catalogue?: string;
 }
 export const PACKS_ORIGIN: string;
 export const RELEASE_PUBLIC_KEY: string;
