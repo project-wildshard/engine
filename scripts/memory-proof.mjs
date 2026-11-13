@@ -6,13 +6,17 @@
 // device loads, the grid's resident cells and claims, the JS heap (Chromium) and, on Chromium, the renderer and GPU
 // process footprints. Phone tier, iPhone 17 Pro viewport (402x874, 3x pixel density), headless.
 //   scripts/browser-lane.sh node scripts/memory-proof.mjs --base=<staging or loopback url> [--engine=chromium|webkit]
-//     [--out=tmp/<lane>/memory-proof] [--label=<name>] [--edge=0] [--budget-mb=<n>]
+//     [--out=tmp/<lane>/memory-proof] [--label=<name>] [--edge=0] [--budget-mb=<n>] [--dump]
+// --inspector-buffers=keep: the old launch, whose DevTools Network sessions buffer every response body (~500 MB here).
+// --dump (Chromium, PZ24): a memory-infra dump at every phase, the renderer's footprint by allocator (V8, PartitionAlloc's
+// array buffers, malloc, Oilpan, Skia, GPU shared memory), so what holds the process is read, not guessed.
 // --budget-mb fails the run (exit 1) when the ledger's GPU+RAM peak passes n MB: the gate a later lane can hold.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, webkit } from 'playwright';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { launchMemoryBrowser } from './chromium-memory-browser.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { pageMemoryAttributionExpression } from './memory-report-snapshot.mjs';
 
@@ -66,8 +70,14 @@ const PAGE_READ = `(() => {
 
 /** @type {Record<string, unknown>} */
 const result = { lane: 'opus-iosmem', engine: engineName, base, label, at: new Date().toISOString(), phases: [], errors: [] };
-const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true,
-  args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] : [] });
+// PZ24: Chromium through launchMemoryBrowser, so Playwright's Network sessions (the page's and every worker's) keep no
+// response bodies. Before, DevTools' NetworkResourcesData held ~500 MB of the game's fetched bytes in the renderer's
+// buffer partition (memory-infra, after a full GC), a cost a player's phone, with no inspector attached, never has.
+const chromiumArgs = ['--use-angle=metal', '--ignore-gpu-blocklist', '--enable-precise-memory-info', ...args.dump === undefined ? [] : ['--js-flags=--expose-gc']];
+const launched = engineName === 'webkit' ? webkit.launch({ headless: true }).then(browser => ({ browser, close: () => browser.close() }))
+  : args['inspector-buffers'] === 'keep' ? chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, ...chromiumArgs] }).then(browser => ({ browser, close: () => browser.close() }))
+  : launchMemoryBrowser(chromiumArgs);
+const { browser, close: closeBrowser } = await launched;
 let code = 0;
 try {
   const context = await browser.newContext({ viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: engineName === 'chromium', hasTouch: true,
@@ -82,7 +92,9 @@ try {
   const pageCdp = engineName === 'chromium' ? await context.newCDPSession(page) : null;
   const heapProfile = args['heap-profile'] !== undefined && pageCdp !== null;
   /** Chromium only: the live JS heap after a full collection, so garbage awaiting GC is told apart from what is held. */
-  const heapAfterGc = async () => { if (pageCdp === null) return null; await pageCdp.send('HeapProfiler.collectGarbage'); return Math.round((await pageCdp.send('Runtime.getHeapUsage')).usedSize / MB); };
+  const heapAfterGc = async () => { if (pageCdp === null) return null; await pageCdp.send('HeapProfiler.collectGarbage');
+    // --dump: the workers' isolates too (an idle worker may never collect on its own)
+    if (args.dump !== undefined) for (const worker of page.workers()) await worker.evaluate('globalThis.gc?.()').catch(() => undefined); return Math.round((await pageCdp.send('Runtime.getHeapUsage')).usedSize / MB); };
   const footprint = async () => {
     if (cdp === null) return null;
     const info = await cdp.send('SystemInfo.getProcessInfo'), pids = info.processInfo.filter(row => row.type === 'renderer' || row.type === 'GPU');
@@ -90,9 +102,42 @@ try {
     const mb = (/** @type {string} */ type) => Math.round(pids.filter(row => row.type === type).reduce((sum, row) => sum + (sizes[String(row.id)] ?? 0), 0) / MB);
     return { rendererMB: mb('renderer'), gpuMB: mb('GPU') };
   };
+  /** PZ24: the renderer's memory-infra allocators at this moment (before the GC heapAfterGc runs), in MB. */
+  const allocators = async (deterministic = false) => {
+    if (cdp === null || args.dump === undefined) return null;
+    /** @type {any[]} */ const events = [];
+    const onData = (/** @type {any} */ data) => { events.push(...data.value); };
+    cdp.on('Tracing.dataCollected', onData);
+    let dumped = { success: false };
+    try {
+      const done = new Promise(resolve => { cdp.once('Tracing.tracingComplete', resolve); });
+      await cdp.send('Tracing.start', { traceConfig: { includedCategories: ['disabled-by-default-memory-infra'],
+        // no periodic dumps: only the one requested below (Playwright types the config as string pairs)
+        memoryDumpConfig: /** @type {Record<string, string>} */ (/** @type {unknown} */ ({ triggers: [] })) }, transferMode: 'ReportEvents' });
+      // deterministic: Chrome collects every isolate (page and workers) first, so freed buffers are not counted
+      try { dumped = await cdp.send('Tracing.requestMemoryDump', { deterministic, levelOfDetail: 'detailed' }); }
+      finally { await cdp.send('Tracing.end'); await done; }
+    } finally { cdp.off('Tracing.dataCollected', onData); }
+    const info = await cdp.send('SystemInfo.getProcessInfo'), renderers = new Set(info.processInfo.filter(row => row.type === 'renderer').map(row => row.id));
+    /** @type {Record<string, number>} */ const sizes = {};
+    for (const event of events) {
+      if (event.ph !== 'v' || !renderers.has(event.pid)) continue;
+      const all = event.args?.dumps?.allocators ?? {};
+      for (const [name, node] of Object.entries(all)) {
+        const depth = name.split('/').length; if (depth > 3 && !(args.dump === 'buckets' && name.startsWith('partition_alloc/partitions/'))) continue;
+        const size = node.attrs?.size?.value; if (size === undefined) continue;
+        sizes[name] = (sizes[name] ?? 0) + Number.parseInt(size, 16);
+      }
+    }
+    return { ok: dumped.success, mb: Object.fromEntries(Object.entries(sizes).filter(([, b]) => b >= MB).sort((a, b) => b[1] - a[1]).map(([k, b]) => [k, Math.round(b / MB * 10) / 10])) };
+  };
   const phase = async (/** @type {string} */ name) => {
-    const row = { phase: name, ...await page.evaluate(PAGE_READ), process: await footprint(), heapAfterGcMB: await heapAfterGc() };
+    const dump = await allocators();
+    const row = { phase: name, ...await page.evaluate(PAGE_READ), process: await footprint(), dump, heapAfterGcMB: await heapAfterGc() };
+    if (dump !== null) console.log(`   allocators ${JSON.stringify(Object.fromEntries(Object.entries(dump.mb).filter(([k]) => k.split('/').length === 1)))}`);
     row.processAfterGc = pageCdp === null ? null : await footprint();
+    row.dumpAfterGc = await allocators(true);
+    if (row.dumpAfterGc !== null) console.log(`   after GC ${JSON.stringify(Object.fromEntries(Object.entries(row.dumpAfterGc.mb).filter(([k]) => k.split('/').length === 1 || /partitions\/[a-z_]+$|v8\/[a-z]+$/u.test(k))))} workers ${page.workers().length}`);
     /** @type {unknown[]} */ (result.phases).push(row);
     await page.screenshot({ path: join(out, `${label}-${name}.jpg`), type: 'jpeg', quality: 60 }).catch(() => undefined);
     const t = row.totalsMB;
@@ -117,6 +162,16 @@ try {
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
   await sleep(10_000);
   await phase('playing');
+  if (args.snapshot !== undefined && pageCdp !== null) {
+    // --snapshot: the page's heap at Playing (written beside the json), for a holder the ledger does not name. V8 keeps
+    // tracking object moves after it, so the later phases of a --snapshot run read a little high (result.snapshot).
+    result.snapshot = true;
+    const { createWriteStream } = await import('node:fs'), file = createWriteStream(join(out, `${label}-playing.heapsnapshot`));
+    const onChunk = (/** @type {any} */ c) => { file.write(c.chunk); };
+    pageCdp.on('HeapProfiler.addHeapSnapshotChunk', onChunk);
+    await pageCdp.send('HeapProfiler.takeHeapSnapshot', { reportProgress: false, captureNumericValue: false, exposeInternals: true });
+    pageCdp.off('HeapProfiler.addHeapSnapshotChunk', onChunk); await new Promise(resolve => { file.end(resolve); });
+  }
   // 40 s more without moving: a page that keeps growing while the player stands still is the leak, not the walk.
   /** @type {unknown[]} */ const still = []; result.still = still;
   for (let i = 0; i < 4; i++) { await sleep(10_000); const at = await page.evaluate(() => ({ heapMB: (() => { const memory = /** @type {any} */ (performance).memory; return memory ? Math.round(memory.usedJSHeapSize / 1048576) : null; })(), loading: /** @type {any} */ (window).__wildshard.shard.grid.state().cells.filter((/** @type {any} */ c) => c.shows === 'loading').length })); still.push({ s: (i + 1) * 10, ...at, process: await footprint() }); console.log(`still +${(i + 1) * 10}s ${JSON.stringify(still.at(-1))}`); }
@@ -152,7 +207,7 @@ try {
 } catch (error) { code = 1; /** @type {string[]} */ (result.errors).push(String(error).slice(0, 400)); console.log(`FAIL ${String(error).slice(0, 400)}`); }
 finally {
   writeFileSync(join(out, `${label}.json`), `${JSON.stringify(result, null, 2)}\n`);
-  await browser.close();
+  await closeBrowser();
 }
 console.log(`memory proof ${label}: ${code === 0 ? 'done' : 'FAIL'} → ${join(out, `${label}.json`)}`);
 process.exit(code);
