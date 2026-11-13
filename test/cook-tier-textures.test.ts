@@ -2,7 +2,7 @@
 // largest size. No re-encode: every level the phone keeps is the master's own bytes, so the look is the master's at
 // any distance the phone draws.
 import {describe, expect, it} from 'vitest';
-import {glbImages, ktx2Info, tierGlb, trimKtx2} from '../src/cook/game/tierTextures';
+import {glbImages, ktx2Info, phoneTier, tierGlb, trimKtx2} from '../src/cook/game/tierTextures';
 
 const LEVEL_INDEX = 80;
 
@@ -110,5 +110,49 @@ describe('S12: per-tier texture sizes from one master', () => {
   it('leaves a GLB with nothing to cut as the same bytes', () => {
     const small = glb(ktx2(256));
     expect(tierGlb(small, 512)).toBe(small);
+  });
+});
+
+describe('phoneTier (S12b)', () => {
+  const files: Readonly<Record<string, Uint8Array>> = {
+    '/assets/gpu/rock-c9b1bd73.ktx2': ktx2(2048), '/assets/gpu/leaf-11111111.ktx2': ktx2(256),
+    '/assets/x/astc6/ground-22222222.ktx2': ktx2(1024), '/assets/gpu/tree-33333333.glb': glb(ktx2(1024)),
+  };
+  const desktop = {'/assets/rock.png': '/assets/gpu/rock-c9b1bd73.ktx2'};
+  const discovery = (phone: Record<string, string>): Uint8Array => new TextEncoder().encode(JSON.stringify({version: 1, slug: 'x', rows: {},
+    native: {ktx2: {$call: 'pageModeKtx2', args: [{shard: {phone, desktop}, grid: {phone: {...phone}, desktop}}]}}}));
+  const read = (url: string): Uint8Array | undefined => files[url];
+  interface Rows {shard: {phone: Record<string, string>; desktop: Record<string, string>}; grid: {phone: Record<string, string>}}
+  const rowsOf = (bytes: Uint8Array): Rows | undefined => (JSON.parse(new TextDecoder().decode(bytes)) as {native: {ktx2: {args: Rows[]}}}).native.ktx2.args[0];
+
+  it('gives each phone row over 512 its own content-named file, and moves only the phone maps to it', () => {
+    const tier = phoneTier(discovery({
+      '/assets/rock.png': '/assets/gpu/rock-c9b1bd73.ktx2', '/assets/leaf.png': '/assets/gpu/leaf-11111111.ktx2',
+      '/assets/ground.webp#layer': '/assets/x/astc6/ground-22222222.ktx2', '/assets/tree.glb': '/assets/gpu/tree-33333333.glb',
+    }), read);
+    if (tier === undefined) throw new Error('expected a phone tier');
+    expect([...tier.files.keys()].sort()).toEqual(['/assets/gpu/rock-c9b1bd73.ktx2', '/assets/gpu/tree-33333333.glb']);
+    const rock = tier.files.get('/assets/gpu/rock-c9b1bd73.ktx2')?.[0], tree = tier.files.get('/assets/gpu/tree-33333333.glb')?.[0];
+    expect(rock?.url).toMatch(/^\/assets\/gpu\/rock\.t512-[a-f0-9]{8}\.ktx2$/u);
+    expect(rock === undefined ? 0 : ktx2Info(rock.bytes).width).toBe(512);
+    expect(tree === undefined ? 0 : ktx2Info(glbImages(tree.bytes)[0]?.bytes ?? new Uint8Array()).width).toBe(512);
+    const rows = rowsOf(tier.discovery);
+    expect(rows?.shard.phone['/assets/rock.png']).toBe(rock?.url);
+    expect(rows?.grid.phone['/assets/rock.png']).toBe(rock?.url);
+    expect(rows?.shard.desktop['/assets/rock.png']).toBe('/assets/gpu/rock-c9b1bd73.ktx2');
+    // A row at or under its size, and an author's `#layer` row, keep their file.
+    expect(rows?.shard.phone['/assets/leaf.png']).toBe('/assets/gpu/leaf-11111111.ktx2');
+    expect(rows?.shard.phone['/assets/ground.webp#layer']).toBe('/assets/x/astc6/ground-22222222.ktx2');
+    expect([...tier.kept].sort()).toEqual(['/assets/gpu/leaf-11111111.ktx2', '/assets/x/astc6/ground-22222222.ktx2']);
+  });
+
+  it('is nothing when no row gets smaller, so the cook keeps every byte', () => {
+    expect(phoneTier(discovery({'/assets/leaf.png': '/assets/gpu/leaf-11111111.ktx2'}), read)).toBeUndefined();
+  });
+
+  it('keeps a target a kept row still names, beside its phone file', () => {
+    const both = phoneTier(discovery({'/assets/rock.png': '/assets/gpu/rock-c9b1bd73.ktx2', '/assets/horizon/day.webp': '/assets/gpu/rock-c9b1bd73.ktx2'}), read);
+    expect(both?.kept.has('/assets/gpu/rock-c9b1bd73.ktx2')).toBe(true);
+    expect(both?.files.get('/assets/gpu/rock-c9b1bd73.ktx2')).toHaveLength(1);
   });
 });

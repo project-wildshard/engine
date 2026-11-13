@@ -23,6 +23,7 @@ import {readTar} from '@wildshard/format/tar';
 import type {ServerPack, ServerPackPart} from '../../shared/game/shardfile/serverPack';
 import {serverReadsFile} from '../../shared/game/shardfile/outputDescriptor';
 import {entryReadSet} from './entryReadSet';
+import {phoneTier} from './tierTextures';
 import {createPartEncoder, packable, writeSpawnParts, type CookedMember, type PartEncoder} from './spawnParts';
 
 export type CookTier = 'phone' | 'desktop';
@@ -160,11 +161,18 @@ export interface ShardHalf {
   readonly mountRows: (tier: CookTier, set: CookSet) => readonly SpawnFile[];
   readonly read: (url: string) => Uint8Array;
   readonly stableKey: (url: string) => string | undefined;
+  /** A mount's bytes as this cook serves it: the discovery document carries the phone tier's table (S12b). */
+  readonly mountBytes: (row: CookMount) => Uint8Array;
 }
+
+/** S12b: what the cook does with a shard's textures per tier. `phone`: give each phone row of the KTX2 table its own
+ *  trimmed file (`phoneTier`), listed in the phone manifests in place of the file it stands in for. Off by default until
+ *  the cook's own 6×6 encode (S12c) can replace the hand-made sets. */
+export interface CookTiers {readonly phone?: boolean}
 
 /** The shard half of every manifest: what the app build's `write` and the standalone cook share. `folder` is where the
  *  product is served; a catalogue names it by slug, and today's `_template` folder is the one that differs (`template`). */
-export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (line: string) => void = () => undefined, folder: string = shard.slug): ShardHalf {
+export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (line: string) => void = () => undefined, folder: string = shard.slug, tiers: CookTiers = {}): ShardHalf {
   const prefix = `/shardfiles/${folder}/`, {index, source, sections} = shard, named = namedPlaces(sections);
   // D5-4: a preparation-only preview lists the default set alone (no stored fence), so `wildshard prepare` sees the boot's
   // own reads beyond it. Listing the whole level there made every recorded fence the whole level (Pine, Nalati).
@@ -187,17 +195,31 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
   sources.set(headerURL, () => shard.header);
   const header = {url: headerURL, bytes: shard.header.length, hash: headerHash, wireBytes: wireBytes(`${prefix}shard.json`, shard.header, headerHash)};
   // C3: a page reads this before it knows the product, and a cold offline entry reads it too.
-  const document = shard.cook?.mounts.find(row => row.url === `${prefix}discovery.json`), discovery: readonly SpawnFile[] = document === undefined ? [] : [{
-    url: `${document.url}?v=${document.hash.slice(0, 8)}`, bytes: document.bytes, hash: document.hash, wireBytes: wireBytes(document.url, shard.read(document.path), document.hash)}];
-  for (const row of discovery) if (document !== undefined) sources.set(row.url, () => shard.read(document.path));
-  const mounts = downloaded(shard), mountURLs = new Set(mounts.map(row => row.url)), onTier = mountTiers(mountURLs);
+  const document = shard.cook?.mounts.find(row => row.url === `${prefix}discovery.json`), mounts = downloaded(shard);
+  // S12b: the phone tier's files, made from the KTX2 table's own targets; the discovery document names them.
+  const onTier = mountTiers(new Set(mounts.map(row => row.url))), mountByURL = new Map(mounts.map(row => [row.url, row])), mountOf = (url: string): Uint8Array | undefined => { const row = mountByURL.get(url); return row === undefined ? undefined : shard.read(row.path); };
+  const phone = tiers.phone === true && document !== undefined ? phoneTier(shard.read(document.path), mountOf) : undefined;
+  const documentBytes = phone?.discovery ?? (document === undefined ? undefined : shard.read(document.path));
+  const discovery: readonly SpawnFile[] = document === undefined || documentBytes === undefined ? [] : [(() => {
+    const hash = phone === undefined ? document.hash : sha256(documentBytes);
+    return {url: `${document.url}?v=${hash.slice(0, 8)}`, bytes: documentBytes.length, hash, wireBytes: wireBytes(document.url, documentBytes, hash)};
+  })()];
+  for (const row of discovery) if (documentBytes !== undefined) sources.set(row.url, () => documentBytes);
   const mountRow = new Map(mounts.map(row => {
     const url = CONTENT_NAMED.test(row.url) || /-[a-f0-9]{8}\.[a-z0-9]+$/u.test(row.url) ? row.url : `${row.url}?v=${row.hash.slice(0, 8)}`;
     sources.set(url, () => shard.read(row.path));
     return [row.url, () => ({url, bytes: row.bytes, hash: row.hash, wireBytes: wireBytes(row.url, shard.read(row.path), row.hash)})] as const;
   }));
+  const tierRows = new Map([...phone?.files ?? []].map(([from, files]) => [from, files.map(file => {
+    const hash = sha256(file.bytes);
+    sources.set(file.url, () => file.bytes);
+    return {url: file.url, bytes: file.bytes.length, hash, wireBytes: wireBytes(file.url, file.bytes, hash)};
+  })]));
+  /** A phone list names each trimmed target's phone files in its place, and the target too while a kept row still reads it. */
+  const tiered = (tier: CookTier, url: string): readonly string[] => tier !== 'phone' || !tierRows.has(url) ? [url] : phone?.kept.has(url) === true ? [url, `tier:${url}`] : [`tier:${url}`];
   return {shard, header, read: url => { const read = sources.get(url); if (read === undefined) throw new Error(`Spawn file has no source: ${url}`); return read(); },
     stableKey: url => stableKeys.get(url),
+    mountBytes: row => (row.url === document?.url && documentBytes !== undefined ? documentBytes : shard.read(row.path)),
     productRows: (tier, set) => {
       const selected: SpawnFile[] = [header, ...discovery];
       for (const row of index.sections) selected.push(productFile(row.path, row.bytes, row.hash, `section:${row.name}`));
@@ -208,7 +230,13 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
     },
     mountRows: (tier, set) => {
       const urls = wholeSet(tier, set) ? mounts.map(row => row.url).filter(url => onTier(url, tier)) : fence.mounts;
-      return urls.flatMap(url => { const row = mountRow.get(url); return row === undefined ? [] : [row()]; });
+      // A phone file whose target no phone list names (a fence shard's file read past its fence) rides in the phone's whole
+      // set: no other tier's part holds it, and it costs less than the target a phone read from a desktop part before.
+      const listed = new Set(urls), unlisted = tier === 'phone' && set === 'whole' ? [...tierRows.keys()].filter(url => !listed.has(url)).map(url => `tier:${url}`) : [];
+      return [...urls.flatMap(url => tiered(tier, url)), ...unlisted].flatMap(url => {
+        if (url.startsWith('tier:')) return tierRows.get(url.slice(5)) ?? [];
+        const row = mountRow.get(url); return row === undefined ? [] : [row()];
+      });
     }};
 }
 
@@ -300,6 +328,8 @@ export interface CookShardOptions {
   readonly warn?: (line: string) => void;
   /** The renderer fingerprint to cook for; this engine's own unless a build names it. */
   readonly renderer?: string;
+  /** S12b: per-tier texture files; off unless a cook asks. */
+  readonly tiers?: CookTiers;
 }
 
 /** `cook <shardfile> → <packs>`: the shard's half of every manifest, its parts, and its loose mounts at their URLs. */
@@ -313,7 +343,7 @@ export async function cookShard(tarball: Uint8Array, out: string, options: CookS
 async function cookWith(tarball: Uint8Array, out: string, options: CookShardOptions, encoder: PartEncoder): Promise<CookReport> {
   const started = options.now(), shard = openShardfile(tarball, options.renderer === undefined ? {} : {renderer: options.renderer});
   if (shard.preparation === 'stale') options.warn?.(stalePreparationLine(shard.slug));
-  const half = shardHalf(shard, options.wireBytes, options.warn);
+  const half = shardHalf(shard, options.wireBytes, options.warn, shard.slug, options.tiers);
   const before = encoder.stats();
   const table = COOK_TIERS.flatMap(tier => COOK_SETS.map(set => ({tier, set, rows: [...half.productRows(tier, set), ...half.mountRows(tier, set)]})));
   const whole = table.filter(row => row.set === 'whole');
@@ -337,7 +367,7 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
   const loose = (half.shard.cook?.mounts ?? []).filter(row => !packable(row.url) || !row.url.startsWith('/assets/'));
   for (const row of loose) {
     const file = join(out, row.url.slice(1));
-    mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.shard.read(row.path));
+    mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.mountBytes(row));
   }
   // C3: a title or menu `<img>` reads a shard's images by the URLs its level manifest names, before any fetch layer exists.
   const images = half.shard.index.files.flatMap(row => row.name?.startsWith('ui/images/') === true ? [row.path] : []);

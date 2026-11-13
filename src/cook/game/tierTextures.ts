@@ -4,11 +4,14 @@
  * the master's top level was minified anyway, which is most of what a phone draws.
  *
  * Cuttable: UASTC (`vkFormat` 0) and raw ASTC, with Zstandard or no supercompression, whose levels stand alone.
- * BasisLZ (ETC1S) shares a codebook across levels, so it stays as it is until the cook re-encodes (S12b).
+ * BasisLZ (ETC1S) shares a codebook across levels, so it stays as it is until the cook re-encodes (S12c).
  *
  * GLBs carry their images inside (57 of Pine's 102 MB of `.glb`). `glbImages` takes them out, and `tierGlb` puts each
  * back at the tier's size, moving every other buffer view and meshopt stream by whole 16-byte steps so no alignment
- * changes. Pure bytes in, bytes out: no file system, no shardfile; `shardCook` wiring is S12a. */
+ * changes. Pure bytes in, bytes out: no file system, no shardfile. `phoneTier` (S12b) gives a shard's KTX2 table its phone
+ * files, which `shardHalf` lists in the phone manifests. */
+// oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
+import {createHash} from 'node:crypto';
 
 const KTX2_ID = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a];
 const LEVEL_INDEX = 80;
@@ -208,4 +211,66 @@ export function ktx2GpuBytes(bytes: Uint8Array): number {
     total += block === undefined ? Math.ceil(width / 4) * Math.ceil(height / 4) * (info.scheme === BASIS_LZ ? 8 : 16) : Math.ceil(width / block[0]) * Math.ceil(height / block[1]) * 16;
   }
   return total;
+}
+
+/** S12b: the largest side a phone draws from one KTX2 table row, or undefined to keep the file as it is. The table's source
+ *  key is the author's hint (D5): a `#layer` twin (a terrain layer, tiled at a texel a metre) and a horizon strip are S4's
+ *  1024 rows, kept on purpose; every other row is 512 on a phone. */
+export const PHONE_TIER_MAX = 512;
+export function phoneTierSize(source: string): number | undefined {
+  return source.endsWith('#layer') || /\/horizon\//u.test(source) ? undefined : PHONE_TIER_MAX;
+}
+
+/** One phone file the cook made: `from` is the table target it stands in for, `url` its own content-named URL. */
+export interface TierFile {readonly from: string; readonly url: string; readonly bytes: Uint8Array}
+export interface PhoneTier {
+  /** The discovery document with each trimmed row's phone target moved to its phone file; desktop maps keep their bytes. */
+  readonly discovery: Uint8Array;
+  /** Each table target the phone reads at another size: its phone files (one a size, nearly always one). */
+  readonly files: ReadonlyMap<string, readonly TierFile[]>;
+  /** Table targets a phone row still names as they are (kept by size, unchanged, or not this shard's file), so a phone list keeps them. */
+  readonly kept: ReadonlySet<string>;
+}
+
+type Json = null | boolean | number | string | readonly Json[] | {readonly [key: string]: Json};
+const isMap = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const hex8 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex').slice(0, 8);
+
+/** The phone tier of a shard's KTX2 table (`discovery.json` `native.ktx2`, any shape: `pageModeKtx2` args, `GPU_FILES`, a bare
+ *  tier map). Every `phone` map's GLB and KTX2 target that `read` can read is trimmed to its row's size; a target that gets
+ *  smaller moves to `<name>.t<size>-<hash8>.<ext>` beside it. Undefined when nothing gets smaller, so the cook keeps every
+ *  byte of today's product. */
+export function phoneTier(discovery: Uint8Array, read: (url: string) => Uint8Array | undefined, size: (source: string) => number | undefined = phoneTierSize): PhoneTier | undefined {
+  const document = JSON.parse(new TextDecoder().decode(discovery)) as Json;
+  const native = isMap(document) && isMap(document['native']) ? document['native'] : undefined;
+  if (native?.['ktx2'] === undefined) return undefined;
+  const phoneMaps: Record<string, unknown>[] = [];
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) { for (const item of value) walk(item); return; }
+    if (!isMap(value)) return;
+    for (const [key, item] of Object.entries(value)) {
+      if (key === 'phone' && isMap(item) && Object.values(item).every(target => typeof target === 'string')) phoneMaps.push(item);
+      else walk(item);
+    }
+  };
+  walk(native['ktx2']);
+  const made = new Map<string, TierFile | null>(), files = new Map<string, TierFile[]>(), kept = new Set<string>();
+  for (const map of phoneMaps) for (const [source, target] of Object.entries(map)) {
+    if (typeof target !== 'string') continue;
+    const max = size(source), match = /^(.*?)(?:-[a-f0-9]{8})?\.(glb|ktx2)$/u.exec(target), bytes = max === undefined || match === null ? undefined : read(target);
+    if (max === undefined || match === null || bytes === undefined) { kept.add(target); continue; }
+    const key = `${target}@${max}`;
+    let file = made.get(key);
+    if (file === undefined) {
+      // A file the trim can't read keeps today's bytes: one odd texture never stops a cook.
+      let trimmed = bytes;
+      try { trimmed = match[2] === 'glb' ? tierGlb(bytes, max) : trimKtx2(bytes, max); } catch { trimmed = bytes; }
+      file = trimmed.length < bytes.length ? {from: target, url: `${match[1] ?? ''}.t${max}-${hex8(trimmed)}.${match[2] ?? ''}`, bytes: trimmed} : null;
+      made.set(key, file);
+      if (file !== null) files.set(target, [...files.get(target) ?? [], file]);
+    }
+    if (file === null) kept.add(target); else map[source] = file.url;
+  }
+  if (files.size === 0) return undefined;
+  return {discovery: new TextEncoder().encode(JSON.stringify(document)), files, kept};
 }
