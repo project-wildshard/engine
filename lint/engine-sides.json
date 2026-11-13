@@ -250,6 +250,7 @@
     "src/client/engine/net/attackPrediction.ts": "client",
     "src/client/engine/net/client.ts": "client",
     "src/client/engine/net/heldOnOthers.ts": "client",
+    "src/client/engine/net/nameTag.ts": "client",
     "src/client/engine/net/netRecord.ts": "client",
     "src/client/engine/net/interpolator.ts": "client",
     "src/client/engine/net/netClock.ts": "client",

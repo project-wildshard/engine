@@ -9,6 +9,7 @@ import { castawayBody, groundContact, type CastawayBody } from '../models/castaw
 import { AnimMachine } from '../anim/machine';
 import { gaitMix, gaitOf, STRIDE_JOINTS, stridePose, stridePoseAtRest } from './remoteGait';
 import { BoardUnder, DECK_LIFT } from './remoteBoard';
+import { NameTag, type NameTagShown } from './nameTag';
 import { HeldInHand } from './heldOnOthers';
 import type { NetClient } from './client';
 import { othersOnMap } from './othersOnMap';
@@ -18,7 +19,6 @@ const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => ent
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), BOARD = column('board'), HELD = column('held'), HP = column('hp'), SWIM = column('swim');
 /** A body's speed settles at this rate, so one late row is no stumble. */
 const SETTLE = 8;
-const NAME_HEIGHT = 2.05, NAME_WIDTH = 1.5, NAME_RATIO = 4;
 /** VOICE-POLISH V8: the ring over a talking player's Name, its size in metres, and how fast and far it breathes. */
 const TALK_HEIGHT = 2.62, TALK_SIZE = 0.5, TALK_PULSE = 9, TALK_SWELL = 0.1;
 /** How far a board floats, with its rider on it (RP8: the deck's own lift). */
@@ -29,19 +29,10 @@ const SADDLE_LIFT = 0.85;
 const SEAT = 1.2;
 const AXIS = new THREE.Vector3(1, 0, 0), turn = new THREE.Quaternion();
 
-/** A Name as a sprite: it reads the same on any shard, and it needs no DOM over the canvas. */
-function nameTag(name: string): THREE.Sprite {
-  const canvas = document.createElement('canvas'), { width, height } = Object.assign(canvas, { width: 320, height: 320 / NAME_RATIO }), pen = canvas.getContext('2d');
-  if (pen !== null) {
-    pen.font = '600 44px system-ui, sans-serif'; pen.textAlign = 'center'; pen.textBaseline = 'middle';
-    const wide = Math.min(width, pen.measureText(name).width + 32);
-    pen.fillStyle = 'rgba(8, 14, 24, 0.62)'; pen.beginPath(); pen.roundRect((width - wide) / 2, 6, wide, height - 12, 14); pen.fill();
-    pen.fillStyle = '#fff'; pen.fillText(name, width / 2, height / 2, width - 24);
-  }
-  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
-  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, fog: false }));
-  tag.scale.set(NAME_WIDTH, NAME_WIDTH / NAME_RATIO, 1); tag.position.y = NAME_HEIGHT;
-  return tag;
+/** A Name as a sprite: it reads the same on any shard, and it needs no DOM over the canvas. RP12: sharp on a phone, sized by
+ *  distance within its clamps, clear of the head, gone past 60 m (nameTag.ts). */
+function nameTag(name: string): NameTag {
+  return new NameTag(name);
 }
 
 /** VOICE-POLISH V8: who is talking, over their head: voice's cyan ring round a mic, as the chat's mic button draws it. */
@@ -71,7 +62,8 @@ class OtherBody {
   readonly group: THREE.Group = new THREE.Group();
   /** RP8: the world-scale board under it while its row hovers, banking into turns. */
   private readonly board = new BoardUnder();
-  private readonly tag: THREE.Sprite;
+  /** RP12: its Name, which fits itself to every draw and says what it drew. */
+  readonly tag: NameTag;
   private readonly ring: THREE.Sprite = talkRing();
   private talkPhase = 0;
   private readonly rest = new Map<DummyJoint, THREE.Quaternion>();
@@ -173,7 +165,11 @@ export class OtherPlayers {
     return nearest;
   }
   /** What a proof reads. */
-  get shown(): readonly OtherShown[] { return [...this.bodies.values()].map(body => body.shown); }
+  get shown(): readonly (OtherShown & { readonly tag: NameTagShown })[] {
+    const shown: (OtherShown & { readonly tag: NameTagShown })[] = [];
+    for (const body of this.bodies.values()) shown.push({ ...body.shown, tag: body.tag.report }); // RP12: what its Name drew
+    return shown;
+  }
   frame(renderTick: number, dt: number): void {
     const { client, bodies, row } = this, own = client.welcome?.handle ?? 0;
     for (const handle of bodies.keys()) if (!client.entities.has(handle)) this.drop(handle);
