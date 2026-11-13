@@ -17,8 +17,15 @@ import { emptyCellSquares, GAP_HALF, gridRail, type CellSquare } from './roadLay
 export type VoidBox = CellSquare;
 /** How far the floor runs on past the rail, so a capsule pressed to the rim still stands on it. */
 export const VOID_FLOOR_PAST_RAIL = 20;
-/** A floor slab's thickness (m): its top is road level. */
+/** How far the rim reaches below road level (m). */
 export const VOID_FLOOR_DEPTH = 1;
+/**
+ * The floor's largest square (m). One road-level slab as long as the band (2875 m × 560 m) is a cuboid Rapier can't stand a capsule on:
+ * its contact error grows with the shape's size, so a player walked a metre onto it, sank 0.17 m into its top and stuck there (on the
+ * in-page server's road and so on the page, which takes the server's state back). The floor is a flat trimesh of squares this size
+ * instead, as the strips are, each collider in its own box's frame.
+ */
+export const VOID_FLOOR_TILE = 125;
 
 /** The placed cells' rectangle, in cells (the strips' extent: `strips.ts` builds a gap round every side of it). */
 function placedRange(cells: readonly { readonly cell: readonly [number, number] }[]): { minX: number; maxX: number; minZ: number; maxZ: number } {
@@ -43,6 +50,22 @@ export function voidFloorBoxes(cells: readonly { readonly cell: readonly [number
   return boxes;
 }
 
+/** A floor box as a flat, upward-facing trimesh at road level (y 0) in the box's own frame: squares of at most `VOID_FLOOR_TILE`. */
+export function voidFloorMesh(box: VoidBox): { readonly positions: Float32Array; readonly indices: Uint32Array } {
+  const nx = Math.max(1, Math.ceil((2 * box.hx) / VOID_FLOOR_TILE)), nz = Math.max(1, Math.ceil((2 * box.hz) / VOID_FLOOR_TILE));
+  const positions = new Float32Array((nx + 1) * (nz + 1) * 3), indices = new Uint32Array(nx * nz * 6);
+  for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) {
+    const at = (i * (nz + 1) + j) * 3;
+    positions[at] = -box.hx + (2 * box.hx * i) / nx; positions[at + 2] = -box.hz + (2 * box.hz * j) / nz;
+  }
+  let k = 0;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+    const a = i * (nz + 1) + j, b = a + nz + 1; // a: (i, j), b: (i + 1, j); +1 steps j
+    indices.set([a, a + 1, b, b, a + 1, b + 1], k); k += 6; // wound to face up (+y)
+  }
+  return { positions, indices };
+}
+
 /** The rim: four walls on the rail's lines, as `ReadinessEdge`s are built (never opened: the void has no sim to wait for). */
 export function rimWalls(pitch: number): readonly { readonly x: number; readonly z: number; readonly axis: 'x' | 'z'; readonly halfLength: number }[] {
   const { minX, maxX, minZ, maxZ } = gridRail(pitch), cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2, hx = (maxX - minX) / 2, hz = (maxZ - minZ) / 2;
@@ -61,7 +84,8 @@ export function installVoidFloor(physics: Pick<Physics, 'R' | 'world'>, cells: r
   const { R, world } = physics;
   let made = 0;
   for (const box of voidFloorBoxes(cells, pitch)) {
-    const collider = world.createCollider(R.ColliderDesc.cuboid(box.hx, VOID_FLOOR_DEPTH / 2, box.hz).setTranslation(box.x, -VOID_FLOOR_DEPTH / 2, box.z).setCollisionGroups(groups('WORLD')));
+    const { positions, indices } = voidFloorMesh(box);
+    const collider = world.createCollider(R.ColliderDesc.trimesh(positions, indices, R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(box.x, 0, box.z).setCollisionGroups(groups('WORLD')));
     tagCollider(collider, 'stone', PLATFORM_COLLIDER_OWNER); made++;
   }
   if (rim) for (const wall of rimWalls(pitch)) {
