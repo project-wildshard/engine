@@ -22,6 +22,9 @@ export function bootRoute(search: URLSearchParams, previous: { readonly line: st
  * already skips the title asks for it. A reopened tab, a bookmark or a crashed session lands on the title, and nothing joins.
  */
 export function onlineTitleFirst(search: URLSearchParams, online: boolean, tapped: boolean): boolean {
-  if (!online || tapped || search.has('skipintro') || search.has('tour')) return false;
+  // ?glreload is the engine's own reload back into the world (GPU recovery, RELOAD HERE, the reload prompt; play.ts strips it once
+  // read, so a reopened tab has none): QA-FEEDBACK-2026-11-13 rows 6 and 13 (WILDSHARD-GAME-8H), a GPU process restart on an
+  // Android phone sent the player to the title instead
+  if (!online || tapped || search.has('skipintro') || search.has('tour') || search.has('glreload')) return false;
   return !bootRoute(search, { line: '', level: '' }).titleOnly;
 }

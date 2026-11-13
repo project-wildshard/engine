@@ -1,7 +1,7 @@
 import { titleAssetURL } from './titleAssets';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { isDev } from '@wildshard/engine/core/devMode';
-import { followsTap, listenDom, listenTap } from '@wildshard/engine/input/dom';
+import { capturePointer, followsTap, listenDom, listenTap } from '@wildshard/engine/input/dom';
 import { beginNavigationShell } from '@wildshard/engine/boot/shell';
 import { startEntryDownload } from './shardfile/entryTransport';
 import { saves } from '@wildshard/engine/saves/runtime';
@@ -346,7 +346,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   listenDom(scope, list, 'pointerdown', (e) => {
     if (drag) return;
     drag = { id: e.pointerId, x0: e.clientX, t0: performance.now(), dx: 0 };
-    list.setPointerCapture(e.pointerId);
+    capturePointer(list, e.pointerId);
   });
   listenDom(scope, list, 'pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;

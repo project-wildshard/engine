@@ -105,6 +105,10 @@ test('an online build enters a level only from a tap (QA row 16)', () => {
   expect(onlineTitleFirst(at('chunk=driftwood-isle'), true, true), 'a title tap or grid intent enters').toBe(false);
   expect(onlineTitleFirst(at('chunk=driftwood-isle&skipintro=1'), true, false), 'a harness that skips the title enters').toBe(false);
   expect(onlineTitleFirst(at('chunk=driftwood-isle&tour=1'), true, false)).toBe(false);
+  // QA-FEEDBACK-2026-11-13 rows 6 and 13 (WILDSHARD-GAME-8H): the engine's own reload (GPU recovery, RELOAD HERE, the reload
+  // prompt) carries ?glreload and returns to the world, not the title; play.ts strips it once read, so a reopened tab has none
+  expect(onlineTitleFirst(at('chunk=driftwood-isle&glreload=1&at=1,2,3,0,0'), true, false), 'GPU recovery returns to the world').toBe(false);
+  expect(onlineTitleFirst(at('glreload=1'), true, false), 'a grid page recovery reload too').toBe(false);
   expect(onlineTitleFirst(at('chunk=driftwood-isle'), false, false), 'the solo build keeps its deep links').toBe(false);
   expect(onlineTitleFirst(at(''), true, false), 'the plain title is the title already').toBe(false);
   expect(onlineTitleFirst(at('utm_source=bookmark'), true, false), 'a setting that boots the default level is no tap either').toBe(true);

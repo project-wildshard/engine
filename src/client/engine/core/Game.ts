@@ -45,7 +45,7 @@ import { SHADOW_LAYER } from './shadowLayer';
 import { WorldRenderPass } from './worldDepth';
 import { ownComposerDepth } from '../render/composerDepth';
 import { noteDrawnEnvironment } from '../render/drawnEnvironment';
-import { makeSystem, setLoopState, systemFault, type GameSystem } from '../../../shared/engine/core/faults';
+import { emitFault, makeSystem, setLoopState, systemFault, type GameSystem } from '../../../shared/engine/core/faults';
 import { frameCost } from '../../../shared/engine/core/frameCost';
 import { sustainedFrames } from './sustainedFrames';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
@@ -63,6 +63,7 @@ import { duringShadowPass } from '../world/cascadeCull';
 import { recordGpuCheckpoint, traceBootPasses } from '../boot/gpuTrace';
 import { exploreEntryPending, recordExploreFrame, recordBootCheckpoint, bootTraceActive } from '../boot/bootTrace';
 import { cullPlaced } from '../models/place';
+import { DrawCheck, hdrTargetType } from '../render/drawCheck';
 
 /** the world's pace during a hit-stop (not 0: nothing downstream has to cope with a zero dt) */
 const HIT_STOP_SCALE = 0.04;
@@ -393,6 +394,12 @@ export class Game {
   updateMs: Float32Array<ArrayBuffer> = new Float32Array(120); renderMs: Float32Array<ArrayBuffer> = new Float32Array(120);
   /** frames drawn since start() */
   frameCount = 0;
+  /** QA 2026-11-13 row 6: two reads after the first frames that make a world drawing nothing loud (render/drawCheck.ts) */
+  private readonly drawCheck = new DrawCheck({
+    renderer: { getContext: () => this.renderer.getContext(), getRenderTarget: () => this.renderer.getRenderTarget(), setRenderTarget: (t) => { this.renderer.setRenderTarget(t); } },
+    target: () => { const t: unknown = this._composer === null ? null : Reflect.get(this._composer, 'inputBuffer'); return t instanceof THREE.WebGLRenderTarget ? t : null; },
+    report: (error, certain) => { emitFault({ system: 'render.blank', error, verdict: certain ? 'fatal' : 'uncaught' }); },
+  });
   /** Browser rAF timestamp of the last completed draw; null for the initial synchronous draw.
    * Cadence reads this delivered-frame clock; callback-start work and polling use separate clocks. */
   frameRafTime: number | null = null;
@@ -684,7 +691,7 @@ export class Game {
    */
   private replaceComposer(R: ReplaceLook): EffectComposer {
     const msaa = TIER_CONFIG.smaa === 'off' ? 0 : this.renderKnobs().msaa ?? 0;
-    const composer = new EffectComposer(this.renderer, { frameBufferType: THREE.HalfFloatType, multisampling: Math.min(msaa, this.renderer.capabilities.maxSamples) });
+    const composer = new EffectComposer(this.renderer, { frameBufferType: hdrTargetType(this.renderer), multisampling: Math.min(msaa, this.renderer.capabilities.maxSamples) });
     ownComposerDepth(composer);
     const scope = this.levelScope.child('look');
     const { chain } = R.compose({ app: this.app, scope, debug: { expose: (name, value) => { scope.onDispose(this.app.debug.scopedExpose(name, value)); } }, renderer: this.renderer, scene: this.rootScene, camera: this.camera, composer, tier: TIER });
@@ -704,7 +711,7 @@ export class Game {
     if (this.lookStrategy?.mode === 'replace') { this._composer = this.replaceComposer(this.lookStrategy); return; } // the level look's whole chain
     const { atmosphere: A } = this.level;
     const { grade: G, look } = this.app.gradeFor({ grade: this.level.grade, ...(this.level.lookLayer === undefined ? {} : { look: this.level.lookLayer }) }); // + the look loop's layer (PH-L1 / L4)
-    const composer = new EffectComposer(this.renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
+    const composer = new EffectComposer(this.renderer, { frameBufferType: hdrTargetType(this.renderer), multisampling: 0 });
     ownComposerDepth(composer);
     // the scene pass keeps the world's depth for the depth readers below (AO, the volumetric march, the god rays' sun mask):
     // the viewmodels' depth clear used to leave them the weapon alone (worldDepth.ts)
@@ -1784,6 +1791,7 @@ export class Game {
       this.workMs[this.frameI] = work;
       this.frameRafTime = now ?? null;
       this.frameCount++;
+      this.drawCheck.afterDraw(this.frameCount); // QA 2026-11-13 row 6: a world that draws nothing is reported (drawCheck.ts)
       this.updateMs[this.frameI] = renderAt - lastRun; this.renderMs[this.frameI] = done - renderAt;
       if (on) frameCost.end(realDt * 1000, renderAt - lastRun, done - renderAt, cap > 0 ? 1000 / cap : 0);
       // QA row 31: play's sustained fps (a paused game's frames are not play)

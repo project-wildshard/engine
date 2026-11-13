@@ -1,3 +1,4 @@
+import { capturePointer } from '../input/dom';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { uiScope, mountUi } from './ownership';
 import { engineString } from '../../../shared/engine/strings';
@@ -165,7 +166,7 @@ export class WeaponStrip {
     this.scope.listen(ring, 'pointerdown', (e) => {
       e.stopPropagation(); e.preventDefault();
       if (this.press !== null || !this.weapons.enabled) return;
-      ring.setPointerCapture(e.pointerId);
+      capturePointer(ring, e.pointerId);
       ring.classList.add('down');
       const press: NonNullable<WeaponStrip['press']> = { id: e.pointerId, timer: 0, open: false };
       press.timer = this.scope.timeout(HOLD_MS, () => { press.open = true; this.openPie(); });

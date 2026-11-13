@@ -59,6 +59,7 @@ function fixture(stored = false, leaveSaved: (go: () => void) => void = go => { 
   };
   return { owner, game, compile, firstFrame, storage, navigations, faults, rebuild, beforeReload, lose, restore,
     wipe: () => { wiped = true; },
+    hide: () => { doc.visibilityState = 'hidden'; doc.dispatchEvent(new Event('visibilitychange')); },
   };
 }
 
@@ -95,7 +96,17 @@ test('a recovery reload waits for a held session\'s save', async () => {
 
 test('a wiped canvas after the shared retry reports the real fault without another automatic navigation', () => {
   const f = fixture(true); f.wipe(); f.lose();
-  expect(f.navigations).toEqual([]); expect(f.faults).toHaveLength(1); expect(f.game.hold).toBe(true);
+  expect(f.navigations).toEqual([]); expect(f.game.hold).toBe(true);
+  // the loss itself is reported (QA 2026-11-13 row 6), then the one fatal fault that opens the card
+  expect(f.faults.map(fault => String(Reflect.get(fault as object, 'verdict')))).toEqual(['retry', 'fatal']);
+});
+
+test('a context lost in front of the player reaches Sentry; one lost behind a hidden page does not (QA 2026-11-13 row 6)', () => {
+  const shown = fixture(); shown.lose();
+  expect(shown.faults).toHaveLength(1);
+  expect(String(Reflect.get(Reflect.get(shown.faults[0] as object, 'error') as object, 'message'))).toMatch(/^WebGL context lost \(context lost\)/u);
+  const behind = fixture(); behind.hide(); behind.lose();
+  expect(behind.faults).toEqual([]);
 });
 
 test('retiring an in-flight restore prevents rebuild and publication', async () => {

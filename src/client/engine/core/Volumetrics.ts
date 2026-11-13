@@ -6,6 +6,7 @@ import {
 } from 'three';
 import { fogUniforms, volumetricFog } from '../world/Atmosphere';
 import type { Renderer } from '../render/renderer';
+import { fitHdrTarget } from '../render/drawCheck';
 
 /** the march's uniforms, typed per slot so the per-frame `.value.copy(...)` calls are checked */
 interface MarchUniforms {
@@ -216,6 +217,7 @@ export class VolumetricsEffect extends Effect {
   targetSize(): readonly [number, number] | null { return this.renderTarget === null ? null : [this.renderTarget.width, this.renderTarget.height]; }
   /** Compile the separate march's program now (a page that adds this effect late warms it at install, not at first use). */
   warm(renderer: Renderer): void {
+    if (this.renderTarget) fitHdrTarget(renderer, this.renderTarget); // QA 2026-11-13 row 6: 8-bit where half float cannot be drawn into
     if (this.marchScene === null || this.renderTarget === null) return;
     // Output colour space / tone mapping participate in the key even for a raw ShaderMaterial.
     // Compile in the march's real target, as update() draws it, rather than the current canvas.
@@ -224,6 +226,8 @@ export class VolumetricsEffect extends Effect {
     finally { renderer.setRenderTarget(previous); }
   }
 
+  /** fitHdrTarget ran on the light-ray target (once: the GPU does not change under a renderer) */
+  private fitted = false;
   override update(renderer: Renderer, inputBuffer?: WebGLRenderTarget): void {
     // an effect added to a pass after its last resize (a page's late install) takes its size from the frame it composites
     if (inputBuffer !== undefined && (inputBuffer.width !== this.size.width || inputBuffer.height !== this.size.height)) this.setSize(inputBuffer.width, inputBuffer.height);
@@ -238,6 +242,7 @@ export class VolumetricsEffect extends Effect {
     u.uDensity.value = DENSITY;
     u.uFrame.value = (this.frame++ % 64);
     if (this.renderTarget && this.marchMat && this.marchScene && !this.parked) {
+      if (!this.fitted) { fitHdrTarget(renderer, this.renderTarget); this.fitted = true; }
       this.nearU.value = cam.near; this.farU.value = cam.far;
       const prev = renderer.getRenderTarget();
       renderer.setRenderTarget(this.renderTarget);

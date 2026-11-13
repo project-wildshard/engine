@@ -1,4 +1,4 @@
-import { listenDom, listenPage } from '../input/dom';
+import { capturePointer, listenDom, listenPage } from '../input/dom';
 import { app } from '../app/runtime';
 import { engineString } from '../../../shared/engine/strings';
 /**
@@ -28,10 +28,8 @@ const STICK_R = 46;        // px — the thumb's travel
 const TAP_SLOP = 14;       // px — a button touch that travels further than this is not a tap
 const RELAY_SWALLOW_MS = 700; // the browser's own click for a relayed tap, should one still come, lands inside this
 
-/** capture a finger on its control's element (its moves and lift follow it anywhere); a pointer already gone throws */
-function capture(el: HTMLElement, id: number): void {
-  try { el.setPointerCapture(id); } catch { /* lifted before we got here: its pointerup is on its way */ }
-}
+/** capture a finger on its control's element (its moves and lift follow it anywhere); a pointer already gone is skipped */
+function capture(el: HTMLElement, id: number): void { capturePointer(el, id); }
 
 /**
  * A held button (the rail's ▲ / ▼): held while any finger that went down on it is still down. It keeps its own pointer

@@ -1,7 +1,7 @@
 import { mountUi } from '../ui/ownership';
 import { mountBoostLook } from '../ui/hoverBoost';
 import { app } from '../app/runtime';
-import { listenDom } from '../input/dom';
+import { capturePointer, listenDom, listenPage } from '../input/dom';
 import type { Action, TouchStack, TouchVerbSpec } from '../input/InputService';
 import { engineString } from '../../../shared/engine/strings';
 /**
@@ -123,6 +123,8 @@ export class TouchControls {
   private readonly scope = (app.levelScope ?? app.engineScope).child('touch');
   readonly active: boolean;
   private stickPointer = -1; private lookPointer = -1; private attackPointer = -1;
+  /** fingers the stick, look or attack hold whose capture the browser refused (capturePointer): released from the window too */
+  private readonly uncaptured = new Set<number>();
   private stickBase = { x: 0, y: 0 };
   private lookLast = { x: 0, y: 0 };
   private attackLast = { x: 0, y: 0 }; private attackPath = 0; private attackT0 = 0; // the ATTACK touch: last spot, px travelled, start time
@@ -299,7 +301,7 @@ export class TouchControls {
         this.flick.begin(e.clientX, e.clientY, this.lookT0);
         lookpad.classList.toggle('active', inBar);
       } else return;
-      root.setPointerCapture(e.pointerId);
+      if (!capturePointer(root, e.pointerId)) this.uncaptured.add(e.pointerId);
       e.preventDefault();
     });
     listenDom(this.scope, root, 'pointermove', (e) => {
@@ -348,6 +350,12 @@ export class TouchControls {
     };
     listenDom(this.scope, root, 'pointerup', release);
     listenDom(this.scope, root, 'pointercancel', release);
+    // WILDSHARD-GAME-2M (QA 2026-11-13 row 6): Android Chrome can refuse a capture (the touch already handed to the browser).
+    // That finger's lift can then land outside the layer, and the stick, look or attack stayed held: the next touch on it
+    // was ignored ("couldn't control anything"). An uncaptured finger is released from the window as well.
+    for (const type of ['pointerup', 'pointercancel'] as const) {
+      listenPage(this.scope, type, (e) => { if (this.uncaptured.delete(e.pointerId)) release(e); }, { capture: true });
+    }
 
     // ── ATTACK / FIRE: fires on touch-down; the disc then captures the touch (its move / up events bubble to the layer's
     //    handlers above), so a drag from it turns the camera while the finger is held and a still hold (melee) becomes the
@@ -359,7 +367,7 @@ export class TouchControls {
       if (this.attackPointer >= 0) return; // one finger on the disc at a time
       this.attackPointer = e.pointerId;
       this.attackLast = { x: e.clientX, y: e.clientY }; this.attackPath = 0; this.attackT0 = performance.now();
-      attack.setPointerCapture(e.pointerId);
+      if (!capturePointer(attack, e.pointerId)) this.uncaptured.add(e.pointerId);
       attack.classList.add('down');
       if (!this.weapons.enabled) return;
       this.weapons.tryFire(); // the bow: only the dry click on an empty quiver — its draw is the hold
@@ -458,7 +466,7 @@ export class TouchControls {
         const own = button; root.append(own); this.verbs.set(slot, own);
         const pointers = new Set<number>();
         listenDom(this.scope, own, 'pointerdown', (event) => {
-          event.preventDefault(); event.stopPropagation(); pointers.add(event.pointerId); own.setPointerCapture(event.pointerId);
+          event.preventDefault(); event.stopPropagation(); pointers.add(event.pointerId); capturePointer(own, event.pointerId);
           const current = this.verbActions[slot]; if (current === undefined || pointers.size !== 1) return;
           const live = this.verbSpecs[slot];
           if (live?.hold === true) { this.heldVerbs.set(slot, current); app.input.setHeld(current, true); } else app.input.press(current);

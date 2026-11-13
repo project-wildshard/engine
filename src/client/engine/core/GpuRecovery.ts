@@ -37,6 +37,7 @@ import { gpuOnlyContent, rebakeGpuContent } from './gpuOnly';
 import { emitFault } from '../../../shared/engine/core/faults';
 import { recordGpuRecovery } from '../boot/bootTrace';
 import { leaveSaved, markReload } from '../boot/lastEnd';
+import { gpuSummary } from '../render/drawCheck';
 
 const savedStorage = saveStorage('session');
 
@@ -73,6 +74,8 @@ export function installGpuRecovery(host: RecoveryHost): void {
   const canvas = game.renderer.domElement;
   if (canvas !== game.canvas) return; // an offscreen canvas of our own, not the one the player sees
   const gl = game.renderer.getContext();
+  let lostGpu = 'GPU unknown'; // read while the context lives: a lost one answers nothing
+  try { lostGpu = gpuSummary(gl); } catch { /* the summary is a courtesy */ }
 
   let phase: Phase = 'ok';
   let hidden = document.visibilityState === 'hidden';
@@ -129,6 +132,10 @@ export function installGpuRecovery(host: RecoveryHost): void {
     game.hold = true;
     document.dispatchEvent(new Event('ws:background'));
     console.warn(`[gl] ${why}: holding the frame loop`);
+    // QA 2026-11-13 row 6 (Android Chrome: the world went black after a jump): a loss in front of the player reaches
+    // Sentry with the GPU that lost it (one behind a hidden page is the iOS app switch: routine, not reported). Time
+    // still never reloads: only a confirmed wipe or failed restore does (gpu-recovery-conditions.test.ts)
+    if (!hidden) emitFault({ system: 'gpu-recovery', error: new Error(`WebGL context lost (${why}) · ${lostGpu}`), verdict: 'retry' });
     // the GPU process died (every canvas wiped): nothing to restore in place — do not wait for the restore event
     if (canvasesWiped()) reload('the GPU process restarted: every canvas was wiped');
   };

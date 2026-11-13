@@ -1,3 +1,4 @@
+import { capturePointer } from '../input/dom';
 import { uiScope, mountUi } from './ownership';
 import { app } from '../app/runtime';
 import type { UiHandle } from './layers';
@@ -293,7 +294,7 @@ export class Feedback {
     fit(); paint();
     let live: Stroke | null = null;
     const at = (e: PointerEvent): [number, number] => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; };
-    penScope.listen(cv, 'pointerdown', (e) => { e.preventDefault(); cv.setPointerCapture(e.pointerId); live = { pts: at(e) }; this.strokes.push(live); paint(); });
+    penScope.listen(cv, 'pointerdown', (e) => { e.preventDefault(); capturePointer(cv, e.pointerId); live = { pts: at(e) }; this.strokes.push(live); paint(); });
     penScope.listen(cv, 'pointermove', (e) => { if (!live) return; live.pts.push(...at(e)); paint(); });
     const end = (): void => { live = null; };
     penScope.listen(cv, 'pointerup', end); penScope.listen(cv, 'pointercancel', end);

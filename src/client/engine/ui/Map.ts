@@ -1,3 +1,4 @@
+import { capturePointer } from '../input/dom';
 import { app } from '../app/runtime';
 import type { UiHandle } from './layers';
 import type { Scope } from '../../../shared/engine/app/scope';
@@ -85,7 +86,7 @@ export class FullMap {
     this.root.append(this.canvas);
 
     // pan / pinch
-    this.scope.listen(this.canvas, 'pointerdown', (e) => { this.canvas.setPointerCapture(e.pointerId); this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (this.pointers.size === 2) { this.pinchDist = this.dist(); this.pinchZoom = this.zoom; } });
+    this.scope.listen(this.canvas, 'pointerdown', (e) => { capturePointer(this.canvas, e.pointerId); this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (this.pointers.size === 2) { this.pinchDist = this.dist(); this.pinchZoom = this.zoom; } });
     this.scope.listen(this.canvas, 'pointermove', (e) => {
       const p = this.pointers.get(e.pointerId); if (!p) return;
       if (this.pointers.size === 1) { this.panBy(e.clientX - p.x, e.clientY - p.y); }

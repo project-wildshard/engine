@@ -1,4 +1,4 @@
-import { listenDom } from '../input/dom';
+import { capturePointer, listenDom } from '../input/dom';
 import { app } from '../app/runtime';
 import { LoadProgress } from '../ui/loadProgress';
 import { engineString } from '../../../shared/engine/strings';
@@ -60,7 +60,7 @@ export class Compare {
     listenDom(this.uiScope, this.picker.querySelector('.ws-x-picker-close'), 'click', () => { this.picker.classList.remove('show'); this.pickerProgress.clear(); });
     this.picker.querySelectorAll<HTMLElement>('.ws-x-target').forEach((b) => { listenDom(this.uiScope, b, 'click', () => { const t = this.targets.find((x) => x.id === b.dataset['id']); if (t) this.show(t); }); });
     listenDom(this.uiScope, this.overlay.querySelector('.ws-x-compare-close'), 'click', () => { this.close(); });
-    listenDom(this.uiScope, this.divider, 'pointerdown', (e) => { this.divider.setPointerCapture(e.pointerId); this.splitAt(e.clientX); e.preventDefault(); });
+    listenDom(this.uiScope, this.divider, 'pointerdown', (e) => { capturePointer(this.divider, e.pointerId); this.splitAt(e.clientX); e.preventDefault(); });
     listenDom(this.uiScope, this.divider, 'pointermove', (e) => { if (this.divider.hasPointerCapture(e.pointerId)) this.splitAt(e.clientX); });
     listenDom(this.uiScope, this.divider, 'keydown', (e) => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;

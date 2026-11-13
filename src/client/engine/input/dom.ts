@@ -60,3 +60,15 @@ export function listenPage<K extends PageInputEvent>(scope: Scope, type: K, fn: 
   const { on = 'window', ...rest } = options ?? {};
   scope.listen(on === 'document' ? document : window, type, fn, rest);
 }
+
+/**
+ * Capture a pointer on an element (its moves and lift follow it anywhere). A pointer that is already gone throws:
+ * Chrome on Android raises `InvalidStateError` when the touch was handed to the browser (a scroll, a system gesture)
+ * before the pointerdown handler ran, and `NotFoundError` for an id it never knew. That touch's pointerup or
+ * pointercancel is on its way, so the control runs uncaptured; the throw used to escape the handler, skip the rest of
+ * the press and raise "A glitch was reported" (QA-FEEDBACK-2026-11-13 row 6, Sentry WILDSHARD-GAME-2M).
+ * Every capture in the client goes through here (test/pointer-capture.test.ts). Returns whether the capture took.
+ */
+export function capturePointer(el: Element, pointerId: number): boolean {
+  try { el.setPointerCapture(pointerId); return true; } catch { return false; }
+}
