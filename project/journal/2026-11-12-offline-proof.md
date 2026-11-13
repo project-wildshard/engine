@@ -17,3 +17,10 @@
   reading through the worker.
 - The rules live in `offline-proof-rules.mjs`, pinned on a saved log by
   `test/offline-proof-rules.test.ts`. Never in CI.
+- Review folded (claude -p): the load error screen, a proof error, a
+  resume never offered and an offline read reaching the proxy are red;
+  `ERR_ABORTED` is not a failed read; the door is always routed (offline
+  closes it); START's first reads are tagged with the card, not the
+  title. With one entry at a time the proxy goes offline too, so a read
+  the CDP emulation missed fails as on a phone. `--require-world` is for
+  OF5 and OF9. Shards off the deck go in by their deep link.

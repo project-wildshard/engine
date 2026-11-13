@@ -93,7 +93,7 @@ export function judge(run) {
     out.push({ shard, rule: proof ? 'proof-error' : 'load-error-screen', detail: proof ? run.proofError : samples.at(-1)?.text.slice(0, 200) ?? '' });
   }
   if (run.outcome === 'no-resume') out.push({ shard, rule: 'no-resume', detail: 'reopening the page showed the title, not the shard' });
-  if ((run.leaks ?? 0) > 0) out.push({ shard, rule: 'offline-leak', detail: `${String(run.leaks)} reads reached the server while offline` });
+  if ((run.leaks ?? 0) > 0) out.push({ shard, rule: 'offline-leak', detail: `${String(run.leaks)} reads reached the server while offline (the URLs are in the run's screens log)` });
   if (run.requireWorld === true && run.outcome !== 'play') out.push({ shard, rule: 'not-in-world', detail: run.outcome });
   // 6. A load that never finished with nothing else to blame.
   if (run.outcome === 'stalled' && out.length === 0) {

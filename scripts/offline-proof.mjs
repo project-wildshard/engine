@@ -10,7 +10,7 @@
 //            (`routeWebSocket`) that says the world word (SOCKET_WORLD, every proof shard on a 20-cell grid) and never seats,
 //            as opus-offlinefix1's run did. So a staging-like load ends at the seat (LOAD step `server`), never in play.
 // Per shard, one persistent headless Chromium profile per channel (402x874, touch): a warm visit by the player's path, then
-// the mode, entered by the deck (Shard select; Open Plots by `?chunk=<slug>&skipintro` with Developer on, their only way in)
+// the mode, entered by the deck (Shard select; Open Plots, and a shard the deck doesn't show, by `?chunk=<slug>&skipintro` with Developer on)
 // and by resume (reopen `/`, whatever the site does). Modes, all inside that one browser, never the laptop's network:
 //   offline    `context.setOffline(true)` plus CDP offline on every target (page, workers, the service worker)
 //   slow       CDP 0.7 Mbit/s, 300 ms on every target
@@ -109,10 +109,20 @@ let STAMP = '';
 const RELEASE_PATH = '/__offline-proof/staging.json';
 /** @type {Promise<string> | undefined} */
 let signedRelease;
-let stamperHits = 0;
+let stamperHits = 0, proxyOffline = false;
+/** @type {string[]} the last reads the proxy answered, to name an offline leak */
+const stamperSeen = [];
 /** @param {import('node:http').IncomingMessage} request @param {import('node:http').ServerResponse} response */
 async function stamp(request, response) {
-  stamperHits++;
+  // the browser's own worker update check is not the game's read, and fails on a phone with no link anyway
+  if (request.url !== '/sw.js') {
+    stamperHits++;
+    stamperSeen.push(request.url ?? '');
+    if (stamperSeen.length > 200) stamperSeen.shift();
+  }
+  // one offline entry at a time (--jobs=1, the walk-through): the proxy is offline too, so a read the CDP emulation missed
+  // fails as it would on a phone; it is still counted and named
+  if (proxyOffline) { request.socket.destroy(); return; }
   try {
     if (request.url === RELEASE_PATH) {
       signedRelease ??= fetch(STAGING.release, { cache: 'no-store' }).then(answer => { if (!answer.ok) throw new Error(`release ${String(answer.status)}`); return answer.text(); });
@@ -288,12 +298,16 @@ async function enter(run) {
     let outcome = 'stalled';
     let tappedAt = 0, outcomeMs = 0, proofError = '';
     let leakFrom = () => 0;
+    /** @type {() => string[]} */
+    let leakedUrls = () => [];
     try {
       const open = OPEN_PLOTS.includes(slug) && entry === 'deck' ? `/?chunk=${slug}&skipintro&mute=1` : '/?mute=1';
       // a deep link is the entry itself: its reads are the card's from the first one
       if (open !== '/?mute=1') phase = 'none';
       const hitsBefore = stamperHits;
+      proxyOffline = mode === 'offline' && channel === 'staging' && jobs === 1;
       leakFrom = () => stamperHits - hitsBefore;
+      leakedUrls = () => stamperSeen.slice(-Math.min(stamperSeen.length, stamperHits - hitsBefore));
       await page.goto(new URL(open, ORIGINS[channel]).href, { waitUntil: 'commit', timeout: 60_000 }).catch((/** @type {unknown} */ error) => { consoleLines.push(`goto ${String(error).slice(0, 200)}`); });
       if (entry === 'deck' && !OPEN_PLOTS.includes(slug)) {
         const select = page.locator('.ws-main-select');
@@ -304,9 +318,15 @@ async function enter(run) {
         const card = DECK_SHARDS.find(shard => shard.slug === slug)?.card ?? '';
         const names = await page.locator('.ws-menu-card b').allTextContents();
         const index = names.findIndex(name => name.trim().toLowerCase() === card.toLowerCase());
-        if (index === -1) throw new Error(`no deck card "${card}" (deck: ${names.join(', ')})`);
-        await page.locator(`.ws-menu-dots i[data-i="${String(index)}"]`).click();
-        await page.locator('.ws-menu-play').click();
+        if (index === -1) {
+          // a shard this build's deck doesn't show (Pastel Plain, Ink & Cel): the deep link with Developer on, as for Open Plots
+          consoleLines.push(`no deck card "${card}" (deck: ${names.join(', ')}): entered by ?chunk=`);
+          phase = 'none';
+          await page.goto(new URL(`/?chunk=${slug}&skipintro&mute=1`, ORIGINS[channel]).href, { waitUntil: 'commit', timeout: 60_000 });
+        } else {
+          await page.locator(`.ws-menu-dots i[data-i="${String(index)}"]`).click();
+          await page.locator('.ws-menu-play').click();
+        }
       }
       tappedAt = at();
       if (phase === 'title') phase = 'none';
@@ -353,7 +373,11 @@ async function enter(run) {
       for (const name of await globalThis.caches.keys()) counts[name] = (await (await globalThis.caches.open(name)).keys()).length;
       return counts;
     }), 10_000) ?? {};
-    const leaks = mode === 'offline' && channel === 'staging' ? leakFrom() : 0;
+    const reached = mode === 'offline' && channel === 'staging' ? leakFrom() : 0;
+    if (reached > 0) consoleLines.push(`offline ${proxyOffline ? 'reads refused by the offline proxy' : 'leak'}: ${leakedUrls().join(' ')}`);
+    // refused reads failed as they would on a phone, so they aren't a leak; with --jobs above 1 the proxy can't go offline
+    const leaks = proxyOffline ? 0 : reached;
+    proxyOffline = false;
     return { rows, samples, consoleLines, outcome, ms: outcomeMs, proofError, leaks, caches, finalUrl: last?.url ?? '', world: last?.world ?? false, lastCard: `${last?.phase ?? ''}/${last?.step ?? ''} ${last?.error ?? ''}`.trim() };
   } finally {
     await context.close().catch(() => undefined);
