@@ -19,19 +19,24 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
 
-const BASE = 'https://staging.wildshard.io', HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health', RELEASE = 'https://packs.wildshard.io/releases/staging.json';
-const out = absolute(process.argv.slice(2).find(arg => !arg.startsWith('--')) ?? '');
-if (out === absolute('')) throw new Error('usage: grid-spawn-proof.mjs <out dir> [--layouts=desktop,phone] [--cells=…] [--parallel=3] [--no-dev]');
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
+// GRID-CROSSING GC27 (J311): `--base=<a preview build>` runs the same walk on preview (preview.wildshard.io, or a local
+// `scripts/serve-build.sh` build), whose in-page server hosts the grid: no world door, so no staging health or release read.
+const BASE = flag('base', 'https://staging.wildshard.io').replace(/\/$/u, ''), STAGING = BASE === 'https://staging.wildshard.io';
+const HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health', RELEASE = 'https://packs.wildshard.io/releases/staging.json';
+const out = absolute(process.argv.slice(2).find(arg => !arg.startsWith('--')) ?? '');
+if (out === absolute('')) throw new Error('usage: grid-spawn-proof.mjs <out dir> [--base=<preview url>] [--layouts=desktop,phone] [--cells=…] [--parallel=3] [--no-dev]');
 const layouts = flag('layouts', 'desktop,phone').split(','), parallel = Math.min(3, Number(flag('parallel', '3')));
 const devRetry = !process.argv.includes('--no-dev'), only = flag('cells', '').split(',').filter(Boolean);
 const shots = join(out, 'shots');
 mkdirSync(shots, { recursive: true });
 
 /** The 25 cells (src/shared/game/grid/singleplayer.json) and the deck card that names each, where the deck has one. */
-// staging's own grid: the catalogue at the build staging runs (`/health`), not this checkout's, which other lanes edit
-const stagingBuild = await fetch(HEALTH, { signal: AbortSignal.timeout(15_000) }).then(async found => String((await found.json()).build)).catch(() => '');
+// staging's own grid: the catalogue at the build staging runs (`/health`), not this checkout's, which other lanes edit; a preview's
+// is the build its `version.json` names
+const stagingBuild = STAGING ? await fetch(HEALTH, { signal: AbortSignal.timeout(15_000) }).then(async found => String((await found.json()).build)).catch(() => '')
+  : await fetch(`${BASE}/version.json`, { signal: AbortSignal.timeout(15_000) }).then(async found => String((await found.json()).build).split('-')[0] ?? '').catch(() => '');
 const catalogueText = (() => {
   try { return execFileSync('git', ['show', `${stagingBuild}:src/shared/game/grid/singleplayer.json`], { cwd: join(import.meta.dirname, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); }
   catch { console.log(`staging build ${stagingBuild} is not in this checkout: reading the working catalogue`); return readFileSync(join(import.meta.dirname, '../src/shared/game/grid/singleplayer.json'), 'utf8'); }
@@ -195,11 +200,12 @@ if (againFile !== '') {
   }
 }
 if (!process.argv.includes('--report-only')) {
-  const health = await fetch(HEALTH, { signal: AbortSignal.timeout(15_000) }).then(found => found.json()).catch(() => ({}));
-  const release = await fetch(RELEASE, { signal: AbortSignal.timeout(15_000) }).then(async found => JSON.parse((await found.json()).body)).catch(() => ({}));
+  const health = STAGING ? await fetch(HEALTH, { signal: AbortSignal.timeout(15_000) }).then(found => found.json()).catch(() => ({})) : {};
+  const release = STAGING ? await fetch(RELEASE, { signal: AbortSignal.timeout(15_000) }).then(async found => JSON.parse((await found.json()).body)).catch(() => ({})) : {};
   const version = await fetch(`${BASE}/version.json`, { signal: AbortSignal.timeout(15_000) }).then(found => found.json()).catch(() => ({}));
   state.staging = { serial: health.serial ?? release.serial, build: health.build ?? release.engineBuild, pageBuild: version.build, cells: health.cells, workers: health.workers, table: health.table, shards: (release.shards ?? []).length, started: new Date().toISOString() };
-  console.log(`staging serial ${String(state.staging.serial)} build ${String(state.staging.build)} cells ${String(health.cells)} workers ${String(health.workers)}`);
+  if (!STAGING) state.staging = { ...state.staging, base: BASE, build: stagingBuild };
+  console.log(`${STAGING ? 'staging' : BASE} serial ${String(state.staging.serial)} build ${String(state.staging.build)} cells ${String(health.cells)} workers ${String(health.workers)}`);
   const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
   // phone first (the brief: all 25 phone runs before desktop if time runs short)
   const jobs = layouts.slice().sort(a => (a === 'phone' ? -1 : 1)).flatMap(layout => cells.map(cell => ({ cell, layout })));
@@ -294,7 +300,7 @@ dl { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin: 0; font
 code { font-family: var(--mono); font-size: 0.85em; }
 </style>
 <h1>Grid spawn proof, GC21</h1>
-<p class="sub">Staging, every cell of the 5×5 grid, each in a fresh headless Chromium profile: title → SHARD SELECT → the shard's card → ENTER WORLD, then control, a 10 m walk by input, a jump, and the seat's cell from the server's own snapshot. A run is green only if the page is the grid, inside that cell, the server seats it there, it walks 10 m and jumps. The Shard Select columns are a fresh player (Developer off). Where that card is locked, the grey column tries the same card with Developer on, to show whether the cell itself spawns; the open plots have no card with Developer on either. ${againRuns.length === 0 ? '' : 'The first pass ran three pages at once, and the staging door refused some of their sockets (429: it allows 4 sockets and 10 connects a minute per address, and every agent on this Mac shares one), so every carded cell ran again one page at a time; that result is the line under each run.'} Finished ${esc(when)} Cancún.</p>
+<p class="sub">${STAGING ? 'Staging' : `Preview (${esc(BASE)}, the in-page grid)`}, every cell of the 5×5 grid, each in a fresh headless Chromium profile: title → SHARD SELECT → the shard's card → ENTER WORLD, then control, a 10 m walk by input, a jump, and the seat's cell from the server's own snapshot. A run is green only if the page is the grid, inside that cell, the server seats it there, it walks 10 m and jumps. The Shard Select columns are a fresh player (Developer off). Where that card is locked, the grey column tries the same card with Developer on, to show whether the cell itself spawns; the open plots have no card with Developer on either. ${againRuns.length === 0 ? '' : 'The first pass ran three pages at once, and the staging door refused some of their sockets (429: it allows 4 sockets and 10 connects a minute per address, and every agent on this Mac shares one), so every carded cell ran again one page at a time; that result is the line under each run.'} Finished ${esc(when)} Cancún.</p>
 <div class="strip">
 <div class="stat"><b>${String(green)} / ${String(cardRuns.length)}</b><span>Shard Select runs green</span></div>
 <div class="stat"><b>${String(chunkGreen)} / ${String(chunkRuns.length)}</b><span>Developer-on retries green</span></div>
