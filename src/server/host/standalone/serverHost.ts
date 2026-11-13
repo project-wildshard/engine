@@ -38,6 +38,8 @@ export interface StandaloneServerOptions {
   readonly reports?: ChatReports;
   /** A proof's ways in, which no product path passes: boot on the road at this world point, hold this many worlds, read each tick's cost and the running server. */
   readonly proof?: { readonly arrival?: Readonly<GridPoint>; readonly residents?: number; readonly ticked?: (ms: number) => void; readonly booted?: (server: StandaloneGrid) => void };
+  /** J311: the grid cell (instance) a no-world build's Shard select chose; a grid session starts there. */
+  readonly goto?: string;
 }
 
 /** A worker has no page, so no app identity: all it needs of one is the save prefix, which the page passes at boot. */
@@ -90,7 +92,7 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     installSaveEnvironment({ storage: saveScope => saveScope === 'session' ? null : local, persistent: () => true, persist: () => Promise.resolve(false) });
     const server = await bootTask('server:world-boot', () => StandaloneGrid.boot({ slug: message.slug, build: message.build, book, saves, storage: local, savePrefix: message.savePrefix, now: diagnosticNow, ...(message.lone === true ? { lone: true } : {}),
       load: slug => options.load(message, slug), strips: () => options.strips?.(message) ?? Promise.resolve([]), stepped, ...(options.onSaveRefused === undefined ? {} : { refused: options.onSaveRefused }), ...(options.reports === undefined ? {} : { reports: options.reports }),
-      ...(arrival === undefined ? {} : { arrival }), ...(residents === undefined ? {} : { residents }) }));
+      ...(arrival === undefined ? {} : { arrival }), ...(residents === undefined ? {} : { residents }), ...(options.goto === undefined ? {} : { goto: options.goto }) }));
     grid = server;
     const { restored } = server;
     if (restored?.ledger !== undefined) book.restore(restored.ledger);

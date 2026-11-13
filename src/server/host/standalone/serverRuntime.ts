@@ -9,7 +9,11 @@ import { fetchGridCollision, fetchServerProduct } from './serverProduct';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 
 /** What a page hands its server's worker: what its document holds and a worker's realm has no way to read. */
-export interface ServerWorkerStart { readonly catalogue: unknown; readonly validator: unknown; readonly verdicts: unknown }
+export interface ServerWorkerStart {
+  readonly catalogue: unknown; readonly validator: unknown; readonly verdicts: unknown;
+  /** J311: the grid cell (instance) a no-world build's Shard select chose, or null. */
+  readonly goto: string | null;
+}
 
 /** Physics, once, from the page's own copy where it holds one (DL25). */
 let physics: Promise<Rapier> | undefined;
@@ -33,7 +37,7 @@ export function runServerWorker(event: MessageEvent<unknown>): void {
   const [control, game, harness, reads] = event.ports;
   if (control === undefined || game === undefined) return;
   const held = reads === undefined ? undefined : askHeldReads(reads);
-  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, load: async (boot, slug) => fetchServerProduct(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held), held),
+  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, load: async (boot, slug) => fetchServerProduct(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held), held),
     strips: boot => fetchGridCollision(boot.base),
     onSaveRefused: error => { console.warn('Standalone save refused, falling back', error); } });
 }

@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { catalogueDocument } from '../src/shared/game/grid/catalogueDocument';
-import { currentPageMode, gotoHosted, pageGoto, setPageGoto, setPageMode } from '../src/shared/game/grid/pageMode';
+import { chosenCell, currentPageMode, gotoHosted, pageGoto, setPageGoto, setPageMode } from '../src/shared/game/grid/pageMode';
 import { enterByShard, oneWayIn, shardCell, worldHosted } from '../src/client/game/grid/oneWayIn';
 import { gridIntents, pageGridIntents } from '../src/client/game/grid/intent';
 import { SaveStore } from '../src/shared/engine/saves/store';
@@ -41,12 +41,20 @@ test('an online build whose world hosts the grid: Shard select → Driftwood boo
   expect(oneWayIn({ online: true, hosted: true, slug: 'open-plot-sky-race', kept: false }, assembly)?.instance).toBe('open-plot-2-0');
 });
 
-test('a solo build still opens the shard alone, and never asks a world', async () => {
-  const hosted = vi.fn(async () => true);
-  expect(await enterByShard({ online: false, slug: 'driftwood-isle', kept: false }, undefined, hosted)).toBeNull();
+test('J311: a solo build (preview) enters its in-page grid at the shard\'s cell, and never asks a world', async () => {
+  const hosted = vi.fn(async () => false);
+  expect(await enterByShard({ online: false, slug: 'nalati-grasslands', kept: false }, undefined, hosted)).toBe('nalati-grasslands');
   expect(hosted).not.toHaveBeenCalled();
-  expect(bootPageMode('driftwood-isle')).toBe('shard');
-  expect(pageGoto()).toBeNull();
+  expect(bootPageMode('nalati-grasslands'), 'the same page boots as a grid page').toBe('grid');
+  expect([pageGoto(), chosenCell()], 'and the in-page server is told to start in Nalati\'s cell').toEqual(['nalati-grasslands', 'nalati-grasslands']);
+  // every grid shard's card enters its own cell; a kept page (EXPLORE WORLD) and an off-grid shard stay one-shard pages
+  for (const cell of assembly.cells) expect(oneWayIn({ online: false, hosted: false, slug: cell.slug, kept: false }, assembly)?.instance, cell.slug).toBe(shardCell(cell.slug, assembly)?.instance);
+  expect(oneWayIn({ online: false, hosted: false, slug: 'driftwood-isle', kept: true }, assembly)).toBeNull();
+  expect(oneWayIn({ online: false, hosted: false, slug: 'open-plot-thin-ice', kept: false }, assembly)).toBeNull();
+  // the page asks only for a title tap, so a bare `?chunk=` link and the harness URLs still open the shard alone
+  expect(readFileSync('src/client/app/entry.ts', 'utf8')).toContain("(online || pendingTitleArrival(requested ?? '') !== null) && requested !== null");
+  // the in-page server is handed the chosen cell (gridServer.ts starts there: test/standalone-grid-goto.test.ts)
+  expect(readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8')).toContain('const goto = lone ? null : chosenCell();');
 });
 
 test('a world that hosts only its home cell (production until WORLD_CELLS=grid) keeps today\'s one-shard page', async () => {

@@ -2,7 +2,7 @@
 // reconciles, and every creature is an interpolated row drawn by the real views.
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { LiveGridWire } from '../grid/liveSession';
-import { gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
+import { chosenCell, gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
 import { Vector3, type Object3D } from 'three';
@@ -262,7 +262,9 @@ async function bootStandalone(slug: string, lone: boolean, held: () => void): Pr
   // PZ3: its book, server parts, road part and loose reads follow the content base; rapier stays in the page
   // MP2.4: the Name the page keeps (the Name prompt) goes with the server's own device id; solo shows it on this page only
   const name = page === null ? null : heldName(page, savePrefix);
-  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
+  // J311: on a grid page, Shard select's pick is where the in-page grid starts, wherever this device last stood.
+  const goto = lone ? null : chosenCell();
+  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, ...goto === null ? {} : { goto }, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
 }
 /** LD5 (J208): a standalone server started while the first frame builds. On Jake's iPhone its boot was the last 5.1 s of
  *  Load, after every frame step; it runs on its own thread, so it can boot beside them. Its reads before the Worker boot

@@ -25,7 +25,7 @@ export class PageStorage implements SaveStorage {
   removeItem(key: string): void { this.items.delete(key); }
 }
 
-async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
+export async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
   const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));

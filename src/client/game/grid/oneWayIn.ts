@@ -2,7 +2,9 @@
 // Shard select → a grid shard enters the grid at that shard's cell, so Shard select only changes the spawn cell of the one online
 // world, and no online page boots a bordered `'shard'` page for a grid shard. J300 (GRID-CROSSING GC20): that holds when the world's
 // word is missing, late or never kept; only a world known to host one cell (production before GC16) keeps GO4's one-shard page. A
-// shard the grid doesn't place (OFFLINE OF3's) and a build with no world (preview, sharddev) keep today's one-shard page.
+// shard the grid doesn't place (OFFLINE OF3's) keeps today's one-shard page. J311: a build with no world (preview) does the same with
+// its in-page server, which hosts the whole grid: a Shard select tap enters the solo grid at the shard's cell (`entry.ts` asks only
+// for a tap, so a bare `?chunk=` link, a harness or an author's embedded product still opens the shard alone).
 import { pageScope } from '@wildshard/engine/app/resources';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
@@ -17,9 +19,9 @@ export function shardCell(slug: string, assembly: GridAssembly = new GridAssembl
 
 /** What a `?chunk=` page decides before anything loads. */
 export interface OneWayIn {
-  /** the build is stamped with a world (play, staging) */
+  /** the build is stamped with a world (play, staging); false: the in-page server hosts the grid (J311) */
   readonly online: boolean;
-  /** the world may host the grid: false only once its door's word (heard now or kept) says it opens one cell (`worldHosted`) */
+  /** the world may host the grid: false only once its door's word (heard now or kept) says it opens one cell (`worldHosted`). Read only online */
   readonly hosted: boolean;
   /** the shard the URL names */
   readonly slug: string;
@@ -29,7 +31,7 @@ export interface OneWayIn {
 
 /** The cell a one-shard page enters instead, or null when it stays a one-shard page. */
 export function oneWayIn(page: OneWayIn, assembly?: GridAssembly): GridCell | null {
-  if (!page.online || !page.hosted || page.kept) return null;
+  if ((page.online && !page.hosted) || page.kept) return null;
   return shardCell(page.slug, assembly) ?? null;
 }
 
@@ -102,9 +104,10 @@ async function readHosted(world: unknown, waitMs: number): Promise<boolean | nul
  * instance, or null when the page stays a one-shard page.
  */
 export async function enterByShard(page: Omit<OneWayIn, 'hosted'>, world: unknown, hosted: (world: unknown) => Promise<boolean> = worldHosted): Promise<string | null> {
-  // Only a page that could turn asks the world: a solo build, a kept page and a shard off the grid never wait on a read.
+  // Only a page that could turn asks the world: a kept page and a shard off the grid never wait on a read, and a solo build has no
+  // world to ask (its in-page server hosts the grid, J311).
   if (oneWayIn({ ...page, hosted: true }) === null) return null;
-  const cell = oneWayIn({ ...page, hosted: await hosted(world) });
+  const cell = oneWayIn({ ...page, hosted: !page.online || await hosted(world) });
   if (cell === null) return null;
   pageGridIntents().admit({ instance: cell.instance, slug: cell.slug, goto: true });
   return cell.instance;

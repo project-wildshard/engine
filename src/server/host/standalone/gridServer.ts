@@ -63,6 +63,8 @@ export interface GridServerOptions {
   readonly arrival?: Readonly<GridPoint>;
   /** A proof's override of `STANDALONE_RESIDENTS`. */
   readonly residents?: number;
+  /** J311: the cell (instance) a no-world build's Shard select chose. The session starts in it, not where its save stood. */
+  readonly goto?: string;
 }
 
 /** What boot hands the session it built. */
@@ -140,10 +142,13 @@ export class StandaloneGrid {
     };
     const candidate = sites.candidates().find(row => row.saved.site === null || assembly.cells.some(cell => cell.instance === row.saved.site));
     if (candidate !== undefined) sites.restored(candidate);
+    // J311: a Shard select pick starts in its cell, wherever the session stood. The site save still counts on from the newest
+    // (`saved` below), so the next boot without a pick resumes in the chosen cell.
+    const chosen = options.lone === true || options.goto === undefined ? undefined : assembly.cells.find(cell => cell.instance === options.goto);
     // A session with no save of its own opens where the page's save last stood.
-    const place = candidate !== undefined || options.arrival !== undefined || options.lone === true ? null : gridRecovery(saves).lastPlace(assembly);
+    const place = candidate !== undefined || chosen !== undefined || options.arrival !== undefined || options.lone === true ? null : gridRecovery(saves).lastPlace(assembly);
     const arrival = options.arrival ?? (place?.location.kind === 'road' ? { x: place.road.x, y: 0, z: place.road.z } : undefined);
-    const site = arrival !== undefined ? null : candidate === undefined ? place?.instance ?? home.instance : candidate.saved.site;
+    const site = arrival !== undefined ? null : chosen !== undefined ? chosen.instance : candidate === undefined ? place?.instance ?? home.instance : candidate.saved.site;
     const firstSlug = site === null ? home.slug : assembly.cell(site).slug, first = await bootTask('server:product-inputs', () => options.load(firstSlug)), { rapier } = first, lent = new Map([[firstSlug, first]]);
     let resumed: SavedContinuation | undefined;
     const input = (cell: GridCell): Promise<HeadlessRuntimeInput> => { const held = lent.get(cell.slug); lent.clear(); return held === undefined ? options.load(cell.slug) : Promise.resolve(held); };
