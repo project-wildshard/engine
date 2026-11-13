@@ -30,9 +30,10 @@ export function assetIndex(): string {
 const BYTES_TABLE = 'src/client/game/boot/bytes.generated.ts';
 function bytesModule(): string {
   const rows = Object.fromEntries(Object.entries(JSON.parse(assetIndex()) as Record<string, number>).filter(([name]) => !name.endsWith('.DS_Store')));
-  // The committed table is the baseline, not the file a local run last wrote (it may hold an older public/'s sizes).
+  // The staged table is the baseline (HEAD's, unless a fix to it is staged on purpose), not the file a local run last
+  // wrote: that may hold an older public/'s sizes.
   let committed = '';
-  try { committed = execFileSync('git', ['show', `HEAD:${BYTES_TABLE}`], { encoding: 'utf8', maxBuffer: 16_000_000, stdio: ['ignore', 'pipe', 'ignore'] }); }
+  try { committed = execFileSync('git', ['show', `:${BYTES_TABLE}`], { encoding: 'utf8', maxBuffer: 16_000_000, stdio: ['ignore', 'pipe', 'ignore'] }); }
   catch { /* no git history here (an installed package): nothing to compare */ }
   const changed = changedContentNamed(committed, rows);
   if (changed.length > 0) throw new Error(`${changed.length} content-named file(s) changed bytes under one URL, which players keep for a year (AUDIO AU21): ${changed.slice(0, 5).join(', ')}. A changed file needs a new name (sharddev 0.2.10 renames a re-encoded recording); a stale public/ copy needs \`pnpm pins\``);
