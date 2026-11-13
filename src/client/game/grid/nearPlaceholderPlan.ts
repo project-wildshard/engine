@@ -58,3 +58,11 @@ export function planNearPlaceholders(cells: readonly GridCell[], pitch: number,
 export function placeholderBlocksTiles(instance:string,entered:string|null,registered:boolean,ownsNear:boolean,absentNear:boolean):boolean {
   return instance!==entered&&!registered&&(ownsNear||absentNear);
 }
+
+/** DL17 (G872) with D189: the cell the player is in, drawn by its regional runtime, skips its tile-view admission only when
+ *  that runtime draws its own ground, through the tile registration (`registered`) or its manifest's `cellGround: 'world'`.
+ *  A runtime whose ground is the cell's ring tiles (Pine) admits them like any neighbour: skipped, its far proxy stayed over
+ *  the spawn and its ground never drew. */
+export function admitsCellTiles(instance:string,drawn:string|null,registered:boolean,ownGround:boolean):boolean {
+  return instance!==drawn||(!registered&&!ownGround);
+}
