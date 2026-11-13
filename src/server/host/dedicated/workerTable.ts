@@ -20,7 +20,7 @@ export function worldSettings(channel: string, env: Readonly<Record<string, stri
  * its cells unless `WORLD_CROSSING=off` (a bench's lone cells). Unset, or blank, is `worker`.
  */
 export function worldCrossing(value: string | undefined): boolean {
-  if (value === undefined || value === 'worker') return true;
+  if (value === undefined || value === '' || value === 'worker') return true;
   if (value === 'off') return false;
   throw new Error(`WORLD_CROSSING=${value}: only worker (the default) or off`);
 }

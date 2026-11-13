@@ -5,6 +5,7 @@ import { snapshotSimHost, type SimSnapshot } from '@wildshard/engine/sim/snapsho
 import { prepareFrameMotors, type FrameMember } from '@wildshard/engine/physics/frame';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { entrywayStands } from '@wildshard/engine/physics/query';
+import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 import type { GridAssembly, GridCell, GridPoint } from '../../../shared/game/grid/assembly';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { GridContinuationCache, GRID_CONTINUATION_CACHE_BYTES } from '../../../shared/game/grid/continuations';
@@ -358,8 +359,9 @@ export function landOnGround(host: SimHost, seat: PlayerSim): boolean {
   if (Math.max(Math.abs(position.x), Math.abs(position.z)) < CHUNK_HALF - 10) return false;
   near?.update(position.x, position.z);
   if (entrywayStands(host.physics, position.x, position.z)) return false;
-  const { at } = host.level.player;
-  seat.resetPose(at, host.level.player.yaw);
+  const { at, yaw } = host.level.player, mounted = mountedPlayerOf(host, seat.id);
+  // a rider and their horse go together, as a harness's `place` moves them
+  if (mounted?.mounted === true) mounted.teleport(at.x, at.z, yaw); else seat.resetPose(at, yaw);
   near?.update(at.x, at.z);
   return true;
 }

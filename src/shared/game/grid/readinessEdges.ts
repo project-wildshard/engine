@@ -11,12 +11,3 @@ export function neighbourEdges(cell: GridCell, home: Readonly<{ origin: Readonly
   const edge = (ex: number, ez: number, axis: 'x' | 'z'): ReadinessEdge => ({ instance: cell.instance, x: ex, z: ez, axis, halfLength, floor: 0 });
   return [edge(x + r, z, 'x'), edge(x - r, z, 'x'), edge(x, z + r, 'z'), edge(x, z - r, 'z')];
 }
-
-/**
- * GC36 / ROAD-PRELOAD RP4 (J322, Jake 11-13: "There should never be any walls"): the readiness walls a page stands, one set per
- * neighbour. The home cell is the page's own world, always ready, so it has none: nothing ever walls a player off between their own
- * cell and the road. A neighbour's edge may still hold while that cell loads.
- */
-export function readinessWallCells<Cell extends Pick<GridCell, 'instance'>>(cells: readonly Cell[], home: Pick<GridCell, 'instance'>): Cell[] {
-  return cells.filter(cell => cell.instance !== home.instance);
-}

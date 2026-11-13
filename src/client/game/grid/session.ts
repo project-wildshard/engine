@@ -51,7 +51,7 @@ import { WATER_UNBOUNDED, waterExtent } from '@wildshard/engine/world/waves';
 import type { Renderer } from '@wildshard/engine/render/renderer';
 import { generatePlatform, generatePlatformSliced, type GeneratedStrip, type PlatformCell, type StripProfile } from '@wildshard/engine/sim/strips';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
-import { neighbourEdges, readinessWallCells } from '../../../shared/game/grid/readinessEdges';
+import { neighbourEdges } from '../../../shared/game/grid/readinessEdges';
 import { DEVSERVER, gridMode } from './menu';
 import { gridCells, pageGridInstance } from '../plugin/context';
 import { prepareHomeMetadata, withInitialHomeMetadata } from './homeMetadata';
@@ -668,7 +668,7 @@ export class GridSession {
     // G85: a closed neighbour edge shows as a cyan hex shimmer
     this.constructorTiming?.('road');
     this.softWalls = installSoftWallLook({ scene: host.scene, scope: host.scope, time: () => app.clock.now,
-      edges: readinessWallCells(this.neighbours, home).flatMap((cell) => neighbourEdges(cell, home).map((edge) => {
+      edges: this.neighbours.flatMap((cell) => neighbourEdges(cell, home).map((edge) => {
         const look = { instance: cell.instance, x: edge.x, z: edge.z, axis: edge.axis, halfLength: edge.halfLength };
         return cell.edgeLook === undefined ? look : Object.assign(look, { height: cell.edgeLook.height });
       })),
@@ -692,8 +692,7 @@ export class GridSession {
     withOwner(host.scope, () => installVoidFloor(host.physics, this.assembly.cells, this.assembly.pitch, false));
     // The normal world stage owns the home's sockets; this scope adds only rebased neighbours.
     installEntrySockets(host.physics, host.scope, this.neighbours.map((cell) => ({ x: cell.origin.x - nativeOrigin.origin.x, z: cell.origin.z - nativeOrigin.origin.z })));
-    // GC36: no wall ever stands at the home cell's own edge (J322); only a loading neighbour's holds
-    this.walls = new ReadinessWalls(host.physics, [...readinessWallCells(this.neighbours, home).flatMap((cell) => neighbourEdges(cell, nativeOrigin)), ...rimEdges(this.assembly, nativeOrigin)], host.scope);
+    this.walls = new ReadinessWalls(host.physics, [...this.neighbours.flatMap((cell) => neighbourEdges(cell, nativeOrigin)), ...rimEdges(this.assembly, nativeOrigin)], host.scope);
     // a cell's PMREM of a new cube height fading in (drawnEnvironment.ts): the road's views take its variants before it lights
     // them (G639 desktop: Pine's 1024 and Nalati's 512 ring / road variants linked on the first road frame beside each)
     host.scope.onDispose(onPageEnvironment(() => { this.prelinkViews(); }));

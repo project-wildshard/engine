@@ -49,6 +49,7 @@ test('each channel starts on its own count and cap, and the bench\'s answer is o
 // GRID-CROSSING GC35 (J322): crossing is on by default; only an explicit off keeps a server's cells lone.
 test('a world with no WORLD_CROSSING setting crosses; only off turns it off', () => {
   expect(worldCrossing(undefined)).toBe(true);
+  expect(worldCrossing('')).toBe(true);
   expect(worldCrossing('worker')).toBe(true);
   expect(worldCrossing('off')).toBe(false);
   expect(() => worldCrossing('on')).toThrow(/only worker/u);
