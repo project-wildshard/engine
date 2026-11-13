@@ -1,7 +1,11 @@
 import { DefaultLoadingManager, LoaderUtils } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 import { loadRigFile } from '@wildshard/engine/anim/rig';
+
+// loadRigFile imports rigParser on first use, and its chain (core/ktx2 -> boot/bytes, since OF17 e4cb7b1f) installs the
+// page's own URL modifier as it loads. Load it first, so it can't replace the modifier a test sets.
+beforeAll(async () => { await import('./rigParser'); });
 
 const pageLocation = location;
 afterEach(() => { DefaultLoadingManager.setURLModifier(undefined); vi.restoreAllMocks(); vi.stubGlobal('location', pageLocation); });
