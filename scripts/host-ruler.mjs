@@ -16,6 +16,7 @@ import { dirname, extname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'vite';
 import { CLIENT_PLAN, ENGINE_ROOT, clientPlanRoots, productRoots, resolveModule } from './host-ruler/roots.mjs';
 import { NATIVE_ASSEMBLY, NATIVE_HOSTS, nativeAssemblyRoots, productServerRoots } from './host-ruler/server-roots.mjs';
+import { REGISTER, readHostRegister } from './host-ruler/register.mjs';
 
 /** Dispatch tables: a module whose entries a product reaches one by one through its declarations. The module itself
  * runs (its lines count for every product that reaches it); `static` and `dynamic` say which of its own imports are
@@ -274,35 +275,133 @@ export function oneUserLines(modules, slugs) {
   return out;
 }
 
-/** Measure built product dirs end to end, with the shell and the pinned format package.
- * @param {readonly string[]} dirs @param {{ root?: string }} [options] */
+/** HR6's verdict on a span of one-user lines. `platform` and `pending` are credited (pending only until its recheck);
+ * the rest are charged to the user: `no-row` ("one-user host, no register row"), `charged-back` (pending or
+ * borderline past recheck) and `silly`. */
+export const STATUSES = /** @type {const} */ (['platform', 'pending', 'no-row', 'charged-back', 'silly']);
+const CREDITED = new Set(['platform', 'pending']);
+const PLATFORM_VERDICTS = new Set(['engine', 'game']);
+/** @param {{ verdict: string, recheck?: string } | undefined} row @param {string} today */
+const statusOf = (row, today) => {
+  if (row === undefined) return 'no-row';
+  if (PLATFORM_VERDICTS.has(row.verdict)) return 'platform';
+  if (row.verdict === 'silly') return 'silly';
+  return row.recheck !== undefined && row.recheck >= today ? 'pending' : 'charged-back';
+};
+
+/** The platform rule (HA0 f) and the register's gates. A module with two or more real users (products, or the shell
+ * on a named control module) is platform. A one-user module is charged to its user unless a register row credits it: an
+ * `engine`/`game` row with a decision is platform; a `pending`/`borderline` row is credited until its `recheck` date and
+ * charged back after it; a `silly` row is charged. A `module#binding` row decides that binding's declaration lines,
+ * the module's own row (or none) the rest. A `silly` row on a shared module charges its lines to the row's users that
+ * reach it. A platform verdict without a decision id refuses. Report-only until Jake says otherwise.
+ * @param {ReturnType<typeof measure>} modules @param {ReturnType<typeof createTreeReader>} reader
+ * @param {readonly { key: string, verdict: string, decision?: string, users: readonly string[], recheck?: string }[]} rows
+ * @param {{ today: string }} options `today` as YYYY-MM-DD */
+export function applyRegister(modules, reader, rows, options) {
+  /** @type {Map<string, typeof rows[number]>} */
+  const byModule = new Map();
+  /** @type {Map<string, Map<string, typeof rows[number]>>} */
+  const byBinding = new Map();
+  for (const row of rows) {
+    if (PLATFORM_VERDICTS.has(row.verdict) && !/^[GJ]\d+$/u.test(row.decision ?? '')) throw new Error(`host register: ${row.key} is ${row.verdict} (platform) without a decision id`);
+    const [module = '', binding] = row.key.split('#');
+    if (binding === undefined) byModule.set(module, row);
+    else byBinding.set(module, (byBinding.get(module) ?? new Map()).set(binding, row));
+  }
+  /** @type {Map<string, { module: string, user: string, lines: number, layer: string, spans: Record<string, number>, rows: string[] }>} */
+  const charged = new Map();
+  /** @type {{ module: string, users: string[], lines: number, key: string }[]} */
+  const sillyShared = [];
+  for (const [module, use] of modules) {
+    const bindings = byBinding.get(module) ?? new Map(), own = byModule.get(module);
+    if (use.users.length !== 1) {
+      for (const row of [own, ...bindings.values()]) if (row?.verdict === 'silly') {
+        const binding = row.key.split('#')[1];
+        const lines = binding === undefined ? use.lines : reader.read(module).declarations.filter(d => d.names.includes(binding)).reduce((sum, d) => sum + d.lines, 0);
+        sillyShared.push({ module, users: row.users.filter(user => use.users.includes(user)), lines, key: row.key });
+      }
+      continue;
+    }
+    /** @type {Record<string, number>} */
+    const spans = Object.fromEntries(STATUSES.map(status => [status, 0]));
+    let rest = use.lines;
+    if (bindings.size > 0) for (const declaration of reader.read(module).declarations) {
+      const row = declaration.names.map(name => bindings.get(name)).find(found => found !== undefined);
+      if (row === undefined) continue;
+      spans[statusOf(row, options.today)] += declaration.lines;
+      rest -= declaration.lines;
+    }
+    spans[statusOf(own, options.today)] += rest;
+    charged.set(module, { module, user: use.users[0], lines: use.lines, layer: use.layer, spans,
+      rows: [own, ...bindings.values()].filter(row => row !== undefined).map(row => row.key) });
+  }
+  return { modules: charged, sillyShared };
+}
+
+/** Per product: one-user lines without register credit, and what the register credits or charges of them.
+ * @param {ReturnType<typeof applyRegister>} ruled @param {readonly string[]} slugs */
+export function shardTotals(ruled, slugs) {
+  const out = new Map(slugs.map(slug => [slug, { modules: 0, lines: 0, format: 0, ...Object.fromEntries(STATUSES.map(status => [status, 0])), charged: 0 }]));
+  for (const row of ruled.modules.values()) {
+    const total = /** @type {Record<string, number> | undefined} */ (out.get(row.user));
+    if (total === undefined) continue;
+    total.modules++;
+    total.lines += row.lines;
+    if (row.layer === 'format') total.format += row.lines;
+    for (const status of STATUSES) {
+      total[status] += row.spans[status];
+      if (!CREDITED.has(status)) total.charged += row.spans[status];
+    }
+  }
+  for (const row of ruled.sillyShared) for (const user of row.users) {
+    const total = /** @type {Record<string, number> | undefined} */ (out.get(user));
+    if (total !== undefined) { total.silly += row.lines; total.charged += row.lines; }
+  }
+  return out;
+}
+
+/** Today in Cancún time (the register's recheck dates are Cancún days). */
+const cancunToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Cancun' }).format(new Date());
+
+/** Measure built product dirs end to end, with the shell, the pinned format package and the host register.
+ * @param {readonly string[]} dirs @param {{ root?: string, today?: string, register?: readonly any[] }} [options] */
 export function rule(dirs, options = {}) {
-  const root = options.root ?? ENGINE_ROOT;
+  const root = options.root ?? ENGINE_ROOT, today = options.today ?? cancunToday();
   const tables = { plan: clientPlanRoots(root), native: nativeAssemblyRoots({ root }) };
   const products = dirs.map(dir => productRootModules(dir, tables));
   const slugs = products.map(product => product.slug);
   if (new Set(slugs).size !== slugs.length) throw new Error(`two products share a slug: ${slugs.join(', ')}`);
   const reader = createTreeReader({ root });
   const modules = measure(products, reader, { shell: { roots: SHELL_ROOTS, control: SHELL_CONTROL } });
-  return { products, format: reader.format.version, modules, oneUser: oneUserLines(modules, slugs) };
+  const ruled = applyRegister(modules, reader, options.register ?? readHostRegister(root).rows, { today });
+  return { products, format: reader.format.version, today, modules, ruled, oneUser: oneUserLines(modules, slugs), totals: shardTotals(ruled, slugs) };
 }
 
 /** @param {ReturnType<typeof rule>} report */
 export function formatTable(report) {
-  const rows = [...report.oneUser].map(([slug, total]) => [slug, String(total.modules), String(total.lines), String(total.format)]);
-  const head = ['shard', 'one-user modules', 'one-user lines', 'of which format'];
+  const columns = /** @type {const} */ ([['modules', 'one-user modules'], ['lines', 'one-user lines'], ['format', 'of which format'], ['platform', 'credited'],
+    ['pending', 'pending'], ['no-row', 'no row'], ['charged-back', 'charged back'], ['silly', 'silly'], ['charged', 'charged']]);
+  const rows = [...report.totals].map(([slug, total]) => [slug].concat(columns.map(([key]) => String(/** @type {Record<string, number>} */ (total)[key]))));
+  const head = ['shard', ...columns.map(([, name]) => name)];
   const width = head.map((h, i) => Math.max(h.length, ...rows.map(row => row[i].length)));
   const line = (/** @type {string[]} */ cells) => `| ${cells.map((cell, i) => i === 0 ? cell.padEnd(width[i]) : cell.padStart(width[i])).join(' | ')} |`;
+  const noRow = [...report.ruled.modules.values()].filter(row => row.spans['no-row'] > 0)
+    .sort((a, b) => a.user.localeCompare(b.user) || a.module.localeCompare(b.module))
+    .map(row => `one-user host, no register row: ${row.user} ${row.module} (${row.spans['no-row']} lines)`);
   const unmeasured = report.products.flatMap(p => p.unmeasured.map(u => `unmeasured: ${p.slug} host ${u.host}: ${u.reason}`));
-  return [`format package ${FORMAT} ${report.format}`, line(head), `|${width.map((w, i) => i === 0 ? '-'.repeat(w + 2) : `${'-'.repeat(w + 1)}:`).join('|')}|`, ...rows.map(line), ...unmeasured].join('\n');
+  return [`format package ${FORMAT} ${report.format}; register ${REGISTER}; today ${report.today}`,
+    'one-user lines without register credit: "one-user lines"; with it: "charged" (no row + charged back + silly)',
+    line(head), `|${width.map((w, i) => i === 0 ? '-'.repeat(w + 2) : `${'-'.repeat(w + 1)}:`).join('|')}|`, ...rows.map(line), ...noRow, ...unmeasured].join('\n');
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
   const args = process.argv.slice(2), json = args.includes('--json');
-  const at = args.indexOf('--products');
-  const dirs = at === -1 ? [] : args.slice(at + 1).filter(arg => !arg.startsWith('--'));
-  if (dirs.length === 0) { console.error('usage: node scripts/host-ruler.mjs --products <product-dir>... [--json]'); process.exit(2); }
-  const report = rule(dirs);
-  if (json) console.log(JSON.stringify({ format: report.format, products: report.products, modules: Object.fromEntries(report.modules) }, null, 2));
+  const at = args.indexOf('--products'), todayAt = args.indexOf('--today');
+  const dirs = at === -1 ? [] : args.slice(at + 1).filter((arg, i, all) => !arg.startsWith('--') && all.slice(0, i).every(prev => !prev.startsWith('--')));
+  if (dirs.length === 0) { console.error('usage: node scripts/host-ruler.mjs --products <product-dir>... [--today YYYY-MM-DD] [--json]'); process.exit(2); }
+  const report = rule(dirs, todayAt === -1 ? {} : { today: args[todayAt + 1] });
+  if (json) console.log(JSON.stringify({ format: report.format, today: report.today, products: report.products, modules: Object.fromEntries(report.modules),
+    oneUser: Object.fromEntries(report.ruled.modules), sillyShared: report.ruled.sillyShared, totals: Object.fromEntries(report.totals) }, null, 2));
   else console.log(formatTable(report));
 }

@@ -43,3 +43,9 @@
   folders is charged to its shard. Format modules resolve through the
   pinned package's exports map and `files` (an unpublished file refuses) and
   are charged like any host, reported as layer `format`.
+- HR6 (opus-hrm1): the ruler reads the register. Two or more real users is
+  platform; a one-user module is credited by an engine/game row with a
+  decision, credited by pending/borderline until its recheck and charged
+  back after, charged by silly, and charged and printed as "one-user host,
+  no register row" with no row. Binding rows decide their declaration's
+  lines. A platform verdict without a decision refuses. Report-only.

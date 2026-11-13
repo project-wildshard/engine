@@ -2,7 +2,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Runs the ruler's CLI as a user would.
 import { execFileSync } from 'node:child_process';
 import { describe, expect, test } from 'vitest';
-import { codeLines, createTreeReader, formatTable, layerOf, measure, oneUserLines, productRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
+import { applyRegister, codeLines, createTreeReader, formatTable, layerOf, shardTotals, measure, oneUserLines, productRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
 import { CLIENT_PLAN, clientPlanRoots } from '../scripts/host-ruler/roots.mjs';
 import { NATIVE_ASSEMBLY, NATIVE_HOSTS } from '../scripts/host-ruler/server-roots.mjs';
 
@@ -109,5 +109,55 @@ describe('the shell by name, format charged (HR4, HA0 d, e)', () => {
     const shellReach = reach(SHELL_ROOTS, reader);
     expect(SHELL_CONTROL.filter(module => !shellReach.has(module))).toEqual([]);
     expect(new Set(SHELL_CONTROL).size).toBe(SHELL_CONTROL.length);
+  });
+});
+
+describe('the platform rule and the register\'s gates (HR6, HA0 f)', () => {
+  const tree = createTreeReader({ root: 'test/fixtures/host-ruler/tree', formatDir: 'test/fixtures/host-ruler/tree/format' });
+  const products = [{ slug: 'a', roots: ['src/client/game/feature/a.ts'] }, { slug: 'b', roots: ['src/client/game/feature/b.ts'] }];
+  const modules = measure(products, tree, { shell: { roots: ['src/client/app/entry.ts'], control: ['src/client/game/session/play.ts'] } });
+  const today = '2026-11-13';
+  const row = (key: string, verdict: string, extra: Record<string, unknown> = {}) => ({ key, verdict, decision: 'G600', users: [], ...extra });
+  const register = [
+    row('src/client/game/session/hudExtra.ts', 'game'),
+    row('@wildshard/format/src/format/oneUser.ts', 'pending', { recheck: '2026-11-01' }),
+    row('@wildshard/format/src/format/oneUser.ts#readOneUser', 'pending', { recheck: '2026-12-11' }),
+    row('@wildshard/format/src/format/shared.ts', 'silly', { users: ['b'] }),
+  ];
+  const ruled = applyRegister(modules, tree, register, { today });
+  const spans = (module: string) => Object.fromEntries(Object.entries(ruled.modules.get(module)!.spans).filter(([, lines]) => lines > 0));
+
+  test('two or more real users: platform, with or without a row', () => {
+    expect(ruled.modules.has('src/client/game/session/play.ts')).toBe(false);
+    expect(ruled.modules.has('@wildshard/format/src/format/shared.ts')).toBe(false);
+  });
+  test('one user and an engine/game row with a decision: platform', () => {
+    expect(spans('src/client/game/session/hudExtra.ts')).toEqual({ platform: 4 });
+  });
+  test('one user and no row: charged, printed as one-user host, no register row', () => {
+    expect(spans('src/client/game/feature/a.ts')).toEqual({ 'no-row': 4 });
+    const report = { products: [], format: '0.0.0', today, modules, ruled, oneUser: oneUserLines(modules, ['a', 'b']), totals: shardTotals(ruled, ['a', 'b']) };
+    expect(formatTable(report)).toContain('one-user host, no register row: a src/client/game/feature/a.ts (4 lines)');
+  });
+  test('a pending row past recheck charges back; a binding row before recheck stays credited', () => {
+    // readOneUser (3 lines) is pending to 2026-12-11; the rest of the module is pending to 2026-11-01, so past.
+    expect(spans('@wildshard/format/src/format/oneUser.ts')).toEqual({ pending: 3, 'charged-back': 2 });
+    // Before either recheck, the whole module is credited.
+    expect(applyRegister(modules, tree, register, { today: '2026-10-01' }).modules.get('@wildshard/format/src/format/oneUser.ts')!.spans.pending).toBe(5);
+  });
+  test('a silly row on a shared module charges its lines to the row\'s users; totals add up', () => {
+    expect(ruled.sillyShared).toEqual([{ module: '@wildshard/format/src/format/shared.ts', users: ['b'], lines: 1, key: '@wildshard/format/src/format/shared.ts' }]);
+    const totals = shardTotals(ruled, ['a', 'b']);
+    expect(totals.get('a')).toEqual({ modules: 3, lines: 13, format: 5, platform: 4, pending: 3, 'no-row': 4, 'charged-back': 2, silly: 0, charged: 6 });
+    expect(totals.get('b')).toEqual({ modules: 1, lines: 3, format: 0, platform: 0, pending: 0, 'no-row': 3, 'charged-back': 0, silly: 1, charged: 4 });
+  });
+  test('a platform verdict without a decision id refuses', () => {
+    expect(() => applyRegister(modules, tree, [{ key: 'src/client/game/feature/a.ts', verdict: 'engine', users: [] }], { today })).toThrow(/without a decision id/u);
+    expect(() => applyRegister(modules, tree, [{ key: 'src/client/game/feature/a.ts', verdict: 'game', decision: '', users: [] }], { today })).toThrow(/without a decision id/u);
+  });
+  test('the real register reads and every product run prints both readings', () => {
+    const report = rule(['test/fixtures/host-ruler/closure-a', 'test/fixtures/host-ruler/pine-hollow'], { today });
+    expect(report.totals.get('pine-hollow')!.lines).toBe(report.oneUser.get('pine-hollow')!.lines);
+    expect(formatTable(report)).toMatch(/\| pine-hollow +\|/u);
   });
 });

@@ -34,6 +34,9 @@ export interface ProductRootModules {
   readonly unmeasured: readonly { readonly host: string; readonly reason: string }[];
 }
 export interface RulerReport {
+  readonly today: string;
+  readonly ruled: Ruled;
+  readonly totals: ReadonlyMap<string, ShardTotal>;
   readonly products: readonly ProductRootModules[];
   readonly format: string;
   readonly modules: ReadonlyMap<string, ModuleUse>;
@@ -51,5 +54,16 @@ export function reach(roots: Iterable<string>, reader: TreeReader, tables?: Read
 export function productRootModules(dir: string, tables?: { readonly plan?: ClientPlanRoots; readonly native?: NativeAssemblyRoots }): ProductRootModules;
 export function measure(users: readonly { readonly slug: string; readonly roots: Iterable<string> }[], reader: TreeReader, options?: MeasureOptions): Map<string, ModuleUse>;
 export function oneUserLines(modules: ReadonlyMap<string, ModuleUse>, slugs: readonly string[]): Map<string, OneUserTotal>;
-export function rule(dirs: readonly string[], options?: { readonly root?: string }): RulerReport;
+export function rule(dirs: readonly string[], options?: { readonly root?: string; readonly today?: string; readonly register?: readonly RegisterRule[] }): RulerReport;
 export function formatTable(report: RulerReport): string;
+export declare const STATUSES: readonly ['platform', 'pending', 'no-row', 'charged-back', 'silly'];
+export type Status = (typeof STATUSES)[number];
+export interface RegisterRule { readonly key: string; readonly verdict: string; readonly decision?: string; readonly users: readonly string[]; readonly recheck?: string }
+export interface RuledModule { readonly module: string; readonly user: string; readonly lines: number; readonly layer: string; readonly spans: Readonly<Record<Status, number>>; readonly rows: readonly string[] }
+export interface Ruled {
+  readonly modules: ReadonlyMap<string, RuledModule>;
+  readonly sillyShared: readonly { readonly module: string; readonly users: readonly string[]; readonly lines: number; readonly key: string }[];
+}
+export type ShardTotal = OneUserTotal & Record<Status | 'charged', number>;
+export function applyRegister(modules: ReadonlyMap<string, ModuleUse>, reader: TreeReader, rows: readonly RegisterRule[], options: { readonly today: string }): Ruled;
+export function shardTotals(ruled: Ruled, slugs: readonly string[]): Map<string, ShardTotal>;
