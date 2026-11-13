@@ -305,6 +305,18 @@ test('SA35: preview bakes the grid it borrowed from staging; staging and product
   }
 });
 
+// SA35 (opus-place1, 2026-11-13): flow.mjs passed the borrowed catalogue in the environment, and `build:game` set its own on top,
+// so preview baked the pins' grid every time. The script's assignment now keeps a catalogue it is given, and only defaults one.
+test('SA35: build:game keeps the catalogue it is given, and defaults to the pins', () => {
+  const script = String((JSON.parse(readFileSync('package.json', 'utf8')) as {scripts: Record<string, string>}).scripts['build:game']);
+  const assignment = /WILDSHARD_CATALOGUE=\S+/u.exec(script)?.[0];
+  expect(assignment, 'build:game names a catalogue').toBeDefined();
+  const baked = (given?: string): string => spawnSync('bash', ['-c', `${String(assignment)} printenv WILDSHARD_CATALOGUE`], {encoding: 'utf8',
+    env: {PATH: process.env['PATH'] ?? '', ...(given === undefined ? {} : {WILDSHARD_CATALOGUE: given})}}).stdout.trim();
+  expect(baked('tmp/preview-grid/catalogue.json')).toBe('tmp/preview-grid/catalogue.json');
+  expect(baked()).toBe('test/pins/catalogue.json');
+});
+
 test('a preview page stamped with a world never builds', async () => {
   const {deps, files} = rig('preview');
   files.set('/out/index.html', page('staging'));

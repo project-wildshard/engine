@@ -57,7 +57,7 @@
     "ring:1": "bash scripts/ring1.sh all",
     "lint:typed": "node scripts/lint-all.mjs",
     "test:checks": "pnpm gen && node scripts/check-graph.mjs --source-only && node scripts/check-engine-sides.mjs && node scripts/check-sim-players.mjs",
-    "build:game": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install && node scripts/gen.mjs --inputs-only && npr tsc -b tsconfig.layers.json --builders 1 && WILDSHARD_CATALOGUE=test/pins/catalogue.json node scripts/build-app.mjs && node scripts/check-devserver.mjs dist && node scripts/app-build/splitOutput.mjs dist && node scripts/page-size.mjs dist --gate'",
+    "build:game": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install && node scripts/gen.mjs --inputs-only && npr tsc -b tsconfig.layers.json --builders 1 && WILDSHARD_CATALOGUE=\"${WILDSHARD_CATALOGUE:-test/pins/catalogue.json}\" node scripts/build-app.mjs && node scripts/check-devserver.mjs dist && node scripts/app-build/splitOutput.mjs dist && node scripts/page-size.mjs dist --gate'",
     "tools:install": "npr install --frozen"
   },
   "dependencies": {
