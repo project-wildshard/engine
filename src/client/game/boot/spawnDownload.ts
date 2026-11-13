@@ -247,17 +247,25 @@ async function exactCopy(file: HeldFile): Promise<Uint8Array<ArrayBuffer> | null
   return body.byteLength === file.bytes && await sha256(body) === file.hash ? body : null;
 }
 /** DL25: the server worker's ask. A file this page's download lists: its bytes once they land, moved to the front of the job
- *  as any page read is, whether they sit in the part or the page's store. Null is 'not here': the worker reads the network. */
-export async function spawnHeldBytes(url: string): Promise<ArrayBuffer | null> {
+ *  as any page read is, whether they sit in the part or the page's store. Null is 'not here': the worker reads the network.
+ *  AUDIO AU2: LOAD's audio reads pass `demand` false, so they wait in the manifest's order (after the world's files, as the
+ *  prefetch queue's barrier kept them) instead of moving ~90 recordings ahead of the steps that need the link first. */
+export async function spawnHeldBytes(url: string, demand = true): Promise<ArrayBuffer | null> {
   const address = new URL(pageURL(new URL(url, location.href).href), location.href), file = pageFiles.get(address.origin + address.pathname);
   if (file === undefined) return null;
   const pending = jobWaits?.get(file.url);
-  if (pending !== undefined) { jobDemand?.(file.url); await pending; }
+  if (pending !== undefined) { if (demand) jobDemand?.(file.url); await pending; }
   const member = await members.get(file.url);
   if (member !== null && member !== undefined) return member.slice().buffer; // a view into its part: only its own bytes cross
   const memory = memoryPartMembers.get(address.pathname);
   if (memory !== undefined) return memory.slice().buffer;
   return (await exactCopy(file))?.buffer ?? null;
+}
+/** AUDIO AU2: this page's download lists `url` (bare or versioned), so LOAD reads its bytes with `spawnHeldBytes`, never
+ *  with `fetch` (QA 11-12 row 36: on bad LTE each LOAD audio read went back to the network and the card sat on it). */
+export function spawnListed(url: string): boolean {
+  const address = new URL(pageURL(new URL(url, location.href).href), location.href);
+  return pageFiles.has(address.origin + address.pathname);
 }
 /** Control: the level is complete and its reads are done, so the member bytes go. */
 export function releaseSpawnMembers(): void { members.clear(); storedUrls.clear(); jobPaths = null; jobWaits = null; jobDemand = null; storeRead = null; }
