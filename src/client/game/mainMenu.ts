@@ -17,7 +17,7 @@ import { mobileDevice } from '@wildshard/engine/boot/titleArrival';
 import { dropFirstPlay, firstPlayDone, startFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
 import { lowPowerOn } from '@wildshard/engine/core/graphicsMode';
 import { askNameOnce, nameAskDue } from '@wildshard/engine/ui/namePrompt';
-import { lastEnd } from '@wildshard/engine/boot/lastEnd';
+import { lastEnd, type LastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
 import { buildTitleDeck, titleCards, type TitleDeck, type TitleDeckOptions } from './titleDeck';
 import { gridEntryShown, menuMode, gridMode } from './grid/menu';
@@ -258,11 +258,16 @@ export interface GridTitle { readonly onGrid: () => void; readonly note: string;
 /** Return the installed title action and note for the grid entry. */
 export function installGridTitle(): GridTitle {
   dropGridIntent();
-  const end = lastEnd();
   const loop = gridRecoveryLoop();
-  // QB6: a standalone world's unexpected end gets the same one line, by the world's name
+  return { onGrid: enterGrid, note: endedNote(lastEnd(), loop), ...(loop ? { screen: 'select' } : {}) };
+}
+
+/** The title's one line about the previous page's unexpected end: the grid's, or a standalone world's by its name (QB6).
+ *  OF14: the world's name wins over the grid's recovery loop, which a one-shard page's crash inside the grid's 10-minute
+ *  recovery guard trips too (Signal Dunes' offline failure said "Infinite Wildshard ended unexpectedly last time"). */
+export function endedNote(end: Pick<LastEnd, 'kind' | 'mode' | 'slug'>, loop: boolean, find: (slug: string) => { readonly name: string } | undefined = findTitleManifest): string {
   const world = end.kind === 'unexpected' && end.mode !== 'grid' ? end.slug : '';
-  const name = world.length === 0 ? '' : findTitleManifest(world)?.name ?? world;
-  return { onGrid: enterGrid, note: loop || (end.kind === 'unexpected' && end.mode === 'grid') ? GAME_STRINGS.grid.ended : name !== '' ? GAME_STRINGS.grid.shardEnded(name) : '',
-    ...(loop ? { screen: 'select' } : {}) };
+  const name = world.length === 0 ? '' : find(world)?.name ?? world;
+  if (name !== '') return GAME_STRINGS.grid.shardEnded(name);
+  return loop || (end.kind === 'unexpected' && end.mode === 'grid') ? GAME_STRINGS.grid.ended : '';
 }
