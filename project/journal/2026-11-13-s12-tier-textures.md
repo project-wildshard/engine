@@ -65,3 +65,4 @@ Still off: the app build (`entryTotals`), whose discovery document is served fro
 Review follow-ups: a worker's failed encode is retried on the cook's thread, lanes cap at six, the recording pass sizes
 nothing, merge steering stays in 12 MB units, and a cook that would pass ~96 parts per manifest keeps the 12 MB rule.
 Pine re-measured unchanged (45 phone parts, 69.24 MB, 3.28 MB mean refetch).
+The vendored basisu build moved to `scripts/vendor/basisu/`: engine-sides tags every file under src and holds the cook's DOM use at zero, and the emscripten loader names `window` and `document`.

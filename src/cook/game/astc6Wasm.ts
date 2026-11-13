@@ -1,4 +1,4 @@
-/** S12d: the cook's ASTC 6×6 encoder with no child process: basisu's own WebAssembly build (`basisu/`, Binomial's
+/** S12d: the cook's ASTC 6×6 encoder with no child process: basisu's own WebAssembly build (`scripts/vendor/basisu/`, Binomial's
  * `webgl/encoder/build` at 32c7b74, Apache-2.0), so the box's cook job (`--permission`, no child processes, no basisu
  * installed) and CI's bake encode what `cook --phone-astc6` encoded with the CLI (S12c). Same steps and flags: the
  * trimmed master's top level decoded to RGBA, encoded as ASTC LDR 6×6 at effort 4 with the role's preset (`-srgb`,
@@ -57,8 +57,8 @@ const PRESET = {srgb: 'setSRGBPreset', linear: 'setLinearPreset', normal: 'setNo
 /** One encoder on this thread: the master's top level to RGBA, then ASTC 6×6. Undefined when basisu refuses the file. */
 export async function loadBasisuAstc6(): Promise<Astc6Encode> {
   const require = createRequire(import.meta.url);
-  const factory = require('./basisu/basis_encoder.cjs') as BasisFactory;
-  const wasm = new Uint8Array(readFileSync(new URL('basisu/basis_encoder.wasm', import.meta.url)));
+  const factory = require('../../../scripts/vendor/basisu/basis_encoder.cjs') as BasisFactory;
+  const wasm = new Uint8Array(readFileSync(new URL('../../../scripts/vendor/basisu/basis_encoder.wasm', import.meta.url)));
   const basis = await factory({wasmBinary: wasm, print: () => undefined, printErr: () => undefined});
   basis.initializeBasis();
   const rgba32 = basis.transcoder_texture_format.cTFRGBA32.value, astc6 = basis.basis_tex_format.cASTC_LDR_6x6.value;

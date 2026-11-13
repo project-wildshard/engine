@@ -8,8 +8,8 @@ import {ktx2Info} from '../src/cook/game/tierTextures';
 
 /** A UASTC master with its mip chain, made by the same vendored build. */
 async function uastcMaster(size: number): Promise<Uint8Array> {
-  const factory = createRequire(import.meta.url)('../src/cook/game/basisu/basis_encoder.cjs') as (options: object) => Promise<Record<string, any>>;
-  const basis = await factory({wasmBinary: new Uint8Array(readFileSync(new URL('../src/cook/game/basisu/basis_encoder.wasm', import.meta.url))), print: () => undefined, printErr: () => undefined});
+  const factory = createRequire(import.meta.url)('../scripts/vendor/basisu/basis_encoder.cjs') as (options: object) => Promise<Record<string, any>>;
+  const basis = await factory({wasmBinary: new Uint8Array(readFileSync(new URL('../scripts/vendor/basisu/basis_encoder.wasm', import.meta.url))), print: () => undefined, printErr: () => undefined});
   basis['initializeBasis']();
   const rgba = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) rgba.set([x * 4 % 256, y * 4 % 256, (x ^ y) % 256, 255], (y * size + x) * 4);
