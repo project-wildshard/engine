@@ -86,7 +86,7 @@ run 1-root bash /root/wildshard/scripts/vps/harden.sh --check
 for row in VH2 VH3 VH5 VH6 VH7 VH9 VH10 VH11 VH12 VH13 VH14 VH15; do row_fails 1-root "$row"; done
 has 1-root "sudo group is 'raynos,matt'"
 has 1-root 'a docker group exists'
-has 1-root '1 files under /home or /etc hold an OpenClaw token (sk_claw); names withheld'
+has 1-root '1 files under /home or /etc hold an OpenClaw token (sk_claw_): /home/raynos/.config/systemd/user/openclaw-gateway.service; delete them'
 has 1-root "sshd x11forwarding is 'yes'; want no"
 has 1-root 'no fail2ban caddy jail (jails: sshd)'
 has 1-root 'WARNING auth.log has 1 accepted SSH logins as root'

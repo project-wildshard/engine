@@ -10,21 +10,28 @@
 # Installed root-owned as /usr/local/sbin/wildshard-config by harden.sh; the sudo allowlist names that path only.
 import os, re, subprocess, sys, tempfile, time, urllib.request
 
-CHANNELS = {'production': {'port': 8790, 'cpus': 9}, 'staging': {'port': 8791, 'cpus': 4}}
+CHANNELS = {'production': {'port': 8790, 'cpus': 9, 'host': 0}, 'staging': {'port': 8791, 'cpus': 4, 'host': 1}}
+# The pages that open the game (engine doorTrust DEFAULT_ALLOWED_ORIGINS); each channel's own is at its 'host' index.
+GAME_HOSTS = ('https://play.wildshard.io', 'https://staging.wildshard.io', 'https://preview.wildshard.io')
 CELL = r'[a-z0-9][a-z0-9-]{0,63}'
 # Each allowed key and its rule. Anything else is refused: secrets (SEAT_SECRET, SENTRY_DSN, DATABASE_URL), the trust roots
 # (RELEASE_URL, RELEASE_PUBLIC_KEY, BUNDLE_ORIGIN, PACK_ORIGIN, TELEMETRY_URL, ERRORS_URL) and exposure (HOST, PORT,
-# TRUST_PROXY, ALLOWED_ORIGINS) are root's, by hand or by a reviewed script.
+# TRUST_PROXY) are root's, by hand or by a reviewed script. ALLOWED_ORIGINS may only narrow (MS3.4): a set of the game's three
+# hosts that keeps the channel's own, so an agent can drop a page but never add one or lock its own players out.
 SETTINGS = {
     'WORLD_CELLS': lambda value, channel: value == 'grid' or (re.fullmatch(f'{CELL}(,{CELL}){{0,63}}', value) is not None
                                                              and len(set(value.split(','))) == len(value.split(','))),
     'WORLD_WORKERS': lambda value, channel: re.fullmatch(r'[1-9][0-9]?', value) is not None and int(value) <= CHANNELS[channel]['cpus'],
     'WORLD_SEATS': lambda value, channel: re.fullmatch(r'[1-9][0-9]{0,3}', value) is not None and int(value) <= 2000,
     'RECORD_TAG': lambda value, channel: re.fullmatch(r'[A-Za-z0-9._-]{0,64}', value) is not None,
+    'ALLOWED_ORIGINS': lambda value, channel: (set(value.split(',')) <= set(GAME_HOSTS) and len(set(value.split(','))) == len(value.split(','))
+                                               and GAME_HOSTS[CHANNELS[channel]['host']] in value.split(',')),
 }
 RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), none twice",
          'WORLD_WORKERS': 'a whole number from 1 to the channel\'s pinned CPUs (production 9, staging 4)',
-         'WORLD_SEATS': 'a whole number from 1 to 2000', 'RECORD_TAG': 'up to 64 of A-Z a-z 0-9 . _ -'}
+         'WORLD_SEATS': 'a whole number from 1 to 2000', 'RECORD_TAG': 'up to 64 of A-Z a-z 0-9 . _ -',
+         'ALLOWED_ORIGINS': "comma-separated, none twice, from https://play.wildshard.io, https://staging.wildshard.io and "
+                            "https://preview.wildshard.io, keeping the channel's own (production play, staging staging)"}
 
 # The engine's tests hand it a made-up /etc and no systemctl; never as root, so sudo (which drops the environment anyway) cannot.
 TEST = os.geteuid() != 0 and os.environ.get('WILDSHARD_CONFIG_TEST_ROOT')

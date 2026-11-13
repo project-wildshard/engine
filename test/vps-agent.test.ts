@@ -42,7 +42,13 @@ test('wildshard-config refuses a secret, a trust root, an unknown key, a bad val
   for (const [args, why] of [
     [['set', 'staging', 'SEAT_SECRET', 'x'], 'SEAT_SECRET is not a setting an agent may change'],
     [['set', 'staging', 'RELEASE_URL', 'https://evil.example/r.json'], 'RELEASE_URL is not a setting'],
-    [['set', 'staging', 'ALLOWED_ORIGINS', '*'], 'ALLOWED_ORIGINS is not a setting'],
+    [['set', 'staging', 'ALLOWED_ORIGINS', '*'], 'ALLOWED_ORIGINS must be'],
+    [['set', 'staging', 'ALLOWED_ORIGINS', 'https://staging.wildshard.io,https://wildshard-singleplayer.vercel.app'], 'ALLOWED_ORIGINS must be'],
+    [['set', 'staging', 'ALLOWED_ORIGINS', 'https://play.wildshard.io'], 'ALLOWED_ORIGINS must be'],
+    [['set', 'staging', 'ALLOWED_ORIGINS', 'https://staging.wildshard.io,https://staging.wildshard.io'], 'ALLOWED_ORIGINS must be'],
+    [['set', 'staging', 'ALLOWED_ORIGINS', 'https://staging.wildshard.io https://play.wildshard.io'], 'ALLOWED_ORIGINS must be'],
+    [['set', 'staging', 'ALLOWED_ORIGINS', 'https://staging.wildshard.io\nSEAT_SECRET=x'], 'ALLOWED_ORIGINS must be'],
+    [['set', 'staging', 'TRUST_PROXY', 'none'], 'TRUST_PROXY is not a setting'],
     [['set', 'staging', 'NODE_OPTIONS', '--require=/tmp/x'], 'NODE_OPTIONS is not a setting'],
     [['set', 'staging', 'WORLD_WORKERS', '5'], 'WORLD_WORKERS must be'],
     [['set', 'staging', 'WORLD_WORKERS', 'two'], 'WORLD_WORKERS must be'],
@@ -77,6 +83,16 @@ test('wildshard-config writes one setting, keeps the others and never touches th
   const shown = config(root, 'show', 'staging');
   expect(shown.out).toBe('WORLD_CELLS=grid\nWORLD_WORKERS=4\n');
   expect(shown.out).not.toContain('planted');
+});
+
+test('wildshard-config narrows ALLOWED_ORIGINS to the game hosts, keeping the channel its own (MS3.4)', () => {
+  const root = etc();
+  const hosts = 'https://play.wildshard.io,https://staging.wildshard.io,https://preview.wildshard.io';
+  const staging = config(root, 'set', 'staging', 'ALLOWED_ORIGINS', hosts);
+  expect(staging.status, staging.out).toBe(0);
+  expect(config(root, 'show', 'staging').out).toBe(`ALLOWED_ORIGINS=${hosts}\n`);
+  expect(config(root, 'set', 'production', 'ALLOWED_ORIGINS', 'https://staging.wildshard.io', '--production').out).toContain('ALLOWED_ORIGINS must be');
+  expect(config(root, 'set', 'production', 'ALLOWED_ORIGINS', 'https://play.wildshard.io', '--production').status).toBe(0);
 });
 
 test('a change that leaves the server unhealthy is undone, and the old settings are started again', () => {

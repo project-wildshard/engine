@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The real script, on a made-up box.
 import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- A made-up root filesystem and stub commands in the checkout's tmp/.
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- As above.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
@@ -77,7 +77,8 @@ test('on the audited box, every row from VH2 to VH15 but VH8 fails, and nothing 
     'production sets no TRUST_PROXY', 'no PostgreSQL server', 'production.env is 640 root:wildshard; want 640 root:wildshard-production',
     'no installed dump.sh', 'journald keeps no log', 'ops.env names no SENTRY_CRON_DSN (J252)', 'sysctl drift: net.ipv4.ip_forward=1', 'fs.suid_dumpable=2'])
     expect(run.out, want).toContain(want);
-  expect(run.out).toContain('1 files under /home or /etc hold an OpenClaw token (sk_claw); names withheld');
+  expect(run.out).toContain('1 files under /home or /etc hold an OpenClaw token (sk_claw_): /home/raynos/.config/systemd/user/openclaw-gateway.service; delete them');
+  expect(run.out).not.toContain('PLANTEDSECRETVALUE');
   expect(run.out).toContain('sudoers.d/90-cloud-init-users: 1 rules for matt, 1 NOPASSWD');
   expect(run.out).not.toContain('NOPASSWD:ALL');
   expect(run.out).toContain('auth.log: 1 accepted SSH logins (raynos@100.101.1.2 x1), 2 failed or invalid, 0 as root, 1 sudo commands');
@@ -113,7 +114,7 @@ const HARDENED: Readonly<Record<string, string>> = { ...TODAY,
 test('a hardened box reads clean for the rows it can see', () => {
   const run = check(HARDENED);
   // The made-up box keeps its planted OpenClaw token, so VH2's search still finds it.
-  expect(run.failed('VH2')).toEqual(['fail    VH2   1 files under /home or /etc hold an OpenClaw token (sk_claw); names withheld']);
+  expect(run.failed('VH2')).toEqual(['fail    VH2   1 files under /home or /etc hold an OpenClaw token (sk_claw_): /home/raynos/.config/systemd/user/openclaw-gateway.service; delete them']);
   for (const row of ['VH3', 'VH4', 'VH6', 'VH7', 'VH8', 'VH10']) expect(run.failed(row), row).toEqual([]);
   expect(run.out).toContain('ok      VH10  production TRUST_PROXY=caddy');
   expect(run.out).toContain("ok      VH10  production ALLOWED_ORIGINS is the game's own hosts");
@@ -152,6 +153,23 @@ test('VH10: the retired singleplayer page host is outside the game hosts (OFF-VE
     {}, ['--check'], { 'etc/wildshard/staging.env': 'ALLOWED_ORIGINS=https://play.wildshard.io https://wildshard-singleplayer.vercel.app\n' });
   expect(run.out).toContain("ok      VH10  production ALLOWED_ORIGINS is the game's own hosts");
   expect(run.out).toContain("fail    VH10  staging ALLOWED_ORIGINS has a page outside the game's hosts");
+});
+
+test('VH2: harden.sh copies and a bare prefix are not a token (MS3.4)', () => {
+  const run = check(HARDENED, {}, ['--check'], {
+    'home/raynos/.config/systemd/user/openclaw-gateway.service': 'removed\n',
+    'home/raynos/harden.sh': readFileSync('scripts/vps/harden.sh', 'utf8'),
+    'home/wildshard-agent/vps-build/scripts/vps/harden.sh': 'grep -rl sk_claw_PLANTEDCOPYVALUE\n',
+    'etc/notes.txt': 'the old prefix was sk_claw, now retired\n',
+  });
+  expect(run.out).toContain('ok      VH2   no OpenClaw token under /home or /etc');
+});
+
+test('VH10: a settings-file ALLOWED_ORIGINS wins over the unit and the env file (MS3.4)', () => {
+  const run = check({ ...HARDENED, systemctl: `case "$1" in cat) [ "$2" != cloudflared.service ] ;; show) echo 'Environment=TRUST_PROXY=caddy "ALLOWED_ORIGINS=https://play.wildshard.io https://wildshard-singleplayer.vercel.app"' ;; esac` },
+    {}, ['--check'], { 'etc/wildshard/staging.settings': 'WORLD_CELLS=grid\nALLOWED_ORIGINS=https://play.wildshard.io,https://staging.wildshard.io,https://preview.wildshard.io\n' });
+  expect(run.out).toContain("fail    VH10  production ALLOWED_ORIGINS has a page outside the game's hosts");
+  expect(run.out).toContain("ok      VH10  staging ALLOWED_ORIGINS is the game's own hosts");
 });
 
 test("a Hetzner firewall on another server, or one that lets in more, is not this box's", () => {

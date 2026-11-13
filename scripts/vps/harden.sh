@@ -5,7 +5,7 @@
 #   sudo bash harden.sh --check   the full report; without root, what root alone can read says `unknown`
 #   sudo bash harden.sh           apply VH3 to VH15 (harden-apply.sh beside it; --open-443 and --close-443 are its too)
 # Exit 0 is a clean box, 1 is any `fail`, 2 is no `fail` but something unreadable. It never prints a secret: a secret search
-# reports a count of files, and env files are tested for a name, never read out.
+# reports file names only, and env files are tested for a name, never read out.
 # HARD STOP (Jake, 2026-11-09): nothing here touches the old VPS beyond reading it, and Jake runs it there, not an agent.
 # HARDEN_ROOTFS prefixes every file it reads, so the engine's test can hand it a made-up box; commands come from PATH.
 set -uo pipefail
@@ -71,8 +71,12 @@ if [ "$LISTENERS_OK" = 1 ]; then
   if listens_on 11434; then bad VH2 'something listens on 11434 (Ollama)'; else ok VH2 'nothing on 11434'; fi
 else unknown VH2 'listeners: ss is missing'; fi
 if [ "$ROOT" = 1 ]; then
-  found=$(grep -rlsI sk_claw "$R/home" "$R/etc" 2>/dev/null | wc -l | tr -d ' ')
-  if [ "$found" = 0 ]; then ok VH2 'no OpenClaw token under /home or /etc'; else bad VH2 "$found files under /home or /etc hold an OpenClaw token (sk_claw); names withheld"; fi
+  # A real token's shape, not the bare prefix: this script holds the pattern, so its copies (and the test's plants) matched
+  # themselves (MS3.4, 2026-11-12: all four hits were harden.sh). Names are printed so Jake can delete them; contents never.
+  files=$(grep -rlsIE --exclude=harden.sh --exclude=vps-harden-proof.sh --exclude=vps-harden.test.ts 'sk_claw_[A-Za-z0-9_-]{16,}' "$R/home" "$R/etc" 2>/dev/null | sed "s|^$R||" | sort)
+  found=$(printf '%s' "$files" | grep -c . || true)
+  if [ "$found" = 0 ]; then ok VH2 'no OpenClaw token under /home or /etc'
+  else bad VH2 "$found files under /home or /etc hold an OpenClaw token (sk_claw_): $(printf '%s\n' "$files" | awk 'NF {printf "%s%s", (n++ ? ", " : ""), $0}'); delete them"; fi
 else unknown VH2 "OpenClaw token search: $NEEDS_ROOT"; fi
 
 # --- VH3: SSH.
@@ -241,6 +245,11 @@ if has systemctl && systemctl cat wildshard-server@.service >/dev/null 2>&1; the
       file_origins=$(grep -E '^ALLOWED_ORIGINS=' "$R/etc/wildshard/$channel.env" | tail -1 | cut -d= -f2- | tr -d "\"'")
       mode=${file_mode:-$mode}; origins=${file_origins:-$origins}
     elif [ "$ROOT" != 1 ]; then unknown VH10 "$channel env-file overrides: $NEEDS_ROOT"; fi
+    # J266: the settings file is read after the .env, so its ALLOWED_ORIGINS (wildshard-config's) wins over both.
+    if [ "$ROOT" = 1 ] && [ -r "$R/etc/wildshard/$channel.settings" ]; then
+      settings_origins=$(grep -E '^ALLOWED_ORIGINS=' "$R/etc/wildshard/$channel.settings" | tail -1 | cut -d= -f2- | tr -d "\"'")
+      origins=${settings_origins:-$origins}
+    fi
     cloudflared=0; if systemctl cat cloudflared.service >/dev/null 2>&1; then cloudflared=1; fi
     if [ -z "$mode" ]; then bad VH10 "$channel sets no TRUST_PROXY: rerun setup.sh after the VH10 release"
     elif [ "$mode" = caddy ] || { [ "$mode" = cloudflare ] && [ "$cloudflared" = 1 ]; }; then ok VH10 "$channel TRUST_PROXY=$mode"
