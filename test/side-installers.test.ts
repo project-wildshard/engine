@@ -17,13 +17,12 @@ import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 // A shard with an open gap lists each exact line under KNOWN with the row that owns it, so CI stays green while the row is open
 // and goes red when the gap changes or closes unrecorded.
 
-// SS4 to SS6 (stealth, the Pine secret, the fall floor) landed before SS3, so none of their lines is open here.
+// SS4 to SS6 (stealth, the Pine secret, the fall floor) landed before SS3, so none of their lines is open here; SS3b closed
+// Driftwood's keepsakes (loot/keepsakeProgression.ts) and Nalati's adventure saves (serverChapters.ts, chapterRecords.ts).
 const KNOWN: Readonly<Record<string, { readonly row: string; readonly lines: readonly string[] }>> = {
-  'driftwood-isle': { row: 'SS3b: the page completes keepsakes, effects and loot from quests/page-composition.json alone; HS6: `bridge-sway` is a page-only pose view, and SS2 sides every view.program `both` for the slots and open arena',
-    lines: ['client/plan quest.continuation (keepsakes)', 'client/plan view.program (poseViews)'] },
-  'nalati-grasslands': { row: 'SS3b: adventure progress (quests/persistence.json) is saved by the page only',
-    lines: ['client/plan state.adventure (saves)'] },
-  'nine-dragon-stack': { row: 'SS3b: its named places ride `world.sets` rows, and the server reads places only from the quest files (serverPlaces.ts PLACE_FILES); HS6: `movers` is a page-only pose view',
+  'driftwood-isle': { row: 'HS6: `bridge-sway` is a page-only pose view, and SS2 sides every view.program `both` for the slots and open arena',
+    lines: ['client/plan view.program (poseViews)'] },
+  'nine-dragon-stack': { row: 'SS3b: `world.sets` only lists placed models for the sets explorer, so shard-format `2515bdb` sides it `view`; the line leaves at the format bump past v0.4.8. HS6: `movers` is a page-only pose view',
     lines: ['client/plan world.sets (places)', 'client/plan view.program (poseViews)'] },
 };
 

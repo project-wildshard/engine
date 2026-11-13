@@ -28,6 +28,7 @@ import { questObservation, type ObservedRecords } from '../../../shared/game/que
 import type { QuestStepEffect } from '../../../shared/game/quest/steps';
 import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 import { mountedPlayerOf } from '../riding/native';
+import { registerInstalled } from '../shardfile/installedSides';
 
 /** The file that says a shard's story runs on its chapters. */
 export const CHAPTER_CONTENT = 'quests/content.json';
@@ -188,5 +189,8 @@ export async function installServerChapters(host: SimHost, product: ShardProduct
     }
   });
   host.scope.onDispose(() => { for (const seat of seats.values()) seat.off(); seats.clear(); });
+  // SS3b: `state.adventure`'s server half: the same quests/persistence.json rows, each player's feat counts and bond kept as
+  // their own book's flags (saved with the room), where the page keeps one device's records
+  if (counters !== undefined || saved.bond !== undefined) registerInstalled(host, 'saves');
   return true;
 }

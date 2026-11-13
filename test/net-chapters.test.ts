@@ -8,6 +8,8 @@ import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
 import { installServerChapters } from '../src/server/game/quest/serverChapters';
+import { installedKeys } from '../src/server/game/shardfile/installedSides';
+import { featOutcome, type FeatCounterRows } from '../src/shared/game/quest/featCounters';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
@@ -97,5 +99,31 @@ test('a chapter is each player\'s own, and a seat costs a projection, not a scri
     for (let i = 0; i < 600; i++) host.step();
     const withTwo = (performance.now() - at) / 600;
     console.info(`[chapters] 2 seats: host tick ${withTwo.toFixed(2)} ms`);
+  } finally { live.dispose(); }
+});
+
+// SERVER-PARITY SS3b: `state.adventure` (quests/persistence.json) has its server half here. Each player's feat counts and bond
+// are their own book's flags, saved with the room, and they move by the page's own law (featOutcome) over the same rows.
+test('a room keeps each player\'s adventure records by the page\'s law, and installs them as its saves', { timeout: 10_000 }, async () => {
+  const live = await nalati();
+  try {
+    const { host } = live, books = questBooks(host), routes = actRoutes(host), other = host.addPlayer('other').id;
+    expect(installedKeys(host).has('saves'), 'the room installs state.adventure\'s server half').toBe(true);
+    host.step();
+    const wolf = [...host.entities.values()][0];
+    if (wolf === undefined) throw new Error('Missing body');
+    Object.defineProperty(wolf, 'kind', { value: 'wolf' }); Object.defineProperty(wolf, 'variant', { value: undefined });
+    for (let i = 0; i < 6; i++) { host.events.emit('actor.died', { actor: wolf.combatActor() } as never); host.step(); }
+    routes.bonded?.(other, '1');
+    host.step();
+    // the page: one device's counts, advanced by the same kills and the bond's event
+    const rows = (await (await loadHeadlessProduct(builtProduct('nalati-grasslands'))).json<{ counters: FeatCounterRows }>('quests/persistence.json')).counters, page: Record<string, number> = {}, ports = { read: () => page, write: () => undefined, fact: () => undefined };
+    for (let i = 0; i < 6; i++) featOutcome(rows, ports, 'kill', 'wolf');
+    featOutcome(rows, ports, 'event', 'tame');
+    expect(page, 'six wolves and a bond, on the page').toMatchObject({ wolf5: 5, wolf25: 6, tame: 1 });
+    const counted = (player: string, id: string): number => { const feat = rows.feats.find(row => row.id === id); let n = 0; while (n < (feat?.count ?? 0) && books.of(player).flags.has(`feat:${id}:${String(n + 1)}`)) n++; return n; };
+    for (const id of ['wolf5', 'wolf25']) expect(counted(other, id), `${id}: the room's count is the page's`).toBe(page[id]);
+    expect(counted(other, 'tame'), 'the bond counts its feat, for the player who bonded').toBe(page['tame']);
+    expect(counted(books.lead.player, 'tame'), 'and nobody else').toBe(0);
   } finally { live.dispose(); }
 });

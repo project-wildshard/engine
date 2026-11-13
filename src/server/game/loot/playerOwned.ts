@@ -12,6 +12,7 @@ import { Exchange } from '../../../shared/game/loot/exchange';
 import { isCosmetic, isOwnedId, Owned } from '../../../shared/game/loot/Owned';
 import { Purse } from '../../../shared/game/loot/Purse';
 import { installOwnedEffects } from '../loadout/ownedEffects';
+import { installKeepsakeProgression } from './keepsakeProgression';
 import { OWNED_ROW, WORN_LINE } from '../../../shared/game/loot/ownedRows';
 import { inventorySave, ownedSave, purseSave, skinSave, compendiumSave, finishPickupSave, saveSlug, CreatureRewardSchema, creatureRewardSave, type CreatureRewardState } from '../../../shared/game/saves';
 
@@ -228,8 +229,11 @@ export function installPlayerOwned(host: SimHost, shard: string, economy: unknow
     }
     return seat;
   };
+  // SS3b: the keepsakes' progression rewards (sea glass charms) land in the same book its effects read
+  const keepsakes = source === undefined ? null : installKeepsakeProgression(host, source, () => session !== null
+    ? [[questBooks(host).lead.player, session.owned] as const] : [...seats].map(([player, seat]) => [player, seat.owned] as const));
   publishOwned(host, 'player', (player, out) => { of(player).read(out, pack); });
   routes.wear = (player, id) => { const { owned } = of(player); if (isOwnedId(id) && isCosmetic(id) && owned.has(id)) owned.toggleWorn(id); };
   if (shopped) routes.buy = (player, good) => { of(player).buy(good); };
-  return { of, drop: player => { effects.get(player)?.(); effects.delete(player); seats.delete(player); } };
+  return { of, drop: player => { keepsakes?.(player); effects.get(player)?.(); effects.delete(player); seats.delete(player); } };
 }

@@ -17,6 +17,7 @@ import { isOwnedId, isCosmetic, type Owned } from '../../../shared/game/loot/Own
 import { wirePage } from '../shardfile/wirePage';
 import { rollLoot } from '../loot/tables';
 import { onCreatureDeath } from '../../../shared/game/loot/deaths';
+import { progressionState } from '../../../shared/game/compendium/keepsakeProgression';
 import type { DeclaredLootEconomy } from '../../../shared/game/shard/declaredRows';
 import type { ShardContext } from '../plugin/context';
 import type { CollectionCatalogue, CollectionDisplay, CollectionParams } from '../models/collectionDisplay';
@@ -56,8 +57,7 @@ export function installCollectionKeepsakes<A extends { kind: string; variant?: s
   const pending: { text: string; at: number }[] = [];
   let clock = 0;
   const sync = (announce: boolean): void => {
-    const state = progression.states[progression.flags.filter(flag => flags.has(flag)).length];
-    if (state === undefined) throw new Error('Missing admitted reward state');
+    const state = progressionState(progression, flag => flags.has(flag));
     view.chime?.setCount(state.displayCount);
     for (const reward of state.earned) {
       if (!owned.grant(reward.id) || !announce) continue;

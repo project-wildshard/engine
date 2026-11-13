@@ -7,6 +7,7 @@ import {installRuntimeState,pageStateOf} from '../../../shared/game/shardfile/ru
 import type {ObservedRecords} from '../../../shared/game/quest/questObservation';
 import {featOutcome,witnessSavedFeats} from '../../../shared/game/quest/featCounters';
 import {nativeQuestInputs,type NativeQuestInputs} from './nativeInputs';
+import {registerInstalled} from '../shardfile/installedSides';
 
 interface BossRecord { defeated:boolean;rewardTaken:boolean;kills:number }
 /** The actual declared boss field and the existing elite continuation, borrowed
@@ -86,6 +87,7 @@ export async function prepareChapterRecords(product:Pick<ShardProduct,'json'|'sh
       live();return v.parse(elites,eliteOwner.snapshot()).records;
     }},outcomes:{kill:(kind,variant)=>{featOutcome(counterRows,counterPorts,'kill',kind,variant);},
       feat:(event,total)=>{featOutcome(counterRows,counterPorts,'event',event,undefined,total);}}};
+    registerInstalled(host,'saves'); // SS3b: the boss record and feat counts of quests/persistence.json, in the room's continuation
     host.onStep(ids.step,()=>{/* Encounters own all writes; this adapter adds no tick work. */}, {
       snapshot:()=>JSON.stringify({version:1,bosses:read(),counts:readCounts()}),restore:value=>{
         if(typeof value!=='string')throw new Error('Chapter boss continuation requires its JSON wire');
