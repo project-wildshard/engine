@@ -540,6 +540,10 @@ export class LiveGridHost {
         tileApproach.controller.abort(); this.tileApproach = null;
       }
     }
+    // The world built ahead goes once the traveller is a pitch from it, or heads from the road into another mouth (a stop
+    // keeps it). Checked while a build runs too, which the gate below skips.
+    if (this.ahead !== null && (this.distance(this.assembly.cell(this.ahead), feet) >= this.assembly.pitch
+      || moving !== undefined && moving.instance !== this.ahead && this.assembly.at(feet.x, feet.z) === undefined)) this.ahead = null;
     if (this.requests.size === 0) {
       const wallReach = 6 + this.ports.player.motor.opts.radius + 0.5 + this.ports.readiness.link.speed / 60;
       const departed = this.transitions.at(-1)?.from;
@@ -575,14 +579,11 @@ export class LiveGridHost {
       // cell retires first, as the entry would retire it; a U-turn builds it again, as any entry does.
       // Only from the road itself: past a cell's line (inside its square, before the 6 m entry) the heading names the cell
       // beyond it, which would retire the world just built for the one underfoot.
-      if (this.ports.buildAhead === true && moving !== undefined && this.active === null && this.assembly.at(feet.x, feet.z) === undefined) {
-        // a turn into another mouth lets the earlier one go (it retires on the next tick, as any unentered world does)
-        if (moving.instance !== this.ahead) this.ahead = null;
-        if (!this.residents.has(moving.instance) && !this.issues.has(moving.instance)
-          && this.distance(moving, feet) < this.assembly.pitch && this.retireInactiveRegions(moving.instance)) {
-          this.ahead = moving.instance;
-          void background(moving.instance, this.ensure(moving.instance), () => !this.disposed);
-        }
+      if (this.ports.buildAhead === true && moving !== undefined && this.active === null && this.assembly.at(feet.x, feet.z) === undefined
+        && !this.residents.has(moving.instance) && !this.issues.has(moving.instance)
+        && this.distance(moving, feet) < this.assembly.pitch && this.retireInactiveRegions(moving.instance)) {
+        this.ahead = moving.instance;
+        void background(moving.instance, this.ensure(moving.instance), () => !this.disposed);
       }
       if (approach !== undefined && this.ports.prepareNeighbour !== undefined && this.tileMetadata.has(approach.instance)
         && !this.residents.has(approach.instance) && !this.issues.has(approach.instance)
@@ -709,6 +710,8 @@ export class LiveGridHost {
   /** Prepare disabled replacement controllers while the existing page stays authoritative; no entered runtime hooks run here. */
   async prepare(from: string | null, to: string | null): Promise<PreparedGridCrossing> {
     if (this.disposed || this.active !== from || from === to) throw new Error('Stale live frame preparation');
+    // An entry anywhere but the world built ahead lets that world go, so it retires before this one allocates.
+    if (this.ahead !== to) this.ahead = null;
     if (from !== null && to !== null) throw new Error('Owned runtime crossing must commit onto the neutral road first');
     // Protect a ready return before yielding: expiry/pressure cannot free it
     // between its selection and the final prepared-frame reservation.

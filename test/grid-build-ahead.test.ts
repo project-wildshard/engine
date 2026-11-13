@@ -72,3 +72,51 @@ for (const [axis, side] of [['x', 1], ['x', -1], ['z', 1], ['z', -1]] as const) 
     expect(residency.allocator.entries()).toEqual([]);
   });
 }
+
+// Review (opus-crossholds): an entry elsewhere, or a walk away down the road, lets the world built ahead go.
+test('a world built ahead retires when the traveller enters another cell or leaves it a pitch behind', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const assembly = new GridAssembly({ developer: false, devserver: false });
+  const home = assembly.cell('driftwood-isle');
+  const target = assembly.cells.find(cell => cell.origin.x === assembly.pitch && cell.origin.z === 0);
+  if (target === undefined) throw new Error('Missing east destination');
+  const page = createSimHost(level, { rapier }), residency = new PageResidency();
+  const player = { position: leadPlayer(page).position, yaw: 0, health: leadPlayer(page).health, owner: leadPlayer(page), motor: leadPlayer(page).releaseMotor() };
+  const created: string[] = [];
+  const live = new LiveGridHost(assembly, {
+    home: { mode: 'owned', instance: home.instance, bytes: 1000, residency: residency.admitHome(home.instance, 1000) },
+    player, allocator: residency.allocator, bindFrame: () => undefined, gameplayReady: () => true, buildAhead: true,
+    highway: { bytes: 1000, create: () => ({ physics: page.physics, dispose: () => undefined }) },
+    readiness: { link: { speed: 30, linkBitsPerSecond: 5_000_000, requestLatencySeconds: 0.25, maxStallSeconds: 3 },
+      bundle: () => ({ criticalWireBytes: 1000, hybridWireBytes: 1000, decodeSeconds: 0, runtimeParseSeconds: 0 }) },
+    admit: cell => Promise.resolve({ bytes: 1000, exclusiveRuntime: true, prepareRuntime: () => Promise.resolve(),
+      create: () => {
+        created.push(cell.instance);
+        const host = createSimHost(level, { rapier, playerBody: false, ground: false });
+        return Promise.resolve({ host, dispose: () => { host.dispose(); } });
+      } }),
+  });
+  const settle = (): Promise<void> => new Promise(resolve => { setTimeout(resolve, 50); });
+  try {
+    const enterHome = await live.prepare(null, home.instance); enterHome.commit();
+    player.position.x = CHUNK_HALF - 0.5; (await live.prepare(home.instance, null)).commit();
+    player.position.x = CHUNK_HALF + 0.5; live.beforeFixed();
+    await expect.poll(() => live.ready(target.instance), { timeout: 5000, interval: 10 }).toBe(true);
+    // a U-turn home: the world built ahead retires before home allocates again
+    player.position.x = CHUNK_HALF + 0.2;
+    (await live.prepare(null, home.instance)).commit();
+    for (let tick = 0; tick < 3; tick++) live.beforeFixed();
+    await settle();
+    expect(live.state().issues).toEqual({}); expect(live.state().residents).toEqual([home.instance]);
+    // out again, built ahead again, then off along the road a pitch away: it goes
+    player.position.x = CHUNK_HALF - 0.5; (await live.prepare(home.instance, null)).commit();
+    player.position.x = CHUNK_HALF + 0.5; live.beforeFixed();
+    await expect.poll(() => live.ready(target.instance), { timeout: 5000, interval: 10 }).toBe(true);
+    player.position.x = CHUNK_HALF + 0.5; player.position.z = 2 * assembly.pitch;
+    for (let tick = 0; tick < 3; tick++) live.beforeFixed();
+    await settle(); live.beforeFixed(); await settle();
+    expect(live.state().residents).toEqual([]);
+    expect(created.filter(instance => instance === target.instance)).toHaveLength(2);
+  } finally { live.dispose(); player.motor.dispose(); page.dispose(); residency.dispose(); }
+  expect(residency.allocator.entries()).toEqual([]);
+});

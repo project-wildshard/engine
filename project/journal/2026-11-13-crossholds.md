@@ -22,3 +22,8 @@ Measured (local rig, headless Chromium `--use-angle=metal`): worst stop walk / b
 before, 0 / 0 / 0 ms after. The long frame at the line is not fixed: it is WebGL program links (ANGLE on Metal, 110 to
 180 ms each) for the programs the arrival first draws, about 4 in the commit frame (555 ms) and a dozen more in the
 following second.
+
+Review (one `claude -p` pass): the world built ahead was released only by an entry or a fresh heading, so an entry into
+another cell (a U-turn home, a pose jump) kept it charged beside the new one, and a walk off along the road kept it for
+good. An entry anywhere else now drops it before allocating, and so does a traveller a pitch from it or heading from the
+road into another mouth, checked while a build runs too (second test in `test/grid-build-ahead.test.ts`, red first).
