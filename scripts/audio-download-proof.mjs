@@ -67,11 +67,12 @@ const AU6_AUDIO_MB = /** @type {Record<string, number>} */ ({ 'driftwood-isle': 
 /** Deck card names (scripts/offline-proof-rules.mjs DECK_SHARDS). */
 const CARDS = /** @type {Record<string, string>} */ ({ 'driftwood-isle': 'Driftwood Isle', 'nalati-grasslands': 'Nalati Grasslands', 'pine-hollow': 'Pine Hollow', 'nine-dragon-stack': 'Nine Dragon Stack' });
 const DEFAULT_ENTRIES = 'driftwood-isle:grid,driftwood-isle:client,nalati-grasslands:grid,nine-dragon-stack:grid,pine-hollow:grid,open-plot-thin-ice:client';
+/** @type {{ slug: string, route: 'grid' | 'client' }[]} */
 const entries = (option('entry') ?? DEFAULT_ENTRIES).split(',').map(spec => {
   const [slug = '', route = 'grid'] = spec.split(':');
   if (route !== 'grid' && route !== 'client') throw new Error(`route is grid or client, not ${route}`);
   if (route === 'grid' && CARDS[slug] === undefined) throw new Error(`${slug} has no deck card: use ${slug}:client`);
-  return { slug, route };
+  return { slug, route: route === 'grid' ? 'grid' : 'client' };
 });
 const jobs = Number(option('jobs') ?? 2);
 if (!Number.isInteger(jobs) || jobs < 1) throw new Error(`--jobs is a whole number from 1, not ${String(option('jobs'))}`);
@@ -138,7 +139,7 @@ async function startLink(slow) {
   const down = lane(slow ? 87_500 : 0, slow ? 150 : 0), up = lane(slow ? 87_500 : 0, slow ? 150 : 0);
   /** @type {{ t: number, url: string }[]} */
   const seen = [];
-  /** @type {Set<import('node:net').Socket>} */
+  /** @type {Set<import('node:stream').Duplex>} */
   const sockets = new Set();
   let closed = false;
   const server = createServer((request, response) => {
@@ -267,7 +268,7 @@ async function localOrigin() {
 function tapBuses() {
   const P = AudioNode.prototype;
   /** @type {(this: AudioNode, ...args: unknown[]) => unknown} */
-  const plain = Reflect.get(P, 'connect');
+  const plain = /** @type {(this: AudioNode, ...args: unknown[]) => unknown} */ (/** @type {unknown} */ (Reflect.get(P, 'connect')));
   /** @type {WeakMap<AudioNode, Set<AudioNode>>} */
   const outs = new WeakMap();
   /** @type {WeakMap<AudioNode, string>} */
@@ -295,8 +296,7 @@ function tapBuses() {
     plain.call(node, analyser); plain.call(analyser, sink);
     taps.push({ kind, node: analyser, data: new Float32Array(analyser.fftSize) }); state.taps.push(kind);
   };
-  /** @this {AudioNode} @param {AudioNode | AudioParam} destination @param {...number} rest */
-  P.connect = /** @type {typeof P.connect} */ (function connect(destination, ...rest) {
+  P.connect = /** @type {typeof P.connect} */ (/** @this {AudioNode} @param {AudioNode | AudioParam} destination @param {...number} rest */ function connect(destination, ...rest) {
     const result = Reflect.apply(plain, this, [destination, ...rest]);
     try {
       if (destination instanceof AudioNode) {
@@ -664,7 +664,7 @@ try {
             if (row.manifest !== null) earlier = new URL(row.manifest, origin).href;
             results.push(row);
           }
-          catch (error) { log(`${label} broke: ${String(error)}`); results.push({ target, shard: entry.slug, route: entry.route, flowRead: '', manifest: null, manifestsFetched: [], mode, outcome: 'error', seconds: 0, loadAudioRequests: 0, loadAudioNetworkFetches: 0, audioRequestsByPhase: {}, networkAudioFetches: 0, linkSeen: 0, downloadMB: null, downloadCardMB: null, manifestAudioMB: null, manifestAudioRows: 0, au6AudioMB: 0, peaksFirst10s: {}, firstHeardMs: {}, audible: { music: false, sfx: false }, failures: [{ rule: 'proof-error', detail: String(error).slice(0, 300) }] }); }
+          catch (error) { log(`${label} broke: ${String(error)}`); results.push({ entry: 'proof error', target, shard: entry.slug, route: entry.route, flowRead: '', manifest: null, manifestsFetched: [], mode, outcome: 'error', seconds: 0, loadAudioRequests: 0, loadAudioNetworkFetches: 0, audioRequestsByPhase: {}, networkAudioFetches: 0, linkSeen: 0, downloadMB: null, downloadCardMB: null, manifestAudioMB: null, manifestAudioRows: 0, au6AudioMB: 0, peaksFirst10s: {}, firstHeardMs: {}, audible: { music: false, sfx: false }, failures: [{ rule: 'proof-error', detail: String(error).slice(0, 300) }] }); }
         }
         rmSync(profile, { recursive: true, force: true });
       }
