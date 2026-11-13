@@ -18,6 +18,8 @@ test('primary authoring law refuses runtime, executable configs and runtime impo
     'sample/generators/build.ts': "import { run } from '@wildshard/sharddev/runtime/sim'; export default run;",
     'sample/generators/type.ts': "type Host = import('../../../sharddev/runtime/sim').Host;",
     'sample/generators/late.ts': "export const run = () => import('@wildshard/sharddev/runtime/sim');",
+    // Node reads `%2e%2e` as `..`: an escaped path still reaches the runtime.
+    'sample/generators/escaped.ts': "type Host = import('./%2e%2e/%2E%2E/%2e%2e/sharddev/runtime/sim').Host;",
     'sample-legacy/runtime/index.ts': 'export default {};',
     'nine-dragon-stack-legacy/unregistered.ts': 'export default {};',
     // LD6 retired the last inventoried copy: its old runtime path is an ordinary refusal now.
@@ -44,7 +46,7 @@ test('primary authoring law refuses runtime, executable configs and runtime impo
     const output = v.parse(v.object({ diagnostics: v.array(v.object({ filename: v.string(), code: v.string() })) }), JSON.parse(result.stdout));
     expect(result.status, result.stdout + result.stderr).toBe(1);
     expect(output.diagnostics.every(row => row.code === 'wildshard(no-shard-runtime)')).toBe(true);
-    expect(output.diagnostics.map(row => resolve(row.filename)).sort()).toEqual(Object.keys(files).slice(0, 11)
+    expect(output.diagnostics.map(row => resolve(row.filename)).sort()).toEqual(Object.keys(files).slice(0, 12)
       .map(file => resolve(root, 'src/shards', file)).sort());
     const registered = resolve(root, 'src/shards/driftwood-isle/blender/fp-arms/gate.mjs');
     writeFileSync(registered, "import '@wildshard/sharddev/runtime/sim';");

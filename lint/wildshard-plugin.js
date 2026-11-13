@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { simClosure, simRoot } from './sim-closure.mjs';
 import { authoredHtmlSites } from './authored-html.mjs';
 import { runtimePerformanceViolations } from './runtime-performance.mjs';
-import { shardGameImport, shardEngineImport, generatorImportViolation } from './shard-imports.mjs';
+import { shardGameImport, shardEngineImport, sharddevRuntimeImport, generatorImportViolation } from './shard-imports.mjs';
 import { shardfileBoundaryVisitors } from './shardfile-boundaries.mjs';
 import { hostCallbackSites } from './host-callback-syntax.mjs';
 import { hostPlayFile } from './host-files.mjs';
@@ -1010,8 +1010,8 @@ const noShardRuntime = rule('Primary shards contain authoring and declarations o
         report(context, node, 'Primary shard runtime source is forbidden; use generators/, registered Blender sources or erased declarations; shard.config.ts must be declaration-only');
     },
     ...boundaryVisitors((node, source) => {
-      if (typeof source === 'string' && (/^@wildshard\/sharddev\/runtime(?:\/|$)/u.test(source)
-        || modulePath(context.filename, source).startsWith('src/sharddev/runtime/')))
+      if (typeof source === 'string' && (/^@wildshard\/sharddev\/runtime(?:[/?#]|$)/u.test(source)
+        || modulePath(context.filename, source).startsWith('src/sharddev/runtime/') || sharddevRuntimeImport(context.filename, source)))
         report(context, node, 'Primary shards cannot import trusted SDK runtime; emit admitted data or WASM instead');
     }),
   };
