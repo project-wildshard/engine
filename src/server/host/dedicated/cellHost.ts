@@ -22,7 +22,7 @@ const READING_MS = 10_000;
 const TICKS_KEPT = 720;
 /** The save prefix a cell's stores share. Nothing outside a cell ever reads it. */
 const SAVE_PREFIX = 'wildshard.room.';
-/** J107: a cell left empty this long starts over when someone arrives. */
+/** J107: a cell everyone left starts over once it has stood empty this long, on its own timer, before anyone comes back (J320). */
 const EMPTY_MS = 300_000;
 
 /** A port as `worker_threads` and a `MessageChannel` both give it. */
@@ -51,8 +51,11 @@ export interface CellHostOptions {
    */
   readonly road?: () => Promise<readonly GridCollisionStrip[]>;
 }
-/** One cell, and when it last emptied. A cell with nobody in it takes no ticks: that is all sleep is (Q80). */
-interface Cell { readonly slug: string; room: DedicatedRoom; emptySince: number; waking: Promise<void> | null }
+/**
+ * One cell, and when it last emptied. A cell with nobody in it takes no ticks: that is all sleep is (Q80). Its world, colliders and sim stay
+ * in memory from the worker's boot (J320). `used`: someone stood in this world since it booted, so it has something to start over from.
+ */
+interface Cell { readonly slug: string; room: DedicatedRoom; emptySince: number; used: boolean; waking: Promise<void> | null }
 const percentile = (sorted: readonly number[], at: number): number => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * at))] ?? 0;
 
 /** A worker has no page, so no app identity: all it needs of one is the save prefix. */
@@ -75,12 +78,24 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   };
   /** A cell on this worker, or its road, by name. */
   const named = (name: string): Cell | RoadRoom | undefined => road !== undefined && road.name === name ? road : cells.get(name);
+  const emptyMs = options.emptyMs ?? EMPTY_MS;
+  /** `startOver`, once it is made below: a start-over opens a cell, and a cell's room says when it emptied. */
+  const later = { startOver: (_cell: Cell, _since: number): void => undefined };
+  /** Someone stood in this world: it has something to start over from. A refused seat never got this far. */
+  const used = (slug: string, room: DedicatedRoom): void => { const cell = cells.get(slug); if (cell !== undefined && cell.room === room) cell.used = true; };
+  /** J107 on J320's terms: the last seat left this cell's world, so it starts over once it has stood empty `emptyMs`, nobody waiting on it. */
+  const emptied = (slug: string, room: DedicatedRoom): void => {
+    const cell = cells.get(slug);
+    if (cell === undefined || cell.room !== room || disposed) return;
+    const since = cell.emptySince = diagnosticNow();
+    if (cell.used) scope.timeout(emptyMs, () => { later.startOver(cell, since); });
+  };
   // GO3: a row names cells by grid instance; each loads its shard's pack.
   const open = async (slug: string): Promise<DedicatedRoom> => {
     const shard = cellShard(slug), begun = diagnosticNow(), input = await options.load(shard), onto = seams(slug);
     rapier ??= input.rapier;
-    const room = await DedicatedRoom.boot({ slug: shard, cell: slug, build: options.build, bootId: options.bootId(), input, now: options.roomNow ?? diagnosticNow, ...(onto === undefined ? {} : { road: onto }),
-      post: news => { if (news.kind === 'left' && news.seats === 0) { const cell = cells.get(slug); if (cell !== undefined) cell.emptySince = diagnosticNow(); } post({ ...news, slug }); },
+    const room: DedicatedRoom = await DedicatedRoom.boot({ slug: shard, cell: slug, build: options.build, bootId: options.bootId(), input, now: options.roomNow ?? diagnosticNow, ...(onto === undefined ? {} : { road: onto }),
+      post: news => { if (news.kind === 'seated') used(slug, room); else if (news.kind === 'left' && news.seats === 0) emptied(slug, room); post({ ...news, slug }); },
       reports: { file: report => { post({ kind: 'report', slug, report }); } }, ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }),...(options.playtest===true?{playtest:row=>{post({kind:'playtest',slug,row});}}:{}) });
     post({ kind: 'cell', slug, ms: diagnosticNow() - begun });
     options.booted?.(slug, room);
@@ -101,24 +116,38 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     readAt = now; dropsAt = clock?.drops ?? 0; ticks = [];
     post({ kind: 'reading', reading: row });
   };
-  /** A cell left empty long enough starts over: only someone arriving pays for it, and the other cells on this worker wait while it does. */
-  const wake = async (cell: Cell): Promise<void> => {
-    if (cell.waking !== null) await cell.waking;
-    if (cell.room.taken > 0 || diagnosticNow() - cell.emptySince < (options.emptyMs ?? EMPTY_MS)) return;
-    const waking = (async (): Promise<void> => {
-      try { const old = cell.room; cell.room = await open(cell.slug); old.dispose(); cell.emptySince = diagnosticNow(); } finally { cell.waking = null; }
-    })();
-    cell.waking = waking;
-    await waking;
+  /** One start-over at a time on this worker: each boot stalls the clock of every other cell here, so they never pile up. */
+  let overs: Promise<void> = Promise.resolve();
+  /** The fresh world, swapped in while the cell is still empty. One that fails keeps the old world and says so; the worker plays on. */
+  const restart = async (cell: Cell): Promise<void> => {
+    if (disposed || cell.room.taken > 0) return;
+    try {
+      const old = cell.room, room = await open(cell.slug);
+      if (disposed) { room.dispose(); return; }
+      cell.room = room; old.dispose(); cell.used = false; cell.emptySince = diagnosticNow();
+    } catch (error) { console.warn(JSON.stringify({ at: 'cell.start-over-failed', slug: cell.slug, error: error instanceof Error ? error.message : String(error) })); }
+  };
+  /** A cell everyone left starts over. An arrival meanwhile waits for it (`settled`). A timer can fire a little early by this clock, so it looks again. */
+  later.startOver = (cell: Cell, since: number): void => {
+    if (disposed || cell.waking !== null || !cell.used || cell.room.taken > 0 || cell.emptySince !== since) return;
+    const left = emptyMs - (diagnosticNow() - since);
+    if (left > 0) { scope.timeout(left, () => { later.startOver(cell, since); }); return; }
+    const job = overs.then(() => restart(cell)).finally(() => { if (cell.waking === job) cell.waking = null; });
+    cell.waking = job; overs = job;
+  };
+  /** J320: an arrival never boots a cell. It waits only for a start-over already under way, and false when the worker closed meanwhile. */
+  const settled = async (...waiting: readonly Cell[]): Promise<boolean> => {
+    for (let busy = waiting.find(cell => cell.waking !== null); busy?.waking; busy = waiting.find(cell => cell.waking !== null)) await busy.waking;
+    return !disposed;
   };
   const dispose = (): void => { if (disposed) return; disposed = true; clock?.pause(); scope.dispose(); for (const { room } of cells.values()) room.dispose(); road?.dispose(); options.closed?.(); };
   const find = async (cell: Cell | RoadRoom, id: number, device: string): Promise<void> => {
     if (cell instanceof RoadRoom) { post({ kind: 'found', id, held: cell.holds(device), spawn: cell.spawn }); return; }
-    await wake(cell); post({ kind: 'found', id, held: cell.room.holds(device), spawn: cell.room.spawn });
+    if (await settled(cell)) post({ kind: 'found', id, held: cell.room.holds(device), spawn: cell.room.spawn });
   };
   const seat = async (cell: Cell | RoadRoom, order: Extract<CellOrder, { kind: 'seat' }>): Promise<void> => {
     // The transport starts its port: made before a wake, a close on the way would reach nobody.
-    if (!(cell instanceof RoadRoom) && cell.waking !== null) await cell.waking;
+    if (!(cell instanceof RoadRoom) && !await settled(cell)) return;
     const transport = new SeatTransport(order.port), hello = (): void => { transport.deliver('reliable', order.hello); };
     if (cell instanceof RoadRoom) cell.seat(order, transport, hello); else cell.room.seat(order, transport, hello);
   };
@@ -143,18 +172,18 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
         if (cells.has(slug)) continue;
         const room = await open(slug);
         if (disposed) { room.dispose(); post({ kind: 'placed', id: order.id, opened, error: 'The worker closed' }); return; }
-        cells.set(slug, { slug, room, emptySince: diagnosticNow(), waking: null }); opened.push(slug);
+        cells.set(slug, { slug, room, emptySince: diagnosticNow(), used: false, waking: null }); opened.push(slug);
       }
       post({ kind: 'placed', id: order.id, opened });
     } catch (error) { post({ kind: 'placed', id: order.id, opened, error: error instanceof Error ? error.message : String(error) }); }
     finally { if (!disposed) laid?.(); }
   };
-  /** GC15: a seat walks from one of this worker's cells into another, or onto or off its road, the target woken first if it slept long enough to start over. */
+  /** GC15: a seat walks from one of this worker's cells into another, or onto or off its road; a target starting over is waited for (J320). */
   const cross = async (order: Extract<CellOrder, { kind: 'cross' }>): Promise<void> => {
     const { kind: _kind, from: fromSlug, to: toSlug, at, ...entry } = order, from = named(fromSlug), to = named(toSlug);
     if (from === undefined || to === undefined) throw new Error(`${from === undefined ? fromSlug : toSlug} is not on this worker`);
-    if (!(to instanceof RoadRoom)) await wake(to);
-    if (!(from instanceof RoadRoom) && from.waking !== null) await from.waking;
+    // Both settled in one look, then read and moved with no await between: a start-over can't begin under the seat (J320).
+    if (!await settled(...[from, to].filter((cell): cell is Cell => !(cell instanceof RoadRoom)))) return;
     const source = from instanceof RoadRoom ? from : from.room, target = to instanceof RoadRoom ? to : to.room;
     const moved = source.handOver(entry.device, target, entry, at);
     post({ kind: 'crossed', device: entry.device, name: entry.name, from: fromSlug, to: toSlug, moved, stays: source.holds(entry.device), body: moved ? target.bodyId(entry.device) ?? entry.body : entry.body });
@@ -183,7 +212,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const first = options.slugs[0];
     // SA34a: a worker booted after a placement (its `placed`) lays the placed cells out from the start.
     if (options.road !== undefined && first !== undefined) { const assembly = gridAssembly(), strips = await options.road(), placed = placedStrips(assembly, gridAssembly(false)); crossing = { name: roadName(first), assembly, strips: [...strips, ...placed.strips], seams: placed.seams }; }
-    for (const slug of options.slugs) { const room = await open(slug); if (disposed) return; cells.set(slug, { slug, room, emptySince: diagnosticNow(), waking: null }); }
+    for (const slug of options.slugs) { const room = await open(slug); if (disposed) return; cells.set(slug, { slug, room, emptySince: diagnosticNow(), used: false, waking: null }); }
     if (crossing !== undefined && rapier !== undefined) {
       const { name, assembly, strips } = crossing, begun = diagnosticNow();
       road = new RoadRoom({ name, build: options.build, assembly, host: openRoad(rapier, assembly.cells.filter(cell => !cells.has(cell.instance)), strips, assembly.cells), hosts: instance => cells.has(instance),

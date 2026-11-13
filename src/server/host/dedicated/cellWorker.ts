@@ -14,17 +14,19 @@ import { placeCell, type PlacedCell } from './gridCells';
 
 /** What the door boots a worker with. */
 export interface CellWorkerData { readonly slugs: readonly string[]; readonly build: string; readonly origin: string; readonly cache: string; readonly holdMs?: number;readonly playtest?:boolean;
+  /** J107's start-over wait, a proof's override (`EMPTY_MS`): 5 minutes when absent. */
+  readonly emptyMs?: number;
   /** GC15: `WORLD_CROSSING=worker`, this worker hosts the road between its cells. */
   readonly crossing?: boolean;
   /** SA33: the cells the door had placed when it booted this worker; a worker's module state is its own. */
   readonly placed?: readonly PlacedCell[] }
 
-const { slugs, build, origin, cache, holdMs,playtest, crossing, placed } = workerData as CellWorkerData, port = parentPort;
+const { slugs, build, origin, cache, holdMs, emptyMs, playtest, crossing, placed } = workerData as CellWorkerData, port = parentPort;
 if (port === null) throw new Error('A cell runs in a worker');
 for (const row of placed ?? []) placeCell(row);
 const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 };
 const rapier = await loadRapier(await readFile(new URL('rapier.wasm', import.meta.url)));
-runCells(port as unknown as CellPort, { slugs, build, bootId: () => randomBytes(4).toString('hex'), memory: () => process.memoryUsage(), closed: () => { process.exit(0); }, ...(holdMs === undefined ? {} : { holdMs }),...(playtest===undefined?{}:{playtest}),...(crossing === true ? { road: async () => {
+runCells(port as unknown as CellPort, { slugs, build, bootId: () => randomBytes(4).toString('hex'), memory: () => process.memoryUsage(), closed: () => { process.exit(0); }, ...(holdMs === undefined ? {} : { holdMs }), ...(emptyMs === undefined ? {} : { emptyMs }),...(playtest===undefined?{}:{playtest}),...(crossing === true ? { road: async () => {
     // A build whose server book has no grid pack gives a road with no strips: this line says so before anyone falls through it.
     const strips = await readPackGrid(build, { origin, cache }, reads);
     console.info(JSON.stringify({ at: 'road.pack', strips: strips.length, ...reads }));

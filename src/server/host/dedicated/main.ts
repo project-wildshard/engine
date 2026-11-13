@@ -58,7 +58,7 @@ const release = await installedRelease();
 // C5, C11, GO3: the cells, by grid instance, fixed at startup; a player with no save lands in the first. `grid` opens every grid cell
 // the release names, home first. A cell runs its shard's pack, and the release must name that shard.
 const listed = process.env['WORLD_CELLS'] ?? 'driftwood-isle', cells = worldCells(listed, release.shards.map(shard => shard.slug)), shards = [...new Set(cells.map(cellShard))];
-const hold = process.env['HOLD_MS'], grace = process.env['GRACE_MS'], poll = process.env['RELEASE_POLL_MS'], recordEvery = process.env['RECORD_MS'];
+const hold = process.env['HOLD_MS'], empty = process.env['EMPTY_MS'], grace = process.env['GRACE_MS'], poll = process.env['RELEASE_POLL_MS'], recordEvery = process.env['RECORD_MS'];
 // An env file's blank row means unset.
 const setting = (name: string): string | undefined => { const value = process.env[name]; return value === '' ? undefined : value; };
 const sentry = serverSentry({ dsn: setting('SENTRY_DSN'), version: engineVersion, build, channel: release.channel });
@@ -77,7 +77,7 @@ const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting
 
 /** One row of the table is one worker thread, started once (J182). */
 function bootWorker(slugs: readonly string[]): WorkerLink {
-  const data: CellWorkerData = { slugs, build, origin, cache, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(crossing ? { crossing } : {}),...(playtest===undefined?{}:{playtest:true}) };
+  const data: CellWorkerData = { slugs, build, origin, cache, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), ...(crossing ? { crossing } : {}),...(playtest===undefined?{}:{playtest:true}) };
   const worker = new Worker(new URL('cellWorker.mjs', import.meta.url), { workerData: data });
   let stopped = false;
   return { send: (order, transfer = []) => { worker.postMessage(order, transfer as never); },
