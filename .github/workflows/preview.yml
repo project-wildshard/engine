@@ -116,7 +116,10 @@ jobs:
       # Staging unreadable keeps the live preview's grid with a ::warning::; the job summary says which grid this page bakes.
       - name: Borrow staging's grid
         if: steps.changed.outputs.deploy == 'true'
-        run: node --import ./scripts/bake-loader.mjs scripts/preview-grid.ts tmp/preview-grid/catalogue.json
+        # a dispatch of a commit before SA35 has no tool: that page bakes the pinned grid, as it always did
+        run: |
+          if [ -f scripts/preview-grid.ts ]; then node --import ./scripts/bake-loader.mjs scripts/preview-grid.ts tmp/preview-grid/catalogue.json
+          else echo "::warning title=preview grid::$(git rev-parse --short HEAD) predates SA35: the pinned grid"; fi
       # SENTRY-TRIAGE S5: the Workers host's package step sends the hidden maps to Sentry (release wildshard@<version>,
       # dist the build) with node scripts/sentry-maps.mjs dist --environment preview, then strips every map from dist/
       # (PZ1, OV4): a Sentry outage or a missing token never stops the preview, and no map reaches the CDN.
@@ -126,4 +129,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: node scripts/page-release.mjs preview build,upload,check,go-live --host=workers --catalogue=tmp/preview-grid/catalogue.json
+        run: |
+          grid=(); [ -f tmp/preview-grid/catalogue.json ] && grid=(--catalogue=tmp/preview-grid/catalogue.json)
+          node scripts/page-release.mjs preview build,upload,check,go-live --host=workers "${grid[@]}"
