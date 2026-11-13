@@ -267,6 +267,26 @@ test('every channel has one page host, workers: any other --host is a usage erro
   }
 });
 
+test('--print-env: the three channels build alike but for named keys (PAGE-SIZE PZ6)', () => {
+  const envs = Object.fromEntries((['preview', 'staging', 'production'] as const).map(channel => {
+    const run = spawnSync(process.execPath, ['scripts/page-release.mjs', '--print-env', channel], {encoding: 'utf8', timeout: 20_000});
+    expect(run.status, run.stderr).toBe(0);
+    return [channel, new Map(run.stdout.trim().split('\n').map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]))];
+  }));
+  const names = new Set(Object.values(envs).flatMap(env => [...env.keys()]));
+  const differing = [...names].filter(name => new Set(Object.values(envs).map(env => env.get(name))).size > 1).sort();
+  // PZ6's done-when allows release URL, previous origin, Sentry env, icon channel and Worker env (WS_CHANNEL carries the
+  // last three). WILDSHARD_RELEASE_KEY differs only because preview signs nothing yet (PZ6 D2): it leaves this list then.
+  expect(differing).toEqual(['WILDSHARD_RELEASE_KEY', 'WILDSHARD_RELEASE_URL', 'WS_CHANNEL', 'WS_PREVIOUS_DEPLOY_ORIGIN']);
+  expect(envs['preview']?.get('WS_PREVIOUS_DEPLOY_ORIGIN')).toBe(CHANNELS.preview.origin);
+  for (const bad of [['nowhere'], ['toString'], ['staging', '--catalogue=x.json']]) {
+    const run = spawnSync(process.execPath, ['scripts/page-release.mjs', '--print-env', ...bad], {encoding: 'utf8', timeout: 20_000});
+    expect(run.status, bad.join(' ')).toBe(2);
+  }
+  const borrowed = spawnSync(process.execPath, ['scripts/page-release.mjs', '--print-env', 'preview', '--catalogue=x.json'], {encoding: 'utf8', timeout: 20_000});
+  expect(borrowed.stdout).toContain(`WILDSHARD_CATALOGUE=${resolve('x.json')}`);
+});
+
 test('preview is the solo game: no release file, no packs, no gate, and the alias still moves last', async () => {
   const {deps, calls, lines} = rig('preview');
   const seen: Record<string, string>[] = [];

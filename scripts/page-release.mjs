@@ -15,13 +15,18 @@
 //   --catalogue=<file>       preview build: bake this catalogue, the grid borrowed from staging (SHARD-AUTHORING SA35,
 //                            scripts/preview-grid.ts); default test/pins/catalogue.json. Refused on staging and production
 //
+//   node scripts/page-release.mjs --print-env <preview|staging|production> [--root=<dir>] [--catalogue=<file>]
+//                            print the channel's build environment for the root's HEAD (--catalogue on preview only),
+//                            one sorted KEY=value a line, and run nothing (PAGE-SIZE PZ6: the three channels' builds
+//                            differ only in named keys)
+//
 // The flow and its gates are scripts/page-release/flow.mjs; the page hosts are scripts/page-release/hosts/*.mjs.
 // Phase results go to <root>/tmp/page-release/<channel>-<sha>.json, which the next phase reads.
 import {execFileSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {RefusedError, runPhase} from './page-release/flow.mjs';
+import {CHANNELS, RefusedError, buildEnv, runPhase} from './page-release/flow.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content} from './page-release/content.mjs';
@@ -32,6 +37,19 @@ const value = (/** @type {string} */ name) => flag(name)?.split('=').slice(1).jo
 /** Every channel is on Cloudflare Workers (OFF-VERCEL OV6 preview, OV7 staging, OV8 production), so `--host` has one value. */
 const [channel, phaseList] = args.filter(arg => !arg.startsWith('--'));
 const hostName = value('host') ?? 'workers';
+if (flag('print-env') !== undefined) {
+  const config = channel !== undefined && Object.hasOwn(CHANNELS, channel) ? Reflect.get(CHANNELS, channel) : undefined;
+  const catalogue = value('catalogue');
+  if (config === undefined || phaseList !== undefined || (catalogue !== undefined && !config.solo)) {
+    console.error('usage: node scripts/page-release.mjs --print-env <preview|staging|production> [--root=<dir>] [--catalogue=<file>, preview only]');
+    process.exit(2);
+  }
+  const cwd = resolve(value('root') ?? '.');
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
+  const env = buildEnv(config, /** @type {any} */ ({build: head, ...(catalogue === undefined ? {} : {catalogue: resolve(catalogue)})}));
+  for (const name of Object.keys(env).sort()) console.log(`${name}=${env[name]}`);
+  process.exit(0);
+}
 if (channel === undefined || phaseList === undefined || hostName !== 'workers') {
   console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--after-staging-proofs] [--content] [--catalogue=<file>]');
   process.exit(2);
