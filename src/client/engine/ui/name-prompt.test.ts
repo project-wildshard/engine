@@ -16,6 +16,10 @@ const submit = (): void => { box()?.requestSubmit(); };
 const stored = (): NetName => { const storage = saveEnvironment().storage('global'); if (storage === null) throw new Error('no storage'); return { name: heldName(storage, appIdentity().savePrefix) }; };
 interface NetName { readonly name: string | null }
 const tick = (): Promise<void> => new Promise(resolve => { setTimeout(resolve, 0); });
+// happy-dom has no visualViewport: the page gets Safari's (MK9, below), in place before the first PLAY installs the marks on it
+const PAGE = 714, view = Object.assign(new EventTarget(), { height: PAGE, offsetTop: 0, scale: 1 });
+Object.defineProperty(window, 'innerHeight', { configurable: true, value: PAGE });
+Object.defineProperty(window, 'visualViewport', { configurable: true, value: view });
 
 test('a first PLAY shows the prompt; Let\'s go keeps the Name for the join; a second PLAY skips it', async () => {
   expect(nameAskDue()).toBe(true);
@@ -102,4 +106,37 @@ test('Settings ▸ System ▸ Name changes the Name, by the same rule', () => {
   expect(note.dataset['tone']).toBe('ok');
   expect(stored().name).toBe('Matt');
   expect(nameAskDue()).toBe(false);
+});
+
+// MOBILE-KEYBOARD MK9 (meta, J297): the Name card fits above a phone's keyboard by viewport.ts's marks, the one module that owns
+// the keyboard, not by a `visualViewport` fit of its own. The numbers are MK1's iOS 26 Simulator reading (iPhone 17 Pro, Safari):
+// the page 714 tall, the keyboard up, the visible band 377 tall and panned 213 down. The title asks before any Game has
+// installed the marks, so the prompt installs them.
+test('MK9: the prompt reads the keyboard marks, with no visualViewport fit of its own', async () => {
+  const root = document.documentElement;
+  try {
+    const owner = scope(), asking = askNameOnce(owner, { parent: document.body });
+    const form = box();
+    if (form === null) throw new Error('no prompt');
+    expect(document.activeElement).toBe(form.querySelector('input'));
+    expect(root.dataset['wsKeyboard']).toBeUndefined(); // focus alone, no keyboard yet
+    // the keyboard rises: Safari shrinks the visual viewport and pans the page
+    view.height = 377; view.offsetTop = 213; view.dispatchEvent(new Event('resize'));
+    expect(root.dataset['wsKeyboard']).toBe('');
+    expect(root.style.getPropertyValue('--ws-kb-top')).toBe('213px');
+    expect(root.style.getPropertyValue('--ws-kb-bottom')).toBe('590px');
+    // the card's own box carries no fit: namePrompt.css places it in the marked band
+    expect(form.style.top).toBe('');
+    expect(form.style.height).toBe('');
+    // oxlint-disable-next-line import/no-nodejs-modules -- the real stylesheet's rule, not a copy of it
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync('src/client/engine/ui/styles/namePrompt.css', 'utf8').replaceAll(/\s+/g, ' ')).toContain('html[data-ws-keyboard] .ws-name { top: var(--ws-kb-top, 0px); height: calc(var(--ws-kb-bottom, 100%) - var(--ws-kb-top, 0px)); }');
+    owner.dispose();
+    expect(await asking).toBe(false);
+  } finally {
+    // the keyboard drops, so viewport.ts's own state closes too (claude -p review)
+    view.height = PAGE; view.offsetTop = 0; view.dispatchEvent(new Event('resize'));
+    delete root.dataset['wsKeyboard'];
+    for (const name of ['--ws-vh', '--ws-kb-top', '--ws-kb-bottom', '--ws-home']) root.style.removeProperty(name);
+  }
 });

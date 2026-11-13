@@ -7,6 +7,7 @@ import type { SaveStorage } from '../../../shared/engine/saves/store';
 import { engineString } from '../../../shared/engine/strings';
 import { jsonSlot } from '../saves/slots';
 import { followsTap, listenTap } from '../input/dom';
+import { installViewport } from '../core/viewport';
 import './styles/namePrompt.css';
 
 /**
@@ -69,7 +70,9 @@ export interface NamePromptOptions {
 
 /**
  * Show the prompt. Resolves the Name typed (cleaned), null for Skip, or undefined when `scope` closed it first. The card sits in
- * the visible part of the page (`visualViewport`), so a phone's keyboard never covers the field or the buttons.
+ * the visible part of the page, so a phone's keyboard never covers the field or the buttons: MOBILE-KEYBOARD MK9 (meta, J297)
+ * reads the keyboard from viewport.ts's marks (`data-ws-keyboard`, `--ws-kb-top` / `--ws-kb-bottom`, namePrompt.css), the one
+ * module that owns it, instead of a second `visualViewport` fit of its own.
  */
 export function showNamePrompt(scope: Scope, options: NamePromptOptions): Promise<string | null | undefined> {
   const own = scope.child('name-prompt');
@@ -88,10 +91,8 @@ export function showNamePrompt(scope: Scope, options: NamePromptOptions): Promis
     card.append(check);
   }
   box.append(card);
-  // the visible part of the page: a phone's keyboard shrinks it, and the card stays centred in what is left
-  const view = globalThis.visualViewport;
-  const fit = (): void => { if (view === null || view === undefined) return; box.style.top = `${String(view.offsetTop)}px`; box.style.height = `${String(view.height)}px`; };
-  if (view !== null && view !== undefined) { own.listen(view, 'resize', fit); own.listen(view, 'scroll', fit); fit(); }
+  // the keyboard's marks: the title asks before any Game installed them (idempotent; Game's constructor calls it again)
+  installViewport();
   own.ownNode(box); options.parent.append(box);
   input.focus({ preventScroll: true });
   return new Promise(resolve => {
