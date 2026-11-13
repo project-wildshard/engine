@@ -157,3 +157,46 @@ jobs:
           node scripts/server-release/publish.mjs
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
           --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" $ALIGN_FLAG
+
+  # HOW-WE-BUILD ENG-16 (SHARD-AUTHORING SA15, J314): the devserver client an installed `wildshard dev` serves, on the same
+  # release as the dedicated bundle (`server-staging-<sha>` or `vX.Y.Z`), so sharddev fetches it at its engine pin
+  # (sharddev src/sharddev/devClient.ts). After publish, which makes the release; a held or failed publish leaves the release
+  # in place, so the client still goes up. The first upload wins: a rerun keeps the asset already there.
+  devserver-client:
+    needs: [source, publish]
+    if: always() && needs.source.outputs.ready == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      SOURCE_SHA: ${{ needs.source.outputs.sha }}
+      RELEASE_TAG: ${{ needs.source.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - name: Skip a source from before ENG-16
+        id: has
+        run: if [ -f scripts/devserver-client.mjs ]; then echo "build=true" >> "$GITHUB_OUTPUT"; else echo "::notice::$SOURCE_SHA has no scripts/devserver-client.mjs"; fi
+      - if: steps.has.outputs.build == 'true'
+        uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - name: Build the devserver client
+        if: steps.has.outputs.build == 'true'
+        run: |
+          node scripts/pins.ts install
+          node scripts/gen.mjs --inputs-only
+          python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --out "$RUNNER_TEMP/devserver-client.tar.gz"
+      - name: Upload it to the release, once
+        if: steps.has.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' > "$RUNNER_TEMP/assets.txt"; then
+            echo "::warning::no release $RELEASE_TAG for $SOURCE_SHA: publish made none"; exit 0
+          fi
+          if grep -qx 'devserver-client.tar.gz' "$RUNNER_TEMP/assets.txt"; then echo "::notice::$RELEASE_TAG already has its devserver client"; exit 0; fi
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/devserver-client.tar.gz" --repo "$GITHUB_REPOSITORY"
