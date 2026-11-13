@@ -44,7 +44,7 @@ test('old active reward saves resume quietly and reject invalid ownership before
 test('a finished reward hands carry to completion, while an active teardown restores its borrower', () => {
   for (const takeover of [false, true]) {
     const actor = player(), events: string[] = [];
-    const beat = new QuestRewardController(actor, null, { when: () => true, finish: () => { events.push('finish'); return takeover; } }, {
+    const beat = new QuestRewardController(actor, null, { when: () => true, yaw: 1, finish: () => { events.push('finish'); return takeover; } }, {
       start: () => { expect(actor.carried).toBe(true); events.push('start'); },
       finish: () => { events.push('hide'); }, release: () => { expect(actor.carried).toBe(false); events.push('release'); },
     });
@@ -52,6 +52,27 @@ test('a finished reward hands carry to completion, while an active teardown rest
     expect(events).toEqual(takeover ? ['start', 'hide', 'finish'] : ['start', 'hide', 'finish', 'release']);
     expect(actor.carried).toBe(takeover);
   }
-  const actor = player(), beat = new QuestRewardController(actor, null, { when: () => true, finish: () => undefined });
+  const actor = player(), beat = new QuestRewardController(actor, null, { when: () => true, pitch: 0.4, finish: () => undefined });
   beat.update(0.1); beat.dispose(); expect(actor.carried).toBe(false);
+});
+
+// opus-questfreeze (Jake 2026-11-12, Template: "quest complete behavior ... is freezing the camera"): every declared quest's
+// default "Quest complete" beat names no pose, and it held the player and forced the camera's yaw for its whole 7 s hold.
+test('a reward that names no pose shows its beat but never takes the player or the camera', () => {
+  const actor = player(), day = { phase: 0.4 }, events: string[] = [];
+  const beat = new QuestRewardController(actor, day, { when: () => true, finish: () => { events.push('finish'); return undefined; } }, {
+    start: () => { events.push('start'); }, finish: () => { events.push('hide'); }, release: () => { events.push('release'); },
+  });
+  for (let frame = 0; frame < 60 * 8; frame++) {
+    actor.yaw += 0.01; actor.pitch += 0.001; actor.velocity.set(3, 0, 0); // the player's own look and walk this frame
+    const yaw = actor.yaw, pitch = actor.pitch;
+    beat.update(1 / 60);
+    expect(actor.carried).toBe(false); expect(actor.yaw).toBe(yaw); expect(actor.pitch).toBe(pitch); expect(actor.velocity.x).toBe(3);
+  }
+  expect(day.phase).toBe(0.4); expect(beat.active).toBe(false);
+  expect(events).toEqual(['start', 'hide', 'finish', 'release']);
+  // a ride that took the player during the beat keeps it: the beat never hands back a carry it did not take
+  const rider = player(), held = new QuestRewardController(rider, null, { when: () => true, finish: () => undefined });
+  held.update(0.1); rider.carried = true; held.update(8); expect(rider.carried).toBe(true);
+  held.dispose(); expect(rider.carried).toBe(true);
 });

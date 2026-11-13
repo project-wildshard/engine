@@ -63,6 +63,9 @@ const RewardSaved: v.GenericSchema<BoundedQuestRewardSavedInput, BoundedQuestRew
 });
 /** One renderer-free reward continuation for native and page quests. Restore validates before mutation and never
  * advances time or invokes effects; the existing host retains position, velocity, yaw, clock and save ownership.
+ * Only a posed beat (`at`, `yaw`, `pitch` or `phase`) takes the player: one that names no pose, every declared quest's
+ * default "Quest complete", shows its effects and keeps the camera and walk on the player's input (opus-questfreeze,
+ * Jake 2026-11-12: "quest complete behavior ... is freezing the camera").
  */
 export class QuestRewardController {
   private readonly from: QuestRewardOrigin = { position: new Vector3(), yaw: 0, pitch: 0, phase: 0 };
@@ -73,29 +76,31 @@ export class QuestRewardController {
   private readonly day: { phase: number } | null | undefined;
   private readonly spec: QuestRewardControllerSpec;
   private readonly effects: QuestRewardEffects;
+  private readonly posed: boolean;
   constructor(player: QuestRewardCarryPlayer, day: { phase: number } | null | undefined,
     spec: QuestRewardControllerSpec, effects: QuestRewardEffects = {}) {
     this.player = player; this.day = day; this.spec = spec; this.effects = effects;
+    this.posed = spec.at !== undefined || spec.yaw !== undefined || spec.pitch !== undefined || spec.phase !== undefined;
   }
   get active(): boolean { return this.elapsed >= 0; }
   /** The admitted director may own completion; otherwise the authored hold duration finishes the beat. */
   update(dt: number, authoritativeFinish?: boolean): void {
     if (this.disposed) return;
     if (this.elapsed === -1 && this.spec.when()) {
-      this.elapsed = 0; this.carried = this.player.carried; this.player.carried = true;
+      this.elapsed = 0; this.carried = this.player.carried; if (this.posed) this.player.carried = true;
       this.from.position.copy(this.player.position); this.from.yaw = this.player.yaw; this.from.pitch = this.player.pitch;
       this.from.phase = this.day?.phase ?? 0;
       this.effects.start?.();
     }
     if (!this.active) return;
     this.elapsed += dt;
-    applyQuestRewardPose(this.elapsed, this.from, this.spec, this.player, this.day);
+    if (this.posed) applyQuestRewardPose(this.elapsed, this.from, this.spec, this.player, this.day);
     if (authoritativeFinish ?? this.elapsed > (this.spec.holdSeconds ?? 7)) {
       this.elapsed = -2; this.effects.finish?.();
       if (this.spec.finish() !== true) this.release();
     }
   }
-  private release(): void { this.player.carried = this.carried; this.effects.release?.(); }
+  private release(): void { if (this.posed) this.player.carried = this.carried; this.effects.release?.(); }
   /** Copy the existing native envelope without sharing mutable origin data. */
   snapshot(): v.InferOutput<typeof RewardSaved> {
     const { position, yaw, pitch, phase } = this.from;
@@ -106,11 +111,11 @@ export class QuestRewardController {
   restore(value: unknown): void {
     if (this.disposed) throw new Error('Quest reward is disposed');
     const saved = v.parse(RewardSaved, value);
-    if (saved.elapsed >= 0 && !saved.player.carried) throw new Error('Active quest reward must own the player');
+    if (saved.elapsed >= 0 && this.posed && !saved.player.carried) throw new Error('Active quest reward must own the player');
     this.elapsed = saved.elapsed; this.carried = saved.carried;
     this.from.position.set(saved.from.x, saved.from.y, saved.from.z);
     this.from.yaw = saved.from.yaw; this.from.pitch = saved.from.pitch; this.from.phase = saved.from.phase;
-    this.player.pitch = saved.player.pitch; this.player.carried = saved.player.carried;
+    if (this.posed) { this.player.pitch = saved.player.pitch; this.player.carried = saved.player.carried; }
   }
   /** Only an active beat releases carry on teardown; a finished card keeps its own ownership. */
   dispose(): void {

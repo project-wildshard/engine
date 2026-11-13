@@ -13,7 +13,7 @@ test('page rewards keep caption, sting, objective and weapon effects in their or
     setViewmodel: on => {
       expect(actor.carried).toBe(!on); expect(caption()?.classList.contains('show')).toBe(!on); events.push(on ? 'weapon-up' : 'weapon-down');
     }, sting: () => { expect(objective.classList.contains('ws-quest-hide')).toBe(true); events.push('sting'); } }, {
-    kicker: 'Reward', title: 'Quest complete', subtitle: 'Same text', when: () => true,
+    kicker: 'Reward', title: 'Quest complete', subtitle: 'Same text', when: () => true, yaw: 1,
     finish: () => { expect(caption()?.classList.contains('show')).toBe(false); expect(actor.carried).toBe(true); events.push('finish'); return false; },
   }));
   try {
