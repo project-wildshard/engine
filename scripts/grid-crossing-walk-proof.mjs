@@ -54,6 +54,16 @@ try {
   if (open === null) throw new Error(`The world did not start: see ${join(work, 'server.log')}`);
   browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } }), page = await context.newPage(), errors = /** @type {string[]} */ ([]);
+  // RP4: every program's first use (three's uniform read after its link, where a link not yet finished blocks the frame),
+  // counted so a leg's receipt says how many programs linked on the way (a cell's whole set relinking at its edge was 2.5 s)
+  await context.addInitScript(() => {
+    const W = /** @type {any} */ (window); W.__programLinks = 0;
+    for (const C of [W.WebGL2RenderingContext, W.WebGLRenderingContext]) {
+      if (C === undefined) continue;
+      const read = C.prototype.getProgramParameter;
+      C.prototype.getProgramParameter = function getProgramParameter(/** @type {WebGLProgram} */ program, /** @type {number} */ name) { if (name === this.ACTIVE_UNIFORMS) W.__programLinks++; return read.call(this, program, name); };
+    }
+  });
   page.on('pageerror', error => { errors.push(error.message.slice(0, 240)); });
   let navigations = 0;
   page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
@@ -128,7 +138,7 @@ try {
     /** @type {Record<string, unknown>[]} */
     const events = [];
     let stuckSince = 0, stuckMs = 0, worstStuck = 0, last = start, enteredAt = 0, controlAt = 0, roadAt = 0, jumps = 0;
-    const t1 = Date.now(), framesFrom = await page.evaluate(() => /** @type {any} */ (window).__gc15c.frames.length);
+    const t1 = Date.now(), framesFrom = await page.evaluate(() => /** @type {any} */ (window).__gc15c.frames.length), linksFrom = await page.evaluate(() => /** @type {any} */ (window).__programLinks);
     await face(yaw);
     await page.keyboard.down('KeyW'); if (leg.boost) await page.keyboard.down('ShiftLeft');
     while (Date.now() - t1 < LEG_MS) {
@@ -153,9 +163,10 @@ try {
     await page.keyboard.up('KeyW'); if (leg.boost) await page.keyboard.up('ShiftLeft');
     const end = await sample(), frames = /** @type {number[][]} */ (await page.evaluate(n => /** @type {any} */ (window).__gc15c.frames.slice(n), framesFrom));
     await page.screenshot({ path: join(out, `${engineName}-${leg.name}-after.png`) });
-    const deltas = frames.map(row => row[1] ?? 0), row = { name: leg.name, from, target: leg.target, boost: leg.boost, roadAtMs: roadAt, enteredAtMs: enteredAt, controlAtMs: controlAt,
+    const programLinks = await page.evaluate(() => /** @type {any} */ (window).__programLinks) - linksFrom;
+    const deltas = frames.map(row => row[1] ?? 0), row = { name: leg.name, programLinks, from, target: leg.target, boost: leg.boost, roadAtMs: roadAt, enteredAtMs: enteredAt, controlAtMs: controlAt,
       borderToControlMs: enteredAt === 0 || controlAt === 0 ? null : controlAt - enteredAt, worstStopMs: worstStuck, stoppedMs: stuckMs, jumps, frames: deltas.length,
-      over50: deltas.filter(ms => ms > 50).length, worstFrameMs: Math.max(0, ...deltas), events, end };
+      over50: deltas.filter(ms => ms > 50).length, over100: deltas.filter(ms => ms > 100).length, worstFrameMs: Math.max(0, ...deltas), events, end };
     legs.push(row);
     note(`${leg.name}: arrives in ${leg.target} with control`, controlAt !== 0, { enteredAt, controlAt, end: { inside: end.inside, z: end.z, ready: end.ready } });
     note(`${leg.name}: no stop or wall on the way`, worstStuck <= STUCK_MS && jumps === 0, { worstStuck, jumps });

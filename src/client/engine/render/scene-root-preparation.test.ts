@@ -55,12 +55,28 @@ test('root discovery retains each road environment layout without changing borro
   f.scene.environment = own; noteEnvironment(peer);
   try {
     await prepareSceneRoots(f.renderer, f.camera, f.scene, null, [f.root], () => true, () => Promise.resolve());
+    // the drawn frame's, then the road's declared none (RP4), the live one beside the cell and every other height recorded
     expect(f.compiled.map(row => [row.receiver, row.environment])).toEqual([
-      [false,own], [true,own], [false,own], [true,own], [false,peer], [true,peer],
+      [false,own], [true,own], [false,null], [true,null], [false,own], [true,own], [false,peer], [true,peer],
     ]);
     expect(f.scene.environment).toBe(own); expect(f.root.visible).toBe(false);
     expect(f.compiled.every(row => row.lights === 1 && row.fog === f.scene.fog)).toBe(true);
   } finally {f.dispose(); own.dispose(); peer.dispose();}
+});
+
+test('RP4: a cell PMREM live in the page never stands in for the road environment declared none', async () => {
+  // Inside a cell its layer swaps the cell's PMREM into the page scene; the road beyond the layer's half weight draws with
+  // the page's own environment, declared none at registration. Keyed with the live PMREM only, every program of the cell
+  // linked again as the player stepped off it (Driftwood's west edge: ~17 links in one frame, 2.5 to 4.3 s in Chromium).
+  const f = fixture(), cell = new DataTexture(new Uint8Array(4), 1, 1);
+  f.scene.environment = cell;
+  try {
+    await prepareSceneRoots(f.renderer, f.camera, f.scene, null, [f.root], () => true, () => Promise.resolve());
+    const exterior = f.compiled.slice(2);
+    expect(exterior.filter(row => row.environment === null).map(row => row.receiver)).toEqual([false, true]);
+    expect(exterior.filter(row => row.environment === cell).map(row => row.receiver)).toEqual([false, true]);
+    expect(f.scene.environment).toBe(cell);
+  } finally {f.dispose(); cell.dispose();}
 });
 
 test('costly light discovery yields between objects and cancellation stops before compilation', async () => {

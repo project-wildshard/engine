@@ -158,9 +158,13 @@ function* exteriorJobSteps(scene: THREE.Scene, rt: THREE.WebGLRenderTarget | nul
   const target = createCompileScene(scene);
   const lights = new CompileLights();
   // the road draws with the page's own environment (a layer swaps a cell's in only while it renders, `BackdropLayer.apply`):
-  // with none declared, the live page environment keys the exterior variant (G639: a null one keyed Driftwood's road
-  // programs without the page PMREM, so they all linked on the first road frame)
-  target.fog = scene.fog; target.environment = state.environment ?? scene.environment;
+  // the declared one keys the exterior variant, and the live one (a cell's PMREM, swapped in by its layer at half weight, so
+  // drawn on the road beside the cell; G639: Driftwood's road programs linked on the first road frame without it) one more
+  // below. RP4: keyed with the live PMREM alone, between frames inside a cell, a grid page (declared none) had no variant
+  // for the road past the layer's half weight, and every program of the cell linked again 2 m before its edge (Driftwood's
+  // west edge: about 17 links in one frame, 2.5 to 4.3 s in Chromium)
+  target.fog = scene.fog; target.environment = state.environment;
+  const live = scene.environment;
   const pending: THREE.Object3D[] = [scene];
   while (pending.length > 0) {
     const object = pending.pop();
@@ -183,17 +187,19 @@ function* exteriorJobSteps(scene: THREE.Scene, rt: THREE.WebGLRenderTarget | nul
     : exterior;
   // Passes with their own scene keep their authored state. Only the page world/depth variants transition outside.
   for (const job of jobs) if (job.target === scene) { job.target = target; job.lights = lights; }
-  // A view root's warm-up (`roots`): also the variant for every other environment the road may draw with, one per cube
-  // height (a cell's layer swaps its PMREM in by weight; G639: Driftwood's, Nalati's and Pine's ring and road views linked
-  // their 256 / 512 / 1024 variants on the first road frame beside each, 150-270 ms each with a cold shader cache)
-  if (roots !== undefined) {
-    const own = target.environment, height = (t: THREE.Texture | null): unknown => (t === null ? null : Reflect.get(t.image ?? {}, 'height'));
-    for (const environment of pageEnvironments()) {
-      if (height(environment) === height(own)) continue;
-      const lit = (yield* sceneJobSteps(scene, rt, 1, roots, state.roots)).jobs;
-      for (const job of lit) if (job.target === scene) { job.target = target; job.lights = lights; job.environment = environment; }
-      jobs.push(...lit);
-    }
+  // Also the variant for every other environment the road may draw with, one per cube height (three keys a program by the
+  // PMREM's height, and by none): the live one, and for a view root's warm-up (`roots`) every one the page recorded (a
+  // cell's layer swaps its PMREM in by weight; G639: Driftwood's, Nalati's and Pine's ring and road views linked their
+  // 256 / 512 / 1024 variants on the first road frame beside each, 150-270 ms each with a cold shader cache)
+  const height = (t: THREE.Texture | null): unknown => (t === null ? null : Reflect.get(t.image ?? {}, 'height'));
+  const keyed = new Set<unknown>([height(target.environment)]);
+  for (const environment of [...live === null ? [] : [live], ...roots === undefined ? [] : pageEnvironments()]) {
+    if (keyed.has(height(environment))) continue;
+    keyed.add(height(environment));
+    const lit = [...(yield* sceneJobSteps(scene, rt, roots === undefined ? per : 1, roots ?? [scene], state.roots, undefined, from)).jobs,
+      ...roots === undefined ? familyCompileJobs(scene, rt, per, excludedMaterials) : []];
+    for (const job of lit) if (job.target === scene) { job.target = target; job.lights = lights; job.environment = environment; }
+    jobs.push(...lit);
   }
   return jobs;
 }
