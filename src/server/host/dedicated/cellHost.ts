@@ -47,7 +47,7 @@ export interface CellHostOptions {
   readonly playtest?:boolean;
   /**
    * GC15 (`WORLD_CROSSING=worker`): the grid pack's road strips. Given, this worker hosts the road between its cells, each of its grid
-   * cells opens onto it instead of standing in lone walls, and a seat walks cell, road, cell on one socket. Left out, every cell is lone.
+   * cells opens onto it instead of standing in lone walls, and a seat walks cell, road, cell on one socket. Left out, or no strips, every cell is lone.
    */
   readonly road?: () => Promise<readonly GridCollisionStrip[]>;
 }
@@ -76,6 +76,11 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     if (crossing === undefined || !crossing.assembly.cells.some(cell => cell.instance === instance)) return undefined;
     return { name: crossing.name, assembly: crossing.assembly, seams: [...crossing.strips.flatMap(strip => strip.duplicates), ...crossing.seams].filter(row => row.instance === instance).map(row => row.mesh) };
   };
+  /**
+   * GC30: a cell this worker hosts and whose entryways all have ground at road height. Any other (another worker's, or Far Reach's sky
+   * islands) is walled on the road: a walker meets the wall and turns back, never falls in with no way out.
+   */
+  const enterable = (instance: string): boolean => { const room = cells.get(instance)?.room; return room !== undefined && room.entrywaysStand(); };
   /** A cell on this worker, or its road, by name. */
   const named = (name: string): Cell | RoadRoom | undefined => road !== undefined && road.name === name ? road : cells.get(name);
   const emptyMs = options.emptyMs ?? EMPTY_MS;
@@ -166,7 +171,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
       if (crossing !== undefined && was !== undefined && was !== grown) {
         const { strips, seams: more } = placedStrips(grown, was), fresh = grown.cells.slice(was.cells.length);
         crossing = { name: crossing.name, assembly: grown, strips: [...crossing.strips, ...strips], seams: [...crossing.seams, ...more] };
-        laid = () => { road?.place(grown, strips, fresh.filter(cell => !cells.has(cell.instance))); };
+        laid = () => { road?.place(grown, strips, fresh.filter(cell => !enterable(cell.instance))); };
       }
       for (const slug of order.open) {
         if (cells.has(slug)) continue;
@@ -211,11 +216,12 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   void (async (): Promise<void> => {
     const first = options.slugs[0];
     // SA34a: a worker booted after a placement (its `placed`) lays the placed cells out from the start.
-    if (options.road !== undefined && first !== undefined) { const assembly = gridAssembly(), strips = await options.road(), placed = placedStrips(assembly, gridAssembly(false)); crossing = { name: roadName(first), assembly, strips: [...strips, ...placed.strips], seams: placed.seams }; }
+    // GC28: a book with no grid pack reads no strips: no road to stand on, so the cells open lone (the worker's `road.pack` line says 0).
+    if (options.road !== undefined && first !== undefined) { const assembly = gridAssembly(), strips = await options.road(), placed = placedStrips(assembly, gridAssembly(false)); if (strips.length > 0) crossing = { name: roadName(first), assembly, strips: [...strips, ...placed.strips], seams: placed.seams }; }
     for (const slug of options.slugs) { const room = await open(slug); if (disposed) return; cells.set(slug, { slug, room, emptySince: diagnosticNow(), used: false, waking: null }); }
     if (crossing !== undefined && rapier !== undefined) {
       const { name, assembly, strips } = crossing, begun = diagnosticNow();
-      road = new RoadRoom({ name, build: options.build, assembly, host: openRoad(rapier, assembly.cells.filter(cell => !cells.has(cell.instance)), strips, assembly.cells), hosts: instance => cells.has(instance),
+      road = new RoadRoom({ name, build: options.build, assembly, host: openRoad(rapier, assembly.cells.filter(cell => !enterable(cell.instance)), strips, assembly.cells), hosts: instance => cells.has(instance),
         now: options.roomNow ?? diagnosticNow, post: news => { post({ ...news, slug: name }); }, reports: { file: report => { post({ kind: 'report', slug: name, report }); } },
         ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }) });
       post({ kind: 'cell', slug: name, ms: diagnosticNow() - begun });
