@@ -11,6 +11,7 @@ import { buildValidationReceipts } from './scripts/app-build/validationReceipts.
 import { BUILD_ID_EXPRESSION, VALIDATOR_EXPRESSION, VERDICTS_EXPRESSION, SHARED_CODE_DIRECTORY, codeDirectory } from './scripts/app-build/buildIdentity.mjs';
 import { controlChunkGroups, controlChunkFileName } from './scripts/app-build/controlChunks';
 import { engineRelease } from './scripts/changelog.mjs';
+import { entryStamp } from './scripts/app-build/builtAt.mjs';
 import { worktreeWatchIgnored } from './scripts/worktree-ignore.mjs';
 
 /** The world map atlas's define, as scripts/app-build/worldMapAtlas.ts baked it before the bundle. */
@@ -53,6 +54,8 @@ export default defineConfig(({ mode, command }) => {
           strictExecutionOrder: true, chunkFileNames: chunk => controlChunkFileName(chunk, shared, basename(process.cwd())),
           assetFileNames: asset => `${asset.names.some(name => /\.(?:js|css|wasm)$/u.test(name)) ? shared : 'assets'}/[name]-[hash][extname]`,
           codeSplitting: { groups: controlChunkGroups(process.cwd()) },
+          // STALE-BUILD SB1/SB3 (J321): the page's own entry carries its build time and the age check (app-build/builtAt.mjs)
+          banner: chunk => chunk.isEntry && chunk.name === 'main' ? entryStamp(process.env['WS_BUILT_AT']) : '',
         },
       },
     },

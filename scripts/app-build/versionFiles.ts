@@ -5,6 +5,7 @@ import { assetIndex } from './gen';
 import { WILDSHARD_IDENTITY } from '../../src/client/game/identity';
 import { rendererRevision } from '../renderer-revision.mjs';
 import { gitDescribe } from '../changelog.mjs';
+import { builtAtOf } from './builtAt.mjs';
 
 /** version.json (the build id, written into each document by build-app and never into content-hashed runtime modules, so
  *  the app can tell when the server has a newer build: iOS home-screen PWAs have no address bar, so the title screen
@@ -14,7 +15,7 @@ export function writeVersionFiles(outDir: string, build: string): void {
   const {WILDSHARD_PREPARATION_ONLY} = process.env;
   const epoch: unknown = JSON.parse(readFileSync('save-epoch.json', 'utf8'));
   if (typeof epoch !== 'object' || epoch === null || !('saveEpoch' in epoch) || epoch.saveEpoch !== WILDSHARD_IDENTITY.saveEpoch) throw new Error('Save epoch metadata must match game identity');
-  writeFileSync(join(outDir, 'version.json'), JSON.stringify({ build, saveEpoch: epoch.saveEpoch, rendererRevision: rendererRevision(), preparationOnly: WILDSHARD_PREPARATION_ONLY === '1', time: new Date().toISOString(), describe: gitDescribe(process.cwd()) }));
+  writeFileSync(join(outDir, 'version.json'), JSON.stringify({ build, saveEpoch: epoch.saveEpoch, rendererRevision: rendererRevision(), preparationOnly: WILDSHARD_PREPARATION_ONLY === '1', time: new Date(Number(builtAtOf(process.env['WS_BUILT_AT']))).toISOString(), describe: gitDescribe(process.cwd()) }));
   writeFileSync(join(outDir, 'asset-index.json'), assetIndex());
   writeFileSync(join(outDir, 'asset-manifest.json'), JSON.stringify(hashTree('assets')));
 }

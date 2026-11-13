@@ -3,6 +3,7 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { newBuildId } from "./app-build/buildIdentity.mjs";
+import { builtAtOf } from "./app-build/builtAt.mjs";
 import { deferredPublicCopy } from "./app-build/outputProducts.mjs";
 import { prepareAppBuild, finishAppBuild, AppBuildFailureError } from "./app-build-pipeline.mjs";
 
@@ -23,6 +24,9 @@ try {
 
   const vite = resolve(import.meta.dirname, "../node_modules/vite/bin/vite.js");
   const buildId = newBuildId();
+  // STALE-BUILD SB1 (J321): one build time for every step's stamp (version.json, the documents, the entry, sw.js);
+  // a caller may pass its own, as with WS_BUILD_ID
+  process.env.WS_BUILT_AT = builtAtOf(process.env.WS_BUILT_AT);
   const deferPublic = deferredPublicCopy(process.cwd(), outDir, args);
   // vite.config.ts bundles to one module whose static imports reach @wildshard/format, so the hook comes first (J82).
   const build = spawnSync(

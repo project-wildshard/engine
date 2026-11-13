@@ -111,7 +111,7 @@ export function refreshServiceWorker(outDir: string, before: string): void {
   const core = held.split(document).join(JSON.stringify(html)).replaceAll(old, `${buildId}-${digest}`), scripts = workerScripts(core);
   mkdirSync(dirname(join(outDir, scripts.fileName)), { recursive: true });
   writeFileSync(join(outDir, scripts.fileName), core);
-  writeFileSync(join(outDir, 'sw.js'), scripts.bootstrap);
+  writeFileSync(join(outDir, 'sw.js'), stampWorker(scripts.bootstrap, outDir));
   console.log(`sw.js refreshed (${buildId}-${digest})`);
 }
 
@@ -129,6 +129,13 @@ function splitBundle(outDir: string, bundle: Record<string, EmittedFile>): Recor
   return joined;
 }
 
+/** STALE-BUILD SB1 (J321): sw.js opens with its build's time (version.json `time`), as the page and its entry do. */
+function stampWorker(bootstrap: string, outDir: string): string {
+  const { time } = JSON.parse(readFileSync(join(outDir, 'version.json'), 'utf8')) as { time?: unknown };
+  const at = typeof time === 'string' ? Date.parse(time) : Number.NaN;
+  return Number.isFinite(at) ? `// built ${new Date(at).toISOString()}\nself.__WS_BUILT_AT__=${at};\n${bootstrap}` : bootstrap;
+}
+
 /** Called after ordinary bundling; previous-deploy chunks are carried by MF2 afterwards. */
 export async function writeServiceWorker(outDir: string, root: string): Promise<void> {
   const { build: buildId } = JSON.parse(readFileSync(join(outDir, 'version.json'), 'utf8')) as { build: string };
@@ -140,6 +147,6 @@ export async function writeServiceWorker(outDir: string, root: string): Promise<
   const { core, build, hashed } = await serviceWorkerCore(splitBundle(outDir, writtenBundle(outDir, root)), root, buildId, book(serverPackBookPath(buildId)), book(packsBookPath(buildId))), scripts = workerScripts(core);
   mkdirSync(dirname(join(outDir, scripts.fileName)), { recursive: true });
   writeFileSync(join(outDir, scripts.fileName), core);
-  writeFileSync(join(outDir, 'sw.js'), scripts.bootstrap);
+  writeFileSync(join(outDir, 'sw.js'), stampWorker(scripts.bootstrap, outDir));
   console.log(`sw.js written (${build}; ${ASSET_CACHE_NAME}; ${hashed.length} precached files)`);
 }
