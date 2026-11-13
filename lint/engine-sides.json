@@ -1289,6 +1289,7 @@
     "src/server/host/dedicated/playerDoc.ts": "server",
     "src/server/host/dedicated/playerSaves.ts": "server",
     "src/server/host/dedicated/playerStore.ts": "server",
+    "src/server/host/dedicated/placementFile.ts": "server",
     "src/server/host/dedicated/releaseFile.ts": "server",
     "src/server/host/dedicated/saves/database.ts": "server",
     "src/server/host/dedicated/saves/migrate.ts": "server",

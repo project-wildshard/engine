@@ -35,6 +35,17 @@ server moves (its poller preloads, counts down 60 s and restarts), then
 alias the staging page to the same build. If a step fails, the previous
 signed file stays live and the server keeps serving it.
 
+**A placed cell is not a release (SA33).** A new slug the API places on
+the grid (SA30) reaches a running `WORLD_CELLS=grid` server through a
+second signed file, the placement file (`placementFile.ts`): `channel`,
+`serial` and `cells` (`instance`, `slug`, `cell`), signed with the API's
+own placement key, never the release key, which vouches for the bundle.
+The server reads it at `PLACEMENT_URL` with `PLACEMENT_PUBLIC_KEY` (both or
+neither) at boot and each minute, places each new cell on an empty spot,
+preloads its pack from this build's book (a cell with none waits for the
+next look) and opens it on a worker of its own: no grace, no restart, and
+no other cell is touched. `/health` says `placements: <serial>`.
+
 ## Page release
 
 The channel pages ship with one committed script, in four phases, from

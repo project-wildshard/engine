@@ -155,6 +155,8 @@ export class World {
   /** GC15: devices whose source said `left` while their crossing was in flight: applied if the crossing is abandoned before `cross`. */
   private readonly leftCrossing = new Set<string>();
   private asked = 0;
+  /** SA33: cells whose late worker is booting, so a second open of the same cell boots nothing. */
+  private readonly booting = new Set<string>();
   private draining = false;
   private grace: { readonly endsAt: number; readonly build: string } | null = null;
   /** J218: who is on voice in each cell, and their signalling. */
@@ -172,13 +174,36 @@ export class World {
     await Promise.all(workerTable(options.cells, options.workers).map(slugs => world.bootWorker(slugs)));
     return world;
   }
-  private bootWorker(slugs: readonly string[]): Promise<void> {
+  /** A worker on its row. At startup its cells are in the table at once, and any failure ends the process (Q77). SA33: a `late` worker's cells
+   *  join the table only once it has booted, and one that fails to boot is let go with nobody seated on it; after its boot it is like any. */
+  private bootWorker(slugs: readonly string[], late = false): Promise<void> {
     const link = this.options.boot(slugs), index = this.workers.push(link) - 1;
-    for (const slug of slugs) this.links.set(slug, link);
+    if (!late) for (const slug of slugs) this.links.set(slug, link);
+    let up = false;
     return new Promise((resolve, reject) => {
-      const ended = (reason: string): void => { this.options.log({ at: 'worker.ended', index, slugs, reason }); reject(new Error(reason)); this.options.crashed(new Error(reason)); };
-      link.listen(news => { if (news.kind === 'booted') { this.options.log({ at: 'worker.booted', index, slugs, ms: news.ms }); resolve(); } else if (news.kind === 'failed') ended(news.reason); else this.heard(index, news); }, ended);
+      const ended = (reason: string): void => {
+        this.options.log({ at: 'worker.ended', index, slugs, reason }); reject(new Error(reason));
+        if (late && !up) { link.stop(); if (this.workers.at(-1) === link) this.workers.pop(); return; }
+        this.options.crashed(new Error(reason));
+      };
+      link.listen(news => {
+        if (news.kind === 'booted') { up = true; if (late) for (const slug of slugs) this.links.set(slug, link); this.options.log({ at: 'worker.booted', index, slugs, ms: news.ms }); resolve(); }
+        else if (news.kind === 'failed') ended(news.reason); else this.heard(index, news);
+      }, ended);
     });
+  }
+  /**
+   * SA33: open cells on a running world (a placement the API made, J314) on a worker of their own. No other worker is told anything, so every
+   * player in another cell stays where they are, and the door seats a player in a new cell only once its worker has booted. A cell this world
+   * already opens is skipped. Rejects, with nothing opened, when the worker fails to boot. The next restart deals them out with the rest.
+   */
+  async openCells(cells: readonly string[]): Promise<readonly string[]> {
+    const fresh = [...new Set(cells)].filter(cell => !this.links.has(cell) && !this.booting.has(cell));
+    if (fresh.length === 0 || this.draining) return [];
+    for (const cell of fresh) this.booting.add(cell);
+    try { await this.bootWorker(fresh, true); } finally { for (const cell of fresh) this.booting.delete(cell); }
+    this.options.log({ at: 'cells.opened', cells: fresh, total: this.links.size });
+    return fresh;
   }
   private heard(index: number, news: WorkerNews): void {
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }

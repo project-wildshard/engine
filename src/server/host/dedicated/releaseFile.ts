@@ -10,19 +10,26 @@ import { ReleaseSchema, SignedSchema, type ReleaseFile } from '../../../shared/h
 
 /** How often the server looks, in ms: as the cook worker does, outbound, so the VPS opens no port (J175, Q91). */
 const POLL_MS = 60_000;
-/** The file's text as what it says. It throws on a bad signature, before a byte of the body is believed. `publicKey` is SPKI DER in hex, and the signature is hex. */
-export function readReleaseFile(text: string, publicKey: string): ReleaseFile {
+/** A look that hangs would stop every later look: one minute's poll is the most it may take. */
+const FETCH_MS = 30_000;
+/** A signed file's text as what it says. It throws on a bad signature, before a byte of the body is believed. `publicKey` is SPKI DER in hex, and the signature is hex.
+ *  The release file and SA33's placement file share it, each under its own key. */
+export function readSigned<T>(text: string, publicKey: string, schema: v.GenericSchema<T>, what: string): T {
   const signed = v.parse(SignedSchema, JSON.parse(text)), key = createPublicKey({ key: Buffer.from(publicKey, 'hex'), format: 'der', type: 'spki' });
-  if (!verify(null, Buffer.from(signed.body), key, Buffer.from(signed.signature, 'hex'))) throw new Error('A release file has a bad signature');
-  return v.parse(ReleaseSchema, JSON.parse(signed.body));
+  if (!verify(null, Buffer.from(signed.body), key, Buffer.from(signed.signature, 'hex'))) throw new Error(`A ${what} has a bad signature`);
+  return v.parse(schema, JSON.parse(signed.body));
 }
+/** A signed file's text at `url`, an `https:` bucket or a `file:` path. */
+export async function fetchSignedText(url: string, what: string): Promise<string> {
+  if (url.startsWith('file:')) return readFile(new URL(url), 'utf8');
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(FETCH_MS) });
+  if (!response.ok) throw new Error(`No ${what} at ${url}: ${String(response.status)}`);
+  return response.text();
+}
+/** The release file's text as what it says. */
+export function readReleaseFile(text: string, publicKey: string): ReleaseFile { return readSigned(text, publicKey, ReleaseSchema, 'release file'); }
 /** The release file at `url`, an `https:` bucket or a `file:` path. */
-export async function fetchReleaseFile(url: string, publicKey: string): Promise<ReleaseFile> {
-  if (url.startsWith('file:')) return readReleaseFile(await readFile(new URL(url), 'utf8'), publicKey);
-  const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`No release file at ${url}: ${String(response.status)}`);
-  return readReleaseFile(await response.text(), publicKey);
-}
+export async function fetchReleaseFile(url: string, publicKey: string): Promise<ReleaseFile> { return readReleaseFile(await fetchSignedText(url, 'release file'), publicKey); }
 
 /** Boot from the release whose bundle passed the pull. Remote metadata alone cannot change its epoch.
  * A direct local boot without a kept file may use the signed file for its build and configured channel. */

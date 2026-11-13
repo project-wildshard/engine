@@ -3,6 +3,7 @@
 // player's progress under the shard's slug, so a save made before GO3 reads back. A name the grid doesn't place is a cell of its own.
 import { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import { catalogueDocument } from '@wildshard/engine/game/grid/catalogueDocument';
+import { GRID_RADIUS } from '@wildshard/format/contentBounds';
 
 /** `WORLD_CELLS=grid`: every grid cell the release names, the home cell first. */
 export const WHOLE_GRID = 'grid';
@@ -10,19 +11,49 @@ export const WHOLE_GRID = 'grid';
 const UNPLACED_FRAME = 1;
 
 /** The grid's cells in catalogue order, and each one's frame, by instance and by shard. */
-interface GridNames { readonly instances: readonly string[]; readonly frames: ReadonlyMap<string, number>; readonly shards: ReadonlyMap<string, string>; readonly cells: ReadonlyMap<string, string>; readonly home: string | undefined }
-let read: { readonly from: unknown; readonly names: GridNames } | null = null;
-/** Parsed once per installed catalogue, the way a grid page assembles it. */
+interface GridNames { readonly instances: readonly string[]; readonly frames: ReadonlyMap<string, number>; readonly shards: ReadonlyMap<string, string>; readonly cells: ReadonlyMap<string, string>; readonly home: string | undefined;
+  /** Each taken spot (`x,z`), and the instance on it. */
+  readonly spots: ReadonlyMap<string, string> }
+/** SA33: one cell a signed placement file names: the API's placement of a new slug (SA30), on a spot the catalogue leaves empty. */
+export interface PlacedCell { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number] }
+/** SA33: the cells placed on this running server, in the placement file's order, after the catalogue's. A restart forgets them; the
+ *  placement watch's first look places them again. */
+const placed: PlacedCell[] = [];
+let read: { readonly from: unknown; readonly placed: number; readonly names: GridNames } | null = null;
+/** Parsed once per installed catalogue, the way a grid page assembles it, then the placed cells: frame `catalogue count + n`. */
 function gridNames(): GridNames {
   const { grid } = catalogueDocument();
-  if (read?.from === grid) return read.names;
-  const { cells } = new GridAssembly({ developer: false, devserver: false }, grid);
-  const names: GridNames = { instances: cells.map(cell => cell.instance), frames: new Map(cells.map((cell, index) => [cell.instance, index + 1])),
-    shards: new Map(cells.map(cell => [cell.instance, cell.slug])), cells: new Map(cells.map(cell => [cell.slug, cell.instance])),
-    home: cells.find(cell => cell.cell[0] === 0 && cell.cell[1] === 0)?.instance };
-  read = { from: grid, names };
+  if (read?.from === grid && read.placed === placed.length) return read.names;
+  const { cells } = new GridAssembly({ developer: false, devserver: false }, grid), rows = [...cells.map(({ instance, slug, cell }) => ({ instance, slug, cell })), ...placed];
+  const names: GridNames = { instances: rows.map(cell => cell.instance), frames: new Map(rows.map((cell, index) => [cell.instance, index + 1])),
+    shards: new Map(rows.map(cell => [cell.instance, cell.slug])), cells: new Map(rows.map(cell => [cell.slug, cell.instance])),
+    home: cells.find(cell => cell.cell[0] === 0 && cell.cell[1] === 0)?.instance, spots: new Map(rows.map(cell => [cell.cell.join(','), cell.instance])) };
+  read = { from: grid, placed: placed.length, names };
   return names;
 }
+/**
+ * SA33: place a cell the API placed (a new slug, J314) on this running server. True when it is new here, false when this server already
+ * places it the same way. A slug keeps one cell for life and a spot holds one cell, so a row that disagrees with the catalogue or an earlier
+ * placement throws and changes nothing. The server draws nothing, so any spot inside the format's grid (the 7 × 7, SA29) is admitted.
+ */
+export function placeCell(row: PlacedCell): boolean {
+  const { shards, cells, spots } = gridNames(), [x, z] = row.cell, spot = `${String(x)},${String(z)}`;
+  if (shards.has(row.instance)) {
+    if (cells.get(row.slug) === row.instance && spots.get(spot) === row.instance) return false;
+    throw new Error(`${row.instance} is already placed elsewhere`);
+  }
+  if (!Number.isInteger(x) || !Number.isInteger(z) || Math.abs(x) > GRID_RADIUS || Math.abs(z) > GRID_RADIUS) throw new Error(`${row.instance}'s cell ${spot} is off the grid`);
+  if (cells.has(row.slug) || shards.has(row.slug)) throw new Error(`${row.slug} already has a cell`);
+  if (cells.has(row.instance)) throw new Error(`${row.instance} is a placed shard's name`);
+  const taken = spots.get(spot);
+  if (taken !== undefined) throw new Error(`${spot} is ${taken}'s`);
+  placed.push({ instance: row.instance, slug: row.slug, cell: [x, z] });
+  return true;
+}
+/** What a worker thread is booted with, so its rooms name, frame and load a placed cell as the door does. */
+export function placedCells(): readonly PlacedCell[] { return [...placed]; }
+/** Tests only: forget every placed cell. */
+export function forgetPlacedCells(): void { placed.length = 0; }
 
 /** The instance a name means: an instance stands, a grid shard's slug becomes its cell, and anything else is its own name. */
 export function cellName(name: string): string { const { shards, cells } = gridNames(); return shards.has(name) ? name : cells.get(name) ?? name; }

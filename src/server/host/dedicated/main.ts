@@ -26,7 +26,8 @@ import { World, type PlayerSaves, type WorkerLink } from './world';
 import { cloudflareTurn } from './voiceRelay';
 import { worldSettings } from './workerTable';
 import { doorTrust } from './doorTrust';
-import { cellShard, worldCells } from './gridCells';
+import { WHOLE_GRID, cellShard, placeCell, placedCells, worldCells } from './gridCells';
+import { PlacementWatch, fetchPlacementFile } from './placementFile';
 
 declare const __BUILD_ID__: string;
 /** scripts/build-server.mjs: package.json's version, the Sentry release (S8). */
@@ -56,7 +57,7 @@ async function installedRelease(): Promise<ReleaseFile> {
 const release = await installedRelease();
 // C5, C11, GO3: the cells, by grid instance, fixed at startup; a player with no save lands in the first. `grid` opens every grid cell
 // the release names, home first. A cell runs its shard's pack, and the release must name that shard.
-const cells = worldCells(process.env['WORLD_CELLS'] ?? 'driftwood-isle', release.shards.map(shard => shard.slug)), shards = [...new Set(cells.map(cellShard))];
+const listed = process.env['WORLD_CELLS'] ?? 'driftwood-isle', cells = worldCells(listed, release.shards.map(shard => shard.slug)), shards = [...new Set(cells.map(cellShard))];
 const hold = process.env['HOLD_MS'], grace = process.env['GRACE_MS'], poll = process.env['RELEASE_POLL_MS'], recordEvery = process.env['RECORD_MS'];
 // An env file's blank row means unset.
 const setting = (name: string): string | undefined => { const value = process.env[name]; return value === '' ? undefined : value; };
@@ -69,11 +70,14 @@ const turnKey = setting('WILDSHARD_TURN_KEY_ID'), turnToken = setting('WILDSHARD
 const crossingSetting = setting('WORLD_CROSSING');
 if (crossingSetting !== undefined && crossingSetting !== 'worker') throw new Error(`WORLD_CROSSING=${crossingSetting}: only worker, or unset`);
 const crossing = crossingSetting === 'worker';
+// SA33: where the API's signed placement file is, and its own key's public half. Both or neither; only a whole-grid world grows.
+const placementAt = setting('PLACEMENT_URL'), placementKey = setting('PLACEMENT_PUBLIC_KEY');
+if ((placementAt === undefined) !== (placementKey === undefined)) throw new Error('PLACEMENT_URL and PLACEMENT_PUBLIC_KEY go together');
 const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting('PLAYTEST_DIR')??'/var/log/wildshard',build,log,...(recordTag===undefined?{}:{tag:recordTag})}):undefined;
 
 /** One row of the table is one worker thread, started once (J182). */
 function bootWorker(slugs: readonly string[]): WorkerLink {
-  const data: CellWorkerData = { slugs, build, origin, cache, ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(crossing ? { crossing } : {}),...(playtest===undefined?{}:{playtest:true}) };
+  const data: CellWorkerData = { slugs, build, origin, cache, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(crossing ? { crossing } : {}),...(playtest===undefined?{}:{playtest:true}) };
   const worker = new Worker(new URL('cellWorker.mjs', import.meta.url), { workerData: data });
   let stopped = false;
   return { send: (order, transfer = []) => { worker.postMessage(order, transfer as never); },
@@ -100,10 +104,12 @@ const world: World = await World.open({ build, cells, ...worldSettings(release.c
   // J218: phones on 4G need TURN to reach each other's voice. Without the key, voice falls back to public STUN.
   ...(turnKey === undefined || turnToken === undefined ? {} : { voiceIce: cloudflareTurn(turnKey, turnToken) }),
   restart: () => { stop(0); } });
+/** SA33's watch, once the door listens; `/health` names its serial. */
+let placements: PlacementWatch | null = null;
 const server = createServer((request, response) => {
   if (request.url !== '/health') { response.writeHead(404).end(); return; }
   // E7.5 prep: any page may read it (no player data), so the Connection doctor sees the build; `now` lets it read a phone's clock.
-  response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ ...world.health(), serial: release.serial, uptime: Math.round((Date.now() - started) / 1000), now: Date.now() }));
+  response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ ...world.health(), serial: release.serial, ...(placements === null ? {} : { placements: placements.serial }), uptime: Math.round((Date.now() - started) / 1000), now: Date.now() }));
 });
 server.on('upgrade', (request, socket, head) => { world.upgrade(request, socket, head); });
 stop = (code): void => { void (async (): Promise<void> => {
@@ -131,4 +137,18 @@ const watch = new ReleaseWatch({ read: readRelease, serving: release, cells: sha
     for (const slug of shards) await readPackProduct(slug, next.engineBuild, await rapier(), { origin, cache }, reads);
     world.beginGrace(next.engineBuild);
   } });
-process.once('SIGTERM', () => { watch.dispose(); stop(0); });
+// SA33: a cell the API placed opens on this running server within a look, on a worker of its own, with no grace and no restart. Its shard's
+// server pack must already be in this build's book: one that isn't is refused here, before any worker boots, and asked for again next look.
+placements = placementAt === undefined || placementKey === undefined || listed.trim() !== WHOLE_GRID ? null : new PlacementWatch({
+  read: () => fetchPlacementFile(placementAt, placementKey), channel: release.channel, ...(poll === undefined ? {} : { everyMs: Number(poll) }),
+  failed: error => { log({ at: 'placement.failed', error: String(error) }); },
+  open: async rows => {
+    const ready: string[] = [];
+    for (const row of rows) {
+      try { placeCell(row); await readPackProduct(row.slug, build, await rapier(), { origin, cache }, reads); ready.push(row.instance); }
+      catch (error) { log({ at: 'placement.refused', instance: row.instance, slug: row.slug, error: String(error) }); }
+    }
+    return ready.length === 0 ? [] : world.openCells(ready);
+  } });
+void placements?.look();
+process.once('SIGTERM', () => { watch.dispose(); placements?.dispose(); stop(0); });
