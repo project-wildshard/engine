@@ -158,3 +158,34 @@ test('only the files it reads make a push run it', () => {
   for (const path of ['pnpm-lock.yaml', 'package.json', 'src/game/package.json', '.github/workflows/ci.yml']) expect(isFormatLockInput(path)).toBe(true);
   for (const path of ['src/client/game/boot.ts', 'docs/package.json.md', '.github/actions/README.md']) expect(isFormatLockInput(path)).toBe(false);
 });
+
+// NPM-PUBLISH NP6: engine takes the format from npm by the same alias; its lock row is the registry release, keyed by version
+const NPM_PIN = 'npm:@wildshard/shard-format@^0.4.9';
+const npmLock = (locked = '0.4.9', row = '0.4.9', resolution = 'integrity: sha512-HbNtrUnsBQHq+q0y95b298kf4w3sQQ1Yef=='): string => `lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    dependencies:
+      '@wildshard/format':
+        specifier: ${NPM_PIN}
+        version: '@wildshard/shard-format@${locked}(typescript@6.0.3)'
+
+packages:
+
+  '@wildshard/shard-format@${row}':
+    resolution: {${resolution}}
+    engines: {node: '>=24.18.0'}
+
+snapshots:
+`;
+test('NP6: an npm pin and its registry row pass, and no tag is fetched for it', () => {
+  const files = tree({ 'pnpm-lock.yaml': npmLock(), 'package.json': manifest(NPM_PIN) });
+  expect(formatLockFailures(files)).toEqual([]);
+  expect(formatTagFailures(files, () => { throw new Error('an npm pin reads no tag'); })).toEqual([]);
+});
+test('NP6: an npm pin whose importer and row disagree, or a git row under an npm pin, is refused', () => {
+  expect(formatLockFailures(tree({ 'pnpm-lock.yaml': npmLock('0.4.8'), 'package.json': manifest(NPM_PIN) })).join('\n')).toContain('importer . locks 0.4.8, its package row 0.4.9');
+  expect(formatLockFailures(tree({ 'pnpm-lock.yaml': lock('0.3.4', COMMIT, [importer('.', NPM_PIN)]), 'package.json': manifest(NPM_PIN) })).join('\n')).toContain('pins the npm release, its package row is a git row');
+  expect(formatLockFailures(tree({ 'pnpm-lock.yaml': npmLock(), 'package.json': manifest('npm:left-pad@1.0.0') })).join('\n')).toContain("isn't a shard-format release tag or npm release");
+});

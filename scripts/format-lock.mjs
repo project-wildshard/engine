@@ -12,6 +12,8 @@ const LOCK = 'pnpm-lock.yaml';
 const FORMAT = '@wildshard/format';
 const PACKAGE = '@wildshard/shard-format';
 const PIN = /^github:project-wildshard\/shard-format#(v\d+\.\d+\.\d+)$/u;
+// NPM-PUBLISH NP6: the registry release, by the same alias (`npm:@wildshard/shard-format@^0.4.9`); its lock row is an integrity, no commit
+const NPM_PIN = /^npm:@wildshard\/shard-format@\^?\d+\.\d+\.\d+$/u;
 const SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies'];
 const FETCH_MS = 8000;
 
@@ -26,16 +28,21 @@ function parseLock(text) {
   const block = start === -1 || end === -1 ? '' : text.slice(start, end), keys = [...block.matchAll(/^ {2}(\S+):$/gmu)];
   keys.forEach((key, index) => {
     const body = block.slice(key.index, keys[index + 1]?.index);
-    // pnpm locks a github pin as git (`git+ssh://…#<commit>`) or as a codeload tarball (`…/tar.gz/<commit>`)
-    const row = /^ {6}'@wildshard\/format':\n {8}specifier: (\S+)\n {8}version: \S*?(?:#|\/tar\.gz\/)([0-9a-f]{40})/mu.exec(body);
-    if (row !== null) importers.set(key[1], { specifier: row[1], commit: row[2] });
+    // pnpm locks a github pin as git (`git+ssh://…#<commit>`) or as a codeload tarball (`…/tar.gz/<commit>`), an npm one by version
+    const row = /^ {6}'@wildshard\/format':\n {8}specifier: (\S+)\n {8}version: (\S+)/mu.exec(body);
+    const version = row?.[2] ?? '';
+    if (row !== null) importers.set(key[1], { specifier: row[1], commit: /(?:#|\/tar\.gz\/)([0-9a-f]{40})/u.exec(version)?.[1],
+      registry: /^'?@wildshard\/shard-format@(\d+\.\d+\.\d+[^('\s]*)/u.exec(version)?.[1] });
   });
-  const rows = [...text.matchAll(/^ {2}'@wildshard\/shard-format@[^']*':\n {4}resolution: \{([^}\n]*)\}\n(?: {4}version: (\S+)\n)?/gmu)]
+  const rows = [...text.matchAll(/^ {2}'@wildshard\/shard-format@([^']*)':\n {4}resolution: \{([^}\n]*)\}\n(?: {4}version: (\S+)\n)?/gmu)]
+    .map(([, key, resolution, version]) => [resolution, version, key])
     .map(row => {
-      const git = /^commit: ([0-9a-f]{40}), repo: ([^,]+), type: git$/u.exec(row[1] ?? '');
-      if (git !== null) return { commit: git[1], repo: git[2], version: row[2] };
-      const tarball = /tarball: https:\/\/codeload\.github\.com\/([\w.-]+\/[\w.-]+)\/tar\.gz\/([0-9a-f]{40})$/u.exec(row[1] ?? '');
-      return { commit: tarball?.[2], repo: tarball === null ? undefined : `https://github.com/${tarball[1]}.git`, version: row[2] };
+      // NP6: a registry row is keyed by its version and resolved by integrity alone
+      if (/^integrity: sha512-[^,]+$/u.test(row[0] ?? '') && /^\d+\.\d+\.\d+/u.test(row[2] ?? '')) return { commit: undefined, repo: undefined, version: row[2], registry: true };
+      const git = /^commit: ([0-9a-f]{40}), repo: ([^,]+), type: git$/u.exec(row[0] ?? '');
+      if (git !== null) return { commit: git[1], repo: git[2], version: row[1], registry: false };
+      const tarball = /tarball: https:\/\/codeload\.github\.com\/([\w.-]+\/[\w.-]+)\/tar\.gz\/([0-9a-f]{40})$/u.exec(row[0] ?? '');
+      return { commit: tarball?.[2], repo: tarball === null ? undefined : `https://github.com/${tarball[1]}.git`, version: row[1], registry: false };
     });
   return { importers, keys: keys.map(key => key[1]), rows };
 }
@@ -48,7 +55,7 @@ export function formatLockFailures(read, workflows = []) {
   const { importers, keys, rows } = parseLock(text);
   const row = rows[0];
   if (rows.length !== 1 || row === undefined) return [`${LOCK}: expected one ${PACKAGE} package row, found ${rows.length}`];
-  if (row.commit === undefined) return [`${LOCK}: ${PACKAGE} row's resolution is neither a git commit nor a codeload tarball`];
+  if (row.commit === undefined && !row.registry) return [`${LOCK}: ${PACKAGE} row's resolution is neither a git commit, a codeload tarball nor a registry integrity`];
   const pins = new Set();
   for (const key of keys) {
     const file = key === '.' ? 'package.json' : `${key}/package.json`, manifest = read(file);
@@ -59,10 +66,12 @@ export function formatLockFailures(read, workflows = []) {
       if (locked !== undefined) failures.push(`${LOCK}: importer ${key} locks ${FORMAT} but ${file} doesn't name it`);
       continue;
     }
-    if (!PIN.test(pin)) failures.push(`${file}: ${FORMAT} pin ${pin} isn't a shard-format release tag`);
+    const npm = NPM_PIN.test(pin);
+    if (!npm && !PIN.test(pin)) failures.push(`${file}: ${FORMAT} pin ${pin} isn't a shard-format release tag or npm release`);
     pins.add(pin);
     if (locked?.specifier !== pin) failures.push(`${file}: ${FORMAT} pin ${pin} but ${LOCK} has ${locked?.specifier ?? 'no row'}`);
-    else if (locked.commit !== row.commit) failures.push(`${LOCK}: importer ${key} locks ${locked.commit}, its package row ${row.commit}`);
+    else if (npm !== row.registry) failures.push(`${LOCK}: importer ${key} pins ${npm ? 'the npm release' : 'a git tag'}, its package row is ${row.registry ? 'a registry' : 'a git'} row`);
+    else if (npm ? locked.registry !== row.version : locked.commit !== row.commit) failures.push(`${LOCK}: importer ${key} locks ${npm ? locked.registry : locked.commit}, its package row ${npm ? row.version : row.commit}`);
   }
   if (pins.size > 1) failures.push(`package.json: ${FORMAT} pins disagree: ${[...pins].join(', ')}`);
   const tag = pins.size === 1 ? PIN.exec([...pins][0] ?? '')?.[1] : undefined;

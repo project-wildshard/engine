@@ -65,8 +65,8 @@
     "@sentry/browser": "11.0.0",
     "@sentry/core": "11.0.0",
     "@valibot/to-json-schema": "1.8.0",
-    "@wildshard/format": "github:project-wildshard/shard-format#v0.4.9",
-    "@wildshard/wire": "github:project-wildshard/shard-format#203e4fa89f0c5f3804b6b254363d7597008a9389&path:/packages/wire",
+    "@wildshard/format": "npm:@wildshard/shard-format@^0.4.9",
+    "@wildshard/wire": "^0.1.0",
     "ajv": "6.15.0",
     "fflate": "0.8.3",
     "hono": "4.13.13",
@@ -80,9 +80,15 @@
     "ws": "8.22.0"
   },
   "peerDependencies": {
-    "sharp": "0.35.5"
+    "@types/three": "*",
+    "@typescript/typescript6": "6.0.2",
+    "sharp": "0.35.5",
+    "vite": "8.3.0"
   },
   "peerDependenciesMeta": {
+    "@types/three": {
+      "optional": true
+    },
     "sharp": {
       "optional": true
     }
