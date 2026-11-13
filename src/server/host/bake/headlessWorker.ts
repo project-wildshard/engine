@@ -3,6 +3,7 @@ import '@wildshard/engine/core/portableMathFirst';
 import {createTrustedHeadlessTape} from '../../../shared/host/headlessTape';
 import { runHeadlessJourney } from '../../../shared/host/headlessJourney';
 import { proveShardfileEntries } from '@wildshard/engine/game/bake/entryways';
+import { openWorldAdapter } from '../openWorld';
 import { createTrustedHeadlessAdapter } from '../headlessRuntime';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 // oxlint-disable-next-line import/no-nodejs-modules -- Only the platform-selected physics binary is read inside the isolated worker.
@@ -34,8 +35,11 @@ await runTickWorker(async raw => {
   if (payload.product !== undefined) {
     // A native assembly's server-class files live only in the built product, never in the client's sections or assets.
     const { loadHeadlessProduct } = await import('../headlessProduct');
-    return createTrustedHeadlessAdapter({ shard, assets: payload.assets, rapier, product: await loadHeadlessProduct(payload.product) }, payload.snapshot);
+    return openWorldAdapter({ shard, assets: payload.assets, rapier, product: await loadHeadlessProduct(payload.product) }, payload.snapshot);
   }
+  // SERVER-PARITY HS1 left: a runtime plan carried as sections, with no product, still ticks the bare resident. Far Reach's and
+  // Dunes' proof witnesses build their checkpoints that way; moving it to `openWorldAdapter` re-records them.
+  // oxlint-disable-next-line typescript/no-deprecated -- HS1 left, above
   if (sections.has('sim/runtime-plan')) return createTrustedHeadlessAdapter({ shard, assets: payload.assets, rapier, sections }, payload.snapshot);
   let commands: ReadonlyMap<string, number> = new Map();
   let effects: HeadlessEffect[] = [];

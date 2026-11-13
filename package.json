@@ -1189,6 +1189,7 @@
     "./host/headlessJourney": "./src/shared/host/headlessJourney.ts",
     "./host/headlessTape": "./src/shared/host/headlessTape.ts",
     "./host/headlessRuntime": "./src/server/host/headlessRuntime.ts",
+    "./host/openWorld": "./src/server/host/openWorld.ts",
     "./host/immutable": "./src/shared/host/immutable.ts",
     "./host/tickProtocol": "./src/shared/host/tickProtocol.ts",
     "./host/tickWorkerHost": "./src/server/host/tickWorkerHost.ts",

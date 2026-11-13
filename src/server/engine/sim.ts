@@ -538,6 +538,9 @@ export class SimHost {
   }
   /** Preflight a fixed-step registration without installing a callback or consuming any simulation state. */
   hasStep(id: string): boolean { return this.callbacks.has(id) || this.afterCallbacks.has(id); }
+  /** SERVER-PARITY HS1: every fixed-step owner, in registration order (before bodies, then after), so two hosts built from one
+   *  product can be compared owner for owner. */
+  stepIds(): readonly string[] { return [...this.callbacks.keys(), ...this.afterCallbacks.keys()]; }
   /** Scoped fixed-step work before bodies by default; afterBodies matches equipment following creature contact.
    * Removing a registration releases its future snapshot adapter. Registration order remains snapshot order. */
   onStep(id: string, run: (dt: number, host: SimHost) => void, adapter?: SimStateAdapter, phase: 'beforeBodies' | 'afterBodies' = 'beforeBodies'): () => void {

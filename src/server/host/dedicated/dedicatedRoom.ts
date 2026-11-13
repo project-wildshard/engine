@@ -12,7 +12,8 @@ import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { carryMotion } from '@wildshard/engine/game/grid/simulation';
 import { netBuys, netWorldInput } from '../../../shared/host/standalone/netInput';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
-import { LEAD_SEAT, openCellWorld, type CellWorld } from '../standalone/cellWorld';
+import { LEAD_SEAT, type CellWorld } from '../standalone/cellWorld';
+import { openWorld } from '../openWorld';
 import type { FallFloor } from '../standalone/fallFloor';
 import { ledgerFilings } from '../standalone/ledgerFilings';
 import { questBooks } from '@wildshard/engine/quest/players';
@@ -139,7 +140,8 @@ export class DedicatedRoom implements CrossTarget {
       if (seat === undefined) throw new Error(`No seat for ${body}`);
       return seat;
     };
-    const cell = await openCellWorld({ instance: options.cell ?? cellName(slug) }, input, undefined, { saves, lone: options.road === undefined, wholeSolids: true, pageless: true,
+    // SERVER-PARITY HS1: the one world-build entry a shard's CI journeys tick too
+    const cell = await openWorld(input, { room: true, cell: options.cell ?? cellName(slug), saves, lone: options.road === undefined,
       owned: body => seated(body).store.slots,
       profiles: {
         read: identity => seats.get(identity)?.store.rewards.read(slug).players[identity] ?? null,

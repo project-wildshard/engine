@@ -1323,6 +1323,7 @@
     "src/server/host/headlessProduct.ts": "server",
     "src/server/host/headlessRuntime.ts": "server",
     "src/server/host/installers.ts": "server",
+    "src/server/host/openWorld.ts": "server",
     "src/server/host/ropeDecks.ts": "server",
     "src/server/host/standalone/cellWorld.ts": "server",
     "src/server/host/standalone/continuation.ts": "server",

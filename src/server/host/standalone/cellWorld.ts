@@ -33,7 +33,7 @@ import { pageRuntimeState } from '@wildshard/engine/game/shardfile/runtimeState'
 import { commandsOf } from '@wildshard/engine/game/grid/roomNet';
 import { pageSavedFlags } from '@wildshard/engine/world/interact/flags';
 import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
-import { createTrustedHeadlessResident, type HeadlessRuntimeInput } from '../headlessRuntime';
+import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../headlessRuntime';
 import { registerInstalled } from '@wildshard/engine/game/shardfile/installedSides';
 import { productHeadlessSections } from '@wildshard/engine/host/headlessSections';
 import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
@@ -58,6 +58,8 @@ export interface CellWorld extends GridResident {
   readonly fallFloor: () => FallFloor;
   /** The first seat's. */
   readonly fall: FallFloor;
+  /** HS1: a native world's trusted resident, which a tick adapter steps with the lead's own commands. A data cell has none. */
+  readonly resident?: TrustedHeadlessResident;
 }
 /** What a host lends a cell it opens. */
 export interface CellWorldOptions {
@@ -134,7 +136,7 @@ function ownedOf(host: SimHost, input: HeadlessRuntimeInput, stores: OwnedStores
 }
 
 /** Whether this output runs on the trusted headless owner. */
-const nativeCell = (input: HeadlessRuntimeInput): boolean => input.product !== undefined && (hasNativeAssembly(input.product) || input.product.has('sim/runtime-plan'));
+export const nativeCell = (input: HeadlessRuntimeInput): boolean => input.product !== undefined && (hasNativeAssembly(input.product) || input.product.has('sim/runtime-plan'));
 
 /** Open `cell`'s world from `input`, at `snapshot` if there is one. */
 export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, options: CellWorldOptions, refused?: SimSnapshot): Promise<CellWorld> {
@@ -154,7 +156,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
     bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product)); await installServerChapters(host, input.product, input.shard, resident.fact); await installServerDoors(host, input.product, seeded ? pageOpenDoors(options.saves, placed) : undefined);
     host.respawn.served = true; actRoutes(host).introLocks = true;
     const owned = ownedOf(host, input, options.owned, options.profiles), fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
-    return { host, owned, fallFloor, fall: fallFloor(), dispose: () => { resident.dispose(); }, fact, effects: () => resident.effects,
+    return { host, owned, fallFloor, fall: fallFloor(), resident, dispose: () => { resident.dispose(); }, fact, effects: () => resident.effects,
       adopt: () => { regionalRuntimeCheckpoint(options.saves, placed, input.shard.identity.revision).restore({ animals: [...host.entities.values()] }); return true; }, step: inputs => {
       const player = leadSeat(host);
       near?.update(player.position.x, player.position.z);

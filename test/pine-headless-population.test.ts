@@ -8,6 +8,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { HeadlessSimulation } from '../src/server/host/headless';
+import { openWorldAdapter } from '../src/server/host/openWorld';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { hasNativeAssembly } from '../src/server/game/shardfile/nativeAssembly';
@@ -28,7 +29,7 @@ async function shipped() {
   if (descriptor === undefined) throw new Error('Missing admitted Pine output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  return { directory, product, shard, assets, resident: (snapshot?: string) => createTrustedHeadlessResident({ shard, assets, rapier, product }, snapshot) };
+  return { directory, product, shard, assets, rapier, resident: (snapshot?: string) => createTrustedHeadlessResident({ shard, assets, rapier, product }, snapshot) };
 }
 const steps = (resident: TrustedHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
 const variants = (census: PopulationCensus, ...names: string[]): string[] => census.bodies.filter(body => names.includes(body.variant)).map(body => body.variant).sort();
@@ -96,9 +97,10 @@ test('Pine lands, moves, loses and fills out its population headless, and its ce
   } finally { restored?.dispose(); live.dispose(); }
 }, 120_000);
 
+// SERVER-PARITY HS1: the worker ticks the room's world (`openWorldAdapter`), so its twin here is that world too
 test('the tick worker runs Pine from its built product: the same world, and it resumes from its own checkpoint', async () => {
-  const { directory, shard, assets, resident } = await shipped(), options = { deadline: 'advisory', product: directory } as const;
-  const twin = await resident(), worker = await HeadlessSimulation.create(shard, assets, undefined, options);
+  const { directory, shard, assets, product, rapier } = await shipped(), options = { deadline: 'advisory', product: directory } as const;
+  const twin = await openWorldAdapter({ shard, assets, rapier, product }), worker = await HeadlessSimulation.create(shard, assets, undefined, options);
   try {
     const start = canonicalSimDigest(snapshotSimHost(twin.host)), input = [{ kind: 'player' as const, moveX: 0.6, moveZ: -0.8, yaw: 0 }];
     let tick = 0;

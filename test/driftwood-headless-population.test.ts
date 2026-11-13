@@ -8,6 +8,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { HeadlessSimulation } from '../src/server/host/headless';
+import { openWorldAdapter, type WorldAdapter } from '../src/server/host/openWorld';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { populationCensus } from '../src/shared/game/population/census';
@@ -26,7 +27,7 @@ async function shipped() {
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  return { directory, product, shard, assets, descriptor, resident: (snapshot?: string) => createTrustedHeadlessResident({ shard, assets, rapier, product }, snapshot) };
+  return { directory, product, shard, assets, descriptor, rapier, resident: (snapshot?: string) => createTrustedHeadlessResident({ shard, assets, rapier, product }, snapshot) };
 }
 const kill = (resident: TrustedHeadlessResident, id: string): void => {
   const actor = resident.host.entities.get(id);
@@ -84,15 +85,16 @@ test('Driftwood spawns, moves, kills and returns its mixed population headless, 
   } finally { restored?.dispose(); live.dispose(); }
 }, 120_000);
 
-test('the worker runs Driftwood from its built product, tick for tick with the resident', async () => {
-  const { directory, shard, assets, resident } = await shipped();
+// SERVER-PARITY HS1: the worker ticks the room's world (`openWorldAdapter`), so its twin on this thread is that world too
+test('the worker runs Driftwood from its built product, tick for tick with the room\'s world', async () => {
+  const { directory, shard, assets, product, rapier } = await shipped();
   // TS11 / FL23: the worker's start (its own thread loading ~530 source modules) is most of this case. The resident is
   // built and stepped on this thread meanwhile, instead of after it: the same two owners, inputs and ticks.
   const starting = HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory', product: directory });
   starting.catch(() => undefined); // observed now; `await starting` below still throws its refusal
-  let live: TrustedHeadlessResident | undefined;
+  let live: WorldAdapter | undefined;
   try {
-    live = await resident();
+    live = await openWorldAdapter({ shard, assets, rapier, product });
     const sim = await starting, commands = [{ kind: 'player' as const, moveX: 0.6, moveZ: 0.8, yaw: 0 }];
     const part = sim.verbTapePart({ version: 1, observe: [], segments: [{ id: 'same-300-inputs', ticks: 300, commands }] });
     part.catch(() => undefined); // awaited below; a throw on this thread first must not leave it unhandled

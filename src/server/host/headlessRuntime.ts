@@ -301,7 +301,9 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
     dispose: () => { host.dispose(); },
   };
 }
-/** Worker-side composition only: owns one trusted resident (its real SimHost, native continuation and scoped installers). */
+/** Worker-side composition only: owns one trusted resident (its real SimHost, native continuation and scoped installers).
+ * @deprecated SERVER-PARITY HS1: the bare resident is a world no player runs. Tick `openWorldAdapter`
+ * (`@wildshard/engine/host/openWorld`), the room's own world; this stays only until every shard's CI has moved. */
 export async function createTrustedHeadlessAdapter(preparation: HeadlessRuntimeInput, snapshot?: string): Promise<TickWorkerAdapter> {
   const resident = await createTrustedHeadlessResident(preparation, snapshot), { host } = resident;
   const tape=createTrustedHeadlessTape(host,input=>resident.step(input),()=>resident.effects);
