@@ -230,6 +230,7 @@ export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'sect
         if(room&&next===undefined)continue;
         if(next===undefined)throw new Error('Missing next held slot');slot=next;clock.stop();queued=false;
       }
+      player.held=order.indexOf(slot); // opus-slotsync (J293): the row others see names the slot in hand, in the kit's order
       aim=0;
       for(const command of commands)if(command.kind==='script'&&command.value!==undefined){
         if(command.actorId===arms.input.aim){

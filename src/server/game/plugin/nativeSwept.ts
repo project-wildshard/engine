@@ -31,13 +31,21 @@ type NativeSweptActor = NonNullable<ReturnType<SimHost['entities']['get']>>;
 /** Borrowed world reactions for swept phases; no secondary clock or body service is installed. */
 export interface NativeSweptMeleePorts {
   readonly input: (player: PlayerSim, first: boolean) => NativeSweptMeleeInput; readonly alarm: () => void;
+  /** The slot this player's page asked for this tick (a net equip act), or null; undefined where this kit holds no swap route,
+   *  and so leaves the row's `held` to the loadout that does. A native kit's slots are its kit's order. */
+  readonly pick?: (player: PlayerSim, first: boolean) => number | null | undefined;
   readonly staggered: (actor: NativeSweptActor, strength: number, running: boolean) => void;
+  /** A pick past the kit's slots: the room counts it, as it does any input it had no use for. */
+  readonly refused?: () => void;
   /** The blade's poses; the starter sword's unless the kit brings its own. */
   readonly blade?: SweptBladeRig;
 }
 /** The lead's swept weapon. */
 export interface NativeSweptMeleeOwner {
   readonly held: () => number; readonly equip: (slot: number) => void; readonly equipFor: (player: PlayerSim, slot: number) => void;
+  /** Lends the rule a player must pass to take a slot up, beside the kit's own: a quest's item (Driftwood's iron sword) is the
+   *  quest's to give. Without one, the kit's ownership alone decides. */
+  readonly owns: (rule: (player: PlayerSim, slot: number) => boolean) => void;
   readonly swings: () => number; readonly hits: () => number;
 }
 
@@ -67,6 +75,7 @@ export function installNativeSweptMelee(host: SimHost, items: readonly unknown[]
   };
   const yAxis = new Vector3(0, 1, 0), queries = createNativeTargetQueries<NativeSweptActor>({ fore: false }), rays = createNativeTargetQueries<NativeSweptActor>();
   const roster: NativeSweptActor[] = [];
+  let owns: (player: PlayerSim, slot: number) => boolean = () => true;
   const bodies = (): NativeSweptActor[] => { roster.length = 0; for (const body of host.entities.values()) roster.push(body); return roster; };
   const seats = playerSeats(host, (player, first) => {
     const loadout = createNativeLoadout(row.selection ?? { slots, initial: row.initial, lower: 0, raise: 0 }, { owned: () => true, locked: () => false });
@@ -159,9 +168,20 @@ export function installNativeSweptMelee(host: SimHost, items: readonly unknown[]
         },
       });
     };
+    /** Takes `index` up, if this player owns it: the swing in hand stops and its queue and target go. */
+    const select = (index: number): void => {
+      if (index === loadout.held() || !loadout.owned(index) || !owns(player, index)) return;
+      clocks[loadout.held()]?.stop(); state.queued = false; state.target = null; loadout.select(index);
+    };
     return {
-      loadout, clocks, state,
+      loadout, clocks, state, select,
       step: () => {
+        // opus-slotsync (J293): a page's swap reaches the server, and the row others see says what this player holds
+        const picked = ports.pick?.(player, first);
+        if (picked !== undefined) {
+          if (picked !== null) { if (slots.includes(picked)) select(picked); else ports.refused?.(); }
+          player.held = loadout.held();
+        }
         const index = loadout.held(), clock = clocks[index], profile = profiles[index];
         if (clock === undefined || profile === undefined) throw new Error('Missing selected swept melee slot');
         const command = ports.input(player, first), target = command.attack; current = command;
@@ -221,10 +241,9 @@ export function installNativeSweptMelee(host: SimHost, items: readonly unknown[]
   const { lead } = seats;
   const equip = (seat: typeof lead, index: number): void => {
     if (!slots.includes(index)) throw new Error('Invalid swept melee slot');
-    if (index === seat.loadout.held()) return;
-    seat.clocks[seat.loadout.held()]?.stop(); seat.state.queued = false; seat.state.target = null; seat.loadout.select(index);
+    seat.select(index);
   };
   return { held: lead.loadout.held,
-    equip: index => { equip(lead, index); }, equipFor: (player, index) => { equip(seats.of(player), index); },
+    equip: index => { equip(lead, index); }, equipFor: (player, index) => { equip(seats.of(player), index); }, owns: rule => { owns = rule; },
     swings: () => lead.state.swings, hits: () => lead.state.hits };
 }

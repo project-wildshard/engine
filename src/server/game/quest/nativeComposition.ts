@@ -145,6 +145,8 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   const purchases = new Map<string, Map<number, number>>();
   const population = rows.acquisition === undefined ? null : mixedPopulation(host, rows.acquisition.population);
   const equipment = rows.acquisition === undefined ? null : nativeMeleeItem(host, rows.acquisition.equipment);
+  // opus-slotsync (J293): a page may ask for any slot by its kit's order; the quest's item stays the quest's to give
+  if (equipment !== null && rows.acquisition !== undefined) { const quested = rows.acquisition.slot; equipment.owns((body, slot) => slot !== quested || gearOf(body.id).state.iron); }
   const finale = rows.reward === undefined ? null : nativeStageLane(host, rows.reward.director);
   const channels = rows.reward === undefined ? null : nativeQuestChannels(host, rows.reward.channels);
   const props = rows.props === undefined ? null : installNativeQuestProps(host, ports.props, ports.restoring ?? false);

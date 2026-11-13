@@ -364,12 +364,15 @@ export class EquipmentService implements WeaponHooks {
     if (weapon === undefined) return;
     this.unlock(weapon.id); this.choose(weapon.id, false);
   }
-  /** RP5: an item as other players' bodies draw it (net/heldOnOthers.ts): its first-person model, by row, or by its place in the
-   *  kit's order (a native kit's slots: Nalati's bow, sabre, spear), which is the list's where the kit names none (Driftwood). */
-  heldLook(which: string | number): HeldLook | null {
-    const id = typeof which === 'number' ? (this.order ?? this.list.map(w => w.id))[which] : undefined;
-    const weapon = typeof which === 'number' ? this.list.find(w => w.id === id) : this.list.find(w => w.row.id === which);
+  /** RP5: an item as other players' bodies draw it (net/heldOnOthers.ts): its first-person model, by row. */
+  heldLook(row: string): HeldLook | null {
+    const weapon = this.list.find(w => w.row.id === row);
     return weapon === undefined ? null : { row: weapon.row.id, model: weapon.model, bow: weapon.row.ui.touch === 'bow' };
+  }
+  /** The kit's rows in its order (a native kit's slots: Nalati's bow, sabre, spear), the list's where the kit names none
+   *  (Driftwood): what `kitSlots` numbers a native kit by, as its server does. */
+  kitRows(): string[] {
+    return (this.order ?? this.list.map(w => w.id)).map(id => this.list.find(w => w.id === id)?.row.id ?? '');
   }
   /** The server settled a blow of ours: the weapon in hand plays it. */
   serverHit(hit: OwnHit): void { this.current.serverHit(hit); }

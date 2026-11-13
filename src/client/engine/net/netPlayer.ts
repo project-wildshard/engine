@@ -13,15 +13,17 @@ import { PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import type { Physics } from '../../../shared/engine/physics/Physics';
 import type { Player, PlayerLink, PlayerWireInput } from '../player/Player';
 import { AttackPrediction } from './attackPrediction';
-import { heldOnOthers, slotKit, type HeldLook } from './heldOnOthers';
+import { heldOnOthers, kitSlots, slotKit, type HeldLook } from './heldOnOthers';
 import type { NetClient } from './client';
 import { predictedPlayer, PredictionWorld } from './predictionWorld';
 import { Predictor } from './predictor';
 
 /** Where this player's attacks are drawn: `EquipmentService`, on a page. */
 export interface NetWeapons { readonly bindWire: (wire: WeaponWire | null) => void; readonly serverHit: (hit: OwnHit) => void; readonly attackRefused: () => void; readonly heldByServer: (row: string) => void; readonly mirrorArrows: (count: number) => void;
-  /** RP5: an item as other players' bodies draw it, by row or (a kit with no slot map) by its place in the kit. */
-  readonly heldLook?: (which: string | number) => HeldLook | null }
+  /** RP5: an item as other players' bodies draw it, by its row. */
+  readonly heldLook?: (row: string) => HeldLook | null;
+  /** The rows of this page's kit in its order: a native kit's slots, where it has no slot map (`kitSlots`). */
+  readonly kitRows?: () => readonly string[] }
 
 /** A traversal tool's line to the server. `lock` is a LOCK press naming its hook by index, and answers the `seq` that carries it. */
 export interface NetHookWire { readonly lock: (hook: number | undefined) => number; readonly fire: () => void }
@@ -103,8 +105,10 @@ export class NetPlayer implements PlayerLink {
   private seat: NetRideSeat | null = null;
   /** The ride this player has heard of and its page has not yet acted on: each frame takes them first. */
   private readonly heard: NetRide[] = [];
-  /** The server's slot for each row this page can hold. A row it has no slot for is the server's own business. */
-  private slots: ReadonlyMap<string, number> = new Map<string, number>();
+  /** The kit's slot map, empty for a native kit, whose slots are its kit's order. */
+  private slotMap: ReadonlyMap<string, number> = new Map<string, number>();
+  /** The server's slot for each row this page can hold (`kitSlots`). A row it has no slot for is the server's own business. */
+  get slots(): ReadonlyMap<string, number> { return kitSlots(this.slotMap, this.weapons?.kitRows?.() ?? []); }
   /** The slot this page holds and the server has not yet said it does. */
   private wanted: number | null = null;
   private asks = 0;
@@ -131,14 +135,14 @@ export class NetPlayer implements PlayerLink {
   }
   /** Draw this player's attacks on `weapons`: they stop settling their own contact and take the server's word. */
   bindWeapons(weapons: NetWeapons, slots: ReadonlyMap<string, number>): void {
-    this.weapons = weapons; this.slots = slots; weapons.bindWire(this.wire);
+    this.weapons = weapons; this.slotMap = slots; weapons.bindWire(this.wire);
     // RP5: other players' bodies draw what their slot holds as this page's kit does
     this.unlend(); this.unlend = heldOnOthers.lend(slotKit(() => this.slots, which => this.weapons?.heldLook?.(which) ?? null));
   }
   private unlend: () => void = () => undefined;
   /** A world has its own items, and so its own slots. */
   bindSlots(slots: ReadonlyMap<string, number>): void {
-    this.slots = slots;
+    this.slotMap = slots;
     if (this.weapons !== null) { this.unlend(); this.unlend = heldOnOthers.lend(slotKit(() => this.slots, which => this.weapons?.heldLook?.(which) ?? null)); } // RP5: its items too
   }
   /** Where this player's ride lands. A page with none takes no ride's words. */

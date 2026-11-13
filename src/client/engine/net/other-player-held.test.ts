@@ -8,7 +8,7 @@ import { afterEach, expect, test } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import type { NetClient } from './client';
-import { heldOnOthers, slotKit, type HeldLook } from './heldOnOthers';
+import { heldOnOthers, kitSlots, slotKit, type HeldLook } from './heldOnOthers';
 import { OtherPlayers } from './otherPlayers';
 
 const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => entry.name === name);
@@ -48,12 +48,15 @@ let unlend: () => void = () => undefined;
 afterEach(() => { unlend(); });
 
 test('a slot maps to its row by the slot map, or by kit order where a native kit has none', () => {
-  const asked: (string | number)[] = [], look = (which: string | number): HeldLook => { asked.push(which); return { row: String(which), model: null, bow: false }; };
-  const mapped = slotKit(() => new Map([['weapon.sabre', 3], ['weapon.bow', 7]]), look);
+  const asked: string[] = [], look = (row: string): HeldLook => { asked.push(row); return { row, model: null, bow: false }; };
+  const kit = ['weapon.bow', 'weapon.sabre', 'weapon.spear'];
+  const mapped = slotKit(() => kitSlots(new Map([['weapon.sabre', 3], ['weapon.bow', 7]]), kit), look);
   expect([mapped(7)?.row, mapped(3)?.row, mapped(0)]).toEqual(['weapon.bow', 'weapon.sabre', null]);
-  const native = slotKit(() => new Map(), look);
-  expect(native(1)?.row).toBe('1');
-  expect(asked).toEqual(['weapon.bow', 'weapon.sabre', 1]);
+  // opus-slotsync: the one numbering a page sends its swaps by and draws others' hands by
+  expect([...kitSlots(new Map(), kit)]).toEqual([['weapon.bow', 0], ['weapon.sabre', 1], ['weapon.spear', 2]]);
+  const native = slotKit(() => kitSlots(new Map(), kit), look);
+  expect([native(1)?.row, native(3)]).toEqual(['weapon.sabre', null]);
+  expect(asked).toEqual(['weapon.bow', 'weapon.sabre', 'weapon.sabre']);
 });
 
 test('another player holds the first-person item their slot names, in the right hand or a bow in the left, and swaps it', () => {

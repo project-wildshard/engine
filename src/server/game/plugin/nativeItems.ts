@@ -18,6 +18,7 @@ import { createNativeTargetQueries, type NativeTargetPose, type NativeTargetHit 
 import { installNativeSweptMelee, type NativeSweptMeleeOwner } from './nativeSwept';
 import { seenBodies, seenRay, seenRequest, seenShift } from './nativeRewind';
 import { playerSeats } from './playerSeats';
+import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 
 /** A bounded native launcher input. Its slot must resolve to an installed bolt
@@ -413,8 +414,12 @@ export function installNativeItems(host: SimHost, frame: NativeCombatFrame, inpu
   if (input.kind === 'swept') {
     const id = v.parse(v.object({ step: v.string() }), input.policy).step, book = nativeMeleeItems.get(host) ?? new Map<string, NativeSweptMeleeOwner>();
     if (book.has(id)) throw new Error('Duplicate native melee owner');
+    // opus-slotsync (J293): a page's equip act names a slot in its kit's order; the kit takes the route unless a loadout has it
+    const routes = actRoutes(host), swap = routes.equip === null ? (routes.equip = `${id}.equip`) : null;
     const owner = installNativeSweptMelee(host, input.items, input.policy, {
     input: (player, first) => first ? frame.melee : otherCombatFrame(frame, player.id).melee,
+    pick: (player, first) => swap === null || routes.equip !== swap ? undefined : (first ? frame : otherCombatFrame(frame, player.id)).scripts.get(swap) ?? null,
+    refused: () => { routes.refused++; },
     alarm: () => { host.events.ask('item.reaction', { kind: 'alarm' }); },
     staggered: (actor, strength, running) => { host.events.ask('item.reaction', { kind: 'stagger', actor, strength, running }); },
   });

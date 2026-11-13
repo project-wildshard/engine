@@ -6,7 +6,7 @@ import { createTrustedHeadlessResident,type TrustedHeadlessResident } from '@wil
 import { tickCommands } from '@wildshard/engine/host/tickProtocol';
 import type { NetCommand } from '@wildshard/wire/netCommand';
 import { readFileSync } from 'node:fs';
-import { Group } from 'three';
+import { Group, Vector3 } from 'three';
 import { beforeAll,expect,test } from 'vitest';
 import { EquipmentService } from '../src/client/engine/combat/EquipmentService';
 import { NetClient } from '../src/client/engine/net/client';
@@ -52,15 +52,15 @@ async function resident(shard = 'pine-hollow'): Promise<TrustedHeadlessResident>
   return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier: serverR, product });
 }
 interface Rig { readonly net: NetPlayer; readonly client: NetClient; readonly live: TrustedHeadlessResident; readonly followed: string[]; readonly hits: OwnHit[]; readonly refusals: number[]; run: (ticks: number) => void; held: () => unknown; done: () => void }
-async function rig(): Promise<Rig> {
-  const live = await resident(), { host } = live, lead = leadPlayer(host).id, world = new SimNetWorld(host), page = new PageSide(R, scenario), { player } = page, link = directLoopback(), client = new NetClient(link.client);
+async function rig(shard = 'pine-hollow', slots: ReadonlyMap<string, number> = SLOTS, kit?: readonly string[]): Promise<Rig> {
+  const live = await resident(shard), { host } = live, lead = leadPlayer(host).id, world = new SimNetWorld(host), page = new PageSide(R, scenario), { player } = page, link = directLoopback(), client = new NetClient(link.client);
   const room = new NetRoom({ world, step: (inputs: readonly NetTickInput[]) => {
     const own = inputs.find(row => row.player === lead), others = new Map<string, NetCommand>();
     live.step(tickCommands([{ source: 'net', commands: netTickCommands(own?.command ?? null, own?.acts ?? [], actRoutes(host)) }], 8), others, new Map(inputs.map(row => [row.player, row.acts])));
   } });
   room.join(link.server, world.playerOf(lead)); client.hello(); link.pump(); room.open(); link.pump();
   const net = new NetPlayer(client, player, page.physics), followed: string[] = [], hits: OwnHit[] = [], refusals: number[] = [];
-  net.bindWeapons({ bindWire: () => undefined, serverHit: hit => { hits.push(hit); }, mirrorArrows: () => undefined, attackRefused: () => { refusals.push(1); }, heldByServer: row => { followed.push(row); } }, SLOTS);
+  net.bindWeapons({ bindWire: () => undefined, serverHit: hit => { hits.push(hit); }, mirrorArrows: () => undefined, attackRefused: () => { refusals.push(1); }, heldByServer: row => { followed.push(row); }, ...(kit === undefined ? {} : { kitRows: () => kit }) }, slots);
   for (let at = 0; at < 4; at++) { room.tick(); link.pump(); }
   player.link = net; player.locked = true;
   const run = (ticks: number): void => {
@@ -176,3 +176,29 @@ test('a reload the page starts reaches the server, on the rifle in hand', async 
     expect(item.act.phase).toBe('reload');
   } finally { held.done(); }
 }, 10_000);
+
+// opus-slotsync (J293): a native kit has no slot map (Driftwood's swords). Its page numbered no slot for a swap, so the server and
+// everyone else kept the starting sword; it now asks by its kit's order, and takes the server's word back by the same numbers.
+// The iron sword stays the quest's to give: asked for before the wreck's rack, the server keeps the wooden one and the page follows.
+test('a native kit with no slot map swaps by its kit order, and follows the server back', async () => {
+  const kit = ['weapon.driftwood-isle.wood', 'weapon.driftwood-isle.iron'], held = await rig('driftwood-isle', new Map(), kit);
+  try {
+    held.run(10);
+    expect(held.held()).toBe(0);
+    held.net.wire.equip('weapon.driftwood-isle.iron'); held.run(30 * 11);
+    expect(held.held(), 'not the page\'s to take').toBe(0);
+    expect(held.followed).toEqual(['weapon.driftwood-isle.wood']);
+    // the rack: its sailor down, the player beside it; the quest hands the sword over and the page follows by kit order
+    const { host } = held.live, lead = leadPlayer(host);
+    for (const body of host.entities.values()) if (body.kind === 'sailor') host.combat.hit({ source: 'env', sourceTags: [], target: body.combatActor(), amount: 1e6, point: body.position.clone(), dir: new Vector3(0, 0, 1) });
+    lead.position.set(153.2, 2.3, 3.4); lead.motor.resetAt(lead.position); held.run(5);
+    held.net.wire.interact('iron-sword'); held.run(30);
+    expect(held.held()).toBe(1);
+    expect(held.followed).toEqual(['weapon.driftwood-isle.wood', 'weapon.driftwood-isle.iron']);
+    // and now the page's own swaps land, both ways
+    held.net.wire.equip('weapon.driftwood-isle.wood'); held.run(30);
+    expect(held.held()).toBe(0);
+    held.net.wire.equip('weapon.driftwood-isle.iron'); held.run(30);
+    expect([held.held(), held.net.heldSlot]).toEqual([1, 1]);
+  } finally { held.done(); }
+}, 30_000);

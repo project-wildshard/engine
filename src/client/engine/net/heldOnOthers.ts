@@ -14,13 +14,16 @@ export type HeldKit = (slot: number) => HeldLook | null;
 /** An item as a hand holds it, from the kit lent as `kit`. */
 export interface HeldProp { readonly row: string; readonly prop: THREE.Group; readonly hand: 'right' | 'left'; readonly kit: number }
 
-/** A page's kit by the server's slots: a slot names its row in `slots` (kit melee, levers, ranged); a native kit with no slot map
- *  (Driftwood's swords) holds its weapons in its kit's order, which is the server's (`selection.slots`). */
-export function slotKit(slots: () => ReadonlyMap<string, number>, look: (which: string | number) => HeldLook | null): HeldKit {
+/** The server's slot for each row a page can hold: its slot map (kit melee, levers, ranged), or, for a native kit with none
+ *  (Driftwood's swords, Nalati's bow, sabre and spear), each row's place in the kit's order, which is the server's
+ *  (`selection.slots`). The one numbering a page sends a swap by, follows the server's word by, and draws others' hands by. */
+export function kitSlots(slots: ReadonlyMap<string, number>, kit: readonly string[]): ReadonlyMap<string, number> {
+  return slots.size > 0 ? slots : new Map(kit.map((row, at) => [row, at]));
+}
+/** A page's kit by the server's slots (`kitSlots`). */
+export function slotKit(slots: () => ReadonlyMap<string, number>, look: (row: string) => HeldLook | null): HeldKit {
   return slot => {
-    const map = slots();
-    if (map.size === 0) return look(slot);
-    for (const [row, at] of map) if (at === slot) return look(row);
+    for (const [row, at] of slots()) if (at === slot) return look(row);
     return null;
   };
 }

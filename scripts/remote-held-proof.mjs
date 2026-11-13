@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // REMOTE-PLAYERS RP5 (Jake, 2026-11-12 17:43: "they need a sword ... I don't see his sword and stuff"), on the rig of
-// `remote-body-proof.mjs`: two phones in one room, Jimmy 2.5 m in front of Jake. On Driftwood Jimmy holds his sword; on Pine
-// Hollow he holds his crossbow and tries the longbow and back. It fails unless Jake's page draws, each time, the item Jimmy's
-// row holds (`__onlinePlayers()` names its row) in Jimmy's hand, built from the very geometry Jake's own first-person view draws
-// for that row, at a hand-held size and off the ground, and nothing else in his hands. (Driftwood's swords are a native kit whose
-// swap never reaches the server, so its row holds the starting sword whatever Jimmy's page holds: Pine proves the swap.)
-//   scripts/browser-lane.sh --max 15 node scripts/remote-held-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--shots=<dir>]
+// `remote-body-proof.mjs`: two phones in one room, Jimmy 2.5 m in front of Jake. On Driftwood Jimmy holds his wooden sword and
+// tries the iron one; on Nalati his bow, then the sabre and back; on Pine Hollow his crossbow, and tries the longbow. It fails unless Jake's page draws, each time, the item Jimmy's row holds (`__onlinePlayers()` names its row) in
+// Jimmy's hand, built from the very geometry Jake's own first-person view draws for that row, at a hand-held size and off the
+// ground, and nothing else in his hands. (Driftwood's and Nalati's kits have no slot map: since opus-slotsync a page swaps them
+// by its kit's order, `kitSlots`, so the switch reaches the server.)
+//   scripts/browser-lane.sh --max 15 node scripts/remote-held-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--shots=<dir>] [--legs=driftwood,nalati]
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, devices } from 'playwright';
@@ -13,12 +13,16 @@ import { enterPage, intoWorld, openRig } from './online-rig.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 const [dist = '', work = '', keyFile = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
-if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-held-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>]');
+if (dist === '' || work === '' || keyFile === '') throw new Error('usage: remote-held-proof.mjs <app dist> <work dir> <key.json> [--shots=<dir>] [--legs=driftwood,nalati]');
 const keep = process.argv.find(value => value.startsWith('--shots='))?.slice('--shots='.length) ?? '', shots = join(work, 'shots-remote-held'), AWAY = 2.5;
-/** Each room: its shard, the row Jimmy starts with and its hand, and the row he switches to and back from (none where the kit
- *  can't swap). Pine's longbow is a quest's: a fresh Jimmy doesn't own it, the server keeps his crossbow, and the swap is skipped
- *  with what the server said until a room lets a fresh player swap. */
-const LEGS = [{ shard: 'driftwood-isle', first: /sword/u, hand: 'right', other: null }, { shard: 'pine-hollow', first: /crossbow/u, hand: 'right', other: /longbow/u }];
+/** Each room: its shard, the row Jimmy starts with and its hand, and the row he switches to and back from. Driftwood's iron
+ *  sword and Pine's longbow are a quest's: a fresh Jimmy doesn't own them, the server keeps what he holds, and the swap is
+ *  skipped with what the server said (`net-remote-held-swap.test.ts` earns the iron sword and swaps it). Nalati's arms are his.
+ *  `--legs=driftwood,nalati` runs only those rooms. */
+const ALL = [{ shard: 'driftwood-isle', first: /^weapon\.sword$/u, hand: 'right', other: /iron/u }, { shard: 'nalati-grasslands', first: /bow/u, hand: 'left', other: /sabre/u },
+  { shard: 'pine-hollow', first: /crossbow/u, hand: 'right', other: /longbow/u }];
+const picked = process.argv.find(value => value.startsWith('--legs='))?.slice('--legs='.length).split(',') ?? [];
+const LEGS = picked.length === 0 ? ALL : ALL.filter(leg => picked.some(name => leg.shard.startsWith(name)));
 mkdirSync(shots, { recursive: true });
 const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
 /** @param {string} step @param {boolean} ok @param {unknown} [detail] */
