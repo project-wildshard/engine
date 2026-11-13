@@ -196,6 +196,8 @@ jobs:
           python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --out "$RUNNER_TEMP/devserver-client.tar.gz"
       - name: Build the preparation client
         if: steps.has.outputs.preparation == 'true'
+        # a failed preparation build never holds back the devserver client: the upload skips a missing asset
+        continue-on-error: true
         run: python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --kind preparation --out "$RUNNER_TEMP/preparation-client.tar.gz"
       - name: Upload it to the release, once
         if: steps.has.outputs.build == 'true'
