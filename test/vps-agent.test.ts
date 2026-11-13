@@ -78,7 +78,7 @@ test('wildshard-config writes one setting, keeps the others and never touches th
   const settings = read(root, 'staging.settings');
   expect(settings.split('\n').filter(row => /^[A-Z]/u.test(row))).toEqual(['WORLD_CELLS=grid', 'WORLD_WORKERS=4']);
   expect(read(root, 'staging.env')).toBe(envBefore);
-  expect(config(root, 'set', 'staging', 'WORLD_WORKERS', '4').out).toContain('already 4');
+  expect(config(root, 'set', 'staging', 'WORLD_WORKERS', '4').out).toContain('already has WORLD_WORKERS=4');
   expect(config(root, 'set', 'production', 'WORLD_CELLS', 'grid', '--production').status).toBe(0);
   const shown = config(root, 'show', 'staging');
   expect(shown.out).toBe('WORLD_CELLS=grid\nWORLD_WORKERS=4\n');
@@ -93,6 +93,86 @@ test('wildshard-config narrows ALLOWED_ORIGINS to the game hosts, keeping the ch
   expect(config(root, 'show', 'staging').out).toBe(`ALLOWED_ORIGINS=${hosts}\n`);
   expect(config(root, 'set', 'production', 'ALLOWED_ORIGINS', 'https://staging.wildshard.io', '--production').out).toContain('ALLOWED_ORIGINS must be');
   expect(config(root, 'set', 'production', 'ALLOWED_ORIGINS', 'https://play.wildshard.io', '--production').status).toBe(0);
+});
+
+// SA33, GC33 (Jake, 2026-11-13): the placement pair and WORLD_CROSSING. Each placement key takes one exact value or blank, and the
+// two go together, as main.ts throws at boot on one without the other.
+const STAGING_FILE = 'https://packs.wildshard.io/releases/staging-placements.json';
+const PLACEMENT_KEY = /^export const PLACEMENT_PUBLIC_KEY = '([0-9a-f]+)';$/mu.exec(readFileSync('scripts/preview-grid.ts', 'utf8'))?.[1] ?? '';
+
+test('wildshard-config pins the placement key preview-grid.ts holds, an Ed25519 SPKI', () => {
+  expect(PLACEMENT_KEY).toMatch(/^302a300506032b6570032100[0-9a-f]{64}$/u);
+  expect(readFileSync(CONFIG, 'utf8')).toContain(`PLACEMENT_PUBLIC_KEY = '${PLACEMENT_KEY}'`);
+});
+
+test('wildshard-config refuses a placement file or key that is not the API\'s own, half a pair, and a crossing mode it does not know', () => {
+  const root = etc(), other = PLACEMENT_KEY.slice(0, -2) + (PLACEMENT_KEY.endsWith('00') ? '01' : '00');
+  for (const [args, why] of [
+    [['set', 'staging', 'PLACEMENT_URL', 'https://evil.example/releases/staging-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'PLACEMENT_URL must be'],
+    [['set', 'staging', 'PLACEMENT_URL', 'https://packs.wildshard.io/releases/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'PLACEMENT_URL must be'],
+    [['set', 'staging', 'PLACEMENT_URL', `${STAGING_FILE}?x=1`, 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'PLACEMENT_URL must be'],
+    [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY', other], 'PLACEMENT_PUBLIC_KEY must be'],
+    [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY.toUpperCase()], 'PLACEMENT_PUBLIC_KEY must be'],
+    [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE], 'go together'],
+    [['set', 'staging', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'go together'],
+    [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY', ''], 'go together'],
+    [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_URL', STAGING_FILE], 'each key once'],
+    [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY'], 'usage'],
+    [['set', 'staging', 'WORLD_CROSSING', 'on'], 'WORLD_CROSSING must be'],
+    [['set', 'staging', 'WORLD_CROSSING', ''], 'WORLD_CROSSING must be'],
+    [['set', 'production', 'PLACEMENT_URL', 'https://packs.wildshard.io/releases/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'a production change needs --production'],
+    [['set', 'production', 'WORLD_CROSSING', 'off'], 'a production change needs --production'],
+  ] as const) {
+    const run = config(root, ...args);
+    expect(run.status, args.join(' ')).toBe(1);
+    expect(run.out, args.join(' ')).toContain(why);
+  }
+  expect(existsSync(join(root, 'etc/wildshard/staging.settings'))).toBe(false);
+  expect(existsSync(join(root, 'etc/wildshard/production.settings'))).toBe(false);
+});
+
+test('wildshard-config sets the placement pair in one write and one restart, clears it the same way, and reads the .env for the pair', () => {
+  const root = etc();
+  const both = config(root, 'set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY);
+  expect(both.status, both.out).toBe(0);
+  expect(both.out.match(/doing {3}restart/gu)).toHaveLength(1);
+  expect(config(root, 'show', 'staging').out).toBe(`PLACEMENT_URL=${STAGING_FILE}\nPLACEMENT_PUBLIC_KEY=${PLACEMENT_KEY}\n`);
+  expect(config(root, 'set', 'staging', 'WORLD_CROSSING', 'worker').status).toBe(0);
+  // Blanking one half would boot into the throw; blanking both is off.
+  expect(config(root, 'set', 'staging', 'PLACEMENT_URL', '').out).toContain('go together');
+  expect(config(root, 'set', 'staging', 'PLACEMENT_URL', '', 'PLACEMENT_PUBLIC_KEY', '').status).toBe(0);
+  expect(config(root, 'show', 'staging').out).toBe('WORLD_CROSSING=worker\nPLACEMENT_URL=\nPLACEMENT_PUBLIC_KEY=\n');
+  // Production takes its own file, flagged.
+  const production = config(root, 'set', 'production', 'PLACEMENT_URL', 'https://packs.wildshard.io/releases/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY, '--production');
+  expect(production.status, production.out).toBe(0);
+  // A pair root wrote in the .env counts: the settings file may not blank one half of it, or add the other half alone.
+  const fresh = etc();
+  writeFileSync(join(fresh, 'etc/wildshard/staging.env'), `SEAT_SECRET=s\nPLACEMENT_URL="${STAGING_FILE}"\nPLACEMENT_PUBLIC_KEY=${PLACEMENT_KEY}\n`);
+  expect(config(fresh, 'set', 'staging', 'PLACEMENT_PUBLIC_KEY', '').out).toContain('go together');
+  expect(config(fresh, 'set', 'staging', 'WORLD_SEATS', '8').status).toBe(0);
+  writeFileSync(join(fresh, 'etc/wildshard/staging.env'), `SEAT_SECRET=s\nPLACEMENT_URL=${STAGING_FILE}\n`);
+  expect(config(fresh, 'set', 'staging', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY).status).toBe(0);
+  expect(read(fresh, 'staging.env')).toBe(`SEAT_SECRET=s\nPLACEMENT_URL=${STAGING_FILE}\n`);
+  // systemd's spacing counts too; a half pair already on the channel blocks every set, and says so.
+  const spaced = etc();
+  writeFileSync(join(spaced, 'etc/wildshard/staging.env'), `SEAT_SECRET=s\n  PLACEMENT_URL = ${STAGING_FILE}\n`);
+  const half = config(spaced, 'set', 'staging', 'WORLD_SEATS', '8');
+  expect(half.status).toBe(1);
+  expect(half.out).toContain('already holds only one');
+  writeFileSync(join(spaced, 'etc/wildshard/staging.env'), 'SEAT_SECRET=s\n');
+  writeFileSync(join(spaced, 'etc/wildshard/staging.settings'), `PLACEMENT_PUBLIC_KEY=${PLACEMENT_KEY}\n`);
+  expect(config(spaced, 'set', 'staging', 'WORLD_SEATS', '8').out).toContain('already holds only one');
+  expect(config(spaced, 'set', 'staging', 'PLACEMENT_URL', STAGING_FILE).out).toContain('note    staging WORLD_CELLS is not grid');
+});
+
+test('a placement pair that leaves the server unhealthy is undone whole', () => {
+  const root = etc();
+  expect(config(root, 'set', 'staging', 'WORLD_SEATS', '16').status).toBe(0);
+  const before = read(root, 'staging.settings');
+  const bad = configWith(root, { WILDSHARD_CONFIG_TEST_HEALTHY: '0' }, 'set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY);
+  expect(bad.status).toBe(2);
+  expect(bad.out).toContain('the old settings are back');
+  expect(read(root, 'staging.settings')).toBe(before);
 });
 
 test('a change that leaves the server unhealthy is undone, and the old settings are started again', () => {

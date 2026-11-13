@@ -1,12 +1,16 @@
 #!/usr/bin/python3 -I
 # MMO-SERVER-PLAN MS3.5 (J266): the agents' one way to change a game server's settings, through sudo with no password.
 #   wildshard-config show <channel>                                 print the channel's settings file
-#   wildshard-config set <channel> <KEY> <value> [--production]     write one setting, restart the channel, roll back if it
-#                                                                   does not come up healthy
+#   wildshard-config set <channel> <KEY> <value> [<KEY> <value>]... [--production]
+#                                                                   write the settings, restart the channel once, roll back if
+#                                                                   it does not come up healthy
 #   wildshard-config split <channel>                                setup.sh's: move the settings out of <channel>.env, once
 # Settings live in /etc/wildshard/<channel>.settings (640 root:wildshard-<channel>), which the units read after <channel>.env.
-# Secrets stay in the root-only .env, and this never reads one out or writes one: only the keys in SETTINGS below, each
+# Secrets stay in the root-only .env, and this never prints one or writes one (it reads only the placement rows there, for
+# the pair check below): only the keys in SETTINGS below, each
 # checked by its own rule. A production change needs --production, so no one changes the live world by a slip.
+# The two placement keys (SA33, GC33) go together: the server throws at boot on one without the other, so a `set` that would
+# leave the channel with one is refused before anything is written; set both in one call.
 # Installed root-owned as /usr/local/sbin/wildshard-config by harden.sh; the sudo allowlist names that path only.
 import os, re, subprocess, sys, tempfile, time, urllib.request
 
@@ -14,9 +18,20 @@ CHANNELS = {'production': {'port': 8790, 'cpus': 9, 'host': 0}, 'staging': {'por
 # The pages that open the game (engine doorTrust DEFAULT_ALLOWED_ORIGINS); each channel's own is at its 'host' index.
 GAME_HOSTS = ('https://play.wildshard.io', 'https://staging.wildshard.io', 'https://preview.wildshard.io')
 CELL = r'[a-z0-9][a-z0-9-]{0,63}'
+# SA33a: the API's placement key, public half as SPKI DER hex; equal to engine scripts/preview-grid.ts PLACEMENT_PUBLIC_KEY (the
+# engine's test holds them equal). Pinned, so an agent can point a channel at the API's own signed file and nothing else.
+PLACEMENT_PUBLIC_KEY = '302a300506032b65700321004afd39342aac6a4de6066cb72e9df54cbd3d4eb522e5e6e175a17954ab98f25e'
+PLACEMENT_PAIR = ('PLACEMENT_URL', 'PLACEMENT_PUBLIC_KEY')
+
+
+def placements(channel):
+    """The one signed placement file a channel reads: the API writes only releases/<channel>-placements.json (SA33a)."""
+    return f'https://packs.wildshard.io/releases/{channel}-placements.json'
+
 # Each allowed key and its rule. Anything else is refused: secrets (SEAT_SECRET, SENTRY_DSN, DATABASE_URL), the trust roots
 # (RELEASE_URL, RELEASE_PUBLIC_KEY, BUNDLE_ORIGIN, PACK_ORIGIN, TELEMETRY_URL, ERRORS_URL) and exposure (HOST, PORT,
-# TRUST_PROXY) are root's, by hand or by a reviewed script. ALLOWED_ORIGINS may only narrow (MS3.4): a set of the game's three
+# TRUST_PROXY) are root's, by hand or by a reviewed script. The placement pair is a trust root too, so each takes one
+# exact value (the channel's own file, the API's pinned key) or blank, which the server reads as unset (Jake, 2026-11-13). ALLOWED_ORIGINS may only narrow (MS3.4): a set of the game's three
 # hosts that keeps the channel's own, so an agent can drop a page but never add one or lock its own players out.
 SETTINGS = {
     'WORLD_CELLS': lambda value, channel: value == 'grid' or (re.fullmatch(f'{CELL}(,{CELL}){{0,63}}', value) is not None
@@ -26,12 +41,18 @@ SETTINGS = {
     'RECORD_TAG': lambda value, channel: re.fullmatch(r'[A-Za-z0-9._-]{0,64}', value) is not None,
     'ALLOWED_ORIGINS': lambda value, channel: (set(value.split(',')) <= set(GAME_HOSTS) and len(set(value.split(','))) == len(value.split(','))
                                                and GAME_HOSTS[CHANNELS[channel]['host']] in value.split(',')),
+    'WORLD_CROSSING': lambda value, channel: value in ('off', 'worker'),
+    'PLACEMENT_URL': lambda value, channel: value in ('', placements(channel)),
+    'PLACEMENT_PUBLIC_KEY': lambda value, channel: value in ('', PLACEMENT_PUBLIC_KEY),
 }
 RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), none twice",
          'WORLD_WORKERS': 'a whole number from 1 to the channel\'s pinned CPUs (production 9, staging 4)',
          'WORLD_SEATS': 'a whole number from 1 to 2000', 'RECORD_TAG': 'up to 64 of A-Z a-z 0-9 . _ -',
          'ALLOWED_ORIGINS': "comma-separated, none twice, from https://play.wildshard.io, https://staging.wildshard.io and "
-                            "https://preview.wildshard.io, keeping the channel's own (production play, staging staging)"}
+                            "https://preview.wildshard.io, keeping the channel's own (production play, staging staging)",
+         'WORLD_CROSSING': 'off or worker',
+         'PLACEMENT_URL': "https://packs.wildshard.io/releases/<channel>-placements.json for this channel, or blank",
+         'PLACEMENT_PUBLIC_KEY': f'the API placement key {PLACEMENT_PUBLIC_KEY}, or blank'}
 
 # The engine's tests hand it a made-up /etc and no systemctl; never as root, so sudo (which drops the environment anyway) cannot.
 TEST = os.geteuid() != 0 and os.environ.get('WILDSHARD_CONFIG_TEST_ROOT')
@@ -58,6 +79,31 @@ def read_rows(path):
 def key_of(row):
     match = re.match(r'^([A-Z_][A-Z0-9_]*)=', row)
     return match.group(1) if match else None
+
+
+def plain(row):
+    """A row's value as systemd reads it: one pair of matching quotes stripped."""
+    value = row.split('=', 1)[1].strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
+        value = value[1:-1]
+    return value
+
+
+def effective(rows, keys):
+    """What the server reads for these keys: the last assignment wins, as systemd reads it (spaces around the key and =)."""
+    seen = {}
+    for row in rows:
+        match = re.match(r'^\s*([A-Z_][A-Z0-9_]*)\s*=', row)
+        if match and match.group(1) in keys:
+            seen[match.group(1)] = plain(row[match.end() - 1:])
+    return seen
+
+
+def pair_broken(env_rows, settings_rows):
+    """True when the server would start with one placement key and not the other (main.ts throws). The settings file is
+    read after the .env, and a blank value is unset. Only these two keys are read from the .env."""
+    seen = effective(env_rows + settings_rows, PLACEMENT_PAIR)
+    return (seen.get('PLACEMENT_URL', '') == '') != (seen.get('PLACEMENT_PUBLIC_KEY', '') == '')
 
 
 def write_rows(path, rows, channel):
@@ -121,7 +167,7 @@ def main(argv):
     production = '--production' in argv
     args = [arg for arg in argv if arg != '--production']
     if not args or args[0] not in ('show', 'set', 'split'):
-        stop('usage: wildshard-config show <channel> | set <channel> <KEY> <value> [--production] | split <channel>')
+        stop('usage: wildshard-config show <channel> | set <channel> <KEY> <value> [<KEY> <value>]... [--production] | split <channel>')
     verb = args[0]
     if len(args) < 2 or args[1] not in CHANNELS:
         stop('the channel is production or staging')
@@ -148,11 +194,6 @@ def main(argv):
             stop('usage: wildshard-config split <channel>')
         env_rows = read_rows(env_path)
         # systemd strips one pair of matching quotes; a value that still fails its rule stays in the .env, never dropped.
-        def plain(row):
-            value = row.split('=', 1)[1].strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
-                value = value[1:-1]
-            return value
         # The last assignment of a key is the one systemd uses; a key moves only if that one passes its rule, and then all of
         # its rows move, so the precedence never changes (Codex J206).
         last = {key_of(row): row for row in env_rows if key_of(row) in SETTINGS}
@@ -170,30 +211,45 @@ def main(argv):
         print(f'doing   move {", ".join(sorted(keys))} from {channel}.env to {channel}.settings')
         return 0
 
-    if len(args) != 4:
-        stop('usage: wildshard-config set <channel> <KEY> <value> [--production]')
-    key, value = args[2], args[3]
-    if key not in SETTINGS:
-        stop(f'{key} is not a setting an agent may change; allowed: {", ".join(SETTINGS)}')
-    if not SETTINGS[key](value, channel):
-        stop(f'{key} must be {RULES[key]}')
+    if len(args) < 4 or len(args) % 2 != 0:
+        stop('usage: wildshard-config set <channel> <KEY> <value> [<KEY> <value>]... [--production]')
+    pairs = list(zip(args[2::2], args[3::2]))
+    keys = [key for key, _ in pairs]
+    if len(set(keys)) != len(keys):
+        stop('each key once per set')
+    for key, value in pairs:
+        if key not in SETTINGS:
+            stop(f'{key} is not a setting an agent may change; allowed: {", ".join(SETTINGS)}')
+        if not SETTINGS[key](value, channel):
+            stop(f'{key} must be {RULES[key]}')
     if channel == 'production' and not production:
         stop('a production change needs --production')
     before = read_rows(settings_path)
     rows = list(before) or list(HEADER)
-    rows = [row for row in rows if key_of(row) != key] + [f'{key}={value}']
+    rows = [row for row in rows if key_of(row) not in keys] + [f'{key}={value}' for key, value in pairs]
+    change = ' '.join(f'{key}={value}' for key, value in pairs)
     if rows == before:
-        print(f'ok      {channel} {key} is already {value}')
+        print(f'ok      {channel} already has {change}')
         return 0
+    # Checked against what the server would read, the .env included, so no restart can boot into main.ts's throw.
+    env_rows = read_rows(env_path)
+    if pair_broken(env_rows, rows):
+        if pair_broken(env_rows, before):
+            stop(f'{channel} already holds only one of PLACEMENT_URL and PLACEMENT_PUBLIC_KEY (in its .env or .settings), so '
+                 'its server cannot start; set both in one call, both set or both blank')
+        stop('PLACEMENT_URL and PLACEMENT_PUBLIC_KEY go together: set both in one call, both set or both blank')
+    placing = effective(env_rows + rows, PLACEMENT_PAIR + ('WORLD_CELLS',))
+    if any(key in PLACEMENT_PAIR for key in keys) and placing.get('PLACEMENT_URL', '') != '' and placing.get('WORLD_CELLS', '').strip() != 'grid':
+        print(f'note    {channel} WORLD_CELLS is not grid, so the server reads no placement file (main.ts)')
     was_running = running(channel)
     write_rows(settings_path, rows, channel)
-    print(f'doing   {channel} {key}={value}')
+    print(f'doing   {channel} {change}')
     if not was_running:
         # A channel still waiting for its first release keeps its health stub; the setting takes effect when it starts.
-        print(f'skip    wildshard-server@{channel} is not running; {key}={value} takes effect when it starts')
+        print(f'skip    wildshard-server@{channel} is not running; {change} takes effect when it starts')
         return 0
     if restart(channel):
-        print(f'ok      {channel} is healthy with {key}={value}')
+        print(f'ok      {channel} is healthy with {change}')
         return 0
     # It did not come back: put the old file back and start the old settings, so a bad value never leaves a channel down.
     if before:
