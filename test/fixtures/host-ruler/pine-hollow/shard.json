@@ -1,0 +1,240 @@
+{
+ "_copied": "shard-pine-hollow 3cdd93f out/pine-hollow/shard.json, trimmed to identity and section names (HOST-RULER HR1)",
+ "identity": {
+  "slug": "pine-hollow"
+ },
+ "sections": [
+  {
+   "name": "actors/creatures",
+   "path": "sections/actors/creatures.json"
+  },
+  {
+   "name": "actors/crowds",
+   "path": "sections/actors/crowds.json"
+  },
+  {
+   "name": "actors/moves",
+   "path": "sections/actors/moves.json"
+  },
+  {
+   "name": "actors/npcs",
+   "path": "sections/actors/npcs.json"
+  },
+  {
+   "name": "actors/return-scripts",
+   "path": "sections/actors/return-scripts.json"
+  },
+  {
+   "name": "actors/spawn-scripts",
+   "path": "sections/actors/spawn-scripts.json"
+  },
+  {
+   "name": "actors/spawns",
+   "path": "sections/actors/spawns.json"
+  },
+  {
+   "name": "actors/species",
+   "path": "sections/actors/species.json"
+  },
+  {
+   "name": "actors/species-programs",
+   "path": "sections/actors/species-programs.json"
+  },
+  {
+   "name": "audio/audio",
+   "path": "sections/audio/audio.json"
+  },
+  {
+   "name": "client/plan",
+   "path": "sections/client/plan.json"
+  },
+  {
+   "name": "combat/encounters",
+   "path": "sections/combat/encounters.json"
+  },
+  {
+   "name": "combat/items",
+   "path": "sections/combat/items.json"
+  },
+  {
+   "name": "combat/strikes",
+   "path": "sections/combat/strikes.json"
+  },
+  {
+   "name": "economy/ledger",
+   "path": "sections/economy/ledger.json"
+  },
+  {
+   "name": "economy/loot",
+   "path": "sections/economy/loot.json"
+  },
+  {
+   "name": "explore/catalogue",
+   "path": "sections/explore/catalogue.json"
+  },
+  {
+   "name": "held/equipment",
+   "path": "sections/held/equipment.json"
+  },
+  {
+   "name": "held/finishes",
+   "path": "sections/held/finishes.json"
+  },
+  {
+   "name": "held/gear",
+   "path": "sections/held/gear.json"
+  },
+  {
+   "name": "held/loadout",
+   "path": "sections/held/loadout.json"
+  },
+  {
+   "name": "look/hull-book",
+   "path": "sections/look/hull-book.json"
+  },
+  {
+   "name": "look/keyed-sky",
+   "path": "sections/look/keyed-sky.json"
+  },
+  {
+   "name": "look/look",
+   "path": "sections/look/look.json"
+  },
+  {
+   "name": "look/map",
+   "path": "sections/look/map.json"
+  },
+  {
+   "name": "look/materials",
+   "path": "sections/look/materials.json"
+  },
+  {
+   "name": "look/rigged-hulls",
+   "path": "sections/look/rigged-hulls.json"
+  },
+  {
+   "name": "quests/host",
+   "path": "sections/quests/host.json"
+  },
+  {
+   "name": "quests/quests",
+   "path": "sections/quests/quests.json"
+  },
+  {
+   "name": "sim/client-channels",
+   "path": "sections/sim/client-channels.json"
+  },
+  {
+   "name": "sim/client-scripts",
+   "path": "sections/sim/client-scripts.json"
+  },
+  {
+   "name": "sim/hooks",
+   "path": "sections/sim/hooks.json"
+  },
+  {
+   "name": "sim/plumbing",
+   "path": "sections/sim/plumbing.json"
+  },
+  {
+   "name": "sim/scripts",
+   "path": "sections/sim/scripts.json"
+  },
+  {
+   "name": "sim/sim",
+   "path": "sections/sim/sim.json"
+  },
+  {
+   "name": "state/migrations",
+   "path": "sections/state/migrations.json"
+  },
+  {
+   "name": "state/modes",
+   "path": "sections/state/modes.json"
+  },
+  {
+   "name": "state/state",
+   "path": "sections/state/state.json"
+  },
+  {
+   "name": "ui/card",
+   "path": "sections/ui/card.json"
+  },
+  {
+   "name": "ui/compendium",
+   "path": "sections/ui/compendium.json"
+  },
+  {
+   "name": "ui/level",
+   "path": "sections/ui/level.json"
+  },
+  {
+   "name": "ui/strings",
+   "path": "sections/ui/strings.json"
+  },
+  {
+   "name": "ui/ui",
+   "path": "sections/ui/ui.json"
+  },
+  {
+   "name": "world/collision",
+   "path": "sections/world/collision.json"
+  },
+  {
+   "name": "world/days",
+   "path": "sections/world/days.json"
+  },
+  {
+   "name": "world/edge",
+   "path": "sections/world/edge.json"
+  },
+  {
+   "name": "world/movers",
+   "path": "sections/world/movers.json"
+  },
+  {
+   "name": "world/navigation",
+   "path": "sections/world/navigation.json"
+  },
+  {
+   "name": "world/physics",
+   "path": "sections/world/physics.json"
+  },
+  {
+   "name": "world/props",
+   "path": "sections/world/props.json"
+  },
+  {
+   "name": "world/scenes",
+   "path": "sections/world/scenes.json"
+  },
+  {
+   "name": "world/spawn",
+   "path": "sections/world/spawn.json"
+  },
+  {
+   "name": "world/terrain",
+   "path": "sections/world/terrain.json"
+  },
+  {
+   "name": "world/tiles",
+   "path": "sections/world/tiles.json"
+  },
+  {
+   "name": "world/traversal",
+   "path": "sections/world/traversal.json"
+  },
+  {
+   "name": "world/trees",
+   "path": "sections/world/trees.json"
+  },
+  {
+   "name": "world/water",
+   "path": "sections/world/water.json"
+  },
+  {
+   "name": "world/weather",
+   "path": "sections/world/weather.json"
+  }
+ ]
+}

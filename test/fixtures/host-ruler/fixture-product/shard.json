@@ -1,0 +1,27 @@
+{
+ "identity": {
+  "slug": "host-ruler-fixture"
+ },
+ "sections": [
+  {
+   "name": "client/plan",
+   "path": "sections/client/plan.json"
+  },
+  {
+   "name": "world/scenes",
+   "path": "sections/world/scenes.json"
+  },
+  {
+   "name": "world/spawn",
+   "path": "sections/world/spawn.json"
+  },
+  {
+   "name": "view/modules",
+   "path": "sections/view/modules.json"
+  },
+  {
+   "name": "held/arms",
+   "path": "sections/held/arms.json"
+  }
+ ]
+}
