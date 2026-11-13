@@ -1113,6 +1113,7 @@
     "src/cook/game/shardCook.ts": "cook",
     "src/cook/game/spawnParts.ts": "cook",
     "src/cook/game/stripPack.ts": "cook",
+    "src/cook/game/tierTextures.ts": "cook",
     "src/server/engine/ai/bossContenders.ts": "server",
     "src/server/engine/ai/burstFlyer.ts": "server",
     "src/server/engine/ai/challengeGrazer.ts": "server",
