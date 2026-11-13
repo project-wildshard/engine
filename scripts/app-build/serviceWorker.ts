@@ -34,6 +34,13 @@ function shellFiles(html: string, root: string, sources: ReadonlyMap<string, str
   const fonts = join(publicRoot, 'fonts');
   // S2: the title's bytes. Only the Latin faces the game's text uses wait in the shell; the rest load if a glyph asks.
   if (existsSync(fonts)) for (const file of readdirSync(fonts)) if (file.endsWith('-latin.woff2')) add(`/fonts/${file}`);
+  // AUDIO AU3: the title's music comes with the shell (play never streams it). Piano is the one style left (AU16, J304);
+  // its `title` slot names the file. A build with a content base moves it to the content list, as it does the title art.
+  const music = join(publicRoot, 'assets/music/piano/music.json');
+  if (existsSync(music)) {
+    const full: unknown = Reflect.get(Reflect.get(Reflect.get(JSON.parse(readFileSync(music, 'utf8')) as object, 'slots') ?? {}, 'title') ?? {}, 'full');
+    if (typeof full === 'string') add(`/assets/music/piano/${full}`);
+  }
   // S2: iOS reads the launch image itself, once, when the app is added; no page or worker route ever serves it.
   return [...files].filter(url => !url.startsWith('/assets/title/launch-')).sort();
 }
