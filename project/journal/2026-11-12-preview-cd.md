@@ -19,3 +19,4 @@
   dispatch; the "At most hourly" step reads the live version.json `time`;
   concurrency `preview` no longer cancels a run mid-release; the checkout
   fetches tags so `git describe` sees v0.1.x.
+- The plan (PCD1 to PCD5) is docs/plans/opus-2026-11-12-preview-cd.md; PCD3 (a 75-minute lag watchdog), PCD4 (proof) and PCD5 (meta architecture) stay open.
