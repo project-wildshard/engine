@@ -153,7 +153,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
     const page = seeded ? { flags: [...new Set([...new Set([input.shard.identity.slug, cell.instance])].flatMap(level => pageSavedFlags(level)).concat(refused?.flags ?? []))], state: pageRuntimeState(options.saves, cell.instance) } : undefined;
     const resident = await bootTask(snapshot === undefined ? 'server:simulation-and-collision-create' : 'server:continuation-restore', () => createTrustedHeadlessResident(input, snapshot, page === undefined ? around : { ...around, page })), { host } = resident;
     if (snapshot !== undefined) removeChunkEdgeWalls(host.physics); // GC36: a world saved while lone cells had walls
-    bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product)); await installServerChapters(host, input.product, input.shard, resident.fact); await installServerDoors(host, input.product, seeded ? pageOpenDoors(options.saves, placed) : undefined);
+    bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product)); await installServerChapters(host, input.product, input.shard, resident.fact); await installServerDoors(host, input.product, seeded ? pageOpenDoors(options.saves, placed) : undefined, snapshot !== undefined);
     host.respawn.served = true; actRoutes(host).introLocks = true;
     const owned = ownedOf(host, input, options.owned, options.profiles), fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
     return { host, owned, fallFloor, fall: fallFloor(), resident, dispose: () => { resident.dispose(); }, fact, effects: () => resident.effects,

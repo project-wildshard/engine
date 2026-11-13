@@ -24,3 +24,12 @@ material (`sameMaterial`: the boat is `boat` planks on the page and `driftwood.b
 since HS2) and `chunked` owners, whose page copies of one piece under another chunk's owner are that one piece (the pier deck
 is registered in four chunks, its landings in two). Two copies in one chunk stay two, and a stale material or chunked owner
 fails. Driftwood's only `known` line left is the castaway (SS10b).
+
+## A restored world's doors stood still (opus-hs1)
+
+Moving Pine Hollow's `product-play` onto `openWorldAdapter` failed its resume check: a world restored from the adapter's
+commit had different physics bytes from the one that never stopped, from the first step. Bisected to `installServerDoors`:
+it posed every leaf at install, and on a restored world that re-set an already-placed collider by an f32 rounding error,
+which re-files it in the broad phase. Now a restored world (`openCellWorld` with a snapshot) leaves its leaves where the save
+put them, and reads the shut pose by turning the standing one back, so a door saved open no longer swings twice. The open
+world test now resumes every native pin through the adapter and compares the next steps byte for byte.

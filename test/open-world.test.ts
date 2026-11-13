@@ -35,6 +35,29 @@ describe('open world: the room and the tick adapter step the same owners', { con
   }, 180_000);
 });
 
+// A saved room world continues identically: the bake worker and a shard's CI resume a native world from the adapter's commit,
+// and every byte of the next steps (the physics included) matches the world that never stopped.
+describe('open world: a saved world continues identically through the tick adapter', { concurrent: false }, () => {
+  for (const slug of pins) test(slug, async () => {
+    const directory = builtProduct(slug === 'template' ? '_template' : slug), product = await loadHeadlessProduct(directory);
+    const input = { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
+    const probe = await openWorld(input, { room: true }), native = probe.resident !== undefined; probe.dispose();
+    if (!native) return;
+    const control = await openWorldAdapter(input);
+    try {
+      for (let tick = 0; tick < 60; tick++) control.step([{ kind: 'player', moveX: 0, moveZ: -1, yaw: 0, commandVersion: 1 }]);
+      const resumed = await openWorldAdapter(input, control.commit().snapshot);
+      try {
+        for (let tick = 0; tick < 3; tick++) {
+          const commands = [{ kind: 'player' as const, moveX: 0, moveZ: -1, yaw: 0, commandVersion: 1 as const }];
+          control.step(commands); resumed.step(commands);
+          expect(resumed.commit(), `${slug}: tick ${tick} after the resume`).toEqual(control.commit());
+        }
+      } finally { resumed.dispose(); }
+    } finally { control.dispose(); }
+  }, 180_000);
+});
+
 test('Nalati\'s tick adapter runs its story on the server with no hand-installed chapters', async () => {
   const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory);
   const adapter = await openWorldAdapter({ shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) });

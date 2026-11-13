@@ -41,8 +41,9 @@ function pieceColliders(host: SimHost): ReadonlyMap<string, Collider> {
   return found;
 }
 
-/** Keep the building doors of a shard that has them. False when it has none. `opened`: what a page's save left open, for a world's first boot. */
-export async function installServerDoors(host: SimHost, product: ShardProduct | undefined, opened: ReadonlySet<string> = new Set()): Promise<boolean> {
+/** Keep the building doors of a shard that has them. False when it has none. `opened`: what a page's save left open, for a world's first boot.
+ *  `restored`: a world restored from its save, whose leaves already stand where the save put them. */
+export async function installServerDoors(host: SimHost, product: ShardProduct | undefined, opened: ReadonlySet<string> = new Set(), restored = false): Promise<boolean> {
   if (product === undefined || !product.hasFile(PIECES) || !product.hasFile(FOREST)) return false;
   const [piecesInput, forestInput, compositionInput] = await Promise.all([product.json<unknown>(PIECES), product.json<unknown>(FOREST), product.hasFile(COMPOSITION) ? product.json<unknown>(COMPOSITION) : null]);
   const look = v.parse(Forest, forestInput).buildings?.life.door, composition = compositionInput === null ? undefined : v.parse(Composition, compositionInput).door;
@@ -52,11 +53,14 @@ export async function installServerDoors(host: SimHost, product: ShardProduct | 
   for (const row of rows) {
     const collider = colliders.get(row.id), matrix = row.follows?.matrix;
     if (row.category !== 'buildings' || row.follows?.rotation !== true || matrix === undefined || collider === undefined || rows.some(other => other.id === row.id.replace(/-bar$/u, '') && other.id !== row.id)) continue;
-    const hinge = { x: matrix[12] ?? 0, y: matrix[13] ?? 0, z: matrix[14] ?? 0 }, rotation = collider.rotation(), at = collider.translation();
-    const local = turned(conjugate(rotation), { x: at.x - hinge.x, y: at.y - hinge.y, z: at.z - hinge.z });
     const door = buildingDoor(row.id), flag = buildingDoorFlag(row.id);
     if (opened.has(row.id)) host.flags.set(flag);
     door.open = host.flags.has(flag); door.t = door.open ? 1 : 0;
+    // A fresh world's leaf stands shut, as baked. A restored one stands where its save put it (open, if its flag is), so its
+    // shut pose is that one turned back.
+    const hinge = { x: matrix[12] ?? 0, y: matrix[13] ?? 0, z: matrix[14] ?? 0 }, standing = collider.rotation(), at = collider.translation();
+    const rotation = restored ? times(standing, yawOf(-buildingDoorYaw(door.t, look.angle))) : standing;
+    const local = turned(conjugate(standing), { x: at.x - hinge.x, y: at.y - hinge.y, z: at.z - hinge.z });
     leaves.push({ door, flag, collider, hinge, rotation, local, bars: bars.filter(gate => gate.target.piece === row.id).map(gate => gate as { readonly opensWhen: Parameters<typeof test>[1] }) });
   }
   if (leaves.length === 0) return false;
@@ -66,7 +70,9 @@ export async function installServerDoors(host: SimHost, product: ShardProduct | 
     leaf.collider.setRotation(q); leaf.collider.setTranslation({ x: leaf.hinge.x + at.x, y: leaf.hinge.y + at.y, z: leaf.hinge.z + at.z });
   };
   for (const leaf of leaves) {
-    pose(leaf);
+    // A restored leaf is left where it stands: posing it again moves it by a rounding error and re-files it in the broad
+    // phase, so the resumed world's physics would no longer match the world that never stopped (HS1).
+    if (!restored) pose(leaf);
     routes.claims.set(leaf.door.id, player => {
       const body = host.players.get(player);
       if (body === undefined || Math.hypot(body.position.x - leaf.hinge.x, body.position.z - leaf.hinge.z) > DOOR_REACH + Math.hypot(leaf.local.x, leaf.local.z)) return;
