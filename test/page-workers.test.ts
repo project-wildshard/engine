@@ -136,3 +136,26 @@ test('a spawn part keeps the assets\' headers and gains Content-Encoding: br; an
     expect(response.headers.get('content-encoding'), path).toBeNull();
   }
 });
+
+// SA36: preview alone serves the page for /slug/<slug> (its `SLUG_PAGE` var); staging and production keep the 404 until SA37.
+test('preview serves the page for /slug/<slug>; staging and production answer the assets\' 404', async () => {
+  expect(read('preview').vars).toEqual({ SLUG_PAGE: 'on' });
+  for (const channel of ['production', 'staging'] as const) expect(read(channel).vars).toEqual({});
+  const miss = (seen: string[]): Env['ASSETS'] => ({ fetch: request => {
+    const path = new URL(request.url).pathname;
+    seen.push(path);
+    return Promise.resolve(path === '/' ? new Response('<!doctype html>', { status: 200, headers: { 'content-type': 'text/html' } }) : new Response('gone', { status: 404 }));
+  } });
+  for (const path of ['/slug/driftwood-isle', '/slug/open-plot-thin-ice/', '/slug/_template?x=1']) {
+    const seen: string[] = [];
+    const response = await worker.fetch(new Request(`https://preview.wildshard.io${path}`), { ASSETS: miss(seen), SLUG_PAGE: 'on' });
+    expect([response.status, response.headers.get('cache-control'), await response.text()]).toEqual([200, 'no-store', '<!doctype html>']);
+    expect(seen).toEqual(['/']);
+    const off: string[] = [];
+    expect((await worker.fetch(new Request(`https://play.wildshard.io${path}`), { ASSETS: miss(off) })).status).toBe(404);
+  }
+  for (const path of ['/slug/', '/slug/a/b', '/slugs/driftwood-isle']) {
+    const seen: string[] = [];
+    expect((await worker.fetch(new Request(`https://preview.wildshard.io${path}`), { ASSETS: miss(seen), SLUG_PAGE: 'on' })).status, path).toBe(404);
+  }
+});

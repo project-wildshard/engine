@@ -35,6 +35,15 @@ export const GAME_STRINGS = {
       hide: 'HIDE UNTIL NEXT BUILD',
     },
   },
+  /** SA36 (Jake, grill Q14-Q16): the `/slug/<slug>` page, one shard's card and hero and PLAY, a link an author shares */
+  slugPage: {
+    menu: 'MAIN MENU',
+    play: 'Play',
+    /** under PLAY: it enters Infinite Wildshard at the shard's cell, the way Shard select does */
+    placed: 'Spawns you on the grid',
+    /** Q16: a slug with no grid cell (not placed yet, `--no-place`, an off-grid shard) */
+    unplaced: 'Not on the grid yet',
+  },
   /** a shard card whose shardfile needs a newer client (G86, temporary): dimmed, a badge and the save promise */
   upgrade: {
     badge: 'NEEDS UPGRADE',

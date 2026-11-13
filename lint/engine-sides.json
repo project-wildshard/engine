@@ -1019,6 +1019,7 @@
     "src/client/game/shardfile/worldSceneUniforms.ts": "client",
     "src/client/game/shardfile/worldSceneWeld.ts": "client",
     "src/client/game/shardfile/worldUpdates.ts": "client",
+    "src/client/game/slugPage.ts": "client",
     "src/client/game/stealth/controller.ts": "client",
     "src/client/game/summary.ts": "client",
     "src/client/game/systems/audio/crossbowSounds.ts": "client",

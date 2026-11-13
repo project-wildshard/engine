@@ -80,22 +80,26 @@ export function titleCards(showHidden: boolean = isDev(), upgradeNeeded: Upgrade
   const ordinary = titleManifests().filter(m => m.shardSelect !== false && !autoPlaced(m));
   const visible = ordinary.filter((m) => !hidden(m));
   const manifests = showHidden ? [...visible, ...ordinary.filter(hidden)] : visible;
-  return manifests.map((m): TitleCard => {
-    const card: TitleCard = {
+  return manifests.map((m): TitleCard => titleCard(m, upgradeNeeded, refused));
+}
+
+/** One shard's card, as Shard Select draws it; also the `/slug/<slug>` page's one card (SA36), which a shard with no Shard
+ *  Select card (an open plot, an auto-placed shard) still gets. */
+export function titleCard(m: TitleManifest, upgradeNeeded: UpgradeNeeded = noUpgrades, refused: RefusedShard = sessionRefusals): TitleCard {
+  const card: TitleCard = {
     slug: m.slug, name: m.name, label: m.biome,
     thumbnail: m.card.thumb, heroPortrait: m.card.portrait, heroLandscape: m.card.landscape,
-    };
-    const status = titleStatus(m);
-    if (status === 'earlyAccess') card.badge = 'Early access';
-    if (status === 'experimental') card.badge = 'Experimental';
-    if (status === 'partial') card.badge = 'Partial';
-    if (hidden(m)) card.badge = 'Developer only';
-    const built = upgradeNeeded(m.slug);
-    if (built !== null) card.upgrade = { built };
-    const refusal = built === null ? refused(m.slug) : null; // G86's card already says NEEDS UPGRADE
-    if (refusal !== null) card.unavailable = refusal;
-    return card;
-  });
+  };
+  const status = titleStatus(m);
+  if (status === 'earlyAccess') card.badge = 'Early access';
+  if (status === 'experimental') card.badge = 'Experimental';
+  if (status === 'partial') card.badge = 'Partial';
+  if (playerHidden(m)) card.badge = 'Developer only';
+  const built = upgradeNeeded(m.slug);
+  if (built !== null) card.upgrade = { built };
+  const refusal = built === null ? refused(m.slug) : null; // G86's card already says NEEDS UPGRADE
+  if (refusal !== null) card.unavailable = refusal;
+  return card;
 }
 
 /** A deck entry: a shard's card, or a draft's COMING SOON card (WORLDCLAW-TOOLS W9, J19, J38): no world to enter, its
@@ -131,6 +135,11 @@ export interface TitleDeckOptions {
   readonly notice?: string;
   /** what the menu may show and enter (default: Settings ▸ Developer and the DEVSERVER build, read live) */
   readonly mode?: () => MenuMode;
+  /** SA36: the `/slug/<slug>` page's one card. ENTER WORLD reads `play` over `hint`; `closed` (a slug with no grid cell)
+   *  disables it and says why in the hint's place (Jake, grill Q16: the card and hero, Play disabled) */
+  readonly single?: { readonly play: string; readonly hint: string; readonly closed?: string };
+  /** runs on ENTER WORLD's tap before the entry (the slug page's first-play name ask); `go` enters */
+  readonly gate?: (go: () => void) => void;
 }
 
 export interface TitleDeck {
@@ -203,7 +212,8 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   const onTap = (el: HTMLElement, fn: () => void): void => { listenTap(scope, el, fn); };
   const { cards } = opts;
   // J313: a draft's card (Thin Ice, off the grid by J305) never loads, so only Developer sees it
-  const drafts = mode().developer || mode().devserver ? DRAFT_TITLES : [];
+  // SA36: the slug page holds exactly its one card, Developer or not
+  const drafts = opts.single === undefined && (mode().developer || mode().devserver) ? DRAFT_TITLES : [];
   const entries: readonly DeckEntry[] = [...cards.map(fromShard), ...drafts.map(fromDraft)];
   const activeIndex = entries.map((card): string => card.slug).indexOf(opts.active ?? '');
   const root = document.createElement('div');
@@ -226,7 +236,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     const image = document.createElement('span'); image.className = 'ws-menu-card-img'; image.style.backgroundImage = `url('${titleAssetURL(card.thumbnail)}')`;
     if (card.upgrade !== undefined) image.append(words('i', 'ws-menu-card-tag ws-menu-card-needs', GAME_STRINGS.upgrade.badge));
     else if (card.unavailable !== undefined) image.append(words('i', 'ws-menu-card-tag ws-menu-card-needs', GAME_STRINGS.unavailable.badge));
-    if (canEnter(card, mode())) image.append(words('i', `ws-menu-card-tag${active ? ' ok' : ''}`, active ? 'Loaded' : 'Load'));
+    if (canEnter(card, mode()) && opts.single?.closed === undefined) image.append(words('i', `ws-menu-card-tag${active ? ' ok' : ''}`, active ? 'Loaded' : 'Load'));
     // G238: the port badge, Developer on only (the public card is unchanged)
     const ribbon = ribbonFor(card, mode());
     const tone = !canEnter(card, mode()) ? '' : card.badge === 'Early access' ? ' ws-menu-card-ea' : card.badge === 'Partial' ? ' ws-menu-card-partial' : '';
@@ -287,11 +297,12 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     // (a phone network, a busy page), the backdrop is the card's picture, never black (Jake's Pine Hollow, ab93dccfe)
     hero.style.backgroundImage = `url('${heroUrl(c)}'), url('${titleAssetURL(c.thumbnail)}')`;
     hero.classList.add('show');
-    hint.textContent = hintFor(c, index === activeIndex, mode());
-    play.disabled = !canEnter(c, mode()) && c.draft === null;
+    const open = canEnter(c, mode()), single = opts.single;
+    hint.textContent = single?.closed ?? (single === undefined || !open ? hintFor(c, index === activeIndex, mode()) : single.hint);
+    play.disabled = (!open && c.draft === null) || single?.closed !== undefined;
     explore.disabled = !canExplore(c, mode());
     explore.classList.toggle('off', !canExplore(c, mode())); // menu.css hides .off
-    required(play, 'b').textContent = c.draft ? (isDev() ? GAME_STRINGS.drafts.draftMode : GAME_STRINGS.drafts.followBuild) : c.upgrade !== undefined ? GAME_STRINGS.upgrade.badge : c.unavailable !== undefined ? GAME_STRINGS.unavailable.badge : canEnter(c, mode()) ? 'Enter world' : 'Coming soon';
+    required(play, 'b').textContent = c.draft ? (isDev() ? GAME_STRINGS.drafts.draftMode : GAME_STRINGS.drafts.followBuild) : c.upgrade !== undefined ? GAME_STRINGS.upgrade.badge : c.unavailable !== undefined ? GAME_STRINGS.unavailable.badge : open ? single?.play ?? 'Enter world' : 'Coming soon';
     paintSummary(c);
   };
   const select = (raw: number, smooth = true): void => {
@@ -303,7 +314,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   let entering = false;
   const enter = (c: DeckEntry): boolean => {
     if (entering) return false;
-    if (c.shard === null || !canEnter(c, mode())) return false;
+    if (c.shard === null || !canEnter(c, mode()) || opts.single?.closed !== undefined) return false;
     const shard = c.shard;
     entering = true;
     startEntryDownload(c.slug); titlePrefetchChoice(saves).remember(c.slug);
@@ -344,7 +355,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   // a click that only follows the title's SHARD SELECT tap lands where that tap was, not on a card or dot (QC2)
   cardEls.forEach((e, i) => { listenDom(scope, e, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev) && i !== index && performance.now() - swipedAt > 400) select(i); }); });
   dots.forEach((d, i) => { listenDom(scope, d, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev)) select(i); }); });
-  onTap(required(root, '.ws-menu-play'), () => { activate(); });
+  onTap(required(root, '.ws-menu-play'), () => { if (opts.gate === undefined) activate(); else opts.gate(() => { activate(); }); });
   onTap(required(root, '.ws-menu-explore'), () => { const c = entries[index]; if (c?.shard && canExplore(c, mode())) opts.onExplore(c.shard); });
   onTap(required(root, '.ws-menu-settings'), opts.onSettings);
   // QA row 25's Developer pixel card is gone: Settings ▸ Graphics ▸ Pixel density is the one pixel control (MG8, Jake ~23:45)

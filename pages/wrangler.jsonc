@@ -30,7 +30,9 @@
     "preview": {
       "name": "wildshard-play-preview",
       "workers_dev": false,
-      "preview_urls": true
+      "preview_urls": true,
+      // SA36: preview alone serves the page for /slug/<slug> (worker.ts SLUG_PAGE); SA37 adds staging and production
+      "vars": { "SLUG_PAGE": "on" }
     }
   }
 }

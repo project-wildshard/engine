@@ -37,6 +37,7 @@ import { lastEnd } from '@wildshard/engine/boot/lastEnd';
 import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
+import { slugOfPath } from './slugPath';
 
 
 declare const __BUILD_ID__: string;
@@ -52,6 +53,7 @@ const entryScope = new Scope('entry');
 let crashResume: CrashResume | null = null;
 let selectedImages: Scope | undefined;
 const task = (): Promise<void> => new Promise((resolve) => { entryScope.timeout(0, resolve); });
+const UNLISTED = 'This world is not listed. Choose a world from the list.';
 /** The plain home URL paints only the title. No renderer, world, or Three.js is imported until a shard is chosen. */
 // RL3: the static module graph has arrived and run; index.html's 12 s self-reload stands down (only a hung module
 // fetch, which never gets here, reloads by itself; anything after this is guardBoot's)
@@ -98,11 +100,16 @@ function serverSites(): Promise<readonly { readonly site: string | null | undefi
 }
 async function enterPage(): Promise<unknown> {
   const requested = search.get('chunk');
+  // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here
+  // Preview only until SA37 (a build with no world: the worker serves any navigation the cached page, so the Worker's gate alone
+  // would open it on staging and production to a returning player)
+  const slugged = slugOfPath(location.pathname);
+  if (slugged !== null && requested === null && (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ === undefined) return showSlugPage(slugged);
   // An embedded author product has its own admission. A game URL must name a
   // listed world before any discovery, tables or renderer can be prepared.
   if (requested !== null && document.getElementById('ws-shardfile') === null && findTitleManifest(requested) === undefined) {
     document.documentElement.classList.add('title-first');
-    return showPageTitle('This world is not listed. Choose a world from the list.');
+    return showPageTitle(UNLISTED);
   }
   await waitFor('Startup stylesheets', waitForLoadingStyles(entryScope), 'file');
   const { consumeGridRecovery, gridRecoveryRefused, pageGridRecovery, pendingGridEntry } = await bootTask('app:page-entry-import', () => import('@wildshard/engine/game/grid/pageEntry'));
@@ -214,6 +221,41 @@ async function showPageTitle(refusal = ''): Promise<void> {
   // GPU process's compiler, so a cold entry's first program does not pay its 1-1.4 s start-up
   showDropOnTitle();
   startTitleLowPowerProbe(); // Jake (11-10): the shown title, once idle, reads Low Power Mode for the tab (boot/lowPower.ts)
+  void startTitleWarmup(import('@wildshard/engine/boot/earlyPrograms'), entryScope, window);
+}
+
+/**
+ * SA36 (Jake, grill Q14 to Q16): the `/slug/<slug>` page, one shard's card and hero (src/client/game/slugPage.ts). PLAY travels to
+ * `/?chunk=<slug>` as a Shard select tap does, so that page enters the grid at the shard's cell (grid/oneWayIn.ts); a shard the
+ * grid doesn't place keeps PLAY disabled. A slug no title row names goes to the title with the unlisted line.
+ */
+async function showSlugPage(slug: string): Promise<void> {
+  document.documentElement.classList.add('title-first');
+  const manifest = findTitleManifest(slug);
+  // the page's query (`?sw=0`, `?tier=`, …) rides along to `/`, as a Shard select tap keeps it
+  const home = (): URL => new URL(`/${location.search}`, location.origin);
+  if (manifest === undefined) {
+    history.replaceState(history.state, '', home());
+    return showPageTitle(UNLISTED);
+  }
+  const [{ showStartTitle }, { buildSlugPage }, { installGridTitle }, { shardCell }, { travel }] = await Promise.all([
+    import('@wildshard/engine/ui/StartTitle'), import('@wildshard/engine/game/slugPage'), import('@wildshard/engine/game/mainMenu'),
+    import('@wildshard/engine/game/grid/oneWayIn'), import('@wildshard/engine/game/travel/travel')]);
+  const grid = installGridTitle();
+  const placed = shardCell(manifest.slug) !== undefined;
+  const leave = (mode: 'enter' | 'explore') => (card: { readonly slug: string }): void => {
+    // the shard's page is `/?chunk=`: travel keeps this document's path, so the link's path goes first
+    history.replaceState(history.state, '', home());
+    travel({ to: card.slug, mode });
+  };
+  showStartTitle(({ settings, notice }) => {
+    const lines = [notice ?? '', grid.note].filter((line) => line !== '').join('\n');
+    return buildSlugPage({ manifest, placed, onEnter: leave('enter'), onExplore: leave('explore'),
+      onSettings: () => { void (async () => { const { openTitleSettings } = await import('./titleSettings'); await openTitleSettings(settings); })(); },
+      ...(lines === '' ? {} : { notice: lines }) });
+  });
+  showDropOnTitle();
+  startTitleLowPowerProbe();
   void startTitleWarmup(import('@wildshard/engine/boot/earlyPrograms'), entryScope, window);
 }
 

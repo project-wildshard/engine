@@ -18,6 +18,8 @@ interface Fetcher {
 
 interface Env {
   readonly ASSETS: Fetcher
+  /** SA36: `on` serves the page for `/slug/<slug>` too. Only preview sets it (wrangler.jsonc); SA37 takes it to every host. */
+  readonly SLUG_PAGE?: string
 }
 
 const SW = /^sw(?:=|$)/u
@@ -28,6 +30,8 @@ function doctor(search: string): string {
   return `/doctor/?${[...kept, 'sw=0'].join('&')}`
 }
 const PAGE = new Set(['/', '/index.html'])
+// SA36: the one-shard page a sharddev author shares (src/client/app/slugPath.ts reads the same paths)
+const SLUG = /^\/slug\/[\w-]+\/?$/u
 const OK = 200
 const PART = /^\/assets\/spawn\/(?:parts|server)\/[^/]+\.pack\.br$/u
 const NOT_MODIFIED = 304
@@ -75,7 +79,7 @@ async function page(request: Request, url: URL, env: Env): Promise<Response> {
 // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
 async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
-  if (PAGE.has(url.pathname)) {
+  if (PAGE.has(url.pathname) || (env.SLUG_PAGE === 'on' && SLUG.test(url.pathname))) {
     return await page(request, url, env)
   }
   if (PART.test(url.pathname)) {

@@ -1154,6 +1154,7 @@
     "./game/models/binarySource": "./src/client/game/models/binarySource.ts",
     "./game/plugin/clientChannelView": "./src/client/game/plugin/clientChannelView.ts",
     "./game/mainMenu": "./src/client/game/mainMenu.ts",
+    "./game/slugPage": "./src/client/game/slugPage.ts",
     "./game/systems/species/install": "./src/client/game/systems/species/install.ts",
     "./game/icons": "./src/client/game/icons.ts",
     "./game/models/interact": "./src/client/game/models/interact.ts",
