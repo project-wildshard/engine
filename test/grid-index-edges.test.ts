@@ -212,3 +212,48 @@ test('offline neighbour sections never fall through to a network pack', async ()
   await expect(readGridProductEdges(f.url, f.source.identity.slug, { ...f.options, offline: true })).rejects.toThrow('Missing cached grid product file');
   expect(f.fetch).toHaveBeenCalledExactlyOnceWith(f.url);
 });
+
+/** OFFLINE OF8: the far charge, the far proxy and the near proxy read a neighbour's sections at once; one URL is one read. */
+test('OF8: two concurrent reads of one section URL make one fetch', async () => {
+  const f = fixture('of8-shared-section');
+  let open = (): void => { throw new Error('Missing gate'); };
+  const gate = new Promise<void>(resolve => { open = resolve; });
+  const fetch = vi.fn(async (path: string): Promise<Response> => {
+    if (path === f.edgeUrl) await gate;
+    return f.fetch(path);
+  });
+  const options = { ...f.options, fetch };
+  const reads = [readGridProductEdges(f.url, f.source.identity.slug, options), readGridProductEdges(f.url, f.source.identity.slug, options)];
+  // both readers are past their index before the section read may finish
+  await vi.waitFor(() => { expect(fetch.mock.calls.filter(([url]) => url === f.url)).toHaveLength(2); });
+  await new Promise<void>(resolve => { setImmediate(resolve); });
+  open();
+  expect(await Promise.all(reads)).toEqual([{ edge: f.source.edge, entryways: f.source.entryways }, { edge: f.source.edge, entryways: f.source.entryways }]);
+  expect(fetch.mock.calls.filter(([url]) => url === f.edgeUrl)).toHaveLength(1);
+  // settled reads are not kept: a later read asks again (the service worker's cache answers it)
+  await readGridProductEdges(f.url, f.source.identity.slug, options);
+  expect(fetch.mock.calls.filter(([url]) => url === f.edgeUrl)).toHaveLength(2);
+});
+
+test('OF8: a first-party section URL carries ?v= from the hash its index declares, and is read once a load', async () => {
+  const f = fixture('of8-versioned-section'), edgeHash = hashImmutableBytes(f.wires.get(f.edgeUrl) ?? new Uint8Array());
+  let open = (): void => { throw new Error('Missing gate'); };
+  const gate = new Promise<void>(resolve => { open = resolve; });
+  const reads: string[] = [];
+  const options = { ...f.options, firstParty: true, descriptorHash: 'a'.repeat(64), firstPartyRead: async (url: string, size: number | undefined, _read?: (bytes: number) => void, hash?: string) => {
+    reads.push(url);
+    const address = new URL(url); address.search = '';
+    if (address.href === f.edgeUrl) { expect(hash).toBe(edgeHash); await gate; }
+    const bytes = f.wires.get(address.href); if (bytes === undefined || (size !== undefined && size !== bytes.length)) throw new Error('Missing emitted file');
+    return bytes;
+  } };
+  const both = Promise.all([readGridProductEdges(f.url, f.source.identity.slug, options), readGridProductEdges(f.url, f.source.identity.slug, options)]);
+  await vi.waitFor(() => { expect(reads.filter(url => new URL(url).pathname === new URL(f.url).pathname)).toHaveLength(2); });
+  await new Promise<void>(resolve => { setImmediate(resolve); });
+  open();
+  await both;
+  expect(reads.filter(url => new URL(url).pathname === new URL(f.edgeUrl).pathname)).toEqual([`${f.edgeUrl}?v=${edgeHash.slice(0, 8)}`]);
+  // a later reader in the same load (the far and near proxies after the far charge) reads none: the bytes were kept
+  expect(await readGridProductEdges(f.url, f.source.identity.slug, options)).toEqual({ edge: f.source.edge, entryways: f.source.entryways });
+  expect(reads.filter(url => new URL(url).pathname === new URL(f.edgeUrl).pathname)).toHaveLength(1);
+});

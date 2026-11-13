@@ -75,10 +75,11 @@ async function readGridProductIndex(url: string, identity: string, options: Prod
   return { index, url, options, packed };
 }
 /** One immutable file the index declares (a section or a blob), from the content cache or the product URL, size and hash
- * checked; a network read is kept in the content cache like an admission's. */
-async function readGridProductFile(at: GridProductIndex, path: string, hash: string, size: number): Promise<Uint8Array> {
-  const { options } = at, base = new URL('.', at.url).href, address = new URL(path, at.url).href;
-  if(options.firstParty&&options.firstPartyRead!==undefined)return options.firstPartyRead(address,size,undefined,hash);
+ * checked; a network read is kept in the content cache like an admission's. `address` is the file's URL (a versioned
+ * section's carries its `?v=`). */
+async function readGridProductFile(at: GridProductIndex, path: string, hash: string, size: number, address = new URL(path, at.url).href): Promise<Uint8Array> {
+  const { options } = at, base = new URL('.', at.url).href, native = nativeRead(options);
+  if(native!==undefined)return native(address,size,undefined,hash);
   const held = await options.cache?.asset(base, hash) ?? await options.cachedResponse?.(address, hash, size);
   if ((held === null || held === undefined) && options.offline) throw new Error(`Missing cached grid product file ${path}`);
   const bytes = held ?? (at.packed.has(hash) ? await at.packed.read(hash) : await boundedResponse(await options.fetch(address), size));
@@ -93,11 +94,60 @@ async function readGridProductFile(at: GridProductIndex, path: string, hash: str
   }
   return bytes;
 }
+/** OFFLINE OF8: one read per section URL in a load. The far ring's byte charge, the far proxy and the near proxy each read a
+ *  neighbour's world/tiles (and both proxies its look), at once or a few hundred ms apart, and the audit saw one section URL
+ *  read up to 5 times in a load. A read in flight is shared; each caller parses its own copy. */
+const sectionReads = new Map<string, Promise<Uint8Array>>();
+/** A first-party section's verified bytes, kept after the read settles so the next caller in the same load reads none. Its
+ *  URL names its hash, so a kept copy is never stale. Least recently used leaves first past `SECTION_BYTES` (one load's
+ *  neighbour sections are about 0.3-1 MB; the largest seen is 73 KB). */
+const settledSections = new Map<string, Uint8Array>();
+const SECTION_BYTES = 2 * 1024 * 1024;
+let settledBytes = 0;
+function keepSection(key: string, bytes: Uint8Array): void {
+  if (bytes.length > SECTION_BYTES || settledSections.has(key)) return;
+  settledSections.set(key, bytes); settledBytes += bytes.length;
+  for (const [oldest, held] of settledSections) {
+    if (settledBytes <= SECTION_BYTES) break;
+    settledSections.delete(oldest); settledBytes -= held.length;
+  }
+}
+/** A first-party section's URL carries `?v=` and the first 8 hex of the hash its index declares, as the cook names it in a
+ *  spawn manifest (`shardCook.ts` productFile), so the service worker's `immutable()` keeps it and a spawn download's copy
+ *  answers it. A third-party product's file keeps its bare URL. */
+function gridSectionAddress(at: GridProductIndex, path: string, hash: string): string {
+  const address = new URL(path, at.url);
+  if (nativeRead(at.options) !== undefined) address.searchParams.set('v', hash.slice(0, 8));
+  return address.href;
+}
+/** The build-owned reader a first-party product reads through (undefined: the checked network and content-cache path). */
+function nativeRead(options: ProductOptions): ProductOptions['firstPartyRead'] {
+  return options.firstParty ? options.firstPartyRead : undefined;
+}
 /** One hash-verified section of the index, parsed (null when the index has none). */
 async function readGridSection(at: GridProductIndex, name: string): Promise<unknown> {
   const section = at.index.sections.find(row => row.name === name);
   if (section === undefined) return null;
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await readGridProductFile(at, section.path, section.hash, section.bytes)));
+  const address = gridSectionAddress(at, section.path, section.hash), versioned = nativeRead(at.options) !== undefined;
+  const decode = (bytes: Uint8Array): unknown => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  // Only a first-party section is kept once settled: the checked path has its own content cache and revalidation.
+  const held = versioned ? settledSections.get(`${address} ${section.hash}`) : undefined;
+  if (held !== undefined) {
+    const kept = `${address} ${section.hash}`;
+    settledSections.delete(kept); settledSections.set(kept, held);
+    return decode(held);
+  }
+  // an offline caller on the checked path refuses what an online one would fetch, so they never share a read
+  const key = `${address} ${section.hash} ${String(at.options.offline)}`;
+  let reading = sectionReads.get(key);
+  if (reading === undefined) {
+    const read = readGridProductFile(at, section.path, section.hash, section.bytes, address);
+    reading = read;
+    sectionReads.set(key, read);
+    const forget = (): void => { if (sectionReads.get(key) === read) sectionReads.delete(key); };
+    void read.then(bytes => { forget(); if (versioned) keepSection(`${address} ${section.hash}`, bytes); return bytes; }, forget);
+  }
+  return decode(await reading);
 }
 /** One hash-verified section of a product's bounded index (null when the index has none). No runtime or asset is admitted. */
 async function readGridProductSection(url: string, identity: string, name: string, options: ProductOptions): Promise<unknown> {
