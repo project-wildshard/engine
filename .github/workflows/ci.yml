@@ -101,6 +101,14 @@ jobs:
       - name: Require this version's changelog section (Jake, 2026-11-10)
         if: matrix.job == 1
         run: node scripts/changelog.mjs check --at="$GITHUB_SHA"
+      # SHARD-DELETE DEL9: the pins and both release variables name only slugs the live catalogue lists (a deleted shard
+      # leaves it). Offline half: test/pins-catalogue.test.ts. An API outage warns, never reds.
+      - name: Refuse a pinned or released slug the API catalogue no longer lists
+        if: matrix.job == 1
+        env:
+          E7_STAGING_SHARDS: ${{ vars.E7_STAGING_SHARDS }}
+          E7_PRODUCTION_SHARDS: ${{ vars.E7_PRODUCTION_SHARDS }}
+        run: node scripts/pins-catalogue.ts check
       - name: Stop job 1's own-checks clock
         if: matrix.job == 1
         run: echo "WS_CI_JOB_OWN_MS=$(( $(date +%s%3N) - WS_CI_JOB_OWN_FROM_MS ))" >> "$GITHUB_ENV"

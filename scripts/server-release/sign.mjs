@@ -4,6 +4,9 @@ import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import * as v from 'valibot';
 import { ReleaseSchema, SignedSchema } from '../../src/shared/host/releaseRows.ts';
+import { servedSlug } from './served-slug.mjs';
+
+export { DEFAULT_SERVER_SHARDS, servedSlug } from './served-slug.mjs';
 
 /** @typedef {import('../../src/shared/host/releaseRows.ts').ReleaseFile} ReleaseFile */
 export const COMMIT = /^[0-9a-f]{40}$/u;
@@ -53,13 +56,6 @@ export function readPublication(text, publicKey) {
 export function bundleDescriptor(archive, tag) {
   return { name: `${tag}/${basename(archive)}`, sha256: createHash('sha256').update(readFileSync(archive)).digest('hex') };
 }
-
-/** A pin whose installed folder isn't its slug: the template's shardfile is `template` on the API (J259 slugs are kebab-case), but it
- *  installs into `_template`, and the server book, the grid and the server's cells all say `_template`. The release names the folder,
- *  so a server opening the whole grid finds the template's cell (GO7: `template` in the release opened 24 of 25 cells). */
-const PIN_FOLDERS = new Map([['template', '_template']]);
-/** The folder a pinned slug installs into, which is the name the server, its book and the grid use. */
-export const servedSlug = (/** @type {string} */ slug) => PIN_FOLDERS.get(slug) ?? slug;
 
 /** The release's shards, by the name the server reads them under; a variable may give a pin's slug or its folder.
  * @param {unknown} pins @param {string} names @returns {ReleaseFile['shards']} */

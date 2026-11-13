@@ -7,7 +7,7 @@ import { parseArgs } from 'node:util';
 import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, S3ServiceException } from '@aws-sdk/client-s3';
 import * as v from 'valibot';
 import { readServerPackBook, serverPackBookPath } from '../../src/shared/game/shardfile/serverPack.ts';
-import { bundleDescriptor, COMMIT, publication, readPublication, releasePublicKey, releaseShards, signRelease } from './sign.mjs';
+import { bundleDescriptor, COMMIT, DEFAULT_SERVER_SHARDS, publication, readPublication, releasePublicKey, releaseShards, signRelease } from './sign.mjs';
 
 /** @typedef {import('../../src/shared/host/releaseRows.ts').ReleaseFile} ReleaseFile */
 /** @typedef {{client: S3Client, bucket: string, candidate: ReleaseFile, privateKey: string, publicKey: string, isAncestor: (older: string, newer: string) => boolean,
@@ -119,7 +119,7 @@ async function main() {
   const epoch = v.parse(v.object({ saveEpoch: v.pipe(v.number(), v.integer(), v.minValue(1)) }), JSON.parse(sourceFile('save-epoch.json'))).saveEpoch;
   const shardNames = process.env.E7_SERVER_SHARDS?.trim();
   const candidate = publication({ channel: values.channel, serial: 1, engineBuild: values.build, saveEpoch: epoch,
-    shards: releaseShards(JSON.parse(sourceFile('test/pins/shardfiles.json')), shardNames === undefined || shardNames === '' ? 'driftwood-isle,nalati-grasslands' : shardNames),
+    shards: releaseShards(JSON.parse(sourceFile('test/pins/shardfiles.json')), shardNames === undefined || shardNames === '' ? DEFAULT_SERVER_SHARDS : shardNames),
     bundle: bundleDescriptor(values.bundle, values.tag), socket: need('E7_RELEASE_SOCKET') });
   if (releasePublicKey(privateKey) !== publicKey.toLowerCase()) throw new Error('Signing key does not match E7_RELEASE_PUBLIC_KEY');
   if (values.check) { console.log('Server release configuration admitted'); return; }

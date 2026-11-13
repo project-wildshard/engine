@@ -2,7 +2,9 @@
 // J65: engine's products are pinned real shardfiles, not a shard build. `test/pins/shardfiles.json` names each one by the
 // hash `api.wildshard.io` serves, and `test/pins/catalogue.json` is the catalogue document those heads came from.
 //
-//   node scripts/pins.ts refresh            re-pin to the live heads (read only: GETs)
+//   node scripts/pins.ts refresh            re-pin to the live heads (read only: GETs); refuses while a pin, the default
+//                                           release pair or a set E7_*_SHARDS names a slug GET /api/catalogue no longer
+//                                           lists (DEL9); `--drop <slug>` lets refresh drop a deleted pin
 //   node scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder> and publish its mounts
 //   node scripts/pins.ts install --ring 1   Ring 1: pinned Template 1 and Dunes, dependency Template 2, and server slices
 //   node scripts/pins.ts install --from-format <slug>  a frozen dependency product (blender-template, brasscap-mesa),
@@ -42,6 +44,8 @@ import { dropManifest, folderName, insideTree, lockPins, mountPath, pinsKey, reu
 import type { PackedIndex } from './pin-packs.ts';
 import { fetchPinnedPublicAssets, pinnedPublicAssets } from './pin-assets.ts';
 import { assertKtx2TableTargets } from '../src/shared/game/shardfile/ktx2Targets.ts';
+import { catalogueSlugs, documentSlugs, pinnedSlugs, releaseNamed, unlistedMessage, unlistedSlugs } from './pins-catalogue.ts';
+import { servedSlug } from './server-release/served-slug.mjs';
 
 interface Pin { readonly slug: string; readonly revision: number; readonly hash: string; readonly bytes: number }
 interface PinFile { readonly api: string; readonly shards: readonly Pin[] }
@@ -102,9 +106,17 @@ async function getJson(path: string): Promise<unknown> {
   return response.json();
 }
 
-/** Re-pin to the catalogue's live heads. */
-async function refresh(): Promise<void> {
+/** Re-pin to the catalogue's live heads. A slug the catalogue no longer lists (DEL9: deleted) is refused, never silently
+ *  dropped: whatever names it (a ring, a release variable, a proof list) has to drop it first, then `--drop <slug>`. */
+async function refresh(drop: readonly string[]): Promise<void> {
   const [catalogue, listed, document] = await Promise.all([getJson('/api/catalogue'), getJson('/api/shardfiles'), getJson('/api/catalogue.json?stage=live')]);
+  const pinned = existsSync(PINS) ? pinnedSlugs(readJson(PINS)) : [], liveSlugs = catalogueSlugs(catalogue);
+  const wrongDrop = drop.filter(slug => !pinned.includes(slug) || liveSlugs.has(servedSlug(slug)));
+  if (wrongDrop.length > 0) throw new Error(`pins refresh refused: --drop ${wrongDrop.join(',')} names no pin, or one GET /api/catalogue still lists`);
+  const held = pinned.filter(slug => !drop.includes(slug));
+  const unlisted = unlistedSlugs(liveSlugs, { [PINS]: held, 'GET /api/catalogue.json?stage=live': documentSlugs(document), ...releaseNamed(process.env) });
+  if (unlisted.length > 0) throw new Error(`pins refresh refused, nothing written:\n${unlistedMessage(unlisted)}\n`
+    + `A deleted pin: drop it from what names it, then run pins.ts refresh --drop <slug>.`);
   const { shards } = catalogue as { shards: readonly CatalogueRow[] }, rows = Array.isArray(listed) ? listed as readonly ListedRow[] : (listed as { shardfiles: readonly ListedRow[] }).shardfiles;
   const sizes = new Map(rows.map(row => [row.hash, row.bytes]));
   const pins = shards.flatMap(({ slug, live }): Pin[] => (live === undefined ? [] : [{ slug, revision: live.revision, hash: live.hash, bytes: sizes.get(live.hash) ?? 0 }]));
@@ -456,7 +468,10 @@ function status(): void {
 }
 
 const [command = 'status', ...rest] = process.argv.slice(2);
-if (command === 'refresh') await refresh();
+if (command === 'refresh') {
+  if (rest.some((arg, at) => arg.startsWith('-') ? arg !== '--drop' : rest[at - 1] !== '--drop')) throw new Error('usage: pins.ts refresh [--drop slug[,slug]]...');
+  await refresh(rest.flatMap((arg, at) => rest[at - 1] === '--drop' ? arg.split(',') : []));
+}
 else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1');
 else if (command === 'install' && rest[0] === '--from-format') await install(rest.slice(1), 'format');
 else if (command === 'install') await install(rest);
@@ -465,4 +480,4 @@ else if (command === 'verify-slices') await slice(true);
 else if (command === 'install-saves') await installSaves(rest);
 else if (command === 'keep') await keep(rest[0] ?? 'tmp/pins-release');
 else if (command === 'status') status();
-else throw new Error('usage: pins.ts refresh | install [slug...] | install --ring 1 | install-saves [slug...] | slice | verify-slices | keep <dir> | status');
+else throw new Error('usage: pins.ts refresh [--drop slug] | install [slug...] | install --ring 1 | install-saves [slug...] | slice | verify-slices | keep <dir> | status');
