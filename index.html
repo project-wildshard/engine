@@ -451,6 +451,23 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
   .ws-load .ws-load-hold, .ws-load .ws-load-copy, .ws-load .ws-load-menu { width: 100%; }
 }
 
+/* QA 2026-11-13 (Jake: "make it look the same as the one for Shard Select"): a grid cell's preparation is this same card,
+   inset over the live world (Loading's `inset` mode): no backdrop, wordmark or footer, no input (the move stick, the look pad
+   and the buttons under it keep working). It sits under the minimap and above the touch buttons on a 402 x 874 portrait,
+   centred near the top on desktop, where its footer line (the work now, or a refusal's reason) follows the card. */
+.ws-load[data-inset] { z-index: calc(var(--ws-layer-hud) + 5); background: none; pointer-events: none; justify-content: flex-start; }
+.ws-load[data-inset]::before, .ws-load[data-inset]::after, .ws-load[data-inset] .ws-load-head { display: none; }
+.ws-load[data-inset] .ws-load-foot { box-sizing: border-box; width: min(560px, calc(100% - 32px)); margin: 8px auto 0; padding: 6px 10px; background: rgba(3, 8, 15, 0.55); text-shadow: 0 1px 2px #000; }
+.ws-load[data-inset] .ws-load-foot:has([data-el="foot"]:empty) { display: none; }
+.ws-load[data-inset] .ws-load-body { flex: none; padding: clamp(72px, 12vh, 140px) 16px 0; }
+.ws-load[data-inset] .ws-load-copy, .ws-load[data-inset] .ws-load-retry { pointer-events: auto; }
+/* a phone: the card starts under the minimap and ends above the hover chip; the footer line shows only a refusal */
+@media (max-width: 700px) {
+  .ws-load[data-inset] .ws-load-body { padding: calc(136px + env(safe-area-inset-top, 0px)) 16px 0; }
+  .ws-load[data-inset]:not([data-failed='true']) .ws-load-foot { display: none; }
+}
+@media (max-height: 500px) { .ws-load[data-inset] .ws-load-body { padding-top: 12px; } }
+
 /* G846: everyone sees the detailed progress; only the hold control is Developer-only. */
 /* </inline-shell-css> */
       html, body { margin: 0; width: 100%; height: 100%; background: #0b1622; }
