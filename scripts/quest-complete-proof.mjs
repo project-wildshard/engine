@@ -50,7 +50,8 @@ try {
       w.__workerClientFlag('template.blob');
       /** @param {number} now */
       const tick = now => {
-        player.yaw += 0.01; // the input's turn this frame; the next frame reads whether it held
+        // the input's turn this frame: a beat that writes the player's yaw (holds the camera) undoes it before the next frame
+        player.yaw += 0.01;
         const caption = [...document.querySelectorAll('.ws-quest-reward.show')].length > 0;
         out.push({ t: now - t0, dt: now - last, carried: player.carried, yaw: player.yaw, caption });
         last = now;

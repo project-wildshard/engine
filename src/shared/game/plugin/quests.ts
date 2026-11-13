@@ -63,9 +63,10 @@ const RewardSaved: v.GenericSchema<BoundedQuestRewardSavedInput, BoundedQuestRew
 });
 /** One renderer-free reward continuation for native and page quests. Restore validates before mutation and never
  * advances time or invokes effects; the existing host retains position, velocity, yaw, clock and save ownership.
- * Only a posed beat (`at`, `yaw`, `pitch` or `phase`) takes the player: one that names no pose, every declared quest's
- * default "Quest complete", shows its effects and keeps the camera and walk on the player's input (opus-questfreeze,
- * Jake 2026-11-12: "quest complete behavior ... is freezing the camera").
+ * Only a posed beat (`at`, `yaw` or `pitch`) takes the player: one that names no pose, every declared quest's default
+ * "Quest complete", shows its effects and keeps the camera and walk on the player's input, and a `phase` alone eases the
+ * clock only (opus-questfreeze, Jake 2026-11-12: "quest complete behavior ... is freezing the camera"). A pose-less
+ * beat's snapshot still carries the carry fields; restore leaves the player alone.
  */
 export class QuestRewardController {
   private readonly from: QuestRewardOrigin = { position: new Vector3(), yaw: 0, pitch: 0, phase: 0 };
@@ -80,9 +81,11 @@ export class QuestRewardController {
   constructor(player: QuestRewardCarryPlayer, day: { phase: number } | null | undefined,
     spec: QuestRewardControllerSpec, effects: QuestRewardEffects = {}) {
     this.player = player; this.day = day; this.spec = spec; this.effects = effects;
-    this.posed = spec.at !== undefined || spec.yaw !== undefined || spec.pitch !== undefined || spec.phase !== undefined;
+    this.posed = spec.at !== undefined || spec.yaw !== undefined || spec.pitch !== undefined;
   }
   get active(): boolean { return this.elapsed >= 0; }
+  /** Whether this beat takes the player (and so the camera) for its hold. */
+  get holdsPlayer(): boolean { return this.posed; }
   /** The admitted director may own completion; otherwise the authored hold duration finishes the beat. */
   update(dt: number, authoritativeFinish?: boolean): void {
     if (this.disposed) return;
@@ -95,6 +98,9 @@ export class QuestRewardController {
     if (!this.active) return;
     this.elapsed += dt;
     if (this.posed) applyQuestRewardPose(this.elapsed, this.from, this.spec, this.player, this.day);
+    else if (this.day && this.spec.phase !== undefined) {
+      this.day.phase = questPhaseAt(this.from.phase, questPhaseSpan(this.from.phase, this.spec.phase), Math.max(0, this.elapsed), 3.5);
+    }
     if (authoritativeFinish ?? this.elapsed > (this.spec.holdSeconds ?? 7)) {
       this.elapsed = -2; this.effects.finish?.();
       if (this.spec.finish() !== true) this.release();

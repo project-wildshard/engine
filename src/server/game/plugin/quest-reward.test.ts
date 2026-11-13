@@ -75,4 +75,8 @@ test('a reward that names no pose shows its beat but never takes the player or t
   const rider = player(), held = new QuestRewardController(rider, null, { when: () => true, finish: () => undefined });
   held.update(0.1); rider.carried = true; held.update(8); expect(rider.carried).toBe(true);
   held.dispose(); expect(rider.carried).toBe(true);
+  // a clock-only beat eases the day and still leaves the player its input
+  const walker = player(), sky = { phase: 0.2 }, clock = new QuestRewardController(walker, sky, { when: () => true, phase: 0.6, finish: () => undefined });
+  walker.yaw = 1; clock.update(0.1); walker.yaw = 1.5; clock.update(2);
+  expect(walker.carried).toBe(false); expect(walker.yaw).toBe(1.5); expect(sky.phase).toBeGreaterThan(0.2); expect(clock.holdsPlayer).toBe(false);
 });

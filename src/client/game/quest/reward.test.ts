@@ -25,3 +25,23 @@ test('page rewards keep caption, sting, objective and weapon effects in their or
   } finally { scope.dispose(); }
   expect(caption()).toBeNull();
 });
+
+// opus-questfreeze: the default "Quest complete" every declared quest gets names no pose
+test('a pose-less page reward shows its caption and sting but leaves the player, camera and weapon alone', () => {
+  const scope = new Scope('page-reward-free'), actor = player(), objective = document.createElement('div'), events: string[] = [];
+  const caption = () => document.querySelector('.ws-quest-reward');
+  const beat = scope.run(() => new QuestRewardBeat({ scope, player: actor, objective, setViewmodel: on => { events.push(on ? 'weapon-up' : 'weapon-down'); },
+    sting: () => { events.push('sting'); } }, { kicker: 'Quest complete', title: 'A first adventure', subtitle: '', when: () => true, finish: () => undefined }));
+  try {
+    for (let frame = 0; frame < 60 * 8; frame++) {
+      actor.yaw += 0.01; actor.velocity.set(2, 0, 0);
+      const yaw = actor.yaw;
+      beat.update(1 / 60);
+      expect(actor.carried).toBe(false); expect(actor.yaw).toBe(yaw); expect(actor.velocity.x).toBe(2);
+      if (frame === 1) { expect(caption()?.classList.contains('show')).toBe(true); expect(objective.classList.contains('ws-quest-hide')).toBe(true); }
+    }
+    expect(events).toEqual(['sting']);
+    expect(beat.active).toBe(false); expect(caption()?.classList.contains('show')).toBe(false);
+    expect(objective.classList.contains('ws-quest-hide')).toBe(false);
+  } finally { scope.dispose(); }
+});

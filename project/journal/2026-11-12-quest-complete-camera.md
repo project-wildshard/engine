@@ -19,3 +19,8 @@
   d6f24d8a (420 frozen frames), green with the fix.
 - The proof script lands in its own commit: run it on any served build with
   `scripts/browser-lane.sh node scripts/quest-complete-proof.mjs --base=<url>`.
+- Review (claude -p, no MUST): a `phase`-only beat now eases the clock without
+  holding the player, and a pose-less beat leaves the weapon in hand (it hid
+  the viewmodel for 7 s while the gun still fired). Shards whose rewarded
+  quest passes no `beat` (Signal Dunes, Sky Reach) lose the old 7 s stand-still
+  too, on purpose.

@@ -20,7 +20,8 @@ export interface QuestRewardHost {
   sting: () => void;
 }
 
-/** Wendell's held reward view: the same caption, 2.5 s camera ease, 3.5 s clock ease and 7 s hold. */
+/** Wendell's held reward view: the same caption, 2.5 s camera ease, 3.5 s clock ease and 7 s hold. A beat that names no
+ * pose shows the caption and sting only: the player keeps the camera, the walk and the weapon in hand. */
 export class QuestRewardBeat {
   private readonly caption: RewardCaption;
   private readonly motion: QuestRewardController;
@@ -28,12 +29,13 @@ export class QuestRewardBeat {
     this.caption = new RewardCaption(spec.kicker, spec.title, spec.subtitle);
     this.motion = new QuestRewardController(host.player, host.dayNight, spec, {
       start: () => {
-        this.caption.show(true); host.setViewmodel?.(false);
+        this.caption.show(true); if (this.motion.holdsPlayer) host.setViewmodel?.(false);
         host.objective?.classList.add('ws-quest-hide'); host.sting();
       },
       finish: () => { this.caption.show(false); },
       release: () => {
-        host.setViewmodel?.(true); host.objective?.classList.remove('ws-quest-hide');
+        if (this.motion.holdsPlayer) host.setViewmodel?.(true);
+        host.objective?.classList.remove('ws-quest-hide');
       },
     });
     host.scope.onDispose(() => { this.motion.dispose(); this.caption.scope.dispose(); });
