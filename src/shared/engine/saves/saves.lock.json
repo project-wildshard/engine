@@ -423,6 +423,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/'drop.seen'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/'drop.step.once'": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",
@@ -469,6 +474,11 @@
       "migrations": []
     },
     "json:device/'release.kept'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/'screen.reports'": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",
       "migrations": []

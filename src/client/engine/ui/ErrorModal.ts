@@ -36,7 +36,7 @@ import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
 import { leftByPlayer } from '../boot/dropNotice';
 import { showReloading } from './reloadCover';
 import { leaveAfterPaint } from '../boot/leaveAfterPaint';
-import { captureBrowserError } from '../telemetry/browserErrors';
+import { captureBrowserError, flushScreenReports, type ErrorScreen } from '../telemetry/browserErrors';
 import { bootDiagnostic, bootDiagnosticJson } from '../boot/bootTrace';
 // reloads from this modal (and the boot's stuck-loader recovery, src/client/engine/boot/stuck.ts) inside RELOAD_WINDOW_MS before
 // RELOAD HERE stops returning to the spot: one shared budget
@@ -236,7 +236,8 @@ function showChip(sent: Promise<ReportOutcome>): void {
   } catch { /* never throw from here */ }
 }
 
-function report(system: string, error: unknown, flags: { fatal?: boolean; disabled?: boolean; stall?: Record<string, unknown> }): Promise<ReportOutcome> {
+/** `screen` (SENTRY-TRIAGE S13): the screen this report opens; only the report that opens it names it, so a screen is one event */
+function report(system: string, error: unknown, flags: { fatal?: boolean; disabled?: boolean; stall?: Record<string, unknown>; screen?: ErrorScreen }): Promise<ReportOutcome> {
   if (system !== 'lifecycle') {
     let level = '';
     try { level = activeLevel().id; } catch { /* the registry may not be ready during early boot */ }
@@ -247,15 +248,20 @@ function report(system: string, error: unknown, flags: { fatal?: boolean; disabl
       bootStage: document.querySelector<HTMLElement>('.ws-load')?.dataset['step'] ?? loopState(),
       fatal: flags.fatal === true,
       diagnostic: flags.stall === undefined ? bootDiagnostic() : { ...bootDiagnostic(), stall: flags.stall },
+      ...(flags.screen === undefined ? {} : { screen: flags.screen }),
     });
   }
-  try { return reporter?.report(system, error, flags) ?? Promise.resolve('dropped'); } catch { return Promise.resolve('dropped'); }
+  const inbox = { ...(flags.fatal === undefined ? {} : { fatal: flags.fatal }), ...(flags.disabled === undefined ? {} : { disabled: flags.disabled }) };
+  try { return reporter?.report(system, error, inbox) ?? Promise.resolve('dropped'); } catch { return Promise.resolve('dropped'); }
 }
 
 /** a fault from the frame loop or the window: report it and open the modal (G880: every reported error) */
 function handle(f: Fault): void {
   const fatal = f.verdict === 'fatal' || (f.verdict === 'uncaught' && loopState() === 'boot');
-  const sent = report(f.system, f.error, { fatal });
+  // S13: the screen this fault opens, if any: the modal (first one), the chip (once a session), or none (a later fault, a retry)
+  const shows = !fatal && f.verdict !== 'uncaught' ? null : !fatal && !isDev() ? 'glitch-chip' : 'error-modal';
+  const screen = shows === 'glitch-chip' ? (chipShown || root ? undefined : shows) : shows === 'error-modal' && !root ? shows : undefined;
+  const sent = report(f.system, f.error, { fatal, ...(screen === undefined ? {} : { screen }) });
   if (!fatal && f.verdict !== 'uncaught') return; // internal retry bookkeeping is not a separate report
   // G901 (refines G880): with Developer on every error opens the modal; with it off only a play-breaking one does (the loop
   // stopped, or the boot failed), and a recoverable error (the system goes on, MF6) gets the quiet chip
@@ -268,7 +274,8 @@ function handle(f: Fault): void {
 export function showError(message: string, stack = '', stall?: Record<string, unknown>): void {
   app.setState('error');
   try {
-    showFatal(message, stack, report('boot', new DescribedError(message, stack), { fatal: true, ...(stall === undefined ? {} : { stall }) }));
+    const screen: ErrorScreen | undefined = root ? undefined : stall === undefined ? 'error-modal' : 'stuck-step';
+    showFatal(message, stack, report('boot', new DescribedError(message, stack), { fatal: true, ...(stall === undefined ? {} : { stall }), ...(screen === undefined ? {} : { screen }) }));
   } catch { /* the modal must never throw */ }
 }
 
@@ -305,5 +312,5 @@ export function installErrorModal(): void {
   scope.listen(window, 'unhandledrejection', (e) => { emitFault({ system: 'promise', error: e.reason, verdict: 'uncaught' }); });
   // what an offline page queued goes once the network is back (and a little after boot, off the critical path)
   scope.listen(window, 'online', () => { void reporter?.flushQueue(); });
-  scope.timeout(8000, () => { void reporter?.flushQueue(); });
+  scope.timeout(8000, () => { void reporter?.flushQueue(); flushScreenReports(); });
 }

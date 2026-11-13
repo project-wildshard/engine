@@ -1,5 +1,7 @@
 import { Scope } from '../../../shared/engine/app/scope';
 import { harnessPins, installedIdentity } from '../../../shared/engine/app/identity';
+import { pageScope } from '../../../shared/engine/app/resources';
+import { jsonSlot, type Json } from '../saves/slots';
 /** Optional, error-only Sentry channel. The existing /api/errors report remains the primary local inbox. */
 import type { captureException, ErrorEvent, getClient, httpContextIntegration, init, withScope } from '@sentry/browser';
 
@@ -15,7 +17,25 @@ export interface BrowserErrorTags {
   readonly fatal: boolean;
   /** Small, explicit diagnostics supplied by the caller; never browser storage or request headers. */
   readonly diagnostic?: Record<string, unknown>;
+  /** SENTRY-TRIAGE S13: the error screen this report opened. Set only by the call that opens it, so each screen is one event. */
+  readonly screen?: ErrorScreen;
 }
+
+/**
+ * SENTRY-TRIAGE S13 (Jake, 2026-11-13: "Every time an error modal opens, are we writing something to Sentry that we can pull down and
+ * audit?"): every screen a player sees that means something went wrong, as its Sentry `screen` tag. Query: `screen:title-drop`.
+ *   error-modal   the fatal modal (src/client/engine/ui/ErrorModal.ts showFatal: a fault, the boot failed, Developer's every error)
+ *   stuck-step    the same modal opened by the stuck-step watchdog (showError with S4's stall, src/client/app/entry.ts)
+ *   glitch-chip   "A glitch was reported" (ErrorModal.ts showChip, once a session)
+ *   load-failure  the shard's load-failure page (src/client/engine/ui/errorScreen.ts showLoadFailure, src/client/game/session/session.ts)
+ *   title-drop    the drop modal, "Unexpectedly back at the title" (src/client/app/dropModal.ts showDropModal)
+ *   link-lost     the online stop card "Couldn't reconnect" (src/client/host/online/linkScreens.ts)
+ *   link-refused  the online stop card "The world turned this connection away" (the same file)
+ * Not screens of a fault, so never reported: the player's own reload, back or exit (QA 11-12 row 35), "Playing somewhere else",
+ * "The world is full", the reconnect banner (counted in `net` telemetry), title refusal lines and the Connection doctor.
+ */
+export const ERROR_SCREENS = ['error-modal', 'stuck-step', 'glitch-chip', 'load-failure', 'title-drop', 'link-lost', 'link-refused'] as const;
+export type ErrorScreen = typeof ERROR_SCREENS[number];
 
 // A DSN is a public browser endpoint, not an auth token. Only real production pages report.
 const productionDsn = 'https://ccaf25bcd6baa389433fb9efe0117c9b@o4512161165410304.ingest.us.sentry.io/4512161184088064';
@@ -34,6 +54,9 @@ export function browserErrorDist(build: string): string | undefined {
   return build !== '' && build.length <= 64 ? build : undefined;
 }
 let sdk: Promise<BrowserSdk | null> | null = null;
+/** S13: deliveries waiting on an event that beforeSend refused (noise, a page that stopped reporting): that event is done, not owed */
+const refusedListeners = new Set<(id: string) => void>();
+const refused = (id: string | undefined): null => { for (const listener of refusedListeners) listener(id ?? ''); return null; };
 
 /** External error delivery is opt-in by exact app origin and never by a test runner. */
 export function browserErrorDeliveryAllowed(environment: { readonly origin: string; readonly automated: boolean; readonly harness: boolean },
@@ -96,8 +119,8 @@ function loadSdk(): Promise<BrowserSdk | null> {
       maxBreadcrumbs: 0,
       normalizeDepth: 6, // context -> checkpoint array -> checkpoint -> facts
       beforeSend(event) {
-        if (!productionPage()) return null;
-        if (browserErrorNoise(event, { environment, userAgent: navigator.userAgent }) !== null) return null;
+        if (!productionPage()) return refused(event.event_id);
+        if (browserErrorNoise(event, { environment, userAgent: navigator.userAgent }) !== null) return refused(event.event_id);
         if (event.request) {
           event.request.url = `${location.origin}${location.pathname}`;
           // The user agent names the browser, OS and device; no referrer or other header leaves the page.
@@ -108,8 +131,13 @@ function loadSdk(): Promise<BrowserSdk | null> {
       },
     });
     return sentry;
-  }).catch(() => null);
+  // S13: a failed chunk load (a stale page, the network) must not silence every later report on this page; the next one tries again
+  }).catch(() => { sdk = null; return null; });
   return sdk;
+}
+
+function tagsOf(tags: BrowserErrorTags): Record<string, string> {
+  return { system: tags.system, build: tags.build, shard: tags.shard, boot_stage: tags.bootStage, ...(tags.screen === undefined ? {} : { screen: tags.screen }) };
 }
 
 async function send(error: unknown, tags: BrowserErrorTags): Promise<void> {
@@ -117,12 +145,7 @@ async function send(error: unknown, tags: BrowserErrorTags): Promise<void> {
   if (sentry === null) return;
   try {
     sentry.withScope((scope) => {
-      scope.setTags({
-        system: tags.system,
-        build: tags.build,
-        shard: tags.shard,
-        boot_stage: tags.bootStage,
-      });
+      scope.setTags(tagsOf(tags));
       scope.setLevel(tags.fatal ? 'fatal' : 'error');
       if (tags.diagnostic) scope.setContext('boot_diagnostic', tags.diagnostic);
       sentry.captureException(asError(error));
@@ -140,34 +163,115 @@ function asError(error: unknown): Error {
   return new Error(String(error));
 }
 
-/** Fire and forget: an absent DSN adds no request or SDK initialization to a player's boot. */
+/**
+ * Fire and forget: an absent DSN adds no request or SDK initialization to a player's boot. A report that opens an error screen
+ * (`tags.screen`) is durable instead (S13): it is written to the device's screen outbox first, in the screen's own turn, and leaves
+ * the outbox only once Sentry acknowledges it, so a page that reloads, goes to the title or dies right after still delivers it
+ * (the next page sends it with the same event id, so Sentry keeps one).
+ */
 export function captureBrowserError(error: unknown, tags: BrowserErrorTags): void {
   if (!dsn || !productionPage()) return;
+  if (tags.screen !== undefined) { reportScreen(error, tags); return; }
   void send(error, tags);
 }
 
-/** Durable diagnostics require a transport acknowledgement, not just captureException's event ID. */
-export async function deliverBrowserError(error: Error, tags: BrowserErrorTags): Promise<boolean> {
+/** Durable diagnostics require a transport acknowledgement, not just captureException's event ID. `eventId`: a fixed id (S13). */
+export async function deliverBrowserError(error: Error, tags: BrowserErrorTags, eventId?: string): Promise<boolean> {
   if (!dsn || !productionPage()) return true;
   const sentry = await loadSdk();
   const client = sentry?.getClient();
   if (!sentry || !client) { sdk = null; return false; }
   return new Promise((resolve) => {
     const delivery = new Scope('error.delivery');
-    let eventId = '';
+    let sentId = '';
     let unsubscribe = (): void => undefined;
-    delivery.timeout(5000, () => { delivery.dispose(); unsubscribe(); resolve(false); });
-    const finish = (ok: boolean): void => { delivery.dispose(); unsubscribe(); resolve(ok); };
+    let stopRefused = (): void => undefined;
+    delivery.timeout(5000, () => { delivery.dispose(); unsubscribe(); stopRefused(); resolve(false); });
+    const finish = (ok: boolean): void => { delivery.dispose(); unsubscribe(); stopRefused(); resolve(ok); };
+    const onRefused = (id: string): void => { if (id !== '' && (id === sentId || id === eventId)) finish(true); };
+    refusedListeners.add(onRefused);
+    stopRefused = (): void => { refusedListeners.delete(onRefused); };
     unsubscribe = client.on('afterSendEvent', (event, response) => {
-      if (event.event_id === eventId) finish(response.statusCode !== undefined && response.statusCode >= 200 && response.statusCode < 300);
+      if (event.event_id === sentId) finish(response.statusCode !== undefined && response.statusCode >= 200 && response.statusCode < 300);
     });
     try {
       sentry.withScope((scope) => {
-        scope.setTags({ system: tags.system, build: tags.build, shard: tags.shard, boot_stage: tags.bootStage });
-        scope.setLevel('error');
+        scope.setTags(tagsOf(tags));
+        scope.setLevel(tags.screen !== undefined && tags.fatal ? 'fatal' : 'error');
         if (tags.diagnostic) scope.setContext('boot_diagnostic', tags.diagnostic);
-        eventId = sentry.captureException(error);
+        sentId = sentry.captureException(error, eventId === undefined ? undefined : { event_id: eventId });
       });
     } catch { finish(false); }
   });
+}
+
+// ── S13: the screen outbox (its reader and sender, src/client/engine/telemetry/screenOutbox.ts, load only when something is owed) ──
+/** one screen report waiting for Sentry's acknowledgement */
+export interface ScreenReport {
+  /** the Sentry event id (32 hex), fixed when the screen opens so a resend is the same event */
+  readonly id: string;
+  readonly at: number;
+  readonly message: string;
+  readonly stack: string;
+  readonly tags: BrowserErrorTags & { readonly screen: ErrorScreen };
+}
+/** where the outbox lives: the device's `screen.reports` slot on a page, a variable in a test */
+export interface ScreenStore { read: () => Json; write: (value: Json) => void }
+export const OUTBOX_MAX = 8;
+
+let idCount = 0;
+/** A fresh event id. getRandomValues works on a plain-http page, where crypto.randomUUID throws (QA 11-13 row 5). */
+export function screenEventId(random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array = (bytes) => crypto.getRandomValues(bytes)): string {
+  try { return [...random(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join(''); }
+  catch { idCount++; return `${Date.now().toString(16)}${idCount.toString(16)}`.padStart(32, '0').slice(-32); }
+}
+
+/** the page's outbox: literal jsonSlot calls (test/saves-lock.test.ts reads the key from them) */
+const pageStore: ScreenStore = {
+  read: () => jsonSlot('screen.reports', 'device').peek(),
+  write: (value) => { if (!jsonSlot('screen.reports', 'device').write(value)) throw new Error('screen outbox not saved'); },
+};
+const sending = new Set<string>();
+let flushWired = false;
+/** a report as the outbox stores it: JSON, so a diagnostic's undefined fields drop as they would on the wire */
+function stored(report: ScreenReport): Json {
+  const text = JSON.stringify(report);
+  return JSON.parse(text) as Json;
+}
+async function sendOnce(error: Error, tags: BrowserErrorTags, id: string): Promise<void> {
+  sending.add(id);
+  try { await deliverBrowserError(error, tags, id); } catch { /* telemetry never throws */ } finally { sending.delete(id); }
+}
+
+/** S13: the report of a screen that just opened, on the device before anything awaits, then sent. */
+function reportScreen(error: unknown, tags: BrowserErrorTags): void {
+  if (tags.screen === undefined) return;
+  const e = asError(error);
+  // the diagnostic rides along up to 16 KB of JSON; a larger one is cut to a note, so eight stored reports stay small beside the saves
+  const diagnostic = tags.diagnostic === undefined ? undefined : JSON.stringify(tags.diagnostic).length <= 16_384 ? tags.diagnostic : { truncated: true };
+  const report: ScreenReport = { id: screenEventId(), at: Date.now(), message: e.message.slice(0, 2000), stack: (e.stack ?? '').slice(0, 6000),
+    tags: { ...tags, screen: tags.screen, ...(diagnostic === undefined ? {} : { diagnostic }) } };
+  let kept = true;
+  try {
+    const raw = pageStore.read();
+    pageStore.write([...(Array.isArray(raw) ? raw : []), stored(report)].slice(-OUTBOX_MAX));
+  } catch { kept = false; }
+  // storage refused: this page still sends it, once
+  if (kept) flushScreenReports(); else void sendOnce(e, report.tags, report.id);
+}
+
+/** Send what this page or an earlier one still owes (every document, off the boot's hot path), and again when the network is back. */
+export function flushScreenReports(): void {
+  if (!dsn || !productionPage()) return;
+  if (!flushWired && typeof window !== 'undefined') {
+    flushWired = true;
+    pageScope.listen(window, 'online', () => { flushScreenReports(); });
+  }
+  // offline: the `online` listener sends it; a chunk import now would only fail
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  let raw: Json = null;
+  try { raw = pageStore.read(); } catch { return; }
+  if (!Array.isArray(raw) || raw.length === 0) return;
+  void import('./screenOutbox').then(({ ScreenOutbox, flushScreenOutbox }) => flushScreenOutbox(new ScreenOutbox(pageStore), deliverBrowserError, sending))
+    .catch(() => undefined);
 }

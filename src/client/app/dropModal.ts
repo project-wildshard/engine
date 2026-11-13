@@ -6,6 +6,17 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { Drop } from '@wildshard/engine/boot/dropNotice';
 import { mountUi } from '@wildshard/engine/ui/ownership';
+import { captureBrowserError } from '@wildshard/engine/telemetry/browserErrors';
+
+/** SENTRY-TRIAGE S13: the drop modal's one Sentry event (`screen:title-drop`), durable through the screen outbox */
+export function reportDrop(drop: Drop, report: typeof captureBrowserError = captureBrowserError): void {
+  try {
+    const error = new Error(`${drop.what}: ${drop.reason}`);
+    if (drop.stack !== '') error.stack = drop.stack;
+    report(error, { system: 'title-drop', build: drop.build, shard: drop.world, bootStage: drop.step, fatal: true, screen: 'title-drop',
+      diagnostic: { kind: drop.kind, message: drop.message, code: drop.code, end: drop.end, trail: drop.trail, route: drop.routeStack.slice(0, 1500) } });
+  } catch { /* telemetry never stops the modal */ }
+}
 
 const STYLE = `
   #wsdrop { position: fixed; inset: 0; z-index: var(--ws-layer-error, 2147482500); display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); background: rgba(4, 9, 14, 0.62); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: #e6f2f8; font: 12px/1.5 "JetBrains Mono", ui-monospace, Menlo, monospace; }
@@ -48,8 +59,10 @@ function make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, 
   return el;
 }
 
-/** Show the drop over the title. `dev`: the real error too. Returns the close. */
-export function showDropModal(drop: Drop, scope: Scope, options: { readonly dev: boolean; readonly extra?: readonly string[]; readonly parent?: HTMLElement }): () => void {
+/** Show the drop over the title and report it (S13). `dev`: the real error too. `report`: a test's own. Returns the close. */
+export function showDropModal(drop: Drop, scope: Scope, options: { readonly dev: boolean; readonly extra?: readonly string[]; readonly parent?: HTMLElement;
+  readonly report?: typeof captureBrowserError }): () => void {
+  reportDrop(drop, options.report);
   if (document.getElementById('wsdrop-style') === null) {
     const style = make('style', ''); style.id = 'wsdrop-style'; style.textContent = STYLE; document.head.append(style);
   }

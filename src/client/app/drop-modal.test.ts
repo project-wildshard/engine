@@ -23,9 +23,9 @@ function tab() {
       removeItem: (key: string): void => { values.delete(key); } };
   };
   const dropStore: DropStore = {
-    read: (key) => { const map = key.endsWith('Once') ? local : session; const raw = map.get(`drop.${key}`); return raw === undefined ? null : JSON.parse(raw) as Json; },
-    write: (key, value) => { (key.endsWith('Once') ? local : session).set(`drop.${key}`, JSON.stringify(value)); },
-    clear: (key) => { (key.endsWith('Once') ? local : session).delete(`drop.${key}`); },
+    read: (key) => { const map = key.endsWith('Once') || key === 'seen' ? local : session; const raw = map.get(`drop.${key}`); return raw === undefined ? null : JSON.parse(raw) as Json; },
+    write: (key, value) => { (key.endsWith('Once') || key === 'seen' ? local : session).set(`drop.${key}`, JSON.stringify(value)); },
+    clear: (key) => { (key.endsWith('Once') || key === 'seen' ? local : session).delete(`drop.${key}`); },
   };
   /** a new page in this tab: how the last one ended, and its drop notes */
   const page = (): { life: PageLife; notes: DropNotes } => ({ life: new PageLife(scope(), life), notes: new DropNotes(dropStore) });
@@ -183,5 +183,24 @@ test("the player's own exit shows no modal", () => {
   const card = tab(), loading = enterWorld(card);
   loading.life.markUnload('exit to title from the loading card');
   expect(title(card, true).drop).toBeNull();
+  expect(modal()).toBeNull();
+});
+
+test('a drop shows once: a later page that dies does not bring the old Playing drop back (Jake, 2026-11-13 ~10:05)', () => {
+  // 14:48: Driftwood is playing; an unmarked navigation (an iOS left-edge back swipe) lands on the title, which shows the drop
+  const t = tab(), world = t.page();
+  world.life.setAliveSource(() => ({ slug: 'driftwood-isle', resident: '', mode: 'shard' }));
+  world.notes.markStep({ world: 'driftwood-isle', name: 'Driftwood Isle', step: 'Start' });
+  world.notes.markStep({ step: 'Playing' });
+  window.dispatchEvent(new Event('pagehide'));
+  const first = title(t, false);
+  expect(first.drop).toMatchObject({ what: 'Unexpectedly back at the title', step: 'Playing', world: 'driftwood-isle' });
+  document.body.replaceChildren();
+  // later the player plays elsewhere; a page in this tab then ends with no pagehide and no world of its own (slug '')
+  const later = t.page();
+  later.life.setAliveSource(() => ({ slug: '', resident: '', mode: 'shard' }));
+  t.session.clear(); // a killed process can lose sessionStorage
+  const again = title(t, false);
+  expect(again.drop).toBeNull();
   expect(modal()).toBeNull();
 });

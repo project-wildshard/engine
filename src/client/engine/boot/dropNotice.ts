@@ -70,7 +70,7 @@ export interface DropStore {
   write: (key: DropKey, value: Json) => void;
   clear: (key: DropKey) => void;
 }
-type DropKey = 'step' | 'stepOnce' | 'pending' | 'pendingOnce' | 'expect';
+type DropKey = 'step' | 'stepOnce' | 'pending' | 'pendingOnce' | 'expect' | 'seen';
 
 /** the step a world page names once it is playing */
 export const PLAYING = 'Playing';
@@ -184,9 +184,9 @@ export class DropNotes {
     if (end.player === true) return null;
     const said = end.kind === 'fresh' ? '' : end.reason;
     if (pending !== null && time(pending, 'at') >= time(expected, 't')) {
-      return { kind: 'error', what: text(pending, 'what'), reason: text(pending, 'reason'), step: text(pending, 'step'), world: text(pending, 'world'),
+      return this.once({ kind: 'error', what: text(pending, 'what'), reason: text(pending, 'reason'), step: text(pending, 'step'), world: text(pending, 'world'),
         name: text(pending, 'name'), message: text(pending, 'message'), code: text(pending, 'code'), stack: text(pending, 'stack'), end: said,
-        trail: text(pending, 'trail'), routeStack: text(pending, 'routeStack'), at: time(pending, 'at'), build: text(pending, 'build') };
+        trail: text(pending, 'trail'), routeStack: text(pending, 'routeStack'), at: time(pending, 'at'), build: text(pending, 'build') });
     }
     // the first boot of a visit, and a title after a title: no world page came before it in this tab
     if (step === null) return null;
@@ -195,7 +195,7 @@ export class DropNotes {
     if (end.kind === 'intentional' && PLAYER_EXITS.some((exit) => end.reason.startsWith(exit))) return null;
     const name = first(step.name, step.world), trail = step.trail.join(' → ');
     const via = trail === '' ? '' : ` It was sent here by a redirect: ${trail} → ${name} at ${step.step}.`;
-    return {
+    return this.once({
       kind: 'restart',
       what: unexpected ? 'The game restarted unexpectedly' : 'Unexpectedly back at the title',
       reason: unexpected ? `The page stopped${name === '' ? '' : ` while ${name} was loading or running`}, without an error the game could catch. On a phone this is most often the system closing the page to free memory.${via}`
@@ -203,7 +203,21 @@ export class DropNotes {
           : `The page left ${name === '' ? 'the world' : name} for the title without the game or you asking (a browser back or reload, or an unmarked navigation).${via}`,
       step: step.step, world: step.world, name: step.name, message: step.error, code: '', stack: step.errorStack, end: first(said, step.route),
       trail, routeStack: step.routeStack, at: step.t, build: step.build,
-    };
+    });
+  }
+
+  /**
+   * A drop shows once (Jake, 2026-11-13 ~10:05: the 14:48 Driftwood drop came back word for word, same time, after other play).
+   * The device copies outlive a quiet take (another tab's copies are its own, so they stay), and a later page that died read the
+   * old Playing step back; the device's `seen` mark names the last drop shown, and the same drop (its world and time) never shows again.
+   */
+  private once(drop: Drop): Drop | null {
+    let seen: Json = null;
+    try { seen = this.store.read('seen'); } catch { /* storage blocked: show it */ }
+    if (drop.at === 0) return drop; // no time to know it by
+    if (time(seen, 'at') === drop.at && text(seen, 'world') === drop.world) return null;
+    try { this.store.write('seen', { at: drop.at, world: drop.world }); } catch { /* storage blocked */ }
+    return drop;
   }
 
   private step(device: boolean): DropStep | null {
@@ -231,7 +245,7 @@ export class DropNotes {
 const SLOT: Readonly<Record<DropKey, () => ReturnType<typeof jsonSlot>>> = {
   step: () => jsonSlot('drop.step', 'session'), stepOnce: () => jsonSlot('drop.step.once', 'device'),
   pending: () => jsonSlot('drop.pending', 'session'), pendingOnce: () => jsonSlot('drop.pending.once', 'device'),
-  expect: () => jsonSlot('drop.expect', 'session'),
+  expect: () => jsonSlot('drop.expect', 'session'), seen: () => jsonSlot('drop.seen', 'device'),
 };
 const slotOf = (key: DropKey): ReturnType<typeof jsonSlot> => SLOT[key]();
 const PAGE_STORE: DropStore = {

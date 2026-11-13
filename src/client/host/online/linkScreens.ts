@@ -8,6 +8,17 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { LinkCause, LinkProgress, LinkState } from '@wildshard/engine/net/redial';
 import type { Countdown } from '@wildshard/engine/net/socketFrames';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { captureBrowserError } from '@wildshard/engine/telemetry/browserErrors';
+
+declare const __BUILD_ID__: string;
+/** SENTRY-TRIAGE S13: a stop card that means the link failed (`link-lost`, `link-refused`) sends one event as it opens */
+function reportStop(screen: 'link-lost' | 'link-refused', detail: string, report: typeof captureBrowserError): void {
+  try {
+    let build = ''; try { build = __BUILD_ID__; } catch { /* under Node */ }
+    report(new Error(screen === 'link-lost' ? `Couldn't reconnect: ${detail}` : `The world turned this connection away: ${detail}`),
+      { system: 'link', build, shard: '', bootStage: 'running', fatal: false, screen, diagnostic: { detail } });
+  } catch { /* telemetry never stops the card */ }
+}
 
 /** Redial gives up after this long (`redial.ts` GIVE_UP_MS). */
 const GIVE_UP_S = 120;
@@ -77,6 +88,8 @@ export interface LinkScreenHooks {
   readonly doctor?: (from: string) => void;
   /** Reload this page into the world, taking the seat back (another tab, a turned-away link). */
   readonly reload: () => void;
+  /** S13: where a failed link's stop card reports (the browser error tracker; a test observes its own) */
+  readonly report?: typeof captureBrowserError;
 }
 /** What the shell tells the screens, and asks of them. */
 export interface LinkScreens {
@@ -144,6 +157,7 @@ function buttons(scope: Scope, actions: readonly { readonly label: string; reado
  *   if (!screens.allow('Talk')) return;   // a tap the world must hear
  */
 export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLElement = document.body): LinkScreens {
+  const report = hooks.report ?? captureBrowserError;
   // the stylesheet lives as long as the document: a second shell (a reload in place) shares it
   if (document.getElementById('ws-link-style') === null) { const style = make('style'); style.id = 'ws-link-style'; style.textContent = CSS; document.head.append(style); }
   // the banner keeps the old strip's id, so the online proofs still find it
@@ -255,6 +269,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     }
     if (state === 'ended') for (const kept of held.splice(0)) kept.drop();
     if (state === 'lost') {
+      reportStop('link-lost', `${String(hooks.progress().dials)} dials · last close: ${hooks.why()}`, report);
       stop('lost', 'bad', 'Connection lost', 'Couldn\'t reconnect', 'We tried for 2 minutes and the world didn\'t answer. Anything the world hadn\'t saved yet may need doing again.',
         [{ label: 'Try again', primary: true, busy: 'Reconnecting…', act: () => { hooks.retry(); } }, ...doctor('lost')], `${String(hooks.progress().dials)} dials · last close: ${hooks.why()}`);
     } else if (state === 'full') {
@@ -264,6 +279,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       stop('replaced', 'info', 'Another tab', 'Playing somewhere else', 'This world is open in another tab or on another device. Only one can play at a time.',
         [{ label: 'Play here', primary: true, busy: 'Joining…', act: () => { hooks.reload(); } }], 'close "replaced" (4003)');
     } else if (state === 'ended' && reason !== 'reload') {
+      reportStop('link-refused', `close "${String(reason)}"`, report);
       stop('refused', 'bad', 'Turned away', 'The world turned this connection away', 'The server ended this link and won\'t take it back by itself.',
         [{ label: 'Play again', primary: true, busy: 'Joining…', act: () => { hooks.reload(); } }, ...doctor('lost')], `close "${String(reason)}"`);
     }

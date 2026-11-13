@@ -286,13 +286,8 @@ function showDrop(drop: ReturnType<typeof takeDrop>): void {
   void (async () => {
     const [{ showDropModal }, { isDev }] = await Promise.all([import('./dropModal'), import('@wildshard/engine/core/devMode')]);
     const abrupt = previousBootLine();
+    // Jake (17:52): every title nobody asked for is an error, so the modal's open reports it (SENTRY-TRIAGE S13, `screen:title-drop`)
     showDropModal(drop, entryScope, { dev: isDev(), ...(abrupt === '' ? {} : { extra: [abrupt] }) });
-    // Jake (17:52): every title nobody asked for is an error, so every drop goes to Sentry
-    const { captureBrowserError } = await import('@wildshard/engine/telemetry/browserErrors');
-    const error = new Error(`${drop.what}: ${drop.reason}`);
-    if (drop.stack !== '') error.stack = drop.stack;
-    captureBrowserError(error, { system: 'title-drop', build: drop.build, shard: drop.world, bootStage: drop.step, fatal: true,
-      diagnostic: { kind: drop.kind, message: drop.message, code: drop.code, end: drop.end, trail: drop.trail, route: drop.routeStack.slice(0, 1500) } });
   })().catch(() => undefined);
 }
 

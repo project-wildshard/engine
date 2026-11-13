@@ -103,7 +103,8 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
       build: __BUILD_ID__, dispose: () => {
         if (app.render !== null) app.render.hold = true;
         scope.dispose();
-      }, report: reportError,
+      // SENTRY-TRIAGE S13: a failure whose page the player sees says so (`screen:load-failure`); a recovery's stays a plain report
+      }, report: (failure) => reportError(options.recovery === undefined ? { ...failure, tags: { ...failure.tags, screen: 'load-failure' } } : failure),
       show: (failure) => { if (options.recovery !== undefined) return; session.fatalShown = true; showLoadFailure(failure); },
     });
     let memoryAt = -Infinity, memoryMB = 0;
