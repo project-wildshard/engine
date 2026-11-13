@@ -36,7 +36,7 @@ import { readSummary, summaryView } from './summary';
 import { GAME_STRINGS } from '../../shared/game/strings';
 import { menuMode, selectEnters, selectExplores, type MenuMode } from './grid/menu';
 import { pageShardRefusals, refusalReason, type ShardRefusal } from './grid/refusal';
-import { autoPlaced, playerHidden, titleStatus } from '../../shared/game/grid/catalogueSlot';
+import { autoPlaced, placedByFile, playerHidden, titleStatus } from '../../shared/game/grid/catalogueSlot';
 import { worldOpens } from './grid/oneWayIn';
 import './summary.css';
 import './upgrade.css';
@@ -82,8 +82,9 @@ const buildWorld = (): OpensShard => worldOpens((globalThis as { __WS_WORLD__?: 
 export function titleCards(showHidden: boolean = isDev(), upgradeNeeded: UpgradeNeeded = noUpgrades, refused: RefusedShard = sessionRefusals, opens: OpensShard = buildWorld()): readonly TitleCard[] {
   // a `_` prototype stays Developer only unless its catalogue placement opens it (J313: Mossgate)
   const hidden = (m: TitleManifest): boolean => playerHidden(m);
-  // SA34 (Q12): an auto-placed shard has no card, even for Developer: you cross in from a neighbour
-  const ordinary = titleManifests().filter(m => m.shardSelect !== false && !autoPlaced(m));
+  // SA34 (Q12): an auto-placed shard has no card, even for Developer: you cross in from a neighbour. A cell the page learned from its
+  // channel's placement file (`placedCells.ts`) has one: with crossing off, its card and `?chunk=` are the only ways in
+  const ordinary = titleManifests().filter(m => (m.shardSelect !== false && !autoPlaced(m)) || placedByFile(m));
   const visible = ordinary.filter((m) => !hidden(m));
   const manifests = showHidden ? [...visible, ...ordinary.filter(hidden)] : visible;
   return manifests.map((m): TitleCard => titleCard(m, upgradeNeeded, refused, opens));

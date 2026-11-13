@@ -605,7 +605,7 @@ test('PZ10: the books precache at their CDN URLs, in CORS mode, and adoption wai
 
 test('PZ10: the content origin\'s mutable files go to the network untouched', async () => {
   const f = fixture(), worker = f.load('A', [], [], { base });
-  for (const path of ['/clear-cache.json', '/releases/preview.json', '/content/0123456789abcdef/assets/x.json?sw=0']) {
+  for (const path of ['/clear-cache.json', '/releases/preview.json', '/releases/staging-placements.json', '/content/0123456789abcdef/assets/x.json?sw=0']) {
     expect(await worker.dispatch('fetch', { request: new Request(`${cdn}${path}`) })).toBeUndefined();
   }
   expect(await worker.dispatch('fetch', { request: new Request(cdnPart, { method: 'HEAD' }) })).toBeUndefined();

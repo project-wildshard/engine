@@ -54,6 +54,8 @@ let crashResume: CrashResume | null = null;
 let selectedImages: Scope | undefined;
 const task = (): Promise<void> => new Promise((resolve) => { entryScope.timeout(0, resolve); });
 const UNLISTED = 'This world is not listed. Choose a world from the list.';
+/** How long the boot waits for the placement file (`placedCells.ts`'s own deadline, GO4's 3 s), its chunk's import included. */
+const PLACED_DEADLINE_MS = 3000;
 /** The plain home URL paints only the title. No renderer, world, or Three.js is imported until a shard is chosen. */
 // RL3: the static module graph has arrived and run; index.html's 12 s self-reload stands down (only a hung module
 // fetch, which never gets here, reloads by itself; anything after this is guardBoot's)
@@ -65,6 +67,9 @@ installDropNotes();
 installInlineCatalogue(document);
 const titleRows = withCatalogueHeads(readTitleRows(document));
 installTitleManifests(titleRows);
+// SA33 to SA35, the page half: a released page adds the cells the API placed after its build (its channel's signed placement file) to the
+// catalogue before anything reads the grid; `enterPage` waits for it (3 s at most), and any failure keeps the build's grid.
+const placedCells = learnPlacedCellsOnce();
 // G727 / I9: Settings' "Download everything"; the prefetch loads only when the player opens or presses it
 installOfflineDownload({
   size: async owner => (await import('@wildshard/engine/game/grid/prefetch')).remainingDownloadBytes(owner),
@@ -98,7 +103,26 @@ function serverSites(): Promise<readonly { readonly site: string | null | undefi
   const late = new Promise<undefined>(resolve => { entryScope.timeout(SERVER_SITES_MS, () => { resolve(undefined); }); });
   return Promise.race([read, late]).catch(() => undefined);
 }
+/** The page's placement file read, started at once; it never rejects and settles inside `PLACED_DEADLINE_MS` (3 s) of the entry's
+ *  start, chunk import included. Past that the boot goes on with the build's grid and a late answer installs nothing. A page with no
+ *  world (preview, solo) reads none. */
+function learnPlacedCellsOnce(): Promise<void> {
+  const late = new AbortController();
+  const read = (async (): Promise<void> => {
+    try {
+      const { learnPlacedCells, placementsOf } = await import('@wildshard/engine/game/grid/placedCells');
+      const url = placementsOf(globalThis as { __WS_WORLD__?: unknown; __WS_PLACEMENTS__?: unknown });
+      if (url === null || late.signal.aborted) return;
+      const answer = await bootTask('app:placed-cells', () => learnPlacedCells(url, { signal: late.signal }));
+      if ('kept' in answer) console.info(`[grid] build's grid kept: ${answer.kept}`);
+      else console.info(`[grid] placement serial ${String(answer.serial)}: ${answer.added.map(cell => `${cell.instance} at (${cell.cell.join(',')})`).join(', ') || 'no new cell'}${answer.left.length === 0 ? '' : `; left out ${answer.left.join('; ')}`}`);
+    } catch (error) { console.warn('[grid] placement file not read:', error); }
+  })();
+  const deadline = new Promise<void>(resolve => { entryScope.timeout(PLACED_DEADLINE_MS, () => { late.abort(); resolve(); }); });
+  return Promise.race([read, deadline]);
+}
 async function enterPage(): Promise<unknown> {
+  await placedCells;
   const requested = search.get('chunk');
   // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here.
   // SA37: on every host, a world build too: PLAY's `/?chunk=` page enters the world's grid at the shard's cell (GO7 below)

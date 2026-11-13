@@ -891,6 +891,8 @@
     "./game/grid/voidFloor": "./src/shared/game/grid/voidFloor.ts",
     "./game/grid/assembly": "./src/shared/game/grid/assembly.ts",
     "./game/grid/catalogueSlot": "./src/shared/game/grid/catalogueSlot.ts",
+    "./game/grid/placedCells": "./src/client/game/grid/placedCells.ts",
+    "./game/grid/placementRows": "./src/shared/game/grid/placementRows.ts",
     "./game/grid/catalogueDocument": "./src/shared/game/grid/catalogueDocument.ts",
     "./game/grid/room": "./src/server/game/grid/room.ts",
     "./game/grid/roomNet": "./src/server/game/grid/roomNet.ts",

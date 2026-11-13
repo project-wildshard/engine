@@ -16,6 +16,8 @@ export interface CatalogueDocument {
   /** Parsed by `parseGridCatalogue`, which owns its shape. */
   readonly grid: {readonly cells: readonly {readonly instance: string; readonly slug: string}[]};
   readonly shards?: readonly CatalogueHead[];
+  /** The slugs a released page's placement file added to `grid` at runtime (SA33's file, `placedCells.ts`); never in a baked copy. */
+  readonly placed?: readonly string[];
 }
 
 const SLOT = Symbol.for('game.catalogue');
@@ -61,4 +63,9 @@ export function autoPlaced(row: {readonly slug: string}): boolean {
   const catalogue = installedCatalogue();
   if (catalogue === undefined || catalogue.placements.some(placed => bareSlug(placed.slug) === bareSlug(row.slug))) return false;
   return catalogue.grid.cells.some(cell => bareSlug(cell.slug) === bareSlug(row.slug));
+}
+/** A shard the API placed on this channel after the build (the placement file's cell, `placedCells.ts`): Shard Select cards it, an open
+ *  plot or an auto-placed shard too, because with no crossing (staging's default) its card and `?chunk=` are the only ways in. */
+export function placedByFile(row: {readonly slug: string}): boolean {
+  return installedCatalogue()?.placed?.some(slug => bareSlug(slug) === bareSlug(row.slug)) === true;
 }

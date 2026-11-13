@@ -44,3 +44,19 @@ stop later ones. Left as known limits: once booted, a placed cell's worker is li
 Q77); `seen` starts afresh at each boot, so the API's serial must never go back (its spec says so); a restart's grace
 preloads only the release's shards, so a placed cell reopens on the first look after the restart; older workers don't
 learn of a placed cell (crossing into it and its chat lines' cell name wait for GC15 and SA34).
+
+## The page half (opus-placedclient, 2026-11-13)
+
+The staging page never learned a placed cell: Thin Ice sat at (0,3) on the box (placement serial 1) but had no Shard Select card, and
+`?chunk=open-plot-thin-ice` landed on the deck, because the page's grid is the catalogue its build baked. Now a released page (one with
+a world stamp, staging or production) reads `releases/<channel>-placements.json` at boot (`src/client/game/grid/placedCells.ts`),
+checks it with WebCrypto under the API placement key and the box's own `PlacementSchema` (moved to `src/shared/game/grid/placementRows.ts`
+so both ends read one schema and one key), and adds the cells by `placeCell`'s rules to the installed catalogue before anything reads
+the grid. The card shows even for an open plot (`placedByFile`), since with crossing off it is the only way in. A slug the build has no
+card or product for stays out. The boot waits 3 s at most, import included; a 404, bad signature, wrong channel, timeout or junk keeps
+the build's 25 cells, and a late answer installs nothing. No-store read; the service worker already leaves `/releases/` to the network.
+
+Proof: `test/placed-cells.test.ts`; a local build (no world, so `__WS_PLACEMENTS__` named the live staging file, its bytes handed over
+with a CORS header since packs only allows our origins) went title → Shard Select → Thin Ice card → ENTER WORLD → inside
+`open-plot-thin-ice`, seat 26, and walked 17 m, desktop and phone. The live walk waits for v0.1.18. Not done: the page keeps no
+highest serial (J179); placements only add today, so an older file is a subset.

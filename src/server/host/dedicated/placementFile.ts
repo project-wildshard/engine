@@ -2,30 +2,14 @@
 // writes this file, signed with its own placement key; the release key stays engine CI's, because it vouches for the server bundle the box
 // runs. A placement can only add a cell on an empty spot, for a shard whose server pack this build's book already holds: it never moves the
 // build, the bundle or the save epoch, and a new serial here starts no grace, so players in every other cell stay connected.
-import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
 import { fetchSignedText, readSigned } from './releaseFile';
+import { PlacementSchema, type PlacementFile } from '@wildshard/engine/game/grid/placementRows';
 import type { PlacedCell } from './gridCells';
 
 /** How often the server looks, in ms: the release file's minute, so a placement is open inside SA33's two minutes. */
 const POLL_MS = 60_000;
 const WHAT = 'placement file';
-const id = v.pipe(v.string(), v.regex(/^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u), v.maxLength(64));
-const spot = v.pipe(v.number(), v.integer());
-
-/** What a placement file says: every cell the API placed on one channel, in its grid's order. */
-export interface PlacementFile {
-  /** Which kind of signed file this is, so a body can never be read as another kind's. */
-  readonly kind: 'placement';
-  readonly channel: 'production' | 'staging';
-  /** Rises with every write; an older file is never believed (J179). */
-  readonly serial: number;
-  readonly cells: readonly PlacedCell[];
-}
-/** A placement file's body, once its signature has held. The spot's bounds are `placeCell`'s. */
-export const PlacementSchema: v.GenericSchema<PlacementFile> = v.object({ kind: v.literal('placement'), channel: v.picklist(['production', 'staging']), serial: v.pipe(v.number(), v.integer(), v.minValue(0)),
-  cells: v.pipe(v.array(v.object({ instance: id, slug: id, cell: v.tuple([spot, spot]) })), v.maxLength(49)) });
-
 /** The file's text as what it says, under the placement key (SPKI DER in hex). */
 export function readPlacementFile(text: string, publicKey: string): PlacementFile { return readSigned(text, publicKey, PlacementSchema, WHAT); }
 /** The placement file at `url`, an `https:` bucket or a `file:` path. */

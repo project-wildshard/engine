@@ -2,7 +2,8 @@
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { afterEach, expect, test, vi } from 'vitest';
 import { cellFrame, cellName, cellShard, forgetPlacedCells, placeCell, placedCells, type PlacedCell } from '../src/server/host/dedicated/gridCells';
-import { PlacementWatch, readPlacementFile, type PlacementFile } from '../src/server/host/dedicated/placementFile';
+import { PlacementWatch, readPlacementFile } from '../src/server/host/dedicated/placementFile';
+import type { PlacementFile } from '../src/shared/game/grid/placementRows';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
