@@ -62,3 +62,6 @@ cache, since a job's files can't be trusted by the next. Pine rev2, default cook
 figure), whole 95.56; cold, 48 s locally; through the real job launcher at 4 CPU slots on a loaded Mac, 358 s, 1.4 GB
 peak; at 2 slots (one encode lane) it passed the 600 s limit. The box has 16 cores and passes no grant, so it gets 14.
 Still off: the app build (`entryTotals`), whose discovery document is served from the product, not from the cook.
+Review follow-ups: a worker's failed encode is retried on the cook's thread, lanes cap at six, the recording pass sizes
+nothing, merge steering stays in 12 MB units, and a cook that would pass ~96 parts per manifest keeps the 12 MB rule.
+Pine re-measured unchanged (45 phone parts, 69.24 MB, 3.28 MB mean refetch).

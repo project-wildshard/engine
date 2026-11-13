@@ -38,6 +38,8 @@ export const WHOLE_PART_LIMITS: PartLimits = {max: PART_BYTES, target: PART_TARG
  *  3.28 MB of phone parts on average (9.19 MB at 12 MB, 3.77 at 5 MB), for 45 phone parts instead of 17 and the same
  *  wire bytes (69.24 MB against 69.20). */
 export const PART_LIMITS: PartLimits = {max: 4 << 20, target: 3 << 20};
+/** Under `readSpawnManifest`'s 128 parts, with room for the key boundaries' spread around their average. */
+const MANIFEST_PARTS = 96;
 export interface SpawnPartInput {readonly rows: readonly SpawnFile[]; readonly public: boolean; readonly desktop?: boolean}
 /** `desktop`: a desktop list holds these files too. S3: it never shares a part with a phone's own, or it fetches them all. */
 interface Group {readonly key: string; readonly members: ReadonlySet<number>; readonly desktop: boolean; readonly urls: string[]; bytes: number}
@@ -53,7 +55,7 @@ export const packable = (url: string): boolean => !/\.(?:js|mjs|css)(?:\?|$)/u.t
   // shard's discovery document, so one kept in its shard's part costs that whole part: 59 MB of 80 on a grid entry.
   && !/\/(?:shard|discovery)\.json(?:\?|$)/u.test(url);
 /** The groups after the steered merge (exported for the census and tests). */
-export function spawnPartGroups(manifests: readonly SpawnPartInput[], limits: PartLimits = PART_LIMITS): Group[] {
+export function spawnPartGroups(manifests: readonly SpawnPartInput[]): Group[] {
   const need = new Map<string, Set<number>>(), size = new Map<string, number>(), order: string[] = [];
   manifests.forEach((manifest, index) => {
     for (const row of manifest.rows) {
@@ -76,7 +78,7 @@ export function spawnPartGroups(manifests: readonly SpawnPartInput[], limits: Pa
   const publicIndices = manifests.flatMap((manifest, index) => manifest.public ? [index] : []);
   const own = new Map(publicIndices.map(index => [index, manifests[index]?.rows.reduce((sum, row) => sum + (packable(row.url) ? row.bytes : 0), 0) ?? 0]));
   const over = new Map(publicIndices.map(index => [index, 0]));
-  const partsOf = (group: Group): number => Math.max(1, Math.ceil(group.bytes / limits.max));
+  const partsOf = (group: Group): number => Math.max(1, Math.ceil(group.bytes / PART_BYTES));
   const needs = (index: number): number => [...groups.values()].reduce((sum, group) => sum + (group.members.has(index) ? partsOf(group) : 0), 0);
   for (;;) {
     const worst = publicIndices.reduce<number | undefined>((best, index) => best === undefined || needs(index) > needs(best) ? index : best, undefined);
@@ -186,12 +188,21 @@ export async function writeSpawnParts(outDir: string, manifests: readonly SpawnP
     inflight.add(job); void job.finally(() => { inflight.delete(job); }).catch(() => undefined);
   };
   try {
-    for (const group of spawnPartGroups(manifests, limits)) {
+    const groups = spawnPartGroups(manifests);
+    // A manifest names at most 128 parts. Estimate each one's count under the phone rule (its share of every group it
+    // touches); a shard whose desktop shares most of its files with its phone (no tier table) keeps the 12 MB rule.
+    const groupOf = new Map(groups.flatMap(group => group.urls.map(url => [url, group] as const)));
+    const estimate = (input: SpawnPartInput): number => {
+      const touched = new Set(input.rows.flatMap(row => { const group = groupOf.get(row.url); return group === undefined ? [] : [group]; }));
+      return [...touched].reduce((sum, group) => sum + Math.ceil(group.bytes / (group.key.startsWith('P:') ? limits.target : WHOLE_PART_LIMITS.target)), 0);
+    };
+    const phoneRule = manifests.every(input => estimate(input) <= MANIFEST_PARTS) ? limits : WHOLE_PART_LIMITS;
+    for (const group of groups) {
       for (const url of group.urls) {
         const bytes = sizes.get(url) ?? 0;
         if (bytes > PART_BYTES) throw new Error(`Spawn file larger than a part (${bytes} > ${PART_BYTES}): ${url}`);
       }
-      const rule = group.key.startsWith('P:') ? limits : WHOLE_PART_LIMITS;
+      const rule = group.key.startsWith('P:') ? phoneRule : WHOLE_PART_LIMITS;
       for (const batch of placeByKey(group.urls.filter(url => !cooked.has(url)), url => sizes.get(url) ?? 0, keyOf, rule)) await write(batch);
     }
     await Promise.all(inflight);

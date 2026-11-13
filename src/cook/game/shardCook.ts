@@ -186,7 +186,8 @@ export async function defaultCookTiers(cacheDir?: string): Promise<CookTiers> {
 /** `shardHalf` with its encodes run in parallel first, when the tiers can. */
 export async function preparedShardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: ((line: string) => void) | undefined, folder: string, tiers: CookTiers): Promise<ShardHalf> {
   if (tiers.phone === true && tiers.prepare !== undefined) {
-    shardHalf(shard, wireBytes, undefined, folder, {phone: true, encode: tiers.prepare.record});
+    // Only the encodes' inputs matter here: no file of this pass is sized or kept.
+    shardHalf(shard, () => 0, undefined, folder, {phone: true, encode: tiers.prepare.record});
     await tiers.prepare.flush();
   }
   return shardHalf(shard, wireBytes, warn, folder, tiers);

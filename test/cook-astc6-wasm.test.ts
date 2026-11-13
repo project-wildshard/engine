@@ -34,7 +34,8 @@ test('S12d: basisu\'s WebAssembly build encodes a UASTC master as ASTC 6x6, on w
   await astc6.flush();
   expect(astc6.stats).toEqual({encoded: 1, reused: 0, failed: 0});
   expect(astc6.encode(master, 'srgb')).toEqual(direct);
-  expect(astc6.stats).toEqual({encoded: 1, reused: 1, failed: 0});
+  expect(astc6.stats).toEqual({encoded: 1, reused: 0, failed: 0});
   // Not a KTX2 basisu reads: no file, and the cook keeps the trimmed master.
   expect(astc6.encode(new Uint8Array(64), 'linear')).toBeUndefined();
+  expect(astc6.stats.failed).toBe(1);
 }, 120_000);

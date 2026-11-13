@@ -27,6 +27,7 @@ import type {Astc6Encode, TextureRole} from './tierTextures';
 /** The vendored build; a new build is a new cache key. */
 export const BASISU_WASM_BUILD = '32c7b74';
 const KEY_PREFIX = `astc6-wasm/1|${BASISU_WASM_BUILD}|ASTC_LDR_6x6 effort 4|`;
+const MAX_LANES = 6;
 
 interface Ktx2File {
   readonly isValid: () => boolean; readonly startTranscoding: () => boolean; readonly getLevels: () => number; readonly close: () => void; readonly delete: () => void;
@@ -105,13 +106,13 @@ export interface WasmAstc6 {
 
 /** The cook's 6×6 encoder: `lanes` worker threads for `flush`, this thread for anything `flush` didn't see. */
 export async function wasmAstc6(options: {readonly cacheDir?: string; readonly lanes?: number} = {}): Promise<WasmAstc6> {
-  const {cacheDir} = options, lanes = Math.max(1, options.lanes ?? Math.max(1, availableParallelism() - 2));
+  // Each lane holds its own WebAssembly heap; six keep a cook well inside the job's resident limit.
+  const {cacheDir} = options, lanes = Math.max(1, Math.min(MAX_LANES, options.lanes ?? availableParallelism() - 2));
   if (cacheDir !== undefined) mkdirSync(cacheDir, {recursive: true});
   const stats = {encoded: 0, reused: 0, failed: 0};
   const keyOf = (ktx2: Uint8Array, role: TextureRole): string => createHash('sha256').update(`${KEY_PREFIX}${role}|`).update(ktx2).digest('hex');
   const done = new Map<string, Uint8Array | null>(), pending = new Map<string, {bytes: Uint8Array; role: TextureRole}>();
-  const cached = (key: string): Uint8Array | null | undefined => {
-    const kept = done.get(key); if (kept !== undefined) return kept;
+  const stored = (key: string): Uint8Array | undefined => {
     if (cacheDir === undefined) return undefined;
     const path = join(cacheDir, `${key}.ktx2`);
     return existsSync(path) ? new Uint8Array(readFileSync(path)) : undefined;
@@ -124,8 +125,10 @@ export async function wasmAstc6(options: {readonly cacheDir?: string; readonly l
   };
   const here = await loadBasisuAstc6();
   const encode: Astc6Encode = (ktx2, role) => {
-    const key = keyOf(ktx2, role), hit = cached(key);
-    if (hit !== undefined) { stats.reused++; done.set(key, hit); return hit ?? undefined; }
+    const key = keyOf(ktx2, role), kept = done.get(key);
+    if (kept !== undefined) return kept ?? undefined;
+    const hit = stored(key);
+    if (hit !== undefined) { stats.reused++; done.set(key, hit); return hit; }
     let out: Uint8Array | undefined;
     try { out = here(ktx2, role); } catch { out = undefined; }
     keep(key, out);
@@ -133,7 +136,7 @@ export async function wasmAstc6(options: {readonly cacheDir?: string; readonly l
   };
   const record: Astc6Encode = (ktx2, role) => {
     const key = keyOf(ktx2, role);
-    if (cached(key) === undefined) pending.set(key, {bytes: new Uint8Array(ktx2), role});
+    if (!done.has(key) && stored(key) === undefined) pending.set(key, {bytes: new Uint8Array(ktx2), role});
     return ktx2;
   };
   const flush = async (): Promise<void> => {
@@ -151,10 +154,13 @@ export async function wasmAstc6(options: {readonly cacheDir?: string; readonly l
           id++;
           // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a worker_threads port has no origin.
           worker.postMessage({id, bytes: job[1].bytes, role: job[1].role});
-          worker.once('message', ({out}: {out?: Uint8Array}) => { keep(job[0], out === undefined ? undefined : new Uint8Array(out)); next(); });
+          // A lane's refusal isn't kept: the real pass encodes that input again on this thread, and counts a failure there.
+          worker.once('message', ({out}: {out?: Uint8Array}) => { if (out !== undefined) keep(job[0], new Uint8Array(out)); next(); });
         };
         worker.once('message', () => { next(); });
         worker.once('error', reject);
+        // A lane that dies leaves its inputs to this thread.
+        worker.once('exit', () => { resolve(); });
       })));
     } finally { await Promise.all(workers.map(worker => worker.terminate())); }
   };
