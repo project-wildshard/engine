@@ -521,17 +521,22 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
           box.className = 'ws-launch'; box.dataset.staleScreen = '';
           box.innerHTML = '<div class="ws-launch-hero" aria-hidden="true"></div><div class="ws-launch-brand">WILDSHARD</div><div style="position:relative;margin:0 24px calc(28px + env(safe-area-inset-bottom,0px));font:16px/1.4 system-ui,sans-serif"><p role="status" style="margin:0 0 14px;padding:12px 14px;background:rgba(6,10,18,.88);border:1px solid #8fe3ff"></p><button type="button" style="padding:12px 18px;background:rgba(6,10,18,.88);border:1px solid #8fe3ff;color:#8fe3ff;font:600 14px system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase">Update now</button></div>';
           const line = box.querySelector('p'), say = text => { line.textContent = 'This version is from ' + date + ', too old' + text; };
+          let busy = false;
           const update = async manual => {
+            if (busy) return;
+            busy = true;
             if (manual) keep(sessionStorage, 'ws-stale-tries', null);
-            if (navigator.onLine === false) return say(' to play. Connect to the internet to update.');
+            if (navigator.onLine === false) { busy = false; return say(' to play. Connect to the internet to update.'); }
             say('. Updating…');
             let server, fresh = {};
             try { server = await fetch('/version.json?ws-fresh=' + Date.now(), {cache: 'no-store'}); fresh = await server.json(); }
-            catch { if (!server) return say(' to play. Connect to the internet to update.'); }
-            if (Date.parse(server.headers.get('date') || '') - at <= LIMIT) { keep(sessionStorage, 'ws-stale-pass', build); return location.reload(); }
-            const tries = Number(keep(sessionStorage, 'ws-stale-tries')) || 0, same = fresh.build === build;
+            catch { if (!server) { busy = false; return say(' to play. Connect to the internet to update.'); } }
+            // the device clock is wrong (the server's Date says the build is fresh), or the server has nothing newer (no deploy in
+            // 3 weeks): an update cannot help, so this build boots for the session instead of locking everyone out
+            if (Date.parse(server.headers.get('date') || '') - at <= LIMIT || fresh.build === build) { keep(sessionStorage, 'ws-stale-pass', build); return location.reload(); }
+            const tries = Number(keep(sessionStorage, 'ws-stale-tries')) || 0;
             keep(localStorage, 'ws-stale-build', JSON.stringify({build, at, server: String(fresh.build || ''), tries, seen: Date.now()}));
-            if (same || tries >= 2) return say(same ? ', and this address still serves it. Open play.wildshard.io.' : ', and updating did not replace it. Close the app fully and open it again.');
+            if (tries >= 2) return say(', and updating did not replace it. Close the app fully and open it again.');
             keep(sessionStorage, 'ws-stale-tries', String(tries + 1));
             try { for (const worker of await navigator.serviceWorker.getRegistrations()) await worker.unregister(); } catch {}
             try { for (const name of await caches.keys()) if (name.startsWith('ws-')) await caches.delete(name); } catch {}
@@ -545,7 +550,7 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
         };
         if (root.dataset.secureDoor === 'moving' || root.dataset.doctor !== undefined) return;
         const page = Number(globalThis.__WS_BUILT_AT__) || 0;
-        if (old(page)) { window.stop(); globalThis.__wsStaleBuild(page); } else keep(sessionStorage, 'ws-stale-tries', null);
+        if (old(page)) { window.stop(); globalThis.__wsStaleBuild(page); }
       })();
     </script>
     <!-- UI styles: base first (tokens + shared primitives), then one sheet per screen with its own class prefix (scripts/check-css.mjs) -->
