@@ -11,9 +11,11 @@
 // (AUDIO AU4, J299): the assets would send the path's year-long `immutable` from `_headers`, so one miss during a
 // deploy would stay on phones and at the edge for a year. Any answer but a 2xx or a 304 is no-store; those keep theirs.
 // SA37: `/slug/<slug>` on every host is the page too, with its link-preview tags (og:title, og:description, og:image) from
-// the catalogue the page carries (slug-meta.ts); a slug that names no shard answers 404.
+// the catalogue the page carries (slug-meta.ts); a slug that names no shard answers 404. SA49: unless the channel's placement
+// file gives it a cell and the API names it (placed-slug.ts), a new author's shard placed after the build.
 
-import { slugMeta, withSlugMeta } from './slug-meta.ts'
+import { placedName } from './placed-slug.ts'
+import { placedMeta, slugMeta, withSlugMeta } from './slug-meta.ts'
 
 interface Fetcher {
   // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request, only passed through
@@ -106,7 +108,9 @@ async function slugPage({ request, url, slug }: SlugRequest, env: Env): Promise<
     return uncachedMiss(asset)
   }
   const html = await asset.text()
-  const meta = slugMeta(html, slug, url.origin)
+  const found = slugMeta(html, slug, url.origin)
+  const name = found === undefined ? await placedName(url.hostname, slug) : undefined
+  const meta = found ?? (name === undefined ? undefined : placedMeta(html, slug, url.origin, name))
   const head = request.method === 'HEAD'
   if (meta === undefined) {
     return new Response(head ? undefined : `No shard is named ${slug}.\n`, { status: NOT_FOUND, headers: PLAIN })

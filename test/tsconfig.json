@@ -568,6 +568,7 @@
     "../scripts/engine-ci-plan.ts",
     "../scripts/engine-ci-budget.ts",
     "../pages/worker.ts",
+    "../pages/placed-slug.ts",
     "../pages/slug-meta.ts"
   ]
 }

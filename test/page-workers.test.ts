@@ -6,9 +6,13 @@ import { execFile } from 'node:child_process';
 import { join, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Promise form of execFile.
 import { promisify } from 'node:util';
-import { expect, test } from 'vitest';
+// oxlint-disable-next-line import/no-nodejs-modules -- SA49: a placement file signed by a real key.
+import { generateKeyPairSync, sign } from 'node:crypto';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { unstable_readConfig } from 'wrangler';
 import worker, { type Env } from '../pages/worker.ts';
+import { PLACEMENT_PUBLIC_KEY as WORKER_KEY } from '../pages/placed-slug.ts';
+import { PLACEMENT_PUBLIC_KEY } from '../src/shared/game/grid/placementRows';
 
 
 // OFF-VERCEL OV1 (J272): one wrangler.jsonc, three Workers. Production is the top level; staging and preview are envs.
@@ -48,7 +52,7 @@ test('wrangler deploy --dry-run passes for all three channels', async () => {
   try {
     mkdirSync(join(root, 'pages'));
     mkdirSync(join(root, 'dist'));
-    for (const file of ['wrangler.jsonc', 'worker.ts', 'slug-meta.ts']) copyFileSync(resolve('pages', file), join(root, 'pages', file));
+    for (const file of ['wrangler.jsonc', 'worker.ts', 'slug-meta.ts', 'placed-slug.ts']) copyFileSync(resolve('pages', file), join(root, 'pages', file));
     writeFileSync(join(root, 'dist', 'index.html'), '<!doctype html>');
     const wrangler = resolve('node_modules/.bin/wrangler');
     const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: join(root, 'logs'), CLOUDFLARE_API_TOKEN: '', CI: '1' };
@@ -221,4 +225,56 @@ test('an unknown slug answers 404 with no-store from the Worker; other paths are
 test('?doctor on a slug link still goes to the doctor', async () => {
   const response = await worker.fetch(new Request('https://play.wildshard.io/slug/driftwood-isle?doctor'), { ASSETS: site([]) })
   expect([response.status, response.headers.get('location')]).toEqual([307, '/doctor/?doctor&sw=0'])
+})
+
+// SA49: a slug the API placed after the build. The Worker reads its channel's signed placement file and the API's row, through
+// `fetch` (stubbed here: every other test sees the network answer 404, so an unknown slug stays a 404 with no lookup leaking).
+const keys = generateKeyPairSync('ed25519')
+const signedFile = (body: unknown, key = keys.privateKey): string => { const text = JSON.stringify(body); return JSON.stringify({ body: text, signature: sign(null, Buffer.from(text), key).toString('hex') }) }
+const placementBody = (channel: string, slugs: readonly string[]): unknown => ({ kind: 'placement', channel, serial: 4, cells: slugs.map((slug, index) => ({ instance: slug, slug, cell: [index, 3] })) })
+let network: (url: string) => Response = () => new Response('missing', { status: 404 })
+const asked: string[] = []
+beforeEach(() => {
+  asked.length = 0
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => { const url = String(input instanceof Request ? input.url : input); asked.push(url); try { return Promise.resolve(network(url)) } catch (error) { return Promise.reject(error) } })
+})
+afterEach(() => { vi.restoreAllMocks(); network = () => new Response('missing', { status: 404 }) })
+/** The packs file and API row a new author's slug would have, the file signed by `key`. */
+function placedNetwork(channel: string, key = keys.privateKey): (url: string) => Response {
+  return url => {
+    if (url === `https://packs.wildshard.io/releases/${channel}-placements.json`) return new Response(signedFile(placementBody(channel, ['new-author-isle']), key))
+    if (url === 'https://api.wildshard.io/api/catalogue/shards/new-author-isle') return Response.json({ slug: 'new-author-isle', name: 'New <Author> Isle' })
+    if (url === 'https://api.wildshard.io/api/catalogue/shards/not-placed') return Response.json({ slug: 'not-placed', name: 'Not Placed' })
+    return new Response('missing', { status: 404 })
+  }
+}
+
+test('the Worker checks placement files under the API placement key the box and page use', () => {
+  expect(WORKER_KEY).toBe(PLACEMENT_PUBLIC_KEY)
+})
+
+test('SA49: a slug placed after the build unfurls with its API name; an unplaced one, a bad signature or another host stays 404', async () => {
+  const pub = keys.publicKey.export({ type: 'spki', format: 'der' }).toString('hex')
+  // The test's key stands in for the API's: the file is checked exactly as live, under another public half.
+  const importKey = crypto.subtle.importKey.bind(crypto.subtle)
+  vi.spyOn(crypto.subtle, 'importKey').mockImplementation(((format: 'spki', _data: BufferSource, algorithm: AlgorithmIdentifier, extractable: boolean, usages: KeyUsage[]) => importKey(format, Buffer.from(pub, 'hex'), algorithm, extractable, usages)) as never)
+  for (const [host, channel] of [['staging.wildshard.io', 'staging'], ['preview.wildshard.io', 'staging'], ['play.wildshard.io', 'production']] as const) {
+    network = placedNetwork(channel)
+    const response = await worker.fetch(new Request(`https://${host}/slug/new-author-isle`), { ASSETS: site([]) })
+    expect(response.status, host).toBe(200)
+    expect(og(await response.text()), host).toMatchObject({ title: 'New &lt;Author&gt; Isle', description: 'A shard on the Wildshard grid. Tap to play in your browser.', image: `https://${host}/icons/staging/apple-touch-icon.png`, url: `https://${host}/slug/new-author-isle` })
+    expect((await worker.fetch(new Request(`https://${host}/slug/not-placed`), { ASSETS: site([]) })).status, 'a catalogue row with no cell').toBe(404)
+  }
+  network = placedNetwork('staging', generateKeyPairSync('ed25519').privateKey)
+  expect((await worker.fetch(new Request('https://staging.wildshard.io/slug/new-author-isle'), { ASSETS: site([]) })).status, 'a file the placement key did not sign').toBe(404)
+  network = placedNetwork('production')
+  expect((await worker.fetch(new Request('https://staging.wildshard.io/slug/new-author-isle'), { ASSETS: site([]) })).status, "production's cells on staging").toBe(404)
+  asked.length = 0
+  expect((await worker.fetch(new Request('https://wildshard-play-staging.example.workers.dev/slug/new-author-isle'), { ASSETS: site([]) })).status, 'a host with no channel').toBe(404)
+  expect(asked, 'asks nothing').toEqual([])
+  network = () => { throw new Error('offline') }
+  expect((await worker.fetch(new Request('https://staging.wildshard.io/slug/new-author-isle'), { ASSETS: site([]) })).status).toBe(404)
+  asked.length = 0
+  await worker.fetch(new Request('https://staging.wildshard.io/slug/driftwood-isle'), { ASSETS: site([]) })
+  expect(asked, 'a slug the page names asks nothing').toEqual([])
 })
