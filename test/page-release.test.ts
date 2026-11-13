@@ -169,6 +169,20 @@ test('go-live refuses when the signed release names another build or does not ve
   expect(calls).not.toContain('goLive');
 });
 
+// SHELL-CUTOVER SC2 (WWW W8): the train promotes only a client the production world accepts. Go-live re-reads production's
+// signed release file and the world's /health; a candidate either doesn't name holds with the reason, and play's alias stays.
+test('production go-live holds a candidate the world does not run, with the reason, and never moves play', async () => {
+  const {deps, calls, live} = rig('production');
+  await through(deps, 'check');
+  deps.afterStagingProofs = true;
+  live.release = signed('production', 8, 'd'.repeat(40));
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/production\.json serial 8 signs d+, not /u);
+  live.release = signed('production', 7);
+  live.health = {build: 'd'.repeat(40), serial: 7};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/health shows d+ serial 7, not /u);
+  expect(calls).not.toContain('goLive');
+});
+
 test('check waits for the signed serial and health, and gives up without a match', async () => {
   const {deps, live, lines} = rig();
   await through(deps, 'upload');
