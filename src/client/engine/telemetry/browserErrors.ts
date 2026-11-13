@@ -4,6 +4,7 @@ import { pageScope } from '../../../shared/engine/app/resources';
 import { jsonSlot, type Json } from '../saves/slots';
 /** Optional, error-only Sentry channel. The existing /api/errors report remains the primary local inbox. */
 import type { captureException, ErrorEvent, getClient, httpContextIntegration, init, withScope } from '@sentry/browser';
+import type { StaleBuildNote } from '../saves/staleBuildNote';
 
 declare const __BUILD_ID__: string;
 /** vite.config.ts: package.json's version (scripts/changelog.mjs); absent under Node */
@@ -31,10 +32,12 @@ export interface BrowserErrorTags {
  *   title-drop    the drop modal, "Unexpectedly back at the title" (src/client/app/dropModal.ts showDropModal)
  *   link-lost     the online stop card "Couldn't reconnect" (src/client/host/online/linkScreens.ts)
  *   link-refused  the online stop card "The world turned this connection away" (the same file)
+ *   stale-build   the stale-build screen (index.html data-stale-build, STALE-BUILD SB6), reported by the next build that boots
+ *                 (telemetry/staleBuildReport.ts) since that page stops before Sentry can load
  * Not screens of a fault, so never reported: the player's own reload, back or exit (QA 11-12 row 35), "Playing somewhere else",
  * "The world is full", the reconnect banner (counted in `net` telemetry), title refusal lines and the Connection doctor.
  */
-export const ERROR_SCREENS = ['error-modal', 'stuck-step', 'glitch-chip', 'load-failure', 'title-drop', 'link-lost', 'link-refused'] as const;
+export const ERROR_SCREENS = ['error-modal', 'stuck-step', 'glitch-chip', 'load-failure', 'title-drop', 'link-lost', 'link-refused', 'stale-build'] as const;
 export type ErrorScreen = typeof ERROR_SCREENS[number];
 
 // A DSN is a public browser endpoint, not an auth token. Only real production pages report.
@@ -218,6 +221,18 @@ export async function deliverBrowserError(error: Error, tags: BrowserErrorTags, 
       });
     } catch { finish(false); }
   });
+}
+
+/**
+ * STALE-BUILD SB6: the stale-build screen (index.html `data-stale-build`) runs before Sentry can load, so the next build that
+ * boots reports it, once, as screen `stale-build` through the screen outbox (durable until Sentry acknowledges it). The build
+ * tag is the stale build's, not this page's.
+ */
+export function staleBuildReport(note: StaleBuildNote): { error: Error; tags: BrowserErrorTags } {
+  const days = Math.floor((note.seen - note.at) / 86_400_000);
+  const error = new Error(`A stale build was stopped at the title and sent to update (${String(days)} days old)`);
+  return { error, tags: { system: 'stale-build', build: note.build, shard: '', bootStage: 'title', fatal: false, screen: 'stale-build',
+    diagnostic: { builtAt: new Date(note.at).toISOString(), seen: new Date(note.seen).toISOString(), server: note.server, tries: note.tries } } };
 }
 
 // ── S13: the screen outbox (its reader and sender, src/client/engine/telemetry/screenOutbox.ts, load only when something is owed) ──

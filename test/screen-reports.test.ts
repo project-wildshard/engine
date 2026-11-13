@@ -109,6 +109,29 @@ for (const [screen, state, why] of [['link-lost', 'lost', undefined], ['link-ref
   });
 }
 
+walk('stale-build', "the next build that boots reports an earlier page's stale-build screen once, and clears its note", async () => {
+  const { reportStaleBuild } = await import('../src/client/engine/telemetry/staleBuildReport');
+  const day = 86_400_000, at = Date.UTC(2026, 9, 1);
+  // the note as index.html's data-stale-build script writes it, before the update
+  localStorage.setItem('ws-stale-build', JSON.stringify({ build: 'old-build', at, server: 'new-build', tries: 1, seen: at + 23 * day }));
+  reportStaleBuild(); reportStaleBuild();
+  expect(opened()).toEqual(['stale-build']);
+  expect(localStorage.getItem('ws-stale-build')).toBeNull();
+  expect(reports[0]?.tags).toMatchObject({ system: 'stale-build', build: 'old-build', fatal: false, bootStage: 'title',
+    diagnostic: { server: 'new-build', tries: 1, builtAt: '2026-10-01T00:00:00.000Z' } });
+  expect(String((reports[0]?.error as Error).message)).toContain('23 days old');
+});
+
+test('a stale-build note that is not the inline script\'s shape is dropped, never reported', async () => {
+  const { parseStaleBuildNote, takeStaleBuildNote } = await import('../src/client/engine/saves/staleBuildNote');
+  for (const raw of [null, '', 'junk', '[]', '{"build":"b"}', JSON.stringify({ build: 1, at: 0, server: '', tries: 0, seen: 0 }), '{"build":"b","at":1e300,"server":"","tries":0,"seen":0}']) expect(parseStaleBuildNote(raw)).toBeNull();
+  localStorage.setItem('ws-stale-build', '{"build":');
+  expect(takeStaleBuildNote()).toBeNull();
+  expect(localStorage.getItem('ws-stale-build')).toBeNull();
+  // storage that refuses the removal: no report, so a stuck note can't report on every boot
+  expect(takeStaleBuildNote({ getItem: () => JSON.stringify({ build: 'b', at: 0, server: '', tries: 0, seen: 0 }), removeItem: () => { throw new Error('denied'); } })).toBeNull();
+});
+
 test('the player\'s own outcomes open no reporting screen: "Playing somewhere else", "The world is full", a reload end', async () => {
   const { linkScreens } = await import('../src/client/host/online/linkScreens');
   const { Scope } = await import('../src/shared/engine/app/scope');

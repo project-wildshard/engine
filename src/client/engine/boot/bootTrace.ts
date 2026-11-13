@@ -2,6 +2,7 @@ import { pageScope } from '../../../shared/engine/app/resources';
 import { saveStorage } from '../saves/slots';
 /** A small durable breadcrumb for an enabled level boot. A terminated WebContent process cannot run a final handler. */
 import { deliverBrowserError, flushScreenReports } from '../telemetry/browserErrors';
+import { reportStaleBuild } from '../telemetry/staleBuildReport';
 import type { ProgressView } from './plan';
 import { markDropStep } from './dropNotice';
 
@@ -206,7 +207,8 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
     }
     void flushBootReports();
     // SENTRY-TRIAGE S13: an error screen an earlier page opened and could not deliver goes now, off the boot's hot path (title too)
-    if (typeof window !== 'undefined') pageScope.timeout(8000, () => { flushScreenReports(); });
+    // STALE-BUILD SB6: a stale-build screen an earlier page showed (index.html's note) joins the outbox first
+    if (typeof window !== 'undefined') pageScope.timeout(8000, () => { reportStaleBuild(); flushScreenReports(); });
   }
 
   /** Shown in the loader and the Loading & memory Debug row after a restart. */
