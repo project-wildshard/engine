@@ -74,9 +74,10 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
 /** Taken on engine main 2887bd63, before the first change; re-taken for TE-ENG7, whose `animal.species` adds one
  *  initial text to every creature spawn (an empty one for Nalati's native bodies). Re-taken for ENG-18: three far bots
  *  of this bare resident fell through to y -300 for ever; its fall net now puts them back at the spawn. Re-taken for
- *  REMOTE-PLAYERS RP6, whose player row for others carries a swing count, its weight and the airborne bit. */
-const EXPECTED = 'ec39f2f4231bbcdc5c45c4f4422eaa042c81d756754255c5e9a5f2eca2753bb5';
+ *  REMOTE-PLAYERS RP6, whose player row for others carries a swing count, its weight and the airborne bit. Re-taken for GRID-CROSSING
+ *  GC36 (J322, no walls): Nalati's bake holds untagged chunk-edge walls, which no world stands now. */
+const EXPECTED = '7b00c3c4674c62e80a92c83067c36a7f28713ec164a3c672bf321ee3fcb9c622';
 /** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. Re-taken for SS4 (75a5d6ae):
  *  each seat now has a stealth seat whose state the digest hashes, and an arrow loosed from Hidden hits for x2. Re-taken
- *  for RP6 as above. */
-const EXPECTED_ROOM = '68fdb24740c2032364b6fd18861e10be1b5d33841a6fa4e9e62b45e76cb5fc80';
+ *  for RP6 as above. Re-taken for GC36 as above. */
+const EXPECTED_ROOM = 'b6c1d7df90df4992a280c1b809ee0bdb9c2d7588c612884d3e4e840893d75085';
