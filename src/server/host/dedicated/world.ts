@@ -16,7 +16,7 @@ import { NetIdentitySchema } from '@wildshard/engine/net/identity';
 import { decodeFirstMessage } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
 import { encodeCountdown, type WorldWord } from '@wildshard/engine/net/socketFrames';
-import { deviceLine, readDeviceWord, type DeviceSnapshot } from '@wildshard/engine/net/deviceWord';
+import { deviceLine, readDeviceWord, type DeviceSnapshot, type DeviceWho } from '@wildshard/engine/net/deviceWord';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
 import type {PlaytestRow} from './playtest';
 import type { ChatReport } from '@wildshard/engine/net/chat';
@@ -147,7 +147,7 @@ export class World {
   /** Links whose player quit (`ready` with `LEAVE_FLAG`) before a body was theirs. */
   private readonly quits = new WeakSet<SocketTransport>();
   /** DEVICE-TELEMETRY DT4: each socket's device word and the player its hello named, until the one `client.device` line is written. */
-  private readonly devices = new WeakMap<SocketTransport, { said?: DeviceSnapshot; player?: string; done: boolean }>();
+  private readonly devices = new WeakMap<SocketTransport, { said?: DeviceSnapshot; who?: DeviceWho; done: boolean }>();
   /** Clients loading: each holds a seat, and has no body yet. */
   private readonly pending = new Map<string, PendingSeat>();
   /** Who has a body, by link or by hold, and in which cell. */
@@ -344,17 +344,17 @@ export class World {
     seen.said = said; this.devices.set(end, seen); this.deviceSeen(end);
   }
   /** DT4: the hello named this socket's player. */
-  private devicePlayer(end: SocketTransport, player: string): void {
+  private devicePlayer(end: SocketTransport, who: DeviceWho): void {
     const seen = this.devices.get(end) ?? { done: false };
-    seen.player ??= player; this.devices.set(end, seen); this.deviceSeen(end);
+    seen.who ??= who; this.devices.set(end, seen); this.deviceSeen(end);
   }
   /** DT4: one `client.device` journal line per connect, once both the word and the hello's player are in. Privacy: the player id the
    *  hello already carries and device characteristics only; never the address, which the door keeps for its limits alone. */
   private deviceSeen(end: SocketTransport): void {
     const seen = this.devices.get(end);
-    if (seen === undefined || seen.done || seen.said === undefined || seen.player === undefined) return;
+    if (seen === undefined || seen.done || seen.said === undefined || seen.who === undefined) return;
     seen.done = true;
-    this.options.log(deviceLine(seen.player, seen.said));
+    this.options.log(deviceLine(seen.who, seen.said));
   }
   private async joining(end: SocketTransport, bytes: ArrayBuffer, goto: string | null): Promise<void> {
     try { await this.hello(end, bytes, goto); }
@@ -395,7 +395,8 @@ export class World {
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.refuse('identity'); end.close('refused'); return; }
     const device = said.output.player, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
-    this.devicePlayer(end, device);
+    // DT4: the Name everyone sees and the secret-keyed body id; never the raw player id, which is a bearer credential
+    this.devicePlayer(end, { name: this.names.get(device) ?? typed, body });
     // GC15: a seat mid-crossing is in neither cell for the door to ask: the client dials again in a moment.
     if (this.crossings.has(device)) { end.close('retry'); return; }
     if (holding !== undefined) {

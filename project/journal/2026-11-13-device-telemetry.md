@@ -11,3 +11,6 @@
 - Sentry: the `device` context and `device.*` tags ride the lazy SDK load, so the title pays nothing, and only errors carry them.
 - No admin view: the door has no ADMIN_TOKEN area and `/health` is public by design, so the journal line is the read path
   (`scripts/devices.mjs`).
+- Review (claude -p): the raw player id is a bearer credential, so the line names the player by Name and the door's
+  secret-keyed body id instead. Also: Unicode-category strip of control/format/private-use characters, and the client's
+  own build logged as `clientBuild` (it is a claim, not the door's build).

@@ -51,9 +51,9 @@ const FIELDS: Readonly<Record<Field, Kind>> = {
 };
 
 const TEXT_MAX = 96, LONG_MAX = 320, LIST_ITEMS = 6, ITEM_MAX = 48;
-// Bidi overrides, zero-width and other format characters would let a junk word reorder or hide text in a journal line
-// eslint-disable-next-line no-control-regex
-const UNPRINTABLE = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF]/gu;
+// Control, format (bidi, zero-width, soft hyphen), private-use and line/paragraph separators would let a junk word reorder or hide
+// text in a journal line
+const UNPRINTABLE = /[\p{Cc}\p{Cf}\p{Co}\p{Zl}\p{Zp}]/gu;
 const text = (value: unknown, max: number): string | undefined => {
   if (typeof value !== 'string') return undefined;
   const cut = value.replaceAll(UNPRINTABLE, '').trim().slice(0, max);
@@ -110,9 +110,12 @@ export function deviceBrowser(device: DeviceSnapshot): string | undefined {
   return found.length === 3 ? `${found[1] ?? ''} ${found[2] ?? ''}` : `Safari ${found[1] ?? ''}`;
 }
 
-/** The door's one journal line per connect: who (the player id the hello already carries, never an address) and what device. */
-export function deviceLine(player: string, device: DeviceSnapshot): Record<string, unknown> {
-  const line: Record<string, unknown> = { at: 'client.device', player };
+/** Who a device line names: the player's Name (what everyone in the world sees) and their body id (the door's secret-keyed hash of the
+ *  player id, `seats.ts` bodyId). Never the raw player id, which whoever holds it can play as, and never an address. */
+export interface DeviceWho { readonly name: string; readonly body: string }
+/** The door's one journal line per connect: who and what device. */
+export function deviceLine(who: DeviceWho, device: DeviceSnapshot): Record<string, unknown> {
+  const line: Record<string, unknown> = { at: 'client.device', name: who.name, body: who.body };
   const put = (key: string, value: unknown): void => { if (value !== undefined) line[key] = value; };
   put('model', device.model); put('platform', device.platform); put('platformVersion', device.platformVersion);
   put('browser', deviceBrowser(device)); put('gpu', device.gpu); put('gpuVendor', device.gpuVendor);
@@ -121,7 +124,7 @@ export function deviceLine(player: string, device: DeviceSnapshot): Record<strin
   put('formFactors', device.formFactors?.join(',')); put('architecture', device.architecture); put('maxTexture', device.maxTexture);
   put('textures', [device.astc === true ? 'astc' : '', device.etc2 === true ? 'etc2' : '', device.bptc === true ? 'bptc' : ''].filter(Boolean).join(',') || undefined);
   put('language', device.language); put('timeZone', device.timeZone); put('net', device.net); put('display', device.display);
-  put('build', device.build); put('ua', device.ua);
+  put('clientBuild', device.build); put('ua', device.ua);
   return line;
 }
 

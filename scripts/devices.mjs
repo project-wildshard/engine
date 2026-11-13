@@ -4,10 +4,10 @@
 //   ssh wildshard-agent journalctl -u wildshard-server@staging --since today -o cat | node scripts/devices.mjs --last 20
 //   node scripts/devices.mjs --last 20 journal.txt        (a saved journal)
 //   node scripts/devices.mjs --json < journal.txt         (the lines themselves)
-// Read-only: it reads text and prints. Lines carry device characteristics and the player id only, never an address.
+// Read-only: it reads text and prints. Lines carry device characteristics, the Name and the secret-keyed body id, never an address.
 import { readFileSync } from 'node:fs';
 
-const COLUMNS = [['player', 18], ['model', 16], ['platform', 10], ['platformVersion', 8], ['browser', 24], ['gpu', 36], ['screen', 10], ['dpr', 5], ['memory', 4], ['cores', 4], ['build', 12]];
+const COLUMNS = [['name', 14], ['body', 12], ['model', 16], ['platform', 10], ['platformVersion', 8], ['browser', 24], ['gpu', 36], ['screen', 10], ['dpr', 5], ['memory', 4], ['cores', 4], ['clientBuild', 12]];
 
 /** The `client.device` lines in a journal's text, oldest first; anything else on a line (a journal prefix) is skipped. */
 export function deviceLines(text) {

@@ -74,7 +74,8 @@ test('DEVICE-TELEMETRY DT3: the page sends its device once per socket, and the d
   await shell.booted;
   await vi.waitFor(() => { expect(bench?.lines.filter(line => line['at'] === 'client.device')).toHaveLength(1); }, { timeout: 5000 });
   const line = bench.lines.find(entry => entry['at'] === 'client.device');
-  expect(line).toMatchObject({ player: IDENTITY.player, gpu: 'Bench GPU', gpuVendor: 'Bench Vendor', maxTexture: 8192, build: 'bench' });
+  expect(line).toMatchObject({ name: IDENTITY.name, gpu: 'Bench GPU', gpuVendor: 'Bench Vendor', maxTexture: 8192, clientBuild: 'bench' });
+  expect(JSON.stringify(line), 'never the raw player id').not.toContain(IDENTITY.player);
   expect(Object.keys(line ?? {}).some(key => /ip|addr/iu.test(key)), 'never an address').toBe(false);
   expect(bench.world.refusals).toEqual({});
 });

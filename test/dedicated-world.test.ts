@@ -5,6 +5,7 @@ import { encodeHello } from '../src/shared/engine/net/messages';
 import { NET_SCHEMA_HASH } from '../src/shared/engine/net/netSchemas';
 import { closeReason, decodeCountdown, framed, SOCKET_RELIABLE } from '../src/shared/engine/net/socketFrames';
 import { DEVICE_WORD_MAX_BYTES, encodeDeviceWord } from '../src/shared/engine/net/deviceWord';
+import { bodyId } from '../src/server/host/dedicated/seats';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
@@ -130,8 +131,9 @@ test('a device word makes one client.device line with its fields; a second word 
   phone.transport.control('device', encodeDeviceWord({ ...word, model: 'second' }));
   await vi.waitFor(() => { expect(deviceLines(bench?.lines ?? [])).toHaveLength(1); });
   await new Promise(resolve => { setTimeout(resolve, 100); });
-  expect(deviceLines(bench.lines)).toEqual([{ at: 'client.device', player: 'device:friend', model: 'SM-S918B', platform: 'Android', platformVersion: '14.0.0', browser: 'Google Chrome 141.0.7390.122',
-    gpu: 'Adreno (TM) 740', screen: '384x832', dpr: 2.8, memory: 8, cores: 8, build: 'bench' }]);
+  expect(deviceLines(bench.lines)).toEqual([{ at: 'client.device', name: 'Bot', body: bodyId('bench', 'device:friend'), model: 'SM-S918B', platform: 'Android', platformVersion: '14.0.0', browser: 'Google Chrome 141.0.7390.122',
+    gpu: 'Adreno (TM) 740', screen: '384x832', dpr: 2.8, memory: 8, cores: 8, clientBuild: 'bench' }]);
+  expect(JSON.stringify(deviceLines(bench.lines)), 'never the raw player id').not.toContain('device:friend');
 });
 
 test.each([

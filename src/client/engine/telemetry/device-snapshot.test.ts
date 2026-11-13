@@ -50,7 +50,7 @@ test('untrusted words: junk, wrong types and unknown fields drop; an oversized w
   expect(readDeviceWord(encode([1, 2]))).toBeNull();
   expect(readDeviceWord(new Uint8Array([0xff, 0xfe]).buffer)).toBeNull();
   expect(readDeviceWord(encode({ model: 'x'.repeat(DEVICE_WORD_MAX_BYTES) }))).toBeNull();
-  expect(readDeviceWord(encode({ model: 'Pixel‮ 8\u0000', memory: 'lots', cores: Infinity, mobile: 'yes', brands: [1, 'a'.repeat(80), 'B'], ip: '10.0.0.1', __proto__: { x: 1 } })))
+  expect(readDeviceWord(encode({ model: 'Pixel\u202E 8\u0000\u00AD\uE000', memory: 'lots', cores: Infinity, mobile: 'yes', brands: [1, 'a'.repeat(80), 'B'], ip: '10.0.0.1', __proto__: { x: 1 } })))
     .toEqual({ model: 'Pixel 8', brands: ['a'.repeat(48), 'B'] });
   expect(cleanDevice(null)).toEqual({});
   expect(cleanDevice({ languages: Array.from({ length: 40 }, (_, i) => `l${String(i)}`) }).languages).toHaveLength(6);
@@ -65,8 +65,8 @@ test('a client\'s word always fits the room\'s message cap, keeping the model an
 
 test('the door\'s journal line and the Sentry tags', () => {
   const device = { model: 'SM-S918B', platform: 'Android', platformVersion: '14.0.0', gpu: 'g'.repeat(96), screenW: 384, screenH: 832, dpr: 2.8, memory: 8, cores: 8, astc: true, etc2: true, bptc: false, fullVersionList: ['Not)A;Brand 99', 'Google Chrome 141.0.7390.122'], build: 'b3' };
-  expect(deviceLine('device:abc', device)).toMatchObject({ at: 'client.device', player: 'device:abc', model: 'SM-S918B', browser: 'Google Chrome 141.0.7390.122', screen: '384x832', dpr: 2.8, memory: 8, cores: 8, textures: 'astc,etc2', build: 'b3' });
-  expect(deviceLine('device:abc', device)).not.toHaveProperty('ip');
+  expect(deviceLine({ name: 'Friend', body: 'p.abc' }, device)).toMatchObject({ at: 'client.device', name: 'Friend', body: 'p.abc', model: 'SM-S918B', browser: 'Google Chrome 141.0.7390.122', screen: '384x832', dpr: 2.8, memory: 8, cores: 8, textures: 'astc,etc2', clientBuild: 'b3' });
+  expect(deviceLine({ name: 'Friend', body: 'p.abc' }, device)).not.toHaveProperty('player');
   expect(deviceTags(device)).toEqual({ 'device.model': 'SM-S918B', 'device.gpu': 'g'.repeat(96), 'device.platform': 'Android', 'device.platform_version': '14.0.0', 'device.memory': '8' });
   expect(deviceBrowser({ ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1' })).toBe('Safari 18');
   expect(deviceBrowser({ ua: PIXEL_UA })).toBe('Chrome 141');
