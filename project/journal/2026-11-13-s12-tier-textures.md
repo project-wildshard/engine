@@ -50,3 +50,15 @@ A one-texture edit re-downloads the whole part holding it (DL18). Measured on Pi
 12 MB rule an edit costs a phone 9.19 MB on average (10.09 for a real byte-flip of a 0.15 MB texture); at 5 MB 3.77; at
 4 MiB 3.28 (1.14 real), with phone wire unchanged (69.20 → 69.24 MB) and 17 → 45 parts. Phone-read groups take 4 MiB;
 desktop-only groups keep 12 MB, because Pine's desktop level in 4 MiB parts is 151 parts and a manifest holds 128.
+
+## S12d, engine half: the phone tier on by default (opus-shardsize)
+
+`cookShard` now cooks the phone tier unless a caller passes `tiers: {}`, with 6×6 by basisu's own WebAssembly build
+(`src/cook/game/basisu/`, Binomial `32c7b74`, Apache-2.0): the box's job runs under `--permission` with no child process
+and no basisu, so the CLI path couldn't run there. Probe on Pine's `wood_planks_dirt` at 1024: top level 66–71 dB from the
+CLI's, same PSNR against the master, sizes within 0.2–5% (the WASM build regenerates mips from the top level). Encodes run
+on worker threads first (a recording pass, then `flush`), then the real pass reads them back. The job keeps no encode
+cache, since a job's files can't be trusted by the next. Pine rev2, default cook: phone entry 88.75 MB (the CLI's S12c
+figure), whole 95.56; cold, 48 s locally; through the real job launcher at 4 CPU slots on a loaded Mac, 358 s, 1.4 GB
+peak; at 2 slots (one encode lane) it passed the 600 s limit. The box has 16 cores and passes no grant, so it gets 14.
+Still off: the app build (`entryTotals`), whose discovery document is served from the product, not from the cook.

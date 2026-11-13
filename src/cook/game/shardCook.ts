@@ -24,6 +24,7 @@ import type {ServerPack, ServerPackPart} from '../../shared/game/shardfile/serve
 import {serverReadsFile} from '../../shared/game/shardfile/outputDescriptor';
 import {entryReadSet} from './entryReadSet';
 import {phoneTier, type Astc6Encode} from './tierTextures';
+import {wasmAstc6} from './astc6Wasm';
 import {createPartEncoder, packable, writeSpawnParts, type CookedMember, type PartEncoder} from './spawnParts';
 
 export type CookTier = 'phone' | 'desktop';
@@ -169,7 +170,27 @@ export interface ShardHalf {
  *  trimmed file (`phoneTier`), listed in the phone manifests in place of the file it stands in for. Off by default until
  *  the cook's own 6×6 encode (S12c) can replace the hand-made sets. `encode` (S12c): cook each phone row from its desktop
  *  master as ASTC 6×6 (`basisuAstc6`), what the phone reads once the hand-made sets are gone. */
-export interface CookTiers {readonly phone?: boolean; readonly encode?: Astc6Encode}
+export interface CookTiers {readonly phone?: boolean; readonly encode?: Astc6Encode
+  /** S12d: run the encodes a cook will ask for on worker threads first (`wasmAstc6`'s `record` and `flush`). */
+  readonly prepare?: {readonly record: Astc6Encode; readonly flush: () => Promise<void>}}
+
+/** S12d: the phone tier is on by default, 6×6 by basisu's WebAssembly build: no child process, nothing to install, so
+ *  the box's cook job and CI's bake cook what `cook --phone-astc6` did. `cacheDir` keeps encodes between cooks; a cook
+ *  job passes none (its files can't be trusted by the next job). */
+export async function defaultCookTiers(cacheDir?: string): Promise<CookTiers> {
+  const lanes = process.env['COOK_CPU_SLOTS'] === undefined ? undefined : Math.max(1, Number(process.env['COOK_CPU_SLOTS']) - 1);
+  const astc6 = await wasmAstc6({...(cacheDir === undefined ? {} : {cacheDir}), ...(lanes === undefined || !Number.isSafeInteger(lanes) ? {} : {lanes})});
+  return {phone: true, encode: astc6.encode, prepare: astc6};
+}
+
+/** `shardHalf` with its encodes run in parallel first, when the tiers can. */
+export async function preparedShardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: ((line: string) => void) | undefined, folder: string, tiers: CookTiers): Promise<ShardHalf> {
+  if (tiers.phone === true && tiers.prepare !== undefined) {
+    shardHalf(shard, wireBytes, undefined, folder, {phone: true, encode: tiers.prepare.record});
+    await tiers.prepare.flush();
+  }
+  return shardHalf(shard, wireBytes, warn, folder, tiers);
+}
 
 /** The shard half of every manifest: what the app build's `write` and the standalone cook share. `folder` is where the
  *  product is served; a catalogue names it by slug, and today's `_template` folder is the one that differs (`template`). */
@@ -329,7 +350,7 @@ export interface CookShardOptions {
   readonly warn?: (line: string) => void;
   /** The renderer fingerprint to cook for; this engine's own unless a build names it. */
   readonly renderer?: string;
-  /** S12b: per-tier texture files; off unless a cook asks. */
+  /** S12b: per-tier texture files; `defaultCookTiers()` (the phone tier, 6×6) unless a cook names its own. `{}` turns them off. */
   readonly tiers?: CookTiers;
 }
 
@@ -344,7 +365,7 @@ export async function cookShard(tarball: Uint8Array, out: string, options: CookS
 async function cookWith(tarball: Uint8Array, out: string, options: CookShardOptions, encoder: PartEncoder): Promise<CookReport> {
   const started = options.now(), shard = openShardfile(tarball, options.renderer === undefined ? {} : {renderer: options.renderer});
   if (shard.preparation === 'stale') options.warn?.(stalePreparationLine(shard.slug));
-  const half = shardHalf(shard, options.wireBytes, options.warn, shard.slug, options.tiers);
+  const half = await preparedShardHalf(shard, options.wireBytes, options.warn, shard.slug, options.tiers ?? await defaultCookTiers());
   const before = encoder.stats();
   const table = COOK_TIERS.flatMap(tier => COOK_SETS.map(set => ({tier, set, rows: [...half.productRows(tier, set), ...half.mountRows(tier, set)]})));
   const whole = table.filter(row => row.set === 'whole');
