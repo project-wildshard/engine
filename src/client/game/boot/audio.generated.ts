@@ -2827,7 +2827,7 @@ export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = {
     "duration": 58.0693
    },
    "title": {
-    "full": "title-3d1f713a.m4a",
+    "full": "title-7ce82663.m4a",
     "bpm": 75.666,
     "beatsPerBar": 4,
     "loopStart": 27.3995,
@@ -2836,9 +2836,9 @@ export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = {
    }
   },
   "stings": {
-   "death": "sting-death-99b071e0.m4a",
-   "chunk": "sting-chunk-a4f2ffab.m4a",
-   "pickup": "sting-pickup-6ed91318.m4a"
+   "death": "sting-death-8ee9ff5d.m4a",
+   "chunk": "sting-chunk-1f540734.m4a",
+   "pickup": "sting-pickup-5ba19a30.m4a"
   }
  },
  "pine-hollow-piano": {
@@ -4236,7 +4236,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "gain": 0.5
    },
    "underwater": {
-    "file": "bed-underwater-3-cbe2810d.m4a",
+    "file": "bed-underwater-3-e24ff222.m4a",
     "loopStart": 9,
     "loopEnd": 21,
     "duration": 22.016,
@@ -4245,7 +4245,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
   },
   "hums": {
    "pickup": {
-    "file": "hum-pickup-3-7b7db58f.m4a",
+    "file": "hum-pickup-3-7fc62eae.m4a",
     "loopStart": 3.25,
     "loopEnd": 9.25,
     "duration": 10.2613,
@@ -4255,263 +4255,263 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
   "oneshots": {
    "crossbowFire": {
     "files": [
-     "crossbowFire-3-18ccf9f0.m4a"
+     "crossbowFire-3-ea28c0a1.m4a"
     ],
     "gain": 1
    },
    "dryFire": {
     "files": [
-     "dryFire-2-88071d1d.m4a",
-     "dryFire-3-173415cb.m4a"
+     "dryFire-2-fdc93561.m4a",
+     "dryFire-3-da2f2db5.m4a"
     ],
     "gain": 1
    },
    "boltImpact-wood": {
     "files": [
-     "boltImpact-wood-2-8e9e99ee.m4a",
-     "boltImpact-wood-3-673a0ef6.m4a"
+     "boltImpact-wood-2-6d2a1507.m4a",
+     "boltImpact-wood-3-6a4b8f28.m4a"
     ],
     "gain": 1
    },
    "boltImpact-ground": {
     "files": [
-     "boltImpact-ground-2-5e8a3076.m4a",
-     "boltImpact-ground-1-f81140e6.m4a"
+     "boltImpact-ground-2-129e0855.m4a",
+     "boltImpact-ground-1-d23a3448.m4a"
     ],
     "gain": 1
    },
    "boltImpact-flesh": {
     "files": [
-     "boltImpact-flesh-2-13ed7f2c.m4a",
-     "boltImpact-flesh-3-62e25aa5.m4a"
+     "boltImpact-flesh-2-f674bf18.m4a",
+     "boltImpact-flesh-3-2338408b.m4a"
     ],
     "gain": 1
    },
    "swordSwing": {
     "files": [
-     "swordSwing-1-6303fc5d.m4a"
+     "swordSwing-1-22b97070.m4a"
     ],
     "gain": 1
    },
    "swordHeavy": {
     "files": [
-     "swordHeavy-2-1debcc8f.m4a",
-     "swordHeavy-3-1bed510f.m4a"
+     "swordHeavy-2-f396e760.m4a",
+     "swordHeavy-3-3138e14f.m4a"
     ],
     "gain": 1
    },
    "swordHit-flesh": {
     "files": [
-     "swordHit-flesh-1-07225bb8.m4a",
-     "swordHit-flesh-2-efbf5fd7.m4a"
+     "swordHit-flesh-1-bb37e93c.m4a",
+     "swordHit-flesh-2-feb9c7ca.m4a"
     ],
     "gain": 1
    },
    "swordHit-wood": {
     "files": [
-     "swordHit-wood-3-6381cc6b.m4a",
-     "swordHit-wood-2-800b6fe9.m4a"
+     "swordHit-wood-3-22e728e1.m4a",
+     "swordHit-wood-2-e1d4dc58.m4a"
     ],
     "gain": 1
    },
    "dodge": {
     "files": [
-     "dodge-2-13887dd8.m4a",
-     "dodge-3-453516f6.m4a"
+     "dodge-2-f01c46d0.m4a",
+     "dodge-3-b4decd39.m4a"
     ],
     "gain": 1
    },
    "lunge": {
     "files": [
-     "lunge-3-be45ba7a.m4a"
+     "lunge-3-8d441293.m4a"
     ],
     "gain": 1
    },
    "reload": {
     "files": [
-     "reload-3-d81ab6e2.m4a",
-     "reload-1-d3e6d32a.m4a"
+     "reload-3-e088b909.m4a",
+     "reload-1-3b1ae590.m4a"
     ],
     "gain": 1
    },
    "rifleFire": {
     "files": [
-     "rifleFire-3-8ed56841.m4a",
-     "rifleFire-2-a850ad83.m4a"
+     "rifleFire-3-0504f7cc.m4a",
+     "rifleFire-2-a0343e34.m4a"
     ],
     "gain": 1
    },
    "rifleReload": {
     "files": [
-     "rifleReload-2-1ad54372.m4a",
-     "rifleReload-3-20027167.m4a"
+     "rifleReload-2-e8696bed.m4a",
+     "rifleReload-3-bf8f116a.m4a"
     ],
     "gain": 1
    },
    "weaponSwap": {
     "files": [
-     "weaponSwap-3-fbe81018.m4a"
+     "weaponSwap-3-de475e16.m4a"
     ],
     "gain": 1
    },
    "footstep-litter": {
     "files": [
-     "footstep-litter-1-fe9cd8d9.m4a",
-     "footstep-litter-3-09ceed7a.m4a"
+     "footstep-litter-1-e4432f8f.m4a",
+     "footstep-litter-3-c0eef9be.m4a"
     ],
     "gain": 1
    },
    "footstep-planks": {
     "files": [
-     "footstep-planks-3-d919e436.m4a",
-     "footstep-planks-2-ebb5a80c.m4a"
+     "footstep-planks-3-07743ea3.m4a",
+     "footstep-planks-2-b3d3f757.m4a"
     ],
     "gain": 1
    },
    "footstep-sand": {
     "files": [
-     "footstep-sand-2-4b40473a.m4a",
-     "footstep-sand-1-09a40a2f.m4a"
+     "footstep-sand-2-5551248f.m4a",
+     "footstep-sand-1-20fe21fe.m4a"
     ],
     "gain": 1
    },
    "land": {
     "files": [
-     "land-2-773487f2.m4a",
-     "land-3-eebff605.m4a"
+     "land-2-33a6e4b7.m4a",
+     "land-3-6b542c4e.m4a"
     ],
     "gain": 1
    },
    "land-hard": {
     "files": [
-     "land-hard-3-5aed2a6b.m4a",
-     "land-hard-1-2ce640be.m4a"
+     "land-hard-3-ea1ae9ba.m4a",
+     "land-hard-1-33dd612d.m4a"
     ],
     "gain": 1
    },
    "splash": {
     "files": [
-     "splash-3-9509efbe.m4a",
-     "splash-2-03ab63ae.m4a"
+     "splash-3-c8eb6dc8.m4a",
+     "splash-2-42205790.m4a"
     ],
     "gain": 1
    },
    "wadeStep": {
     "files": [
-     "wadeStep-1-83e1423c.m4a",
-     "wadeStep-2-402e850a.m4a"
+     "wadeStep-1-2743035d.m4a",
+     "wadeStep-2-06aa98c5.m4a"
     ],
     "gain": 1
    },
    "swimStroke": {
     "files": [
-     "swimStroke-2-9e35721b.m4a"
+     "swimStroke-2-21f83d52.m4a"
     ],
     "gain": 1
    },
    "waterExit": {
     "files": [
-     "waterExit-1-d85f0e47.m4a"
+     "waterExit-1-990a61e9.m4a"
     ],
     "gain": 1
    },
    "dive": {
     "files": [
-     "dive-1-4b978224.m4a",
-     "dive-3-e74abc72.m4a"
+     "dive-1-970397fa.m4a",
+     "dive-3-3ffe8999.m4a"
     ],
     "gain": 1
    },
    "surface": {
     "files": [
-     "surface-3-85550528.m4a",
-     "surface-2-e5ac4e8a.m4a"
+     "surface-3-7fff73d1.m4a",
+     "surface-2-11564c13.m4a"
     ],
     "gain": 1
    },
    "hitMarker": {
     "files": [
-     "hitMarker-1-46ef1236.m4a"
+     "hitMarker-1-5c1e66a1.m4a"
     ],
     "gain": 1
    },
    "kill": {
     "files": [
-     "kill-3-5f7ea225.m4a",
-     "kill-2-5e4acc1b.m4a"
+     "kill-3-f99b2126.m4a",
+     "kill-2-f4fb9a77.m4a"
     ],
     "gain": 1
    },
    "deer_call": {
     "files": [
-     "deer_call-3-1d601bb4.m4a",
-     "deer_call-1-7cd35867.m4a"
+     "deer_call-3-c8a420b0.m4a",
+     "deer_call-1-b68edf22.m4a"
     ],
     "gain": 1
    },
    "boar_grunt": {
     "files": [
-     "boar_grunt-3-4e4a9bec.m4a"
+     "boar_grunt-3-a64bbfdc.m4a"
     ],
     "gain": 1
    },
    "hoofsteps": {
     "files": [
-     "hoofsteps-3-f1c11f8f.m4a",
-     "hoofsteps-1-9580d36a.m4a"
+     "hoofsteps-3-877c081a.m4a",
+     "hoofsteps-1-04492a4d.m4a"
     ],
     "gain": 1
    },
    "boar_squeal": {
     "files": [
-     "boar_squeal-1-804df37c.m4a"
+     "boar_squeal-1-92d61176.m4a"
     ],
     "gain": 1
    },
    "elk_bugle": {
     "files": [
-     "elk_bugle-3-f6e8030e.m4a",
-     "elk_bugle-2-0e80875f.m4a"
+     "elk_bugle-3-f9685682.m4a",
+     "elk_bugle-2-2ca5339a.m4a"
     ],
     "gain": 1
    },
    "bear_growl": {
     "files": [
-     "bear_growl-3-f91d7740.m4a"
+     "bear_growl-3-cc7886e0.m4a"
     ],
     "gain": 1
    },
    "bear_roar": {
     "files": [
-     "bear_roar-3-9f1e177e.m4a",
-     "bear_roar-2-29e3055e.m4a"
+     "bear_roar-3-73630c1c.m4a",
+     "bear_roar-2-1cef350c.m4a"
     ],
     "gain": 1
    },
    "bear_hurt": {
     "files": [
-     "bear_hurt-1-43b45d1e.m4a",
-     "bear_hurt-3-3aea6172.m4a"
+     "bear_hurt-1-f85f52c2.m4a",
+     "bear_hurt-3-55a83ba0.m4a"
     ],
     "gain": 1
    },
    "footstep-mud": {
     "files": [
-     "footstep-mud-2-99e4a10d.m4a",
-     "footstep-mud-1-1dd22736.m4a"
+     "footstep-mud-2-7d83fc7c.m4a",
+     "footstep-mud-1-b66bbd49.m4a"
     ],
     "gain": 1
    },
    "footstep-rock": {
     "files": [
-     "footstep-rock-2-58c2cc26.m4a",
-     "footstep-rock-3-98e0e874.m4a"
+     "footstep-rock-2-f5124e07.m4a",
+     "footstep-rock-3-8a0054f7.m4a"
     ],
     "gain": 1
    },
    "footstep-wet": {
     "files": [
-     "footstep-wet-1-58d313a2.m4a"
+     "footstep-wet-1-9495bb0e.m4a"
     ],
     "gain": 1
    }

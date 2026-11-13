@@ -22,7 +22,7 @@
       "duration": 58.0693
     },
     "title": {
-      "full": "title-3d1f713a.m4a",
+      "full": "title-7ce82663.m4a",
       "bpm": 75.666,
       "beatsPerBar": 4,
       "loopStart": 27.3995,
@@ -31,9 +31,9 @@
     }
   },
   "stings": {
-    "death": "sting-death-99b071e0.m4a",
-    "chunk": "sting-chunk-a4f2ffab.m4a",
-    "pickup": "sting-pickup-6ed91318.m4a"
+    "death": "sting-death-8ee9ff5d.m4a",
+    "chunk": "sting-chunk-1f540734.m4a",
+    "pickup": "sting-pickup-5ba19a30.m4a"
   },
   "provenance": [
     {
@@ -93,7 +93,7 @@
       "limiter_ceiling_db": -2.0
     },
     {
-      "file": "title-3d1f713a.m4a",
+      "file": "title-7ce82663.m4a",
       "model": "MiniMaxAI/MiniMax-Music3",
       "diffusers": "0.40.0",
       "prompt": "Genre: video game main title theme, cinematic piano. BPM: 92. Key: D major. Instrumental only, no vocals, no choir. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable grand-piano melody stated simply, then again fuller with warm strings, a cello counter-line, upright bass and a steady soft drum groove; it builds to a heartfelt climax and ends on a resolved final chord. Production: rich close piano, warm hall reverb.",
@@ -106,7 +106,7 @@
       "limiter_ceiling_db": -2.0
     },
     {
-      "file": "sting-death-99b071e0.m4a",
+      "file": "sting-death-8ee9ff5d.m4a",
       "model": "MiniMaxAI/MiniMax-Music3",
       "diffusers": "0.40.0",
       "prompt": "Genre: video game main title theme, cinematic piano. BPM: 92. Key: D major. Instrumental only, no vocals, no choir. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable grand-piano melody stated simply, then again fuller with warm strings, a cello counter-line, upright bass and a steady soft drum groove; it builds to a heartfelt climax and ends on a resolved final chord. Production: rich close piano, warm hall reverb.",
@@ -120,7 +120,7 @@
       "gain_db": 10.9
     },
     {
-      "file": "sting-chunk-a4f2ffab.m4a",
+      "file": "sting-chunk-1f540734.m4a",
       "model": "MiniMaxAI/MiniMax-Music3",
       "diffusers": "0.40.0",
       "prompt": "Genre: video game main title theme, cinematic piano. BPM: 92. Key: D major. Instrumental only, no vocals, no choir. The main theme of Wildshard, a world that arrives one chunk at a time - wonder first, adventure second, a little melancholy underneath. Arrangement: a memorable, hummable grand-piano melody stated simply, then again fuller with warm strings, a cello counter-line, upright bass and a steady soft drum groove; it builds to a heartfelt climax and ends on a resolved final chord. Production: rich close piano, warm hall reverb.",
@@ -134,7 +134,7 @@
       "gain_db": 3.7
     },
     {
-      "file": "sting-pickup-6ed91318.m4a",
+      "file": "sting-pickup-5ba19a30.m4a",
       "model": "MiniMaxAI/MiniMax-Music3",
       "diffusers": "0.40.0",
       "prompt": "Genre: video game soundtrack, ambient piano with a gentle groove. BPM: 88. Key: D major. Instrumental only, no vocals, no choir. Setting: Pine Hollow, a misty pine forest at dawn in an open-world adventure game - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a sparse, singable grand-piano melody with long rests, over soft string pads and a warm upright bass; a light, steady groove of brushed drums, soft kick and shaker runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: close-miked felt piano, natural wooden-room reverb.",
