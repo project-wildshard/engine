@@ -114,7 +114,7 @@ test('a seat held on the road comes back to the road when its player dials again
   expect(bench.crashes).toEqual([]);
 });
 
-test('without WORLD_CROSSING a cell stays lone: feet past its edge cross nowhere', { timeout: 120_000 }, async () => {
+test('with WORLD_CROSSING=off a cell stays lone: feet past its edge cross nowhere', { timeout: 120_000 }, async () => {
   bench = await roomBench({ cells: CELLS, workers: 2 });
   const a = bot(bench.url, 'bench', 'device:a', 'A');
   expect(await a.arrived()).toBe(true);

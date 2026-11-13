@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { workerTable, worldSettings } from '../src/server/host/dedicated/workerTable';
+import { workerTable, worldCrossing, worldSettings } from '../src/server/host/dedicated/workerTable';
 
 // J182, J185: which worker runs which cell, fixed at startup, on a worker count the bench sets.
 const REST = ['_template', 'blender-template', 'ink-cel-valley', 'pastel-plain', ...Array.from({ length: 16 }, (_unused, index) => `open-plot-${String(index)}`)];
@@ -44,4 +44,12 @@ test('each channel starts on its own count and cap, and the bench\'s answer is o
   expect(worldSettings('staging', {})).toEqual({ workers: 2, seats: 16 });
   expect(worldSettings('production', { WORLD_WORKERS: '8', WORLD_SEATS: '50' })).toEqual({ workers: 8, seats: 50 });
   expect(() => worldSettings('preview', {})).toThrow(/No game server/u);
+});
+
+// GRID-CROSSING GC35 (J322): crossing is on by default; only an explicit off keeps a server's cells lone.
+test('a world with no WORLD_CROSSING setting crosses; only off turns it off', () => {
+  expect(worldCrossing(undefined)).toBe(true);
+  expect(worldCrossing('worker')).toBe(true);
+  expect(worldCrossing('off')).toBe(false);
+  expect(() => worldCrossing('on')).toThrow(/only worker/u);
 });

@@ -16,6 +16,16 @@ export function worldSettings(channel: string, env: Readonly<Record<string, stri
 }
 
 /**
+ * GC35 (J322, Jake 11-13: "World crossing should be on by default. There should never be any walls"): each worker hosts the road between
+ * its cells unless `WORLD_CROSSING=off` (a bench's lone cells). Unset, or blank, is `worker`.
+ */
+export function worldCrossing(value: string | undefined): boolean {
+  if (value === undefined || value === 'worker') return true;
+  if (value === 'off') return false;
+  throw new Error(`WORLD_CROSSING=${value}: only worker (the default) or off`);
+}
+
+/**
  * The table for the cells this server opens: one row a worker, at most `workers` rows. Only an open cell takes a row, so one cell is one
  * worker. Named rows go first; the rest are shared, and if the count runs out the last row takes whatever is left.
  */
