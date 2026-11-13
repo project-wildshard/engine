@@ -20,6 +20,7 @@ ETC=/etc/wildshard HOME_DIR=/var/lib/wildshard SYSTEMD=/etc/systemd/system
 PG_VERSION=16 NODE=/usr/bin/node NODE_MAJOR=24 PNPM=pnpm@10.34.9
 KEY_DIR=/home/raynos/wildshard-e7 KEY_FILE=/home/raynos/wildshard-e7/release-public-key.hex
 COOK_ENV=/etc/wildshard/cook.env COOK_HOME=/var/lib/wildshard-cook COOK_SRC=/opt/wildshard/engine COOK_LIB=/usr/local/lib/wildshard-cook
+COOK_GROUP=wildshard-cook
 # 8790 and 8791 are the game's loopback ports; the cook worker's own default was 8791 too.
 COOK_PORT=8792
 ENGINE_GIT=https://github.com/project-wildshard/engine.git
@@ -454,10 +455,24 @@ make_cook_source() {
   printf '%s %s\n' "$COOK_REF" "$(cook_commit)" > "$COOK_SRC/.wildshard-installed"
   chmod -R go-w "$COOK_SRC"
 }
+# MMO-SERVER MS2.4b: root clones under the box's umask 027, so the checkout came out 750 root:root and the cook, its own user,
+# could not enter its WorkingDirectory (200/CHDIR). Root keeps owning it; the cook's group reads and traverses, and neither the
+# group nor anyone else writes. The worker's own hash of cook.env stays root's. Symlinks (pnpm's) carry no mode of their own.
+cook_unreadable() {
+  find "$COOK_SRC" -name .wildshard-env -prune -o ! -type l \( ! -group "$COOK_GROUP" -o ! -perm -g+r -o -perm -g+w -o -perm -o+w \
+    -o \( -type d ! -perm -g+x \) \) -print -quit
+}
+have_cook_read() { [ -d "$COOK_SRC" ] && [ -z "$(cook_unreadable)" ]; }
+make_cook_read() {
+  find "$COOK_SRC" -name .wildshard-env -prune -o -exec chgrp -h "$COOK_GROUP" {} + || return 1
+  find "$COOK_SRC" -name .wildshard-env -prune -o ! -type l -exec chmod g+rX,g-w,o-w {} +
+}
 COOK_SOURCE_CHANGED=0
 if [ "$COOK_READY" = 1 ]; then
   if [ "$CHECK" = 0 ] && ! have_cook_source; then COOK_SOURCE_CHANGED=1; fi
   step "cook source $COOK_SRC at $COOK_REF" have_cook_source make_cook_source
+  if [ "$CHECK" = 0 ] && ! have_cook_read; then COOK_SOURCE_CHANGED=1; fi
+  step "cook source readable by $COOK_GROUP" have_cook_read make_cook_read
 fi
 # What the running worker last read of cook.env, as a hash in its root-owned checkout: a changed file restarts it.
 cook_env_hash() { sha256sum < "$COOK_ENV" | cut -d' ' -f1; }
@@ -475,6 +490,9 @@ User=wildshard-cook
 Group=wildshard-cook
 WorkingDirectory=$COOK_SRC
 EnvironmentFile=$COOK_ENV
+# MS2.4b: the checkout is root's and the worker runs git in it as wildshard-cook, which git refuses ("dubious ownership")
+# unless the path is a safe.directory. Set here, not in a gitconfig the worker's home would have to hold.
+Environment=GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=$COOK_SRC
 Environment=COOK_PORT=$COOK_PORT
 Environment=COOK_HOST=127.0.0.1
 Environment=COOK_SCRATCH=$COOK_HOME/scratch

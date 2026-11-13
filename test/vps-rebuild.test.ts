@@ -97,6 +97,35 @@ test('the cook worker keeps off the game ports and runs each job without a netwo
   expect(readFileSync('scripts/cook-worker.mjs', 'utf8')).toContain('env.COOK_PORT ?? 8792');
 });
 
+test('MS2.4b: the cook reads and enters its root-owned checkout, and git trusts it', () => {
+  const unit = source.slice(source.indexOf('wildshard-cook.service" 644'), source.indexOf('WantedBy=multi-user.target', source.indexOf('wildshard-cook.service" 644')));
+  expect(unit).toContain('Environment=GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=$COOK_SRC');
+  expect(source).toMatch(/^COOK_GROUP=wildshard-cook$/mu);
+  expect(source).toContain('step "cook source readable by $COOK_GROUP" have_cook_read make_cook_read');
+  // a group this user is in but files here don't start with: the check sees the wrong group, the repair sets it
+  const mine = spawnSync('id', ['-Gn'], { encoding: 'utf8' }).stdout.trim().split(/\s+/u);
+  const start = spawnSync('stat', process.platform === 'darwin' ? ['-f', '%Sg', '.'] : ['-c', '%G', '.'], { encoding: 'utf8' }).stdout.trim();
+  const group = mine.find(name => name !== start) ?? mine[0] ?? '';
+  const root = scratch(), src = join(root, 'engine');
+  // the umask-027 shape: directories 750, files 640, one 600 and one group-writable, and the worker's hash 600
+  mkdirSync(join(src, 'scripts/deep'), { recursive: true, mode: 0o750 });
+  writeFileSync(join(src, 'scripts/cook-worker.mjs'), 'x', { mode: 0o640 });
+  writeFileSync(join(src, 'scripts/deep/private.json'), '{}', { mode: 0o600 });
+  writeFileSync(join(src, 'scripts/deep/shared.json'), '{}', { mode: 0o664 });
+  writeFileSync(join(src, '.wildshard-env'), 'hash', { mode: 0o600 });
+  spawnSync('chmod', ['750', src, join(src, 'scripts'), join(src, 'scripts/deep')]);
+  const run = (name: string) => spawnSync('bash', ['-c', `COOK_SRC="$1" COOK_GROUP="$2"\n${definition('cook_unreadable')}\n${definition('have_cook_read')}\n${definition('make_cook_read')}\n${name}`, 'rebuild', src, group], { encoding: 'utf8' });
+  expect(run('have_cook_read').status).toBe(1);
+  expect(run('make_cook_read').status).toBe(0);
+  expect(run('have_cook_read').status).toBe(0);
+  const mode = (path: string) => spawnSync('stat', process.platform === 'darwin' ? ['-f', '%Lp %Sg', path] : ['-c', '%a %G', path], { encoding: 'utf8' }).stdout.trim();
+  expect(mode(src)).toBe(`750 ${group}`);
+  expect(mode(join(src, 'scripts/deep'))).toBe(`750 ${group}`);
+  expect(mode(join(src, 'scripts/deep/private.json'))).toBe(`640 ${group}`);
+  expect(mode(join(src, 'scripts/deep/shared.json'))).toBe(`644 ${group}`);
+  expect(mode(join(src, '.wildshard-env'))).toBe(`600 ${start}`);
+});
+
 test('Caddy is never started by the rebuild, and only the package file or its own placeholder is replaced', () => {
   const root = scratch(), caddyfile = join(root, 'Caddyfile'), shipped = ':80 {\n\troot * /usr/share/caddy\n\tfile_server\n}\n';
   const md5 = createHash('md5').update(shipped).digest('hex');
