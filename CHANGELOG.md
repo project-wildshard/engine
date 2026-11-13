@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.14 (2026-11-12)
+
+- Online, other players look like players: their body, held item, moves, attacks, health bars, Name and a dot on your minimap.
+- The loading bar's percentage follows the real work, a reload takes you back to the main menu, and a slow link no longer stalls START.
+- Shard select puts you in that shard's spot in the world grid, now with the templates in the middle; Infinite Wildshard is Developer only.
+- On phones, chat docks above the keyboard, and a missing game file is never cached, so it loads once it is there.
+- Heavy attacks land as heavy, and more of the game's rules run on the online server, like status effects, feats and quest secrets.
+
 ## v0.1.13 (2026-11-12)
 
 - The Template has its new Mossgate look, and Pine Hollow is on its second version.
