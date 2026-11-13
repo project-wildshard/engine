@@ -10,3 +10,4 @@
   next save); `musicStyleRow.ts` goes. `Music.ts` keeps the synth only as the fallback when a recording fails.
 - A score set's decoded slots were tagged genre `'folk'` (lift-era); they are tagged `'score'` now so they still
   never match the engine style's bank, the behaviour piano players had.
+- Commit 2: bootAudio.ts and the cook's pack list read ENGINE_MUSIC_STYLE; the per-style lists go.

@@ -8,17 +8,20 @@
 import type { AudioData } from '@wildshard/format/audio';
 import { musicManifests, publicBytes, sfxManifests } from '../boot/tables';
 
-export const MUSIC_STYLES = ['piano', 'orchestral', 'folk', 'synth'] as const;
-export type MusicStyle = (typeof MUSIC_STYLES)[number];
+/** J304 (AUDIO AU16): the engine's one recorded music style. There is no choice: the synth score plays only where a
+ *  recording is missing or fails to decode. */
+export const ENGINE_MUSIC_STYLE = 'piano';
+export type MusicStyle = typeof ENGINE_MUSIC_STYLE;
+/** A level score set's decoded slots carry this tag, never the engine style's: they come from the set's own folder. */
+export const SCORE_GENRE = 'score';
 export const SFX_SETS = ['best'] as const;
 export type SfxSet = 'best' | 'synth';
-/** A new player's choices (Settings): the files the cook puts in DOWNLOAD. */
-export const DEFAULT_MUSIC_STYLE: MusicStyle = 'piano';
+/** A new player's sound-effect set: the files the cook puts in DOWNLOAD. */
 export const DEFAULT_SFX_SET: SfxSet = 'best';
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-// ---- inventories (the generated manifests, the selected style and set first) ----
+// ---- inventories (the generated manifests: the one music style, the selected sound-effect set first) ----
 
 const AUDIO_RE = /\.(m4a|mp3|ogg|opus|wav|webm|flac)$/;
 /** every audio file name a manifest mentions, wherever it sits (slots, stings, beds, hums, one-shot variants) */
@@ -37,7 +40,6 @@ function ordered<T extends string>(all: readonly T[], selected: string, manifest
   const have = all.filter((v) => Object.hasOwn(manifests, v));
   return [...have.filter((v) => v === selected), ...have.filter((v) => v !== selected)];
 }
-export const musicStylesFor = (style: MusicStyle): string[] => ordered(MUSIC_STYLES, style, musicManifests());
 export const sfxSetsFor = (set: SfxSet): string[] => ordered(SFX_SETS, set, sfxManifests());
 const filesOf = (dir: string, manifest: unknown): string[] => manifestFiles(manifest).map((f) => `${dir}${f}`).filter((p) => p in publicBytes()); // a file the build does not ship is never asked for
 export const musicDir = (style: string): string => `/assets/music/${style}/`;
@@ -49,16 +51,16 @@ function withoutSlots(m: unknown, drop: readonly string[]): unknown {
   if (typeof slots !== 'object' || slots === null || Array.isArray(slots)) return m;
   return { ...m, slots: Object.fromEntries(Object.entries(slots).filter(([k]) => !drop.includes(k))) };
 }
-/** Shared style/set files, followed by the level profile's own sets. */
+/** The engine style's and the shared sets' files, followed by the level profile's own sets. */
 export interface AudioFilePolicy {
   omitSlots?: readonly string[];
   musicSets?: readonly string[];
   sfxSets?: readonly string[];
   omitSfx?: Readonly<Record<string, readonly string[]>>;
 }
-export function audioFilesFor(style: MusicStyle, set: SfxSet, policy: AudioFilePolicy = {}): { music: string[]; sfx: string[] } {
+export function audioFilesFor(set: SfxSet, policy: AudioFilePolicy = {}): { music: string[]; sfx: string[] } {
   return {
-    music: [...musicStylesFor(style).flatMap((s) => filesOf(musicDir(s), withoutSlots(musicManifests()[s], policy.omitSlots ?? []))), ...(policy.musicSets ?? []).flatMap((s) => filesOf(musicDir(s), musicManifests()[s]))],
+    music: [...filesOf(musicDir(ENGINE_MUSIC_STYLE), withoutSlots(musicManifests()[ENGINE_MUSIC_STYLE], policy.omitSlots ?? [])), ...(policy.musicSets ?? []).flatMap((s) => filesOf(musicDir(s), musicManifests()[s]))],
     sfx: [...sfxSetsFor(set).flatMap((s) => filesOf(sfxDir(s), sfxManifests()[s]).filter((url) => !(policy.omitSfx?.[s] ?? []).includes(url.slice(sfxDir(s).length)))), ...(policy.sfxSets ?? []).flatMap((s) => filesOf(sfxDir(s), sfxManifests()[s]))],
   };
 }
@@ -245,32 +247,32 @@ export interface AudioSelection {
   titleFiles: (style: MusicStyle) => readonly string[];
   controlFiles: (style: MusicStyle) => readonly string[];
 }
-/** The selection of a level's admitted audio rows under the player's music style and sound-effect set (`style` and
- *  `set`, read on each call, as Settings is; `bootFiles` takes its style as an argument). `extraFiles` is a trusted sprite catalogue's own one-shot list; a declared bank catalogue supplies its
+/** The selection of a level's admitted audio rows under the engine's one music style and the player's sound-effect set
+ *  (`set`, read on each call, as Settings is). `extraFiles` is a trusted sprite catalogue's own one-shot list; a declared bank catalogue supplies its
  *  own. Throws when the rows declare no catalogue (createCatalogueAudio's refusal). */
-export function audioSelection(data: AudioData, style: () => MusicStyle, set: () => SfxSet, extraFiles?: () => readonly string[]): AudioSelection {
+export function audioSelection(data: AudioData, set: () => SfxSet, extraFiles?: () => readonly string[]): AudioSelection {
   const music = data.music, samples = data.samples;
   if (music?.setCatalogue !== undefined) {
     const policy = music.setCatalogue, source = music.source;
     if (samples === undefined || source === undefined || source === null) throw new Error('Missing score set catalogue');
-    return scoreSetSelection(music.bootSlots, policy, source, samples, style, set);
+    return scoreSetSelection(music.bootSlots, policy, source, samples, set);
   }
   const bankPolicy = data.bank?.catalogue, extras = extraFiles ?? (bankPolicy === undefined ? undefined : () => cueShotFiles(bankPolicy.set));
   const policy = samples?.catalogue;
   if (samples === undefined || music === undefined || policy === undefined) throw new Error('Missing declared audio catalogue');
   const levels = { loopGains: samples.loopGains };
   const ownMusic = (): string[] => {
-    const genre = style(), key = `${samples.set}-${genre}`;
-    return policy.ownMusic && genre !== 'synth' && Object.hasOwn(musicManifests(), key) ? [key] : [];
+    const key = `${samples.set}-${ENGINE_MUSIC_STYLE}`;
+    return policy.ownMusic && Object.hasOwn(musicManifests(), key) ? [key] : [];
   };
   const ownSfx = (): string[] => Object.hasOwn(sfxManifests(), samples.set) ? [samples.set] : [];
   const selectedSfx = (): string[] => [...sfxFiles(set(), samples.bed, levels),
     ...(policy.overlaySamples && set() !== 'synth' ? sfxFiles(samples.set, samples.bed, levels) : []),
     ...(set() === 'synth' ? [] : extras?.() ?? [])];
   return {
-    files: () => audioFilesFor(style(), set(), { omitSlots: policy.inventoryOmitSlots, musicSets: ownMusic(), sfxSets: ownSfx() }),
+    files: () => audioFilesFor(set(), { omitSlots: policy.inventoryOmitSlots, musicSets: ownMusic(), sfxSets: ownSfx() }),
     ...(policy.priorityOwn ? { priorityFiles: () => {
-      const files = audioFilesFor(style(), set(), { musicSets: ownMusic(), sfxSets: ownSfx() }), dirs = [...ownMusic().map(musicDir), ...ownSfx().map(sfxDir)];
+      const files = audioFilesFor(set(), { musicSets: ownMusic(), sfxSets: ownSfx() }), dirs = [...ownMusic().map(musicDir), ...ownSfx().map(sfxDir)];
       return [...files.music, ...files.sfx].filter(url => dirs.some(dir => url.startsWith(dir)));
     } } : {}),
     bootFiles: genre => [...styleFiles(genre, music.bootSlots), ...selectedSfx()],
@@ -283,24 +285,22 @@ export function audioSelection(data: AudioData, style: () => MusicStyle, set: ()
   };
 }
 type ScorePolicy = NonNullable<NonNullable<AudioData['music']>['setCatalogue']>;
-function scoreSetSelection(bootSlots: readonly string[], policy: ScorePolicy, set: ScoreSet, samples: NonNullable<AudioData['samples']>, style: () => MusicStyle, sfxSet: () => SfxSet): AudioSelection {
+function scoreSetSelection(bootSlots: readonly string[], policy: ScorePolicy, set: ScoreSet, samples: NonNullable<AudioData['samples']>, sfxSet: () => SfxSet): AudioSelection {
   const slots = bootSlots.filter(slot => slot !== 'title');
   const titleFiles = (genre: MusicStyle): string[] => {
     if (policy.inventory === 'base') return styleFiles(genre, ['title']);
     const title = musicManifest(genre)?.slots['title']; return title ? [`/assets/music/${genre}/${title.calm}`].filter(shipped) : [];
   };
-  const scoreSlots = (genre: MusicStyle): readonly string[] => genre === 'synth' && !policy.bootSynth ? [] : slots;
-  const bootScore = (genre: MusicStyle): string[] => genre === 'synth' && !policy.bootSynth ? [] : scoreFiles(set, slots);
   const useCues = (): boolean => !policy.cueOverlay || sfxSet() !== 'synth';
   return {
-    files: () => { const base = policy.inventory === 'base' ? audioFilesFor(style(), sfxSet()) : { music: MUSIC_STYLES.flatMap(titleFiles), sfx: [] }; return { music: [...base.music, ...scoreFiles(set)], sfx: [...base.sfx, ...cueFiles(samples.set)] }; },
+    files: () => { const base = policy.inventory === 'base' ? audioFilesFor(sfxSet()) : { music: titleFiles(ENGINE_MUSIC_STYLE), sfx: [] }; return { music: [...base.music, ...scoreFiles(set)], sfx: [...base.sfx, ...cueFiles(samples.set)] }; },
     ...(policy.priority ? { priorityFiles: () => [...scoreFiles(set), ...cueFiles(samples.set)] } : {}),
     bootFiles: genre => [...titleFiles(genre), ...(policy.baseSamples ? sfxFiles(sfxSet(), samples.bed) : []),
-      ...(policy.cueOverlay ? (useCues() ? cueFiles(samples.set) : []) : bootScore(genre)),
-      ...(policy.cueOverlay ? bootScore(genre) : cueFiles(samples.set))],
+      ...(policy.cueOverlay ? (useCues() ? cueFiles(samples.set) : []) : scoreFiles(set, slots)),
+      ...(policy.cueOverlay ? scoreFiles(set, slots) : cueFiles(samples.set))],
     titleFiles,
     controlFiles: genre => [...(policy.inventory === 'base' ? styleFiles(genre, ['title'], false) : titleFiles(genre)),
-      ...scoreFiles(set, scoreSlots(genre), false), ...(policy.baseSamples ? sfxBedFiles(sfxSet(), samples.bed) : [])],
+      ...scoreFiles(set, slots, false), ...(policy.baseSamples ? sfxBedFiles(sfxSet(), samples.bed) : [])],
   };
 }
 
@@ -308,9 +308,9 @@ function scoreSetSelection(bootSlots: readonly string[], policy: ScorePolicy, se
 export function selectedBootAudio(inventory: { music: readonly string[]; sfx: readonly string[] }, selected: ReadonlySet<string>): { music: string[]; sfx: string[] } {
   return { music: inventory.music.filter(url => selected.has(url)), sfx: inventory.sfx.filter(url => selected.has(url)) };
 }
-/** AU1: what DOWNLOAD holds for a level's audio rows: a new player's boot set (the default style and set), every file
- *  LOAD reads before control. The cook lists these in the shard's spawn manifests. */
+/** AU1: what DOWNLOAD holds for a level's audio rows: a new player's boot set (the engine style and the default set), every
+ *  file LOAD reads before control. The cook lists these in the shard's spawn manifests. */
 export function defaultBootAudio(data: AudioData): string[] {
-  const selection = audioSelection(data, () => DEFAULT_MUSIC_STYLE, () => DEFAULT_SFX_SET), files = selectedBootAudio(selection.files(), new Set(selection.bootFiles(DEFAULT_MUSIC_STYLE)));
+  const selection = audioSelection(data, () => DEFAULT_SFX_SET), files = selectedBootAudio(selection.files(), new Set(selection.bootFiles(ENGINE_MUSIC_STYLE)));
   return [...files.music, ...files.sfx];
 }

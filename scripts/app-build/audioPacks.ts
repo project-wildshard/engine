@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readOutputDownloadIndex } from '@wildshard/format/outputDownload';
 import { parseAudioData } from '@wildshard/format/audio';
 import { createCatalogueAudio } from '../../src/client/engine/audio/levelAudio';
-import { MUSIC_STYLES } from '@wildshard/engine/audio/bootAudio';
+import { ENGINE_MUSIC_STYLE } from '@wildshard/engine/audio/bootAudio';
 
 /** One built product's audio declaration, read from `out/` with its section hash checked. */
 function productAudioData(root: string, slug: string): ReturnType<typeof parseAudioData> | undefined {
@@ -35,11 +35,7 @@ export async function lateAudioGroups(root: string, slug: string): Promise<Reado
   const data = productAudioData(root, slug);
   if (data?.music === undefined || data.samples?.catalogue === undefined && data.music.setCatalogue === undefined) return {};
   const profile = await createCatalogueAudio(data);
-  const groups: Record<string, readonly string[]> = {};
-  for (const style of MUSIC_STYLES) {
-    const boot = profile.bootFiles(style), control = new Set(profile.controlFiles?.(style) ?? boot);
-    const files = [...new Set(boot)].filter(file => !control.has(file));
-    if (files.length > 0) groups[`${slug}-audio-${style}`] = files;
-  }
-  return groups;
+  const style = ENGINE_MUSIC_STYLE, boot = profile.bootFiles(style), control = new Set(profile.controlFiles?.(style) ?? boot);
+  const files = [...new Set(boot)].filter(file => !control.has(file));
+  return files.length > 0 ? { [`${slug}-audio-${style}`]: files } : {};
 }
