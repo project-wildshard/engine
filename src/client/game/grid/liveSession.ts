@@ -89,6 +89,7 @@ import { resolveLevelBounds } from '../../../shared/game/shard/runtime';
 import { declaredPlayArea, type PlayArea } from '@wildshard/engine/game/shardfile/playArea';
 import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
 import type { Bounds } from '@wildshard/engine/level/spec';
+import { pinFrameOffset } from '@wildshard/engine/ui/hudAdapters';
 
 /** The cached metadata claim and its later constructor enter the same immutable
  * texture policy. Fresh inputs remain borrowed only by actual construction. */
@@ -373,15 +374,16 @@ export class LiveGridSession {
       // done in one go it froze a template cell 1.0–1.6 s every ~6.2 s on the phone.
       if (++saveTicks >= 300) { saveTicks = 0; this.captureAutosave(); }
     });
-    page.onInput(() => { traveller.camera.position.sub(this.applied); this.applied.set(0, 0, 0); });
+    page.onInput(() => { traveller.camera.position.sub(this.applied); this.applied.set(0, 0, 0); pinFrameOffset.set(0, 0, 0); });
     scope.onDispose(() => { this.autosave?.return(false); this.autosave = null; });
     page.onUpdate(() => { // the page has one update slot (game.grid.origin): the camera offset, then one autosave stage
-      if (this.offset.lengthSq() !== 0) { traveller.camera.position.add(this.offset); this.applied.copy(this.offset); }
+      // the HUD's world pins stand in the same frame: their points move with the camera (hudAdapters.ts pinFrameOffset)
+      if (this.offset.lengthSq() !== 0) { traveller.camera.position.add(this.offset); this.applied.copy(this.offset); pinFrameOffset.copy(this.offset); }
       // The capture's own frame encodes nothing more: the next stage waits for the next frame's update.
       if (scope.disposed) return;
       if (this.autosaveCaptured) this.autosaveCaptured = false; else this.stepAutosave();
     });
-    scope.onDispose(() => { traveller.camera.position.sub(this.applied); this.applied.set(0, 0, 0); });
+    scope.onDispose(() => { traveller.camera.position.sub(this.applied); this.applied.set(0, 0, 0); pinFrameOffset.set(0, 0, 0); });
     scope.listen(window, 'pagehide', () => { this.checkpoint(); });
     scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'hidden') this.checkpoint(); });
     scope.onDispose(() => { this.checkpoint(); });

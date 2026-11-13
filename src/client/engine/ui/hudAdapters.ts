@@ -5,12 +5,20 @@ import type { LevelAdapters } from '../../../server/engine/level/context';
 import { hudSlots, type DiscSpot, type TouchRelabel } from './hudSlots';
 import { controlRects, placePin, type PinRect } from './pinKeepOut';
 
+/**
+ * The page-space offset of the frame pins stand in (QA 2026-11-13, Sky Reach: the Keeper's pin drew ahead while he stood
+ * behind). A pin's point is in the frame its content stands in; in a grid frame other than the page's home the live session
+ * stands the camera at that frame's render offset (liveSession `applied`, the same offset the interact pick takes off,
+ * enteredInteract.ts), so the pass adds it before projecting. Zero on a standalone page and in the home frame.
+ */
+export const pinFrameOffset: Vector3 = new Vector3();
+
 /** Scope-owned projection and relabels; content supplies only world positions and elements. */
 export function hudAdapters(game: Game, scope: Scope, root: HTMLElement,
   relabel: (spot: DiscSpot, hint: TouchRelabel | null) => void): NonNullable<LevelAdapters['hud']> {
   hudSlots.configure(game.level.hud?.bands);
   const pins = new Set<{ at: Vector3 | (() => Vector3 | null); el: HTMLElement; x: number; y: number; w: number; h: number; shown: boolean }>();
-  const point = new Vector3();
+  const point = new Vector3(), depth = new Vector3();
   const viewSize = new Vector2(), viewport = { width: 0, height: 0 };
   // pins step round the touch controls (pinKeepOut.ts): the controls' rects and the pins' sizes are read every 15th frame
   // (≈ 2–4 Hz), never per frame; the controls themselves never move
@@ -21,11 +29,21 @@ export function hudAdapters(game: Game, scope: Scope, root: HTMLElement,
       keepOut = hudSlots.touch ? controlRects(root) : [];
       for (const pin of pins) if (pin.shown) { pin.w = pin.el.offsetWidth; pin.h = pin.el.offsetHeight; }
     }
+    // the camera as posed this frame (the grid's frame offset lands in update; the render poses it only after this pass):
+    // its own matrix, not the viewmodel under it
+    game.camera.updateWorldMatrix(true, false);
     let viewportRead = false;
     for (const pin of pins) {
       const at = typeof pin.at === 'function' ? pin.at() : pin.at;
-      if (at !== null) point.copy(at).project(game.camera);
-      const visible = at !== null && point.z >= -1 && point.z <= 1;
+      // A point behind the eye never draws (its projection mirrors through the view): the camera-space depth decides
+      // ahead or behind, the projected depth only the far plane. No edge mode: the quest chip's arrow carries a target behind.
+      let ahead = false;
+      if (at !== null) {
+        point.copy(at).add(pinFrameOffset);
+        ahead = depth.copy(point).applyMatrix4(game.camera.matrixWorldInverse).z < 0;
+        point.project(game.camera);
+      }
+      const visible = ahead && point.z >= -1 && point.z <= 1;
       // Game.resize owns this same native viewport in logical CSS pixels.
       // Read its stored size before the first pin write, without synchronously
       // flushing HUD styles through window dimensions. Readers stay in order.

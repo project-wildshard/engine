@@ -6,7 +6,7 @@ import type {SystemSpec} from '../app/systems';
 import {Scope} from '../../../shared/engine/app/scope';
 import {installBrowserScopeEnvironment} from '../app/view/scopeEnvironment';
 import {legacyDouble} from '../../../test/engine/FakeGame';
-import {hudAdapters} from './hudAdapters';
+import {hudAdapters,pinFrameOffset} from './hudAdapters';
 import {hudSlots} from './hudSlots';
 
 const originalWidth=Object.getOwnPropertyDescriptor(globalThis,'innerWidth');
@@ -17,6 +17,7 @@ afterEach(()=>{
   if(descriptor===undefined)Reflect.deleteProperty(globalThis,name);else Object.defineProperty(globalThis,name,descriptor);
  }
  hudSlots.restore(originalSlots);
+ pinFrameOffset.set(0,0,0);
 });
 function fixture(){
  installBrowserScopeEnvironment();
@@ -64,5 +65,30 @@ test('control avoidance and shown-pin size reads retain their original refresh c
   f.step();expect(el.style.transform).toBe('translate3d(201px, 384px, 0) translate(-50%, -50%)');expect(sizes).toBe(1);
   for(let i=0;i<14;i++)f.step();expect(sizes).toBe(1);expect(controls).toBe(2);
   f.step();expect(sizes).toBe(2);expect(controls).toBe(3);
+ }finally{f.close();}
+});
+
+// QA 2026-11-13 (Jake, preview, Sky Reach, iPhone): facing away from the Keeper, "◆ KEEPER 88 M" stood ahead over the bridge
+// while the quest chip's arrow pointed behind; facing him, no pin. Sky Reach was a grid frame one pitch south of the page's
+// home: the live session stands the camera at the frame's render offset, and the pin's frame-local point was projected
+// without it, 562.5 m off, so a Keeper behind drew ahead and one ahead fell behind.
+const PITCH=562.5,KEEPER=new Vector3(0,30,-88);
+function face(camera:PerspectiveCamera,offsetZ:number,yaw:number){
+ camera.far=2600;camera.updateProjectionMatrix();
+ camera.position.set(0,31.7,offsetZ);camera.rotation.set(0,yaw,0,'YXZ');camera.updateMatrixWorld();
+}
+test('a pin behind the camera never draws in the view; turned round, it stands in the middle',()=>{
+ const f=fixture(),el=document.createElement('div');f.hud.pin(KEEPER,el);
+ try{
+  face(f.camera,0,Math.PI);f.step();expect(el.style.display).toBe('none');
+  face(f.camera,0,0);f.step();expect(el.style.display).toBe('block');expect(el.style.transform).toMatch(/^translate3d\(201px, 4\d\dpx, 0\)/u);
+ }finally{f.close();}
+});
+test('in a grid frame a pin projects its frame-local point at the frame\'s render offset',()=>{
+ const f=fixture(),el=document.createElement('div');f.hud.pin(KEEPER,el);
+ pinFrameOffset.set(0,0,-PITCH);
+ try{
+  face(f.camera,-PITCH,Math.PI);f.step();expect(el.style.display).toBe('none');
+  face(f.camera,-PITCH,0);f.step();expect(el.style.display).toBe('block');expect(el.style.transform).toMatch(/^translate3d\(201px, 4\d\dpx, 0\)/u);
  }finally{f.close();}
 });
