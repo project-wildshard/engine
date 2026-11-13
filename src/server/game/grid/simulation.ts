@@ -46,6 +46,17 @@ export interface PreparedGridFrame { commit: () => void; cancel: () => void }
 export interface PreparedGridUnload { commit: () => void; abort: () => void }
 interface Resident { value: GridResident; touched: number; reservations: number; retained: boolean; evicting: boolean; lease: GridSimLease | undefined }
 
+/** GRID-CROSSING GC34, ROAD-PRELOAD RP4: a crossing hands the walker to the destination's seat with the speed and the mode (foot,
+ *  board, swim) they had, so a walk across the line never stops (it started from rest: RP1's ~0.3 s stop at x -260 while the page
+ *  caught it up), and an owner's seat parked in that cell never mixes the new speed with the mode it was left in. */
+function carryMotion(from: PlayerSim, to: PlayerSim): void {
+  if (to.board.on !== from.board.on) to.setBoard(from.board.on);
+  to.board.hoverAir = from.board.hoverAir; to.board.hoverBob = from.board.hoverBob;
+  Object.assign(to.swim, from.swim); Object.assign(to.footing, from.footing); to.moveScale = from.moveScale;
+  to.velocity.copy(from.velocity); to.impulse.copy(from.impulse); to.fall.grounded = from.fall.grounded;
+  Object.assign(to.shove, from.shove); Object.assign(to.dash, from.dash); Object.assign(to.dodge, from.dodge); Object.assign(to.jump, from.jump);
+}
+
 /**
  * Independent local physics worlds; only a world with a player in it advances, while visible neighbours remain frozen.
  * Each player crosses on their own (P1-E3.9). `owner` is the player this session was built around, the lead of every host:
@@ -264,6 +275,7 @@ export class GridSimulation {
         arrival.health.restore({ ...health, lastHurt: health.lastHurt + (destination.clock.now - source.clock.now) * 1000 });
         transaction.commit(); traveller.releaseMotor(); arrival.attachMotor(rider.motor);
         arrival.position.copy(rider.position); arrival.yaw = traveller.yaw;
+        if (arrival !== traveller) carryMotion(traveller, arrival);
         if (to !== null) landOnGround(destination, arrival);
         this.sites.set(player, to);
         if (player !== this.owner) source.removePlayer(player);
