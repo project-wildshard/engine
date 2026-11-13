@@ -32,3 +32,5 @@ muted, cold shader cache, 3 runs each. Worst frame over the whole leg, edge and 
 
 Links over 30 ms on the leg: 21 -> 0 in Chromium. The probe (`walk-trace.mjs`, GC29's walk plus program attribution) is
 in `~/.cache/wildshard/plan-artifacts/grid/leave-driftwood/relink2/`.
+
+Commits: the road meshes first, then the region lights (`LightPool.adopt`, with the full-reserve fallback from review).

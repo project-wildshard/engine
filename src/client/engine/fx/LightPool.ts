@@ -57,6 +57,8 @@ export class LightPool {
   private readonly yielding = new Set<THREE.PointLight>();
   /** A borrowed light and the yielding light whose place in the scene it holds. */
   private readonly lent = new Map<THREE.PointLight, THREE.PointLight>();
+  /** RP4: this nested pool's scene lights taken out of three's count (`adopt`), with the layer mask each gets back */
+  private readonly adopted = new Map<THREE.PointLight, number>();
 
   private constructor(scene: THREE.Scene) {
     this.group.name = 'light-pool';
@@ -87,7 +89,31 @@ export class LightPool {
     if (page === this) throw new Error('A light pool cannot mirror into itself');
     this.mirroredBy = page; page.sources.add(this);
     for (const light of this.lights) light.layers.disableAll();
-    scope.onDispose(() => { page.sources.delete(this); if (this.mirroredBy === page) this.mirroredBy = null; for (const light of this.lights) light.layers.enable(0); });
+    scope.onDispose(() => {
+      page.sources.delete(this); if (this.mirroredBy === page) this.mirroredBy = null; for (const light of this.lights) light.layers.enable(0);
+      for (const [light, mask] of this.adopted) light.layers.mask = mask;
+      this.adopted.clear();
+    });
+  }
+
+  /** RP4: a mirrored pool also takes the plain point lights its content put under `root` (a region's site and signal
+   *  lights, `new PointLight` in its own tree): each leaves three's light count and shows through the page's reserved
+   *  lights as a pooled one does, while it and its ancestors show. Only as many as the reserve can show alongside this
+   *  pool's own lights; a shadow caster, or one past that, stays counted as before, and so does one that finds the shared
+   *  reserve full when it shows (another region's lights took it: `showMirrors` gives it back to three's count). Again on the same root takes only new
+   *  ones. Returns how many it took. Sunscar's two counted whenever its region showed: arriving moved the page from 6 to
+   *  7 and 8 point lights and every lit program in view linked again (Chromium, 117 to 216 ms a link). */
+  adopt(root: THREE.Object3D): number {
+    const page = this.mirroredBy;
+    if (page === null) return 0;
+    let taken = 0;
+    for (const light of this.adopted.keys()) if (light.parent === null) this.adopted.delete(light); // gone with its content
+    root.traverse(object => {
+      if (!(object instanceof THREE.PointLight) || object.castShadow || object.layers.mask === 0 || this.adopted.has(object)) return;
+      if (this.lights.length + this.adopted.size >= page.reserved.length) return;
+      this.adopted.set(object, object.layers.mask); object.layers.disableAll(); taken++;
+    });
+    return taken;
   }
 
   /** Make `count` free dark lights now (counted, never mirrored), for content known to ask after the first render: a
@@ -164,6 +190,20 @@ export class LightPool {
         next++;
         slot.color.copy(light.color); slot.intensity = light.intensity; slot.distance = light.distance; slot.decay = light.decay;
         // three posed the scene before this hook: the slot's world matrix is set here, from the light's
+        slot.position.setFromMatrixPosition(light.matrixWorld); slot.updateMatrixWorld();
+      }
+      for (const [light, mask] of source.adopted) {
+        if (light.intensity <= 0 || !shownUnder(light, this.group.parent)) continue;
+        const slot = this.reserved[next];
+        if (slot === undefined) {
+          // the reserve is shared by every shown region: one with no slot left is counted again, as before it was adopted
+          // (the count moves, every lit program links again, but it lights), never left dark
+          if (!this.warnedMirror) { this.warnedMirror = true; console.warn(`[LightPool] more shown region lights than the ${String(this.reserved.length)} reserved: an adopted light counts again`); }
+          light.layers.mask = mask; source.adopted.delete(light);
+          continue;
+        }
+        next++;
+        slot.color.copy(light.color); slot.intensity = light.intensity; slot.distance = light.distance; slot.decay = light.decay;
         slot.position.setFromMatrixPosition(light.matrixWorld); slot.updateMatrixWorld();
       }
     }

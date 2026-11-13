@@ -542,7 +542,9 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
         // The world-only inventory can link while kit/play continue, with the exact destination sky and look.
         prepareWorldMaterials: async () => {
           await skyReady;
-          if (!resident.disposed) regionLook?.sweep();
+          if (resident.disposed) return;
+          regionLook?.sweep();
+          LightPool.for(scene).adopt(scene);
         },
         precompileEnvironment: () => scene.environment,
         // rt3-crossing2: the look's per-frame sweep never ran on what the entered hooks added (no frame draws while they
@@ -551,6 +553,9 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
           await skyReady;
           if (resident.disposed) return;
           regionLook?.sweep();
+          // RP4: its content's own point lights (Sunscar's site and signal lights) show through the page's reserved lights,
+          // taken before the warm-up compiles, so showing the region never moves the page's light count
+          LightPool.for(scene).adopt(scene);
           // op-frame21: its own composite, once its world hook has run and before the warm-up compiles the page's passes
           const place = framePort?.composite;
           if (cellComposite !== null && place !== undefined && viewRoot !== null && !composited) {

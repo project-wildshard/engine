@@ -90,3 +90,49 @@ test('a borrow takes a free light first, and with none yielding is a detached on
   expect(pool.borrow(0xff8800, 4, 16).parent).toBeNull();
   expect(pool.group.children.filter(child => child instanceof THREE.PointLight)).toHaveLength(1);
 });
+
+// RP4: a region's own scene lights (Sunscar's brazier site light and its signal light, `new PointLight` in its content)
+// counted in three's light hash whenever the region showed, so arriving moved the page 6 -> 7 -> 8 point lights and every
+// lit program in view linked again (Chromium: 117 to 216 ms a link at Sunscar's edge). Adopted, they show through the
+// reserved lights as pooled ones do, up to the reserve; a shadow caster or one past the reserve stays counted as before.
+test('a mirrored pool adopts its region scene lights up to the reserve, and gives them back', () => {
+  const page = new THREE.Scene(), root = new THREE.Group(), region = new THREE.Scene(), scope = new Scope('adopt');
+  root.add(region); page.add(root);
+  const pagePool = LightPool.for(page), regionPool = LightPool.for(region);
+  pagePool.reserve(3);
+  const counted = (): number => { let n = 0; page.traverse((o) => { if (o instanceof THREE.PointLight && o.layers.mask !== 0) n++; }); return n; };
+  regionPool.mirrorInto(pagePool, scope);
+  const pooled = regionPool.acquire(0xff8800, 3, 11, 2), site = new THREE.PointLight(0xff7a30, 9, 10, 2), signal = new THREE.PointLight(0xff8a3a, 14, 40, 1.6);
+  const caster = new THREE.PointLight(0xffffff, 1, 5, 2), spare = new THREE.PointLight(0xffffff, 2, 5, 2), hidden = new THREE.Group();
+  caster.castShadow = true; hidden.visible = false; hidden.add(signal);
+  site.position.set(4, 1, 0); root.position.set(100, 0, 0);
+  region.add(site, hidden, caster, spare); page.updateMatrixWorld(true);
+  expect(regionPool.adopt(region)).toBe(2);
+  expect(regionPool.adopt(region)).toBe(0);
+  expect(counted()).toBe(3 + 2); // the reserve, the caster, and the one past the reserve
+  expect(site.layers.mask).toBe(0); expect(signal.layers.mask).toBe(0); expect(caster.layers.mask).toBe(1); expect(spare.layers.mask).toBe(1);
+  render(page);
+  const [a, b, c] = pagePool.group.children.filter((o): o is THREE.PointLight => o instanceof THREE.PointLight);
+  expect(a?.intensity).toBe(3);
+  expect(b?.intensity).toBe(9); expect(b?.color.getHex()).toBe(0xff7a30); expect(b?.getWorldPosition(new THREE.Vector3()).toArray()).toEqual([104, 1, 0]);
+  expect(c?.intensity).toBe(0); // the signal's group is hidden: its slot stays dark
+  hidden.visible = true; render(page); expect(c?.intensity).toBe(14);
+  expect(counted()).toBe(5);
+  scope.dispose(); render(page);
+  expect(site.layers.mask).toBe(1); expect(signal.layers.mask).toBe(1); expect(pooled.layers.mask).toBe(1);
+});
+
+// review of RP4: the reserve is shared by every shown region; an adopted light that finds it full lights as before
+test('an adopted light that finds the shared reserve full is counted again, not left dark', () => {
+  const page = new THREE.Scene(), scope = new Scope('full'), pagePool = LightPool.for(page);
+  const regions = [new THREE.Scene(), new THREE.Scene()]; for (const region of regions) page.add(region);
+  pagePool.reserve(1);
+  const [first, second] = regions.map(region => { const pool = LightPool.for(region); pool.mirrorInto(pagePool, scope); return pool; });
+  const lit = new THREE.PointLight(0xffffff, 2, 5, 2), late = new THREE.PointLight(0xffffff, 3, 5, 2);
+  regions[0]?.add(lit); regions[1]?.add(late); page.updateMatrixWorld(true);
+  expect(first?.adopt(regions[0] ?? page)).toBe(1); expect(second?.adopt(regions[1] ?? page)).toBe(1);
+  render(page);
+  expect(lit.layers.mask).toBe(0); expect(late.layers.mask).toBe(1);
+  late.removeFromParent(); expect(second?.adopt(regions[1] ?? page)).toBe(0);
+  scope.dispose();
+});
