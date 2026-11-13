@@ -62,7 +62,7 @@ const pages = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir',
 for (let tries = 0; tries < 100 && !(await fetch(`http://127.0.0.1:${String(PAGE_PORT)}/version.json`).then(found => found.ok).catch(() => false)); tries++) await sleep(100);
 const base = `http://127.0.0.1:${String(PAGE_PORT)}`;
 
-const browser = await (engine === 'webkit' ? webkit : chromium).launch(engine === 'webkit' ? {} : { args: ['--use-mock-keychain', '--password-store=basic'] });
+const browser = await (engine === 'webkit' ? webkit : chromium).launch(engine === 'webkit' ? {} : { args: ['--use-mock-keychain', '--password-store=basic', '--mute-audio'] });
 const device = engine === 'webkit' ? devices['iPhone 13'] : devices['Pixel 7'];
 const failures = /** @type {string[]} */ ([]), results = /** @type {Record<string, unknown>} */ ({});
 /** @param {boolean} ok @param {string} what */

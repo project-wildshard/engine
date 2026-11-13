@@ -157,7 +157,7 @@ Docs / Repo shape
 Code rules
 
  - In the test suite, No LLM, no claude, no herdr.
- - Every Chromium launch passes `--use-mock-keychain` and `--password-store=basic` (else a macOS keychain dialog opens).
+ - Every Chromium launch passes `--use-mock-keychain` and `--password-store=basic` (else a macOS keychain dialog opens) and `--mute-audio` (Jake, 2026-11-13); spread `KEYCHAIN_ARGS` from `scripts/chromium-keychain.mjs`, which carries all three.
 
 Agent tooling
 
