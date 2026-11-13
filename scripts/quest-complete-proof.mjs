@@ -40,7 +40,7 @@ try {
     await page.evaluate(() => { /** @type {any} */ (window).__workerClientFlag('template.hut'); });
     await page.waitForTimeout(2500);
     /** @typedef {{ t: number, dt: number, carried: boolean, yaw: number, caption: boolean }} Row */
-    const rows = await page.evaluate(() => /** @type {Promise<Row[]>} */ (new Promise(resolve => {
+    const rows = /** @type {Row[]} */ (await page.evaluate(() => new Promise(resolve => {
       /** @type {any} */
       const w = window, player = w.__wildshard.world.player;
       /** @type {Row[]} */
