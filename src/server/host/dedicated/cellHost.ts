@@ -47,7 +47,7 @@ export interface CellHostOptions {
   readonly playtest?:boolean;
   /**
    * GC15 (`WORLD_CROSSING=worker`): the grid pack's road strips. Given, this worker hosts the road between its cells, each of its grid
-   * cells opens onto it instead of standing lone (no road, no walls: GC36), and a seat walks cell, road, cell on one socket. Left out, or no strips, every cell is lone.
+   * cells opens onto it instead of standing in lone walls, and a seat walks cell, road, cell on one socket. Left out, or no strips, every cell is lone.
    */
   readonly road?: () => Promise<readonly GridCollisionStrip[]>;
 }
@@ -182,7 +182,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
         cells.set(slug, { slug, room, emptySince: diagnosticNow(), used: false, waking: null }); opened.push(slug);
       }
       post({ kind: 'placed', id: order.id, opened, resident: resident() });
-    } catch (error) { post({ kind: 'placed', id: order.id, opened, error: error instanceof Error ? error.message : String(error) }); }
+    // RR2: a place that failed partway still opened `opened` and grew the road's strips, so its answer says what is resident too
+    } catch (error) { post({ kind: 'placed', id: order.id, opened, error: error instanceof Error ? error.message : String(error), resident: resident() }); }
     finally { if (!disposed) laid?.(); }
   };
   /** GC15: a seat walks from one of this worker's cells into another, or onto or off its road; a target starting over is waited for (J320). */
