@@ -12,3 +12,5 @@ Jake, 2026-11-12, preview 243820b7: "glitched into the pond cant use shift to su
   behavior but gets me unstuck"): a DEV-tab tools row (`ui/unstuck.ts`). A local page goes where a death would put it (last
   place, else spawn), menu closed, no sting or fade or fall. On a world the page sends `interact` `unstuck` (no new wire
   kind) and roomRespawn's `actRoutes.unstuck` places the player the way a fall does, in both cell kinds.
+- Review fold: the server refuses Unstuck while something leads the player, while parked, and more than once in 10 s; no
+  `player.respawned` on either side (it refills ammunition). The swim's mask-edge wall lets a haul-out under way go.

@@ -7,6 +7,8 @@ import { mountedPlayerOf } from './riding/native';
 
 /** Ticks between two reads of the feet: the page reads them four times a second. */
 const OBSERVE_TICKS = 15;
+/** Ticks between two Unstucks a player may take: 10 s at the 60 Hz tick. */
+const UNSTUCK_TICKS = 600;
 
 /** The page's footing test: on foot on the ground, clear of the water. A headless shard's ground may be a height query, so the motor says. */
 function feetOf(host: SimHost, player: PlayerSim): { x: number; y: number; z: number; grounded: boolean } {
@@ -30,26 +32,29 @@ export function installRoomRespawn(host: SimHost, places: readonly PlaceArea[]):
     for (const player of host.players.values()) if (player.hasMotor && !player.borrowed && !host.parked.has(player.id) && !book.fading(player.id)) book.observe(player.id, feetOf(host, player));
   });
   /** Where a fall puts a player: their own last place, else the shard's spawn, off any mount. */
-  const respawn = (id: string): void => {
-    const player = host.players.get(id);
-    if (player === undefined) return;
-    const stand = book.stand(id), { at, yaw } = host.level.player;
-    mountedPlayerOf(host, id)?.dismount();
+  const place = (player: PlayerSim): void => {
+    const stand = book.stand(player.id), { at, yaw } = host.level.player;
+    mountedPlayerOf(host, player.id)?.dismount();
     player.resetPose(stand ?? at, stand?.yaw ?? yaw);
-    host.events.emit('player.respawned', { at: player.position.clone(), checkpoint: false, player: id });
   };
   host.events.on('player.died', ({ actor, checkpoint }) => {
     const player = host.players.get(actor.id);
     if (player === undefined || !serves() || player.borrowed || !player.hasMotor) return;
     book.fell(player.id, player.health);
     if (checkpoint) return;
-    respawn(player.id);
+    place(player);
+    host.events.emit('player.respawned', { at: player.position.clone(), checkpoint: false, player: player.id });
   }, host.scope);
   // Jake, 2026-11-12: "Need a button in <dev> to unstuck in settings, unstuck will respawn me like the death behavior but gets
-  // me unstuck". The page's Unstuck (UNSTUCK_ACT) lands here: the fall's place, no fall counted, no fade, health as it stands.
+  // me unstuck". The page's Unstuck (UNSTUCK_ACT) lands here: the fall's place, with no fall counted, no fade, health as it
+  // stands and no `player.respawned` (that refills ammunition). Any client can send it, so it is no escape hatch: never while
+  // something leads the player (a boss's intro, a traversal, a fall's fade), and at most once per UNSTUCK_TICKS.
+  const lastUnstuck = new Map<string, number>();
   actRoutes(host).unstuck = id => {
-    const player = host.players.get(id);
-    if (player === undefined || player.borrowed || !player.hasMotor || book.fading(id)) return;
-    respawn(id);
+    const player = host.players.get(id), tick = host.state.tick, last = lastUnstuck.get(id);
+    if (player === undefined || host.disposed || host.embedded || player.borrowed || !player.hasMotor || host.parked.has(id) || player.led) return;
+    if (last !== undefined && tick - last < UNSTUCK_TICKS) return;
+    lastUnstuck.set(id, tick);
+    place(player);
   };
 }

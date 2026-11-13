@@ -472,24 +472,24 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   /** Where a death puts a local player: the last named place reached (the pier is the spawn), else the spawn. */
   const deathStand = () => { const stand = gridLive !== null && !gridLive.ownsHomeRecovery() ? null : lastPlace?.stand ?? null; return stand !== null && stand.id !== 'pier' ? stand : null; };
   const die = (by: DeathCause | undefined): void => {
-    const stand = gridLive !== null && !gridLive.ownsHomeRecovery() ? null : lastPlace?.stand ?? null;
+    const stand = deathStand();
     music.sting('death');
     player.carried = true; weapons.setEnabled(false); // frozen: the fixed step leaves the body alone, no swing / shot
-    deathFade.play(deathCause(by ?? null), respawnWhere(chunk, stand !== null && stand.id !== 'pier' ? placeName(stand.label) : null, app.levelRegistrations.findText('respawn.default', game.levelScope)), {
+    deathFade.play(deathCause(by ?? null), respawnWhere(chunk, stand !== null ? placeName(stand.label) : null, app.levelRegistrations.findText('respawn.default', game.levelScope)), {
       dark: () => {
         if (serverRespawn !== null) { serverRespawn(); serverRespawn = null; }
-        else if (stand !== null && stand.id !== 'pier') player.spawn(stand.x, stand.z, stand.yaw, stand.y); else toSpawn();
+        else if (stand !== null) player.spawn(stand.x, stand.z, stand.yaw, stand.y); else toSpawn();
       }, // a server owns its return; a local player uses the last place (the pier is the spawn)
       done: () => { player.carried = false; weapons.setEnabled(!player.swimming); },
     });
   };
   playerHealth.bindLifecycle({ fading: () => deathFade.active, updateFade: (dt) => deathFade.update(dt) });
-  // the DEV tab's Unstuck (ui/unstuck.ts): a death's respawn with no death; on a world the server places the player
+  // the DEV tab's Unstuck (ui/unstuck.ts): a death's respawn with no death; on a world the server places the player. Not while
+  // something else owns the body (a ride, a carry, the free camera, the tour, the practice room): those have their own way back.
   installUnstuck(game.levelScope, {
-    busy: () => deathFade.active || !hud.entered || app.player !== playerHealth, online: () => player.link !== null,
-    send: () => { weapons.interact(UNSTUCK_ACT); }, close: () => { hud.setPaused(false); },
+    busy: () => deathFade.active || !hud.entered || app.player !== playerHealth || player.ride !== null || player.carried || world.freeCamera || world.tour.active || practiceRoom.open,
+    online: () => player.link !== null, send: () => { weapons.interact(UNSTUCK_ACT); }, close: () => { hud.setPaused(false); },
     place: () => { const stand = deathStand(); if (stand !== null) player.spawn(stand.x, stand.z, stand.yaw, stand.y); else toSpawn(); },
-    respawned: () => { app.events.emit('player.respawned', { at: player.position.clone(), checkpoint: false }); },
   });
   installPlayerDeath(app.events, game.levelScope, playerHealth, {
     active: () => app.player === playerHealth, position: () => player.position,

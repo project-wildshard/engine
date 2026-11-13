@@ -110,9 +110,11 @@ export function stepSwim(p: Vec3, v: Vec3, want: Vec3, state: SwimState, move: S
     // drifted off the water's mask. Over a shore (ground within SWIM_OUT of the surface just left) that is the way out:
     // back on foot. Over a deep hole it is not: a pond whose mask ends before its bowl does would drop the swimmer into a
     // dry pit under the waterline, feet on foot, head under, flipping back into the swim every few ticks (Jake, 2026-11-12:
-    // "glitched into the pond cant use shift to surface"). There the mask's edge is a wall: back to where the step began.
+    // "glitched into the pond cant use shift to surface"). There the mask's edge is a wall: back to where the step began. A
+    // haul-out under way is let go, as before: its deck, not the ground under it, is where the feet are bound. The revert is
+    // a motor move, so a hull may leave it short of the start: the surface just left stands in for the water there.
     const left = ports.water(x0, z0);
-    if (left === null || g >= left - SWIM_OUT) { out.water = null; ports.leave(); return 'dry'; }
+    if (left === null || state.climbTo !== null || g >= left - SWIM_OUT) { out.water = null; ports.leave(); return 'dry'; }
     want.x = x0 - p.x; want.y = 0; want.z = z0 - p.z;
     ports.move(p, want);
     v.x = 0; v.z = 0;

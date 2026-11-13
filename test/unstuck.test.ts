@@ -46,9 +46,9 @@ test('pressing Unstuck on a local page closes the menu and puts the player where
   const scope = new Scope('unstuck.page'); owners.push(scope);
   const calls: string[] = [], feet = { x: 25, y: -1.9, z: 20 }, spawn = { x: 0, y: 1, z: -9 };
   installUnstuck(scope, { busy: () => false, online: () => false, send: () => { calls.push('send'); }, close: () => { calls.push('close'); },
-    place: () => { Object.assign(feet, spawn); calls.push('place'); }, respawned: () => { calls.push('respawned'); } });
+    place: () => { Object.assign(feet, spawn); calls.push('place'); } });
   await tapUnstuck();
-  expect(calls).toEqual(['close', 'place', 'respawned']);
+  expect(calls).toEqual(['close', 'place']);
   expect(feet).toEqual(spawn);
 });
 
@@ -57,7 +57,7 @@ test('on a world the page asks the server, and nothing runs under a death\'s fad
   const calls: string[] = [];
   let busy = false;
   installUnstuck(scope, { busy: () => busy, online: () => true, send: () => { calls.push('send'); }, close: () => { calls.push('close'); },
-    place: () => { calls.push('place'); }, respawned: () => { calls.push('respawned'); } });
+    place: () => { calls.push('place'); } });
   await tapUnstuck(); // Developer off: the row does nothing
   expect(calls).toEqual([]);
   setDev(true);
@@ -68,22 +68,29 @@ test('on a world the page asks the server, and nothing runs under a death\'s fad
   expect(calls).toEqual([]);
 });
 
-test('the server answers an Unstuck: the player goes to the spawn a fall would give, with no fall counted', () => {
+test('the server answers an Unstuck: the spawn a fall would give, with no fall, no refill, and not twice in 10 s', () => {
   const host = createSimHost(SIM_LEVEL, { rapier }); installRoomRespawn(host, []); host.respawn.served = true;
   const lead = [...host.players.values()][0];
   if (lead === undefined) throw new Error('No lead');
   host.step();
-  lead.resetPose({ x: 12, y: lead.position.y - 3, z: 12 }, 0); // stuck somewhere under the ground
-  const health = lead.health.attributes.health, respawned: string[] = [];
+  lead.health.attributes.health -= 10; // hurt first: an Unstuck heals nothing
+  const health = lead.health.attributes.health, respawned: string[] = [], { at } = host.level.player;
   host.events.on('player.respawned', ({ player }) => { if (player !== undefined) respawned.push(player); }, host.scope);
-  const commands = netInteractCommands(actRoutes(host), [{ kind: 'interact', seq: 1, id: UNSTUCK_ACT }], lead.id);
-  expect(commands).toEqual([]);
-  const { at } = host.level.player;
+  const unstuck = (): void => { expect(netInteractCommands(actRoutes(host), [{ kind: 'interact', seq: 1, id: UNSTUCK_ACT }], lead.id)).toEqual([]); };
+  lead.resetPose({ x: 12, y: lead.position.y - 3, z: 12 }, 0); // stuck somewhere under the ground
+  unstuck();
   expect(lead.position.distanceTo(at)).toBeLessThan(1e-6);
-  host.step(); // the host's events reach their listeners on its step, as a death's respawn does
-  expect(respawned).toEqual([lead.id]);
+  host.step(); // the host's events reach their listeners on its step
+  expect(respawned).toEqual([]); // a death's respawn refills ammunition: an Unstuck does not
   expect(host.respawn.falls(lead.id)).toBe(0);
   expect(lead.health.attributes.health).toBe(health);
   expect(actRoutes(host).refused).toBe(0);
+  // no escape hatch: a second one inside 10 s leaves the player where they are
+  lead.resetPose({ x: 12, y: lead.position.y, z: 12 }, 0);
+  unstuck();
+  expect(lead.position.x).toBe(12);
+  for (let tick = 0; tick < 600; tick++) host.step();
+  unstuck();
+  expect(Math.hypot(lead.position.x - at.x, lead.position.z - at.z)).toBeLessThan(1e-6);
   host.dispose();
 });
