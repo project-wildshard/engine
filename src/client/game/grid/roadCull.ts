@@ -42,6 +42,25 @@ function binGrid(pitch: number, tileSize?: number): { size: number; offset: numb
 /** A cell edge's distance from its cell centre (the seam's outer row meets the shard's own ground there). */
 const CELL_EDGE = CHUNK_HALF;
 
+/** IOSMEM (WILDSHARD-GAME-8G): the clip's and bin sort's working lists, growing typed storage off the JS heap. As
+ *  number[] they held ~40-90 bytes a triangle of short-lived heap through an install (hundreds of MB on Driftwood's road),
+ *  which an iPhone counts against the page until it collects. */
+class Grow<A extends Uint32Array | Float64Array> {
+  length = 0;
+  constructor(private array: A, private readonly make: (size: number) => A) {}
+  push(value: number): void {
+    if (this.length === this.array.length) { const next = this.make(Math.max(64, this.array.length * 2)); next.set(this.array); this.array = next; }
+    this.array[this.length++] = value;
+  }
+  /** The filled part; `exact` copies it out so a long-kept result never pins the spare capacity. */
+  view(exact = false): A {
+    if (!exact) return this.array.subarray(0, this.length) as A;
+    return (this.length === this.array.length ? this.array : this.array.slice(0, this.length)) as A;
+  }
+}
+const growU32 = (size: number): Grow<Uint32Array> => new Grow(new Uint32Array(size), (n) => new Uint32Array(n));
+const growF64 = (size: number): Grow<Float64Array> => new Grow(new Float64Array(size), (n) => new Float64Array(n));
+
 
 /** The same attribute interpolation and index order, yielding between bounded triangle/copy batches. */
 export function* clipToBinsSteps(geometry: BufferGeometry, pitch: number, tileSize?: number): Generator<void> {
@@ -70,7 +89,7 @@ export function* clipToBinsSteps(geometry: BufferGeometry, pitch: number, tileSi
     for (let n = 0; n < extra.length / stride; n++) { if (n % 256 === 0) yield; for (let c = 0; c < size; c++) array[(count + n) * size + c] = extra[n * stride + o + c] ?? 0; }
     geometry.setAttribute(name, new BufferAttribute(array, size)); o += size;
   }
-  geometry.setIndex(new BufferAttribute(Uint32Array.from(out), 1));
+  geometry.setIndex(new BufferAttribute(out.slice(), 1));
 }
 
 /**
@@ -78,8 +97,9 @@ export function* clipToBinsSteps(geometry: BufferGeometry, pitch: number, tileSi
  * x then z, a new vertex interpolating all `stride` values linearly (position at `px`). A plan that reads only positions
  * gets exactly the builder's positions, new vertices and triangles: every value interpolates on its own.
  */
-function* clipCore(triangles: number, indexAt: (i: number) => number, count: number, stride: number, px: number, read: (n: number) => Float64Array, coordinate: (n: number, axis: number) => number, pitch: number, tileSize?: number, retain = true): Generator<void, { extra: number[]; out: number[]; added: number; corners: number }> {
-  const { size: s, offset } = binGrid(pitch, tileSize), extra: number[] = [], out: number[] = [];
+function* clipCore(triangles: number, indexAt: (i: number) => number, count: number, stride: number, px: number, read: (n: number) => Float64Array, coordinate: (n: number, axis: number) => number, pitch: number, tileSize?: number, retain = true): Generator<void, { extra: Float64Array; out: Uint32Array; added: number; corners: number }> {
+  // Most triangles fit one bin, so the index is about three corners a triangle; cut triangles grow it.
+  const { size: s, offset } = binGrid(pitch, tileSize), extra = growF64(retain ? stride * 64 : 0), out = growU32(retain ? triangles * 3 + 64 : 0);
   let added = 0, corners = 0;
   // Count-only admission needs no final index or copied interpolation channels.
   // Polygon vertices still retain every value used by the original split.
@@ -107,7 +127,7 @@ function* clipCore(triangles: number, indexAt: (i: number) => number, count: num
     // polygons or copying attributes; only an interior cut needs interpolation.
     if (!crossesBin(coordinate(a, 0), coordinate(b, 0), coordinate(third, 0), s, offset)
       && !crossesBin(coordinate(a, 2), coordinate(b, 2), coordinate(third, 2), s, offset)) {
-      corners += 3; if (retain) out.push(a, b, third); continue;
+      corners += 3; if (retain) { out.push(a); out.push(b); out.push(third); } continue;
     }
     const tri: V[] = [a, b, third].map((n) => ({ n, v: read(n) }));
     let polys: V[][] = [tri];
@@ -127,10 +147,10 @@ function* clipCore(triangles: number, indexAt: (i: number) => number, count: num
     }
     for (const poly of polys) for (let k = 1; k + 1 < poly.length; k++) {
       corners += 3;
-      if (retain) out.push(poly[0]?.n ?? 0, poly[k]?.n ?? 0, poly[k + 1]?.n ?? 0);
+      if (retain) { out.push(poly[0]?.n ?? 0); out.push(poly[k]?.n ?? 0); out.push(poly[k + 1]?.n ?? 0); }
     }
   }
-  return { extra, out, added, corners };
+  return { extra: extra.view(), out: out.view(), added, corners };
 }
 
 
@@ -147,26 +167,36 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
   if (index === null) throw new Error('A culled road mesh needs an index');
   // each triangle's bin (`cullBin` of its centroid) as two numbers; a bin's string key, made once, orders the bins
   const { size, offset } = binGrid(pitch, tileSize);
-  const triangles = index.count / 3, byBin = new Map<number, Map<number, { readonly key: string; readonly x: number; readonly z: number; readonly list: number[] }>>();
+  // Each triangle's bin id in one typed pass, then a counting sort keeps every bin's triangles in index order (IOSMEM:
+  // no number[] list per bin on the JS heap).
+  interface BinRow { readonly key: string; readonly x: number; readonly z: number; readonly id: number; count: number }
+  const triangles = index.count / 3, byBin = new Map<number, Map<number, BinRow>>(), binOf = new Uint32Array(triangles);
+  let binCount = 0;
   for (let t = 0; t < triangles; t++) {
     if (t % 256 === 0) yield;
     let x = 0, z = 0;
     for (let c = 0; c < 3; c++) { const n = index.getX(t * 3 + c); x += position.getX(n); z += position.getZ(n); }
     const bx = Math.floor(x / 3 / size + offset), bz = Math.floor(z / 3 / size + offset);
     let row = byBin.get(bx); if (row === undefined) { row = new Map(); byBin.set(bx, row); }
-    const bin = row.get(bz);
-    if (bin === undefined) row.set(bz, { key: `${String(bx)},${String(bz)}`, x: bx, z: bz, list: [t] }); else bin.list.push(t);
+    let bin = row.get(bz);
+    if (bin === undefined) { bin = { key: `${String(bx)},${String(bz)}`, x: bx, z: bz, id: binCount++, count: 0 }; row.set(bz, bin); }
+    bin.count++; binOf[t] = bin.id;
   }
-  const out: number[] = [], bins: CullBin[] = [];
+  const firsts = new Uint32Array(binCount + 1), members = new Uint32Array(triangles);
+  for (const row of byBin.values()) for (const bin of row.values()) firsts[bin.id + 1] = bin.count;
+  for (let b = 0; b < binCount; b++) firsts[b + 1] = (firsts[b + 1] ?? 0) + (firsts[b] ?? 0);
+  { const cursor = firsts.slice(0, binCount); for (let t = 0; t < triangles; t++) { if (t % 4096 === 0) yield; const b = binOf[t] ?? 0; members[cursor[b] ?? 0] = t; cursor[b] = (cursor[b] ?? 0) + 1; } }
+  const out = growU32(triangles * 3 + 64), bins: CullBin[] = [];
   const clusters = lod.map((tier) => clusterer(geometry, pitch, tier.cell, tileSize));
-  const ordered: { readonly key: string; readonly x: number; readonly z: number; readonly list: number[] }[] = [];
+  const ordered: BinRow[] = [];
   for (const row of byBin.values()) for (const bin of row.values()) ordered.push(bin);
   ordered.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   // A shared indexed vertex contributes once per bin to both bounds scans.
   // Keep triangle publication and LOD representative order unchanged.
   const boundedIn = new Uint32Array(position.count);
   let binId = 0;
-  for (const { list, x: tileX, z: tileZ } of ordered) {
+  for (const { id, x: tileX, z: tileZ } of ordered) {
+    const list = members.subarray(firsts[id] ?? 0, firsts[id + 1] ?? 0);
     const start = out.length, unique: number[] = [];
     binId++;
     let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
@@ -198,13 +228,13 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
         if (i % 256 === 0) yield;
         const t = list[i] ?? 0;
         const a = cluster(index.getX(t * 3)), b = cluster(index.getX(t * 3 + 1)), c = cluster(index.getX(t * 3 + 2));
-        if (a !== b && b !== c && a !== c) out.push(a, b, c);
+        if (a !== b && b !== c && a !== c) { out.push(a); out.push(b); out.push(c); }
       }
       levels.push({ start: from, count: out.length - from });
     }
     bins.push({ sphere, start, count, levels, ...(tileSize === undefined ? {} : { tile: { x: tileX, z: tileZ } }) });
   }
-  return { source: Uint32Array.from(out), bins, lod: lod.map((tier) => tier.distance) };
+  return { source: out.view(true), bins, lod: lod.map((tier) => tier.distance) };
 }
 
 /**
