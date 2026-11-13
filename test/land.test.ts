@@ -918,21 +918,28 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect((await reused([run()], ciJobs, {}, { scope: (at: number) => String(at > Date.parse('2026-11-10T20:10:00Z')), now: steady.now })).reason).toMatch(/predates a quarantine or lift-pending change/u);
     expect((await exactBranchProof('ci.yml', env('http://127.0.0.1:9'), steady)).reused).toBe(false);
   });
-  test('main pushes get one concurrency group per SHA, so lands a minute apart never cancel each other\'s main run', () => {
+  test('main pushes coalesce into one concurrency group; a release commit keeps its own (CIQ1, J222)', () => {
     const text = readFileSync('.github/workflows/ci.yml', 'utf8');
     const top = text.split('\njobs:\n')[0] ?? '';
     const template = /^ {2}group: (.+)$/mu.exec(top)?.[1];
     const cancel = /^ {2}cancel-in-progress: (.+)$/mu.exec(top)?.[1];
     if (template === undefined || cancel === undefined) throw new Error('ci.yml has no top-level concurrency group');
-    type Context = { event_name: string; ref: string; sha: string; run_id: string };
+    type Context = { event_name: string; ref: string; sha: string; run_id: string; event: { head_commit: { message: string } } };
     const evaluate = (source: string, github: Context): unknown => source.replaceAll(/\$\{\{(.*?)\}\}/gu, (_match: string, expression: string) =>
       String(runInNewContext(expression.replaceAll(/\bstartsWith\(/gu, 'starts(').replaceAll("'", '"').replaceAll('==', '==='), {
         github, starts: (value: string, prefix: string) => value.startsWith(prefix), format: (pattern: string, argument: string) => pattern.replace('{0}', argument),
       })));
-    const main = { event_name: 'push', ref: 'refs/heads/main', sha: 'a'.repeat(40), run_id: '1' };
+    const main = { event_name: 'push', ref: 'refs/heads/main', sha: 'a'.repeat(40), run_id: '1', event: { head_commit: { message: 'fix(x): y' } } };
     const next = { ...main, sha: 'b'.repeat(40), run_id: '2' };
-    expect(evaluate(template, main)).not.toBe(evaluate(template, next));
+    // A burst of main pushes shares one group: GitHub keeps the running run and only the newest pending one.
+    expect(evaluate(template, main)).toBe(evaluate(template, next));
     expect(evaluate(cancel, main)).toBe('false');
+    // release.sh --finish and server-release need the release commit's own exact-SHA run: never coalesced away.
+    const release = { ...next, event: { head_commit: { message: 'chore(release): v0.1.19\n\nbody' } } };
+    expect(evaluate(template, release)).not.toBe(evaluate(template, main));
+    expect(evaluate(template, release)).not.toBe(evaluate(template, { ...release, sha: 'c'.repeat(40) }));
+    // A qualification dispatch never replaces a pending publication run.
+    expect(evaluate(template, { ...main, event_name: 'workflow_dispatch' })).not.toBe(evaluate(template, main));
     // A plan branch keeps one group, and its newer push cancels the older run.
     const plan = { ...main, ref: 'refs/heads/plan/foo' };
     expect(evaluate(template, plan)).toBe(evaluate(template, { ...plan, sha: next.sha, run_id: '2' }));
