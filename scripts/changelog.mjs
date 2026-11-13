@@ -66,15 +66,25 @@ export function releaseProblems(text, version) {
   return problems;
 }
 
+/** `git describe` of the tree's commit against the engine's version tags: "v0.1.14" on a tagged commit,
+ *  "v0.1.13-100-g5a43d1c4" between them (Jake, 2026-11-12: "make the preview version use git describe"; meta HOW-WE-BUILD
+ *  WL19c). '' with no git, no version tag, or a shallow checkout that has none (preview.yml fetches the whole history).
+ * @param {string} root @returns {string} */
+export function gitDescribe(root) {
+  try {
+    return execFileSync('git', ['describe', '--tags', '--match', 'v[0-9]*'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch { return ''; }
+}
+
 /** The section a build of this tree shows: package.json's version and its notes ('' and none when missing; the gates refuse
- *  that before it can ship).
- * @param {string} root @returns {Release} */
+ *  that before it can ship), and the tree's `git describe`, the label the title shows.
+ * @param {string} root @returns {Release & { describe: string }} */
 export function engineRelease(root) {
   const { version } = /** @type {{ version: string }} */ (JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')));
   let text = '';
   try { text = readFileSync(join(root, CHANGELOG_PATH), 'utf8'); } catch { /* an old tree: version only */ }
   const found = parseChangelog(text).releases.find(release => release.version === version);
-  return { version, date: found?.date ?? '', notes: found?.notes ?? [] };
+  return { version, date: found?.date ?? '', notes: found?.notes ?? [], describe: gitDescribe(root) };
 }
 
 /** The problems at a commit (a pushed ref) for its package.json version, or for `tag`'s version, which must also be the

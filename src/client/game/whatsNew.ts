@@ -15,15 +15,17 @@ export interface WhatsNew {
   readonly date: string;
   /** the version's changelog bullets, plain text, one change each */
   readonly entries: readonly string[];
+  /** the build commit's `git describe`, "v0.1.13-100-g5a43d1c4" ('' when unknown; absent in a hand-made one) */
+  readonly describe?: string;
 }
 
 /** vite.config.ts: package.json's version and its CHANGELOG.md section; absent under Node */
-declare const __ENGINE_RELEASE__: { readonly version: string; readonly date: string; readonly notes: readonly string[] };
+declare const __ENGINE_RELEASE__: { readonly version: string; readonly date: string; readonly notes: readonly string[]; readonly describe?: string };
 
 /** This build's engine version and its changelog; empty under a unit test. */
 export function engineWhatsNew(): WhatsNew {
   if (typeof __ENGINE_RELEASE__ !== 'object') return { version: '', date: '', entries: [] };
-  return { version: __ENGINE_RELEASE__.version, date: __ENGINE_RELEASE__.date, entries: __ENGINE_RELEASE__.notes };
+  return { version: __ENGINE_RELEASE__.version, date: __ENGINE_RELEASE__.date, entries: __ENGINE_RELEASE__.notes, describe: __ENGINE_RELEASE__.describe ?? '' };
 }
 
 export const WHATS_NEW: WhatsNew = engineWhatsNew();

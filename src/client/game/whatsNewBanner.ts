@@ -26,8 +26,10 @@ export function shortBuild(id: string): string {
   return /^[0-9a-f]{7,40}$/iu.test(sha) ? sha.slice(0, 7) : sha.length >= 7 ? sha : stamp;
 }
 
-/** "v0.1.5 · a8144a5": the engine version and the short commit, either alone when the other is unknown */
-export function versionLabel(version: string, build: string): string {
+/** The build's `git describe` ("v0.1.13-100-g5a43d1c4", Jake 2026-11-12), else "v0.1.5 · a8144a5": the engine version
+ *  and the short commit, either alone when the other is unknown */
+export function versionLabel(version: string, build: string, describe = ''): string {
+  if (describe !== '') return describe;
   return [version === '' ? '' : `v${version}`, build].filter(part => part !== '').join(' · ');
 }
 
@@ -78,8 +80,8 @@ export interface WhatsNewBanner {
 export function buildWhatsNewBanner(opts: WhatsNewBannerOptions): WhatsNewBanner | null {
   const store = opts.store ?? deviceHiddenStore();
   const build = opts.build ?? shortBuild(runningBuild());
-  const { entries, date, version } = opts.news;
-  const label = versionLabel(version, build).toUpperCase();
+  const { entries, date, version, describe } = opts.news;
+  const label = versionLabel(version, build, describe).toUpperCase();
   let hiddenOn: string | null = null;
   try { hiddenOn = store.read(); } catch { /* unreadable: show it */ }
   if (!whatsNewShown({ developer: opts.developer, entries: entries.length, build, hiddenOn })) return null;

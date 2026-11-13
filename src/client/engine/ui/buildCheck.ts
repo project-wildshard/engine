@@ -19,15 +19,17 @@ export const shortBuild = (id: string): string => {
 /** The build this page runs. */
 export const runningBuild = (): string => (typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : '');
 
-/** The engine version a build carries and that version's changelog (CHANGELOG.md, one to five plain-language bullets). */
-export interface EngineRelease { readonly version: string; readonly date: string; readonly notes: readonly string[] }
+/** The engine version a build carries, that version's changelog (CHANGELOG.md, one to five plain-language bullets) and
+ *  the build commit's `git describe` ("v0.1.13-100-g5a43d1c4"; '' when the build had no git or no tag). */
+export interface EngineRelease { readonly version: string; readonly date: string; readonly notes: readonly string[]; readonly describe?: string }
 /** This build's engine release; an empty one under a unit test. */
 export const engineRelease = (): EngineRelease =>
   (typeof __ENGINE_RELEASE__ === 'object' ? __ENGINE_RELEASE__ : { version: '', date: '', notes: [] });
 
-/** What the title's build pill and WHAT'S NEW box name a build by: "v0.1.5 · a8144a5" (either half alone when the
- *  other is unknown). */
-export function buildLabel(id: string = runningBuild(), version: string = engineRelease().version): string {
+/** What the title's build pill names a build by: its `git describe`, "v0.1.13-100-g5a43d1c4" (Jake, 2026-11-12: "make the
+ *  preview version use git describe"), else "v0.1.5 · a8144a5" (either half alone when the other is unknown). */
+export function buildLabel(id: string = runningBuild(), version: string = engineRelease().version, describe: string = engineRelease().describe ?? ''): string {
+  if (describe !== '') return describe;
   return [version === '' ? '' : `v${version}`, shortBuild(id)].filter(part => part !== '').join(' · ');
 }
 

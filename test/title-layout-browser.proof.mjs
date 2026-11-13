@@ -72,8 +72,10 @@ test('the title keeps a big hero, a short build label clear of the logo, and the
           await page.screenshot({ path: join(SHOTS, `${name}-${String(width)}x${String(height)}${open ? '-open' : ''}.png`) });
           await page.close();
           // the short commit and the engine version, never the 40-character id, and clear of the logo
-          assert.match(layout.pillText, new RegExp(`^v${release.version.replaceAll('.', '\\.')} · ${BUILD.slice(0, 7)}( · reload)?$`, 'u'), where);
-          assert.equal(layout.boxBuild, `V${release.version} · ${BUILD.slice(0, 7).toUpperCase()}`, where);
+          // WL19c: a build that knows its git describe is named by it alone; else the version and the short commit
+          const label = release.describe === '' ? `v${release.version} · ${BUILD.slice(0, 7)}` : release.describe;
+          assert.match(layout.pillText, new RegExp(`^${label.replaceAll('.', '\\.')}( · reload)?$`, 'u'), where);
+          assert.equal(layout.boxBuild, label.toUpperCase(), where);
           assert.notEqual(layout.pill, null, where);
           if (layout.pill !== null) assert.equal(overlaps(layout.pill, layout.logo), false, `${where}: the pill runs onto the logo`);
           // every card and button whole on screen, none on another or on the hero

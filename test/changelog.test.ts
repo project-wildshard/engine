@@ -18,6 +18,12 @@ test('the real changelog has a valid section for package.json\'s version', () =>
   expect(release.date).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
 });
 
+test('a build names itself by git describe against the version tags (WL19c)', () => {
+  // '' only where the checkout has no version tag (a shallow clone); preview.yml fetches the whole history
+  const { describe } = engineRelease(process.cwd());
+  expect(describe).toMatch(/^(?:v\d+\.\d+\.\d+(?:-\d+-g[0-9a-f]{7,40})?)?$/u);
+});
+
 test('a section has one to five bullets, newest first, each version once', () => {
   expect(parseChangelog(SECTION('0.1.6', [NOTE]) + SECTION('0.1.5', [NOTE])).problems).toEqual([]);
   expect(parseChangelog(SECTION('0.1.6', [])).problems.join()).toMatch(/0 bullets/u);
@@ -60,6 +66,10 @@ test('the title names a build by the engine version and the 7-character commit',
   expect(buildLabel('a8144a50e79afe7e66a8ecdce9406e152518c916', '0.1.5')).toBe('v0.1.5 · a8144a5');
   expect(buildLabel('a8144a5-mwavaean', '')).toBe('a8144a5');
   expect(versionLabel('0.1.5', 'a8144a5')).toBe('v0.1.5 · a8144a5');
+  // WL19c: a build that knows its git describe is named by it alone (Jake, 2026-11-12)
+  expect(buildLabel('5a43d1c473aa', '0.1.13', 'v0.1.13-100-g5a43d1c4')).toBe('v0.1.13-100-g5a43d1c4');
+  expect(versionLabel('0.1.13', '5a43d1c', 'v0.1.13-100-g5a43d1c4')).toBe('v0.1.13-100-g5a43d1c4');
+  expect(versionLabel('0.1.14', '5a43d1c', '')).toBe('v0.1.14 · 5a43d1c');
   expect(changelogDate('2026-11-10')).toBe('10 NOV 2026');
   expect(changelogDate('')).toBe('');
 });
