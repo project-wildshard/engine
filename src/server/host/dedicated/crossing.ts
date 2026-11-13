@@ -2,6 +2,7 @@
 // has walked. A cell and its worker's road hand a seat to each other through the door (`World.crossing`), on the same socket.
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import type { NetRoom } from '@wildshard/engine/net/room';
+import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import type { SimNetWorld } from '@wildshard/engine/net/simWorld';
 import type { Transport } from '@wildshard/engine/net/transport';
 import type { GridAssembly, GridCell, GridPoint } from '@wildshard/engine/game/grid/assembly';
@@ -20,8 +21,11 @@ export interface CrossArrival {
 export interface CrossTarget {
   readonly net: NetRoom; readonly sim: SimNetWorld;
   holds: (device: string) => boolean;
-  /** Make the body first, at `at` in this room's frame; the reason when it can't, with nothing left behind. */
-  admit: (entry: SeatEntry, transport: Transport, at: ResumeAt) => CrossArrival | string;
+  /**
+   * Make the body first, at `at` in this room's frame; the reason when it can't, with nothing left behind. GC34: `motion` is the
+   * walker's body in the room it leaves, so the new one takes its velocity, clocks and mode (`carryMotion`) and never starts from rest.
+   */
+  admit: (entry: SeatEntry, transport: Transport, at: ResumeAt, motion?: PlayerSim) => CrossArrival | string;
 }
 /** Feet the grid can place: a body gone to NaN is skipped, never thrown on, so one bad body can't end its worker. */
 export function finite(feet: Readonly<GridPoint>): boolean { return Number.isFinite(feet.x) && Number.isFinite(feet.y) && Number.isFinite(feet.z); }

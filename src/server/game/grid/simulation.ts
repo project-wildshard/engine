@@ -48,8 +48,9 @@ interface Resident { value: GridResident; touched: number; reservations: number;
 
 /** GRID-CROSSING GC34, ROAD-PRELOAD RP4: a crossing hands the walker to the destination's seat with the speed and the mode (foot,
  *  board, swim) they had, so a walk across the line never stops (it started from rest: RP1's ~0.3 s stop at x -260 while the page
- *  caught it up), and an owner's seat parked in that cell never mixes the new speed with the mode it was left in. */
-function carryMotion(from: PlayerSim, to: PlayerSim): void {
+ *  caught it up), and an owner's seat parked in that cell never mixes the new speed with the mode it was left in. The dedicated server's
+ *  handover (`CrossTarget.admit`) carries the same. */
+export function carryMotion(from: PlayerSim, to: PlayerSim): void {
   if (to.board.on !== from.board.on) to.setBoard(from.board.on);
   to.board.hoverAir = from.board.hoverAir; to.board.hoverBob = from.board.hoverBob;
   Object.assign(to.swim, from.swim); Object.assign(to.footing, from.footing); to.moveScale = from.moveScale;

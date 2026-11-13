@@ -9,6 +9,7 @@ import { saves } from '@wildshard/engine/saves/runtime';
 import type { SimHost } from '@wildshard/engine/sim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
+import { carryMotion } from '@wildshard/engine/game/grid/simulation';
 import { netBuys, netWorldInput } from '../../../shared/host/standalone/netInput';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import { LEAD_SEAT, openCellWorld, type CellWorld } from '../standalone/cellWorld';
@@ -243,7 +244,8 @@ export class DedicatedRoom implements CrossTarget {
   handOver(device: string, target: CrossTarget, entry: SeatEntry, at: ResumeAt): boolean {
     const seat = this.seats.get(device), transport = seat?.transport ?? null;
     if (seat === undefined || transport === null || seat.client === null || !this.net.live(seat.client) || target === this || target.holds(device)) return false;
-    const arrived = target.admit(entry, transport, at);
+    // GC34: the walker's own motion goes with them; a rider's lives on the mount it leaves here, so it arrives on foot from rest
+    const arrived = target.admit(entry, transport, at, mountedPlayerOf(this.host, seat.body)?.mounted === true ? undefined : this.host.players.get(seat.body));
     if (typeof arrived === 'string') return false;
     mountedPlayerOf(this.host, seat.body)?.dismount();
     this.write(seat, 'cross');
@@ -254,13 +256,14 @@ export class DedicatedRoom implements CrossTarget {
     return arrived.land(client);
   }
   /** GC15: a crossing seat's body here, from the door's read of its save on this shard (the previous copy if that one won't import). */
-  admit(entry: SeatEntry, transport: Transport, at: ResumeAt): CrossArrival | string {
+  admit(entry: SeatEntry, transport: Transport, at: ResumeAt, motion?: PlayerSim): CrossArrival | string {
     const { previous, ...current } = entry, { device } = entry;
     let arrived = this.place(current, transport, at), recovered = false;
     if (typeof arrived === 'string' && previous !== undefined) { arrived = this.place({ ...current, doc: previous.doc, recovery: previous.recovery }, transport, at); recovered = typeof arrived !== 'string'; }
     if (typeof arrived === 'string') return arrived;
     if (recovered) this.options.post({ kind: 'recovered', device, seq: entry.seq });
-    const seat = arrived;
+    const seat = arrived, player = this.host.players.get(seat.body);
+    if (motion !== undefined && player !== undefined) carryMotion(motion, player);
     this.arriving.add(seat.body);
     return { body: seat.body, land: client => {
       this.settle(seat);
@@ -370,7 +373,13 @@ export class DedicatedRoom implements CrossTarget {
       const player = this.host.players.get(body);
       if (player === undefined || !finite(player.position)) continue;
       const { x, y, z } = player.position, top = floorBelow(this.host.physics, x, z, y + ARRIVAL_LIFT, ARRIVAL_LIFT * 2);
-      if (top !== undefined && top > y + ARRIVAL_SKIN) player.resetPose({ x, y: top + ARRIVAL_SKIN, z }, player.yaw);
+      if (top === undefined || top <= y + ARRIVAL_SKIN) continue;
+      // GC34: set on the top, the walker keeps the ground speed, board, push and dash it crossed with (a reset stands it still, on foot)
+      const { x: vx, z: vz } = player.velocity, { on, hoverAir, hoverBob } = player.board, impulse = player.impulse.clone(), dash = { ...player.dash };
+      player.resetPose({ x, y: top + ARRIVAL_SKIN, z }, player.yaw);
+      if (on) player.setBoard(true);
+      player.board.hoverAir = hoverAir; player.board.hoverBob = hoverBob;
+      player.velocity.x = vx; player.velocity.z = vz; player.impulse.copy(impulse); Object.assign(player.dash, dash);
     }
   }
   private filings(): readonly LedgerFiling[] {

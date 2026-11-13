@@ -7,6 +7,7 @@ import { SimNetWorld } from '@wildshard/engine/net/simWorld';
 import type { Transport } from '@wildshard/engine/net/transport';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
+import { carryMotion } from '@wildshard/engine/game/grid/simulation';
 import type { GridAssembly, GridCell } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
@@ -74,11 +75,12 @@ export class RoadRoom implements CrossTarget {
   bodyId(device: string): string | undefined { return this.seats.get(device)?.body; }
   bodyOf(device: string): PlayerSim | undefined { const seat = this.seats.get(device); return seat === undefined ? undefined : this.host.players.get(seat.body); }
 
-  admit(entry: SeatEntry, transport: Transport, at: ResumeAt): CrossArrival | string {
+  admit(entry: SeatEntry, transport: Transport, at: ResumeAt, motion?: PlayerSim): CrossArrival | string {
     if (this.seats.has(entry.device)) return 'held';
     const player = this.host.addPlayer(entry.body, at, at.yaw);
     player.netName = entry.name;
     player.resetPose(at, at.yaw);
+    if (motion !== undefined) carryMotion(motion, player);
     const seat: RoadSeat = { device: entry.device, name: entry.name, body: entry.body, transport, client: null, closeOff: null, holdEnds: null, asked: null, askedAt: 0, fall: new FallFloor(ROAD_FLOOR, true, at) };
     this.seats.set(entry.device, seat);
     return { body: seat.body, land: client => {
@@ -102,7 +104,8 @@ export class RoadRoom implements CrossTarget {
   handOver(device: string, target: CrossTarget, entry: SeatEntry, at: ResumeAt): boolean {
     const seat = this.seats.get(device), transport = seat?.transport ?? null;
     if (seat === undefined || transport === null || seat.client === null || !this.net.live(seat.client) || target.holds(device)) return false;
-    const arrived = target.admit(entry, transport, at);
+    // GC34: the walker's own motion goes with them; a rider's lives on the mount it leaves here, so it arrives on foot from rest
+    const arrived = target.admit(entry, transport, at, mountedPlayerOf(this.host, seat.body)?.mounted === true ? undefined : this.host.players.get(seat.body));
     if (typeof arrived === 'string') return false;
     mountedPlayerOf(this.host, seat.body)?.dismount();
     seat.closeOff?.(); seat.closeOff = null; seat.transport = null;
