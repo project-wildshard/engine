@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
 import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
-import { failedJobs, flakyFiles, mainPushArgs, parseArgs, prePushCause, quarantineFile, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
+import { failedJobs, flakyFiles, mainPushArgs, parseArgs, prePushCause, quarantineFile, REF_LOCK, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
 const LAND = resolve('scripts/land.mjs');
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -775,6 +775,80 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(subjects).toEqual(expect.arrayContaining(['feat: foo', 'feat: bar', 'seed']));
     expect(subjects).toHaveLength(3);
   }, 60_000);
+
+  // Run 43332891983 on 2d33c963: two lands share refs/remotes/origin/main, and the one that fetched second lost the
+  // ref's lock ("is at X but expected Y") and stopped. A git shim fails land's main fetch on demand.
+  const fetchShim = (f: Fixture, mode: 'lock-once' | 'lock-always' | 'other') => {
+    const real = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+    const log = join(f.root, 'fetch.log'), marker = join(f.root, 'fetch-fail');
+    writeFileSync(marker, mode);
+    writeFileSync(join(f.root, 'bin/git'), `#!/bin/sh
+case "$*" in *"refs/heads/main:refs/remotes/origin/main"*)
+  echo "$*" >> '${log}'
+  case "$(cat '${marker}' 2>/dev/null)" in
+    lock-once) rm -f '${marker}'; echo "error: cannot lock ref 'refs/remotes/origin/main': is at 67cc4b21 but expected 04ef18ba" >&2; echo " ! 04ef18ba..67cc4b21  main -> origin/main  (unable to update local ref)" >&2; exit 1 ;;
+    lock-always) echo "error: Unable to create '/x/.git/refs/remotes/origin/main.lock': File exists." >&2; exit 1 ;;
+    other) echo "fatal: unable to access 'https://github.com/project-wildshard/fixture/': Could not resolve host: github.com" >&2; exit 128 ;;
+  esac ;;
+esac
+exec '${real}' "$@"
+`);
+    chmodSync(join(f.root, 'bin/git'), 0o755);
+    return () => f.read(log).trim().split('\n').filter(Boolean);
+  };
+
+  test('a fetch that loses origin/main\'s ref lock to another land is retried, and land carries on', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    const head = f.commit(wt, 'src/foo.ts', 'export const foo = 1;', 'feat: foo');
+    const fetches = fetchShim(f, 'lock-once');
+    const result = f.land(wt);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/retry\s+git fetch .*cannot lock ref/u);
+    expect(fetches().length).toBeGreaterThanOrEqual(2);
+    expect(f.remoteMain()).toBe(head);
+  }, 60_000);
+
+  test('a fetch that fails for any other reason still stops land at once, with no retry', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/foo.ts', 'export const foo = 1;', 'feat: foo');
+    const before = f.remoteMain();
+    const fetches = fetchShim(f, 'other');
+    const result = f.land(wt);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/git fetch origin main failed: fatal: unable to access/u);
+    expect(result.stdout).not.toMatch(/retry/u);
+    expect(fetches()).toHaveLength(1);
+    expect(f.remoteMain()).toBe(before);
+  }, 60_000);
+
+  test('a ref lock that never clears stops after 4 retries, naming git\'s error', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/foo.ts', 'export const foo = 1;', 'feat: foo');
+    const before = f.remoteMain();
+    const fetches = fetchShim(f, 'lock-always');
+    const result = f.land(wt);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/git fetch origin main failed: error: Unable to create .*main\.lock': File exists/u);
+    expect(result.stdout.match(/ retry /gu)).toHaveLength(4);
+    expect(fetches()).toHaveLength(5);
+    expect(f.remoteMain()).toBe(before);
+  }, 60_000);
+
+  test('REF_LOCK matches git\'s lock refusals and nothing else', () => {
+    for (const lock of [
+      "error: cannot lock ref 'refs/remotes/origin/main': is at 67cc4b21 but expected 04ef18ba",
+      "error: cannot lock ref 'refs/remotes/origin/main': Unable to create '/r/.git/refs/remotes/origin/main.lock': File exists.",
+      "fatal: Unable to create '/r/.git/packed-refs.lock': File exists.",
+    ]) expect(REF_LOCK.test(lock), lock).toBe(true);
+    for (const other of [
+      "fatal: unable to access 'https://github.com/o/r/': Could not resolve host: github.com",
+      "fatal: couldn't find remote ref refs/heads/plan/foo",
+      'fatal: Authentication failed for \'https://github.com/o/r/\'',
+    ]) expect(REF_LOCK.test(other), other).toBe(false);
+  });
 });
 
 describe('failedJobs', () => {

@@ -74,7 +74,8 @@ Landing from a worktree (mode 2; J290, LAND-SIMPLIFY J249/J258; meta `docs/plans
  - The renderer and validation revisions are computed live from source, in a checkout and in an installed engine
    alike; nothing stamps them into git (LS1, J250).
  - Output: `land HH:MM:SS <state> <detail>`, states `start`, `rebased`, `stamps`, `pushing`, `ci`, `moved`,
-   `carried`, `merging`, `landed`, `canonical`, `watch`, `rule`, `cleaned`; a stop is one `land STOP …` line.
+   `carried`, `merging`, `landed`, `canonical`, `watch`, `rule`, `cleaned`, and `retry` (a fetch lost a ref lock to
+   another git; land waits and tries again, up to 4 times); a stop is one `land STOP …` line.
    Exit 0: landed or nothing to land. Exit 1: stopped; if a `landed` line came first, only the cleanup failed.
  - Landings, CI reds, refusals, conflicts and give-ups append a line to `~/.cache/wildshard/lane-receipts.log`
    (`grep ' land '`). Other stops write none, so no receipt doesn't prove land never ran.

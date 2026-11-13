@@ -11,3 +11,5 @@ export function strikePlans(book: string, file: string, now: number): string[];
 export function quarantineFile(path: string, file: string, owner: string, reason: string, now: number): boolean;
 export const STAMPS: readonly string[];
 export function prePushCause(output: string): string;
+export const REF_LOCK: RegExp;
+export function tryGitLocked(cwd: string, args: string[], env: NodeJS.ProcessEnv, onRetry?: (why: string) => void): import('node:child_process').SpawnSyncReturns<string>;
