@@ -924,6 +924,8 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     const template = /^ {2}group: (.+)$/mu.exec(top)?.[1];
     const cancel = /^ {2}cancel-in-progress: (.+)$/mu.exec(top)?.[1];
     if (template === undefined || cancel === undefined) throw new Error('ci.yml has no top-level concurrency group');
+    // Both are plain YAML scalars: a `: ` or ` #` inside one breaks the whole workflow file (d19ed2a2 did, CIQ1).
+    for (const scalar of [template, cancel]) expect(scalar).not.toMatch(/: | #/u);
     type Context = { event_name: string; ref: string; sha: string; run_id: string; event: { head_commit: { message: string } } };
     const evaluate = (source: string, github: Context): unknown => source.replaceAll(/\$\{\{(.*?)\}\}/gu, (_match: string, expression: string) =>
       String(runInNewContext(expression.replaceAll(/\bstartsWith\(/gu, 'starts(').replaceAll("'", '"').replaceAll('==', '==='), {
