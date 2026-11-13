@@ -1,6 +1,6 @@
 // J130: the row played through, as the flip's real checklist. Each step stands alone: one that fails is listed and the next still runs.
 // Driftwood's opening quest, a fight and its coins; a ride on Nalati; a grapple; the other shards; a crossing; save, reload, resume.
-import { saveFixture } from './debug-settings.mjs';
+import { NAME_ASKED, saveFixture } from './debug-settings.mjs';
 import { floorGridBenchmarkUrl, FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 
 /** Open one page with the row on. */
@@ -9,6 +9,9 @@ async function open(browser, phone, base, path) {
   page.on('pageerror', error => { errors.push(error.message.slice(0, 300)); });
   page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 300)); });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
+  // MP2.4: a device's first world entry asks for the Name, and on a world build (staging) nothing here answers it; mark it
+  // asked, as scripts/goldens/capture.mjs does
+  await saveFixture(context, NAME_ASKED);
   await page.goto(new URL(path, base).href, { waitUntil: 'load' });
   return { context, page, errors };
 }
@@ -468,7 +471,8 @@ export async function play(browser, phone, base, only = '') {
 
   // Every other shard boots on the row, its sky and fights on rows, with no page error
   if (runs('shards')) for (const slug of ['pine-hollow', 'sunscar-dunes', 'far-reach', 'driftwood-isle', 'nalati-grasslands', 'nine-dragon-stack']) {
-    const shard = await open(browser, phone, base, `/?chunk=${slug}&mute=1&nolock=1`);
+    // a world build (staging) sends a bare `?chunk=` link to the title first (bootRoute.ts onlineTitleFirst); `skipintro` enters
+    const shard = await open(browser, phone, base, `/?chunk=${slug}&mute=1&nolock=1&skipintro`);
     await step(`${slug} plays on the row`, async () => {
       await entered(shard.page);
       await shard.page.evaluate(() => { const { player } = window.__wildshard.world; player.touchMove.y = 1; });
