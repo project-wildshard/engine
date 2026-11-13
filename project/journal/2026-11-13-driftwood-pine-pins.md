@@ -20,3 +20,16 @@
   unchanged; the slice is re-cut (`931b62c4`) and both tarballs are on
   the `pins` release. The v0.1.1 save resumes on it. Players need an
   engine with `93e50340` for its spawn ground (v0.1.17 and later).
+- Superseded the same day (opus-uploads3b, meta QA 2026-11-13 row 34):
+  revisions 2 and 3 were prepared over the previous heads' `public/`
+  audio, so their fences held no recordings and
+  `test/download-audio-list.test.ts` went red (see
+  `2026-11-13-stale-public-mounts.md`). Heroes recaptured
+  (shard-driftwood `3087235`, shard-pine-hollow `6aa54ee`, since UP4
+  refuses a rising version with the same hero), rebuilt, re-prepared on
+  a preview of `da8accb9` with their own mounts published, and uploaded
+  to staging: Driftwood revision 3 (`6fdd4f67`, v0.0.2, fence 284, 18
+  recordings) and Pine revision 4 (`1b6dcfb1`, v0.0.3, fence 509, 4
+  recordings). Slices re-cut (`56b8c4af`, `f4ac068f`), all four on the
+  `pins` release; ring 1's step chain unchanged; the v0.1.1 saves
+  resume.

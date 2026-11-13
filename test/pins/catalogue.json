@@ -750,8 +750,8 @@
     {
       "slug": "driftwood-isle",
       "name": "Driftwood Isle",
-      "revision": 2,
-      "hash": "bc397b4208b4b202332b093caf0c8cb167231dc32f01bc55127150c9fa04f394"
+      "revision": 3,
+      "hash": "6fdd4f671ff05a636df2cce55ababbeb75445b5db7de8ce80b2f905238d8e1a2"
     },
     {
       "slug": "far-reach",
@@ -888,8 +888,8 @@
     {
       "slug": "pine-hollow",
       "name": "Pine Hollow",
-      "revision": 3,
-      "hash": "e3d45004263b5c27d280ecedb3211dddfdf46486dc5492e8900946c3960bfeb3"
+      "revision": 4,
+      "hash": "1b6dcfb16c2cfe595fe4feee9420809a4830a74662efdcf088de5cb1b8f8ac9f"
     },
     {
       "slug": "sunscar-dunes",
