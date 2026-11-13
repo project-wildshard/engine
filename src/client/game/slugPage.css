@@ -5,3 +5,7 @@
 .ws-menu.ws-slug .ws-menu-play:disabled { cursor: default; opacity: 1; border-color: rgba(143, 227, 255, 0.25); background: rgba(9, 22, 36, 0.78); box-shadow: none; }
 .ws-menu.ws-slug .ws-menu-play:disabled b, .ws-menu.ws-slug .ws-menu-play:disabled .ws-menu-mode-glyph { opacity: 0.4; }
 .ws-menu.ws-slug .ws-menu-play:disabled small { color: var(--ws-amber); opacity: 1; }
+/* a phone keeps MAIN MENU and the build pill on the top row; the WILDSHARD word ran under the pill at 402 px */
+@media (max-width: 480px) {
+  .ws-menu.ws-slug .ws-menu-title { display: none; }
+}
