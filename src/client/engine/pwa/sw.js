@@ -212,6 +212,25 @@ function precacheGeneration() {
   return precaching;
 }
 
+/** OFFLINE OF7 (PZ15): the build's network-first reads (`/programs/`, `/shardfiles/`) are kept in its shell, which activate
+ *  deletes. Copy them into this build's shell first, so the first offline launch after an update still has them; a copy this
+ *  shell holds wins, and the newest older shell wins over older ones. Online they are still read from the network first.
+ *  Chosen over content-naming those files (OF7's other fix): this changes no URL, no cook and no reader. */
+const NETWORK_FIRST = /^\/(?:programs|shardfiles)\//;
+async function carryNetworkFirst() {
+  const shell = await store(SHELL);
+  for (const name of (await caches.keys()).reverse()) {
+    if (name === SHELL || !name.startsWith(SHELL_PREFIX)) continue;
+    const old = await caches.open(name);
+    // in parallel within one shell (its keys are distinct): activate holds the first launch after an update
+    await Promise.all((await old.keys()).map(async request => {
+      if (!NETWORK_FIRST.test(new URL(request.url).pathname) || await shell.match(request, MATCH) !== undefined) return;
+      const response = await old.match(request, MATCH);
+      if (response !== undefined && !isHtml(response)) await shell.put(request, response);
+    }));
+  }
+}
+
 workerScope.listen(self, 'activate', event => {
   event.waitUntil((async () => {
     const books = await caches.open(BOOKS), current = bookKey(BUILD);
@@ -228,6 +247,7 @@ workerScope.listen(self, 'activate', event => {
       if (record !== undefined) for (const file of (await record.json()).files) if (!kept.has(file)) await assets.delete(file);
       await books.delete(key);
     }
+    await carryNetworkFirst().catch(() => undefined);
     for (const name of await caches.keys()) {
       if (name === SHELL) continue;
       if (name.startsWith('ws-shell-') || name.startsWith('ws-static-') || name === 'ws-immutable') await caches.delete(name);
@@ -372,7 +392,7 @@ workerScope.listen(self, 'fetch', event => {
   }
   if (/^\/(?:assets|basis|fonts)\//.test(url.pathname) || url.pathname === '/manifest.webmanifest') {
     event.respondWith(cached(request, SHELL, event));
-  } else if (/^\/(?:programs|shardfiles)\//.test(url.pathname)) event.respondWith(networkFirst(request, SHELL, event));
+  } else if (NETWORK_FIRST.test(url.pathname)) event.respondWith(networkFirst(request, SHELL, event));
 });
 
 workerScope.listen(self, 'message', event => {

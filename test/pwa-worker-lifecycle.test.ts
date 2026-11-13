@@ -656,3 +656,23 @@ test('QA 11-12 row 36: /programs/ and /shardfiles/ go network first, are kept pe
   // A file this device never read still fails at once offline, as the network does.
   await expect(worker.dispatch('fetch', { request: new Request(url('/programs/nalati-grasslands.json')) })).rejects.toThrow('Failed to fetch');
 });
+
+test('OF7: an update carries the last build\'s /programs/ and /shardfiles/ copies, so the first offline launch has them', async () => {
+  let offline = false;
+  const f = fixture(request => offline ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(new Response(`net:${request.url}`)));
+  const first = f.load('A', [], []); await first.dispatch('install'); await first.dispatch('activate');
+  const files = ['/programs/driftwood-isle.json', '/shardfiles/far-reach/sections/world/tiles.json', '/shardfiles/far-reach/discovery.json'];
+  for (const path of files) await first.dispatch('fetch', { request: new Request(url(path)) });
+  // Build B installs and activates online, and the device visits no shard on it.
+  const next = f.load('B', [], []); await next.dispatch('install');
+  // A copy B already holds is newer than A's, and is kept.
+  await (await f.open('ws-shell-v3-B')).put(url(files[2] ?? ''), new Response('B'));
+  await next.dispatch('activate');
+  expect(await f.caches.keys()).not.toContain('ws-shell-v3-A');
+  offline = true;
+  for (const path of files.slice(0, 2)) expect(await (await next.dispatch('fetch', { request: new Request(url(path)) }))?.text(), `${path} offline after the update`).toBe(`net:${url(path)}`);
+  expect(await (await next.dispatch('fetch', { request: new Request(url(files[2] ?? '')) }))?.text()).toBe('B');
+  // Online, B still reads the network first: the carried copy only answers when the network can't.
+  offline = false;
+  expect(await (await next.dispatch('fetch', { request: new Request(url(files[0] ?? '')) }))?.text()).toBe(`net:${url(files[0] ?? '')}`);
+});
