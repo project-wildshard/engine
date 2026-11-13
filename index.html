@@ -2,11 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script data-secure-door>
+      // QA 2026-11-13 (Chrome on iOS): plain http is not a secure context, so there is no crypto.randomUUID, crypto.subtle or
+      // service worker, and the title froze under WILDSHARD with no buttons. A public host moves to its https twin before
+      // the game loads; an address with none (a LAN dev server on a port) gets a plain line instead of a silent title.
+      (() => {
+        if (window.isSecureContext !== false) return;
+        const host = location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost')) return;
+        if (location.protocol === 'http:' && location.port === '' && host.includes('.') && !host.endsWith('.local') && !/^[\d.]+$|^\[/u.test(host)) {
+          document.documentElement.dataset.secureDoor = 'moving'; // the doctor door below must not override this navigation
+          location.replace('https://' + location.host + location.pathname + location.search + location.hash);
+          return;
+        }
+        document.documentElement.dataset.insecure = '';
+        const say = () => {
+          const line = document.createElement('div');
+          line.setAttribute('role', 'alert');
+          line.style.cssText = 'position:fixed;left:16px;right:16px;bottom:24px;z-index:99;padding:12px 14px;font:14px/1.4 system-ui,sans-serif;color:#e6f2f8;background:rgba(6,10,18,.88);border:1px solid #ff5a4a;border-radius:6px';
+          line.textContent = 'Wildshard needs a secure page and this one is not (no https). Open it with an https:// address, or from localhost.';
+          document.body.append(line);
+        };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', say); else say();
+      })();
+    </script>
     <script data-doctor-door>
       // E7.5 prep: `/?doctor`, or a /doctor/ navigation the service worker answered with this document, goes to the Connection
       // doctor's own page past the worker (`sw=0`) before any of the game loads. A /doctor/ that already passed it is an old deploy.
       (() => {
         const query = new URLSearchParams(location.search), door = query.has('doctor'), path = location.pathname.startsWith('/doctor');
+        if (document.documentElement.dataset.secureDoor === 'moving') return; // already moving to https, which keeps ?doctor
         if (!door && !(path && query.get('sw') !== '0')) return;
         query.delete('doctor'); query.set('sw', '0'); if (!query.has('from')) query.set('from', 'link');
         document.documentElement.dataset.doctor = '';
