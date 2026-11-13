@@ -17,3 +17,5 @@
   and the first key's AudioContext (145 ms, the first gesture, not a quest).
 - Proof: `scripts/quest-complete-proof.mjs` (desktop and 402x874): red on
   d6f24d8a (420 frozen frames), green with the fix.
+- The proof script lands in its own commit: run it on any served build with
+  `scripts/browser-lane.sh node scripts/quest-complete-proof.mjs --base=<url>`.
