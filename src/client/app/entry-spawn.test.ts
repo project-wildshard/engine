@@ -84,7 +84,7 @@ test('original table failure wins over concurrent tier setup failure', async () 
 
 /** Execute the actual selected-entry body with finite service/admission ports.
  * These gates exercise its order without constructing a browser or renderer. */
-function selectedEntry(admissionFailure?: Error, packs = false, authored = false) {
+function selectedEntry(admissionFailure?: Error, packs = false, authored = false, devserver = authored) {
   const source = readFileSync(new URL('entry.ts', import.meta.url), 'utf8');
   const start = source.indexOf('async function startSelected(): Promise<void> {');
   if (start === -1) throw new Error('Missing selected entry');
@@ -113,7 +113,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     '@wildshard/engine/ui/Loading': {beginLoading: () => ({waiting: noop, setPrefetchSource: noop, setPath: noop})},
     '@wildshard/engine/core/tier': {TIER: 'phone'},
     '@wildshard/engine/game/grid/pageEntry': grid,
-    '@wildshard/engine/game/grid/menu': {DEVSERVER: authored, gridMode: () => ({})},
+    '@wildshard/engine/game/grid/menu': {DEVSERVER: devserver, gridMode: () => ({})},
     '@wildshard/engine/game/boot/spawnDownload': {setSpawnPacks: (enabled: boolean) => {transport.push(enabled);},
       startSpawnDownload: () => {transport.push('start'); return null;}, observeSpawnHolds: () => undefined},
     '@wildshard/engine/game/shardfile/clientSource': {configuredShardfile: () => Promise.resolve(null), preparePageResidency: () => page,
@@ -174,6 +174,14 @@ test('a devserver page with an inline author shard reads it first-party and star
   expect(f.transport).toEqual([false]);
   f.memory.finish(); await beforeCompletion(f.admissionStarted.ready, f.run); f.admission.finish(); await f.run;
   expect(f.firstParties).toEqual([true, true]);
+});
+
+test('an inline shard on a build not in devserver mode keeps its spawn download and the checked reader', async () => {
+  const f = selectedEntry(undefined, false, true, false);
+  await beforeCompletion(f.memoryStarted.ready, f.run); f.acceptSession(); await Promise.resolve();
+  expect(f.transport).toEqual([false, 'start']);
+  f.memory.finish(); await beforeCompletion(f.admissionStarted.ready, f.run); f.admission.finish(); await f.run;
+  expect(f.firstParties).toEqual([false, true]);
 });
 
 test('an admission failure still wins over an early session import failure', async () => {

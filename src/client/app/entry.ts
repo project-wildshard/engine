@@ -359,7 +359,7 @@ async function startSelected(): Promise<void> {
   // DL21: a read the whole-set hold stalls is named on the card as the spawn download, in its step
   observeSpawnHolds((held, path) => waitFor('Spawn download', held, 'file', `spawn-download:${path}`));
   // SA15: `wildshard dev`'s page carries the author's shard inline; the catalogue shard's spawn set isn't its download
-  const authored = document.getElementById('ws-shardfile') !== null;
+  const authored = DEVSERVER && document.getElementById('ws-shardfile') !== null;
   const spawnMode = gridMode(DEVSERVER), spawnJob = authored ? null : startSpawnDownload(arrival.slug, earlyPath === 'grid' ? 'grid' : 'client', TIER,
     `${Number(spawnMode.developer)}${Number(spawnMode.devserver)}${Number(spawnMode.nineDragon)}`);
   if (spawnJob !== null) void loading.setDownloadSource(spawnJob);

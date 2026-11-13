@@ -15,9 +15,9 @@ function client(flags: unknown, files: readonly string[]): string {
 }
 
 test('the client keeps the engine page and drops first-party shard content', () => {
-  const kept = ['index.html', 'sw.js', 'b/c/entry.js', 'fonts/a.woff2', 'assets/physics/rapier.wasm', 'assets/music/theme.ogg', 'assets/baked/common/x.bin',
+  const kept = ['index.html', 'sw.js', 'b/c/entry.js', 'fonts/a.woff2', 'assets/physics/rapier.wasm', 'assets/music/theme.ogg', 'assets/baked/common/x.bin', 'assets/tex/rock/a.webp', 'assets/gpu/tex/a-12345678.ktx2', 'assets/gpu/models/b-12345678.ktx2',
     'assets/spawn/server-abc.json', 'assets/boot-tables-1.json', 'shardfiles/driftwood-isle/discovery.json'];
-  const dropped = ['b/c/entry.js.map', 'programs/driftwood-isle.json', 'drafts/a.webp', 'trailer-30.mp4', 'assets/gpu/a.ktx2', 'assets/tex/a.webp',
+  const dropped = ['b/c/entry.js.map', 'programs/driftwood-isle.json', 'drafts/a.webp', 'trailer-30.mp4', 'assets/gpu/nalati/a-12345678.ktx2', 'assets/gpu/baked/driftwood-isle/a.ktx2',
     'assets/nalati/a.glb', 'assets/baked/driftwood-isle/x.bin', 'assets/spawn/driftwood-isle-client-phone-1.json', 'assets/spawn/parts/1.pack.br',
     'shardfiles/driftwood-isle/shard.json', 'shardfiles/driftwood-isle/blobs/image/a.jpg'];
   const root = client({ devserver: true }, [...kept, ...dropped]);

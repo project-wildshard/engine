@@ -5,7 +5,7 @@
 // `src/sharddev/devClient.ts` fetches it once per engine pin.
 //
 // The archive is `build-app.mjs --mode devserver`, minus what only a first-party page reads: the pinned shards' folders
-// (their `discovery.json` stays, the title deck reads it), their asset folders, KTX2 and baked textures, spawn sets,
+// (their `discovery.json` stays, the title deck reads it), their asset folders and KTX2 and baked textures, spawn sets,
 // programs, drafts, trailers and source maps. The author's own shard comes from `wildshard dev`'s build.
 //
 //   python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --out <devserver-client.tar.gz> [--keep <folder>]
@@ -19,7 +19,9 @@ const ROOT = resolve(import.meta.dirname, '..');
 export const DEV_CLIENT_ASSET = 'devserver-client.tar.gz';
 /** Top-level paths (and `assets/` folders) a devserver page never reads. */
 const DROP_TOP = ['programs', 'drafts', 'trailer-15.mp4', 'trailer-30.mp4'];
-const DROP_ASSETS = ['gpu', 'tex', 'driftwood-isle', 'far-reach', 'nalati', 'nine-dragon', 'pine-hollow', 'sunscar-dunes', 'practice'];
+const DROP_ASSETS = ['driftwood-isle', 'far-reach', 'nalati', 'nine-dragon', 'pine-hollow', 'sunscar-dunes', 'practice'];
+/** `assets/gpu/` (KTX2 stand-ins): the shards' own folders go; the engine's `tex`, `models` and `horizon` stay. */
+const DROP_GPU = ['baked', 'far-reach', 'nalati', 'nine-dragon', 'pine-hollow'];
 
 /** Prune a devserver build in place to the client an author's page reads. @param {string} client */
 export function pruneDevserverClient(client) {
@@ -27,6 +29,7 @@ export function pruneDevserverClient(client) {
   if (flags?.devserver !== true) throw new Error('devserver-client: the build is not in devserver mode');
   for (const name of DROP_TOP) rmSync(join(client, name), { recursive: true, force: true });
   for (const name of DROP_ASSETS) rmSync(join(client, 'assets', name), { recursive: true, force: true });
+  for (const name of DROP_GPU) rmSync(join(client, 'assets', 'gpu', name), { recursive: true, force: true });
   // baked: only the engine's common bake; spawn: only the in-page server's book (`server-<build>.json`)
   for (const [folder, keep] of /** @type {const} */ ([['assets/baked', name => name === 'common'], ['assets/spawn', name => /^server-.+\.json$/u.test(name)]])) {
     const path = join(client, folder);
@@ -58,8 +61,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   const tar = spawnSync('tar', ['--version'], { encoding: 'utf8' }).stdout.includes('GNU') ? 'tar' : 'gtar';
   const gnu = spawnSync(tar, ['--version'], { encoding: 'utf8' }).status === 0;
   execFileSync('bash', ['-c', gnu
-    ? `${tar} --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf - -C "$1" . | gzip -n > "$2"`
-    : 'tar -cf - -C "$1" . | gzip -n > "$2"', 'pack', client, out], { stdio: 'inherit' });
+    ? `set -euo pipefail; ${tar} --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf - -C "$1" . | gzip -n > "$2"`
+    : 'set -euo pipefail; tar -cf - -C "$1" . | gzip -n > "$2"', 'pack', client, out], { stdio: 'inherit' });
   console.log(`devserver-client: ${(before / 1e6).toFixed(0)} MB built, ${(bytesOf(client) / 1e6).toFixed(0)} MB kept, ${(statSync(out).size / 1e6).toFixed(1)} MB packed: ${out}`);
   if (option('keep') === undefined) rmSync(client, { recursive: true, force: true });
 }

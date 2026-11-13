@@ -12,3 +12,4 @@
 - Proof: sharddev packed and installed outside every checkout, `wildshard new isle`, `wildshard dev isle/src`, the
   client fetched from a local stand-in release; headless Chromium at `?skipintro` holds W and walks 8.5 m in 2.5 s.
 - Release half (ENG-16): the devserver-client job runs after publish on every server-release, uploads once, and skips a source from before the script.
+- Review (claude -p): keep the engine's own textures (assets/tex, assets/gpu/tex and models: 311 MB packed), gate the spawn skip on DEVSERVER, pipefail the pack, skip only a missing release.
