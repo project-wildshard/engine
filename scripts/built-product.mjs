@@ -8,7 +8,7 @@ import { mapStampPath, mapSettingsPath, mapTilesHash } from './map-hash.mjs';
 import { borrowShardfileEntry, readBuildKey, shardfileCacheRoot } from './shardfile-cache.mjs';
 import { InputHashMemo } from './bake-input-hashes.mjs';
 import { productInputKey, productToolchainKey, matchingProductInputKey } from './shardfile-inputs.mjs';
-import { productFolder } from './shard-outputs.mjs';
+import { hasShardSource, productFolder, shardSourceDir } from './shard-outputs.mjs';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 
 // VITEST-BENCH VB14: the boundary lint pulls in Vite, Rolldown, sharp and semver. Only a source shard's runtime
@@ -98,13 +98,13 @@ export function readBuiltShardfile(sourceRoot, name, { cacheRoot = shardfileCach
   if (built !== undefined && /^[a-f0-9]{40}$/u.test(built) && built === env.GITHUB_SHA
     && existsSync(resolve(destination, 'shard.json'))) return destination;
   // P3: no shard source to rebuild from, so a product is a pinned shardfile (J65) or it is missing.
-  if (!existsSync(resolve(root, 'src/shards'))) {
+  if (!hasShardSource(root)) {
     if (existsSync(resolve(destination, 'shard.json'))) return destination;
     const slice = resolve(root, 'out/.slices', name);
     if (existsSync(resolve(slice, 'shard.json'))) return slice;
     throw new Error(`No shard source and no pinned product: ${name}`);
   }
-  const folder = productFolder(root, name), project = resolve(root, 'src/shards', folder);
+  const folder = productFolder(root, name), project = shardSourceDir(root, folder);
   const output = name === folder ? undefined : name;
   const map = productMapInput(project, output);
   const flags = productFlags(root, output, map, runtimeCopyIssues(root, project).length === 0);

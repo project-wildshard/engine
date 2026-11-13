@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { shardSourceDir, shardSourceFolders } from './shard-outputs.mjs';
 
 // Sharp resolves from this file: engine's own devDependency here, the consumer's through the optional
 // `sharp` peer when a shard repo or sharddev runs this script from its install of engine.
@@ -125,13 +126,9 @@ export function mapTilesHash(shardDir) {
   return hash.digest('hex');
 }
 
-/** Every shard folder with a shardfile project. @param {string} repoRoot @returns {{slug: string, dir: string}[]} */
+/** Every shard folder with a shardfile project: under src/shards, or a single-shard repo's src/ (SA42). @param {string} repoRoot @returns {{slug: string, dir: string}[]} */
 export function mapShards(repoRoot) {
-  const shards = resolve(repoRoot, 'src/shards');
-  return readdirSync(shards, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && existsSync(join(shards, entry.name, 'shard.config.ts')))
-    .map((entry) => ({ slug: entry.name, dir: join(shards, entry.name) }))
-    .sort((a, b) => a.slug.localeCompare(b.slug));
+  return shardSourceFolders(repoRoot, ['shard.config.ts']).map((slug) => ({ slug, dir: shardSourceDir(repoRoot, slug) }));
 }
 
 /** Publish one official map bake and its existing authored-product companion together.
