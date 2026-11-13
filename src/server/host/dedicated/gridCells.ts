@@ -42,7 +42,8 @@ function gridNames(): GridNames {
 export function placeCell(row: PlacedCell): boolean {
   const { shards, cells, spots } = gridNames(), [x, z] = row.cell, spot = `${String(x)},${String(z)}`;
   if (shards.has(row.instance)) {
-    if (cells.get(row.slug) === row.instance && spots.get(spot) === row.instance) return false;
+    // SA47: a new upload moves the cell's hash; a room booted from now on (a restarted worker) opens that one.
+    if (cells.get(row.slug) === row.instance && spots.get(spot) === row.instance) { if (row.hash !== undefined) hashes.set(row.slug, row.hash); return false; }
     throw new Error(`${row.instance} is already placed elsewhere`);
   }
   if (!Number.isInteger(x) || !Number.isInteger(z) || Math.abs(x) > GRID_RADIUS || Math.abs(z) > GRID_RADIUS) throw new Error(`${row.instance}'s cell ${spot} is off the grid`);
@@ -69,7 +70,7 @@ export function gridAssembly(placedToo = true): GridAssembly {
   return assembly;
 }
 /** What a worker thread is booted with, so its rooms name, frame and load a placed cell as the door does. */
-export function placedCells(): readonly PlacedCell[] { return [...placed]; }
+export function placedCells(): readonly PlacedCell[] { return placed.map(row => { const hash = hashes.get(row.slug); return hash === undefined ? row : { ...row, hash }; }); }
 /** Tests only: forget every placed cell. */
 export function forgetPlacedCells(): void { placed.length = 0; hashes.clear(); read = null; assembled = null; }
 

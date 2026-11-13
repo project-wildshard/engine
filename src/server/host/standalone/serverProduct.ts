@@ -51,9 +51,12 @@ function besideShard(path: string, root: string): URL {
   if (!path.startsWith('/') || path.startsWith('//') || at === -1) return new URL(path, base);
   return new URL(`.${path}`, new URL(base.pathname.slice(0, at + 1), base));
 }
-/** A JSON file beside a shard's base, by its path from the origin's root. */
-async function originJson(root: string, path: string, read: ServerRead): Promise<unknown> {
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read(besideShard(`/${path}`, root), path)));
+/** A JSON file beside a shard's base, by its path from the origin's root. `fresh` asks past any cache with a query of its own: a CDN keeps a
+ *  404 for a while, and a cook index that is missing now may be written a minute later. A `file:` origin reads `path` and ignores it. */
+async function originJson(root: string, path: string, read: ServerRead, fresh = false): Promise<unknown> {
+  const url = besideShard(`/${path}`, root);
+  if (fresh) url.search = `?t=${String(Date.now())}`;
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read(url, path)));
 }
 /** This build's server book. */
 async function serverBook(root: string, build: string, read: ServerRead): Promise<ServerPackBook> {
@@ -67,7 +70,7 @@ const shardOf = (slug: string): string => slug.replace(/^_/u, '');
  * their hash as a book's are, so the index only says where they are. A missing index throws, as a missing row does.
  */
 async function cookedPack(root: string, slug: string, cooked: Readonly<{ build: string; hash: string }>, read: ServerRead): Promise<ServerPack> {
-  const { build, hash } = cooked, path = cookIndexPath(build, hash), index = readCookedServerIndex(await originJson(root, path, read));
+  const { build, hash } = cooked, path = cookIndexPath(build, hash), index = readCookedServerIndex(await originJson(root, path, read, true));
   if (index.build !== build || index.hash !== hash || shardOf(index.slug) !== shardOf(slug)) throw new Error(`The cook's ${path} is not ${slug}'s`);
   if (index.serverPack === undefined) throw new Error(`No server pack for ${slug} in the cook's ${path}`);
   return readServerPack(await originJson(root, index.serverPack.index.slice(1), read));

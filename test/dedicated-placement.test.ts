@@ -171,6 +171,9 @@ test('SA47: a placed cell whose pack only the cook has opens on a running world,
   bench = await roomBench({ cells: [home], workers: 1, saves: memoryPlayerSaves(), load: slug => (slug === PLACED.slug ? readPackProduct(slug, BUILD, rapier, options(), reads, placedHash(slug)) : serverInput(slug)) });
   expect(placeCell({ ...PLACED, hash: HASH })).toBe(true);
   expect(placedHash(PLACED.slug)).toBe(HASH);
+  expect(placeCell({ ...PLACED, hash: 'f'.repeat(64) }), 'a new upload of a placed slug moves its hash, not its cell').toBe(false);
+  expect([placedHash(PLACED.slug), placedCells().at(-1)?.hash]).toEqual(['f'.repeat(64), 'f'.repeat(64)]);
+  expect(placeCell({ ...PLACED, hash: HASH })).toBe(false);
   expect(await bench.world.openCells([PLACED.instance])).toEqual([PLACED.instance]);
   const comer = bot(`${bench.url}?chunk=${PLACED.instance}`, 'bench', 'device:comer');
   expect(await comer.arrived()).toBe(true);
