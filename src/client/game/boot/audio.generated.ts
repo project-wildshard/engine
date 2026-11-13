@@ -2809,8 +2809,8 @@ export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = {
   "credit": "Music: MiniMax-Music3",
   "slots": {
    "pine": {
-    "calm": "pine-calm-923e0056.m4a",
-    "tension": "pine-tension-cc014e5b.m4a",
+    "calm": "pine-calm-8a6359d9.m4a",
+    "tension": "pine-tension-ca1a5adc.m4a",
     "bpm": 91.998,
     "beatsPerBar": 4,
     "loopStart": 6.757,
@@ -2818,8 +2818,8 @@ export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = {
     "duration": 61.5467
    },
    "island": {
-    "calm": "island-calm-05125ed8.m4a",
-    "tension": "island-tension-7faf0468.m4a",
+    "calm": "island-calm-3d097258.m4a",
+    "tension": "island-tension-8a001cf9.m4a",
     "bpm": 76.781,
     "beatsPerBar": 4,
     "loopStart": 14.3035,
@@ -2848,24 +2848,24 @@ export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = {
   "credit": "Music: MiniMax-Music3",
   "slots": {
    "night": {
-    "calm": "night-calm-e935c4a1.m4a",
+    "calm": "night-calm-14fe52d9.m4a",
     "bpm": 93.892,
     "beatsPerBar": 4,
     "loopStart": 15.6502,
     "loopEnd": 46.3238,
     "duration": 48.896,
-    "tension": "night-tension-48423068.m4a"
+    "tension": "night-tension-b8bef73b.m4a"
    },
    "boss": {
-    "calm": "boss-base-8b00b5cf.m4a",
+    "calm": "boss-base-dda46eaf.m4a",
     "bpm": 84.375,
     "beatsPerBar": 4,
     "loopStart": 17.1828,
     "loopEnd": 51.3161,
     "duration": 54.1653,
     "layers": [
-     "boss-bass-0ff27574.m4a",
-     "boss-drums-c4644a0b.m4a"
+     "boss-bass-2010a7d2.m4a",
+     "boss-drums-64620197.m4a"
     ],
     "phases": {
      "1": [
@@ -2889,7 +2889,7 @@ export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = {
    }
   },
   "stings": {
-   "dawn": "sting-dawn-6b0b4004.m4a"
+   "dawn": "sting-dawn-f6485494.m4a"
   }
  },
  "saltwind-lighthouse": {
@@ -4715,7 +4715,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
   "licence": "Per file (see provenance.source): MOSS-SoundEffect v2.0 is Apache-2.0; Stable Audio 3 Medium is the Stability AI Community License (free below USD 1M revenue, register with Stability AI for commercial use, show 'Powered by Stability AI').",
   "beds": {
    "island": {
-    "file": "bed-island-1-4611714d.m4a",
+    "file": "bed-island-1-e4bcf390.m4a",
     "loopStart": 2.25,
     "loopEnd": 15.25,
     "duration": 16.256,
@@ -4724,7 +4724,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
   },
   "hums": {
    "shrine": {
-    "file": "hum-shrine-2-d89ed03a.m4a",
+    "file": "hum-shrine-2-387fcd89.m4a",
     "loopStart": 2.75,
     "loopEnd": 8.75,
     "duration": 9.7707,
@@ -4734,60 +4734,60 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
   "oneshots": {
    "gull": {
     "files": [
-     "gull-1-5fa9130b.m4a"
+     "gull-1-13bd74e8.m4a"
     ],
     "gain": 1
    },
    "crab_click": {
     "files": [
-     "crab_click-2-aefbc41d.m4a",
-     "crab_click-3-f47e95a3.m4a"
+     "crab_click-2-6d9c72fc.m4a",
+     "crab_click-3-257be7cc.m4a"
     ],
     "gain": 1
    },
    "crab_snap": {
     "files": [
-     "crab_snap-2-bff601ad.m4a",
-     "crab_snap-3-69ea11c0.m4a"
+     "crab_snap-2-e667a59e.m4a",
+     "crab_snap-3-382299ce.m4a"
     ],
     "gain": 1
    },
    "monkey_chatter": {
     "files": [
-     "monkey_chatter-3-1c7d7e2d.m4a"
+     "monkey_chatter-3-e93276a6.m4a"
     ],
     "gain": 1
    },
    "monkey_shriek": {
     "files": [
-     "monkey_shriek-2-54acd647.m4a",
-     "monkey_shriek-1-1a358b4e.m4a"
+     "monkey_shriek-2-1e59ae1d.m4a",
+     "monkey_shriek-1-a876746e.m4a"
     ],
     "gain": 1
    },
    "sailor_groan": {
     "files": [
-     "sailor_groan-2-43e2a981.m4a"
+     "sailor_groan-2-8c1f159c.m4a"
     ],
     "gain": 1
    },
    "sailor_slash": {
     "files": [
-     "sailor_slash-3-5a10eada.m4a",
-     "sailor_slash-1-611ba654.m4a"
+     "sailor_slash-3-cefa074c.m4a",
+     "sailor_slash-1-3d63c124.m4a"
     ],
     "gain": 1
    },
    "coconut_hit": {
     "files": [
-     "coconut_hit-3-9c8e8fd7.m4a",
-     "coconut_hit-2-83ed831d.m4a"
+     "coconut_hit-3-fc3b4fa6.m4a",
+     "coconut_hit-2-e3427546.m4a"
     ],
     "gain": 1
    },
    "coconut_land": {
     "files": [
-     "coconut_land-1-42389b0a.m4a"
+     "coconut_land-1-bd89bee9.m4a"
     ],
     "gain": 1
    }
@@ -6630,7 +6630,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
   "set": "pine-hollow",
   "beds": {
    "hollow": {
-    "file": "bed-hollow-1-17c54253.m4a",
+    "file": "bed-hollow-1-4ebf7322.m4a",
     "loopStart": 2.25,
     "loopEnd": 17.25,
     "duration": 18.26,
@@ -6639,7 +6639,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": true
    },
    "pond": {
-    "file": "bed-pond-1-d085e52c.m4a",
+    "file": "bed-pond-1-50802fe0.m4a",
     "loopStart": 9,
     "loopEnd": 21,
     "duration": 22.016,
@@ -6648,7 +6648,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": true
    },
    "cabin": {
-    "file": "bed-cabin-2-c2b7a02b.m4a",
+    "file": "bed-cabin-2-8adb6e5b.m4a",
     "loopStart": 10.25,
     "loopEnd": 18.25,
     "duration": 19.264,
@@ -6657,7 +6657,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": true
    },
    "creek": {
-    "file": "bed-creek-1-e1414cd8.m4a",
+    "file": "bed-creek-1-0c854de3.m4a",
     "loopStart": 8,
     "loopEnd": 20,
     "duration": 21.0133,
@@ -6666,7 +6666,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": false
    },
    "waterfall": {
-    "file": "bed-waterfall-1-02ff171d.m4a",
+    "file": "bed-waterfall-1-948139f7.m4a",
     "loopStart": 10.5,
     "loopEnd": 18.5,
     "duration": 19.52,
@@ -6675,7 +6675,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": false
    },
    "mill": {
-    "file": "bed-mill-3-a20c4c53.m4a",
+    "file": "bed-mill-3-e11a9c8c.m4a",
     "loopStart": 2,
     "loopEnd": 14,
     "duration": 15.0187,
@@ -6684,7 +6684,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": false
    },
    "ridge": {
-    "file": "bed-ridge-1-6aecf680.m4a",
+    "file": "bed-ridge-1-ae0ad6a1.m4a",
     "loopStart": 6.25,
     "loopEnd": 17.25,
     "duration": 18.26,
@@ -6693,7 +6693,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": false
    },
    "oldgrowth": {
-    "file": "bed-oldgrowth-3-abf1ab68.m4a",
+    "file": "bed-oldgrowth-3-b0e6178f.m4a",
     "loopStart": 11.75,
     "loopEnd": 22.75,
     "duration": 23.764,
@@ -6702,7 +6702,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": false
    },
    "cave": {
-    "file": "bed-cave-1-9f212e8f.m4a",
+    "file": "bed-cave-1-744c7138.m4a",
     "loopStart": 10.75,
     "loopEnd": 22.75,
     "duration": 23.764,
@@ -6711,7 +6711,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": false
    },
    "night": {
-    "file": "bed-night-1-bb291c08.m4a",
+    "file": "bed-night-1-2a8d47a2.m4a",
     "loopStart": 9.25,
     "loopEnd": 19.25,
     "duration": 20.2667,
@@ -6720,7 +6720,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": false
    },
    "nightfog": {
-    "file": "bed-nightfog-1-7e88dd54.m4a",
+    "file": "bed-nightfog-1-6b06029e.m4a",
     "loopStart": 2,
     "loopEnd": 18,
     "duration": 19.008,
@@ -6729,7 +6729,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": false
    },
    "rain-canopy": {
-    "file": "bed-rain-canopy-3-b1ccc4c3.m4a",
+    "file": "bed-rain-canopy-3-6d02607e.m4a",
     "loopStart": 4,
     "loopEnd": 18,
     "duration": 19.008,
@@ -6738,7 +6738,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": false
    },
    "rain-open": {
-    "file": "bed-rain-open-1-6035278a.m4a",
+    "file": "bed-rain-open-1-ad97e21a.m4a",
     "loopStart": 11,
     "loopEnd": 19,
     "duration": 20.0093,
@@ -6747,7 +6747,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
     "live": false
    },
    "dawn": {
-    "file": "bed-dawn-2-27bd5ac4.m4a",
+    "file": "bed-dawn-2-d479e842.m4a",
     "loopStart": 9.25,
     "loopEnd": 24.25,
     "duration": 25.2573,
@@ -7089,7 +7089,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
    }
   },
   "sprite": {
-   "file": "oneshots-362ce515.m4a",
+   "file": "oneshots-4f27cafa.m4a",
    "gap": 0.2,
    "duration": 159.833,
    "clips": {

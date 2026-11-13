@@ -4,8 +4,8 @@
   "credit": "Music: MiniMax-Music3",
   "slots": {
     "pine": {
-      "calm": "pine-calm-923e0056.m4a",
-      "tension": "pine-tension-cc014e5b.m4a",
+      "calm": "pine-calm-8a6359d9.m4a",
+      "tension": "pine-tension-ca1a5adc.m4a",
       "bpm": 91.998,
       "beatsPerBar": 4,
       "loopStart": 6.757,
@@ -13,8 +13,8 @@
       "duration": 61.5467
     },
     "island": {
-      "calm": "island-calm-05125ed8.m4a",
-      "tension": "island-tension-7faf0468.m4a",
+      "calm": "island-calm-3d097258.m4a",
+      "tension": "island-tension-8a001cf9.m4a",
       "bpm": 76.781,
       "beatsPerBar": 4,
       "loopStart": 14.3035,
@@ -37,7 +37,7 @@
   },
   "provenance": [
     {
-      "file": "pine-calm-923e0056.m4a",
+      "file": "pine-calm-8a6359d9.m4a",
       "model": "MiniMaxAI/MiniMax-Music3",
       "diffusers": "0.40.0",
       "prompt": "Genre: video game soundtrack, ambient piano with a gentle groove. BPM: 88. Key: D major. Instrumental only, no vocals, no choir. Setting: Pine Hollow, a misty pine forest at dawn in an open-world adventure game - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a sparse, singable grand-piano melody with long rests, over soft string pads and a warm upright bass; a light, steady groove of brushed drums, soft kick and shaker runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: close-miked felt piano, natural wooden-room reverb.",
@@ -51,7 +51,7 @@
       "limiter_ceiling_db": -2.0
     },
     {
-      "file": "pine-tension-cc014e5b.m4a",
+      "file": "pine-tension-ca1a5adc.m4a",
       "model": "MiniMaxAI/MiniMax-Music3",
       "diffusers": "0.40.0",
       "prompt": "Genre: video game soundtrack, ambient piano with a gentle groove. BPM: 88. Key: D major. Instrumental only, no vocals, no choir. Setting: Pine Hollow, a misty pine forest at dawn in an open-world adventure game - wonder first, quiet adventure second, a little melancholy underneath. Arrangement: a sparse, singable grand-piano melody with long rests, over soft string pads and a warm upright bass; a light, steady groove of brushed drums, soft kick and shaker runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: close-miked felt piano, natural wooden-room reverb.",
@@ -65,7 +65,7 @@
       "limiter_ceiling_db": -2.0
     },
     {
-      "file": "island-calm-05125ed8.m4a",
+      "file": "island-calm-3d097258.m4a",
       "model": "MiniMaxAI/MiniMax-Music3",
       "diffusers": "0.40.0",
       "prompt": "Genre: video game soundtrack, bright ambient piano with a light groove. BPM: 100. Key: D major. Instrumental only, no vocals, no choir. Setting: Driftwood Isle, a sunlit island of pale sand, driftwood and turquoise water in an open-world adventure game - wonder first, breezy adventure second, a little melancholy underneath. Arrangement: a sparkling, singable grand-piano melody in the upper register with open fifths, over airy pads, a round electric bass and a soft marimba ostinato; a steady light groove of rim clicks, shaker and soft kick runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: bright piano, wide airy reverb.",
@@ -79,7 +79,7 @@
       "limiter_ceiling_db": -2.0
     },
     {
-      "file": "island-tension-7faf0468.m4a",
+      "file": "island-tension-8a001cf9.m4a",
       "model": "MiniMaxAI/MiniMax-Music3",
       "diffusers": "0.40.0",
       "prompt": "Genre: video game soundtrack, bright ambient piano with a light groove. BPM: 100. Key: D major. Instrumental only, no vocals, no choir. Setting: Driftwood Isle, a sunlit island of pale sand, driftwood and turquoise water in an open-world adventure game - wonder first, breezy adventure second, a little melancholy underneath. Arrangement: a sparkling, singable grand-piano melody in the upper register with open fifths, over airy pads, a round electric bass and a soft marimba ostinato; a steady light groove of rim clicks, shaker and soft kick runs under the whole piece from the second bar to the end. No fade-out: the last bar is as full as the rest. Production: bright piano, wide airy reverb.",

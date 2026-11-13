@@ -9,9 +9,9 @@
     },
     {
       "slug": "driftwood-isle",
-      "revision": 3,
-      "hash": "6fdd4f671ff05a636df2cce55ababbeb75445b5db7de8ce80b2f905238d8e1a2",
-      "bytes": 94386688
+      "revision": 4,
+      "hash": "c10405befd5abe86e35e5dade8dcada9ee8a8cddf40b0a328eaa10b0f765a7d6",
+      "bytes": 94885888
     },
     {
       "slug": "far-reach",
@@ -147,9 +147,9 @@
     },
     {
       "slug": "pine-hollow",
-      "revision": 4,
-      "hash": "1b6dcfb16c2cfe595fe4feee9420809a4830a74662efdcf088de5cb1b8f8ac9f",
-      "bytes": 336976384
+      "revision": 5,
+      "hash": "2afc6270c9534acc9d6578686bf87479c63872ac58799cef416d13b3b8b0281b",
+      "bytes": 337219584
     },
     {
       "slug": "sunscar-dunes",
