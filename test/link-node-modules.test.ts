@@ -223,8 +223,8 @@ describe('linkNodeModules', () => {
     // pnpm's own shape: the root importer, a workspace importer after it, then the packages
     const lock = (importer: string, resolved: string | undefined) => writeFileSync(join(repo, 'pnpm-lock.yaml'), [
       "lockfileVersion: '9.0'", '', 'importers:', '', `  ${importer}:`, '    devDependencies:',
-      ...(resolved === undefined ? [] : ["      '@wildshard/wire-released':", '        specifier: github:project-wildshard/shardfile#669d1fc&path:/packages/wire',
-        `        version: '${resolved}@https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fc#path:/packages/wire(typescript@6.0.3)'`]),
+      ...(resolved === undefined ? [] : ["      '@wildshard/wire-released':", '        specifier: github:project-wildshard/shard-format#669d1fc&path:/packages/wire',
+        `        version: '${resolved}@https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fc#path:/packages/wire(typescript@6.0.3)'`]),
       '', '  src/sdk:', '    devDependencies:', "      '@wildshard/wire-released':", '        specifier: npm:@wildshard/other@0.0.0',
       "        version: '@wildshard/other@0.0.0'", '', 'packages:', ''].join('\n'));
     let n = 0;
@@ -243,6 +243,34 @@ describe('linkNodeModules', () => {
       expect(() => linkNodeModules(repo, tree())).toThrow(/points outside the repo/u);
     }
     point(wire); unlinkSync(join(repo, 'pnpm-lock.yaml'));
+    expect(() => linkNodeModules(repo, tree())).toThrow(/points outside the repo/u);
+  });
+
+  // J308: shard-format v0.4.4 renamed the package. Engine imports keep the `@wildshard/format` alias, so the global store
+  // slot holds `@wildshard/shard-format` and the lockfile's root importer is the only thing that lends it.
+  it('links the @wildshard/format alias to the shard-format slot the lockfile resolves it to (J308)', () => {
+    const root = scratch();
+    const repo = join(root, 'repo'), links = join(root, 'store', 'v10', 'links');
+    const slot = join(links, '@wildshard', 'shard-format', '0.4.4', 'a1b2', 'node_modules', '@wildshard', 'shard-format');
+    mkdirSync(slot, { recursive: true });
+    writeFileSync(join(slot, 'package.json'), JSON.stringify({ name: '@wildshard/shard-format', version: '0.4.4' }));
+    mkdirSync(join(repo, 'node_modules', '@wildshard'), { recursive: true });
+    writeFileSync(join(repo, 'node_modules', '.modules.yaml'), JSON.stringify({ virtualStoreDir: relative(join(repo, 'node_modules'), links) }));
+    symlinkSync(slot, join(repo, 'node_modules', '@wildshard', 'format'));
+    const url = 'https://codeload.github.com/project-wildshard/shard-format/tar.gz/17539ea88a9b56449d6cf9af7739b7f298be112e';
+    const lock = (resolved: string) => writeFileSync(join(repo, 'pnpm-lock.yaml'), [
+      "lockfileVersion: '9.0'", '', 'importers:', '', '  .:', '    dependencies:', "      '@wildshard/format':",
+      '        specifier: github:project-wildshard/shard-format#v0.4.4', `        version: '${resolved}@${url}(typescript@6.0.3)'`, '', 'packages:', ''].join('\n'));
+    let n = 0;
+    const tree = () => { const directory = join(root, `tree-${n++}`); mkdirSync(directory); return directory; };
+
+    lock('@wildshard/shard-format');
+    const linked = tree();
+    linkNodeModules(repo, linked);
+    expect(realpathSync(join(linked, 'node_modules', '@wildshard', 'format'))).toBe(slot);
+
+    // a lockfile still naming the pre-J308 package does not lend the renamed slot
+    lock('@wildshard/format');
     expect(() => linkNodeModules(repo, tree())).toThrow(/points outside the repo/u);
   });
 });

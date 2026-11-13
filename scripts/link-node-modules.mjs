@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // E432: give a clean export of the repo (a `git archive` tree) the checkout's node_modules — every entry linked back to
 // the checkout's, except the workspace packages (@wildshard/engine, game, sdk, commons), which link to the export's own
-// src/<layer>. @wildshard/format is installed from the shardfile repo, so it links like any other dependency, unless the
+// src/<layer>. @wildshard/format is installed from the shard-format repo (J308), so it links like any other dependency, unless the
 // export predates that and still holds its own src/format. A plain `ln -s <repo>/node_modules <tree>/node_modules` would resolve @wildshard/* through the checkout's
 // links to the checkout's working tree, so the export would build (and gate) whatever is uncommitted there.
 //

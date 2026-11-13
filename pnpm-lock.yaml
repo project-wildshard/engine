@@ -30,11 +30,11 @@ importers:
         specifier: 1.8.0
         version: 1.8.0(valibot@1.5.0(typescript@6.0.3))
       '@wildshard/format':
-        specifier: github:project-wildshard/shardfile#0786a04b8f824578d4346e735ccc2a6c56c2a094
-        version: https://codeload.github.com/project-wildshard/shardfile/tar.gz/0786a04b8f824578d4346e735ccc2a6c56c2a094(typescript@6.0.3)
+        specifier: github:project-wildshard/shard-format#v0.4.4
+        version: '@wildshard/shard-format@https://codeload.github.com/project-wildshard/shard-format/tar.gz/17539ea88a9b56449d6cf9af7739b7f298be112e(typescript@6.0.3)'
       '@wildshard/wire':
-        specifier: github:project-wildshard/shardfile#203e4fa89f0c5f3804b6b254363d7597008a9389&path:/packages/wire
-        version: https://codeload.github.com/project-wildshard/shardfile/tar.gz/203e4fa89f0c5f3804b6b254363d7597008a9389#path:/packages/wire(typescript@6.0.3)
+        specifier: github:project-wildshard/shard-format#203e4fa89f0c5f3804b6b254363d7597008a9389&path:/packages/wire
+        version: https://codeload.github.com/project-wildshard/shard-format/tar.gz/203e4fa89f0c5f3804b6b254363d7597008a9389#path:/packages/wire(typescript@6.0.3)
       ajv:
         specifier: 6.15.0
         version: 6.15.0
@@ -124,8 +124,8 @@ importers:
         specifier: link:.
         version: 'link:'
       '@wildshard/wire-released':
-        specifier: github:project-wildshard/shardfile#669d1fca695a110e6a8cb059b43a0a5caee60226&path:/packages/wire
-        version: '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire(typescript@6.0.3)'
+        specifier: github:project-wildshard/shard-format#669d1fca695a110e6a8cb059b43a0a5caee60226&path:/packages/wire
+        version: '@wildshard/wire@https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire(typescript@6.0.3)'
       assemblyscript:
         specifier: 0.28.20
         version: 0.28.20
@@ -775,19 +775,19 @@ packages:
   '@vitest/spy@5.0.1':
     resolution: {integrity: sha512-rbto/mF/SGERxEgYOek7Xm6B9b+y+mVoo+f4b2LymYO8zM1b7uB5nHuhVMTP2hxdzgxvGiZYGxGIaMvL5y180Q==}
 
-  '@wildshard/format@https://codeload.github.com/project-wildshard/shardfile/tar.gz/0786a04b8f824578d4346e735ccc2a6c56c2a094':
-    resolution: {gitHosted: true, integrity: sha512-5YLyxEoPSl6KgJ5EbYX84EPjD11gJJPNZ4F/12s/dBjxuCOI2v+djGwz1dDqURfkkjC4Ug01KNIYEJHJNejEBg==, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/0786a04b8f824578d4346e735ccc2a6c56c2a094}
-    version: 0.4.2
+  '@wildshard/shard-format@https://codeload.github.com/project-wildshard/shard-format/tar.gz/17539ea88a9b56449d6cf9af7739b7f298be112e':
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/17539ea88a9b56449d6cf9af7739b7f298be112e}
+    version: 0.4.4
     engines: {node: '>=24.18.0'}
     hasBin: true
 
-  '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire':
-    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
+  '@wildshard/wire@https://codeload.github.com/project-wildshard/shard-format/tar.gz/203e4fa89f0c5f3804b6b254363d7597008a9389#path:/packages/wire':
+    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/203e4fa89f0c5f3804b6b254363d7597008a9389}
     version: 0.0.0
     hasBin: true
 
-  '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/203e4fa89f0c5f3804b6b254363d7597008a9389#path:/packages/wire':
-    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shardfile/tar.gz/203e4fa89f0c5f3804b6b254363d7597008a9389}
+  '@wildshard/wire@https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire':
+    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
     version: 0.0.0
     hasBin: true
 
@@ -2016,20 +2016,20 @@ snapshots:
 
   '@vitest/spy@5.0.1': {}
 
-  '@wildshard/format@https://codeload.github.com/project-wildshard/shardfile/tar.gz/0786a04b8f824578d4346e735ccc2a6c56c2a094(typescript@6.0.3)':
+  '@wildshard/shard-format@https://codeload.github.com/project-wildshard/shard-format/tar.gz/17539ea88a9b56449d6cf9af7739b7f298be112e(typescript@6.0.3)':
     dependencies:
       meshoptimizer: 1.2.0
       valibot: 1.5.0(typescript@6.0.3)
     transitivePeerDependencies:
       - typescript
 
-  '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire(typescript@6.0.3)':
+  '@wildshard/wire@https://codeload.github.com/project-wildshard/shard-format/tar.gz/203e4fa89f0c5f3804b6b254363d7597008a9389#path:/packages/wire(typescript@6.0.3)':
     dependencies:
       valibot: 1.5.0(typescript@6.0.3)
     transitivePeerDependencies:
       - typescript
 
-  '@wildshard/wire@https://codeload.github.com/project-wildshard/shardfile/tar.gz/203e4fa89f0c5f3804b6b254363d7597008a9389#path:/packages/wire(typescript@6.0.3)':
+  '@wildshard/wire@https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire(typescript@6.0.3)':
     dependencies:
       valibot: 1.5.0(typescript@6.0.3)
     transitivePeerDependencies:

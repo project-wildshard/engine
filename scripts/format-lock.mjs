@@ -7,8 +7,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const LOCK = 'pnpm-lock.yaml';
+// J308: the shardfile repo and package became shard-format. Every manifest keeps the `@wildshard/format` alias (the
+// imports name it); the lock's package row and the tag's package.json carry the real name.
 const FORMAT = '@wildshard/format';
-const PIN = /^github:project-wildshard\/shardfile#(v\d+\.\d+\.\d+)$/u;
+const PACKAGE = '@wildshard/shard-format';
+const PIN = /^github:project-wildshard\/shard-format#(v\d+\.\d+\.\d+)$/u;
 const SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies'];
 const FETCH_MS = 8000;
 
@@ -23,11 +26,17 @@ function parseLock(text) {
   const block = start === -1 || end === -1 ? '' : text.slice(start, end), keys = [...block.matchAll(/^ {2}(\S+):$/gmu)];
   keys.forEach((key, index) => {
     const body = block.slice(key.index, keys[index + 1]?.index);
-    const row = /^ {6}'@wildshard\/format':\n {8}specifier: (\S+)\n {8}version: \S*#([0-9a-f]{40})/mu.exec(body);
+    // pnpm locks a github pin as git (`git+ssh://…#<commit>`) or as a codeload tarball (`…/tar.gz/<commit>`)
+    const row = /^ {6}'@wildshard\/format':\n {8}specifier: (\S+)\n {8}version: \S*?(?:#|\/tar\.gz\/)([0-9a-f]{40})/mu.exec(body);
     if (row !== null) importers.set(key[1], { specifier: row[1], commit: row[2] });
   });
-  const rows = [...text.matchAll(/^ {2}'@wildshard\/format@[^']*':\n {4}resolution: \{commit: ([0-9a-f]{40}), repo: ([^,]+), type: git\}\n(?: {4}version: (\S+)\n)?/gmu)]
-    .map(row => ({ commit: row[1], repo: row[2], version: row[3] }));
+  const rows = [...text.matchAll(/^ {2}'@wildshard\/shard-format@[^']*':\n {4}resolution: \{([^}\n]*)\}\n(?: {4}version: (\S+)\n)?/gmu)]
+    .map(row => {
+      const git = /^commit: ([0-9a-f]{40}), repo: ([^,]+), type: git$/u.exec(row[1] ?? '');
+      if (git !== null) return { commit: git[1], repo: git[2], version: row[2] };
+      const tarball = /tarball: https:\/\/codeload\.github\.com\/([\w.-]+\/[\w.-]+)\/tar\.gz\/([0-9a-f]{40})$/u.exec(row[1] ?? '');
+      return { commit: tarball?.[2], repo: tarball === null ? undefined : `https://github.com/${tarball[1]}.git`, version: row[2] };
+    });
   return { importers, keys: keys.map(key => key[1]), rows };
 }
 
@@ -38,7 +47,8 @@ export function formatLockFailures(read, workflows = []) {
   if (text === undefined) return failures;
   const { importers, keys, rows } = parseLock(text);
   const row = rows[0];
-  if (rows.length !== 1 || row === undefined) return [`${LOCK}: expected one ${FORMAT} package row, found ${rows.length}`];
+  if (rows.length !== 1 || row === undefined) return [`${LOCK}: expected one ${PACKAGE} package row, found ${rows.length}`];
+  if (row.commit === undefined) return [`${LOCK}: ${PACKAGE} row's resolution is neither a git commit nor a codeload tarball`];
   const pins = new Set();
   for (const key of keys) {
     const file = key === '.' ? 'package.json' : `${key}/package.json`, manifest = read(file);
@@ -49,7 +59,7 @@ export function formatLockFailures(read, workflows = []) {
       if (locked !== undefined) failures.push(`${LOCK}: importer ${key} locks ${FORMAT} but ${file} doesn't name it`);
       continue;
     }
-    if (!PIN.test(pin)) failures.push(`${file}: ${FORMAT} pin ${pin} isn't a shardfile release tag`);
+    if (!PIN.test(pin)) failures.push(`${file}: ${FORMAT} pin ${pin} isn't a shard-format release tag`);
     pins.add(pin);
     if (locked?.specifier !== pin) failures.push(`${file}: ${FORMAT} pin ${pin} but ${LOCK} has ${locked?.specifier ?? 'no row'}`);
     else if (locked.commit !== row.commit) failures.push(`${LOCK}: importer ${key} locks ${locked.commit}, its package row ${row.commit}`);
@@ -95,7 +105,7 @@ export function formatTagFailures(read, readTag = readTagFromRemote) {
   const row = parseLock(text).rows[0], parsed = JSON.parse(root);
   const pin = SECTIONS.map(section => parsed[section]?.[FORMAT]).find(value => value !== undefined);
   const tag = typeof pin === 'string' ? PIN.exec(pin)?.[1] : undefined;
-  if (row === undefined || tag === undefined) return [];
+  if (row?.repo === undefined || tag === undefined) return [];
   let facts;
   try { facts = readTag(row.repo, tag); }
   catch (error) {
@@ -104,7 +114,7 @@ export function formatTagFailures(read, readTag = readTagFromRemote) {
   }
   const failures = [];
   if (facts.commit !== row.commit) failures.push(`${LOCK}: ${FORMAT} row locks ${row.commit}, ${tag} is commit ${facts.commit}`);
-  if (facts.name !== FORMAT) failures.push(`${LOCK}: ${tag}'s package.json names ${facts.name}, not ${FORMAT}`);
+  if (facts.name !== PACKAGE) failures.push(`${LOCK}: ${tag}'s package.json names ${facts.name}, not ${PACKAGE}`);
   if (facts.version !== row.version) failures.push(`${LOCK}: ${FORMAT} row says version ${row.version ?? '(none)'}, ${tag}'s package.json says ${facts.version}`);
   return failures;
 }

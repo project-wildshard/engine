@@ -3,9 +3,9 @@ import { formatLockFailures, formatTagFailures, isFormatLockInput } from '../scr
 
 const COMMIT = '711d608bcf30ddaa3a3f1a0cc695ceb35c3ad84a';
 const OBJECT = '0eb7926711350ec0ef13d04c478c7e7a76e9ed1c';
-const PIN = 'github:project-wildshard/shardfile#v0.3.4';
-const REPO = 'git@github.com:project-wildshard/shardfile.git';
-const dep = (commit: string): string => `git+ssh://git@github.com/project-wildshard/shardfile.git#${commit}`;
+const PIN = 'github:project-wildshard/shard-format#v0.3.4';
+const REPO = 'git@github.com:project-wildshard/shard-format.git';
+const dep = (commit: string): string => `git+ssh://git@github.com/project-wildshard/shard-format.git#${commit}`;
 const importer = (key: string, specifier = PIN, commit = COMMIT): string => `  ${key}:
     dependencies:
       '@wildshard/format':
@@ -22,13 +22,13 @@ importers:
 ${importers.join('\n')}
 packages:
 
-  '@wildshard/format@${dep(commit)}':
+  '@wildshard/shard-format@${dep(commit)}':
     resolution: {commit: ${commit}, repo: ${REPO}, type: git}
 ${version === undefined ? '' : `    version: ${version}\n`}    engines: {node: '>=24.18.0'}
 
 snapshots:
 
-  '@wildshard/format@${dep(commit)}(typescript@7.0.2)':
+  '@wildshard/shard-format@${dep(commit)}(typescript@7.0.2)':
     dependencies:
       valibot: 1.5.0(typescript@7.0.2)
 `;
@@ -56,8 +56,8 @@ test('a row with no version is refused rather than passed', () => {
 });
 
 test('a manifest the bump missed is named', () => {
-  const failures = formatLockFailures(tree({ ...healthy, 'src/game/package.json': manifest('github:project-wildshard/shardfile#v0.3.3') }));
-  expect(failures.join('\n')).toContain('src/game/package.json: @wildshard/format pin github:project-wildshard/shardfile#v0.3.3 but pnpm-lock.yaml has');
+  const failures = formatLockFailures(tree({ ...healthy, 'src/game/package.json': manifest('github:project-wildshard/shard-format#v0.3.3') }));
+  expect(failures.join('\n')).toContain('src/game/package.json: @wildshard/format pin github:project-wildshard/shard-format#v0.3.3 but pnpm-lock.yaml has');
   expect(failures.join('\n')).toContain('pins disagree');
 });
 
@@ -68,15 +68,15 @@ test('an importer left at the old commit is named', () => {
 });
 
 test('a pin that is not a release tag is refused', () => {
-  const pin = 'github:project-wildshard/shardfile#main';
+  const pin = 'github:project-wildshard/shard-format#main';
   const failures = formatLockFailures(tree({
     'pnpm-lock.yaml': lock('0.3.4', COMMIT, [importer('.', pin)]), 'package.json': manifest(pin),
   }));
-  expect(failures.join('\n')).toContain("isn't a shardfile release tag");
+  expect(failures.join('\n')).toContain("isn't a shard-format release tag");
 });
 
 test('383f470d39: an old pnpm locked the annotated tag object, not its commit', () => {
-  const facts = { commit: COMMIT, name: '@wildshard/format', version: '0.3.4' };
+  const facts = { commit: COMMIT, name: '@wildshard/shard-format', version: '0.3.4' };
   const read = tree({ ...healthy, 'pnpm-lock.yaml': lock('0.3.4', OBJECT, [importer('.', PIN, OBJECT), importer('src/game', PIN, OBJECT)]) });
   expect(formatLockFailures(read)).toEqual([]);
   expect(formatTagFailures(read, () => facts)).toEqual([`pnpm-lock.yaml: @wildshard/format row locks ${OBJECT}, v0.3.4 is commit ${COMMIT}`]);
@@ -84,11 +84,55 @@ test('383f470d39: an old pnpm locked the annotated tag object, not its commit', 
 
 test("the tag's own package.json decides the version", () => {
   const read = tree(healthy);
-  expect(formatTagFailures(read, () => ({ commit: COMMIT, name: '@wildshard/format', version: '0.3.4' }))).toEqual([]);
+  expect(formatTagFailures(read, () => ({ commit: COMMIT, name: '@wildshard/shard-format', version: '0.3.4' }))).toEqual([]);
   expect(formatTagFailures(read, (repo, tag) => {
     expect([repo, tag]).toEqual([REPO, 'v0.3.4']);
-    return { commit: COMMIT, name: '@wildshard/format', version: '0.3.3' };
+    return { commit: COMMIT, name: '@wildshard/shard-format', version: '0.3.3' };
   })).toEqual(["pnpm-lock.yaml: @wildshard/format row says version 0.3.4, v0.3.4's package.json says 0.3.3"]);
+});
+
+test('J308: a pin still naming the shardfile repo is refused', () => {
+  const pin = 'github:project-wildshard/shardfile#v0.3.4';
+  const failures = formatLockFailures(tree({
+    'pnpm-lock.yaml': lock('0.3.4', COMMIT, [importer('.', pin)]), 'package.json': manifest(pin),
+  }));
+  expect(failures.join('\n')).toContain("isn't a shard-format release tag");
+});
+
+test("a tag whose package.json kept the old name is refused", () => {
+  expect(formatTagFailures(tree(healthy), () => ({ commit: COMMIT, name: '@wildshard/format', version: '0.3.4' }))).toEqual(
+    ["pnpm-lock.yaml: v0.3.4's package.json names @wildshard/format, not @wildshard/shard-format"]);
+});
+
+// pnpm 10.34.9 locks a github pin as a codeload tarball: the alias's importer names the real package, the row has no
+// commit field, and the tag is fetched from the github repo the tarball names.
+test('the codeload tarball shape engine locks today passes', () => {
+  const url = `https://codeload.github.com/project-wildshard/shard-format/tar.gz/${COMMIT}`;
+  const tarball = `lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    dependencies:
+      '@wildshard/format':
+        specifier: ${PIN}
+        version: '@wildshard/shard-format@${url}(typescript@6.0.3)'
+
+packages:
+
+  '@wildshard/shard-format@${url}':
+    resolution: {gitHosted: true, tarball: ${url}}
+    version: 0.3.4
+    engines: {node: '>=24.18.0'}
+`;
+  const read = tree({ 'pnpm-lock.yaml': tarball, 'package.json': manifest() });
+  expect(formatLockFailures(read)).toEqual([]);
+  expect(formatTagFailures(read, (repo, tag) => {
+    expect([repo, tag]).toEqual(['https://github.com/project-wildshard/shard-format.git', 'v0.3.4']);
+    return { commit: COMMIT, name: '@wildshard/shard-format', version: '0.3.4' };
+  })).toEqual([]);
+  expect(formatLockFailures(tree({ 'pnpm-lock.yaml': tarball.replace('version: 0.3.4', 'version: 0.3.3'), 'package.json': manifest() })).join('\n'))
+    .toContain('row says version 0.3.3, the pin says v0.3.4');
 });
 
 test('an unreachable tag goes to CI', () => {
