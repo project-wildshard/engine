@@ -3,17 +3,22 @@
 // never had them. Each seated player is now paid off their own book's flags, by the page's own law (`progressionState`).
 // oxlint-disable-next-line import/no-nodejs-modules -- The room runs the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
+import { Vector3 } from 'three';
 import { expect, test } from 'vitest';
+import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { questBooks } from '../src/shared/engine/quest/players';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
-import { progressionState } from '../src/shared/game/compendium/keepsakeProgression';
+import { progressionState, takeKeepsake } from '../src/shared/game/compendium/keepsakeProgression';
+import { isCosmetic, isOwnedId, Owned } from '../src/shared/game/loot/Owned';
+import { OWNED_ROW, WORN_LINE } from '../src/shared/game/loot/ownedRows';
 import { declaredLootEconomy } from '../src/shared/game/shard/declaredRows';
 import type { OwnedSlots } from '../src/server/game/loot/playerOwned';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { installedKeys } from '../src/server/game/shardfile/installedSides';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
+import { ledgerFilings } from '../src/server/host/standalone/ledgerFilings';
 import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 
 /** One player's goods, kept in memory: each seat its own, as a dedicated room keeps them. */
@@ -79,5 +84,48 @@ test('a seat is paid only once someone sits in it, from a save it imports, and a
     world.owned.of(guest.id);
     host.step();
     expect(owns(guest.id), 'the next occupant of that body is paid off its book, afresh').toEqual(earned(5));
+  } finally { world.dispose(); }
+});
+
+/** A fresh page's book (nothing saved on this device), mirrored from the server's lines as wirePage.mirrorOwned does. */
+function freshPage(lines: ReadonlyMap<string, number>): Owned {
+  const page = new Owned('driftwood-isle', { read: () => ({ owned: [], worn: [] }), write: () => true });
+  for (const [name, value] of lines) if (name.startsWith(OWNED_ROW.owned)) {
+    const id = name.slice(OWNED_ROW.owned.length); page.grant(id);
+    if (isOwnedId(id) && isCosmetic(id) && page.worn(id) !== (value === WORN_LINE)) page.toggleWorn(id);
+  }
+  return page;
+}
+
+test('HS4: what a room player earns is in the server\'s book, worn as their pickup wore it, after a reconnect from a fresh page', { timeout: 120_000 }, async () => {
+  const { world, page, stores, owns } = await driftwood();
+  try {
+    const { host } = world, lead = leadPlayer(host), books = questBooks(host), routes = actRoutes(host);
+    const guest = host.addPlayer('bot:1', { x: lead.position.x + 3, y: lead.position.y, z: lead.position.z }), base = guest.health.attributes.maxHealth;
+    const file = (effects: Parameters<typeof ledgerFilings>[2]): void => { for (const filing of ledgerFilings(host, lead.id, effects, null)) world.owned.of(filing.player).file(filing); };
+    world.owned.of(guest.id);
+    // a keepsake flag: five glass
+    for (const flag of page.flags.slice(0, 5)) books.of(guest.id).flags.set(flag);
+    host.step();
+    // a trophy: the guest's boar, rolled by the room and filed through the tick's ledger
+    const boar = [...host.entities.values()].find(body => body.kind === 'boar'); if (boar === undefined) throw new Error('No boar');
+    const blow = { source: guest.health, sourceTags: [], target: boar.combatActor(), amount: 10, point: new Vector3(), dir: new Vector3() };
+    host.damage.record(blow, 10, host.players); host.events.emit('actor.died', { actor: boar.combatActor(), req: blow }); host.step();
+    file(world.effects());
+    // the Drowned Captain's hat, filed as his fall files it; the page's pickup takes it, and its drop row says to wear it
+    file([{ kind: 'item', item: 'captain-hat', count: 1, actorId: guest.id }]);
+    const before = world.owned.of(guest.id).owned, pageBook = freshPage(new Map());
+    takeKeepsake(pageBook, 'captain-hat', true, { worn: id => before.worn(id), wear: id => { routes.wear?.(guest.id, id); } });
+    expect(owns(guest.id), 'the glass\'s charm is the server\'s').toEqual(['charm-1']);
+    expect(['boar-tusk', 'captain-hat'].filter(id => before.has(id)), 'and so are the trophies').toEqual(['boar-tusk', 'captain-hat']);
+    expect(before.worn('captain-hat'), 'the pickup put the hat on in the server\'s book, not only on this page').toBe(true);
+    expect(pageBook.has('captain-hat'), 'the page granted nothing itself: it mirrors').toBe(false);
+    // a reconnect: the seat is let go (its goods stay in the player's store) and the player comes back on a fresh page
+    world.owned.drop(guest.id); expect(stores.has(guest.id)).toBe(true);
+    const lines = new Map<string, number>(); world.owned.of(guest.id).read(lines, false); host.step();
+    const fresh = freshPage(lines);
+    expect(['charm-1', 'boar-tusk', 'captain-hat'].filter(id => fresh.has(id)), 'the fresh page holds all three, off the server\'s lines').toEqual(['charm-1', 'boar-tusk', 'captain-hat']);
+    expect(fresh.worn('captain-hat'), 'with the hat still on').toBe(true);
+    expect(guest.health.attributes.maxHealth, 'and the charm\'s +10 max health still counts on the server').toBe(base + 10);
   } finally { world.dispose(); }
 });

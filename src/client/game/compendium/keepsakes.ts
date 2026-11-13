@@ -17,7 +17,8 @@ import { isOwnedId, isCosmetic, type Owned } from '../../../shared/game/loot/Own
 import { wirePage } from '../shardfile/wirePage';
 import { rollLoot } from '../loot/tables';
 import { onCreatureDeath } from '../../../shared/game/loot/deaths';
-import { progressionState } from '../../../shared/game/compendium/keepsakeProgression';
+import { progressionState, takeKeepsake, type KeepsakeRoom } from '../../../shared/game/compendium/keepsakeProgression';
+import { OWNED_ROW, WORN_LINE } from '../../../shared/game/loot/ownedRows';
 import type { DeclaredLootEconomy } from '../../../shared/game/shard/declaredRows';
 import type { ShardContext } from '../plugin/context';
 import type { CollectionCatalogue, CollectionDisplay, CollectionParams } from '../models/collectionDisplay';
@@ -55,12 +56,19 @@ export function installCollectionKeepsakes<A extends { kind: string; variant?: s
 } {
   const { owned, progression, flags, rows } = h, scope = h.owner?.scope, view = keepsakeView(h);
   const pending: { text: string; at: number }[] = [];
+  // SERVER-PARITY HS4: in a room the server's book holds the keepsakes (SS3b pays the charms off the same flags, personal loot
+  // files the trophies), and this page only mirrors it: it grants nothing, and tells each reward once, past the world's first frame.
+  const room = (): KeepsakeRoom | null => wirePage.client === null ? null
+    : { worn: id => wirePage.line(`${OWNED_ROW.owned}${id}`) === WORN_LINE, wear: id => { wirePage.wear(id); } };
+  const told = new Set<string>();
   let clock = 0;
   const sync = (announce: boolean): void => {
-    const state = progressionState(progression, flag => flags.has(flag));
+    const state = progressionState(progression, flag => flags.has(flag)), online = room() !== null;
     view.chime?.setCount(state.displayCount);
     for (const reward of state.earned) {
-      if (!owned.grant(reward.id) || !announce) continue;
+      const fresh = online ? !told.has(reward.id) : owned.grant(reward.id);
+      told.add(reward.id);
+      if (!fresh || !announce || online && !wirePage.settled) continue;
       const last = pending[pending.length - 1]?.at ?? -Infinity;
       pending.push({ text: reward.text, at: Math.max(clock + rows.delay, last + rows.spacing) });
     }
@@ -78,7 +86,7 @@ export function installCollectionKeepsakes<A extends { kind: string; variant?: s
     }));
   };
   apply(); const offOwned = owned.onChange(apply); scope?.onDispose(offOwned);
-  const awarded = new Set<string>();
+  const awarded = new Set<string>(), restored = new Set<string>();
   const roster = new ClaimedPickupRoster<string>(h.pickups, {
     scene: h.game.scene, has: id => !awarded.has(id) && isOwnedId(id) && owned.has(id),
     model: id => { const row = rows.drops[id]; if (row === undefined) throw new Error(`Missing collection drop: ${id}`); return view.loose(row.model, row.trophy); },
@@ -86,7 +94,9 @@ export function installCollectionKeepsakes<A extends { kind: string; variant?: s
     take: id => {
       const text = h.pickups[id]?.toast, row = rows.drops[id];
       if (!isOwnedId(id) || text === undefined || row === undefined) throw new Error(`Unknown collection pickup: ${id}`);
-      awarded.delete(id); owned.grant(id); if (row.wear && isCosmetic(id)) owned.wear(id);
+      // a restore is the page's own save's: in a room (now, whenever the wire bound) the server's book keeps the reward
+      awarded.delete(id); if (restored.delete(id) && room() !== null) return;
+      takeKeepsake(owned, id, row.wear, room());
       view.announce(text, 0.8);
     },
   });
@@ -107,7 +117,7 @@ export function installCollectionKeepsakes<A extends { kind: string; variant?: s
   });
   for (const row of rows.restore) {
     const at = h.rewardAt();
-    if (flags.has(row.flag) && isOwnedId(row.item) && !owned.has(row.item) && at !== undefined) roster.spawn(row.item, at, false);
+    if (flags.has(row.flag) && isOwnedId(row.item) && !owned.has(row.item) && at !== undefined) { restored.add(row.item); roster.spawn(row.item, at, false); }
   }
   h.game.onUpdate((dt, t) => {
     clock += dt;
