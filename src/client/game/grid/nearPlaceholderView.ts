@@ -73,6 +73,11 @@ export class NearPlaceholders {
       ...(this.host.limit === undefined ? {} : { limit: this.host.limit }) });
     this.eye = { x: Math.round(eye.x * 10) / 10, z: Math.round(eye.z * 10) / 10 };
     const wanted = new Map(plan.cells.map(c => [c.instance, c.distance]));
+    // QA 2026-11-13 (Jake, Driftwood from the road): a cell turns live a few metres before its runtime draws it (the entry
+    // waits at its wall). An owning near view already drawn stays until the runtime covers the cell (its root hides);
+    // dropped at once, its far proxy and props-only tiles drew the props over holes. Never started for the entered cell.
+    const held = entered === null ? undefined : this.slots.get(entered);
+    if (entered !== null && held?.ready === true && held.owns && this.host.root(entered)?.visible === true) wanted.set(entered, plan.cells.find(c => c.instance === entered)?.distance ?? 0);
     this.distances.clear();
     for (const [instance, distance] of wanted) this.distances.set(instance, Math.round(distance));
     for (const [instance, slot] of this.slots) if (!wanted.has(instance)) this.drop(slot);
@@ -86,9 +91,10 @@ export class NearPlaceholders {
 
   /** Mirror the rings' refinement onto a cell's near view (the regions its L1 / L0 tiles now draw). */
   remask(instance: string): void {
-    const view = this.slots.get(instance)?.view;
+    const slot = this.slots.get(instance), view = slot?.view;
     if (view !== null && view !== undefined) {
-      view.mask(this.host.mask(instance));
+      // an owning near view draws the whole cell: tiles refined beside it (the entry's arrival ring) never cut holes in it
+      view.mask(slot?.owns === true ? new Set<number>() : this.host.mask(instance));
       if (this.slots.get(instance)?.ready !== true) view.mesh.visible = false;
     }
   }
@@ -165,7 +171,7 @@ export class NearPlaceholders {
       }
       if (!current()) return;
       slot.ready = true;
-      view.mask(this.host.mask(instance));
+      view.mask(owns ? new Set<number>() : this.host.mask(instance));
       this.host.cover(instance, true);
     };
     void run();

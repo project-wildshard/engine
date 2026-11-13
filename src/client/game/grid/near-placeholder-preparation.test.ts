@@ -4,7 +4,7 @@ import { installFarProxy, type FarProxyView } from './farView';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { bakedNearFiles, NearPlaceholders, type NearPlaceholderHost } from './nearPlaceholderView';
 
-function fixture() {
+function fixture(refined: ReadonlySet<number> = new Set<number>()) {
   const root = new Group(), geometry = new BoxGeometry(), allocator = new ResidencyAllocator();
   const disposed = vi.fn(); geometry.addEventListener('dispose', () => { disposed(); });
   const cover = vi.fn();
@@ -17,7 +17,7 @@ function fixture() {
   const near = new NearPlaceholders({ allocator, root: () => root, pitch: 555,
     cells: [{ instance: 'cell', slug: 'content', cell: [0, 0], origin: { x: 0, y: 0, z: 0 } }],
     load: () => Promise.resolve({ prepared: { geometry, look: { family: 'toon', haze: { colour: [1, 1, 1] } } }, bytes: 100, owns: true }),
-    mask: () => new Set<number>(), cover: (instance, covered) => { cover(instance, covered); }, prepare });
+    mask: () => refined, cover: (instance, covered) => { cover(instance, covered); }, prepare });
   return { near, root, allocator, cover, disposed, finish, fail, current: () => current() };
 }
 
@@ -32,6 +32,22 @@ test('near views retain their far fallback until preparation completes', async (
   expect(f.cover).toHaveBeenCalledExactlyOnceWith('cell', true);
   f.near.dispose(); expect(f.disposed).toHaveBeenCalledOnce();
   expect(f.allocator.entries()).toHaveLength(0);
+});
+
+test('an owning near view stays drawn until the entered runtime covers its cell (QA 2026-11-13)', async () => {
+  // Driftwood from the road: the cell turned live at its wall and its near view went at once, leaving its far proxy masked by
+  // props-only tiles (the hut over a hole); the arrival ring's refinement cut the same holes in the near view
+  const f = fixture(new Set([0, 1, 4, 5])); f.near.update({ x: 0, z: 0 }, null); await Promise.resolve();
+  f.finish(); await Promise.resolve();
+  f.near.remask('cell'); expect(f.near.visible('cell')).toBe(true);
+  f.near.update({ x: 0, z: 0 }, 'cell');
+  expect(f.near.shows('cell')).toBe(true); expect(f.cover).toHaveBeenCalledExactlyOnceWith('cell', true);
+  f.root.visible = false; f.near.update({ x: 0, z: 0 }, 'cell');
+  expect(f.near.shows('cell')).toBe(false); expect(f.cover).toHaveBeenLastCalledWith('cell', false);
+  expect(f.disposed).toHaveBeenCalledOnce(); expect(f.allocator.entries()).toHaveLength(0);
+  f.root.visible = true; f.near.update({ x: 0, z: 0 }, 'cell'); await Promise.resolve();
+  expect(f.near.state().cells).toHaveLength(0);
+  f.near.dispose();
 });
 
 test.each(['replan', 'dispose', 'failure'] as const)('near preparation cannot publish after %s', async reason => {
