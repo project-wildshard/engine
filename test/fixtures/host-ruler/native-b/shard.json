@@ -1,0 +1,13 @@
+{
+ "identity": {
+  "slug": "native-b"
+ },
+ "admission": {
+  "server": [
+   {
+    "name": "server/native-assembly.json",
+    "path": "server/native-assembly.json"
+   }
+  ]
+ }
+}

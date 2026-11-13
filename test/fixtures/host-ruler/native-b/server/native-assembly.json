@@ -1,0 +1,10 @@
+{
+ "features": [
+  {
+   "host": "grapple"
+  },
+  {
+   "host": "decisions"
+  }
+ ]
+}

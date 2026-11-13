@@ -1,0 +1,15 @@
+{
+ "_copied": "shard-pine-hollow 8b17e93 out/pine-hollow/shard.json, trimmed to identity and the native-assembly admission row (HOST-RULER HR2)",
+ "identity": {
+  "slug": "pine-hollow"
+ },
+ "admission": {
+  "server": [
+   {
+    "name": "server/native-assembly.json",
+    "path": "server/native-assembly.json",
+    "hash": "24100c477ed916e021d7a9fd046a97bb09c4837db166115943052e70b19ec35c"
+   }
+  ]
+ }
+}

@@ -19,3 +19,14 @@
   as the row's wording says: flagged for Jake. 18 chargebacks drop (their
   modules or bindings are gone) for HR6 to re-find. `docs/HOST-BAR.md` holds the bar. Nothing
   reads the register yet (HR6).
+- HR2 (opus-hr2): `scripts/host-ruler/server-roots.mjs` lists a built
+  product's server roots from the host ids in its
+  `server/native-assembly.json` (found through shard.json's
+  `admission.server`). nativeAssemblyHosts.ts has no table, so the reader
+  walks each `switch (row.host)` case (and the module helpers it calls,
+  type positions skipped) for the imported bindings it uses. nativeAssembly.ts's
+  value imports are the shared `@native-assembly` root, minus the
+  dispatcher itself and the patrol intake readers gated on
+  `encounter.patrol`. A name it cannot place, or an id with no case, is
+  unmeasured; import(), helper recursion and value-emitting TS refuse.
+  Pine 17 ids and Driftwood 14 resolve all (35 modules each).

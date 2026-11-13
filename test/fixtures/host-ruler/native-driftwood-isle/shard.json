@@ -1,0 +1,15 @@
+{
+ "_copied": "shard-driftwood ca2ba69 out/driftwood-isle/shard.json, trimmed to identity and the native-assembly admission row (HOST-RULER HR2)",
+ "identity": {
+  "slug": "driftwood-isle"
+ },
+ "admission": {
+  "server": [
+   {
+    "name": "server/native-assembly.json",
+    "path": "server/native-assembly.json",
+    "hash": "345c104ee7737a0a2878d8031499a85381abdb883f59cc3378cbf4dc4cad898e"
+   }
+  ]
+ }
+}
