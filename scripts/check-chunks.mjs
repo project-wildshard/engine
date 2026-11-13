@@ -60,7 +60,7 @@ function closureBudgetErrors(modules, budgets, label, roots, forbidden) {
 }
 /** Static dependencies of the original public title's explicit dynamic roots.
  * Count shared chunks once; optional settings and gameplay stay outside.
- * Ceilings 160 KB gzip / 500 KB raw (J322, Jake 2026-11-13: "A 1 megabyte title page is fine"; was 110 KB / 350 KB). */
+ * Ceilings 160 KB gzip / 500 KB raw (J324, Jake 2026-11-13: "A 1 megabyte title page is fine"; was 110 KB / 350 KB). */
 export function titleClosureBudgetErrors(modules, budgets) {
   // C3: the title's rows are data in its document, so the cold title loads no generated module
   return closureBudgetErrors(modules, budgets, 'title', titleRoots, id => /node_modules\/(?:three|@dimforge\/rapier[^/]*)(?:\/|$)/u.test(id)
