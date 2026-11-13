@@ -125,6 +125,21 @@ async function enterPage(): Promise<unknown> {
     document.documentElement.classList.add('title-first');
     return showPageTitle();
   }
+  // OFFLINE OF3 (J298): a world build never enters a shard its world doesn't open (the grid doesn't place it, or the world's word leaves
+  // it out: the one heard on this page, else the device's kept one). The world would seat the page in another cell, so a link to it, a
+  // tap or a harness URL lands on the title with "Not in this world yet". Asked before the title-first rule, so a bare link says why too.
+  const world = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__;
+  const notInWorld = async (): Promise<boolean> => online && requested !== null && document.getElementById('ws-shardfile') === null
+    && !(await bootTask('app:one-way-in-import', () => import('@wildshard/engine/game/grid/oneWayIn'))).worldOpens(world)(requested);
+  const notInWorldTitle = async (slug: string): Promise<void> => {
+    consumeTitleArrival(slug);
+    history.replaceState(history.state, '', new URL('/', location.origin));
+    document.documentElement.classList.add('title-first');
+    const { dropGridEntry, notInWorldLine } = await import('@wildshard/engine/game/grid/oneWayIn');
+    dropGridEntry(slug);
+    return showPageTitle(notInWorldLine(findTitleManifest(slug)?.name ?? slug));
+  };
+  if (requested !== null && await notInWorld()) return notInWorldTitle(requested);
   const tapped = requested !== null && (pendingTitleArrival(requested) !== null || pendingGridEntry(requested));
   if (document.getElementById('ws-shardfile') === null && onlineTitleFirst(search, online, tapped)) {
     history.replaceState(history.state, '', new URL('/', location.origin));
@@ -137,7 +152,9 @@ async function enterPage(): Promise<unknown> {
   // a harness URL still opens the shard alone.
   if ((online || pendingTitleArrival(requested ?? '') !== null) && requested !== null && document.getElementById('ws-shardfile') === null) {
     const { enterByShard } = await bootTask('app:one-way-in-import', () => import('@wildshard/engine/game/grid/oneWayIn'));
-    await bootTask('app:one-way-in', () => enterByShard({ online, slug: requested, kept: search.has('explore') || pendingGridEntry(requested) }, (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__));
+    await bootTask('app:one-way-in', () => enterByShard({ online, slug: requested, kept: search.has('explore') || pendingGridEntry(requested) }, world));
+    // OF3 again: the one way in may have heard the world's word just now, and it may leave this shard out
+    if (await notInWorld()) return notInWorldTitle(requested);
   }
   const end = lastEnd();
   const named = search.get('chunk');

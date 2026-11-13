@@ -1,8 +1,8 @@
 // GO7 (meta MMO-PLAN MP1G, DG4; MMO-ZONE-SELECT ZS4's goto and ZS5's retirement): one way in. On a build with a world (GO4's gate),
 // Shard select → a grid shard enters the grid at that shard's cell, so Shard select only changes the spawn cell of the one online
 // world, and no online page boots a bordered `'shard'` page for a grid shard. J300 (GRID-CROSSING GC20): that holds when the world's
-// word is missing, late or never kept; only a world known to host one cell (production before GC16) keeps GO4's one-shard page. A
-// shard the grid doesn't place (OFFLINE OF3's) keeps today's one-shard page. J311: a build with no world (preview) does the same with
+// word is missing, late or never kept; only a world known to host one cell (production before GC16) keeps GO4's one-shard page. On a
+// world build, a shard the world doesn't open (the grid doesn't place it, or its kept word leaves it out) is never entered (OFFLINE OF3). J311: a build with no world (preview) does the same with
 // its in-page server, which hosts the whole grid: a Shard select tap enters the solo grid at the shard's cell (`entry.ts` asks only
 // for a tap, so a bare `?chunk=` link, a harness or an author's embedded product still opens the shard alone).
 import { pageScope } from '@wildshard/engine/app/resources';
@@ -11,6 +11,7 @@ import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly'
 import { hostsGrid } from '../shardfile/serverRoute';
 import { pageGridIntents } from './intent';
 import { DEVSERVER, gridMode } from './menu';
+import { GAME_STRINGS } from '../../../shared/game/strings';
 
 /** The grid cell a shard's page enters: the first in catalogue order that runs this shard, or undefined for a shard the grid doesn't place. */
 export function shardCell(slug: string, assembly: GridAssembly = new GridAssembly(gridMode(DEVSERVER))): GridCell | undefined {
@@ -29,6 +30,22 @@ export interface OneWayIn {
   readonly kept: boolean;
 }
 
+/** OFFLINE OF3: the shards a world's word names (`shards`, opus-route2), or null when it names none (an older door, nonsense). */
+export function wordShards(word: unknown): readonly string[] | null {
+  const shards = typeof word === 'object' && word !== null && 'shards' in word ? word.shards : null;
+  return Array.isArray(shards) && shards.every(shard => typeof shard === 'string') ? shards : null;
+}
+
+/** OFFLINE OF3 (J298): whether a world build may enter `slug`. The catalogue must place it (the world opens only grid cells, so a shard
+ *  with no cell would be seated in another one), and a word that names shards (`shards`, heard now or kept) must name it. No word
+ *  and nothing kept leaves the catalogue's answer (J300). This replaces ba88ac9a's "unplaced plays solo". */
+export function inThisWorld(slug: string, shards: readonly string[] | null, assembly?: GridAssembly): boolean {
+  return shardCell(slug, assembly) !== undefined && (shards === null || shards.includes(slug));
+}
+
+/** OF3: the title's line after a `?chunk=` link to a shard this world doesn't open (here, so the entry's static graph stays small). */
+export function notInWorldLine(name: string): string { return GAME_STRINGS.notInWorld.line(name); }
+
 /** The cell a one-shard page enters instead, or null when it stays a one-shard page. */
 export function oneWayIn(page: OneWayIn, assembly?: GridAssembly): GridCell | null {
   if ((page.online && !page.hosted) || page.kept) return null;
@@ -44,24 +61,45 @@ interface OnlineGate { readonly worldWord: (world: { readonly release: string; r
 export interface RouteMemory {
   /** the kept answer for this world's release (true: it hosts the grid), or null when this device never heard one */
   readonly read: (release: string) => boolean | null;
-  readonly write: (release: string, grid: boolean) => void;
+  /** OF3: the shards the kept word named, or null when it named none or nothing is kept */
+  readonly shards: (release: string) => readonly string[] | null;
+  readonly write: (release: string, grid: boolean, shards?: readonly string[] | null) => void;
 }
 /** The device's slot (`localStorage`), keyed by the world's release; the build that heard the answer rides along for diagnostics. */
 export function deviceRouteMemory(): RouteMemory {
   const slot = (): ReturnType<typeof jsonSlot> => jsonSlot('gridRoute', 'device');
+  const kept = (release: string): Readonly<Record<string, unknown>> | null => {
+    try {
+      const row = slot().read();
+      return typeof row === 'object' && row !== null && !Array.isArray(row) && row['of'] === release ? row : null;
+    } catch { return null; }
+  };
   return {
-    read: release => {
-      try {
-        const kept = slot().read();
-        return typeof kept === 'object' && kept !== null && !Array.isArray(kept) && kept['of'] === release && typeof kept['grid'] === 'boolean' ? kept['grid'] : null;
-      } catch { return null; }
-    },
-    write: (release, grid) => {
+    read: release => { const grid = kept(release)?.['grid']; return typeof grid === 'boolean' ? grid : null; },
+    shards: release => wordShards(kept(release)),
+    write: (release, grid, shards = null) => {
       const build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '';
-      try { slot().write({ of: release, grid, build, at: Date.now() }); } catch { /* a device that keeps nothing falls back to today's page */ }
+      try { slot().write({ of: release, grid, ...(shards === null ? {} : { shards: [...shards] }), build, at: Date.now() }); } catch { /* a device that keeps nothing falls back to today's page */ }
     },
   };
 }
+
+const releaseOf = (world: unknown): string | null =>
+  typeof world === 'object' && world !== null && 'release' in world && typeof world.release === 'string' ? world.release : null;
+/** OF3: which shards a build may enter, by the world's kept word (`memory`) and the catalogue. A build with no world (preview,
+ *  sharddev) opens every card: its in-page server hosts any shard. A word that arrives after the page's deadline is kept for the next
+ *  launch only: until then the page enters as J300 says (no word takes the grid). */
+export function worldOpens(world: unknown, memory: RouteMemory = deviceRouteMemory()): (slug: string) => boolean {
+  if (world === undefined) return () => true;
+  const release = releaseOf(world), shards = release === null ? null : memory.shards(release);
+  let assembly: GridAssembly | undefined; // one catalogue read for a whole deck of cards
+  return slug => { assembly ??= new GridAssembly(gridMode(DEVSERVER)); return inThisWorld(slug, shards, assembly); };
+}
+/** OF3: a page leaving for the title because its shard isn't in this world drops any grid entry it held (a tap's, or the one way in's). */
+export function dropGridEntry(slug: string): void { pageGridIntents().consume(slug); }
+
+/** What a world's word says, as this page reads it: whether it hosts the grid, and the shards it opens (OF3). */
+export interface WorldHeard { readonly grid: boolean; readonly shards: readonly string[] | null }
 
 /** One deadline over the whole read, the online module's import included (GO4's 3 s). */
 const HOSTED_MS = 3000;
@@ -72,21 +110,23 @@ const KEEP_LATE_MS = 10_000;
  *  a grid shard to a one-shard page for want of a word, so only a world known to open one cell does. A build with no world answers
  *  false. Whether the page then reaches the world is the online shell's business: it never waits here. */
 export async function worldHosted(world: unknown, waitMs: number = HOSTED_MS, memory: RouteMemory = deviceRouteMemory(),
-  read: (world: unknown, waitMs: number) => Promise<boolean | null> = readHosted): Promise<boolean> {
-  const release = typeof world === 'object' && world !== null && 'release' in world && typeof world.release === 'string' ? world.release : null;
+  read: (world: unknown, waitMs: number) => Promise<WorldHeard | boolean | null> = readHosted): Promise<boolean> {
+  const release = releaseOf(world);
   if (release === null) return false;
   const scope = pageScope.child('grid.hosted'), late = new Promise<null>(resolve => { scope.timeout(waitMs, () => { resolve(null); }); });
   // The read itself may run past the page's deadline (`KEEP_LATE_MS`): a link that always answers late still fills the memory
   // for the next launch, though this page has already gone on without it.
-  const reading = read(world, Math.max(waitMs, KEEP_LATE_MS)).catch(() => null);
-  void reading.then(word => { if (word !== null) memory.write(release, word); return undefined; });
-  let heard: boolean | null;
+  // A bare yes or no (a test's reader) names no shards.
+  const reading = read(world, Math.max(waitMs, KEEP_LATE_MS))
+    .then((word): WorldHeard | null => word === null ? null : typeof word === 'boolean' ? { grid: word, shards: null } : word, () => null);
+  void reading.then(word => { if (word !== null) memory.write(release, word.grid, word.shards); return undefined; });
+  let heard: WorldHeard | null;
   try { heard = await Promise.race([reading, late]); } finally { scope.dispose(); }
-  if (heard !== null) return heard;
+  if (heard !== null) return heard.grid;
   return memory.read(release) ?? true;
 }
-/** The door's word read as grid or not, or null when no word came (unreachable, stalled, closed before its word). */
-async function readHosted(world: unknown, waitMs: number): Promise<boolean | null> {
+/** The door's word read as grid or not and the shards it opens, or null when no word came (unreachable, stalled, closed before its word). */
+async function readHosted(world: unknown, waitMs: number): Promise<WorldHeard | null> {
   if (typeof world !== 'object' || world === null || !('release' in world) || !('key' in world)) return null;
   const { release, key } = world;
   if (typeof release !== 'string' || typeof key !== 'string') return null;
@@ -94,7 +134,7 @@ async function readHosted(world: unknown, waitMs: number): Promise<boolean | nul
     const build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '';
     const gate = await import(/* @vite-ignore */ `/b/${build}/standalone/online.js`) as OnlineGate;
     const word = await gate.worldWord({ release, key }, waitMs);
-    return word === null ? null : hostsGrid(word);
+    return word === null ? null : { grid: hostsGrid(word), shards: wordShards(word) };
   } catch { return null; }
 }
 
@@ -103,12 +143,15 @@ async function readHosted(world: unknown, waitMs: number): Promise<boolean | nul
  * goto intent turns this same page into a grid page (`bootPageMode` consumes it), so Shard select loads once. Returns the cell's
  * instance, or null when the page stays a one-shard page.
  */
-export async function enterByShard(page: Omit<OneWayIn, 'hosted'>, world: unknown, hosted: (world: unknown) => Promise<boolean> = worldHosted): Promise<string | null> {
+export async function enterByShard(page: Omit<OneWayIn, 'hosted'>, world: unknown, hosted: (world: unknown) => Promise<boolean> = worldHosted,
+  opens: (slug: string) => boolean = slug => worldOpens(world)(slug)): Promise<string | null> {
   // Only a page that could turn asks the world: a kept page and a shard off the grid never wait on a read, and a solo build has no
   // world to ask (its in-page server hosts the grid, J311).
   if (oneWayIn({ ...page, hosted: true }) === null) return null;
   const cell = oneWayIn({ ...page, hosted: !page.online || await hosted(world) });
-  if (cell === null) return null;
+  // OF3: a world whose word (heard just now, or kept) leaves this shard out never seats it there: no grid entry, and the page's entry
+  // (`entry.ts`) lands on the title with "Not in this world yet"
+  if (cell === null || (page.online && !opens(page.slug))) return null;
   pageGridIntents().admit({ instance: cell.instance, slug: cell.slug, goto: true });
   return cell.instance;
 }

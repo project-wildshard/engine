@@ -12,7 +12,7 @@ const WORLD = { release: 'https://packs.example/releases/staging.json', key: 'ab
 const silent = (): Promise<boolean | null> => new Promise<never>(() => { /* a link that never answers */ });
 function memory(start: Record<string, boolean> = {}): RouteMemory & { readonly kept: Record<string, boolean> } {
   const kept = { ...start };
-  return { kept, read: release => kept[release] ?? null, write: (release, grid) => { kept[release] = grid; } };
+  return { kept, read: release => kept[release] ?? null, shards: () => null, write: (release, grid) => { kept[release] = grid; } };
 }
 afterEach(() => { pageGridIntents().consume(''); setPageMode('shard'); setPageGoto(null); });
 

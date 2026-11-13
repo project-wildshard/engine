@@ -37,6 +37,7 @@ import { GAME_STRINGS } from '../../shared/game/strings';
 import { menuMode, selectEnters, selectExplores, type MenuMode } from './grid/menu';
 import { pageShardRefusals, refusalReason, type ShardRefusal } from './grid/refusal';
 import { autoPlaced, playerHidden, titleStatus } from '../../shared/game/grid/catalogueSlot';
+import { worldOpens } from './grid/oneWayIn';
 import './summary.css';
 import './upgrade.css';
 
@@ -61,6 +62,8 @@ export interface TitleCard {
   upgrade?: { readonly built: number };
   /** G167: this session refused the shard (memory, safety, format or load): the dimmed UNAVAILABLE card with its reason */
   unavailable?: ShardRefusal;
+  /** OFFLINE OF3: a world build whose world doesn't open this shard: the dimmed card reads "Not in this world yet", ENTER WORLD off */
+  closed?: true;
 }
 
 /** Which shards need an upgrade before this client can enter them (G86): the shardfile version each was built for. Every
@@ -71,21 +74,24 @@ const noUpgrades: UpgradeNeeded = () => null;
 /** Which shards this session refused (G167; `src/client/game/grid/refusal.ts`), default: the page's session record. */
 export type RefusedShard = (slug: string) => ShardRefusal | null;
 const sessionRefusals: RefusedShard = (slug) => pageShardRefusals().read(slug);
+/** Which shards this build's world opens (OF3), default: the build's world stamp and the device's kept world word. */
+export type OpensShard = (slug: string) => boolean;
+const buildWorld = (): OpensShard => worldOpens((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__);
 
 /** Developer mode reveals hidden levels after every player-facing card. */
-export function titleCards(showHidden: boolean = isDev(), upgradeNeeded: UpgradeNeeded = noUpgrades, refused: RefusedShard = sessionRefusals): readonly TitleCard[] {
+export function titleCards(showHidden: boolean = isDev(), upgradeNeeded: UpgradeNeeded = noUpgrades, refused: RefusedShard = sessionRefusals, opens: OpensShard = buildWorld()): readonly TitleCard[] {
   // a `_` prototype stays Developer only unless its catalogue placement opens it (J313: Mossgate)
   const hidden = (m: TitleManifest): boolean => playerHidden(m);
   // SA34 (Q12): an auto-placed shard has no card, even for Developer: you cross in from a neighbour
   const ordinary = titleManifests().filter(m => m.shardSelect !== false && !autoPlaced(m));
   const visible = ordinary.filter((m) => !hidden(m));
   const manifests = showHidden ? [...visible, ...ordinary.filter(hidden)] : visible;
-  return manifests.map((m): TitleCard => titleCard(m, upgradeNeeded, refused));
+  return manifests.map((m): TitleCard => titleCard(m, upgradeNeeded, refused, opens));
 }
 
 /** One shard's card, as Shard Select draws it; also the `/slug/<slug>` page's one card (SA36), which a shard with no Shard
  *  Select card (an open plot, an auto-placed shard) still gets. */
-export function titleCard(m: TitleManifest, upgradeNeeded: UpgradeNeeded = noUpgrades, refused: RefusedShard = sessionRefusals): TitleCard {
+export function titleCard(m: TitleManifest, upgradeNeeded: UpgradeNeeded = noUpgrades, refused: RefusedShard = sessionRefusals, opens: OpensShard = buildWorld()): TitleCard {
   const card: TitleCard = {
     slug: m.slug, name: m.name, label: m.biome,
     thumbnail: m.card.thumb, heroPortrait: m.card.portrait, heroLandscape: m.card.landscape,
@@ -97,7 +103,9 @@ export function titleCard(m: TitleManifest, upgradeNeeded: UpgradeNeeded = noUpg
   if (playerHidden(m)) card.badge = 'Developer only';
   const built = upgradeNeeded(m.slug);
   if (built !== null) card.upgrade = { built };
-  const refusal = built === null ? refused(m.slug) : null; // G86's card already says NEEDS UPGRADE
+  // OF3: a shard this world doesn't open never loads here, so no refusal of it is news
+  if (built === null && !opens(m.slug)) card.closed = true;
+  const refusal = built === null && card.closed === undefined ? refused(m.slug) : null; // G86's card already says NEEDS UPGRADE
   if (refusal !== null) card.unavailable = refusal;
   return card;
 }
@@ -111,6 +119,7 @@ interface DeckEntry {
   readonly badge?: TitleBadge | undefined;
   readonly upgrade?: { readonly built: number } | undefined;
   readonly unavailable?: ShardRefusal | undefined;
+  readonly closed?: true | undefined;
   readonly thumbnail: string;
   readonly heroPortrait: string;
   readonly heroLandscape: string;
@@ -173,20 +182,21 @@ const restricted = (card: DeckEntry): boolean => card.badge === 'Developer only'
 
 /** ENTER WORLD for a card: Select a shard enters what §3.3's table allows in this mode (SF21a: shipped, Developer, DEVSERVER) */
 function canEnter(card: DeckEntry, mode: MenuMode = menuMode()): boolean {
-  if (card.draft || card.upgrade !== undefined || card.unavailable !== undefined) return false;
+  if (card.draft || card.upgrade !== undefined || card.unavailable !== undefined || card.closed === true) return false;
   return selectEnters(card.slug, restricted(card), mode);
 }
 
 /** EXPLORE WORLD is a developer tool: only in developer mode (or a DEVSERVER build), and only for a world that can be
  *  entered (Jake, E386) */
 function canExplore(card: DeckEntry, mode: MenuMode = menuMode()): boolean {
-  return !card.draft && selectExplores(card.slug, restricted(card), mode);
+  // OF3: exploring joins the world too (OF2), which would seat a closed shard's page in another cell
+  return !card.draft && card.closed !== true && selectExplores(card.slug, restricted(card), mode);
 }
 
 /** the tape over a card's image: a world that can't be entered reads COMING SOON, not EXPERIMENTAL (Jake, E386) */
 function ribbonFor(card: DeckEntry, mode: MenuMode = menuMode()): string {
   if (card.draft) return mode.developer || mode.devserver ? GAME_STRINGS.drafts.ribbon(card.draft.stage) : GAME_STRINGS.drafts.comingSoon;
-  if (card.upgrade !== undefined || card.unavailable !== undefined) return ''; // G86 / G167: the amber badge says it, not a tape
+  if (card.upgrade !== undefined || card.unavailable !== undefined || card.closed === true) return ''; // G86 / G167 / OF3: the amber line says it, not a tape
   if (!canEnter(card, mode)) return 'Coming soon';
   return card.badge === 'Developer only' ? GAME_STRINGS.developer.ribbon : card.badge ?? '';
 }
@@ -232,7 +242,8 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   const cardTrack = required(root, '.ws-menu-deck-track'), dotTrack = required(root, '.ws-menu-dots');
   entries.forEach((card, index) => {
     const active = index === activeIndex, button = document.createElement('button'); button.type = 'button'; button.dataset['i'] = String(index);
-    button.className = `ws-menu-card${active ? ' active' : ''}${card.upgrade !== undefined || card.unavailable !== undefined ? ' ws-menu-card-upgrade' : ''}${card.unavailable !== undefined ? ' ws-menu-card-unavailable' : ''}`;
+    const dimmed = card.upgrade !== undefined || card.unavailable !== undefined || card.closed === true, amber = card.unavailable !== undefined || card.closed === true;
+    button.className = `ws-menu-card${active ? ' active' : ''}${dimmed ? ' ws-menu-card-upgrade' : ''}${amber ? ' ws-menu-card-unavailable' : ''}`;
     const image = document.createElement('span'); image.className = 'ws-menu-card-img'; image.style.backgroundImage = `url('${titleAssetURL(card.thumbnail)}')`;
     if (card.upgrade !== undefined) image.append(words('i', 'ws-menu-card-tag ws-menu-card-needs', GAME_STRINGS.upgrade.badge));
     else if (card.unavailable !== undefined) image.append(words('i', 'ws-menu-card-tag ws-menu-card-needs', GAME_STRINGS.unavailable.badge));
@@ -241,8 +252,8 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     const ribbon = ribbonFor(card, mode());
     const tone = !canEnter(card, mode()) ? '' : card.badge === 'Early access' ? ' ws-menu-card-ea' : card.badge === 'Partial' ? ' ws-menu-card-partial' : '';
     if (ribbon !== '') image.append(words('i', `ws-menu-card-exp${tone}`, ribbon));
-    const sub = card.upgrade !== undefined ? GAME_STRINGS.upgrade.built(card.upgrade.built) : card.unavailable !== undefined ? refusalReason(card.unavailable) : card.label;
-    button.append(image, words('b', '', card.name), words('small', card.unavailable !== undefined ? 'ws-menu-card-reason' : '', sub)); cardTrack.append(button);
+    const sub = card.upgrade !== undefined ? GAME_STRINGS.upgrade.built(card.upgrade.built) : card.closed === true ? GAME_STRINGS.notInWorld.badge : card.unavailable !== undefined ? refusalReason(card.unavailable) : card.label;
+    button.append(image, words('b', '', card.name), words('small', amber ? 'ws-menu-card-reason' : '', sub)); cardTrack.append(button);
     const dot = document.createElement('i'); dot.dataset['i'] = String(index); dot.dataset['tag'] = dotTag(card, mode()); dot.style.setProperty('--thumb', `url('${titleAssetURL(card.thumbnail)}')`); dotTrack.append(dot);
   });
   if (opts.notice) {
@@ -302,7 +313,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     play.disabled = (!open && c.draft === null) || single?.closed !== undefined;
     explore.disabled = !canExplore(c, mode());
     explore.classList.toggle('off', !canExplore(c, mode())); // menu.css hides .off
-    required(play, 'b').textContent = c.draft ? (isDev() ? GAME_STRINGS.drafts.draftMode : GAME_STRINGS.drafts.followBuild) : c.upgrade !== undefined ? GAME_STRINGS.upgrade.badge : c.unavailable !== undefined ? GAME_STRINGS.unavailable.badge : open ? single?.play ?? 'Enter world' : 'Coming soon';
+    required(play, 'b').textContent = c.draft ? (isDev() ? GAME_STRINGS.drafts.draftMode : GAME_STRINGS.drafts.followBuild) : c.upgrade !== undefined ? GAME_STRINGS.upgrade.badge : c.unavailable !== undefined ? GAME_STRINGS.unavailable.badge : c.closed === true ? GAME_STRINGS.notInWorld.badge : open ? single?.play ?? 'Enter world' : 'Coming soon';
     paintSummary(c);
   };
   const select = (raw: number, smooth = true): void => {

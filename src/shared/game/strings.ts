@@ -61,6 +61,12 @@ export const GAME_STRINGS = {
     safety: 'FAILED SAFETY CHECK',
     load: "COULDN'T LOAD",
   },
+  /** OFFLINE OF3 (J298): on a world build, a shard the world doesn't open (the grid doesn't place it, or the world's word leaves it out).
+   *  Its Shard select card (dimmed, ENTER WORLD off) and the title's line after a `?chunk=` link to it */
+  notInWorld: {
+    badge: 'Not in this world yet',
+    line: (name: string): string => `${name}: Not in this world yet`,
+  },
   /** G168 (art/hud/round-22-script-error): a shard script switched off after its strikes. The player's toast, once; with
    *  Developer on, the red strip names the module and its cause */
   script: {
