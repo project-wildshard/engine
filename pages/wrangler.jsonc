@@ -15,10 +15,11 @@
     "binding": "ASSETS",
     // A missing chunk must 404, never return HTML: previousDeploy.mjs treats text/html as gone.
     "not_found_handling": "none",
-    // Only the page itself (the ?doctor 302 and no-store) and the spawn parts (stored brotli sent as is, OV2) run
+    // Only the page itself (the ?doctor 302 and no-store, and SA37's /slug/<slug>) and the spawn parts (stored brotli sent as is, OV2) run
     // worker.ts; everything else is a free asset request. A path with no asset also runs it: its 404 leaves no-store
     // (AUDIO AU4), never the path's `_headers` cache.
-    "run_worker_first": ["/", "/index.html", "/assets/spawn/parts/*", "/assets/spawn/server/*"]
+    // SA37: `/slug/*` is the one-shard page with its link-preview tags, or a 404 for a slug that names no shard.
+    "run_worker_first": ["/", "/index.html", "/slug/*", "/assets/spawn/parts/*", "/assets/spawn/server/*"]
   },
   "observability": { "enabled": true },
   "env": {
@@ -30,9 +31,7 @@
     "preview": {
       "name": "wildshard-play-preview",
       "workers_dev": false,
-      "preview_urls": true,
-      // SA36: preview alone serves the page for /slug/<slug> (worker.ts SLUG_PAGE); SA37 adds staging and production
-      "vars": { "SLUG_PAGE": "on" }
+      "preview_urls": true
     }
   }
 }

@@ -100,11 +100,10 @@ function serverSites(): Promise<readonly { readonly site: string | null | undefi
 }
 async function enterPage(): Promise<unknown> {
   const requested = search.get('chunk');
-  // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here
-  // Preview only until SA37 (a build with no world: the worker serves any navigation the cached page, so the Worker's gate alone
-  // would open it on staging and production to a returning player)
+  // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here.
+  // SA37: on every host, a world build too: PLAY's `/?chunk=` page enters the world's grid at the shard's cell (GO7 below)
   const slugged = slugOfPath(location.pathname);
-  if (slugged !== null && requested === null && (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ === undefined) return showSlugPage(slugged);
+  if (slugged !== null && requested === null) return showSlugPage(slugged);
   // An embedded author product has its own admission. A game URL must name a
   // listed world before any discovery, tables or renderer can be prepared.
   if (requested !== null && document.getElementById('ws-shardfile') === null && findTitleManifest(requested) === undefined) {

@@ -10,6 +10,10 @@
 // A path with no asset also reaches the Worker; the assets answer it 404, and the Worker makes that miss `no-store`
 // (AUDIO AU4, J299): the assets would send the path's year-long `immutable` from `_headers`, so one miss during a
 // deploy would stay on phones and at the edge for a year. Any answer but a 2xx or a 304 is no-store; those keep theirs.
+// SA37: `/slug/<slug>` on every host is the page too, with its link-preview tags (og:title, og:description, og:image) from
+// the catalogue the page carries (slug-meta.ts); a slug that names no shard answers 404.
+
+import { slugMeta, withSlugMeta } from './slug-meta.ts'
 
 interface Fetcher {
   // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request, only passed through
@@ -18,8 +22,6 @@ interface Fetcher {
 
 interface Env {
   readonly ASSETS: Fetcher
-  /** SA36: `on` serves the page for `/slug/<slug>` too. Only preview sets it (wrangler.jsonc); SA37 takes it to every host. */
-  readonly SLUG_PAGE?: string
 }
 
 const SW = /^sw(?:=|$)/u
@@ -31,7 +33,10 @@ function doctor(search: string): string {
 }
 const PAGE = new Set(['/', '/index.html'])
 // SA36: the one-shard page a sharddev author shares (src/client/app/slugPath.ts reads the same paths)
-const SLUG = /^\/slug\/[\w-]+\/?$/u
+const SLUG = /^\/slug\/(?<slug>[\w-]+)\/?$/u
+const NOT_FOUND = 404
+const PLAIN = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }
+const DROPPED = ['content-length', 'etag', 'last-modified']
 const OK = 200
 const PART = /^\/assets\/spawn\/(?:parts|server)\/[^/]+\.pack\.br$/u
 const NOT_MODIFIED = 304
@@ -76,11 +81,49 @@ async function page(request: Request, url: URL, env: Env): Promise<Response> {
   return response
 }
 
+/** The page's headers for a rewritten body: no-store, HTML, and none that describe the stored bytes. */
+function pageHeaders(asset: Response): Headers {
+  const headers = new Headers(asset.headers)
+  for (const name of DROPPED) {
+    headers.delete(name)
+  }
+  headers.set('cache-control', 'no-store')
+  headers.set('content-type', 'text/html; charset=utf-8')
+  return headers
+}
+
+interface SlugRequest {
+  readonly request: Request
+  readonly url: URL
+  readonly slug: string
+}
+
+// oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
+async function slugPage({ request, url, slug }: SlugRequest, env: Env): Promise<Response> {
+  // The page itself, whole: a HEAD's empty body or a conditional request's 304 would hide which shards it names (review)
+  const asset = await env.ASSETS.fetch(new Request(new URL('/', url), { method: 'GET' }))
+  if (!asset.ok) {
+    return uncachedMiss(asset)
+  }
+  const html = await asset.text()
+  const meta = slugMeta(html, slug, url.origin)
+  const head = request.method === 'HEAD'
+  if (meta === undefined) {
+    return new Response(head ? undefined : `No shard is named ${slug}.\n`, { status: NOT_FOUND, headers: PLAIN })
+  }
+  return new Response(head ? undefined : withSlugMeta(html, meta), { status: OK, headers: pageHeaders(asset) })
+}
+
 // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
 async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
-  if (PAGE.has(url.pathname) || (env.SLUG_PAGE === 'on' && SLUG.test(url.pathname))) {
+  const slug = SLUG.exec(url.pathname)?.groups?.['slug']
+  // A slug link's `?doctor` goes to the doctor as the page's does
+  if (PAGE.has(url.pathname) || (slug !== undefined && url.searchParams.has('doctor'))) {
     return await page(request, url, env)
+  }
+  if (slug !== undefined) {
+    return await slugPage({ request, url, slug }, env)
   }
   if (PART.test(url.pathname)) {
     return await part(request, env)

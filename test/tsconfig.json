@@ -567,6 +567,7 @@
     "../scripts/pin-format.ts",
     "../scripts/engine-ci-plan.ts",
     "../scripts/engine-ci-budget.ts",
-    "../pages/worker.ts"
+    "../pages/worker.ts",
+    "../pages/slug-meta.ts"
   ]
 }
