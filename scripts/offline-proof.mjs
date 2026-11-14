@@ -217,7 +217,8 @@ const readScreen = () => {
   const fail = [...document.querySelectorAll('[class^="ws-fail"],[class*=" ws-fail"]')].find(node => node instanceof HTMLElement && node.offsetParent !== null);
   const world = /** @type {{ __wildshard?: { world?: { player?: unknown } } }} */ (/** @type {unknown} */ (window)).__wildshard?.world;
   /** @type {string | null | undefined} */ let grid;
-  try { grid = /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().inside; } catch { grid = undefined; }
+  // the probe's area (T2E-1b): a grid cell's instance, null between cells (the road); a one-shard page's area has no instance
+  try { const area = /** @type {any} */ (window).__wildshard?.area?.(); grid = area === null ? null : typeof area?.instance === 'string' ? area.instance : undefined; } catch { grid = undefined; }
   return {
     card, title: title && !card, player: world?.player !== undefined && world.player !== null && !card,
     phase: card ? (on instanceof HTMLElement ? on.dataset.phase ?? 'none' : 'none') : title ? 'title' : 'page',
@@ -312,8 +313,8 @@ async function enter(run) {
       if (screen !== undefined) {
         last = screen; phase = screen.phase; step = screen.step;
         const previous = samples.at(-1);
-        const sample = { t: at(), phase: screen.phase, step: screen.step, card: screen.card, title: screen.title, player: screen.player, failCard: screen.failCard, text: screen.text };
-        if (previous === undefined || previous.phase !== sample.phase || previous.step !== sample.step || previous.title !== sample.title || previous.player !== sample.player || previous.failCard !== sample.failCard || previous.text.slice(0, 400) !== sample.text.slice(0, 400)) samples.push(sample);
+        const sample = { t: at(), phase: screen.phase, step: screen.step, card: screen.card, title: screen.title, player: screen.player, failCard: screen.failCard, text: screen.text, ...screen.inside === undefined ? {} : { inside: screen.inside } };
+        if (previous === undefined || previous.phase !== sample.phase || previous.step !== sample.step || previous.title !== sample.title || previous.player !== sample.player || previous.failCard !== sample.failCard || previous.inside !== sample.inside || previous.text.slice(0, 400) !== sample.text.slice(0, 400)) samples.push(sample);
       }
     };
     const poller = setInterval(() => { void poll(); }, 250);
