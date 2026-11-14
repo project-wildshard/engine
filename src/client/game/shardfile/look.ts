@@ -22,7 +22,7 @@ export function shardfileLook(look: Shardfile['look'], assets?: ReadonlyMap<stri
   // B2: `grade.tone` is a grade choice, not a light setting: it holds on every tier, with or without the row (so do M4.7's
   // exposure and vignette); the bloom radius rides the bloom, which the row and the tier gate
   return dataLook({ day: look.day ?? DATA_LOOK_DAY, dayOverride: look.dayOverride, keys: look.keys, lut, neutral: look.grade.tone === 'neutral', aces: look.grade.tone === 'aces',
-    exposure: look.grade.exposure, vignette: look.grade.vignette ?? null, bloomRadius: resolved.bloom.radius,
+    exposure: look.grade.exposure, vignette: look.grade.vignette ?? null, bloomRadius: resolved.bloom.radius, sky: look.sky?.graph ?? null,
     light: { rim: resolved.rim, pools: resolved.pools, heightFogDensity: resolved.atmosphere.fogHeightDensity, lamps: resolved.lamps, bounce: resolved.bounce, environment: resolved.environment,
       shadow: resolved.shadow, motes: resolved.motes } });
 }

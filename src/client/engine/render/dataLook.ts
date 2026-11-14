@@ -17,8 +17,9 @@ import { LUT_SIZE, fetchLut } from './lut';
 import { PATCH_ORDER, patchShader, setInheritedPatch, type ShaderSource } from './shaderPatches';
 import { Scope } from '../../../shared/engine/app/scope';
 import { curveAt, type Curve } from '@wildshard/format/materials';
-import type { GraphIr } from '@wildshard/format/materialGraph';
+import type { GraphBudget, GraphIr } from '@wildshard/format/materialGraph';
 import { loadLookGraphCompiler } from './graphBackend';
+import { LOOK_SKY_BUDGET } from '@wildshard/format/look-sky';
 import { EmissiveLook } from './families/emissive';
 import { familyMaterial } from './families/registry';
 import { ToonLook } from './families/toon';
@@ -77,6 +78,13 @@ export interface DataLookSpec {
   readonly exposure?: number;
   readonly vignette?: LookVignette | null;
   readonly bloomRadius?: number | null;
+  /**
+   * SHARD-SOURCE AP14 (`look.sky`): the dome's painted sky, an unlit material graph over the dome's direction
+   * (`normalize(positionLocal)`), compiled on the page's renderer with the backdrop in place of the gradient. The
+   * environment (`light.environment`) is filtered from the same dome, so reflections show the painted sky. Absent or
+   * null: the gradient of the keys' zenith and horizon.
+   */
+  readonly sky?: GraphIr | null;
 }
 
 /** A sampled look: plain numbers, blended between the two keys around a time of day. */
@@ -134,7 +142,7 @@ export function dataLookClock(day: LookDay, dayOverride: number | null): DayCycl
 }
 
 /** The engine's gradient dome: radius 600 m, drawn first, unfogged, kept on the camera by Game (the backdrop's `clouds`). */
-function gradientDome(): { dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>; zenith: THREE.Color; horizon: THREE.Color } {
+function gradientDome(): { dome: THREE.Mesh<THREE.SphereGeometry, THREE.Material>; zenith: THREE.Color; horizon: THREE.Color } {
   const zenith = new THREE.Color(), horizon = new THREE.Color();
   const material = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: { uZenith: { value: zenith }, uHorizon: { value: horizon } },
@@ -144,6 +152,18 @@ function gradientDome(): { dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMa
   const dome = new THREE.Mesh(new THREE.SphereGeometry(600, 24, 12), material);
   dome.name = 'look-dome'; dome.renderOrder = -1; dome.frustumCulled = false;
   return { dome, zenith, horizon };
+}
+
+/**
+ * AP14: a look's painted sky on the dome: its graph compiled (by `compile`, the page's look-graph compiler) as an unlit
+ * material drawn on the inside of the sphere, first, unfogged and writing no depth, as the gradient's material is (the
+ * old material is freed).
+ */
+export function paintDome(dome: THREE.Mesh<THREE.SphereGeometry, THREE.Material>, sky: GraphIr, compile: (ir: GraphIr, opts: { readonly budget: GraphBudget }) => { readonly material: THREE.Material }): void {
+  const { material } = compile(sky, { budget: LOOK_SKY_BUDGET });
+  material.side = THREE.BackSide; material.depthWrite = false; material.name = 'engine.look.sky';
+  if ('fog' in material) material.fog = false;
+  dome.material.dispose(); dome.material = material;
 }
 
 async function lutTexture(url: string | Uint8Array | null): Promise<LookupTexture | null> {
@@ -249,7 +269,7 @@ ${mist ? `
       #endif`);
     shader.fragmentShader = `#ifdef USE_FOG\nuniform float wsLookFogNear; uniform float wsLookFogFar; uniform float wsLookFogEnabled;\n#endif\n${patched}`;
   };
-  const owned: { dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null; lut: LookupTexture | null; pools: THREE.Object3D | null; rim: boolean;
+  const owned: { dome: THREE.Mesh<THREE.SphereGeometry, THREE.Material> | null; lut: LookupTexture | null; pools: THREE.Object3D | null; rim: boolean;
     lamps: ReturnType<typeof lampLights> | null; bounce: ReturnType<typeof bounceLight> | null; environment: THREE.WebGLRenderTarget | null;
     glow: THREE.Object3D[] | null; fx: EngineEffects | null; exposure: ExposureEffect | null; clock: DayCycle | null;
     chain: { vignette: { offset: number; darkness: number }; radius: number } | null } = { dome: null, lut: null, pools: null, rim: false, lamps: null, bounce: null, environment: null, glow: null,
@@ -383,10 +403,12 @@ ${mist ? `
     sky: { clouds: false, planet: false, sun: { disc: false, halo: false } },
     // M4.7: the look's shadow radius and normal bias (its strength is set on the cascades each frame, below)
     ...(shadow === null ? {} : { shadows: { rig: 'tier' as const, radius: shadow.radius, normalBias: shadow.normalBias } }),
-    backdrop: async ({ sky }) => {
+    backdrop: async ({ sky, renderer }) => {
       const clock = dataLookClock(spec.day, spec.dayOverride), now = lookSample();
       owned.clock = clock;
       const { dome, zenith, horizon } = gradientDome();
+      // AP14: the painted sky replaces the gradient before the compose filters the environment from the dome
+      if (spec.sky !== undefined && spec.sky !== null) paintDome(dome, spec.sky, (await loadLookGraphCompiler(renderer)).compileGraph);
       owned.dome = dome;
       const bounce = owned.bounce;
       let targets: SkyBackdropTargets | null = null, flicker = 0;
