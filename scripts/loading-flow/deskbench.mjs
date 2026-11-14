@@ -23,9 +23,10 @@ import { NAME_ASKED, developerSettings, saveFixture, levelDownloadFixtures, hide
 const { values } = parseArgs({ options: { base: { type: 'string' }, shards: { type: 'string', default: 'Nine,Nalati,Driftwood' },
   frames: { type: 'string', default: '240' }, poses: { type: 'string', default: '6' }, width: { type: 'string', default: '1496' },
   height: { type: 'string', default: '717' }, scale: { type: 'string', default: '2' }, json: { type: 'string' }, shots: { type: 'string' },
-  'gfx-dpr': { type: 'string' }, ab: { type: 'boolean', default: false }, census: { type: 'boolean', default: false }, profile: { type: 'string' }, settle: { type: 'string', default: '2500' } } });
+  'gfx-dpr': { type: 'string' }, extra: { type: 'string' }, walk: { type: 'string', default: '0' }, ab: { type: 'boolean', default: false }, census: { type: 'boolean', default: false }, profile: { type: 'string' }, settle: { type: 'string', default: '2500' } } });
 if (values.base === undefined) { console.error('usage: deskbench.mjs --base <url> [--shards Nine,Nalati,Driftwood] [--frames 240] [--poses 6] [--json <file>] [--shots <dir>] [--profile <dir>] [--census] [--ab]'); process.exit(2); }
 const base = values.base.replace(/\/$/u, ''), frames = Number(values.frames), maxPoses = Number(values.poses), settle = Number(values.settle);
+const walkSeconds = Number(values.walk);
 const viewport = { width: Number(values.width), height: Number(values.height) }, scale = Number(values.scale);
 /** @param {number} ms */
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
@@ -79,6 +80,35 @@ function frameCensus() {
       if (g.frameCount - start < 2) { requestAnimationFrame(tick); return; }
       if (own === undefined) Reflect.deleteProperty(r, 'render'); else Object.defineProperty(r, 'render', own);
       resolve({ objects, meshes, visibleMeshes, autoUpdate, lights, skinned, programs: r.info.programs?.length ?? -1, calls: calls.slice(0, 80), perFrame: calls.length / (g.frameCount - start) });
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+/** Browser side: walk `seconds` from where the player stands, recording drawn intervals and long animation frames. */
+function walkHitches(/** @type {number} */ seconds) {
+  const w = /** @type {any} */ (window).__wildshard.world, g = w.game, input = g.app.input, p = w.player;
+  /** @type {any[]} */
+  const loafs = [];
+  const t0 = performance.now();
+  const observer = new PerformanceObserver((list) => { for (const e of /** @type {any[]} */ (list.getEntries())) loafs.push(e); });
+  try { observer.observe({ type: 'long-animation-frame', buffered: false }); } catch { /* no LoAF: intervals only */ }
+  return new Promise((resolve) => {
+    /** @type {number[]} */
+    const intervals = [];
+    let count = g.frameCount, last = -1;
+    const step = () => { if (performance.now() - t0 < seconds * 1000) { input.setHeld('move.forward', true); p.yaw += 0.004; setTimeout(step, 16); } };
+    step();
+    const tick = (/** @type {number} */ t) => {
+      if (g.frameCount !== count) { if (last >= 0) intervals.push(t - last); count = g.frameCount; last = t; }
+      if (performance.now() - t0 < seconds * 1000) { requestAnimationFrame(tick); return; }
+      input.setHeld('move.forward', false); observer.disconnect();
+      const s = [...intervals].sort((a, b) => a - b), at = (/** @type {number} */ q) => Math.round((s[Math.min(s.length - 1, Math.floor(s.length * q))] ?? 0) * 10) / 10;
+      const r = (/** @type {number} */ v) => Math.round(v);
+      resolve({ frames: intervals.length, p50: at(0.5), p95: at(0.95), p99: at(0.99), max: r(s.at(-1) ?? 0),
+        over33: intervals.filter((v) => v > 33).length, over50: intervals.filter((v) => v > 50).length, over100: intervals.filter((v) => v > 100).length,
+        loafs: loafs.sort((a, b) => b.duration - a.duration).slice(0, 12).map((e) => ({ at: Math.round((e.startTime - t0) / 100) / 10, duration: r(e.duration), blocking: r(e.blockingDuration ?? 0),
+          scripts: (e.scripts ?? []).sort((/** @type {any} */ a, /** @type {any} */ b) => b.duration - a.duration).slice(0, 3).map((/** @type {any} */ x) => ({ fn: x.sourceFunctionName === "" ? x.invoker : x.sourceFunctionName, src: `${String(x.sourceURL).split('/').pop()}:${x.sourceCharPosition}`, ms: r(x.duration) })) })) });
     };
     requestAnimationFrame(tick);
   });
@@ -167,7 +197,14 @@ try {
     if (cdp !== null && profileDir !== undefined) { mkdirSync(profileDir, { recursive: true }); await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); }
     const authored = await page.evaluate(`(async () => { const a = await window.__wildshard.world.game.level.capturePoses?.() ?? {};
       return Object.entries(a).flatMap(([name, c]) => c.probe ? [{ ...c.probe, name: c.probe.name ?? name }] : c.feet ? [{ name, x: c.feet[0], y: c.feet[1], z: c.feet[2], yaw: -c.yaw * Math.PI / 180, pitch: c.pitch * Math.PI / 180 }] : []); })()`);
-    const poses = [meta.spawn, { ...meta.spawn, name: 'spawn-reverse', yaw: meta.spawn.yaw + Math.PI }, ...authored].slice(0, maxPoses);
+    // --extra 'forward,right,yawDeg[,pitchDeg];…': more poses from the spawn, in metres along its facing and degrees off it
+    const extra = (values.extra ?? '').split(';').filter(Boolean).map((row, i) => {
+      const [forward = 0, right = 0, yawDeg = 0, pitchDeg = 0] = row.split(',').map(Number), yaw = meta.spawn.yaw;
+      // the probe's yaw faces -z at 0 (three's camera): forward is (-sin, -cos), right is (cos, -sin)
+      return { name: `extra-${i}`, x: meta.spawn.x - Math.sin(yaw) * forward + Math.cos(yaw) * right, y: meta.spawn.y, z: meta.spawn.z - Math.cos(yaw) * forward - Math.sin(yaw) * right,
+        yaw: yaw + yawDeg * Math.PI / 180, pitch: pitchDeg * Math.PI / 180 };
+    });
+    const poses = [meta.spawn, { ...meta.spawn, name: 'spawn-reverse', yaw: meta.spawn.yaw + Math.PI }, ...authored].slice(0, maxPoses).concat(extra);
     console.log(`deskbench ${titles[target]} (${meta.level}) at ${base}: control ${controlS.toFixed(1)} s · ${meta.viewport.join('x')} @${meta.dpr} · ${meta.renderer}`);
     console.log(`  passes: ${meta.passes.join(' | ')}`);
     /** @type {any[]} */
@@ -188,6 +225,17 @@ try {
       for (const k of c.calls.slice(0, Math.ceil(c.perFrame))) console.log(`    ${k.scene} / ${k.camera} to ${k.target}: ${k.draws} draws, ${k.ms} ms`);
     }
     /** @type {any} */
+    let walk = null;
+    if (walkSeconds > 0) {
+      // --walk: from the spawn, walk forward turning slowly for N seconds (benchmax's input), every drawn interval kept, and
+      // Chromium's long animation frames (their scripts, by source position) for the hitches
+      await page.evaluate(`window.__wildshard.pose(${JSON.stringify(meta.spawn)})`);
+      await sleep(settle);
+      walk = await page.evaluate(`(${walkHitches.toString()})(${walkSeconds})`);
+      console.log(`  walk ${walkSeconds} s: ${walk.frames} frames · p50 ${walk.p50} p95 ${walk.p95} p99 ${walk.p99} max ${walk.max} ms · over 33 ms ${walk.over33} · over 50 ms ${walk.over50} · over 100 ms ${walk.over100}`);
+      for (const loaf of walk.loafs.slice(0, 8)) console.log(`    +${loaf.at} s ${loaf.duration} ms (blocking ${loaf.blocking}): ${loaf.scripts.map((/** @type {any} */ x) => `${x.fn}@${x.src} ${x.ms} ms`).join(' | ')}`);
+    }
+    /** @type {any} */
     let ab = null;
     if (values.ab) {
       ab = await page.evaluate(`(${abCosts.toString()})(${sampleFrames.toString()})`);
@@ -195,7 +243,7 @@ try {
       for (const v of ab) console.log(`    ${v.variant.padEnd(34)} p50 ${v.p50} (saves ${v.saves}) · work ${v.work} · render ${v.render} · ${v.calls} draws`);
     }
     if (errors.length > 0) console.log(`  page errors: ${errors.slice(0, 5).join(' | ')}`);
-    report.push({ shard: titles[target], meta, controlS, rows, ab, errors });
+    report.push({ shard: titles[target], meta, controlS, rows, walk, ab, errors });
     await context.close();
   }
 } finally { await browser.close(); }
