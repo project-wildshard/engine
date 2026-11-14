@@ -44,8 +44,12 @@ const execAsync = async (/** @type {string} */ file, /** @type {string[]} */ arg
   if (code !== 0) throw new Error(`${file} exited ${String(code)}`);
   return Buffer.concat(chunks).toString();
 };
-/** One command on the box, its output as text. */
-const box = (/** @type {string} */ command, /** @type {Buffer | string | undefined} */ input) => {
+/**
+ * One command on the box, its output as text.
+ * @param {string} command
+ * @param {Buffer | string} [input]
+ */
+const box = (command, input) => {
   if (remote === undefined) throw new Error('Not remote');
   if (input === undefined) return execAsync('ssh', [...ALIVE, remote, command], 120_000);
   return execFileSync('ssh', [...ALIVE, remote, command], { input, maxBuffer: 1 << 26, timeout: 300_000 }).toString();
