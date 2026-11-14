@@ -22,7 +22,9 @@ export const DOCTOR_CHECKS = [
 export type DoctorId = (typeof DOCTOR_CHECKS)[number]['id'];
 export type DoctorState = 'wait' | 'run' | 'pass' | 'warn' | 'fail' | 'skip';
 /** One check as the panel shows it. `value` is what was measured; `hint` says what to do when it is not a pass. */
-export interface DoctorRow { readonly id: DoctorId; readonly label: string; readonly state: DoctorState; readonly value: string; readonly hint: string; readonly ms: number }
+export interface DoctorRow { readonly id: DoctorId; readonly label: string; readonly state: DoctorState; readonly value: string; readonly hint: string; readonly ms: number;
+  /** The failure-mode catalogue's id this row's warning stands for (meta MMO-FAILURE-MODES-PLAN; FM4b mode 42, `clock-skew`). */
+  readonly failmode?: string }
 
 /** What the page knows before any check: its own stamps (`stampBuildDocuments`). */
 export interface DoctorConfig {
@@ -56,14 +58,14 @@ async function limited<T>(scope: Scope, ms: number, work: (signal: AbortSignal) 
 }
 
 /** A check's outcome before it is timed. */
-interface Outcome { readonly state: DoctorState; readonly value: string; readonly hint?: string }
+interface Outcome { readonly state: DoctorState; readonly value: string; readonly hint?: string; readonly failmode?: string }
 const pass = (value: string): Outcome => ({ state: 'pass', value });
 const warn = (value: string, hint: string): Outcome => ({ state: 'warn', value, hint });
 const fail = (value: string, hint: string): Outcome => ({ state: 'fail', value, hint });
 const skip = (value: string): Outcome => ({ state: 'skip', value });
 
 /** What the earlier checks learned, for the later ones. */
-interface Learned { readonly scope: Scope; release?: ReleaseFile; socket?: string; serverOffset?: number; pageOffset?: number; serverBuild?: string; rtt: number[]; joined: boolean;
+export interface Learned { readonly scope: Scope; release?: ReleaseFile; socket?: string; serverOffset?: number; pageOffset?: number; serverBuild?: string; rtt: number[]; joined: boolean;
   /** The release's build has no server book or part on the packs origin: the server cannot move to it. */
   packsMissing?: boolean }
 
@@ -238,18 +240,29 @@ function checkJoin(config: DoctorConfig, learned: Learned, ms: number): Promise<
   });
 }
 
-function checkLatency(learned: Learned): Outcome {
+/**
+ * FM4b mode 42 (`clock-skew`): the device's clock measured more than 30 s off the server's health `now` (or the page's `Date`
+ * header). The warning shows the measured offset and the automatic-clock fix; it never claims the offset caused a failed secure
+ * connection. An unmeasured clock is `clock unknown`, never a warning.
+ */
+const clockSkew = (offsetMs: number, server: boolean): Outcome => ({ state: 'warn', value: '', failmode: 'clock-skew',
+  hint: `Check automatic date and time: this device's clock is ${(Math.abs(offsetMs) / 1000).toFixed(0)} s ${offsetMs >= 0 ? 'behind' : 'ahead of'} the ${server ? 'server' : 'page\'s host'}. Set date and time to automatic in its settings, then Run again.` });
+
+/** The latency row, with the device clock's measured offset. Exported for its test. */
+export function checkLatency(learned: Learned): Outcome {
   const offsetMs = learned.serverOffset ?? learned.pageOffset ?? null;
   const clock = offsetMs === null ? 'clock unknown' : `clock ${offsetMs >= 0 ? '+' : '−'}${(Math.abs(offsetMs) / 1000).toFixed(1)} s${learned.serverOffset === undefined ? ' vs page' : ''}`;
-  const clockOff = offsetMs !== null && Math.abs(offsetMs) > CLOCK_OFF_MS;
+  const skewed = offsetMs !== null && Math.abs(offsetMs) > CLOCK_OFF_MS ? clockSkew(offsetMs, learned.serverOffset !== undefined) : null;
   if (learned.rtt.length === 0) {
+    // a clock that is off is worth saying even when the socket gave no pings to time
+    if (skewed !== null) return { ...skewed, value: `${learned.joined ? 'no pong' : 'needs the socket'} · ${clock}` };
     if (!learned.joined) return skip(`needs the socket · ${clock}`);
     return warn(`no pong · ${clock}`, 'The server answered the join but not the pings. Run the check again.');
   }
   const sorted = [...learned.rtt].sort((a, b) => a - b), median = sorted[Math.floor(sorted.length / 2)] ?? 0, min = sorted[0] ?? 0;
   const fmt = (ms: number): string => ms < 10 ? ms.toFixed(1) : String(Math.round(ms));
   const value = `${fmt(median)} ms (min ${fmt(min)}) · ${clock}`;
-  if (clockOff) return warn(value, "This phone's clock is off. Set date and time to automatic in the phone's settings.");
+  if (skewed !== null) return { ...skewed, value };
   if (median > SLOW_MS) return warn(value, 'The link is slow. Play still works, but hits may feel late. Try Wi-Fi closer to the router, or mobile data.');
   return pass(value);
 }
@@ -302,7 +315,7 @@ export async function runDoctor(config: DoctorConfig, owner: Scope, show: (row: 
     let outcome: Outcome;
     // A check's own limit is inside it; this one is the guard for a check that forgot.
     try { outcome = await limited(scope, ms * 2, () => work[id]()); } catch (error) { outcome = fail(errorText(error), 'This check did not finish. Run the checks again.'); }
-    const row: DoctorRow = { id, label, state: outcome.state, value: outcome.value, hint: outcome.hint ?? '', ms: Math.round(diagnosticNow() - started) };
+    const row: DoctorRow = { id, label, state: outcome.state, value: outcome.value, hint: outcome.hint ?? '', ms: Math.round(diagnosticNow() - started), ...outcome.failmode === undefined ? {} : { failmode: outcome.failmode } };
     if (scope.disposed) break;
     rows.push(row); show(row);
   }

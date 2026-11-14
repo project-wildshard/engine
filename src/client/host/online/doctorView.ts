@@ -111,6 +111,8 @@ export function openDoctor(config: DoctorConfig, exit: DoctorExit | null, earlie
     const view = rows.get(row.id);
     if (view === undefined || scope.disposed) return;
     view.row.dataset['state'] = row.state; view.glyph.textContent = GLYPH[row.state];
+    // FM4b mode 42: a warning that stands for a catalogued failure carries its id (`clock-skew`), as the link's cards do
+    if (row.failmode === undefined) delete view.row.dataset['failmode']; else view.row.dataset['failmode'] = row.failmode;
     view.value.textContent = row.state === 'run' ? 'checking…' : row.value;
     view.hint.textContent = row.hint; view.ms.textContent = row.state === 'run' ? '' : `${String(row.ms)} ms`;
   };
