@@ -129,10 +129,12 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          # PAGE-SIZE PZ6: with --content, a new content set copies unchanged files from the last one on R2 (server side)
+          # PAGE-SIZE PZ6: preview reads its content from packs.wildshard.io. --content stamps the content set's base into the
+          # page, keeps the split (the Worker serves only dist/) and publishes dist-content/ first; a new set copies unchanged
+          # files from the last one on R2 (server side) and puts the rest through S3 with these bucket-scoped keys.
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
           R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
         run: |
           grid=(); [ -f tmp/preview-grid/catalogue.json ] && grid=(--catalogue=tmp/preview-grid/catalogue.json)
-          node scripts/page-release.mjs preview build,upload,check,go-live --host=workers "${grid[@]}"
+          node scripts/page-release.mjs preview build,upload,check,go-live --host=workers --content "${grid[@]}"

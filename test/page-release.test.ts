@@ -110,17 +110,30 @@ test('the four phases run in order and move the alias last', async () => {
 });
 
 test('--content publishes the content set before the packs and the page (PAGE-SIZE PZ2)', async () => {
-  const {deps, calls} = rig();
+  const {deps, calls, files, state} = rig();
   const seen: {dir: string, cors: string, dryRun: boolean}[] = [];
   deps.content = {publish: context => {
     seen.push(context); calls.push('content.publish');
     return Promise.resolve({set: '0123456789abcdef', base: 'https://packs.wildshard.io/content/0123456789abcdef/', files: 5, bytes: 50, uploaded: 2, uploadedBytes: 20, held: 3, cors: context.cors});
   }};
+  // PZ6: the build stamps the set's base into the page (stamp-content.mjs) and keeps the split; the rig's page carries it
+  const stamped = Buffer.from(`${String(files.get('/out/index.html'))}<script type="application/json" id="boot-module-files">{"contentBase":"https://packs.wildshard.io/content/0123456789abcdef/"}</script>`);
+  files.set('/out/index.html', stamped);
   await through(deps, 'upload');
-  expect(fetched(calls)).toEqual(['prepare', 'run pnpm build:game', 'run node scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
-  expect(seen).toEqual([{dir: '/out', cors: CHANNELS.staging.origin, dryRun: false}]);
+  expect(fetched(calls)).toEqual(['prepare', 'run pnpm build:game', 'run node --import ./scripts/bake-loader.mjs scripts/page-release/stamp-content.mjs dist', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
+  expect(seen).toEqual([{dir: '/out-content', cors: CHANNELS.staging.origin, dryRun: false}]);
+  expect(state.build).toMatchObject({contentBase: 'https://packs.wildshard.io/content/0123456789abcdef/'});
   deps.content = {publish: () => Promise.resolve({set: 's', base: 'b', files: 5, bytes: 50, uploaded: 1, uploadedBytes: 10, held: 3, cors: CHANNELS.staging.origin})};
   await expect(runPhase('upload', deps)).rejects.toThrow(/content: 3 held \+ 1 uploaded is not 5/u);
+  // a published set other than the stamped one is refused
+  deps.content = {publish: () => Promise.resolve({set: 'fedcba9876543210', base: 'https://packs.wildshard.io/content/fedcba9876543210/', files: 5, bytes: 50, uploaded: 2, uploadedBytes: 20, held: 3, cors: CHANNELS.staging.origin})};
+  await expect(runPhase('upload', deps)).rejects.toThrow(/published https:\/\/packs\.wildshard\.io\/content\/fedcba9876543210\/, but the page is stamped with https:\/\/packs\.wildshard\.io\/content\/0123456789abcdef\//u);
+});
+
+test('PZ6: a --content build whose page has no content base is refused', async () => {
+  const {deps} = rig();
+  deps.content = {publish: () => Promise.reject(new Error('unreached'))};
+  await expect(runPhase('build', deps)).rejects.toThrow(/index\.html content base is missing/u);
 });
 
 test('the build bakes the channel release file from packs.wildshard.io', async () => {

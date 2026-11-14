@@ -10,8 +10,9 @@
 //   --dry-run                print every step and read the live gate; build, upload and alias nothing
 //   --wait=<minutes>         check: how long to wait for the signed serial and /health (default 45)
 //   --after-staging-proofs   production go-live: the strict staging proofs passed on this exact build
-//   --content                upload: publish the page's content set to packs.wildshard.io first (PAGE-SIZE PZ2,
-//                            page-release/content.mjs); off until PZ4 and PZ6 stamp contentBase into the page
+//   --content                build: stamp the content set's base into dist/ and keep the split (PZ6); upload: publish
+//                            dist-content/ to packs.wildshard.io first (PAGE-SIZE PZ2,
+//                            page-release/content.mjs); preview.yml passes it (PZ6), staging and production with PZ8
 //   --catalogue=<file>       preview build: bake this catalogue, the grid borrowed from staging (SHARD-AUTHORING SA35,
 //                            scripts/preview-grid.ts); default test/pins/catalogue.json. Refused on staging and production
 //

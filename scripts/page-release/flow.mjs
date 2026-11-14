@@ -78,7 +78,7 @@ export class RefusedError extends Error {
  *   Parts first, the book last; an existing object must already have the same bytes.
  * @property {(context: {root: string, build: string, cors: string}) => Promise<PacksSummary>} verify  Read-only.
  *
- * @typedef {{set: string, base: string, files: number, bytes: number, uploaded: number, uploadedBytes: number, held: number, cors: string}} ContentSummary
+ * @typedef {{set: string, base: string, files: number, bytes: number, uploaded: number, uploadedBytes: number, held: number, copied?: number, copiedBytes?: number, cors: string}} ContentSummary
  * @typedef {object} ContentPublisher
  * @property {(context: {dir: string, cors: string, dryRun: boolean}) => Promise<ContentSummary>} publish
  *   PAGE-SIZE PZ2: the page's shard content and engine art to the packs bucket, read back with CORS (content.mjs).
@@ -90,7 +90,7 @@ export class RefusedError extends Error {
  * @property {PageHost} host
  * @property {PackStore} packs
  * @property {ContentPublisher} [content]  PZ2: publish the page's content set before the page goes up (page-release.mjs
- *   --content). Nothing stamps its base into the page yet: PZ4 and PZ6 do.
+ *   --content). PZ6: the build then stamps the set's base into the page and keeps the split (dist-content/ is published).
  * @property {(file: string, args: string[], env: Record<string, string>) => void} run
  * @property {(url: string) => Promise<unknown>} fetchJSON  200 only, no cache, no redirects.
  * @property {(url: string) => Promise<string>} fetchText
@@ -147,16 +147,28 @@ export async function runPhase(phase, deps) {
     if (!dry) await deps.host.prepare(context);
     plan(`run pnpm build:game with ${channel.solo ? 'no release file (solo)' : `WILDSHARD_RELEASE_URL=${env.WILDSHARD_RELEASE_URL}`} WILDSHARD_CATALOGUE=${env.WILDSHARD_CATALOGUE} WS_BUILD_ID=${deps.build} WS_CHANNEL=${channel.channel}`);
     if (!dry) deps.run('pnpm', ['build:game'], {...env, ...deps.host.buildEnv(context)});
-    // PAGE-SIZE PZ4: build:game splits the page (dist/) from its content (dist-content/). No channel stamps a contentBase
-    // yet, so each page still serves its own content: join the two before packaging, until PZ8 ships the split.
-    plan('join dist-content/ back into dist/ (no channel has a contentBase yet)');
-    if (!dry) deps.run('node', ['scripts/app-build/splitOutput.mjs', 'dist', '--join'], {});
+    // PAGE-SIZE PZ4: build:game splits the page (dist/) from its content (dist-content/). A release that publishes its
+    // content (--content, PZ6) stamps the set's base into the page and keeps the split; one that doesn't joins the two, so
+    // the page serves its own content.
+    if (deps.content === undefined) {
+      plan('join dist-content/ back into dist/ (no content base: the page serves its own content)');
+      if (!dry) deps.run('node', ['scripts/app-build/splitOutput.mjs', 'dist', '--join'], {});
+    } else {
+      plan(`stamp dist/index.html with the content set's base on ${PACKS_ORIGIN}/content/ and bake its service worker again (PZ6)`);
+      if (!dry) deps.run('node', ['--import', './scripts/bake-loader.mjs', 'scripts/page-release/stamp-content.mjs', 'dist'], {});
+    }
     for (const line of deps.host.describe('package', context)) plan(line);
     if (!dry) await deps.host.package(context);
     plan(`check ${deps.host.outputDir(context)} names ${channel.solo ? 'no release file' : channel.release} and build ${deps.build}`);
     if (dry) return {refusals};
     const files = checkOutput(channel, deps, context, refuse);
-    deps.state.write('build', {build: deps.build, channel: channel.channel, host: deps.host.name, files});
+    /** @type {string|undefined} */
+    let contentBase;
+    if (deps.content !== undefined) {
+      contentBase = contentBaseIn(Buffer.from(deps.readFile(`${deps.host.outputDir(context)}/index.html`)).toString('utf8'));
+      if (contentBase === undefined || !contentBase.startsWith(`${PACKS_ORIGIN}/content/`)) refuse(`index.html content base is ${contentBase ?? 'missing'}, not a set on ${PACKS_ORIGIN}`);
+    }
+    deps.state.write('build', {build: deps.build, channel: channel.channel, host: deps.host.name, files, ...(contentBase === undefined ? {} : {contentBase})});
     deps.log(`PASS ${channel.channel} page built for ${deps.build}; nothing uploaded, alias not moved`);
     return {refusals};
   }
@@ -172,9 +184,11 @@ export async function runPhase(phase, deps) {
     /** @type {ContentSummary|undefined} */
     let content;
     if (deps.content !== undefined) {
-      plan(`publish the page's content (S1 to S7, E1) from ${deps.host.outputDir(context)} to ${PACKS_ORIGIN}/content/<set>/ with CORS ${channel.origin} (PZ2, before the page)`);
-      content = await deps.content.publish({dir: deps.host.outputDir(context), cors: channel.origin, dryRun: dry});
+      const contentDir = `${deps.host.outputDir(context)}-content`;
+      plan(`publish the page's content (S1 to S7, E1) from ${contentDir} to ${PACKS_ORIGIN}/content/<set>/ with CORS ${channel.origin} (PZ2, before the page)`);
+      content = await deps.content.publish({dir: contentDir, cors: channel.origin, dryRun: dry});
       if (!dry && content.held + content.uploaded !== content.files) refuse(`content: ${content.held} held + ${content.uploaded} uploaded is not ${content.files}`);
+      if (!dry && content.base !== built.contentBase) refuse(`content: published ${content.base}, but the page is stamped with ${built.contentBase ?? 'no base'}`);
     }
     /** @type {PacksSummary|undefined} */
     let packs;
@@ -259,6 +273,15 @@ export function buildEnv(channel, deps) {
   // Preview is the solo game: no release file, so the build stamps no world (app-build-pipeline.mjs E7.2d).
   return channel.solo ? common
     : {...common, WILDSHARD_RELEASE_URL: channel.release, WILDSHARD_RELEASE_KEY: deps.releaseKey ?? RELEASE_PUBLIC_KEY};
+}
+
+/** PZ6: the boot bank's `contentBase` in a built document (undefined when it has none, or it is empty).
+ * @param {string} html @returns {string|undefined} */
+export function contentBaseIn(html) {
+  const bank = /<script type="application\/json" id="boot-module-files">([^<]+)<\/script>/u.exec(html)?.[1];
+  if (bank === undefined) return undefined;
+  const base = JSON.parse(bank).contentBase;
+  return typeof base === 'string' && base !== '' ? base : undefined;
 }
 
 /**

@@ -26,7 +26,7 @@ import {mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} f
 import {join, resolve} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
 import {brotliDecompressSync} from 'node:zlib';
-import {CopyObjectCommand, HeadObjectCommand, ListObjectsV2Command, S3Client} from '@aws-sdk/client-s3';
+import {CopyObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client} from '@aws-sdk/client-s3';
 import {carriedPaths, classify, shardNames} from '../page-size.mjs';
 import {PACKS_ORIGIN} from './flow.mjs';
 import {runRedacted} from './redact.mjs';
@@ -251,9 +251,9 @@ export async function copyFromSets({set, missing, store, origin, log, sleep}) {
   });
   copied.sort((a, b) => (a.path < b.path ? -1 : 1));
   // a copy keeps R2's bytes, so a sample proves the headers and the CDN answer; every upload is still read back in full
-  const sample = [...copied];
-  for (let i = sample.length - 1; i > 0; i--) { const j = randomInt(i + 1); [sample[i], sample[j]] = [/** @type {ContentFile} */ (sample[j]), /** @type {ContentFile} */ (sample[i])]; }
-  await pool(sample.slice(0, COPY_SAMPLE), 8, file => readBack(store, contentKey(set, file.path), file.decoded, origin, sleep).then(() => undefined));
+  const left = [...copied], sample = [];
+  while (sample.length < COPY_SAMPLE && left.length > 0) sample.push(...left.splice(randomInt(left.length), 1));
+  await pool(sample, 8, file => readBack(store, contentKey(set, file.path), file.decoded, origin, sleep).then(() => undefined));
   if (donors.length > 0) log(`content ${set}: ${copied.length} copied from ${donors.join(', ')}, ${failed} copies failed, ${Math.min(COPY_SAMPLE, copied.length)} read back`);
   return copied;
 }
@@ -262,7 +262,8 @@ export async function copyFromSets({set, missing, store, origin, log, sleep}) {
  * PZ6: R2's S3 API on the packs bucket, for the store's `sets` and `copy`. Credentials from the environment
  * (R2_ACCOUNT_ID, R2_PACKS_ACCESS_KEY_ID, R2_PACKS_SECRET_ACCESS_KEY: server-release's bucket-scoped keys), else none.
  * @param {NodeJS.ProcessEnv} env
- * @returns {{sets: () => Promise<string[]>, copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>, secrets: string[], close: () => void} | undefined}
+ * With them the store also puts through S3 (16 at a time), not `wrangler r2 bulk put`, so a CI token needs no R2 write.
+ * @returns {{sets: () => Promise<string[]>, copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>, put: (puts: readonly Put[]) => Promise<void>, secrets: string[], close: () => void} | undefined}
  */
 export function r2Copies(env) {
   const account = env.R2_ACCOUNT_ID, accessKeyId = env.R2_PACKS_ACCESS_KEY_ID, secretAccessKey = env.R2_PACKS_SECRET_ACCESS_KEY;
@@ -290,6 +291,12 @@ export function r2Copies(env) {
         } catch (error) { if (!(error instanceof Error && (error.name === 'NotFound' || error.name === 'NoSuchKey'))) throw error; }
       });
       return complete.sort((a, b) => b.at - a.at).map(row => row.set);
+    },
+    async put(puts) {
+      await pool(puts, 16, async item => {
+        await client.send(new PutObjectCommand({Bucket: BUCKET, Key: item.key, Body: readFileSync(item.file),
+          ContentType: item.headers.type, CacheControl: item.headers.cache, ...(item.headers.encoding === undefined ? {} : {ContentEncoding: item.headers.encoding})}));
+      });
     },
     async copy(from, to, headers, bytes) {
       await client.send(new CopyObjectCommand({Bucket: BUCKET, Key: to, CopySource: `${BUCKET}/${from.split('/').map(encodeURIComponent).join('/')}`,
@@ -323,8 +330,8 @@ export async function sampleContent({dir, store, count, origins, log, sleep = de
 
 /**
  * The real store: HEAD and GET through packs.wildshard.io, writes through `wrangler r2 bulk put`, one call per header set.
- * PZ6: with `copies` (r2Copies) the store also lists complete sets and copies keys server side.
- * @param {{root: string, scratch: string, token?: string, fetch?: typeof fetch, exec?: typeof runRedacted, copies?: Pick<ContentStore, 'sets' | 'copy'>}} options
+ * PZ6: with `copies` (r2Copies) the store also lists complete sets, copies keys server side, and puts through S3.
+ * @param {{root: string, scratch: string, token?: string, fetch?: typeof fetch, exec?: typeof runRedacted, copies?: Pick<ContentStore, 'sets' | 'copy'> & {put?: ContentStore['put']}}} options
  * @returns {ContentStore}
  */
 export function r2Content({root, scratch, token, fetch: get = fetch, exec = runRedacted, copies}) {
@@ -347,7 +354,7 @@ export function r2Content({root, scratch, token, fetch: get = fetch, exec = runR
         await delay(2_000);
       }
     },
-    put(puts) {
+    put: copies?.put ?? (puts => {
       /** @type {Map<string, Put[]>} */
       const groups = new Map();
       for (const item of puts) {
@@ -366,7 +373,7 @@ export function r2Content({root, scratch, token, fetch: get = fetch, exec = runR
         } finally { rmSync(list, {force: true}); }
       }
       return Promise.resolve();
-    },
+    }),
     async read(key, origin) {
       for (let attempt = 0; ; attempt++) {
         try {

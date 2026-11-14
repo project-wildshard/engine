@@ -34,5 +34,5 @@ export function sampleContent(options: { dir: string; store: ContentStore; count
 export const DONOR_SETS: number;
 export const COPY_SAMPLE: number;
 export function copyFromSets(options: { set: string; missing: readonly ContentFile[]; store: ContentStore; origin: string; log: (line: string) => void; sleep: (ms: number) => Promise<void> }): Promise<ContentFile[]>;
-export function r2Copies(env: NodeJS.ProcessEnv): { sets: () => Promise<string[]>; copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>; secrets: string[]; close: () => void } | undefined;
-export function r2Content(options: { root: string; scratch: string; token?: string; fetch?: typeof fetch; copies?: Pick<ContentStore, 'sets' | 'copy'>; exec?: (file: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; timeout?: number }, secrets: string[]) => string }): ContentStore;
+export function r2Copies(env: NodeJS.ProcessEnv): { sets: () => Promise<string[]>; copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>; put: (puts: readonly Put[]) => Promise<void>; secrets: string[]; close: () => void } | undefined;
+export function r2Content(options: { root: string; scratch: string; token?: string; fetch?: typeof fetch; copies?: Pick<ContentStore, 'sets' | 'copy'> & { put?: ContentStore['put'] }; exec?: (file: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; timeout?: number }, secrets: string[]) => string }): ContentStore;
