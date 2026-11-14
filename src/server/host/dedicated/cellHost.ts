@@ -100,6 +100,14 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   /** `startOver`, once it is made below: a start-over opens a cell, and a cell's room says when it emptied. */
   const later = { startOver: (_cell: Cell, _since: number): void => undefined };
   /** Someone stood in this world: it has something to start over from. A refused seat never got this far. */
+  /** SC10 (J328): when each room last had nobody in it, from its boot or its last leave. */
+  const asleep = new Map<DedicatedRoom, number>();
+  /** SC10: a room's first seat after empty time: its world took no ticks meanwhile and is never rebuilt, so it spends the time now. */
+  const woke = (room: DedicatedRoom): void => {
+    const since = asleep.get(room); asleep.delete(room);
+    const seconds = since === undefined ? 0 : (diagnosticNow() - since) / 1000;
+    if (seconds >= 1) room.host.events.emit('world.slept', { seconds });
+  };
   const used = (slug: string, room: DedicatedRoom): void => { const cell = cells.get(slug); if (cell !== undefined && cell.room === room) cell.used = true; };
   /** J107 on J320's terms: the last seat left this cell's world, so it starts over once it has stood empty `emptyMs`, nobody waiting on it.
    *  SC5 (J328): never a grid cell's. */
@@ -114,10 +122,14 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const shard = cellShard(slug), begun = diagnosticNow(), input = await options.load(shard), onto = seams(slug);
     rapier ??= input.rapier;
     const room: DedicatedRoom = await DedicatedRoom.boot({ slug: shard, cell: slug, build: options.build, bootId: options.bootId(), input, now: options.roomNow ?? diagnosticNow, ...(onto === undefined ? {} : { road: onto }),
-      post: news => { if (news.kind === 'seated') used(slug, room); else if (news.kind === 'left' && news.seats === 0) emptied(slug, room); post({ ...news, slug }); },
+      post: news => {
+        if (news.kind === 'seated') { if (news.seats === 1) woke(room); used(slug, room); } else if (news.kind === 'left' && news.seats === 0) { asleep.set(room, diagnosticNow()); emptied(slug, room); }
+        post({ ...news, slug });
+      },
       reports: { file: report => { post({ kind: 'report', slug, report }); } }, ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }),...(options.playtest===true?{playtest:row=>{post({kind:'playtest',slug,row});}}:{}) });
     // SC4: its first ticks now, while nobody is in it, not on its first player's arrival.
     for (let tick = 0; tick < WARM_TICKS; tick++) room.tick();
+    asleep.set(room, diagnosticNow());
     post({ kind: 'cell', slug, ms: diagnosticNow() - begun });
     options.booted?.(slug, room);
     return room;

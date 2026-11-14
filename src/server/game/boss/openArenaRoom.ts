@@ -35,6 +35,7 @@ export class OpenArenaRoom {
     // SC5 (J328): a served world's beaten heart stands again once the arena has stood empty; its prompt starts the next fight.
     this.party = new BossContenders(host.players, inside, place, { served: () => host.respawn.served, rearm: false });
     this.bounty = new BossBounty(host, () => null, data.definition.id); this.inside = inside;
+    host.events.on('world.slept', ({ seconds }) => { this.party.slept(seconds); }, host.scope);
   }
   private readonly inside: (point: { readonly x: number; readonly z: number }) => boolean;
   /** The heart has fallen: name who earned it. Alone there is no one to name. */

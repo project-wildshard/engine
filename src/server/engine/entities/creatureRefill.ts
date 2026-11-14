@@ -87,6 +87,9 @@ export class CreatureRefill {
     this.pending.push({ ...entry, wait: REFILL_WAIT });
   }
 
+  /** SC10: the cell slept this long with nobody near anything owed: each wait spends it at one player's rate. */
+  slept(seconds: number): void { for (const entry of this.pending) entry.wait -= seconds; }
+
   step(dt: number): void {
     if (this.pending.length === 0) return;
     this.clock += dt;

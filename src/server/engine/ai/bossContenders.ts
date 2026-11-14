@@ -8,8 +8,9 @@ interface ContendedBoss {
   readonly engaged: boolean;
   readonly script: { readonly respawnPoint: () => { pos: Vector3; yaw: number } };
   readonly disarm: () => void; readonly arm: () => void; readonly onPlayerDeath: () => boolean;
-  /** SC5: the brain's state, read for a beaten boss's return, and its own way back (else a plain `disarm`). */
-  readonly state?: string; readonly returnBeaten?: () => void;
+  /** SC5: the brain's state, read for a beaten boss's return, and its own way back (else a plain `disarm`). SC10: `defeated`, its record,
+   *  for a boss whose presence puts it away after a win (a roaming boss leaves `victory` for `dormant` when everyone walks off). */
+  readonly state?: string; readonly defeated?: boolean; readonly returnBeaten?: () => void;
 }
 /** SERVER-CELLS SC5 (J328): how a served world brings a beaten boss back, since a grid cell's world is never rebuilt. `rearm`: the
  *  boss stood armed from the start, so it stands armed again; a summoned one goes back to waiting for its summons. */
@@ -85,7 +86,7 @@ export class BossContenders {
   died(boss: ContendedBoss): boolean { return this.players.size > 1 ? boss.engaged : boss.onPlayerDeath(); }
   /** Each fixed step, before the brain's: count who began the fight, and reset it once nobody is left inside. */
   observe(boss: ContendedBoss, dt: number = 1 / 60): void {
-    if (this.beaten !== undefined && boss.state === 'victory' && this.beaten.served()) { this.unbeaten(boss, this.beaten, dt); return; }
+    if (this.beaten !== undefined && (boss.state === 'victory' || (boss.defeated === true && !boss.engaged)) && this.beaten.served()) { this.unbeaten(boss, this.beaten, dt); return; }
     this.emptyFor = 0;
     if (this.players.size <= 1 && this.counted === 0) return;
     if (!boss.engaged) { this.counted = 0; return; }
@@ -102,6 +103,8 @@ export class BossContenders {
     if (boss.returnBeaten === undefined) boss.disarm(); else boss.returnBeaten();
     if (beaten.rearm) boss.arm();
   }
+  /** SC10: the cell slept this long with nobody in it, so nobody stood in the arena: a beaten boss's wait spends it. */
+  slept(seconds: number): void { if (this.beaten !== undefined) this.emptyFor += seconds; }
   /** Players counted at the fight's start, for a continuation: 0 in any one-player fight. */
   get engaged(): number { return this.counted; }
   restoreEngaged(count: number): void { this.counted = count; }

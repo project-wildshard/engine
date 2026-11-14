@@ -37,9 +37,18 @@ test('a served world\'s beaten Drowned Captain stands again once the pool has st
     expect(host.flags.has('dead:captain'), 'the world forgets his fall').toBe(false);
     expect(island.captain(), 'his body is gone').toBeNull();
     expect(captains()).toBe(0);
+    // SC10: a cell asleep with nobody in it spends that time on his wait: one tick after a long sleep and he is back
+    const again = island.spawnCaptain();
+    host.combat.hit({ source: 'env', sourceTags: ['actor.player'], target: again.combatActor(), amount: 1e9, point: pool.clone(), dir: new Vector3(), cause: { kind: 'test', label: 'test' } });
+    seconds(1);
+    expect(host.flags.has('dead:captain')).toBe(true);
+    host.events.emit('world.slept', { seconds: BOSS_RETURN_S + 60 });
+    host.step(); host.step(); // the event reaches its listeners in a tick, the return in the next
+    expect(host.flags.has('dead:captain'), 'back after the sleep').toBe(false);
+    expect(island.captain()).toBeNull();
     const next = island.spawnCaptain();
     expect(next.alive, 'the next wake cue spawns him afresh').toBe(true);
-    expect(next.entityId).not.toBe(first.entityId);
+    expect(next.entityId).not.toBe(first.entityId); expect(next.entityId).not.toBe(again.entityId);
     expect(captains()).toBe(1);
   } finally { world.dispose(); }
 });

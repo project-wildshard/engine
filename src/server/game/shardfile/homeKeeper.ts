@@ -156,6 +156,8 @@ export function installHomeKeeper(host: SimHost, spec: HomeKeeperSpec, saved?: R
   const freeBody = (body: Body): void => { if (body.actor) { holders.delete(body.actor); host.retire(body.id); body.actor = null; body.brain = null; } };
   const respawn = (home: Home): void => { home.wait = 0; drawBody(home); };
   host.events.on('actor.died', ({ actor }) => { const home = homes.find(h => h.actor?.combatActor() === actor); if (home) home.wait = home.respawn; }, host.scope);
+  // SC10: a cell asleep with nobody in it: a fallen home's wait spends the time (it still respawns on its next tick, never asleep)
+  host.events.on('world.slept', ({ seconds }) => { for (const home of homes) if (home.wait > 0) home.wait = Math.max(Number.MIN_VALUE, home.wait - seconds); }, host.scope);
   host.onStep(step, dt => {
     // A boss's fight ends on blows, never on the plane: its flight follows a player down, and a fall would pay it out unstruck.
     // A held boss is a home body: under the plane it goes back to its anchor, never dies of it (HS3).

@@ -128,7 +128,7 @@ export async function prepareOpenArena(product: Pick<ShardProduct, 'json' | 'sec
           easeViewToward(weapons().of(near).look,camera.position,target,dt);},spawnReward:()=>{
           room.heartFell();
           const at=itemPickupFloor(host.physics,fight.rewardPoint());rewardPoint=new Vector3(at.x,at.y+ITEM_PICKUP_HOVER+.5,at.z);reward=true;
-        },persist:saved=>{records.bosses.write({...records.bosses.read(),[data.definition.id]:saved});},toast,feed},ui,current);
+        },persist:saved=>{if(!saved.defeated){reward=false;rewardPoint=null;}/* SC10: the heart stands again, its untaken orb goes */records.bosses.write({...records.bosses.read(),[data.definition.id]:saved});},toast,feed},ui,current);
       encounter.boss=boss;room.bind(boss,fight,()=>rewardPoint);first.health.checkpoint(host.scope,()=>room.party.died(boss));
       const boundaryPorts={boss,fight,prompt,get player(){return room.near.position;},toast,
         wall:()=>{hit('wall',room.near.position,data.view.wallDamage,data.lines.wall);},clear:()=>{actual.storm.weather.force(data.weather.clearing);},

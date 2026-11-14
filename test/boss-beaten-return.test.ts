@@ -41,3 +41,16 @@ test('a page (not served) keeps its boss beaten', () => {
   expect(fight.calls).toEqual([]);
   expect(fight.state).toBe('victory');
 });
+
+test('SC10: a roaming boss put away after its win (dormant, still beaten) comes back too', () => {
+  const fight = { ...boss(), state: 'dormant', defeated: true }, party = new BossContenders(new Map([['a', player(50)]]), arena, () => undefined, { served: () => true, rearm: false });
+  run(party, fight, BOSS_RETURN_S + 1);
+  expect(fight.calls).toEqual(['returnBeaten']);
+});
+
+test('SC10: the time a cell slept with nobody in it counts toward the wait', () => {
+  const fight = boss(), party = new BossContenders(new Map([['a', player(50)]]), arena, () => undefined, { served: () => true, rearm: true });
+  party.slept(BOSS_RETURN_S + 60);
+  run(party, fight, 1 / 60);
+  expect(fight.calls).toEqual(['returnBeaten', 'arm']);
+});

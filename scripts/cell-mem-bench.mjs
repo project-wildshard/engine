@@ -33,6 +33,7 @@ const note = (/** @type {Record<string, unknown>} */ row) => { console.info(JSON
 // SC7: every value that reaches the box's shell is a checked host, taskset list, number or fixed path.
 const remote = values.remote;
 if (remote !== undefined && !/^[\w.@-]+$/u.test(remote)) throw new Error('--remote is an ssh host');
+if (!/^https?:\/\/[\w.:/-]+$/u.test(values.origin)) throw new Error('--origin is a plain http(s) URL');
 if (!/^[\d,-]+$/u.test(values.cpus) || !/^[\d,-]+$/u.test(values['bot-cpus']) || !/^\d{1,3}$/u.test(values.workers) || !/^\d{4,5}$/u.test(values.port)) throw new Error('--cpus and --bot-cpus are taskset lists; --workers and --port are numbers');
 const ALIVE = ['-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8'];
 const away = `cell-mem/${new Date().toISOString().replaceAll(/[-:]/gu, '').replace(/\..*/u, 'Z')}`;

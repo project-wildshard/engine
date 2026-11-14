@@ -43,6 +43,8 @@ export class NativeReturns {
       const herd = hunt.herds[body.herd];
       owe(body.kind, body.variant, body.herd, herd?.cx ?? native.position.x, herd?.cz ?? native.position.z, body.id);
     }, host.scope);
+    // SC10: a cell asleep with nobody in it: what is owed comes due as if the clock had run, and nobody near brings it sooner
+    host.events.on('world.slept', ({ seconds }) => { this.now += seconds; this.check += seconds; }, host.scope);
     // J108: a tame leaves its spot empty on this roster too. Only a room owes it: one player's world stays as it was.
     host.events.on('creature.tamed', ({ kind, variant, herd, x, z, id }) => {
       if ((host.players.size > 1 || host.respawn.served) && bodies.has(id)) owe(kind, variant, herd, x, z, id);

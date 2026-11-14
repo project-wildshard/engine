@@ -1,6 +1,14 @@
 import { LastPlace, type Feet, type LastPlaceSaved, type PlaceArea, type Stand } from '../../../shared/engine/quest/lastPlace';
 import type { PlayerHealth } from '../../../shared/engine/combat/health';
 
+declare module '../../../client/engine/events/maps' {
+  interface EventMap {
+    /** SERVER-CELLS SC10 (J328): a grid cell's world takes no ticks while nobody is in it, and is never rebuilt. On its first seat after
+     *  empty time the cell host says how long it slept, and what comes back on a clock (a beaten boss, a fallen creature, a lair) spends it. */
+    'world.slept': { seconds: number };
+  }
+}
+
 /** The page's death fade (ui/DeathFade: dark, then the fade back): no blow lands on the fallen until then. */
 export const FALL_FADE = 1.35;
 /** One player's record. A save holds a player only once they have one. */

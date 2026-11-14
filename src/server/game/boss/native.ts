@@ -165,7 +165,8 @@ export function installGroundBoss(host: SimHost, input: unknown, profile: unknow
         restoreRoamingFight(row, fight, value, actors);
         if (fight.body !== null) fight.body.hidden = hidden;
       },
-    }, saved, persist: record.persist, rewardPoint: () => reward,
+    // SC10: a served world's boss standing again (its record back to not beaten) takes its untaken orb with it
+    }, saved, persist: value => { if (!value.defeated) reward = null; record.persist(value); }, rewardPoint: () => reward,
     spawnReward: () => { const at = itemPickupFloor(host.physics, fight.rewardPoint()); reward = { x: at.x, y: at.y + ITEM_PICKUP_HOVER + row.reward.hover, z: at.z }; } });
   const Reward = v.strictObject({ version: v.literal(1), point: v.nullable(v.strictObject({ x: finite, y: finite, z: finite })) });
   host.onStep(row.steps.reward, () => undefined, {

@@ -313,6 +313,14 @@ export class EliteCore<S extends EliteCoreScript> {
     this.save();
   }
 
+  /** SERVER-CELLS SC10: a served cell slept this long with nobody in it: a fallen lair's timer spends it (a dusk lair still waits for dusk). */
+  slept(seconds: number): void {
+    for (const e of this.entries) if ((e.state === 'dead' || e.state === 'absent') && e.timer > 0) {
+      e.timer = Math.max(0, e.timer - seconds);
+      if (e.timer === 0 && (e.script.def.rule === 'dusk' || e.script.def.rule === 'night')) e.waitDusk = true;
+    }
+  }
+
   /** Copy the lair rules only, preserving their historical wire field order and null last-hit sentinel. */
   snapshot(): EliteCoreContinuation {
     // A page's save can hold a lair this world has no row for: its record rides along, for the world that has one.

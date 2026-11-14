@@ -19,3 +19,11 @@ test('a page with one player still owes nothing', () => {
   refill.left(left);
   expect(refill.pending).toEqual([]);
 });
+
+test('SC10: the time a cell slept counts toward what it owes', () => {
+  const back: RefillEntry[] = [], refill = new CreatureRefill({ players: () => [at(500, 0)], room: () => 9, random: () => .5, spawn: entry => { back.push(entry); }, served: () => true });
+  refill.left(left);
+  refill.slept(REFILL_WAIT + 1);
+  refill.step(1); refill.step(1);
+  expect(back.map(entry => entry.from)).toEqual(['creature:1']);
+});

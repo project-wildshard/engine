@@ -190,6 +190,7 @@ export function installPopulationRoster(host: SimHost, ports: PopulationRosterPo
       const at = fallen === undefined ? -1 : group?.members.indexOf(fallen) ?? -1;
       if (at === -1) group?.members.push(a); else if (group !== undefined) group.members[at] = a;
     } });
+  host.events.on('world.slept', ({ seconds }) => { refill.slept(seconds); }, host.scope);
   host.events.on('actor.died', ({ actor }) => {
     if (host.players.size <= 1 && !host.respawn.served) return;
     const a = list.find(body => body.actor.combatActor() === actor)?.actor, group = a === undefined ? undefined : hunt.herds[a.herd];
@@ -224,6 +225,7 @@ export function installPopulationRoster(host: SimHost, ports: PopulationRosterPo
       herdOwners();
     },
   });
+  host.events.on('world.slept', ({ seconds }) => { refill.slept(seconds); }, host.scope);
   // a restoring install: the saved list's live spawns from the host's own recipes, in order (a body retired in play leaves it)
   const saved = ports.saved, keeper = saved === undefined ? undefined : v.parse(Saved, saved.adapters.find(adapter => adapter.id === ROSTER_STEP)?.state);
   if (saved?.adapters.some(adapter => adapter.id === REFILL_STATE) === true) host.adapters.set(REFILL_STATE, refill.state);

@@ -28,7 +28,7 @@ export function eliteDrops<S extends EliteCoreScript<Body>>(host: SimHost): { re
   let core: EliteCore<S> | null = null;
   const owns = (player: string, id: string): boolean => { const books = questBooks(host), flag = eliteSkinFlag(id); books.claim([flag]); return books.of(player).flags.has(flag); };
   const lacking = (id: string): boolean => [...host.players.keys()].some(player => !host.parked.has(player) && !owns(player, id));
-  return { bind: owner => { core = owner; }, hooks: { fell: (entry, first) => {
+  return { bind: owner => { core = owner; host.events.on('world.slept', ({ seconds }) => { owner.slept(seconds); }, host.scope); }, hooks: { fell: (entry, first) => {
     const { animal, def } = entry.script, served = host.respawn.served;
     if (animal === null || def.drop === undefined || def.drop.skin === null || !(served ? lacking(def.id) : first)) return;
     const at = itemPickupFloor(host.physics, animal.position);

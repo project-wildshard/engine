@@ -25,6 +25,7 @@ export function installWildRefill(host: SimHost, mounts: BondedMountRoster, herd
       mounts.reveal(from, x, z, yaw);
       herd.adoptStallion(actor); herd.addTrust(-100);
     } });
+  host.events.on('world.slept', ({ seconds }) => { refill.slept(seconds); }, host.scope);
   if (saved?.adapters.some(row => row.id === state) === true) host.adapters.set(state, refill.state);
   return dt => {
     if (host.players.size > 1 || host.respawn.served) for (const hidden of mounts.hidden) {

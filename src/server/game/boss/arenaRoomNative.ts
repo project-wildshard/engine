@@ -127,7 +127,7 @@ export function installArenaRoom<A extends ArenaRoomBody>(host: SimHost, rows: A
   host.onStep(`${rows.step}.brain`, dt => {
     if (portal !== undefined) for (const player of host.players.values()) through(player, portal, dt);
     // SC10 (J328): a long-lived world forgets the doors of those who left (one who comes back starts outside, as a fresh world's would)
-    if (doors.size > host.players.size) for (const id of doors.keys()) if (!host.players.has(id)) doors.delete(id);
+    for (const id of doors.keys()) if (!host.players.has(id)) doors.delete(id);
     seal(); sand.advance(dt);
     const body = fight.body(); if (body === null || !body.alive) return;
     const foe = row.party.nearest(body.position).position, initial = rows.initialize;

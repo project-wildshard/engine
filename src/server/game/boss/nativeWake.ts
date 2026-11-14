@@ -30,6 +30,7 @@ export function installWakeBoss(host: SimHost, input: unknown, placement: { pool
     returnBeaten: () => { host.flags.clear(row.deadFlag); returned?.(); encounter.returnBeaten(); } };
   const observation = (): WakeBossObservation => ({ player: nearestOnGround(host.players, pool.x, pool.z).position, animal: body(), wake: host.flags.has(row.wakeFlag), dead: host.flags.has(row.deadFlag) });
   const flush = (): void => { for (const effect of encounter.takeEffects()) if (effect.kind === 'outcome') host.events.emit('boss.attempt', { boss: row.id, level: row.level, outcome: effect.outcome }); };
+  host.events.on('world.slept', ({ seconds }) => { party.slept(seconds); }, host.scope);
   host.events.on('damage.dealt', ({ req, killed }) => {
     const actor = body(); if (killed && actor !== null && req.target === actor.combatActor()) host.flags.set(row.deadFlag);
   }, host.scope);

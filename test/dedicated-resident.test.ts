@@ -23,8 +23,12 @@ test('SC5: a grid cell everyone left keeps its world, however long it stands emp
   await wait(1200);
   expect(room(SHARD), 'J328: a grid cell never starts over').toBe(first);
   expect(boots(lines)).toBe(booted);
+  // SC10: it took no ticks while empty, so its first seat after says how long it slept, for what comes back on a clock
+  const slept: number[] = []; first?.host.events.on('world.slept', ({ seconds }) => { slept.push(seconds); }, first.host.scope);
   const late = bot(bench.url, 'bench', 'device:late');
   expect(await late.arrived()).toBe(true);
+  expect(slept, 'one wake, at least the second it stood empty').toHaveLength(1);
+  expect(slept[0]).toBeGreaterThanOrEqual(1);
   expect(room(SHARD)).toBe(first);
   expect(boots(lines), 'J320: no cell boots on an arrival').toBe(booted);
 });

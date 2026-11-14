@@ -50,3 +50,10 @@
   (its receipts ride its save), the trample's `others` and the arena room's `doors` forget anyone gone, the quest's `purchases` lines
   too, and what a body was paid here (`ledgerDedupe` `loot:<body>:`) is forgotten once it has stayed away 5 min (`FORGET_PAID_MS`, as
   J107's start-over forgot it), so bouncing across a cell edge cannot re-farm a bounty. Test: `served-world-prunes` (1,000 visits).
+- Plan review (one `claude -p`), MUSTs fixed: an empty grid cell takes no ticks, so every return clock stalled while nobody was in it;
+  the cell host now says how long a room slept on its first seat after (`world.slept`), and the boss returns, creature refills, native
+  returns, home respawns and elite lair timers spend it. A roaming boss whose presence puts it away after a win (dormant, still
+  beaten) now returns too, and a returned roaming boss or open-arena heart drops its untaken orb (a stale one broke restore). Arena
+  doors prune without a size gate; the bench checks `--origin`. Left as SHOULDs: the skin flag is claimed at the first fall (a
+  restarted world's lead can inherit an unclaimed copy), the first press takes a kill's orb for everyone present, the lead seat
+  forgets its loot at once (J105, as before) and its taming session is not released on `clearLead`.
