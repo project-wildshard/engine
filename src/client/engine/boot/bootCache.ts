@@ -1,4 +1,4 @@
-import { ASSET_CACHE_NAME } from '../pwa/cacheNames';
+import { assetCacheName } from '../pwa/cacheNames';
 
 /** Publish a complete immutable native response after an uncontrolled read.
  * No metadata owner or protocol: the next worker reads the same absolute URL.
@@ -10,7 +10,7 @@ export async function publishBootResponse(path: string, response: Response): Pro
     const url = new URL(path, location.href);
     if (url.origin !== location.origin || url.searchParams.has('sw')
       || !(/-[a-f0-9]{8,64}\.[a-z0-9]+$/u.test(url.pathname) || /^[a-f0-9]{8,64}$/u.test(url.searchParams.get('v') ?? ''))) return;
-    await (await caches.open(ASSET_CACHE_NAME)).put(url.href, response);
+    await (await caches.open(assetCacheName())).put(url.href, response);
   } catch { /* Quota, disabled storage and publication failure keep the native read usable. */ }
   finally { void response.body?.cancel().catch(() => undefined); }
 }

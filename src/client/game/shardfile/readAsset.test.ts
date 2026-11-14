@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { readAsset } from './readAsset';
-import { ASSET_CACHE_NAME } from '@wildshard/engine/pwa/cacheNames';
+import { assetCacheName } from '@wildshard/engine/pwa/cacheNames';
 
 const url = `https://assets.test/shardfiles/world/blobs/bin/${'a'.repeat(64)}.bin`;
 
@@ -21,7 +21,7 @@ test('controllerless cold publishes one complete response to the existing URL st
       bytes: [...new Uint8Array(await response.arrayBuffer())], type: response.headers.get('content-type') });
   } }) });
   expect(bytes).toEqual(new Uint8Array([1, 2, 3]));
-  expect(stored).toEqual([{ name: ASSET_CACHE_NAME, url, bytes: [1, 2, 3], type: 'application/octet-stream' }]);
+  expect(stored).toEqual([{ name: assetCacheName(), url, bytes: [1, 2, 3], type: 'application/octet-stream' }]);
 });
 
 test.each([new Uint8Array([9]), new Uint8Array([9, 9, 9])])('a stale response refetches once and only the correct complete body is published', async stale => {
@@ -39,7 +39,7 @@ test('storage refusal keeps online bytes usable and never creates another cache'
   const bytes = await readAsset(url, 1, { fetch: () => Promise.resolve(new Response(new Uint8Array([1]))) }, {
     open: name => { names.push(name); return Promise.reject(new Error('Quota denied')); },
   });
-  expect(bytes).toEqual(new Uint8Array([1])); expect(names).toEqual([ASSET_CACHE_NAME]);
+  expect(bytes).toEqual(new Uint8Array([1])); expect(names).toEqual([assetCacheName()]);
 });
 
 test('an index without a declared size uses the source cap without inventing a length', async () => {

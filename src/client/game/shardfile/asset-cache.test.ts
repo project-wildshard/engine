@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { ASSET_CACHE_NAME } from '@wildshard/engine/pwa/cacheNames';
+import { assetCacheName } from '@wildshard/engine/pwa/cacheNames';
 import { cachedAsset, hasCachedAsset } from './assetCache';
 
 const address = `https://cache.test/assets/grid-road/${'a'.repeat(64)}.bin`;
@@ -23,7 +23,7 @@ test('direct reads select only the original cache and retain owned complete body
   expect(first).toEqual(body); first?.fill(7);
   expect(await cachedAsset(storage, address, 3)).toEqual(body);
   expect(match).toHaveBeenCalledTimes(2);
-  for (const call of match.mock.calls) expect(call).toEqual([address, { cacheName: ASSET_CACHE_NAME, ignoreVary: true }]);
+  for (const call of match.mock.calls) expect(call).toEqual([address, { cacheName: assetCacheName(), ignoreVary: true }]);
   expect(old.open).not.toHaveBeenCalled();
 });
 
@@ -43,7 +43,7 @@ test('open-only hosts and refused direct queries keep the original read and pres
     } };
     expect(await cachedAsset(storage, address, 2)).toEqual(Uint8Array.of(5, 6));
     expect(await hasCachedAsset(storage, address)).toBe(true);
-    expect(old.open.mock.calls).toEqual([[ASSET_CACHE_NAME], [ASSET_CACHE_NAME]]);
+    expect(old.open.mock.calls).toEqual([[assetCacheName()], [assetCacheName()]]);
     expect(old.match.mock.calls).toEqual([[address, { ignoreVary: true }], [address, { ignoreVary: true }]]);
   }
 });

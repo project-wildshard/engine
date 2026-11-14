@@ -3,7 +3,7 @@
 import type { ImportReport, SaveStorage } from '../../../shared/engine/saves/store';
 import { installedIdentity, saveEpoch } from '../../../shared/engine/app/identity';
 import { deviceIdentity } from '../../../shared/engine/net/identity';
-import { ASSET_CACHE_NAME } from '../pwa/cacheNames';
+import { assetCacheName } from '../pwa/cacheNames';
 import { bootTiming } from '../../../shared/engine/boot/timing';
 
 /** A server's saves on a page: the same documents localStorage would hold. */
@@ -89,7 +89,7 @@ export async function openIndexedSaves(name: string): Promise<IndexedSaves> {
     // Resource timings lend already-known URLs and measured sizes: no native
     // Cache.keys enumeration can be left pending across a title navigation.
     try {
-      const cache = await caches.open(ASSET_CACHE_NAME), origin = globalThis.location?.origin;
+      const cache = await caches.open(assetCacheName()), origin = globalThis.location?.origin;
       const observed = new Map<string, number>();
       for (const entry of bootTiming()?.resources ?? []) {
         const url = entry['url'], bytes = entry['decodedBodySize'];

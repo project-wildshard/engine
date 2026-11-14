@@ -1,4 +1,5 @@
 import {joinSpawnManifest, packsBookPath, readSpawnCodeList, readSpawnManifest, readSpawnManifestAddress, type SpawnManifest, type SpawnManifestAddress, type SpawnPart} from '../../../shared/game/shardfile/spawnManifest';
+import {assetCacheName} from '@wildshard/engine/pwa/cacheNames';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
 import { bootMark,bootProgress,bootTiming,downloadShown } from '@wildshard/engine/boot/timing';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
@@ -829,14 +830,17 @@ export function entryProgramsURL(slug: string): string | null {
   const base = shardPackBase(slug);
   return base === null ? null : new URL(`programs/${bareSlug(slug)}.json`, base).href;
 }
+/** OFFLINE OF12: the build bakes production's asset cache name (one bundle serves every channel); a page keeps its spawn
+ *  files in its own channel's (`assetCacheName`), as the service worker of that channel does. */
+const channelCache = (baked: unknown): unknown => typeof baked === 'string' ? assetCacheName() : baked;
 function spawnSelection(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): {address: SpawnManifestAddress; cacheName: unknown; base: string} | null {
   const text = document.getElementById('boot-module-files')?.textContent; if (!text) return null;
   const manifests = get(JSON.parse(text), 'spawnManifests'), address = bookSelection(manifests, slug, flow, tier, mode);
-  if (address !== null) return {address, cacheName: get(manifests, 'cacheName'), base: packBase(get(manifests, 'home'), slug)};
+  if (address !== null) return {address, cacheName: channelCache(get(manifests, 'cacheName')), base: packBase(get(manifests, 'home'), slug)};
   // SA48: a slug placed after the build reads the cook's entry rows from the store, on either flow (no build has its grid manifest;
   // the grid's own code and seams are this page's and load as they always do)
   const placed = placedSpawn(slug), cooked = placed?.entry[tier];
-  return placed === undefined || cooked === undefined ? null : {address: cooked, cacheName: get(manifests, 'cacheName'), base: placed.base};
+  return placed === undefined || cooked === undefined ? null : {address: cooked, cacheName: channelCache(get(manifests, 'cacheName')), base: placed.base};
 }
 /** DL16: the packs book (the whole level with its parts) is this build's own file, fetched only with Runtime packs on,
  * so the default page carries nothing for an off row. */

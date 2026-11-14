@@ -58,7 +58,7 @@ test('visited cache bodies use the same parser and paced complete fence before p
   const bytes = new Uint8Array([1, 2]), calls: string[] = [];
   let value: unknown = { source: { rows: Array.from({ length: 1000 }, (_, id) => ({ id })) }, firstParty: true };
   const method: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end).replace('export function', 'function')}\nbrowserProductCache`), {
-    URL, ASSET_CACHE_NAME: 'test-asset-cache', HASH: /^[a-f0-9]{64}$/u,
+    URL, assetCacheName: () => 'test-asset-cache', HASH: /^[a-f0-9]{64}$/u,
     boundedResponse: (): Promise<Uint8Array> => Promise.resolve(bytes), limits: { sourceBytes: 4000000 }, preflightProduct,
   });
   if (typeof method !== 'function') throw new Error('Browser product cache is not callable');

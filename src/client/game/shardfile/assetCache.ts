@@ -1,4 +1,4 @@
-import { ASSET_CACHE_NAME } from '@wildshard/engine/pwa/cacheNames';
+import { assetCacheName } from '@wildshard/engine/pwa/cacheNames';
 import { readContentResponse } from '@wildshard/engine/boot/readContentResponse';
 
 type ReadStorage = Pick<CacheStorage, 'open'> & Partial<Pick<CacheStorage, 'match'>>;
@@ -7,9 +7,9 @@ type ReadStorage = Pick<CacheStorage, 'open'> & Partial<Pick<CacheStorage, 'matc
 async function matchAsset(storage: ReadStorage, url: string): Promise<Response | undefined> {
   try {
     const match = storage.match;
-    if (match !== undefined) return await match.call(storage, url, { cacheName: ASSET_CACHE_NAME, ignoreVary: true });
+    if (match !== undefined) return await match.call(storage, url, { cacheName: assetCacheName(), ignoreVary: true });
   } catch { /* The existing read port may still be available. */ }
-  return (await storage.open(ASSET_CACHE_NAME)).match(url, { ignoreVary: true });
+  return (await storage.open(assetCacheName())).match(url, { ignoreVary: true });
 }
 
 /** Shared service-worker URL storage, without a page index, queue or leases. */
@@ -38,7 +38,7 @@ export async function cacheAsset(storage: Pick<CacheStorage, 'open'>, url: strin
   const type = path.endsWith('.wasm') ? 'application/wasm' : path.endsWith('.json') ? 'application/json'
     : path.endsWith('.glb') ? 'model/gltf-binary' : path.endsWith('.ktx2') ? 'image/ktx2' : 'application/octet-stream';
   try {
-    await (await storage.open(ASSET_CACHE_NAME)).put(url, new Response(Uint8Array.from(bytes), {
+    await (await storage.open(assetCacheName())).put(url, new Response(Uint8Array.from(bytes), {
       headers: { 'content-type': type, 'content-length': String(bytes.length) },
     }));
     return true;

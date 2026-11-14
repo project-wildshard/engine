@@ -4,7 +4,7 @@ import { hashImmutableBytes } from '../src/shared/host/immutable';
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { installTitleManifests, titleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
 import { startGridPrefetch, gridPrefetchStatus } from '../src/client/game/grid/prefetch';
-import { ASSET_CACHE_NAME } from '../src/client/engine/pwa/cacheNames';
+import { assetCacheName } from '../src/client/engine/pwa/cacheNames';
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 test('prefetch publishes canonical URL bytes and durable progress in the worker store', async () => {
@@ -42,6 +42,6 @@ test('prefetch publishes canonical URL bytes and durable progress in the worker 
     const held = disk.get(`http://localhost/product/blobs/bin/${hash}.bin`);
     if (held === undefined) throw new Error('Missing canonical stored response');
     expect(new Uint8Array(await held.arrayBuffer())).toEqual(body);
-    expect(new Set(stores)).toEqual(new Set([ASSET_CACHE_NAME]));
+    expect(new Set(stores)).toEqual(new Set([assetCacheName()]));
   } finally { installTitleManifests(previous); }
 });

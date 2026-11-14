@@ -18,7 +18,10 @@ const origin = 'https://worker.test';
 const url = (path: string): string => new URL(path, origin).href;
 const shared = '/assets/shared-ssssssss.js';
 const shell = ['/manifest.webmanifest'];
-const document = '<!doctype html><html><body>worker shell π</body></html>';
+// OF12: a production document (its world's release file is production's), so these tests read production's cache names,
+// which OF12 keeps. A build with no world is preview's (`previewDocument`), whose names carry the channel.
+const document = '<!doctype html><html><head><script>globalThis.__WS_WORLD__={"release":"https://packs.test/releases/production.json","key":"ab"};</script></head><body>worker shell π</body></html>';
+const previewDocument = '<!doctype html><html><body>worker shell π</body></html>';
 interface NativeRoute {
   condition: {urlPattern: URLPatternInit; requestMethod: string; requestMode?: string; requestDestination?: string};
   source: string | {cacheName: string};
@@ -53,7 +56,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
     if (cache === undefined) { cache = new StoredCache(); books.set(name, cache); }
     return Promise.resolve(cache);
   };
-  const caches = { open, keys: () => Promise.resolve([...books.keys()]), delete: (name: string) => Promise.resolve(books.delete(name)) };
+  const caches = { open, keys: () => Promise.resolve([...books.keys()]), has: (name: string) => Promise.resolve(books.has(name)), delete: (name: string) => Promise.resolve(books.delete(name)) };
   const fetch = vi.fn((input: Request | string) => read?.(typeof input === 'string' ? new Request(input) : input)
     ?? Promise.resolve(new Response(`body:${typeof input === 'string' ? input : input.url}`)));
   const load = (build: string, files: string[], shellFiles = shell, content: { base?: string; files?: string[] } = {}, page = document, documentHeaders: Record<string, string> = {}) => {
@@ -586,21 +589,22 @@ test('PZ10: the books precache at their CDN URLs, in CORS mode, and adoption wai
   const books = [`${base}assets/spawn/packs-A.json`, `${base}assets/spawn/server-A.json`];
   let refuse = true;
   const f = fixture(request => Promise.resolve(request.url.startsWith(cdn) ? (refuse ? typed(null, 'opaque', 0) : typed(`cdn:${request.url}`, 'cors')) : new Response(`body:${request.url}`)));
-  const worker = f.load('A', ['/b/A/a-aaaaaaaa.js'], [], { base, files: books });
+  // a build with no world (preview's names): a world build never precaches the server book (OF5)
+  const worker = f.load('A', ['/b/A/a-aaaaaaaa.js'], [], { base, files: books }, previewDocument);
   await worker.dispatch('install'); await worker.dispatch('activate');
   expect(f.fetch).not.toHaveBeenCalled(); // DL1: nothing before control
   const replies: unknown[] = [], port = { postMessage: (value: unknown) => { replies.push(value); } };
   await worker.dispatch('message', { ...precached, ports: [port] });
   expect(replies).toEqual([{ type: 'PRECACHE', ok: false, build: 'A' }]);
-  expect(await (await f.open('ws-builds-v1')).keys()).toHaveLength(0);
+  expect(await (await f.open('ws-preview-builds-v1')).keys()).toHaveLength(0);
   refuse = false;
   await worker.dispatch('message', { ...precached, ports: [port] });
   expect(replies.at(-1)).toEqual({ type: 'PRECACHE', ok: true, build: 'A' });
-  const content = await f.open(CONTENT_CACHE);
+  const content = await f.open('ws-preview-content-v1');
   for (const book of books) expect(await (await content.match(book))?.text()).toBe(`cdn:${book}`);
   for (const [input] of f.fetch.mock.calls) if (input instanceof Request && input.url.startsWith(cdn)) { expect(input.mode).toBe('cors'); expect(input.credentials).toBe('omit'); }
   // the build's own record names its page code only, so no activate ever reaches into the content cache
-  const record = await (await f.open('ws-builds-v1')).match(url('/__ws_build__/A'));
+  const record = await (await f.open('ws-preview-builds-v1')).match(url('/__ws_build__/A'));
   expect(await record?.json()).toEqual({ files: [url('/b/A/a-aaaaaaaa.js')] });
 });
 
@@ -702,9 +706,9 @@ test('OF5: a world build never precaches the solo server (its code and its serve
   const staged = fixture(), worker = staged.load('B', [...solo, ...kept], [], {}, world);
   await worker.dispatch('install'); await worker.dispatch('activate'); await worker.dispatch('message', precached);
   expect(read(staged).sort()).toEqual([...kept].sort());
-  const record = await (await staged.open('ws-builds-v1')).match(url('/__ws_build__/B'));
+  const record = await (await staged.open('ws-staging-builds-v1')).match(url('/__ws_build__/B'));
   expect((await record?.json() as { files: string[] }).files.map(file => new URL(file).pathname).sort(), 'the generation is complete without them').toEqual([...kept].sort());
-  const preview = fixture(), solo2 = preview.load('B', [...solo, ...kept], []);
+  const preview = fixture(), solo2 = preview.load('B', [...solo, ...kept], [], {}, previewDocument);
   await solo2.dispatch('install'); await solo2.dispatch('activate'); await solo2.dispatch('message', precached);
   expect(read(preview).sort()).toEqual([...solo, ...kept].sort());
   // with a content base the server book is precached there: a world build skips it on the base too
@@ -762,4 +766,50 @@ test('PZ12: an isolated build answers its document and every worker script with 
   // a channel that is not isolated leaves worker scripts as served
   const plain = fixture(), open = plain.load('A', [script]); await open.dispatch('install'); await open.dispatch('activate');
   expect((await open.dispatch('fetch', { request: worker(script) }))?.headers.get('cross-origin-embedder-policy')).toBeNull();
+});
+
+// OFFLINE OF12 (J298: "The preview build should have a different cache"): every cache name carries the channel, so preview and
+// staging served on one origin keep disjoint caches, and neither's activate deletes the other's.
+const stagingDocument = '<!doctype html><html><head><script>globalThis.__WS_WORLD__={"release":"https://packs.test/releases/staging.json","key":"ab"};</script></head></html>';
+test('OF12: a preview worker and a staging worker on one origin keep disjoint caches, and neither\'s activate deletes the other\'s', async () => {
+  const f = fixture(), files = ['/assets/a-aaaaaaaa.js'], programs = '/programs/driftwood-isle.json';
+  const contents = async (): Promise<Map<string, number>> => new Map(await Promise.all((await f.caches.keys()).map(async name => [name, (await (await f.open(name)).keys()).length] as const)));
+  const preview = f.load('P1', files, shell, {}, previewDocument);
+  await preview.dispatch('install'); await preview.dispatch('activate'); await preview.dispatch('message', precached);
+  await preview.dispatch('fetch', { request: new Request(url(programs)) });
+  const previewOnly = await contents();
+  expect([...previewOnly.keys()].sort()).toEqual(['ws-preview-assets-v1', 'ws-preview-builds-v1', 'ws-preview-shell-v3-P1']);
+  const staging = f.load('S1', files, shell, {}, stagingDocument);
+  await staging.dispatch('install'); await staging.dispatch('activate'); await staging.dispatch('message', precached);
+  await staging.dispatch('fetch', { request: new Request(url(programs)) });
+  const both = await contents();
+  for (const [name, count] of previewOnly) expect(both.get(name), `staging's activate kept ${name}`).toBe(count);
+  expect([...both.keys()].filter(name => !previewOnly.has(name)).sort()).toEqual(['ws-staging-assets-v1', 'ws-staging-builds-v1', 'ws-staging-shell-v3-S1']);
+  // preview's next build: its own older shell goes, staging's stay whole
+  const next = f.load('P2', files, shell, {}, previewDocument);
+  await next.dispatch('install'); await next.dispatch('activate');
+  const after = await contents();
+  for (const name of ['ws-staging-assets-v1', 'ws-staging-builds-v1', 'ws-staging-shell-v3-S1']) expect(after.get(name), `preview's activate kept ${name}`).toBe(both.get(name));
+  expect(after.has('ws-preview-shell-v3-P1')).toBe(false);
+  expect(await (await f.open('ws-preview-shell-v3-P2')).match(url(programs)), 'preview carried its own network-first copy').toBeDefined();
+  // each channel's worker reads its own caches only
+  const opened = vi.spyOn(f.caches, 'open'); await next.dispatch('fetch', { request: new Request(url(files[0] ?? '')) });
+  expect(opened.mock.calls.map(([name]) => name).filter(name => !name.startsWith('ws-preview-'))).toEqual([]);
+});
+
+test('OF12: production keeps its names and marks the origin; another channel drops its pre-OF12 production-named caches only where production never ran', async () => {
+  const files = ['/assets/a-aaaaaaaa.js'];
+  const prod = fixture(), worker = prod.load('A', files);
+  await worker.dispatch('install'); await worker.dispatch('activate'); await worker.dispatch('message', precached);
+  expect((await prod.caches.keys()).sort()).toEqual(['ws-assets-v1', 'ws-builds-v1', 'ws-production-mark', 'ws-shell-v3-A']);
+  const staging = prod.load('S1', files, shell, {}, stagingDocument);
+  await staging.dispatch('install'); await staging.dispatch('activate');
+  expect((await prod.caches.keys()).filter(name => !name.startsWith('ws-staging-')).sort(), 'production ran here: its caches stay')
+    .toEqual(['ws-assets-v1', 'ws-builds-v1', 'ws-production-mark', 'ws-shell-v3-A']);
+  // the staging origin itself: its pre-OF12 caches had production's names; the first channel-named worker drops them once
+  const old = fixture();
+  for (const name of ['ws-assets-v1', 'ws-builds-v1', 'ws-shell-v3-old', 'ws-content-v1', 'ws-immutable']) await (await old.open(name)).put(url('/x'), new Response('x'));
+  const first = old.load('S1', files, shell, {}, stagingDocument);
+  await first.dispatch('install'); await first.dispatch('activate');
+  expect((await old.caches.keys()).sort()).toEqual(['ws-staging-assets-v1', 'ws-staging-builds-v1', 'ws-staging-shell-v3-S1']);
 });

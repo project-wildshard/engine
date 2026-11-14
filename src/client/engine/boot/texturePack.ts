@@ -1,4 +1,4 @@
-import { ASSET_CACHE_NAME } from '../pwa/cacheNames';
+import { assetCacheName } from '../pwa/cacheNames';
 import { publishBootResponse } from './bootCache';
 import { contentURL, isContentOrigin, pageURL } from './contentBase';
 import type { Scope } from '../../../shared/engine/app/scope';
@@ -147,7 +147,7 @@ async function readBody(response: Response, expected: number, signal: AbortSigna
   } catch (error) { void reader.cancel().catch(() => undefined); throw error; }
 }
 async function cachedPart(path: string): Promise<Response | undefined> {
-  try { return typeof caches === 'undefined' ? undefined : await (await caches.open(ASSET_CACHE_NAME)).match(new URL(path, location.href).href, { ignoreVary: true }); }
+  try { return typeof caches === 'undefined' ? undefined : await (await caches.open(assetCacheName())).match(new URL(path, location.href).href, { ignoreVary: true }); }
   catch { return undefined; } // Storage denial preserves the ordinary direct read.
 }
 const readers = new Set<TexturePackReads>();

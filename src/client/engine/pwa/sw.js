@@ -1,5 +1,6 @@
 import { workerScope } from '../app/workerScope.js';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
+import { cacheChannel, cacheName, ownsCache, PRODUCTION_MARK } from './cacheNames';
 /* MF1: one URL cache, one build shell, and one previous generation of code.
  * No fetched-body reconstruction, checksums, receipts, packs, retries or work timers. */
 const BUILD = '__BUILD_ID__';
@@ -18,13 +19,20 @@ async function isolatedWorkerScript(pending) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 const answer = (event, request, pending) => { event.respondWith(ISOLATED && request.destination === 'worker' ? isolatedWorkerScript(pending) : pending); };
-const ASSETS = '__ASSET_CACHE__';
-const BOOKS = 'ws-builds-v1';
-const SHELL_PREFIX = 'ws-shell-v3-';
-const SHELL = `${SHELL_PREFIX}${BUILD}`;
 /** OFFLINE OF5 (J298): a world build (its document stamped with `__WS_WORLD__`; play, staging) never runs the in-page solo
  *  server, so it never precaches the solo server's code or its server book. Read at run time: a deploy stamps the document. */
 const WORLD = /\bglobalThis\.__WS_WORLD__=/u.test(DOCUMENT);
+/** OFFLINE OF12: every cache this worker opens carries its channel (cacheNames.ts), read from the same stamp, so preview and
+ *  staging on one origin keep disjoint caches. Production's names are the ones it always had. */
+const CHANNEL = cacheChannel((() => {
+  const stamp = /\bglobalThis\.__WS_WORLD__=(\{[^;]+\});/u.exec(DOCUMENT)?.[1];
+  try { return stamp === undefined ? undefined : JSON.parse(stamp); } catch { return {}; }
+})());
+const ASSETS = cacheName('__ASSET_CACHE__', CHANNEL);
+const BOOKS = cacheName('ws-builds-v1', CHANNEL);
+const SHELL_FAMILY = cacheName('ws-shell-', CHANNEL);
+const SHELL_PREFIX = cacheName('ws-shell-v3-', CHANNEL);
+const SHELL = `${SHELL_PREFIX}${BUILD}`;
 const SOLO_ONLY = /\/standalone\/(?:serverWorker|serverRuntime)-[^/]+\.js$|\/assets\/spawn\/server-[^/]+\.json$/u;
 const FILES = JSON.parse('__FILES__');
 /** What this build precaches and records as its generation: its files, less the solo server's on a world build. */
@@ -51,7 +59,7 @@ const isHtml = response => /\btext\/html\b/i.test(response.headers.get('content-
 const { base: CONTENT_BASE, files: CONTENT_FILES } = JSON.parse('__CONTENT__');
 /** OF5: the server book on the content base is solo-only too (a URL there, its path under the base's folder). */
 const CONTENT_PRECACHE = CONTENT_FILES.filter(href => !WORLD || !SOLO_ONLY.test(new URL(href).pathname));
-const CONTENT_CACHE = 'ws-content-v1';
+const CONTENT_CACHE = cacheName('ws-content-v1', CHANNEL);
 const CONTENT_URL = CONTENT_BASE === '' ? undefined : new URL(CONTENT_BASE);
 /** A base on the page's own origin (contentBase.ts allows one) owns its folder only; the rest of the origin is the page's. */
 const SAME_ORIGIN_BASE = CONTENT_URL?.origin === self.location.origin;
@@ -128,6 +136,8 @@ workerScope.listen(self, 'install', event => {
   ]) : undefined;
   event.waitUntil((async () => {
     await routes;
+    // OF12: production marks the origin, so another channel's worker here keeps production's caches
+    if (CHANNEL === 'production') await caches.open(PRODUCTION_MARK);
     const [assets, shell, books] = await Promise.all([store(ASSETS), store(SHELL), caches.open(BOOKS)]);
     await importPrevious(assets, books);
     const namedShell = SHELL_FILES.filter(path => immutable(new URL(abs(path))));
@@ -283,9 +293,14 @@ workerScope.listen(self, 'activate', event => {
       await books.delete(key);
     }
     await carryNetworkFirst().catch(() => undefined);
+    // OF12: only this channel's older shells (and production's legacy caches) go. Another channel's worker on this origin
+    // also drops the caches it kept under production's names before OF12, once, unless production runs here too.
+    const productionHere = CHANNEL !== 'production' && await caches.has(PRODUCTION_MARK);
     for (const name of await caches.keys()) {
-      if (name === SHELL) continue;
-      if (name.startsWith('ws-shell-') || name.startsWith('ws-static-') || name === 'ws-immutable') await caches.delete(name);
+      if (name === SHELL || name === PRODUCTION_MARK) continue;
+      const legacy = CHANNEL === 'production' && (name.startsWith('ws-static-') || name === 'ws-immutable');
+      if (name.startsWith(SHELL_FAMILY) || legacy) await caches.delete(name);
+      else if (CHANNEL !== 'production' && !productionHere && ownsCache(name, 'production')) await caches.delete(name);
     }
   })());
 });

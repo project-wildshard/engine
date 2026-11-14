@@ -1,4 +1,4 @@
-import { ASSET_CACHE_NAME } from '@wildshard/engine/pwa/cacheNames';
+import { assetCacheName, setCacheChannel } from '@wildshard/engine/pwa/cacheNames';
 import { installWorkerBootTiming } from '@wildshard/engine/boot/workerTiming';
 
 installWorkerBootTiming('road-tile-write');
@@ -11,10 +11,12 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
   if (typeof message !== 'object' || message === null) return;
   const id: unknown = Reflect.get(message, 'id'), url: unknown = Reflect.get(message, 'url'), bytes: unknown = Reflect.get(message, 'bytes');
   if (typeof id !== 'number' || typeof url !== 'string' || !(bytes instanceof Uint8Array) || !(bytes.buffer instanceof ArrayBuffer)) return;
+  // OF12: this worker has no document stamp; the page names its channel's cache
+  setCacheChannel(Reflect.get(message, 'channel'));
   const body = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   void (async (): Promise<void> => {
     try {
-      await (await caches.open(ASSET_CACHE_NAME)).put(url, new Response(body, {
+      await (await caches.open(assetCacheName())).put(url, new Response(body, {
         headers: { 'content-type': 'application/octet-stream', 'content-length': String(body.length) },
       }));
       self.postMessage({ id, ok: true }, { transfer: [] });

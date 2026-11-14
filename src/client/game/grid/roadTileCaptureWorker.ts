@@ -1,3 +1,4 @@
+import { pageCacheChannel } from '@wildshard/engine/pwa/cacheNames';
 /** DL11: the road tile capture's worker, owned by the backing's scope. A source's compaction, coarse merge and
  * archive writes run there on a copy of its arrays, so the page publishes (and uploads) the source at once and
  * only the references come back. Until the worker says it is running, and whenever it cannot start, the backing
@@ -69,7 +70,7 @@ export class RoadTileCaptureWorker {
     const worker = this.worker; if (!this.usable() || worker === undefined) return null;
     return new Promise<CaptureResult>((resolve, reject) => {
       this.waiting.set(job.id, { job, resolve, reject, refused });
-      worker.postMessage(job, { transfer: [] });
+      worker.postMessage({ ...job, channel: pageCacheChannel() }, { transfer: [] }); // OF12: the worker's cache channel
     });
   }
   private message(reply: unknown): void {

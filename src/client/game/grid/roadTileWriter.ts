@@ -1,3 +1,4 @@
+import { pageCacheChannel } from '@wildshard/engine/pwa/cacheNames';
 /** DL11: road archive writes go to one dedicated worker that owns the Cache
  * Storage put; the page transfers each freshly encoded body instead of copying
  * it. Reads, hashes and URLs are the original store's. Until the worker says it
@@ -61,7 +62,7 @@ export function roadTileWriter(scope: Scope, storage: Pick<CacheStorage, 'open'>
     const id = next++;
     return new Promise<boolean>(resolve => {
       waiting.set(id, { hash, finish: resolve });
-      target.postMessage({ id, url: roadTileUrl(origin, hash), bytes }, { transfer: [bytes.buffer] });
+      target.postMessage({ id, url: roadTileUrl(origin, hash), bytes, channel: pageCacheChannel() }, { transfer: [bytes.buffer] });
     });
   } };
 }

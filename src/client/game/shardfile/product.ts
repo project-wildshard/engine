@@ -14,7 +14,7 @@ import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { builtIndexHash } from '@wildshard/format/builtIndexes';
 
 import { acceptValidatedCost } from '@wildshard/format/deviceMemoryCost';
-import { ASSET_CACHE_NAME } from '@wildshard/engine/pwa/cacheNames';
+import { assetCacheName } from '@wildshard/engine/pwa/cacheNames';
 import { saves } from '@wildshard/engine/saves/runtime';
 import { contentHash } from '../../../shared/game/shardfile/contentHash';
 import { packReads } from '../../../shared/game/shardfile/packReads';
@@ -686,7 +686,7 @@ async function admitProductWork(input: unknown, options: ProductOptions, trace?:
  * browser reads use native fetch, without a page index, leases or worker. */
 export function browserProductCache(storage: Pick<CacheStorage, 'open'>,
   preparation: Pick<ProductOptions, 'pause' | 'parseJson'> = {}): ProductCache {
-  const open = () => storage.open(ASSET_CACHE_NAME);
+  const open = () => storage.open(assetCacheName());
   const productUrl = (base: string) => new URL('__visited_shardfile__', base).href;
   const assetUrl = (base: string, hash: string): string => {
     if (!HASH.test(hash)) throw new Error('Invalid content hash');

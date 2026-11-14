@@ -27,12 +27,16 @@
 // world, a staging-like seat wait included. `--report` prints the same and exits 0. CI never runs this (FM11: no browser proof
 // in pre-push or CI); it is not in scripts/ci-pack.mjs.
 //
+// `--one-origin` (OF12) serves both channels on the staging-like origin, from one profile: the proxy stamps the world only while
+// the staging pass runs. Passes preview, staging, then preview again (offline, from what the first pass warmed), so each
+// channel's worker activating over the other's on one origin must leave the other's caches whole.
+//
 // `--walkthrough <slug>` is Jake's walk-through (OF21) on the staging-like build, on a fresh profile: online, Shard select to
 // the shard, play about 30 s moving around, close the browser, reopen it offline, Shard select to the same shard. Green only
 // when START, DOWNLOAD and LOAD finish from the cache, the player is in the world, and then the connection card shows.
 //
 //   scripts/browser-lane.sh node scripts/offline-proof.mjs [--channel=staging|preview|both] [--mode=offline|slow|nobackend]
-//       [--shard=<slug>[,<slug>]] [--entry=deck|resume|both] [--jobs=<n>] [--base=<served build>] [--out=<dir>] [--require-world] [--staging-port=<n>] [--report]
+//       [--shard=<slug>[,<slug>]] [--entry=deck|resume|both] [--jobs=<n>] [--base=<served build>] [--out=<dir>] [--require-world] [--staging-port=<n>] [--one-origin] [--report]
 //   scripts/browser-lane.sh node scripts/offline-proof.mjs --walkthrough <slug> [--base=…] [--out=…] [--report]
 // With no `--base` it builds this working tree with scripts/serve-build.sh and stops that server at the end. `--jobs` above 1
 // gives each shard its own profile (one profile can't hold two browsers), which trades the shared-device shape for time.
@@ -74,6 +78,9 @@ if (!Number.isInteger(jobs) || jobs < 1) throw new Error(`--jobs is a whole numb
 /** OF5 and OF9 on: an entry that ends anywhere but in the world is red (a staging-like seat wait included). */
 const requireWorld = argv.includes('--require-world');
 const report = argv.includes('--report');
+/** OF12: both channels on one origin and one profile (see above). */
+const oneOrigin = argv.includes('--one-origin');
+if (oneOrigin && (jobs !== 1 || walkthrough !== undefined)) throw new Error('--one-origin runs one profile: --jobs=1, no --walkthrough');
 const out = resolvePath(ROOT, option('out') ?? join('tmp', 'offline-proof', new Date().toISOString().replaceAll(/[:.]/gu, '-')));
 mkdirSync(out, { recursive: true });
 const STAGING = CHANNELS.staging;
@@ -113,6 +120,8 @@ const RELEASE_PATH = '/__offline-proof/staging.json';
 /** @type {Promise<string> | undefined} */
 let signedRelease;
 let stamperHits = 0, proxyOffline = false;
+/** OF12 `--one-origin`: off while the preview pass runs, so the one origin serves the build as built. */
+let stampOn = true;
 /** @type {string[]} the last reads the proxy answered, to name an offline leak */
 const stamperSeen = [];
 /** @param {import('node:http').IncomingMessage} request @param {import('node:http').ServerResponse} response */
@@ -146,7 +155,10 @@ async function stamp(request, response) {
     const sent = {};
     answer.headers.forEach((value, name) => { if (!['content-length', 'transfer-encoding', 'connection', 'keep-alive'].includes(name)) sent[name] = value; });
     const html = (answer.headers.get('content-type') ?? '').includes('text/html');
-    if (html || new URL(request.url ?? '/', upstream).pathname.startsWith('/sw-core/')) {
+    const workerCore = new URL(request.url ?? '/', upstream).pathname.startsWith('/sw-core/');
+    // OF12: one origin, two documents under one name: neither may come from the HTTP cache, or a channel switch never lands
+    if (oneOrigin && (html || workerCore)) { for (const name of ['etag', 'last-modified']) Reflect.deleteProperty(sent, name); sent['cache-control'] = 'no-store'; }
+    if (stampOn && (html || workerCore)) {
       const text = body.toString('utf8');
       if (!text.includes('globalThis.__WS_BUILD_ID__=')) { response.writeHead(500).end('offline-proof: a document without the build stamp'); return; }
       // in the worker's copy the stamp sits inside a JSON string, so it goes in escaped
@@ -170,7 +182,7 @@ await new Promise((resolve, reject) => { stamper.once('error', reject); stamper.
 const stamperAddress = stamper.address();
 if (stamperAddress === null || typeof stamperAddress === 'string') throw new Error('offline-proof: the stamping server has no port');
 /** @type {Record<Channel, string>} */
-const ORIGINS = { preview: upstream.origin, staging: `http://127.0.0.1:${String(stamperAddress.port)}` };
+const ORIGINS = { preview: oneOrigin ? `http://127.0.0.1:${String(stamperAddress.port)}` : upstream.origin, staging: `http://127.0.0.1:${String(stamperAddress.port)}` };
 STAMP = `globalThis.__WS_WORLD__=${JSON.stringify({ release: `${ORIGINS.staging}${RELEASE_PATH}`, key: RELEASE_PUBLIC_KEY })};`;
 
 /** A free loopback port for a browser's own DevTools endpoint. */
@@ -311,7 +323,7 @@ async function enter(run) {
       let linked = open !== '/?mute=1';
       if (linked) phase = 'none';
       const hitsBefore = stamperHits;
-      proxyOffline = mode === 'offline' && channel === 'staging' && jobs === 1;
+      proxyOffline = mode === 'offline' && (channel === 'staging' || oneOrigin) && jobs === 1;
       leakFrom = () => stamperHits - hitsBefore;
       leakedUrls = () => stamperSeen.slice(-Math.min(stamperSeen.length, stamperHits - hitsBefore));
       await page.goto(new URL(open, ORIGINS[channel]).href, { waitUntil: 'commit', timeout: 60_000 }).catch((/** @type {unknown} */ error) => { consoleLines.push(`goto ${String(error).slice(0, 200)}`); });
@@ -382,7 +394,7 @@ async function enter(run) {
       for (const name of await globalThis.caches.keys()) counts[name] = (await (await globalThis.caches.open(name)).keys()).length;
       return counts;
     }), 10_000) ?? {};
-    const reached = mode === 'offline' && channel === 'staging' ? leakFrom() : 0;
+    const reached = mode === 'offline' && (channel === 'staging' || oneOrigin) ? leakFrom() : 0;
     if (reached > 0) consoleLines.push(`offline ${proxyOffline ? 'reads refused by the offline proxy' : 'leak'}: ${leakedUrls().join(' ')}`);
     // refused reads failed as they would on a phone, so they aren't a leak; with --jobs above 1 the proxy can't go offline
     const leaks = proxyOffline ? 0 : reached;
@@ -407,12 +419,47 @@ async function installApp(profile) {
 }
 
 /**
+ * OF12 `--one-origin`: hand the one origin to a channel. The page is served by the worker in control, whose copy of the document
+ * is the old channel's, so the new channel's worker is installed by an update check and adopted (SKIP_WAITING), as a deploy's is,
+ * until a fresh load of `/` carries the channel's stamp (or none). Logs the origin's caches after the switch.
+ * @param {string} profile @param {Channel} channel
+ */
+async function switchChannel(profile, channel) {
+  const context = await chromium.launchPersistentContext(profile, { headless: true, viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true, userAgent: IPHONE,
+    serviceWorkers: 'allow', args: ['--use-angle=metal', ...KEYCHAIN_ARGS, '--mute-audio'] });
+  try {
+    const page = context.pages()[0] ?? await context.newPage();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await page.goto(new URL('/?mute=1', ORIGINS[channel]).href, { waitUntil: 'load', timeout: 60_000 });
+      const world = await page.evaluate(() => Reflect.get(globalThis, '__WS_WORLD__') !== undefined);
+      const controlled = await page.evaluate(() => navigator.serviceWorker.controller !== null);
+      if (world === (channel === 'staging') && controlled) {
+        const names = await page.evaluate(async () => (await caches.keys()).sort());
+        log(`one origin is ${channel}'s (attempt ${String(attempt + 1)}); caches: ${names.join(' ')}`);
+        return;
+      }
+      await page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration();
+        await registration?.update().catch(() => undefined);
+        const next = registration?.installing ?? registration?.waiting;
+        if (next === null || next === undefined) return;
+        if (next.state === 'installing') await new Promise(resolve => { next.addEventListener('statechange', () => { if (next.state !== 'installing') resolve(null); }); });
+        // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a ServiceWorker's postMessage takes no origin
+        next.postMessage({ type: 'SKIP_WAITING' });
+        await new Promise(resolve => { navigator.serviceWorker.addEventListener('controllerchange', () => { resolve(null); }); setTimeout(resolve, 10_000); });
+      }).catch(() => undefined);
+    }
+    throw new Error(`offline-proof: the one origin never turned to ${channel}`);
+  } finally { await context.close().catch(() => undefined); }
+}
+
+/**
  * One shard on one channel: warm (once per profile), then the mode's entries.
  * @param {Channel} channel @param {Mode} mode @param {string} slug @param {string} profile
  */
 async function proveShard(channel, mode, slug, profile) {
   // beside its own profile, so a different --jobs layout (a cold profile) warms again
-  const warmFile = join(`${profile}.warm-${slug}.json`);
+  const warmFile = join(oneOrigin ? `${profile}.warm-${channel}-${slug}.json` : `${profile}.warm-${slug}.json`);
   const results = [];
   /** @type {Set<string> | undefined} */
   let warm;
@@ -480,14 +527,15 @@ try {
     const offline = await enter({ channel: 'staging', profile, slug: walkthrough, mode: 'offline', entry: 'deck', label: `staging-walk-offline-${walkthrough}` });
     results.push(record('staging', 'offline', walkthrough, 'deck', offline, warm, { walkthrough: true }));
   } else {
-    const channels = /** @type {Channel[]} */ (channelArg === 'both' ? ['preview', 'staging'] : [channelArg]);
+    const channels = /** @type {Channel[]} */ (oneOrigin ? ['preview', 'staging', 'preview'] : channelArg === 'both' ? ['preview', 'staging'] : [channelArg]);
     for (const channel of channels) {
       const mode = /** @type {Mode} */ (modeArg);
       if (channel === 'preview' && mode === 'nobackend') { log('preview has no world: --mode=nobackend skipped'); continue; }
+      if (oneOrigin) { stampOn = channel === 'staging'; await switchChannel(join(out, 'profile-one-origin'), channel); }
       const queue = [...shards];
       const worker = async (/** @type {number} */ lane) => {
         for (let slug = queue.shift(); slug !== undefined; slug = queue.shift()) {
-          const profile = join(out, jobs > 1 ? `profile-${channel}-${slug}` : `profile-${channel}`);
+          const profile = join(out, oneOrigin ? 'profile-one-origin' : jobs > 1 ? `profile-${channel}-${slug}` : `profile-${channel}`);
           try { results.push(...await proveShard(channel, mode, slug, profile)); } catch (error) { log(`lane ${String(lane)} ${slug} broke: ${String(error)}`); results.push({ shard: slug, channel, mode, entry: 'deck', outcome: 'error', ms: 0, lastCard: '', served: {}, swSoloReads: 0, caches: {}, world: false, failures: [{ shard: slug, rule: 'proof-error', detail: String(error).slice(0, 300) }] }); }
         }
       };

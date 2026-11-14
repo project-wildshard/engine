@@ -1,5 +1,5 @@
 import { readContent, type ContentReadOptions } from '@wildshard/engine/boot/contentRead';
-import { ASSET_CACHE_NAME } from '@wildshard/engine/pwa/cacheNames';
+import { assetCacheName } from '@wildshard/engine/pwa/cacheNames';
 import { SHARDFILE_ADMISSION_LIMITS as limits } from '@wildshard/format/admissionLimits';
 
 interface AssetStorePort { open: (name: string) => Promise<Pick<Cache, 'put'>> }
@@ -36,7 +36,7 @@ export async function readAsset(url: string, bytes: number | undefined, options:
     } });
     options.signal?.throwIfAborted();
     if (copy !== undefined && publication !== undefined) {
-      try { await (await publication.open(ASSET_CACHE_NAME)).put(url, copy); }
+      try { await (await publication.open(assetCacheName())).put(url, copy); }
       catch { /* Disk denial never rejects complete online bytes. */ }
     }
     return result;

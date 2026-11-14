@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { ASSET_CACHE_NAME } from '../pwa/cacheNames';
+import { assetCacheName } from '../pwa/cacheNames';
 import { publishBootResponse } from './bootCache';
 
 let restore = (): void => undefined;
@@ -22,7 +22,7 @@ test('a complete uncontrolled part publishes exact native bytes at its shared ab
   const digest = vi.spyOn(crypto.subtle, 'digest').mockRejectedValue(new Error('No write digest'));
   try {
     await publishBootResponse(path, new Response(bytes));
-    expect(f.open).toHaveBeenCalledExactlyOnceWith(ASSET_CACHE_NAME); expect(f.put).toHaveBeenCalledOnce();
+    expect(f.open).toHaveBeenCalledExactlyOnceWith(assetCacheName()); expect(f.put).toHaveBeenCalledOnce();
     expect(f.entries.get(new URL(path, location.href).href)).toEqual(bytes); expect(digest).not.toHaveBeenCalled();
   } finally { digest.mockRestore(); }
 });

@@ -23,12 +23,13 @@ test('clear waits for actual stop, deletion and HTTP completion and retains play
   const saves = new Map([['player.keep', 'retained']]);
   const functions: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end).replaceAll('export ', '')}\n({clearDownloads,storageUsed})`), {
     Date, REPORT_KEY: 'clear.report', CLEAR_HTTP_URL: '/clear-cache.json?sw=0', URL, contentBase: () => '',
+    pageCacheChannel: () => 'production', PRODUCTION_MARK: 'ws-production-mark', isForeign: () => false,
     navigator: { storage: { estimate: () => Promise.resolve({ usage: 42 }) }, serviceWorker: {
       getRegistrations: () => { calls.push('registrations'); return Promise.resolve([{unregister: () => Promise.resolve(true)}]); },
     } },
     window: { __ws_prefetch: { stop: () => { calls.push('stop'); return stop.promise; } },
       __ws_sw: { version: () => Promise.resolve({ build: 'fixture' }) } },
-    caches: { keys: () => Promise.resolve([...remaining]), delete: async (key: string) => {
+    caches: { has: () => Promise.resolve(false), keys: () => Promise.resolve([...remaining]), delete: async (key: string) => {
       calls.push('delete'); sawDelete.resolve(true); const done = await deleted.promise;
       if (done) remaining.delete(key); return done;
     } },
@@ -60,8 +61,9 @@ async function clearWith(base: string, answer: (url: string) => Promise<Response
   const asked: { url: string; init: RequestInit | undefined }[] = [];
   const functions: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end).replaceAll('export ', '')}\n({clearDownloads})`), {
     Date, URL, REPORT_KEY: 'clear.report', CLEAR_HTTP_URL: '/clear-cache.json?sw=0', contentBase: () => base,
+    pageCacheChannel: () => 'production', PRODUCTION_MARK: 'ws-production-mark', isForeign: () => false,
     navigator: { storage: { estimate: () => Promise.resolve({ usage: 1 }) } }, window: {},
-    caches: { keys: () => Promise.resolve([]), delete: () => Promise.resolve(true) },
+    caches: { has: () => Promise.resolve(false), keys: () => Promise.resolve([]), delete: () => Promise.resolve(true) },
     fetch: (url: string, init?: RequestInit) => { asked.push({ url, init }); return answer(url); },
     jsonSlot: () => ({ read: () => ({}), write: () => undefined }), saveStorage: () => ({ setItem: () => undefined }),
   });

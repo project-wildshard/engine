@@ -1,5 +1,6 @@
 import { saveStorage,jsonSlot } from '../saves/slots';
 import { contentBase } from './contentBase';
+import { isForeign, pageCacheChannel, PRODUCTION_MARK } from '../pwa/cacheNames';
 // oxlint-disable-next-line import/no-empty-named-blocks, unicorn/require-module-specifiers -- Its ambient Window type is the point.
 import type {} from './shardPrefetch'; // Window.__ws_prefetch, for a program that reaches this file alone.
 /**
@@ -75,11 +76,13 @@ export async function clearDownloads(): Promise<ClearReport> {
       workers = done.filter(Boolean).length;
     } catch { /* no worker API here: nothing registered */ }
   }
-  // 3. every cache; a put that was already under way can re-create one, so look again until none is left
+  // 3. every cache of this page's channel; a put that was already under way can re-create one, so look again until none
+  // is left. OFFLINE OF12: another channel's caches on this origin (a local proof serving two channels) are left alone.
   let deleted = 0;
   if (typeof caches !== 'undefined') {
+    const channel = pageCacheChannel(), productionHere = await caches.has(PRODUCTION_MARK);
     for (;;) {
-      const keys = await caches.keys();
+      const keys = (await caches.keys()).filter(key => !isForeign(key, channel, productionHere));
       if (keys.length === 0) break;
       let removed = false;
       for (const k of keys) if (await caches.delete(k)) { deleted++; removed = true; }

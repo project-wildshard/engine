@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { legacyAsset } from './legacyAsset';
 import { readAsset } from './readAsset';
-import { ASSET_CACHE_NAME } from '@wildshard/engine/pwa/cacheNames';
+import { assetCacheName } from '@wildshard/engine/pwa/cacheNames';
 
 const hash = 'a'.repeat(64), url = `https://cache.test/shardfiles/world/blobs/bin/${hash}.bin`;
 function fixture() {
@@ -29,11 +29,11 @@ test('offline old hash bytes migrate once to their native URL without changing t
   const result = await readAsset(url, 3, { fetch: () => Promise.reject(new TypeError('Offline')),
     legacy: { read, store: f.storage } });
   expect(result).toEqual(bytes); expect(read).toHaveBeenCalledTimes(1);
-  expect([...f.stores.keys()].sort()).toEqual([ASSET_CACHE_NAME, 'ws-content-v0'].sort());
+  expect([...f.stores.keys()].sort()).toEqual([assetCacheName(), 'ws-content-v0'].sort());
   const old = f.stores.get('ws-content-v0')?.get(oldKey);
   if (old === undefined) throw new Error('Old offline bytes were removed');
   expect(new Uint8Array(await old.clone().arrayBuffer())).toEqual(bytes);
-  const migrated = f.stores.get(ASSET_CACHE_NAME)?.get(url);
+  const migrated = f.stores.get(assetCacheName())?.get(url);
   if (migrated === undefined) throw new Error('Missing canonical migration');
   expect(new Uint8Array(await migrated.arrayBuffer())).toEqual(bytes);
 });
@@ -56,7 +56,7 @@ test('a visited root must name the exact current index hash before offline migra
   const bytes = await readAsset(root, undefined, { fetch: () => Promise.reject(new TypeError('Offline')),
     legacy: { read: () => legacyAsset(f.storage, root, hash), store: f.storage } });
   expect(JSON.parse(new TextDecoder().decode(bytes))).toEqual(source);
-  expect(f.stores.get(ASSET_CACHE_NAME)?.has(root)).toBe(true);
+  expect(f.stores.get(assetCacheName())?.has(root)).toBe(true);
 });
 
 test('migration does not create missing old caches or scan their body keys', async () => {

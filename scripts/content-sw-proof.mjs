@@ -109,7 +109,8 @@ const booted = page => page.waitForFunction(() => {
   return typeof window.__workerClient === 'function' && window.__workerClient().frames > 0 && Array.isArray(timing?.entries) && timing.entries.some(/** @param {{operation: string}} row */ row => row.operation === 'app:loader-complete');
 }, undefined, { timeout });
 /** @param {import('playwright').Page} page */
-const contentKeys = page => page.evaluate(async () => (await caches.keys()).includes('ws-content-v1') ? (await (await caches.open('ws-content-v1')).keys()).map(request => request.url) : []);
+// OFFLINE OF12: the channel sits in the name (`ws-preview-content-v1` on a build with no world; production keeps `ws-content-v1`)
+const contentKeys = page => page.evaluate(async () => { const name = (await caches.keys()).find(key => /^ws-(?:[a-z]+-)?content-v1$/u.test(key)); return name === undefined ? [] : (await (await caches.open(name)).keys()).map(request => request.url); });
 /** @param {import('playwright').Page} page @param {() => Promise<boolean>} test @param {string} what */
 async function until(page, test, what) {
   const end = Date.now() + timeout;
