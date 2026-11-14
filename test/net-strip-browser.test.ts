@@ -80,6 +80,30 @@ test.skipIf(FOLDER === undefined)('a browser sees the strip appear when the link
     expect(report.rejoins).toBe(1);
     expect(shownAfter).toBeLessThan(1600);
     expect(clearedAfter).toBeLessThan(6000);
+    // FM4b mode 2: the device goes offline and the link with it. The offline-play card stands in for the banner, nothing is
+    // dialled while offline, and the network back dials at once and closes the card by itself
+    await page.waitForFunction(() => (window as unknown as { proof: { frames: number } }).proof.frames > 0);
+    const context = page.context();
+    await context.setOffline(true); puller.pull();
+    const offlineCard = page.locator('.ws-link-scrim[data-failmode="offline-play"]');
+    await offlineCard.waitFor({ state: 'visible', timeout: 6000 });
+    expect(await offlineCard.innerText()).toContain('offline');
+    expect(await page.locator(STRIP).isHidden(), 'the card is the screen: no banner under it').toBe(true);
+    const rejoinsOffline = await page.evaluate(() => (window as unknown as { proof: { rejoins: number } }).proof.rejoins);
+    await new Promise(wait => { setTimeout(wait, 3000); });
+    await page.screenshot({ path: join(FOLDER, '4-offline-play.png') });
+    expect(await page.evaluate(() => (window as unknown as { proof: { rejoins: number } }).proof.rejoins), 'no dial while offline').toBe(rejoinsOffline);
+    const back = performance.now();
+    puller.restore(); await context.setOffline(false);
+    await offlineCard.waitFor({ state: 'detached', timeout: 5000 });
+    await page.locator('[data-failmode="reconnected"]').waitFor({ state: 'visible', timeout: 5000 });
+    const backAfter = performance.now() - back;
+    await page.screenshot({ path: join(FOLDER, '5-back-online.png') });
+    const after = await page.evaluate(() => (window as unknown as { proof: { states: string[]; rejoins: number } }).proof);
+    console.info(`browser offline-play: back in ${backAfter.toFixed(0)} ms, ${JSON.stringify(after)}`);
+    expect(after.states).toEqual(['reconnecting', 'live', 'reconnecting', 'live']);
+    expect(after.rejoins).toBe(rejoinsOffline + 1);
+    expect(backAfter).toBeLessThan(3000);
   } finally {
     open = false; clearInterval(clock);
     await browser.close(); room.dispose(); host.dispose(); await puller.close(); await bench.close();

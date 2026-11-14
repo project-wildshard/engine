@@ -255,3 +255,43 @@ test('the card\'s Tab ring includes Details and wraps both ways; focus falls bac
   expect(document.activeElement === field).toBe(false);
   scope.dispose();
 });
+
+test('FM4b mode 2: offline shows the offline-play card over play; taps wait; the network back gives way to the banner, the link to the notice', () => {
+  const { scope, screens, calls, set } = harness();
+  set({ why: 'offline', downMs: 12_000 });
+  screens.link('reconnecting', 'offline');
+  const card = shown('offline-play');
+  expect(card?.getAttribute('role')).toBe('alertdialog');
+  expect(card?.textContent).toContain('You\'re offline');
+  expect(card?.textContent).toContain('Down for 12 s');
+  expect(card?.textContent).not.toMatch(/held for|30 seconds|saved/);
+  expect(shown('drop'), 'the card is the screen: no Reconnecting banner under it').toBeNull();
+  // a tap the world must hear: refused, and the card stays (no hold card on top of it)
+  expect(screens.allow('Talk')).toBe(false);
+  expect(shown('drop-blocked')).toBeNull();
+  // a chat line is still held for the link, under the same card
+  const sent: string[] = [];
+  expect(screens.holdChat('brb', line => { sent.push(line); }, () => undefined)).toBe(true);
+  expect(shown('reset-blocked')).toBeNull();
+  click(document.querySelector('.ws-link-scrim[data-failmode="offline-play"]'), 'Check connection');
+  expect(calls).toEqual(['doctor:offline-play']);
+  // the network is back: the cause changes while the link is still down, and the banner takes over
+  set({ why: 'closed' });
+  screens.link('reconnecting', 'closed');
+  expect(document.querySelector('.ws-link-scrim[data-failmode="offline-play"]')).toBeNull();
+  expect(shown('drop')?.textContent).toContain('Reconnecting');
+  screens.link('live');
+  expect(sent).toEqual(['brb']);
+  expect(shown('reconnected')).not.toBeNull();
+  scope.dispose();
+});
+
+test('FM4b mode 2: the link back while the card shows closes it at once', () => {
+  const { scope, screens, set } = harness();
+  set({ why: 'offline' });
+  screens.link('reconnecting', 'offline');
+  expect(shown('offline-play')).not.toBeNull();
+  screens.link('live');
+  expect(shown('offline-play')).toBeNull();
+  scope.dispose();
+});

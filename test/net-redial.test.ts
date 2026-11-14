@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
-import { Redial, type LinkState } from '../src/client/engine/net/redial';
+import { Redial, type LinkCause, type LinkState } from '../src/client/engine/net/redial';
 import type { DecodedFrame } from '../src/shared/engine/net/frame';
 import type { NetChannel, Transport, TransportStats } from '../src/shared/engine/net/transport';
 
@@ -17,14 +17,14 @@ class FakeLink implements Transport {
   fail(reason: string): void { for (const listener of [...this.closes]) listener(reason); this.closes.clear(); }
 }
 const frame = { tick: 1 } as DecodedFrame;
-function harness(random = 0.5): { client: NetClient; redial: Redial; links: FakeLink[]; states: LinkState[]; dialTimes: number[]; now: () => number; heard: () => void; run: (ms: number) => void; failDials: (reason: string) => void } {
+function harness(random = 0.5, online: () => boolean = () => true): { client: NetClient; redial: Redial; links: FakeLink[]; states: LinkState[]; causes: LinkCause[]; dialTimes: number[]; now: () => number; heard: () => void; run: (ms: number) => void; failDials: (reason: string) => void } {
   let clock = 0, failing: string | null = null;
-  const first = new FakeLink(), links = [first], states: LinkState[] = [], dialTimes: number[] = [];
+  const first = new FakeLink(), links = [first], states: LinkState[] = [], causes: LinkCause[] = [], dialTimes: number[] = [];
   const client = new NetClient(first, () => clock), frames: ((value: DecodedFrame) => void)[] = [], onFrame = client.onFrame.bind(client);
   vi.spyOn(client, 'onFrame').mockImplementation(fn => { frames.push(fn); return onFrame(fn); });
-  const redial = new Redial({ client, transport: first, now: () => clock, random: () => random, onState: state => { states.push(state); },
+  const redial = new Redial({ client, transport: first, now: () => clock, random: () => random, online, onState: state => { states.push(state); }, onCause: cause => { causes.push(cause); },
     dial: () => { const link = new FakeLink(); links.push(link); dialTimes.push(clock); return link; } });
-  return { client, redial, links, states, dialTimes, now: () => clock, heard: () => { for (const fn of frames) fn(frame); }, failDials: reason => { failing = reason; },
+  return { client, redial, links, states, causes, dialTimes, now: () => clock, heard: () => { for (const fn of frames) fn(frame); }, failDials: reason => { failing = reason; },
     run: ms => { for (let left = ms; left > 0; left -= 50) { clock += 50; vi.advanceTimersByTime(50); if (failing !== null) links.at(-1)?.fail(failing); } } };
 }
 beforeEach(() => { vi.useFakeTimers(); });
@@ -217,5 +217,49 @@ test('after the first frame, `reload` still ends the link: a refused build reloa
   const { heard, links, states, redial } = harness();
   heard(); links[0]?.fail('reload');
   expect(states).toContain('ended');
+  redial.dispose();
+});
+
+test('FM4b mode 2: offline, nothing is dialled and the give-up clock stands still; the network back dials at once', () => {
+  let online = true;
+  const { heard, run, states, causes, dialTimes, failDials, links, redial } = harness(0.5, () => online);
+  heard(); run(100);
+  online = false;
+  // the network went, then the frames: the strip says offline, and 3 s closes the dead socket as before
+  run(1100);
+  expect(states).toEqual(['reconnecting']);
+  expect(redial.why).toBe('offline');
+  run(2000);
+  expect(links[0]?.closedAs).toBe('stalled');
+  failDials('lost');
+  run(10 * 60_000);
+  expect(dialTimes, 'no dial goes out while the device says it is offline').toEqual([]);
+  expect(states, 'ten minutes offline is neither Resuming nor lost').toEqual(['reconnecting']);
+  online = true;
+  run(100);
+  expect(dialTimes, 'the network back dials within one watch').toHaveLength(1);
+  expect(redial.why).toBe('closed');
+  expect(causes, 'offline rode the strip\'s own state; the network back is told at once').toEqual(['closed']);
+  // the clock goes on from where it stopped: about 3 s down before Redial saw it offline, so Resuming about 32 s from here
+  run(31_000);
+  expect(states).toEqual(['reconnecting']);
+  run(1500);
+  expect(states).toEqual(['reconnecting', 'resuming']);
+  run(86_000);
+  expect(states).toEqual(['reconnecting', 'resuming', 'lost']);
+  redial.dispose();
+});
+
+test('FM4b mode 2: a link closed while offline is told as offline, and a frame clears it', () => {
+  let online = false;
+  const { heard, run, states, dialTimes, links, redial } = harness(0.5, () => online);
+  heard(); links[0]?.fail('lost'); run(5000);
+  expect(states).toEqual(['reconnecting']);
+  expect(redial.why).toBe('offline');
+  expect(dialTimes).toEqual([]);
+  online = true; run(100);
+  expect(dialTimes).toHaveLength(1);
+  heard(); run(100);
+  expect(states).toEqual(['reconnecting', 'live']);
   redial.dispose();
 });

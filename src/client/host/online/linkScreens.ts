@@ -169,7 +169,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   parent.append(banner, deploy);
 
   let state: LinkState = 'live', reason: string | undefined, wasDown = false, quietUntil = 0, deployLeft = 0, deployTicking = false;
-  let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop'; paint: () => void; what?: string; chat?: boolean; key?: string } | null = null;
+  let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop' | 'offline'; paint: () => void; what?: string; chat?: boolean; key?: string } | null = null;
   const held: { text: string; send: (text: string) => void; drop: () => void }[] = [];
   const down = (): boolean => state === 'reconnecting' || state === 'resuming';
 
@@ -180,10 +180,11 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   // a card takes the pointer back from the game (desktop pointer lock), so its buttons can be clicked
   const freePointer = (): void => { if ('exitPointerLock' in document && document.pointerLockElement instanceof Element) document.exitPointerLock(); };
   const paintBanner = (): void => {
-    const shown = down();
+    // offline, the card is the screen (FM4b mode 2): no banner under it
+    const shown = down() && hooks.why() !== 'offline';
     banner.hidden = !shown;
     // a link that is down takes the top band from the deploy countdown; the countdown comes back with the link
-    deploy.hidden = shown || deployLeft <= 0;
+    deploy.hidden = down() || deployLeft <= 0;
     if (!shown) return;
     const said = bannerFor(state, hooks.why(), hooks.progress().dials);
     banner.dataset['failmode'] = said.ids; banner.dataset['tone'] = said.tone; banner.dataset['state'] = state;
@@ -201,7 +202,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   };
   /** The hold card: the banner opened up, on a tap it can't carry. It repaints each second from the dial's progress. */
   const hold = (what: string, chat: boolean): void => {
-    if (open?.kind === 'stop') return;
+    // the offline card already says why nothing goes out; a held chat line still waits for the link
+    if (open?.kind === 'stop' || open?.kind === 'offline') return;
     remember(); open?.scope.dispose(); open = null;
     const own = scope.child('online.hold'), said = bannerFor(state, hooks.why(), hooks.progress().dials);
     const title = chat ? 'Your message will send when you\'re back' : state === 'resuming' ? 'Still reconnecting' : hooks.why() === 'restart' ? 'The world is restarting' : 'Not connected yet';
@@ -248,6 +250,28 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     root.querySelector('button')?.focus();
   };
   const doctor = (from: string): { label: string; busy: string; act: () => void }[] => hooks.doctor === undefined ? [] : [{ label: 'Check connection', busy: 'Opening…', act: () => { hooks.doctor?.(from); } }];
+  /**
+   * FM4b mode 2 (`offline-play`): the device says it has no network. Play waits under the card, the dial waits for the network
+   * (Redial's `offline`), and the card closes by itself when the network is back (the banner takes over) or the link is.
+   * J229: no seat-hold or save time is claimed, only what this page measured.
+   */
+  const offlineCard = (): void => {
+    if (open?.kind === 'offline') return;
+    remember(); open?.scope.dispose(); open = null;
+    const own = scope.child('online.offline'), { root, box } = card(own, 'offline-play', 'warn', 'Connection dropped', 'You\'re offline');
+    box.append(make('p', 'ws-link-body', 'This device lost its internet connection. The world needs it to carry on.'));
+    const status = make('ul', 'ws-link-facts'), waiting = make('li');
+    status.setAttribute('role', 'status'); status.append(waiting);
+    const paint = (): void => { waiting.replaceChildren(ring(), `Down for ${String(Math.floor(hooks.progress().downMs / 1000))} s`); };
+    paint(); own.interval(1000, paint);
+    box.append(status, make('p', 'ws-link-auto', 'We\'ll connect again by ourselves as soon as the network is back. Nothing is sent while you\'re offline.'));
+    const actions = doctor('offline-play');
+    if (actions.length > 0) box.append(buttons(own, actions));
+    const details = make('details'); details.append(make('summary', '', 'Details'), make('p', '', 'navigator.onLine is false · dialling waits for "online"')); box.append(details);
+    parent.append(root); freePointer();
+    open = { scope: own, root, kind: 'offline', paint };
+    root.querySelector('button')?.focus();
+  };
 
   const link = (next: LinkState, why?: string): void => {
     state = next; reason = why;
@@ -256,6 +280,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     if (down()) {
       wasDown = true; unnotice();
       if (open?.kind === 'stop') close();
+      if (hooks.why() === 'offline') { offlineCard(); return; }
+      if (open?.kind === 'offline') close();
       // a hold card follows its banner: a new cause (silent to restart) or 35 s down redraws it, else it just ticks
       if (open?.kind === 'hold' && open.key !== `${state}:${hooks.why()}` && open.what !== undefined) hold(open.what, open.chat === true); else open?.paint();
       return;

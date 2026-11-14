@@ -8,8 +8,8 @@ import type { NetClient } from './client';
 export type LinkState = 'live' | 'reconnecting' | 'resuming' | 'lost' | 'full' | 'ended';
 /** Why a link is down, as far as a browser can tell (meta MMO-FAILURE-MODES-PLAN FM4): `silent` stopped carrying frames (a half-open
  *  socket), `closed` was closed with no word (1006, a reset), `restart` was closed by a restarting server, `hidden` went quiet while the
- *  page was out of view. It rides `onState`'s reason for `reconnecting` and `resuming`. */
-export type LinkCause = 'silent' | 'closed' | 'restart' | 'hidden' | 'updating';
+ *  page was out of view, `offline` is a device that says it has no network (FM4b mode 2). It rides `onState`'s reason for `reconnecting` and `resuming`. */
+export type LinkCause = 'silent' | 'closed' | 'restart' | 'hidden' | 'updating' | 'offline';
 /** Where the dial is, for a screen that shows it: dials so far, the wait to the next (null while one is out), and how long it's been down. */
 export interface LinkProgress { readonly dials: number; readonly nextDialMs: number | null; readonly downMs: number }
 
@@ -51,7 +51,10 @@ export interface RedialOptions {
   readonly onCut?: (reason: string) => void;
   readonly now?: () => number;
   readonly random?: () => number;
+  /** FM4b mode 2: does the device say it has a network? Default `navigator.onLine`; a browser with no answer counts as online. */
+  readonly online?: () => boolean;
 }
+const browserOnline = (): boolean => typeof navigator === 'undefined' || (navigator as { onLine?: boolean }).onLine !== false;
 
 /**
  * E7.1: one client's link, kept up. It watches for frames, and a link that stops carrying them is closed and dialled again on a
@@ -62,6 +65,7 @@ export class Redial {
   private readonly scope = new Scope('net.redial');
   private readonly now: () => number;
   private readonly random: () => number;
+  private readonly online: () => boolean;
   private readonly offFrame: () => void;
   private transport: Transport;
   private offClose: () => void;
@@ -75,8 +79,10 @@ export class Redial {
   private dialled: number | null = null;
   private waitingForSeat = false;
   private cause: LinkCause = 'closed';
+  /** When the device last said it went offline while the link was down; null while it has a network. */
+  private offlineAt: number | null = null;
   constructor(options: RedialOptions) {
-    this.options = options; this.transport = options.transport; this.now = options.now ?? diagnosticNow; this.random = options.random ?? jitterFrom(this.now());
+    this.options = options; this.transport = options.transport; this.now = options.now ?? diagnosticNow; this.random = options.random ?? jitterFrom(this.now()); this.online = options.online ?? browserOnline;
     this.offFrame = options.client.onFrame(() => { this.heard(); });
     this.offClose = this.watchClose(options.transport);
     this.scope.interval(WATCH_MS, () => { this.watch(); });
@@ -112,7 +118,7 @@ export class Redial {
   private heard(): void {
     const now = this.now(), wasDown = this.phase === 'down';
     this.heardAt = now;
-    if (wasDown) { this.phase = 'up'; this.dialled = null; this.dials = 0; this.waitingForSeat = false; }
+    if (wasDown) { this.phase = 'up'; this.dialled = null; this.dials = 0; this.waitingForSeat = false; this.offlineAt = null; }
     this.show('live');
   }
   private watch(): void {
@@ -120,17 +126,34 @@ export class Redial {
     if (this.phase === 'up') {
       if (this.heardAt === null) return;
       const silent = now - this.heardAt;
-      if (silent >= STRIP_MS && this.state === 'live') this.because('silent');
+      if (silent >= STRIP_MS && this.state === 'live') this.because(this.online() ? 'silent' : 'offline');
       if (silent >= DROP_MS) this.lose(now); else if (silent >= STRIP_MS) this.show('reconnecting');
     } else if (this.phase === 'down') this.redial(now);
   }
   private redial(now: number): void {
     if (this.waitingForSeat) { if (this.dialled === null && now >= this.dialAt) this.dial(now); else if (this.dialled !== null && now - this.dialled >= DROP_MS) { this.failedDial(now); this.drop(); } return; }
+    if (this.offline(now)) { if (this.dialled !== null && now - this.dialled >= DROP_MS) { this.failedDial(now); this.drop(); } return; }
     const out = now - this.lostAt;
     if (out >= GIVE_UP_MS) { this.stop(); this.show('lost'); return; }
     if (out >= RESUMING_MS) this.show('resuming');
     if (this.dialled !== null) { if (now - this.dialled >= DROP_MS) { this.failedDial(now); this.drop(); } return; }
     if (now >= this.dialAt) this.dial(now);
+  }
+  /**
+   * FM4b mode 2: a device with no network is not dialled (each dial would only fail) and its give-up clock stands still, so a
+   * phone in a tunnel never reaches `lost` while it waits; the world's own hold on the seat (J114) is the server's and goes on.
+   * The network back: the clock goes on from where it stopped and the dial goes out at once. True while offline.
+   */
+  private offline(now: number): boolean {
+    if (!this.online()) {
+      this.offlineAt ??= now;
+      this.because('offline');
+      return true;
+    }
+    if (this.offlineAt === null) return false;
+    this.lostAt += now - this.offlineAt; this.offlineAt = null; this.dialAt = now;
+    this.because('closed');
+    return false;
   }
   private dial(now: number): void {
     const transport = this.options.dial();
@@ -154,7 +177,7 @@ export class Redial {
     if (reason === 'retry' || cut) this.because('updating');
     if (cut) this.options.onCut?.(reason);
     if (reason === 'full') { this.phase = 'down'; this.waitingForSeat = true; this.dialled = null; this.dialAt = now + FULL_RETRY_MS; this.show('full'); return; }
-    if (this.phase === 'up') { if (this.cause !== 'updating') this.because(reason === 'restart' ? 'restart' : 'closed'); this.lose(now, false); }
+    if (this.phase === 'up') { if (this.cause !== 'updating') this.because(reason === 'restart' ? 'restart' : this.online() ? 'closed' : 'offline'); this.lose(now, false); }
     else if (this.phase === 'down') { if (reason === 'restart') this.because('restart'); this.failedDial(now); }
   }
   /** The link is gone or no use: from now it is dialled, and a player's 35 s count from the last frame. */

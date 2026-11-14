@@ -9,7 +9,9 @@ const url = new URLSearchParams(location.search).get('ws') ?? '', scope = new Sc
 const proof: { states: LinkState[]; frames: number; rejoins: number; welcome: string | null; rtt: number; said: string[]; heard: string[] } = { states: [], frames: 0, rejoins: 0, welcome: null, rtt: 0, said: [], heard: [] };
 Object.assign(window, { proof });
 const screens = linkScreens(scope, { retry: () => { redial.retry(); }, dialNow: () => { redial.dialNow(); }, progress: () => redial.progress, why: () => redial.why, reload: () => undefined });
-const redial = new Redial({ client, transport, dial: () => new WebSocketTransport(url), onState: (state, reason) => { proof.states.push(state); screens.link(state, reason); } });
+const redial = new Redial({ client, transport, dial: () => new WebSocketTransport(url), onState: (state, reason) => { proof.states.push(state); screens.link(state, reason); },
+  // as the shell does: a cause that changes while down (the network back, FM4b) repaints the screens
+  onCause: cause => { screens.link(redial.told, cause); } });
 client.gateActions(what => screens.allow(what));
 // the proof's taps: an act the world must hear, and a chat line
 Object.assign(window, { tap: (): void => { client.act({ kind: 'interact', seq: 0, id: 'proof' }); }, say: (text: string): void => { if (!screens.holdChat(text, line => { proof.said.push(line); client.say('room', line); }, () => undefined)) { proof.said.push(text); client.say('room', text); } } });
