@@ -21,9 +21,10 @@ if (dist === '' || work === '' || keyFile === '') throw new Error('usage: grid-c
 const engineName = process.argv.find(arg => arg.startsWith('--engine='))?.slice(9) ?? 'chromium', out = absolute(process.argv.find(arg => arg.startsWith('--out='))?.slice(6) ?? join(work, 'shots'));
 if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error(`No engine ${engineName}`);
 const phone = process.argv.includes('--layout=phone'), solo = process.argv.includes('--solo');
-// GRID-CROSSING GC2: --breach, when the last leg is held at a closed wall (a cell on another worker, GC30's Far Reach wall, a
-// neighbour still loading), throws the breach cases at it by real input from where it stands: jump into it, jump along it both
-// ways, and boost-jump into it. A case holds when the page never enters the target and the walker stays on the road, standing.
+// GRID-CROSSING GC2: --breach, at the first wall a leg is held at (a neighbour still preparing: the page's loading wall), else when
+// the last leg ends held (a cell on another worker, GC30's Far Reach wall), throws the breach cases at it by real input from where
+// it stands: jump into it, jump along it both ways, and boost-jump into it. A case holds when the page never enters the target
+// while its crossing is unready and the walker stays on the road, standing; entering once the neighbour is ready is the crossing.
 const breach = process.argv.includes('--breach');
 /** The page's memory now: JS heap (Chromium), the grid's resident and playing MB, the owner ledger's totals, the memory warning. */
 const MEMORY_READ = `(() => { const api = window.__wildshard; let ledger = null; try { const mem = ${pageMemoryAttributionExpression}; ledger = mem?.totals ? { gpuMB: Math.round(mem.totals.gpu / 1048576), ramMB: Math.round(mem.totals.ram / 1048576) } : null; } catch {}
@@ -162,6 +163,41 @@ try {
   let north = to.axis === 'z' ? (to.sign > 0 ? Math.PI : 0) : (to.sign > 0 ? -Math.PI / 2 : Math.PI / 2);
   { await face(north); const a = await sample(); await page.keyboard.down('KeyW'); await sleep(1200); await page.keyboard.up('KeyW'); await sleep(300); const b = await sample();
     if ((b[to.axis] - a[to.axis]) * to.sign < 0) north += Math.PI; result.probe = { axis: to.axis, from: a[to.axis], to: b[to.axis], yaw: north }; }
+  /** GC2: the breach cases at the wall the walker is held at, by real input, facing `yaw` toward `target`. A case is a breach when
+   *  the page enters the target while its crossing is still unready (preparing or blocked: the wall was closed), or the walker
+   *  falls off the road. Run once a walk: at the first leg held at a preparing neighbour (the in-page loading wall), else at the end. */
+  const breachCases = async (/** @type {string} */ where, /** @type {number} */ yaw, /** @type {string} */ target) => {
+    /** @type {Record<string, unknown>[]} */ const cases = []; result.breach = { where, cases };
+    const keys = /** @type {Record<string, string[]>} */ ({ 'jump into it': ['KeyW'], 'jump along it, right': ['KeyW', 'KeyD'], 'jump along it, left': ['KeyW', 'KeyA'], 'boost-jump into it': ['KeyW', 'ShiftLeft'] });
+    await face(yaw);
+    for (const [name, held_] of Object.entries(keys)) {
+      const start = await sample(), sign = target === NEXT ? to.sign : -to.sign;
+      // the wall opened under an earlier case (the neighbour got ready): the walker is across, nothing is left to breach
+      if (start.inside === target) { cases.push({ name, skipped: 'the wall opened: the walker is in the target' }); note(`breach (${where}): ${name}`, true, { skipped: 'the wall opened' }); continue; }
+      let entered = false, breached = false, lowest = Infinity, furthest = -Infinity, last = start, closedSamples = 0, samples = 0;
+      for (const key of held_) await page.keyboard.down(key);
+      for (let jump = 0; jump < 8; jump++) {
+        await page.keyboard.press('Space');
+        for (let tick = 0; tick < 3; tick++) {
+          await sleep(250);
+          const at = await sample();
+          if (at === undefined || at.err !== undefined) continue;
+          samples++; if (at.phase === 'preparing' || at.phase === 'blocked' || (at.closed ?? 0) > 0) closedSamples++;
+          if (at.inside === target && last.inside !== target) { entered = true; breached ||= last.phase === 'preparing' || last.phase === 'blocked'; }
+          lowest = Math.min(lowest, at.y); furthest = Math.max(furthest, at[to.axis] * sign); last = at;
+        }
+      }
+      for (const key of held_) await page.keyboard.up(key);
+      await sleep(800);
+      const end = await sample();
+      await page.screenshot({ path: join(out, `${engineName}-breach-${name.replaceAll(/[^a-z]+/gu, '-')}.png`) });
+      const row = { name, entered, breached, closedShare: samples === 0 ? null : Number((closedSamples / samples).toFixed(2)), past: Number((furthest - start[to.axis] * sign).toFixed(2)), lowest: Number(lowest.toFixed(2)),
+        start: { x: start.x, y: start.y, z: start.z, phase: start.phase, closed: start.closed }, end: { inside: end.inside, x: end.x, y: end.y, z: end.z, phase: end.phase } };
+      cases.push(row);
+      // entering once the neighbour is ready is the crossing working, not a breach; a held wall must also keep the walker on the road
+      note(`breach (${where}): ${name} holds`, !breached && lowest > -2 && (entered || end.inside === null), row);
+    }
+  };
   /** @type {Record<string, unknown>[]} */
   const legs = [];
   for (const leg of LEGS) {
@@ -183,6 +219,12 @@ try {
       if (s.inside === leg.target && enteredAt === 0) enteredAt = at;
       if (controlAt === 0) {
         if (moved < 0.15) { stuckSince ||= at; } else { if (stuckSince !== 0) { stuckMs += at - stuckSince; worstStuck = Math.max(worstStuck, at - stuckSince); } stuckSince = 0; }
+        if (breach && result.breach === undefined && stuckSince !== 0 && at - stuckSince > STUCK_MS && s.inside !== leg.target && s.phase === 'preparing') {
+          await page.keyboard.up('KeyW'); if (leg.boost) await page.keyboard.up('ShiftLeft');
+          await breachCases(`${leg.name}, held at ${leg.target} while it prepares`, yaw, leg.target);
+          await face(yaw); await page.keyboard.down('KeyW'); if (leg.boost) await page.keyboard.down('ShiftLeft');
+          stuckSince = 0; last = await sample(); continue;
+        }
         if (stuckSince !== 0 && at - stuckSince > STUCK_MS && jumps < 4) { if (jumps === 0) { events.push({ at, stuck: true, x: s.x, z: s.z, inside: s.inside, closed: s.closed, phase: s.phase }); await page.screenshot({ path: join(out, `${engineName}-${leg.name}-stuck.png`) }); } await page.keyboard.press('Space'); jumps++; }
         if (s.inside === leg.target && s.ready === true && (s.phase === undefined || s.phase === 'settled') && moved > 0.3) { controlAt = at; events.push({ at, control: true, x: s.x, z: s.z, memory: await page.evaluate(MEMORY_READ) }); }
       }
@@ -211,35 +253,10 @@ try {
     note(`${leg.name}: arrives in ${leg.target} with control`, controlAt !== 0, { enteredAt, controlAt, end: { inside: end.inside, z: end.z, ready: end.ready } });
     note(`${leg.name}: no stop or wall on the way`, worstStuck <= STUCK_MS && jumps === 0, { worstStuck, jumps });
   }
-  if (breach) {
+  if (breach && result.breach === undefined) {
     const held = /** @type {any} */ (legs.at(-1));
-    if (held === undefined || held.controlAtMs !== 0) note('breach: the last leg is held at a wall', false, { skipped: 'the target took the walker: no closed wall to test' });
-    else {
-      /** @type {Record<string, unknown>[]} */ const cases = []; result.breach = cases;
-      const keys = /** @type {Record<string, string[]>} */ ({ 'jump into it': ['KeyW'], 'jump along it, right': ['KeyW', 'KeyD'], 'jump along it, left': ['KeyW', 'KeyA'], 'boost-jump into it': ['KeyW', 'ShiftLeft'] });
-      await face(north);
-      for (const [name, held_] of Object.entries(keys)) {
-        const start = await sample();
-        let entered = false, lowest = Infinity, furthest = -Infinity;
-        for (const key of held_) await page.keyboard.down(key);
-        for (let jump = 0; jump < 8; jump++) {
-          await page.keyboard.press('Space');
-          for (let tick = 0; tick < 3; tick++) {
-            await sleep(250);
-            const at = await sample();
-            if (at === undefined || at.err !== undefined) continue;
-            entered ||= at.inside === NEXT; lowest = Math.min(lowest, at.y); furthest = Math.max(furthest, at[to.axis] * to.sign);
-          }
-        }
-        for (const key of held_) await page.keyboard.up(key);
-        await sleep(800);
-        const end = await sample();
-        await page.screenshot({ path: join(out, `${engineName}-breach-${name.replaceAll(/[^a-z]+/gu, '-')}.png`) });
-        const row = { name, entered, past: Number((furthest - start[to.axis] * to.sign).toFixed(2)), lowest: Number(lowest.toFixed(2)), end: { inside: end.inside, x: end.x, y: end.y, z: end.z, phase: end.phase } };
-        cases.push(row);
-        note(`breach: ${name} holds`, !entered && end.inside === null && lowest > -2, row);
-      }
-    }
+    if (held === undefined || held.controlAtMs !== 0) note('breach: a leg is held at a wall', false, { skipped: 'no leg was held at a closed wall: nothing to test' });
+    else await breachCases('the last leg, held at a wall', north, NEXT);
   }
   const sentinel = await page.evaluate(() => /** @type {any} */ (window).__gc15c?.sentinel === 1).catch(() => false);
   note('no page reload through every crossing', sentinel && navigations === navigationsBefore, { sentinel, navigations: navigations - navigationsBefore });
