@@ -26,3 +26,10 @@
   builds the seat's transport only once the room has settled, refuses cleanly if it never does, and holds off a start-over
   while an arrival is in flight. `NetRoom.travelled` resets the ledger it has seen, so the new room sends the arrival a full
   ledger. Not fixed: input the client sends between the road's `travel` and the door's re-pump is dropped (a few frames).
+- GC3 tooling: `scripts/grid-crossing-tour.mjs` walks every neighbouring pair in one page on a live site. It places the
+  walker 238 m into the source cell, walks (toward +x/+z) or boosts (toward -x/-z) across, records border-to-control, the
+  wall, the freeze, frames over 50 ms, memory and the loading steps per crossing, and repeats over good arcs to reach the
+  next untried one; a stranded walker re-enters by the title with a fresh profile. `scripts/grid-crossing-report.mjs`
+  turns runs into one page with thumbnails and holds them to `test/grid-crossing-ratchet.json`
+  (`scripts/grid-crossing-ratchet.mjs`: a pair may not get worse past its slack; `--tighten` lowers the bar). First
+  preview read: Chromium desktop, run beside WebKit, held 73 s on the road into Nalati and never reached control.

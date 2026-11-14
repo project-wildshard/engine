@@ -1,0 +1,210 @@
+#!/usr/bin/env node
+// GRID-CROSSING GC3: every neighbouring pair of the grid, both ways, in one page. The page enters the grid on Driftwood's deck card,
+// then tours the grid's border arcs (each pair once in each direction; the grid is the build's own catalogue `grid.cells`): for each
+// arc the harness sets the walker 12 m inside the cell's edge on its entryway (probe.ts's harness pose, which only an in-page server
+// hears: preview or a loopback page) and walks or boosts across by real input until it has control in the neighbour. Arcs toward +x
+// or +z walk, arcs toward -x or -z boost, so every pair is crossed at both speeds once. A failed arc stays in its cell and the tour
+// picks another; when a cell has no arc left it goes back over crossings that worked (scored too, marked `repeat`), and when none
+// leads anywhere (a cell it can't leave) it enters again by the title.
+// Per crossing, from the in-page samples (every 100 ms) and every frame: border to control, the longest run under 90 % of the
+// approach speed (slow) and under 0.1 m per 100 ms with the key held (freeze), the time held at an unready neighbour (wall: phase
+// preparing or blocked while frozen), the time the cell step screen shows, and frames over 33 and 50 ms within 3 s of the border.
+// Not measured: grey stand-ins within 60 m (no reader yet).
+//   scripts/browser-lane.sh node scripts/grid-crossing-tour.mjs --base=https://preview.wildshard.io --out=<dir> [--engine=chromium|webkit]
+//     [--layout=phone] [--arcs=<from>:<to>,…] [--limit=<n crossings>]
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve as absolute } from 'node:path';
+import { chromium, webkit } from 'playwright';
+import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { saveFixture } from './debug-settings.mjs';
+
+/** @param {string} name @param {string} fallback */
+const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
+const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), phone = flag('layout', 'desktop') === 'phone';
+// the harness pose is the in-page server's: preview or a loopback page only (never staging's or production's seats, J205)
+if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: grid-crossing-tour.mjs --base=<preview or loopback url> --out=<dir> [--engine=chromium|webkit] [--layout=phone] [--arcs=a:b,…] [--limit=n]');
+if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error(`No engine ${engineName}`);
+const limit = Number(flag('limit', '400')), only = flag('arcs', '').split(',').filter(Boolean);
+mkdirSync(out, { recursive: true });
+const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
+
+// the grid at the build the base serves (its version.json), not this checkout's
+const build = await fetch(`${base}/version.json`, { signal: AbortSignal.timeout(15_000) }).then(async found => String((await found.json()).build).split('-')[0] ?? '').catch(() => '');
+const catalogueText = (() => {
+  try { return execFileSync('git', ['show', `${build}:src/shared/game/grid/singleplayer.json`], { cwd: join(import.meta.dirname, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); }
+  catch { console.log(`build ${build} is not in this checkout: reading the working catalogue`); return readFileSync(join(import.meta.dirname, '../src/shared/game/grid/singleplayer.json'), 'utf8'); }
+})();
+/** @type {{ instance: string, slug: string, cell: [number, number] }[]} */
+const cells = JSON.parse(catalogueText).grid.cells;
+const at = new Map(cells.map(cell => [cell.cell.join(','), cell]));
+/** @typedef {{ from: string, to: string, dx: number, dz: number, boost: boolean }} Arc */
+/** @type {Arc[]} */
+const arcs = [];
+for (const cell of cells) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+  const next = at.get(`${String(cell.cell[0] + dx)},${String(cell.cell[1] + dz)}`);
+  if (next !== undefined) arcs.push({ from: cell.instance, to: next.instance, dx, dz, boost: dx + dz < 0 });
+}
+const wanted = only.length === 0 ? arcs : arcs.filter(arc => only.includes(`${arc.from}:${arc.to}`));
+const HOME = 'driftwood-isle', HOME_CARD = 'Driftwood Isle', EDGE_IN = 238, LEG_MS = 90_000, STUCK_MS = 1500;
+
+/** @type {Record<string, unknown>[]} */
+const crossings = [];
+const result = { lane: 'opus-gcm2', base, build, engine: engineName, layout: phone ? 'phone 402x874 touch' : 'desktop 1440x900', at: new Date().toISOString(), arcs: wanted.length, crossings, errors: /** @type {string[]} */ ([]), reloads: 0, reentries: 0, note: '', untried: /** @type {string[]} */ ([]) };
+const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] : [] });
+let code = 1;
+try {
+  // a fresh profile at each entry: the first, and again when the tour is stranded in a cell it can't leave (a grid page's title
+  // won't take a second Shard Select in the same profile)
+  /** @type {import('playwright').BrowserContext | null} */ let context = null;
+  /** @type {import('playwright').Page} */ let page;
+  let navigations = 0;
+  const profile = async () => {
+    await context?.close();
+    context = await browser.newContext(phone ? { viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: engineName === 'chromium', hasTouch: true,
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Mobile/15E148 Safari/604.1' } : { viewport: { width: 1440, height: 900 } });
+    await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
+    await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
+    await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: phone ? { tier: 'phone', volume: 0 } : { volume: 0 } });
+    page = await context.newPage();
+    const opened = page;
+    page.on('pageerror', error => { if (result.errors.length < 20) result.errors.push(error.message.slice(0, 240)); });
+    page.on('framenavigated', frame => { if (frame === opened.mainFrame()) navigations++; });
+  };
+  /** Into the grid by Driftwood's deck card, and the sampler on: at the start, and again when the tour is stranded in a cell it can't leave. */
+  const enter = async () => {
+    await profile();
+    await page.goto(`${base}/?mute=1&nolock=1`, { waitUntil: 'load' });
+    await page.locator('.ws-main-select').click({ timeout: 120_000 });
+    if (await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false)) { await page.locator('#ws-name-box input').fill('walker'); await page.locator('#ws-name-box button[type=submit]').click(); }
+    await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
+    const index = await page.evaluate(card => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes(card)), HOME_CARD);
+    if (index < 0) throw new Error(`No ${HOME_CARD} card`);
+    await page.locator('.ws-menu-dots i').nth(index).click();
+    await page.locator('.ws-menu-play').click();
+    await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 180_000, polling: 100 });
+    await sleep(2000);
+    await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
+    await page.evaluate(() => {
+      const W = /** @type {any} */ (window), q = W.__gc3 = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), sentinel: 1 }, t0 = performance.now();
+      let last = t0;
+      const raf = (/** @type {number} */ now) => { q.frames.push([Math.round(now - t0), Number((now - last).toFixed(1))]); last = now; if (q.frames.length > 60_000) q.frames.splice(0, 30_000); requestAnimationFrame(raf); };
+      requestAnimationFrame(raf);
+      setInterval(() => { try {
+        const st = W.__wildshard.shard.grid.state(), p = W.__wildshard.world.player, lv = st.live;
+        q.samples.push({ t: Math.round(performance.now() - t0), x: Number(p.position.x.toFixed(2)), y: Number(p.position.y.toFixed(2)), z: Number(p.position.z.toFixed(2)), inside: st.inside,
+          phase: lv?.crossing?.phase, ready: lv?.live?.gameplayReady, loading: st.cellLoading, step: st.cellStep?.step ?? null });
+        if (q.samples.length > 20_000) q.samples.splice(0, 10_000);
+      } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 100);
+    });
+    await sleep(500);
+  };
+  await enter();
+  let navigationsBefore = navigations;
+  /** @returns {Promise<any>} */
+  const sample = () => page.evaluate(() => { const rows = /** @type {any[]} */ (/** @type {any} */ (window).__gc3.samples); for (let i = rows.length - 1; i >= 0; i--) if (rows[i].err === undefined) return rows[i]; return undefined; });
+  const face = (/** @type {number} */ yaw) => page.evaluate(wanted_ => { /** @type {any} */ (window).__wildshard.world.player.yaw = wanted_; }, yaw);
+
+  /** One crossing over `arc` from where the walker stands (in `arc.from`). @param {Arc} arc @param {boolean} repeat */
+  const cross = async (arc, repeat) => {
+    const row = /** @type {Record<string, any>} */ ({ from: arc.from, to: arc.to, boost: arc.boost, repeat, ok: false, why: '' });
+    crossings.push(row);
+    const yaw = Math.atan2(-arc.dx, -arc.dz), px = arc.dx * EDGE_IN, pz = arc.dz * EDGE_IN;
+    // the harness pose: probe.ts `told`, so the in-page server hears where the walker stands
+    await page.evaluate(([x, z, y]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(x, z, y, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, y); }, [px, pz, yaw]);
+    await sleep(3000);
+    const placed = await sample();
+    row.placed = { x: placed.x, y: placed.y, z: placed.z, inside: placed.inside };
+    if (placed.inside !== arc.from || Math.hypot(placed.x - px, placed.z - pz) > 4) { row.why = `not placed on ${arc.from}'s entryway (inside ${String(placed.inside)})`; return row; }
+    await face(yaw);
+    const t1 = Date.now(), tFrom = (await sample()).t;
+    await page.keyboard.down('KeyW'); if (arc.boost) await page.keyboard.down('ShiftLeft');
+    let controlAt = 0, controlT = 0, jumps = 0, stuckSince = 0, last = placed, fell = false;
+    while (Date.now() - t1 < LEG_MS) {
+      await sleep(250);
+      const s = await sample();
+      if (s === undefined) continue;
+      const moved = Math.hypot(s.x - last.x, s.z - last.z), now = Date.now() - t1;
+      if (controlAt === 0) {
+        if (moved < 0.15) stuckSince ||= now; else stuckSince = 0;
+        if (stuckSince !== 0 && now - stuckSince > STUCK_MS && jumps < 4 && s.phase !== 'preparing') { await page.keyboard.press('Space'); jumps++; stuckSince = now; }
+        if (s.inside === arc.from && s.y < placed.y - 8) { fell = true; break; }
+        if (s.inside === arc.to && s.ready === true && (s.phase === undefined || s.phase === 'settled') && moved > 0.3) {
+          controlAt = now; controlT = s.t;
+          // GC14: the page's memory at each control, so the tour doubles as the long-walk soak
+          row.memory = await page.evaluate(() => { const W = /** @type {any} */ (window); let st = null; try { st = W.__wildshard.shard.grid.state(); } catch { /* no grid yet */ }
+            const perf = /** @type {any} */ (performance); return { playingMB: st?.playingMB ?? null, residentMB: st?.residentMB ?? null, heapMB: perf.memory ? Math.round(perf.memory.usedJSHeapSize / 1048576) : null }; }).catch(() => null);
+        }
+      } else if (now - controlAt > 2500) break;
+      last = s;
+      if (jumps >= 4 && stuckSince !== 0 && now - stuckSince > 10_000) break;
+    }
+    await page.keyboard.up('KeyW'); if (arc.boost) await page.keyboard.up('ShiftLeft');
+    await sleep(400);
+    const rows = /** @type {any[]} */ (await page.evaluate(t => /** @type {any} */ (window).__gc3.samples.filter((/** @type {any} */ r) => r.err === undefined && r.t >= t), tFrom));
+    const frames = /** @type {number[][]} */ (await page.evaluate(t => /** @type {any} */ (window).__gc3.frames.filter((/** @type {number[]} */ f) => (f[0] ?? 0) >= t), tFrom));
+    const entered = rows.find(r => r.inside === arc.to), roadAt = rows.find(r => r.inside === null);
+    /** longest run of consecutive samples (each ~100 ms) matching `test`, in ms, before control */
+    const untilT = controlAt === 0 ? Infinity : controlT;
+    const speeds = rows.slice(1).map((r, i) => { const p = rows[i]; return { t: r.t, v: Math.hypot(r.x - p.x, r.z - p.z) / Math.max(0.05, (r.t - p.t) / 1000), r }; });
+    const head = speeds.slice(2, 22).map(s => s.v).sort((a, b) => a - b), approach = head[Math.floor(head.length / 2)] ?? 0;
+    const longest = (/** @type {(s: { t: number, v: number, r: any }) => boolean} */ test) => { let best = 0, since = -1; for (const s of speeds) { if (s.t > untilT) break; if (test(s)) { if (since < 0) since = s.t; best = Math.max(best, s.t - since + 100); } else since = -1; } return best; };
+    const sum = (/** @type {(s: { t: number, v: number, r: any }) => boolean} */ test) => speeds.filter(s => s.t <= untilT && test(s)).length * 100;
+    const border = entered?.t ?? Infinity, near = frames.filter(f => Math.abs((f[0] ?? 0) - border) <= 3000).map(f => f[1] ?? 0);
+    Object.assign(row, { ok: controlAt !== 0, why: controlAt !== 0 ? '' : fell ? `fell off ${arc.from}'s entryway (no ground there)` : entered === undefined ? (roadAt === undefined ? `never left ${arc.from}` : `held on the road (${String(last.phase)})`) : 'in the cell, no control',
+      borderToControlMs: entered === undefined || controlAt === 0 ? null : controlT - entered.t, controlMs: controlAt === 0 ? null : controlAt, approachMps: Number(approach.toFixed(2)),
+      slowMs: approach > 0 ? longest(s => s.v < approach * 0.9) : null, freezeMs: longest(s => s.v * 0.1 < 0.1), wallMs: sum(s => (s.r.phase === 'preparing' || s.r.phase === 'blocked') && s.v * 0.1 < 0.1),
+      stepScreenMs: sum(s => s.r.loading !== null && s.r.loading !== undefined && s.r.loading !== false), over33: near.filter(ms => ms > 33).length, over50: near.filter(ms => ms > 50).length,
+      // GC8: how long each `cell` step stood on the loading screen in this crossing (samples every 100 ms; a build before GC8 reads none)
+      steps: speeds.reduce((/** @type {Record<string, number>} */ onScreen, x) => { if (x.t <= untilT && typeof x.r.step === 'string' && x.r.step !== '') onScreen[x.r.step] = (onScreen[x.r.step] ?? 0) + 100; return onScreen; }, {}),
+      worstFrameMs: Math.max(0, ...near), jumps, lowestY: Math.min(...rows.map(r => r.y)), end: { inside: last.inside, x: last.x, y: last.y, z: last.z, phase: last.phase } });
+    // a failed crossing held on the road boosts back into the cell it left, so the tour goes on from there
+    if (!row.ok && last.inside !== arc.from && last.inside !== arc.to) {
+      await face(yaw + Math.PI); await page.keyboard.down('KeyW'); await page.keyboard.down('ShiftLeft');
+      for (const ends = Date.now() + 30_000; Date.now() < ends && (await sample())?.inside !== arc.from;) await sleep(250);
+      await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft'); await sleep(1500);
+      row.backIn = (await sample())?.inside === arc.from;
+    }
+    if (!row.ok || row.wallMs > 0) await page.screenshot({ path: join(out, `${engineName}-${arc.from}-${arc.to}.png`) }).catch(() => undefined);
+    console.log(`${row.ok ? 'ok  ' : 'FAIL'} ${arc.from} -> ${arc.to}${arc.boost ? ' boost' : ''}${repeat ? ' (repeat)' : ''} ${JSON.stringify({ why: row.why, b2c: row.borderToControlMs, wall: row.wallMs, freeze: row.freezeMs, over50: row.over50 })}`);
+    return row;
+  };
+
+  // the tour: from the cell the walker is in, the arc not yet crossed whose target has the most arcs left; else back over a crossed arc
+  let here = (await sample()).inside ?? HOME;
+  const left = new Set(wanted), good = /** @type {Arc[]} */ ([]);
+  while (left.size > 0 && crossings.length < limit) {
+    if (navigations !== navigationsBefore) { result.note = 'the page reloaded: tour stopped'; break; }
+    const outs = [...left].filter(arc => arc.from === here);
+    let arc = outs.sort((a, b) => [...left].filter(o => o.from === b.to).length - [...left].filter(o => o.from === a.to).length)[0], repeat = false;
+    if (arc === undefined) {
+      // the shortest way over crossed arcs to a cell with arcs left
+      /** @type {Map<string, Arc | null>} */ const via = new Map([[here, null]]); const queue = [here]; let goal = '';
+      while (queue.length > 0 && goal === '') { const cell = /** @type {string} */ (queue.shift()); for (const g of good.filter(o => o.from === cell && !via.has(o.to))) { via.set(g.to, g); queue.push(g.to); if ([...left].some(o => o.from === g.to)) { goal = g.to; break; } } }
+      if (goal === '') {
+        // stranded (a cell whose every way out failed, Far Reach's sky islands): back in by the title; the arcs out of here count as tried
+        for (const o of [...left].filter(row => row.from === here)) { left.delete(o); crossings.push({ from: o.from, to: o.to, boost: o.boost, repeat: false, ok: false, why: `not tried: stranded in ${here}` }); }
+        if (result.reentries >= 4) { result.note = `stranded in ${here} a fifth time: stopped`; break; }
+        // re-entry lands on HOME: stop when no arc left starts anywhere HOME's good arcs reach (one failure out of HOME otherwise re-enters four times for nothing)
+        const reach = new Set([HOME]); for (let grew = true; grew;) { grew = false; for (const g of good) if (reach.has(g.from) && !reach.has(g.to)) { reach.add(g.to); grew = true; } }
+        if (![...left].some(o => reach.has(o.from))) { result.note = `stranded in ${here}, and no arc left is reachable from ${HOME}: stopped`; break; }
+        result.reentries++; await enter(); navigationsBefore = navigations; here = (await sample())?.inside ?? HOME; continue;
+      }
+      let step = goal; while (via.get(step)?.from !== here) step = /** @type {Arc} */ (via.get(step)).from;
+      arc = /** @type {Arc} */ (via.get(step)); repeat = true;
+    }
+    left.delete(arc);
+    const row = await cross(arc, repeat);
+    if (row.ok) { if (!repeat) good.push(arc); here = arc.to; } else { here = (await sample()).inside ?? here; if (repeat) good.splice(good.indexOf(arc), 1); }
+  }
+  result.reloads = navigations - navigationsBefore;
+  if (left.size > 0) result.untried = [...left].map(arc => `${arc.from}:${arc.to}`);
+  code = crossings.length > 0 && crossings.every(row => row.ok) && result.reloads === 0 ? 0 : 1;
+  await /** @type {import('playwright').BrowserContext | null} */ (/** @type {unknown} */ (context))?.close();
+} catch (error) { result.note = `the run: ${String(error).slice(0, 400)}`; }
+finally {
+  writeFileSync(join(out, `${engineName}-${phone ? 'phone' : 'desktop'}-tour.json`), `${JSON.stringify(result, null, 2)}\n`);
+  await browser.close();
+}
+console.log(`grid-crossing tour: ${String(crossings.filter(row => row.ok).length)} of ${String(crossings.length)} crossings reached control; ${out}`);
+process.exit(code);
