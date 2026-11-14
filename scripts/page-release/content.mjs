@@ -58,9 +58,16 @@ export function contentHeaders(key) {
   return {type, cache: IMMUTABLE};
 }
 
-/** The kind a page path publishes as, or undefined when it stays on the page (code, shell, runtime, maps).
+/** PZ7: a shard file's I5 packs (`shardfiles/<slug>/blobs/pack/`, 475 MB). The wire meter read none of them on any deck
+ *  card or the grid, phone and desktop (meta docs/plans/page-size/pz7-wire-meter-2026-11-13.json): spawn downloads read
+ *  the loose blobs, and every pack reader falls back to them (`packOrLoose`, src/shared/game/shardfile/packReads.ts). */
+export const UNREAD_PACK = /^shardfiles\/[^/]+\/blobs\/pack\//u;
+
+/** The kind a page path publishes as, or undefined when it stays on the page (code, shell, runtime, maps) or nobody reads
+ * it (PZ7's S1 packs).
  * @param {string} path @param {ReadonlySet<string>} shards @returns {Kind | undefined} */
 export function contentKind(path, shards) {
+  if (UNREAD_PACK.test(path)) return undefined;
   const {kind, part} = classify(path, shards);
   if (kind === 'shard content') return /** @type {Kind} */ (part);
   return kind === 'engine art' ? 'E1' : undefined;

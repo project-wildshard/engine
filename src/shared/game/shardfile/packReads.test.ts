@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { packReads, readPackWhole, releasePackWholes } from './packReads';
+import { packMissing, packOrLoose, packReads, readPackWhole, releasePackWholes } from './packReads';
 
 const a = 'a'.repeat(64), b = 'b'.repeat(64), hash = 'f'.repeat(64);
 const pack = { hash, bytes: 4, path: 'blobs/pack/example.pack', entries: [
@@ -78,4 +78,24 @@ test('a released pack leaves every owner table and is read again rather than hel
   expect(first).toBe(second); expect(read).toHaveBeenCalledTimes(4);
   await readPackWhole(owner, released, read, digest, {});
   expect(read).toHaveBeenCalledTimes(5);
+});
+
+test('PZ7: a pack that fails to read is remembered, and its members read loose from then on', async () => {
+  const dropped = { ...pack, hash: 'd'.repeat(64) };
+  const read = vi.fn(() => Promise.reject(new Error('404')));
+  const phase = packReads([dropped], new Set([a, b]), read, () => Promise.resolve(dropped.hash));
+  expect(phase.has(a)).toBe(true);
+  const loose = vi.fn(() => Promise.resolve(Uint8Array.of(7, 7)));
+  expect(await packOrLoose(() => phase.read(a), loose)).toEqual(Uint8Array.of(7, 7));
+  expect(packMissing(dropped)).toBe(true);
+  expect(phase.has(a)).toBe(false); expect(phase.has(b)).toBe(false);
+  await expect(readPackWhole({}, dropped, read, () => Promise.resolve(dropped.hash))).rejects.toThrow('Shardfile pack is missing');
+  expect(read).toHaveBeenCalledOnce(); expect(loose).toHaveBeenCalledOnce();
+});
+
+test('PZ7: an aborted pack read is not remembered as missing and still throws', async () => {
+  const held = { ...pack, hash: 'c'.repeat(64) }, abort = Object.assign(new Error('stop'), { name: 'AbortError' });
+  const phase = packReads([held], new Set([a, b]), () => Promise.reject(abort), () => Promise.resolve(held.hash));
+  await expect(packOrLoose(() => phase.read(a), () => Promise.resolve(Uint8Array.of(1)))).rejects.toBe(abort);
+  expect(packMissing(held)).toBe(false); expect(phase.has(a)).toBe(true);
 });

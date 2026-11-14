@@ -4,8 +4,11 @@ import { memoryAttribution } from '@wildshard/engine/core/memoryAttribution';
 
 import { boundedResponse, type ProductOptions } from './product';
 import { outputBlobUrl, outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
-import { readPackWhole, releasePackWholes } from '../../../shared/game/shardfile/packReads';
+import { packMissing, packOrLoose, readPackWhole, releasePackWholes } from '../../../shared/game/shardfile/packReads';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+
+/** PZ7: the marker for "read this member loose" */
+const LOOSE = new Uint8Array(0);
 
 /** Release admitted transport copies after decoding; revisiting a tile rechecks immutable bytes from cache or the product. */
 export class ClientAssets {
@@ -105,9 +108,10 @@ export class ClientAssets {
     const packs = outputDescriptor(this.source)?.index.packs;
     const pack = packs?.find(row => row.entries.some(entry => entry.hash === ref));
     const member = pack?.entries.find(entry => entry.hash === ref);
-    if (packs === undefined || pack === undefined || member === undefined) return undefined;
+    if (packs === undefined || pack === undefined || member === undefined || packMissing(pack)) return undefined;
     if (member.bytes !== cap) throw new Error('Resident packed member size mismatch');
-    const wire = await readPackWhole(packs, pack, async (path, maximum) => {
+    // PZ7: a pack that is not published (or fails) leaves the member to its loose blob (an abort still throws)
+    const wire = await packOrLoose(() => readPackWhole(packs, pack, async (path, maximum) => {
 
       const fetch = priority === 'low' ? this.options.backgroundFetch ?? this.options.fetch : this.options.fetch;
       const response = await fetch(new URL(path, this.options.base).href);
@@ -115,8 +119,8 @@ export class ClientAssets {
       const bytes = await boundedResponse(response, maximum);
 
       return this.observe(pack.hash, bytes);
-    }, bytes => this.hashOf(bytes), this.options.hash);
-    return wire.slice(member.offset, member.offset + member.bytes);
+    }, bytes => this.hashOf(bytes), this.options.hash), () => Promise.resolve(LOOSE));
+    return wire === LOOSE ? undefined : wire.slice(member.offset, member.offset + member.bytes);
   }
 
   /** SHA-256 of `bytes` off the page (an owned copy through `hashOwned`), else on the page. */

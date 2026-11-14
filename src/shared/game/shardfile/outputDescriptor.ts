@@ -1,5 +1,5 @@
 import { outputBlobPath } from '@wildshard/format/outputAddress';
-import { packReads } from './packReads';
+import { packOrLoose, packReads } from './packReads';
 import type { OutputIndex } from '@wildshard/format/outputIndex';
 import { assembleOutputTransport } from '@wildshard/format/outputFields';
 import { isJsonDataWithFileSchemas } from '@wildshard/format/json';
@@ -236,8 +236,12 @@ export async function resolveOutputDescriptor(input: unknown, reader: OutputDesc
       reader.cacheHit?.(section.path, section.hash, bytes.length);
     } else if (bytes === null || bytes === undefined) {
       if (reader.offline) throw new IncompleteOutputCacheError();
-      if (inPack && packed !== undefined) { bytes = await packed.read(section.hash); reader.packedHit?.(section.path, section.hash); }
-      else bytes = await reader.read(section.path, section.bytes);
+      // PZ7: a pack that is not published (or fails) falls back to the section's own read
+      if (inPack && packed !== undefined) {
+        let fromPack = true;
+        bytes = await packOrLoose(() => packed.read(section.hash), () => { fromPack = false; return reader.read(section.path, section.bytes); });
+        if (fromPack) reader.packedHit?.(section.path, section.hash);
+      } else bytes = await reader.read(section.path, section.bytes);
       if (bytes.length !== section.bytes || await reader.hash(bytes) !== section.hash) throw new Error('Shardfile section hash or size mismatch');
       if (reader.backgroundStore !== undefined) {
         // A scheduled write is not durable cache proof. Complete offline

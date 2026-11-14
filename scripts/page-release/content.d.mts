@@ -18,6 +18,7 @@ export const CONTENT_ROOT: string;
 export const GAME_ORIGIN: string;
 export const KIND_NAMES: readonly Kind[];
 export function contentHeaders(key: string): Headers;
+export const UNREAD_PACK: RegExp;
 export function contentKind(path: string, shards: ReadonlySet<string>): Kind | undefined;
 export function contentKey(set: string, path: string): string;
 export function contentBaseOf(set: string): string;

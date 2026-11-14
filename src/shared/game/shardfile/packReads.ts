@@ -7,6 +7,23 @@ const sharedPacks = new WeakMap<object, Map<string, SharedPack>>();
 /** MF7: the packs a finished boot let go (`hash:bytes`), and every owner table that may hold each one */
 const releasedPacks = new Set<string>();
 const holders = new Map<string, WeakRef<Map<string, Promise<Uint8Array>>>[]>();
+/** PAGE-SIZE PZ7: packs whose read failed (dropped from the CDN, or not reachable): every later member of one reads its
+ *  loose blob at once, so a dropped pack costs one failed request per page, not one per member. */
+const missingPacks = new Set<string>();
+interface PackName { readonly hash: string; readonly bytes: number }
+const packKey = (pack: PackName): string => `${pack.hash}:${pack.bytes}`;
+const aborted = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError';
+/** whether a read of `pack` failed earlier in this page (PZ7): read its members loose */
+export function packMissing(pack: PackName): boolean { return missingPacks.has(packKey(pack)); }
+/** remember a pack whose read failed for a reason other than an abort (PZ7) */
+export function markPackMissing(pack: PackName, error: unknown): void { if (!aborted(error)) missingPacks.add(packKey(pack)); }
+/** PZ7: a member from its pack, or from its loose blob when the pack is missing or its read fails (an abort still throws) */
+export async function packOrLoose(read: () => Promise<Uint8Array>, loose: () => Promise<Uint8Array>): Promise<Uint8Array> {
+  let bytes: Uint8Array;
+  try { bytes = await read(); }
+  catch (error: unknown) { if (aborted(error)) throw error; return loose(); }
+  return bytes;
+}
 
 /** One verified whole GET per immutable index inventory, shared across admission
  * and later demand waves. Failed attempts leave no retained rejection. The weak
@@ -16,7 +33,8 @@ export function readPackWhole(owner: object, pack: Pack,
   if (pack.bytes < 1 || pack.bytes > 4_194_304) return Promise.reject(new Error('Shardfile pack size exceeds 4 MiB'));
   let whole = wholePacks.get(owner);
   if (whole === undefined) { whole = new Map(); wholePacks.set(owner, whole); }
-  const key = `${pack.hash}:${pack.bytes}`, previous = whole.get(key);
+  const key = packKey(pack), previous = whole.get(key);
+  if (missingPacks.has(key)) return Promise.reject(new Error('Shardfile pack is missing'));
   if (previous !== undefined) return previous;
   let shared = sharedPacks.get(identity);
   if (shared === undefined) { shared = new Map(); sharedPacks.set(identity, shared); }
@@ -32,7 +50,9 @@ export function readPackWhole(owner: object, pack: Pack,
   if (known?.pending !== undefined) { held.set(key, known.pending); forget(known.pending); return known.pending; }
   if (present !== undefined) { const borrowed = Promise.resolve(present); if (keep) { held.set(key, borrowed); forget(borrowed); } return borrowed; }
   const bytes = (async () => {
-    const wire = await read(pack.path, pack.bytes, pack.entries);
+    let wire: Uint8Array;
+    try { wire = await read(pack.path, pack.bytes, pack.entries); }
+    catch (error: unknown) { markPackMissing(pack, error); throw error; }
     if (wire.length !== pack.bytes || await hash(wire) !== pack.hash) throw new Error('Shardfile pack hash or size mismatch');
     return wire;
   })();
@@ -82,7 +102,7 @@ export function packReads(packs: OutputIndex['packs'], members: ReadonlySet<stri
     }
   }
   return {
-    has: member => where.has(member),
+    has: member => { const at = where.get(member); return at !== undefined && !missingPacks.has(packKey(at.pack)); },
     read: async member => {
       const at = where.get(member);
       if (at === undefined) throw new Error('Not a packed member');

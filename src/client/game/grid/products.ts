@@ -27,7 +27,7 @@ import * as v from 'valibot';
 import { GridAdmissionPriority } from './admissionPriority';
 import { timeClientPreparation } from '../shardfile/preparationTiming';
 import { readCheckedOutputIndex } from '../../../shared/game/shardfile/outputIndexChecks';
-import { packReads, type PackReads } from '../../../shared/game/shardfile/packReads';
+import { packOrLoose, packReads, type PackReads } from '../../../shared/game/shardfile/packReads';
 
 const edgeRows = v.strictObject({ edge: EdgeProfilesSchema, entryways: EntrywaysSchema });
 const farRow = v.looseObject({ far: v.nullable(v.looseObject({ decoded: v.number(), gpu: v.number() })) });
@@ -82,7 +82,9 @@ async function readGridProductFile(at: GridProductIndex, path: string, hash: str
   if(native!==undefined)return native(address,size,undefined,hash);
   const held = await options.cache?.asset(base, hash) ?? await options.cachedResponse?.(address, hash, size);
   if ((held === null || held === undefined) && options.offline) throw new Error(`Missing cached grid product file ${path}`);
-  const bytes = held ?? (at.packed.has(hash) ? await at.packed.read(hash) : await boundedResponse(await options.fetch(address), size));
+  const loose = async (): Promise<Uint8Array> => boundedResponse(await options.fetch(address), size);
+  // PZ7: a pack that is not published (or fails) falls back to the file's own URL
+  const bytes = held ?? (at.packed.has(hash) ? await packOrLoose(() => at.packed.read(hash), loose) : await loose());
   if (bytes.length !== size || await options.hash(bytes) !== hash) throw new Error(`Grid product file ${path} hash or size mismatch`);
   if (held === null || held === undefined) {
     const cache = options.cache;

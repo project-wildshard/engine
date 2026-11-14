@@ -25,6 +25,7 @@ function page(extra: Record<string, string | Uint8Array> = {}) {
     'assets/physics/rapier.wasm': 'wasm',
     'shardfiles/pine-hollow/shard.json': '{"slug":"pine-hollow"}',
     'shardfiles/pine-hollow/blobs/glb/aa.glb': 'glb',
+    'shardfiles/pine-hollow/blobs/pack/bb.pack': 'unread pack',
     'assets/spawn/parts/0123456789abcdef.pack.br': brotliCompressSync(Buffer.from('part bytes')),
     'assets/spawn/server/fedcba9876543210.pack.br': brotliCompressSync(Buffer.from('server part')),
     'assets/spawn/server-build.json': '{"build":"x"}',
@@ -64,7 +65,7 @@ function fakeBucket(objects = new Map<string, {body: Uint8Array, headers: Put['h
 
 const run = (dir: string, store: ContentStore) => publishContent({dir, store, scratch: join(scratchRoot, 'scratch'), origin: ORIGIN, log: () => undefined, sleep: () => Promise.resolve()});
 
-test('keys: one content-named set mirrors page paths, S1 to S7 and engine art only, with the cook headers', () => {
+test('keys: one content-named set mirrors page paths, S1 to S7 and engine art only (no S1 packs, PZ7), with the cook headers', () => {
   const dir = page(), files = scanContent(dir), set = contentSet(files);
   expect(set).toMatch(/^[0-9a-f]{16}$/u);
   expect(Object.fromEntries(files.map(file => [file.path, file.kind]))).toEqual({

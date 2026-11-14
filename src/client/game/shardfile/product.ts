@@ -17,7 +17,7 @@ import { acceptValidatedCost } from '@wildshard/format/deviceMemoryCost';
 import { assetCacheName } from '@wildshard/engine/pwa/cacheNames';
 import { saves } from '@wildshard/engine/saves/runtime';
 import { contentHash } from '../../../shared/game/shardfile/contentHash';
-import { packReads } from '../../../shared/game/shardfile/packReads';
+import { packOrLoose, packReads } from '../../../shared/game/shardfile/packReads';
 import { productResourceRole } from '../../../shared/game/shardfile/resourceRole';
 import { preflightProduct } from './productPreflight';
 
@@ -565,8 +565,13 @@ async function admitProductWork(input: unknown, options: ProductOptions, trace?:
     if (bytes === null || bytes === undefined) {
       if (options.offline) throw new Error('Visited shardfile has an incomplete offline cache');
       progress('assets', `Fetching ${role}`, url);
-      if (inPack && packed !== undefined) { bytes = await waitFor(`Pack member · ${role}`, packed.read(hash), 'file', url); bytesRead += bytes.length;  }
-      else bytes = await boundedResponse(await options.fetch(url), cap, (size) => { bytesRead += size; progress('assets', `Reading ${role}`, url); });
+      const loose = async (): Promise<Uint8Array> => boundedResponse(await options.fetch(url), cap, (size) => { bytesRead += size; progress('assets', `Reading ${role}`, url); });
+      // PZ7: a pack that is not published (or fails) falls back to the member's loose blob
+      if (inPack && packed !== undefined) {
+        let fromPack = true;
+        bytes = await waitFor(`Pack member · ${role}`, packOrLoose(() => packed.read(hash), () => { fromPack = false; return loose(); }), 'file', url);
+        if (fromPack) bytesRead += bytes.length;
+      } else bytes = await loose();
     } else { bytesRead += bytes.length; progress('assets', `Cached ${role}`, url); }
     if (bytes.length !== cap) throw new Error('Shardfile asset wire size differs from declaration');
     progress('hash', `Verifying ${role}`, url);
