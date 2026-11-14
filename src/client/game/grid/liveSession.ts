@@ -241,6 +241,10 @@ export class LiveGridSession {
   private readonly plotBanks = new Map<string, ReturnType<PlotAudioPorts['bank']>>();
   private readonly runtimeScope: Scope;
   private readonly runtimeRegions = new Map<string, PreparedRegionalRuntime>();
+  /** GC9: worlds pre-warmed from inside an entered runtime (GC5), whose entry preparation waits for the source to be left:
+   *  the hybrid session prepares an entry only from the neutral road, so preparing it inside the source threw away the
+   *  whole world just built ("Entry preparation requires the neutral road") and closed the cell until a retry. */
+  private readonly deferredEntries = new Map<string, { readonly prepared: PreparedRegionalRuntime; readonly signal: AbortSignal | undefined }>();
   private readonly leaveTiming: { instance: string; leaveMs: number }[] = [];
   private readonly runtimeResidents = new Map<string, HybridResident>();
   private readonly hybrid: HybridRuntimeSession;
@@ -268,7 +272,7 @@ export class LiveGridSession {
     // Register the resident parent before the live host disposer: the traveller returns before native children free.
     this.runtimeScope = scope.child('grid.runtime.residents');
     this.hybrid = new HybridRuntimeSession(this.runtimeResidents, scope, { pause: yieldGridConstruction });
-    scope.onDispose(gridCells.onLeave(() => { this.hybrid.leave(); }));
+    scope.onDispose(gridCells.onLeave(() => { this.hybrid.leave(); this.prepareDeferredEntries(); }));
     scope.onDispose(gridCells.onLeave(() => { this.leavePlotAudio(); }));
     scope.onDispose(gridCells.onEnter(cell => {
       if (!this.runtimeResidents.has(cell.instance)) { this.enterPlotAudio(cell.instance); ports.lightingSettled?.(); return; }
@@ -800,7 +804,8 @@ export class LiveGridSession {
       this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: retained.admitted.source.entryways });
       try {
         await this.hybrid.prepare(cell.instance);
-        if (!await this.hybrid.prepareEntry(cell.instance, signal)) throw new Error('Admitted entry preparation left its requested cell');
+        if (this.hybrid.state().instance === null) { if (!await this.hybrid.prepareEntry(cell.instance, signal)) throw new Error('Admitted entry preparation left its requested cell'); }
+        else this.deferredEntries.set(cell.instance, { prepared, signal });
         prepared.park?.(); // Only actual entry demand reaches here; keep its frame hidden until commit.
       }
       catch (error) {
@@ -815,6 +820,7 @@ export class LiveGridSession {
       const forget = (): void => {
         if (forgotten) return;
         forgotten = true;
+        if (this.deferredEntries.get(cell.instance)?.prepared === prepared) this.deferredEntries.delete(cell.instance);
         if (this.runtimeRegions.get(cell.instance) === prepared) {
           this.startedRuntimes.delete(cell.instance);
           this.runtimeRegions.delete(cell.instance); this.runtimeResidents.delete(cell.instance); this.transferWalls.delete(cell.instance);
@@ -865,6 +871,19 @@ export class LiveGridSession {
     return current !== null && this.runtimeRegions.has(current) ? current : null;
   }
   /** G555: the entered runtime hooks' timings (the one running and those finished), for the cell loading screen. */
+  /** GC9: once the source is left (the hybrid session is neutral), each world pre-warmed inside it prepares its entry, so the
+   *  crossing finds it ready; an entry that arrives first waits for that preparation (`HybridRuntimeSession.enter`). */
+  private prepareDeferredEntries(): void {
+    for (const [instance, row] of this.deferredEntries) {
+      this.deferredEntries.delete(instance);
+      if (this.runtimeRegions.get(instance) !== row.prepared || row.signal?.aborted === true || this.hybrid.state().instance !== null) continue;
+      void this.prepareEntryOnRoad(instance, row.signal);
+    }
+  }
+  private async prepareEntryOnRoad(instance: string, signal: AbortSignal | undefined): Promise<void> {
+    try { await this.hybrid.prepareEntry(instance, signal); }
+    catch (error) { console.warn(`[grid] ${instance}: entry preparation on the road`, error); }
+  }
   hookTimings(): ReturnType<HybridRuntimeSession['timings']> { return this.hybrid.timings(); }
   /** GC2: the server still has this client in `instance` (an online cell is still walled, C5). */
   serverHolds(instance: string): boolean { return this.wire !== null && this.wire.site() === instance; }

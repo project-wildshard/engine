@@ -107,6 +107,10 @@ export interface ProductOptions {
   memory?: MemoryAdmission;
   /** Trusted residency owner reserves parsed source and immutable transport before any asset-cache read or owned copy. */
   reserve?: (source: Shardfile) => void | Promise<void>;
+  /** GC9: files the trusted owner releases straight after admission (a grid neighbour's runtime-only wires, read back
+   * from cache or network by its inputs). A first-party read leaves them unread instead of fetching and dropping them;
+   * checked admission still reads every file. */
+  deferred?: (source: Shardfile) => Promise<readonly string[]>;
   /** Trusted presentation observer; it does not participate in admission decisions. */
   progress?: (progress: ProductProgress) => void;
   /** Trusted presentation scheduling between complete checks; validation never skips work. */
@@ -388,7 +392,9 @@ async function readBuiltProduct(input:unknown,options:ProductOptions,read:NonNul
   if(!isBuildValidatedOutput(source))throw new Error('First-party reader did not assemble its build output');
   await options.reserve?.(source);
   const selected=options.tier===undefined?source.files:await tierProductFilesPaced(source,options.tier,options.pause,options.splatTier);
-  const initial=options.tier==='phone'?controlFiles(await playLibrarySourcePaced(source,options.pause),selected):selected;
+  const control=options.tier==='phone'?controlFiles(await playLibrarySourcePaced(source,options.pause),selected):selected;
+  const deferred=options.deferred===undefined?undefined:new Set(await options.deferred(source));
+  const initial=deferred===undefined?control:control.filter(file=>!deferred.has(file.hash));
   const base=new URL('.',options.base).href,assets=new Map<string,Uint8Array>();
   const refs=[...initial.map(file=>({ref:file.hash,bytes:file.compressed})),...source.requires.commons.map(hash=>({ref:`commons:${hash}`,bytes:source.requires.commonsWire[hash]??0}))];
   const unique=new Map(refs.map(row=>[row.ref.replace(/^commons:/u,''),row]));
@@ -405,6 +411,10 @@ async function readBuiltProduct(input:unknown,options:ProductOptions,read:NonNul
     }
   };
   await Promise.all(Array.from({length:Math.min(16,addresses.length)},load));
+  // GC9: the files left unread are fetched once more in the background, low priority and unhashed, so the entry's own
+  // verified reads of them find the HTTP cache warm (Pine's scene libraries read them one by one at entry)
+  const warm=options.backgroundFetch;
+  if(deferred!==undefined&&warm!==undefined)void warmTransport(control.filter(file=>deferred.has(file.hash)).map(file=>outputBlobUrl(source,file.hash,base)),warm);
   const wires=new Map<string,Uint8Array>();
   for(const [at,row] of addresses.entries()){
     const result=results[at];if(result===undefined)throw new Error('Missing built file result');if(!result.ok)throw result.error;
@@ -412,6 +422,14 @@ async function readBuiltProduct(input:unknown,options:ProductOptions,read:NonNul
   }
   for(const row of refs){const bytes=wires.get(row.ref.replace(/^commons:/u,''));if(bytes===undefined)throw new Error('Missing built file bytes');assets.set(row.ref,bytes);}
   return {source,assets,cached:false,releaseTransport:transportRelease(source,assets,options),releasePreparedTransport:transportRelease(source,assets,options,true)};
+}
+/** GC9: fetch immutable product files into the HTTP cache, eight at a time, ignoring failures (a later verified read fetches again). */
+async function warmTransport(urls:readonly string[],fetchLow:NonNullable<ProductOptions['backgroundFetch']>):Promise<void>{
+  let next=0;
+  const worker=async():Promise<void>=>{
+    while(next<urls.length){const url=urls[next++];if(url===undefined)return;try{await (await fetchLow(url)).arrayBuffer();}catch{/* the entry's verified read fetches it */}}
+  };
+  await Promise.all(Array.from({length:Math.min(8,urls.length)},worker));
 }
 /** Drain a bounded window before refusal or publication; cache operations keep their authored error order. */
 async function cacheRows<T>(rows: readonly T[], batch: boolean, work: (row: T) => Promise<void>): Promise<void> {

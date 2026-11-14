@@ -261,11 +261,12 @@ export class LiveGridHost {
   }
   /** Submit whole-shard requests in stable order. Failed attempts remain closed until an explicit retry. */
   prefetch(instances: readonly string[], trigger: 'explicit' | 'radial' | 'boulevard' = 'explicit'): Promise<void> { return Promise.all([...new Set(instances)].sort().map((id) => this.residents.has(id) || (!this.disposed && this.constructing.has(id)) || this.deferredProducts.get(id) === this.ports.allocator.revision ? Promise.resolve() : this.prefetchProduct(id, false, trigger))).then(() => undefined); }
-  private async requireProduct(instance: string, pending: Promise<LiveGridAdmission>): Promise<LiveGridAdmission> {
+  private async requireProduct(instance: string, pending: Promise<LiveGridAdmission>, trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' = 'entry', speculative = false): Promise<LiveGridAdmission> {
     try { return await pending; }
     catch (error) {
-      if (!(error instanceof ApproachInputsDeferredError)) throw error;
-      return this.prefetchProduct(instance, true);
+      // the optional read's budget deferral says nothing of a required one: read it again as required
+      if (!(error instanceof ApproachInputsDeferredError) && !(error instanceof Error && error.message.includes(PRODUCT_DEFERRED))) throw error;
+      return this.prefetchProduct(instance, true, trigger, speculative);
     }
   }
   /** `speculative`: a demand read nobody waits on yet (GC5's near neighbour and pre-warm). Its budget refusal is deferred
@@ -274,7 +275,7 @@ export class LiveGridHost {
     this.assertAlive(); const cell = this.assembly.cell(instance);
     const product = this.products.get(instance); if (product !== undefined) return Promise.resolve(product);
     const pending = this.productRequests.get(instance);
-    if (pending !== undefined) return !required || pending.required ? pending.work : this.requireProduct(instance, pending.work);
+    if (pending !== undefined) return !required || pending.required ? pending.work : this.requireProduct(instance, pending.work, trigger, speculative);
     const issue = this.issues.get(instance); if (issue !== undefined) return Promise.reject(new Error(issue));
     const timing = clientPreparationBatch(cell.slug, `grid.product:${instance}`, ['admission', 'runtime']);
     const request = (async (): Promise<LiveGridAdmission> => {
@@ -305,6 +306,8 @@ export class LiveGridHost {
   /** GC5 / GC36: the cell whose world the road is building or built ahead of its line (`buildAhead`), kept until the
    *  traveller enters a cell or heads into another's mouth. */
   private ahead: string | null = null;
+  /** GC9: the optional read last raised to demand, so a pending radial read is raised once, not every tick */
+  private raised: Promise<LiveGridAdmission> | null = null;
   private tileApproach: { instance: string; tile: CellTile; controller: AbortController } | null = null;
   private transportApproach: { instance: string; controller: AbortController; work: Promise<void> } | null = null;
   private retiredTransport: Promise<void> = Promise.resolve();
@@ -558,10 +561,15 @@ export class LiveGridHost {
     // budget declines while every neighbour competes for it (Pine's read alone is 6 to 8 s). One at a time, the nearest.
     if (this.active !== null && this.ports.buildAhead === true) {
       const near = candidates[0];
+      // GC9: a radial read already pending for it is raised to demand once (the budget declined Pine's radial read again and
+      // again while it stood pending, so the demand read never started inside Driftwood and Pine's world was built on the road)
+      const pending = near === undefined ? undefined : this.productRequests.get(near.instance);
       if (near !== undefined && this.distance(near, feet) <= DEMAND_METRES && !this.products.has(near.instance) && !this.residents.has(near.instance)
-        && !this.productRequests.has(near.instance) && !this.issues.has(near.instance) && !this.constructing.has(near.instance)
-        && this.deferredProducts.get(near.instance) !== this.ports.allocator.revision && this.ports.backgroundReady?.() !== false)
+        && (pending === undefined || !pending.required && this.raised !== pending.work) && !this.issues.has(near.instance) && !this.constructing.has(near.instance)
+        && this.deferredProducts.get(near.instance) !== this.ports.allocator.revision && this.ports.backgroundReady?.() !== false) {
+        if (pending !== undefined) this.raised = pending.work;
         void background(near.instance, this.prefetchProduct(near.instance, true, 'explicit', true), () => !this.disposed);
+      }
     }
     // Approach preparation owns render tiles only, never a regional world or gameplay hooks.
     const moving = !travelled ? undefined : candidates.find(cell => headsToEntry(cell, feet, previous)

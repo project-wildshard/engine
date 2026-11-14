@@ -1277,6 +1277,26 @@ test('native first-party loading has no visited fallback, digest or client admis
   expect(requests.filter(path=>path==='shard.json')).toHaveLength(1);expect(store.product()).toBeNull();
 });
 
+// GC9 (GRID-CROSSING; Pine's product read 8.5 s on a loopback page): a grid neighbour releases its runtime-only wires straight
+// after admission, so a first-party read leaves them unread and only warms them, low priority and unhashed, for the entry's reads.
+test('first-party admission leaves deferred files unread, warms them, and still releases them',async()=>{
+  const f=fixture(true),ordinary=options(f.wires),requests:string[]=[],warmed:string[]=[];
+  const files=f.source.files.map(file=>file.hash);expect(files.length).toBeGreaterThan(0);
+  const native:ProductOptions={...ordinary,deferred:()=>Promise.resolve(files),
+    backgroundFetch:url=>{warmed.push(new URL(url).pathname.slice(new URL(base).pathname.length));return Promise.resolve(new Response(new Uint8Array([1,2,3])));},
+    firstPartyRead:(url,expected,read)=>{
+      const path=new URL(url).pathname.slice(new URL(base).pathname.length),bytes=f.wires.get(path);requests.push(path);
+      if(bytes===undefined||(expected!==undefined&&expected!==bytes.length))throw new Error('Missing build file');
+      read?.(bytes.length);return Promise.resolve(bytes);
+    }};
+  const source=await readProductDescriptor(native),loaded=await admitProduct(source,native);
+  expect([...loaded.assets.keys()].filter(ref=>files.includes(ref))).toEqual([]);
+  const blobs=files.map(ref=>new URL(outputBlobUrl(loaded.source,ref,base)).pathname.slice(new URL(base).pathname.length));
+  expect(requests.filter(path=>blobs.includes(path))).toEqual([]);
+  await vi.waitFor(()=>{expect(warmed.sort()).toEqual([...blobs].sort());});
+  expect(await loaded.releaseTransport?.(files,'cache-or-fetch')).toEqual(files);
+});
+
 test('built product residency is the emitted value without another source walk',async()=>{
   const f=fixture(),expected=productResidentBytes(f.source);
   const previous=Object.getOwnPropertyDescriptor(globalThis,'__SHARDFILE_VERDICTS__');
