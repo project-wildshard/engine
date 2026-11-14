@@ -20,3 +20,8 @@
   feet), the J206 review's open SHOULD.
 - `installNativeCollision` with no policy: `test/native-collision-omit.test.ts` holds two piece hulls and builds the declared one.
 - `test/side-parity.allow.json`: Nalati's row note says where its two untagged lines go (the re-pin of SHARD-SIZE S12d's Nalati upload, which carries shard-nalati `eb64606`).
+- Review (one `claude -p`, no MUST): only a row's `ownerId` of `piece:` is
+  held near; a tagged row's own `owner` string is built at once, as before.
+  `ownerGroup` strips only a placement-shaped suffix (`.camp.16`), so a dotted
+  model id still shows as its own group. Pine Hollow's `declared:` rows run
+  under its provenance policy, so the no-policy owner change touches Nalati only.

@@ -108,8 +108,9 @@ export function installNativeCollision(host:Pick<SimHost,'physics'|'scope'|'onSt
       const named=solid.ownerId===undefined?null:solid.ownerId.startsWith('declared:')?solid.ownerId.slice('declared:'.length):solid.ownerId;
       const owner=policy===undefined?solid.owner??named:solid.ownerId===undefined?null:owners.get(solid.ownerId);
       // A hull or mesh is most of a Rapier heap; a declared owner's solid stays, since a script may look it up. A `piece:`
-      // owner names the page piece a solid stands for (Nalati's bake, SERVER-PARITY SS10b): no script looks it up.
-      if(near!==null&&(typeof owner!=='string'||owner.startsWith('piece:'))&&solid.enabled!==false&&(solid.shape===9||solid.shape===6)&&solid.points!==undefined){
+      // `ownerId` names the page piece a solid stands for (Nalati's bake, SERVER-PARITY SS10b): no script looks it up. A tagged
+      // row's own `owner` string is built at once, whatever it reads.
+      if(near!==null&&(typeof owner!=='string'||solid.owner===undefined&&solid.ownerId?.startsWith('piece:')===true)&&solid.enabled!==false&&(solid.shape===9||solid.shape===6)&&solid.points!==undefined){
         near.hold({x:solid.at[0],z:solid.at[2],reach:solidReach(solid.points),make:physics=>withOwner(host.scope,()=>tagged(physics,solid,owner))});
         continue;
       }

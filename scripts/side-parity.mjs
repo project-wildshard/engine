@@ -78,7 +78,7 @@ export function ownerGroup(owner) {
   if (owner === null) return '(untagged)';
   if (owner.startsWith('(object') || owner === '(number)') return 'actor';
   return owner.replace(/^(?:piece|string):/u, '').replace(/\.c(?:[0-9]|[1-5][0-9]|6[0-3])$/u, '').replace(/\.trunks\.t\d+$/u, '')
-    .replace(/^([^/.]+\/[^/.]+)\..*$/u, '$1');
+    .replace(/^([^/.]+\/[^/.]+)\.[a-z0-9-]+(?:\.\d+)?$/u, '$1');
 }
 
 /** A body of flesh is a creature, a person or a player on either side, whatever its owner: an actor. */
