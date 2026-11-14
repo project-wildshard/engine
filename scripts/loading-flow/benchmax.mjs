@@ -16,7 +16,7 @@ import { writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { chromium, devices } from 'playwright';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
-import { developerSettings, saveFixture, levelDownloadFixtures, hideDeveloperOverlays } from '../debug-settings.mjs';
+import { NAME_ASKED, developerSettings, saveFixture, levelDownloadFixtures, hideDeveloperOverlays } from '../debug-settings.mjs';
 import { bootTimelineEntries, CLOCK_MARK_EXPRESSION, profileAnchor, profileIdle, stageStalls, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shard: { type: 'string', default: 'Nine' }, throttle: { type: 'string', default: '4' },
@@ -35,6 +35,8 @@ try {
   for (const fixture of levelDownloadFixtures('packs')) await saveFixture(context, fixture);
   // a phone's first PLAY goes straight to Driftwood's first-play card (MOBILE-GRAPHICS MG5): this device has done it
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
+  // MP2.4: a page with a world asks for the Name before it joins; a bench never answers it, so it never reached control
+  await saveFixture(context, NAME_ASKED);
   await context.addInitScript(hideDeveloperOverlays);
   const page = await context.newPage();
   page.setDefaultTimeout(240_000);
