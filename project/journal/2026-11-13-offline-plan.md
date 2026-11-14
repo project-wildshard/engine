@@ -14,3 +14,8 @@ prod should never try to play offline versions ... Load into the world. And then
   worker deletes its origin's pre-OF12 caches (production's names) once, unless a production worker marked the origin
   (`ws-production-mark`), so a staging phone doesn't keep two copies. `offline-proof.mjs --one-origin` serves preview, then
   staging, then preview again on one origin and one profile.
+- **OF9, into the world without a seat.** `clientWorker.ts` awaited the online shell's `booted` (the seat) before the world
+  showed, so with no backend the card sat at Worker boot until the stuck-step watch. A world build now waits for the seat only
+  `SEAT_GRACE_MS` (1.5 s; none when `navigator.onLine` is false, `seatGrace.ts`), then opens the world unseated: the first-rows
+  waits are skipped, the shell keeps dialling, `ready()` is said early (the online shell already held it until a seat), and the
+  seat, when it comes, places the player (GO5). A seat inside the grace keeps QA row 29's reveal at the saved place.

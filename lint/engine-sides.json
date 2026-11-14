@@ -946,6 +946,7 @@
     "src/client/game/shardfile/clientWater.ts": "client",
     "src/client/game/shardfile/clientWaterSurfaces.ts": "client",
     "src/client/game/shardfile/clientWorker.ts": "client",
+    "src/client/game/shardfile/seatGrace.ts": "client",
     "src/client/game/shardfile/clientWorldAssembly.ts": "client",
     "src/client/game/shardfile/constructionCheckpoint.ts": "client",
     "src/client/game/shardfile/controlFiles.ts": "client",

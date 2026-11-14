@@ -8,6 +8,7 @@ import type { Player } from '@wildshard/engine/player/Player';
 import { Vector3, type Object3D } from 'three';
 import { appIdentity } from '@wildshard/engine/app/identity';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
+import { SEAT_GRACE_MS, seatedInTime } from './seatGrace';
 import { importPageSaves, openIndexedSaves, serverSaveDatabase, serverStopsForImport, type IndexedSaves } from '@wildshard/engine/saves/indexed';
 import { saveEnvironment } from '@wildshard/engine/saves/environment';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
@@ -451,13 +452,19 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     net.bindWeapons(ports.weapons, slotsOf(items));
     const day = ports.day(); if (day !== null) wirePage.dayPassed(day);
   });
-  const { restored } = await bootTask('server:await-booted', () => shell.booted);
+  // OF9: a world build (the online shell redials) opens the world without its seat once the grace is up; the shell keeps dialling,
+  // the link screens say why, and the seat, when it comes, places the player (GO5). A server in this page boots with it, as before.
+  const unseated = shell.redials === true
+    && !await seatedInTime(shell.booted, SEAT_GRACE_MS, navigator.onLine, ms => new Promise<void>(resolve => { scope.timeout(ms, resolve); }));
+  const { restored } = unseated ? { restored: false } : await bootTask('server:await-booted', () => shell.booted);
+  if (unseated) bootMark('server:unseated');
   // E7.6: only a world has anyone else in it.
   let others: OtherPlayers | null = null;
   if (shell.redials === true) others = new (await import('@wildshard/engine/net/otherPlayers')).OtherPlayers(client, ports.scene, scope, player.position);
   if (new URLSearchParams(location.search).has('bossGod')) shell.bossGod();
   bootMark('server:ready-send'); shell.ready();
   const started = diagnosticNow(), report: WorkerClientReport = { drawn: wirePage.drawn, frames: 0, framesPerSecond: 0, ticksPerSecond: 0, correctionsPerMinute: 0, corrections: 0, retired: {}, spawnMs: {}, missed: net.predictor.missed, misses: net.predictor.misses, worstOffset: 0, queue: 0, replaysPerFrame: 0, delayMs: 0, jitterMs: 0, interpHeld: 0, interpStarved: 0, mainMsP95: 0, workerTickMs: 0, rows: 0, attacks: 0, hits: 0, kills: 0, refused: 0, held: 0, dropped: 0, hp: 0, falls: 0, closed: null, x: 0, z: 0, cell: 0, serverX: 0, serverZ: 0, restored, savedTick: -1, savedOk: false, receipts: [], quests: {}, flags: [], paid: 0, fights: [], owned: {}, sky: null, day: null, clawed: false, own: null, movers: 0, posed: 0, sand: 0 };
+  if (unseated) void shell.booted.then(answer => { report.restored = answer.restored; bootMark('server:seated-late'); return undefined; }, () => undefined);
   scope.onDispose(client.onLedger(receipt => { report.receipts.push(`${receipt.grant}:${receipt.name}`); }));
   const contacts: NetCombatEvent[] = [];
   scope.onDispose(client.onTravel(() => { contacts.length = 0; }));
@@ -613,7 +620,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const off = scope.capture('disposers', resolve);
     scope.timeout(FIRST_ROWS_POLL_MS, () => { off(); resolve(); });
   });
-  const firstBy = diagnosticNow() + FIRST_ROWS_MS;
+  // OF9: an unseated page has no rows to wait for: the world opens now
+  const firstBy = unseated ? 0 : diagnosticNow() + FIRST_ROWS_MS;
   while (client.latest === null && diagnosticNow() < firstBy && !scope.disposed && !scope.disposing) await poll();
   if (scope.disposed || scope.disposing) return;
   net.reconcile(false);
@@ -622,7 +630,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   if (ports.linkBodies === undefined) { bootMark('server:launch-complete'); return; }
   bootMark('server:first-body-preparation-start');
   let first = -1;
-  const until = diagnosticNow() + FIRST_ROWS_MS;
+  const until = unseated ? 0 : diagnosticNow() + FIRST_ROWS_MS;
   while (diagnosticNow() < until) {
     renderTick = client.present();
     if (first === -1 && client.latest !== null) first = client.latest.tick;
