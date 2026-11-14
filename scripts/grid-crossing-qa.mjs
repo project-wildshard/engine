@@ -32,7 +32,7 @@ for (const engine of flag('engines', 'chromium,webkit').split(',')) {
     /** @type {any} */
     const walk = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
     rows.push({ run, engine, layout, base, to, pass: done.status === 0, playToReadyMs: walk?.playToReadyMs ?? null, memoryAtHome: walk?.memoryAtHome ?? null,
-      legs: (walk?.legs ?? []).map((/** @type {any} */ leg) => ({ name: leg.name, borderToControlMs: leg.borderToControlMs, enteredAtMs: leg.enteredAtMs, controlAtMs: leg.controlAtMs,
+      legs: (walk?.legs ?? []).map((/** @type {any} */ leg) => ({ name: leg.name, from: leg.from, target: leg.target, boost: leg.boost, borderToControlMs: leg.borderToControlMs, enteredAtMs: leg.enteredAtMs, controlAtMs: leg.controlAtMs,
         worstStopMs: leg.worstStopMs, jumps: leg.jumps, over50: leg.over50, over100: leg.over100, worstFrameMs: leg.worstFrameMs, programLinks: leg.programLinks,
         memory: leg.events?.find((/** @type {any} */ event) => event.control === true)?.memory ?? null })),
       failed: (walk?.steps ?? []).filter((/** @type {any} */ step) => !step.ok).map((/** @type {any} */ step) => step.step) });
