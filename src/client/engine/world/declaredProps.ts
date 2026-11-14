@@ -197,6 +197,8 @@ export async function installDeclaredProps(props: DeclaredProps, ports: {
         source?.dispose(); held.push(m); bases.set(m, base); return m;
       };
       o.material = Array.isArray(o.material) ? original.map(convert) : convert(original[0]);
+      // SHARD-SOURCE AP11: a card's corners and rise live in the shader, past the seats its bounds hold: never culled
+      if ((Array.isArray(o.material) ? o.material : [o.material]).some((m) => m.userData['sceneCard'] === true)) o.frustumCulled = false;
       o.castShadow = o.userData['castShadow'] !== false; o.receiveShadow = o.userData['receiveShadow'] !== false;
     });
     if (disposed) { releaseAll(); throw new Error('Props level unloaded while parsing'); }

@@ -31,14 +31,16 @@ function isMesh(object: Object3D): object is Mesh { return object instanceof Mes
 /**
  * SHARD-SOURCE AP8: a fine tile mesh that may draw in its material's cross-tile merge: a plain drawn mesh (not instanced or
  * skinned, no morphs, no groups, no hull under it) on one opaque built-in family material. Left out: see-through surfaces
- * and cards (they sort or face the camera one by one), swaying ones (a phase per prop) and graph shaders (they may read
- * the mesh's own space).
+ * and cards (they sort or face the camera one by one), swaying ones (a phase per prop), graph shaders (they may read
+ * the mesh's own space) and mirrored meshes.
  */
 function mergeable(mesh: Mesh): mesh is Mesh<BufferGeometry, Material> {
   const material: unknown = mesh.material, geometry: unknown = mesh.geometry;
   if (Object.getPrototypeOf(mesh) !== Mesh.prototype || !mesh.visible || mesh.children.length > 0 || !isMaterial(material) || !isGeometry(geometry)) return false;
   if (material instanceof ShaderMaterial || material.transparent || material.userData['sceneAlpha'] === true || material.userData['sceneCard'] === true) return false;
   if (geometry.groups.length > 0 || Object.keys(geometry.morphAttributes).length > 0 || !geometry.hasAttribute('position')) return false;
+  // a mirrored mesh (negative scale) would keep its triangles' order in the merge and turn inside out: three flips winding per object
+  mesh.updateWorldMatrix(true, false); if (mesh.matrixWorld.determinant() < 0) return false;
   return Object.keys(geometry.attributes).every((name) => !name.startsWith('_') && !name.startsWith('ws'));
 }
 /** a fine tile has nothing under it to hide */
