@@ -4,32 +4,51 @@
 // from the deck's card, then walks into a same-worker neighbour (Sunscar, or Pine Hollow), boosts back into Driftwood and boosts out again, by
 // real input. Each leg passes with no stop (no 1.5 s under 0.15 m a sample while the key is held), no page reload, and control in the
 // target cell (the page inside it, gameplay ready, the player moving). It writes time-to-control per leg beside GC1's baseline.
-//   scripts/browser-lane.sh node scripts/grid-crossing-walk-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--engine=chromium|webkit] [--to=sunscar|pine|farreach|nalati] [--workers=2] [--base=<staging url>] [--out=<dir>]
+//   scripts/browser-lane.sh node scripts/grid-crossing-walk-proof.mjs <app dist stamped with http://127.0.0.1:18799/release.json> <work dir> <key.json> [--engine=chromium|webkit] [--to=sunscar|pine|farreach|nalati] [--workers=2] [--base=<staging url>] [--out=<dir>] [--layout=phone] [--solo]
+// GRID-CROSSING GC24 (J311): --layout=phone walks at Jake's iPhone layout (402x874, pixel density 3, touch, phone tier), and each
+// leg's control reads the page's memory (JS heap, the grid's resident and playing MB, the owner ledger, the memory warning);
+// --solo then opens both shards' one-shard pages (?chunk=) in fresh profiles for the same read beside it.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, webkit } from 'playwright';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
+import { pageMemoryAttributionExpression } from './memory-report-snapshot.mjs';
 import { openRig, WORLD_PORT } from './online-rig.mjs';
 
 const [dist = '', relativeWork = '', keyFile = ''] = process.argv.slice(2).filter(arg => !arg.startsWith('--')), work = relativeWork === '' ? '' : absolute(relativeWork);
 if (dist === '' || work === '' || keyFile === '') throw new Error('usage: grid-crossing-walk-proof.mjs <dist> <work> <key.json> [--engine=chromium|webkit] [--to=sunscar|pine|farreach|nalati] [--out=<dir>]');
 const engineName = process.argv.find(arg => arg.startsWith('--engine='))?.slice(9) ?? 'chromium', out = absolute(process.argv.find(arg => arg.startsWith('--out='))?.slice(6) ?? join(work, 'shots'));
 if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error(`No engine ${engineName}`);
+const phone = process.argv.includes('--layout=phone'), solo = process.argv.includes('--solo');
+/** The page's memory now: JS heap (Chromium), the grid's resident and playing MB, the owner ledger's totals, the memory warning. */
+const MEMORY_READ = `(() => { const api = window.__wildshard; let ledger = null; try { const mem = ${pageMemoryAttributionExpression}; ledger = mem?.totals ? { gpuMB: Math.round(mem.totals.gpu / 1048576), ramMB: Math.round(mem.totals.ram / 1048576) } : null; } catch {}
+  let grid = null; try { const st = api.shard.grid.state(); grid = { inside: st.inside, residentMB: st.residentMB, playingMB: st.playingMB }; } catch {}
+  const warning = document.querySelector('.ws-memory-warning');
+  return { heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null, ledger, grid, memoryWarning: warning !== null && warning.getClientRects().length > 0 }; })()`;
+/** @param {import('playwright').Browser} b */
+const newContext = b => b.newContext(phone ? { viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: engineName === 'chromium', hasTouch: true,
+  userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Mobile/15E148 Safari/604.1' } : { viewport: { width: 1440, height: 900 } });
 mkdirSync(out, { recursive: true });
 /** Driftwood is cell [0, 0]; its same-worker neighbours Pine Hollow [0, 1] (+z, across the island from the spawn at z -194) and Sunscar
  *  [-1, 0] (-x). Far Reach [0, -1] is sky islands: arriving at road height falls below its death floor (GC15b). */
 // Each edge is a bank from the sea floor (-3.4 m) up to the road (0 m) except its entryway, 8 m wide at the edge's middle
 // (`sections/world/edge.json`), so a crossing goes through it: `approach` are waypoints in Driftwood's frame, boosted and not scored,
 // that end in front of it; the legs then walk straight through it.
-const NEIGHBOURS = /** @type {Record<string, { slug: string, axis: 'x' | 'z', sign: number, approach: [number, number][] }>} */ ({
-  pine: { slug: 'pine-hollow', axis: 'z', sign: 1, approach: [[-235, -194], [-235, 235], [0, 235]] }, sunscar: { slug: 'sunscar-dunes', axis: 'x', sign: -1, approach: [[-235, -194], [-235, 0]] },
+const NEIGHBOURS = /** @type {Record<string, { slug: string, axis: 'x' | 'z', sign: number, approach: [number, number][], from?: { slug: string, card: string }, place?: boolean }>} */ ({
+  pine: { slug: 'pine-hollow', axis: 'z', sign: 1, approach: [[-235, -194], [-235, 0], [-200, 20], [-200, 235], [0, 235]] }, sunscar: { slug: 'sunscar-dunes', axis: 'x', sign: -1, approach: [[-235, -194], [-235, 0]] },
   // GC29 (Jake 11-13): his walk off the south dock toward Far Reach, and east into Nalati (staging: another worker).
-  farreach: { slug: 'far-reach', axis: 'z', sign: -1, approach: [[0, -235]] }, nalati: { slug: 'nalati-grasslands', axis: 'x', sign: 1, approach: [[235, -194], [235, 0]] } });
+  farreach: { slug: 'far-reach', axis: 'z', sign: -1, approach: [[0, -235]] }, nalati: { slug: 'nalati-grasslands', axis: 'x', sign: 1, approach: [[235, -194], [235, 0]] },
+  // GC23 (J305): Night Market (open-plot-3-0, cell [1, -2]) from its north neighbour Nine Dragon [1, -1], entered by its own card.
+  // Nine Dragon's stack has no walkable route to its south entryway, so the approach is placed by the harness pose (not scored);
+  // the legs across the line are real input as everywhere else.
+  nightmarket: { slug: 'open-plot-3-0', axis: 'z', sign: -1, approach: [[0, -238]], from: { slug: 'nine-dragon-stack', card: 'Nine Dragon Stack' }, place: true } });
 const toName = process.argv.find(arg => arg.startsWith('--to='))?.slice(5) ?? 'sunscar', to = NEIGHBOURS[toName];
 if (to === undefined) throw new Error(`No neighbour ${toName}: ${Object.keys(NEIGHBOURS).join(', ')}`);
-const HOME = 'driftwood-isle', NEXT = to.slug, STUCK_MS = 1500, LEG_MS = 100_000;
-const LEGS = [{ name: `walk-to-${toName}`, target: NEXT, sign: 1, boost: false }, { name: 'boost-to-driftwood', target: HOME, sign: -1, boost: true }, { name: `boost-to-${toName}`, target: NEXT, sign: 1, boost: true }];
+// a placed approach needs the in-page harness (preview or a loopback page): an online page can't place its seat (shell.ts place is idle)
+const placed = to.place === true || process.argv.includes('--place');
+const HOME = to.from?.slug ?? 'driftwood-isle', HOME_CARD = to.from?.card ?? 'Driftwood Isle', NEXT = to.slug, STUCK_MS = 1500, LEG_MS = 100_000;
+const LEGS = [{ name: `walk-to-${toName}`, target: NEXT, sign: 1, boost: false }, { name: `boost-to-${HOME.split('-')[0] ?? HOME}`, target: HOME, sign: -1, boost: true }, { name: `boost-to-${toName}`, target: NEXT, sign: 1, boost: true }];
 /** @type {{ step: string, ok: boolean, detail?: unknown }[]} */
 const steps = [];
 /** @param {string} step @param {boolean} ok @param {unknown} [detail] */
@@ -46,14 +65,14 @@ const rig = served !== '' ? { base: served.replace(/\/$/, ''), close: () => Prom
   : await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: HOME, more: ['pine-hollow', 'far-reach', 'sunscar-dunes', 'nalati-grasslands'], cells: 'grid', crossing: true, workers });
 let code = 1, browser = /** @type {import('playwright').Browser | null} */ (null);
 /** @type {Record<string, unknown>} */
-const result = { lane: 'opus-gc15c', engine: engineName, layout: 'desktop 1440x900', site: served !== '' ? served : 'local rig, WORLD_CELLS=grid, WORLD_CROSSING=worker, WORLD_WORKERS=2 (staging: Nalati alone, Driftwood with Pine Hollow, Sunscar and Far Reach)' };
+const result = { lane: 'opus-gc15c', engine: engineName, layout: phone ? 'phone 402x874 touch' : 'desktop 1440x900', site: served !== '' ? served : 'local rig, WORLD_CELLS=grid, WORLD_CROSSING=worker, WORLD_WORKERS=2 (staging: Nalati alone, Driftwood with Pine Hollow, Sunscar and Far Reach)' };
 try {
   let open = served !== '' ? { cells: 25 } : null;
   for (let tries = 0; tries < 300 && open === null; tries++) { open = await fetch(`http://127.0.0.1:${String(WORLD_PORT)}/health`).then(found => found.ok ? found.json() : null).catch(() => null); if (open === null) await sleep(200); }
   note('the world runs the grid', open !== null && open.cells > 1, served !== '' ? { skipped: 'a served site: not read' } : { cells: open?.cells });
   if (open === null) throw new Error(`The world did not start: see ${join(work, 'server.log')}`);
-  browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } }), page = await context.newPage(), errors = /** @type {string[]} */ ([]);
+  browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] : [] });
+  const context = await newContext(browser), page = await context.newPage(), errors = /** @type {string[]} */ ([]);
   // RP4: every program's first use (three's uniform read after its link, where a link not yet finished blocks the frame),
   // counted so a leg's receipt says how many programs linked on the way (a cell's whole set relinking at its edge was 2.5 s)
   await context.addInitScript(() => {
@@ -69,20 +88,22 @@ try {
   page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations++; });
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
+  if (phone) await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { tier: 'phone', volume: 0 } });
   await page.goto(`${rig.base}/?mute=1&nolock=1`, { waitUntil: 'load' });
   await page.locator('.ws-main-select').click({ timeout: 120_000 });
   if (await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false)) { await page.locator('#ws-name-box input').fill('walker'); await page.locator('#ws-name-box button[type=submit]').click(); }
   await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
-  const index = await page.evaluate(() => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes('Driftwood Isle')));
-  if (index < 0) throw new Error('No Driftwood Isle card');
+  const index = await page.evaluate(card => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes(card)), HOME_CARD);
+  if (index < 0) throw new Error(`No ${HOME_CARD} card`);
   await page.locator('.ws-menu-dots i').nth(index).click();
   const played = Date.now();
   await page.locator('.ws-menu-play').click();
   await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 180_000, polling: 100 });
   result.playToReadyMs = Date.now() - played;
-  note('Driftwood: gameplay ready after Play', true, { ms: result.playToReadyMs });
+  note(`${HOME_CARD}: gameplay ready after Play`, true, { ms: result.playToReadyMs });
   await sleep(2000);
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
+  result.memoryAtHome = await page.evaluate(MEMORY_READ);
   const navigationsBefore = navigations;
   await page.evaluate(() => {
     const W = /** @type {any} */ (window), q = W.__gc15c = { frames: /** @type {number[][]} */ ([]), samples: /** @type {unknown[]} */ ([]), sentinel: 1 }, t0 = performance.now();
@@ -111,7 +132,7 @@ try {
   const toward = async (/** @type {number} */ x, /** @type {number} */ z) => { const at = await sample(); await face(Math.atan2(at.x - x, at.z - z)); return Math.hypot(at.x - x, at.z - z); };
   const approached = Date.now();
   await page.keyboard.down('ShiftLeft');
-  for (const [x, z] of to.approach) {
+  for (const [x, z] of placed ? [] : to.approach) {
     await page.keyboard.down('KeyW');
     let near = Infinity, stuck = 0, before = await sample();
     for (const ends = Date.now() + 90_000; Date.now() < ends && near > 3; await sleep(250)) {
@@ -122,6 +143,13 @@ try {
     }
     await page.keyboard.up('KeyW');
     note(`the approach reaches (${String(x)}, ${String(z)})`, near <= 3, { near: Math.round(near), at: { x: before.x, z: before.z } });
+  }
+  // a placed approach: the in-page harness pose (probe.ts `told`), so the in-page server hears where the walker stands
+  if (placed) for (const [x, z] of to.approach) {
+    await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [x, z]);
+    await sleep(4000);
+    const at = await sample();
+    note(`the harness places the walker at (${String(x)}, ${String(z)})`, Math.hypot(at.x - x, at.z - z) <= 3 && at.inside === HOME, { at: { x: at.x, y: at.y, z: at.z }, inside: at.inside });
   }
   await page.keyboard.up('ShiftLeft'); await sleep(600);
   result.approachMs = Date.now() - approached;
@@ -152,7 +180,7 @@ try {
       if (controlAt === 0) {
         if (moved < 0.15) { stuckSince ||= at; } else { if (stuckSince !== 0) { stuckMs += at - stuckSince; worstStuck = Math.max(worstStuck, at - stuckSince); } stuckSince = 0; }
         if (stuckSince !== 0 && at - stuckSince > STUCK_MS && jumps < 4) { if (jumps === 0) { events.push({ at, stuck: true, x: s.x, z: s.z, inside: s.inside, closed: s.closed, phase: s.phase }); await page.screenshot({ path: join(out, `${engineName}-${leg.name}-stuck.png`) }); } await page.keyboard.press('Space'); jumps++; }
-        if (s.inside === leg.target && s.ready === true && (s.phase === undefined || s.phase === 'settled') && moved > 0.3) { controlAt = at; events.push({ at, control: true, x: s.x, z: s.z }); }
+        if (s.inside === leg.target && s.ready === true && (s.phase === undefined || s.phase === 'settled') && moved > 0.3) { controlAt = at; events.push({ at, control: true, x: s.x, z: s.z, memory: await page.evaluate(MEMORY_READ) }); }
       }
       last = s;
       if (controlAt !== 0 && at - controlAt > 2500) break;
@@ -183,6 +211,26 @@ try {
   note('no page reload through every crossing', sentinel && navigations === navigationsBefore, { sentinel, navigations: navigations - navigationsBefore });
   note('no page errors', errors.length === 0, errors.slice(0, 5));
   result.legs = legs;
+  note('no memory warning at home or any control', result.memoryAtHome?.memoryWarning !== true && !legs.some(row => /** @type {any[]} */ (row.events).some(e => e.memory?.memoryWarning === true)));
+  if (solo) {
+    // the same two shards' one-shard pages, each in a fresh profile at the same layout, read 10 s after their world boots
+    /** @type {Record<string, any>} */ const pages = {}; result.solo = pages;
+    for (const slug of [HOME, NEXT]) {
+      const alone = await newContext(browser), one = await alone.newPage();
+      await saveFixture(alone, { scope: 'device', key: 'firstPlayDone', data: true });
+      if (phone) await saveFixture(alone, { scope: 'global', key: 'settings', merge: true, data: { tier: 'phone', volume: 0 } });
+      try {
+        await one.goto(`${rig.base}/?chunk=${slug}&skipintro=1&mute=1&nolock=1`, { waitUntil: 'load' });
+        if (await one.locator('#ws-name-box input').waitFor({ timeout: 20_000 }).then(() => true).catch(() => false)) { await one.locator('#ws-name-box input').fill('walker'); await one.locator('#ws-name-box button[type=submit]').click(); }
+        await one.waitForFunction(() => { const W = /** @type {any} */ (window); return typeof W.__workerClient === 'function' && W.__workerClient().frames > 0 && Array.isArray(W.__bootTiming?.entries) && W.__bootTiming.entries.some((/** @type {{ operation: string }} */ row) => row.operation === 'app:loader-complete'); }, undefined, { timeout: 180_000, polling: 250 });
+        await sleep(10_000);
+        pages[slug] = { url: one.url(), ...await one.evaluate(MEMORY_READ) };
+        await one.screenshot({ path: join(out, `${engineName}-solo-${slug}.png`) });
+      } catch (error) { pages[slug] = { error: String(error).slice(0, 300) }; }
+      note(`one-shard page ${slug} read`, pages[slug].error === undefined, pages[slug]);
+      await alone.close();
+    }
+  }
   const samples = await page.evaluate(() => /** @type {any} */ (window).__gc15c.samples);
   writeFileSync(join(out, `${engineName}-samples.json`), JSON.stringify(samples));
   await context.close();
