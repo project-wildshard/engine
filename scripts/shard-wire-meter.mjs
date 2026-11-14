@@ -8,18 +8,20 @@
 //     [--flow select|grid] [--upstream https://play.wildshard.io] [--settle ms] [--timeout ms] [--shot file.jpg]
 //     [--last <slug>]   a returning player whose last pick was <slug>, with nothing stored yet
 //     [--dwell ms]      time on the title before the tap
+//     [--card n]        enter the deck's nth card instead of --shard's benchmark card (PAGE-SIZE PZ7 meters every card)
+// byClass splits S1 shardfiles into `S1-packs` (blobs/pack/) and `S1-loose` (the other blobs) for PZ7. The browser
+// profile lives in the root's tmp/wire-meter, never the system temp folder.
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
-const { values: o } = parseArgs({ options: { root: { type: 'string' }, shard: { type: 'string' }, tier: { type: 'string', default: 'phone' }, flow: { type: 'string', default: 'select' },
+const { values: o } = parseArgs({ options: { root: { type: 'string' }, shard: { type: 'string' }, card: { type: 'string' }, tier: { type: 'string', default: 'phone' }, flow: { type: 'string', default: 'select' },
   out: { type: 'string' }, upstream: { type: 'string' }, settle: { type: 'string', default: '20000' }, timeout: { type: 'string', default: '420000' }, shot: { type: 'string' }, last: { type: 'string' }, dwell: { type: 'string', default: '3000' } } });
 const require = createRequire(join(o.root, 'package.json'));
 const { chromium, devices } = require('playwright');
@@ -54,7 +56,8 @@ const port = await free();
 await new Promise(resolve => { proxy.listen(port, '127.0.0.1', resolve); });
 const url = `http://127.0.0.1:${port}/`;
 
-const profile = mkdtempSync(join(tmpdir(), 'wire-'));
+mkdirSync(join(o.root, 'tmp/wire-meter'), { recursive: true });
+const profile = mkdtempSync(join(o.root, 'tmp/wire-meter/profile-'));
 const context = await chromium.launchPersistentContext(profile, { headless: true, args: [...KEYCHAIN_ARGS, ...process.platform === 'darwin' ? ['--use-angle=metal'] : [], '--ignore-gpu-blocklist', '--mute-audio'],
   ...(o.tier === 'phone' ? devices['iPhone 16 Pro'] : { viewport: { width: 1440, height: 900 } }) });
 await developerSettings(context, { volume: 0, music: 0, tier: o.tier, holdLoading: true });
@@ -66,7 +69,8 @@ page.on('pageerror', e => errors.push(e.message.slice(0, 200)));
 const result = { shard: o.shard, tier: o.tier, url: upstream, build: null, fact: null, bar: null, stoppedOn: null };
 const summary = () => {
   const sum = list => list.reduce((n, r) => n + r.wire, 0), byStage = {}, byClass = {};
-  const klass = u => u.startsWith('/assets/spawn/parts/') ? 'spawn-parts' : /\/shardfiles\//.test(u) ? 'shardfiles' : /\/assets\/packs\//.test(u) ? 'legacy-packs'
+  const klass = u => u.startsWith('/assets/spawn/parts/') ? 'spawn-parts' : /\/shardfiles\/[^/]+\/blobs\/pack\//.test(u) ? 'S1-packs'
+    : /\/shardfiles\/[^/]+\/blobs\//.test(u) ? 'S1-loose' : /\/shardfiles\//.test(u) ? 'shardfiles' : /\/assets\/packs\//.test(u) ? 'legacy-packs'
     : u.startsWith('/assets/spawn/') ? 'manifests' : u.startsWith('/b/') || /\.(?:js|mjs|css|html)(?:\?|$)/.test(u) || u === '/' ? 'app' : /\/assets\//.test(u) ? 'assets' : 'other';
   for (const r of rows) { byStage[r.stage] = (byStage[r.stage] ?? 0) + r.wire; const k = klass(r.url); byClass[k] = (byClass[k] ?? 0) + r.wire; }
   return { requests: rows.length, wireBytes: sum(rows), byStage, byClass };
@@ -79,11 +83,18 @@ try {
   if (o.flow === 'grid') { stage = 'entry'; await page.locator('.ws-main-grid').click({ timeout }); }
   else {
   await page.locator('.ws-main-select').click({ timeout });
+  // a first visit names its player before the deck opens
+  if (await page.locator('#ws-name-box input').waitFor({ timeout: 15_000 }).then(() => true).catch(() => false)) {
+    await page.locator('#ws-name-box input').fill('wiremeter'); await page.locator('#ws-name-box button[type=submit]').click();
+  }
   await page.locator('.ws-menu-card').first().waitFor({ timeout });
-  const { loadingCardIndex } = await import(pathToFileURL(join(o.root, 'scripts/loading-benchmark/catalogue.mjs')).href);
   const titles = await page.locator('.ws-menu-card b').allTextContents();
-  const index = loadingCardIndex(titles, o.shard);
-  await page.locator(`.ws-menu-dots i[data-i="${index}"]`).click();
+  let index;
+  if (o.card !== undefined) index = Number(o.card);
+  else { const { loadingCardIndex } = await import(pathToFileURL(join(o.root, 'scripts/loading-benchmark/catalogue.mjs')).href); index = loadingCardIndex(titles, o.shard); }
+  result.card = { index, title: titles[index] ?? null, of: titles.length };
+  // the dots are positional (no data-i on them since the deck redesign); the card keeps its data-i
+  await page.locator('.ws-menu-dots i').nth(index).click();
   await page.locator(`.ws-menu-card.selected[data-i="${index}"]`).waitFor({ timeout });
   stage = 'entry';
   const explicit = page.locator('.ws-menu-shardfile');
