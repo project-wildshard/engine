@@ -26,3 +26,12 @@ CI or ring build read the untiered table.
 Gate on all 27 pins: driftwood-isle 21.08 MB, far-reach 25.98 MB
 (latched), Pine 41.09, Nalati 43.28, every product within its ceiling.
 A cold build encodes for about 7 minutes; warm, 11 s.
+
+Review follow-ups. The served discovery documents now sit inside the
+build's own output (`<out>/.discovery/`), which `copyOutputProducts`
+lays over each product's and then removes, so no build reads another's.
+The pre-pass keeps only each served document and a way to reopen the
+product, not 27 open shardfiles. A cache hit touches its 6x6 file and
+ci.yml drops encodes no build read for three hours; the hover-contract
+and census builds restore the spawn-part cache before `build:game`, so
+a CI build pays the cold encode once.

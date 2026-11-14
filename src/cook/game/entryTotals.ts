@@ -94,9 +94,10 @@ export function phoneOverlay(discovery: Uint8Array | undefined): Readonly<Record
   const table = v.safeParse(v.looseObject({native: v.looseObject({ktx2: v.looseObject({GPU_FILES: v.looseObject({phone: v.record(v.string(), v.string())})})})}), JSON.parse(new TextDecoder().decode(discovery)));
   return table.success ? Object.fromEntries(Object.entries(table.output.native.ktx2.GPU_FILES.phone).filter(([, url]) => PHONE_STAND_IN.test(url))) : {};
 }
-/** S12d: where the app build keeps each shard's discovery document as its cook serves it (`copyOutputProducts` and the
- *  catalogue read it there in place of the product's own). */
-export function servedDiscoveryPath(root: string, directory: string): string { return join(root, 'out/.app/discovery', directory, 'discovery.json'); }
+/** S12d: where a build keeps each shard's discovery document as its cook serves it, inside that build's own output, until
+ *  `copyOutputProducts` lays it over the product's (and removes the folder); the catalogue hashes it there. */
+export const SERVED_DISCOVERY = '.discovery';
+export function servedDiscoveryPath(outDir: string, directory: string): string { return join(outDir, SERVED_DISCOVERY, directory, 'discovery.json'); }
 /** DL5: a shard's packs set, `src/shards/<slug>/packs-set.json` (`{"version": 1, "set": "fence"}`): 'fence' packs the
  *  default set (what the boot reads before control), absent packs the whole level. Anything else fails the build. */
 export function readPacksSet(path: string): 'whole' | 'fence' {
@@ -210,31 +211,38 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
   // C1: the shard half comes from the shardfile alone, one tarball per product, and its parts from the shard's own cook.
   // S12d: with the cook's tiers, the phone reads the tiered table and its own files, as from the box's cook.
   const tiers = build.preparationOnly === true || build.tiers === undefined ? {} : await build.tiers();
-  rmSync(join(root, 'out/.app/discovery'), {recursive: true, force: true});
-  const halves = new Map<string, ShardHalf>();
+  rmSync(join(output, SERVED_DISCOVERY), {recursive: true, force: true});
+  // Only what the manifests' loop needs: an opened product stays open no longer than its own pass (no 27 at once).
+  const served = new Map<string, NonNullable<ShardHalf['discovery']>>(), open = new Map<string, () => Promise<ShardHalf>>();
   for (const prefix of Object.keys(bank.products)) {
     const directory = prefix.split('/')[2]; if (directory === undefined || !/^[a-z0-9_-]+$/u.test(directory)) throw new Error('Invalid spawn shard');
     const product = join(root, 'out', directory), index = parseOutputIndex(JSON.parse(readFileSync(join(product, 'shard.json'), 'utf8')));
     if (index.runtime !== null && (!('kind' in index.runtime) || index.runtime.kind !== 'client-plan')) continue;
-    const half = await preparedShardHalf(openShardfile(productTarball(product), {preparationOnly: build.preparationOnly === true,
+    const reopen = (): Promise<ShardHalf> => preparedShardHalf(openShardfile(productTarball(product), {preparationOnly: build.preparationOnly === true,
       ...(build.rendererRevision === undefined ? {} : {renderer: build.rendererRevision})}), wireBytes, undefined, directory, tiers);
-    halves.set(directory, half);
+    const half = await reopen();
+    open.set(directory, reopen);
     // What no part answers serves at its URL: the tiered discovery document (beside its product) and the phone's own files.
-    if (half.discovery !== undefined) { const file = servedDiscoveryPath(root, directory); mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.discovery.bytes); }
+    if (half.discovery !== undefined) {
+      served.set(directory, half.discovery);
+      const file = servedDiscoveryPath(output, directory); mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.discovery.bytes);
+    }
     for (const row of half.tierFiles) { const file = join(output, row.url.slice(1)); mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.read(row.url)); }
   }
   // C3: a grid page reads every primary neighbour's discovery document before it enters.
   const discoveries = Object.keys(bank.products).flatMap(prefix => {
     const directory = prefix.split('/')[2] ?? '', url = `/shardfiles/${directory}/discovery.json`, file = join(root, 'out', directory, 'mounts', url);
-    const served = halves.get(directory)?.discovery;
-    if (served === undefined && !existsSync(file)) return [];
-    const bytes = served?.bytes ?? readFileSync(file), hash = createHash('sha256').update(bytes).digest('hex'), row = {url: `${url}?v=${hash.slice(0, 8)}`, bytes: bytes.length, hash, wireBytes: wireBytes(url, bytes, hash)};
+    const own = served.get(directory);
+    if (own === undefined && !existsSync(file)) return [];
+    const bytes = own?.bytes ?? readFileSync(file), hash = createHash('sha256').update(bytes).digest('hex'), row = {url: `${url}?v=${hash.slice(0, 8)}`, bytes: bytes.length, hash, wireBytes: wireBytes(url, bytes, hash)};
     sources.set(row.url, () => bytes);
     return [row];
   });
   const preparations: Partial<Record<PreparationState, string[]>> = {};
   for (const prefix of Object.keys(bank.products)) {
-    const directory = prefix.split('/')[2] ?? '', half = halves.get(directory); if (half === undefined) continue;
+    // The second opening's encodes come straight back from the first's (the encoder keeps them).
+    const directory = prefix.split('/')[2] ?? '', reopen = open.get(directory); if (reopen === undefined) continue;
+    const half = await reopen();
     const index = parseOutputIndex(JSON.parse(readFileSync(join(root, 'out', directory, 'shard.json'), 'utf8'))), {sections} = half.shard, overlay = phoneOverlay(half.discovery?.bytes);
     // J262 (SP1a): a preparation from another renderer cooks as it is, and the build says which shards took that path.
     (preparations[half.shard.preparation] ??= []).push(directory);

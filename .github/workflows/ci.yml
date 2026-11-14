@@ -237,6 +237,8 @@ jobs:
             name=$(basename "$file")
             [ -f "dist/assets/spawn/parts/${name:0:16}.pack.br" ] || rm -f "$file"
           done
+          # S12d: phone 6x6 encodes no build read for three hours leave the cache (a hit refreshes the time).
+          find "${cache%/1}/astc6-1" -name '*.ktx2' -mmin +180 -delete 2>/dev/null || true
           du -sh "$cache" 2>/dev/null || true
       - if: steps.pack.outputs.products == 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0

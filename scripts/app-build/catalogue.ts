@@ -15,6 +15,7 @@ import {bareSlug} from '../../src/shared/game/grid/catalogueSlot';
 import {serverPackBookPath} from '../../src/shared/game/shardfile/serverPack';
 import {productTarball} from '../../src/cook/game/productTarball';
 import {titleMetadata, type TitleManifest} from '../../src/client/game/shard/titleList';
+import {servedDiscoveryPath} from '../../src/cook/game/entryTotals';
 
 /** C3 (J61, D7): every build bakes `catalogue.json`, so a build needs no server, and inlines it in `index.html`, so the
  * first paint waits on no new fetch. `WILDSHARD_CATALOGUE` names a file a deploy took from `api-server`'s
@@ -45,11 +46,11 @@ export function titleRowOf(bytes: Uint8Array, home = ''): TitleManifest {
   return {...titleMetadata(data), card: {thumb: at(thumb), portrait: at(portrait), landscape: at(landscape)}, discovery: `${home}/shardfiles/${data.slug}/discovery.json?v=${hash8(bytes)}`};
 }
 /** Every built product's title row, in title order. */
-export function productTitleRows(products: string): readonly TitleManifest[] {
+export function productTitleRows(products: string, outDir?: string): readonly TitleManifest[] {
   const rows = readdirSync(products, {withFileTypes: true}).flatMap(entry => {
-    // S12d: the document as the build serves it (`servedDiscoveryPath`, the phone tier's table), so the title's `?v=` is its hash.
-    const own = join(products, entry.name, 'mounts/shardfiles', entry.name, 'discovery.json'), served = join(products, '.app/discovery', entry.name, 'discovery.json');
-    const file = existsSync(served) ? served : own;
+    // S12d: the document as this build serves it (`servedDiscoveryPath`, the phone tier's table), so the title's `?v=` is its hash.
+    const own = join(products, entry.name, 'mounts/shardfiles', entry.name, 'discovery.json'), served = outDir === undefined ? undefined : servedDiscoveryPath(outDir, entry.name);
+    const file = served !== undefined && existsSync(served) ? served : own;
     return entry.isDirectory() && existsSync(own) ? [titleRowOf(readFileSync(file))] : [];
   });
   return rows.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -86,7 +87,7 @@ export function inTreeCatalogue(root: string, products: string, listed: readonly
 /** The build's step: the file a deploy names, else the tree's. */
 export function bakeCatalogue(outDir: string, root: string): void {
   const {WILDSHARD_CATALOGUE: source} = process.env;
-  const rows = productTitleRows(join(root, 'out'));
+  const rows = productTitleRows(join(root, 'out'), outDir);
   const document = source === undefined ? inTreeCatalogue(root, join(root, 'out'), rows) : v.parse(StandaloneCatalogueSchema, JSON.parse(readFileSync(source, 'utf8')));
   writeCatalogueDocument(outDir, document);
   writeTitleRows(outDir, rows);

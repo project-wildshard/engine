@@ -41,6 +41,13 @@ jobs:
       - run: bash scripts/ci-playwright-install.sh chromium
       - name: Cook, attach, and play the same bytes
         run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
+      # S12d: the app build's phone 6x6 encodes ride the spawn-part cache (a cold full-pin cook is minutes).
+      - if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ring1-spawn-parts-br-${{ github.sha }}
+          restore-keys: ring1-spawn-parts-br-
       # Ring 2: all 28 real products and a clean build exceed ten seconds.
       - name: Census all pinned title and grid heads
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

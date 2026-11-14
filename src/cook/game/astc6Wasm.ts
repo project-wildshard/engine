@@ -13,7 +13,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, renameSync, utimesSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createRequire} from 'node:module';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -115,7 +115,15 @@ export async function wasmAstc6(options: {readonly cacheDir?: string; readonly l
   const stored = (key: string): Uint8Array | undefined => {
     if (cacheDir === undefined) return undefined;
     const path = join(cacheDir, `${key}.ktx2`);
-    return existsSync(path) ? new Uint8Array(readFileSync(path)) : undefined;
+    if (!existsSync(path)) return undefined;
+    // A hit marks the file in use, so CI's cache keeps only what its builds read (ci.yml prunes by age).
+    try {
+      const now = new Date();
+      utimesSync(path, now, now);
+    } catch {
+      // A read-only cache still serves.
+    }
+    return new Uint8Array(readFileSync(path));
   };
   const keep = (key: string, out: Uint8Array | undefined): void => {
     done.set(key, out ?? null);

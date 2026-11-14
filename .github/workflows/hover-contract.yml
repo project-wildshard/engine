@@ -37,6 +37,12 @@ jobs:
           pins-cache-scope: full
       - run: node scripts/pins.ts install
       - run: bash scripts/ci-playwright-install.sh "$PROOF_BROWSER"
+      # S12d: the app build's phone 6x6 encodes ride the spawn-part cache (a cold full-pin cook is minutes).
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ring1-spawn-parts-br-${{ github.sha }}
+          restore-keys: ring1-spawn-parts-br-
       - run: pnpm build:game
       # PAGE-SIZE PZ4: build:game splits dist/ from dist-content/; this job serves the whole game from dist.
       - run: node scripts/app-build/splitOutput.mjs dist --join
