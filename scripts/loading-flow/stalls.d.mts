@@ -7,7 +7,7 @@ export interface Span { start: number; end: number }
 /** A stage's worst window: its unexplained idle (ms) and where the window starts in the stage. */
 export interface StageStall { stage: string; from: number; idleMs: number; stageMs: number }
 /** A Chromium CPU profile, as `Profiler.stop` returns it. */
-export interface CpuProfile { nodes: readonly { id: number; callFrame: { functionName: string } }[]; samples?: readonly number[]; timeDeltas?: readonly number[]; startTime: number; endTime: number }
+export interface CpuProfile { nodes: readonly { id: number; callFrame: { functionName: string; url?: string } }[]; samples?: readonly number[]; timeDeltas?: readonly number[]; startTime: number; endTime: number }
 
 /** The window a stall is judged over (ms). */
 export const STALL_WINDOW_MS: number;
@@ -37,3 +37,15 @@ export function bootTimelineEntries(): StallEntry[];
 export function startStallProfile(page: Page): Promise<CDPSession | null>;
 /** End a stall profile at control: the ratcheted stages' worst windows and their faults. */
 export function finishStallProfile(page: Page, session: CDPSession): Promise<{ stalls: StageStall[]; faults: string[] }>;
+/** NB6, play: a stretch of live frames' worst window of unbroken main-thread work (ms), where it starts, and play's length. */
+export interface PlayStall { from: number; busyMs: number; playMs: number }
+/** The share of the window unbroken main-thread work must reach to be a play stall. */
+export const PLAY_BUSY_SHARE: number;
+/** A profile's main-thread work on the page clock: neither idle, `(program)`, nor a WebGL call's native leaf. */
+export function profileBusy(profile: CpuProfile, anchor: { pageMs: number; profileUs: number }): Span[];
+/** Play's worst window of [from, to]. */
+export function playStall(busy: readonly Span[], from: number, to: number): PlayStall;
+/** A play stall at or over the share, as a fault line. */
+export function playStallFaults(stall: PlayStall): string[];
+/** End a play profile: play's worst window from `fromPageMs` and its fault. */
+export function finishPlayProfile(page: Page, session: CDPSession, fromPageMs: number): Promise<{ stall: PlayStall; faults: string[] }>;

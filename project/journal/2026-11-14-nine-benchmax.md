@@ -13,3 +13,5 @@
 - NB6 widened to play: Ring 1's boot smoke now also profiles its ten gameplay frames and refuses a 1.5 s window the main
   thread spent 80 % busy without a break (idle, `(program)` and WebGL calls left out, so CI's SwiftShader GPU can't trip
   it). deskbench gets `--capped` (vsync kept: Jake plays on this Mac) and `--stalls` (the same check per desktop pose).
+- (NB3's cut lands as its own commit after the NB6 one: the pre-commit typecheck reads the tree, and NB6's test imports came first.)
+- NB6 follow-up: stalls.mjs has a hand-written stalls.d.mts; the play exports needed their declarations too.
