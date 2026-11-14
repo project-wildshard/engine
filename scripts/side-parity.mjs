@@ -69,14 +69,16 @@ export function colliderInventory(physics) {
 
 /**
  * One name per owner on both sides: a streamed tile keeps its authored owner with an 8 × 8 tile suffix (`pier.c3`), the server's
- * bake prefixes its pieces (`piece:pier`, `string:platform.grid`), a streamed tree keeps its tile (`.trunks.t3`). An owner
+ * bake prefixes its pieces (`piece:pier`, `string:platform.grid`), a streamed tree keeps its tile (`.trunks.t3`), and a placed
+ * piece keeps its placement after its model id (`nalati-grasslands/corral.camp.16`: Nalati's bake names it by the model). An owner
  * object with no string id, or a creature's numeric id, is an actor (the player, a creature, a loose body): an entity the wire
  * carries, grouped as `actor`.
  */
 export function ownerGroup(owner) {
   if (owner === null) return '(untagged)';
   if (owner.startsWith('(object') || owner === '(number)') return 'actor';
-  return owner.replace(/^(?:piece|string):/u, '').replace(/\.c(?:[0-9]|[1-5][0-9]|6[0-3])$/u, '').replace(/\.trunks\.t\d+$/u, '');
+  return owner.replace(/^(?:piece|string):/u, '').replace(/\.c(?:[0-9]|[1-5][0-9]|6[0-3])$/u, '').replace(/\.trunks\.t\d+$/u, '')
+    .replace(/^([^/.]+\/[^/.]+)\..*$/u, '$1');
 }
 
 /** A body of flesh is a creature, a person or a player on either side, whatever its owner: an actor. */
