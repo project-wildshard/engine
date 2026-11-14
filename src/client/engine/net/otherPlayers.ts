@@ -205,13 +205,13 @@ class WarmBody {
     this.hand.add(this.items);
     this.unculled();
   }
-  /** Each frame: a newly lent kit's items replace the last's. */
+  private slot = WARM_SLOTS;
+  /** Each frame: a newly lent kit's items replace the last's, one slot a frame (each first copy clones a first-person model). */
   frame(): void {
-    if (this.kit === heldOnOthers.lent) return;
-    this.kit = heldOnOthers.lent;
-    this.items.clear();
-    for (let slot = 0; slot < WARM_SLOTS; slot++) { const held = heldOnOthers.prop(slot); if (held !== null) this.items.add(held.prop.clone()); }
-    this.unculled();
+    if (this.kit !== heldOnOthers.lent) { this.kit = heldOnOthers.lent; this.items.clear(); this.slot = 0; }
+    if (this.slot >= WARM_SLOTS) return;
+    const held = heldOnOthers.prop(this.slot++);
+    if (held !== null) { const item = held.prop.clone(); item.traverse(node => { node.frustumCulled = false; }); this.items.add(item); }
   }
   /** Drawn wherever the camera looks, so the warm-up and every frame count its programs as used. */
   private unculled(): void { this.group.traverse(node => { node.frustumCulled = false; }); }

@@ -156,7 +156,9 @@ const readings = [];
 // NET-LAG NL3: `staging --tailnet` dials staging's tailnet Serve address (the other door on the staging list) instead of the one
 // the release names, so the same bots measure the wire without Cloudflare
 if (values.tailnet && mode !== 'staging') throw new Error('--tailnet is for staging');
-let url = values.tailnet ? STAGING_SOCKETS[1] ?? '' : release.socket.replace(/\/$/u, '');
+const tailnetDoor = STAGING_SOCKETS[1];
+if (values.tailnet && tailnetDoor === undefined) throw new Error('No tailnet door on the staging list');
+let url = values.tailnet && tailnetDoor !== undefined ? tailnetDoor : release.socket.replace(/\/$/u, '');
 if (mode === 'replica') {
   const tarball = join(work, 'server.tar.gz'), served = join(work, 'server');
   const bytes = serverBundle !== null ? readFileSync(serverBundle) : Buffer.from(await (await fetch(`${BUNDLES}/${release.bundle.name}`, { signal: AbortSignal.timeout(300_000) })).arrayBuffer());

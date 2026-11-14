@@ -25,7 +25,7 @@ test('a page in the world draws a warm body from the start: under the world, nev
   blade.name = 'sword_wood'; sword.add(blade);
   unlend = heldOnOthers.lend(slotKit(() => kitSlots(new Map(), ['weapon.sword']), row => ({ row, model: sword, bow: false })));
   const others = new OtherPlayers(client, scene, scope);
-  others.frame(0, 1 / 60);
+  for (let at = 0; at < 17; at++) others.frame(at, 1 / 60);
   const warm = scene.getObjectByName('other-player-warm');
   expect(warm).toBeDefined();
   expect(warm?.position.y).toBeLessThan(-100);

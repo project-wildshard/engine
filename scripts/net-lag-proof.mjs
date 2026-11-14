@@ -4,8 +4,8 @@
 // plan's bar per run; any miss exits 1.
 //   B1  drawn frames (the renderer's own, so a 30 fps cap reads as 30): none over 2x the frame budget nor over 50 ms, p99 at
 //       most 1.25x it. Budget = 1000 / min(display Hz, the tier's cap), read from the drawn rate before moving.
-//   B2  own character on foot: at most 2 corrections a minute, worst render offset at most 0.10 m.
-//   B3  others: interpolation delay at most 120 ms from 10 s after entry, and no frame held past the buffer (`interpHeld`).
+//   B2  own character on foot (walk and sprint): at most 2 corrections a minute, worst render offset at most 0.10 m.
+//   B3  others: interpolation delay at most 120 ms from 10 s after entry, and no frame held past the buffer (`interpHeld`, from entry).
 //   B4  Driftwood only: the rope bridge crossed with forced 60 ms frames, the feet never under its planks, no fall.
 // J205: staging, preview or a loopback page only, never production; the page's sockets are held to the one door.
 //   node scripts/net-lag-proof.mjs [--base=https://staging.wildshard.io] [--socket=wss://rooms-staging.wildshard.io]
@@ -38,9 +38,10 @@ const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
 /** In the page: drawn frames (page frames that rendered), a forced-slow-frame switch, and the socket delay. Self-contained. @param {number} delay */
 function pageProbe(delay) {
-  const W = /** @type {any} */ (window), S = W.__netLag = { on: false, drawn: /** @type {number[]} */ ([]), last: 0, slowMs: 0, rendered: false };
+  const W = /** @type {any} */ (window), S = W.__netLag = { on: false, drawn: /** @type {number[]} */ ([]), last: 0, slowMs: 0, rendered: false, worst: 0 };
   // a drawn frame is a page frame that rendered at least once (a frame may render offscreen passes too; a capped one renders none)
-  const frame = (/** @type {number} */ now) => { if (S.rendered) { if (S.on && S.last !== 0) S.drawn.push(now - S.last); S.last = now; S.rendered = false; } requestAnimationFrame(frame); };
+  // B2's worst render offset, over the window the proof opens (the client's own `worstOffset` runs from entry)
+  const frame = (/** @type {number} */ now) => { const offset = W.__wildshard?.world?.player?.renderOffset; if (S.on && offset !== undefined) S.worst = Math.max(S.worst, offset.length()); if (S.rendered) { if (S.on && S.last !== 0) S.drawn.push(now - S.last); S.last = now; S.rendered = false; } requestAnimationFrame(frame); };
   requestAnimationFrame(frame);
   const hook = () => {
     const renderer = W.__wildshard?.world?.game?.renderer;
@@ -80,6 +81,8 @@ async function run(browser, engineName, layout, slug, site, socket) {
   const page = await context.newPage(), errors = /** @type {string[]} */ ([]), row = /** @type {Record<string, any>} */ ({ engine: engineName, layout, slug, delayMs: DELAY_MS * 2 });
   page.on('pageerror', error => { errors.push(error.message.slice(0, 200)); });
   const t0 = Date.now();
+  /** @type {ReturnType<typeof setInterval> | undefined} */
+  let sampler;
   try {
     await page.goto(`${site}/?chunk=${slug}&mute=1&nolock=1&skipintro=1`, { waitUntil: 'load', timeout: 90_000 });
     for (const ends = Date.now() + 120_000; Date.now() < ends;) {
@@ -102,9 +105,9 @@ async function run(browser, engineName, layout, slug, site, socket) {
     await page.waitForFunction(() => (window.__workerClient?.().frames ?? 0) > 30, undefined, { timeout: 90_000 });
     if (await page.evaluate(() => /** @type {any} */ (window).__wildshard?.world?.game.app.clock.paused === true)) await page.getByRole('button', { name: /^resume$/iu }).click().catch(() => undefined);
     row.enterMs = Date.now() - t0;
-    const entered = Date.now(), delays = /** @type {{ t: number, delay: number }[]} */ ([]);
+    const entered = Date.now(), delays = /** @type {{ t: number, delay: number }[]} */ ([]), heldFrom = await page.evaluate(() => window.__workerClient?.().interpHeld ?? 0);
     const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed } }; });
-    const sampler = setInterval(() => { void report().then(r => { if (r !== null) delays.push({ t: Date.now() - entered, delay: r.delay }); }).catch(() => undefined); }, 250);
+    sampler = setInterval(() => { void report().then(r => { if (r !== null) delays.push({ t: Date.now() - entered, delay: r.delay }); }).catch(() => undefined); }, 250);
     await sleep(2000);
     // the budget: the drawn rate standing still, against the display's 60 Hz (headless)
     await page.evaluate(() => { const S = /** @type {any} */ (window).__netLag; S.drawn.length = 0; S.on = true; });
@@ -113,7 +116,8 @@ async function run(browser, engineName, layout, slug, site, socket) {
     row.budgetMs = at(idle, 0.5) > 25 ? 1000 / 30 : 1000 / 60;
     // B4 first, from the spawn on the pier, where its route starts
     if (bridge && slug === 'driftwood-isle') row.bridge = await crossBridge(page);
-    const before = await report(), heldBefore = before?.held ?? 0;
+    await page.evaluate(() => { /** @type {any} */ (window).__netLag.worst = 0; });
+    const before = await report();
     const phase = async (/** @type {string} */ name, /** @type {string[]} */ keys) => {
       await page.evaluate(() => { const S = /** @type {any} */ (window).__netLag; S.drawn.length = 0; });
       const from = await report();
@@ -125,23 +129,22 @@ async function run(browser, engineName, layout, slug, site, socket) {
       for (const key of [...keys].reverse()) await page.keyboard.up(key);
       const drawn = await page.evaluate(() => /** @type {any} */ (window).__netLag.drawn.slice()), to = await report();
       // what this phase's corrections disagreed on (position, grounded, board, swim, ride), for the row a miss becomes
-      const missed = Object.fromEntries(Object.entries(to?.missed ?? {}).filter(([key]) => key !== 'gap').map(([key, value]) => [key, Number(value) - Number(from?.missed?.[key] ?? 0)]).filter(([, value]) => value !== 0));
+      const missed = Object.fromEntries(Object.entries(to?.missed ?? {}).filter(([key]) => key !== 'gap').map(([key, value]) => [key, Number(value) - Number(/** @type {Record<string, number> | undefined} */ (from?.missed)?.[key] ?? 0)]).filter(([, value]) => value !== 0));
       return { name, corrections: (to?.corrections ?? 0) - (from?.corrections ?? 0), missed, frames: drawn.length, p50: at(drawn, 0.5), p99: at(drawn, 0.99), max: at(drawn, 1), over2x: drawn.filter((/** @type {number} */ ms) => ms > 2 * row.budgetMs).length, over50: drawn.filter((/** @type {number} */ ms) => ms > 50).length };
     };
     row.walk = await phase('walk', ['KeyW']);
     row.sprint = await phase('sprint', ['KeyW', 'ShiftLeft']);
-    const foot = await report();
+    const foot = await report(), footWorst = await page.evaluate(() => /** @type {any} */ (window).__netLag.worst);
     await page.keyboard.press('KeyH'); await sleep(600);
     row.boost = await phase('boost', ['KeyW', 'ShiftLeft']);
     await page.keyboard.press('KeyH'); await sleep(600);
     const after = await report();
-    clearInterval(sampler);
     const footMinutes = (2 * SECONDS) / 60, late = delays.filter(sample => sample.t >= 10_000);
     row.b1 = { budgetMs: Number(row.budgetMs.toFixed(1)), over2x: row.walk.over2x + row.sprint.over2x + row.boost.over2x, over50: row.walk.over50 + row.sprint.over50 + row.boost.over50, p99: Math.max(row.walk.p99, row.sprint.p99, row.boost.p99) };
     row.b1.ok = row.b1.over2x === 0 && row.b1.over50 === 0 && row.b1.p99 <= 1.25 * row.budgetMs;
-    row.b2 = { perMinute: Number((((foot?.corrections ?? 0) - (before?.corrections ?? 0)) / footMinutes).toFixed(1)), worst: Number((foot?.worst ?? 0).toFixed(3)) };
+    row.b2 = { perMinute: Number((((foot?.corrections ?? 0) - (before?.corrections ?? 0)) / footMinutes).toFixed(1)), worst: Number(footWorst.toFixed(3)) };
     row.b2.ok = row.b2.perMinute <= 2 && row.b2.worst <= 0.1;
-    row.b3 = { delayMaxAfter10s: late.length === 0 ? null : Math.max(...late.map(sample => sample.delay)), held: (after?.held ?? 0) - heldBefore };
+    row.b3 = { delayMaxAfter10s: late.length === 0 ? null : Math.max(...late.map(sample => sample.delay)), held: (after?.held ?? 0) - heldFrom };
     row.b3.ok = row.b3.delayMaxAfter10s !== null && row.b3.delayMaxAfter10s <= 120 && row.b3.held === 0;
     if (row.bridge !== undefined) row.b4 = { ok: row.bridge.reached && row.bridge.under === 0 && row.bridge.falls === 0, ...row.bridge };
     row.ok = row.b1.ok && row.b2.ok && row.b3.ok && (row.b4?.ok ?? true);
@@ -150,6 +153,7 @@ async function run(browser, engineName, layout, slug, site, socket) {
     row.error = String(error instanceof Error ? error.message : error).slice(0, 300); row.ok = false;
     await page.screenshot({ path: join(out, `${engineName}-${layout}-${slug}-error.png`) }).catch(() => undefined);
   }
+  clearInterval(sampler);
   row.errors = errors.slice(0, 5);
   await context.close();
   return row;
@@ -191,7 +195,7 @@ for (const engineName of engines) {
   try {
     for (const slug of shards) {
       /** @type {{ base: string, close: () => Promise<void> }} */
-      let site = { base, close: () => Promise.resolve() }, socket = base.startsWith('https://staging.') ? arg('socket', 'wss://rooms-staging.wildshard.io') : arg('socket', '');
+      let site = { base, close: () => Promise.resolve() }, socket = /^https:\/\/(staging|preview)\./u.test(base) ? arg('socket', 'wss://rooms-staging.wildshard.io') : arg('socket', '');
       if (rigArg !== '') {
         const [dist = '', work = '', keyFile = ''] = rigArg.split(','), { openRig, WORLD_PORT } = await import('./online-rig.mjs');
         site = await openRig({ dist: absolute(dist), work: absolute(work, slug), keyFile, pgBin: 'memory:', pgData: '', shard: slug, crossing: false });
