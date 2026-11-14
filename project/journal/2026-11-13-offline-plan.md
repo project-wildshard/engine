@@ -24,3 +24,8 @@ prod should never try to play offline versions ... Load into the world. And then
   full (`PREDICTION_RING`, 64 steps, about 1 s), then movement holds while the key stays down. A rejoin or a crossing still
   holds still until its first frame. The seat's first frame adopts the server's place and, when it is under `PREDICTION_SNAP`,
   glides the camera onto it (`adopt(..., glide)`). World actions are already gated by FM4's hold cards (`gateActions`).
+- **OF11, no raw failure on a world build.** With OF9 a world page no longer sits at Worker boot: a grid shard entered offline or
+  with no backend opens the world under FM4's link banner ("Reconnecting", then the "Couldn't reconnect" card after 2 minutes).
+  The Name prompt (`askNameOnce`) held Worker boot for a device that never answered it; a join now asks only with a link
+  (`askNameToJoin`): offline it goes on as Skip would, without marking the device asked. A world build with no kept release file
+  (none ever read, or older than 7 days) still fails at `startOnline` before any shell: that is FM5's mode 11 screen.

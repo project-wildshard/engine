@@ -22,7 +22,7 @@ import type { NetClient } from '@wildshard/engine/net/client';
 import type { NetCombatEvent } from '@wildshard/engine/net/messages';
 import type { DeathCause } from '@wildshard/engine/combat/pipeline';
 import { deviceIdentity, heldName, type NetIdentity } from '@wildshard/engine/net/identity';
-import { askNameOnce } from '@wildshard/engine/ui/namePrompt';
+import { askNameToJoin } from '@wildshard/engine/ui/namePrompt';
 import { NetPlayer, type NetWeapons } from '@wildshard/engine/net/netPlayer';
 import type { PredictedRow } from '@wildshard/engine/net/predictionWorld';
 import { ANIMAL_CLASS } from '@wildshard/engine/net/netSchemas';
@@ -346,7 +346,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
     const { startOnline } = await onlineModule();
     // MP2.4: a page that came in without the title's PLAY (a link, a reload) asks for the Name here, once per device, before it joins
-    const answered = await askNameOnce(scope, { parent: document.body, doctor: () => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: 'join' })); } });
+    const answered = await askNameToJoin(scope, { parent: document.body, doctor: () => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: 'join' })); } });
     // a page that left while it asked never joins (Codex review): a cancelled load must not take the device's seat
     if (!answered || scope.disposed) throw new Error('The page left before it joined the world');
     const { grid } = ports, booted = grid?.booted;

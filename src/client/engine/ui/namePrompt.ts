@@ -137,3 +137,10 @@ export function nameSettingRows(scope: Scope): HTMLElement[] {
   });
   return [row, note];
 }
+
+/** OFFLINE OF11 (J298): a page joining the world asks the Name only with a link. Offline it goes on as Skip would, without
+ *  marking the device asked, so Worker boot never waits on a prompt the world can't hear yet and the next online join asks. */
+export function askNameToJoin(scope: Scope, options: Omit<NamePromptOptions, 'current'>, online: boolean = navigator.onLine): Promise<boolean> {
+  if (!online) return Promise.resolve(true);
+  return askNameOnce(scope, options);
+}
