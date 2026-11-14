@@ -22,6 +22,13 @@ export const READING_MS = 10_000;
 const TICKS_KEPT = 720;
 /** The save prefix a cell's stores share. Nothing outside a cell ever reads it. */
 const SAVE_PREFIX = 'wildshard.room.';
+/**
+ * SERVER-CELLS SC4 (J328): the ticks a cell runs as it opens, with nobody in it, before the worker says `booted`. A world's first ticks
+ * build what it builds lazily (each creature's animation channel programs, Rapier's first step, the JIT's first pass): 25 to 30 ms on an
+ * idle Mac, and up to 668 ms on a loaded one, which every player on the worker felt when the cell's first player arrived. One second of
+ * world time at boot pays it there instead.
+ */
+export const WARM_TICKS = 60;
 /** J107: a cell everyone left starts over once it has stood empty this long, on its own timer, before anyone comes back (J320). */
 const EMPTY_MS = 300_000;
 
@@ -104,6 +111,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const room: DedicatedRoom = await DedicatedRoom.boot({ slug: shard, cell: slug, build: options.build, bootId: options.bootId(), input, now: options.roomNow ?? diagnosticNow, ...(onto === undefined ? {} : { road: onto }),
       post: news => { if (news.kind === 'seated') used(slug, room); else if (news.kind === 'left' && news.seats === 0) emptied(slug, room); post({ ...news, slug }); },
       reports: { file: report => { post({ kind: 'report', slug, report }); } }, ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }),...(options.playtest===true?{playtest:row=>{post({kind:'playtest',slug,row});}}:{}) });
+    // SC4: its first ticks now, while nobody is in it, not on its first player's arrival.
+    for (let tick = 0; tick < WARM_TICKS; tick++) room.tick();
     post({ kind: 'cell', slug, ms: diagnosticNow() - begun });
     options.booted?.(slug, room);
     return room;

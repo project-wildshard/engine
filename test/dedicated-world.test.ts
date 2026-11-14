@@ -5,6 +5,7 @@ import { encodeHello } from '../src/shared/engine/net/messages';
 import { NET_SCHEMA_HASH } from '../src/shared/engine/net/netSchemas';
 import { closeReason, decodeCountdown, framed, SOCKET_RELIABLE } from '../src/shared/engine/net/socketFrames';
 import { DEVICE_WORD_MAX_BYTES, encodeDeviceWord } from '../src/shared/engine/net/deviceWord';
+import { WARM_TICKS } from '../src/server/host/dedicated/cellHost';
 import { bodyId } from '../src/server/host/dedicated/seats';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
@@ -35,6 +36,21 @@ test('the right build loads in the first cell, then takes its seat', { timeout: 
   await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds('device:one')).toBe(true); });
   expect(bench.world.health()).toEqual({ build: 'bench', cells: 1, workers: 1, awake: 1, players: 1, table: { [SHARD]: 0 }, resident: { cells: 1, roads: 0, strips: 0 } });
   expect(bench.room(SHARD)?.bodyOf('device:one')?.id).toBe('actor.player');
+});
+
+test('SC4: a cell runs its first second as it opens, with nobody in it, and then sleeps until someone comes', { timeout: 60_000 }, async () => {
+  bench = await roomBench();
+  const first = bench.room(SHARD);
+  // The worker has booted (roomBench waits for it): the lazy first-tick work is paid, and no seat, filing or player came of it.
+  expect(first?.host.state.tick).toBe(WARM_TICKS);
+  expect(first?.taken).toBe(0);
+  expect(bench.world.health()).toMatchObject({ awake: 0, players: 0 });
+  await new Promise(resolve => { setTimeout(resolve, 200); });
+  expect(first?.host.state.tick, 'warm, then asleep: nobody here').toBe(WARM_TICKS);
+  const phone = bot(bench.url, 'bench', 'device:one');
+  expect(await phone.arrived()).toBe(true);
+  await vi.waitFor(() => { expect(first?.host.state.tick).toBeGreaterThan(WARM_TICKS); });
+  expect(bench.crashes).toEqual([]);
 });
 
 test('an empty cell takes no ticks, wakes where it stopped, and starts over once it has been empty long enough', { timeout: 60_000 }, async () => {
