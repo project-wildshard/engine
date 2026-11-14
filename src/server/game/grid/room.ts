@@ -4,6 +4,12 @@ import type { GridAssembly, GridPoint } from '../../../shared/game/grid/assembly
 import { installGridCrossing, type GridCrossingSession } from '../../../shared/game/grid/crossing';
 import type { GridSimulation } from './simulation';
 import type { GridLoadout } from '../../../shared/game/grid/wallet';
+import { CHUNK_HALF } from '@wildshard/engine/core/config';
+
+/** How far from a cell's edge a player on the road has its world opened (the road between two cells is 62.5 m). */
+const WARM_ROAD_METRES = 55;
+/** The least a tick's move toward it counts as heading there (a walk is 0.07 m a tick); a capsule settling is not. */
+const WARM_STEP_METRES = 0.02;
 
 /** A player's completed hand-off: the `travel` a client's view follows (E5-REPLICATION §6.3.4). */
 export interface GridTravel { readonly player: string; readonly from: string | null; readonly to: string | null }
@@ -22,6 +28,10 @@ export class GridRoom {
   private readonly crossings = new Map<string, { readonly session: GridCrossingSession; readonly scope: Scope }>();
   private readonly travels: GridTravel[] = [];
   private readonly scope = new Scope('grid-room');
+  /** each player's last cell left for the road, and the cells being opened ahead of a player on the road (GC5) */
+  private readonly departed = new Map<string, string>();
+  private readonly warming = new Set<string>();
+  private readonly feet = new Map<string, { x: number; z: number }>();
   constructor(grid: GridSimulation, assembly: GridAssembly, ports: GridRoomPorts) {
     this.grid = grid; this.assembly = assembly; this.ports = ports;
     for (const player of grid.players()) this.watch(player);
@@ -30,7 +40,7 @@ export class GridRoom {
     const { grid } = this, scope = this.scope.child(`crossing:${player}`);
     const session = installGridCrossing({ current: () => grid.current(player), prepare: (from, to) => grid.prepare(from, to, player), ready: instance => grid.ready(instance),
       checkpoint: instance => grid.checkpoint(instance), target: feet => grid.target(feet, player) }, this.assembly, instance => this.ports.loadout(player, instance), scope,
-    (from, to) => { this.travels.push({ player, from, to }); });
+    (from, to) => { this.travels.push({ player, from, to }); if (from !== null) this.departed.set(player, from); });
     this.crossings.set(player, { session, scope });
   }
   /** Another player comes onto the highway at `at`, world coordinates, or into the world at `site`, in its own. */
@@ -39,11 +49,38 @@ export class GridRoom {
   leave(player: string): boolean {
     const crossing = this.crossings.get(player);
     if (crossing === undefined || !this.grid.leave(player)) return false;
-    crossing.scope.dispose(); this.crossings.delete(player);
+    crossing.scope.dispose(); this.crossings.delete(player); this.departed.delete(player); this.feet.delete(player);
     return true;
   }
   /** Everyone's own crossing, once per fixed tick, before any world steps. */
-  cross(): void { for (const [player, { session }] of this.crossings) session.step(this.grid.worldFeet(player)); }
+  cross(): void {
+    for (const [player, { session }] of this.crossings) {
+      const feet = this.grid.worldFeet(player);
+      this.warm(player, feet);
+      session.step(feet);
+    }
+  }
+  /** GC5 (preview's in-page server, J311): a player on the road has the nearest cell ahead opened before they reach its line,
+   *  as the page builds its own: opened only at the 6 m line, a cell's world held them at its wall for its whole load. The
+   *  cell they left is not ahead. A failed open stays the crossing's to report. */
+  private warm(player: string, feet: Readonly<GridPoint>): void {
+    const previous = this.feet.get(player);
+    this.feet.set(player, { x: feet.x, z: feet.z });
+    if (this.grid.current(player) !== null || previous === undefined) return;
+    const left = this.departed.get(player), edge = (p: Readonly<{ x: number; z: number }>, cell: { readonly origin: GridPoint }): number =>
+      Math.max(Math.abs(p.x - cell.origin.x), Math.abs(p.z - cell.origin.z)) - CHUNK_HALF;
+    let best: string | undefined, bestDistance = WARM_ROAD_METRES;
+    for (const cell of this.assembly.cells) {
+      // only a cell they draw nearer to: not one behind them, nor the one they left
+      const distance = edge(feet, cell);
+      if (cell.instance === left || distance > bestDistance || distance > edge(previous, cell) - WARM_STEP_METRES) continue;
+      best = cell.instance; bestDistance = distance;
+    }
+    if (best === undefined || this.grid.ready(best) || this.warming.has(best)) return;
+    const instance = best;
+    this.warming.add(instance);
+    void this.grid.prefetch([instance]).catch(() => undefined).finally(() => { this.warming.delete(instance); });
+  }
   /** One fixed tick: everyone's own crossing, then every occupied world. */
   step(commands?: ReadonlyMap<string, SimTickCommand>): void { this.cross(); this.grid.stepAll(commands); }
   /** Every hand-off since the last call. */

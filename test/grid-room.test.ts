@@ -105,7 +105,8 @@ test('health crosses with each player and a bot leaves no ghost in a cell it lef
     // Back from a save that holds the bot's old seat: the cell admits it empty.
     expect(s.grid.unload(s.cell.instance)).toBe(true);
     await until(s, () => new Map([[BOT, walking(-1)]]), () => s.grid.current(BOT) === s.cell.instance);
-    expect(s.loads).toEqual([s.cell.instance, s.cell.instance]);
+    // (walking back out east it drew near the cell beyond, which the road opened ahead: GC5)
+    expect(s.loads.filter(id => id === s.cell.instance)).toEqual([s.cell.instance, s.cell.instance]);
     expect([...(s.hosts.get(s.cell.instance)?.players.keys() ?? [])].sort()).toEqual([BOT, lead].sort());
   } finally { s.room.dispose(); s.grid.dispose(); }
 });
@@ -134,5 +135,29 @@ test('a bot who leaves from a cell lets it freeze', async () => {
     expect(cell?.parked.size).toBe(0); expect(cell?.players.has(BOT)).toBe(false);
     expect(s.grid.players()).toEqual([lead]);
     s.room.step();
+  } finally { s.room.dispose(); s.grid.dispose(); }
+});
+
+// GC5 (preview's in-page server): the road opens the cell ahead before its line. Opened only at the 6 m line, a cell's world
+// held the walker at its wall for its whole load (QA 11-13 rows 39 and 43).
+test('a player on the road has the nearest cell ahead opened 60 m out, before its crossing line, and not the cell they left', async () => {
+  const s = stage(), lead = leadPlayer(s.grid.host()).id;
+  try {
+    place(s, lead, outside(s.cell, 30)); s.room.step(); await settle(); // 30 m east of it on the road, standing: nothing yet
+    expect(s.loads).toEqual([]);
+    // walking toward it (and away from the cell beyond): inside the 60 m reach, far from its 6 m line, it opens
+    for (let tick = 0; tick < 3; tick++) { s.room.step(new Map([[lead, walking(-1)]])); await settle(); }
+    await settle();
+    expect(s.loads).toEqual([s.cell.instance]);
+    expect(s.grid.ready(s.cell.instance)).toBe(true);
+    expect(s.grid.current()).toBeNull(); // opened, not crossed
+    // crossing in finds it open: no second load
+    await until(s, () => new Map([[lead, walking(-1)]]), () => s.grid.current() === s.cell.instance);
+    expect(s.loads).toEqual([s.cell.instance]);
+    // back out onto the road, toward the cell beyond (62.5 m on): the cell just left is not opened again, the one ahead is
+    await until(s, () => new Map([[lead, walking(1)]]), () => s.grid.current() === null);
+    for (let tick = 0; tick < 60; tick++) { s.room.step(new Map([[lead, walking(1)]])); await settle(); }
+    expect(s.loads.filter(id => id === s.cell.instance)).toHaveLength(1);
+    expect(s.loads.length).toBe(2);
   } finally { s.room.dispose(); s.grid.dispose(); }
 });
