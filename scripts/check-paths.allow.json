@@ -300,16 +300,6 @@
     "why": "Immutable reviewed weapon transfer bootstrap; the transfer list is empty and its historical destination is retired. The shrink-only comparator still checks any restored transfer against this identity."
   },
   {
-    "path": "src/engine/models/glbNodes.ts",
-    "file": "scripts/platform-chargebacks.mjs",
-    "why": "G520 retired-module identity: an exact comparison prevents an obsolete pending-user ledger row from earning credit. This selector deliberately names the deleted host; no file is loaded."
-  },
-  {
-    "path": "src/game/shardfile/buildingAssembly.ts",
-    "file": "scripts/platform-chargebacks.mjs",
-    "why": "G520 retired-module identity: an exact comparison prevents an obsolete pending-user ledger row from earning credit. This selector deliberately names the deleted host; no file is loaded."
-  },
-  {
     "path": "src/engine/sim.ts",
     "file": "test/sort-sides.test.ts",
     "why": "J122: the pre-sort tree of the sort's own fixture; not a checkout path and must retain its spelling."
@@ -360,21 +350,6 @@
     "why": "build-sdk.mjs's gitignored package output: the generated-source check names the folder to skip, so it exists only in a tree that built the SDK and never in a clean CI checkout."
   },
   {
-    "path": "src/server/game/population/pageGroups.ts",
-    "file": "test/platform-chargebacks.test.ts",
-    "why": "A retired path kept on purpose: this test feeds it as a synthetic module name, and it must stay unclaimed."
-  },
-  {
-    "path": "src/server/game/ambient/crowdPage.ts",
-    "file": "test/platform-chargebacks.test.ts",
-    "why": "A retired path kept on purpose: this test feeds it as a synthetic module name, and it must stay unclaimed."
-  },
-  {
-    "path": "src/server/game/population/pageGroups.ts",
-    "file": "test/shard-component-spans.test.ts",
-    "why": "A retired path kept on purpose: this test feeds it as a synthetic module name, and it must stay unclaimed."
-  },
-  {
     "path": "src/shards/*/bake/**/*.mjs",
     "file": ".oxlintrc.json",
     "why": "Left with sharddev or a shard at P3"
@@ -407,11 +382,6 @@
   {
     "path": "src/shards",
     "file": "scripts/built-product.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/shards",
-    "file": "scripts/check-closed-components.mjs",
     "why": "Left with sharddev or a shard at P3"
   },
   {
@@ -505,11 +475,6 @@
     "why": "Left with sharddev or a shard at P3"
   },
   {
-    "path": "src/shards/",
-    "file": "scripts/listed-view-code.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
     "path": "test/manifest-declarations.test.ts",
     "file": "scripts/live-prepush.py",
     "why": "Left with sharddev or a shard at P3"
@@ -585,66 +550,6 @@
     "why": "Left with sharddev or a shard at P3"
   },
   {
-    "path": "src/sharddev/crowds.ts",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/phasedBoss.ts",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/kit/bakedGeometry.ts",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/kit/geometryPack.ts",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/assets.ts",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/buildBehaviour.ts",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/questGraph.ts",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/bake/texture.ts",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/shards/driftwood-isle/shard.config.ts",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/bake/rig.ts",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/phasedBoss.ts#RoamingBossRow",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/sharddev/interactions.ts#interactionRules",
-    "file": "scripts/shard-components.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
     "path": "src/engine/",
     "file": "scripts/shard-coupling.mjs",
     "why": "Left with sharddev or a shard at P3"
@@ -657,26 +562,6 @@
   {
     "path": "src/shards",
     "file": "scripts/shard-outputs.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/shards",
-    "file": "scripts/shard-platform.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "test/shard-headless.test.ts",
-    "file": "scripts/shard-platform.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/server/host/package.json",
-    "file": "scripts/shard-platform.mjs",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
-    "path": "src/shards/",
-    "file": "scripts/shard-platform.mjs",
     "why": "Left with sharddev or a shard at P3"
   },
   {

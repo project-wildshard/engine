@@ -7,7 +7,7 @@ import { PLATFORM_FILE_FAMILIES, platformFileFamily, validatePlatformFile } from
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { registeredJsonSchema, namedFormatJsonSchemas } from '@wildshard/engine/host/formatJsonSchema';
 import { hashImmutableBytes } from '@wildshard/engine/host/immutable';
-import { outputSections } from '../scripts/shard-platform-output.mjs';
+import { outputSections } from '../scripts/output-reader.mjs';
 import { namedJsonRoutes, productSectionEntries, sectionInventory } from '../scripts/section-inventory';
 import { platformOutput } from './fixtures/platformOutputs';
 

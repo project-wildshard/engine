@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { defineMirror } from '@wildshard/sharddev/runtimeMirrors';
 import { runtimeCodeLines, validateRuntimeData, writeRuntimeFiles } from '@wildshard/sharddev/outputRuntime';
-import { codeLines } from '../scripts/shard-platform.mjs';
+import { codeLines } from '../scripts/host-ruler.mjs';
 
 const owned: string[] = [];
 afterEach(() => { for (const path of owned.splice(0)) rmSync(path, { recursive: true, force: true }); });

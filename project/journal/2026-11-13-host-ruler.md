@@ -60,3 +60,11 @@
   sharddev's sdk (build-time): layer, lines, users, register row and the
   entry table naming it. The honest run over the origin/main builds is in
   meta `docs/plans/host-ruler/inventory-2026-11-13.md`.
+
+- HR9 (opus-hrm1): retired the old census and the lists it read, together.
+  `shard-platform.mjs` with its hosts and sections siblings, the component
+  census and closed-component guard, the G571 hosts, the chargeback table,
+  the pending-users, host-reviews and listed-view lists, the HR5 migration
+  script and their tests are gone; the format and output readers live on as
+  `node-format.mjs` and `output-reader.mjs`. The ruler reads identical
+  per-shard numbers before and after.

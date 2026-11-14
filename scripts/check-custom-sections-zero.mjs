@@ -31,7 +31,7 @@ if(import.meta.url===pathToFileURL(process.argv[1]??'').href){
   const root=resolve(process.argv[2]??process.cwd());
   // Enumerate declared canonical projects/products rather than existing out/
   // directories: missing products refuse through the verified reader.
-  const {outputSections}=await import('./shard-platform-output.mjs');
+  const {outputSections}=await import('./output-reader.mjs');
   const {execFileSync}=await import('node:child_process');
   const names=execFileSync('git',['ls-tree','-r','--name-only','HEAD','--','src/shards'],{cwd:root,encoding:'utf8'})
     .split('\n').flatMap(path=>/^src\/shards\/([^/]+)\/shard.config.ts$/u.exec(path)?.slice(1)??[]);

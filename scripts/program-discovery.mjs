@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import * as v from 'valibot';
 import { readBuiltShardfile } from './built-product.mjs';
-import { discoveryFormat, outputFormat } from './shard-platform-format.mjs';
+import { discoveryFormat, outputFormat } from './node-format.mjs';
 import { encodeCanonicalJson } from '@wildshard/engine/host/immutable';
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */

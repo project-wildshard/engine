@@ -7,7 +7,6 @@ import { pathToFileURL } from 'node:url';
 import { runtimePerformanceSites } from '../lint/runtime-performance.mjs';
 import { compareRuntimeFiles, RUNTIME_FILES_LIST } from '../lint/runtime-files.mjs';
 import { zeroPolicyFailures } from './check-custom-sections-zero.mjs';
-import { compareClosedComponents } from './check-closed-components.mjs';
 import { SIDE_EDGES_LIST, compareSideEdges } from '../lint/engine-sides.mjs';
 
 export const PLATFORM_LISTS = ['lint/row-functions.json', 'lint/edge-exemptions.json', 'lint/shard-platform.json', 'lint/ratchet.json', 'lint/sim-closure.json', 'lint/sim-schema-leaves.json', 'lint/shard-coupling.json', WEAPON_TRANSFER_LIST, CLASS_MOVE_LIST, 'lint/runtime-performance.json', RUNTIME_FILES_LIST, SIDE_EDGES_LIST];
@@ -152,8 +151,8 @@ export function comparePlatformList(list, baselineFile, candidateFile, trees, so
   if (list === 'lint/ratchet.json') {
     const read=file=>existsSync(file)?JSON.parse(readFileSync(file,'utf8')):undefined;
     const fromSource=reader=>{const text=reader('lint/ratchet.json');return text===undefined?undefined:JSON.parse(text);};
-    const before=sources===undefined?read(baselineFile):fromSource(sources.before),after=sources===undefined?read(candidateFile):fromSource(sources.after);
-    return zeroPolicyFailures(after?.budgets??{}).concat(compareClosedComponents(before?.closedComponents,after?.closedComponents));
+    const after=sources===undefined?read(candidateFile):fromSource(sources.after);
+    return zeroPolicyFailures(after?.budgets??{});
   }
   if (list === SIDE_EDGES_LIST) {
     // P1-E2: the engine-side edge counts only fall; the first commit seeds them.

@@ -92,7 +92,7 @@ export function productFolder(root, slug) {
 }
 /** The built product that stands for a source shard in per-shard measures: a folder that emits several outputs (all from
  * one source, sharing its structure and scripts) is read through its first output; any other folder is its own product.
- * Section inventories union every output (scripts/shard-platform-output.mjs). @param {string} root @param {string} slug */
+ * Section inventories union every output (scripts/output-reader.mjs). @param {string} root @param {string} slug */
 export function representativeProduct(root, slug) {
   return (/^[a-z0-9_-]+$/u.test(slug) ? shardOutputs(root, slug)?.[0]?.slug : undefined) ?? slug;
 }

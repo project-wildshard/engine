@@ -72,7 +72,7 @@ export async function stagedRatchet(files, executable, repository) {
     if (repository === undefined) throw new Error('Missing HEAD repository for staged ratchet comparison');
     const head = resolve('.commit-head');
     const prepared = spawnSync('python3', [resolve(import.meta.dirname, 'precommit-source.py'), repository, head,
-      String(Date.now() / 1000 + 5), 'HEAD', JSON.stringify({ files: missing, guards: [], closed: false, deleted: false })],
+      String(Date.now() / 1000 + 5), 'HEAD', JSON.stringify({ files: missing, guards: [], deleted: false })],
     { encoding: 'utf8', maxBuffer: 1 << 30 });
     if (prepared.error !== undefined) throw prepared.error;
     if (prepared.status !== 0) throw new Error(`HEAD ratchet source failed: ${prepared.stderr}`);
@@ -103,12 +103,6 @@ if (import.meta.main) {
     else if (mode === 'deleted') {
       const { deletedReferences } = await import('./push-checks.mjs');
       const errors = deletedReferences(process.cwd(), JSON.parse(readFileSync('.commit-deleted.json', 'utf8')));
-      if (errors.length > 0) throw new Error(errors.join('\n'));
-    } else if (mode === 'closed') {
-      if (!existsSync('lint/ratchet.json')) throw new Error('Missing staged closed-component policy');
-      const policy = JSON.parse(readFileSync('lint/ratchet.json', 'utf8'));
-      const { closedComponentSources } = await import('./check-closed-components.mjs');
-      const errors = closedComponentSources(process.cwd(), policy.closedComponents);
       if (errors.length > 0) throw new Error(errors.join('\n'));
     } else throw new Error('Unknown pre-commit guard');
   } catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }

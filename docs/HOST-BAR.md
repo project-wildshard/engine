@@ -72,6 +72,6 @@ came from. A binding row is more specific than its module's row.
 `scripts/host-ruler/register.mjs` reads it and refuses a row whose module is missing, whose binding the module never
 names, whose decision id is not in the pinned decision lists the register carries, or whose recheck date is missing or
 misplaced; and it refuses unless the row count equals the source rows minus the listed `merged` and `dropped` ones.
-HR5 migrated it from engine's `lint/platform-pending-users.json`, `scripts/platform-chargebacks.mjs`,
-`lint/host-reviews.json`, `lint/listed-view-code.json` and singleplayer HOST-BAR's G571 and G599–G677 lines
-(`scripts/host-ruler/register-migrate.mjs`). Stale pending rows carry one recheck date, 2026-12-11 (Kitchen Sink Q4).
+HR5 migrated it from engine's old pending-users list, chargeback table, host reviews and listed-view list, and
+singleplayer HOST-BAR's G571 and G599–G677 lines; `sources` names each at the engine commit it was read from. HR9
+retired those lists, the old census and the one-off migration script with them. Stale pending rows carry one recheck date, 2026-12-11 (Kitchen Sink Q4).

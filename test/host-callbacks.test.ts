@@ -94,7 +94,6 @@ test('catalogue joins section fields and actual callers; pending users grant no 
   try {
     f.write('node_modules/@wildshard/format/src/format/sections.ts', "export interface PlatformSections { 'world/props': { props: number[] }; 'ui/ui': { title: string } }");
     f.write('src/shards/second/runtime/main.ts', "import {host} from '../../../game/host'; host({answer:7});");
-    f.write('lint/platform-pending-users.json', JSON.stringify({ entries: [{ module: 'src/game/host.ts', export: 'Base', shard: 'planned' }] }));
     const reference = { fields: [{ path: '$.props', type: 'array' }], abi: [{ name: 'query' }], contract: { version: 0 } };
     const result = hostCatalogue(f.root, reference), called = result.hosts.find(row => row.export === 'host'), planned = result.hosts.find(row => row.export === 'Base');
     expect(called?.users).toEqual(['sample', 'second']);

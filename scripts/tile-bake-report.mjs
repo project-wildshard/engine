@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {existsSync,readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import * as v from 'valibot';
-import {outputFormat} from './shard-platform-format.mjs';
+import {outputFormat} from './node-format.mjs';
 
 const {TilesSchema,SpawnSchema}=await import('@wildshard/format/shardSections');
 const {EntrywaysSchema}=await import('@wildshard/format/entryways');

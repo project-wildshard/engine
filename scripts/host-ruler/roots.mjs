@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // HOST-RULER HR1 (meta docs/plans/HOST-RULER-PLAN.md): the page and section roots one built product reaches.
-// Not a revival of shard-platform.mjs: its roots walked src/shards/ and pre-J122 paths. A product reaches engine code
+// Not a revival of the old census (retired by HR9): its roots walked src/shards/ and pre-J122 paths. A product reaches engine code
 // only through what it declares: its `client/plan` kinds and its section names. A kind roots the import() targets of
 // its one CLIENT_FEATURES entry (never the whole table); a section roots its row in SECTION_HOSTS. clientPlan.ts's own
 // static imports are one shared root, `@client-plan`, reached by every product with a `client/plan`.
@@ -15,7 +15,7 @@ export const CLIENT_PLAN_ROOT = '@client-plan';
 
 /** Section name -> the host bindings that execute it, side-first (J122). `@wildshard/format/x` resolves through the
  * pinned format package's exports map. An empty row is metadata read by another section's host: it roots nothing.
- * Moved from shard-platform-hosts.mjs (old `<layer>/<side>/x` selectors -> `src/<side>/<layer>/x.ts`). Fixed there:
+ * Moved from the old census's section table (old `<layer>/<side>/x` selectors -> `src/<side>/<layer>/x.ts`). Fixed there:
  * `game/server/shardfile/items` -> src/shared/game/shardfile/items.ts; `game/shardfile/directorClient` is gone, its
  * rows run in bindShardfileSim's DirectorStageLane. `client/plan` no longer roots `clientPlan#installClientPhase` (the
  * whole dispatch table, HA0 a) or `declaredEntry#declaredRuntimeEntry` (gone): it roots `@client-plan` and its kinds. */

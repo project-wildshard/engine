@@ -12,7 +12,7 @@ export const GATHERED_SHARDS = Object.freeze(['_template', 'blender-template', '
  *     it, so point the tool at assets/public first. targets.json outputs count: check-model-sources needs them on disk.
  *  2. Move every tracked file there, add the slug here and `/public/assets/<slug>/` to .gitignore, one shard per commit.
  *  3. Prove it from an archive with no aliases: gen, every product by SHA-256 against the parent, and the full
- *     check-closed-components with docs and art present. Scripts and tests read the alias, so their paths don't change.
+ *     the guards with docs and art present. Scripts and tests read the alias, so their paths don't change.
  * gen only copies: a file deleted here leaves its alias until the folder is cleared. */
 export const PUBLIC_TREES = Object.freeze(['sunscar-dunes', 'driftwood-isle']);
 

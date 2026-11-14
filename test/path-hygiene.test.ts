@@ -19,12 +19,12 @@ test('ownership declaration suffixes preserve the module existence check', () =>
   const run = (): ReturnType<typeof spawnSync> => spawnSync(execPath, [resolve('scripts/check-paths.mjs')], { cwd: root, encoding: 'utf8' });
   try {
     put('src/live.ts', 'export const live = 1;');
-    put('scripts/shard-components.mjs', "const owner = 'src/live.ts#live';");
+    put('scripts/owners.mjs', "const owner = 'src/live.ts#live';");
     put('scripts/documented.py', '"""A retired path: src/deleted.ts"""\npattern = r"test/scripts/[^/]+\\.test\\.ts"\n');
     expect(run().status).toBe(0);
-    put('scripts/shard-components.mjs', "const owner = 'src/deleted.ts#live';");
+    put('scripts/owners.mjs', "const owner = 'src/deleted.ts#live';");
     expect(run().status).toBe(1);
-    put('scripts/shard-components.mjs', "const owner = 'src/live.ts#live';");
+    put('scripts/owners.mjs', "const owner = 'src/live.ts#live';");
     put('scripts/consumer.py', "source = r'test/missing.ts'\n");
     expect(run().status).toBe(1);
     put('scripts/consumer.py', '');
@@ -43,9 +43,9 @@ test('a logical src/format label is checked where the installed package holds it
   const run = (): ReturnType<typeof spawnSync> => spawnSync(execPath, [resolve('scripts/check-paths.mjs')], { cwd: root, encoding: 'utf8' });
   try {
     put('node_modules/@wildshard/format/src/format/live.ts', 'export const live = 1;');
-    put('scripts/shard-components.mjs', "const owner = 'src/format/live.ts#live';");
+    put('scripts/owners.mjs', "const owner = 'src/format/live.ts#live';");
     expect(run().status).toBe(0);
-    put('scripts/shard-components.mjs', "const owner = 'src/format/gone.ts#live';");
+    put('scripts/owners.mjs', "const owner = 'src/format/gone.ts#live';");
     expect(run().status).toBe(1);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

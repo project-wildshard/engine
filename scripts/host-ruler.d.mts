@@ -64,7 +64,7 @@ export function productRootModules(dir: string, tables?: { readonly plan?: Clien
 export function measure(users: readonly { readonly slug: string; readonly roots: Iterable<string>; readonly held?: ReadonlySet<string> }[], reader: TreeReader, options?: MeasureOptions): Map<string, ModuleUse>;
 export function oneUserLines(modules: ReadonlyMap<string, ModuleUse>, slugs: readonly string[]): Map<string, OneUserTotal>;
 export function rule(dirs: readonly string[], options?: { readonly root?: string; readonly today?: string; readonly register?: readonly RegisterRule[] }): RulerReport;
-export function formatTable(report: RulerReport): string;
+export function formatTable(report: Pick<RulerReport, 'format' | 'options' | 'products' | 'ruled' | 'today' | 'totals'>): string;
 export declare const STATUSES: readonly ['platform', 'pending', 'no-row', 'charged-back', 'silly'];
 export type Status = (typeof STATUSES)[number];
 export interface RegisterRule { readonly key: string; readonly verdict: string; readonly decision?: string; readonly users: readonly string[]; readonly recheck?: string }

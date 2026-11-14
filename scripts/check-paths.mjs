@@ -48,8 +48,8 @@ function strings(text) {
 /** @param {string} file @param {string} text @param {string} path @param {number} index @param {string} [folder] */
 function check(file, text, path, index, folder = ROOT) {
   if (allowed.has(`${file}\0${path}`)) return;
-  // Component ownership keys append a declaration name to an existing module.
-  const target = file === 'scripts/shard-components.mjs' ? path.split('#')[0] : path;
+  // Ownership keys may append a declaration name (`path#name`) to an existing module.
+  const target = path.split('#')[0] ?? path;
   // Censuses and G571 approvals keep format's logical src/format/x.ts labels (format-package.mjs): check where they live.
   const at = onDisk(folder, target.replace(/^\.\//u, ''));
   const found = GLOB.test(path) ? globSync(at).some((p) => statSync(p).isFile()) : existsSync(at);

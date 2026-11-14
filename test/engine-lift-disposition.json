@@ -8131,23 +8131,6 @@
   },
   {
     "repo": "engine",
-    "file": "test/listed-view-code.test.ts",
-    "outcome": "deleted-j186",
-    "decision": "J186: six cases fabricate approval/register/source snippets and pin private listedViewInventory fields, line partitioning and register labels, plus a repository ledger/docs spelling. They are internal accounting/registration units, not a product or rendering test. Production ownership/accounting gates and ledgers are unchanged.",
-    "originalTests": [
-      "named view declarations partition real source custom without changing credit or closure",
-      "whole-file and sole-export labels count only actual charged contributions",
-      "physical comment handling and shared declaration lines never double-count",
-      "retired or uncharged view declarations stay visible without inventing lines",
-      "register refuses overlapping labels, foreign-shard paths and traversal",
-      "the reviewed repository register has reasons and no whole-file overlap"
-    ],
-    "sourceRevision": "886c620755a3383a793e6938b27c3fb32f39dc0c",
-    "sourceBlob": "3df45cdf81ddfd22c192c22929d70e9a41a460e1",
-    "retirementProof": "Individual body-reviewed J186 disposition; no execution qualification, coverage equivalence or speed claim."
-  },
-  {
-    "repo": "engine",
     "file": "test/physics-headless.test.ts",
     "outcome": "restored",
     "target": "test/physics-headless.test.ts",
@@ -8797,23 +8780,6 @@
   },
   {
     "repo": "engine",
-    "file": "test/platform-source-inputs.test.ts",
-    "outcome": "restored",
-    "target": "test/platform-source-inputs.test.ts",
-    "ring": 1,
-    "decision": "J232 E-GREEN: restore the complete original engine intent: The source-progress inventory refuses an absent discovery root instead of charging its shared user, and requires every composed product discovery, not only the representative.",
-    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
-    "sourceBlob": "7b16dba31a1fe0d7b94acc6e48b15a6ebf779dfd",
-    "originalTests": [
-      "refuses an absent discovery root instead of charging its shared user",
-      "requires every composed product discovery, not only the representative",
-      "refuses a missing registered dependency boot/rows.generated",
-      "refuses a missing registered dependency boot/rows.generated.json"
-    ],
-    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
-  },
-  {
-    "repo": "engine",
     "file": "test/ranged-cycle.test.ts",
     "outcome": "restored",
     "target": "test/ranged-cycle.test.ts",
@@ -8847,20 +8813,6 @@
       "legacy debt stays only unchanged; strict mode and a re-add after deletion are refused",
       "symlinks may not leave the tree or point into generated storage",
       "a blobless clone (CI) checks the pushed range with one batched blob fetch"
-    ],
-    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
-  },
-  {
-    "repo": "engine",
-    "file": "test/ruler-legacy-basis.test.ts",
-    "outcome": "restored",
-    "target": "test/ruler-legacy-basis.test.ts",
-    "ring": 1,
-    "decision": "J232 E-GREEN: restore the complete original engine intent: The decision ruler keeps all six legacy line baselines and zero verdicts with no legacy registry.",
-    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
-    "sourceBlob": "d32e5c2a7e1b7181b9554f15fe39c1314aabf387",
-    "originalTests": [
-      "keeps all six ruler baselines and zero verdicts with no legacy registry"
     ],
     "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
   },
@@ -8902,22 +8854,6 @@
     ],
     "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
     "fixtureChange": "Preserve all seven original case identities and original assertions; bound both actual Oxlint child paths to one thread and add a real invalid-worker-limit CLI refusal. Old implementation accepted the invalid limit (6/7 pass); fixed7/7 pass with unchanged budgets."
-  },
-  {
-    "repo": "engine",
-    "file": "test/shard-component-waves.test.ts",
-    "outcome": "restored",
-    "target": "test/shard-component-waves.test.ts",
-    "ring": 1,
-    "decision": "J232 E-GREEN: restore the complete original engine intent: G471 component waves keep their roster and unknown ownership refuses C9 closure, reviewed pending users apply to current members while next-wave charges stay counted, and W3 folder owners conserve the ruler total and keep unknown paths visible.",
-    "sourceRevision": "6e8568528c3031169a8e86a1313cd6212b980d98",
-    "sourceBlob": "519961502265b1ee8d67014ce46437da8ed36dc8",
-    "originalTests": [
-      "G471 waves retain their roster and unknown ownership refuses C9 closure",
-      "reviewed pending users apply to current members while next-wave charges remain counted",
-      "W3 folder owners conserve the ruler total and keep unknown paths visible"
-    ],
-    "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed."
   },
   {
     "repo": "engine",

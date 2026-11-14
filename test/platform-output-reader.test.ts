@@ -5,7 +5,7 @@ import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Small disposable fixture, never a repository copy.
 import {tmpdir} from 'node:os';
-import {createOutputReader,outputSections} from '../scripts/shard-platform-output.mjs';
+import {createOutputReader,outputSections} from '../scripts/output-reader.mjs';
 import {platformOutput} from './fixtures/platformOutputs';
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';

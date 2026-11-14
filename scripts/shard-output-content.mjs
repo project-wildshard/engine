@@ -1,12 +1,12 @@
 // P4 structural columns use only the emitted index and verified sections.
 import {relative,resolve} from 'node:path';
-import {createOutputReader} from './shard-platform-output.mjs';
+import {createOutputReader} from './output-reader.mjs';
 import {representativeProduct} from './shard-outputs.mjs';
 
 /** Private binaries are opaque bin blobs without a platform decoder declaration.
  * This is structural evidence, never a visual/behaviour compatibility verdict.
  * @param {string} root @param {string} slug @param {string} products
- * @param {import('./shard-platform-output.mjs').OutputReader} reader */
+ * @param {import('./output-reader.mjs').OutputReader} reader */
 export function outputContent(root,slug,products,reader=createOutputReader(root,products)) {
   const output=reader.sections(slug);
   const indexPath=relative(root,resolve(products,representativeProduct(root,slug),'shard.json')).replaceAll('\\','/');

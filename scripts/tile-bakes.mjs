@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as v from 'valibot';
-import { outputFormat } from './shard-platform-format.mjs';
+import { outputFormat } from './node-format.mjs';
 import { parseTileBakePolicy, TILE_BAKE_POLICY } from './tile-bake-policy.mjs';
 
 const { CONTENT_CAPS: caps } = await import('@wildshard/format/contentBounds');

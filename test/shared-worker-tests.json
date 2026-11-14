@@ -569,7 +569,6 @@
  "test/shader-text.test.ts",
  "test/shader-work-ranking.test.ts",
  "test/shadow-chunks.test.ts",
- "test/shard-component-spans.test.ts",
  "test/shard-net.test.ts",
  "test/shard-public.test.ts",
  "test/shard-size-gate.test.ts",

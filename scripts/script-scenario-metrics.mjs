@@ -4,7 +4,7 @@ import {existsSync,readdirSync,readFileSync,statSync} from 'node:fs';
 import {relative,resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import * as v from 'valibot';
-import {outputFormat} from './shard-platform-format.mjs';
+import {outputFormat} from './node-format.mjs';
 import {formatSource} from './format-package.mjs';
 
 const hash=v.pipe(v.string(),v.regex(/^[a-f0-9]{64}$/u)),natural=v.pipe(v.number(),v.safeInteger(),v.minValue(0));

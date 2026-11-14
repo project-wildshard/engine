@@ -6,10 +6,10 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as v from 'valibot';
 import { readBuiltShardfile } from './built-product.mjs';
-import { outputFormat } from './shard-platform-format.mjs';
+import { outputFormat } from './node-format.mjs';
 import { tileBakeCensus } from './tile-bakes.mjs';
 
-// Use the existing format-only Node resolver installed by shard-platform-format, as tile-bakes does.
+// Use the existing format-only Node resolver installed by node-format.mjs, as tile-bakes does.
 const { TilesSchema } = await import('@wildshard/format/shardSections');
 const product = 'open-plot-night-market';
 /** @param {Uint8Array} bytes */

@@ -168,7 +168,7 @@ export function assertBuiltTestProducts(root, files, options = {}) {
  * @param {string} root @param {string} name @param {string} folder @param {string} expectedSourceHash */
 export async function publishProductMap(root, name, folder, expectedSourceHash) {
   if (!/^[a-z0-9_-]+$/u.test(name)) throw new Error('Invalid program-map product name');
-  const { outputFormat } = await import('./shard-platform-format.mjs');
+  const { outputFormat } = await import('./node-format.mjs');
   const envelope = readFileSync(resolve(folder, 'shard.json'));
   const receipt = JSON.parse(readFileSync(resolve(folder, 'validation.json'), 'utf8'));
   if (receipt.indexHash !== createHash('sha256').update(envelope).digest('hex')) throw new Error(`${name}: generated map index receipt differs`);

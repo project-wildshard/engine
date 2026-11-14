@@ -37,7 +37,7 @@ export function pushGuards(changed) {
   return [
     ...(changed.some(file => /^src\/(?:format|sdk|sharddev)\//u.test(file)) ? ['test/schema-reference.test.ts'] : []),
     'test/host-callbacks.test.ts', 'test/shardfile-boundaries.test.ts',
-    'test/platform-chargebacks.test.ts', 'test/manifest-declarations.test.ts',
+    'test/manifest-declarations.test.ts',
   ];
 }
 

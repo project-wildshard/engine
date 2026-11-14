@@ -8,14 +8,13 @@ import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TIME_ALLOW } from './wildshard-plugin.js';
 import { compareCounts, hardRules, requiredGuardRules } from '../scripts/guard-counts.mjs';
-import { closedComponents } from '../scripts/check-closed-components.mjs';
 import { parseSync } from 'vite';
 import { pruneSchemaTypeAllowances } from './schema-types.mjs';
 import { SCHEMA_TYPE_RULE } from '../scripts/ratchet-approval.mjs';
 import { fullRatchetFiles } from './ratchet-files.mjs';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url));
-const NON_FILE = new Set(['allow', 'budgets', 'debugRows', 'closedComponents']);
+const NON_FILE = new Set(['allow', 'budgets', 'debugRows']);
 const configFile = resolve(REPO, '.oxlintrc.ratchet.json');
 const ruleNames = new Set(Object.keys(JSON.parse(readFileSync(configFile, 'utf8')).rules));
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -37,8 +36,6 @@ function validate(baseline, root) {
         if (identity.startsWith('src/')) requireFile(rule, identity.split('#')[0]);
     } else if (key === 'budgets') {
       if (!object(value) || Object.values(value).some((n) => !number(n))) throw new Error('Invalid budgets section');
-    } else if (key === 'closedComponents') {
-      closedComponents(value);
     } else if (key === 'debugRows') {
       if (!object(value) || !number(value.max) || !Number.isInteger(value.max) || !Array.isArray(value.raisedBy)) throw new Error('Invalid debugRows section');
     } else if (!ruleNames.has(key) || !object(value) || Object.values(value).some((n) => !number(n) || !Number.isInteger(n))) throw new Error(`Invalid or unconfigured rule section: ${key}`);

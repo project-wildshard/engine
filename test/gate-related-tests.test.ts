@@ -14,7 +14,7 @@ const related = [...durations.keys()];
 
 it('requires guards and limits forced reruns to root configuration', () => {
   const fixed = ['test/host-callbacks.test.ts', 'test/shardfile-boundaries.test.ts',
-    'test/platform-chargebacks.test.ts', 'test/manifest-declarations.test.ts'];
+    'test/manifest-declarations.test.ts'];
   expect(pushGuards([])).toEqual(fixed);
   expect(pushGuards(['src/game/world.ts'])).toEqual(fixed);
   for (const root of ['format', 'sdk']) expect(pushGuards([`src/${root}/package.json`]))

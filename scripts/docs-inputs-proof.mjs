@@ -20,8 +20,8 @@ try{
  const invalid=spawnSync(process.execPath,['kit/scripts/asks.mjs','check','--all'],{cwd:root,encoding:'utf8'});
  assert.notEqual(invalid.status,0,'An empty Git index must not hide a committed dead ask target');
  assert.match(invalid.stderr,/existing ask|plan/u);
- writeFileSync(join(root,'docs/HOST-BAR.md'),'lint/listed-view-code.json');
- writeFileSync(join(root,'src/read-doc.mjs'),"import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';assert.ok(readFileSync('docs/HOST-BAR.md','utf8').includes('lint/listed-view-code.json'));");
+ writeFileSync(join(root,'docs/HOST-BAR.md'),'lint/host-register.json');
+ writeFileSync(join(root,'src/read-doc.mjs'),"import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';assert.ok(readFileSync('docs/HOST-BAR.md','utf8').includes('lint/host-register.json'));");
  git(['add','src/read-doc.mjs','docs/HOST-BAR.md']);git(['commit','--quiet','-m','document consumer']);
  execFileSync(process.execPath,['src/read-doc.mjs'],{cwd:root});const before=git(['rev-parse','HEAD']);
  writeFileSync(join(root,'docs/HOST-BAR.md'),'missing authority');git(['add','docs/HOST-BAR.md']);git(['commit','--quiet','-m','break documented contract']);

@@ -53,7 +53,7 @@ class GateSteps:
                 row['reason'] = reason
 
 
-CHECK_STEPS = ('closed-components', 'ratchet', 'deleted-paths', 'fast-lint', 'guards', 'recent-selection', 'recent-tests',
+CHECK_STEPS = ('ratchet', 'deleted-paths', 'fast-lint', 'guards', 'recent-selection', 'recent-tests',
                'related-selection', 'related-tests', 'importer-selection', 'typed-lint')
 
 
@@ -165,7 +165,6 @@ def check(root, base, tip, deadline, runner=run, files=None, tools=None, types_a
         # explicit gate/CI handoff instead of losing the empty typed-file case.
         if policy_checks:
             for phase, command in [
-                ('closed-components', ['node', str(tools / 'check-closed-components.mjs'), '--source-only']),
                 ('ratchet', ['node', str(root / 'lint/ratchet.mjs'), '--defer-reductions']),
             ]:
                 rc, output = steps.run(phase, runner, command, root, deadline, env)
@@ -176,7 +175,7 @@ def check(root, base, tip, deadline, runner=run, files=None, tools=None, types_a
                     return result
                 result['output'] += '\nDeferred policy passed: ' + phase
         else:
-            steps.skip(('closed-components', 'ratchet'), 'not-requested')
+            steps.skip(('ratchet',), 'not-requested')
         # Mandatory cheap guards precede optional related tests, including when
         # current generated declarations are unavailable. No app setup runs.
         removed = Path(temporary) / 'deleted.json'
@@ -199,8 +198,7 @@ def check(root, base, tip, deadline, runner=run, files=None, tools=None, types_a
             result.update(phase='fast-lint', output=output, files=failure_paths(output))
             return result
         result['output'] += '\nWhole-repo fast lint passed'
-        guards = ['test/host-callbacks.test.ts', 'test/shardfile-boundaries.test.ts',
-                  'test/platform-chargebacks.test.ts', 'test/manifest-declarations.test.ts']
+        guards = ['test/host-callbacks.test.ts', 'test/shardfile-boundaries.test.ts', 'test/manifest-declarations.test.ts']
         if any(name.startswith(('src/sdk/', 'src/sharddev/')) or name == 'pnpm-lock.yaml' for name in files):
             guards.insert(0, 'test/schema-reference.test.ts')
         rc, output = steps.run('guards', runner, ['pnpm', 'exec', 'vitest', 'run', '--config',

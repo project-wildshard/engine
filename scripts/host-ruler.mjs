@@ -37,7 +37,7 @@ export const TABLES = Object.freeze({
 export const SHELL = '@shell';
 export const SHELL_ROOTS = Object.freeze(['src/client/app/entry.ts']);
 /** The modules the shell is a user of: orchestration it runs for every shard (grid, session, shard loading, travel).
- * Named one by one, replacing SHELL_CONTROL_PREFIXES' seven folders (shard-platform.mjs:634): a new module in those
+ * Named one by one, replacing the old census's SHELL_CONTROL_PREFIXES, seven folders (retired by HR9): a new module in those
  * folders is charged to its shard until someone adds it here. Seeded 2026-11-13 from the folder rule's reach: the
  * modules in those folders (and plugin/ui.ts, whose bridge declarations the old rule named) that the shell reaches and a
  * built product reaches. Never add species, models, looks or gameplay. The test checks the shell reaches each one. */
@@ -522,7 +522,7 @@ export function formatInventory(rows) {
     ...rows.map(row => `| \`${row.module}\` | ${row.layer} | ${row.lines} | ${users(row.users)} | ${row.register} | ${row.entry} |`)].join('\n');
 }
 
-/** @param {ReturnType<typeof rule>} report */
+/** @param {Pick<ReturnType<typeof rule>, 'format' | 'options' | 'products' | 'ruled' | 'today' | 'totals'>} report */
 export function formatTable(report) {
   const columns = /** @type {const} */ ([['modules', 'one-user modules'], ['lines', 'one-user lines'], ['format', 'of which format'], ['platform', 'credited'],
     ['pending', 'pending'], ['no-row', 'no row'], ['charged-back', 'charged back'], ['silly', 'silly'], ['option', 'option'], ['charged', 'charged']]);

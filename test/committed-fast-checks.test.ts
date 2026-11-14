@@ -43,7 +43,6 @@ export default {
 test('source table guards pin producers, schema data and output to the checked commit', () => {
   const f = fixture();
   try {
-    f.put('scripts/check-closed-components.mjs', 'export function closedComponentSources(){return [];}');
     f.put('scripts/check-platform-ratchets.mjs', 'export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
     f.put('scripts/ratchet-approval.mjs', 'export function ratchetApprovalFailures(){return [];}');
     for (const file of ['gen-source.mjs', 'source-generators.mjs'])
@@ -93,7 +92,6 @@ export function sourceProbeTables(root,slug){return {tables:{
 
 test('a format bump the lock left behind is refused, naming the lock, and an untouching push is not',()=>{
   const f=fixture();try{
-    f.put('scripts/check-closed-components.mjs','export function closedComponentSources(){return [];}');
     f.put('scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
     f.put('scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
     f.put('scripts/format-lock.mjs',readFileSync(resolve('scripts/format-lock.mjs'),'utf8'));
@@ -302,7 +300,7 @@ test('literal discovery providers require native context and exact tracked corre
     f.put('src/client/app/main.ts',"import {value} from './derived.generated';export const result=value;");
     const registry=(outputs:string[]):void=>f.put('scripts/source-generation-outputs.json',JSON.stringify({producers:{'scripts/gen-shards.mjs':outputs}}));
     registry([file,retained]);f.put(retained,'{"id":1}');
-    f.put('scripts/shard-platform-format.mjs','// Fixture has no format imports.');
+    f.put('scripts/node-format.mjs','// Fixture has no format imports.');
     const provider=`import{mkdirSync,writeFileSync}from'node:fs';export function genShards(){mkdirSync('src',{recursive:true});writeFileSync('${file}','export const value=1;');writeFileSync('${retained}','{"id":1}');}`;
     f.put('scripts/gen-shards.mjs',provider);const tip=f.commit();
     expect(f.run('fast-lint',tip).stdout).toContain('unverified inputs src/derived.generated');
@@ -358,7 +356,6 @@ test('ratchet retains old unrecorded counts but refuses new counts and cannot bo
 
 test('guards lock zero through immutable committed inputs',()=>{
   const f=fixture();try{
-    f.put('scripts/check-closed-components.mjs','export function closedComponentSources(){return [];}');
     f.put('scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
     f.put('scripts/check-platform-ratchets.mjs',`export {comparePlatformList} from '${pathToFileURL(resolve('scripts/check-platform-ratchets.mjs')).href}';
 export const PLATFORM_LISTS=['lint/ratchet.json'];`);
@@ -373,7 +370,6 @@ export const PLATFORM_LISTS=['lint/ratchet.json'];`);
 
 test('guards refuse paths written as data and a file outside a shard\'s layout',()=>{
   const f=fixture();try{
-    f.put('scripts/check-closed-components.mjs','export function closedComponentSources(){return [];}');
     f.put('scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
     f.put('scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
     for(const file of ['check-spelled-paths.mjs','check-shards.mjs','shard-outputs.mjs'])f.put(`scripts/${file}`,readFileSync(resolve('scripts',file),'utf8'));
@@ -410,7 +406,6 @@ test('the census phase runs the ratchets over the tip, and only for source',()=>
 test('side edges compare net across a push, so only the published step cannot rise',()=>{
   const f=fixture();try{
     const edges=(count:number)=>JSON.stringify({files:{'src/client/game/a.ts':{'client → server':count}}});
-    f.put('scripts/check-closed-components.mjs','export function closedComponentSources(){return [];}');
     f.put('scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
     f.put('scripts/check-platform-ratchets.mjs',`export {comparePlatformList} from '${pathToFileURL(resolve('scripts/check-platform-ratchets.mjs')).href}';
 export const PLATFORM_LISTS=['lint/engine-side-edges.json'];`);
@@ -426,7 +421,6 @@ export const PLATFORM_LISTS=['lint/engine-side-edges.json'];`);
 
 test('a later exact approval repairs a net candidate but cannot approve a larger final row',()=>{
   const f=fixture();try {
-    f.put('scripts/check-closed-components.mjs','export function closedComponentSources(){return [];}');
     f.put('scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
     f.put('scripts/ratchet-approval.mjs',readFileSync(resolve('scripts/ratchet-approval.mjs'),'utf8'));
     const rule='wildshard/generator-imports',file='src/client/app/main.ts';
@@ -443,7 +437,6 @@ test('a later exact approval repairs a net candidate but cannot approve a larger
 
 test('committed guards seed a new rule atomically and ignore dirty future config for its predecessor',()=>{
   const f=fixture();try {
-    f.put('scripts/check-closed-components.mjs','export function closedComponentSources(){return [];}');
     f.put('scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
     f.put('scripts/ratchet-approval.mjs',readFileSync(resolve('scripts/ratchet-approval.mjs'),'utf8'));
     const base=f.commit(),rule='wildshard/no-generated-json-import',file='scripts/old.ts';

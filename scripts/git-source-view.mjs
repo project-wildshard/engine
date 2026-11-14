@@ -203,7 +203,7 @@ export function deriveGitDiscovery(view,path) {
     genShards(process.cwd());
     console.log(JSON.stringify(Object.fromEntries(outputs.map(file=>[file,createHash('sha256').update(readFileSync(file)).digest('hex')]))));
   `;
-  const output=execFileSync(process.execPath,['--experimental-transform-types','--import','./scripts/shard-platform-format.mjs','--input-type=module','--eval',source,'--',JSON.stringify(job.nativeOutputs)],{cwd:view.root,encoding:'utf8',maxBuffer:8*1024*1024,
+  const output=execFileSync(process.execPath,['--experimental-transform-types','--import','./scripts/node-format.mjs','--input-type=module','--eval',source,'--',JSON.stringify(job.nativeOutputs)],{cwd:view.root,encoding:'utf8',maxBuffer:8*1024*1024,
     env:{...process.env,WS_GIT_CHECK_ROOT:view.root,WS_GIT_CHECK_REV:view.revision}});
   const line=output.trim().split('\n').at(-1);
   if(line===undefined)throw new Error('Missing generated-output proof');

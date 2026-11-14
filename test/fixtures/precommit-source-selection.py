@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory(dir=base/'tmp',prefix='staged-inputs-test-') as
  git('add','.');git('commit','-qm','fixture');put('src/unit.ts','import {dependency} from "./dependency"; import asset from "./asset.bin"; export const value = dependency + 1;\n');git('add','src/unit.ts')
  # Loose bytes cannot enter the snapshot or its import helpers.
  put('src/unit.ts','export const value = "foreign";\n');put('scripts/helper.mjs','throw Error("foreign");\n')
- spec={'files':['src/unit.ts'],'changed':['src/unit.ts'],'closed':False,'deleted':False,'guards':[]}
+ spec={'files':['src/unit.ts'],'changed':['src/unit.ts'],'deleted':False,'guards':[]}
  tree=root/'selected';staged_source(root,tree,time.time()+5,specification=spec)
  assert 'dependency + 1' in (tree/'src/unit.ts').read_text()
  assert (tree/'src/dependency.ts').read_text()=='export const dependency = 1;\n'
@@ -53,15 +53,6 @@ if(result.status!==0)throw Error(result.stderr);process.stdout.write(result.stdo
  # Deletions require all active reader inputs, including unchanged readers.
  git('rm','--cached','src/gone.ts');tree=root/'deleted';staged_source(root,tree,time.time()+5,specification={**spec,'deleted':True})
  assert (tree/'src/reader.ts').read_text()=='import "./gone";\n';assert not (tree/'src/gone.ts').exists()
- # Structural zero retains every non-legacy source folder, even without a policy row.
- put('lint/ratchet.json',json.dumps({'closedComponents':{'example':['C9']}}))
- put('src/shards/example/runtime/run.ts','export const row = 1;\n');put('src/shards/other/runtime/run.ts','export const row = 2;\n')
- put('src/shards/other-legacy/runtime/run.ts','export const row = 3;\n')
- put('src/shards/example/generators/bake-one.mjs','export const producer = 1;\n')
- git('add','lint/ratchet.json','src/shards');tree=root/'closed';staged_source(root,tree,time.time()+5,specification={**spec,'closed':True})
- assert (tree/'src/shards/example/runtime/run.ts').is_file();assert (tree/'src/shards/other/runtime/run.ts').is_file()
- assert not (tree/'src/shards/other-legacy/runtime/run.ts').exists()
- assert (tree/'src/shards/example/generators/bake-one.mjs').is_file()
  # Missing authored imports refuse from index metadata even when loose bytes exist.
  put('src/loose.ts','export const hidden = 1;\n')
  checks=0

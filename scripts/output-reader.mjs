@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
-import { outputFormat, platformFileFamiliesFormat } from './shard-platform-format.mjs';
+import { outputFormat, platformFileFamiliesFormat } from './node-format.mjs';
 import { shardOutputs } from './shard-outputs.mjs';
 
 const {parseOutputIndex}=outputFormat;

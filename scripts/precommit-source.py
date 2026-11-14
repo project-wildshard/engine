@@ -160,14 +160,6 @@ def required_sources(blobs, specification, tree=None, executable=None, staged_pa
     if specification.get('deleted'):
         # Every active tracked reader is an input to the deleted-path grep.
         selected.update(name for name in blobs if name.split('/')[0] in ROOTS)
-    if specification.get('closed'):
-        for name in blobs:
-            path = PurePosixPath(name)
-            if len(path.parts) > 3 and path.parts[:2] == ('src', 'shards') and not path.parts[2].endswith('-legacy'):
-                if path.suffix in {'.ts', '.tsx', '.glsl'} and '/generators/' not in name and not re.search(r'\.d\.ts$|\.(?:test|spec)\.tsx?$|/test/', name):
-                    selected.add(name)
-        selected.update(name for name in blobs if re.search(r'/(?:generators/)?bake-[^/]+\.(?:mjs|ts)$', name))
-        selected.add('scripts/source-generation-outputs.json')
     if 'test/schema-reference.test.ts' in specification.get('guards', []):
         for layer in ['sdk', 'sharddev']:
             manifest = json.loads(blobs.get(f'src/{layer}/package.json', b'{}'))
@@ -212,7 +204,7 @@ def required_sources(blobs, specification, tree=None, executable=None, staged_pa
             data = blobs[name] if name in blobs else (tree / name).read_bytes()
             if PurePosixPath(name).suffix not in {'.ts', '.tsx', '.mts', '.js', '.mjs', '.cjs', '.json'}:
                 continue
-            if name.endswith('.json') and name != 'lint/platform-pending-users.json':
+            if name.endswith('.json'):
                 continue
             text = data.decode('utf8')
             imported = set() if name.endswith('.json') else imports(name, text)

@@ -159,11 +159,9 @@ export async function committedFastChecks(root,base,tip,phase,paths) {
       const {deletedReferences}=/** @type {typeof import('./push-checks.mjs')} */(await module('scripts/push-checks.mjs'));
       failures.push(...deletedReferences(root,paths));
     } else if(phase==='guards') {
-      const {closedComponentSources}=/** @type {typeof import('./check-closed-components.mjs')} */(await module('scripts/check-closed-components.mjs'));
       const {comparePlatformList,PLATFORM_LISTS}=/** @type {typeof import('./check-platform-ratchets.mjs')} */(await module('scripts/check-platform-ratchets.mjs'));
       const {ratchetApprovalFailures}=/** @type {typeof import('./ratchet-approval.mjs')} */(await module('scripts/ratchet-approval.mjs'));
       const policy=json(view,'lint/ratchet.json');
-      failures.push(...closedComponentSources(root,policy.closedComponents));
       if(view.files.has('scripts/check-spelled-paths.mjs')) {
         const {spelledPathFailures}=/** @type {typeof import('./check-spelled-paths.mjs')} */(await module('scripts/check-spelled-paths.mjs'));
         view.prime([...view.files.keys()].filter(path=>/^src\/(?:engine|game)\/isolated-[^/]+\.test\.ts$|^scripts\/.*\.[cm]?[jt]s$|^src\/shards\/[^/]+\/(?:data|look)\/map\.json$/u.test(path)));
