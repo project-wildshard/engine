@@ -21,6 +21,6 @@ export function textureForm(path: string): { name: string; form: 'img' | 'ktx2' 
 export function judge(run: {
   shard: string; channel: 'staging' | 'preview'; mode: string; entry: string; rows: readonly RequestRow[];
   samples: readonly ScreenSample[]; outcome: Outcome; warm?: ReadonlySet<string>; layout?: boolean; walkthrough?: boolean;
-  requireWorld?: boolean; proofError?: string; leaks?: number; placed?: boolean;
+  requireWorld?: boolean; proofError?: string; leaks?: number; placed?: boolean; linked?: boolean;
 }): Failure[];
 export function servedCounts(rows: readonly RequestRow[]): Record<string, number>;
