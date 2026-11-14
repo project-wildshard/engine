@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import type { PaintedNumbers } from '@wildshard/format/paintedLook';
 import { BlendFunction, Effect, LookupTexture, ToneMappingMode } from 'postprocessing';
 import { DEFAULT_NORMALIZED_DAY, normalizedDayClock, DayCycle } from '../../../shared/engine/world/dayCycle';
-import type { LookStrategy, SkyBackdropTargets, TerrainPainter } from './look';
+import type { EngineEffects, LookStrategy, SkyBackdropTargets, TerrainPainter } from './look';
 import { LUT_SIZE, fetchLut } from './lut';
 import { PATCH_ORDER, patchShader, setInheritedPatch, type ShaderSource } from './shaderPatches';
 import { Scope } from '../../../shared/engine/app/scope';
@@ -118,6 +118,16 @@ export function sampleLook(keys: readonly LookKey[], time: number, out: LookSamp
   return out;
 }
 
+
+/**
+ * SHARD-SOURCE AP17: what a data look takes in place (`LookStrategy.liveLook`, driven by `wildshard watch` through engine's
+ * dev hook v2): its spec as a fresh build would read it, plus the engine bloom's intensity and threshold (the level grade's
+ * at boot). The keys, the sun's arc, exposure, tone, vignette and bloom go live; the light rows and the LUT must not change.
+ */
+export interface LiveLook extends Omit<DataLookSpec, 'lut'> {
+  readonly lut: string | null;
+  readonly bloom: { readonly intensity: number; readonly threshold: number; readonly radius: number | null };
+}
 /** The engine clock for a data look (an hour clock with one day-long segment, the sun on the day's arc). */
 export function dataLookClock(day: LookDay, dayOverride: number | null): DayCycle {
   return normalizedDayClock(day, dayOverride);
@@ -241,7 +251,13 @@ ${mist ? `
   };
   const owned: { dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null; lut: LookupTexture | null; pools: THREE.Object3D | null; rim: boolean;
     lamps: ReturnType<typeof lampLights> | null; bounce: ReturnType<typeof bounceLight> | null; environment: THREE.WebGLRenderTarget | null;
-    glow: THREE.Object3D[] | null } = { dome: null, lut: null, pools: null, rim: false, lamps: null, bounce: null, environment: null, glow: null };
+    glow: THREE.Object3D[] | null; fx: EngineEffects | null; exposure: ExposureEffect | null; clock: DayCycle | null;
+    chain: { vignette: { offset: number; darkness: number }; radius: number } | null } = { dome: null, lut: null, pools: null, rim: false, lamps: null, bounce: null, environment: null, glow: null,
+    fx: null, exposure: null, clock: null, chain: null };
+  // AP17: what `liveLook` last set (the light rows and the LUT are compared with the build's, never set)
+  let day = spec.day, dayOverride = spec.dayOverride;
+  const fixedOf = (light: DataLookSpec['light'], lut: unknown): string => JSON.stringify({ light: light ?? null, lut: typeof lut === 'string' || lut === null ? lut : 'bytes' });
+  const fixed = fixedOf(spec.light, spec.lut);
   const shadow = spec.light?.shadow ?? null;
   const bounceRow = spec.light?.bounce ?? null;
   // the bounce exists from the backdrop on (it follows the clock's sun there); compose adds it to the scene
@@ -252,6 +268,27 @@ ${mist ? `
       // a fog kind change (exponential to linear, or back) changes the fog patch's shader text: that needs a new look
       if (next.length === 0 || next.some((key) => (key.fog.near !== undefined) !== linear)) return false;
       keys = next;
+      return true;
+    },
+    liveLook: (next) => {
+      const { fx, clock, chain } = owned;
+      // check everything first: a refusal changes nothing
+      if (fx === null || clock === null || chain === null) return false;
+      if (next.keys.length === 0 || next.keys.some((key) => (key.fog.near !== undefined) !== linear)) return false;
+      // the light rows and the LUT are built once; an exposure on a chain built without one, a new day length or a new fixed
+      // time of day each need a new look
+      if (fixedOf(next.light, next.lut) !== fixed || ((next.exposure ?? 0) !== 0 && owned.exposure === null)) return false;
+      if (next.day.minutes !== day.minutes || next.dayOverride !== dayOverride) return false;
+      keys = next.keys; day = next.day; dayOverride = next.dayOverride;
+      Object.assign(clock.spec.sun as { maxElevation: number; azimuthOffset: number }, { maxElevation: next.day.maxElevation, azimuthOffset: next.day.azimuth });
+      const exposure = owned.exposure?.uniforms.get('uExposure');
+      if (exposure !== undefined) exposure.value = 2 ** (next.exposure ?? 0);
+      const tone = next.aces === true ? ToneMappingMode.ACES_FILMIC : next.neutral === true ? ToneMappingMode.NEUTRAL : ToneMappingMode.AGX;
+      if (fx.tone.mode !== tone) fx.tone.mode = tone;
+      const vignette = next.vignette ?? chain.vignette;
+      fx.vignette.offset = vignette.offset; fx.vignette.darkness = vignette.darkness;
+      fx.bloom.intensity = next.bloom.intensity; fx.bloom.luminanceMaterial.threshold = next.bloom.threshold;
+      fx.bloom.mipmapBlurPass.radius = next.bloom.radius ?? next.bloomRadius ?? chain.radius;
       return true;
     },
     // the sky builds before the composer: the level scope takes the dome and the LUT here
@@ -328,6 +365,9 @@ ${mist ? `
       if (dome !== null) { scope.own(dome.geometry); scope.own(dome.material); scope.onDispose(() => { dome.removeFromParent(); }); }
       if (lut !== null) scope.own(lut);
       const chain = engineChain('clean');
+      // AP17: the chain as the engine built it, before this look's own vignette and bloom spread, for `liveLook`
+      owned.fx = fx; owned.chain = { vignette: { offset: fx.vignette.offset, darkness: fx.vignette.darkness }, radius: fx.bloom.mipmapBlurPass.radius };
+      scope.onDispose(() => { if (owned.fx === fx) { owned.fx = null; owned.chain = null; owned.exposure = null; } });
       // B2: the Neutral curve keeps the look's saturated albedo saturated, where AgX would grey it (asked after the clean chain)
       if (spec.neutral === true) fx.tone.mode = ToneMappingMode.NEUTRAL;
       // M4.7: ACES, the look's own vignette and bloom spread, and its exposure ahead of the curve
@@ -335,7 +375,7 @@ ${mist ? `
       if (spec.vignette !== undefined && spec.vignette !== null) { fx.vignette.offset = spec.vignette.offset; fx.vignette.darkness = spec.vignette.darkness; }
       if (spec.bloomRadius !== undefined && spec.bloomRadius !== null) fx.bloom.mipmapBlurPass.radius = spec.bloomRadius;
       const stops = spec.exposure ?? 0, at = chain.indexOf(fx.tone);
-      if (stops !== 0 && at !== -1) { const exposure = new ExposureEffect(stops); scope.own(exposure); chain.splice(at, 0, exposure); }
+      if (stops !== 0 && at !== -1) { const exposure = new ExposureEffect(stops); scope.own(exposure); chain.splice(at, 0, exposure); owned.exposure = exposure; }
       return { chain };
     },
     // G992: no sun disc or corona over the gradient dome. A 1° disc read as a blurred speck with a halo ("half-assed moon
@@ -345,6 +385,7 @@ ${mist ? `
     ...(shadow === null ? {} : { shadows: { rig: 'tier' as const, radius: shadow.radius, normalBias: shadow.normalBias } }),
     backdrop: async ({ sky }) => {
       const clock = dataLookClock(spec.day, spec.dayOverride), now = lookSample();
+      owned.clock = clock;
       const { dome, zenith, horizon } = gradientDome();
       owned.dome = dome;
       const bounce = owned.bounce;

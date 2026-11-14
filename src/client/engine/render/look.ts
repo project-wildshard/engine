@@ -1,7 +1,7 @@
 import type { Camera, Color, DirectionalLight, Fog, Group, HemisphereLight, Material, Mesh, Object3D, Sprite, Texture, Vector3, PerspectiveCamera, Scene, WebGLRenderer, WebGLRenderTarget } from 'three';
 import type { BloomEffect, BrightnessContrastEffect, ChromaticAberrationEffect, Effect, EffectComposer, GodRaysEffect, HueSaturationEffect, LookupTexture, LUT3DEffect, NoiseEffect, Pass, ToneMappingEffect, VignetteEffect } from 'postprocessing';
 import type { N8AOPostPass } from 'n8ao';
-import type { LookKey } from './dataLook';
+import type { LiveLook, LookKey } from './dataLook';
 import type { GradeEffect } from '../core/Grade';
 import type { DayCycleClock } from '../../../shared/engine/world/dayCycle';
 import type { SkyRig as Sky } from '../world/skyRig';
@@ -265,6 +265,12 @@ export interface ExtendLook extends LookParts {
    * hook); the next frame samples them. False: this look can't take them live (a fog kind change), so the page reloads.
    */
   liveKeys?: (keys: readonly LookKey[]) => boolean;
+  /**
+   * SHARD-SOURCE AP17: a data look's keys, sun arc, exposure, tone, vignette and bloom set in place (`wildshard watch`, engine's
+   * dev hook v2). False: this change can't go live (a light row, the LUT, a fog kind, an exposure on a chain built without
+   * one), so the page reloads.
+   */
+  liveLook?: (next: LiveLook) => boolean;
   compose: (c: LookComposeContext) => LookComposition;
 }
 

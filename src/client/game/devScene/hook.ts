@@ -7,6 +7,8 @@ import { lampLights } from '@wildshard/engine/render/lookLight';
 import type { LookLamp } from '@wildshard/format/look-light';
 import type { ShardWater } from '@wildshard/format/water';
 import { installClientWater } from '../shardfile/clientWater';
+import { shardfileLiveLook } from './liveLook';
+import type { Shardfile } from '@wildshard/format/shardSchema';
 import { isDevColliders, swapDevBoxes, type DevBox } from '@wildshard/engine/game/devColliders';
 
 /**
@@ -18,8 +20,9 @@ import { isDevColliders, swapDevBoxes, type DevBox } from '@wildshard/engine/gam
  *   addPart(name, part)        draw a new part: meshes, sprites, lamps (the look's lamp lights) and water (the client's water)
  *   replacePart(name, part)    build the new part first, then dispose the old part's scope, in one call: no frame shows neither
  *   removePart(name)           dispose the part's scope (its boxes stay: the page script calls swapColliders(name, []))
- *   setLook(look)              the data look's day keys (sky, fog, sun, ambient) in place: true, or false when the page's look
- *                              can't take them live and the page must reload
+ *   setLook(look)              v2 (AP17): the look section in place, as the shardfile would carry it: day keys (sky, fog, sun,
+ *                              ambient), the sun's arc, exposure, tone, vignette and bloom (`shardfileLiveLook`); v1 sent
+ *                              the keys only. True, or false when the page's look can't take it live and the page must reload
  *   swapColliders(name, boxes) the part's solid boxes, in the page's world and the in-page server's (the worker, by its
  *                              harness port), new set first, then the old one goes
  *
@@ -28,7 +31,7 @@ import { isDevColliders, swapDevBoxes, type DevBox } from '@wildshard/engine/gam
  * signatures or to `DevPart`. A production build has none of this: `finish.ts` imports it only behind `__DEVSERVER__`, and
  * `scripts/check-devserver.mjs` refuses a bundle that holds `DEV_HOOK_GLOBAL`.
  */
-export const DEV_HOOK_VERSION = 1;
+export const DEV_HOOK_VERSION = 2;
 export const DEV_HOOK_GLOBAL = '__wildshardDevHook';
 
 export type Rgb = readonly [number, number, number];
@@ -94,8 +97,8 @@ export interface DevPart {
   readonly water: ShardWater;
 }
 
-/** The part of a shardfile look a watched page takes live. */
-export interface DevLook { readonly keys: readonly LookKey[] }
+/** The look a watched page takes live: its day keys, and (v2, AP17) the whole look section the page's shardfile would carry. */
+export interface DevLook { readonly keys: readonly LookKey[]; readonly look?: Shardfile['look'] }
 
 export interface DevHook {
   readonly version: number;
@@ -222,7 +225,9 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
   }
   const setLook = (look: DevLook): boolean => {
     const current = ports.look();
-    return current !== null && 'liveKeys' in current && current.liveKeys !== undefined && current.liveKeys(look.keys);
+    if (current === null || !('liveKeys' in current)) return false;
+    if (look.look !== undefined) return current.liveLook !== undefined && current.liveLook(shardfileLiveLook(look.look));
+    return current.liveKeys !== undefined && current.liveKeys(look.keys);
   };
   // The boxes go into the page's world as it is now. After a grid crossing that is a new world: every held part's boxes
   // are made again in it, and the old world's sets are disposed (Physics skips removal from a freed world).

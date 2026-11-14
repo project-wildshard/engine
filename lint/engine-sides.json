@@ -658,6 +658,7 @@
     "src/client/game/grid/memoryWarning.ts": "client",
     "src/client/game/grid/menu.ts": "client",
     "src/client/game/devScene/hook.ts": "client",
+    "src/client/game/devScene/liveLook.ts": "client",
     "src/client/game/grid/minimapBlend.ts": "client",
     "src/client/game/grid/nearGrain.ts": "client",
     "src/client/game/grid/nearPlaceholderPlan.ts": "client",
