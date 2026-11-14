@@ -32,7 +32,8 @@ export class OpenArenaRoom {
     const { center } = data.arena, radius = data.place.arenaRadius; this.centre = new Vector3(center.x, 0, center.z); this.tag = `boss.${data.record.kind}`;
     for (const [name, row] of Object.entries(data.contacts)) this.rows.set(name, strikeFromData(row));
     const inside = (point: { readonly x: number; readonly z: number }): boolean => (point.x - center.x) ** 2 + (point.z - center.z) ** 2 < radius ** 2;
-    this.party = new BossContenders(host.players, inside, place);
+    // SC5 (J328): a served world's beaten heart stands again once the arena has stood empty; its prompt starts the next fight.
+    this.party = new BossContenders(host.players, inside, place, { served: () => host.respawn.served, rearm: false });
     this.bounty = new BossBounty(host, () => null, data.definition.id); this.inside = inside;
   }
   private readonly inside: (point: { readonly x: number; readonly z: number }) => boolean;

@@ -154,7 +154,7 @@ export async function prepareOpenArena(product: Pick<ShardProduct, 'json' | 'sec
           if(pickPrompt([prompt],eye,host.physics)===prompt)
             arenaTie(fight.life,{engaged:boss.engaged,victory:boss.state==='victory',hit:reward,mounted:room.mounted(),storm:actual.storm.stormActive},data.tieLines,{boss,fight,toast:line=>{toast(line);sayFightView(host,arenaTieWord(data.definition.id),[data.tieLines.indexOf(line)]);}});
         }
-        room.party.observe(boss);
+        room.party.observe(boss,dt);
         if(boss.state!=='dormant'||fight.body.visible)boss.update(dt,host.clock.now);else fight.update(dt,host.clock.now,false);
         const answer=fight.takeBoundary();if(answer!==null)arenaBoundary(answer,data.lines,data.record,boundaryPorts);
         sayLooks(dt);
