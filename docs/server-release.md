@@ -93,7 +93,10 @@ SHA and `staging.wildshard.io` already serving it; `go-live` needs
 `--after-staging-proofs`, which says the strict staging proofs passed:
 `e7-doctor-proof.mjs` 7/7 and `e7-live-staging-proof.mjs` on Chromium
 and WebKit. J205: the script opens no socket; production's own proof is
-`e7-doctor-proof.mjs <origin> <sha> <key> --human-static`. The scratch
+`e7-doctor-proof.mjs <origin> <sha> <key> --human-static`. After each
+staging tag, beside GC17's crossing walk, `node scripts/net-lag-proof.mjs`
+reads NET-LAG's "buttery" bar (B1 to B4) on staging, both engines and
+layouts, every deck shard; it gates no release yet. The scratch
 scripts' `/api/*` 401 checks are gone: the page's API is
 `api.wildshard.io` (API-CLOUDFLARE AC11), not the page host.
 If go-live fails after an `ALIAS MOVED` line, the alias did move; fix
