@@ -10,8 +10,8 @@
 - Driftwood Isle revision 4 (`c10405be`, v0.0.3, shard-driftwood
   `489a434`, opus-heroes' curated hero): Wendell has a server body
   (`piece:npc-castaway`, wood, at his feet, shard-driftwood `7eb9437`),
-  and this branch's `6e9bf4d6` puts a placed figure's page body at its
-  feet too, so side parity's `npc-castaway` line leaves `known`. 18
+  and `fix(npc): a placed figure's body is at its feet` (this land)
+  puts his page body there too, so side parity's `npc-castaway` line leaves `known`. 18
   recordings renamed (`island-calm-05125ed8` is `island-calm-3d097258`).
   Fence 284, 134 programs. Ring 1's Driftwood step chain moves (one
   more solid); re-recorded for darwin-arm64.
@@ -21,4 +21,6 @@
 - `public/assets/music/piano/music.json` names the new `island` and
   `pine` slot files (the cook refuses a missing engine slot, AU18).
   Slices re-cut (`8eae1d31`, `67997204`); all four tarballs are on the
-  `pins` release. The v0.1.1 saves resume.
+  `pins` release. The v0.1.1 saves resume. `.gitignore` ignores the
+  piano `island-*`/`pine-*` slots and `bed-forest-2-*` by pattern, since
+  each re-pin renames them.

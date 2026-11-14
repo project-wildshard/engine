@@ -293,10 +293,9 @@ public/assets/driftwood-isle/map/top.webp
 /public/assets/models/wooden_crate_02/textures/wooden_crate_02_nor_gl_1k.jpg
 /public/assets/models/wooden_crate_02/wooden_crate_02.bin
 /public/assets/models/wooden_crate_02/wooden_crate_02.gltf
-/public/assets/music/piano/island-calm-05125ed8.m4a
-/public/assets/music/piano/island-tension-7faf0468.m4a
-/public/assets/music/piano/pine-calm-923e0056.m4a
-/public/assets/music/piano/pine-tension-cc014e5b.m4a
+# Driftwood's and Pine's piano slots: their pins publish them, named by their bytes since sdk 0.2.10 (AU21).
+/public/assets/music/piano/island-*.m4a
+/public/assets/music/piano/pine-*.m4a
 /public/assets/nine-dragon/grade-lut-cleanroom.bin
 /public/assets/nine-dragon/lab/organic/lanterns.glb
 /public/assets/nine-dragon/lab/organic/lion.glb
@@ -305,7 +304,7 @@ public/assets/driftwood-isle/map/top.webp
 /public/assets/nine-dragon/lab/organic/scroll.webp
 /public/assets/nine-dragon/lab/sitter.glb
 /public/assets/nine-dragon/lab/walker.glb
-/public/assets/sfx/best/bed-forest-2-0cd11be5.m4a
+/public/assets/sfx/best/bed-forest-2-*.m4a
 
 # LS1 (J250): the renderer and validation revisions are computed live, never stamped; an old checkout's copies stay out.
 /scripts/renderer-revision.json

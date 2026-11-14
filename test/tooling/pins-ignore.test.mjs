@@ -38,6 +38,10 @@ const PUBLISHED = [
   'public/assets/baked/common/cloud-field.bin',
   'public/assets/music/folk/island-tension-bb05ab64.m4a',
   'public/assets/hdri/qwantani_sunset_puresky_2k.key.jpg',
+  // AU21 (opus-parity2, 2026-11-13): sdk 0.2.10 renames a re-encoded recording to its bytes, so a re-pin moves these names
+  'public/assets/music/piano/island-calm-3d097258.m4a',
+  'public/assets/music/piano/pine-tension-ca1a5adc.m4a',
+  'public/assets/sfx/best/bed-forest-2-c4e7f923.m4a',
 ];
 
 let scratch = '';
