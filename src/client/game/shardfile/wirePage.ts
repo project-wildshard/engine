@@ -82,6 +82,8 @@ export class WirePage {
   private readonly quests = new Map<string, QuestProgress>();
   private readonly heard = new Set<string>();
   private readonly feeds = new Map<string, QuestViewFeed>();
+  /** each feed's declaration, as text: a changed one makes a new feed */
+  private readonly feedWords = new Map<string, string>();
   private readonly waiting = new Set<Live>();
   private readonly books = new Set<Flags>();
   /** The rows a sky reads: none, until the wire is up. */
@@ -140,7 +142,7 @@ export class WirePage {
     for (const use of this.waiting) use(client);
     this.waiting.clear();
   }
-  unbind(): void { this.client = null; this.press = () => undefined; this.act = () => undefined; this.dayRow = undefined; this.stop = () => undefined; this.encounterRows = null; this.heads = () => false; this.seeded = null; this.purchases.clear(); this.books.clear(); this.feeds.clear(); this.movers.clear(); }
+  unbind(): void { this.client = null; this.press = () => undefined; this.act = () => undefined; this.dayRow = undefined; this.stop = () => undefined; this.encounterRows = null; this.heads = () => false; this.seeded = null; this.purchases.clear(); this.books.clear(); this.feeds.clear(); this.feedWords.clear(); this.movers.clear(); }
   /** A setting's weather or a dev's jump: the server's sky takes it. Only a mode outlives its world. */
   climate(word: ClimateWord): void {
     if (word.op !== 'force') this.skyWords.set(word.op, word);
@@ -215,8 +217,10 @@ export class WirePage {
   }
   /** A quest view for `def`, over this player's rows. */
   quest(def: QuestDef): QuestView {
-    const feed = this.feeds.get(def.id) ?? new QuestViewFeed([def], { quests: this.quests, phased: this.heard });
-    this.feeds.set(def.id, feed);
+    // SHARD-SOURCE AP19 (DEVSERVER): a quest whose declaration changed (`wildshard watch`'s soft restart) gets a feed of its new steps
+    const words = typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ ? JSON.stringify(def) : '', held = this.feeds.get(def.id);
+    const feed = held !== undefined && this.feedWords.get(def.id) === words ? held : new QuestViewFeed([def], { quests: this.quests, phased: this.heard });
+    this.feeds.set(def.id, feed); this.feedWords.set(def.id, words);
     return feed.quest(def.id);
   }
   /** The server's payouts: the page's own go, so a kill pays once. */
