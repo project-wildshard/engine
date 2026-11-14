@@ -29,7 +29,7 @@ import {join, resolve} from 'node:path';
 import {CHANNELS, RefusedError, buildEnv, runPhase} from './page-release/flow.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
-import {publishContent, r2Content} from './page-release/content.mjs';
+import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
 
 const args = process.argv.slice(2);
 const flag = (/** @type {string} */ name) => args.find(arg => arg === `--${name}` || arg.startsWith(`--${name}=`));
@@ -74,6 +74,9 @@ async function fetch200(url) {
 }
 
 const host = workersHost({token: () => cloudflareToken, log});
+// PZ6: a content publish copies unchanged files from an older set on R2 when the bucket's S3 keys are in the environment
+const contentCopies = flag('content') === undefined ? undefined : r2Copies(process.env);
+if (contentCopies !== undefined) secrets.push(...contentCopies.secrets);
 
 let phase = '';
 try {
@@ -83,7 +86,7 @@ try {
       packs: r2Packs({log}),
       ...(flag('content') === undefined ? {} : {content: {
         publish: ({dir, cors, dryRun}) => publishContent({dir, origin: cors, dryRun, log,
-          scratch: join(root, 'tmp/page-release/content'), store: r2Content({root, scratch: join(root, 'tmp/page-release/content'), token: cloudflareToken})}),
+          scratch: join(root, 'tmp/page-release/content'), store: r2Content({root, scratch: join(root, 'tmp/page-release/content'), token: cloudflareToken, copies: contentCopies})}),
       }}),
       run: (file, argv, env) => { execFileSync(file, argv, {cwd: root, env: {...process.env, ...env}, stdio: 'inherit'}); },
       fetchJSON: async url => (await fetch200(url)).json(),
@@ -120,4 +123,4 @@ try {
   console.error(redact(error instanceof RefusedError ? error.message : `${channel} ${phase} failed: ${error instanceof Error ? error.message : String(error)}`));
   console.error('the alias did not move unless an ALIAS MOVED line is above');
   process.exitCode = 1;
-}
+} finally { contentCopies?.close(); }

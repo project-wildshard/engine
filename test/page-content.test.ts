@@ -6,7 +6,7 @@ import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- A `.pack.br` part is stored Brotli and read back decoded.
 import {brotliCompressSync, brotliDecompressSync} from 'node:zlib';
 import {afterEach, expect, test} from 'vitest';
-import {contentBaseOf, contentHeaders, contentKey, contentSet, publishContent, r2Content, scanContent, type ContentStore, type Put} from '../scripts/page-release/content.mjs';
+import {contentBaseOf, contentHeaders, contentKey, contentSet, publishContent, r2Content, r2Copies, scanContent, type ContentStore, type Put} from '../scripts/page-release/content.mjs';
 
 const ORIGIN = 'https://play.wildshard.io';
 const scratchRoot = resolve(import.meta.dirname, '../tmp/page-content-test');
@@ -162,4 +162,49 @@ test('the real store reads through packs.wildshard.io cache-busted with the Orig
   expect(runs.map(call => call.list)).toEqual([[{key: 'content/s/a.json', file: '/d/a.json'}], [{key: 'content/s/p.pack.br', file: '/d/p.pack.br'}]]);
   expect(runs[1]?.args).toEqual(expect.arrayContaining(['bulk', 'put', 'wildshard-packs', '--remote', '--content-encoding', 'br']));
   for (const call of runs) { expect(call.args.join(' ')).not.toContain(token); expect(call.secrets).toEqual([token]); }
+});
+
+/** PZ6: the fake bucket's `sets` and `copy`, as R2's S3 API answers them (a copy takes the target's headers). */
+function withCopies(bucket: ReturnType<typeof fakeBucket>, failing = new Set<string>()) {
+  const copies: string[] = [];
+  bucket.store.sets = () => Promise.resolve([...new Set([...bucket.objects.keys()].filter(key => key.endsWith('/content.json')).map(key => key.split('/')[1] ?? ''))]);
+  bucket.store.copy = (from, to, headers, bytes) => {
+    const object = bucket.objects.get(from);
+    if (object === undefined || failing.has(to)) return Promise.reject(new Error(`no ${from}`));
+    if (object.body.length !== bytes) return Promise.reject(new Error('size'));
+    copies.push(to); bucket.objects.set(to, {body: object.body, headers});
+    return Promise.resolve();
+  };
+  return copies;
+}
+
+test('PZ6: a new set copies every unchanged file from the last complete set on R2 and uploads only what changed', async () => {
+  const bucket = fakeBucket(), copies = withCopies(bucket);
+  const first = await run(page(), bucket.store);
+  expect(first).toMatchObject({uploaded: 10, copied: 0});
+  bucket.puts.length = 0;
+  // one changed shard file: a new set, one upload, nine server-side copies
+  const dir = page({'shardfiles/pine-hollow/shard.json': '{"slug":"pine-hollow","v":2}'}), set = contentSet(scanContent(dir));
+  const second = await run(dir, bucket.store);
+  expect(set).not.toBe(first.set);
+  expect(second).toMatchObject({set, files: 10, uploaded: 10, held: 0, copied: 9});
+  expect(second.uploadedBytes).toBe(Buffer.byteLength('{"slug":"pine-hollow","v":2}'));
+  expect(bucket.puts).toEqual([contentKey(set, 'shardfiles/pine-hollow/shard.json'), contentKey(set, 'content.json')]);
+  expect(copies).toHaveLength(9);
+  expect(bucket.objects.get(contentKey(set, 'assets/spawn/parts/0123456789abcdef.pack.br'))?.headers.encoding).toBe('br');
+  expect(brotliDecompressSync(bucket.objects.get(contentKey(set, 'assets/spawn/parts/0123456789abcdef.pack.br'))?.body ?? new Uint8Array()).toString()).toBe('part bytes');
+});
+
+test('PZ6: a failed copy is uploaded instead, and with no S3 keys there are no copies', async () => {
+  const bucket = fakeBucket();
+  const first = await run(page(), bucket.store);
+  const dir = page({'shardfiles/pine-hollow/shard.json': '{"v":3}'}), set = contentSet(scanContent(dir));
+  withCopies(bucket, new Set([contentKey(set, 'assets/tex/rock.ktx2')]));
+  bucket.puts.length = 0;
+  expect(await run(dir, bucket.store)).toMatchObject({uploaded: 10, copied: 8});
+  expect(bucket.puts).toContain(contentKey(set, 'assets/tex/rock.ktx2'));
+  expect(first.set).not.toBe(set);
+  expect(r2Copies({})).toBeUndefined();
+  expect(r2Copies({R2_ACCOUNT_ID: 'a'.repeat(32), R2_PACKS_ACCESS_KEY_ID: 'k'})).toBeUndefined();
+  expect(() => r2Copies({R2_ACCOUNT_ID: 'nope', R2_PACKS_ACCESS_KEY_ID: 'k', R2_PACKS_SECRET_ACCESS_KEY: 's'})).toThrow('Invalid R2_ACCOUNT_ID');
 });

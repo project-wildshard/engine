@@ -8,8 +8,12 @@
 // SHA-256 over every published path, its SHA-256 and its size. PZ3's `contentBase` is one base that mirrors page paths,
 // so the set keeps page paths under one content-named prefix: a build that changes no content names the same set and
 // uploads nothing, and every key is immutable. The set's index, `content/<set>/content.json`, goes last; its presence
-// with the same bytes means the set is complete. (A new set re-uploads files an older set already holds: cross-set
-// dedupe is a follow-up, with PZ10's content cache.)
+// with the same bytes means the set is complete.
+//
+// Cross-set dedupe (PZ6): a new set copies, server side (S3 CopyObject, R2_ACCOUNT_ID and R2_PACKS_* from the
+// environment, the same bucket-scoped keys server-release uses), every missing file whose bytes a recent complete set
+// already holds, so a content change uploads only the files that changed, not the whole ~2.2 GB. A copy is checked by its
+// size on R2, and a sample of copies is read back through the CDN like an upload; a failed copy is uploaded instead.
 //
 // A key that already answers (a cache-busted HEAD on packs.wildshard.io) is skipped only when it reads back with the
 // same decoded bytes and CORS; one with other bytes is uploaded again. The rest go up through
@@ -22,6 +26,7 @@ import {mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} f
 import {join, resolve} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
 import {brotliDecompressSync} from 'node:zlib';
+import {CopyObjectCommand, HeadObjectCommand, ListObjectsV2Command, S3Client} from '@aws-sdk/client-s3';
 import {carriedPaths, classify, shardNames} from '../page-size.mjs';
 import {PACKS_ORIGIN} from './flow.mjs';
 import {runRedacted} from './redact.mjs';
@@ -46,9 +51,17 @@ const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(
  * @property {(key: string) => Promise<boolean>} exists  The key answers 200 now (never a cached 404).
  * @property {(puts: readonly Put[]) => Promise<void>} put
  * @property {(key: string, origin: string) => Promise<Read>} read  A cache-busted CORS GET, decoded.
+ * @property {() => Promise<string[]>} [sets]  PZ6: the complete sets (their `content.json` present), newest first.
+ * @property {(from: string, to: string, headers: Headers, bytes: number) => Promise<void>} [copy]  PZ6: a server-side
+ *   copy with the target's headers, refused unless the copy holds `bytes`.
  */
 /** @typedef {{set: string, base: string, files: number, bytes: number, uploaded: number, uploadedBytes: number, held: number,
- *   kinds: Record<string, {files: number, bytes: number}>, cors: string}} ContentSummary */
+ *   copied: number, copiedBytes: number, kinds: Record<string, {files: number, bytes: number}>, cors: string}} ContentSummary
+ *   `uploaded` counts every key this run wrote (put or copied), `uploadedBytes` only the bytes it sent; `copied` and
+ *   `copiedBytes` are the keys and bytes copied from an older set on R2 (PZ6). */
+/** PZ6: how many recent complete sets a new set may copy from, and how many copies each publish reads back in full. */
+export const DONOR_SETS = 4;
+export const COPY_SAMPLE = 24;
 
 /** The cook's object headers (`objectHeaders()`, src/cook/game/cookWorker.ts), every key immutable: a set is content-named.
  * @param {string} key @returns {Headers} */
@@ -141,8 +154,8 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
   const kinds = Object.fromEntries(KIND_NAMES.map(kind => [kind, {files: 0, bytes: 0}]));
   for (const file of files) { const row = kinds[file.kind]; if (row !== undefined) { row.files++; row.bytes += file.bytes; } }
   const bytes = files.reduce((sum, file) => sum + file.bytes, 0);
-  const summary = (/** @type {number} */ uploaded, /** @type {number} */ uploadedBytes) =>
-    ({set, base: contentBaseOf(set), files: files.length, bytes, uploaded, uploadedBytes, held: files.length - uploaded, kinds, cors: origin});
+  const summary = (/** @type {number} */ uploaded, /** @type {number} */ uploadedBytes, copied = 0, copiedBytes = 0) =>
+    ({set, base: contentBaseOf(set), files: files.length, bytes, uploaded, uploadedBytes, held: files.length - uploaded, copied, copiedBytes, kinds, cors: origin});
   const indexKey = contentKey(set, 'content.json');
   if (dryRun) {
     log(`DRY-RUN would publish ${files.length} files (${mb(bytes)} MB) as ${contentBaseOf(set)}: HEAD each on ${PACKS_ORIGIN}, wrangler r2 bulk put the missing ones to ${BUCKET}, read each back with CORS ${origin}, then ${indexKey}`);
@@ -167,8 +180,12 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
     missing.push(file);
   });
   missing.sort((a, b) => (a.path < b.path ? -1 : 1));
+  const written = missing.length;
+  const copied = await copyFromSets({set, missing, store, origin, log, sleep});
+  const copiedBytes = copied.reduce((sum, file) => sum + file.bytes, 0);
+  if (copied.length > 0) { const done = new Set(copied); missing.splice(0, missing.length, ...missing.filter(file => !done.has(file))); }
   const uploadedBytes = missing.reduce((sum, file) => sum + file.bytes, 0);
-  log(`content ${set}: ${files.length} files (${mb(bytes)} MB), ${files.length - missing.length} held (read back equal), ${missing.length} to upload (${mb(uploadedBytes)} MB, ${wrong} present with other bytes)`);
+  log(`content ${set}: ${files.length} files (${mb(bytes)} MB), ${files.length - written} held (read back equal), ${copied.length} copied on R2 (${mb(copiedBytes)} MB), ${missing.length} to upload (${mb(uploadedBytes)} MB, ${wrong} present with other bytes)`);
   if (missing.length > 0) {
     // `wrangler r2 bulk put` stops at the first failed object (a 502 and a 429 were seen); what landed answers a HEAD, so a retry
     // puts only the rest.
@@ -199,8 +216,88 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
     await store.put([{key: indexKey, file: indexFile, headers: contentHeaders(indexKey)}]);
     await readBack(store, indexKey, sha256(index), origin, sleep);
   } finally { rmSync(indexFile, {force: true}); }
-  log(`content ${set}: ${missing.length} uploaded (${mb(uploadedBytes)} MB), ${files.length - missing.length} held, all read back with CORS ${origin}; base ${contentBaseOf(set)}`);
-  return summary(missing.length, uploadedBytes);
+  log(`content ${set}: ${missing.length} uploaded (${mb(uploadedBytes)} MB), ${copied.length} copied (${mb(copiedBytes)} MB), ${files.length - written} held, read back with CORS ${origin}; base ${contentBaseOf(set)}`);
+  return summary(written, uploadedBytes, copied.length, copiedBytes);
+}
+
+/**
+ * PZ6: copy each missing file whose bytes a recent complete set holds, server side, under this set's key with this
+ * path's headers. Returns the files copied; the rest are left to the upload. Each copy is size-checked by the store, and
+ * a sample of them is read back in full through the CDN with the game's CORS.
+ * @param {{set: string, missing: readonly ContentFile[], store: ContentStore, origin: string, log: (line: string) => void, sleep: (ms: number) => Promise<void>}} options
+ * @returns {Promise<ContentFile[]>}
+ */
+export async function copyFromSets({set, missing, store, origin, log, sleep}) {
+  const {sets, copy} = store;
+  if (sets === undefined || copy === undefined || missing.length === 0) return [];
+  const donors = (await sets()).filter(name => name !== set).slice(0, DONOR_SETS);
+  /** @type {Map<string, string>} sha256 and size to a donor key, the newest set first */
+  const held = new Map();
+  for (const donor of donors) {
+    const read = await store.read(contentKey(donor, 'content.json'), origin);
+    if (read.status !== 200) { log(`content ${set}: donor ${donor}'s index answered ${read.status}; skipped`); continue; }
+    /** @type {{files?: {path: string, bytes: number, sha256: string}[]}} */ const index = JSON.parse(Buffer.from(read.bytes).toString('utf8'));
+    for (const file of index.files ?? []) {
+      const id = `${file.sha256}:${file.bytes}`;
+      if (!held.has(id)) held.set(id, contentKey(donor, file.path));
+    }
+  }
+  /** @type {ContentFile[]} */ const copied = [];
+  let failed = 0;
+  await pool(missing.filter(file => held.has(`${file.sha256}:${file.bytes}`)), 32, async file => {
+    const from = held.get(`${file.sha256}:${file.bytes}`) ?? '';
+    try { await copy(from, contentKey(set, file.path), contentHeaders(file.path), file.bytes); copied.push(file); }
+    catch (error) { failed++; log(`content ${set}: copy ${from} failed (${error instanceof Error ? error.message : String(error)}); uploading it`); }
+  });
+  copied.sort((a, b) => (a.path < b.path ? -1 : 1));
+  // a copy keeps R2's bytes, so a sample proves the headers and the CDN answer; every upload is still read back in full
+  const sample = [...copied];
+  for (let i = sample.length - 1; i > 0; i--) { const j = randomInt(i + 1); [sample[i], sample[j]] = [/** @type {ContentFile} */ (sample[j]), /** @type {ContentFile} */ (sample[i])]; }
+  await pool(sample.slice(0, COPY_SAMPLE), 8, file => readBack(store, contentKey(set, file.path), file.decoded, origin, sleep).then(() => undefined));
+  if (donors.length > 0) log(`content ${set}: ${copied.length} copied from ${donors.join(', ')}, ${failed} copies failed, ${Math.min(COPY_SAMPLE, copied.length)} read back`);
+  return copied;
+}
+
+/**
+ * PZ6: R2's S3 API on the packs bucket, for the store's `sets` and `copy`. Credentials from the environment
+ * (R2_ACCOUNT_ID, R2_PACKS_ACCESS_KEY_ID, R2_PACKS_SECRET_ACCESS_KEY: server-release's bucket-scoped keys), else none.
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {{sets: () => Promise<string[]>, copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>, secrets: string[], close: () => void} | undefined}
+ */
+export function r2Copies(env) {
+  const account = env.R2_ACCOUNT_ID, accessKeyId = env.R2_PACKS_ACCESS_KEY_ID, secretAccessKey = env.R2_PACKS_SECRET_ACCESS_KEY;
+  if (account === undefined || accessKeyId === undefined || secretAccessKey === undefined || account === '' || accessKeyId === '' || secretAccessKey === '') return undefined;
+  if (!/^[0-9a-f]{32}$/u.test(account)) throw new Error('Invalid R2_ACCOUNT_ID');
+  const client = new S3Client({region: 'auto', endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials: {accessKeyId, secretAccessKey}});
+  return {
+    secrets: [accessKeyId, secretAccessKey],
+    close: () => client.destroy(),
+    async sets() {
+      /** @type {string[]} */ const prefixes = [];
+      for (let token; ;) {
+        const page = await client.send(new ListObjectsV2Command({Bucket: BUCKET, Prefix: `${CONTENT_ROOT}/`, Delimiter: '/', ContinuationToken: token}));
+        for (const row of page.CommonPrefixes ?? []) if (row.Prefix !== undefined) prefixes.push(row.Prefix);
+        if (page.IsTruncated !== true || page.NextContinuationToken === undefined) break;
+        token = page.NextContinuationToken;
+      }
+      /** @type {{set: string, at: number}[]} */ const complete = [];
+      await pool(prefixes, 8, async prefix => {
+        const set = prefix.slice(CONTENT_ROOT.length + 1, -1);
+        if (!/^[0-9a-f]{16}$/u.test(set)) return;
+        try {
+          const head = await client.send(new HeadObjectCommand({Bucket: BUCKET, Key: contentKey(set, 'content.json')}));
+          complete.push({set, at: head.LastModified?.getTime() ?? 0});
+        } catch (error) { if (!(error instanceof Error && (error.name === 'NotFound' || error.name === 'NoSuchKey'))) throw error; }
+      });
+      return complete.sort((a, b) => b.at - a.at).map(row => row.set);
+    },
+    async copy(from, to, headers, bytes) {
+      await client.send(new CopyObjectCommand({Bucket: BUCKET, Key: to, CopySource: `${BUCKET}/${from.split('/').map(encodeURIComponent).join('/')}`,
+        MetadataDirective: 'REPLACE', ContentType: headers.type, CacheControl: headers.cache, ...(headers.encoding === undefined ? {} : {ContentEncoding: headers.encoding})}));
+      const head = await client.send(new HeadObjectCommand({Bucket: BUCKET, Key: to}));
+      if (head.ContentLength !== bytes) throw new Error(`${to} holds ${head.ContentLength} bytes after the copy, not ${bytes}`);
+    },
+  };
 }
 
 /**
@@ -226,10 +323,11 @@ export async function sampleContent({dir, store, count, origins, log, sleep = de
 
 /**
  * The real store: HEAD and GET through packs.wildshard.io, writes through `wrangler r2 bulk put`, one call per header set.
- * @param {{root: string, scratch: string, token?: string, fetch?: typeof fetch, exec?: typeof runRedacted}} options
+ * PZ6: with `copies` (r2Copies) the store also lists complete sets and copies keys server side.
+ * @param {{root: string, scratch: string, token?: string, fetch?: typeof fetch, exec?: typeof runRedacted, copies?: Pick<ContentStore, 'sets' | 'copy'>}} options
  * @returns {ContentStore}
  */
-export function r2Content({root, scratch, token, fetch: get = fetch, exec = runRedacted}) {
+export function r2Content({root, scratch, token, fetch: get = fetch, exec = runRedacted, copies}) {
   let reads = 0;
   const bust = (/** @type {string} */ key) => {
     const url = new URL(`/${key}`, PACKS_ORIGIN);
@@ -238,6 +336,7 @@ export function r2Content({root, scratch, token, fetch: get = fetch, exec = runR
   };
   const secrets = token === undefined || token === '' ? [] : [token];
   return {
+    ...(copies?.sets === undefined || copies.copy === undefined ? {} : {sets: copies.sets, copy: copies.copy}),
     async exists(key) {
       for (let attempt = 0; ; attempt++) {
         const response = await get(bust(key), {method: 'HEAD', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30_000)}).catch((/** @type {unknown} */ error) => { if (attempt < 3) return undefined; throw error; });
@@ -284,10 +383,11 @@ async function main() {
   const value = (/** @type {string} */ name) => args.find(arg => arg.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
   const dir = args.find(arg => !arg.startsWith('--'));
   if (dir === undefined) throw new Error('usage: node scripts/page-release/content.mjs <dist> [--origin=<page origin>] [--sample=<n>] [--dry-run]');
-  const root = resolve(import.meta.dirname, '../..'), token = process.env.CLOUDFLARE_API_TOKEN;
-  const hide = (/** @type {string} */ text) => token === undefined || token === '' ? text : text.split(token).join('<token>');
+  const root = resolve(import.meta.dirname, '../..'), token = process.env.CLOUDFLARE_API_TOKEN, copies = r2Copies(process.env);
+  const secrets = [...(token === undefined || token === '' ? [] : [token]), ...copies?.secrets ?? []];
+  const hide = (/** @type {string} */ text) => secrets.reduce((out, secret) => out.split(secret).join('<token>'), text);
   const log = (/** @type {string} */ line) => console.log(hide(line));
-  const scratch = join(root, 'tmp/page-release/content'), store = r2Content({root, scratch, token});
+  const scratch = join(root, 'tmp/page-release/content'), store = r2Content({root, scratch, token, copies});
   const sample = value('sample');
   try {
     if (sample !== undefined) {
@@ -300,7 +400,7 @@ async function main() {
   } catch (error) {
     console.error(hide(`content failed: ${error instanceof Error ? error.message : String(error)}`));
     process.exitCode = 1;
-  }
+  } finally { copies?.close(); }
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) await main();

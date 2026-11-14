@@ -7,9 +7,12 @@ export interface ContentStore {
   exists: (key: string) => Promise<boolean>;
   put: (puts: readonly Put[]) => Promise<void>;
   read: (key: string, origin: string) => Promise<Read>;
+  sets?: () => Promise<string[]>;
+  copy?: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>;
 }
 export interface ContentSummary {
   set: string; base: string; files: number; bytes: number; uploaded: number; uploadedBytes: number; held: number;
+  copied: number; copiedBytes: number;
   kinds: Record<string, { files: number; bytes: number }>; cors: string;
 }
 export const BUCKET: string;
@@ -28,4 +31,8 @@ export function contentIndex(set: string, files: readonly ContentFile[]): Buffer
 export function readBack(store: ContentStore, key: string, expected: string, origin: string, sleep: (ms: number) => Promise<void>): Promise<number>;
 export function publishContent(options: { dir: string; store: ContentStore; scratch: string; origin?: string; dryRun?: boolean; log: (line: string) => void; sleep?: (ms: number) => Promise<void> }): Promise<ContentSummary>;
 export function sampleContent(options: { dir: string; store: ContentStore; count: number; origins: readonly string[]; log: (line: string) => void; sleep?: (ms: number) => Promise<void> }): Promise<{ set: string; checked: Record<string, number> }>;
-export function r2Content(options: { root: string; scratch: string; token?: string; fetch?: typeof fetch; exec?: (file: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; timeout?: number }, secrets: string[]) => string }): ContentStore;
+export const DONOR_SETS: number;
+export const COPY_SAMPLE: number;
+export function copyFromSets(options: { set: string; missing: readonly ContentFile[]; store: ContentStore; origin: string; log: (line: string) => void; sleep: (ms: number) => Promise<void> }): Promise<ContentFile[]>;
+export function r2Copies(env: NodeJS.ProcessEnv): { sets: () => Promise<string[]>; copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>; secrets: string[]; close: () => void } | undefined;
+export function r2Content(options: { root: string; scratch: string; token?: string; fetch?: typeof fetch; copies?: Pick<ContentStore, 'sets' | 'copy'>; exec?: (file: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; timeout?: number }, secrets: string[]) => string }): ContentStore;
