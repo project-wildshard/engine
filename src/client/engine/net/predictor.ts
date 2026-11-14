@@ -30,8 +30,20 @@ export const PREDICTION_SNAP = 3;
 const RIDE_ROOM = 64;
 /** One saved move. */
 const SAVED_WORDS: number = MOTION_WORDS + RIDE_ROOM;
-/** Seconds the camera takes to lose about two thirds of a correction. */
-const SMOOTH_TIME = 0.1;
+/**
+ * NET-LAG NL12 (b): a correction glides at a steady pace over a time scaled to its size, never as a step. At 150 to 200 ms
+ * (J282) corrections are routine, and an exponential glide moved the drawn feet most in its first frame: a third of a 0.3 m
+ * correction in one 30 fps frame. Metres a second the glide adds on top of the feet's own motion, under half a walk.
+ */
+export const GLIDE_SPEED = 2;
+/** The shortest glide: 4 frames at 30 fps, 8 at 60. */
+export const GLIDE_MIN_S: number = 4 / 30;
+/** The longest: a correction near the snap distance still settles within half a second. */
+export const GLIDE_MAX_S = 0.5;
+/** The pace that glides `distance` away: its own size over GLIDE_SPEED, held between the shortest and longest glide. */
+function glidePace(distance: number): number {
+  return distance / Math.min(GLIDE_MAX_S, Math.max(GLIDE_MIN_S, distance / GLIDE_SPEED));
+}
 
 /** What a predictor drives. */
 export interface PredictedBody {
@@ -105,6 +117,8 @@ export class Predictor {
   private resets: number | null = null;
   /** The newest frame has this body on a ride. */
   private aboard = false;
+  /** Metres a second the render offset loses now (NL12 b). */
+  private glide = 0;
   constructor(body: PredictedBody, columns: readonly NetColumn<never>[], corrected?: (row:Omit<NetCorrection,'kind'|'session'>)=>void) {
     this.corrected=corrected;
     this.body = body; this.columns = columns; this.table = ownerTable(columns);
@@ -154,6 +168,8 @@ export class Predictor {
     const saved = offset >= 0 && offset < count, slot = (head + offset) % PREDICTION_RING, at = slot * SAVED_WORDS; // else older than the ring, or nothing saved
     if (saved) { this.head = (slot + 1) % PREDICTION_RING; this.count = count - offset - 1; }
     if (!forced && (!saved || this.matches(slot, owner, ridden))) return false;
+    // NL12 (c): the write below can take feet under a deck only if the server's world lacks the deck; NL5 gave the room the same
+    // rope planks (`server/host/ropeDecks.ts`), and `test/net-predict-deck.test.ts` replays a correction 0.3 to 1 m low back onto them
     const s = body.motionState, { ride } = body, feet = ride?.feet ?? s.position, x = feet.x + body.renderOffset.x, y = feet.y + body.renderOffset.y, z = feet.z + body.renderOffset.z, { yaw } = s;
     if (saved) restoreMotion(s, body.motor, states, at);
     if (saved && this.rode[slot] === 1) ride?.restore(states, at + MOTION_WORDS);
@@ -169,6 +185,7 @@ export class Predictor {
     if (!led && !boarded) this.corrections++;
     const offsetX = x - feet.x, offsetY = y - feet.y, offsetZ = z - feet.z, far = offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ > PREDICTION_SNAP * PREDICTION_SNAP;
     body.renderOffset.set(far ? 0 : offsetX, far ? 0 : offsetY, far ? 0 : offsetZ);
+    this.glide = glidePace(body.renderOffset.length());
     if(!led&&!boarded)this.corrected?.({tick:tick??s.tick,mode:ride!==null?'ride':s.board.on?'board':s.swim.on?'swim':'foot',offset:Math.hypot(offsetX,offsetY,offsetZ),snapped:far});
     return !led && !boarded;
   }
@@ -190,14 +207,16 @@ export class Predictor {
       const dx = was.x - s.position.x, dy = was.y - s.position.y, dz = was.z - s.position.z;
       if (Math.hypot(dx, dy, dz) < PREDICTION_SNAP) body.renderOffset.set(dx, dy, dz);
     }
+    this.glide = glidePace(body.renderOffset.length());
   }
 
-  /** Each render frame: the camera glides back onto the predicted feet. */
+  /** Each render frame: the camera glides back onto the predicted feet at the correction's steady pace (NL12 b). */
   update(dt: number): void {
-    const { renderOffset } = this.body;
-    if (renderOffset.x === 0 && renderOffset.y === 0 && renderOffset.z === 0) return;
-    renderOffset.multiplyScalar(Math.exp(-dt / SMOOTH_TIME));
-    if (renderOffset.lengthSq() < 1e-8) renderOffset.set(0, 0, 0);
+    const { renderOffset } = this.body, left = renderOffset.length();
+    if (left === 0) return;
+    const step = (this.glide > 0 ? this.glide : glidePace(left)) * dt;
+    if (step >= left || left - step < 1e-4) renderOffset.set(0, 0, 0);
+    else renderOffset.multiplyScalar((left - step) / left);
   }
 
   private matches(slot: number, owner: ArrayLike<number>, ridden: ArrayLike<number> | null): boolean {
