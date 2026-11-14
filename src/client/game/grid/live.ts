@@ -13,6 +13,7 @@ import type { ResidencyAllocator, ResidencyLease, ResidencyEviction } from '../.
 import type { PreparedGridCrossing } from '../../../shared/game/grid/crossing';
 import type { HomeResidencyClaim } from './pageResidency';
 import { ApproachInputsDeferredError } from './productInputs';
+import { PRODUCT_DEFERRED } from './productLeases';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
 import { tileOf, type CellTile } from '../../../shared/game/shardfile/tileOrder';
 import type { RegionShell } from './regionShell';
@@ -118,9 +119,9 @@ interface Resident { region: LiveGridRegion; lease: ResidencyLease; reservations
 // before selecting another approach, so sub-centimetre capsule recoil cannot evict the world just prepared.
 const APPROACH_TRAVEL_METRES = 0.1;
 // GC5: the page pre-warms a neighbour's world from inside the source, at the distance the traveller covers at its speed in that
-// world's last measured build time (2 s at least; before it is measured, the slowest build so far or 6 s), times a margin. Kept while the traveller stays within
+// world's last measured build time (2 s at least; before it is measured, the slowest build so far or 14 s, capped at 16 s), times a margin. Kept while the traveller stays within
 // WARM_KEEP_METRES of it; the lead is capped below that, so a pre-warm never starts where it would be dropped.
-const DEMAND_METRES = 80, HELD_RETRY_MS = 5000, FIXED_HZ = 60, WARM_DEFAULT_SECONDS = 14, WARM_MIN_SECONDS = 2, WARM_MAX_SECONDS = 16, WARM_MARGIN = 1.25, WARM_LEAD_METRES = 8, WARM_LEAD_CAP_METRES = 200, WARM_KEEP_METRES = 240;
+const DEMAND_METRES = 80, HELD_RETRY_MS = 5000, HEADING_HOLD_MS = 600, FIXED_HZ = 60, WARM_DEFAULT_SECONDS = 14, WARM_MIN_SECONDS = 2, WARM_MAX_SECONDS = 16, WARM_MARGIN = 1.25, WARM_LEAD_METRES = 8, WARM_LEAD_CAP_METRES = 200, WARM_KEEP_METRES = 240;
 const entryAxes = [['x', 'z'], ['z', 'x']] as const;
 // Distance can decrease while passing parallel to a cell. Only a ray into its first boundary's midpoint mouth
 // predicts entry; product downloads remain radial, but an unrelated native world must not block the real turn-in.
@@ -186,6 +187,8 @@ export class LiveGridHost {
   private warms = 0;
   /** QA row 43: when a traveller held at a cell's wall may next retry its failed build */
   private readonly heldRetryAt = new Map<string, number>();
+  /** the other mouth the traveller inside the source turned to, and since when (HEADING_HOLD_MS) */
+  private turnedSince: { instance: string; at: number } | null = null;
   /** GC5: why the last pre-warm the heading asked for did not start (its product still reading, an exclusive runtime, or the budget) */
   private warmRefusal: string | null = null;
   private previousFeet: GridPoint | undefined;
@@ -265,7 +268,9 @@ export class LiveGridHost {
       return this.prefetchProduct(instance, true);
     }
   }
-  private prefetchProduct(instance: string, required = false, trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' = 'entry'): Promise<LiveGridAdmission> {
+  /** `speculative`: a demand read nobody waits on yet (GC5's near neighbour and pre-warm). Its budget refusal is deferred
+   *  until the budget changes, as a radial read's is, not a failed cell that closes the radial read, the pre-warm and the road. */
+  private prefetchProduct(instance: string, required = false, trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' = 'entry', speculative = false): Promise<LiveGridAdmission> {
     this.assertAlive(); const cell = this.assembly.cell(instance);
     const product = this.products.get(instance); if (product !== undefined) return Promise.resolve(product);
     const pending = this.productRequests.get(instance);
@@ -287,7 +292,8 @@ export class LiveGridHost {
       } catch (error) {
         this.tileMetadata.delete(instance);
         if (this.tileApproach?.instance === instance) { this.tileApproach.controller.abort(); this.tileApproach = null; }
-        if (!required && error instanceof ApproachInputsDeferredError) this.deferredProducts.set(instance, this.ports.allocator.revision);
+        const refused = error instanceof ApproachInputsDeferredError || (error instanceof Error && error.message.includes(PRODUCT_DEFERRED));
+        if ((!required || speculative) && refused) this.deferredProducts.set(instance, this.ports.allocator.revision);
         else { this.issues.set(instance, error instanceof Error ? error.message : String(error)); this.refusals.set(instance, error); }
         try { admission?.cancel?.(); }
         catch (cleanup) { throw new AggregateError([error, cleanup], 'Live product admission and cancellation failed', { cause: cleanup }); }
@@ -554,7 +560,8 @@ export class LiveGridHost {
       const near = candidates[0];
       if (near !== undefined && this.distance(near, feet) <= DEMAND_METRES && !this.products.has(near.instance) && !this.residents.has(near.instance)
         && !this.productRequests.has(near.instance) && !this.issues.has(near.instance) && !this.constructing.has(near.instance)
-        && this.ports.backgroundReady?.() !== false) void background(near.instance, this.prefetchProduct(near.instance, true, 'explicit'), () => !this.disposed);
+        && this.deferredProducts.get(near.instance) !== this.ports.allocator.revision && this.ports.backgroundReady?.() !== false)
+        void background(near.instance, this.prefetchProduct(near.instance, true, 'explicit', true), () => !this.disposed);
     }
     // Approach preparation owns render tiles only, never a regional world or gameplay hooks.
     const moving = !travelled ? undefined : candidates.find(cell => headsToEntry(cell, feet, previous)
@@ -584,8 +591,14 @@ export class LiveGridHost {
     // jump or a recoil off the wall reads as a heading back into the cell just left, which let the world built ahead go.
     const held = this.ports.buildAhead === true && this.active === null && this.assembly.at(feet.x, feet.z) === undefined
       ? nearby.find(cell => cell.instance !== departed && this.distance(cell, feet) <= wallReach) : undefined;
+    // Inside the source a new heading must hold HEADING_HOLD_MS before it retires the world built ahead: steering that
+    // wobbles near a corner would otherwise build and dispose a whole world per flip.
+    const turned = moving !== undefined && moving.instance !== this.ahead;
+    if (!turned || this.active === null) this.turnedSince = null;
+    else if (this.turnedSince?.instance !== moving.instance) this.turnedSince = { instance: moving.instance, at: diagnosticNow() };
+    const settledTurn = turned && (this.active === null || diagnosticNow() - (this.turnedSince?.at ?? 0) >= HEADING_HOLD_MS);
     if (this.ahead !== null && (this.distance(this.assembly.cell(this.ahead), feet) >= this.assembly.pitch
-      || held === undefined && moving !== undefined && moving.instance !== this.ahead && (this.assembly.at(feet.x, feet.z) === undefined || this.active !== null))) this.ahead = null;
+      || held === undefined && settledTurn && (this.assembly.at(feet.x, feet.z) === undefined || this.active !== null))) this.ahead = null;
     if (this.requests.size === 0) {
       const boulevard=work.boulevard;
       if(travelled&&moving===undefined)for(let i=0,length=candidates.length;i<length;i++){
@@ -646,7 +659,11 @@ export class LiveGridHost {
         const product = this.products.get(moving.instance);
         // The heading names it: its product is read as demand (it may evict speculative neighbours' products), not as a radial
         // guess, which the shared budget declines while the page's other neighbours compete for the same headroom.
-        if (product === undefined) { this.warmRefusal = 'product'; if (!this.productRequests.has(moving.instance)) void background(moving.instance, this.prefetchProduct(moving.instance, true, 'explicit'), () => !this.disposed); }
+        if (product === undefined) {
+          this.warmRefusal = 'product';
+          if (!this.productRequests.has(moving.instance) && this.deferredProducts.get(moving.instance) !== this.ports.allocator.revision)
+            void background(moving.instance, this.prefetchProduct(moving.instance, true, 'explicit', true), () => !this.disposed);
+        }
         else if (product.isolatedPreparation !== true) this.warmRefusal = 'exclusive';
         else if (!this.ports.allocator.canPrepareAlongside(this.active, moving.instance, product.bytes,
           { playing: this.ports.allocator.envelope(), loading: CONTENT_CAPS.loading })) this.warmRefusal = 'budget';

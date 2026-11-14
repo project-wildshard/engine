@@ -28,9 +28,11 @@ export class GridRoom {
   private readonly crossings = new Map<string, { readonly session: GridCrossingSession; readonly scope: Scope }>();
   private readonly travels: GridTravel[] = [];
   private readonly scope = new Scope('grid-room');
-  /** each player's last cell left for the road, and the cells being opened ahead of a player on the road (GC5) */
+  /** each player's last cell left for the road, and the cells opened ahead of them on this stretch of road (GC5): each at
+   *  most once a stretch, so two players on the road never evict each other's cell tick after tick, and a failed open is not
+   *  retried every tick (the crossing still prepares it at the line and reports a failure) */
   private readonly departed = new Map<string, string>();
-  private readonly warming = new Set<string>();
+  private readonly opened = new Map<string, Set<string>>();
   private readonly feet = new Map<string, { x: number; z: number }>();
   constructor(grid: GridSimulation, assembly: GridAssembly, ports: GridRoomPorts) {
     this.grid = grid; this.assembly = assembly; this.ports = ports;
@@ -49,7 +51,7 @@ export class GridRoom {
   leave(player: string): boolean {
     const crossing = this.crossings.get(player);
     if (crossing === undefined || !this.grid.leave(player)) return false;
-    crossing.scope.dispose(); this.crossings.delete(player); this.departed.delete(player); this.feet.delete(player);
+    crossing.scope.dispose(); this.crossings.delete(player); this.departed.delete(player); this.feet.delete(player); this.opened.delete(player);
     return true;
   }
   /** Everyone's own crossing, once per fixed tick, before any world steps. */
@@ -66,7 +68,8 @@ export class GridRoom {
   private warm(player: string, feet: Readonly<GridPoint>): void {
     const previous = this.feet.get(player);
     this.feet.set(player, { x: feet.x, z: feet.z });
-    if (this.grid.current(player) !== null || previous === undefined) return;
+    if (this.grid.current(player) !== null) { this.opened.delete(player); return; }
+    if (previous === undefined) return;
     const left = this.departed.get(player), edge = (p: Readonly<{ x: number; z: number }>, cell: { readonly origin: GridPoint }): number =>
       Math.max(Math.abs(p.x - cell.origin.x), Math.abs(p.z - cell.origin.z)) - CHUNK_HALF;
     let best: string | undefined, bestDistance = WARM_ROAD_METRES;
@@ -76,10 +79,11 @@ export class GridRoom {
       if (cell.instance === left || distance > bestDistance || distance > edge(previous, cell) - WARM_STEP_METRES) continue;
       best = cell.instance; bestDistance = distance;
     }
-    if (best === undefined || this.grid.ready(best) || this.warming.has(best)) return;
-    const instance = best;
-    this.warming.add(instance);
-    void this.grid.prefetch([instance]).catch(() => undefined).finally(() => { this.warming.delete(instance); });
+    if (best === undefined || this.grid.ready(best)) return;
+    const opened = this.opened.get(player) ?? new Set<string>();
+    if (opened.has(best)) return;
+    opened.add(best); this.opened.set(player, opened);
+    void this.grid.prefetch([best]).catch(() => undefined);
   }
   /** One fixed tick: everyone's own crossing, then every occupied world. */
   step(commands?: ReadonlyMap<string, SimTickCommand>): void { this.cross(); this.grid.stepAll(commands); }

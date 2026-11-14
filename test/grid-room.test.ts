@@ -161,3 +161,21 @@ test('a player on the road has the nearest cell ahead opened 60 m out, before it
     expect(s.loads.length).toBe(2);
   } finally { s.room.dispose(); s.grid.dispose(); }
 });
+
+// Review of GC5: a cell opened ahead and then evicted (another player's open, one resident slot) or failed is not opened again
+// tick after tick on the same stretch of road; the crossing still prepares it at its line.
+test('the road opens a cell ahead at most once a stretch of road', async () => {
+  const s = stage(), lead = leadPlayer(s.grid.host()).id;
+  try {
+    place(s, lead, outside(s.cell, 30)); s.room.step(); await settle();
+    for (let tick = 0; tick < 3; tick++) { s.room.step(new Map([[lead, walking(-1)]])); await settle(); }
+    await settle();
+    expect(s.loads).toEqual([s.cell.instance]);
+    expect(s.grid.unload(s.cell.instance)).toBe(true); // evicted while still on the road
+    for (let tick = 0; tick < 30; tick++) { s.room.step(new Map([[lead, walking(-1)]])); await settle(); }
+    expect(s.grid.current()).toBeNull();
+    expect(s.loads).toEqual([s.cell.instance]);
+    await until(s, () => new Map([[lead, walking(-1)]]), () => s.grid.current() === s.cell.instance); // the line still opens it
+    expect(s.loads).toEqual([s.cell.instance, s.cell.instance]);
+  } finally { s.room.dispose(); s.grid.dispose(); }
+});

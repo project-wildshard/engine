@@ -4,6 +4,9 @@ import { ApproachInputsDeferredError } from './productInputs';
 import { productResidentBytesSteps } from '../shardfile/productCost';
 import { workSlice } from '@wildshard/engine/core/workSlice';
 
+/** A required product read the shared budget refused for now (not a broken product). */
+export const PRODUCT_DEFERRED = 'Product residency admission deferred';
+
 /** A caller holds the product while any admitted source or immutable transport bytes are still in use. */
 export interface ProductLease<T> { readonly value: T; release: () => void }
 interface Entry<T> { promise: Promise<T>; claim: ResidencyLease | undefined; bytes: number; users: number; settled: boolean; failed: boolean; optional: boolean }
@@ -37,7 +40,7 @@ export class ProductLeases<T> {
             const request = { id: `product:${this.owner}:${key}`, category: 'product' as const, owner: this.owner,
               bytes: fresh.bytes, distance: 0, needed: true, evictSync: () => { this.entries.delete(key); fresh.claim = undefined; } };
             const claim = fresh.optional ? this.allocator.reserveIfFits(request) : this.allocator.reserve(request);
-            if (claim === null) { if (fresh.optional) throw new ApproachInputsDeferredError(); throw new Error('Product residency admission deferred'); } fresh.claim = claim;
+            if (claim === null) { if (fresh.optional) throw new ApproachInputsDeferredError(); throw new Error(PRODUCT_DEFERRED); } fresh.claim = claim;
           }, bytes => {
             if (this.closed) return; // A decoder completing after page disposal has no live claim to reduce.
             if (fresh.claim === undefined) throw new Error('Transport release needs a product claim');
