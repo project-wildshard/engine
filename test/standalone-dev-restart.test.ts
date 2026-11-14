@@ -65,6 +65,15 @@ test('AP19: the in-page server restarts on new quest rows, keeps the player wher
   if (frame === null) throw new Error('no frame after the restart');
   const { px, pz } = shell.client.owner(frame);
   expect(Math.hypot(Number(px) - at.x, Number(pz) - at.z)).toBeLessThan(1);
+  // a section the worker doesn't take answers no before the client leaves its link, and the world keeps running
+  const kept = shell.client.latest?.tick ?? 0;
+  expect(await shell.devRestart({ clientScripts: [] } as unknown as Parameters<typeof shell.devRestart>[0], at)).toMatchObject({ ok: false });
+  await until(() => (shell.client.latest?.tick ?? 0) > kept + 5);
+  // two at once: the first restarts, the second is refused on the page, and the client follows the first's link
+  const [first, second] = await Promise.all([shell.devRestart({ quests }, at), shell.devRestart({ quests }, at)]);
+  expect(first).toMatchObject({ ok: true }); expect(second).toMatchObject({ ok: false, reason: 'a restart is already running' });
+  const after = shell.client.latest?.tick ?? 0;
+  await until(() => (shell.client.latest?.tick ?? 0) > after + 5);
   // rows the format refuses are no restart: the running world stays down only until the page reloads into a new shell
   expect(() => withDevGameplay(input.shard, { quests: { ...quests, quests: [{ ...quests.quests[0], steps: [] }] } as unknown as Shardfile['quests'] })).toThrow();
   shell.dispose();

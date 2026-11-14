@@ -8,7 +8,9 @@ import { carryOutputDescriptor } from '@wildshard/engine/game/shardfile/outputDe
  * state schema, the look, the ground) is a new shell or the hook's other calls. DEVSERVER-only on both sides, as
  * `devColliders.ts` is (engine `scripts/check-devserver.mjs` refuses `wildshardDevRestart` in a production bundle).
  */
-export const DEV_GAMEPLAY_SECTIONS = ['quests', 'questNpcs', 'questHost', 'encounters', 'directors', 'creatures', 'crowds', 'hooks', 'ledger', 'sim', 'clientScripts'] as const;
+// `questNpcs` and `clientScripts` are not here: only the page reads them and the hook rebuilds only the quest views, so a change
+// to either is a new shell.
+export const DEV_GAMEPLAY_SECTIONS = ['quests', 'questHost', 'encounters', 'directors', 'creatures', 'crowds', 'hooks', 'ledger', 'sim'] as const;
 export type DevGameplaySection = typeof DEV_GAMEPLAY_SECTIONS[number];
 /** The new rows of each section the watched source declares now; a section left out keeps the shell's. */
 export type DevGameplay = Partial<Pick<Shardfile, DevGameplaySection>>;

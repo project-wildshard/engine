@@ -87,11 +87,11 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     changed.poll(now);
   };
 
-  /** The grid's boot options for `message`; `patch` changes each read shardfile (AP19's restart). */
+  /** The grid's boot options for `message`; `patch` changes the watched shard's read shardfile (AP19's restart), never a neighbour's. */
   const gridOptions = (message: Boot, local: ForwardedStorage, patch?: (shard: Shardfile) => Shardfile): Parameters<typeof StandaloneGrid.boot>[0] => {
-    const { arrival, residents } = options.proof ?? {};
+    const { arrival, residents } = options.proof ?? {}, watched = new Set([message.slug]);
     return { slug: message.slug, build: message.build, book, saves, storage: local, savePrefix: message.savePrefix, now: diagnosticNow, ...(message.lone === true ? { lone: true } : {}),
-      load: slug => options.load(message, slug, patch), strips: () => options.strips?.(message) ?? Promise.resolve([]), stepped, ...(options.onSaveRefused === undefined ? {} : { refused: options.onSaveRefused }), ...(options.reports === undefined ? {} : { reports: options.reports }),
+      load: slug => options.load(message, slug, watched.has(slug) ? patch : undefined), strips: () => options.strips?.(message) ?? Promise.resolve([]), stepped, ...(options.onSaveRefused === undefined ? {} : { refused: options.onSaveRefused }), ...(options.reports === undefined ? {} : { reports: options.reports }),
       ...(arrival === undefined ? {} : { arrival }), ...(residents === undefined ? {} : { residents }), ...(options.goto === undefined ? {} : { goto: options.goto }) };
   };
 
@@ -121,6 +121,8 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
       const started = diagnosticNow(), old = grid;
       const answer = (ok: boolean, reason?: string): void => { reply.postMessage({ ok, ms: Math.round(diagnosticNow() - started), ...(reason === undefined ? {} : { reason }) } satisfies DevRestarted, []); reply.close(); };
       if (old === undefined || restarting) { answer(false, 'no world to restart'); return; }
+      // the clock comes back only as it was: a hidden tab's or a failed world's server stays paused
+      const running = clock?.running ?? false;
       restarting = true; clock?.pause();
       try {
         await saveWorld();
@@ -135,7 +137,7 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
         next.open();
         answer(true);
       } catch (cause) { answer(false, cause instanceof Error ? cause.message : String(cause)); }
-      finally { restarting = false; clock?.start(); }
+      finally { restarting = false; if (running) clock?.start(); }
     } : null;
     if (options.harness !== undefined) options.harness.onmessage = (event: MessageEvent<unknown>): void => {
       const [port, reply] = event.ports, live = grid;

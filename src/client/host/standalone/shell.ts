@@ -13,7 +13,7 @@ import { ServerMessageSchema, ShellMessageSchema, type ProbedRow, type ServerMes
 import { answerHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import type { HarnessFlag, HarnessGod, HarnessHits, HarnessJoin, HarnessMove, HarnessPlace } from '../../../shared/host/standalone/harnessPlace';
 import type { DevBox, DevCollidersMessage, DevGround, DevGroundMessage } from '@wildshard/engine/game/devColliders';
-import type { DevGameplay, DevPlace, DevRestarted, DevRestartMessage } from '@wildshard/engine/game/devGameplay';
+import { isDevRestart, type DevGameplay, type DevPlace, type DevRestarted, type DevRestartMessage } from '@wildshard/engine/game/devGameplay';
 import type { ServerWorkerStart } from '../../../server/host/standalone/serverRuntime';
 import { WorkerLoopback } from '../../../shared/host/standalone/workerLoopback';
 
@@ -85,6 +85,8 @@ function applyWrite(storage: SaveStorage, key: string, value: string | null): bo
   try { if (value === null) storage.removeItem(key); else storage.setItem(key, value); return true; } catch { return false; }
 }
 
+/** AP19: how long the page waits for the in-page server's answer to a soft restart before it counts as refused. */
+const DEV_RESTART_TIMEOUT_MS = 20_000;
 const SaveDocument = v.object({ keys: v.record(v.string(), v.unknown()), reset: v.optional(v.number()) });
 /** Apply only entries the worker changed since its last document. The page owns discovery and cosmetic wear;
  * a server pack/pending-drop write must leave those newer entries standing. Resets still replace the document. */
@@ -143,14 +145,23 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
     scope.expose(window, '__workerClientDevGround', (ground: DevGround) => { harness.postMessage({ wildshardDevGround: ground } satisfies DevGroundMessage, []); });
   // SHARD-SOURCE AP19: the soft restart. The server takes a new link with the restart; this page's client rejoins on it at once
   // (its hello waits in the port until the new world listens), as an online page does when its server comes back.
+  // One at a time, and only a message the worker takes: anything else answers `ok: false` before the client leaves its link, so
+  // the page reloads instead of sitting on a link nothing serves. A worker that never answers counts as a refusal too.
+  let restarting = false;
   const devRestart = (gameplay: DevGameplay, at: DevPlace | null): Promise<DevRestarted> => new Promise<DevRestarted>(resolve => {
     if (!(typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) || harness === undefined) { resolve({ ok: false, ms: 0, reason: 'not a DEVSERVER page with an in-page server' }); return; }
-    const line = new MessageChannel(), reply = new MessageChannel();
-    reply.port1.onmessage = (event: MessageEvent<DevRestarted>): void => { reply.port1.close(); resolve(event.data); };
+    const message: DevRestartMessage = { wildshardDevRestart: gameplay, at };
+    if (!isDevRestart(message)) { resolve({ ok: false, ms: 0, reason: 'the worker takes only the dev gameplay sections and a finite place' }); return; }
+    if (restarting) { resolve({ ok: false, ms: 0, reason: 'a restart is already running' }); return; }
+    restarting = true;
+    const line = new MessageChannel(), reply = new MessageChannel(), waiting: { timer?: ReturnType<typeof scope.timeout> } = {};
+    const settle = (answer: DevRestarted): void => { if (!restarting) return; restarting = false; scope.cancelTimer(waiting.timer); reply.port1.close(); resolve(answer); };
+    waiting.timer = scope.timeout(DEV_RESTART_TIMEOUT_MS, () => { settle({ ok: false, ms: DEV_RESTART_TIMEOUT_MS, reason: 'the in-page server did not answer the restart' }); });
+    reply.port1.onmessage = (event: MessageEvent<DevRestarted>): void => { settle(event.data); };
     const link = new WorkerLoopback(line.port1);
     link.onClose(reason => { if (reason === 'reload') config.refused?.(); });
     client.rejoin(link);
-    harness.postMessage({ wildshardDevRestart: gameplay, at } satisfies DevRestartMessage, [line.port2, reply.port2]);
+    harness.postMessage(message, [line.port2, reply.port2]);
   });
   if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && harness !== undefined && typeof window !== 'undefined') scope.expose(window, '__workerClientDevRestart', devRestart);
   post({ kind: 'boot', slug: config.slug, base: config.base, build: config.serverBuild ?? config.build, savePrefix: config.savePrefix, saves: documents, ...(config.lone === true ? { lone: true } : {}) });
