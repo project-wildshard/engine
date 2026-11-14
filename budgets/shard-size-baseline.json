@@ -70,6 +70,12 @@
    "toBytes": 34683878,
    "decision": "J299",
    "why": "AUDIO AU1 (J299, Jake 2026-11-12: audio downloads at DOWNLOAD and is cached): the boot audio set moved into the phone download, +2.29 MB over the 32.40 MB latch, inside J303's 10 MB audio budget. Raised by opus-rel14 for v0.1.14."
+  },
+  {
+   "shard": "far-reach",
+   "toBytes": 26340742,
+   "decision": "J338",
+   "why": "GC30b (J338, Jake 2026-11-13: \"let's have it look GREAT FIRST ; then optimize megabytes later\", up to 50 MB a shard, 100 MB the hard ceiling): Sky Reach rev 3 (cdbb400c) gives Far Reach its entry docks and ships its phone tier as copies of the desktop GLBs, +0.36 MB over the 25.98 MB latch. The look stays; megabytes are optimised later. Raised by opus-farreach."
   }
  ],
  "shards": {
@@ -238,7 +244,7 @@
   "far-reach": {
    "baselinePhoneBytes": 49888072,
    "recordedPhoneBytes": 53585115,
-   "ceilingPhoneBytes": 25980736,
+   "ceilingPhoneBytes": 26340742,
    "shrinkOnly": true,
    "baseline": {
     "phone": {
