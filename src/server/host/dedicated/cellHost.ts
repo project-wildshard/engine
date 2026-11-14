@@ -294,8 +294,14 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   void (async (): Promise<void> => {
     const first = options.slugs[0];
     // SA34a: a worker booted after a placement (its `placed`) lays the placed cells out from the start.
-    // GC28: a book with no grid pack reads no strips: no road to stand on, so the cells open lone (the worker's `road.pack` line says 0).
-    if (options.road !== undefined && first !== undefined) { const assembly = gridAssembly(), strips = await options.road(), placed = placedStrips(assembly, gridAssembly(false)); if (strips.length > 0) crossing = { name: roadName(first), assembly, strips: [...strips, ...placed.strips], seams: placed.seams }; }
+    // ROAD-RESIDENT RR4 (Jake 11-13 ~10:35: crossing always on; replaces GC28's lone cells): a book with no grid pack reads no
+    // strips, so there is no road to stand on. The worker refuses its boot: `/health` never comes up and `wildshard-config`'s
+    // rollback keeps the last good server, instead of a server whose players can't leave their cell (the `road.pack` line says 0).
+    if (options.road !== undefined && first !== undefined) {
+      const assembly = gridAssembly(), strips = await options.road(), placed = placedStrips(assembly, gridAssembly(false));
+      if (strips.length === 0) throw new Error('No road: the grid pack read 0 strips (a crossing worker needs its road)');
+      crossing = { name: roadName(first), assembly, strips: [...strips, ...placed.strips], seams: placed.seams };
+    }
     for (const slug of options.slugs) { const room = await open(slug); if (disposed) return; cells.set(slug, { slug, room, emptySince: diagnosticNow(), used: false, waking: null }); }
     if (crossing !== undefined && rapier !== undefined) {
       const { name, assembly, strips } = crossing, begun = diagnosticNow();
