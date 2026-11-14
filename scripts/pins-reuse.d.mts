@@ -17,6 +17,7 @@ export interface Reused {
 }
 export function pinsKey(root: string, revision: string): string;
 export function dropManifest(root: string): void;
+export function stalePinProducts(root: string): { folder: string; revision: unknown }[];
 export function verifiedPinsOutputs(root: string): { paths: Set<string>; key: string };
 export function writeManifest(root: string, key: string, products: Manifest['products'], mounts: Manifest['mounts']): void;
 export function lockPins(root: string, options?: { wait?: boolean }): (() => void) | undefined;

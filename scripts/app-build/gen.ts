@@ -9,6 +9,7 @@ import { contentNamed, hashTree } from './assetHashes';
 import { copyRapierWasm } from '../../vite/rapier';
 import { copyBasisTranscoder } from './basis';
 import { publicBytesTableSource, assetVersionsTableSource } from '../boot-publication.mjs';
+import { stalePinProducts } from '../pins-reuse.mjs';
 
 // /asset-index.json: every file under public/assets with its byte size, so the loading
 // screen can show real "x / y MB" totals for the files it has requested so far.
@@ -29,6 +30,10 @@ export function assetIndex(): string {
 // denominators need no fetch and `pnpm tsc` fails when a file a chunk declares disappears.
 const BYTES_TABLE = 'src/client/game/boot/bytes.generated.ts';
 function bytesModule(): string {
+  // A pinned product older than the pins (a tree installed before a pin bump) published its old mounts under public/:
+  // stamping them would put that revision's files back in the table, as lands from such worktrees did (Far Reach rev 1).
+  const stale = stalePinProducts('.');
+  if (stale.length > 0) throw new Error(`out/ holds pinned products the pins no longer name (${stale.map(row => `${row.folder} revision ${String(row.revision)}`).join(', ')}): their public/ mounts would go into the boot stamps. Run \`pnpm pins\` in this tree, then gen:inputs again`);
   const rows = Object.fromEntries(Object.entries(JSON.parse(assetIndex()) as Record<string, number>).filter(([name]) => !name.endsWith('.DS_Store')));
   // The staged table is the baseline (HEAD's, unless a fix to it is staged on purpose), not the file a local run last
   // wrote: that may hold an older public/'s sizes.

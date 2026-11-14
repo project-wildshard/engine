@@ -198,6 +198,28 @@ function pinHashes(root){
  return (shards??[]).map(row=>String(row.hash));
 }
 
+/**
+ * The products under `out/` whose receipt names a pin `root`'s pins no longer name (`out/<folder>`, with the revision its
+ * receipt says), e.g. a worktree installed before a pin bump and rebased past it. Their mounts under public/ are that old
+ * revision's, so the boot stamps gen:inputs writes from public/ would carry the old files (Far Reach rev 1's 21 rows,
+ * re-added by lands from such worktrees, 2026-11-14). A tree with no `out/` or no pins file has none.
+ * @param {string} root @returns {{folder:string,revision:unknown}[]}
+ */
+export function stalePinProducts(root){
+ let want;
+ try{want=new Set(pinHashes(root));}catch{return [];}
+ let folders;
+ try{folders=readdirSync(join(root,'out'),{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name);}catch{return [];}
+ /** @type {{folder:string,revision:unknown}[]} */const stale=[];
+ for(const folder of folders.sort()){
+  /** @type {unknown} */let pin;
+  try{pin=JSON.parse(readFileSync(join(root,'out',folder,'validation.json'),'utf8')).pin;}catch{continue;}
+  if(typeof pin!=='object'||pin===null||!('hash'in pin)||typeof pin.hash!=='string')continue;
+  if(!want.has(pin.hash))stale.push({folder,revision:'revision'in pin?pin.revision:undefined});
+ }
+ return stale;
+}
+
 /** Every file under `directory` as a path relative to it with its size, or a refusal: an entry that is neither a
  * directory nor a regular file, an executable file, or a directory the owner can't write and enter.
  * @param {string} directory @returns {Map<string,number>|string} */
