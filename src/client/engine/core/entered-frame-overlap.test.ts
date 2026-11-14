@@ -59,7 +59,7 @@ function fixture(early: () => Promise<void> = () => Promise.resolve(), final: ()
   if (start === -1 || end < start) throw new Error('Entered-frame method missing');
   const warnings: string[] = [];
   const method: unknown = runInNewContext(stripTypeScriptTypes(`class Harness { ${source.slice(start, end)} }\nHarness.prototype.warmEnteredFrame`),
-    { boundEntryWarmup, diagnosticNow: () => 0,
+    { boundEntryWarmup, diagnosticNow: () => 0, POST_PREPARATION_WAIT_MS: 12_000,
       console: { warn: (...args: unknown[]) => { warnings.push(args.map(String).join(' ')); } } });
   if (typeof method !== 'function') throw new Error('Entered-frame method is not callable');
   const owner = new Scope('overlap'), root = new Group(), scene = new Scene();
@@ -69,7 +69,7 @@ function fixture(early: () => Promise<void> = () => Promise.resolve(), final: ()
   const frames = new Map<number, (at: number) => void>();
   installScopeEnvironment({ ...original, frame: draw => { const id = ++next; frames.set(id, draw); return id; },
     cancelFrame: id => { frames.delete(id); } });
-  const game = { _composer: {}, scene, frameCount: 1, postPreparation: Promise.resolve(),
+  const game = { _composer: {}, scene, frameCount: 1, postPreparation: Promise.resolve(), engineScope: owner,
     async warmEnteredRoots(actualOwner: Scope, _composer: unknown, roots: readonly Object3D[], lighting: Object3D, current: () => boolean): Promise<void> {
       expect(actualOwner).toBe(owner); expect(roots).toEqual([root]); expect(lighting).toBe(root);
       fence = current; calls.push('world'); await early();
