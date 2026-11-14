@@ -17,6 +17,8 @@ export function assertProductionBuild(directory) {
       else if (file.name.endsWith('.js')) {
         const code = readFileSync(full, 'utf8');
         if (code.includes('__DEVSERVER__') || code.includes('__PREPARATION_ONLY__')) throw new Error('Production bundle contains an unsubstituted DEVSERVER or PREPARATION_ONLY define');
+        // SHARD-SOURCE AP5: the dev scene host (src/client/game/devScene) is DEVSERVER-only.
+        if (code.includes('/__wildshard_scene/')) throw new Error(`Production bundle ${file.name} contains the dev scene host`);
       }
     }
   };
