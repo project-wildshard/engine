@@ -312,6 +312,8 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
     // Play here / Play again reload into the world: the tap that brought the player here comes along (QA row 16)
     reload: () => { entering(link.loaded); void reloadByHand(); },
     progress: () => shellNow?.progress() ?? { dials: 0, nextDialMs: null, downMs: 0 }, why: () => shellNow?.why() ?? 'closed',
+    // FM4b modes 21 and 22: the Slow and Unstable chips read the link's own measurements
+    stats: () => shellNow?.client.stats,
   });
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
   const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void reloadByHand(); }); };

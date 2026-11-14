@@ -7,6 +7,7 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { LinkCause, LinkProgress, LinkState } from '@wildshard/engine/net/redial';
 import type { Countdown } from '@wildshard/engine/net/socketFrames';
+import type { TransportStats } from '@wildshard/engine/net/transport';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { captureBrowserError } from '@wildshard/engine/telemetry/browserErrors';
 
@@ -24,6 +25,12 @@ function reportStop(screen: 'link-lost' | 'link-refused', detail: string, report
 const GIVE_UP_S = 120;
 /** The Reconnected notice stays this long. */
 const NOTICE_MS = 2500;
+/** FM4b modes 21 and 22, sampled once a second while live: a pong RTT over this is slow; five in a row spanning this much are unstable. */
+const SLOW_RTT_MS = 250, UNSTABLE_SPAN_MS = 250;
+/** Mode 22: the share of frames the server says it skipped for this client (`lossPct`), not measured TCP loss. */
+const UNSTABLE_LOSS_PCT = 5;
+/** A quality chip shows after this many bad seconds in a row, clears after this many good ones, and shows at most once a minute. */
+const QUALITY_SUSTAIN_S = 5, QUALITY_CLEAR_S = 10, QUALITY_GAP_S = 60;
 /** After Keep waiting, a blocked tap pulses the banner instead of opening the card again, for this long. */
 const QUIET_MS = 10_000;
 
@@ -88,6 +95,8 @@ export interface LinkScreenHooks {
   readonly doctor?: (from: string) => void;
   /** Reload this page into the world, taking the seat back (another tab, a turned-away link). */
   readonly reload: () => void;
+  /** FM4b modes 21 and 22: the link's measured pong RTT and the server's reported frame skips (`NetClient.stats`) */
+  readonly stats?: () => TransportStats | undefined;
   /** S13: where a failed link's stop card reports (the browser error tracker; a test observes its own) */
   readonly report?: typeof captureBrowserError;
 }
@@ -273,8 +282,43 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     root.querySelector('button')?.focus();
   };
 
+  /**
+   * FM4b modes 21 (`slow`) and 22 (`lossy`): a notice chip in the top band while the link is live and measurably slow or unstable.
+   * Only what the page measured: the pong RTT, the spread of the last five, the server's `lossPct`. Never a guessed cause or a made-up
+   * percentage. A chip waits while a banner is up (it is the bottom layer) and comes back, if still due, with the link.
+   */
+  const rtts: number[] = [];
+  let slowRun = 0, unstableRun = 0, goodRun = 0, sinceChip = QUALITY_GAP_S, qualityScope: Scope | null = null, qualityKind: 'slow' | 'lossy' | null = null, qualityLine: HTMLElement | null = null;
+  const hideQuality = (): void => { qualityScope?.dispose(); qualityScope = null; qualityKind = null; qualityLine = null; };
+  const showQuality = (kind: 'slow' | 'lossy', rtt: number): void => {
+    if (qualityKind !== kind) {
+      hideQuality(); unnotice();
+      const own = qualityScope = scope.child('online.quality'), chip = own.ownNode(make('div', 'ws-link ws-link-notice'));
+      chip.dataset['failmode'] = kind; chip.dataset['tone'] = 'warn'; chip.setAttribute('role', 'status');
+      qualityLine = make('span');
+      chip.append(make('b', '', kind === 'slow' ? 'Slow connection' : 'Unstable connection'), qualityLine);
+      parent.append(chip);
+      qualityKind = kind; sinceChip = 0;
+    }
+    if (qualityLine !== null) qualityLine.textContent = kind === 'slow' ? `${String(Math.round(rtt))} ms` : 'others may jump';
+  };
+  const sampleQuality = (): void => {
+    sinceChip++;
+    const stats = hooks.stats?.();
+    if (stats === undefined || state !== 'live') { hideQuality(); slowRun = unstableRun = goodRun = 0; rtts.length = 0; return; }
+    const rtt = stats.rttMs;
+    if (Number.isFinite(rtt) && rtt > 0) { rtts.push(rtt); if (rtts.length > 5) rtts.shift(); }
+    const slow = Number.isFinite(rtt) && rtt > SLOW_RTT_MS;
+    const unstable = (rtts.length === 5 && Math.max(...rtts) - Math.min(...rtts) >= UNSTABLE_SPAN_MS) || stats.lossPct >= UNSTABLE_LOSS_PCT;
+    slowRun = slow ? slowRun + 1 : 0; unstableRun = unstable ? unstableRun + 1 : 0; goodRun = slow || unstable ? 0 : goodRun + 1;
+    const due = slowRun >= QUALITY_SUSTAIN_S ? 'slow' : unstableRun >= QUALITY_SUSTAIN_S ? 'lossy' : null;
+    if (qualityKind !== null) { if (goodRun >= QUALITY_CLEAR_S) hideQuality(); else showQuality(due ?? qualityKind, rtt); return; }
+    if (due !== null && sinceChip >= QUALITY_GAP_S) showQuality(due, rtt);
+  };
+  scope.interval(1000, sampleQuality);
   const link = (next: LinkState, why?: string): void => {
     state = next; reason = why;
+    if (state !== 'live') hideQuality();
     paintBanner();
     // down again: the notice goes, and a stop card (lost, after Try again) gives way to the banner
     if (down()) {

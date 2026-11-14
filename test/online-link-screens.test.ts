@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import { NetClient } from '../src/client/engine/net/client';
 import type { LinkCause, LinkProgress } from '../src/client/engine/net/redial';
@@ -294,4 +294,57 @@ test('FM4b mode 2: the link back while the card shows closes it at once', () => 
   screens.link('live');
   expect(shown('offline-play')).toBeNull();
   scope.dispose();
+});
+
+test('FM4b modes 21 and 22: Slow and Unstable chips from measured RTT and server skips, sustained 5 s, cleared after 10 good, once a minute', () => {
+  vi.useFakeTimers();
+  try {
+    const stats = { rttMs: 80, lossPct: 0, sentBytes: 0, recvBytes: 0 };
+    const scope = new Scope('test.quality');
+    linkScreens(scope, { retry: () => undefined, dialNow: () => undefined, reload: () => undefined, progress: () => ({ dials: 0, nextDialMs: null, downMs: 0 }), why: () => 'closed', stats: () => stats });
+    const chip = (kind: string): HTMLElement | null => document.querySelector<HTMLElement>(`.ws-link-notice[data-failmode="${kind}"]`);
+    const run = (seconds: number): void => { vi.advanceTimersByTime(seconds * 1000); };
+    stats.rttMs = 480; run(4);
+    expect(chip('slow'), 'four slow seconds are not yet a chip').toBeNull();
+    run(1);
+    expect(chip('slow')?.textContent).toBe('Slow connection480 ms');
+    expect(chip('slow')?.textContent, 'only what was measured').not.toMatch(/%|packet/u);
+    // the drop from 480 to 90 ms is itself a spread for the next four samples, then 10 good seconds clear it
+    stats.rttMs = 90; run(13);
+    expect(chip('slow'), 'it stays until 10 good seconds').not.toBeNull();
+    run(1);
+    expect(chip('slow')).toBeNull();
+    // slow again within the minute: no chip until a minute after the last one showed
+    stats.rttMs = 480; run(10);
+    expect(chip('slow')).toBeNull();
+    run(40);
+    expect(chip('slow')).not.toBeNull();
+    stats.rttMs = 90; run(14);
+    expect(chip('slow')).toBeNull();
+    // unstable: the server says it skipped 6% of this client's frames, for 5 s; with the minute gone it shows
+    run(60);
+    stats.lossPct = 6; run(5);
+    expect(chip('lossy')?.textContent).toBe('Unstable connectionothers may jump');
+    scope.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('FM4b modes 21 and 22: a quality chip waits while the link is down, and an RTT spread of 250 ms over five samples is unstable', () => {
+  vi.useFakeTimers();
+  try {
+    const stats = { rttMs: 80, lossPct: 0, sentBytes: 0, recvBytes: 0 };
+    const scope = new Scope('test.quality2');
+    const screens = linkScreens(scope, { retry: () => undefined, dialNow: () => undefined, reload: () => undefined, progress: () => ({ dials: 0, nextDialMs: null, downMs: 0 }), why: () => 'closed', stats: () => stats });
+    const chip = (kind: string): HTMLElement | null => document.querySelector<HTMLElement>(`.ws-link-notice[data-failmode="${kind}"]`);
+    // never slow 5 s in a row, but each five samples span 260 ms
+    const rtts = [20, 280, 20, 280, 20, 280, 20, 280, 20, 280];
+    for (const rtt of rtts) { stats.rttMs = rtt; vi.advanceTimersByTime(1000); }
+    expect(chip('lossy')).not.toBeNull();
+    expect(chip('slow'), 'no five slow seconds in a row').toBeNull();
+    screens.link('reconnecting', 'closed');
+    expect(chip('lossy'), 'the banner takes the band').toBeNull();
+    for (let second = 0; second < 6; second++) { stats.rttMs = rtts[second % 2] ?? 0; vi.advanceTimersByTime(1000); }
+    expect(chip('lossy'), 'nothing while down').toBeNull();
+    scope.dispose();
+  } finally { vi.useRealTimers(); }
 });
