@@ -103,6 +103,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   const emptyMs = options.emptyMs ?? EMPTY_MS;
   /** GC15 (3): cells a seat from another worker's road is arriving in: none starts over meanwhile (review SHOULD). */
   const arrivals = new Set<Cell>();
+  /** Set by `drain`: the worker is closing, so an arrival is refused (the client retries on the next one). */
+  let drained = false;
   /** `startOver`, once it is made below: a start-over opens a cell, and a cell's room says when it emptied. */
   const later = { startOver: (_cell: Cell, _since: number): void => undefined };
   /** Someone stood in this world: it has something to start over from. A refused seat never got this far. */
@@ -161,8 +163,15 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   /** One start-over at a time on this worker: each boot stalls the clock of every other cell here, so they never pile up. */
   let overs: Promise<void> = Promise.resolve();
   /** The fresh world, swapped in while the cell is still empty. One that fails keeps the old world and says so; the worker plays on. */
+  /** GC4: a walker on this worker's road near the cell's edge, or a seat arriving from another worker's road, may step in now. */
+  const walkerNear = (cell: Cell): boolean => {
+    const origin = crossing?.assembly.cells.find(row => [cell.slug].includes(row.instance))?.origin;
+    return arrivals.has(cell) || (origin !== undefined && road?.near(origin, CHUNK_HALF + NEAR_M) === true);
+  };
   const restart = async (cell: Cell): Promise<void> => {
     if (disposed || cell.room.taken > 0) return;
+    // review SHOULD: a start-over queued behind others looks again when its turn comes, since a walker may have come near meanwhile
+    if (walkerNear(cell)) { const since = cell.emptySince; scope.timeout(NEAR_RETRY_MS, () => { later.startOver(cell, since); }); return; }
     try {
       const old = cell.room, room = await open(cell.slug);
       if (disposed) { room.dispose(); return; }
@@ -175,8 +184,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const left = emptyMs - (diagnosticNow() - since);
     if (left > 0) { scope.timeout(left, () => { later.startOver(cell, since); }); return; }
     // GC4: never boot a cell under a walker heading back to it: while someone on the road stands within NEAR_M of its edge, look again later
-    const origin = crossing?.assembly.cells.find(row => [cell.slug].includes(row.instance))?.origin;
-    if (arrivals.has(cell) || (origin !== undefined && road?.near(origin, CHUNK_HALF + NEAR_M) === true)) { scope.timeout(NEAR_RETRY_MS, () => { later.startOver(cell, since); }); return; }
+    if (walkerNear(cell)) { scope.timeout(NEAR_RETRY_MS, () => { later.startOver(cell, since); }); return; }
     const job = overs.then(() => restart(cell)).finally(() => { if (cell.waking === job) cell.waking = null; });
     cell.waking = job; overs = job;
   };
@@ -246,7 +254,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const refuse = (made?: SeatTransport): void => { (made ?? new SeatTransport(seatPort)).close('retry'); post({ kind: 'crossed', device: entry.device, name: entry.name, from, to: slug, moved: false, stays: false, body: entry.body }); };
     if (cell !== undefined) arrivals.add(cell);
     try {
-      if (cell === undefined || !await settled(cell)) { refuse(); return; }
+      // review SHOULDs: a drained worker seats no one, and a cell that already holds this device keeps that body
+      if (cell === undefined || drained || !await settled(cell) || drained || cell.room.holds(entry.device)) { refuse(); return; }
       const transport = new SeatTransport(seatPort), arrived = cell.room.admit(entry, transport, at);
       if (typeof arrived === 'string') { refuse(transport); return; }
       const player = cell.room.host.players.get(arrived.body);
@@ -268,7 +277,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
       return;
     }
     if (!ready) { fail(new Error('A worker was told something before it booted')); return; }
-    if (order.kind === 'drain') { clock?.pause(); for (const { room } of cells.values()) room.drain(); road?.drain(); post({ kind: 'drained' }); return; }
+    if (order.kind === 'drain') { drained = true; clock?.pause(); for (const { room } of cells.values()) room.drain(); road?.drain(); post({ kind: 'drained' }); return; }
     if (order.kind === 'cross') { cross(order).catch(fail); return; }
     // GC15 (3): crossings between workers, and which cells on the others a walker can stand in
     if (order.kind === 'open') { road?.open(order.cells); return; }
