@@ -2,9 +2,9 @@
   "slices": [
     {
       "slug": "far-reach",
-      "from": "ab7b1d4e1d2ddd29771d6964e470244f3b0ffe6af108bb6196b5071ba18a4e9d",
-      "hash": "1986c2a8bb3be2e93cc0993b850504821fbbc98915ee1bb19b7d9caa7397df33",
-      "bytes": 3902464,
+      "from": "cdbb400ca5d0908399f0e9c43b2304a49fa3881b0846bc562c0f6fe6444051fc",
+      "hash": "b15332936cbfcccf10e9545408deb9a49d348d9b00ed1f8cafde6a600ad64af2",
+      "bytes": 3880448,
       "files": 118
     },
     {
