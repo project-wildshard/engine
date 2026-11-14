@@ -9,3 +9,6 @@
   checks it went with it.
 - The reaper is repo-kit's `files/scripts/worktree-reap.mjs`, byte for byte; `worktree.mjs` takes the same change
   as the kit's copy.
+- Review (J206): the stale list skips a worktree with a process inside or a dirty path changed recently (Git
+  state alone missed days of uncommitted edits); all `du` calls in one reap share a 60 s budget; a change under half a
+  MiB prints `+0`, not `-0`.

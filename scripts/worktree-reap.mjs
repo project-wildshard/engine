@@ -120,15 +120,17 @@ export function freeBytes(path){
  return volume.bavail*volume.bsize;
 }
 
-/** `du -sk` of `path` as GiB text, or `size unknown`. @param {string} path */
-function duSize(path){
- const listed=spawnSync('du',['-sk',path],{encoding:'utf8',timeout:120_000});
+/** `du -sk` of `path` as GiB text, within `budgetMs` (all of a run's `du` calls share one budget), or why not.
+ * @param {string} path @param {number} budgetMs */
+function duSize(path,budgetMs){
+ if(budgetMs<1000)return 'size not measured (du budget spent)';
+ const listed=spawnSync('du',['-sk',path],{encoding:'utf8',timeout:budgetMs});
  const kib=Number((listed.stdout??'').split('\t')[0]);
  return listed.status===0&&Number.isFinite(kib)&&kib>0?`${(kib/1_048_576).toFixed(1)} GiB`:'size unknown';
 }
 
-/** Signed MiB text for a byte count. @param {number} bytes */
-const mib=bytes=>`${bytes<0?'-':'+'}${Math.round(Math.abs(bytes)/1_048_576).toLocaleString('en-US')} MiB`;
+/** Signed MiB text for a byte count; the sign is taken after rounding, so a tiny change reads +0. @param {number} bytes */
+const mib=bytes=>{const size=Math.round(bytes/1_048_576);return `${size<0?'-':'+'}${Math.abs(size).toLocaleString('en-US')} MiB`;};
 
 /** Is `sha` on origin/main itself? @param {string} canonical @param {string} sha */
 export const onMain=(canonical,sha)=>sha!==''&&tryGit(canonical,['merge-base','--is-ancestor',sha,'origin/main']).status===0;
@@ -166,15 +168,23 @@ export function reap(canonical,options,env,say){
  /** @type {string[]} */const reaped=[];
  /** @type {string[]} */const kept=[];
  /** @type {string[]} */const stale=[];
- /** DK11: an unlanded or dirty worktree untouched for --stale hours goes on the receipt with its size.
-  * @param {string} slug @param {string} path @param {string} why */
- const staleCheck=(slug,path,why)=>{
-  let gitDir='';
-  try{gitDir=git(path,['rev-parse','--absolute-git-dir']).trim();}catch{return;}
-  let idle=0;
-  try{idle=(now-lastActivity(path,gitDir))/3_600_000;}catch{return;}
+ const duUntil=now+60_000;
+ /** DK11: an unlanded or dirty worktree untouched for --stale hours goes on the receipt with its size. Untouched
+  * means no Git activity, no change to a dirty path, and no process inside.
+  * @param {string} slug @param {string} path @param {string} why @param {string[]} [dirty] porcelain lines */
+ const staleCheck=(slug,path,why,dirty=[])=>{
+  let gitDir='',physical='';
+  try{gitDir=git(path,['rev-parse','--absolute-git-dir']).trim();physical=realpathSync(path);}catch{return;}
+  if(directories===undefined||[...directories.values()].some(cwd=>cwd===physical||cwd.startsWith(`${physical}${sep}`)))return;
+  let newest=0;
+  try{newest=lastActivity(path,gitDir);}catch{return;}
+  for(const line of dirty.slice(0,500)){
+   const name=line.slice(3).split(' -> ').at(-1)??'';
+   try{newest=Math.max(newest,statSync(join(path,name.replaceAll(/^"|"$/gu,''))).mtimeMs);}catch{/* Deleted: no mtime. */}
+  }
+  const idle=(now-newest)/3_600_000;
   if(idle<options.staleHours)return;
-  const entry=`${slug} (${duSize(path)}, idle ${(idle/24).toFixed(1)} d, ${why})`;
+  const entry=`${slug} (${duSize(path,duUntil-Date.now())}, idle ${(idle/24).toFixed(1)} d, ${why})`;
   stale.push(entry);
   say(`stale    ${entry}`);
  };
@@ -192,7 +202,7 @@ export function reap(canonical,options,env,say){
   // Landed means the tip is on main itself (land fast-forwards): \`git cherry\` would miss a merge's own changes.
   if(!onMain(canonical,tree.head)){const why=`${String(aheadOfMain(canonical,tree.head))} commit(s) not on main`;keep(why);staleCheck(slug,tree.path,why);continue;}
   const dirty=git(tree.path,['--no-optional-locks','status','--porcelain','--untracked-files=all']).split('\n').filter(Boolean);
-  if(dirty.length>0){const why=`${String(dirty.length)} uncommitted path(s)`;keep(`${why}, first ${dirty[0]?.slice(3)}`);staleCheck(slug,tree.path,why);continue;}
+  if(dirty.length>0){const why=`${String(dirty.length)} uncommitted path(s)`;keep(`${why}, first ${dirty[0]?.slice(3)}`);staleCheck(slug,tree.path,why,dirty);continue;}
   const gitDir=git(tree.path,['rev-parse','--absolute-git-dir']).trim();
   const busy=(/** @type {Map<number,string>|undefined} */ seen)=>seen===undefined?'cannot list process working directories'
    :[...seen].filter(([,path])=>path===physical||path.startsWith(`${physical}${sep}`)).map(([pid])=>String(pid)).join(', ');

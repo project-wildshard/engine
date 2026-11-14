@@ -254,8 +254,8 @@ function run(cwd,command,args,env){
 export function diskCost(tree,freeBefore){
  const freeAfter=freeBytes(tree),listed=spawnSync('du',['-sk',tree],{encoding:'utf8',timeout:120_000});
  const kib=Number((listed.stdout??'').split('\t')[0]),duKib=listed.status===0&&Number.isFinite(kib)?kib:undefined;
- const cost=freeBefore-freeAfter;
- const text=`df ${cost<0?'gained':'cost'} ${Math.round(Math.abs(cost)/1_048_576).toLocaleString('en-US')} MiB, du ${duKib===undefined?'unknown':`${(duKib/1_048_576).toFixed(2)} GiB`}, free ${(freeAfter/2**30).toFixed(1)} GiB`;
+ const cost=freeBefore-freeAfter,costMib=Math.round(cost/1_048_576);
+ const text=`df ${costMib<0?'gained':'cost'} ${Math.abs(costMib).toLocaleString('en-US')} MiB, du ${duKib===undefined?'unknown':`${(duKib/1_048_576).toFixed(2)} GiB`}, free ${(freeAfter/2**30).toFixed(1)} GiB`;
  return {freeBefore,freeAfter,dfCostBytes:cost,duKib,text};
 }
 
