@@ -173,6 +173,8 @@ async function checkServer(learned: Learned, ms: number): Promise<Outcome> {
       // D7: behind Cloudflare the rooms address keeps /health private (404, no CORS), so the opaque answer is all a page gets.
       return pass(`${new URL(url).host} reachable · health is private`);
     } catch {
+      // PZ12 (J274): an isolated page (COEP require-corp) is refused the opaque answer itself, so a failure proves nothing
+      if (globalThis.crossOriginIsolated) return warn(`${new URL(url).host}: health is private`, `This page is cross-origin isolated, so it cannot read ${new URL(url).host}'s private health answer. If play fails, tell Jake.`);
       return fail(`${new URL(url).host}: no answer`, `Server unreachable: ${new URL(url).host} is down, its TLS is failing, or the server is stopped. Tell Jake.`);
     }
   }

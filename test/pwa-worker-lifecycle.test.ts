@@ -56,7 +56,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
   const caches = { open, keys: () => Promise.resolve([...books.keys()]), delete: (name: string) => Promise.resolve(books.delete(name)) };
   const fetch = vi.fn((input: Request | string) => read?.(typeof input === 'string' ? new Request(input) : input)
     ?? Promise.resolve(new Response(`body:${typeof input === 'string' ? input : input.url}`)));
-  const load = (build: string, files: string[], shellFiles = shell, content: { base?: string; files?: string[] } = {}, page = document) => {
+  const load = (build: string, files: string[], shellFiles = shell, content: { base?: string; files?: string[] } = {}, page = document, documentHeaders: Record<string, string> = {}) => {
     const listeners = new Map<string, ((event: WorkerEvent) => void)[]>();
     const claim = vi.fn(() => Promise.resolve()), skipWaiting = vi.fn(() => Promise.resolve());
     const routes = vi.fn<(rules: NativeRoute[]) => Promise<void>>(() => Promise.resolve());
@@ -67,9 +67,10 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
     const source = bundled.replaceAll('__BUILD_ID__', build)
       .replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME).replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(page)).replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
       .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shellFiles)))
-      .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base: content.base ?? '', files: content.files ?? [] })));
+      .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base: content.base ?? '', files: content.files ?? [] })))
+      .replace(/['"]__DOCUMENT_HEADERS__['"]/u, () => JSON.stringify(JSON.stringify(documentHeaders)));
     // Deliberately no crypto, scheduler or accounting ports; timers only for the precache's bounded pause.
-    runInNewContext(source, { self, caches, fetch, URL, Request, Response, Set, JSON, encodeURIComponent, AbortController, setTimeout, clearTimeout, performance });
+    runInNewContext(source, { self, caches, fetch, URL, Request, Response, Headers, Set, JSON, encodeURIComponent, AbortController, setTimeout, clearTimeout, performance });
     const dispatch = async (kind: string, payload: Pick<WorkerEvent, 'request' | 'data' | 'ports' | 'source' | 'clientId'> = {}): Promise<Response | undefined> => {
       const work: Promise<unknown>[] = []; let response: Response | undefined;
       for (const listener of listeners.get(kind) ?? []) listener({ ...payload, ...(nativeRoutes && kind === 'install' ? {addRoutes: routes} : {}),
@@ -742,4 +743,23 @@ test('OF5a: a title\'s update PRECACHE fills a new build\'s code only on a devic
   await b.dispatch('message', update);
   expect(await (await f.open(ASSET_CACHE_NAME)).match(url('/b/B/standalone/identity.js')), 'B\'s code, before any shard visit on B').toBeDefined();
   expect(await (await f.open('ws-builds-v1')).match(url('/__ws_build__/B'))).toBeDefined();
+});
+
+test('PZ12: an isolated build answers its document and every worker script with COOP and COEP, cached copies too', async () => {
+  const isolation = { 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp' };
+  const worker = (path: string): Request => { const request = new Request(url(path)); Object.defineProperty(request, 'destination', { value: 'worker' }); return request; };
+  const script = '/b/A/standalone/server-worker.js', f = fixture(), held = f.load('A', [script], shell, {}, document, isolation);
+  await held.dispatch('install'); await held.dispatch('activate'); await held.dispatch('message', precached);
+  // the copy held from before the switch carries no isolation of its own
+  expect((await (await f.open(ASSET_CACHE_NAME)).match(url(script)))?.headers.get('cross-origin-embedder-policy')).toBeNull();
+  const page = await held.dispatch('fetch', { request: new Request(url('/')) });
+  const served = await held.dispatch('fetch', { request: worker(script) }), plainScript = await held.dispatch('fetch', { request: new Request(url(script)) });
+  expect(page?.headers.get('cross-origin-embedder-policy')).toBe('require-corp');
+  expect(served?.headers.get('cross-origin-embedder-policy')).toBe('require-corp');
+  expect(served?.headers.get('cross-origin-opener-policy')).toBe('same-origin');
+  expect(await served?.text()).toBe(`body:${url(script)}`);
+  expect(plainScript?.headers.get('cross-origin-embedder-policy'), 'a same-origin module needs no COEP of its own').toBeNull();
+  // a channel that is not isolated leaves worker scripts as served
+  const plain = fixture(), open = plain.load('A', [script]); await open.dispatch('install'); await open.dispatch('activate');
+  expect((await open.dispatch('fetch', { request: worker(script) }))?.headers.get('cross-origin-embedder-policy')).toBeNull();
 });

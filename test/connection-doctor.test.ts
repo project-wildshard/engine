@@ -78,6 +78,19 @@ test('a server that is down fails health and the socket, with the tunnel hint', 
   expect(rows['latency']?.state).toBe('skip');
 });
 
+test('PZ12: on an isolated page a refused health read is private, not down', { timeout: 30_000 }, async () => {
+  bench = await roomBench();
+  const socket = bench.url;
+  await bench.close(); bench = undefined;
+  // set directly: unstubbing every global would take the setup's localStorage with it
+  Object.defineProperty(globalThis, 'crossOriginIsolated', { value: true, configurable: true });
+  try {
+    const rows = await run(config(await serveOrigin(signed(releaseFor(socket)))));
+    expect(rows['server']?.state).toBe('warn');
+    expect(rows['server']?.hint).toMatch(/cross-origin isolated/u);
+  } finally { Reflect.deleteProperty(globalThis, 'crossOriginIsolated'); }
+});
+
 test('the door says why it refuses a full world; another build of this wire joins', { timeout: 30_000 }, async () => {
   bench = await roomBench({ seats: 0 }); answerHealth(bench);
   const page = await serveOrigin(signed(releaseFor(bench.url)));

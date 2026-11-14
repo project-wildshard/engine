@@ -6,6 +6,18 @@ const BUILD = '__BUILD_ID__';
 const DOCUMENT = '__DOCUMENT__';
 // PZ12 (J274): the page origin's COOP and COEP for the baked document (empty on a channel that is not isolated)
 const DOCUMENT_HEADERS = (baked => baked.startsWith('{') ? JSON.parse(baked) : {})('__DOCUMENT_HEADERS__');
+const ISOLATED = Object.keys(DOCUMENT_HEADERS).length > 0;
+/** PZ12: a dedicated worker in an isolated page starts only if its own script carries COEP. A worker chunk whose name did
+ *  not change across the switch is held here (or in the HTTP cache) with the headers it was first fetched with, so on an
+ *  isolated channel every worker script this worker answers wears the document's headers. */
+async function isolatedWorkerScript(pending) {
+  const response = await pending;
+  if (response.type === 'opaque' || response.type === 'opaqueredirect') return response;
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(DOCUMENT_HEADERS)) headers.set(name, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+const answer = (event, request, pending) => { event.respondWith(ISOLATED && request.destination === 'worker' ? isolatedWorkerScript(pending) : pending); };
 const ASSETS = '__ASSET_CACHE__';
 const BOOKS = 'ws-builds-v1';
 const SHELL_PREFIX = 'ws-shell-v3-';
@@ -410,12 +422,12 @@ workerScope.listen(self, 'fetch', event => {
     return;
   }
   if (immutable(url)) {
-    event.respondWith(cached(request, ASSETS, event));
+    answer(event, request, cached(request, ASSETS, event));
     return;
   }
   if (/^\/(?:assets|basis|fonts)\//.test(url.pathname) || url.pathname === '/manifest.webmanifest') {
-    event.respondWith(cached(request, SHELL, event));
-  } else if (NETWORK_FIRST.test(url.pathname)) event.respondWith(networkFirst(request, SHELL, event));
+    answer(event, request, cached(request, SHELL, event));
+  } else if (NETWORK_FIRST.test(url.pathname)) answer(event, request, networkFirst(request, SHELL, event));
 });
 
 workerScope.listen(self, 'message', event => {
