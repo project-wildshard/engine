@@ -11,3 +11,9 @@
   card) and `--place` (the approach set by the in-page harness pose: preview or a loopback page only; an online page's
   `place` is idle). Pine's approach now goes round the west entryway's pier: the old routes swam under the pier that
   runs along z 0 and stuck there.
+- GC1: `scripts/grid-crossing-qa.mjs` is the crossing harness as one command: the walk proof in Chromium and WebKit at
+  desktop and phone, one JSON row each (`rows.json`: per leg line-to-control, worst stop, long frames, programs linked,
+  memory at control) beside the shots, under `~/.cache/wildshard/plan-artifacts/grid-crossing/`.
+- GC2: the walk proof's `--breach` throws the wall cases at a closed wall from where the last leg is held: jump into it,
+  jump along it both ways, boost-jump into it; a case holds when the page never enters the target and the walker stays
+  on the road, standing.
