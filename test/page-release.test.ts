@@ -122,7 +122,7 @@ test('--content publishes the content set before the packs and the page (PAGE-SI
   await through(deps, 'upload');
   expect(fetched(calls)).toEqual(['prepare', 'run pnpm build:game', 'run node --import ./scripts/bake-loader.mjs scripts/page-release/stamp-content.mjs dist', 'package', 'state build', 'content.publish', 'packs.publish', 'upload', 'state upload']);
   expect(seen).toEqual([{dir: '/out-content', cors: CHANNELS.staging.origin, dryRun: false}]);
-  expect(state.build).toMatchObject({contentBase: 'https://packs.wildshard.io/content/0123456789abcdef/'});
+  expect(state['build']).toMatchObject({contentBase: 'https://packs.wildshard.io/content/0123456789abcdef/'});
   deps.content = {publish: () => Promise.resolve({set: 's', base: 'b', files: 5, bytes: 50, uploaded: 1, uploadedBytes: 10, held: 3, cors: CHANNELS.staging.origin})};
   await expect(runPhase('upload', deps)).rejects.toThrow(/content: 3 held \+ 1 uploaded is not 5/u);
   // a published set other than the stamped one is refused
