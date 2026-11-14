@@ -321,7 +321,10 @@ export function phoneTier(discovery: Uint8Array, read: (url: string) => Uint8Arr
     if (typeof target !== 'string') continue;
     // S12d: a row kept at its size is still encoded 6×6 from its own file when the cook encodes, which retires the hand sets.
     const sized = size(source), own = sized === undefined && counted !== undefined, max = sized ?? (own ? KEPT_ENCODE_MAX : undefined);
-    const match = /^(.*?)(?:-[a-f0-9]{8})?\.(glb|ktx2)$/u.exec(target), bytes = max === undefined || match === null ? undefined : read(target);
+    const match = /^(.*?)(?:-[a-f0-9]{8})?\.(glb|ktx2)$/u.exec(target), held = max === undefined || match === null ? undefined : read(target);
+    // S12d: a shard that dropped its hand-made phone set (Sky Reach) names a target its product no longer carries; the row's own
+    // source, the file desktops load, is then its master, and the cook makes the phone's file from it (`phoneRowSources`).
+    const absent = held === undefined && match !== null && max !== undefined, bytes = held ?? (absent && source.endsWith(`.${match[2] ?? ''}`) ? read(source) : undefined);
     if (max === undefined || match === null || bytes === undefined) { kept.add(target); continue; }
     const ext = match[2] ?? '', master = encode === undefined || own ? undefined : (ext === 'glb' ? sameMaster(desktop, source) : masterOf(desktop, source));
     const masterBytes = master?.endsWith(`.${ext}`) === true ? read(master) : undefined;
@@ -335,7 +338,7 @@ export function phoneTier(discovery: Uint8Array, read: (url: string) => Uint8Arr
       const encodedBefore = encodes;
       const cookedMaster = masterBytes === undefined ? undefined : cook(masterBytes);
       const trimmed = cookedMaster !== undefined && encodes > encodedBefore ? cookedMaster : cook(bytes), fromMaster = trimmed === cookedMaster;
-      file = fromMaster || trimmed.length < bytes.length ? {from: target, url: `${match[1] ?? ''}.t${max}-${hex8(trimmed)}.${ext}`, bytes: trimmed} : null;
+      file = fromMaster || absent || trimmed.length < bytes.length ? {from: target, url: `${match[1] ?? ''}.t${max}-${hex8(trimmed)}.${ext}`, bytes: trimmed} : null;
       made.set(key, file);
       if (file !== null) files.set(target, [...files.get(target) ?? [], file]);
     }

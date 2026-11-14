@@ -37,6 +37,15 @@ describe('the KTX2 table rule', () => {
     expect(() => assertKtx2TableTargets(product({ ...files, 'blobs/ktx2/gone.ktx2': new Uint8Array(1) }), engine)).not.toThrow();
   });
 
+  test('S12d: a phone row the product dropped is served by its source, which the cook makes it from (Sky Reach rev 3)', () => {
+    const table = { GPU_FILES: tiers({ '/assets/glade/fan.glb': '/assets/gpu/glade/fan-c0f55842.glb', '/assets/glade/gone.glb': '/assets/gpu/glade/gone-1.glb',
+      '/assets/glade/a.webp': '/assets/gpu/glade/a.phone-1.ktx2' }, { '/assets/glade/b.glb': '/assets/gpu/glade/b-2.glb' }) };
+    const files = { 'mounts/shardfiles/glade/discovery.json': discovery(table), 'mounts/assets/glade/fan.glb': new Uint8Array(1), 'mounts/assets/glade/b.glb': new Uint8Array(1),
+      'mounts/assets/glade/a.webp': new Uint8Array(1) };
+    // fan's phone file is made from fan.glb; gone.glb is no source either; a webp is no KTX2's master; a desktop row is never made
+    expect(missingKtx2Targets(product(files))).toEqual({ total: 4, missing: ['/assets/gpu/glade/gone-1.glb', '/assets/gpu/glade/a.phone-1.ktx2', '/assets/gpu/glade/b-2.glb'] });
+  });
+
   test('a product file is served at its own slug only, and one missing target is named once', () => {
     const table = { GPU_FILES: tiers({ '/a.webp': '/shardfiles/other/blobs/x.ktx2', '/b.webp': '/shardfiles/other/blobs/x.ktx2' }, {}) };
     const files = { 'mounts/shardfiles/glade/discovery.json': discovery(table), 'blobs/x.ktx2': new Uint8Array(1) };
@@ -61,7 +70,8 @@ const tarball = (hash: string): Ktx2TableProduct => {
 };
 
 test.skipIf(!existsSync(join(CACHE, `${REV1}.tar`)))('Pine Hollow rev 1 is refused, naming its first missing target', () => {
-  expect(() => assertKtx2TableTargets(tarball(REV1))).toThrow('KTX2 table names a missing file: /assets/gpu/pine-hollow/creatures/antler-king-rig.phone.rigged-4aa793ec.glb (81 of 321 targets missing)');
+  // 81 of its targets are absent; 3 are phone GLB rows whose source it carries, which the S12d cook makes
+  expect(() => assertKtx2TableTargets(tarball(REV1))).toThrow('KTX2 table names a missing file: /assets/gpu/pine-hollow/creatures/antler-king-rig.phone.rigged-4aa793ec.glb (78 of 321 targets missing)');
 }, 60_000);
 
 test.skipIf(!existsSync(join(CACHE, `${REV2}.tar`)))('Pine Hollow rev 2 is admitted', () => {

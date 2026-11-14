@@ -151,6 +151,17 @@ describe('phoneTier (S12b)', () => {
     expect(phoneTier(discovery({'/assets/leaf.png': '/assets/gpu/leaf-11111111.ktx2'}), read)).toBeUndefined();
   });
 
+  it('S12d: makes a phone row\'s file from its source when the product dropped the target (Sky Reach rev 3)', () => {
+    const own = {'/assets/fan.glb': glb(ktx2(1024))}, from = (url: string): Uint8Array | undefined => own[url as keyof typeof own] ?? files[url];
+    const tier = phoneTier(discovery({'/assets/fan.glb': '/assets/gpu/fan-c0f55842.glb', '/assets/gone.glb': '/assets/gpu/gone-44444444.glb'}), from);
+    const made = tier?.files.get('/assets/gpu/fan-c0f55842.glb')?.[0];
+    expect(made?.url).toMatch(/^\/assets\/gpu\/fan\.t512-[a-f0-9]{8}\.glb$/u);
+    expect(made === undefined ? 0 : ktx2Info(glbImages(made.bytes)[0]?.bytes ?? new Uint8Array()).width).toBe(512);
+    expect(rowsOf(tier?.discovery ?? new Uint8Array())?.shard.phone['/assets/fan.glb']).toBe(made?.url);
+    // with neither the target nor its source, the row stays as it is
+    expect(tier?.kept.has('/assets/gpu/gone-44444444.glb')).toBe(true);
+  });
+
   it('keeps a target a kept row still names, beside its phone file', () => {
     const both = phoneTier(discovery({'/assets/rock.png': '/assets/gpu/rock-c9b1bd73.ktx2', '/assets/horizon/day.webp': '/assets/gpu/rock-c9b1bd73.ktx2'}), read);
     expect(both?.kept.has('/assets/gpu/rock-c9b1bd73.ktx2')).toBe(true);

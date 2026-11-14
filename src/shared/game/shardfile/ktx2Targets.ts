@@ -5,7 +5,9 @@
  *  missing target in the table's own order.
  *
  *  A target is served when it is a file under `mounts/`, a `cook.json` mount row over a file the product holds, a product
- *  file at `/shardfiles/<slug>/<path>`, or an engine file: the caller says which URLs its host serves itself. */
+ *  file at `/shardfiles/<slug>/<path>`, or an engine file: the caller says which URLs its host serves itself. A `phone` row's
+ *  target is also served when its source is (SHARD-SIZE S12d): the cook makes that phone file from the source, as a shard that
+ *  dropped its hand-made phone set (Sky Reach rev 2 on) expects. */
 
 /** Read access to one product: the paths it holds and the bytes of one of them. */
 export interface Ktx2TableProduct {
@@ -34,13 +36,30 @@ export function ktx2TableTargets(table: unknown): readonly string[] {
   return targets;
 }
 
+/** Each `phone` row's target and the source the cook makes it from when the product lacks it (`phoneTier`, S12d): a row whose
+ *  source and target are the same kind of file (GLB or KTX2). */
+export function phoneRowSources(table: unknown): ReadonlyMap<string, string> {
+  const rows = new Map<string, string>(), kind = (url: string): string | undefined => /\.(glb|ktx2)$/u.exec(url)?.[1];
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) { for (const child of value) walk(child); return; }
+    if (!isRow(value)) return;
+    for (const [key, child] of Object.entries(value)) {
+      if (key === 'phone' && isRow(child)) {
+        for (const [source, target] of Object.entries(child)) if (typeof target === 'string' && kind(target) !== undefined && kind(source) === kind(target) && !rows.has(target)) rows.set(target, source);
+      } else walk(child);
+    }
+  };
+  walk(table);
+  return rows;
+}
+
 /** The table's targets nothing serves, each once, first missing first. */
 export function missingKtx2Targets(product: Ktx2TableProduct, engineFile: (url: string) => boolean = () => false): { readonly total: number; readonly missing: readonly string[] } {
   const paths = new Set(product.paths());
   const discovery = [...paths].find(path => DISCOVERY.test(path));
   if (discovery === undefined) return { total: 0, missing: [] };
   const document = parse(product.read(discovery), discovery);
-  const targets = ktx2TableTargets(isRow(document) && isRow(document['native']) ? document['native']['ktx2'] : undefined);
+  const table = isRow(document) && isRow(document['native']) ? document['native']['ktx2'] : undefined, targets = ktx2TableTargets(table);
   if (targets.length === 0) return { total: 0, missing: [] };
   const mounted = new Set<string>();
   if (paths.has('cook.json')) {
@@ -51,7 +70,8 @@ export function missingKtx2Targets(product: Ktx2TableProduct, engineFile: (url: 
   const home = `/shardfiles/${DISCOVERY.exec(discovery)?.[1] ?? ''}/`;
   const served = (url: string): boolean => paths.has(`mounts${url}`) || mounted.has(url)
     || (url.startsWith(home) && paths.has(url.slice(home.length))) || engineFile(url);
-  return { total: targets.length, missing: [...new Set(targets.filter(url => !served(url)))] };
+  const cooked = phoneRowSources(table), made = (url: string): boolean => { const source = cooked.get(url); return source !== undefined && served(source); };
+  return { total: targets.length, missing: [...new Set(targets.filter(url => !served(url) && !made(url)))] };
 }
 
 /** Refuse a product whose KTX2 table names a file nothing serves. */
