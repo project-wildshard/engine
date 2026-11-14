@@ -12,3 +12,4 @@
   every-pair preview tour once a night, writes the report, checks the ratchet and appends a `grid-nightly` receipt. The tour's
   `--hold` stands in each cell reached and records when the cell behind let its world go (`fromEvictedMs`) and the page's peak
   playing cost, for GC13's straight walk.
+- Tour types: the probe's `target`, the prepare window's tuple and the page handle now typecheck (the commit lane read them).

@@ -11,7 +11,9 @@
 // preparing or blocked while frozen), the time the cell step screen shows, and frames over 33 and 50 ms within 3 s of the border.
 // Not measured: grey stand-ins within 60 m (no reader yet).
 //   scripts/browser-lane.sh node scripts/grid-crossing-tour.mjs --base=https://preview.wildshard.io --out=<dir> [--engine=chromium|webkit]
-//     [--layout=phone] [--arcs=<from>:<to>,…] [--limit=<n crossings>] [--cold] [--lane=<name>]
+//     [--layout=phone] [--arcs=<from>:<to>,…] [--limit=<n crossings>] [--cold] [--lane=<name>] [--hold=<ms>]
+// --hold (GC13): after control, stand this long in the cell reached before the next crossing; each row then says when the cell left
+// behind let its world go (`fromEvictedMs`) and the most the page's playing cost reached (`peakPlayingMB`).
 // --cold (GC3's cold-cache pass): no HTTP cache and no service worker in any page, so every crossing fetches its cell from the
 // network as a first visit does (Chromium: the DevTools cache switch; WebKit: service workers blocked only).
 import { execFileSync } from 'node:child_process';
@@ -27,7 +29,7 @@ const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', ''
 // the harness pose is the in-page server's: preview or a loopback page only (never staging's or production's seats, J205)
 if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: grid-crossing-tour.mjs --base=<preview or loopback url> --out=<dir> [--engine=chromium|webkit] [--layout=phone] [--arcs=a:b,…] [--limit=n]');
 if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error(`No engine ${engineName}`);
-const limit = Number(flag('limit', '400')), only = flag('arcs', '').split(',').filter(Boolean), cold = process.argv.includes('--cold'), lane = flag('lane', 'opus-gcm2');
+const limit = Number(flag('limit', '400')), only = flag('arcs', '').split(',').filter(Boolean), cold = process.argv.includes('--cold'), lane = flag('lane', 'opus-gcm2'), hold = Number(flag('hold', '0'));
 mkdirSync(out, { recursive: true });
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 
@@ -60,7 +62,7 @@ try {
   // a fresh profile at each entry: the first, and again when the tour is stranded in a cell it can't leave (a grid page's title
   // won't take a second Shard Select in the same profile)
   /** @type {import('playwright').BrowserContext | null} */ let context = null;
-  /** @type {import('playwright').Page} */ let page;
+  /** @type {import('playwright').Page} */ let page = /** @type {any} */ (undefined);
   let navigations = 0;
   const profile = async () => {
     await context?.close();
@@ -91,7 +93,7 @@ try {
     await sleep(2000);
     await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
     await page.evaluate(() => {
-      const W = /** @type {any} */ (window), q = W.__gc3 = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), longTasks: /** @type {number[][]} */ ([]), sentinel: 1 }, t0 = performance.now();
+      const W = /** @type {any} */ (window), q = W.__gc3 = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), longTasks: /** @type {number[][]} */ ([]), sentinel: 1, target: /** @type {string | undefined} */ (undefined) }, t0 = performance.now();
       try { performance.setResourceTimingBufferSize(100_000); } catch { /* the default 250 entries */ }
       // GC8: main-thread long tasks (Chromium only; WebKit has no longtask entries), as [start, duration] on the page clock
       try { new PerformanceObserver(list => { for (const entry of list.getEntries()) { q.longTasks.push([Math.round(entry.startTime), Math.round(entry.duration)]); if (q.longTasks.length > 20_000) q.longTasks.splice(0, 10_000); } }).observe({ type: 'longtask', buffered: true }); } catch { /* no longtask entries */ }
@@ -103,7 +105,9 @@ try {
         q.samples.push({ t: Math.round(performance.now() - t0), x: Number(p.position.x.toFixed(2)), y: Number(p.position.y.toFixed(2)), z: Number(p.position.z.toFixed(2)), inside: st.inside,
           phase: lv?.crossing?.phase, ready: lv?.live?.gameplayReady, loading: st.cellLoading, step: st.cellStep?.step ?? null,
           // GC6: whether the crossing's target world (colliders and sim) is resident yet, and the world built ahead (GC5)
-          built: q.target === undefined ? null : lv?.live?.residents?.includes(q.target) === true, ahead: lv?.live?.ahead?.instance ?? null });
+          built: q.target === undefined ? null : lv?.live?.residents?.includes(q.target) === true, ahead: lv?.live?.ahead?.instance ?? null,
+          // GC13: the cells whose worlds the page holds, and what playing costs
+          res: lv?.live?.residents ?? null, mb: st.playingMB ?? null });
         if (q.samples.length > 20_000) q.samples.splice(0, 10_000);
       } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 100);
     });
@@ -158,8 +162,9 @@ try {
       if (jumps >= 4 && stuckSince !== 0 && now - stuckSince > 10_000) break;
     }
     await page.keyboard.up('KeyW'); if (arc.boost) await page.keyboard.up('ShiftLeft');
-    await sleep(400);
-    const rows = /** @type {any[]} */ (await page.evaluate(t => /** @type {any} */ (window).__gc3.samples.filter((/** @type {any} */ r) => r.err === undefined && r.t >= t), tFrom));
+    // GC13 `--hold`: stand in the cell reached, so the page can let the cell behind go
+    await sleep(controlAt === 0 ? 400 : Math.max(400, hold));
+    const rows =/** @type {any[]} */ (await page.evaluate(t => /** @type {any} */ (window).__gc3.samples.filter((/** @type {any} */ r) => r.err === undefined && r.t >= t), tFrom));
     const frames = /** @type {number[][]} */ (await page.evaluate(t => /** @type {any} */ (window).__gc3.frames.filter((/** @type {number[]} */ f) => (f[0] ?? 0) >= t), tFrom));
     const entered = rows.find(r => r.inside === arc.to), roadAt = rows.find(r => r.inside === null);
     /** longest run of consecutive samples (each ~100 ms) matching `test`, in ms, before control */
@@ -172,6 +177,11 @@ try {
     const builtAt = rows.find(r => r.built === true)?.t;
     row.builtBeforeBorderMs = builtAt === undefined || entered === undefined ? null : entered.t - builtAt;
     row.prewarmed = rows.some(r => r.ahead === arc.to && r.inside === arc.from);
+    // GC13: how long after control the cell left behind still held its world (null: still held when the window ended), and the most
+    // the page's playing cost reached in the window
+    const evicted = controlAt === 0 ? undefined : rows.find(r => r.t >= controlT && Array.isArray(r.res) && !r.res.includes(arc.from));
+    row.fromEvictedMs = evicted === undefined ? null : evicted.t - controlT;
+    row.peakPlayingMB = Math.max(0, ...rows.map(r => (typeof r.mb === 'number' ? r.mb : 0)));
     const border = entered?.t ?? Infinity, near = frames.filter(f => Math.abs((f[0] ?? 0) - border) <= 3000).map(f => f[1] ?? 0);
     Object.assign(row, { ok: controlAt !== 0, why: controlAt !== 0 ? '' : fell ? `fell off ${arc.from}'s entryway (no ground there)` : entered === undefined ? (roadAt === undefined ? `never left ${arc.from}` : `held on the road (${String(last.phase)})`) : 'in the cell, no control',
       borderToControlMs: entered === undefined || controlAt === 0 ? null : controlT - entered.t, controlMs: controlAt === 0 ? null : controlAt, approachMps: Number(approach.toFixed(2)),
@@ -198,7 +208,7 @@ try {
       const files = /** @type {PerformanceResourceTiming[]} */ (performance.getEntriesByType('resource')).filter(entry => entry.startTime >= from && entry.name.includes(`/${name}/`));
       return { prepare: { windowMs: Math.round(end - from), spans: spans.slice(0, 200), longTasks: tasks.length, longTaskMs: tasks.reduce((total, task) => total + (task[1] ?? 0), 0),
         files: files.length, bytes: files.reduce((total, entry) => total + (entry.transferSize || 0), 0), decodedBytes: files.reduce((total, entry) => total + (entry.decodedBodySize || 0), 0) }, windowEnd: end };
-    }, [windowStart, slug]).then(({ prepare, windowEnd }) => { lastWindowEnd = windowEnd; return { prepare }; }).catch(() => ({})));
+    }, /** @type {[number, string]} */ ([windowStart, slug])).then(({ prepare, windowEnd }) => { lastWindowEnd = windowEnd; return { prepare }; }).catch(() => ({})));
     if (!row.ok || row.wallMs > 0) await page.screenshot({ path: join(out, `${engineName}-${arc.from}-${arc.to}.png`) }).catch(() => undefined);
     console.log(`${row.ok ? 'ok  ' : 'FAIL'} ${arc.from} -> ${arc.to}${arc.boost ? ' boost' : ''}${repeat ? ' (repeat)' : ''} ${JSON.stringify({ why: row.why, b2c: row.borderToControlMs, wall: row.wallMs, freeze: row.freezeMs, over50: row.over50 })}`);
     return row;
