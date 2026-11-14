@@ -103,9 +103,13 @@ export function installNativeCollision(host:Pick<SimHost,'physics'|'scope'|'onSt
       if(omitted(solid))continue;
       // A world held near its player is a grid cell, whose edge is the platform's (`gridLevel`): a shard's own page walls don't stand there.
       if(near!==null&&solid.material==='edge')continue;
-      const owner=policy===undefined?solid.owner??null:solid.ownerId===undefined?null:owners.get(solid.ownerId);
-      // A hull or mesh is most of a Rapier heap; a declared owner's solid stays, since a script may look it up.
-      if(near!==null&&typeof owner!=='string'&&solid.enabled!==false&&(solid.shape===9||solid.shape===6)&&solid.points!==undefined){
+      // With no policy a row names its owner itself: a tagged row's `owner`, or a piece row's `ownerId` (Nalati's bake,
+      // SERVER-PARITY SS10b): `piece:<id>` as written, a `declared:` id by its name, the one a script looks up.
+      const named=solid.ownerId===undefined?null:solid.ownerId.startsWith('declared:')?solid.ownerId.slice('declared:'.length):solid.ownerId;
+      const owner=policy===undefined?solid.owner??named:solid.ownerId===undefined?null:owners.get(solid.ownerId);
+      // A hull or mesh is most of a Rapier heap; a declared owner's solid stays, since a script may look it up. A `piece:`
+      // owner names the page piece a solid stands for (Nalati's bake, SERVER-PARITY SS10b): no script looks it up.
+      if(near!==null&&(typeof owner!=='string'||owner.startsWith('piece:'))&&solid.enabled!==false&&(solid.shape===9||solid.shape===6)&&solid.points!==undefined){
         near.hold({x:solid.at[0],z:solid.at[2],reach:solidReach(solid.points),make:physics=>withOwner(host.scope,()=>tagged(physics,solid,owner))});
         continue;
       }

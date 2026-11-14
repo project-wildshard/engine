@@ -18,3 +18,4 @@
   (`.camp.16`, `.outcrops.0`), so the page and the room name one model.
 - `test/figure-rows-feet.test.ts` covers `3cf3bfda` (Wendell's body at his
   feet), the J206 review's open SHOULD.
+- `installNativeCollision` with no policy: `test/native-collision-omit.test.ts` holds two piece hulls and builds the declared one.
