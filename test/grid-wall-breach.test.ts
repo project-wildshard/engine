@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { afterEach, expect, test, vi } from 'vitest';
 import { CHUNK_HALF } from '../src/shared/engine/core/config';
 import { NET_BUTTONS } from '../src/shared/engine/input/netButtons';
+import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
 import { roadName } from '../src/server/host/dedicated/gridCells';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
@@ -13,15 +14,19 @@ import { RoomBot } from './fixtures/dedicated/roomBot';
 // directly: a fall along the wall from a ledge's height and from its top (60 m: `roadWorld.ts` addCellWalls), and a run along it
 // at sprint both ways. A case holds when the body is never handed into the walled cell
 // and ends on the road, on the walker's side of the wall.
+// Since GC30b (Sky Reach rev 3) Far Reach's docks stand at its entryways, so its road wall is gone; the bench walls it as a bare cell
+// would be (its entryway probe answers no), and the wall it stands up is the one every walled cell gets.
 const HOME = 'driftwood-isle', SOUTH = 'far-reach', CELLS = [HOME, SOUTH, 'sunscar-dunes', 'nalati-grasslands'];
 /** Far Reach's north edge, south of Driftwood's origin on staging's pitch; its road wall stands 2 m further north. */
 const FAR_EDGE = -(562.5 - CHUNK_HALF), WALL_FACE = FAR_EDGE + 2;
 let bench: RoomBench | undefined;
 const bots: RoomBot[] = [];
-afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await bench?.close(); bench = undefined; });
+afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await bench?.close(); bench = undefined; vi.restoreAllMocks(); });
 const sleep = (ms: number) => new Promise(resolve => { setTimeout(resolve, ms); });
 
 test('the road wall in front of a walled cell holds a fall along it, a fall from its top and a run along it', { timeout: 180_000 }, async () => {
+  const stands = DedicatedRoom.prototype.entrywaysStand;
+  vi.spyOn(DedicatedRoom.prototype, 'entrywaysStand').mockImplementation(function (this: DedicatedRoom) { return !this.name.includes(SOUTH) && stands.call(this); });
   bench = await roomBench({ cells: CELLS, workers: 2, crossing: true });
   const a = new RoomBot(bench.url, 'bench', 'device:a', 'A'); bots.push(a);
   expect(await a.arrived()).toBe(true);
