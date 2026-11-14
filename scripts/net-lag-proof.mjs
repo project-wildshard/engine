@@ -56,15 +56,16 @@ function pageProbe(delay) {
   };
   setInterval(hook, 250);
   if (delay > 0) {
-    const P = WebSocket.prototype, send = P.send, add = P.addEventListener, remove = P.removeEventListener, held = new WeakMap();
-    P.send = function delayedSend(/** @type {any} */ data) { setTimeout(() => { if (this.readyState === 1) send.call(this, data); }, delay); };
-    P.addEventListener = function delayedAdd(/** @type {string} */ type, /** @type {any} */ listener, /** @type {any} */ options) {
-      if (type !== 'message' || typeof listener !== 'function') return add.call(this, type, listener, options);
+    const P = WebSocket.prototype, held = new WeakMap();
+    const raw = /** @type {any} */ (P), sendFn = raw.send, addFn = raw.addEventListener, removeFn = raw.removeEventListener;
+    P.send = function send(/** @type {any} */ data) { setTimeout(() => { if (this.readyState === 1) sendFn.call(this, data); }, delay); };
+    P.addEventListener = function addEventListener(/** @type {string} */ type, /** @type {any} */ listener, /** @type {any} */ options) {
+      if (type !== 'message' || typeof listener !== 'function') { addFn.call(this, type, listener, options); return; }
       const late = (/** @type {Event} */ event) => { setTimeout(() => { listener.call(this, event); }, delay); };
       held.set(listener, late);
-      return add.call(this, type, late, options);
+      addFn.call(this, type, late, options);
     };
-    P.removeEventListener = function delayedRemove(/** @type {string} */ type, /** @type {any} */ listener, /** @type {any} */ options) { return remove.call(this, type, held.get(listener) ?? listener, options); };
+    P.removeEventListener = function removeEventListener(/** @type {string} */ type, /** @type {any} */ listener, /** @type {any} */ options) { removeFn.call(this, type, held.get(listener) ?? listener, options); };
   }
 }
 
@@ -72,7 +73,7 @@ function pageProbe(delay) {
 const at = (list, p) => { const sorted = [...list].sort((a, b) => a - b); return sorted.length === 0 ? 0 : Number((sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0).toFixed(1)); };
 
 /** One run: enter `slug` on `engineName` at `layout`, walk, sprint, boost (and the bridge on Driftwood). @param {import('playwright').Browser} browser @param {string} engineName @param {string} layout @param {string} slug @param {string} site @param {string} socket */
-async function run(browser, engineName, layout, slug, site, socket) {
+async function runOne(browser, engineName, layout, slug, site, socket) {
   const context = await browser.newContext(layout === 'phone' ? { ...IPHONE, isMobile: engineName === 'chromium' } : { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   if (socket !== '') await context.addInitScript(guardStagingSockets, socket);
   await context.addInitScript(pageProbe, DELAY_MS);
@@ -107,7 +108,7 @@ async function run(browser, engineName, layout, slug, site, socket) {
     row.enterMs = Date.now() - t0;
     const entered = Date.now(), delays = /** @type {{ t: number, delay: number }[]} */ ([]), heldFrom = await page.evaluate(() => window.__workerClient?.().interpHeld ?? 0);
     const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed } }; });
-    sampler = setInterval(() => { void report().then(r => { if (r !== null) delays.push({ t: Date.now() - entered, delay: r.delay }); }).catch(() => undefined); }, 250);
+    sampler = setInterval(() => { void report().then(r => { if (r !== null) delays.push({ t: Date.now() - entered, delay: r.delay }); return undefined; }).catch(() => undefined); }, 250);
     await sleep(2000);
     // the budget: the drawn rate standing still, against the display's 60 Hz (headless)
     await page.evaluate(() => { const S = /** @type {any} */ (window).__netLag; S.drawn.length = 0; S.on = true; });
@@ -129,7 +130,7 @@ async function run(browser, engineName, layout, slug, site, socket) {
       for (const key of [...keys].reverse()) await page.keyboard.up(key);
       const drawn = await page.evaluate(() => /** @type {any} */ (window).__netLag.drawn.slice()), to = await report();
       // what this phase's corrections disagreed on (position, grounded, board, swim, ride), for the row a miss becomes
-      const missed = Object.fromEntries(Object.entries(to?.missed ?? {}).filter(([key]) => key !== 'gap').map(([key, value]) => [key, Number(value) - Number(/** @type {Record<string, number> | undefined} */ (from?.missed)?.[key] ?? 0)]).filter(([, value]) => value !== 0));
+      const missed = Object.fromEntries(Object.entries(to?.missed ?? {}).filter(([key]) => key !== 'gap').map(([key, value]) => [key, value - (/** @type {Record<string, number> | undefined} */ (from?.missed)?.[key] ?? 0)]).filter(([, value]) => value !== 0));
       return { name, corrections: (to?.corrections ?? 0) - (from?.corrections ?? 0), missed, frames: drawn.length, p50: at(drawn, 0.5), p99: at(drawn, 0.99), max: at(drawn, 1), over2x: drawn.filter((/** @type {number} */ ms) => ms > 2 * row.budgetMs).length, over50: drawn.filter((/** @type {number} */ ms) => ms > 50).length };
     };
     row.walk = await phase('walk', ['KeyW']);
@@ -162,10 +163,10 @@ async function run(browser, engineName, layout, slug, site, socket) {
 /** B4: walk Driftwood's pier to the rope bridge, then cross it with every drawn frame forced to 60 ms. @param {import('playwright').Page} page */
 async function crossBridge(page) {
   const where = () => page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player.position; return { x: p.x, y: p.y, z: p.z }; });
-  const steer = (/** @type {number} */ x, /** @type {number} */ z, /** @type {boolean} */ run) => page.evaluate(([x, z, run]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.yaw = Math.atan2(-(Number(x) - p.position.x), -(Number(z) - p.position.z)); p.touchMove.y = 1; p.touchMove.x = 0; p.touchSprint = run === 1; }, [x, z, run ? 1 : 0]);
+  const steer = (/** @type {number} */ x, /** @type {number} */ z, /** @type {boolean} */ sprint) => page.evaluate(([toX, toZ, fast]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.yaw = Math.atan2(-(toX - p.position.x), -(toZ - p.position.z)); p.touchMove.y = 1; p.touchMove.x = 0; p.touchSprint = fast === 1; }, [x, z, sprint ? 1 : 0]);
   const stop = () => page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; p.touchMove.y = 0; p.touchSprint = false; });
   let lowest = Infinity, under = 0;
-  const go = async (/** @type {number} */ x, /** @type {number} */ z, /** @type {boolean} */ run, /** @type {boolean} */ watch) => {
+  const go = async (/** @type {number} */ x, /** @type {number} */ z, /** @type {boolean} */ sprint, /** @type {boolean} */ watch) => {
     for (const ends = Date.now() + 20_000; Date.now() < ends;) {
       const p = await where();
       if (watch) {
@@ -173,7 +174,7 @@ async function crossBridge(page) {
         if (along > 0.1 && along < 0.9) { lowest = Math.min(lowest, p.y); if (p.y < 3) under++; } // NL5: the planks stay over 5 m; the gully floor is under 0
       }
       if (Math.hypot(p.x - x, p.z - z) < 0.7) return true;
-      await steer(x, z, run); await sleep(50);
+      await steer(x, z, sprint); await sleep(50);
     }
     return false;
   };
@@ -203,7 +204,7 @@ for (const engineName of engines) {
       }
       try {
         for (const layout of layouts) {
-          const row = await run(browser, engineName, layout, slug, site.base, socket);
+          const row = await runOne(browser, engineName, layout, slug, site.base, socket);
           rows.push(row);
           const { walk: _w, sprint: _s, boost: _b, bridge: _r, ...brief } = row;
           console.log(`${row.ok === true ? 'ok  ' : 'MISS'} ${JSON.stringify(brief)}`);

@@ -167,11 +167,11 @@ try {
     // NET-LAG NL7: the crossing as numbers. From the page's 100 ms samples: the border (the first sample outside the cell the leg
     // left) to the target's gameplay ready, each loading-card row's time on screen, and the longest the feet stood still while the
     // key was held (the stop above, at 250 ms)
-    const legSamples = /** @type {any[]} */ (await page.evaluate(n => /** @type {any} */ (window).__gc15c.samples.slice(n), samplesFrom)).filter(sample => sample.err === undefined);
-    const border = legSamples.find(sample => sample.inside !== from), ready = legSamples.find(sample => sample.inside === leg.target && sample.ready === true && (sample.phase === undefined || sample.phase === 'settled'));
+    const legSamples = /** @type {any[]} */ (await page.evaluate(n => /** @type {any} */ (window).__gc15c.samples.slice(n), samplesFrom)).filter(entry => entry.err === undefined);
+    const border = legSamples.find(entry => entry.inside !== from), ready = legSamples.find(entry => entry.inside === leg.target && entry.ready === true && (entry.phase === undefined || entry.phase === 'settled'));
     /** @type {Record<string, number>} */
     const stages = {};
-    for (const [index, sample] of legSamples.entries()) { const next = legSamples[index + 1]; if (next !== undefined && typeof sample.stage === 'string') stages[sample.stage] = (stages[sample.stage] ?? 0) + next.t - sample.t; }
+    for (const [at, entry] of legSamples.entries()) { const next = legSamples[at + 1]; if (next !== undefined && typeof entry.stage === 'string') stages[entry.stage] = (stages[entry.stage] ?? 0) + next.t - entry.t; }
     const deltas = frames.map(row => row[1] ?? 0), row = { name: leg.name, borderToReadyMs: border === undefined || ready === undefined ? null : Math.max(0, ready.t - border.t), stages, programLinks, from, target: leg.target, boost: leg.boost, roadAtMs: roadAt, enteredAtMs: enteredAt, controlAtMs: controlAt,
       borderToControlMs: enteredAt === 0 || controlAt === 0 ? null : controlAt - enteredAt, worstStopMs: worstStuck, stoppedMs: stuckMs, jumps, frames: deltas.length,
       over50: deltas.filter(ms => ms > 50).length, over100: deltas.filter(ms => ms > 100).length, worstFrameMs: Math.max(0, ...deltas), events, end };
