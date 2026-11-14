@@ -46,6 +46,8 @@ export interface NativeTamingControls {
   readonly press: (id: string, press: NativeTamingPress) => void;
   /** A player's own session, once they have one. */
   readonly sessionOf: (id: string) => NativeTamingOwner | undefined;
+  /** SC10 review: this player's seat emptied (a served world's lead seat, parked): its bonded horses go and its session starts wild. */
+  readonly release: (id: string) => void;
 }
 export interface NativeTamingOwner {
   readonly scope: SimHost['scope'];
@@ -206,7 +208,6 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
   const first = sessionFor(firstSeat.player), { law } = first;
   // SC10 review: the lead seat's session as a fresh world gives it, for when its player leaves a served world (the seat is parked)
   const fresh = first.save();
-  let leadReleased = false;
   const others = (): TamingSeat[] => [...sessions.values()].filter(session => session !== first);
   host.events.on('creature.signal', ({ name, x, z }) => { for (const session of sessions.values()) session.law.noteEvent(name, x, z); }, host.scope);
   host.events.on('weapon.impact', ({ point }) => {
@@ -231,11 +232,6 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
   };
   law.update = dt => {
     for (const [id, session] of sessions) if (host.players.get(id) !== session.player) { session.release(); sessions.delete(id); }
-    // SC10 review: an empty lead seat (a served world's, parked) keeps no one's taming: its bonded horses go as any leaver's do and
-    // the next player in it starts wild, not on the last one's horse
-    const parked = host.parked.has(first.player.id);
-    if (parked && !leadReleased) { first.release(); first.load(fresh, []); }
-    leadReleased = parked;
     // Trust is the herd's: one voice speaks to it, the wild session closest to a stallion, or a far player would talk it down.
     const heard = sessions.size < 2 ? null : closestToWild();
     if (heard === null || first.law.phase !== 'wild' || heard === first) first.tick(dt, true);
@@ -274,7 +270,12 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
     },
   }, 'afterBodies');
   host.scope.onDispose(() => { for (let i = 0; i < 64; i++) { const actor = poseRows[i]; if (actor === undefined) break; poses.delete(actor.entityId); } poseRows.length = 0; installed.delete(host); });
-  controls.set(host, { sessionOf: id => sessions.get(id)?.law, press: (id, press) => {
+  controls.set(host, { sessionOf: id => sessions.get(id)?.law, release: id => {
+    // an emptied seat keeps no one's taming: its horses go as any leaver's do, and the lead's own session starts wild again
+    const session = sessions.get(id); if (session === undefined) return;
+    session.release(); pending.delete(id);
+    if (session === first) first.load(fresh, []); else sessions.delete(id);
+  }, press: (id, press) => {
     if (!host.players.has(id)) throw new RangeError(`Unknown taming player ${id}`);
     pending.set(id, { ...pending.get(id), ...press });
   } });

@@ -12,6 +12,7 @@ const sorted = (rows: readonly string[]): string[] => [...rows].sort();
 const load = (row: readonly string[]): number => row.reduce((total, slug) => total + cellCost(slug), 0);
 
 test('the first test: one cell, one worker, whatever the count', () => { expect(workerTable(['driftwood-isle'], 4)).toEqual([['driftwood-isle']]); });
+test('no cells, no workers: never a worker with nothing to run', () => { expect(workerTable([], 4)).toEqual([]); });
 
 // SERVER-CELLS SC8: the table is weighed by each cell's measured awake cost, so the busiest worker carries as little as the cells
 // allow. The name table it replaces put 22 of 25 cells on one of production's 4 workers (GC13 then spread them by count).

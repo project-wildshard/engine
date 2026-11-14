@@ -18,6 +18,7 @@ import type { FallFloor } from '../standalone/fallFloor';
 import { ledgerFilings } from '../standalone/ledgerFilings';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
+import { nativeTamingControls } from '@wildshard/engine/game/riding/nativeTaming';
 import { carryDoc, exportPlayer, importPlayer, parseDoc, PLAYER_DOC_VERSION, type PlayerDoc } from './playerDoc';
 import { PlayerStore, recoverPlayer } from './playerStore';
 import { ShopGate } from './shopGate';
@@ -221,6 +222,7 @@ export class DedicatedRoom implements CrossTarget {
     const seat: Seat = { device: entry.device, name: entry.name, read: entry.doc, body, own: entry.body, store, fall: this.cell.fallFloor(), transport, client: null, closeOff: null, holdEnds: null, seq: entry.seq, receipted: doc?.ledger.serial ?? 0, dirtyAt: null, savedAt: now, stand: null, version: 0 };
     this.seats.set(entry.device, seat); this.bodies.set(body, seat); this.departed.delete(body);
     // SC10 review: the lead seat takes back what this device was paid here when it last left (kept under its own id)
+    const away = this.departed.get(entry.body);
     if (lead) { this.departed.delete(entry.body); this.movePaid(entry.body, LEAD_SEAT); this.unparkLead(); }
     // Two who join together would otherwise stand inside each other.
     const aside = SPAWN_ASIDE[(this.joined++) % SPAWN_ASIDE.length] ?? 0, stand = { ...spawn, x: spawn.x + aside };
@@ -233,7 +235,8 @@ export class DedicatedRoom implements CrossTarget {
     catch (error) {
       // No save or live link is installed on a failed continuation. Keep the durable copies intact.
       this.seats.delete(entry.device); this.bodies.delete(body); this.cell.owned.drop(body); book.drop(body);
-      if (lead) this.clearLead(entry.body, false); else host.removePlayer(body);
+      // review MUST: a failed continuation keeps what this device was paid here, on the clock it left on
+      if (lead) this.clearLead(entry.body, away ?? now); else host.removePlayer(body);
       return `doc: ${String(error)}`;
     }
     return seat;
@@ -342,7 +345,7 @@ export class DedicatedRoom implements CrossTarget {
     this.playerRefusals.delete(seat.body);
     actRoutes(this.host).identities.delete(seat.body);
     this.seats.delete(seat.device); this.bodies.delete(seat.body); this.cell.owned.drop(seat.body); this.book.drop(seat.body);
-    if (seat.body === LEAD_SEAT) this.clearLead(seat.own, true); else { this.host.removePlayer(seat.body); this.departed.set(seat.body, this.options.now()); }
+    if (seat.body === LEAD_SEAT) this.clearLead(seat.own, this.options.now()); else { this.host.removePlayer(seat.body); this.departed.set(seat.body, this.options.now()); }
     this.options.post({ kind: 'left', device: seat.device, seats: this.seats.size });
   }
   private flushRefusals(): void {
@@ -359,12 +362,13 @@ export class DedicatedRoom implements CrossTarget {
   /**
    * The seat goes back to how boot left it, and what it was paid goes with who earned it: the next player's bounty is their own (J105).
    * SC10 review: it goes under the leaver's own id, as any other body's stays, so a lead who bounces across an edge cannot re-farm a
-   * bounty; it is forgotten `FORGET_PAID_MS` on (`left`), or at once when the seat never stood (a failed continuation).
+   * bounty; it is forgotten `FORGET_PAID_MS` after `left`. The seat's taming session goes too: the next lead starts wild.
    */
-  private clearLead(own: string, left: boolean): void {
+  private clearLead(own: string, left: number): void {
     actRoutes(this.host).identities.delete(LEAD_SEAT);
     this.movePaid(LEAD_SEAT, own);
-    if (left) this.departed.set(own, this.options.now()); else this.forgetPaid(own);
+    this.departed.set(own, left);
+    nativeTamingControls(this.host)?.release(LEAD_SEAT);
     importPlayer(this.host, this.lead, this.blank); this.parkLead();
   }
   /** What `from` was paid here is `to`'s now. */

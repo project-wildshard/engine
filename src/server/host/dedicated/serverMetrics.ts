@@ -41,6 +41,8 @@ export class ServerMetrics {
   private readonly memory: Gauge<'thread' | 'kind'>;
   private readonly tick: Gauge<'worker' | 'quantile'>;
   private readonly cellTick: Gauge<'cell'>;
+  /** Each worker's cells awake in its last reading. */
+  private readonly ticking = new Map<number, ReadonlySet<string>>();
   private readonly rate: Gauge<'worker'>;
   private readonly drops: Counter<'worker'>;
   private readonly awake: Gauge<'worker'>;
@@ -85,6 +87,10 @@ export class ServerMetrics {
     const worker = String(index);
     for (const [quantile, ms] of [['0.5', row.p50], ['0.95', row.p95], ['0.99', row.p99], ['1', row.max]] as const) this.tick.set({ worker, quantile }, ms / 1000);
     this.rate.set({ worker }, row.ticksPerSecond);
+    // a cell gone back to sleep stops reporting its last awake cost (review SHOULD)
+    const awake = new Set(Object.keys(row.cellMs ?? {}));
+    for (const cell of this.ticking.get(index) ?? []) if (!awake.has(cell)) this.cellTick.remove({ cell });
+    this.ticking.set(index, awake);
     for (const [cell, ms] of Object.entries(row.cellMs ?? {})) this.cellTick.set({ cell }, ms / 1000);
     this.drops.inc({ worker }, Math.max(0, row.drops));
     this.awake.set({ worker }, row.awake);

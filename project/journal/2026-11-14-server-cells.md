@@ -15,3 +15,4 @@
   next lead rode the last one's horse); a retired bonded horse leaves the mounted owner's rows first ("Missing mounted pose
   actor" failed the worker on the next step); an elite's skin orb stays until every player present has taken theirs.
 - Tests: `served-lead-taming` (red without the parked release), `served-world-prunes` (lead bounce), `elite-skin-per-player` (two takers, one kill).
+- Review (one `claude -p`): MUST fixed, a failed lead continuation keeps the device's earlier loot rows on the clock it left on; SHOULDs fixed: the lead seat's taming is released from `clearLead` (`nativeTamingControls.release`), not by spotting the park in `update`; no cells is no workers; a sleeping cell leaves `wildshard_cell_tick_seconds`; an owner's press clears an orb nobody present lacks. SC8 box bench on this branch (`19df3187`): worst worker p95 8.6 ms (old table 9.4), p50 3.9 (5.8), 60 ticks/s, 25 of 25 seated.

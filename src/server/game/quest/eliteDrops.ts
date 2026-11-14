@@ -35,7 +35,9 @@ export function eliteDrops<S extends EliteCoreScript<Body>>(host: SimHost): { re
     entry.drop = { x: at.x, y: at.y + ITEM_PICKUP_HOVER, z: at.z };
     routes.claims.set(`${def.id}.reward`, player => {
       const feet = host.players.get(player)?.position, { drop } = entry;
-      if (feet === undefined || drop === null || (served && owns(player, def.id))) return;
+      if (feet === undefined || drop === null) return;
+      // an owner's press takes nothing; once nobody present lacks the skin, it clears the orb (review SHOULD: no orb left standing)
+      if (served && owns(player, def.id)) { if (!lacking(def.id)) entry.drop = null; return; }
       if (pickPrompt([{ position: { x: drop.x, y: drop.y + PROMPT_ABOVE, z: drop.z }, radius: PROMPT_RADIUS }], { x: feet.x, y: feet.y + REACH_EYE, z: feet.z }, host.physics) === undefined) return;
       // SC10 review: in a served world the orb stays while anyone present still lacks the skin, so the first press takes it for the
       // presser only, not for everyone who shared the kill

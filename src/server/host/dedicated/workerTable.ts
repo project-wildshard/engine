@@ -48,6 +48,7 @@ export function workerTable(cells: readonly string[], workers: number): readonly
   const open = [...new Set(cells)].sort(), grouped = new Set(TOGETHER.flat());
   const units = [...TOGETHER.map(group => group.filter(slug => open.includes(slug))).filter(group => group.length > 0), ...open.filter(slug => !grouped.has(slug)).map(slug => [slug])];
   const weight = (unit: readonly string[]): number => unit.reduce((total, slug) => total + cellCost(slug), 0);
+  if (units.length === 0) return [];
   units.sort((a, b) => weight(b) - weight(a) || (a[0] ?? '').localeCompare(b[0] ?? ''));
   const rows = Array.from({ length: Math.max(1, Math.min(workers, units.length)) }, () => ({ cells: [] as string[], cost: 0 }));
   for (const unit of units) {
