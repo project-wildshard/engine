@@ -221,7 +221,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   // the standalone shell and its server worker under the build's folder, before the service worker, which precaches them (J130)
   await (
     await import("./app-build/standaloneOutput.mjs")
-  ).writeStandaloneOutput(outDir, buildId, process.cwd());
+  ).writeStandaloneOutput(outDir, buildId, process.cwd(), { devserver: mode === "devserver" });
 
   // the crossroads phone rig beside the bundle (was vite/crossroadsRig.ts); before the worker, which counts its files
   step([

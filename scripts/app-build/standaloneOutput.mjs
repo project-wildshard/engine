@@ -11,13 +11,15 @@ import { engineRelease } from '../changelog.mjs';
  * @param {string} buildId */
 export const standaloneDirectory = (buildId) => `${codeDirectory(buildId)}/standalone`;
 
-/** @param {string} outDir @param {string} buildId @param {string} root */
-export async function writeStandaloneOutput(outDir, buildId, root) {
+/** @param {string} outDir @param {string} buildId @param {string} root @param {{ devserver?: boolean }} [options] */
+export async function writeStandaloneOutput(outDir, buildId, root, options = {}) {
   const directory = standaloneDirectory(buildId);
   await build({
     configFile: false, root, logLevel: 'warn', publicDir: false, resolve: { alias: rapierAlias }, assetsInclude: ['**/*.bin', '**/*.wasm'],
     // SENTRY-TRIAGE S5: the shells report errors too, under the same wildshard@<version> release as the page
-    define: { __TITLE_ASSET_URLS__: '{}', __BUILD_ID__: BUILD_ID_EXPRESSION, __ENGINE_RELEASE__: JSON.stringify(engineRelease(root)) }, worker: { format: 'es' },
+    // SHARD-SOURCE AP5: the shell and the server worker read `__DEVSERVER__` too (the dev hook's server half); a production
+    // build folds it to false here as the page bundle does (scripts/check-devserver.mjs refuses one left unsubstituted)
+    define: { __TITLE_ASSET_URLS__: '{}', __BUILD_ID__: BUILD_ID_EXPRESSION, __ENGINE_RELEASE__: JSON.stringify(engineRelease(root)), __DEVSERVER__: JSON.stringify(options.devserver === true) }, worker: { format: 'es' },
     build: {
       outDir: resolve(outDir), emptyOutDir: false, assetsDir: directory, target: 'es2022', sourcemap: false, reportCompressedSize: false,
       rolldownOptions: {
