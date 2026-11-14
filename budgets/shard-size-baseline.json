@@ -157,7 +157,7 @@
   "driftwood-isle": {
    "baselinePhoneBytes": 23757802,
    "recordedPhoneBytes": 26278506,
-   "ceilingPhoneBytes": 22460181,
+   "ceilingPhoneBytes": 21082585,
    "shrinkOnly": true,
    "baseline": {
     "phone": {
@@ -233,12 +233,12 @@
     "bytes": 94310912,
     "mountsAssetsBytes": 12076637
    },
-   "latchedPhoneBytes": 19177364
+   "latchedPhoneBytes": 21082585
   },
   "far-reach": {
    "baselinePhoneBytes": 49888072,
    "recordedPhoneBytes": 53585115,
-   "ceilingPhoneBytes": 30338351,
+   "ceilingPhoneBytes": 25980736,
    "shrinkOnly": true,
    "baseline": {
     "phone": {
@@ -310,7 +310,7 @@
     "bytes": 66691072,
     "mountsAssetsBytes": 29602062
    },
-   "latchedPhoneBytes": 30338351
+   "latchedPhoneBytes": 25980736
   },
   "sunscar-dunes": {
    "baselinePhoneBytes": 12421514,

@@ -162,6 +162,8 @@ export async function writeSpawnParts(outDir: string, manifests: readonly SpawnP
     return key;
   };
   const inflight = new Set<Promise<void>>(), bodies = new Map<string, readonly string[]>();
+  // A shard cook's part is a body too: the same bytes under another URL of one manifest must not take its name.
+  for (const [member, at] of cooked) bodies.set(at.hash, [...bodies.get(at.hash) ?? [], member]);
   const write = async (batch: readonly string[]): Promise<void> => {
     const length = batch.reduce((at, url) => align(at) + (sizes.get(url) ?? 0), 0);
     let body = new Uint8Array(length); const offsets = new Map<string, number>(); let cursor = 0;

@@ -255,6 +255,9 @@ export function ktx2GpuBytes(bytes: Uint8Array): number {
  *  key is the author's hint (D5): a `#layer` twin (a terrain layer, tiled at a texel a metre) and a horizon strip are S4's
  *  1024 rows, kept on purpose; every other row is 512 on a phone. */
 export const PHONE_TIER_MAX = 512;
+/** S12d: the cap a kept row (a `#layer` twin, a horizon) is encoded under: none it reaches, so it keeps its own size and only
+ *  its encoding changes to 6×6, as S4's hand-made set had it. */
+export const KEPT_ENCODE_MAX = 16_384;
 export function phoneTierSize(source: string): number | undefined {
   return source.endsWith('#layer') || /\/horizon\//u.test(source) ? undefined : PHONE_TIER_MAX;
 }
@@ -316,9 +319,11 @@ export function phoneTier(discovery: Uint8Array, read: (url: string) => Uint8Arr
   const sameMaster = (desktop: Readonly<Record<string, unknown>> | undefined, source: string): string | undefined => { const target = desktop?.[source]; return typeof target === 'string' ? target : undefined; };
   for (const {phone: map, desktop} of phoneMaps) for (const [source, target] of Object.entries(map)) {
     if (typeof target !== 'string') continue;
-    const max = size(source), match = /^(.*?)(?:-[a-f0-9]{8})?\.(glb|ktx2)$/u.exec(target), bytes = max === undefined || match === null ? undefined : read(target);
+    // S12d: a row kept at its size is still encoded 6×6 from its own file when the cook encodes, which retires the hand sets.
+    const sized = size(source), own = sized === undefined && counted !== undefined, max = sized ?? (own ? KEPT_ENCODE_MAX : undefined);
+    const match = /^(.*?)(?:-[a-f0-9]{8})?\.(glb|ktx2)$/u.exec(target), bytes = max === undefined || match === null ? undefined : read(target);
     if (max === undefined || match === null || bytes === undefined) { kept.add(target); continue; }
-    const ext = match[2] ?? '', master = encode === undefined ? undefined : (ext === 'glb' ? sameMaster(desktop, source) : masterOf(desktop, source));
+    const ext = match[2] ?? '', master = encode === undefined || own ? undefined : (ext === 'glb' ? sameMaster(desktop, source) : masterOf(desktop, source));
     const masterBytes = master?.endsWith(`.${ext}`) === true ? read(master) : undefined;
     const key = `${target}<${masterBytes === undefined ? target : master ?? target}@${max}`;
     let file = made.get(key);

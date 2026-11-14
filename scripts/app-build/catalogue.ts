@@ -47,8 +47,10 @@ export function titleRowOf(bytes: Uint8Array, home = ''): TitleManifest {
 /** Every built product's title row, in title order. */
 export function productTitleRows(products: string): readonly TitleManifest[] {
   const rows = readdirSync(products, {withFileTypes: true}).flatMap(entry => {
-    const file = join(products, entry.name, 'mounts/shardfiles', entry.name, 'discovery.json');
-    return entry.isDirectory() && existsSync(file) ? [titleRowOf(readFileSync(file))] : [];
+    // S12d: the document as the build serves it (`servedDiscoveryPath`, the phone tier's table), so the title's `?v=` is its hash.
+    const own = join(products, entry.name, 'mounts/shardfiles', entry.name, 'discovery.json'), served = join(products, '.app/discovery', entry.name, 'discovery.json');
+    const file = existsSync(served) ? served : own;
+    return entry.isDirectory() && existsSync(own) ? [titleRowOf(readFileSync(file))] : [];
   });
   return rows.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }

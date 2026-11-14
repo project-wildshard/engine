@@ -1,9 +1,9 @@
 /// <reference types="node" />
 import * as v from 'valibot';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {existsSync, readFileSync, mkdirSync, readdirSync} from 'node:fs';
+import {existsSync, readFileSync, mkdirSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {join, relative, resolve, sep} from 'node:path';
+import {dirname, join, relative, resolve, sep} from 'node:path';
 import {PickupCatalogueSchema} from '@wildshard/format/specimenCatalogue';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -11,7 +11,7 @@ import {createHash} from 'node:crypto';
 import {readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnManifestAddress} from '../../shared/game/shardfile/spawnManifest';
 import {assetIdentities, audioTableRefs, bundlerSources as manifestSources, identityFiles, joinRefs, standInRefs, packMembers, readFenceReads, resolveFenceReads, sectionRefs, type PackPart} from './fenceReads';
 import {createPartEncoder, writeSpawnManifestFiles, writeSpawnParts, type CookedMember, type SpawnPartEncoding} from './spawnParts';
-import {cookParts, cookShardServerPack, openShardfile, servedAsIs, shardHalf, stalePreparationLine, type PreparationState} from './shardCook';
+import {cookParts, cookShardServerPack, openShardfile, preparedShardHalf, servedAsIs, stalePreparationLine, type CookTiers, type PreparationState, type ShardHalf} from './shardCook';
 import type {ServerPack} from '../../shared/game/shardfile/serverPack';
 import {contentNamed} from './contentNamed';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -64,6 +64,9 @@ export interface BuildHalf {
   readonly rendererRevision?: string;
   readonly cacheName: string;
   readonly gpuFiles: Parameters<typeof standInRefs>[0];
+  /** S12d: the cook's per-tier textures (`defaultCookTiers`), as the box's cook makes them. None: every tier reads the
+   *  product's own table. A preparation-only build never takes them: a fence records the product's own URLs. */
+  readonly tiers?: () => Promise<CookTiers>;
   /** The boot tables' common and pack sources, as `assetTables.mjs` bakes them. */
   readonly tables: (root: string) => {readonly common: {readonly source: string}; readonly all: {readonly source: string}; readonly packs: Readonly<Record<string, {readonly source: string}>>};
   readonly tableAddresses: (root: string) => {readonly common: Address; readonly all: Address; readonly packs: Readonly<Record<string, Address>>};
@@ -80,17 +83,20 @@ export function desktopFence(reads: readonly string[], urls: readonly string[]):
   const desktop = new Map(urls.filter(url => !phoneOnly(url)).sort((a, b) => named(a) - named(b)).map(url => [plain(url), url]));
   return [...new Set(reads.flatMap(url => { if (!phoneOnly(url)) return [url]; const own = desktop.get(plain(url)); return own === undefined ? [] : [own]; }))];
 }
-/** S4: a shard's phone stand-ins laid over the engine's table (`data/astc6.generated.json`). A phone reads the overlay's
- *  file under the same served URL, so its fence read keeps the identity it had. */
-function phoneOverlay(root: string, directory: string): Readonly<Record<string, string>> {
-  const path = join(root, 'src/shards', directory, 'data/astc6.generated.json');
-  if (existsSync(path)) return v.parse(v.record(v.string(), v.string()), JSON.parse(readFileSync(path, 'utf8')));
-  // Any other shard's overlay is in its product: the discovery's phone table, the rows that name a 6×6 file.
-  const discovery = join(root, 'out', directory, 'mounts/shardfiles', directory, 'discovery.json');
-  if (!existsSync(discovery)) return {};
-  const table = v.safeParse(v.looseObject({native: v.looseObject({ktx2: v.looseObject({GPU_FILES: v.looseObject({phone: v.record(v.string(), v.string())})})})}), JSON.parse(readFileSync(discovery, 'utf8')));
-  return table.success ? Object.fromEntries(Object.entries(table.output.native.ktx2.GPU_FILES.phone).filter(([, url]) => url.includes('/astc6/'))) : {};
+/** A phone file in place of the one its source names on a desktop: S4's hand-made 6×6 overlay (`/assets/<shard>/astc6/`)
+ *  or the cook's own phone tier (`<name>.t<size>-<hash8>.<ext>`, S12b). */
+// oxlint-disable-next-line typescript/no-inferrable-types -- isolatedDeclarations wants the type written.
+export const PHONE_STAND_IN: RegExp = /\/astc6\/|\.t[0-9]+-[a-f0-9]{8}\.(?:ktx2|glb)$/u;
+/** S4, S12d: a shard's phone stand-ins, read off the discovery document the phone reads (the cook's tiered table): the
+ *  phone rows that name a stand-in. A phone reads that file under the source's URL, so its fence read keeps its identity. */
+export function phoneOverlay(discovery: Uint8Array | undefined): Readonly<Record<string, string>> {
+  if (discovery === undefined) return {};
+  const table = v.safeParse(v.looseObject({native: v.looseObject({ktx2: v.looseObject({GPU_FILES: v.looseObject({phone: v.record(v.string(), v.string())})})})}), JSON.parse(new TextDecoder().decode(discovery)));
+  return table.success ? Object.fromEntries(Object.entries(table.output.native.ktx2.GPU_FILES.phone).filter(([, url]) => PHONE_STAND_IN.test(url))) : {};
 }
+/** S12d: where the app build keeps each shard's discovery document as its cook serves it (`copyOutputProducts` and the
+ *  catalogue read it there in place of the product's own). */
+export function servedDiscoveryPath(root: string, directory: string): string { return join(root, 'out/.app/discovery', directory, 'discovery.json'); }
 /** DL5: a shard's packs set, `src/shards/<slug>/packs-set.json` (`{"version": 1, "set": "fence"}`): 'fence' packs the
  *  default set (what the boot reads before control), absent packs the whole level. Anything else fails the build. */
 export function readPacksSet(path: string): 'whole' | 'fence' {
@@ -201,22 +207,35 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
   const clientAt: Record<string, {phone: number; desktop: number}> = {}, gridAt: Record<string, Record<string, {phone: number; desktop: number}>> = {};
   const packsClientAt: typeof clientAt = {}, packsGridAt: typeof gridAt = {};
   const encoder = createPartEncoder(), cooked = new Map<string, CookedMember>(), serverPacks: Record<string, ServerPack> = {};
+  // C1: the shard half comes from the shardfile alone, one tarball per product, and its parts from the shard's own cook.
+  // S12d: with the cook's tiers, the phone reads the tiered table and its own files, as from the box's cook.
+  const tiers = build.preparationOnly === true || build.tiers === undefined ? {} : await build.tiers();
+  rmSync(join(root, 'out/.app/discovery'), {recursive: true, force: true});
+  const halves = new Map<string, ShardHalf>();
+  for (const prefix of Object.keys(bank.products)) {
+    const directory = prefix.split('/')[2]; if (directory === undefined || !/^[a-z0-9_-]+$/u.test(directory)) throw new Error('Invalid spawn shard');
+    const product = join(root, 'out', directory), index = parseOutputIndex(JSON.parse(readFileSync(join(product, 'shard.json'), 'utf8')));
+    if (index.runtime !== null && (!('kind' in index.runtime) || index.runtime.kind !== 'client-plan')) continue;
+    const half = await preparedShardHalf(openShardfile(productTarball(product), {preparationOnly: build.preparationOnly === true,
+      ...(build.rendererRevision === undefined ? {} : {renderer: build.rendererRevision})}), wireBytes, undefined, directory, tiers);
+    halves.set(directory, half);
+    // What no part answers serves at its URL: the tiered discovery document (beside its product) and the phone's own files.
+    if (half.discovery !== undefined) { const file = servedDiscoveryPath(root, directory); mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.discovery.bytes); }
+    for (const row of half.tierFiles) { const file = join(output, row.url.slice(1)); mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.read(row.url)); }
+  }
   // C3: a grid page reads every primary neighbour's discovery document before it enters.
   const discoveries = Object.keys(bank.products).flatMap(prefix => {
     const directory = prefix.split('/')[2] ?? '', url = `/shardfiles/${directory}/discovery.json`, file = join(root, 'out', directory, 'mounts', url);
-    if (!existsSync(file)) return [];
-    const bytes = readFileSync(file), hash = createHash('sha256').update(bytes).digest('hex'), row = {url: `${url}?v=${hash.slice(0, 8)}`, bytes: bytes.length, hash, wireBytes: wireBytes(url, bytes, hash)};
+    const served = halves.get(directory)?.discovery;
+    if (served === undefined && !existsSync(file)) return [];
+    const bytes = served?.bytes ?? readFileSync(file), hash = createHash('sha256').update(bytes).digest('hex'), row = {url: `${url}?v=${hash.slice(0, 8)}`, bytes: bytes.length, hash, wireBytes: wireBytes(url, bytes, hash)};
     sources.set(row.url, () => bytes);
     return [row];
   });
   const preparations: Partial<Record<PreparationState, string[]>> = {};
   for (const prefix of Object.keys(bank.products)) {
-    const directory = prefix.split('/')[2]; if (directory === undefined || !/^[a-z0-9_-]+$/u.test(directory)) throw new Error('Invalid spawn shard');
-    const product = join(root, 'out', directory), index = parseOutputIndex(JSON.parse(readFileSync(join(product, 'shard.json'), 'utf8')));
-    if (index.runtime !== null && (!('kind' in index.runtime) || index.runtime.kind !== 'client-plan')) continue;
-    // C1: the shard half comes from the shardfile alone, one tarball per product, and its parts from the shard's own cook.
-    const half = shardHalf(openShardfile(productTarball(product), {preparationOnly: build.preparationOnly === true,
-      ...(build.rendererRevision === undefined ? {} : {renderer: build.rendererRevision})}), wireBytes, undefined, directory), {sections} = half.shard;
+    const directory = prefix.split('/')[2] ?? '', half = halves.get(directory); if (half === undefined) continue;
+    const index = parseOutputIndex(JSON.parse(readFileSync(join(root, 'out', directory, 'shard.json'), 'utf8'))), {sections} = half.shard, overlay = phoneOverlay(half.discovery?.bytes);
     // J262 (SP1a): a preparation from another renderer cooks as it is, and the build says which shards took that path.
     (preparations[half.shard.preparation] ??= []).push(directory);
     if (half.shard.preparation === 'stale') console.warn(stalePreparationLine(directory));
@@ -242,7 +261,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
       const urls = publicAssets(), members = [...packParts().values()].flatMap(part => part.members);
       // Section references, then the boot tables' audio slots (Pine's colliding sfx revisions).
       const refs = joinRefs(sectionRefs(sections, new Set([...urls, ...members].map(url => url.split('?')[0] ?? url))),
-        audioTableRefs(JSON.parse(build.tables(root).common.source) as {sfx?: unknown; music?: unknown}), standInRefs({...build.gpuFiles, phone: {...build.gpuFiles['phone'], ...phoneOverlay(root, directory)}}));
+        audioTableRefs(JSON.parse(build.tables(root).common.source) as {sfx?: unknown; music?: unknown}), standInRefs({...build.gpuFiles, phone: {...build.gpuFiles['phone'], ...overlay}}));
       // An identity is one file or none: one naming two distinct files (two vendor versions, sp-x9) refuses, never the first.
       const owners = identityFiles(assetIdentities(urls, packParts(), refs, {digests: assetDigests, sources: bundlerSources()}));
       const ambiguous = shell.filter(identity => (owners.get(identity)?.length ?? 0) > 1);
@@ -292,8 +311,8 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
         if (inventory.length !== extra[1] || createHash('sha256').update(inventory).digest('hex') !== extra[3]) throw new Error('Spawn public inventory differs');
         // S4 on Sky: this inventory names a page's image sources on every tier. A phone with an overlay reads the 6×6 file in
         // their place, and one with no ASTC reads them loose, so they stay off the phone's list.
-        const overlay = tier === 'phone' ? phoneOverlay(root, directory) : {};
-        for (const [url, bytes] of v.parse(files, JSON.parse(new TextDecoder().decode(inventory)))) if (!Object.hasOwn(overlay, url.split('?')[0] ?? url)) add(asset(url, bytes));
+        const standIns = tier === 'phone' ? overlay : {};
+        for (const [url, bytes] of v.parse(files, JSON.parse(new TextDecoder().decode(inventory)))) if (!Object.hasOwn(standIns, url.split('?')[0] ?? url)) add(asset(url, bytes));
       }
       // Required code can resolve while bulk content downloads. Keep each
       // partition's original order, every row and the full download barrier.

@@ -135,9 +135,11 @@ let resolving = false;
 /** A phone-tier GPU that can't sample raw ASTC: absent, or read wrong by the probe (the iOS Simulator has the extension and
  *  zeroes sRGB mips). No verdict (no page, or a measurement pin) changes nothing. The transcoder reads this same probe. */
 const noRawAstc = (probe: Ktx2Probe): boolean => probe.ran && probe.families.astc !== true;
-/** S4: an overlay's raw ASTC 6×6 files have no transcode, so a phone-tier GPU that can't sample ASTC loads images. */
+/** S4: an overlay's raw ASTC 6×6 files have no transcode, so a phone-tier GPU that can't sample ASTC loads images.
+ *  S12d: the cook's phone files (`<name>.t<size>-<hash8>.<ext>`) are 6×6 too, and replace the hand-made overlay. */
+const RAW_ASTC = /\/astc6\/|\.t[0-9]+-[a-f0-9]{8}\.(?:ktx2|glb)$/u;
 export function rawAstcVeto(probe: Ktx2Probe): string | null {
-  if (TIER !== 'phone' || !noRawAstc(probe) || ![...registered.phone].some(url => url.includes('/astc6/'))) return null;
+  if (TIER !== 'phone' || !noRawAstc(probe) || ![...registered.phone].some(url => RAW_ASTC.test(url))) return null;
   return 'this table names raw ASTC 6×6 and the GPU has no ASTC';
 }
 /** S4: which tier's splat layers this device draws. A phone's are raw ASTC 6×6, so a phone that can't sample ASTC draws the

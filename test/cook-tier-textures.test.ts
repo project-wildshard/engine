@@ -3,6 +3,7 @@
 // any distance the phone draws.
 import {describe, expect, it} from 'vitest';
 import {glbImages, ktx2Info, phoneTier, tierGlb, tierKtx2, trimKtx2, type TextureRole} from '../src/cook/game/tierTextures';
+import {phoneOverlay} from '../src/cook/game/entryTotals';
 
 const LEVEL_INDEX = 80;
 
@@ -199,6 +200,20 @@ describe('S12c: the phone tier as ASTC 6×6', () => {
     expect(phoneTier(document, url => files[url])?.files.get('/assets/x/astc6/rock-44444444.ktx2')).toBeUndefined();
   });
 
+  it('S12d: encodes a kept row (a horizon, a #layer twin) at its own size from its own file, never its master', () => {
+    const files: Readonly<Record<string, Uint8Array>> = {
+      '/assets/gpu/horizon/day-phone-77777777.ktx2': ktx2(1024), '/assets/gpu/horizon/day-88888888.ktx2': ktx2(4096),
+    };
+    const phone = {'/assets/horizon/day-phone.webp': '/assets/gpu/horizon/day-phone-77777777.ktx2'};
+    const document = new TextEncoder().encode(JSON.stringify({native: {ktx2: {shard: {phone, desktop: {'/assets/horizon/day.webp': '/assets/gpu/horizon/day-88888888.ktx2'}}}}}));
+    const {calls, encode} = encoder();
+    const day = phoneTier(document, url => files[url], undefined, encode)?.files.get('/assets/gpu/horizon/day-phone-77777777.ktx2')?.[0];
+    expect(day?.url).toMatch(/^\/assets\/gpu\/horizon\/day-phone\.t16384-[a-f0-9]{8}\.ktx2$/u);
+    expect(calls).toEqual([{width: 1024, role: 'linear'}]);
+    // Without an encoder it keeps its file, as S12b did.
+    expect(phoneTier(document, url => files[url])).toBeUndefined();
+  });
+
   it('takes a master only when the encode ran, and never a desktop GLB for a .phone GLB', () => {
     const files: Readonly<Record<string, Uint8Array>> = {
       '/assets/gpu/rock-c9b1bd73.ktx2': ktx2(2048), '/assets/x/astc6/rock-44444444.ktx2': ktx2(512, {vkFormat: 166}),
@@ -218,4 +233,15 @@ describe('S12c: the phone tier as ASTC 6×6', () => {
     new DataView(flat.buffer).setUint32(40, 1, true);
     expect(tierKtx2(flat, 512, encode)).toBe(flat);
   });
+});
+
+it('S12d: the phone overlay is the tiered table\'s stand-ins: the cook\'s phone files and any hand-made 6×6 row', () => {
+  const discovery = new TextEncoder().encode(JSON.stringify({native: {ktx2: {GPU_FILES: {phone: {
+    '/assets/far-reach/sky.jpg': '/assets/gpu/far-reach/sky.t512-0a1b2c3d.ktx2', '/assets/far-reach/rock.jpg': '/assets/far-reach/astc6/rock-11112222.ktx2',
+    '/assets/far-reach/layer.png': '/assets/gpu/far-reach/layer-33334444.ktx2', '/assets/models/bird.glb': '/assets/gpu/models/bird.t512-55556666.glb'},
+  desktop: {'/assets/far-reach/sky.jpg': '/assets/gpu/far-reach/sky-77778888.ktx2'}}}}}));
+  expect(phoneOverlay(discovery)).toEqual({'/assets/far-reach/sky.jpg': '/assets/gpu/far-reach/sky.t512-0a1b2c3d.ktx2',
+    '/assets/far-reach/rock.jpg': '/assets/far-reach/astc6/rock-11112222.ktx2', '/assets/models/bird.glb': '/assets/gpu/models/bird.t512-55556666.glb'});
+  expect(phoneOverlay(undefined)).toEqual({});
+  expect(phoneOverlay(new TextEncoder().encode('{"native": {}}'))).toEqual({});
 });

@@ -22,6 +22,9 @@ export function copyOutputProducts(root, outDir) {
     // C3: the mounts a page reads by this folder's URL: a discovery document and the art of a product that packs none.
     const own = resolve(source, 'mounts/shardfiles', entry.name);
     if (existsSync(own)) cpSync(own, resolve(shardfiles, entry.name), { recursive: true });
+    // S12d: the discovery document as the build's cook serves it (the phone tier's table), over the product's own.
+    const served = resolve(products, '.app/discovery', entry.name, 'discovery.json');
+    if (existsSync(served)) copyFileSync(served, resolve(shardfiles, entry.name, 'discovery.json'));
   }
 }
 

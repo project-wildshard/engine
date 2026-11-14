@@ -280,3 +280,14 @@ test('S12e: a part stays within its cap; a file over the cap stands alone', asyn
   for (const part of phone ?? []) if (part.members.length > 1) expect(part.bytes).toBeLessThanOrEqual(PART_LIMITS.max);
   expect(Math.max(...(desktop ?? []).map(part => part.bytes))).toBeGreaterThan(PART_LIMITS.max);
 });
+
+test('a file whose bytes match a shard cook\'s one-file part takes a part of its own, not that part\'s name', async () => {
+  // The app build's audio row and a shard cook's mount hold one recording under two URLs (S12d, the full pin set).
+  const bytes = body('/assets/sfx/x/ambience-1.m4a', 4096), hash = createHash('sha256').update(bytes).digest('hex');
+  const cookedRow = file('/assets/sfx/x/ambience-1.m4a?v=11111111', 4096), loose = file('/assets/sfx/x/ambience-1.m4a', 4096);
+  const cooked = new Map([[cookedRow.url, { url: `/assets/spawn/parts/${hash.slice(0, 16)}.pack.br`, bytes: 4096, hash, offset: 0, wireBytes: 4096 }]]);
+  const rows = [cookedRow, loose];
+  const [parts = []] = await writeSpawnParts(out, [manifest(rows)], () => bytes, undefined, encoder(), cooked);
+  expect(new Set(parts.map(part => part.url)).size).toBe(2);
+  expect(readSpawnManifest({ version: 1, shard: 'x', tier: 'phone', flow: 'client', files: rows, totalBytes: 8192, parts }).parts).toEqual(parts);
+});

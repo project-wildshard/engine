@@ -161,6 +161,10 @@ export interface ShardHalf {
   /** The mounts of one manifest. */
   readonly mountRows: (tier: CookTier, set: CookSet) => readonly SpawnFile[];
   readonly read: (url: string) => Uint8Array;
+  /** S12d: the phone tier's own files (`phoneTier`), each at its content-named URL; none with the tiers off. */
+  readonly tierFiles: readonly SpawnFile[];
+  /** The discovery document as this cook serves it (the phone tier's table when the tiers are on), and its row. */
+  readonly discovery: {readonly row: SpawnFile; readonly bytes: Uint8Array} | undefined;
   readonly stableKey: (url: string) => string | undefined;
   /** A mount's bytes as this cook serves it: the discovery document carries the phone tier's table (S12b). */
   readonly mountBytes: (row: CookMount) => Uint8Array;
@@ -240,7 +244,8 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
   })]));
   /** A phone list names each trimmed target's phone files in its place, and the target too while a kept row still reads it. */
   const tiered = (tier: CookTier, url: string): readonly string[] => tier !== 'phone' || !tierRows.has(url) ? [url] : phone?.kept.has(url) === true ? [url, `tier:${url}`] : [`tier:${url}`];
-  return {shard, header, read: url => { const read = sources.get(url); if (read === undefined) throw new Error(`Spawn file has no source: ${url}`); return read(); },
+  return {shard, header, tierFiles: [...tierRows.values()].flat(), discovery: discovery[0] === undefined || documentBytes === undefined ? undefined : {row: discovery[0], bytes: documentBytes},
+    read: url => { const read = sources.get(url); if (read === undefined) throw new Error(`Spawn file has no source: ${url}`); return read(); },
     stableKey: url => stableKeys.get(url),
     mountBytes: row => (row.url === document?.url && documentBytes !== undefined ? documentBytes : shard.read(row.path)),
     productRows: (tier, set) => {
