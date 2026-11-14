@@ -17,8 +17,8 @@ export const STALL_IDLE_SHARE: number;
 export const STALL_STAGES: readonly string[];
 /** The page function the clock mark runs, by this name in the profile. */
 export const CLOCK_MARK: string;
-/** The page expression that runs the clock mark and returns its start on the page clock. */
-export const CLOCK_MARK_EXPRESSION: string;
+/** A fresh page expression (new text each call) that runs the clock mark and returns its start on the page clock. */
+export function clockMarkExpression(): string;
 /** Idle spans merged, minus holes, cut to [from, to]. */
 export function idleWithin(spans: readonly Span[], holes: readonly Span[], from: number, to: number): Span[];
 /** The most of the spans inside any window of `width`, and where that window starts. */

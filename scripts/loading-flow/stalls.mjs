@@ -108,10 +108,16 @@ export function profileIdle(profile, anchor) {
   return out;
 }
 
-/** The page expression that runs the clock mark: 30 ms busy inside CLOCK_MARK, returning its start on the page clock. */
-export const CLOCK_MARK_EXPRESSION = `(() => { const start = performance.now(), until = start + 30;
+let clockMarks = 0;
+/** The page expression that runs the clock mark: 30 ms busy inside CLOCK_MARK, returning its start on the page clock. Each
+ * call's text is new: V8 reuses a repeated eval's compiled script, and a second mark (play's profile after boot's) then
+ * ran with CLOCK_MARK inlined into its caller and never sampled by name (NB6).
+ * @returns {string} */
+export function clockMarkExpression() {
+  return `/* clock mark ${++clockMarks} */ (() => { const start = performance.now(), until = start + 30;
   function ${CLOCK_MARK}() { while (performance.now() < until) { /* busy: the profiler samples this function */ } }
   ${CLOCK_MARK}(); return start; })()`;
+}
 
 /** Browser-side: the page's boot timeline entries (its own collector, as Copy diagnostics reads it). */
 export function bootTimelineEntries() {
@@ -133,7 +139,7 @@ export async function startStallProfile(page) {
 /** End a stall profile at control: pin its clock with the mark, then the ratcheted stages' worst windows and their faults.
  * @param {import('playwright').Page} page @param {import('playwright').CDPSession} session */
 export async function finishStallProfile(page, session) {
-  const markPageMs = Number(await page.evaluate(CLOCK_MARK_EXPRESSION));
+  const markPageMs = Number(await page.evaluate(clockMarkExpression()));
   const { profile } = await session.send('Profiler.stop');
   await session.detach().catch(() => undefined);
   const entries = await page.evaluate(bootTimelineEntries), idle = profileIdle(profile, profileAnchor(profile, markPageMs));
@@ -186,7 +192,7 @@ export function playStallFaults(stall) {
  * play's worst window and its fault.
  * @param {import('playwright').Page} page @param {import('playwright').CDPSession} session @param {number} fromPageMs */
 export async function finishPlayProfile(page, session, fromPageMs) {
-  const markPageMs = Number(await page.evaluate(CLOCK_MARK_EXPRESSION));
+  const markPageMs = Number(await page.evaluate(clockMarkExpression()));
   const { profile } = await session.send('Profiler.stop');
   await session.detach().catch(() => undefined);
   // the clock mark's own 30 ms of busy work ends the window

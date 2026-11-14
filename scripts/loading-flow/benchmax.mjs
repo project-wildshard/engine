@@ -18,7 +18,7 @@ import { parseArgs } from 'node:util';
 import { chromium, devices } from 'playwright';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { NAME_ASKED, developerSettings, saveFixture, levelDownloadFixtures, hideDeveloperOverlays } from '../debug-settings.mjs';
-import { bootTimelineEntries, CLOCK_MARK_EXPRESSION, profileAnchor, profileIdle, stageStalls, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';
+import { bootTimelineEntries, clockMarkExpression, profileAnchor, profileIdle, stageStalls, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shard: { type: 'string', default: 'Nine' }, throttle: { type: 'string', default: '4' },
   seconds: { type: 'string', default: '60' }, json: { type: 'string' }, profile: { type: 'string' },
@@ -74,7 +74,7 @@ try {
   if (!await until(control, 240_000)) throw new Error('never reached control');
   if (values.profile !== undefined) {
     // the profile's end is the page's `performance.now()` read just before the stop (its clock is the profiler's own)
-    const markPageMs = Number(await page.evaluate(CLOCK_MARK_EXPRESSION)), pageEnd = await page.evaluate('performance.now()');
+    const markPageMs = Number(await page.evaluate(clockMarkExpression())), pageEnd = await page.evaluate('performance.now()');
     const { profile } = await cdp.send('Profiler.stop');
     writeFileSync(values.profile, JSON.stringify({ pageEnd, profile }));
     // NB6: the ring-1 stall ratchet's own reading of this load (stalls.mjs), every load stage

@@ -16,3 +16,6 @@
 - (NB3's cut lands as its own commit after the NB6 one: the pre-commit typecheck reads the tree, and NB6's test imports came first.)
 - NB6 follow-up: stalls.mjs has a hand-written stalls.d.mts; the play exports needed their declarations too.
 - NB3's cut commits after NB6 (the commit typecheck reads the tree: NB6's test imports had to land first).
+- NB6 proof: play's clock mark found no sample on its second call (V8 reused the repeated eval's compiled script with
+  the mark inlined), so every eval now gets new text. Ring 1's developer group then passed (play busy 20-52 ms) and a 2 s
+  busy sleep every 5th frame failed it: "Play stall: the main thread worked 1.50 s of a 1.5 s window".
