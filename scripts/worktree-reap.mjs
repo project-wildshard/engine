@@ -13,23 +13,28 @@
 // commit, and `origin plan/<slug>` deleted (`git push --delete`, which the pre-push lets through without a gate)
 // only if the remote branch is landed too, under a lease on the SHA it had. A worktree that fails any check is kept
 // and named with the reason; an unlanded branch, local or remote, is never touched. Every run appends one receipt.
+// REPO-DISK DK11: a removed worktree takes its tmp/ and build output with it (they are ignored files inside it), and
+// a real run's receipt records the `df` bytes it freed (other writers move df too, so it is a measure, not a ledger).
+// A worktree kept because it is unlanded or dirty and untouched for --stale hours (default 72) is named in the
+// receipt with its `du` size, so the coordinator's brief can put it to its owner.
 import {execFileSync,spawnSync} from 'node:child_process';
-import {appendFileSync,existsSync,mkdirSync,readdirSync,readlinkSync,realpathSync,statSync} from 'node:fs';
+import {appendFileSync,existsSync,mkdirSync,readdirSync,readlinkSync,realpathSync,statSync,statfsSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename,dirname,join,resolve,sep} from 'node:path';
 import {pidLock} from './pid-lock.mjs';
 import {WORKTREES} from './worktree-ignore.mjs';
 
-const REAP_USAGE='usage: node scripts/worktree.mjs reap [--dry-run] [--grace=HOURS] [--no-remote]';
+const REAP_USAGE='usage: node scripts/worktree.mjs reap [--dry-run] [--grace=HOURS] [--stale=HOURS] [--no-remote]';
 
-/** @param {string[]} argv the arguments after `reap` @returns {{dryRun:boolean,graceHours:number,remote:boolean}} */
+/** @param {string[]} argv the arguments after `reap` @returns {{dryRun:boolean,graceHours:number,staleHours:number,remote:boolean}} */
 export function parseReapArgs(argv){
- const options={dryRun:false,graceHours:24,remote:true};
+ const options={dryRun:false,graceHours:24,staleHours:72,remote:true};
  for(const arg of argv){
   const [name,value]=arg.split('=',2);
   if(arg==='--dry-run')options.dryRun=true;
   else if(arg==='--no-remote')options.remote=false;
   else if(name==='--grace'&&value!==undefined&&/^\d+(?:\.\d+)?$/u.test(value))options.graceHours=Number(value);
+  else if(name==='--stale'&&value!==undefined&&/^\d+(?:\.\d+)?$/u.test(value))options.staleHours=Number(value);
   else throw new Error(`unknown option ${arg}\n${REAP_USAGE}`);
  }
  return options;
@@ -109,6 +114,22 @@ export function lastActivity(tree,gitDir){
  return newest;
 }
 
+/** Free bytes on the volume holding `path` (what `df` shows as available). @param {string} path */
+export function freeBytes(path){
+ const volume=statfsSync(path);
+ return volume.bavail*volume.bsize;
+}
+
+/** `du -sk` of `path` as GiB text, or `size unknown`. @param {string} path */
+function duSize(path){
+ const listed=spawnSync('du',['-sk',path],{encoding:'utf8',timeout:120_000});
+ const kib=Number((listed.stdout??'').split('\t')[0]);
+ return listed.status===0&&Number.isFinite(kib)&&kib>0?`${(kib/1_048_576).toFixed(1)} GiB`:'size unknown';
+}
+
+/** Signed MiB text for a byte count. @param {number} bytes */
+const mib=bytes=>`${bytes<0?'-':'+'}${Math.round(Math.abs(bytes)/1_048_576).toLocaleString('en-US')} MiB`;
+
 /** Is `sha` on origin/main itself? @param {string} canonical @param {string} sha */
 export const onMain=(canonical,sha)=>sha!==''&&tryGit(canonical,['merge-base','--is-ancestor',sha,'origin/main']).status===0;
 /** Commits of `sha` that origin/main lacks. @param {string} canonical @param {string} sha */
@@ -141,9 +162,22 @@ export function reap(canonical,options,env,say){
  const fetched=tryGit(canonical,['fetch','--quiet','origin','+refs/heads/main:refs/remotes/origin/main']);
  if(fetched.status!==0){say(`reap STOP cannot fetch origin main: ${fetched.stderr.trim()}`);return 1;}
  const directories=processDirectories();
- const realRoot=realpathSync(canonical),now=Date.now();
+ const realRoot=realpathSync(canonical),now=Date.now(),freeBefore=freeBytes(canonical);
  /** @type {string[]} */const reaped=[];
  /** @type {string[]} */const kept=[];
+ /** @type {string[]} */const stale=[];
+ /** DK11: an unlanded or dirty worktree untouched for --stale hours goes on the receipt with its size.
+  * @param {string} slug @param {string} path @param {string} why */
+ const staleCheck=(slug,path,why)=>{
+  let gitDir='';
+  try{gitDir=git(path,['rev-parse','--absolute-git-dir']).trim();}catch{return;}
+  let idle=0;
+  try{idle=(now-lastActivity(path,gitDir))/3_600_000;}catch{return;}
+  if(idle<options.staleHours)return;
+  const entry=`${slug} (${duSize(path)}, idle ${(idle/24).toFixed(1)} d, ${why})`;
+  stale.push(entry);
+  say(`stale    ${entry}`);
+ };
  /** @type {string[]} */const remotes=[];
  for(const tree of linkedWorktrees(canonical)){
   const slug=basename(tree.path),branch=`refs/heads/plan/${slug}`;
@@ -156,9 +190,9 @@ export function reap(canonical,options,env,say){
   if(tree.branch!==branch){keep(`on ${tree.branch===''?'a detached HEAD':tree.branch}, not plan/${slug}`);continue;}
   if(!existsSync(tree.path)){keep('its folder is gone; `git worktree prune` clears it');continue;}
   // Landed means the tip is on main itself (land fast-forwards): \`git cherry\` would miss a merge's own changes.
-  if(!onMain(canonical,tree.head)){keep(`${String(aheadOfMain(canonical,tree.head))} commit(s) not on main`);continue;}
+  if(!onMain(canonical,tree.head)){const why=`${String(aheadOfMain(canonical,tree.head))} commit(s) not on main`;keep(why);staleCheck(slug,tree.path,why);continue;}
   const dirty=git(tree.path,['--no-optional-locks','status','--porcelain','--untracked-files=all']).split('\n').filter(Boolean);
-  if(dirty.length>0){keep(`${String(dirty.length)} uncommitted path(s), first ${dirty[0]?.slice(3)}`);continue;}
+  if(dirty.length>0){const why=`${String(dirty.length)} uncommitted path(s)`;keep(`${why}, first ${dirty[0]?.slice(3)}`);staleCheck(slug,tree.path,why);continue;}
   const gitDir=git(tree.path,['rev-parse','--absolute-git-dir']).trim();
   const busy=(/** @type {Map<number,string>|undefined} */ seen)=>seen===undefined?'cannot list process working directories'
    :[...seen].filter(([,path])=>path===physical||path.startsWith(`${physical}${sep}`)).map(([pid])=>String(pid)).join(', ');
@@ -206,8 +240,10 @@ export function reap(canonical,options,env,say){
   else{remotes.push(`${slug} delete failed`);say(`         ${slug}: origin plan/${slug} not deleted: ${pushed.stderr.trim()}`);}
  }
  if(!options.dryRun)tryGit(canonical,['worktree','prune']);
+ const freed=options.dryRun?'':`; df ${mib(freeBytes(canonical)-freeBefore)}`;
+ if(freed!=='')say(`df free changed ${freed.slice(5)} during the run`);
  const lane=/^[a-z][a-z0-9_-]*$/u.test(env.WS_LANE_NAME??'')?String(env.WS_LANE_NAME):'reaper';
- const line=`${new Date().toISOString().slice(11,16)} UTC ${lane} worktree reap ${basename(canonical)}${options.dryRun?' (dry run)':''}: ${reaped.length===0?'none':`${options.dryRun?'would reap':'reaped'} ${reaped.join(', ')}`}; kept ${kept.length===0?'none':kept.join(', ')}${remotes.length===0?'':`; origin ${remotes.join(', ')}`}`;
+ const line=`${new Date().toISOString().slice(11,16)} UTC ${lane} worktree reap ${basename(canonical)}${options.dryRun?' (dry run)':''}: ${reaped.length===0?'none':`${options.dryRun?'would reap':'reaped'} ${reaped.join(', ')}`}; kept ${kept.length===0?'none':kept.join(', ')}${remotes.length===0?'':`; origin ${remotes.join(', ')}`}${freed}${stale.length===0?'':`; stale ${String(options.staleHours)} h+: ${stale.join(', ')}`}`;
  const file=resolve(env.WS_LANE_RECEIPTS??join(homedir(),'.cache/wildshard/lane-receipts.log'));
  try{mkdirSync(dirname(file),{recursive:true});appendFileSync(file,`${line}\n`);}catch(error){say(`reap receipt unavailable: ${String(error)}`);}
  return 0;

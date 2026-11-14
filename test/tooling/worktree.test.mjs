@@ -85,7 +85,10 @@ describe('worktree new', () => {
     expect(record.steps.map((/** @type {{step: string}} */ row) => row.step)).toEqual(['fetch', 'add', 'checkout']);
     if (process.platform === 'darwin') expect(record.steps[2].detail).toMatch(/^4 of 7 tracked files cloned/u);
     expect(made.stdout).toContain('WS_LANE_NAME=lane-x node scripts/land.mjs');
-    expect(readFileSync(receipts, 'utf8')).toMatch(/^\d\d:\d\d UTC lane-x worktree new engine\/\.worktrees\/foo on plan\/foo from [0-9a-f]{10} in /mu);
+    expect(readFileSync(receipts, 'utf8')).toMatch(/^\d\d:\d\d UTC lane-x worktree new engine\/\.worktrees\/foo on plan\/foo from [0-9a-f]{10} in .*; df (?:cost|gained) [\d,]+ MiB, du \d+\.\d\d GiB, free [\d.]+ GiB$/mu);
+    // REPO-DISK DK10: the record keeps df before and after and the worktree's du.
+    expect(record.disk.dfCostBytes).toBe(record.disk.freeBefore - record.disk.freeAfter);
+    expect(record.disk.duKib).toBeGreaterThan(0);
   });
 
   test('keeps the canonical checkout on origin/main: fast-forwards a clean one, never moves a diverged or edited one', () => {

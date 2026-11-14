@@ -38,7 +38,7 @@ function repos(names) {
   const origin = join(base, 'origin.git'), canonical = join(base, 'engine');
   git(base, ['init', '-q', '--bare', '-b', 'main', origin]);
   git(base, ['clone', '-q', origin, canonical]);
-  put(canonical, '.gitignore', '/.worktrees/\n/out/\n');
+  put(canonical, '.gitignore', '/.worktrees/\n/out/\n/tmp/\n');
   put(canonical, 'src/a.ts', 'export const a = 1;\n');
   git(canonical, ['add', '.']);
   git(canonical, ['commit', '-q', '-m', 'seed']);
@@ -62,9 +62,9 @@ function repos(names) {
 
 describe('worktree reap', () => {
   test('parses its options and refuses anything else', () => {
-    expect(parseReapArgs([])).toEqual({dryRun: false, graceHours: 24, remote: true});
-    expect(parseReapArgs(['--dry-run', '--grace=0.5', '--no-remote'])).toEqual({dryRun: true, graceHours: 0.5, remote: false});
-    for (const bad of [['--force'], ['--grace'], ['--grace=-1'], ['x']]) expect(() => parseReapArgs(bad)).toThrow();
+    expect(parseReapArgs([])).toEqual({dryRun: false, graceHours: 24, staleHours: 72, remote: true});
+    expect(parseReapArgs(['--dry-run', '--grace=0.5', '--stale=1', '--no-remote'])).toEqual({dryRun: true, graceHours: 0.5, staleHours: 1, remote: false});
+    for (const bad of [['--force'], ['--grace'], ['--grace=-1'], ['--stale=x'], ['x']]) expect(() => parseReapArgs(bad)).toThrow();
   });
 
   test('reaps a landed, clean, idle worktree with its branch and origin branch; keeps unlanded, dirty, busy and landing ones', async () => {
@@ -79,8 +79,9 @@ describe('worktree reap', () => {
     const busy = spawn('sleep', ['30'], {cwd: f.tree('busy'), stdio: 'ignore'});
     children.push(busy);
     await new Promise(done => setTimeout(done, 200));
-    // Ignored build output never counts as dirt.
+    // Ignored build output and scratch never count as dirt, and go with the worktree (REPO-DISK DK11).
     put(f.tree('landed'), 'out/big.bin', 'x');
+    put(f.tree('landed'), 'tmp/lane/scratch.bin', 'x');
 
     const dry = f.reap(['--grace=0', '--dry-run']);
     expect(dry.status, dry.stderr).toBe(0);
@@ -96,10 +97,28 @@ describe('worktree reap', () => {
     expect(result.stdout).toMatch(new RegExp(`kept {5}busy: in use by pid [\\d, ]*${String(busy.pid)}`, 'u'));
     expect(result.stdout).toMatch(/kept {5}landing: land is running there/u);
     expect(existsSync(f.tree('landed'))).toBe(false);
+    expect(existsSync(join(f.tree('landed'), 'tmp'))).toBe(false);
     for (const name of ['unlanded', 'dirty', 'busy', 'landing']) expect(existsSync(f.tree(name)), name).toBe(true);
     expect(f.branches().sort()).toEqual(['plan/busy', 'plan/dirty', 'plan/landing', 'plan/unlanded']);
     expect(f.remoteBranches().sort()).toEqual(['plan/busy', 'plan/dirty', 'plan/landing', 'plan/unlanded']);
-    expect(readFileSync(f.receipts, 'utf8')).toMatch(/^\d\d:\d\d UTC fixture-lane worktree reap engine: reaped landed; kept busy \(.*\), dirty \(.*\), landing \(.*\), unlanded \(.*\); origin landed deleted$/mu);
+    expect(readFileSync(f.receipts, 'utf8')).toMatch(/^\d\d:\d\d UTC fixture-lane worktree reap engine: reaped landed; kept busy \(.*\), dirty \(.*\), landing \(.*\), unlanded \(.*\); origin landed deleted; df [+-][\d,]+ MiB$/mu);
+  }, 60_000);
+
+  test('DK11: an unlanded or dirty worktree past --stale goes on the receipt with its size; a dry run records no df', () => {
+    const f = repos(['old', 'messy', 'done']);
+    f.work('old', false);
+    f.work('done', true);
+    put(f.tree('messy'), 'notes.txt', 'mine\n');
+    const quiet = f.reap(['--grace=0', '--stale=24']);
+    expect(quiet.stdout).not.toMatch(/stale/u);
+    const dry = f.reap(['--grace=0', '--stale=0', '--dry-run']);
+    expect(dry.status, dry.stderr).toBe(0);
+    expect(dry.stdout).toMatch(/stale {4}old \([\d.]+ GiB, idle 0\.0 d, 1 commit\(s\) not on main\)/u);
+    expect(dry.stdout).toMatch(/stale {4}messy \([\d.]+ GiB, idle 0\.0 d, 1 uncommitted path\(s\)\)/u);
+    const lines = readFileSync(f.receipts, 'utf8').trim().split('\n');
+    expect(lines[0]).toMatch(/; df [+-][\d,]+ MiB$/u);
+    expect(lines[1]).toMatch(/\(dry run\).*; stale 0 h\+: messy \(.*\), old \(.*\)$/u);
+    expect(lines[1]).not.toMatch(/; df /u);
   }, 60_000);
 
   test('FL30: an orphaned process in a landed worktree is stopped and the worktree reaped; a dry run only names it', async () => {

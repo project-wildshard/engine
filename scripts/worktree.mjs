@@ -13,7 +13,9 @@
 //
 // Never copied: .env*, tmp/, .review/, .cache/, browser profiles, leases, ports, push proofs; the worktree gets
 // only tracked files and its own install. Each step's seconds go to <worktree>/tmp/worktree-setup.json and, with
-// WS_LANE_NAME set, one line in ~/.cache/wildshard/lane-receipts.log. Removal is DS13's reaper: `reap`
+// WS_LANE_NAME set, one line in ~/.cache/wildshard/lane-receipts.log. REPO-DISK DK10: the record and the receipt also
+// carry the volume's `df` free bytes before and after and the worktree's `du`: build output inside a worktree costs
+// nothing until written (clones), so `df` shows the real cost and `du` the apparent one. Removal is DS13's reaper: `reap`
 // (scripts/worktree-reap.mjs) removes landed, clean, idle worktrees with their branches, local and on origin.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
@@ -22,7 +24,7 @@ import {homedir} from 'node:os';
 import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {WORKTREES} from './worktree-ignore.mjs';
-import {parseReapArgs,reap} from './worktree-reap.mjs';
+import {freeBytes,parseReapArgs,reap} from './worktree-reap.mjs';
 
 export const SLUG=/^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const REGULAR=/^100(?:644|755)$/u;
@@ -247,12 +249,22 @@ function run(cwd,command,args,env){
  if(result.status!==0)throw new StopError(`${command} ${args.join(' ')} exited ${String(result.status)}`);
 }
 
+/** DK10: what the new worktree cost the volume (`df` free before minus after; other writers move it too) and what
+ * `du` counts in it (clones in full). @param {string} tree @param {number} freeBefore free bytes before setup */
+export function diskCost(tree,freeBefore){
+ const freeAfter=freeBytes(tree),listed=spawnSync('du',['-sk',tree],{encoding:'utf8',timeout:120_000});
+ const kib=Number((listed.stdout??'').split('\t')[0]),duKib=listed.status===0&&Number.isFinite(kib)?kib:undefined;
+ const cost=freeBefore-freeAfter;
+ const text=`df ${cost<0?'gained':'cost'} ${Math.round(Math.abs(cost)/1_048_576).toLocaleString('en-US')} MiB, du ${duKib===undefined?'unknown':`${(duKib/1_048_576).toFixed(2)} GiB`}, free ${(freeAfter/2**30).toFixed(1)} GiB`;
+ return {freeBefore,freeAfter,dfCostBytes:cost,duKib,text};
+}
+
 /** @param {string[]} argv @param {string} [cwd] @param {NodeJS.ProcessEnv} [env] @returns {number} */
 export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
  const options=parseArgs(argv),canonical=canonicalRoot(cwd),common=join(canonical,'.git');
  const relative=`${WORKTREES}/${options.slug}`,tree=join(canonical,relative),branch=`plan/${options.slug}`;
  /** @type {{step:string,seconds:number,detail?:string}[]} */const steps=[];
- const began=performance.now();
+ const began=performance.now(),freeBefore=freeBytes(canonical);
  /** @param {string} step @param {() => (string|void)} work */
  const timed=(step,work)=>{
   const started=performance.now(),detail=work();
@@ -307,13 +319,15 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
   catch(error){process.stderr.write(`worktree: timings refresh not started (${error instanceof Error?error.message:String(error)})\n`);}
  }
  const total=Number(((performance.now()-began)/1000).toFixed(2));
- const record={slug:options.slug,branch,base,tree,total,steps,finished:new Date().toISOString()};
+ const disk=diskCost(tree,freeBefore);
+ process.stdout.write(`worktree disk     ${disk.text}\n`);
+ const record={slug:options.slug,branch,base,tree,total,steps,disk,finished:new Date().toISOString()};
  mkdirSync(join(tree,'tmp'),{recursive:true});
  writeFileSync(join(tree,'tmp/worktree-setup.json'),`${JSON.stringify(record,null,2)}\n`);
  const lane=/^[a-z][a-z0-9_-]*$/u.test(env.WS_LANE_NAME??'')?String(env.WS_LANE_NAME):'';
  if(lane!==''){
   const file=resolve(env.WS_LANE_RECEIPTS??join(homedir(),'.cache/wildshard/lane-receipts.log'));
-  try{mkdirSync(dirname(file),{recursive:true});appendFileSync(file,`${new Date().toISOString().slice(11,16)} UTC ${lane} worktree new ${basename(canonical)}/${relative} on ${branch} from ${base.slice(0,10)} in ${total.toFixed(1)} s (${steps.map(row=>`${row.step} ${row.seconds.toFixed(1)}`).join(', ')})\n`);}
+  try{mkdirSync(dirname(file),{recursive:true});appendFileSync(file,`${new Date().toISOString().slice(11,16)} UTC ${lane} worktree new ${basename(canonical)}/${relative} on ${branch} from ${base.slice(0,10)} in ${total.toFixed(1)} s (${steps.map(row=>`${row.step} ${row.seconds.toFixed(1)}`).join(', ')}); ${disk.text}\n`);}
   catch(error){process.stderr.write(`worktree receipt unavailable: ${String(error)}\n`);}
  }
  const name=lane===''?'<lane>':lane;
