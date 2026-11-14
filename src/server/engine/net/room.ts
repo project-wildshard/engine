@@ -239,6 +239,8 @@ export class NetRoom {
     this.remove(client);
     return true;
   }
+  /** GC15 (3): a client whose hello this room heard again after a travel from another worker reads this room's receipts from the start, as an adopted one does (its hello's ledger was the first room's). */
+  travelled(id: number): void { const client = this.clients.find(entry => entry.id === id); if (client !== undefined) client.ledgerSeen = 0; }
   private adopt(transport: Transport, player: NetPlayer, queue: CommandQueue, said: { readonly identity: NetIdentity; readonly reader: WireClientReader | undefined; readonly capabilities: readonly number[] }): number | null {
     const id = this.join(transport, player, queue), client = this.clients.find(entry => entry.id === id), { identity } = said;
     if (client !== undefined) {

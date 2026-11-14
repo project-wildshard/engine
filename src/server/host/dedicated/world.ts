@@ -497,7 +497,7 @@ export class World {
   private movedOut(device: string, end: SocketTransport, motion: unknown): void {
     const out = this.outs.get(device), kept = this.seatSockets.get(device), link = out === undefined ? undefined : this.linkOf(out.to);
     this.outs.delete(device);
-    if (out === undefined || kept?.end !== end || link === undefined || !end.isOpen || this.draining) { this.abandon(device, out?.from ?? ''); end.close('retry'); return; }
+    if (out === undefined || kept?.end !== end || link === undefined || !end.isOpen || this.draining) { this.abandon(device, out?.from ?? ''); end.close(this.draining ? 'restart' : 'retry'); return; }
     const { port1, port2 } = new MessageChannel(), hello = kept.hello.slice(0);
     pumpSocket(end, port1, undefined, next => { this.movedOut(device, end, next); });
     link.send({ kind: 'arrive', from: out.from, to: out.to, at: out.at, port: port2, hello, motion: motion as MotionSnapshot | null, ...out.entry }, [port2, hello]);
@@ -529,7 +529,14 @@ export class World {
       end.onClose(off);end.control('playtest');
     }
     this.seatSockets.set(entry.device, { end, hello: hello.slice(0) });
-    end.onClose(() => { if (this.seatSockets.get(entry.device)?.end === end) this.seatSockets.delete(entry.device); });
+    end.onClose(() => {
+      if (this.seatSockets.get(entry.device)?.end !== end) return;
+      this.seatSockets.delete(entry.device);
+      // GC15 (3), review MUST: the socket went while a crossing onto another worker waited for its `out`, which this close swallowed:
+      // the crossing is off, and a `left` the road said (or says next) frees the seat
+      const out = this.outs.get(entry.device);
+      if (out !== undefined) { this.outs.delete(entry.device); this.abandon(entry.device, out.from); }
+    });
     pumpSocket(end, port1, undefined, motion => { this.movedOut(entry.device, end, motion); });
     const rebody = this.voice.attach(end, slug, entry.name, entry.body);
     this.voiceBodies.set(entry.device, rebody);
