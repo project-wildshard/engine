@@ -1,47 +1,55 @@
 import { expect, test } from 'vitest';
-import { workerTable, worldCrossing, worldSettings } from '../src/server/host/dedicated/workerTable';
+import { cellCost, COSTS_MEASURED, workerTable, worldCrossing, worldSettings } from '../src/server/host/dedicated/workerTable';
 
 // J182, J185: which worker runs which cell, fixed at startup, on a worker count the bench sets.
 const REST = ['_template', 'blender-template', 'ink-cel-valley', 'pastel-plain', ...Array.from({ length: 16 }, (_unused, index) => `open-plot-${String(index)}`)];
 const ALL = ['driftwood-isle', 'nalati-grasslands', 'nine-dragon-stack', 'pine-hollow', 'sunscar-dunes', 'far-reach', ...REST];
+// The grid as production opens it (`WORLD_CELLS=grid`): instances, as `server.listening` names them.
+const GRID = ['driftwood-isle', 'pine-hollow', 'template-2', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pastel-plain', 'blender-template', 'nine-dragon-stack',
+  'ink-cel-valley', ...['0-0', '1-0', '2-0', '3-0', '4-0', '0-1', '4-1', '0-2', '4-2', '0-3', '4-3', '0-4', '2-4', '3-4', '4-4'].map(at => `open-plot-${at}`)];
 
 const sorted = (rows: readonly string[]): string[] => [...rows].sort();
+const load = (row: readonly string[]): number => row.reduce((total, slug) => total + cellCost(slug), 0);
 
 test('the first test: one cell, one worker, whatever the count', () => { expect(workerTable(['driftwood-isle'], 4)).toEqual([['driftwood-isle']]); });
 
-test('at 8 the four big cells each get a worker, Dunes and Sky Reach share one, and the rest share the others', () => {
-  const table = workerTable(ALL, 8);
-  expect(table).toHaveLength(8);
-  expect(table.slice(0, 5)).toEqual([['nalati-grasslands'], ['nine-dragon-stack'], ['pine-hollow'], ['driftwood-isle'], ['sunscar-dunes', 'far-reach']]);
-  expect(sorted(table.flat())).toEqual(sorted(ALL));
-  expect(table.slice(5).map(row => row.length)).toEqual([7, 7, 6]);
-});
-
-test('production\'s 4 and staging\'s 2 hold every cell, and the last row keeps the big cells left over', () => {
-  for (const workers of [4, 2]) {
-    const table = workerTable(ALL, workers);
+// SERVER-CELLS SC8: the table is weighed by each cell's measured awake cost, so the busiest worker carries as little as the cells
+// allow. The name table it replaces put 22 of 25 cells on one of production's 4 workers (GC13 then spread them by count).
+test('SC8: every worker carries close to an even share of the grid\'s awake cost', () => {
+  const whole = load(GRID), heaviest = Math.max(...GRID.map(cellCost));
+  for (const workers of [2, 3, 4, 5, 8]) {
+    const table = workerTable(GRID, workers);
     expect(table).toHaveLength(workers);
-    expect(sorted(table.flat())).toEqual(sorted(ALL));
-  }
-  expect(workerTable(ALL, 4).map(row => row[0])).toEqual(['nalati-grasslands', 'nine-dragon-stack', 'pine-hollow', 'driftwood-isle']);
-  expect(workerTable(ALL, 4)[3]?.slice(0, 3)).toEqual(['driftwood-isle', 'sunscar-dunes', 'far-reach']);
-  expect(workerTable(ALL, 2)[1]?.slice(0, 5)).toEqual(['nine-dragon-stack', 'pine-hollow', 'driftwood-isle', 'sunscar-dunes', 'far-reach']);
-});
-
-// GRID-CROSSING GC13: when the count runs out, the cells spread over the workers. Staging's table put Nalati alone on one worker
-// and the other 25 cells on the other; production's put 23 on its last. Dunes and Sky Reach still share a worker. (With a worker for
-// each big cell, 6 and up, a big cell is a worker's load, as at 8 above.)
-test('short of workers, no worker holds more than its share plus one', () => {
-  for (const cells of [ALL, [...ALL, 'open-plot-thin-ice']]) for (const workers of [2, 3, 4, 5]) {
-    const table = workerTable(cells, workers), share = cells.length / workers;
-    expect(sorted(table.flat())).toEqual(sorted(cells));
-    for (const row of table) expect(row.length).toBeLessThanOrEqual(Math.floor(share) + 1);
+    expect(sorted(table.flat())).toEqual(sorted(GRID));
+    // LPT's bound: no row passes an even share by more than the heaviest cell
+    for (const row of table) expect(load(row), row.join(',')).toBeLessThanOrEqual(whole / workers + heaviest);
     expect(table.find(row => row.includes('sunscar-dunes'))).toContain('far-reach');
   }
+  // production's 4: each within 5 % of a quarter
+  for (const row of workerTable(GRID, 4)) expect(load(row)).toBeLessThan(whole / 4 * 1.05);
 });
 
-// GRID-CROSSING GC31: a crossing runs only between cells on one worker, so staging's `WORLD_WORKERS=1` must open one worker. It opened
-// two (Nalati alone), which walled Nalati off Driftwood's road.
+test('SC8: the costs are measured, and a cell with none weighs as an Open Plot', () => {
+  expect(COSTS_MEASURED).toMatch(/cell-mem-bench/u);
+  for (const slug of GRID) expect(cellCost(slug), slug).toBeGreaterThan(0);
+  expect(cellCost('nalati-grasslands')).toBeGreaterThan(cellCost('open-plot-0-0'));
+  expect(cellCost('open-plot-new')).toBeGreaterThan(0);
+  expect(cellCost('open-plot-new')).toBeLessThan(cellCost('driftwood-isle'));
+});
+
+test('with a worker for each, every cell (or the pair that shares) has its own', () => {
+  const table = workerTable(ALL, ALL.length);
+  expect(table).toHaveLength(ALL.length - 1);
+  expect(table.find(row => row.includes('far-reach'))).toEqual(['sunscar-dunes', 'far-reach']);
+});
+
+// GC15 (3)'s benches: staging's 2 workers put Nalati on one and Driftwood with its south neighbour on the other.
+test('the crossing benches\' tables: Nalati apart from Driftwood and Far Reach', () => {
+  expect(workerTable(['driftwood-isle', 'far-reach', 'nalati-grasslands'], 2)).toEqual([['nalati-grasslands'], ['driftwood-isle', 'far-reach']]);
+  expect(workerTable(['driftwood-isle', 'far-reach', 'sunscar-dunes', 'nalati-grasslands'], 2)).toEqual([['nalati-grasslands'], ['driftwood-isle', 'sunscar-dunes', 'far-reach']]);
+});
+
+// GRID-CROSSING GC31: staging's `WORLD_WORKERS=1` must open one worker.
 test('one worker holds every cell', () => {
   const table = workerTable(ALL, 1);
   expect(table).toHaveLength(1);
@@ -50,6 +58,7 @@ test('one worker holds every cell', () => {
 
 test('the same cells give the same table, whatever order they were listed in', () => {
   expect(workerTable([...ALL].reverse(), 8)).toEqual(workerTable(ALL, 8));
+  expect(workerTable([...GRID].reverse(), 4)).toEqual(workerTable(GRID, 4));
 });
 
 test('each channel starts on its own count and cap, and the bench\'s answer is one env var', () => {
