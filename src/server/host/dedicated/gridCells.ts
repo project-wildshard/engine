@@ -76,6 +76,8 @@ export function forgetPlacedCells(): void { placed.length = 0; hashes.clear(); r
 
 /** The instance a name means: an instance stands, a grid shard's slug becomes its cell, and anything else is its own name. */
 export function cellName(name: string): string { const { shards, cells } = gridNames(); return shards.has(name) ? name : cells.get(name) ?? name; }
+/** SERVER-CELLS SC5 (J328): whether a cell is the grid's, the catalogue's or a placed one. A grid cell never starts over (J107 is retired for it). */
+export function gridCell(cell: string): boolean { return gridNames().shards.has(cell); }
 /** The shard a cell runs: its pack, its stores and its save rows. */
 export function cellShard(cell: string): string { return gridNames().shards.get(cell) ?? cell; }
 /** GC15: a worker's road is named for the first cell on its row, so the door finds its worker, and it is in nobody's place row. */

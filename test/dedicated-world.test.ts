@@ -53,7 +53,7 @@ test('SC4: a cell runs its first second as it opens, with nobody in it, and then
   expect(bench.crashes).toEqual([]);
 });
 
-test('an empty cell takes no ticks, wakes where it stopped, and starts over once it has been empty long enough', { timeout: 60_000 }, async () => {
+test('an empty grid cell takes no ticks, wakes where it stopped, and keeps its world however long it was empty (SC5)', { timeout: 60_000 }, async () => {
   bench = await roomBench({ holdMs: 50, emptyMs: 600 });
   const { world, room } = bench, first = room(SHARD), at = first?.host.state.tick ?? -1;
   await new Promise(resolve => { setTimeout(resolve, 200); });
@@ -74,7 +74,7 @@ test('an empty cell takes no ticks, wakes where it stopped, and starts over once
   await new Promise(resolve => { setTimeout(resolve, 700); });
   const late = bot(bench.url, 'bench', 'device:late');
   expect(await late.arrived()).toBe(true);
-  expect(room(SHARD), 'J107: a world empty that long starts over').not.toBe(first);
+  expect(room(SHARD), 'J328: a grid cell never starts over').toBe(first);
 });
 
 test('two cells on two workers: each player stands in theirs, the cap is the grid\'s, and a cell with nobody in it sleeps', { timeout: 120_000 }, async () => {

@@ -20,3 +20,11 @@
   count as players in its reading.
 - Proof: `test/dedicated-metrics.test.ts` (a two-cell world, a crossing, every family); a bench run on staging's build
   `c5359cb4`, counts 1 and 2, read straight off the bundled server's `/metrics`.
+
+## SC4, SC5 (opus-cells, ~22:15 Cancún)
+
+- SC4: a cell runs 60 ticks with nobody in it as it opens (`cellHost.ts WARM_TICKS`), so the lazy first-tick work (animation
+  channel programs, Rapier's first step, the JIT) is paid at boot, not on the first arrival. Driftwood's first-arrival tick max on an
+  idle Mac went from 29-30 ms to 6 ms.
+- SC5 (J328, grill Q3): J107's start-over is retired for grid cells (`gridCell`); only a cell the grid does not place still
+  starts over. A grid world is never rebuilt, so its respawns carry what the start-over used to reset.

@@ -8,7 +8,7 @@ import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { DedicatedRoom, type DedicatedRoomRoad } from './dedicatedRoom';
-import { cellShard, gridAssembly, placeCell, roadName } from './gridCells';
+import { cellShard, gridAssembly, gridCell, placeCell, roadName } from './gridCells';
 import { RoadRoom } from './roadRoom';
 import { placedStrips } from '@wildshard/engine/game/grid/voidFloor';
 import { openRoad } from '../standalone/roadWorld';
@@ -29,7 +29,11 @@ const SAVE_PREFIX = 'wildshard.room.';
  * world time at boot pays it there instead.
  */
 export const WARM_TICKS = 60;
-/** J107: a cell everyone left starts over once it has stood empty this long, on its own timer, before anyone comes back (J320). */
+/**
+ * J107: a cell everyone left starts over once it has stood empty this long, on its own timer, before anyone comes back (J320). J328 (SC5)
+ * retires it for grid cells: a grid cell's world is never rebuilt, and what players spend in it comes back through its own respawns. Only
+ * a cell the grid doesn't place (a local run's `WORLD_CELLS`) still starts over.
+ */
 const EMPTY_MS = 300_000;
 
 /** A port as `worker_threads` and a `MessageChannel` both give it. */
@@ -97,10 +101,11 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   const later = { startOver: (_cell: Cell, _since: number): void => undefined };
   /** Someone stood in this world: it has something to start over from. A refused seat never got this far. */
   const used = (slug: string, room: DedicatedRoom): void => { const cell = cells.get(slug); if (cell !== undefined && cell.room === room) cell.used = true; };
-  /** J107 on J320's terms: the last seat left this cell's world, so it starts over once it has stood empty `emptyMs`, nobody waiting on it. */
+  /** J107 on J320's terms: the last seat left this cell's world, so it starts over once it has stood empty `emptyMs`, nobody waiting on it.
+   *  SC5 (J328): never a grid cell's. */
   const emptied = (slug: string, room: DedicatedRoom): void => {
     const cell = cells.get(slug);
-    if (cell === undefined || cell.room !== room || disposed) return;
+    if (cell === undefined || cell.room !== room || disposed || gridCell(slug)) return;
     const since = cell.emptySince = diagnosticNow();
     if (cell.used) scope.timeout(emptyMs, () => { later.startOver(cell, since); });
   };
