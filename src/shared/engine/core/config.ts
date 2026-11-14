@@ -22,6 +22,9 @@ export const CELL_ABOVE: number = contentBounds.CELL_ABOVE;
 export const CONTENT_MB: 1000000 = contentBounds.CONTENT_MB;
 /** Provisional phone caps v1 (SF22a); shadow draws count in each draw cap. */
 export const CONTENT_CAPS: { readonly l0: { readonly size: 62.5; readonly resident: number; readonly compressed: number; readonly triangles: 40000; readonly draws: 8; }; readonly l1: { readonly size: 125; readonly resident: number; readonly compressed: number; readonly triangles: 10000; readonly draws: 2; }; readonly far: { readonly resident: number; readonly compressed: 1000000; readonly triangles: 8000; readonly draws: 1; }; readonly library: { readonly resident: number; readonly compressed: number; }; readonly sim: { readonly resident: number; readonly compressed: number; }; readonly engineBase: number; readonly playing: number; readonly loading: number; readonly l0Count: 40; readonly l1Count: 32; readonly farCount: 9; readonly simCount: 4; readonly libraryCount: 4; readonly overlap: number; readonly residentFactor: 1.11; readonly nearRadius: 150; readonly shadowRadius: 80; readonly pitch: 562.5; } = contentBounds.CONTENT_CAPS;
+/** GC13: the phone tier's playing envelope, G65's 1.0 GB (the shared caps' Explorer figure is 1.2 GB until SHARD-PLATFORM
+ * closes): a phone page admits, retains and evicts against this, so a straight walk stays under it. */
+export const PHONE_PLAYING_BYTES: number = 1000 * contentBounds.CONTENT_MB;
 
 export const TERRAIN_RES = 256;       // vertices per side
 

@@ -10,11 +10,12 @@ import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { SHARDFILE_ADMISSION_LIMITS as limits } from '@wildshard/format/admissionLimits';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { isDev } from '@wildshard/engine/core/devMode';
-import { CONTENT_CAPS, _applyChunkConstants } from '@wildshard/engine/core/config';
+import { CONTENT_CAPS, PHONE_PLAYING_BYTES, _applyChunkConstants } from '@wildshard/engine/core/config';
 import { configureLevel } from '@wildshard/engine/level/selection';
 import { pageGridInstance, sourceManifest, compiledPageBoot, type PageMode } from '../plugin/context';
 import { PageResidency } from '../grid/pageResidency';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
+import { TIER, type Tier } from '@wildshard/engine/core/tier';
 import type { GridRecoveryRecord } from '../../../shared/game/grid/recovery';
 import { bootPageMode, pageGridRecovery } from '../grid/pageEntry';
 import { currentPageMode } from '../../../shared/game/grid/pageMode';
@@ -51,13 +52,16 @@ export interface PageResidencyBoot {
  * against their declared sim cost, then their actual library and tile claims. The root disposes failed hydration; the
  * successful session installs the owner's level lifetime.
  */
+/** GC13: the page's playing envelope: the phone tier's 1.0 GB (G65), else the shared caps' */
+export function pagePlayingBytes(tier: Tier = TIER): number { return tier === 'phone' ? PHONE_PLAYING_BYTES : CONTENT_CAPS.playing; }
+
 export function preparePageResidency(manifest: Pick<ShardManifest, 'slug' | 'shardfile' | 'runtimeCost'>, configuredSlug?: string, memory: MemoryAdmission = new MemoryAdmission(() => MEMORY_GATES.reportOnly || isDev())): PageResidencyBoot {
   const mode = bootPageMode(configuredSlug ?? manifest.slug);
   const measuredHome = configuredSlug === undefined && manifest.shardfile === undefined;
   if (mode !== 'grid' && (!measuredHome || manifest.runtimeCost === undefined)) return { mode, instance: null, memory };
   const instance = mode === 'grid' ? pageGridInstance() : manifest.slug;
   if (instance === null) throw new Error('Grid residency requires the consumed home instance');
-  const residency = new PageResidency(new ResidencyAllocator({ memory }));
+  const residency = new PageResidency(new ResidencyAllocator({ memory, playing: pagePlayingBytes() }));
   try {
     if (measuredHome) {
       if (manifest.runtimeCost === undefined) throw new Error('Grid runtime home requires reviewed memory measurements before bootstrap');
@@ -100,7 +104,7 @@ function clientSource(admitted: AdmittedProduct, options: ProductOptions, bindin
   const sections = outputDescriptor(source)?.sections;
   if (sections !== undefined) prepareClientModuleGroups(source, sections);
   const ownedBindings = { ...bindings,
-    ...(bindings.allocator === undefined && bindings.residency === undefined && options.memory !== undefined ? { allocator: new ResidencyAllocator({ memory: options.memory }) } : {}),
+    ...(bindings.allocator === undefined && bindings.residency === undefined && options.memory !== undefined ? { allocator: new ResidencyAllocator({ memory: options.memory, playing: pagePlayingBytes() }) } : {}),
     ...(options.firstParty ? {} : { instance: admitted.instance ?? '' }) };
   const residency = clientResidency(source, ownedBindings);
   const assets = new ClientAssets(source, admitted.assets, options);

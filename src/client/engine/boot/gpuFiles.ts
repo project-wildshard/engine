@@ -44,7 +44,7 @@
 import { GPU_FILES as ENGINE_GPU_FILES } from './ktx2.generated';
 import { TIER } from '../core/tier';
 import { pageURL } from './contentBase';
-import { CONTENT_CAPS, PAGE_LEVEL } from '../../../shared/engine/core/config';
+import { PAGE_LEVEL, PHONE_PLAYING_BYTES } from '../../../shared/engine/core/config';
 import { harnessPins } from '../../../shared/engine/app/identity';
 import { ktx2Probe, ktx2ProbeResult, type Ktx2Probe } from '../render/ktx2Probe';
 
@@ -106,8 +106,8 @@ export function setDeviceTexForm(memory: DeviceTexForm | null): void { deviceFor
 /** G188's automatic tier policy: measured over-cap phone builds use KTX2 before the first visit, never desktop. */
 export function autoTexturePolicy(mode: TexMode | undefined, imagesFirstPlayingBytes?: number): { mode: TexMode; why: string } | undefined {
   if (imagesFirstPlayingBytes !== undefined && (!Number.isSafeInteger(imagesFirstPlayingBytes) || imagesFirstPlayingBytes < 0)) throw new RangeError('Invalid images-first playing estimate');
-  if (TIER === 'phone' && imagesFirstPlayingBytes !== undefined && imagesFirstPlayingBytes > CONTENT_CAPS.playing) {
-    return { mode: 'ktx2', why: `auto: images-first playing estimate ${imagesFirstPlayingBytes} exceeds ${CONTENT_CAPS.playing}` };
+  if (TIER === 'phone' && imagesFirstPlayingBytes !== undefined && imagesFirstPlayingBytes > PHONE_PLAYING_BYTES) {
+    return { mode: 'ktx2', why: `auto: images-first playing estimate ${imagesFirstPlayingBytes} exceeds ${PHONE_PLAYING_BYTES}` };
   }
   return mode === undefined ? undefined : { mode, why: 'auto: level tier texture policy' };
 }

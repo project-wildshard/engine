@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { expect, test, vi } from 'vitest';
-import { configuredShardfile, preparePageResidency } from './clientSource';
+import { configuredShardfile, pagePlayingBytes, preparePageResidency } from './clientSource';
+import { CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { parseShardSlug } from '../../../shared/game/shard/slug';
 import type { ProductOptions } from './product';
 import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
@@ -33,4 +34,10 @@ test('embedded descriptor admission retains its size and format refusals before 
   await expect(configuredShardfile({ getElementById: () => element }, input)).rejects.toThrow('requires a format-2 output');
   expect(input.fetch).not.toHaveBeenCalled();
   expect(input.hash).not.toHaveBeenCalled();
+});
+
+test('a phone page admits against G65\'s 1.0 GB playing envelope, a desktop page against the shared caps (GC13)', () => {
+  expect(pagePlayingBytes('phone')).toBe(1_000_000_000);
+  expect(pagePlayingBytes('desktop')).toBe(CONTENT_CAPS.playing);
+  expect(pagePlayingBytes('phone')).toBeLessThan(CONTENT_CAPS.playing);
 });
