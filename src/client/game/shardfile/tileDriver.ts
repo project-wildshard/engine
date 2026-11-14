@@ -24,7 +24,7 @@ import { macrotask } from '@wildshard/engine/boot/plan';
 import { loadingUnits } from '@wildshard/engine/boot/waits';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { bootTask, bootWork } from '@wildshard/engine/boot/timing';
-import { FENCE_LANES, SPAWN_VIEW_M, spawnViewUsesCamera } from './controlRefinement';
+import { SPAWN_VIEW_M, spawnViewUsesCamera } from './controlRefinement';
 import { streamingDistance, streamingOrder, type StreamingBounds, type StreamingPoint, type StreamingView } from './streamingView';
 
 /** MF5: the live drivers, and whether the loader is settling them (no world frames under the card since FC2). */
@@ -52,6 +52,8 @@ export async function settleTileDrivers(frame?: () => void, stallMs = 20000): Pr
     await bootTask('app:spawn-view-tiles', async () => { for (const driver of Array.from(liveDrivers)) await driver.settle(stallMs); });
   } finally { loaderMode = false; }
 }
+/** Whether the loader is settling the live drivers now (no frame is presented under its card). */
+export function tilesSettling(): boolean { return loaderMode; }
 /** DL21: while the loader settles, the render tiles inside its fence across the live drivers and how many are complete (the
  *  spawn view's card counts them); null outside the settle. */
 export function settlingTiles(): { readonly done: number; readonly total: number; readonly stages: number; readonly stagesTotal: number } | null {
@@ -81,8 +83,8 @@ export class TileDriver {
   private readonly retried = new Set<string>();
   private centre: CellTile | null = null;
   private renderRing: ReadonlySet<number> = new Set();
-  /** the attaches `step` started, while they run (the loader's settle waits on them): one in play, FENCE_LANES under the
-   *  loader */
+  /** the attaches `step` started, while they run (the loader's settle waits on them): one in play, every fence tile under
+   *  the loader */
   private readonly inflight = new Set<Promise<void>>();
   private plan: TileRingPlan | null = null;
   private coarseScope: Scope | null = null;
@@ -189,7 +191,7 @@ export class TileDriver {
   }
 
   /** Once a frame with the player's cell-local position: retire the tiles outside the rings, then start the nearest wanted
-   *  tile not yet attached (colliders first), one at a time in play; under the loader up to FENCE_LANES at once (DL21: the
+   *  tile not yet attached (colliders first), one at a time in play; under the loader all at once (DL21, NB3: the
    *  fence's slab reads and decodes then overlap, where one tile at a time held its queue at one job). Render owners retire one tile beyond the attach ring;
    *  collider owners retain the exact 3 x 3 physical ring (D2 B). */
   step(x: number, z: number): void {
@@ -201,7 +203,10 @@ export class TileDriver {
       if (plan.retained[layer].has(key)) continue;
       this.attached[layer].delete(key); tile.scope.dispose();
     }
-    const lanes = loaderMode ? FENCE_LANES : 1;
+    // NB3: under the loader every fence tile starts at once. A tile's attach mostly awaits shared work (its slab banks'
+    // reads and their one publication chain, the refinement queue's FENCE_LANES jobs), so a lane cap left the spawn's
+    // slab tiles queued behind the collider ring's builds (Nine: render began ~450 ms in at x4)
+    const lanes = loaderMode ? Number.POSITIVE_INFINITY : 1;
     if (this.inflight.size >= lanes) return;
     const now = diagnosticNow(), cone = loaderMode || this.view === null ? null : this.view(), streamView = spawnViewUsesCamera() ? this.streamingView?.() ?? null : null;
     for (const key of this.wantedAt.keys()) if (!wanted.render.has(key)) this.wantedAt.delete(key);
@@ -326,17 +331,33 @@ export class TileDriver {
     // content (the card names the step's wait; this says which content holds it)
     const timed = loaderMode, started = timed ? diagnosticNow() : 0, contents: Record<string, number> = {};
     try {
-      for (const content of this.contents) {
-        if (tile.done.has(content)) continue;
-        if (!content.tiles().has(key)) { tile.done.add(content); continue; }
-        if (layer === 'render' && content.ready?.() === false) continue;
+      /** under the loader, one content's stage of this tile (timed); false when the tile retired meanwhile */
+      const stage = async (content: TileContent): Promise<boolean> => {
+        if (tile.done.has(content)) return true;
+        if (!content.tiles().has(key)) { tile.done.add(content); return true; }
+        if (layer === 'render' && content.ready?.() === false) return true;
         // Cached stages may resolve in microtasks; share the live frame's
         // budget before admitting another stage, including background tiles.
-        if (frameBudgetSpent(WORK_SLICE_MS)) await (loaderMode ? task() : this.pause()); // MF5: no frames under the card
-        if (tile.scope.disposed || tile.scope.disposing) return null;
+        if (frameBudgetSpent(WORK_SLICE_MS)) await task(); // MF5: no frames under the card
+        if (tile.scope.disposed || tile.scope.disposing) return false;
         const at = timed ? diagnosticNow() : 0;
         await (layer === 'render' ? content.attach(key, tile.scope) : content.attachColliders?.(key, tile.scope));
         if (timed) contents[content.id] = Math.round(diagnosticNow() - at);
+        if (tile.scope.disposed || tile.scope.disposing) return false;
+        tile.done.add(content);
+        return true;
+      };
+      // NINE-DRAGON-BENCHMAX NB3: under the loader a tile's contents attach together, so the slab keys' publications queue
+      // at once and publish as one warm (slabLibrary.ts `publish`); one after another, each waited on its own (~50 serialized
+      // warms on Nine's spawn view, ~75 ms each on a cold phone). In play they stay in order, one at a time.
+      if (loaderMode) { if (!(await Promise.all(this.contents.map(stage))).every(Boolean)) return null; }
+      else for (const content of this.contents) {
+        if (tile.done.has(content)) continue;
+        if (!content.tiles().has(key)) { tile.done.add(content); continue; }
+        if (layer === 'render' && content.ready?.() === false) continue;
+        if (frameBudgetSpent(WORK_SLICE_MS)) await this.pause();
+        if (tile.scope.disposed || tile.scope.disposing) return null;
+        await (layer === 'render' ? content.attach(key, tile.scope) : content.attachColliders?.(key, tile.scope));
         if (tile.scope.disposed || tile.scope.disposing) return null;
         tile.done.add(content);
       }

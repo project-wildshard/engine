@@ -9,7 +9,7 @@ import { parseWorldScenes } from '@wildshard/format/worldScenes';
 import { provideRuntimeProduct, runtimeProduct } from '../src/client/game/shardfile/runtimeProduct';
 import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { ControlRefinement } from '../src/client/game/shardfile/controlRefinement';
-import { SlabLibrary } from '../src/client/game/shardfile/slabLibrary';
+import { SlabLibrary, type SlabPart } from '../src/client/game/shardfile/slabLibrary';
 import { readWholeLibrary } from '../src/client/game/shardfile/wholeLibrary';
 import * as work from '../src/shared/engine/core/workSlice';
 
@@ -25,7 +25,7 @@ function geometryOf(part: unknown): BufferGeometry {
   return geometry;
 }
 
-function fixture(indexed = false, covers?: number[], prepare?: (part: InstancedMesh, owner: Scope) => Promise<void>, separateKeys = false) {
+function fixture(indexed = false, covers?: number[], prepare?: (parts: readonly SlabPart[]) => Promise<void>, separateKeys = false) {
   const owner = new Scope('slab-resident'), source = emptyShardfile({ slug: 'slab-fixture', name: 'Slabs', author: 'Fixture', revision: 1, seed: 1 });
   const bakeMaterial = new MeshBasicMaterial(), assets = new Map<string, Uint8Array>(), shapes = [triangle(0), triangle(5), triangle(40)];
   if (indexed) for (const shape of shapes) shape.setIndex([0, 1, 2]);
@@ -237,7 +237,7 @@ test('fine identities require complete explicit coverage and refuse cold reconst
 
 test('different keys await one shared preparation fence before exposing their native chunks', async () => {
   const pending: (() => void)[] = [];
-  const prepare = vi.fn<(part: InstancedMesh, owner: Scope) => Promise<void>>().mockImplementation(() => new Promise(resolve => { pending.push(resolve); }));
+  const prepare = vi.fn<(parts: readonly SlabPart[]) => Promise<void>>().mockImplementation(() => new Promise(resolve => { pending.push(resolve); }));
   const f = fixture(false, undefined, prepare, true), first = f.owner.child('first-key'), second = f.owner.child('second-key');
   const next = async (): Promise<void> => { await vi.waitFor(() => { expect(pending.length).toBeGreaterThan(0); }); };
   const release = (): void => { const finish = pending.shift(); if (finish === undefined) throw new Error('No pending preparation'); finish(); };
@@ -248,7 +248,7 @@ test('different keys await one shared preparation fence before exposing their na
     await Promise.resolve();
     expect(prepare).toHaveBeenCalledTimes(1);
     expect(f.anchor.children).toEqual([]); expect(f.alias.children).toEqual([]);
-    const firstPart = prepare.mock.calls[0]?.[0];
+    const firstPart = prepare.mock.calls[0]?.[0][0]?.part;
     expect(firstPart?.parent).toBeNull(); expect(f.anchor.layers.mask).toBe(0);
     release(); await next();
     expect(prepare).toHaveBeenCalledTimes(2);
@@ -257,18 +257,18 @@ test('different keys await one shared preparation fence before exposing their na
     await Promise.all([left, right]);
     expect(prepare).toHaveBeenCalledTimes(3);
     expect(f.anchor.children).toHaveLength(2); expect(f.alias.children).toHaveLength(1);
-    for (const [part] of prepare.mock.calls) expect(part.parent === f.anchor || part.parent === f.alias).toBe(true);
+    for (const [parts] of prepare.mock.calls) { expect(parts).toHaveLength(1); for (const { part } of parts) expect(part.parent === f.anchor || part.parent === f.alias).toBe(true); }
   } finally { for (const finish of pending) finish(); f.close(); }
 });
 
 test('retirement during native preparation leaves no exposed or leaked instance', async () => {
   let finish = (): void => undefined;
-  const prepare = vi.fn<(part: InstancedMesh, owner: Scope) => Promise<void>>().mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  const prepare = vi.fn<(parts: readonly SlabPart[]) => Promise<void>>().mockImplementation(() => new Promise(resolve => { finish = resolve; }));
   const f = fixture(false, undefined, prepare), holder = f.owner.child('preparing');
   try {
     const pending = f.content.attach(0, holder);
     await vi.waitFor(() => { expect(prepare).toHaveBeenCalledOnce(); });
-    const part = prepare.mock.calls[0]?.[0];
+    const part = prepare.mock.calls[0]?.[0][0]?.part;
     if (part === undefined) throw new Error('Missing native chunk');
     const disposed = vi.fn<() => void>(); part.addEventListener('dispose', disposed);
     holder.dispose(); expect(disposed).toHaveBeenCalledOnce();

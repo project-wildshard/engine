@@ -1,7 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import { TileDriver, tileKeys, residentTiles, followResidentTiles, tileRing, productTileRing, settleTileDrivers, settlingTiles } from './tileDriver';
-import { FENCE_LANES } from './controlRefinement';
 import { ring, type TileContent } from './tileContent';
 import { tileOrder, tileOf } from '../../../shared/game/shardfile/tileOrder';
 import { noteFrameDrawn, setBuildHeld } from '@wildshard/engine/core/framePacing';
@@ -467,8 +466,10 @@ test('the loader fence resolves only once every in-fence render tile is attached
   } finally { scope.dispose(); }
 });
 
-// DL21: under the loader up to FENCE_LANES tiles attach at once (their reads overlap); in play one at a time
-test('the loader settle attaches up to FENCE_LANES tiles at once', async () => {
+// DL21: under the loader the fence tiles attach together (their reads overlap); in play one at a time
+// NINE-DRAGON-BENCHMAX NB3: under the loader every fence tile starts at once (a lane cap queued Nine's slab tiles behind
+// the collider ring)
+test('the loader settle attaches every fence tile at once', async () => {
   const scope = new Scope('tiles');
   let running = 0, most = 0;
   const releases: (() => void)[] = [];
@@ -486,7 +487,7 @@ test('the loader settle attaches up to FENCE_LANES tiles at once', async () => {
     }
     await settled;
     expect(driver.resident('render').size).toBe(9);
-    expect(most).toBe(FENCE_LANES);
+    expect(most).toBe(9);
   } finally { scope.dispose(); }
 });
 
@@ -515,9 +516,11 @@ test('a fence that makes no progress rejects after its bound instead of passing 
 // DL21: the spawn view's card counts the settle's tiles ('tiles n of m'); outside the settle there is nothing to count
 test('settlingTiles counts the fence tiles while the loader settles, and nothing outside it', async () => {
   const scope = new Scope('tiles'), made = content(), seen: { done: number; total: number }[] = [];
-  const counting: TileContent = { ...made, attach: (tile, owner) => {
+  // every fence tile starts at once (NB3), so each reads the count after a staggered wait: the earlier ones are done by then
+  const counting: TileContent = { ...made, attach: async (tile, owner) => {
+    await made.attach(tile, owner);
+    await new Promise<void>(resolve => { setTimeout(resolve, tile % 9 * 2); });
     const count = settlingTiles(); if (count !== null) seen.push({ ...count });
-    return made.attach(tile, owner);
   } };
   const driver = new TileDriver(scope, [counting], () => 1, () => Promise.resolve());
   try {
@@ -535,7 +538,9 @@ test('settlingTiles counts the fence tiles while the loader settles, and nothing
 // stages count before any tile does
 test('settlingTiles counts content stages before the tiles they complete', async () => {
   const scope = new Scope('tiles'), first = content(), second = content(), seen: { done: number; total: number; stages: number; stagesTotal: number }[] = [];
-  const counting: TileContent = { ...second, attach: (tile, owner) => {
+  // a tile's contents attach together under the loader (NB3): the second reads the count once the first has landed
+  const counting: TileContent = { ...second, attach: async (tile, owner) => {
+    await new Promise<void>(resolve => { setTimeout(resolve, 0); });
     const count = settlingTiles(); if (count !== null) seen.push({ ...count });
     return second.attach(tile, owner);
   } };

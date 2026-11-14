@@ -105,7 +105,20 @@ try {
       && e.start >= ready.start && e.start < ready.start + ready.ms).map(e => ({ op: e.op, from: e.start - ready.start, ms: e.ms }));
     // NB4: the boot's script memory bank against what the page took from it by control (fixedMemory.ts census)
     const scriptMemory = window.__wildshard?.scriptMemory?.() ?? null;
-    return { phases: { control, firstStage: first }, stage, waits, readyGaps: gaps, readyParts, scriptMemory, timeline };
+    // NB3's cut: the settle's per-tile attaches (tileDriver's DL21 measure), by content: how many, their summed and longest ms
+    // (FENCE_LANES run at once, so the sum exceeds the span), and the attaches' own wall span
+    const attaches = performance.getEntriesByName('wildshard.tile.attach'), byContent = new Map();
+    for (const a of attaches) for (const [id, ms] of Object.entries(a.detail?.contents ?? {})) {
+      const row = byContent.get(id) ?? { id, n: 0, ms: 0, max: 0 }; row.n++; row.ms += ms; row.max = Math.max(row.max, ms); byContent.set(id, row); }
+    const attachSpan = attaches.length === 0 ? 0 : Math.max(...attaches.map(a => a.startTime + a.duration)) - Math.min(...attaches.map(a => a.startTime));
+    // DL21's Developer split of each slab part's geometry warm (Game.warmSceneRoots): its prepare and its parked draws
+    const warm = Object.fromEntries(['prepare', 'draws'].map(part => { const list = performance.getEntriesByName('wildshard.warm.geometry-' + part);
+      return [part, { n: list.length, ms: list.reduce((sum, e) => sum + e.duration, 0) }]; }));
+    const raw = ['wildshard.tile.attach', 'wildshard.warm.geometry-prepare', 'wildshard.warm.geometry-draws'].flatMap(n => performance.getEntriesByName(n)
+      .map(e => ({ n: n.split('.').pop(), start: Math.round(e.startTime), ms: Math.round(e.duration), key: e.detail?.key, layer: e.detail?.layer })));
+    const tileAttach = { raw, warm, tiles: attaches.length, span: attachSpan, contents: [...byContent.values()].sort((a, b) => b.ms - a.ms),
+      slowest: [...attaches].sort((a, b) => b.duration - a.duration).slice(0, 5).map(a => ({ key: a.detail?.key, layer: a.detail?.layer, ms: Math.round(a.duration), contents: a.detail?.contents })) };
+    return { phases: { control, firstStage: first }, stage, waits, readyGaps: gaps, readyParts, scriptMemory, tileAttach, timeline };
   })()`);
 
   // the play: walk 10 s, then the hoverboard at boost; the game's own frame ring, read every 250 ms
@@ -174,6 +187,11 @@ try {
   console.log('stages, longest first:'); for (const e of load.stage.slice(0, 10)) console.log(`  ${e.op.slice(6).padEnd(16)} ${s(e.ms)}`);
   console.log('named waits >= 200 ms:'); for (const e of load.waits.slice(0, 10)) console.log(`  ${e.op.slice(5, 90).padEnd(60)} ${s(e.ms)}`);
   console.log('readyFrame parts >= 100 ms:'); for (const e of load.readyParts.slice(0, 12)) console.log(`  +${s(e.from)} ${e.op.slice(0, 60).padEnd(60)} ${s(e.ms)}`);
+  const ta = load.tileAttach;
+  console.log(`spawn-view tile attaches: ${ta.tiles} measures over ${s(ta.span)}, by content (count · sum · longest):`);
+  for (const row of ta.contents.slice(0, 12)) console.log(`  ${String(row.id).padEnd(40)} ${String(row.n).padStart(3)} · ${s(row.ms)} · ${s(row.max)}`);
+  console.log(`  geometry warms: prepare ${ta.warm.prepare.n} · ${s(ta.warm.prepare.ms)} · parked draws ${ta.warm.draws.n} · ${s(ta.warm.draws.ms)}`);
+  for (const row of ta.slowest.slice(0, 2)) console.log(`  slowest tile ${row.key} ${row.layer} ${s(row.ms)}: ${Object.entries(row.contents ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id, ms]) => `${id.slice(0, 28)} ${ms} ms`).join(', ')}`);
   const bank = (/** @type {{ hits: number, misses: number, retained: number } | null} */ m) => m === null ? 'n/a' : `hits ${m.hits} · misses ${m.misses} · retained ${m.retained}`;
   console.log(`script memory bank: at control ${bank(load.scriptMemory)} · after play ${bank(play.scriptMemory)}`);
   console.log(`readyFrame unlogged >= 100 ms: ${load.readyGaps.length === 0 ? 'none' : load.readyGaps.map((/** @type {{ ms: number, from: number }} */ g) => `${s(g.ms)} at +${s(g.from)}`).join(', ')}`);

@@ -15,3 +15,4 @@
   it). deskbench gets `--capped` (vsync kept: Jake plays on this Mac) and `--stalls` (the same check per desktop pose).
 - (NB3's cut lands as its own commit after the NB6 one: the pre-commit typecheck reads the tree, and NB6's test imports came first.)
 - NB6 follow-up: stalls.mjs has a hand-written stalls.d.mts; the play exports needed their declarations too.
+- NB3's cut commits after NB6 (the commit typecheck reads the tree: NB6's test imports had to land first).

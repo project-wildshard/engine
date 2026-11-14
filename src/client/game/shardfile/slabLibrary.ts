@@ -2,6 +2,7 @@ import { Box3, BufferGeometry, InstancedBufferAttribute, InstancedMesh, Mesh, Sp
 import * as v from 'valibot';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
 import type { Scope } from '@wildshard/engine/app/scope';
+import { pageScope } from '@wildshard/engine/app/resources';
 import { ownSceneResource } from '@wildshard/engine/app/sceneOwnership';
 import { workSlice } from '@wildshard/engine/core/workSlice';
 import { nativeWholeGeometry } from '@wildshard/engine/models/nativeGeometry';
@@ -11,6 +12,7 @@ import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 import { runtimeProduct } from './runtimeProduct';
 import { SharedTileBuilds, type TileContent } from './tileContent';
 import type { ControlRefinement } from './controlRefinement';
+import { tilesSettling } from './tileDriver';
 
 type WholeLibrary = Extract<WorldScenesSection['libraries'][number], { kind: 'whole' }>;
 type SlabTile = WorldSceneSlabLibrary['tiles'][number];
@@ -20,6 +22,12 @@ const EMPTY: ReadonlySet<number> = new Set();
 
 function slabMesh(node: Object3D): node is Mesh { return node instanceof Mesh; }
 function materialList(mesh: Mesh): Material[] { return Array.isArray(mesh.material) ? mesh.material : [mesh.material]; }
+
+/** NB3: the longest a loader publication waits for one more bank read before it publishes what it holds */
+const GATHER_MS = 250;
+
+/** One slab part waiting to publish: its instanced chunk, the anchor it joins, and the holder scope that retires it. */
+export interface SlabPart { readonly part: InstancedMesh; readonly anchor: Mesh; readonly scope: Scope }
 
 /** a tile's chunks in file order, then each file's chunk order (as its build returns their geometries) */
 const chunksOf = (entry: SlabTile): readonly WorldSceneSlabChunk[] => entry.files.flatMap(file => file.chunks);
@@ -76,17 +84,25 @@ export class SlabLibrary {
   private readonly entries = new Map<number, SlabTile>();
   private readonly keys = new Map<string, WorldSceneSlabKey>();
   private serial = 0;
-  private publication: Promise<void> = Promise.resolve();
+  /** the parts waiting for the one publication cursor, and whether it is running (`publish`) */
+  private readonly waiting: { readonly parts: readonly SlabPart[]; readonly mount: () => Promise<void>; readonly done: () => void; readonly fail: (error: unknown) => void }[] = [];
+  private publishing = false;
+  private readonly bounds: ReadonlyMap<number, ShardProduct['shardfile']['tiles'][number]['bounds']>;
+  private readonly product: ShardProduct;
+  /** bank reads running now, and the publication waiting for one to finish (NB3: the loader's gather) */
+  private reads = 0;
+  private readonly readDone: (() => void)[] = [];
   constructor(owner: Scope, product: ShardProduct, private readonly whole: WholeLibrary, private readonly row: WorldSceneSlabLibrary,
     private readonly queue: ControlRefinement, private readonly cover: (tile: number) => Promise<void>,
-    private readonly prepare?: (part: InstancedMesh, owner: Scope, anchor: Mesh) => Promise<void>) {
+    private readonly prepare?: (parts: readonly SlabPart[]) => Promise<void>) {
     if (row.of !== whole.id) throw new Error('Slab library covers another library');
     for (const key of row.keys) {
       if (key.castFrom !== undefined) throw new Error('Slab key casting from a band has no run-time draw');
       for (const source of key.sources) { if (this.keys.has(source)) throw new Error('Slab source belongs to two keys'); this.keys.set(source, key); }
     }
     for (const model of whole.models) if (!this.keys.has(model.id)) throw new Error(`Slab library omits refine model ${model.id}`);
-    const bounds = new Map(product.shardfile.tiles.filter(tile => tile.lod === 0).map(tile => [tile.z * 8 + tile.x, tile.drawBounds ?? tile.bounds] as const));
+    const bounds = this.bounds = new Map(product.shardfile.tiles.filter(tile => tile.lod === 0).map(tile => [tile.z * 8 + tile.x, tile.drawBounds ?? tile.bounds] as const));
+    this.product = product;
     const declared = new Set(product.shardfile.files.filter(file => file.kind === 'glb').map(file => file.hash));
     for (const entry of row.tiles) {
       for (const tile of entry.covers ?? [entry.tile]) if (!bounds.has(tile)) throw new Error(`Slabs require a declared fine tile: ${String(tile)}`);
@@ -94,38 +110,87 @@ export class SlabLibrary {
       this.entries.set(entry.tile, entry);
     }
     this.builds = new SharedTileBuilds(owner, async (tile, scope) => {
-      const entry = this.entries.get(tile); if (entry === undefined) throw new Error('Missing slab tile');
-      const chunks: BufferGeometry[] = [];
-      let box = bounds.get(tile);
-      if (entry.covers !== undefined) {
-        const min: [number, number, number] = [Infinity, Infinity, Infinity], max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
-        for (const logical of entry.covers) {
-          const covered = bounds.get(logical); if (covered === undefined) throw new Error('Missing slab logical bounds');
-          for (const axis of [0, 1, 2] as const) { min[axis] = Math.min(min[axis], covered.min[axis]); max[axis] = Math.max(max[axis], covered.max[axis]); }
-        }
-        box = { min, max };
-      }
-      // A shared bank is visible wherever any of its actual logical coverage
-      // is visible. Its storage address alone cannot fence its publication.
-      const at = { x: entry.covers === undefined || box === undefined ? -250 + (tile % 8 + 0.5) * 62.5 : (box.min[0] + box.max[0]) / 2,
-        y: box === undefined ? 0 : (box.min[1] + box.max[1]) / 2,
-        z: entry.covers === undefined || box === undefined ? -250 + (Math.floor(tile / 8) + 0.5) * 62.5 : (box.min[2] + box.max[2]) / 2,
-        ...(box === undefined ? {} : { bounds: box }) };
-      await queue.add(`${row.id}:${String(tile)}:${String(this.serial++)}`, at, async () => {
-        if (scope.disposed || scope.disposing) return;
-        for (const logical of entry.covers ?? [tile]) await this.cover(logical);
-        for (const file of entry.files) {
-          if (scope.disposed || scope.disposing) return;
-          let read: readonly BufferGeometry[];
-          try { read = await readSlabChunks(scope, product, tile, file); }
-          catch (error) { if (scope.disposed || scope.disposing) return; throw error; }
-          for (const geometry of read) ownSceneResource(geometry, scope);
-          chunks.push(...read);
-        }
-      });
-      if (!scope.disposed && !scope.disposing && chunks.length !== chunksOf(entry).length) throw new Error('Slab tile chunk count differs from its row');
-      return chunks;
+      this.reads++;
+      try { return await this.read(tile, scope); }
+      finally { this.reads--; for (const wake of this.readDone.splice(0)) wake(); }
     });
+  }
+  /** One storage bank's chunk geometries: read and decoded in the refinement queue, its covered tiles first covered. */
+  private async read(tile: number, scope: Scope): Promise<BufferGeometry[]> {
+    const { row, queue, bounds, product } = this;
+    const entry = this.entries.get(tile); if (entry === undefined) throw new Error('Missing slab tile');
+    const chunks: BufferGeometry[] = [];
+    let box = bounds.get(tile);
+    if (entry.covers !== undefined) {
+      const min: [number, number, number] = [Infinity, Infinity, Infinity], max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+      for (const logical of entry.covers) {
+        const covered = bounds.get(logical); if (covered === undefined) throw new Error('Missing slab logical bounds');
+        for (const axis of [0, 1, 2] as const) { min[axis] = Math.min(min[axis], covered.min[axis]); max[axis] = Math.max(max[axis], covered.max[axis]); }
+      }
+      box = { min, max };
+    }
+    // A shared bank is visible wherever any of its actual logical coverage
+    // is visible. Its storage address alone cannot fence its publication.
+    const at = { x: entry.covers === undefined || box === undefined ? -250 + (tile % 8 + 0.5) * 62.5 : (box.min[0] + box.max[0]) / 2,
+      y: box === undefined ? 0 : (box.min[1] + box.max[1]) / 2,
+      z: entry.covers === undefined || box === undefined ? -250 + (Math.floor(tile / 8) + 0.5) * 62.5 : (box.min[2] + box.max[2]) / 2,
+      ...(box === undefined ? {} : { bounds: box }) };
+    await queue.add(`${row.id}:${String(tile)}:${String(this.serial++)}`, at, async () => {
+      if (scope.disposed || scope.disposing) return;
+      for (const logical of entry.covers ?? [tile]) await this.cover(logical);
+      for (const file of entry.files) {
+        if (scope.disposed || scope.disposing) return;
+        let read: readonly BufferGeometry[];
+        try { read = await readSlabChunks(scope, product, tile, file); }
+        catch (error) { if (scope.disposed || scope.disposing) return; throw error; }
+        for (const geometry of read) ownSceneResource(geometry, scope);
+        chunks.push(...read);
+      }
+    });
+    if (!scope.disposed && !scope.disposing && chunks.length !== chunksOf(entry).length) throw new Error('Slab tile chunk count differs from its row');
+    return chunks;
+  }
+  /**
+   * The library's one publication cursor: `parts` are prepared (the native warm and its completed-draw fence) before they
+   * mount (`mount`, inside the cursor), never while another publication's preparation runs. In play a publication is one queued part list (one part);
+   * NINE-DRAGON-BENCHMAX NB3: under the loader's settle a publication takes every list waiting when it starts, so one warm
+   * covers what was ~50 serialized ones on Nine's spawn view (~75 ms each on a cold phone). A failed preparation fails
+   * every list it covered; a retired holder's part is left out of the next publication.
+   */
+  private publish(parts: readonly SlabPart[], mount: () => Promise<void>): Promise<void> {
+    return new Promise<void>((resolve, reject) => { this.waiting.push({ parts, mount, done: resolve, fail: reject }); void this.drain(); });
+  }
+  private async drain(): Promise<void> {
+    if (this.publishing) return;
+    this.publishing = true;
+    try {
+      while (this.waiting.length > 0) {
+        // under the loader a publication first gathers: while banks are still reading it waits for them (each wait capped
+        // at GATHER_MS, so a read that never runs can't hold it), and then takes every part they produced at once
+        for (let gathered = true; gathered && tilesSettling() && this.reads > 0;) {
+          gathered = await new Promise<boolean>(resolve => {
+            let settled = false;
+            const settle = (read: boolean): void => { if (!settled) { settled = true; resolve(read); } };
+            pageScope.timeout(GATHER_MS, () => { settle(false); });
+            this.readDone.push(() => { settle(true); });
+          });
+        }
+        const lists = tilesSettling() ? this.waiting.splice(0) : this.waiting.splice(0, 1);
+        const parts = lists.flatMap(list => list.parts).filter(({ scope }) => !scope.disposed && !scope.disposing);
+        try { if (this.prepare !== undefined && parts.length > 0) await this.prepare(parts); }
+        catch (error) {
+          // a holder retired during a shared preparation fails only its own list; the live lists publish again
+          const retired = (list: (typeof lists)[number]): boolean => list.parts.some(({ scope }) => scope.disposed || scope.disposing);
+          const live = lists.filter(list => !retired(list));
+          if (live.length < lists.length && live.length > 0) { for (const list of lists) if (retired(list)) list.fail(error); this.waiting.unshift(...live); }
+          else for (const list of lists) list.fail(error);
+          continue;
+        }
+        for (const list of lists) {
+          try { await list.mount(); list.done(); } catch (error) { list.fail(error); }
+        }
+      }
+    } finally { this.publishing = false; }
   }
   /** an anchor's frozen stand-in until its key's first chunk: no channels (the anchor stays hidden) */
   geometry(id: string): BufferGeometry | null { return this.whole.models.some(model => model.id === id) ? new BufferGeometry() : null; }
@@ -159,7 +224,7 @@ export class SlabLibrary {
       const drawn: InstancedMesh[] = [];
       if (lifetime.disposed || lifetime.disposing || scope.disposed || scope.disposing) return drawn;
       scope.onDispose(() => { for (const part of drawn) { part.removeFromParent(); part.dispose(); } drawn.length = 0; });
-      const slice = workSlice(undefined, scope);
+      const slice = workSlice(undefined, scope), parts: SlabPart[] = [];
       for (const [index, chunk] of chunksOf(entry).entries()) {
         if (chunk.key !== key.id) continue;
         if (lifetime.disposed || lifetime.disposing || scope.disposed || scope.disposing) return drawn;
@@ -171,23 +236,24 @@ export class SlabLibrary {
         part.name = `${mesh.name}:slab:${String(tile)}:${String(index)}`; part.matrixAutoUpdate = false;
         part.castShadow = key.castShadow; part.receiveShadow = key.receiveShadow; part.renderOrder = key.renderOrder;
         part.layers.mask = key.layers; part.frustumCulled = key.frustumCulled;
-        // All keys share one publication cursor. A CPU-budget yield alone can
-        // mount several still-culled chunks before a turn first uploads them.
-        // Preparation lends the actual native geometry to the existing warmer;
-        // it must finish its completed-draw fence before another key enters.
-        drawn.push(part);
-        const prior = this.publication;
-        let release = (): void => undefined;
-        this.publication = new Promise<void>(resolve => { release = resolve; });
-        await prior;
-        try {
-          if (lifetime.disposed || lifetime.disposing || scope.disposed || scope.disposing) return drawn;
-          if (this.prepare !== undefined) await this.prepare(part, scope, mesh);
-          if (lifetime.disposed || lifetime.disposing || scope.disposed || scope.disposing) return drawn;
+        drawn.push(part); parts.push({ part, anchor: mesh, scope });
+      }
+      // All keys share one publication cursor. A CPU-budget yield alone can
+      // mount several still-culled chunks before a turn first uploads them.
+      // Preparation lends the actual native geometry to the existing warmer;
+      // it must finish its completed-draw fence before another key enters.
+      // In play one part a publication (and a frame); under the loader's card a
+      // publication takes every part waiting then (NB3, `publish`).
+      for (let at = 0; at < parts.length;) {
+        const batch = tilesSettling() ? parts.slice(at) : parts.slice(at, at + 1);
+        at += batch.length;
+        if (lifetime.disposed || lifetime.disposing || scope.disposed || scope.disposing) return drawn;
+        await this.publish(batch, async () => {
+          if (lifetime.disposed || lifetime.disposing || scope.disposed || scope.disposing) return;
           if (!laid) lay();
-          mesh.add(part);
-          await slice.yield();
-        } finally { release(); }
+          for (const { part } of batch) mesh.add(part);
+          await (tilesSettling() ? slice.check() : slice.yield());
+        });
       }
       return drawn;
     });

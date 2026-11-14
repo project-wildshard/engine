@@ -420,18 +420,25 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
               // reconstructing a union during play.
               const slabs = section.libraries.find(entry => entry.kind === 'slabs' && entry.of === row.id);
               if (slabs?.kind !== 'slabs') throw new Error(`Fine refinement requires baked slabs: ${row.id}`);
-              const whole = new SlabLibrary(owner, product, row, slabs, refinementQueue(), coarse.ensure, async (part, scope, anchor) => {
+              const whole = new SlabLibrary(owner, product, row, slabs, refinementQueue(), coarse.ensure, async parts => {
                 const game = ctx.game.runtime?.world?.game;
                 if (game === undefined || game === null) return;
-                const live = (): boolean => !owner.disposed && !owner.disposing && !scope.disposed && !scope.disposing;
-                // The native warmer draws connected hidden roots. Borrow the
-                // key's actual world frame, without exposing a partial anchor.
-                anchor.updateWorldMatrix(true, false);
-                const stage = new Group(); stage.visible = false; stage.matrixAutoUpdate = false; stage.matrix.copy(game.rootScene.matrixWorld).invert().multiply(anchor.matrixWorld);
-                stage.add(part); game.rootScene.add(stage);
-                const forget = scope.capture('disposers', () => { stage.removeFromParent(); });
-                try { await game.warmSceneRoots([stage], live, undefined, { drawGeometry: true }); }
-                finally { forget(); part.removeFromParent(); stage.removeFromParent(); }
+                const live = (): boolean => !owner.disposed && !owner.disposing && parts.every(({ scope }) => !scope.disposed && !scope.disposing);
+                // The native warmer draws connected hidden roots. Borrow each
+                // key's actual world frame, without exposing a partial anchor;
+                // one hidden root holds the publication's every part (NB3).
+                const root = new Group(); root.visible = false; root.matrixAutoUpdate = false;
+                root.matrix.copy(game.rootScene.matrixWorld).invert();
+                const staged = parts.map(({ part, anchor, scope }) => {
+                  anchor.updateWorldMatrix(true, false);
+                  const stage = new Group(); stage.matrixAutoUpdate = false; stage.matrix.copy(anchor.matrixWorld);
+                  stage.add(part); root.add(stage);
+                  const forget = scope.capture('disposers', () => { stage.removeFromParent(); });
+                  return { part, stage, forget };
+                });
+                game.rootScene.add(root);
+                try { await game.warmSceneRoots([root], live, undefined, { drawGeometry: true }); }
+                finally { for (const { part, stage, forget } of staged) { forget(); part.removeFromParent(); stage.removeFromParent(); } root.removeFromParent(); }
               });
               refining.set(row.id, whole);
               libraries.set(row.id, { geometry: id => whole.geometry(id) }); return;
