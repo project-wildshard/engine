@@ -24,9 +24,11 @@ export interface DevSceneReport {
 }
 
 export async function connectDevScene(ports: { scope: Scope; scene: THREE.Object3D; physics: Physics | null; watchFrames: (fn: (dt: number) => void) => () => void }): Promise<DevSceneHost | null> {
+  // a server without the dev scene answers 404, or (a static server with an index fallback) a page: neither is ours
   const probe = await fetch(`${DEV_SCENE_PATH}state`, { cache: 'no-store' }).catch(() => null);
-  if (probe === null || !probe.ok || ports.scope.disposed) return null;
-  const first = await probe.json() as DevSceneState;
+  if (probe === null || !probe.ok || !(probe.headers.get('content-type') ?? '').includes('application/json') || ports.scope.disposed) return null;
+  const first = await probe.json().catch(() => null) as DevSceneState | null;
+  if (first === null || typeof first.wire !== 'number') return null;
   if (first.wire !== DEV_SCENE_WIRE) { console.error(`[devScene] the dev server speaks wire ${first.wire}, this page ${DEV_SCENE_WIRE}: update the SDK or the engine pin`); return null; }
   const { scope } = ports, host = new DevSceneHost(scope, ports.scene, ports.physics);
   const report: DevSceneReport = { revision: 0, framedRevision: 0, framedAt: 0, frames: 0, error: null, applied: host.applied,
@@ -59,7 +61,7 @@ export async function connectDevScene(ports: { scope: Scope; scene: THREE.Object
       geometry: (key: string): DevGeometry => { const geometry = geometries.get(key); if (geometry === undefined) throw new Error(`dev scene: geometry ${key} was not fetched`); return geometry; },
       texture: (key: string): Uint8Array => { const raster = textures.get(key); if (raster === undefined) throw new Error(`dev scene: texture ${key} was not fetched`); return raster; },
     };
-    for (const part of parts) host.apply(part, assets);
+    host.applyAll(parts, assets);
     const live = new Set(state.parts.map(part => part.name));
     for (const name of host.names()) if (!live.has(name)) host.remove(name);
     report.revision = state.revision; pendingFrame = state.revision;

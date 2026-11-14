@@ -21,6 +21,7 @@ const hut = (hash: string, colour: [number, number, number]): DevPart => ({
   sprites: [], lights: [{ colour: [1, 0.6, 0.3], intensity: 4, distance: 9, decay: 2, position: [0, 2, 0] }],
   colliders: [{ centre: [0, 0.5, 0], half: [1, 0.5, 1], rotation: [0, 0, 0, 1] }], water: [{ tint: [0.1, 0.1, 0.2], triangles: [0, 0, 0, 1, 0, 0, 0, 0, 1] }],
 });
+const moved = (name: string, hash: string, geometries: string[]): DevPart => ({ ...hut(hash, [1, 1, 1]), name, geometries, draws: geometries.map(key => ({ geometry: key, material: 'roof', matrix: identity, instances: null, castShadow: false, receiveShadow: false })), colliders: [] });
 const meshes = (root: THREE.Object3D): THREE.Mesh[] => { const out: THREE.Mesh[] = []; root.traverse(o => { if (o instanceof THREE.Mesh) out.push(o as THREE.Mesh); }); return out; };
 
 test('AP5: a part pushed twice swaps its draws and colliders in one call; shared geometry survives; the player is untouched', async () => {
@@ -74,4 +75,22 @@ test('AP5: the geometry wire decodes what the watch server encodes', () => {
   expect(decoded.uv?.length).toBe(6);
   expect(decoded.colour).toBeNull();
   expect([...decoded.index ?? []]).toEqual([0, 1, 2]);
+});
+
+test('AP5: a geometry that moves between parts in one revision survives; a part that fails to build leaves nothing behind', () => {
+  const scope = new Scope('test.devScene.batch'), host = new DevSceneHost(scope, new THREE.Scene(), null);
+  host.applyAll([moved('a', '1', ['g1']), moved('b', '1', ['g2'])], assets);
+  expect(host.held()).toEqual({ geometries: 2, textures: 1 });
+  // g1 leaves a for b in the same revision: a's release must not drop it before b holds it
+  host.applyAll([moved('a', '2', ['g2']), moved('b', '2', ['g1'])], assets);
+  expect(host.held()).toEqual({ geometries: 2, textures: 1 });
+  expect(meshes(host.root).every(mesh => mesh.geometry.attributes['position'] !== undefined)).toBe(true);
+  // a part naming a material it does not carry refuses; the scene keeps revision 2 and holds nothing new
+  const broken: DevPart = { ...moved('a', '3', ['g3']), draws: [{ geometry: 'g3', material: 'missing', matrix: identity, instances: null, castShadow: false, receiveShadow: false }] };
+  expect(() => { host.applyAll([moved('b', '3', ['g4']), broken], assets); }).toThrow('names material missing');
+  expect(host.held()).toEqual({ geometries: 2, textures: 1 });
+  expect([host.hash('a'), host.hash('b')]).toEqual(['2', '2']);
+  host.remove('a'); host.remove('b');
+  expect(host.held()).toEqual({ geometries: 0, textures: 0 });
+  scope.dispose();
 });

@@ -22,7 +22,6 @@ import { idleTurn } from '@wildshard/engine/boot/idle';
 import { installGpuRecovery } from '@wildshard/engine/core/GpuRecovery';
 import { TIER } from '@wildshard/engine/core/tier';
 import { installProbe } from '@wildshard/engine/debug/probe';
-import { DEVSERVER } from '../grid/menu';
 import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
 import { withoutOffscreenBakes } from '@wildshard/engine/render/offscreenPreparation';
 import { liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
@@ -399,8 +398,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     // T2E-1b: a grid page's area is the cell the player is in, not the shell
     area: () => grid === null ? shardArea(slug, app.debug.snapshot()['shardfile'], boot.runtime.hooks.questFlags?.() ?? []) : grid.area() });
   // SHARD-SOURCE AP5: under `wildshard watch` the dev server streams the author's scene parts into this page; a production
-  // build folds DEVSERVER to false and drops the import (scripts/check-devserver.mjs checks).
-  if (DEVSERVER) void import('../devScene/connect').then(dev => dev.connectDevScene({ scope: game.levelScope, scene: game.rootScene, physics: world.physics, watchFrames: fn => game.watchFrames(fn) }))
+  // build's define makes this `false` in this module, so the import and its chunk go (scripts/check-devserver.mjs checks;
+  // DEVSERVER imported from grid/menu did not fold across modules and kept the chunk).
+  if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) void import('../devScene/connect').then(dev => dev.connectDevScene({ scope: game.levelScope, scene: game.rootScene, physics: world.physics, watchFrames: fn => game.watchFrames(fn) }))
     .catch((cause: unknown) => { console.error('[devScene]', cause); });
   ctx.startExplore?.();
   document.dispatchEvent(new Event('ws:ready')); // booted to the title
