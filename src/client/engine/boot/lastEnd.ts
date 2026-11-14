@@ -19,6 +19,11 @@ import { saveStorage } from '../saves/slots';
  *                   iOS tab killed in the background (its pagehide ran hidden). index.html's 12 s self-reload (`boot.selfReload`,
  *                   claimed just before this document) is the engine's and resumes, unless it retried a hung player reload
  *     fresh         neither: a cold launch
+ *   settleLastEnd()                SENTRY-TRIAGE S20: a new tab has no session copy, so it reads the device copy, which may be
+ *                                  another tab's live beat (a duplicated tab's session copy is one too). Each page holds a Web Lock
+ *                                  named for its page id (on the beat) while it is shown; an end that rests on a beat stays pending
+ *                                  until a lock query says whether that page still lives (then `fresh`, and its beat is left alone).
+ *                                  The entry awaits it before the title reads lastEnd().
  *   `document.wasDiscarded` rides along (Chrome's tab discarding; iOS never sets it).
  *
  * The last non-fresh end is kept in localStorage `life.lastEnd`, so pause ▸ Settings ▸ Debug ▸ Loading & memory can show it
@@ -56,7 +61,30 @@ const PLAYER_RETRY_MS = 60_000;
 export interface AliveInfo<M extends string = string> { slug: string; resident: string; mode: M }
 interface Stamp { t: number; build: string; slug: string; resident: string; mode: string }
 interface Unload extends Stamp { reason: string; reload?: true }
-interface Alive extends Stamp { vis: string }
+interface Alive extends Stamp { vis: string; page?: string }
+/** S20: a Web Lock each shown page holds, named for its page id, so another tab can ask whether the page behind a device beat
+ *  still lives. `hold` returns the release. */
+export interface PageLocks { hold: (name: string) => () => void; held: (name: string) => Promise<boolean> }
+const PAGE_LOCK = 'ws-page:';
+/** a lock query this slow answers "not held": the end stays what the beat said */
+const SETTLE_MS = 500;
+function browserLocks(): PageLocks | null {
+  // an old Safari, an insecure page or a test DOM may have none, or null
+  const locks: LockManager | null | undefined = typeof navigator === 'undefined' ? undefined : (navigator as { locks?: LockManager | null }).locks;
+  if (locks === undefined || locks === null || typeof locks.request !== 'function' || typeof locks.query !== 'function') return null;
+  return {
+    hold: (name) => {
+      let release = (): void => undefined;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      void locks.request(name, () => held).catch(() => undefined);
+      return release;
+    },
+    // a request not yet granted is a live page too (a first beat, a bfcache return, both before the grant)
+    held: async (name) => { const state = await locks.query(); return [...(state.held ?? []), ...(state.pending ?? [])].some((lock) => lock.name === name); },
+  };
+}
+/** Web Locks need a secure context, which always has randomUUID; without one the beat carries no id and reads as before */
+const newPageId = (): string => { try { return crypto.randomUUID(); } catch { return ''; } };
 export interface LastEnd {
   kind: 'intentional' | 'unexpected' | 'fresh';
   /** what ended it, in words */
@@ -115,7 +143,15 @@ function navigationType(): string {
 export class PageLife {
   private source: (() => AliveInfo) | null = null;
   private alive = true;
-  private readonly thisEnd: LastEnd;
+  private thisEnd: LastEnd;
+  /** S20: this page's id, on its beat and its Web Lock */
+  private readonly id = newPageId();
+  private readonly locks: PageLocks | null;
+  private readonly scope: Scope;
+  private releaseLock: (() => void) | null = null;
+  /** S20: the page id of a device beat this end rests on alone, until settle() asks whether it lives */
+  private pendingPage: string | null = null;
+  private settling: Promise<LastEnd> | undefined;
   private beforeReload: ((reason: ReloadReason) => boolean) | undefined;
   private readonly storage: typeof store;
   private readonly nav: () => string;
@@ -123,29 +159,67 @@ export class PageLife {
   private readonly page: () => { href: string; startedAt: number };
 
   constructor(scope: Scope, storage: typeof store = store, nav: () => string = navigationType,
-    page: () => { href: string; startedAt: number } = () => ({ href: inPage() ? location.href : '', startedAt: typeof performance === 'undefined' ? Date.now() : performance.timeOrigin })) {
+    page: () => { href: string; startedAt: number } = () => ({ href: inPage() ? location.href : '', startedAt: typeof performance === 'undefined' ? Date.now() : performance.timeOrigin }),
+    locks: PageLocks | null = browserLocks()) {
     this.storage = storage;
+    this.locks = locks;
+    this.scope = scope;
     this.nav = nav;
     this.page = page;
     this.thisEnd = this.classify();
     // S18: a reload the page before marked is never index.html's self-reload
     inspectPreviousBoot(this.thisEnd.kind === 'intentional' && this.thisEnd.player !== true && this.thisEnd.bootedAt - this.thisEnd.at < INTENT_MS);
-    if (this.thisEnd.kind !== 'fresh' || this.thisEnd.discarded) writeJson(this.storage('local'), END_KEY, this.thisEnd);
-    if (this.thisEnd.kind !== 'fresh') console.info(`[lastEnd] the previous page: ${this.thisEnd.reason}${this.thisEnd.resident === '' ? '' : ` · resident ${this.thisEnd.resident}`}`);
+    if (this.pendingPage === null) this.record();
+    this.holdLock();
     // the beat: the page's own timer (this module loads before any shard scope exists)
     if (inPage()) {
       this.beat();
       scope.interval(BEAT_MS, () => { this.beat(); });
       // back on screen after a pagehide that did not end the page (iOS can send one on an app switch): beating again
-      scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') this.alive = true; this.beat(); });
+      scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') { this.alive = true; this.holdLock(); } this.beat(); });
       // a page that ends normally takes its marker with it; a bfcache return (pageshow persisted) puts it back
       scope.listen(window, 'pagehide', () => {
-        this.alive = false; this.clearAlive();
+        this.alive = false; this.clearAlive(); this.dropLock();
         // QA 11-12 row 35: how this page ended, for telling the player's reload (a visible page) from a system one (hidden)
         writeJson(this.storage('session'), HID_KEY, { t: Date.now(), vis: document.visibilityState, href: location.href });
       });
-      scope.listen(window, 'pageshow', (e) => { if (e.persisted) { this.alive = true; this.beat(); } });
+      scope.listen(window, 'pageshow', (e) => { if (e.persisted) { this.alive = true; this.holdLock(); this.beat(); } });
     }
+    scope.onDispose(() => { this.dropLock(); });
+  }
+
+  /** the device's last-end record and the console line, once the end is known */
+  private record(): void {
+    if (this.thisEnd.kind !== 'fresh' || this.thisEnd.discarded) writeJson(this.storage('local'), END_KEY, this.thisEnd);
+    if (this.thisEnd.kind !== 'fresh') console.info(`[lastEnd] the previous page: ${this.thisEnd.reason}${this.thisEnd.resident === '' ? '' : ` · resident ${this.thisEnd.resident}`}`);
+  }
+
+  /** S20: held while this page is shown; a pagehide lets it go (a held lock would keep the page out of the bfcache) */
+  private holdLock(): void { if (this.locks !== null && this.id !== '' && this.releaseLock === null) this.releaseLock = this.locks.hold(PAGE_LOCK + this.id); }
+  private dropLock(): void { this.releaseLock?.(); this.releaseLock = null; }
+
+  /** S20: an end that rests on a device beat alone is `fresh` when that beat's page still holds its lock (another tab, playing);
+   *  else it stands, and the beat is cleared as the classification would have. Once; at most SETTLE_MS. */
+  settle(): Promise<LastEnd> {
+    this.settling ??= (async () => {
+      const id = this.pendingPage, locks = this.locks;
+      if (id === null || locks === null) return this.thisEnd;
+      let alive = false;
+      try {
+        let timer: ReturnType<Scope['timeout']> | undefined;
+        const late = new Promise<boolean>((resolve) => { timer = this.scope.timeout(SETTLE_MS, () => { resolve(false); }); });
+        alive = await Promise.race([locks.held(PAGE_LOCK + id).catch(() => false), late]);
+        if (timer !== undefined) this.scope.cancelTimer(timer);
+      } catch { /* not settled: the beat's word stands */ }
+      this.pendingPage = null;
+      if (alive) {
+        const { bootedAt, discarded, nav } = this.thisEnd;
+        this.thisEnd = { kind: 'fresh', reason: 'fresh launch (another tab is playing)', at: 0, resident: '', slug: '', mode: '', build: '', bootedAt, discarded, nav };
+      } else this.dropBeat(id);
+      this.record();
+      return this.thisEnd;
+    })();
+    return this.settling;
   }
 
   /** what the alive beat and markUnload record: the running shard and the resident list (main.ts, once the host exists) */
@@ -191,11 +265,17 @@ export class PageLife {
   private beat(): void {
     if (!this.alive) return;
     if (!inPage()) return;
-    const a: Alive = { ...this.stamp(), vis: document.visibilityState };
+    const a: Alive = { ...this.stamp(), vis: document.visibilityState, ...(this.id === '' ? {} : { page: this.id }) };
     writeJson(this.storage('session'), ALIVE_KEY, a);
     // A killed iOS WebContent process may lose sessionStorage too. Normal
     // navigation clears both copies; a kill cannot run that cleanup.
     writeJson(this.storage('local'), ALIVE_BACKUP_KEY, a);
+  }
+
+  /** the device beat of page `id`, consumed by this page's classification; once this page beats, the copy is its own and stays */
+  private dropBeat(id: string): void {
+    if (id === '') return;
+    try { const local = this.storage('local'); if (str(readJson(local, ALIVE_BACKUP_KEY), 'page') === id) local?.removeItem(ALIVE_BACKUP_KEY); } catch { /* storage blocked */ }
   }
 
   private clearAlive(): void {
@@ -207,15 +287,19 @@ export class PageLife {
     const now = Date.now();
     const local = this.storage('local'), session = this.storage('session');
     const u = readJson(local, UNLOAD_KEY), a = readJson(session, ALIVE_KEY) ?? readJson(local, ALIVE_BACKUP_KEY);
-    try { local?.removeItem(ALIVE_BACKUP_KEY); } catch { /* consumed by this page's classification */ }
+    // S20: a beat from a page with an id may be another tab's live one: the device copy in a new tab, or the session copy a
+    // duplicated tab (or a window.open) starts with. settle() asks before it is taken; a page of this tab can't be alive.
+    const otherPage = this.locks !== null ? str(a, 'page') : '';
+    if (otherPage === '') try { local?.removeItem(ALIVE_BACKUP_KEY); } catch { /* consumed by this page's classification */ }
     try { local?.removeItem(UNLOAD_KEY); } catch { /* read once either way */ }
     const discarded = inPage() && Reflect.get(document, 'wasDiscarded') === true;
     const nav = this.nav(), hid = readJson(session, HID_KEY);
     try { session?.removeItem(HID_KEY); } catch { /* read once either way */ }
     const base = { bootedAt: now, discarded, nav, ...(typeof u === 'object' && u !== null && Reflect.get(u, 'reload') === true ? { reload: true as const } : {}) };
     const ut = num(u, 't');
-    if (u !== null && now - ut < INTENT_MS) return { kind: 'intentional', reason: str(u, 'reason'), at: ut, resident: str(u, 'resident'), slug: str(u, 'slug'), mode: str(u, 'mode'), build: str(u, 'build'), ...base };
+    if (u !== null && now - ut < INTENT_MS) { this.dropBeat(otherPage); return { kind: 'intentional', reason: str(u, 'reason'), at: ut, resident: str(u, 'resident'), slug: str(u, 'slug'), mode: str(u, 'mode'), build: str(u, 'build'), ...base }; }
     if (a !== null) {
+      if (otherPage !== '') this.pendingPage = otherPage;
       const where = str(a, 'vis') === 'hidden' ? 'in the background' : 'on screen';
       return { kind: 'unexpected', reason: `page ended unexpectedly ${where} (browser or system cause unknown)`, at: num(a, 't'), resident: str(a, 'resident'), slug: str(a, 'slug'), mode: str(a, 'mode'), build: str(a, 'build'), ...base };
     }
@@ -315,5 +399,7 @@ export function leaveSaved(go: () => void): void {
 }
 
 export function lastEnd(): LastEnd { return page.lastEnd(); }
+/** S20: lastEnd() once a device beat it rests on alone is known to be no other tab's live page; the entry awaits it before the title */
+export function settleLastEnd(): Promise<LastEnd> { return page.settle(); }
 export function lastRecordedEnd(): LastEnd | null { return page.lastRecordedEnd(); }
 export function lastEndLine(now: number = Date.now()): string { return page.lastEndLine(now); }

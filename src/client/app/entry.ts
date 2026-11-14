@@ -33,7 +33,7 @@ import { inspectPreviousBoot, previousBootLine, previousBootLevel } from '@wilds
 import { Scope } from '@wildshard/engine/app/scope';
 import { bootRoute, onlineTitleFirst } from './bootRoute';
 import { consumeTitleArrival, pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
-import { lastEnd } from '@wildshard/engine/boot/lastEnd';
+import { lastEnd, settleLastEnd } from '@wildshard/engine/boot/lastEnd';
 import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
@@ -122,6 +122,8 @@ function learnPlacedCellsOnce(): Promise<void> {
   return Promise.race([read, deadline]);
 }
 async function enterPage(): Promise<unknown> {
+  // S20: a crash read off another tab's live beat is no crash; asked now, answered (at most 500 ms) before the title reads it
+  const settled = settleLastEnd();
   await placedCells;
   const requested = search.get('chunk');
   // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here.
@@ -135,6 +137,7 @@ async function enterPage(): Promise<unknown> {
     return showPageTitle(UNLISTED);
   }
   await waitFor('Startup stylesheets', waitForLoadingStyles(entryScope), 'file');
+  await settled;
   const { consumeGridRecovery, gridRecoveryRefused, pageGridRecovery, pendingGridEntry } = await bootTask('app:page-entry-import', () => import('@wildshard/engine/game/grid/pageEntry'));
   // QA row 16 (GO1): an online level seats a body the world sees, so only a tap enters one. Crash resume is the solo build's.
   const online = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined;
@@ -243,7 +246,8 @@ async function enterPage(): Promise<unknown> {
   })();
 }
 async function showPageTitle(refusal = ''): Promise<void> {
-  const [{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }] = await Promise.all([import('@wildshard/engine/ui/StartTitle'), import('@wildshard/engine/game/mainMenu'), import('@wildshard/engine/game/travel/travel')]);
+  // S20: the title's ended note reads lastEnd(), settled (the imports take longer than the lock query)
+  const [{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }] = await Promise.all([import('@wildshard/engine/ui/StartTitle'), import('@wildshard/engine/game/mainMenu'), import('@wildshard/engine/game/travel/travel'), settleLastEnd()]);
   // SF21a: a tap or validated recovery selects a grid; unrecorded process loss returns to title
   const grid = installGridTitle();
   // the composition root wires the game's main menu (over its shard deck) into the engine's title (E405)
@@ -274,6 +278,7 @@ async function showPageTitle(refusal = ''): Promise<void> {
  */
 async function showSlugPage(slug: string): Promise<void> {
   document.documentElement.classList.add('title-first');
+  await settleLastEnd(); // S20: its ended note reads lastEnd()
   const manifest = findTitleManifest(slug);
   // the page's query (`?sw=0`, `?tier=`, …) rides along to `/`, as a Shard select tap keeps it
   const home = (): URL => new URL(`/${location.search}`, location.origin);
