@@ -140,6 +140,17 @@ export function enterGrid(): void {
 
 
 
+/** The grid page's address: its path, and only the harness flags skipintro, mute and nolock, none of which selects a level, and `skipintro` dropped here sent a
+ *  `?chunk=<slug>&skipintro` link on a world build back under the title (OFFLINE OF18: every Open Plot in the offline proof). */
+export function gridPageUrl(href: string): URL {
+  const from = new URL(href).searchParams, to = new URL(new URL(href).pathname, new URL(href).origin);
+  const skipintro = from.get('skipintro'), mute = from.get('mute'), nolock = from.get('nolock');
+  if (skipintro !== null) to.searchParams.set('skipintro', skipintro);
+  if (mute !== null) to.searchParams.set('mute', mute);
+  if (nolock !== null) to.searchParams.set('nolock', nolock);
+  return to;
+}
+
 /** The boot's one read of the tap intent (used or not), overridden by validated recovery before ordinary admission.
  * In grid mode the address becomes the bare title URL, preventing an unrecorded automatic restart. */
 export function bootPageMode(slug: string): PageMode {
@@ -172,7 +183,7 @@ export function bootPageMode(slug: string): PageMode {
     registerBeforeReload(pageScope, reason => gridRecovery(saves).write(assembly, home, road, reason === 'settings' ? 'reload' : reason)); // SR12: a Settings reload continues play
   }
   if (mode === 'grid' && typeof history !== 'undefined') {
-    try { history.replaceState(history.state, '', new URL(location.pathname, location.origin)); } catch { /* a sandboxed frame: the URL stays */ }
+    try { history.replaceState(history.state, '', gridPageUrl(location.href)); } catch { /* a sandboxed frame: the URL stays */ }
   }
   return mode;
 }
