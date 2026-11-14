@@ -324,6 +324,9 @@ jobs:
   boundaries:
     # J186's report-only cook-to-play (engine-boundaries' push half): cook Ring 1, attach, and play the same bytes.
     # Non-blocking and on its own runner from t=0 (EV3b), so it never sets the run's long pole behind products.
+    # CIQ1 (HOW-WE-BUILD): non-blocking, so a plan/** run skips it (land never waits on it), and main runs it on every push
+    # without reusing the plan run, which no longer has it: each landed SHA still gets one run, on main.
+    if: ${{ !startsWith(github.ref, 'refs/heads/plan/') }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -338,20 +341,14 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: package.json
-      - name: Reuse this exact SHA's green plan-branch run (J240)
-        id: reuse
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-exact-reuse.mjs ci.yml
       - name: Classify from an actually green code-proving ancestor
-        if: steps.reuse.outputs.reused != 'true'
         id: paths
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-selection.mjs
       - id: code
-        if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'
+        if: steps.paths.outputs.docs != 'true'
         run: echo "run=true" >> "$GITHUB_OUTPUT"
       # The full pins, as the tests shares: the Ring 1 cook reads raw tarballs only `pnpm pins` fetches.
       - if: steps.code.outputs.run == 'true'
@@ -391,6 +388,9 @@ jobs:
     # J193: run every active quarantined proof with its ordinary exit code,
     # separately from the blocking verdict and its covered-commit summary.
     # One job, one file at a time (it was three in ci, and ring-1 ran the same three again).
+    # CIQ1 (HOW-WE-BUILD): non-blocking, so a plan/** run skips it (land never waits on it), and main runs it on every push
+    # without reusing the plan run, which no longer has it: each landed SHA still gets one run, on main.
+    if: ${{ !startsWith(github.ref, 'refs/heads/plan/') }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -402,20 +402,14 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: package.json
-      - name: Reuse this exact SHA's green plan-branch run (J240)
-        id: reuse
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci-exact-reuse.mjs ci.yml
       - name: Classify from an actually green code-proving ancestor
-        if: steps.reuse.outputs.reused != 'true'
         id: paths
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-selection.mjs
       - id: code
-        if: steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'
+        if: steps.paths.outputs.docs != 'true'
         run: echo "run=true" >> "$GITHUB_OUTPUT"
       - if: steps.code.outputs.run == 'true'
         uses: ./.github/actions/ring-setup

@@ -873,6 +873,26 @@ describe('shaVerdict', () => {
   });
 });
 
+test('CIQ1: boundaries and quarantine skip plan/** runs, and main runs them without reusing a plan run', () => {
+  const text = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const job = (name: string): string => {
+    const start = text.indexOf(`\n  ${name}:\n`);
+    if (start === -1) throw new Error(`ci.yml has no ${name} job`);
+    const next = text.slice(start + 1).search(/\n {2}[a-z][a-z0-9_-]*:\n/u);
+    return next === -1 ? text.slice(start) : text.slice(start, start + 1 + next);
+  };
+  for (const name of ['boundaries', 'quarantine']) {
+    const block = job(name);
+    expect(block, name).toContain("    if: ${{ !startsWith(github.ref, 'refs/heads/plan/') }}\n    continue-on-error: true");
+    // a main push that reused the plan run would skip it for every landed SHA: no reuse step here
+    expect(block, name).not.toContain('ci-exact-reuse.mjs');
+    expect(block, name).not.toContain('steps.reuse');
+  }
+  // the blocking tests keep their exact reuse and run on plan branches, as land waits on them
+  expect(job('tests')).toContain('node scripts/ci-exact-reuse.mjs ci.yml');
+  expect(job('tests')).not.toMatch(/^ {4}if: /mu);
+});
+
 describe('main reuses the exact SHA\'s green plan-branch run (no double run)', () => {
   const sha = 'b'.repeat(40);
   const ciJobs = ['changes', 'static', 'plan', 'e2e', 'tests (1)', 'tests (2)'].map(name => ({ name, status: 'completed', conclusion: 'success' }));
@@ -964,15 +984,21 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(timings).toContain("github.ref == 'refs/heads/main'");
     expect(timings).not.toMatch(/ci-pack|vitest|test-quarantine/u);
     for (const [name, body] of jobs) {
-      // No job waits on another, and none is skipped wholesale: a failed reuse check is a red job, never a false green.
-      expect(body, name).not.toMatch(/^ {4}(?:if|needs):/mu);
       const steps = body.slice(body.indexOf('    steps:\n')).split(/^ {6}- /mu).slice(1);
-      const reuse = steps.findIndex(step => step.includes('node scripts/ci-exact-reuse.mjs ci.yml'));
-      expect(reuse, name).toBeGreaterThan(0);
       const work = steps.filter(step => /scripts\/(?:ci-pack|test-quarantine)\.mjs --(?:jobs|shard)/u.test(step));
       expect(work.length, name).toBe(1);
       expect(work[0], name).toMatch(/if: steps\.code\.outputs\.run == 'true'/u);
       const code = steps.find(step => step.startsWith('id: code')) ?? '';
+      expect(body, name).not.toMatch(/^ {4}needs:/mu);
+      if (name !== 'tests') {
+        // CIQ1: the non-blocking jobs skip plan/** runs by ref and never reuse one (the CIQ1 test above)
+        expect(code, name).toContain("if: steps.paths.outputs.docs != 'true'");
+        continue;
+      }
+      // The blocking job is never skipped wholesale: a failed reuse check is a red job, never a false green.
+      expect(body, name).not.toMatch(/^ {4}if:/mu);
+      const reuse = steps.findIndex(step => step.includes('node scripts/ci-exact-reuse.mjs ci.yml'));
+      expect(reuse, name).toBeGreaterThan(0);
       expect(code, name).toContain("steps.reuse.outputs.reused != 'true' && steps.paths.outputs.docs != 'true'");
     }
     expect(jobs.get('tests')).toContain("name: Run this job's packed share");
