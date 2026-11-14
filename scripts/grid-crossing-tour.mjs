@@ -87,21 +87,26 @@ try {
     await sleep(2000);
     await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
     await page.evaluate(() => {
-      const W = /** @type {any} */ (window), q = W.__gc3 = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), sentinel: 1 }, t0 = performance.now();
+      const W = /** @type {any} */ (window), q = W.__gc3 = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), longTasks: /** @type {number[][]} */ ([]), sentinel: 1 }, t0 = performance.now();
+      try { performance.setResourceTimingBufferSize(100_000); } catch { /* the default 250 entries */ }
+      // GC8: main-thread long tasks (Chromium only; WebKit has no longtask entries), as [start, duration] on the page clock
+      try { new PerformanceObserver(list => { for (const entry of list.getEntries()) { q.longTasks.push([Math.round(entry.startTime), Math.round(entry.duration)]); if (q.longTasks.length > 20_000) q.longTasks.splice(0, 10_000); } }).observe({ type: 'longtask', buffered: true }); } catch { /* no longtask entries */ }
       let last = t0;
       const raf = (/** @type {number} */ now) => { q.frames.push([Math.round(now - t0), Number((now - last).toFixed(1))]); last = now; if (q.frames.length > 60_000) q.frames.splice(0, 30_000); requestAnimationFrame(raf); };
       requestAnimationFrame(raf);
       setInterval(() => { try {
         const st = W.__wildshard.shard.grid.state(), p = W.__wildshard.world.player, lv = st.live;
         q.samples.push({ t: Math.round(performance.now() - t0), x: Number(p.position.x.toFixed(2)), y: Number(p.position.y.toFixed(2)), z: Number(p.position.z.toFixed(2)), inside: st.inside,
-          phase: lv?.crossing?.phase, ready: lv?.live?.gameplayReady, loading: st.cellLoading, step: st.cellStep?.step ?? null });
+          phase: lv?.crossing?.phase, ready: lv?.live?.gameplayReady, loading: st.cellLoading, step: st.cellStep?.step ?? null,
+          // GC6: whether the crossing's target world (colliders and sim) is resident yet, and the world built ahead (GC5)
+          built: q.target === undefined ? null : lv?.live?.residents?.includes(q.target) === true, ahead: lv?.live?.ahead?.instance ?? null });
         if (q.samples.length > 20_000) q.samples.splice(0, 10_000);
       } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 100);
     });
     await sleep(500);
   };
   await enter();
-  let navigationsBefore = navigations;
+  let navigationsBefore = navigations, lastWindowEnd = 0;
   /** @returns {Promise<any>} */
   const sample = () => page.evaluate(() => { const rows = /** @type {any[]} */ (/** @type {any} */ (window).__gc3.samples); for (let i = rows.length - 1; i >= 0; i--) if (rows[i].err === undefined) return rows[i]; return undefined; });
   const face = (/** @type {number} */ yaw) => page.evaluate(wanted_ => { /** @type {any} */ (window).__wildshard.world.player.yaw = wanted_; }, yaw);
@@ -110,13 +115,21 @@ try {
   const cross = async (arc, repeat) => {
     const row = /** @type {Record<string, any>} */ ({ from: arc.from, to: arc.to, boost: arc.boost, repeat, ok: false, why: '' });
     crossings.push(row);
-    const yaw = Math.atan2(-arc.dx, -arc.dz), px = arc.dx * EDGE_IN, pz = arc.dz * EDGE_IN;
+    // GC8: the target's preparation work since the last crossing ended (a pre-warm starts inside the source, GC5)
+    const windowStart = lastWindowEnd;
+    await page.evaluate(target => { /** @type {any} */ (window).__gc3.target = target; }, arc.to);
+    const yaw = Math.atan2(-arc.dx, -arc.dz);
     // the harness pose: probe.ts `told`, so the in-page server hears where the walker stands
-    await page.evaluate(([x, z, y]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(x, z, y, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, y); }, [px, pz, yaw]);
-    await sleep(3000);
-    const placed = await sample();
+    const place = async (/** @type {number} */ inset) => {
+      const px = arc.dx * inset, pz = arc.dz * inset;
+      await page.evaluate(([x, z, y]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(x, z, y, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, y); }, [px, pz, yaw]);
+      await sleep(3000);
+      const at_ = await sample();
+      return { at_, ok: at_.inside === arc.from && Math.hypot(at_.x - px, at_.z - pz) <= 4 };
+    };
+    const { at_: placed, ok: placedOk } = await place(EDGE_IN);
     row.placed = { x: placed.x, y: placed.y, z: placed.z, inside: placed.inside };
-    if (placed.inside !== arc.from || Math.hypot(placed.x - px, placed.z - pz) > 4) { row.why = `not placed on ${arc.from}'s entryway (inside ${String(placed.inside)})`; return row; }
+    if (!placedOk) { row.why = `not placed on ${arc.from}'s entryway (inside ${String(placed.inside)})`; return row; }
     await face(yaw);
     const t1 = Date.now(), tFrom = (await sample()).t;
     await page.keyboard.down('KeyW'); if (arc.boost) await page.keyboard.down('ShiftLeft');
@@ -151,6 +164,10 @@ try {
     const head = speeds.slice(2, 22).map(s => s.v).sort((a, b) => a - b), approach = head[Math.floor(head.length / 2)] ?? 0;
     const longest = (/** @type {(s: { t: number, v: number, r: any }) => boolean} */ test) => { let best = 0, since = -1; for (const s of speeds) { if (s.t > untilT) break; if (test(s)) { if (since < 0) since = s.t; best = Math.max(best, s.t - since + 100); } else since = -1; } return best; };
     const sum = (/** @type {(s: { t: number, v: number, r: any }) => boolean} */ test) => speeds.filter(s => s.t <= untilT && test(s)).length * 100;
+    // GC6: how long before the border the target's world stood built (negative: built only after the feet crossed)
+    const builtAt = rows.find(r => r.built === true)?.t;
+    row.builtBeforeBorderMs = builtAt === undefined || entered === undefined ? null : entered.t - builtAt;
+    row.prewarmed = rows.some(r => r.ahead === arc.to && r.inside === arc.from);
     const border = entered?.t ?? Infinity, near = frames.filter(f => Math.abs((f[0] ?? 0) - border) <= 3000).map(f => f[1] ?? 0);
     Object.assign(row, { ok: controlAt !== 0, why: controlAt !== 0 ? '' : fell ? `fell off ${arc.from}'s entryway (no ground there)` : entered === undefined ? (roadAt === undefined ? `never left ${arc.from}` : `held on the road (${String(last.phase)})`) : 'in the cell, no control',
       borderToControlMs: entered === undefined || controlAt === 0 ? null : controlT - entered.t, controlMs: controlAt === 0 ? null : controlAt, approachMps: Number(approach.toFixed(2)),
@@ -166,6 +183,18 @@ try {
       await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft'); await sleep(1500);
       row.backIn = (await sample())?.inside === arc.from;
     }
+    // GC8: what preparing the target cost in this window: its `wildshard.prepare:<slug>:<step>` spans (wall ms, developer pages
+    // only), the main thread's long tasks, and the bytes fetched under its shardfile folder (resource timing transfer sizes)
+    const slug = cells.find(cell => cell.instance === arc.to)?.slug ?? arc.to;
+    Object.assign(row, await page.evaluate(([from, name]) => {
+      const W = /** @type {any} */ (window), end = performance.now();
+      const spans = performance.getEntriesByType('measure').filter(entry => entry.name.startsWith(`wildshard.prepare:${name}:`) && entry.startTime >= from)
+        .map(entry => [entry.name.slice(`wildshard.prepare:${name}:`.length), Math.round(entry.startTime - from), Math.round(entry.duration)]);
+      const tasks = /** @type {number[][]} */ (W.__gc3.longTasks ?? []).filter(task => (task[0] ?? 0) >= from && (task[0] ?? 0) <= end);
+      const files = /** @type {PerformanceResourceTiming[]} */ (performance.getEntriesByType('resource')).filter(entry => entry.startTime >= from && entry.name.includes(`/${name}/`));
+      return { prepare: { windowMs: Math.round(end - from), spans: spans.slice(0, 200), longTasks: tasks.length, longTaskMs: tasks.reduce((total, task) => total + (task[1] ?? 0), 0),
+        files: files.length, bytes: files.reduce((total, entry) => total + (entry.transferSize || 0), 0), decodedBytes: files.reduce((total, entry) => total + (entry.decodedBodySize || 0), 0) }, windowEnd: end };
+    }, [windowStart, slug]).then(({ prepare, windowEnd }) => { lastWindowEnd = windowEnd; return { prepare }; }).catch(() => ({})));
     if (!row.ok || row.wallMs > 0) await page.screenshot({ path: join(out, `${engineName}-${arc.from}-${arc.to}.png`) }).catch(() => undefined);
     console.log(`${row.ok ? 'ok  ' : 'FAIL'} ${arc.from} -> ${arc.to}${arc.boost ? ' boost' : ''}${repeat ? ' (repeat)' : ''} ${JSON.stringify({ why: row.why, b2c: row.borderToControlMs, wall: row.wallMs, freeze: row.freezeMs, over50: row.over50 })}`);
     return row;
@@ -189,7 +218,7 @@ try {
         // re-entry lands on HOME: stop when no arc left starts anywhere HOME's good arcs reach (one failure out of HOME otherwise re-enters four times for nothing)
         const reach = new Set([HOME]); for (let grew = true; grew;) { grew = false; for (const g of good) if (reach.has(g.from) && !reach.has(g.to)) { reach.add(g.to); grew = true; } }
         if (![...left].some(o => reach.has(o.from))) { result.note = `stranded in ${here}, and no arc left is reachable from ${HOME}: stopped`; break; }
-        result.reentries++; await enter(); navigationsBefore = navigations; here = (await sample())?.inside ?? HOME; continue;
+        result.reentries++; await enter(); navigationsBefore = navigations; lastWindowEnd = 0; here = (await sample())?.inside ?? HOME; continue;
       }
       let step = goal; while (via.get(step)?.from !== here) step = /** @type {Arc} */ (via.get(step)).from;
       arc = /** @type {Arc} */ (via.get(step)); repeat = true;
