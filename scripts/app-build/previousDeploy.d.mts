@@ -12,6 +12,8 @@ export function carryPreviousDeploy(directory: string, options?: {
   readonly optional?: boolean;
   /** PZ5: this build reads its content from a content base: its graph names code only, marked, so it is carried as code only */
   readonly contentBase?: boolean;
+  /** PAGE-SIZE D1: what the kept builds may add to the page; a kept build past it is dropped whole, newest first */
+  readonly budget?: {readonly files: number; readonly bytes: number};
 }): Promise<{current: number; builds: number; carried: number; bytes: number}>;
 /** Whether an unreachable carried origin may mean no previous builds: a CI test build or the solo preview, never a
  * staging or production release (OFF-VERCEL OV6). */

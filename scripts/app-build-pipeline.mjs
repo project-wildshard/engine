@@ -25,12 +25,23 @@ import { buildLabelOf, stampBuildDocuments } from "./app-build/buildIdentity.mjs
 import { engineRelease } from "./changelog.mjs";
 import { homeIconChannel, writeHomeIcons } from "./app-build/homeIcons.mjs";
 import { carryPreviousDeploy, channelOrigin, previousDeployOptional } from "./app-build/previousDeploy.mjs";
+import { PAGE_LIMITS, pageSize } from "./page-size.mjs";
 import { assertAssetLimits, describeAssetLimits } from "./app-build/assetLimits.mjs";
 import { buildValidationReceipts } from "./app-build/validationReceipts.mjs";
 import { shardfileValidationRevision } from "./shardfile-validation-revision.mjs";
 import { checkBakedTextures } from "./app-build/bakedTextures.mjs";
 
 import { assertHeavyLease } from "./heavy-lane-lease.mjs";
+
+/** PAGE-SIZE D1: what the kept builds may add, D1's limits less this build's own page (its content and maps go elsewhere).
+ * @param {string} outDir @returns {{files: number, bytes: number} | undefined} */
+function carryBudget(outDir) {
+  if (!existsSync(resolve(outDir, "index.html"))) return undefined;
+  const report = pageSize(outDir), zero = { files: 0, bytes: 0 };
+  const off = ["maps", "shard content", "engine art"].map((kind) => report.kinds[kind] ?? zero);
+  const files = report.total.files - off.reduce((sum, row) => sum + row.files, 0), bytes = report.total.bytes - off.reduce((sum, row) => sum + row.bytes, 0);
+  return { files: Math.max(0, PAGE_LIMITS.files - files), bytes: Math.max(0, PAGE_LIMITS.bytes - bytes) };
+}
 
 /** A refused child step; the CLI preserves its code, library callers can clean up. */
 export class AppBuildFailureError extends Error {
@@ -272,6 +283,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   // PAGE-SIZE PZ5: a build that reads its content from a content base (WS_CONTENT_BASE, stamped by PZ8) names its code
   // only, so a later release carries its code only. A kept build without that mark still carries its content.
   const contentBase = (process.env.WS_CONTENT_BASE ?? "") !== "";
+  const budget = carryBudget(outDir);
   console.log(
     "Previous deploy chunks:",
     await carryPreviousDeploy(outDir, {
@@ -279,6 +291,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
       ...(previousOrigin === undefined ? {} : { previousOrigin }),
       optional,
       contentBase,
+      ...(budget === undefined ? {} : { budget }),
     }),
   );
 

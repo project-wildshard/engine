@@ -169,7 +169,11 @@ export function channelOrigin(channel) {
  * A test build (`optional`) treats a 5xx or network failure fetching the origin's manifest as no previous builds.
  * PZ5: `contentBase` says this build reads its content from a content base: its graph names its code only and is marked,
  * and a marked kept graph carries its code only (`CHUNK`). An unmarked one keeps its content, since its tabs read the page.
- * @param {{previousDirectory?: string, previousOrigin?: string, live?: readonly string[], ours?: (build: string) => boolean, optional?: boolean, contentBase?: boolean}} [options]
+ * PAGE-SIZE D1: `budget` is what the kept builds may add to the page (D1's limits less this build's own page). Newest first, a
+ * kept build that would take the page past it is dropped whole, as a pruned build is: chunk recovery moves its tabs on. Without
+ * it, the first build that splits its content off carried four builds that hold theirs (preview, 2026-11-13: 178 MB) and the
+ * gate refused every build, so those never aged out.
+ * @param {{previousDirectory?: string, previousOrigin?: string, live?: readonly string[], ours?: (build: string) => boolean, optional?: boolean, contentBase?: boolean, budget?: {files: number, bytes: number}}} [options]
  */
 export async function carryPreviousDeploy(directory, options = {}) {
   const current = currentManifest(directory, options.contentBase === true);
@@ -217,6 +221,11 @@ export async function carryPreviousDeploy(directory, options = {}) {
       continue;
     }
     for (const row of graph.files) if (!held.has(row.path)) fresh.push(row);
+    const freshBytes = fresh.reduce((sum, row) => sum + row.bytes, 0), budget = options.budget;
+    if (budget !== undefined && (carried + fresh.length > budget.files || bytes + freshBytes > budget.bytes)) {
+      console.warn(`Dropped previous build ${graph.build}: its ${String(fresh.length)} files (${(freshBytes / 1e6).toFixed(1)} MB) would take the page past PAGE-SIZE D1 (room for ${String(Math.max(0, budget.files - carried))} files, ${(Math.max(0, budget.bytes - bytes) / 1e6).toFixed(1)} MB)`);
+      continue;
+    }
     try {
       await pool(fresh, async row => {
         const target = join(directory, row.path);

@@ -4,7 +4,7 @@ import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync}
 import {join, resolve as resolvePath} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the production manifest/body HTTP path locally.
 import {createServer} from 'node:http';
-import {expect, test} from 'vitest';
+import {expect, test, vi} from 'vitest';
 import {CHUNK, KEEP_PROMOTED, carryPreviousDeploy, channelOrigin, liveDeployBuilds, previousDeployOptional} from '../scripts/app-build/previousDeploy.mjs';
 
 test('a deploy carries the kept builds unchanged, but never one past the prune, nor a map', async () => {
@@ -303,4 +303,31 @@ test('only a test build or the solo preview may treat an unreachable origin as n
   expect(previousDeployOptional({WS_RELEASE: '1', WS_CHANNEL: 'staging', WS_PREVIOUS_DEPLOY_OPTIONAL: '1'})).toBe(false);
   expect(previousDeployOptional({WS_RELEASE: '1', WS_CHANNEL: 'production', WS_PREVIOUS_DEPLOY_OPTIONAL: '1'})).toBe(false);
   expect(previousDeployOptional({})).toBe(false);
+});
+
+test('PAGE-SIZE D1: a kept build that would take the page past its budget is dropped whole, newest first, and the rest still carry', async () => {
+  mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-budget-'));
+  // preview, 2026-11-13: the first build that split its content off carried four that hold theirs, 178 MB, and the gate refused it
+  const big = ['b/big/main-aaaaaaaa.js', 'assets/spawn/pine-hollow-client-phone-54ce6c8d049d9b8c.json'], small = ['b/small/main-bbbbbbbb.js'];
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  try {
+    const pre = join(root, 'pre'); mkdirSync(pre); writeFileSync(join(pre, 'version.json'), '{"build":"big"}');
+    const rows = (paths: string[], bytes: number): {path: string; bytes: number}[] => paths.map(path => {
+      mkdirSync(join(pre, path, '..'), {recursive: true}); writeFileSync(join(pre, path), 'x'.repeat(bytes)); return {path, bytes};
+    });
+    writeFileSync(join(pre, 'deploy-chunks.json'), JSON.stringify({format: 2, builds: [{build: 'big', files: rows(big, 600)}, {build: 'small', content: true, files: rows(small, 100)}]}));
+    const first = join(root, 'first'); mkdirSync(first); writeFileSync(join(first, 'version.json'), '{"build":"first"}');
+    expect(await carryPreviousDeploy(first, {previousDirectory: pre, contentBase: true, live: ['big'], budget: {files: 10, bytes: 1000}})).toMatchObject({builds: 2, carried: 1, bytes: 100});
+    for (const path of big) expect(existsSync(join(first, path)), path).toBe(false);
+    expect(readFileSync(join(first, small[0] ?? ''), 'utf8')).toHaveLength(100);
+    const manifest = JSON.parse(readFileSync(join(first, 'deploy-chunks.json'), 'utf8')) as {builds: {build: string}[]};
+    expect(manifest.builds.map(row => row.build)).toEqual(['first', 'small']);
+    expect(warn.mock.calls.flat().join(' ')).toMatch(/Dropped previous build big: .*PAGE-SIZE D1/u);
+    // the file count is a budget too
+    const second = join(root, 'second'); mkdirSync(second); writeFileSync(join(second, 'version.json'), '{"build":"second"}');
+    expect(await carryPreviousDeploy(second, {previousDirectory: pre, contentBase: true, live: ['big'], budget: {files: 1, bytes: 1e6}})).toMatchObject({builds: 2, carried: 1});
+    // with room, both carry as before
+    const third = join(root, 'third'); mkdirSync(third); writeFileSync(join(third, 'version.json'), '{"build":"third"}');
+    expect(await carryPreviousDeploy(third, {previousDirectory: pre, contentBase: true, budget: {files: 10, bytes: 1e6}})).toMatchObject({builds: 3, carried: 3});
+  } finally {warn.mockRestore(); rmSync(root, {recursive: true, force: true});}
 });
