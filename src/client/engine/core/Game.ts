@@ -53,6 +53,7 @@ import { yieldTask } from '../../../shared/engine/core/workSlice';
 import { buildHeld, heldDrawDeferred, noteFrameDrawn } from '../../../shared/engine/core/framePacing';
 import { isDev, onDev } from './devMode';
 import { activeDevPixels, drawingPixelRatio } from './devPixels';
+import { RenderBudget, budgetCeiling } from './renderBudget';
 import { graphicsMode, lowPowerOn, noteFastFrames, PIXELS_EVENT } from './graphicsMode';
 import { flagOn, frameCapFor, noteShipped, presetLabel, setFrameReadout, type ShippedLook } from './graphicsQuality';
 import { classifyFrames } from '../boot/lowPower';
@@ -526,10 +527,10 @@ export class Game {
     if (tracedBoot) recordGpuCheckpoint(this.renderer, 'renderer:created');
     // QA row 25 / MG2: a Developer's screen × density pick (core/devPixels.ts), else a phone's Low graphics
     // (core/graphicsMode.ts), stands in for the tier's cap; either applies live
-    this.renderer.setPixelRatio(drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, this.phoneGraphics));
+    this.renderer.setPixelRatio(this.wantedRatio());
     // the new ratio waits for the frame that draws (RT3: never in the task that decided it, whose cleared canvas nothing
     // would replace; under a menu or the title the world stays as it was until play draws again)
-    const repixel = (): void => { const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, this.phoneGraphics); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; this.applyQuality(); };
+    const repixel = (): void => { const ratio = this.wantedRatio(); this.pickedRatio = ratio === this.renderer.getPixelRatio() ? null : ratio; this.applyQuality(); };
     this.engineScope.listen(document, PIXELS_EVENT, repixel);
     // MG8 prototype: the player has control, so the boot's shadow draws are done: a no-shadows mode clears the maps once more
     this.engineScope.listen(document, 'ws:control-ready', () => { this.qualityClearedMaps = new WeakSet(); });
@@ -1687,8 +1688,24 @@ export class Game {
   // MG8: Settings ▸ Graphics ▸ Pixel density replaces the boot-time render scale on a phone (Jake ~23:45: one pixel control)
   private readonly phoneGraphics: boolean = TIER === 'phone';
   resize(): void { this.fitSize(); this.kickLoop(); }
+  /** NB5 (renderBudget.ts): the desktop's pixel budget and dynamic resolution, on the tier's own scale only: never a phone
+   *  (MG8's Pixel density; Jake 2026-10-20, no dynamic resolution on the phone), a Developer's pixel pick or a player's saved
+   *  render scale (Settings ▸ Graphics, gfxPrefs.dpr) */
+  private budget: RenderBudget | null = null;
+  private budgetOn(): boolean { return !this.phoneGraphics && activeDevPixels() === null && gfxPrefs.dpr === 'auto'; }
+  /** The drawing buffer's pixel ratio the page wants now: the budget's on the desktop's own scale, else drawingPixelRatio. */
+  private wantedRatio(): number {
+    const base = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, this.phoneGraphics);
+    if (!this.budgetOn()) { this.budget = null; return base; }
+    const ceiling = budgetCeiling(window.innerWidth, viewportHeight(), window.devicePixelRatio, base);
+    if (this.budget === null) this.budget = new RenderBudget(ceiling);
+    else if (this.budget.ceiling !== ceiling) this.budget.resize(ceiling);
+    return this.budget.ratio;
+  }
   private fitSize(): void {
     const w = window.innerWidth, h = viewportHeight();
+    // a new window size moves the budget's ceiling (a smaller ratio lands now: this resize redraws anyway)
+    if (this.budget !== null) { const ratio = this.wantedRatio(); if (ratio !== this.renderer.getPixelRatio()) this.renderer.setPixelRatio(ratio); }
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
@@ -1725,7 +1742,7 @@ export class Game {
       // worker messages and input; like a capped vsync, a skipped one does nothing. A capture draws at the tier's own
       // scale on its own clock: no spacing, and any lowered scale restored
       const capture = this.app.clock.mode === 'capture';
-      if (capture) this.slowPacing?.restore();
+      if (capture) { this.slowPacing?.restore(); this.budget?.restore(); }
       const pacing = capture ? null : this.slowPacing;
       if (pacedSkip(pacing, lastRun, this.pacedStart, forceFrame, buildHeld())) return;
       // G782: held at a cell's wall with build slices running, skip vsyncs up to the 30 fps held floor (framePacing.ts);
@@ -1771,7 +1788,8 @@ export class Game {
         // QA row 25: a Developer pixel pick (core/devPixels.ts) holds against the software pacing's scale while it is set
         const paced = this.stepOnly ? null : this.slowPacing?.takeRatio() ?? null, picked = this.stepOnly ? null : this.pickedRatio;
         if (picked !== null) this.pickedRatio = null;
-        const ratio = picked ?? (paced !== null && activeDevPixels() === null ? paced : null);
+        const budgeted = this.stepOnly ? null : this.budget?.takeRatio() ?? null;
+        const ratio = picked ?? (paced !== null && activeDevPixels() === null ? paced : null) ?? (this.budgetOn() ? budgeted : null);
         if (ratio !== null) { this.renderer.setPixelRatio(ratio); this.fitSize(); }
         sky.update(realDt);
         // planet + sun disc travel with the camera so they stay "infinitely" far
@@ -1806,6 +1824,8 @@ export class Game {
       noteFrameDrawn(done, now, cap, cap > 0 && Number.isFinite(lastDrawn) ? lastDrawn : undefined); // Builds share the cap recovery deadline; actual rAF still measures display cadence.
       this.app.cpu.end();
       if (pacing !== null) this.measurePacedFrame(lastRun);
+      // NB5: dynamic resolution reads the drawn frame's interval (uncapped play only: a cap or a capture sets its own pace)
+      else if (this.budget !== null && !capture && cap === 0 && !forceFrame && !this.app.clock.paused) this.budget.measured(liveDt * 1000);
       this.workMs[this.frameI] = work;
       this.frameRafTime = now ?? null;
       this.frameCount++;

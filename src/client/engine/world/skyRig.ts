@@ -152,7 +152,10 @@ export class SkyRig {
     // a low sun (golden hour, dawn) grazes flat decks: a shadow style may take more normal bias, or the planks speckle with acne
     for (const l of this.csm.lights) { l.color.copy(this.sunColor); l.shadow.normalBias = shadows?.normalBias ?? 0.05; l.shadow.radius = shadows?.radius ?? 2; }
     this.texelBias = shadows?.texelBias === 'phone' && rig.phone;
-    this.farEveryOther = this.texelBias && this.csm.lights.length > 1;
+    // NB5 (QA-FEEDBACK-2026-11-14 rows 2, 3, 5): the desktop's three 2048² cascades take the phone's staggered cadence too
+    // (BA-3's A / B, shadowCadence.ts): near every frame, middle every 2nd, far every 4th. Desktop frames run at 60-120, so a
+    // far moving caster steps at 15-30 Hz; the shadow pass was ~110 of Driftwood's ~320 draws a frame
+    this.farEveryOther = (this.texelBias || TIER_CONFIG.cascadeStagger) && this.csm.lights.length > 1;
     // E174: the phone rig's shadow maps are depth only at 16 bits (Jake's pick C; shadowVariants.ts): 40 MB, not three's 160
     if (shadows?.depth16 === 'phone' && rig.phone) {
       const maps = new ShadowMaps(this.renderer, this.csm, this.shadowFade?.ghosts ?? [], rig.size);
