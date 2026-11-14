@@ -114,9 +114,12 @@ export function judge(run) {
     const proof = run.proofError !== undefined && run.proofError !== '';
     out.push({ shard, rule: proof ? 'proof-error' : 'load-error-screen', detail: proof ? run.proofError : samples.at(-1)?.text.slice(0, 200) ?? '' });
   }
-  if (run.outcome === 'no-resume') out.push({ shard, rule: 'no-resume', detail: 'reopening the page showed the title, not the shard' });
+  // OF9: on a world build, reopening the page lands on the title by design (QA 11-12 row 35, Jake: "I expected reload to go back to
+  // main menu"; GO1: only a tap enters a world that seats a body), so its resume is the title, and the deck is the way back in.
+  const titleByDesign = channel === 'staging' && run.outcome === 'no-resume';
+  if (run.outcome === 'no-resume' && !titleByDesign) out.push({ shard, rule: 'no-resume', detail: 'reopening the page showed the title, not the shard' });
   if ((run.leaks ?? 0) > 0) out.push({ shard, rule: 'offline-leak', detail: `${String(run.leaks)} reads reached the server while offline (the URLs are in the run's screens log)` });
-  if (run.requireWorld === true && run.outcome !== 'play' && !(run.outcome === 'outside-world' && run.placed === false)) out.push({ shard, rule: 'not-in-world', detail: run.outcome });
+  if (run.requireWorld === true && run.outcome !== 'play' && !titleByDesign && !(run.outcome === 'outside-world' && run.placed === false)) out.push({ shard, rule: 'not-in-world', detail: run.outcome });
   // OF3: a world build never enters a shard its grid doesn't place (a draft such as Thin Ice): the title's "Not in this world yet"
   // is the right end there, and wrong for a placed shard or a build with no world (preview opens every shard).
   if (run.outcome === 'outside-world' && !(channel === 'staging' && run.placed === false))

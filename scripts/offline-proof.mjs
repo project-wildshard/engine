@@ -36,7 +36,7 @@
 // when START, DOWNLOAD and LOAD finish from the cache, the player is in the world, and then the connection card shows.
 //
 //   scripts/browser-lane.sh node scripts/offline-proof.mjs [--channel=staging|preview|both] [--mode=offline|slow|nobackend]
-//       [--shard=<slug>[,<slug>]] [--entry=deck|resume|both] [--jobs=<n>] [--base=<served build>] [--out=<dir>] [--require-world] [--staging-port=<n>] [--one-origin] [--report]
+//       [--shard=<slug>[,<slug>]] [--entry=deck|resume|both] [--jobs=<n>] [--base=<served build>] [--out=<dir>] [--require-world] [--staging-port=<n>] [--one-origin] [--cells=<n>] [--report]
 //   scripts/browser-lane.sh node scripts/offline-proof.mjs --walkthrough <slug> [--base=…] [--out=…] [--report]
 // With no `--base` it builds this working tree with scripts/serve-build.sh and stops that server at the end. `--jobs` above 1
 // gives each shard its own profile (one profile can't hold two browsers), which trades the shared-device shape for time.
@@ -88,7 +88,10 @@ const STAGING = CHANNELS.staging;
  *  tree (the default, or a `--base` served from it), not a build of another commit. */
 const CATALOGUE = JSON.parse(readFileSync(join(ROOT, 'src/shared/game/grid/singleplayer.json'), 'utf8'));
 /** The stand-in door's world word: every proof shard on staging's grid. */
-const WORLD_WORD = Buffer.concat([Buffer.from([9]), Buffer.from(JSON.stringify({ cells: 20, shards: [...ALL_SHARDS] }))]);
+/** OF5b: `--cells=1` makes the stand-in door say production's one-cell word, so every page takes the one-shard `client` route. */
+const WORD_CELLS = Number(option('cells') ?? 20);
+if (!Number.isInteger(WORD_CELLS) || WORD_CELLS < 1) throw new Error(`--cells is a whole number from 1, not ${String(option('cells'))}`);
+const WORLD_WORD = Buffer.concat([Buffer.from([9]), Buffer.from(JSON.stringify({ cells: WORD_CELLS, shards: [...ALL_SHARDS] }))]);
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 /** @param {number} ms */
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });

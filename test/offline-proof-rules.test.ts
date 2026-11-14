@@ -91,7 +91,9 @@ describe('offline proof rules (OF1)', () => {
     const rules = (extra: Partial<Parameters<typeof judge>[0]>) => judge({ ...base, rows: greenLog, samples: inPlay, outcome: 'play', ...extra }).map(failure => failure.rule);
     expect(rules({ outcome: 'error' })).toEqual(['load-error-screen']);
     expect(rules({ outcome: 'error', proofError: 'TimeoutError: .ws-main-select' })).toEqual(['proof-error']);
-    expect(rules({ outcome: 'no-resume' })).toEqual(['no-resume']);
+    expect(rules({ outcome: 'no-resume', channel: 'preview' })).toEqual(['no-resume']);
+    // OF9: a world build's reopened page lands on the title by design (QA 11-12 row 35); the deck is the way back in
+    expect(rules({ outcome: 'no-resume', channel: 'staging', entry: 'resume', requireWorld: true })).toEqual([]);
     expect(rules({ leaks: 3 })).toEqual(['offline-leak']);
     expect(rules({ outcome: 'seat-wait', samples: [screen({ step: 'server' })], requireWorld: true })).toEqual(['not-in-world']);
     // a read cancelled by the page (or by closing the browser) is not a failed read
