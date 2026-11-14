@@ -6,7 +6,7 @@ import { registeredJsonSchema, namedJsonSchema } from '@wildshard/engine/host/fo
 import { worldScenePlacementPages } from '@wildshard/sharddev/worldScenes';
 import { parseSampledAudioPlacement } from '@wildshard/format/audioScene';
 import { nameBlob } from '@wildshard/sharddev/blobs';
-import { createShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
+import { createShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
 import { emptyShardfile } from '@wildshard/engine/host/author';
 
 const encode = (input: unknown) => new TextEncoder().encode(JSON.stringify(input));
@@ -137,7 +137,7 @@ test('page publication and external reads require exact provenance before any tr
   expect(() => nameBlob(name, 'json', bytes)).toThrow('defining schema');
   expect(() => nameBlob(name, 'json', bytes, { jsonSchema: namedJsonSchema(WorldScenePlacementPageSchema) })).toThrow('exact defining format contract');
   let reads = 0;
-  const product = createShardFolder({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity), sections: new Map(),
+  const product = createShardProduct({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity), sections: new Map(),
     files: new Map([[name, { hash: 'a'.repeat(64), url: 'x', jsonSchema: namedJsonSchema(WorldScenePlacementPageSchema) }]]),
     read: () => { reads++; return Promise.resolve(bytes); }, builtJson: true });
   await expect(product.json(name)).rejects.toThrow('unregistered named JSON is retired');

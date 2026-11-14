@@ -7,7 +7,7 @@ import { QuestState } from '../src/shared/engine/quest/core';
 import type { AnimalManager } from '../src/server/engine/entities/AnimalManager';
 import type { DeclaredSoundBank } from '../src/client/engine/audio/declaredBank';
 import type { ShardContext } from '../src/client/game/plugin/context';
-import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import type { ShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import type { QuestPageComposition } from '../src/client/game/quest/pageComposition';
 import { publishEntryOwner } from '../src/shared/game/shardfile/entryOwners';
 import { publishBoundQuest } from '../src/shared/game/quest/boundState';
@@ -51,7 +51,7 @@ function fixture(omit?: 'quest' | 'animals' | 'sounds') {
     puffs: { color: [1, 1, 1], count: 2, height: .5, burst: [1, 2, .4, .6] } };
   const runtime = { ...runtimeFixture, spawns: rows };
   const json = vi.fn(); json.mockResolvedValue(runtime);
-  const product = legacyDouble<ShardFolder>({ json }), ctx = legacyDouble<ShardContext>({ scope, product });
+  const product = legacyDouble<ShardProduct>({ json }), ctx = legacyDouble<ShardContext>({ scope, product });
   Object.defineProperty(ctx, 'game', { value: { runtime: { world: { sky: { dayNight: { night: 1 } } }, play: {
     hud: { toast: (text: string) => { events.push(text); } }, inventory: { add: () => undefined, take: () => false }, music: { sting: () => undefined },
   } } } });
@@ -114,7 +114,7 @@ test('a changed product during runtime admission publishes no spawn owner', asyn
   f.json.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
   const pending = installDeclaredQuestSpawns(f.ctx, f.capability);
   const refusal = expect(pending).rejects.toThrow('Quest left during runtime admission');
-  Object.defineProperty(f.ctx, 'product', { value: legacyDouble<ShardFolder>({}), configurable: true });
+  Object.defineProperty(f.ctx, 'product', { value: legacyDouble<ShardProduct>({}), configurable: true });
   if (finish === undefined) throw new Error('Missing pending runtime admission');
   finish(f.runtime); await refusal;
   expect(f.read).not.toHaveBeenCalled(); expect(f.events).toEqual([]);

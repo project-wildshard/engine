@@ -15,6 +15,6 @@ export function shardOutputs(root: string, folder: string): { slug: string; fold
 export function builtShardFolders(root: string, folders: readonly string[]): ShardFolder[];
 export function outputManifest(root: string, folder: string, output: ShardOutputRow): Record<string, unknown>;
 export function manifestFolders(root: string): string[];
-export function builtFolder(root: string, slug: string): string;
+export function outputFolderOf(root: string, slug: string): string;
 /** The built product that stands for a source shard in per-shard measures (its first output, else itself). */
 export function representativeFolder(root: string, slug: string): string;

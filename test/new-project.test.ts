@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { buildProject } from '@wildshard/sharddev/project';
-import { validateOutputFolder } from '@wildshard/sharddev/outputFolder';
+import { validateOutputProduct } from '@wildshard/sharddev/outputProduct';
 import { writeNewProject } from '../src/sharddev/newProject';
 import { runCli } from '../src/sharddev/cli';
 import { checkShardLayout } from '../scripts/check-shards.mjs';
@@ -28,7 +28,7 @@ export const output = { platform: emitPlatformSections(new Map([['actors/moves',
 ]]])) };
 `);
     await buildProject(project, output, { client: null, copyRuntime: true });
-    const product = validateOutputFolder(output);
+    const product = validateOutputProduct(output);
     expect(product.index.formatVersion).toBe(2);
     expect(product.index.identity.slug).toBe('new-world');
     expect(product.index.runtime).toBeNull();

@@ -7,16 +7,16 @@ import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The recorder fixture uses the actual repository root.
 import process from 'node:process';
-import { captureFolderInputs } from '../scripts/shardfile-inputs.mjs';
+import { captureProductInputs } from '../scripts/shardfile-inputs.mjs';
 import { build } from '../scripts/shardfile-vite.mjs';
 import recurve from '../public/assets/nalati/baked/recurve-pool.json' with { type:'json' };
 import { HeldBowFileSchema, HeldBowDefinitionSchema } from '@wildshard/format/weaponProfiles';
 import { bindHeldBow } from '../src/client/game/weapons/heldLauncher';
 import { registeredJsonSchema } from '../src/shared/host/formatJsonSchema';
-import { fixtureJsonCheck } from './fixtures/folderFile';
+import { fixtureJsonCheck } from './fixtures/productFile';
 import { nameBlob } from '../src/sharddev/blobs';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
-import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { emptyShardfile } from '../src/shared/host/author';
 
 const encode=(input:unknown):Uint8Array=>new TextEncoder().encode(`${JSON.stringify(input)}\n`);
@@ -28,7 +28,7 @@ test('the named bow retains the original bytes, pool channels and borrowed array
   expect(named.bytes).toEqual(bytes);
   if(named.file.jsonSchema===undefined)throw new Error('Missing named bow admission');
   const source=emptyShardfile({slug:'bow-fixture',name:'Bow fixture',author:'Fixture',revision:1,seed:1});
-  const product=createShardFolder({slug:source.identity.slug,revision:1,shardfile:source,sections:new Map(),jsonCheck:fixtureJsonCheck,
+  const product=createShardProduct({slug:source.identity.slug,revision:1,shardfile:source,sections:new Map(),jsonCheck:fixtureJsonCheck,
     files:new Map([['weapons/bow-page.json',{hash:named.file.hash,url:'/bow.json',jsonSchema:named.file.jsonSchema}]]),read:()=>Promise.resolve(named.bytes)});
   const admitted=v.parse(HeldBowFileSchema,await product.json('weapons/bow-page.json'));
   expect(admitted.pool).toEqual(recurve.pool);
@@ -61,7 +61,7 @@ test('actual named admission rejects malformed bow and pool bytes',async()=>{
   for(const input of invalid){
     const bytes=encode(input);expect(()=>nameBlob('weapons/bow-page.json','json',bytes,{jsonSchema:schema})).toThrow();
     expect(()=>validateNamedJsonSchema(schema,bytes)).toThrow();
-    const product=createShardFolder({slug:source.identity.slug,revision:1,shardfile:source,sections:new Map(),jsonCheck:fixtureJsonCheck,
+    const product=createShardProduct({slug:source.identity.slug,revision:1,shardfile:source,sections:new Map(),jsonCheck:fixtureJsonCheck,
       files:new Map([['weapons/bow-page.json',{hash:'a'.repeat(64),url:'/bad.json',jsonSchema:schema}]]),read:()=>Promise.resolve(bytes)});
     await expect(product.json('weapons/bow-page.json')).rejects.toThrow();
   }
@@ -73,7 +73,7 @@ test('the product input recorder sees the raw bow and its existing producer',asy
   const dir=mkdtempSync(resolve('tmp/held-bow-input-')),entry=resolve(dir,'entry.mjs'),receipt=resolve(dir,'inputs.json');
   writeFileSync(entry,`import rows from ${JSON.stringify(resolve(source))} with {type:'json'};export const bow=rows;`);
   try {
-    await captureFolderInputs(root,receipt,async()=>{await build({root,configFile:false,publicDir:false,logLevel:'silent',build:{write:false,minify:false,lib:{entry,formats:['es'],fileName:'bow-input'}}});});
+    await captureProductInputs(root,receipt,async()=>{await build({root,configFile:false,publicDir:false,logLevel:'silent',build:{write:false,minify:false,lib:{entry,formats:['es'],fileName:'bow-input'}}});});
     const captured=v.parse(v.object({inputs:v.array(v.string())}),JSON.parse(readFileSync(receipt,'utf8')));
     expect(captured.inputs.some(input=>input.slice(2)===source)).toBe(true);
   } finally {rmSync(dir,{recursive:true,force:true});}

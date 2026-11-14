@@ -16,7 +16,7 @@ import { pageAir } from '../src/client/game/population/pageAir';
 import { bindStealthWeapons, installClientStealthEntry } from '../src/client/game/shardfile/clientStealthEntry';
 import { publishEntryOwner } from '../src/shared/game/shardfile/entryOwners';
 import { CLIENT_FEATURES } from '../src/client/game/shardfile/clientPlan';
-import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { emptyShardfile } from '../src/shared/host/author';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { lendNalatiAdmission } from './fixtures/nalati-return-modules';
@@ -100,7 +100,7 @@ test('a missing world refuses before construction or publication', () => {
 
 test('world admission reserves only stealth memory; controller guest initialization remains at prepare-play', async () => {
   const scope = new Scope('early-stealth'), rows: unknown = originalHeldMetadata().stealth;
-  const product = createShardFolder({slug: 'orchard', revision: 1,
+  const product = createShardProduct({slug: 'orchard', revision: 1,
     shardfile: emptyShardfile({slug: 'orchard', name: 'Orchard', author: 'Test', revision: 1, seed: 1}),
     sections: new Map([['player/stealth', rows]]), files: new Map(), read: () => Promise.reject(new Error('Stealth needs no file read'))});
   const ctx = legacyDouble<ShardContext>({scope, product}), feature = CLIENT_FEATURES['stealth.entry'];

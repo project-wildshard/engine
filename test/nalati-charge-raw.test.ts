@@ -17,7 +17,7 @@ import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import {parseShardfile} from '@wildshard/format/shardSchema';
 import {resolveOutputDescriptor,carryOutputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
-import {shardFolderData} from '../src/shared/game/shardfile/folderData';
+import {shardProductData} from '../src/shared/game/shardfile/productData';
 
 const hash=sha256(chargeModule);
 const inline={...charge,bytes:btoa(String.fromCodePoint(...chargeModule))};
@@ -37,7 +37,7 @@ async function product() {
     const bytes=wires.get(path);if(bytes===undefined)throw new Error('Missing fixture section');return Promise.resolve(bytes);
   }});
   const parsed=parseShardfile(assembled);carryOutputDescriptor(assembled,parsed);
-  return shardFolderData(parsed,'https://charge.test/',()=>Promise.resolve(chargeModule));
+  return shardProductData(parsed,'https://charge.test/',()=>Promise.resolve(chargeModule));
 }
 test('the named spawn module stays raw in the original asset map and default readers retain inline bytes',async()=>{
   expect(chargeModule.byteLength).toBe(chargeModuleSize);

@@ -10,8 +10,8 @@ import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { emptyShardfile } from '../src/shared/host/author';
 import { staticGlb } from '../src/sharddev/bake/glb';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
-import { provideRuntimeFolder, runtimeFolder } from '../src/client/game/shardfile/runtimeFolder';
-import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { provideRuntimeProduct, runtimeProduct } from '../src/client/game/shardfile/runtimeProduct';
+import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { readWholeLibrary } from '../src/client/game/shardfile/wholeLibrary';
 import { parseWorldScenes } from '@wildshard/format/worldScenes';
 import * as geometryModule from '../src/client/game/plugin/geometry';
@@ -28,13 +28,13 @@ function fixture(limit = 10000, transform = new Matrix4(), part = 'draw', readCo
   const hash = hashImmutableBytes(bytes), source = emptyShardfile({ slug: 'whole-cache', name: 'Whole cache', author: 'Fixture', revision: 1, seed: 1 });
   source.files.push({ hash, kind: 'glb', compressed: bytes.length, decoded: bytes.length, gpu: 72, triangles: 1, draws: 1, dependencies: [], critical: false });
   source.library.push(hash);
-  provideRuntimeFolder({ source, assets: readCold === undefined ? new Map([[hash, bytes]]) : new Map(), cached: false }, owner, {
+  provideRuntimeProduct({ source, assets: readCold === undefined ? new Map([[hash, bytes]]) : new Map(), cached: false }, owner, {
     base: 'https://test.example/shardfiles/whole-cache/', offline: false, firstParty: true,
     fetch: () => Promise.reject(new Error('Use admitted bytes')), hash: wire => Promise.resolve(hashImmutableBytes(wire)),
     ...(readCold === undefined ? {} : { cache: { product: () => Promise.resolve(null), asset: () => Promise.reject(new Error('Use verified cold source')),
-      putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true), verifiedAsset: readCold } }),
+      putProduct: () => Promise.resolve(), putAsset: () => Promise.resolve(true), verifiedAsset: readCold } }),
   });
-  const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(), files: new Map(), read: () => Promise.resolve(bytes) });
+  const product = createShardProduct({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(), files: new Map(), read: () => Promise.resolve(bytes) });
   const parsed = parseWorldScenes({ version: 1, libraries: [{ id: 'parts', kind: 'whole', models: [
     { id: 'plain', part, files: [hash] }, { id: 'alias', part, files: [hash] },
     { id: 'posed', part, files: [hash], matrix: new Matrix4().makeTranslation(4, 2, 1).elements },
@@ -144,11 +144,11 @@ test('ordered content hashes identify reconstructions and partial registration u
   const f = fixture(), other = fixture(10000, new Matrix4(), 'other');
   const source = emptyShardfile({ slug: 'whole-pair', name: 'Pair', author: 'Fixture', revision: 1, seed: 1 });
   source.files.push(...f.product.shardfile.files, ...other.product.shardfile.files); source.library.push(f.hash, other.hash);
-  provideRuntimeFolder({ source, assets: new Map([[f.hash, f.bytes], [other.hash, other.bytes]]), cached: false }, f.owner, {
+  provideRuntimeProduct({ source, assets: new Map([[f.hash, f.bytes], [other.hash, other.bytes]]), cached: false }, f.owner, {
     base: 'https://test.example/shardfiles/whole-pair/', offline: false, firstParty: true,
     fetch: () => Promise.reject(new Error('Use admitted bytes')), hash: wire => Promise.resolve(hashImmutableBytes(wire)),
   });
-  const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(), files: new Map(), read: () => Promise.reject(new Error('Use runtime reader')) });
+  const product = createShardProduct({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(), files: new Map(), read: () => Promise.reject(new Error('Use runtime reader')) });
   const rows = (files: string[]) => ({ ...f.row, models: f.row.models.map(model => ({ ...model, files })) });
   const decode = vi.spyOn(geometryModule, 'readWholeGeometry');
   for (const files of [[f.hash, other.hash], [other.hash, f.hash], [f.hash]]) {
@@ -179,7 +179,7 @@ test('a sliced retiring ancestor refuses before creating a child, registering or
 test('cache hits retain transport release authority and cancellation releases the construction lease', async () => {
   const f = fixture();
   (await readWholeLibrary(f.owner.child('cold'), f.product, f.row, ids, undefined, f.assets)).done();
-  const runtime = runtimeFolder(f.product.shardfile);
+  const runtime = runtimeProduct(f.product.shardfile);
   const owner = f.owner.child('warm');
   let resume = (): void => undefined;
   const wait = new Promise<void>(resolve => { resume = resolve; });
@@ -221,11 +221,11 @@ test('cold whole transport refills six shared slots before the first ordered dec
   const owner = new Scope('whole-phase-source'), source = emptyShardfile({ slug: 'whole-phase', name: 'Phase', author: 'Fixture', revision: 1, seed: 1 });
   for (const piece of pieces) { source.files.push(...piece.product.shardfile.files); source.library.push(piece.hash); }
   const started: string[] = [], deliver = new Map<string, () => void>();
-  provideRuntimeFolder({ source, assets: new Map(), cached: false }, owner, {
+  provideRuntimeProduct({ source, assets: new Map(), cached: false }, owner, {
     base: 'https://test.example/shardfiles/whole-phase/', offline: false, firstParty: true,
     fetch: () => Promise.reject(new Error('Use verified source')), hash: wire => Promise.resolve(hashImmutableBytes(wire)),
     cache: { product: () => Promise.resolve(null), asset: () => Promise.reject(new Error('Use verified source')),
-      putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true), verifiedAsset: hash => {
+      putProduct: () => Promise.resolve(), putAsset: () => Promise.resolve(true), verifiedAsset: hash => {
         const piece = pieces.find(row => row.hash === hash);
         if (piece === undefined) return Promise.reject(new Error('Unexpected source file'));
         started.push(hash); return new Promise(resolve => { deliver.set(hash, () => { resolve(Uint8Array.from(piece.bytes)); }); });

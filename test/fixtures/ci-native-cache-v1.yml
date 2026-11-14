@@ -37,7 +37,7 @@ jobs:
         id: native-inputs
         run: |
           zstd -d --rm test-products.tar.zst
-          python3 scripts/ci-folders.py unpack
+          python3 scripts/ci-products.py unpack
       - uses: actions/download-artifact@v4
         with:
           name: native-fixtures
@@ -302,7 +302,7 @@ jobs:
       - name: Verify and restore exact-run generated inputs and products
         run: |
           zstd -d --rm test-products.tar.zst
-          python3 scripts/ci-folders.py unpack
+          python3 scripts/ci-products.py unpack
       - uses: actions/download-artifact@v4
         with:
           name: vitest-plan

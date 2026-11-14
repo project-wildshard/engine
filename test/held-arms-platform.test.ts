@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { readSourceModel } from '../src/sharddev/bake/skinned';
 import * as rigLoader from '../src/client/engine/anim/rig';
-import * as lookCompiler from '../src/client/game/shardfile/runtimeFolder';
+import * as lookCompiler from '../src/client/game/shardfile/runtimeProduct';
 import { ToonLook } from '../src/client/engine/render/families/toon';
 import { BufferGeometry, InterleavedBufferAttribute, Color, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector2, Vector3, Vector4 } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';

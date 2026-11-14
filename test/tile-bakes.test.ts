@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { CONTENT_CAPS } from '@wildshard/format/contentBounds';
 import { emptyShardfile } from '../src/shared/host/author';
-import { writeOutputFolder } from '../src/sharddev/outputFolder';
+import { writeOutputProduct } from '../src/sharddev/outputProduct';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { checkTileBake, readTileBakeCensus, tileBakeCensus } from '../scripts/tile-bakes.mjs';
 import { parseTileBakePolicy, tileBakeApprovalFailures } from '../scripts/tile-bake-policy.mjs';
@@ -26,7 +26,7 @@ function fixture(rows = tiles()): { root: string; folder: string } {
   writeFileSync(resolve(root, 'lint/tile-bake-debt.json'), JSON.stringify({ version: 1, products: {} }));
   const folder = resolve(root, 'out/check'), source = emptyShardfile({ slug: 'check', name: 'Check', author: 'Test', revision: 1, seed: 1 });
   source.tiles = rows;
-  writeOutputFolder(source, new Map(), folder);
+  writeOutputProduct(source, new Map(), folder);
   return { root, folder };
 }
 test('a new product requires all 64+16 coordinates and every full 5x5', () => {
@@ -55,7 +55,7 @@ test('exact coordinate debt permits its current cost but no new or worsened over
   expect(checkTileBake(f.root, 'check', f.folder).debt).toEqual({ 'tile/0/0/0/compressed': first.compressed });
   first.compressed++;
   const source = emptyShardfile({ slug: 'check', name: 'Check', author: 'Test', revision: 1, seed: 1 }); source.tiles = rows;
-  writeOutputFolder(source, new Map(), f.folder);
+  writeOutputProduct(source, new Map(), f.folder);
   expect(() => checkTileBake(f.root, 'check', f.folder)).toThrow('tile/0/0/0/compressed');
   writeFileSync(path, JSON.stringify({ version: 1, products: { other: { 'tile/0/0/0/compressed': first.compressed } } }));
   expect(() => checkTileBake(f.root, 'check', f.folder)).toThrow('tile bake refused');

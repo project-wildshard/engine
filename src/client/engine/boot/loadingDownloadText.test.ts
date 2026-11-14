@@ -24,14 +24,14 @@ it('reserves completion for the complete file operation, including genuinely emp
   expect(loadingDownloadFraction({...empty, complete: true})).toBe(1);
   expect(loadingDownloadText({...allBytes, cachedBytes: 51_600_000, complete: true})).toBe('0.4 MB downloaded, 51.6 MB from cache');
 });
-const prefetch: LoadingPrefetchSnapshot = { phase: 'running', reason: null, products: 25, foldersRead: 3,
+const prefetch: LoadingPrefetchSnapshot = { phase: 'running', reason: null, shardfiles: 25, shardfilesRead: 3,
   knownFiles: 10, knownBytes: 20_000_000, presentFiles: 2, presentBytes: 4_000_000, storedFiles: 3, storedBytes: 6_000_000 };
 
 it('the grid prefetch row reports disk progress against the set known so far, and stops honestly', () => {
   expect(loadingPrefetchFraction(prefetch)).toBe(0.5);
-  expect(loadingPrefetchText(prefetch)).toBe('Streams in play · On disk: 10.0 MB of 20.0 MB known so far · 5 / 10 files · 3 / 25 products checked · prefetching');
+  expect(loadingPrefetchText(prefetch)).toBe('Streams in play · On disk: 10.0 MB of 20.0 MB known so far · 5 / 10 files · 3 / 25 cells checked · prefetching');
   expect(loadingPrefetchText({ ...prefetch, phase: 'quota', reason: 'storage quota' })).toContain('prefetch stopped (storage quota)');
-  const cached = { ...prefetch, foldersRead: 25, presentFiles: 7, presentBytes: 14_000_000 };
+  const cached = { ...prefetch, shardfilesRead: 25, presentFiles: 7, presentBytes: 14_000_000 };
   expect(loadingPrefetchFraction(cached)).toBeLessThan(1);
   expect(loadingPrefetchFraction({ ...cached, phase: 'done' })).toBe(1);
 });

@@ -9,10 +9,10 @@ import { platformFileFamily, validatePlatformFile } from '@wildshard/format/plat
 import { emptyShardfile } from '../src/shared/host/author';
 import { serverBlob } from '../src/sharddev/blobs';
 import { HeadlessSimulation } from '../src/server/host/headless';
-import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { validateOutputFolder, writeOutputFolder } from '../src/sharddev/outputFolder';
+import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { validateOutputProduct, writeOutputProduct } from '../src/sharddev/outputProduct';
 import { hasNativeAssembly } from '../src/server/game/shardfile/nativeAssembly';
-import { prepareFolderRuntimePlan } from '../src/server/game/shardfile/nativePlan';
+import { prepareProductRuntimePlan } from '../src/server/game/shardfile/nativePlan';
 
 const plan: NativeAssemblyPlan = { kind: 'native-assembly', level: { speed: 5, ground: { size: 500, height: 0 } }, terrain: { kind: 'bake-ground' }, navigation: 'shard',
   bake: { rows: { file: 'server/physics.json' }, reader: { label: 'Fixture', resolution: 256, size: 500 }, ground: 'data/ground.bin', colliders: [], read: 'bake' },
@@ -45,21 +45,21 @@ test('ships through the server class and takes the dispatch ahead of sim/runtime
   try {
     const shard = emptyShardfile({ slug: 'native-assembly-fixture', name: 'Assembly', author: 'Test', revision: 1, seed: 3 });
     const server = [serverBlob(NATIVE_ASSEMBLY_FILE, { schema: NATIVE_ASSEMBLY_SCHEMA, value: plan }), serverBlob('server/physics.json', { schema: NATIVE_ASSEMBLY_DATA_SCHEMA, value: {} })];
-    const index = writeOutputFolder(shard, new Map(), directory, { server });
+    const index = writeOutputProduct(shard, new Map(), directory, { server });
     expect(index.admission.server?.map(row => row.name)).toEqual([NATIVE_ASSEMBLY_FILE, 'server/physics.json']);
     expect(index.sections.map(row => row.name)).not.toContain('sim/runtime-plan');
-    validateOutputFolder(directory);
+    validateOutputProduct(directory);
 
-    const product = await loadHeadlessFolder(directory);
+    const product = await loadHeadlessProduct(directory);
     expect(hasNativeAssembly(product)).toBe(true);
     expect(parseNativeAssembly(await product.json(NATIVE_ASSEMBLY_FILE))).toEqual(plan);
-    await expect(prepareFolderRuntimePlan(product, new Map())).rejects.toThrow('needs its server ports');
+    await expect(prepareProductRuntimePlan(product, new Map())).rejects.toThrow('needs its server ports');
 
     // The worker reaches the assembly's own prepare: the fixture has no bake to read, and that is what refuses it.
     await expect(HeadlessSimulation.create(product.shardfile, new Map(), undefined, { deadline: 'advisory', product: directory })).rejects.toThrow(/data\/ground\.bin/u);
 
     // A changed plan is an invalid product, like any other file.
     writeFileSync(resolve(directory, server[0]?.file.path ?? ''), 'tampered');
-    expect(() => validateOutputFolder(directory)).toThrow(/hash|size/u);
+    expect(() => validateOutputProduct(directory)).toThrow(/hash|size/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
 }, 120_000);

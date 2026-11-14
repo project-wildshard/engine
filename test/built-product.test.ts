@@ -224,7 +224,7 @@ test('source-program maps key both builder and reader recipes on current world i
   const first = folderMapInput(project, undefined);
   expect(first).toEqual({ tilesHash: mapTilesHash(project) });
   expect(folderFlags(f.root, undefined, first, false)).toEqual([`--generated-map-tiles-hash=${mapTilesHash(project)}`]);
-  write(project, 'data/folderMap.json', JSON.stringify({ tilesHash: 'stale source output' }));
+  write(project, 'data/productMap.json', JSON.stringify({ tilesHash: 'stale source output' }));
   expect(folderMapInput(project, undefined)).toEqual(first);
   write(project, 'source.txt', 'changed world');
   expect(folderMapInput(project, undefined)?.tilesHash).not.toBe(first?.tilesHash);

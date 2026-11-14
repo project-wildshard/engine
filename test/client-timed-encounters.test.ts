@@ -1,4 +1,4 @@
-import {fixtureFolderFile,fixtureJsonCheck} from './fixtures/folderFile';
+import {fixtureProductFile,fixtureJsonCheck} from './fixtures/productFile';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the actual generated envelope, not a static generated import.
 import { readFileSync } from 'node:fs';
 import { NALATI_NIGHT } from './fixtures/nalati-night';
@@ -21,7 +21,7 @@ import type { SpeciesCatalogue } from '../src/client/game/looks/speciesBook';
 import type { ForestWeatherRig } from '../src/client/game/weather/forest';
 import { CueDirector } from '../src/client/game/audio/cueDirector';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { clientNativeBook } from '../src/client/game/shardfile/clientNativeBook';
 import { entryOwner, publishEntryOwner } from '../src/shared/game/shardfile/entryOwners';
 import { installClientTimedEncounters } from '../src/client/game/shardfile/clientTimedEncounters';
@@ -47,8 +47,8 @@ function fixture(retireOnRead = false) {
   if (script === undefined) throw new Error('Missing original watch programme');
   const night = withWeatherWitness({...admitted, program: {...admitted.program, script}});
   const bytes = new TextEncoder().encode(JSON.stringify(night)), hash = sha256(bytes);
-  const product = createShardFolder({slug: 'quarry', revision: 1, shardfile: emptyShardfile({slug: 'quarry', name: 'Quarry', author: 'Fixture', revision: 1, seed: 1}), sections: new Map(),
-    files: new Map([[input.file, fixtureFolderFile(input.file,{hash, url: '/watch.json'})]]), jsonCheck:fixtureJsonCheck, read: () => { if (retireOnRead) scope.dispose(); return Promise.resolve(bytes); }});
+  const product = createShardProduct({slug: 'quarry', revision: 1, shardfile: emptyShardfile({slug: 'quarry', name: 'Quarry', author: 'Fixture', revision: 1, seed: 1}), sections: new Map(),
+    files: new Map([[input.file, fixtureProductFile(input.file,{hash, url: '/watch.json'})]]), jsonCheck:fixtureJsonCheck, read: () => { if (retireOnRead) scope.dispose(); return Promise.resolve(bytes); }});
   const game = legacyDouble<Game>({app, levelScope: scope, scene: new Scene(), camera: new PerspectiveCamera(), renderer: legacyDouble<Game['renderer']>({getDrawingBufferSize: (out: Vector2) => out.set(400, 800)})});
   const world = legacyDouble<ShardWorld>({game, sky: legacyDouble<ShardWorld['sky']>({}), forest: legacyDouble<ShardWorld['forest']>({}), player: legacyDouble<Player>({position: new Vector3()})});
   const ctx = legacyDouble<ShardContext>({scope, product, game: legacyDouble<ShardContext['game']>({runtime: legacyDouble<ShardRuntime>({world})})});

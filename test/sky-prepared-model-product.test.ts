@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare the complete GLB without expanding a 10 MB assertion.
 import { Buffer } from 'node:buffer';
 import { expect, test } from 'vitest';
-import { readBuiltShardfile } from '../scripts/built-folder.mjs';
+import { readBuiltShardfile } from '../scripts/built-product.mjs';
 import { readProgramDiscovery } from '../scripts/program-discovery.mjs';
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { hashImmutableBytes } from '../src/shared/host/immutable';

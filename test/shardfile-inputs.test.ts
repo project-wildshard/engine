@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture subprocess runtime.
 import process from 'node:process';
 import { afterEach, expect, it } from 'vitest';
-import { captureFolderInputs, folderInputKey, folderToolchainKey, recordBundle, recordModuleInput, recordResolution, inputRecorderPlugin, matchingFolderInputKey, publishFolderInputs, replayFolderInputs } from '../scripts/shardfile-inputs.mjs';
+import { captureProductInputs, productInputKey, productToolchainKey, recordBundle, recordModuleInput, recordResolution, inputRecorderPlugin, matchingProductInputKey, publishProductInputs, replayProductInputs } from '../scripts/shardfile-inputs.mjs';
 import { InputHashMemo } from '../scripts/bake-input-hashes.mjs';
 import { build } from '../scripts/shardfile-vite.mjs';
 import {build as buildCompiler} from 'vite';
@@ -28,7 +28,7 @@ function fixture(): string {
 }
 it('receipts include step keys and explicit inputs without depending on cached files', async () => {
   const root=fixture(), receipt=resolve(root,'receipt.json'), cache=resolve(root,'.cache'), memo=new InputHashMemo(root);
-  await captureFolderInputs(root,receipt,async()=>{
+  await captureProductInputs(root,receipt,async()=>{
     const ctx=createProjectGeneration(root,'a'.repeat(64),new Map(),cache);
     await ctx.cached({id:'fixture',inputs:['asset.txt']},inputs=>inputs);
     recordBundle({output:[]});
@@ -36,25 +36,25 @@ it('receipts include step keys and explicit inputs without depending on cached f
   const rows=v.parse(v.object({inputs:v.array(v.string())}),JSON.parse(readFileSync(receipt,'utf8')));
   expect(rows.inputs.some(entry=>/^G [a-f0-9]{64}$/u.test(entry))).toBe(true);
   expect(rows.inputs.some(entry=>entry.includes('.cache'))).toBe(false);
-  const key=folderInputKey(root,receipt,[],memo); expect(key).toMatch(/^[a-f0-9]{64}$/u);
-  rmSync(cache,{recursive:true}); expect(folderInputKey(root,receipt,[],memo)).toBe(key);
-  writeFileSync(resolve(root,'asset.txt'),'changed'); expect(folderInputKey(root,receipt,[],memo)).toBeUndefined();
+  const key=productInputKey(root,receipt,[],memo); expect(key).toMatch(/^[a-f0-9]{64}$/u);
+  rmSync(cache,{recursive:true}); expect(productInputKey(root,receipt,[],memo)).toBe(key);
+  writeFileSync(resolve(root,'asset.txt'),'changed'); expect(productInputKey(root,receipt,[],memo)).toBeUndefined();
 });
 it('keys native-bundled modules, sync and async reads, negative probes and real directory inventories only', async () => {
   const root = fixture(), receipt = resolve(root,'receipt.json'), memo = new InputHashMemo(root);
-  await captureFolderInputs(root,receipt,async () => {
+  await captureProductInputs(root,receipt,async () => {
     readFileSync(resolve(root,'asset.txt')); await readFile(resolve(root,'asset.txt'));
     existsSync(resolve(root,'optional.json')); readdirSync(resolve(root,'assets'));
     await build({root,configFile:false,publicDir:false,logLevel:'silent',build:{write:false,minify:false,lib:{entry:resolve(root,'entry.ts'),formats:['es'],fileName:'fixture'}}});
   });
-  const key = () => folderInputKey(root,receipt,[],memo), before = key(); expect(before).toMatch(/^[a-f0-9]{64}$/u);
+  const key = () => productInputKey(root,receipt,[],memo), before = key(); expect(before).toMatch(/^[a-f0-9]{64}$/u);
   writeFileSync(resolve(root,'src/engine/unread.generated.ts'),'unread'); expect(key()).toBe(before);
   writeFileSync(resolve(root,'src/engine/used.ts'),'export const value=2;\n'); expect(key()).toBeUndefined();
   writeFileSync(resolve(root,'src/engine/used.ts'),'export const value=1;\n'); expect(key()).toBe(before);
   writeFileSync(resolve(root,'optional.json'),'{}'); expect(key()).toBeUndefined(); rmSync(resolve(root,'optional.json'));
   writeFileSync(resolve(root,'assets/new.txt'),'new'); expect(key()).toBeUndefined(); rmSync(resolve(root,'assets/new.txt'));
-  expect(folderInputKey(root,receipt,['--other-flags'],memo)).not.toBe(key());
-  expect(folderInputKey(root,receipt,[],new InputHashMemo(fixture()))).toBeUndefined();
+  expect(productInputKey(root,receipt,['--other-flags'],memo)).not.toBe(key());
+  expect(productInputKey(root,receipt,[],new InputHashMemo(fixture()))).toBeUndefined();
   rmSync(resolve(root,'asset.txt'));mkdirSync(resolve(root,'asset.txt'));
   expect(key()).toBeUndefined();rmSync(resolve(root,'asset.txt'),{recursive:true});
   symlinkSync('entry.ts',resolve(root,'asset.txt'));
@@ -69,45 +69,45 @@ it('keeps another revision from replacing a matching captured read set', async (
   const receipts=[];
   for(const root of [first,second]) {
     const receipt=resolve(root,'trace.json'), memo=new InputHashMemo(root);
-    await captureFolderInputs(root,receipt,()=>{readFileSync(resolve(root,'asset.txt'));recordBundle({output:[]});return Promise.resolve();});
-    const key=folderInputKey(root,receipt,recipe,memo); if(key===undefined)throw new Error('Fixture requires a complete receipt');
-    publishFolderInputs(directory,receipt,key);receipts.push(key);
+    await captureProductInputs(root,receipt,()=>{readFileSync(resolve(root,'asset.txt'));recordBundle({output:[]});return Promise.resolve();});
+    const key=productInputKey(root,receipt,recipe,memo); if(key===undefined)throw new Error('Fixture requires a complete receipt');
+    publishProductInputs(directory,receipt,key);receipts.push(key);
   }
   expect(receipts[0]).not.toBe(receipts[1]);
-  expect(matchingFolderInputKey(first,directory,recipe,new InputHashMemo(first))).toBe(receipts[0]);
-  expect(matchingFolderInputKey(second,directory,recipe,new InputHashMemo(second))).toBe(receipts[1]);
+  expect(matchingProductInputKey(first,directory,recipe,new InputHashMemo(first))).toBe(receipts[0]);
+  expect(matchingProductInputKey(second,directory,recipe,new InputHashMemo(second))).toBe(receipts[1]);
   writeFileSync(resolve(first,'asset.txt'),'third');
-  expect(matchingFolderInputKey(first,directory,recipe,new InputHashMemo(first))).toBeUndefined();
+  expect(matchingProductInputKey(first,directory,recipe,new InputHashMemo(first))).toBeUndefined();
 });
 it('keys compiler writes, refuses concurrent source edits and rejects incomplete traces', async () => {
   const root = fixture(), receipt = resolve(root,'receipt.json');
-  await expect(captureFolderInputs(root,receipt,() => {
+  await expect(captureProductInputs(root,receipt,() => {
     readFileSync(resolve(root,'asset.txt')); writeFileSync(resolve(root,'asset.txt'),'changed');
     recordBundle({output:[]}); return Promise.resolve();
   })).resolves.toBeUndefined(); // declared compiler writes are keyed by their resulting bytes
-  await expect(captureFolderInputs(root,receipt,() => {
+  await expect(captureProductInputs(root,receipt,() => {
     readFileSync(resolve(root,'asset.txt'));
     execFileSync(process.execPath,['-e', 'require("node:fs").writeFileSync(process.argv[1],"external")',resolve(root,'asset.txt')]);
     recordBundle({output:[]}); return Promise.resolve();
   })).rejects.toThrow('Product input changed during build');
-  await expect(captureFolderInputs(root,receipt,() => Promise.resolve())).rejects.toThrow('Incomplete');
+  await expect(captureProductInputs(root,receipt,() => Promise.resolve())).rejects.toThrow('Incomplete');
 });
 
 it('replay keeps an earlier observation and refuses a crossed product scope',async()=>{
   const root=fixture(),receipt=resolve(root,'compiler.json'),other=fixture(),source=resolve(root,'asset.txt');
-  await captureFolderInputs(root,receipt,()=>{readFileSync(source);recordBundle({output:[]});return Promise.resolve();});
-  await expect(captureFolderInputs(other,resolve(other,'product.json'),()=>{
-    replayFolderInputs(root,receipt);recordBundle({output:[]});return Promise.resolve();
+  await captureProductInputs(root,receipt,()=>{readFileSync(source);recordBundle({output:[]});return Promise.resolve();});
+  await expect(captureProductInputs(other,resolve(other,'product.json'),()=>{
+    replayProductInputs(root,receipt);recordBundle({output:[]});return Promise.resolve();
   })).rejects.toThrow('Invalid compiler input receipt');
-  await expect(captureFolderInputs(root,resolve(root,'product.json'),async()=>{
+  await expect(captureProductInputs(root,resolve(root,'product.json'),async()=>{
     readFileSync(source);
     execFileSync(process.execPath,['-e','require("node:fs").writeFileSync(process.argv[1],"changed")',source]);
-    await captureFolderInputs(root,receipt,()=>{readFileSync(source);recordBundle({output:[]});return Promise.resolve();});
-    replayFolderInputs(root,receipt);recordBundle({output:[]});
+    await captureProductInputs(root,receipt,()=>{readFileSync(source);recordBundle({output:[]});return Promise.resolve();});
+    replayProductInputs(root,receipt);recordBundle({output:[]});
   })).rejects.toThrow('Product input changed during build');
 });
 it('keys workspace installation while complete receipts own SDK and format source freshness', () => {
-  const root = fixture(), memo = new InputHashMemo(root), key = () => folderToolchainKey(root,memo), before = key();
+  const root = fixture(), memo = new InputHashMemo(root), key = () => productToolchainKey(root,memo), before = key();
   writeFileSync(resolve(root,'src/sharddev/unread.generated.ts'),'generated'); expect(key()).toBe(before);
   writeFileSync(resolve(root,'src/sharddev/compiler.ts'),'compiler'); expect(key()).toBe(before);
   writeFileSync(resolve(root,'src/format/schema.ts'),'schema'); expect(key()).toBe(before);
@@ -119,12 +119,12 @@ it('invalidates when a new native directory entry can take precedence', async ()
   mkdirSync(resolve(root,'module'));
   writeFileSync(resolve(root,'module/index.ts'),'export const value=1;');
   writeFileSync(resolve(root,'entry.ts'),"import {value} from './module'; export const answer=value;");
-  await captureFolderInputs(root,receipt,async()=>{
+  await captureProductInputs(root,receipt,async()=>{
     await build({root,configFile:false,publicDir:false,logLevel:'silent',build:{write:false,lib:{entry:resolve(root,'entry.ts'),formats:['es'],fileName:'fixture'}}});
   });
-  const before=folderInputKey(root,receipt,[],memo); expect(before).toMatch(/^[a-f0-9]{64}$/u);
+  const before=productInputKey(root,receipt,[],memo); expect(before).toMatch(/^[a-f0-9]{64}$/u);
   writeFileSync(resolve(root,'module/index.mts'),'export const value=2;');
-  expect(folderInputKey(root,receipt,[],memo)).not.toBe(before);
+  expect(productInputKey(root,receipt,[],memo)).not.toBe(before);
 });
 
 it('keeps package metadata as content when native resolution changes its main entry',async()=>{
@@ -132,43 +132,43 @@ it('keeps package metadata as content when native resolution changes its main en
   mkdirSync(resolve(root,'module'));writeFileSync(packageFile,JSON.stringify({main:'a.js'}));
   writeFileSync(resolve(root,'module/a.js'),'export const value=1;');writeFileSync(resolve(root,'module/b.js'),'export const value=2;');
   writeFileSync(resolve(root,'entry.ts'),"import {value} from './module';export const answer=value;");
-  await captureFolderInputs(root,receipt,async()=>{
+  await captureProductInputs(root,receipt,async()=>{
     const result=await build({root,configFile:false,publicDir:false,logLevel:'silent',build:{write:false,lib:{entry:resolve(root,'entry.ts'),formats:['es'],fileName:'fixture'}}});
     const output=Array.isArray(result)?result.at(0):result;
     if(output===undefined||!('output'in output))throw new Error('Missing native fixture output');
     const chunk=output.output.find(row=>row.type==='chunk');if(chunk===undefined)throw new Error('Missing native fixture chunk');
     const value=v.parse(v.object({answer:v.number()}),await import(`data:text/javascript,${encodeURIComponent(chunk.code)}`));expect(value.answer).toBe(1);
   });
-  const memo=new InputHashMemo(root);expect(folderInputKey(root,receipt,[],memo)).toMatch(/^[a-f0-9]{64}$/u);
-  writeFileSync(packageFile,JSON.stringify({main:'b.js'}));expect(folderInputKey(root,receipt,[],memo)).toBeUndefined();
+  const memo=new InputHashMemo(root);expect(productInputKey(root,receipt,[],memo)).toMatch(/^[a-f0-9]{64}$/u);
+  writeFileSync(packageFile,JSON.stringify({main:'b.js'}));expect(productInputKey(root,receipt,[],memo)).toBeUndefined();
 });
 
 it('rechecks absent descendants after a file parent becomes a directory', async () => {
   const root=fixture(), receipt=resolve(root,'receipt.json'), memo=new InputHashMemo(root);
-  await captureFolderInputs(root,receipt,()=>{
+  await captureProductInputs(root,receipt,()=>{
     existsSync(resolve(root,'asset.txt/child.ts'));recordBundle({output:[]});return Promise.resolve();
   });
-  const before=folderInputKey(root,receipt,[],memo);expect(before).toMatch(/^[a-f0-9]{64}$/u);
+  const before=productInputKey(root,receipt,[],memo);expect(before).toMatch(/^[a-f0-9]{64}$/u);
   rmSync(resolve(root,'asset.txt'));mkdirSync(resolve(root,'asset.txt'));
   writeFileSync(resolve(root,'asset.txt/child.ts'),'new input');
-  expect(folderInputKey(root,receipt,[],memo)).toBeUndefined();
+  expect(productInputKey(root,receipt,[],memo)).toBeUndefined();
 });
 
 it('keys existence probes without treating them as source-content reads',async()=>{
   const root=fixture(),receipt=resolve(root,'receipt.json'),source=resolve(root,'entry.ts');
-  await captureFolderInputs(root,receipt,()=>{existsSync(source);recordBundle({output:[]});return Promise.resolve();});
-  const memo=new InputHashMemo(root),key=()=>folderInputKey(root,receipt,[],memo),before=key();expect(before).toMatch(/^[a-f0-9]{64}$/u);
+  await captureProductInputs(root,receipt,()=>{existsSync(source);recordBundle({output:[]});return Promise.resolve();});
+  const memo=new InputHashMemo(root),key=()=>productInputKey(root,receipt,[],memo),before=key();expect(before).toMatch(/^[a-f0-9]{64}$/u);
   writeFileSync(source,'// changed source, same existence');expect(key()).toBe(before);
   rmSync(source);expect(key()).toBeUndefined();
 });
 
 it('separates unselected resolution candidates from loaded source bytes',async()=>{
   const root=fixture(),receipt=resolve(root,'receipt.json'),candidate=resolve(root,'src/engine/used.ts');
-  await captureFolderInputs(root,receipt,()=>{
+  await captureProductInputs(root,receipt,()=>{
     recordResolution('./src/engine/used',resolve(root,'entry.ts'));
     recordModuleInput(resolve(root,'entry.ts'));recordBundle({output:[]});return Promise.resolve();
   });
-  const memo=new InputHashMemo(root),key=()=>folderInputKey(root,receipt,[],memo),before=key();expect(before).toMatch(/^[a-f0-9]{64}$/u);
+  const memo=new InputHashMemo(root),key=()=>productInputKey(root,receipt,[],memo),before=key();expect(before).toMatch(/^[a-f0-9]{64}$/u);
   writeFileSync(candidate,'// unused candidate changed');expect(key()).toBe(before);
   writeFileSync(resolve(root,'src/engine/used.js'),'export const value=2;');expect(key()).toBeUndefined();
   rmSync(resolve(root,'src/engine/used.js'));expect(key()).toBe(before);
@@ -180,15 +180,15 @@ it.each(['execution','source','function-text'])('keeps %s compiler dependencies 
   const initial='/** initial documentation */\nexport function compile(){return 1;}\n';
   writeFileSync(compiler,initial);
   const script=`import fs from 'node:fs';import {pathToFileURL}from'node:url';
-    const {installInputRecorder,captureFolderInputs,recordBundle}=await import(process.argv[3]);
+    const {installInputRecorder,captureProductInputs,recordBundle}=await import(process.argv[3]);
     installInputRecorder();const compiler=await import(pathToFileURL(process.argv[1]).href);
-    await captureFolderInputs(process.argv[4],process.argv[2],()=>{
+    await captureProductInputs(process.argv[4],process.argv[2],()=>{
       compiler.compile();
       ${mode==='source'?"fs.readFileSync(process.argv[1]);":mode==='function-text'?"compiler.compile.toString();":''}
       recordBundle({output:[]});return Promise.resolve();
     });`;
   execFileSync(process.execPath,['--input-type=module','-e',script,compiler,receipt,resolve('scripts/shardfile-inputs.mjs'),root],{encoding:'utf8'});
-  const memo=new InputHashMemo(root),key=()=>folderInputKey(root,receipt,[],memo),before=key();
+  const memo=new InputHashMemo(root),key=()=>productInputKey(root,receipt,[],memo),before=key();
   expect(before).toMatch(/^[a-f0-9]{64}$/u);
   writeFileSync(compiler,initial.replace('initial documentation','additional compiler documentation'));
   if(mode==='execution')expect(key()).toBe(before);else expect(key()).toBeUndefined();
@@ -198,11 +198,11 @@ it.each(['execution','source','function-text'])('keeps %s compiler dependencies 
 it.each([true,false])('keeps native compiler execution %s separate from raw runtime bytes',async execution=>{
   const root=fixture(),receipt=resolve(root,'receipt.json'),compiler=resolve(root,'src/sharddev/compiler.ts');
   const before='/** compiler docs */ export const compile=()=>1;';writeFileSync(compiler,before);
-  await captureFolderInputs(root,receipt,async()=>{
+  await captureProductInputs(root,receipt,async()=>{
     const result=await buildCompiler({root,configFile:false,publicDir:false,logLevel:'silent',plugins:[inputRecorderPlugin({execution})],build:{write:false,minify:false,lib:{entry:compiler,formats:['es'],fileName:'compiler'}}});
     recordBundle(result,{execution});
   });
-  const memo=new InputHashMemo(root),key=()=>folderInputKey(root,receipt,[],memo),initial=key();expect(initial).toMatch(/^[a-f0-9]{64}$/u);
+  const memo=new InputHashMemo(root),key=()=>productInputKey(root,receipt,[],memo),initial=key();expect(initial).toMatch(/^[a-f0-9]{64}$/u);
   writeFileSync(compiler,before.replace('compiler docs','changed compiler docs'));
   if(execution)expect(key()).toBe(initial);else expect(key()).toBeUndefined();
   writeFileSync(compiler,before.replace('()=>1','()=>2'));expect(key()).toBeUndefined();
@@ -210,10 +210,10 @@ it.each([true,false])('keeps native compiler execution %s separate from raw runt
 it.each([false,true])('keys an explicitly executed author declaration separately from runtime source: %s',async execution=>{
   const root=fixture(),receipt=resolve(root,'receipt.json'),compiler=resolve(root,'src/sharddev/compiler.ts');
   const source='/** declaration documentation */ export const value=1;';writeFileSync(compiler,source);
-  await captureFolderInputs(root,receipt,async()=>{
+  await captureProductInputs(root,receipt,async()=>{
     await build({root,configFile:false,publicDir:false,logLevel:'silent',plugins:execution?[{name:'wildshard-author-execution',api:{wildshardInputIdentity:'execution'}}]:[],build:{write:false,minify:false,lib:{entry:compiler,formats:['es'],fileName:'config'}}});
   });
-  const memo=new InputHashMemo(root),key=()=>folderInputKey(root,receipt,[],memo),initial=key();expect(initial).toMatch(/^[a-f0-9]{64}$/u);
+  const memo=new InputHashMemo(root),key=()=>productInputKey(root,receipt,[],memo),initial=key();expect(initial).toMatch(/^[a-f0-9]{64}$/u);
   writeFileSync(compiler,source.replace('declaration documentation','revised declaration documentation'));
   if(execution)expect(key()).toBe(initial);else expect(key()).toBeUndefined();
   writeFileSync(compiler,source.replace('value=1','value=2'));expect(key()).toBeUndefined();
@@ -222,13 +222,13 @@ it.each([false,true])('guards function text after the native bundle execution bo
   const root=fixture(),receipt=resolve(root,'receipt.json'),compiler=resolve(root,'src/sharddev/compiler.ts');
   const source='/** first docs */ export const compile=()=>1;';writeFileSync(compiler,source);
   const bundled=v.parse(v.object({compile:v.function()}),await import(`data:text/javascript,${encodeURIComponent(source)}`));
-  await captureFolderInputs(root,receipt,()=>{
+  await captureProductInputs(root,receipt,()=>{
     recordModuleInput(compiler,{execution:true});
     if(executed)recordBundle({output:[{type:'chunk',moduleIds:[compiler]}]},{execution:true});
     const callback=executed?bundled.compile:()=>1;callback.toString();
     recordBundle({output:[]});return Promise.resolve();
   });
-  const memo=new InputHashMemo(root),key=()=>folderInputKey(root,receipt,[],memo),initial=key();expect(initial).toMatch(/^[a-f0-9]{64}$/u);
+  const memo=new InputHashMemo(root),key=()=>productInputKey(root,receipt,[],memo),initial=key();expect(initial).toMatch(/^[a-f0-9]{64}$/u);
   writeFileSync(compiler,source.replace('first docs','changed docs'));
   if(executed)expect(key()).toBeUndefined();else expect(key()).toBe(initial);
 });
@@ -237,20 +237,20 @@ it('injected input inventory receipts observe nested additions and removals with
   const root = fixture(), receipt = resolve(root, 'inventory-receipt.json'), assets = resolve(root, 'assets');
   mkdirSync(resolve(assets, 'nested')); writeFileSync(resolve(assets, 'one.webp'), 'original');
   writeFileSync(resolve(assets, 'nested/two.webp'), 'two');
-  await captureFolderInputs(root, receipt, () => {
+  await captureProductInputs(root, receipt, () => {
     const ctx = createProjectGeneration(root, 'c'.repeat(64), new Map(), resolve(root, '.cache'), [{ prefix: '/assets/', directory: assets }]);
     const list = ctx.inputFiles; if (list === undefined) throw new Error('Current SDK must supply inputFiles');
     expect(list(['/assets/'])).toEqual(['/assets/nested/two.webp', '/assets/one.webp']);
     recordBundle({ output: [] }); return Promise.resolve();
   });
-  const memo = new InputHashMemo(root), key = folderInputKey(root, receipt, [], memo);
+  const memo = new InputHashMemo(root), key = productInputKey(root, receipt, [], memo);
   expect(key).toMatch(/^[a-f0-9]{64}$/u);
   writeFileSync(resolve(assets, 'one.webp'), 'changed payload size and content');
-  expect(folderInputKey(root, receipt, [], memo)).toBe(key);
+  expect(productInputKey(root, receipt, [], memo)).toBe(key);
   writeFileSync(resolve(assets, 'nested/new.webp'), 'new');
-  expect(folderInputKey(root, receipt, [], memo)).toBeUndefined();
+  expect(productInputKey(root, receipt, [], memo)).toBeUndefined();
   rmSync(resolve(assets, 'nested/new.webp'));
-  expect(folderInputKey(root, receipt, [], memo)).toBe(key);
+  expect(productInputKey(root, receipt, [], memo)).toBe(key);
   rmSync(resolve(assets, 'one.webp'));
-  expect(folderInputKey(root, receipt, [], memo)).toBeUndefined();
+  expect(productInputKey(root, receipt, [], memo)).toBeUndefined();
 });

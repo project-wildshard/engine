@@ -1,11 +1,11 @@
-import { builtFolder } from '../fixtures/builtFolder';
+import { builtProduct } from '../fixtures/builtProduct';
 import { beforeAll, expect, test } from 'vitest';
 import { scenario } from '../../src/sharddev/test/scriptScenario';
 
 let directory: string;
-beforeAll(() => { directory = builtFolder('sunscar-dunes'); });
+beforeAll(() => { directory = builtProduct('sunscar-dunes'); });
 test('the published Matriarch guest flies, grounds and restores without replaying effects', async () => {
-  const create = () => scenario('sunscar-dunes', 'sunscar.matriarch.decision', { folderDirectory: directory, seed: 6511,
+  const create = () => scenario('sunscar-dunes', 'sunscar.matriarch.decision', { productDirectory: directory, seed: 6511,
     actors: [{ id: 'matriarch', at: [-14, 18, -150] }], players: [{ id: 101, at: [-14, 0, -130] }],
   });
   const boss = await create(); boss.send('start');
@@ -34,7 +34,7 @@ test('the published Matriarch guest flies, grounds and restores without replayin
 test('a retried fight in the storm starts circling at its kept phase', async () => {
   // A retry restores the guest's start state while the encounter keeps its phase: the phase arrives as a threshold
   // before the fight restarts, and the restarted fight must fly (it hung on its last idle steering and left the map).
-  const boss = await scenario('sunscar-dunes', 'sunscar.matriarch.decision', { folderDirectory: directory, seed: 6511,
+  const boss = await scenario('sunscar-dunes', 'sunscar.matriarch.decision', { productDirectory: directory, seed: 6511,
     actors: [{ id: 'matriarch', at: [-14, 18, -150] }], players: [{ id: 101, at: [-14, 0, -130] }] });
   boss.send('threshold', 'matriarch', 1); expect(boss.commands()).toEqual([]); expect(boss.state()).toEqual({ step: 10 });
   boss.send('start');

@@ -3,20 +3,20 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 // oxlint-disable-next-line import/no-nodejs-modules -- Keep fixture paths inside repository scratch.
 import { dirname, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { emitProgramTables, generationPlan, programDiscoveryFolders, programInputPlan } from '../scripts/gen-programs.mjs';
-import { captureFolderInputs, folderInputKey, folderToolchainKey, publishFolderInputs, recordBundle } from '../scripts/shardfile-inputs.mjs';
-import { folderRecipe } from '../scripts/built-folder.mjs';
+import { emitProgramTables, generationPlan, programDiscoveryProducts, programInputPlan } from '../scripts/gen-programs.mjs';
+import { captureProductInputs, productInputKey, productToolchainKey, publishProductInputs, recordBundle } from '../scripts/shardfile-inputs.mjs';
+import { productRecipe } from '../scripts/built-product.mjs';
 import { InputHashMemo } from '../scripts/bake-input-hashes.mjs';
 import { shardfileValidationRevision } from '../scripts/shardfile-validation-revision.mjs';
 import { readProgramDiscovery, usesProgramDiscovery } from '../scripts/program-discovery.mjs';
 import { authoredManifestSource } from '../scripts/authored-manifest.mjs';
 import { emptyShardfile } from '../src/shared/host/author';
-import { writeOutputFolder } from '../src/sharddev/outputFolder';
+import { writeOutputProduct } from '../src/sharddev/outputProduct';
 import { readProjectAssets } from '../src/sharddev/project';
 
 const owned: string[] = [];
 afterEach(() => { for (const root of owned.splice(0)) rmSync(root, { recursive: true, force: true }); });
-function fixture(actualFolder = false) {
+function fixture(actualProduct = false) {
   mkdirSync('tmp', { recursive: true }); const root = mkdtempSync(resolve('tmp/discovery-bootstrap-')); owned.push(root);
   const cacheRoot = resolve(root, 'cache'), options = { cacheRoot, env: {} };
   const put = (file: string, text: string): void => { const path = resolve(root, file); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text); };
@@ -25,27 +25,27 @@ function fixture(actualFolder = false) {
   const manifest = { slug: 'alpha', card: {}, sky: {}, minimap: {}, explore: {}, horizonStrips: [], bindings: { accent: '#123456', budgets: { program: true } } };
   put('src/shards/alpha/manifest.json', JSON.stringify(manifest));
   const source = emptyShardfile({ slug: 'alpha', name: 'Alpha', author: 'Test', revision: 1, seed: 1 });
-  put('src/shards/alpha/shard.config.ts', actualFolder
+  put('src/shards/alpha/shard.config.ts', actualProduct
     ? `export function generate() { return {shard:${JSON.stringify(source)},output:{},discovery:{budgets:{}}}; } export default generate;`
     : 'export async function generate() {}');
   put('src/shards/beta/shard.config.ts', 'export default {};');
   put('src/shards/beta/manifest.json', '{}');
   const build = async (): Promise<number> => {
     const memo = new InputHashMemo(root);
-    const toolchain = `${folderToolchainKey(root, memo)}:${shardfileValidationRevision(root)}`;
-    const { recipe, receipts } = folderRecipe(root, 'alpha', ['--copy-runtime'], toolchain, cacheRoot);
+    const toolchain = `${productToolchainKey(root, memo)}:${shardfileValidationRevision(root)}`;
+    const { recipe, receipts } = productRecipe(root, 'alpha', ['--copy-runtime'], toolchain, cacheRoot);
     const receipt = resolve(root, 'receipt.json');
-    await captureFolderInputs(root, receipt, async () => {
+    await captureProductInputs(root, receipt, async () => {
       readFileSync(resolve(root, 'src/shards/alpha/shard.config.ts'));
       readFileSync(resolve(root, 'src/shards/alpha/manifest.json'));
       recordBundle({ output: [] }); await Promise.resolve();
     });
-    const key = folderInputKey(root, receipt, recipe, memo); if (key === undefined) throw new Error('Missing complete input receipt');
+    const key = productInputKey(root, receipt, recipe, memo); if (key === undefined) throw new Error('Missing complete input receipt');
     const output = resolve(root, 'out/alpha');
     rmSync(output, { recursive: true, force: true });
-    const built = actualFolder ? await readProjectAssets(resolve(root, 'src/shards/alpha')) : undefined;
-    writeOutputFolder(built?.shard ?? source, built?.assets ?? new Map(), output, built?.output ?? { discovery: { budgets: {} } });
-    put('out/alpha/.build-key', key); publishFolderInputs(receipts, receipt, key);
+    const built = actualProduct ? await readProjectAssets(resolve(root, 'src/shards/alpha')) : undefined;
+    writeOutputProduct(built?.shard ?? source, built?.assets ?? new Map(), output, built?.output ?? { discovery: { budgets: {} } });
+    put('out/alpha/.build-key', key); publishProductInputs(receipts, receipt, key);
     return 1;
   };
   const writeTables = async (): Promise<void> => {
@@ -113,7 +113,7 @@ test('ordinary manifests keep their original inputs-only and normal ordering', a
 test('composed output markers are discovered without executing source or accepting executable slots', () => {
   const f = fixture();
   f.put('src/shards/beta/outputs.json', JSON.stringify({ outputs: [{ slug: 'beta-one', manifest: { bindings: { boot: { files: { program: true } } } } }, { slug: 'beta-two' }] }));
-  expect(programDiscoveryFolders(f.root)).toEqual(['alpha', 'beta-one']);
+  expect(programDiscoveryProducts(f.root)).toEqual(['alpha', 'beta-one']);
   expect(usesProgramDiscovery({ bindings: { entry: { program: true }, load: { program: true } } })).toBe(false);
 });
 

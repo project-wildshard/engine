@@ -5,7 +5,7 @@ import {validateDefinedJson} from '../src/sharddev/sections';
 import {encodeCanonicalJson} from '../src/shared/host/immutable';
 import {registeredJsonSchema} from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema, validateNamedJsonSchemaPaced } from '../src/shared/game/shardfile/customSchema';
-import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { emptyShardfile } from '@wildshard/engine/host/author';
 
 const jsonSchema = { $schema: 'http://json-schema.org/draft-07/schema#', type: 'array', maxItems: 20000,
@@ -57,7 +57,7 @@ test('each inline schema keeps the existing independent plain-JSON cap', () => {
 test("a first-party build's named JSON parses without its schema; an external product's validates", async () => {
   const schema=registeredJsonSchema('models/shape-book.json'),good=[{slot:'shape',channels:[],file:'shape.glb'}],bad=[{slot:'shape'}];
   const identity = { slug: 'named-built', name: 'Named built', author: 'Wildshard', revision: 1, seed: 1 };
-  const product = (value: unknown, builtJson: boolean) => createShardFolder({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity),
+  const product = (value: unknown, builtJson: boolean) => createShardProduct({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity),
     sections: new Map(), files: new Map([['models/shape-book.json', { hash: 'a'.repeat(64), url: 'https://example.test/rows', jsonSchema: schema }]]),
     read: () => Promise.resolve(encode(value)), builtJson });
   // the build refuses malformed rows before they reach a product
@@ -66,7 +66,7 @@ test("a first-party build's named JSON parses without its schema; an external pr
   expect(await product(good, false).json('models/shape-book.json')).toEqual(good);
   await expect(product(bad, false).json('models/shape-book.json')).rejects.toThrow('refuses its schema');
   // a built read still refuses bytes that are not canonical JSON
-  await expect(createShardFolder({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity), sections: new Map(),
+  await expect(createShardProduct({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity), sections: new Map(),
     files: new Map([['models/shape-book.json', { hash: 'a'.repeat(64), url: 'https://example.test/rows', jsonSchema: schema }]]),
     read: () => Promise.resolve(new TextEncoder().encode('[[-0]]')), builtJson: true }).json('models/shape-book.json')).rejects.toThrow('canonical numbers');
 });

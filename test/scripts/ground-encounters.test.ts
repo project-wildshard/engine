@@ -1,16 +1,16 @@
 import { beforeAll, expect, test } from 'vitest';
-import { builtFolder } from '../fixtures/builtFolder';
+import { builtProduct } from '../fixtures/builtProduct';
 import { scenario, type DiskScriptScenario } from '../../src/sharddev/test/scriptScenario';
-import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
+import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
 
 const directories = new Map<string, string>();
-beforeAll(() => { for (const slug of ['driftwood-isle', 'pine-hollow']) directories.set(slug, builtFolder(slug)); });
+beforeAll(() => { for (const slug of ['driftwood-isle', 'pine-hollow']) directories.set(slug, builtProduct(slug)); });
 
 async function encounter(slug: string, actorName: string, at: readonly [number, number, number], player: readonly [number, number, number]) {
   const directory = directories.get(slug); if (directory === undefined) throw new Error('Missing selected scenario product');
-  const product = await loadHeadlessFolder(directory);
+  const product = await loadHeadlessProduct(directory);
   const made = await scenario(slug, `${slug === 'pine-hollow' ? 'pine.king' : 'driftwood.captain'}.decision`, {
-    folderDirectory: directory, seed: 6218, actors: [{ id: actorName, at }], players: [{ id: 101, at: player }],
+    productDirectory: directory, seed: 6218, actors: [{ id: actorName, at }], players: [{ id: 101, at: player }],
   });
   const fields = new Map(product.shardfile.state.shared.map(row => [row.name, row.id]));
   const body = (owner: DiskScriptScenario) => {

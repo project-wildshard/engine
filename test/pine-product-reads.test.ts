@@ -1,7 +1,7 @@
 import { parsePageLife } from '@wildshard/format/pageLife';
 import { parseCoverAppearance } from '@wildshard/format/coverAppearance';
 import { HeldEquipmentSchema } from '@wildshard/format/heldEquipment';
-import { outputPlatformPayloads } from '../src/sharddev/outputFolder';
+import { outputPlatformPayloads } from '../src/sharddev/outputProduct';
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { readPineProject } from './fixtures/pine-project';

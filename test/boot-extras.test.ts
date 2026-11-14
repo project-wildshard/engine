@@ -9,7 +9,7 @@ import { resolve, dirname } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Give the fixture its actual admitted hashes.
 import { createHash } from 'node:crypto';
 import { sceneSourceUrls, homeExtraFiles } from '../scripts/app-build/bootExtras';
-import { homeClientModuleGroups, folderDownloadTotal } from '../scripts/app-build/bootFolders';
+import { homeClientModuleGroups, productDownloadTotal } from '../scripts/app-build/bootProducts';
 
 test('lists exactly the model reader preloads, deduplicating URLs and excluding unused mappings/specimen metadata', () => {
   expect(sceneSourceUrls('models', { rows: {
@@ -112,7 +112,7 @@ test('a real emitted image and admitted source produce only the selected home ba
       expect(banked).not.toContainEqual(['/assets/pickup.bin', 17]);
     } finally { writeFileSync(cataloguePath, originalCatalogue); }
     const withoutRig = { ...index, files: index.files.filter(file => file.hash !== rigHash) };
-    expect(folderDownloadTotal(index, 100)[1] - folderDownloadTotal(withoutRig, 100)[1]).toBe(rig.length);
+    expect(productDownloadTotal(index, 100)[1] - productDownloadTotal(withoutRig, 100)[1]).toBe(rig.length);
     writeFileSync(resolve(root, 'out/home/shard.json'), JSON.stringify(withoutRig));
     expect(() => homeExtraFiles(root, 'home')).toThrow('Unsafe boot source URL');
     writeFileSync(resolve(root, 'out/home/shard.json'), JSON.stringify(index));

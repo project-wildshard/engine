@@ -48,7 +48,7 @@ export interface GridPrefetchStatus {
    * storage, a newer deployment; `error`: the run itself failed (one product's failure only skips that product) */
   readonly phase: 'running' | 'done' | 'quota' | 'stopped' | 'error';
   readonly reason: string | null;
-  readonly products: number; readonly foldersRead: number;
+  readonly shardfiles: number; readonly shardfilesRead: number;
   /** distinct files (by hash) and their wire bytes known from the product indexes read so far */
   readonly knownFiles: number; readonly knownBytes: number;
   /** of those, already on disk before this run looked, and stored by this run */
@@ -111,13 +111,13 @@ class GridPrefetch {
    * This does not widen the phone ring or the device's admitted file tier. */
   title = false;
   private status: Omit<{ -readonly [K in keyof GridPrefetchStatus]: GridPrefetchStatus[K] }, 'inFlightBytes' | 'peakInFlightBytes' | 'limitInFlightBytes'> = { phase: 'running', reason: null,
-    products: 0, foldersRead: 0, knownFiles: 0, knownBytes: 0, presentFiles: 0, presentBytes: 0, storedFiles: 0, storedBytes: 0 };
+    shardfiles: 0, shardfilesRead: 0, knownFiles: 0, knownBytes: 0, presentFiles: 0, presentBytes: 0, storedFiles: 0, storedBytes: 0 };
   /** Queue these slugs ahead of the rest (already read ones are skipped); start the run if it is not running. */
   prioritize(slugs: readonly string[], ring: readonly string[]): void {
     for (const id of ring) this.ring.add(id);
     const fresh = slugs.filter(id => !this.known.has(id) || this.queue.includes(id));
     for (const id of fresh) { const at = this.queue.indexOf(id); if (at !== -1) this.queue.splice(at, 1); this.known.add(id); }
-    this.queue.unshift(...fresh); this.status.products = this.known.size;
+    this.queue.unshift(...fresh); this.status.shardfiles = this.known.size;
   }
   snapshot(): GridPrefetchStatus { return { ...this.status, inFlightBytes: this.memory.usedBytes,
     peakInFlightBytes: this.memory.peakBytes, limitInFlightBytes: this.memory.limit }; }
@@ -143,7 +143,7 @@ class GridPrefetch {
             console.warn(`[grid prefetch] ${next} skipped`, error);
           }
         } // an ordinary grid run still skips only the failed product
-        this.status.foldersRead++;
+        this.status.shardfilesRead++;
       }
       if (this.status.reason === null) this.status.phase = 'done';
     } finally {
@@ -167,7 +167,7 @@ class GridPrefetch {
     const address = (hash: string): string => { const path = urls.get(hash); if (path === undefined) throw new Error('Undeclared prefetch file'); return path; };
     const holds: PrefetchCache['holds'] = hash => hasCachedAsset(caches, address(hash));
     const keepAsset: PrefetchCache['keepAsset'] = (hash, body) => cacheAsset(caches, address(hash), body);
-    // a commons blob or a shared section is listed by several products: count and store it once
+    // a commons blob or a shared section is listed by several shard files: count and store it once
     const rows = listed.filter(row => { if (this.hashes.has(row.hash)) return false; this.hashes.add(row.hash); return true; });
     this.status.knownFiles += rows.length; this.status.knownBytes += rows.reduce((sum, row) => sum + row.bytes, 0);
     // I5: members of a pack come from one read of the pack; only the rest are read one by one
@@ -282,7 +282,7 @@ export function startTitlePrefetch(target: string, flow: 'client' | 'grid' = 'cl
   return {stop: () => {stopTap(); held.stop();}, snapshot: () => {
     const row = held.download.snapshot();
     return {phase: row.error !== null ? 'error' : row.complete ? 'done' : 'running', reason: row.error,
-      products: 1, foldersRead: row.complete ? 1 : 0, knownFiles: row.filesTotal, knownBytes: row.totalBytes,
+      shardfiles: 1, shardfilesRead: row.complete ? 1 : 0, knownFiles: row.filesTotal, knownBytes: row.totalBytes,
       presentFiles: row.complete && row.cachedBytes === row.totalBytes ? row.filesDone : 0, presentBytes: row.cachedBytes,
       storedFiles: row.filesDone, storedBytes: row.completedBytes - row.cachedBytes,
       inFlightBytes: row.totalBytes - row.completedBytes, peakInFlightBytes: 0, limitInFlightBytes: 0};

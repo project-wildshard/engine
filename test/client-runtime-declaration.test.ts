@@ -11,7 +11,7 @@ import { runtimeAccountedBytes } from '@wildshard/format/runtimeCost';
 import { parseManifestMetadata } from '@wildshard/format/minimap';
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { emptyShardfile } from '../src/shared/host/author';
-import { writeOutputFolder, validateOutputFolder } from '../src/sharddev/outputFolder';
+import { writeOutputProduct, validateOutputProduct } from '../src/sharddev/outputProduct';
 import { writeRuntimeFiles } from '../src/sharddev/outputRuntime';
 import { formatJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { authoredManifestSource } from '../scripts/authored-manifest.mjs';
@@ -48,7 +48,7 @@ test('built-in manifest policy emits only the platform constructor and keeps CSS
 
 test('compiled output refuses real runtime code and ships no declaration stubs', () => {
   mkdirSync(resolve('tmp'),{recursive:true}); const root=mkdtempSync(resolve('tmp/client-runtime-')),project=join(root,'project'),output=join(root,'output');
-  mkdirSync(join(project,'runtime'),{recursive:true});writeFileSync(join(project,'runtime','folderSections.generated.d.ts'),'export interface Generated { readonly id: string }');
+  mkdirSync(join(project,'runtime'),{recursive:true});writeFileSync(join(project,'runtime','productSections.generated.d.ts'),'export interface Generated { readonly id: string }');
   try {
     expect(writeRuntimeFiles(project,output)).toEqual({files:[],lines:0});
     writeFileSync(join(project,'runtime','hidden.ts'),'export const value = 3;');
@@ -62,7 +62,7 @@ test('actual output transport preserves compiled cost and binds while refusing a
   const source=emptyShardfile({slug:'compiled-product',name:'Compiled product',author:'Fixture',revision:1,seed:7});
   source.runtime={kind:'client-plan',cost,binds:['terrain','props','movers']};
   try{
-    const index=writeOutputFolder(source,new Map(),root),actual=validateOutputFolder(root);
+    const index=writeOutputProduct(source,new Map(),root),actual=validateOutputProduct(root);
     expect(actual.shard.runtime).toEqual(source.runtime);expect(index.runtime).toEqual({...source.runtime,trust:'first-party',files:[],lines:0});
     expect(()=>parseOutputIndex({...index,runtime:{...index.runtime,entry:'runtime/index.ts'}})).toThrow();
     expect(()=>parseOutputIndex({...index,runtime:{...index.runtime,lines:1}})).toThrow();

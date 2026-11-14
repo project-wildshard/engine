@@ -30,11 +30,11 @@ test('Template author modules and temporary discovery have zero P0 and sim viola
   expect(checkShards(root, new Set(['_template']))).toEqual([]);
   const template = resolve(root, 'src/shards/_template');
   expect(mapSettingsPath(template)).toBe(resolve(template, 'data/map.json'));
-  expect(mapStampPath(template)).toBe(resolve(template, 'data/folderMap.json'));
+  expect(mapStampPath(template)).toBe(resolve(template, 'data/productMap.json'));
   expect(mapSettings(template).style?.kind).toBe('ground');
   const farReach = resolve(root, 'src/shards/far-reach');
   expect(mapSettingsPath(farReach)).toBe(resolve(farReach, 'data/map.json'));
-  expect(mapStampPath(farReach)).toBe(resolve(farReach, 'data/folderMap.json'));
+  expect(mapStampPath(farReach)).toBe(resolve(farReach, 'data/productMap.json'));
 });
 
 test('legacy map layout remains the fallback until a source map exists', () => {
@@ -48,7 +48,7 @@ test('legacy map layout remains the fallback until a source map exists', () => {
     mkdirSync(resolve(fixture, 'data'));
     writeFileSync(resolve(fixture, 'data/map.json'), JSON.stringify({ why: 'Source fixture', inputs: ['source'] }));
     expect(mapSettingsPath(fixture)).toBe(resolve(fixture, 'data/map.json'));
-    expect(mapStampPath(fixture)).toBe(resolve(fixture, 'data/folderMap.json'));
+    expect(mapStampPath(fixture)).toBe(resolve(fixture, 'data/productMap.json'));
     expect(mapSettings(fixture).inputs).toEqual(['source']);
   } finally {
     rmSync(fixture, { recursive: true, force: true });

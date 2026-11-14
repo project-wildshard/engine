@@ -8,7 +8,7 @@ import {expect,test} from 'vitest';
 import {SceneFloorSchema} from '@wildshard/format/sceneDressing';
 import {readSceneFloors} from '../src/client/game/shardfile/sceneDressing';
 import {prepareBinarySources} from '../src/client/game/models/binarySource';
-import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
+import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
 import {emptyShardfile} from '../src/shared/host/author';
 import {Scope} from '../src/shared/engine/app/scope';
 
@@ -19,7 +19,7 @@ const fields=source.places.rows.flatMap(row=>row.members.flatMap(([,member])=>me
 test('the two named floor rasters read their exact blocks, NaN words included',async()=>{
   const scope=new Scope('floor.binary.receipt'),blocks=new Map([0,1].map(index=>[`world/floors/${String(index)}.bin`,Uint8Array.from(readFileSync(`test/fixtures/nalati-floor-original-${String(index)}.bin`))] as const));
   const hashes=new Map([...blocks].map(([name,bytes])=>[name,createHash('sha256').update(bytes).digest('hex')]));
-  const product=createShardFolder({slug:'floor-place',revision:1,shardfile:emptyShardfile({slug:'floor-place',name:'Floor',author:'Test',revision:1,seed:1}),sections:new Map(),
+  const product=createShardProduct({slug:'floor-place',revision:1,shardfile:emptyShardfile({slug:'floor-place',name:'Floor',author:'Test',revision:1,seed:1}),sections:new Map(),
     files:new Map([...hashes].map(([name,hash])=>[name,{hash,url:name}])),read:hash=>{const entry=[...hashes].find(([,value])=>value===hash),bytes=entry===undefined?undefined:blocks.get(entry[0]);if(bytes===undefined)throw new Error('Missing original floor');return Promise.resolve(bytes);}});
   const files=await prepareBinarySources(product,fields.map(field=>({source:{file:field.file},bytes:field.res*field.res*4})),scope);
   try{

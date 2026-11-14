@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { expect, test, vi } from 'vitest';
-import {fixtureFolderFile,fixtureJsonCheck} from './fixtures/folderFile';
+import {fixtureProductFile,fixtureJsonCheck} from './fixtures/productFile';
 import * as v from 'valibot';
 import { Group, Scene, Mesh, MeshBasicMaterial, BufferGeometry } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
@@ -12,7 +12,7 @@ import { CLIENT_FEATURES } from '../src/client/game/shardfile/clientPlan';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { WorldAssemblySchema } from '@wildshard/format/worldAssembly';
 import { publishEntryOwner, entryOwner, lendEntryOwner } from '../src/shared/game/shardfile/entryOwners';
-import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { emptyShardfile } from '../src/shared/host/author';
 import { ClientChannels } from '../src/sharddev/clientChannels';
 import { parseClientChannels } from '@wildshard/format/clientChannels';
@@ -33,8 +33,8 @@ function fixture(parent?: Scope) {
   let settle: (value: unknown) => void = () => { throw new Error('Missing read resolver'); };
   const result = new Promise<unknown>(resolve => { settle = resolve; });
   const source = emptyShardfile({ slug: 'weather-fixture', name: 'Weather fixture', author: 'Fixture', revision: 1, seed: 1 });
-  const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(),
-    files: new Map([[row.file, fixtureFolderFile(row.file, { hash: 'weather', url: 'weather' })]]), jsonCheck: fixtureJsonCheck, read: async () => { trace.push('read weather'); return new TextEncoder().encode(JSON.stringify(await result)); } });
+  const product = createShardProduct({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(),
+    files: new Map([[row.file, fixtureProductFile(row.file, { hash: 'weather', url: 'weather' })]]), jsonCheck: fixtureJsonCheck, read: async () => { trace.push('read weather'); return new TextEncoder().encode(JSON.stringify(await result)); } });
   const ctx = legacyDouble<ShardContext>({ scope, product, game: legacyDouble<ShardContext['game']>({ runtime }) });
   return { scope, ctx, runtime, world, product, trace, settle };
 }
@@ -152,8 +152,8 @@ function clockedFixture(hold?: 'sky' | 'program', parent?: Scope, nativeOwner?: 
   let reached: () => void = () => { throw new Error('No held read notification'); };
   const reading = new Promise<void>(resolve => { reached = resolve; });
   const gate = new Promise<void>(resolve => { release = resolve; }), heldFile = hold === 'sky' ? skyRows.file : hold === 'program' ? policy.files.program : null;
-  const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(),
-    files: new Map([...values.keys()].map(file => [file, fixtureFolderFile(file, { hash: file, url: file })])), jsonCheck: fixtureJsonCheck, read: async url => {
+  const product = createShardProduct({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(),
+    files: new Map([...values.keys()].map(file => [file, fixtureProductFile(file, { hash: file, url: file })])), jsonCheck: fixtureJsonCheck, read: async url => {
       trace.push(`read ${url}`); if (url === heldFile) { reached(); await gate; }
       return new TextEncoder().encode(JSON.stringify(values.get(url)));
     } });

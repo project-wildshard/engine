@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { emptyShardfile } from '../src/shared/host/author';
 import { mergeProjectSections } from '../src/sharddev/projectSections';
 import { readProjectAssets, buildProject } from '../src/sharddev/project';
-import { validateOutputFolder } from '../src/sharddev/outputFolder';
+import { validateOutputProduct } from '../src/sharddev/outputProduct';
 import { originalDriftwoodMovers } from './fixtures/driftwood-movers';
 import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';
 
@@ -41,7 +41,7 @@ test('the real sidecar pipeline emits one canonical section from declared data w
   // a client-plan project's output is separate from its author folder (the runtime copy refuses an overlap)
   const destination = mkdtempSync(resolve('tmp', 'project-sections-out-')); directories.push(destination);
   await buildProject(path, destination, { client: null });
-  const checked = validateOutputFolder(destination);
+  const checked = validateOutputProduct(destination);
   expect(checked.index.sections.filter(row => row.name === 'world/movers')).toHaveLength(1);
   expect(JSON.parse(readFileSync(resolve(destination, 'sections/world/movers.json'), 'utf8'))).toEqual({ movers });
   expect(checked.shard.movers).toEqual(movers);

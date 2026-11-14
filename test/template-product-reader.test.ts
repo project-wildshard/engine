@@ -5,9 +5,9 @@ import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare immutable payload bytes without giant assertion diffs.
 import { Buffer } from 'node:buffer';
 import { expect, test } from 'vitest';
-import { writeOutputFolder, validateOutputFolder } from '../src/sharddev/outputFolder';
+import { writeOutputProduct, validateOutputProduct } from '../src/sharddev/outputProduct';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
-import { readFolderDescriptor } from '../src/client/game/shardfile/folder';
+import { readProductDescriptor } from '../src/client/game/shardfile/product';
 import { outputBlobUrl } from '../src/shared/game/shardfile/outputDescriptor';
 import { TEMPLATE_SOURCE, templateAssets } from './fixtures/templateSource';
 
@@ -15,9 +15,9 @@ test('Template browser tools reconstruct the real product and resolve every immu
   mkdirSync('tmp', { recursive: true }); const directory = mkdtempSync(resolve('tmp', 'template-reader-'));
   try {
     const assets = templateAssets();
-    writeOutputFolder(structuredClone(TEMPLATE_SOURCE), assets, directory);
-    const admitted = validateOutputFolder(directory), base = 'https://template.test/shard.json';
-    const source = await readFolderDescriptor({ base, offline: false, firstParty: true,
+    writeOutputProduct(structuredClone(TEMPLATE_SOURCE), assets, directory);
+    const admitted = validateOutputProduct(directory), base = 'https://template.test/shard.json';
+    const source = await readProductDescriptor({ base, offline: false, firstParty: true,
       fetch: url => {
         const path = new URL(url).pathname.slice(1);
         return Promise.resolve(new Response(new Uint8Array(readFileSync(resolve(directory, path)))));

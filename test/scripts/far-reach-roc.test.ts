@@ -1,14 +1,14 @@
 import { beforeAll, expect, test } from 'vitest';
-import { builtFolder } from '../fixtures/builtFolder';
+import { builtProduct } from '../fixtures/builtProduct';
 import { scenario as diskScenario,type DiskScriptScenario } from '../../src/sharddev/test/scriptScenario';
 
 let prepared:readonly [DiskScriptScenario,DiskScriptScenario]|undefined;
 
 beforeAll(async () => {
-  const directory = builtFolder('far-reach');
+  const directory = builtProduct('far-reach');
   // Disk admission and independent host allocation are fixture preparation.
   // The unchanged two-second body measures every gameplay/save/restore step.
-  const create = () => diskScenario('far-reach', 'far.roc.decision', { folderDirectory: directory, seed: 6417,
+  const create = () => diskScenario('far-reach', 'far.roc.decision', { productDirectory: directory, seed: 6417,
     actors: [{ id: 'roc', at: [13, 55, -196] }], players: [{ id: 101, at: [0, 44, -196] }],
   });
   prepared=[await create(),await create()];

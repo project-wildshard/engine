@@ -2,7 +2,7 @@ import { nineNativeConstants } from './fixtures/nine-native-constants';
 // @vitest-environment node
 import {expect,test} from 'vitest';
 import * as v from 'valibot';
-import {openFolderSession,type FolderSessionVariant} from './fixtures/headless/folderSession';
+import {openProductSession,type ProductSessionVariant} from './fixtures/headless/productSession';
 import {parseGrappleProfile} from '@wildshard/format/grapple';
 import type {HeadlessTapeObservation,HeadlessTapePlan} from '../src/shared/host/headlessTape';
 
@@ -13,8 +13,8 @@ function state(row:HeadlessTapeObservation){
   const adapter=row.adapters[0];if(adapter===undefined)throw new Error('Missing actual grapple owner');
   return v.parse(adapterSchema,JSON.parse(adapter.state));
 }
-async function hookTape(variant?:FolderSessionVariant){
-  const f=await openFolderSession('nine-dragon-stack',variant);
+async function hookTape(variant?:ProductSessionVariant){
+  const f=await openProductSession('nine-dragon-stack',variant);
   try{
     const payload=v.parse(payloadSchema,await nineNativeConstants());
     const source=f.product.shardfile.spawn,p={x:source.x,y:Math.max(source.y,payload.spawnY),z:source.z};
@@ -49,5 +49,5 @@ test('QB17 real LOCK and ZIP rise under the ring; the former flat path fails tha
 },30_000);
 
 test('the negative native control cannot be used with another product',async()=>{
-  await expect(openFolderSession('pine-hollow','nine-flat')).rejects.toThrow('variant does not match product');
+  await expect(openProductSession('pine-hollow','nine-flat')).rejects.toThrow('variant does not match product');
 });

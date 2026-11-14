@@ -5,7 +5,7 @@ import { downloadShown, downloadShownFraction } from '../../../shared/engine/boo
 export interface LoadingPrefetchSnapshot {
   readonly phase: 'running' | 'done' | 'quota' | 'stopped' | 'error';
   readonly reason: string | null;
-  readonly products: number; readonly foldersRead: number;
+  readonly shardfiles: number; readonly shardfilesRead: number;
   readonly knownFiles: number; readonly knownBytes: number;
   readonly presentFiles: number; readonly presentBytes: number;
   readonly storedFiles: number; readonly storedBytes: number;
@@ -41,7 +41,7 @@ export function loadingCacheText(row: LoadingDownloadSnapshot): string {
 
 /** The grid prefetch's own row: disk bytes against the set discovered so far (a finished run with every product read is 1). */
 export function loadingPrefetchFraction(prefetch: LoadingPrefetchSnapshot): number {
-  const complete = prefetch.phase === 'done' && prefetch.foldersRead === prefetch.products
+  const complete = prefetch.phase === 'done' && prefetch.shardfilesRead === prefetch.shardfiles
     && prefetch.presentFiles + prefetch.storedFiles === prefetch.knownFiles;
   return complete ? 1 : Math.min(0.999, (prefetch.presentBytes + prefetch.storedBytes) / Math.max(1, prefetch.knownBytes));
 }
@@ -50,5 +50,5 @@ export function loadingPrefetchText(prefetch: LoadingPrefetchSnapshot): string {
   const bytes = prefetch.presentBytes + prefetch.storedBytes, files = prefetch.presentFiles + prefetch.storedFiles;
   const state = prefetch.phase === 'running' ? 'prefetching' : prefetch.phase === 'done' ? 'prefetch finished' : 'prefetch stopped';
   // Even a finished run can skip a failed product: its discovered set is not an invented whole-set total.
-  return `Streams in play · On disk: ${formatMB(bytes)} of ${formatMB(prefetch.knownBytes)} known so far · ${files} / ${prefetch.knownFiles} files · ${prefetch.foldersRead} / ${prefetch.products} products checked · ${state}${prefetch.reason === null ? '' : ` (${prefetch.reason})`}`;
+  return `Streams in play · On disk: ${formatMB(bytes)} of ${formatMB(prefetch.knownBytes)} known so far · ${files} / ${prefetch.knownFiles} files · ${prefetch.shardfilesRead} / ${prefetch.shardfiles} cells checked · ${state}${prefetch.reason === null ? '' : ` (${prefetch.reason})`}`;
 }

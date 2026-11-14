@@ -5,8 +5,8 @@ import {registeredJsonContract,validateRegisteredJson} from '@wildshard/format/r
 import {registeredJsonSchema,namedJsonSchema} from '../src/shared/host/formatJsonSchema';
 import {nameBlob} from '../src/sharddev/blobs';
 import {emptyShardfile} from '../src/shared/host/author';
-import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
-import {fixtureJsonCheck} from './fixtures/folderFile';
+import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
+import {fixtureJsonCheck} from './fixtures/productFile';
 
 const cover={name:'cover',placement:'logs',mesh:'cover.mesh',userData:{active:true}};
 const meadow={seed:29,world:{res:2,size:20,water:-100,wet:'raster',pond:'raster'},trails:[],
@@ -24,7 +24,7 @@ for(const root of roots){
  });
  for(const kind of ['missing','foreign']as const)test(`${root.name} refuses ${kind} provenance before payload`,async()=>{
   let reads=0;const identity={slug:'native-ground',name:'Ground',author:'Fixture',revision:1,seed:1},schema=registeredJsonSchema(root.name);
-  const product=createShardFolder({...identity,shardfile:emptyShardfile(identity),sections:new Map(),jsonCheck:fixtureJsonCheck,
+  const product=createShardProduct({...identity,shardfile:emptyShardfile(identity),sections:new Map(),jsonCheck:fixtureJsonCheck,
    files:new Map([[root.name,{hash:'a'.repeat(64),url:'/original',...(kind==='missing'?{}:{jsonSchema:{...schema,$comment:'foreign'}})}]]),
    read:()=>{reads++;return Promise.resolve(new TextEncoder().encode(JSON.stringify(root.value)));}});
   await expect(product.json(root.name)).rejects.toThrow('unregistered named JSON is retired');expect(reads).toBe(0);

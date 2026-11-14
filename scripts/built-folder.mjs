@@ -8,7 +8,7 @@ import { mapStampPath, mapSettingsPath, mapTilesHash } from './map-hash.mjs';
 import { borrowShardfileEntry, readBuildKey, shardfileCacheRoot } from './shardfile-cache.mjs';
 import { InputHashMemo } from './bake-input-hashes.mjs';
 import { folderInputKey, folderToolchainKey, matchingFolderInputKey } from './shardfile-inputs.mjs';
-import { hasShardSource, builtFolder, shardSourceDir } from './shard-outputs.mjs';
+import { hasShardSource, outputFolderOf, shardSourceDir } from './shard-outputs.mjs';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 
 // VITEST-BENCH VB14: the boundary lint pulls in Vite, Rolldown, sharp and semver. Only a source shard's runtime
@@ -104,7 +104,7 @@ export function readBuiltShardfile(sourceRoot, name, { cacheRoot = shardfileCach
     if (existsSync(resolve(slice, 'shard.json'))) return slice;
     throw new Error(`No shard source and no pinned product: ${name}`);
   }
-  const folder = builtFolder(root, name), project = shardSourceDir(root, folder);
+  const folder = outputFolderOf(root, name), project = shardSourceDir(root, folder);
   const output = name === folder ? undefined : name;
   const map = folderMapInput(project, output);
   const flags = folderFlags(root, output, map, runtimeCopyIssues(root, project).length === 0);

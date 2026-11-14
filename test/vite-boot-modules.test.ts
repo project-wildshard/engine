@@ -124,9 +124,9 @@ test('the actual Vite plugin emits exact module body sizes into the existing doc
     if (typeof rows !== 'object' || rows === null || !('common' in rows) || !('client' in rows) || !('grid' in rows) || !('products' in rows)) throw new Error('Missing banks');
     const expected = (stems: readonly string[]): [string, number][] => output.filter(file => stems.some(stem => file.fileName.includes(stem)) || file.fileName.endsWith('.css'))
       .map((file): [string, number] => [`/${file.fileName}`, file.bytes]).sort(([left], [right]) => left.localeCompare(right));
-    const folderText=readFileSync(resolve(product,'shard.json'),'utf8');
-    const total=Buffer.byteLength(folderText)+sections.reduce((sum,row)=>sum+row.bytes,0);
-    expect(rows.products).toEqual({'/shardfiles/example/':[Buffer.byteLength(folderText),total,total,total]});
+    const productText=readFileSync(resolve(product,'shard.json'),'utf8');
+    const total=Buffer.byteLength(productText)+sections.reduce((sum,row)=>sum+row.bytes,0);
+    expect(rows.products).toEqual({'/shardfiles/example/':[Buffer.byteLength(productText),total,total,total]});
     expect(rows.common).toEqual(expected(['/first-', '/index-']));
     expect(rows.client).toEqual(expected(['/client-', '/index-']));
     expect(rows.grid).toEqual(expected(['/session-', '/reveal-', '/index-']));

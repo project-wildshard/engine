@@ -1,5 +1,5 @@
 import { registeredJsonSchema } from '../src/shared/host/formatJsonSchema';
-import { fixtureFolderFile, fixtureJsonCheck } from './fixtures/folderFile';
+import { fixtureProductFile, fixtureJsonCheck } from './fixtures/productFile';
 import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import * as THREE from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
@@ -19,7 +19,7 @@ import { bakeRawColourPixels } from '../src/sharddev/bake/rawTexture';
 import { emptyShardfile } from '../src/shared/host/author';
 import { emitNamedBlobs, nameBlob } from '../src/sharddev/blobs';
 import { parseExplorerCatalogue } from '@wildshard/format/explorerCatalogue';
-import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { SceneDressing } from '../src/client/game/shardfile/sceneDressing';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import { explorerRoster } from '../src/client/game/models/explorerCatalogue';
@@ -153,10 +153,10 @@ test('Explorer, direct dressing and generated encounter adapters prepare the sam
   initializeTier('desktop'); const f = fixture(), book = 'models/cover-phone.json';
   const declared = emitNamedBlobs([...f.files].map(([name, bytes]) => nameBlob(name, name.endsWith('.ktx2') ? 'ktx2' : 'glb', bytes))
     .concat(nameBlob(book, 'json', new TextEncoder().encode(JSON.stringify({ rows: f.rows, materials: {} })), {jsonSchema:registeredJsonSchema(book)})));
-  const product = createShardFolder({ slug: 'atlas-fixture', revision: 1,
+  const product = createShardProduct({ slug: 'atlas-fixture', revision: 1,
     shardfile: emptyShardfile({ slug: 'atlas-fixture', name: 'Atlas fixture', author: 'Fixture', revision: 1, seed: 1 }),
     sections: new Map([['explore/catalogue', parseExplorerCatalogue({ version: 1, entries: [{ kind: 'specimen', id: 'atlas-crate', books: { phone: book, desktop: book }, model: 'crate' }] })]]),
-    files: new Map(declared.files.flatMap(row => row.name === undefined ? [] : [[row.name, fixtureFolderFile(row.name, { hash: row.hash, url: row.hash })]])),
+    files: new Map(declared.files.flatMap(row => row.name === undefined ? [] : [[row.name, fixtureProductFile(row.name, { hash: row.hash, url: row.hash })]])),
     jsonCheck:fixtureJsonCheck, read: hash => { const bytes = declared.assets.get(hash); if (bytes === undefined) throw new Error('Missing admitted atlas fixture'); return Promise.resolve(bytes); }, check: true });
   const sky = skyFixture(), registry = new WorldRegistry(), scope = new Scope('atlas-adapters'), root = new THREE.Group(), restore = bindFlatTerrain({ heightAt: () => 0 });
   try {

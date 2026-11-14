@@ -130,14 +130,14 @@ test('resident rows share one native batch across a named model and fixed tail',
     placements: [{ id: 'marker', model: 'marker', draw: 'batched', batch: 'shared', poses: [{ x: 0, y: 0, z: 0, yxz: { yaw: 1.2, scale: 0.8, pitch: 0.2, roll: -0.1 } }] }],
   });
   try {
-    const anotherFolder = () => ({ ...context, product: { ...context.product } }) as ShardContext;
+    const anotherProduct = () => ({ ...context, product: { ...context.product } }) as ShardContext;
     const tooSmall = structuredClone(rows), incompatible = structuredClone(rows);
     const capacityBatch = tooSmall.batches[0], incompatibleBatch = incompatible.batches[0];
     if (capacityBatch === undefined || incompatibleBatch === undefined) throw new Error('Missing fixture batches');
     capacityBatch.capacity.instances = 1;
     incompatible.materials.push({ id: 'other', kind: 'basic', properties: {} }); incompatibleBatch.material = 'other';
-    await expect(installWorldScenes(anotherFolder(), tooSmall)).rejects.toThrow('instance capacity');
-    await expect(installWorldScenes(anotherFolder(), incompatible)).rejects.toThrow('cannot share');
+    await expect(installWorldScenes(anotherProduct(), tooSmall)).rejects.toThrow('instance capacity');
+    await expect(installWorldScenes(anotherProduct(), incompatible)).rejects.toThrow('cannot share');
     const handles = await installWorldScenes(context, rows);
     const [{ defineWorldSceneCatalogue }, { TIER }] = await Promise.all([import('../src/client/game/models/worldSceneCatalogue'), import('../src/client/engine/core/tier')]);
     expect(defineWorldSceneCatalogue(catalogue).model('marker').lods?.[0]?.from).toBe(TIER === 'phone' ? 2 : 4);

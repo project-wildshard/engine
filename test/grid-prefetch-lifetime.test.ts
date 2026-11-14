@@ -56,7 +56,7 @@ test('completed prefetch releases dedupe hashes after their last live reader', a
   try {
     startGridPrefetch(['_template', 'blender-template']);
     await vi.waitFor(() => {expect(reads).toContain(`http://localhost/alpha/blobs/bin/${hashes[1]}.bin`);});
-    expect(gridPrefetchStatus()).toMatchObject({phase: 'running', products: 2, knownFiles: 2});
+    expect(gridPrefetchStatus()).toMatchObject({phase: 'running', shardfiles: 2, knownFiles: 2});
     startGridPrefetch(['_template', 'blender-template']);
     if (release === undefined) throw new Error('Missing pending-file release');
     release();
@@ -75,7 +75,7 @@ test('completed prefetch releases dedupe hashes after their last live reader', a
     expect(history.size).toBe(0);
     expect(writes.filter(url => hashes.some(hash => url.endsWith(`/${hash}.bin`)))).toHaveLength(2);
     const done = gridPrefetchStatus();
-    expect(done).toMatchObject({products: 2, foldersRead: 2, knownFiles: 2, knownBytes: 2, storedFiles: 2, storedBytes: 2, inFlightBytes: 0});
+    expect(done).toMatchObject({shardfiles: 2, shardfilesRead: 2, knownFiles: 2, knownBytes: 2, storedFiles: 2, storedBytes: 2, inFlightBytes: 0});
     expect(window.__ws_gridPrefetch?.()).toEqual(done);
     startGridPrefetch(['blender-template']);
     expect(gridPrefetchStatus()).toEqual(done);

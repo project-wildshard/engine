@@ -8,7 +8,7 @@ import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { registeredJsonSchema, namedFormatJsonSchemas } from '@wildshard/engine/host/formatJsonSchema';
 import { hashImmutableBytes } from '@wildshard/engine/host/immutable';
 import { outputSections } from '../scripts/output-reader.mjs';
-import { namedJsonRoutes, folderSectionEntries, sectionInventory } from '../scripts/section-inventory';
+import { namedJsonRoutes, productSectionEntries, sectionInventory } from '../scripts/section-inventory';
 import { platformOutput } from './fixtures/platformOutputs';
 
 const source = '@wildshard/format/questSteps#QuestServiceActionsSchema';
@@ -76,7 +76,7 @@ test('gate and census exclude only admitted families and retain hash, schema and
     };
     const schema = registeredJsonSchema(name); publish(good, schema);
     expect(outputSections(root, 'demo').customSections).toEqual([]);
-    const product = folderSectionEntries(folder, 'demo', 'demo');
+    const product = productSectionEntries(folder, 'demo', 'demo');
     expect(product.entries.find(row => row.name === name)).toMatchObject({ kind: 'platform-file', routes: ['client/plan'] });
     const report = sectionInventory([product], namedFormatJsonSchemas(), { 'client/plan': 'plan' }, [], []);
     expect(report.rows.find(row => row.name === name)).toMatchObject({ provenance: 'verified-format', registeredReader: 'src/game/quest/effects.ts' });

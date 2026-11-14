@@ -7,14 +7,14 @@ import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { openArenaOf } from '../src/server/game/boss/openArenaNative';
 import { mountedPlayerOf } from '../src/server/game/riding/native';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { HeadlessCommand } from '../src/shared/host/tickProtocol';
-import { builtFolder } from './fixtures/builtFolder';
+import { builtProduct } from './fixtures/builtProduct';
 import { titanBowPilot } from './proof/nalati-grasslands/titanCombat';
 
 test('a rider at a gallop takes the Titan\'s heart to his next phase with real arrows', { timeout: 300_000 }, async () => {
-  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true }), { host } = live;

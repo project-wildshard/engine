@@ -49,7 +49,7 @@
     "src/shards/far-reach/generators/rows/skyPaintedLook.ts": 1,
     "src/shards/nalati-grasslands/generators/output.ts": 1,
     "src/shards/nalati-grasslands/generators/postChain.ts": 1,
-    "src/shards/nalati-grasslands/generators/folder.ts": 1,
+    "src/shards/nalati-grasslands/generators/product.ts": 1,
     "test/adventure-persistence.test.ts": 1,
     "test/arena-room-fight.test.ts": 1,
     "test/audio-catalogue-manifest.test.ts": 1,

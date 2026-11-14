@@ -87,7 +87,7 @@ export function manifestFolders(root) {
   return shardSourceFolders(root, ['manifest.ts', 'manifest.json']);
 }
 /** The source folder of a product slug (itself for a one-product folder). @param {string} root @param {string} slug */
-export function builtFolder(root, slug) {
+export function outputFolderOf(root, slug) {
   return builtShardFolders(root, manifestFolders(root)).find((row) => row.slug === slug)?.folder ?? slug;
 }
 /** The built product that stands for a source shard in per-shard measures: a folder that emits several outputs (all from

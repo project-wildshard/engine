@@ -1,13 +1,13 @@
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
-import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { builtFolder } from './fixtures/builtFolder';
+import { builtProduct } from './fixtures/builtProduct';
 import { ResolvedIslandLibrarySchema } from '@wildshard/format/islandLibrary';
 import { BAKED_COVE } from './fixtures/driftwood-baked-cove';
 
 test('Driftwood fixed draws and island cover files name admitted product blobs (no legacy URL table)', async () => {
-  const root = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(root), output = outputDescriptor(product.shardfile);
+  const root = builtProduct('driftwood-isle'), product = await loadHeadlessProduct(root), output = outputDescriptor(product.shardfile);
   const row = output?.index.sections.find(value => value.name === 'models/island-library');
   if (output === undefined || row === undefined) throw new Error('Fixed layouts absent');
   expect(output.index.sections.some(value => value.name === 'custom/assets')).toBe(false);

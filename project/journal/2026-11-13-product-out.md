@@ -20,3 +20,20 @@
 - Consumers: sharddev and the shard repos import nine renamed engine
   subpaths; they take the map with their next engine pin (`moves.json`
   beside the codemod).
+
+Review fixes (one claude -p review, two MUSTs). The director schema id is built
+from its `formatJsonSchema` key, so the key stays `directorProduct.DirectorProduct`
+(the wire id `@wildshard/format/directorProduct#DirectorProductSchema` is what
+shard-format v0.5.0 registers); only the binding is `DirectorDocumentSchema`. The
+map stamp on disk stays `data/productMap.json`: sharddev and every authored
+project read that name. The 92 lift-pending tests (they neither run nor
+typecheck), parity baselines, `lint/generated-import-debt.json`,
+`test/engine-lift-disposition.json` and the old CI cache fixtures are saved records
+and go back to their bytes; `nine-walk-verbs` is typechecked, so it keeps the move.
+Prefetch's counters are `shardfiles` and `shardfilesRead` ("cells checked" on the
+loading line), and `shard-outputs.mjs`'s `productFolder` is `outputFolderOf`,
+not a second `builtFolder`. Consumers take two maps on their next engine pin:
+file moves and names, in `~/.cache/wildshard/plan-artifacts/sa25/`
+(`moves.json`, `names.json`), for a sharddev `codemods/<v>.mjs`. Visible on
+release: `error.name` is `FolderError`, frame-floor keys are `foldersMinBytes` and
+`foldersMaxBytes`, and validation caches miss once.

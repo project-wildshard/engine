@@ -1,9 +1,9 @@
-import { prepareFolderPlan as prepareHeadlessRuntime } from './fixtures/headless-native';
+import { prepareProductPlan as prepareHeadlessRuntime } from './fixtures/headless-native';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native checkpoint regression uses the shipped physics module.
 import { readFileSync } from 'node:fs';
 import { expect,test } from 'vitest';
-import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { builtFolder } from './fixtures/builtFolder';
+import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { builtProduct } from './fixtures/builtProduct';
 import { decodeTerrainTile } from '@wildshard/format/terrainTileBytes';
 import type { BakedGrid } from '@wildshard/format/bakedTerrainBytes';
 import { createSimHost,type SimHost } from '../src/server/engine/sim';
@@ -22,7 +22,7 @@ function originalTerrain(bytes: Uint8Array | undefined,seed: number,row: { resol
   return { res: tile.resolution,size: tile.size,seed,landscapeHash: 0,heights: tile.heights,splat: tile.splat,undergrowth: null };
 }
 test('declared sampling rows retain the original native checkpoint and restore suffix',async () => {
-  const product = await loadHeadlessFolder(builtFolder('nalati-grasslands')),rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const product = await loadHeadlessProduct(builtProduct('nalati-grasslands')),rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const context={shard:product.shardfile,assets:nalatiNativeAssets(product.shardfile),rapier,product};
   // The shipped decoder keeps the frozen admission and storage law, row for row.
   const sampling=product.shardfile.terrain?.sampling,bytes=sampling===undefined?undefined:context.assets.get(sampling.file),row={resolution:256,size:500,seed:context.shard.identity.seed};

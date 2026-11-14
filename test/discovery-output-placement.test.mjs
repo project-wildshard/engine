@@ -6,14 +6,14 @@ import {existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from
 import {dirname,resolve} from 'node:path';
 import ts from '@typescript/typescript6';
 import {expect,test} from 'vitest';
-import {authoredManifestSource,folderManifestPath} from '../scripts/authored-manifest.mjs';
+import {authoredManifestSource,productManifestPath} from '../scripts/authored-manifest.mjs';
 import {relocateDiscoverySource,shardSource,manifestClosure} from '../scripts/gen-shards.mjs';
-import {outputManifest,builtShardFolders} from '../scripts/shard-outputs.mjs';
+import {outputManifest,shardProducts} from '../scripts/shard-outputs.mjs';
 import {pushTables} from '../scripts/push-tables.mjs';
 
 const root=process.cwd(),policyPath='lint/generated-source-debt.json';
 const names=['fossil-badlands','jungle-ziggurat','patchwork-fairground','saltwind-lighthouse'];
-const selected=builtShardFolders(root,['open-plots']).filter(row=>names.some(name=>row.slug===`open-plot-${name}`));
+const selected=shardProducts(root,['open-plots']).filter(row=>names.some(name=>row.slug===`open-plot-${name}`));
 const oldPath=row=>`src/shards/open-plots/discovery.${row.slug}.generated.ts`;
 const text=row=>authoredManifestSource(root,row.slug,{folder:row.folder,composed:outputManifest(root,row.folder,row.output)});
 function fixture(run){
@@ -38,13 +38,13 @@ function graph(source,directory){
 test('ungrandfathered discoveries leave src while reviewed paths and authored factories remain unchanged',()=>fixture((directory,put)=>{
  put(policyPath,JSON.stringify({schema:'generated-source/1',source:'a'.repeat(40),files:['src/shards/source/discovery.old.generated.ts']}));
  const row=slug=>({slug,folder:'source',output:{slug}});
- expect(folderManifestPath(directory,row('old'))).toBe('src/shards/source/discovery.old.generated.ts');
- expect(folderManifestPath(directory,row('new'))).toBe('out/.app/discovery.source.new.generated.ts');
+ expect(productManifestPath(directory,row('old'))).toBe('src/shards/source/discovery.old.generated.ts');
+ expect(productManifestPath(directory,row('new'))).toBe('out/.app/discovery.source.new.generated.ts');
  put('lint/generated-import-debt.json',JSON.stringify({schema:'no-generated-import/1',sources:['src/shards/source/discovery.reviewed.generated.ts']}));
- expect(folderManifestPath(directory,row('reviewed'))).toBe('src/shards/source/discovery.reviewed.generated.ts');
- expect(folderManifestPath(directory,row('new'))).toBe('out/.app/discovery.source.new.generated.ts');
+ expect(productManifestPath(directory,row('reviewed'))).toBe('src/shards/source/discovery.reviewed.generated.ts');
+ expect(productManifestPath(directory,row('new'))).toBe('out/.app/discovery.source.new.generated.ts');
  put('src/shards/factory/manifest.ts','export default {};');
- expect(folderManifestPath(directory,{slug:'factory',folder:'factory',output:null})).toBe('src/shards/factory/manifest.ts');
+ expect(productManifestPath(directory,{slug:'factory',folder:'factory',output:null})).toBe('src/shards/factory/manifest.ts');
 }));
 
 test('relative static and lazy imports move, authored data that resembles an import remains exact',()=>{
@@ -60,7 +60,7 @@ test('all four actual NU3 wrappers keep complete code, manifest rows and physica
  const composition=shardSource(root),closure=manifestClosure(root);
  const catalogue=JSON.parse(readFileSync(resolve(root,'scripts/source-generation-outputs.json'),'utf8')).producers['scripts/gen-shards.mjs'];
  for(const row of selected){
-  const source=text(row),file=folderManifestPath(root,row),moved=relocateDiscoverySource(root,row,source);
+  const source=text(row),file=productManifestPath(root,row),moved=relocateDiscoverySource(root,row,source);
   expect(file.startsWith('out/.app/')).toBe(true);
   expect(catalogue).toContain(file);
   expect(catalogue).not.toContain(oldPath(row));
@@ -87,9 +87,9 @@ test('the unchanged original all-files guard refuses actual src wrappers and acc
  const command=()=>spawnSync(process.execPath,[resolve(root,'scripts/no-binary-json.mjs'),'--all'],{cwd:directory,encoding:'utf8'});
  const red=command();expect(red.status).toBe(1);
  for(const row of selected)expect(red.stderr).toContain(`GENERATED-SOURCE ${oldPath(row)}`);
- for(const row of selected){put(folderManifestPath(root,row),relocateDiscoverySource(root,row,text(row)));rmSync(resolve(directory,oldPath(row)));}
+ for(const row of selected){put(productManifestPath(root,row),relocateDiscoverySource(root,row,text(row)));rmSync(resolve(directory,oldPath(row)));}
  const green=command();expect(green.status,green.stderr).toBe(0);
- for(const row of selected)expect(existsSync(resolve(directory,folderManifestPath(root,row)))).toBe(true);
+ for(const row of selected)expect(existsSync(resolve(directory,productManifestPath(root,row)))).toBe(true);
 }));
 
 test('the normal push metadata writer emits complete relocated wrappers without a product build',()=>fixture((directory,put)=>{
@@ -97,7 +97,7 @@ test('the normal push metadata writer emits complete relocated wrappers without 
  put('src/shards/open-plots/outputs.json',JSON.stringify({outputs:selected.map(row=>row.output)}));
  pushTables(directory);
  for(const row of selected){
-  const file=folderManifestPath(directory,row),source=authoredManifestSource(directory,row.slug,{folder:row.folder,composed:outputManifest(directory,row.folder,row.output),generation:true,metadataOnly:true});
+  const file=productManifestPath(directory,row),source=authoredManifestSource(directory,row.slug,{folder:row.folder,composed:outputManifest(directory,row.folder,row.output),generation:true,metadataOnly:true});
   expect(readFileSync(resolve(directory,file),'utf8')).toBe(relocateDiscoverySource(directory,row,source));
   expect(existsSync(resolve(directory,oldPath(row)))).toBe(false);
  }

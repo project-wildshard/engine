@@ -3,7 +3,7 @@ import { registeredJsonSchema } from '@wildshard/engine/host/formatJsonSchema';
 import { modelSceneSourceFile, bakedSceneSourceFile } from '@wildshard/sharddev/worldScenes';
 import { nameBlob } from '@wildshard/sharddev/blobs';
 import { emptyShardfile } from '@wildshard/engine/host/author';
-import { createShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
+import { createShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
 import { prepareSceneSources, sceneModelDefinition } from '@wildshard/engine/game/shardfile/sceneSources';
 import { parseWorldScenes } from '@wildshard/format/worldScenes';
 import { platformFileFamily } from '@wildshard/format/platformFileFamilies';
@@ -32,7 +32,7 @@ test('the native reader refuses a malformed cold pool before publishing any mode
   const identity = { slug: 'cold-source', name: 'Cold source', author: 'Test', revision: 1, seed: 1 };
   const value = { rows: { ...model.rows, geometryPools: [{ url: 'cold.glb', parts: ['rest'], native: { requireIndex: 'bad' } }] } };
   let reads = 0;
-  const product = createShardFolder({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity),
+  const product = createShardProduct({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity),
     sections: new Map([['world/scenes', parseWorldScenes({ version: 1, libraries: [{ id: 'models', kind: 'models', file: 'world/sources/models.json' }], materials: [], steps: [] })]]),
     // Simulate build admission so this negative reaches the original native pool parser.
     builtJson: true, files: new Map([['world/sources/models.json', { hash: 'source', url: '/models', jsonSchema: registeredJsonSchema('world/sources/models.json') }]]),

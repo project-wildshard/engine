@@ -4,7 +4,7 @@ import {expect,test} from 'vitest';
 import { NALATI_VIEW_BLOBS } from './fixtures/nalati-view-modules';
 import {admitScriptV2} from '@wildshard/format/scriptAdmissionV2';
 import {output} from './fixtures/nalati-output-original';
-import {outputPlatformPayloads} from '../src/sharddev/outputFolder';
+import {outputPlatformPayloads} from '../src/sharddev/outputProduct';
 
 const originals = [
   { stem: 'creatureViews', slug: 'creature-views', ioBytes: 8192 },

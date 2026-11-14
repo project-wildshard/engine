@@ -5,19 +5,19 @@ import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 import { parseSync } from 'vite';
 import { generatorImportViolation } from '../lint/shard-imports.mjs';
-import { nineFolderFrom } from '../src/shards/nine-dragon-stack/generators/folderDefinition';
-import product, { nineFolder, inputs } from './fixtures/nine-product-inputs';
+import { nineProductFrom } from '../src/shards/nine-dragon-stack/generators/productDefinition';
+import product, { nineProduct, inputs } from './fixtures/nine-product-inputs';
 
 
 test('owned inputs compose the supplied view contract', () => {
-  const declaration = nineFolderFrom(inputs);
+  const declaration = nineProductFrom(inputs);
   expect(declaration).toEqual(product);
-  expect(nineFolderFrom(inputs, { pages: 3 })).toEqual(nineFolder({ pages: 3 }));
+  expect(nineProductFrom(inputs, { pages: 3 })).toEqual(nineProduct({ pages: 3 }));
 });
 
 test('the declaration factory admits supplied inputs instead of consulting a generated file', () => {
-  expect(() => nineFolderFrom({ ...inputs, navigation: { ...inputs.navigation, navigation: { ...inputs.navigation.navigation, file: 'bad' } } })).toThrow();
-  const path = resolve('src/shards/nine-dragon-stack/generators/folderDefinition.ts');
+  expect(() => nineProductFrom({ ...inputs, navigation: { ...inputs.navigation, navigation: { ...inputs.navigation.navigation, file: 'bad' } } })).toThrow();
+  const path = resolve('src/shards/nine-dragon-stack/generators/productDefinition.ts');
   const parsed = parseSync(path, readFileSync(path, 'utf8'));
   expect(parsed.errors).toEqual([]);
   for (const node of parsed.program.body) if (node.type === 'ImportDeclaration') {

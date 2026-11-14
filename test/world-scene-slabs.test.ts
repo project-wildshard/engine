@@ -6,8 +6,8 @@ import { emptyShardfile } from '../src/shared/host/author';
 import { staticGlb } from '../src/sharddev/bake/glb';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
 import { parseWorldScenes } from '@wildshard/format/worldScenes';
-import { provideRuntimeFolder, runtimeFolder } from '../src/client/game/shardfile/runtimeFolder';
-import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { provideRuntimeProduct, runtimeProduct } from '../src/client/game/shardfile/runtimeProduct';
+import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { ControlRefinement } from '../src/client/game/shardfile/controlRefinement';
 import { SlabLibrary } from '../src/client/game/shardfile/slabLibrary';
 import { readWholeLibrary } from '../src/client/game/shardfile/wholeLibrary';
@@ -38,11 +38,11 @@ function fixture(indexed = false, covers?: number[], prepare?: (part: InstancedM
     source.tiles.push({ lod: 0, x: tile, z: 0, geometricError: 0, bounds: { min: [-250 + tile * 62.5, -1, -250], max: [-250 + (tile + 1) * 62.5, 1, -187.5] }, files: [hash], compressed: bytes.length, decoded: 72, gpu: 0, triangles: 1, draws: 1 });
     return { tile, files: [{ file: hash, chunks: parts.map(() => ({ key: separateKeys && tile === 1 ? 'k1' : 'k0', bytes: 72, geometricError: 0, box: [0, 0, 0, 1, 1, 1], sphere: [0.5, 0.5, 0.5, 1] })) }] };
   });
-  provideRuntimeFolder({ source, assets, cached: false }, owner, { base: 'https://test.example/shardfiles/slab-fixture/', offline: false, firstParty: true,
+  provideRuntimeProduct({ source, assets, cached: false }, owner, { base: 'https://test.example/shardfiles/slab-fixture/', offline: false, firstParty: true,
     cache: { product: () => Promise.resolve(null), asset: () => Promise.resolve(null), verifiedAsset: hash => Promise.resolve(assets.get(hash)?.slice() ?? null),
-      putAsset: () => Promise.resolve(), putFolder: () => Promise.resolve() },
+      putAsset: () => Promise.resolve(), putProduct: () => Promise.resolve() },
     fetch: () => Promise.reject(new Error('Only admitted source bytes are permitted')), hash: bytes => Promise.resolve(hashImmutableBytes(bytes)) });
-  const product = createShardFolder({ slug: 'slab-fixture', revision: 1, shardfile: source, sections: new Map(), files: new Map(), read: () => Promise.reject(new Error('Use declared content hash')) });
+  const product = createShardProduct({ slug: 'slab-fixture', revision: 1, shardfile: source, sections: new Map(), files: new Map(), read: () => Promise.reject(new Error('Use declared content hash')) });
   const covered: (typeof files[number] & { covers?: number[] })[] = [];
   for (const entry of files) covered.push(entry.tile === 0 && covers !== undefined ? { ...entry, covers } : entry);
   const [whole, slabs] = parseWorldScenes({ version: 1, materials: [], steps: [], libraries: [
@@ -56,7 +56,7 @@ function fixture(indexed = false, covers?: number[], prepare?: (part: InstancedM
   const queue = new ControlRefinement(owner, undefined, () => ({ x: -230, z: -230 }), () => Promise.resolve()), cover = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const library = new SlabLibrary(owner, product, whole, slabs, queue, cover, prepare), material = new MeshBasicMaterial();
   const anchor = new Mesh(library.geometry('fabric') ?? new BufferGeometry(), material), alias = new Mesh(library.geometry('alias') ?? new BufferGeometry(), material);
-  const read = vi.spyOn(runtimeFolder(source).assets, 'read');
+  const read = vi.spyOn(runtimeProduct(source).assets, 'read');
   const content = library.bind('fabric', anchor, owner), aliasContent = library.bind('alias', alias, owner);
   return { owner, shapes, source, assets, product, whole, slabs, queue, anchor, alias, material, content, aliasContent, read, cover, close: () => {
     owner.dispose(); for (const shape of shapes) shape.dispose(); material.dispose(); bakeMaterial.dispose(); vi.restoreAllMocks();

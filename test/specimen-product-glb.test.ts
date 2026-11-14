@@ -1,5 +1,5 @@
 import { registeredJsonSchema } from '../src/shared/host/formatJsonSchema';
-import { fixtureFolderFile, fixtureJsonCheck } from './fixtures/folderFile';
+import { fixtureProductFile, fixtureJsonCheck } from './fixtures/productFile';
 import {afterEach,expect,test,vi} from 'vitest';
 import * as THREE from 'three';
 import {parse} from 'valibot';
@@ -16,7 +16,7 @@ import {WorldRegistry} from '../src/client/engine/world/registry';
 import {staticGlb} from '../src/sharddev/bake/glb';
 import {emptyShardfile} from '../src/shared/host/author';
 import {emitNamedBlobs,nameBlob} from '../src/sharddev/blobs';
-import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
+import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
 import {SceneDressing} from '../src/client/game/shardfile/sceneDressing';
 import type {ShardContext} from '../src/client/game/plugin/context';
 import {explorerRoster} from '../src/client/game/models/explorerCatalogue';
@@ -106,10 +106,10 @@ test('Explorer and live dressing geometry, material and encounter adapters use v
   initializeTier('desktop');const book='models/cover-phone.json',siteAsset={url:{file:'models/statue.glb',bytes:phone.length},material};
   const declared=emitNamedBlobs([nameBlob(asset.url.file,'glb',desktop),nameBlob(siteAsset.url.file,'glb',phone),
     nameBlob(book,'json',new TextEncoder().encode(JSON.stringify({rows,materials:{}})),{jsonSchema:registeredJsonSchema(book)})]);
-  const product=createShardFolder({slug:'product-glb-fixture',revision:1,
+  const product=createShardProduct({slug:'product-glb-fixture',revision:1,
     shardfile:emptyShardfile({slug:'product-glb-fixture',name:'GLB fixture',author:'Fixture',revision:1,seed:1}),
     sections:new Map([['explore/catalogue',parseExplorerCatalogue({version:1,entries:[{kind:'specimen',id:'product-crate',books:{phone:book,desktop:book},model:'crate'}]})]]),
-    files:new Map(declared.files.flatMap(row=>row.name===undefined?[]:[[row.name,fixtureFolderFile(row.name,{hash:row.hash,url:row.hash})]])),
+    files:new Map(declared.files.flatMap(row=>row.name===undefined?[]:[[row.name,fixtureProductFile(row.name,{hash:row.hash,url:row.hash})]])),
     jsonCheck:fixtureJsonCheck, read:hash=>{const bytes=declared.assets.get(hash);if(bytes===undefined)throw new Error('Missing product GLB');return Promise.resolve(bytes);},check:true});
   const fetch=vi.spyOn(globalThis,'fetch').mockRejectedValue(new Error('No URL fallback')),sky=skyFixture(),registry=new WorldRegistry(),scope=new Scope('product-glb-adapters'),root=new THREE.Group(),restore=bindFlatTerrain({heightAt:()=>0});
   try{

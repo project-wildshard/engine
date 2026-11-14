@@ -6,14 +6,14 @@ import { encodeCanonicalJson } from '@wildshard/engine/host/immutable';
 import { nameBlob } from '@wildshard/sharddev/blobs';
 import { validateDefinedJson } from '@wildshard/sharddev/sections';
 import { emptyShardfile } from '@wildshard/engine/host/author';
-import { createShardFolder, type ShardFolderInput } from '@wildshard/engine/game/shardfile/shardFolder';
+import { createShardProduct, type ShardProductInput } from '@wildshard/engine/game/shardfile/shardProduct';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
 
 const name = 'quests/services.json';
 const good = { version: 1, actions: [{ id: 'hello', effects: [{ kind: 'toast', text: 'Hello' }] }] };
 const encode = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
 const identity = { slug: 'registered-test', name: 'Registered test', author: 'Test', revision: 1, seed: 1 };
-function input(value: unknown, schema: Readonly<Record<string, unknown>> | undefined = registeredJsonSchema(name)): ShardFolderInput {
+function input(value: unknown, schema: Readonly<Record<string, unknown>> | undefined = registeredJsonSchema(name)): ShardProductInput {
   return { slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity), sections: new Map(),
     files: new Map([[name, { hash: 'a'.repeat(64), url: 'https://example.test/data', ...(schema === undefined ? {} : { jsonSchema: schema }) }]]),
     read: () => Promise.resolve(encode(value)) };
@@ -51,7 +51,7 @@ test('a registered read refuses missing or foreign metadata before reading any b
   for (const schema of [undefined, {}, { $comment: '@wildshard/format/other#Schema' }]) {
     let reads = 0;
     const base = input(good);
-    const product = createShardFolder({ ...base, files: new Map([[name, { hash: 'a'.repeat(64), url: 'x', ...(schema === undefined ? {} : { jsonSchema: schema }) }]]),
+    const product = createShardProduct({ ...base, files: new Map([[name, { hash: 'a'.repeat(64), url: 'x', ...(schema === undefined ? {} : { jsonSchema: schema }) }]]),
       read: () => { reads++; return Promise.resolve(encode(good)); }, builtJson: true });
     await expect(product.json(name)).rejects.toThrow('unregistered named JSON is retired');
     expect(reads).toBe(0);
@@ -61,7 +61,7 @@ test('a registered read refuses missing or foreign metadata before reading any b
 test('external reads retain schema admission, defining semantic checks, identity and optional freezing', async () => {
   const schema = registeredJsonSchema(name), decoded = structuredClone(good);
   let checks = 0;
-  const product = createShardFolder({ ...input(good, schema), check: true, jsonCheck: (actualSchema, bytes) => {
+  const product = createShardProduct({ ...input(good, schema), check: true, jsonCheck: (actualSchema, bytes) => {
     checks++; expect(actualSchema).toBe(schema); expect(validateNamedJsonSchema(actualSchema, bytes)).toEqual(good);
     return Promise.resolve(decoded);
   } });
@@ -69,21 +69,21 @@ test('external reads retain schema admission, defining semantic checks, identity
   expect(rows).toBe(decoded); expect(rows.actions[0]?.id).toBe('hello'); expect(checks).toBe(1);
   expect(Object.isFrozen(rows.actions)).toBe(true);
   const permissive = { $schema: 'http://json-schema.org/draft-07/schema#', $comment: REGISTERED_JSON[name].source, type: 'object' };
-  await expect(createShardFolder(input({ version: 1, actions: [...good.actions, ...good.actions] }, permissive)).json(name)).rejects.toThrow('must be unique');
-  await expect(createShardFolder(input({ version: 9 }, permissive)).json(name)).rejects.toThrow('defining contract');
-  await expect(createShardFolder(input({ version: 9 })).json(name)).rejects.toThrow('refuses its schema');
+  await expect(createShardProduct(input({ version: 1, actions: [...good.actions, ...good.actions] }, permissive)).json(name)).rejects.toThrow('must be unique');
+  await expect(createShardProduct(input({ version: 9 }, permissive)).json(name)).rejects.toThrow('defining contract');
+  await expect(createShardProduct(input({ version: 9 })).json(name)).rejects.toThrow('refuses its schema');
 });
 
 test('trusted built reads keep canonical parsing and do not invoke the external checker', async () => {
-  const product = createShardFolder({ ...input(good), builtJson: true, jsonCheck: () => Promise.reject(new Error('Unexpected external check')) });
+  const product = createShardProduct({ ...input(good), builtJson: true, jsonCheck: () => Promise.reject(new Error('Unexpected external check')) });
   expect(await product.json(name)).toEqual(good);
-  await expect(createShardFolder({ ...input(good), builtJson: true,
+  await expect(createShardProduct({ ...input(good), builtJson: true,
     read: () => Promise.resolve(new TextEncoder().encode('{"version":-0}')) }).json(name)).rejects.toThrow('canonical numbers');
 });
 
 test('retired private documents refuse their old checked bridge and keep missing-file refusal', async () => {
   const privateName = 'private/data.json', base = input(good);
-  const product = createShardFolder({ ...base, files: new Map([[privateName, { hash: 'a'.repeat(64), url: 'x', jsonSchema: namedJsonSchema(QuestServiceActionsSchema) }]]) });
+  const product = createShardProduct({ ...base, files: new Map([[privateName, { hash: 'a'.repeat(64), url: 'x', jsonSchema: namedJsonSchema(QuestServiceActionsSchema) }]]) });
   await expect(product.json(privateName)).rejects.toThrow('unregistered named JSON is retired');
   await expect(product.json('absent.json')).rejects.toThrow('names no file');
   const keys: readonly RegisteredJsonName[] = ['quests/achievements.json', 'quests/page-composition.json', name];
