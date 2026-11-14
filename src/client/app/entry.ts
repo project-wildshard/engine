@@ -110,6 +110,9 @@ function learnPlacedCellsOnce(): Promise<void> {
   const late = new AbortController();
   const read = (async (): Promise<void> => {
     try {
+      // a page with no world and no placement stamp (preview, solo) reads none and imports nothing (PAGE-SIZE: the title waits here)
+      const stamps = globalThis as { __WS_WORLD__?: unknown; __WS_PLACEMENTS__?: unknown };
+      if (stamps.__WS_WORLD__ === undefined && stamps.__WS_PLACEMENTS__ === undefined) return;
       const { learnPlacedCells, placementsOf } = await import('@wildshard/engine/game/grid/placedCells');
       const url = placementsOf(globalThis as { __WS_WORLD__?: unknown; __WS_PLACEMENTS__?: unknown });
       if (url === null || late.signal.aborted) return;

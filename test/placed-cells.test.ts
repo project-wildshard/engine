@@ -267,12 +267,12 @@ test('OF20: the device keep shares OF0\'s gridRoute slot and leaves the kept wor
   const { deviceRouteMemory } = await import('../src/client/game/grid/oneWayIn');
   const route = deviceRouteMemory(), keep = devicePlacedKeep(), release = 'https://packs.example/releases/staging.json';
   route.write(release, true, ['driftwood-isle']);
-  keep.write(URL_AT, signed());
+  await keep.write(URL_AT, signed());
   expect(route.read(release)).toBe(true);
   route.write(release, true, ['driftwood-isle', 'open-plot-thin-ice']);
-  expect(keep.read(URL_AT)).toBe(signed());
+  expect(await keep.read(URL_AT)).toBe(signed());
   expect(route.shards(release)).toEqual(['driftwood-isle', 'open-plot-thin-ice']);
-  keep.write(URL_AT, null);
-  expect(keep.read(URL_AT)).toBeNull();
+  await keep.write(URL_AT, null);
+  expect(await keep.read(URL_AT)).toBeNull();
   expect(route.read(release)).toBe(true);
 });

@@ -8,9 +8,11 @@
 // OFFLINE OF20: the device keeps the last file it believed (its text, in OF0's `gridRoute` slot, beside the world's kept word), and
 // the next page installs it at once, its signature checked again: offline, or on a link that hangs past the deadline, Shard Select
 // still has the cells this device last saw. A fresh file read in time replaces it, from the build's own catalogue; a 404 drops it.
+// PAGE-SIZE (time to the title): the device keep imports the saves slots (about 1.2 MB of chunks) only when it is read or written,
+// never on the title's path: online it is read only once the fresh read is slow (`KEPT_AFTER_MS`) or fails, and written a while after.
 import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
-import { jsonSlot, type Json } from '@wildshard/engine/saves/slots';
+import type { Json, jsonSlot } from '@wildshard/engine/saves/slots';
 import { GRID_RADIUS } from '@wildshard/format/contentBounds';
 import { PLACEMENT_PUBLIC_KEY, PlacementSchema, SignedPlacementSchema, placementsURL, type PlacementFile } from '../../../shared/game/grid/placementRows';
 import { installCatalogue, installedCatalogue, type CatalogueDocument } from '../../../shared/game/grid/catalogueSlot';
@@ -21,6 +23,10 @@ import { parseGridCatalogue } from '../../../shared/game/grid/catalogue';
 
 /** How long a page's boot waits for the file: GO4's 3 s, the world word's own deadline. A slower answer leaves the build's grid. */
 export const PLACED_DEADLINE_MS = 3000;
+/** OF20 with the title's time: an online page reads its kept file only once the fresh read has taken this long (or failed). */
+export const KEPT_AFTER_MS = 600;
+/** How long after the fresh file is believed the device keep writes it (its slots chunks load then, off the title's path). */
+export const KEEP_WRITE_AFTER_MS = 5000;
 
 type Cell = PlacementFile['cells'][number];
 const hexBytes = (hex: string): Uint8Array<ArrayBuffer> => Uint8Array.from(hex.match(/../gu) ?? [], pair => Number.parseInt(pair, 16));
@@ -81,21 +87,26 @@ export function addPlacedCells(document: CatalogueDocument, file: PlacementFile,
 export type PlacedRead = { readonly added: readonly Cell[]; readonly left: readonly string[]; readonly serial: number; readonly carded: readonly string[];
   /** OF20: the device's kept file, because the fresh one did not come (why) */ readonly cached?: string } | { readonly kept: string };
 /** OF20: the last placement file this device believed, by its address. */
-export interface PlacedKeep { readonly read: (url: string) => string | null; readonly write: (url: string, text: string | null) => void }
+export interface PlacedKeep {
+  readonly read: (url: string) => string | null | Promise<string | null>;
+  readonly write: (url: string, text: string | null) => void | Promise<void>;
+}
 /** OF20: in OF0's device slot `gridRoute` (oneWayIn.ts `deviceRouteMemory`), as `placed: { url, text }`: one store for the world's
- *  last word and its last layout. */
+ *  last word and its last layout. The slots module is imported on the first read or write, never with this file (PAGE-SIZE: it is
+ *  about 1.2 MB of chunks the title would wait for). */
 export function devicePlacedKeep(): PlacedKeep {
-  const slot = (): ReturnType<typeof jsonSlot> => jsonSlot('gridRoute', 'device');
-  const row = (): Record<string, Json> => { const value = slot().read(); return typeof value === 'object' && value !== null && !Array.isArray(value) ? value : {}; };
+  const slot = async (): Promise<ReturnType<typeof jsonSlot>> =>
+    (await import('@wildshard/engine/saves/slots')).jsonSlot('gridRoute', 'device');
+  const row = async (): Promise<Record<string, Json>> => { const value = (await slot()).read(); return typeof value === 'object' && value !== null && !Array.isArray(value) ? value : {}; };
   return {
-    read: url => {
+    read: async url => {
       try {
-        const placed = row()['placed'];
+        const placed = (await row())['placed'];
         return typeof placed === 'object' && placed !== null && !Array.isArray(placed) && placed['url'] === url && typeof placed['text'] === 'string' ? placed['text'] : null;
       } catch { return null; }
     },
-    write: (url, text) => {
-      try { const { placed: _old, ...rest } = row(); slot().write(text === null ? rest : { ...rest, placed: { url, text } }); }
+    write: async (url, text) => {
+      try { const { placed: _old, ...rest } = await row(); (await slot()).write(text === null ? rest : { ...rest, placed: { url, text } }); }
       catch { /* a device that keeps nothing reads the network only, as before */ }
     },
   };
@@ -119,6 +130,10 @@ export interface PlacedPorts {
   readonly content?: (slug: string, hash: string | undefined, signal: AbortSignal) => Promise<PlacedContent | undefined>;
   /** OF20: where the last believed file is kept (default: the device, `devicePlacedKeep`) */
   readonly keep?: PlacedKeep;
+  /** An online page reads its kept file once the fresh read has taken this long (default `KEPT_AFTER_MS`); offline at once. */
+  readonly keptAfterMs?: number;
+  /** The fresh file is kept this long after it is believed (default `KEEP_WRITE_AFTER_MS`; the default keep only). */
+  readonly keepWriteAfterMs?: number;
 }
 /** The cook's content for a placed slug, from the store the placement file is in, for this page's build under its own validator. */
 const cookContent = (url: string, read: typeof fetch): NonNullable<PlacedPorts['content']> => (slug, hash, signal) => {
@@ -148,32 +163,49 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     const known = ports.known ?? (slug => findTitleManifest(slug) !== undefined);
     // the page's own deadline, read afresh after each wait: once it fires the boot has gone on
     const wentOn = (): boolean => ports.signal?.aborted === true;
-    // OF20: the kept file first, so a page whose read never comes still has the layout this device last saw
-    const keep = ports.keep ?? devicePlacedKeep(), held = keep.read(url);
-    let cached: { readonly added: readonly Cell[]; readonly left: readonly string[]; readonly serial: number } | undefined;
-    if (held !== null) {
+    // OF20: the kept file, so a page whose read never comes still has the layout this device last saw. Offline it is read at once;
+    // online only once the fresh read is slow or fails, so the title never waits for the keep's chunks (PAGE-SIZE). A fresh file
+    // installed first wins: the kept one never replaces it.
+    const keep = ports.keep ?? devicePlacedKeep();
+    let cached: { readonly added: readonly Cell[]; readonly left: readonly string[]; readonly serial: number } | undefined, fresh = false;
+    let keptRead: Promise<void> | undefined;
+    const readKept = (): Promise<void> => (keptRead ??= (async () => {
+      const held = await keep.read(url);
+      if (held === null || fresh) return;
       try {
         const file = await believe(held), kept = addPlacedCells(document, file, known);
-        if (!wentOn() && kept.added.length > 0) { installCatalogue(kept.document); cached = { added: kept.added, left: kept.left, serial: file.serial }; }
-      } catch { keep.write(url, null); } // a kept file this build no longer believes is dropped
-    }
-    const fallBack = (why: string): PlacedRead => cached === undefined ? { kept: why } : { ...cached, carded: [], cached: why };
+        if (!fresh && !wentOn() && kept.added.length > 0) { installCatalogue(kept.document); cached = { added: kept.added, left: kept.left, serial: file.serial }; }
+      } catch { await keep.write(url, null); } // a kept file this build no longer believes is dropped
+    })().catch(() => undefined));
+    if (typeof navigator !== 'undefined' && !navigator.onLine) void readKept();
+    else scope.timeout(ports.keptAfterMs ?? KEPT_AFTER_MS, () => { void readKept(); });
+    const fallBack = async (why: string): Promise<PlacedRead> => {
+      await readKept();
+      return cached === undefined ? { kept: why } : { ...cached, carded: [], cached: why };
+    };
     let response: Response;
     try { response = await (ports.fetch ?? fetch)(url, { cache: 'no-store', credentials: 'omit', redirect: 'error', signal: abort.signal }); }
-    catch (error) { return fallBack(error instanceof Error ? error.message : String(error)); }
+    catch (error) { return await fallBack(error instanceof Error ? error.message : String(error)); }
     if (response.status === 404) {
       // nothing placed on this channel now: the kept cells leave too
-      keep.write(url, null);
+      fresh = true;
+      await keep.write(url, null);
       if (cached !== undefined && !wentOn()) installCatalogue(document);
       return { kept: 'no placement file (404): nothing placed on this channel' };
     }
-    if (!response.ok) return fallBack(`placement file ${String(response.status)}`);
+    if (!response.ok) return await fallBack(`placement file ${String(response.status)}`);
     let text: string, file: PlacementFile;
     try { text = await response.text(); file = await believe(text); }
-    catch (error) { return fallBack(error instanceof Error ? error.message : String(error)); }
+    catch (error) { return await fallBack(error instanceof Error ? error.message : String(error)); }
     const placed = addPlacedCells(document, file, known);
-    keep.write(url, text); // only a file that places cleanly is kept
-    if (wentOn()) return fallBack('the page went on before the placement file was read');
+    // only a file that places cleanly is kept; the device keep writes it a while later, off the title's path
+    if (ports.keep === undefined) {
+      const believed = text, later = new Scope('grid.placed-keep');
+      later.timeout(ports.keepWriteAfterMs ?? KEEP_WRITE_AFTER_MS, () => { void keep.write(url, believed); later.dispose(); });
+    }
+    else await keep.write(url, text);
+    if (wentOn()) return await fallBack('the page went on before the placement file was read');
+    fresh = true;
     // from the build's own catalogue, so the fresh file replaces the kept one's cells
     if (placed.added.length > 0 || cached !== undefined) installCatalogue(placed.document);
     // SA46: a cell the box would open whose slug this build has no card for (an upload after the build) is carded from its catalogue
