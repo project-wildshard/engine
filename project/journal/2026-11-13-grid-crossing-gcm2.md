@@ -21,3 +21,8 @@
 - GC8, first half: the grid's state names the `cell` step the loading screen shows now (`cellStep`, from `CellLoading.now`),
   and the walk proof and the tour sample it, so each step's time on screen is measured per crossing once preview and
   staging serve this build. Before, the state named only the waiting cell.
+- GC15 review (one-shot `claude -p`): a seat whose socket closes mid-move now clears its `outs` entry and abandons the
+  crossing, and a worker that drains while a seat moves out closes it with `restart` so the client redials. The target
+  builds the seat's transport only once the room has settled, refuses cleanly if it never does, and holds off a start-over
+  while an arrival is in flight. `NetRoom.travelled` resets the ledger it has seen, so the new room sends the arrival a full
+  ledger. Not fixed: input the client sends between the road's `travel` and the door's re-pump is dropped (a few frames).

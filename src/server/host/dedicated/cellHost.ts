@@ -90,6 +90,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   /** A cell on this worker, or its road, by name. */
   const named = (name: string): Cell | RoadRoom | undefined => road !== undefined && road.name === name ? road : cells.get(name);
   const emptyMs = options.emptyMs ?? EMPTY_MS;
+  /** GC15 (3): cells a seat from another worker's road is arriving in: none starts over meanwhile (review SHOULD). */
+  const arrivals = new Set<Cell>();
   /** `startOver`, once it is made below: a start-over opens a cell, and a cell's room says when it emptied. */
   const later = { startOver: (_cell: Cell, _since: number): void => undefined };
   /** Someone stood in this world: it has something to start over from. A refused seat never got this far. */
@@ -148,7 +150,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     if (left > 0) { scope.timeout(left, () => { later.startOver(cell, since); }); return; }
     // GC4: never boot a cell under a walker heading back to it: while someone on the road stands within NEAR_M of its edge, look again later
     const origin = crossing?.assembly.cells.find(row => [cell.slug].includes(row.instance))?.origin;
-    if (origin !== undefined && road?.near(origin, CHUNK_HALF + NEAR_M) === true) { scope.timeout(NEAR_RETRY_MS, () => { later.startOver(cell, since); }); return; }
+    if (arrivals.has(cell) || (origin !== undefined && road?.near(origin, CHUNK_HALF + NEAR_M) === true)) { scope.timeout(NEAR_RETRY_MS, () => { later.startOver(cell, since); }); return; }
     const job = overs.then(() => restart(cell)).finally(() => { if (cell.waking === job) cell.waking = null; });
     cell.waking = job; overs = job;
   };
@@ -213,17 +215,22 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
    * with the walker's motion, then the room hears the client's hello again and welcomes it (the client heard `travel` first).
    */
   const arrive = async (order: Extract<CellOrder, { kind: 'arrive' }>): Promise<void> => {
-    const { kind: _kind, from, to: slug, at, port: seatPort, hello, motion, ...entry } = order, cell = cells.get(slug), transport = new SeatTransport(seatPort);
-    const refuse = (): void => { transport.close('retry'); post({ kind: 'crossed', device: entry.device, name: entry.name, from, to: slug, moved: false, stays: false, body: entry.body }); };
-    if (cell === undefined || !await settled(cell)) { refuse(); return; }
-    const arrived = cell.room.admit(entry, transport, at);
-    if (typeof arrived === 'string') { refuse(); return; }
-    const player = cell.room.host.players.get(arrived.body);
-    if (motion !== null && player !== undefined) applyMotion(motion, player);
-    const client = cell.room.net.join(transport, cell.room.sim.playerOf(arrived.body));
-    transport.deliver('reliable', hello);
-    const moved = arrived.land(cell.room.net.live(client) ? client : null);
-    post({ kind: 'crossed', device: entry.device, name: entry.name, from, to: slug, moved, stays: false, body: cell.room.bodyId(entry.device) ?? entry.body });
+    const { kind: _kind, from, to: slug, at, port: seatPort, hello, motion, ...entry } = order, cell = cells.get(slug);
+    // review MUST: the port's transport is made after the wait, as `seat`'s is: a close meanwhile stays queued on the port for it
+    const refuse = (made?: SeatTransport): void => { (made ?? new SeatTransport(seatPort)).close('retry'); post({ kind: 'crossed', device: entry.device, name: entry.name, from, to: slug, moved: false, stays: false, body: entry.body }); };
+    if (cell !== undefined) arrivals.add(cell);
+    try {
+      if (cell === undefined || !await settled(cell)) { refuse(); return; }
+      const transport = new SeatTransport(seatPort), arrived = cell.room.admit(entry, transport, at);
+      if (typeof arrived === 'string') { refuse(transport); return; }
+      const player = cell.room.host.players.get(arrived.body);
+      if (motion !== null && player !== undefined) applyMotion(motion, player);
+      const client = cell.room.net.join(transport, cell.room.sim.playerOf(arrived.body));
+      transport.deliver('reliable', hello);
+      cell.room.net.travelled(client);
+      const moved = arrived.land(cell.room.net.live(client) ? client : null);
+      post({ kind: 'crossed', device: entry.device, name: entry.name, from, to: slug, moved, stays: false, body: cell.room.bodyId(entry.device) ?? entry.body });
+    } finally { if (cell !== undefined) arrivals.delete(cell); }
   };
   const handle = (order: CellOrder): void => {
     if (order.kind === 'close') { dispose(); return; }
