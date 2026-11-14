@@ -14,7 +14,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { bindRig, prepareRigLoader, type ClipName, type RigInstance } from '@wildshard/engine/anim/rig';
 import { AnimMachine } from '@wildshard/engine/anim/machine';
 import type { Scope } from '@wildshard/engine/app/scope';
-import type { AssetCost } from '@wildshard/format/product';
+import type { AssetCost } from '@wildshard/format/shardfileAssets';
 import { parseGlbData, prepareGlbCost } from '@wildshard/format/glbCost';
 import { skinLayerDecoded } from '@wildshard/format/skinLayers';
 import { parseSkinBindings, type SkinRow, type SkinBinding } from '@wildshard/format/skinData';

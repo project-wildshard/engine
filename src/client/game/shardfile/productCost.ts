@@ -14,7 +14,7 @@ import { preflightShardfile, preflightShardfileSteps } from '@wildshard/format/p
 import { jsonDataHeapBytes } from '@wildshard/format/json';
 import { outputDescriptor, isBuildValidatedOutput } from '../../../shared/game/shardfile/outputDescriptor';
 import { otherTierSplatFiles } from '../../../shared/game/shardfile/wholeInputs';
-import {builtProductPostCost} from '@wildshard/format/validationReceipt';
+import {builtShardfilePostCost} from '@wildshard/format/validationReceipt';
 import {postStackCost,type PostStackCost} from '@wildshard/format/postStack';
 import { isPlatformDataSection } from '@wildshard/format/outputFields';
 import { parseWorldScenes } from '@wildshard/format/worldScenes';
@@ -306,7 +306,7 @@ export function jsonResidentBytes(input: unknown): number {
 export function productPostCost(source:Shardfile,bytes:(hash:string)=>Uint8Array|undefined):PostStackCost{
   const descriptor=outputDescriptor(source);
   if(descriptor?.built===true){
-    const cost=builtProductPostCost(descriptor.index.build.sourceHash);
+    const cost=builtShardfilePostCost(descriptor.index.build.sourceHash);
     if(cost===undefined)throw new Error('Build must publish post cost');
     return cost;
   }

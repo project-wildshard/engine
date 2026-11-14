@@ -11,8 +11,8 @@ import {createHash} from 'node:crypto';
 import {mkdirSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {dirname, join} from 'node:path';
-import {prepareAssetDecoders} from '@wildshard/format/product';
-import {validateShardfileProduct, type ValidatedProduct} from '@wildshard/format/productValidation';
+import {prepareAssetDecoders} from '@wildshard/format/shardfileAssets';
+import {validateShardfileFolder, type ValidatedShardfile as ValidatedProduct} from '@wildshard/format/shardfileValidation';
 import type {Shardfile} from '@wildshard/format/shardSchema';
 import {readTar} from '@wildshard/format/tar';
 import {cookShard, openShardfile, serverRows, type CookReport, type OpenShardfile, type WireBytes} from './shardCook';
@@ -62,7 +62,7 @@ function admit(tarball: Uint8Array, cap: number): {readonly product: ValidatedPr
   if (tarball.length > cap) throw new ShardfileRefusedError(`Shardfile is ${tarball.length} bytes, past the ${cap} cap`);
   try {
     const files = readTar(tarball);
-    const product = validateShardfileProduct({
+    const product = validateShardfileFolder({
       read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path} within ${maximum} bytes`); return bytes; },
       paths: () => files.keys(),
     }, {hash: sha256});

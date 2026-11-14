@@ -4,8 +4,8 @@ import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import * as v from 'valibot';
 import {packsBookPath, readSpawnManifest} from '../../src/shared/game/shardfile/spawnManifest';
-import {prepareAssetDecoders} from '@wildshard/format/product';
-import {validateShardfileProduct} from '@wildshard/format/productValidation';
+import {prepareAssetDecoders} from '@wildshard/format/shardfileAssets';
+import {validateShardfileFolder} from '@wildshard/format/shardfileValidation';
 import {assertKtx2TableTargets} from '../../src/shared/game/shardfile/ktx2Targets';
 import {StandaloneCatalogueSchema, type StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
 import {readTar} from '@wildshard/format/tar';
@@ -154,7 +154,7 @@ export function addCookedShards(outDir: string, shards: readonly CookedShard[], 
 export async function productVerdict(tarball: Uint8Array, out: string): Promise<{readonly verdict: unknown; readonly discovery?: Uint8Array}> {
   await prepareAssetDecoders();
   const files = readTar(tarball);
-  validateShardfileProduct({read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path}`); return bytes; }, paths: () => files.keys()},
+  validateShardfileFolder({read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path}`); return bytes; }, paths: () => files.keys()},
     {hash: bytes => createHash('sha256').update(bytes).digest('hex')});
   // S11: a deploy's added shard serves its KTX2 targets itself, or the build already holds them.
   assertKtx2TableTargets({paths: () => files.keys(), read: path => { const bytes = files.get(path); if (bytes === undefined) throw new Error(`No ${path}`); return bytes; }},

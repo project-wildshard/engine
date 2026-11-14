@@ -17,7 +17,7 @@ export async function prepareCheckedProduct(source: Shardfile): Promise<boolean>
     if (!isBuildValidatedOutput(source)) throw new Error('Shardfile needs server validation before client admission');
     return false;
   }
-  const checked = await import('@wildshard/format/product');
+  const checked = await import('@wildshard/format/shardfileAssets');
   await checked.prepareAssetDecoders();
   checked.preflightAssetGraph(source);
   return true;
@@ -33,7 +33,7 @@ export async function checkedProductCosts(source: Shardfile, memory: MemoryAdmis
 export async function validateCheckedProductAssets(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, hash: (bytes: Uint8Array) => string,
   memory: MemoryAdmission | undefined, textures: TextureTranscodeSupport | undefined, sections: ReadonlyMap<string, unknown> | undefined, decodersReady: boolean): Promise<void> {
   if (!(import.meta.env?.SSR ?? true)) throw new Error('Shardfile needs server validation before client admission');
-  if (!decodersReady) await (await import('@wildshard/format/product')).prepareAssetDecoders();
+  if (!decodersReady) await (await import('@wildshard/format/shardfileAssets')).prepareAssetDecoders();
   const { validateShardfileAssets } = await import('@wildshard/format/assetAdmission');
   const { scriptAdmissionRows } = await import('@wildshard/format/scriptContract');
   validateShardfileAssets(source, assets, hash, memory, textures, scriptAdmissionRows(sections));

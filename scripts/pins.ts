@@ -15,7 +15,7 @@
 //
 // `install` is what a build runs first. For each pin, in order:
 //   1. The tarball comes from the cache, the mirror or the API, and its sha256 has to be the pin.
-//   2. This tree's format validator admits it: files, hashes, schemas, budgets (`validateShardfileProduct`).
+//   2. This tree's format validator admits it: files, hashes, schemas, budgets (`validateShardfileFolder`).
 //   3. Its product goes to `out/<folder>`, with any pack a tarball left out rebuilt from its members, so a page and the
 //      grid bake read what they would from a build. Its receipt is issued under this tree's validator revision, by this file, only
 //      after step 2 passed, as `productVerdict` earns one for a head a build never made. The cost numbers stay the
@@ -237,8 +237,8 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   // The validator hashes most members already; the manifest reuses those digests rather than hashing twice.
   const digests = new WeakMap<Uint8Array, string>();
   const digest = (bytes: Uint8Array): string => { let held = digests.get(bytes); if (held === undefined) { held = sha256(bytes); digests.set(bytes, held); } return held; };
-  const { prepareAssetDecoders } = await import('@wildshard/format/product');
-  const { validateShardfileProduct } = await import('@wildshard/format/productValidation');
+  const { prepareAssetDecoders } = await import('@wildshard/format/shardfileAssets');
+  const { validateShardfileFolder } = await import('@wildshard/format/shardfileValidation');
   const { readTar } = await import('@wildshard/format/tar');
   const { restorePacks } = await import('./pin-packs.ts');
   await prepareAssetDecoders();
@@ -286,7 +286,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     const started = performance.now(), files = readTar(bytes);
     const fileNamed = (path: string): Uint8Array => { const body = files.get(path); if (body === undefined) throw new Error(`${pin.slug}: no ${path}`); return body; };
     try {
-      const { warnings } = validateShardfileProduct(
+      const { warnings } = validateShardfileFolder(
         { read: (path, maximum) => { const body = fileNamed(path); if (body.length > maximum) throw new Error(`${path} is over its cap`); return body; }, paths: () => files.keys() },
         { hash: digest },
       );

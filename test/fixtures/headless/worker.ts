@@ -6,7 +6,7 @@ import * as v from 'valibot';
 import { runTickWorker } from '../../../src/server/host/tickWorkerLoop';
 import { parseShardfile } from '../../../src/shared/host/shardfile';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier';
-import { prepareAssetDecoders, offlineMemoryAdmission } from '@wildshard/format/product';
+import { prepareAssetDecoders, offlineMemoryAdmission } from '@wildshard/format/shardfileAssets';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { hashImmutableBytes } from '../../../src/shared/host/immutable';

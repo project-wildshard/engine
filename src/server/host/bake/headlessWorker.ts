@@ -23,7 +23,7 @@ import { simPlayerCommand, MAX_TICK_SNAPSHOT_CHARS, type HeadlessEffect, type He
 import { headlessSections } from '../../../shared/host/headlessSections';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
-import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/product';
+import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 await runTickWorker(async raw => {

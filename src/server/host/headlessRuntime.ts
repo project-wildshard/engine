@@ -3,7 +3,7 @@ import * as v from 'valibot';
 import { runHeadlessJourney } from '../../shared/host/headlessJourney';
 import { registerNativeQuestInputs } from '@wildshard/engine/game/quest/nativeInputs';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
-import { prepareAssetDecoders } from '@wildshard/format/product';
+import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
 import { MoverScriptDriver, type MoverRuntime } from '@wildshard/engine/game/plugin/mover';
 import { installRopeDecks } from './ropeDecks';

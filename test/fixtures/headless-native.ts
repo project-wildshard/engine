@@ -5,7 +5,7 @@ import { installNativeWalkBounds } from './headless/nativeBounds';
 import { installWalkRopeBodies } from './headless/ropeBodies';
 import { runHeadlessJourney } from '../../src/shared/host/headlessJourney';
 import { fillNativeCombatFrame, headlessAssemblyPorts, validateHeadlessCommandOwners, type HeadlessRuntimeInput, type HeadlessRuntimeInstallation, type HeadlessRuntimePreparation, type HeadlessRuntimePlan, type PrepareHeadlessRuntime, type TrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
-import { prepareAssetDecoders } from '@wildshard/format/product';
+import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { prepareProductRuntimePlan } from '../../src/server/game/shardfile/nativePlan';

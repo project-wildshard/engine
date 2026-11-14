@@ -14,7 +14,7 @@ import { encodeCanonicalJson, hashImmutableBytes } from '../src/shared/host/immu
 import { admitProduct as admitBrowser, readProductDescriptor, type ProductOptions } from '../src/client/game/shardfile/product';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import { admitScriptContract, decisionModuleContracts, decisionScriptsFromSections } from '@wildshard/format/scriptContract';
-import { assetCost } from '@wildshard/format/product';
+import { assetCost } from '@wildshard/format/shardfileAssets';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { HeadlessSimulation } from '../src/server/host/headless';
 import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';

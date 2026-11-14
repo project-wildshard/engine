@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/product';
+import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { TickWorkerHost } from './tickWorkerHost';
 import { AuthorProofPlanSchema, TickCommandSchema, type HeadlessCommand, type AuthorProofPlan, type AuthorProofReport, type HeadlessCommandSource, type HeadlessTickCommit, type HeadlessTapePartReport } from '../../shared/host/tickProtocol';
 import * as v from 'valibot';

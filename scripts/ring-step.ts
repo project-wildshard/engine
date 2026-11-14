@@ -27,7 +27,7 @@ const sha256 = (text: string): string => createHash('sha256').update(text).diges
 const line = (tick: number): HeadlessCommand => ({ kind: 'player', moveX: 0.3 * Math.sin(tick / 90), moveZ: -1, yaw: 0, ...(tick % 47 === 0 ? { jump: true as const } : {}), ...(tick % 97 === 0 ? { dodge: true as const } : {}) });
 const only = option('only')?.split(',');
 
-const { prepareAssetDecoders } = await import('@wildshard/format/product');
+const { prepareAssetDecoders } = await import('@wildshard/format/shardfileAssets');
 const { loadRapier } = await import('../src/shared/engine/physics/rapier.ts');
 const { loadHeadlessProduct } = await import('../src/server/host/headlessProduct.ts');
 const { createTrustedHeadlessResident } = await import('../src/server/host/headlessRuntime.ts');

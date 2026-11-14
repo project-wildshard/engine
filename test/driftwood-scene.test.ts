@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { projectPlaceholders } from '../src/sharddev/bake/placeholders';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
-import { prepareAssetDecoders } from '@wildshard/format/product';
+import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { productClosureFile } from '../src/shared/game/shardfile/shardProduct';
