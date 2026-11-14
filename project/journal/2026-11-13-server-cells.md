@@ -32,3 +32,5 @@
   `served`, the roster, native returns, wild stallions), a player who leaves takes their bonded horses with them (no pile-up past
   the taming roster's 64), and a beaten boss (boss rows, phase encounters) stands again once its arena has stood empty 5 min,
   its reward too. Wake fights, open arenas, once-elites, elite skins and some per-player maps are left as a follow-up row.
+- SC7: `cell-mem-bench.mjs --remote wildshard-agent` runs the matrix on the box (replica on staging's cores 9-13, bots on 14-15,
+  scrapes over ssh); each count reports `arrivalTickMax` for SC4.
