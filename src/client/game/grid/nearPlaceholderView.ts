@@ -14,7 +14,6 @@ import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { ResidencyAllocator, ResidencyLease } from '../../../shared/game/grid/allocator';
 import { installFarProxy, type FarPrepared, type FarProxyView } from './farView';
 import { planNearPlaceholders } from './nearPlaceholderPlan';
-import { BudgetDeferrals } from './budgetDeferral';
 
 /** A legacy near view exists only when both files are in this build's asset inventory. */
 export function bakedNearFiles(slug: string, files: Readonly<Record<string, number>>): { readonly row: string; readonly mesh: string } | null {
@@ -58,14 +57,12 @@ export interface NearPlaceholderState {
 export class NearPlaceholders {
   private readonly slots = new Map<string, Slot>();
   private readonly missing = new Set<string>();
-  /** GC6: near views the budget refused (each loads and parses its whole bake first), tried again once room was freed or
-   *  BUDGET_RETRY_MS passed, not on every budget change */
-  private readonly deferred: BudgetDeferrals;
+  private readonly deferred = new Map<string, number>();
   private eye: { x: number; z: number } | null = null;
   private readonly distances = new Map<string, number>();
   private generation = 0;
   private disposed = false;
-  constructor(private readonly host: NearPlaceholderHost) { this.deferred = new BudgetDeferrals(host.allocator); }
+  constructor(private readonly host: NearPlaceholderHost) {}
 
   /** Re-plan around the eye (grid metres; the caller converts from its frame) and stream the difference. */
   update(eye: Readonly<{ x: number; z: number }>, entered: string | null): void {
@@ -87,7 +84,7 @@ export class NearPlaceholders {
     for (const [instance, distance] of wanted) {
       const slot = this.slots.get(instance);
       if (slot === undefined) {
-        if (!this.deferred.waiting(instance)) this.start(instance, distance);
+        if (this.deferred.get(instance) !== this.host.allocator.revision) this.start(instance, distance);
       } else slot.lease?.update({ distance });
     }
   }
@@ -158,7 +155,7 @@ export class NearPlaceholders {
         evictSync: () => { const live = this.slots.get(instance); if (live !== undefined) this.drop(live, false); } });
       if (root === undefined || lease === null) {
         prepared.geometry.dispose(); prepared.light?.dispose(); prepared.colour?.dispose(); this.slots.delete(instance);
-        if (root !== undefined) this.deferred.defer(instance);
+        if (root !== undefined) this.deferred.set(instance, this.host.allocator.revision);
         return; // No headroom: far stays drawn; retry only after charged costs change.
       }
       const view = installFarProxy(root, prepared.geometry, prepared.look, prepared.positionalMask === true, this.host.decorate, true, null, prepared.light ?? null, prepared.colour ?? null);

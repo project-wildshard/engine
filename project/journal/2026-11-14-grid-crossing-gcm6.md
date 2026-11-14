@@ -11,10 +11,12 @@
   Three sequential tours said 3.5 s; interleaved before/after pairs on a loaded box (load average 25 to 30) said no gain,
   and 2 of 8 "after" tours held 12 to 17 s with Nalati's world hook at 15 to 28 s (the wait's 20 s cap), against 0 of 8
   "before". Interleave before and after; sequential runs on this shared Mac lie.
-- The real waste: the per-crossing fetch log showed far-reach's, pine-hollow's and nine-dragon's whole products (descriptor
-  and every section) and their near bakes read 4 to 12 times each during the entry window. A page at its envelope refuses
-  them; the refusal was keyed on the allocator's revision, which every claim anywhere moves, so each was read, parsed and
-  refused again many times a second. `BudgetDeferrals` retries a refused optional read only once room was freed or 3 s
-  passed (the cell ahead's demand read keeps the revision rule).
+- Second try, withdrawn too: far-reach's, pine-hollow's and nine-dragon's products and near bakes were read 4 to 12 times
+  each in the entry window (a refusal keyed on the allocator revision, which every claim moves). Retrying a refused optional
+  read only after freed room or 3 s cut nothing measurable: 5 interleaved pairs, Driftwood to Nalati held 3.9 to 6.9 s in 3
+  "after" tours against 1 (5.2 s) "before"; the same radial read covers the cell ahead, so a backoff can delay it.
+- What is left, for the next owner: the on-road preparation is mostly Nalati's own hooks on a first visit (world 1.5 to
+  2.7 s, afterKit 0.5 to 4 s, play 3 to 8 s, from the grid probe's `hookTimings`), and the far ring re-reads about 12
+  shards' products (descriptor, world sections, bins, all from the HTTP cache) about once a second during it.
 - GC13: the phone tier's allocator admits against G65's 1.0 GB (`PHONE_PLAYING_BYTES`), not the shared caps' 1.2 GB
   Explorer figure, and last-cell retention reads the allocator's envelope.
