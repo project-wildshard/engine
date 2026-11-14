@@ -15,8 +15,8 @@
  *   shadowless warm fill from the anti-sun heading; an environment filtered once from the look's own sky over a ground
  *   colour (`dataLook`).
  *
- * All of it waits behind Settings ▸ Debug ▸ Look ▸ "Look light" (default off, read at load) until Jake picks: with the row
- * off, a look that declares every setting draws as one that declares none.
+ * All of it waits behind Settings ▸ Debug ▸ Look ▸ "Look light" (read at load; default on for desktop since TEMPLATES-CLEANROOM
+ * B2, off on phones): with the row off, a look that declares every setting draws as one that declares none.
  */
 import * as THREE from 'three';
 import type { LookBounce, LookEnvironment, LookLamp, LookLight, LookPools, LookRim } from '@wildshard/format/look-light';

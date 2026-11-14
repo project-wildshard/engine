@@ -200,14 +200,14 @@ ${mist ? `
     shader.fragmentShader = `#ifdef USE_FOG\nuniform float wsLookFogNear; uniform float wsLookFogFar; uniform float wsLookFogEnabled;\n#endif\n${patched}`;
   };
   const owned: { dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null; lut: LookupTexture | null; pools: THREE.Object3D | null; rim: boolean;
-    lamps: THREE.Object3D | null; bounce: ReturnType<typeof bounceLight> | null; environment: THREE.Texture | null } = { dome: null, lut: null, pools: null, rim: false, lamps: null, bounce: null, environment: null };
+    lamps: THREE.Object3D | null; bounce: ReturnType<typeof bounceLight> | null; environment: THREE.WebGLRenderTarget | null } = { dome: null, lut: null, pools: null, rim: false, lamps: null, bounce: null, environment: null };
   const bounceRow = spec.light?.bounce ?? null;
   // the bounce exists from the backdrop on (it follows the clock's sun there); compose adds it to the scene
   if (bounceRow !== null) owned.bounce = bounceLight(bounceRow);
   return {
     ...(spec.neutral === true ? { cell: { replaces: 'tone', build: () => ({ display: new NeutralToneEffect() }) } } as const : {}),
     // the sky builds before the composer: the level scope takes the dome and the LUT here
-    mode: 'extend', chain: 'clean', compose: ({ engineChain, scene, scope, fx }) => {
+    mode: 'extend', chain: 'clean', compose: ({ engineChain, scene, scope, fx, renderer }) => {
       const rim = spec.light?.rim ?? null, pools = spec.light?.pools ?? null, lamps = spec.light?.lamps ?? null;
       if (rim !== null && !owned.rim) {
         owned.rim = true; scope.onDispose(() => { owned.rim = false; });
@@ -238,10 +238,21 @@ ${mist ? `
       if (bounce !== null && bounce.light.parent !== scene) {
         scene.add(bounce.light, bounce.light.target); scope.onDispose(() => { bounce.light.removeFromParent(); bounce.light.target.removeFromParent(); });
       }
-      const environment = owned.environment;
-      if (environment !== null) {
-        scene.environment = environment; scene.environmentIntensity = spec.light?.environment?.intensity ?? 1;
-        scope.onDispose(() => { if (scene.environment === environment) scene.environment = null; environment.dispose(); if (owned.environment === environment) owned.environment = null; });
+      const envRow = spec.light?.environment ?? null;
+      if (envRow !== null && owned.environment === null && owned.dome !== null) {
+        // B2: sky-derived ambient, filtered once from the dome at the look's start (a clock that runs keeps this one). Built
+        // here, not in the backdrop: a grid cell runs only the backdrop and must not hold an unused cube (review MUST 2).
+        // The far plane clears the 600 m dome (fromScene's default 100 m clips it to black).
+        const made = environmentScene(owned.dome, envRow), pmrem = tierPmremGenerator(renderer);
+        let target: THREE.WebGLRenderTarget;
+        try { target = pmrem.fromScene(made.scene, 0.02, 0.1, 1000); } finally { pmrem.dispose(); made.dispose(); }
+        const before = { environment: scene.environment, intensity: scene.environmentIntensity };
+        owned.environment = target;
+        scene.environment = target.texture; scene.environmentIntensity = envRow.intensity;
+        scope.onDispose(() => {
+          if (scene.environment === target.texture) { scene.environment = before.environment; scene.environmentIntensity = before.intensity; }
+          target.dispose(); if (owned.environment === target) owned.environment = null;
+        });
       }
       if (linear) {
         setInheritedPatch(patchFog, { scope, chain: true });
@@ -265,7 +276,7 @@ ${mist ? `
     // G992: no sun disc or corona over the gradient dome. A 1° disc read as a blurred speck with a halo ("half-assed moon
     // or sun", Jake), and a crisp disc alone as a 3 px dot (art/open-plots/sun-disc-g992/board.jpg); the key light is unchanged.
     sky: { clouds: false, planet: false, sun: { disc: false, halo: false } },
-    backdrop: async ({ sky, renderer }) => {
+    backdrop: async ({ sky }) => {
       const clock = dataLookClock(spec.day, spec.dayOverride), now = lookSample();
       const { dome, zenith, horizon } = gradientDome();
       owned.dome = dome;
@@ -291,12 +302,6 @@ ${mist ? `
       sampleLook(spec.keys, clock.hour / 24, now);
       zenith.copy(now.zenith); horizon.copy(now.horizon);
       bounce?.aim(clock.sunDir);
-      const envRow = spec.light?.environment ?? null;
-      if (envRow !== null && owned.environment === null) {
-        // B2: sky-derived ambient, filtered once from the dome at the look's start (a clock that runs keeps this one)
-        const made = environmentScene(dome, envRow), pmrem = tierPmremGenerator(renderer);
-        try { owned.environment = pmrem.fromScene(made.scene, 0.02).texture; } finally { pmrem.dispose(); made.dispose(); }
-      }
       owned.lut = await lutTexture(spec.lut);
       return { clock, horizon: now.fog.clone(), lut: owned.lut, clouds: dome,
         bind: (t) => { targets = t; apply(); },
@@ -440,7 +445,6 @@ export function headingHaze(row: HeadingHazeRow, sun: LookVec3): (shader: Shader
     shader.fragmentShader = head + shader.fragmentShader.replace('#include <fog_fragment>', fog);
   };
 }
-
 
 /** A painted look's dome (its sky layer) and the heading strip its haze reads (null on a painted-strip sky). */
 export interface PaintedSky { readonly dome: THREE.Mesh<THREE.BufferGeometry, THREE.Material>; readonly strip: THREE.Texture | null }
