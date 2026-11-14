@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.20 (2026-11-14)
+
+- Big desktop screens stay smoother: the game drops its render sharpness a step when frames run slow and raises it again when there is room.
+- Walking into the next shard is faster: the shard ahead loads first, and you no longer freeze at the edge of a shard while it builds.
+- Glowing parts of a shard, like lamps and lit windows, glow again in the new looks.
+- A small chip tells you when your connection is slow or unstable, and coming back after a long time away shows a welcome back card.
+- Behind the scenes: the server spreads busy shards across its workers by how much work each one costs, and its monitoring works again.
+
 ## v0.1.19 (2026-11-13)
 
 - Mossgate Hollow and Brasscap Mesa have new looks: sunset sky, warm lamps, mossy stone, and a beach edge on Mossgate's pond.
