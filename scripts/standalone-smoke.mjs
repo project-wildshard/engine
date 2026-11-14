@@ -16,6 +16,7 @@ import { codeDirectory, stampBuildHtml } from './app-build/buildIdentity.mjs';
 import { standaloneDirectory, writeStandaloneOutput } from './app-build/standaloneOutput.mjs';
 import { readBuiltShardfile } from './built-product.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { documentIsolation } from './app-build/isolation.mjs';
 
 const ROOT = resolveFile(import.meta.dirname, '..'), OUT = join(ROOT, 'tmp', 'standalone-smoke'), EMITTED = join(OUT, 'emitted');
 const option = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
@@ -46,16 +47,20 @@ const resolvePath = path => {
 };
 const declaredCreatures = join(unpacked !== '' || dist === '' ? resolveFile(product) : join(output, 'shardfiles', slug), 'sections/actors/creatures.json');
 const declaresCreatures = !existsSync(declaredCreatures) || JSON.parse(readFileSync(declaredCreatures, 'utf8')).creatures?.spawns?.length !== 0;
+// PZ12 (J274): the build's own isolation (its `_headers` `/*` rule, dist/ only), on every answer, as its host sends it
+const isolation = dist === '' || !existsSync(join(output, '_headers')) ? {} : documentIsolation(readFileSync(join(output, '_headers'), 'utf8'));
+const isolatedBuild = isolation['cross-origin-embedder-policy'] === 'require-corp' && isolation['cross-origin-opener-policy'] === 'same-origin';
 const server = createServer((request, response) => {
   const path = new URL(request.url ?? '/', 'http://localhost').pathname;
   // The uncached pointer (J57): only these two responses say which build is live.
-  if (path === '/') { response.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' }).end(stampBuildHtml(html, pointer)); return; }
+  if (path === '/') { response.writeHead(200, { ...isolation, 'content-type': 'text/html', 'cache-control': 'no-store' }).end(stampBuildHtml(html, pointer)); return; }
   if (path === '/version.json') { response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify({ build: pointer })); return; }
   // WebKit asks for the page's service worker over the pointer's reload, and a build has one. This smoke's has nothing to cache.
   if (path === '/sw.js') { response.writeHead(200, { 'content-type': 'text/javascript' }).end(); return; }
   const file = resolvePath(path);
   if (file === null || !existsSync(file) || !statSync(file).isFile()) { response.writeHead(404).end(); return; }
-  response.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', ...file.endsWith('.pack.br') ? { 'content-encoding': 'br' } : {} }); // no COOP / COEP (J59 Q8)
+  // J59 Q8: the loopback needs no SharedArrayBuffer; an isolated channel's build (PZ12) sends its COOP / COEP on every file
+  response.writeHead(200, { ...isolation, 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', ...file.endsWith('.pack.br') ? { 'content-encoding': 'br' } : {} });
   createReadStream(file).pipe(response);
 });
 await new Promise(resolve => { server.listen(0, '127.0.0.1', resolve); });
@@ -96,7 +101,7 @@ try {
   // A shard that declares no creature has no row to walk to (Nine's spawns are empty): the check holds for every shard that declares one.
   check('rows checked against the worker', report.probes >= seconds * 2 && (report.matched > 0 || !declaresCreatures), report);
   check('rows within one quantisation step', report.worstError <= report.step, { worst: report.worstError, step: report.step });
-  check('no cross-origin isolation', !report.crossOriginIsolated, report.crossOriginIsolated);
+  check(isolatedBuild ? 'cross-origin isolated, as its channel (PZ12)' : 'no cross-origin isolation', report.crossOriginIsolated === isolatedBuild, report.crossOriginIsolated);
   check('commands reached the worker', report.positionMoved > 5, report.positionMoved);
   check('save durable', saved.ok && stored > 0, { saved, stored });
   check('save survives the reload', second.restored && second.tick === saved.tick, { second, saved });

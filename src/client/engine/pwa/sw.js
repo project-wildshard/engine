@@ -4,6 +4,8 @@ import { diagnosticNow } from '../../../shared/engine/core/clock';
  * No fetched-body reconstruction, checksums, receipts, packs, retries or work timers. */
 const BUILD = '__BUILD_ID__';
 const DOCUMENT = '__DOCUMENT__';
+// PZ12 (J274): the page origin's COOP and COEP for the baked document (empty on a channel that is not isolated)
+const DOCUMENT_HEADERS = (baked => baked.startsWith('{') ? JSON.parse(baked) : {})('__DOCUMENT_HEADERS__');
 const ASSETS = '__ASSET_CACHE__';
 const BOOKS = 'ws-builds-v1';
 const SHELL_PREFIX = 'ws-shell-v3-';
@@ -399,7 +401,7 @@ workerScope.listen(self, 'fetch', event => {
   if (url.pathname === '/version.json' || url.pathname === '/sw.js' || url.pathname.startsWith('/api/')) return;
   if (request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
     const received=diagnosticNow();
-    event.respondWith(new Response(DOCUMENT, { headers: { 'content-type': 'text/html;charset=utf-8', 'cache-control': 'no-store' } }));
+    event.respondWith(new Response(DOCUMENT, { headers: { ...DOCUMENT_HEADERS, 'content-type': 'text/html;charset=utf-8', 'cache-control': 'no-store' } }));
     bootPublish(event,[{operation:'sw:navigation-handler-and-delivery',url:request.url,start:received,end:diagnosticNow(),result:'complete'}]);
     return;
   }

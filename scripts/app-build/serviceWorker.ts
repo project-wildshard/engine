@@ -8,6 +8,7 @@ import { ASSET_CACHE_NAME } from '../../src/client/engine/pwa/cacheNames';
 import { serverPackBookPath } from '../../src/shared/game/shardfile/serverPack';
 import { packsBookPath } from '../../src/shared/game/shardfile/spawnManifest';
 import { titleAssetURLs } from '../title-assets.mjs';
+import { documentIsolation } from './isolation.mjs';
 import { writtenBundle, type EmittedFile } from './writtenBundle';
 
 /** Update checks fetch this tiny bootstrap; the core URL names its exact bytes. */
@@ -56,7 +57,8 @@ function documentContentBase(html: string): string {
 interface Book { readonly url: string; readonly bytes: Uint8Array }
 
 /** The build owns names. No worker parses boot banks, packs or runtime product metadata. */
-export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedFile>>, root: string, buildId: string, serverBook?: Book, packsBook?: Book): Promise<{
+export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedFile>>, root: string, buildId: string, serverBook?: Book, packsBook?: Book,
+  documentHeaders: Readonly<Record<string, string>> = {}): Promise<{
   core: string; build: string; assets: string; hashed: string[];
 }> {
   const document = bundle['index.html'];
@@ -87,6 +89,8 @@ export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedF
   // PZ10: with a content base, every content path (the books, the title art) is read from it, so the worker precaches it
   // there, into its cross-build content cache; the page keeps code and shell. With none, the lists are today's.
   const base = documentContentBase(html);
+  // PZ12: a change of the document's isolation is a new worker (empty on a channel that is not isolated: its id is unchanged)
+  if (Object.keys(documentHeaders).length > 0) digest.update(JSON.stringify(documentHeaders));
   // The build's server book with its code: a device that adopts a build and goes offline can still read a server class it holds.
   let files = [...hashed, ...portraits, ...serverBook === undefined ? [] : [serverBook.url]], shellList = shell.filter(url => !portraits.includes(url));
   let content: string[] = [];
@@ -102,7 +106,9 @@ export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedF
     .replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
     .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shellList)))
     .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base, files: content })))
-    .replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(html));
+    .replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(html))
+    // PZ12: the page origin's COOP and COEP on the baked document, so a load the worker serves is isolated like the network's
+    .replace(/['"]__DOCUMENT_HEADERS__['"]/u, () => JSON.stringify(JSON.stringify(documentHeaders)));
   return { core, build, assets: ASSET_CACHE_NAME, hashed };
 }
 
@@ -151,7 +157,8 @@ export async function writeServiceWorker(outDir: string, root: string): Promise<
     const file = [join(outDir, path), join(`${resolve(outDir)}-content`, path)].find(at => existsSync(at));
     return file === undefined ? undefined : { url: `/${path}`, bytes: readFileSync(file) };
   };
-  const { core, build, hashed } = await serviceWorkerCore(splitBundle(outDir, writtenBundle(outDir, root)), root, buildId, book(serverPackBookPath(buildId)), book(packsBookPath(buildId))), scripts = workerScripts(core);
+  const headersFile = join(outDir, '_headers'), documentHeaders = existsSync(headersFile) ? documentIsolation(readFileSync(headersFile, 'utf8')) : {};
+  const { core, build, hashed } = await serviceWorkerCore(splitBundle(outDir, writtenBundle(outDir, root)), root, buildId, book(serverPackBookPath(buildId)), book(packsBookPath(buildId)), documentHeaders), scripts = workerScripts(core);
   mkdirSync(dirname(join(outDir, scripts.fileName)), { recursive: true });
   writeFileSync(join(outDir, scripts.fileName), core);
   writeFileSync(join(outDir, 'sw.js'), stampWorker(scripts.bootstrap, outDir));
