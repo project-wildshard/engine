@@ -1,16 +1,22 @@
-# 2026-11-13: the dev scene host (SHARD-SOURCE AP5)
+# 2026-11-13: the dev hook (SHARD-SOURCE AP5)
 
-> Written by: Claude (lane opus-ap1)
+> Written by: Claude (lanes opus-ap1, opus-ap5)
 
 J339 wants an author's edit on screen in 3 s or less with no reload. `wildshard dev` rebuilds the whole product and
-reloads the page. `src/client/game/devScene/` is the page half of the new `wildshard watch`: the dev server lowers the
-author's three.js scene to parts, and a DEVSERVER page fetches only the parts whose hash changed (and only the geometry
-and rasters it lacks, both immutable by key), then swaps each in one call so no frame shows neither and the player and
-frame loop are untouched. M1 draws parts as plain three meshes, PointLights and cuboid WORLD colliders, not through the
-engine's own families: that is the proof slice's shortcut, to revisit with M2's look rows. Production never carries it:
-`DEVSERVER` folds the import away and `check-devserver.mjs` now refuses a bundle holding `/__wildshard_scene/`.
+reloads the page. The first cut (opus-ap1) put a whole dev scene host in engine: the transport (SSE plus fetch), the
+wire and the part swap. J347 (Jake, 23:00 Cancún) moved the line: engine is the deployed MMO client and server only, dev
+and authoring tooling is sharddev's. So engine now keeps one thing, `src/client/game/devScene/hook.ts`: a versioned,
+DEVSERVER-only hook with five calls (add, replace and remove a part, set the look, swap a part's colliders). sharddev's
+`watch` owns the WebSocket server, the protocol, the part diff and the page script it injects, which owns one scope per
+part and the swap order and calls the hook.
 
-Review fixes the same night: a revision's parts are built before any old part is released (a mesh moved between parts
-kept its geometry), a failed build rolls back, and the hook reads `__DEVSERVER__` in `finish.ts` itself. The `DEVSERVER`
-const imported from `grid/menu` did not fold across modules: a production build kept the host's chunk, and the new
-`check-devserver.mjs` line caught it.
+The hook draws through engine's own pieces where they exist: a part's lamps are the look's `lampLights`, its water is
+`installClientWater`, the look is the data look's day keys swapped in place (`liveKeys`; a fog kind change can't go live
+and the page reloads). Meshes and materials are still plain three ones, as M1's proof slice needs. Colliders go into
+both worlds: the page's (the player's prediction) and the in-page server's, over the worker's harness port, through one
+shared `swapDevBoxes`; before, only the page had them, so the server let the player walk through the hut.
+
+Production never carries it: `finish.ts`, `clientWorker.ts`, the standalone shell and the server host each read
+`__DEVSERVER__` in their own module (a `DEVSERVER` const imported from `grid/menu` did not fold across modules), and
+`check-devserver.mjs` refuses a bundle holding `__wildshardDevHook` or `wildshardDevColliders`. A devserver build's
+`build-flags.json` names `devHook`, which sharddev checks against its own version before it serves a page.

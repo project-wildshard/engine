@@ -12,6 +12,7 @@ import type { SaveStorage } from '@wildshard/engine/saves/store';
 import { ServerMessageSchema, ShellMessageSchema, type ProbedRow, type ServerMessage, type ShellMessage } from '@wildshard/format/standaloneControl';
 import { answerHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import type { HarnessFlag, HarnessGod, HarnessHits, HarnessJoin, HarnessMove, HarnessPlace } from '../../../shared/host/standalone/harnessPlace';
+import type { DevBox, DevCollidersMessage } from '@wildshard/engine/game/devColliders';
 import type { ServerWorkerStart } from '../../../server/host/standalone/serverRuntime';
 import { WorkerLoopback } from '../../../shared/host/standalone/workerLoopback';
 
@@ -66,6 +67,8 @@ export interface StandaloneShell {
   raise: (flag: string) => void;
   /** A proof's second client, a real one on its own link: it stands at this point in this cell, and `move` puts its body elsewhere. */
   join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void };
+  /** SHARD-SOURCE AP5: a watched part's solid boxes for the server's world (DEVSERVER pages only; elsewhere it does nothing). */
+  devColliders: (name: string, boxes: readonly DevBox[]) => void;
   dispose: () => void;
 }
 
@@ -136,6 +139,7 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
     hardHits: by => { harness?.postMessage({ hits: by } satisfies HarnessHits, []); },
     bossGod: () => { harness?.postMessage({ god: true } satisfies HarnessGod, []); },
     raise: flag => { harness?.postMessage({ flag } satisfies HarnessFlag, []); },
+    devColliders: (name, boxes) => { if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) harness?.postMessage({ wildshardDevColliders: name, boxes } satisfies DevCollidersMessage, []); },
     join: (id, x, y, z) => {
       const line = new MessageChannel(), second = new NetClient(new WorkerLoopback(line.port1));
       harness?.postMessage({ join: id, x, y, z } satisfies HarnessJoin, [line.port2]);

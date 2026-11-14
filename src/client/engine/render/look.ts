@@ -1,6 +1,7 @@
 import type { Camera, Color, DirectionalLight, Fog, Group, HemisphereLight, Material, Mesh, Object3D, Sprite, Texture, Vector3, PerspectiveCamera, Scene, WebGLRenderer, WebGLRenderTarget } from 'three';
 import type { BloomEffect, BrightnessContrastEffect, ChromaticAberrationEffect, Effect, EffectComposer, GodRaysEffect, HueSaturationEffect, LookupTexture, LUT3DEffect, NoiseEffect, Pass, ToneMappingEffect, VignetteEffect } from 'postprocessing';
 import type { N8AOPostPass } from 'n8ao';
+import type { LookKey } from './dataLook';
 import type { GradeEffect } from '../core/Grade';
 import type { DayCycleClock } from '../../../shared/engine/world/dayCycle';
 import type { SkyRig as Sky } from '../world/skyRig';
@@ -259,6 +260,11 @@ export interface ExtendLook extends LookParts {
    * cell carries its engine chain only. Standalone its compose builds its composite as before.
    */
   cell?: LookCellComposite;
+  /**
+   * A data look's day keys replaced in place (SHARD-SOURCE AP5: `wildshard watch` sets a look live through engine's dev
+   * hook); the next frame samples them. False: this look can't take them live (a fog kind change), so the page reloads.
+   */
+  liveKeys?: (keys: readonly LookKey[]) => boolean;
   compose: (c: LookComposeContext) => LookComposition;
 }
 

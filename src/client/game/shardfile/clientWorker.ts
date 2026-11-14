@@ -1,6 +1,7 @@
 // P1-E5.3 I6 (J126), E6: every page runs the real Game and Player against the real server in its worker: the Player predicts and
 // reconciles, and every creature is an interpolated row drawn by the real views.
 import type { Scope } from '@wildshard/engine/app/scope';
+import type { DevBox } from '@wildshard/engine/game/devColliders';
 import type { LiveGridWire } from '../grid/liveSession';
 import { chosenCell, gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
@@ -128,7 +129,7 @@ function releaseKeep(): ReleaseKeep {
 }
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
 interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean } }) => Promise<Shell> }
-interface Shell { readonly redials?: true; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
+interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: readonly DevBox[]) => void; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
 
 const SAVE_EVERY_MS = 30_000;
 /** How long the card waits for the server's first rows, and how often it looks. A server that has booted says them in a tick. */
@@ -166,7 +167,7 @@ export interface WorkerClientReport {
 }
 /** A fight as a proof reads it: its row, where its body stands and the server's name for it. */
 export type WorkerClientFight = EncounterRow & { readonly at: { readonly x: number; readonly y: number; readonly z: number } | null; readonly name: string | null };
-declare global { interface Window { __onlinePlayers?: () => OtherPlayers['shown']; __workerClientFights?: () => readonly WorkerClientFight[]; __workerClientHits?: (by: number) => void; __workerClientTravel?: (to: ShardSlug) => void;__workerClientSky?: (name: string) => void; __workerClientTime?: (pick: OptionValue<'time'>) => void; __workerClientRow?: (name: string) => number | undefined; __workerClientFlag?: (flag: string) => void; __workerClientRows?: (kind: string) => readonly { readonly x: number; readonly y: number; readonly z: number }[]; __workerClientGate?: (flag: string) => boolean; __workerClientBot?: (id: string, x: number, y: number, z: number) => { readonly move: (x: number, y: number, z: number) => void; readonly press: (id: string) => void; readonly end: () => void }; __workerClient?: () => WorkerClientReport; __workerClientSave?: () => Promise<void> } }
+declare global { interface Window { __onlinePlayers?: () => OtherPlayers['shown']; __workerClientFights?: () => readonly WorkerClientFight[]; __workerClientHits?: (by: number) => void; __workerClientTravel?: (to: ShardSlug) => void;__workerClientSky?: (name: string) => void; __workerClientTime?: (pick: OptionValue<'time'>) => void; __workerClientRow?: (name: string) => number | undefined; __workerClientFlag?: (flag: string) => void; __workerClientDevColliders?: (name: string, boxes: readonly DevBox[]) => void; __workerClientRows?: (kind: string) => readonly { readonly x: number; readonly y: number; readonly z: number }[]; __workerClientGate?: (flag: string) => boolean; __workerClientBot?: (id: string, x: number, y: number, z: number) => { readonly move: (x: number, y: number, z: number) => void; readonly press: (id: string) => void; readonly end: () => void }; __workerClient?: () => WorkerClientReport; __workerClientSave?: () => Promise<void> } }
 
 /** The page's pose inputs, as acts short enough to go. */
 function poseActs(names: ReadonlySet<string>): readonly string[] {
@@ -580,6 +581,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   window.__onlinePlayers = () => others?.shown ?? [];
   window.__workerClientHits = by => { shell.hardHits(by); };
   window.__workerClientFlag = flag => { shell.raise(flag); };
+  // SHARD-SOURCE AP5: the dev hook's `swapColliders` reaches the in-page server here (DEVSERVER only: the define folds it away)
+  if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) window.__workerClientDevColliders = (name, boxes) => { shell.devColliders?.(name, boxes); };
   window.__workerClientTravel = to => { travel({ to, mode: 'enter' }); };
   window.__workerClientSky = name => { wirePage.climate({ op: 'force', name, at: 0.1 }); };
   window.__workerClientTime = pick => { saveSetting('time', pick); };

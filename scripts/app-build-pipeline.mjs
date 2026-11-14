@@ -43,6 +43,13 @@ function carryBudget(outDir) {
   return { files: Math.max(0, PAGE_LIMITS.files - files), bytes: Math.max(0, PAGE_LIMITS.bytes - bytes) };
 }
 
+/** SHARD-SOURCE AP5: the dev hook's version (`DEV_HOOK_VERSION` in src/client/game/devScene/hook.ts), for a devserver build's flags. */
+function devHookVersion() {
+  const version = /export const DEV_HOOK_VERSION = (\d+);/u.exec(readFileSync(resolve(import.meta.dirname, "../src/client/game/devScene/hook.ts"), "utf8"))?.[1];
+  if (version === undefined) throw new Error("app-build: src/client/game/devScene/hook.ts names no DEV_HOOK_VERSION");
+  return Number(version);
+}
+
 /** A refused child step; the CLI preserves its code, library callers can clean up. */
 export class AppBuildFailureError extends Error {
   /** @param {number} exitCode */
@@ -245,7 +252,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(
     resolve(outDir, "build-flags.json"),
-    JSON.stringify({ devserver: mode === "devserver" }),
+    // SHARD-SOURCE AP5: a devserver client names its dev hook's version, which sharddev's `watch` checks against its own
+    JSON.stringify(mode === "devserver" ? { devserver: true, devHook: devHookVersion() } : { devserver: false }),
   );
 
   // the data products beside the app (was vite/outputProducts.ts)

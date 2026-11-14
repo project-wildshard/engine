@@ -210,6 +210,8 @@ function cellTone(spec: { readonly neutral?: boolean; readonly aces?: boolean; r
 export function dataLook(spec: DataLookSpec): LookStrategy {
   if (spec.keys.length === 0) throw new Error('[look] a data look needs at least one key');
   const linear = spec.keys[0]?.fog.near !== undefined;
+  // the keys the frame samples: a `liveKeys` call (sharddev `watch`, through engine's dev hook) replaces them in place
+  let keys = spec.keys;
   // the mist's GLSL is in the linear fog only when the look declares it (LF1-4): off, the shader text is as before
   const mist = (spec.light?.heightFogDensity ?? 0) > 0;
   const fog = { wsLookFogNear: new THREE.Uniform(0), wsLookFogFar: new THREE.Uniform(1), wsLookFogEnabled: new THREE.Uniform(0) };
@@ -246,6 +248,12 @@ ${mist ? `
   if (bounceRow !== null) owned.bounce = bounceLight(bounceRow);
   return {
     ...cellTone(spec),
+    liveKeys: (next) => {
+      // a fog kind change (exponential to linear, or back) changes the fog patch's shader text: that needs a new look
+      if (next.length === 0 || next.some((key) => (key.fog.near !== undefined) !== linear)) return false;
+      keys = next;
+      return true;
+    },
     // the sky builds before the composer: the level scope takes the dome and the LUT here
     mode: 'extend', chain: 'clean', compose: ({ engineChain, scene, scope, fx, renderer }) => {
       const rim = spec.light?.rim ?? null, pools = spec.light?.pools ?? null, lamps = spec.light?.lamps ?? null;
@@ -342,7 +350,7 @@ ${mist ? `
       const bounce = owned.bounce;
       let targets: SkyBackdropTargets | null = null, flicker = 0;
       const apply = (): void => {
-        sampleLook(spec.keys, clock.hour / 24, now);
+        sampleLook(keys, clock.hour / 24, now);
         zenith.copy(now.zenith); horizon.copy(now.horizon);
         sky.setKeyLight(clock.sunDir, now.sun, now.sunIntensity);
         bounce?.aim(clock.sunDir);
@@ -359,7 +367,7 @@ ${mist ? `
         targets.fogU.fogDistDensity.value = now.fogDensity; targets.fogU.fogHeightDensity.value = spec.light?.heightFogDensity ?? 0;
         targets.fogU.fogSunColor.value.copy(now.sun);
       };
-      sampleLook(spec.keys, clock.hour / 24, now);
+      sampleLook(keys, clock.hour / 24, now);
       zenith.copy(now.zenith); horizon.copy(now.horizon);
       bounce?.aim(clock.sunDir);
       owned.lut = await lutTexture(spec.lut);

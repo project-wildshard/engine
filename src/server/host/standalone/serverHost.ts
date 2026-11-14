@@ -20,6 +20,7 @@ import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import { StandaloneGrid } from './gridServer';
 import { isHarnessFlag, isHarnessGod, isHarnessHits, isHarnessJoin, isHarnessMove, isHarnessPlace } from '../../../shared/host/standalone/harnessPlace';
 import { WorkerLoopback } from '../../../shared/host/standalone/workerLoopback';
+import { isDevColliders, swapDevBoxes } from '@wildshard/engine/game/devColliders';
 import { ProgressSaves, ProgressWatch } from './progressWatch';
 
 type Boot = Extract<ShellMessage, { kind: 'boot' }>;
@@ -98,7 +99,9 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     if (restored?.ledger !== undefined) book.restore(restored.ledger);
     server.connect(new WorkerLoopback(game));
     watch.look(server.host, book.filed); // where the world stands before its first tick: what that tick moves is progress
-    if (options.harness !== undefined) options.harness.onmessage = (event: MessageEvent<unknown>): void => { const [port] = event.ports; if (isHarnessJoin(event.data) && port !== undefined) server.join(event.data, new WorkerLoopback(port)); else if (isHarnessFlag(event.data)) server.raise(event.data.flag); else if (isHarnessMove(event.data)) server.place(event.data, event.data.move); else if (isHarnessPlace(event.data)) server.place(event.data); else if (isHarnessHits(event.data)) server.hardHits(event.data.hits); else if (isHarnessGod(event.data)) server.bossGod(); };
+    // SHARD-SOURCE AP5: `wildshard watch`'s part colliders, in this world as in the page's (DEVSERVER only: the define folds it away)
+    const devBoxes = new Map<string, Scope>();
+    if (options.harness !== undefined) options.harness.onmessage = (event: MessageEvent<unknown>): void => { const [port] = event.ports; if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && isDevColliders(event.data)) swapDevBoxes(server.host.physics, server.host.scope, devBoxes, event.data.wildshardDevColliders, event.data.boxes); else if (isHarnessJoin(event.data) && port !== undefined) server.join(event.data, new WorkerLoopback(port)); else if (isHarnessFlag(event.data)) server.raise(event.data.flag); else if (isHarnessMove(event.data)) server.place(event.data, event.data.move); else if (isHarnessPlace(event.data)) server.place(event.data); else if (isHarnessHits(event.data)) server.hardHits(event.data.hits); else if (isHarnessGod(event.data)) server.bossGod(); };
     clock = new ServerClock({ now: diagnosticNow, wait: (ms, run) => { const timer = scope.timeout(ms, run); return () => { scope.cancelTimer(timer); }; },
       step: () => { try { server.tick(); progress(server); } catch (error) { fail(error); } } });
     options.proof?.booted?.(server);

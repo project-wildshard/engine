@@ -397,10 +397,11 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   installProbe(handle, { leakPhysics, health: () => playerHealth.attributes.health, quest: () => ({ adventure: boot.runtime.hooks.adventureFlags?.() ?? [], quest: boot.runtime.hooks.questFlags?.() ?? [] }),
     // T2E-1b: a grid page's area is the cell the player is in, not the shell
     area: () => grid === null ? shardArea(slug, app.debug.snapshot()['shardfile'], boot.runtime.hooks.questFlags?.() ?? []) : grid.area() });
-  // SHARD-SOURCE AP5: under `wildshard watch` the dev server streams the author's scene parts into this page; a production
+  // SHARD-SOURCE AP5 (J347): a DEVSERVER page carries the dev hook sharddev's `watch` page script drives; a production
   // build's define makes this `false` in this module, so the import and its chunk go (scripts/check-devserver.mjs checks;
   // DEVSERVER imported from grid/menu did not fold across modules and kept the chunk).
-  if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) void import('../devScene/connect').then(dev => dev.connectDevScene({ scope: game.levelScope, scene: game.rootScene, physics: world.physics, watchFrames: fn => game.watchFrames(fn) }))
+  if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) void import('../devScene/hook').then(dev => dev.installDevHook({ scope: game.levelScope, scene: game.rootScene, physics: world.physics,
+    look: () => game.look, server: () => window.__workerClientDevColliders ?? null, watchFrames: fn => game.watchFrames(fn) }))
     .catch((cause: unknown) => { console.error('[devScene]', cause); });
   ctx.startExplore?.();
   document.dispatchEvent(new Event('ws:ready')); // booted to the title
