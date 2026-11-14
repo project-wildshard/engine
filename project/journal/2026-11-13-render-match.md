@@ -10,3 +10,4 @@
 - The render hosts' tests: test/look-light.test.ts (phone gating, flicker), test/look-render.test.ts.
 - Review MUST (claude -p): a grid cell never runs compose, so ACES and the exposure ride the cell's own display (AcesToneEffect), as Neutral does. Halos dispose their instance buffer.
 - CI: lookRender's halos on the model contract's effect list; the wire lockfile entry kept as main writes it.
+- M4.8 (opus-mossrender2): the PBR family passes format 0.5.3's `emissive` (sRGB) and `emissiveIntensity` to MeshStandardMaterial, so lit lamp glass can glow while the sun still lights it. Brazier flames need no engine host: the Template draws layered additive emissive tongues.

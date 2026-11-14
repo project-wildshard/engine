@@ -62,6 +62,8 @@ export function compilePbr(params: PbrMaterialParams, textures: TextureResolver,
     alphaTest: params.alphaCutoff,
   });
   m.name = 'family:pbr';
+  // M4.3: the surface's own glow, added over its lit colour (lamp glass that the sun still lights); absent = black
+  if (params.emissive !== undefined) { m.emissive.setRGB(...params.emissive, THREE.SRGBColorSpace); m.emissiveIntensity = params.emissiveIntensity ?? 1; }
   if (params.ground !== null && params.measure !== null) throw new Error('material family: a PBR surface takes a ground or a measure layer, not both');
   if (params.ground !== null) applyGround(m, params.ground, textures, emitterPools);
   if (params.measure !== null) applyMeasure(m, params.measure);
