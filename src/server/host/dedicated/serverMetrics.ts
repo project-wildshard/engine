@@ -40,6 +40,7 @@ export class ServerMetrics {
   private readonly lag: Gauge<'thread' | 'quantile'>;
   private readonly memory: Gauge<'thread' | 'kind'>;
   private readonly tick: Gauge<'worker' | 'quantile'>;
+  private readonly cellTick: Gauge<'cell'>;
   private readonly rate: Gauge<'worker'>;
   private readonly drops: Counter<'worker'>;
   private readonly awake: Gauge<'worker'>;
@@ -60,6 +61,7 @@ export class ServerMetrics {
     this.memory = new Gauge({ name: 'wildshard_thread_memory_bytes', help: 'Each thread\'s own heap, external and array-buffer bytes (a worker\'s from its last reading).', labelNames: ['thread', 'kind'], registers,
       collect() { const own = process.memoryUsage(); this.set({ thread: 'main', kind: 'heap' }, own.heapUsed); this.set({ thread: 'main', kind: 'external' }, own.external); this.set({ thread: 'main', kind: 'arrayBuffers' }, own.arrayBuffers); } });
     this.tick = new Gauge({ name: 'wildshard_tick_seconds', help: 'Tick time per worker over its last 10 s reading.', labelNames: ['worker', 'quantile'], registers });
+    this.cellTick = new Gauge({ name: 'wildshard_cell_tick_seconds', help: 'SC8: each awake cell\'s mean tick time over its worker\'s last 10 s reading (its awake cost).', labelNames: ['cell'], registers });
     this.rate = new Gauge({ name: 'wildshard_ticks_per_second', help: 'Ticks per second per worker over its last 10 s reading.', labelNames: ['worker'], registers });
     this.drops = new Counter({ name: 'wildshard_tick_drops_total', help: 'Ticks a worker\'s clock dropped to catch up.', labelNames: ['worker'], registers });
     this.registry.registerMetric(new Gauge({ name: 'wildshard_cells_resident', help: 'Cells open in memory, per worker (from /health\'s table).', labelNames: ['worker'], registers: [],
@@ -83,6 +85,7 @@ export class ServerMetrics {
     const worker = String(index);
     for (const [quantile, ms] of [['0.5', row.p50], ['0.95', row.p95], ['0.99', row.p99], ['1', row.max]] as const) this.tick.set({ worker, quantile }, ms / 1000);
     this.rate.set({ worker }, row.ticksPerSecond);
+    for (const [cell, ms] of Object.entries(row.cellMs ?? {})) this.cellTick.set({ cell }, ms / 1000);
     this.drops.inc({ worker }, Math.max(0, row.drops));
     this.awake.set({ worker }, row.awake);
     this.players.set({ worker }, row.players);

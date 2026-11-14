@@ -109,6 +109,8 @@ async function phase(/** @type {number} */ seconds, /** @type {string[]} */ work
     tickP50: Math.max(0, ...ticks.map(row => row.p50)), tickP95: Math.max(0, ...ticks.map(row => row.p95)), tickP99: Math.max(0, ...ticks.map(row => row.p99)), tickMax: Math.max(0, ...ticks.map(row => row.max)),
     drops: ticks.reduce((total, row) => total + row.drops, 0), minTicksPerSecond: Math.min(60, ...ticks.map(row => row.ticksPerSecond)),
     awake: Math.max(0, ...samples.map(row => sum(row, 'wildshard_cells_awake'))), players: Math.max(0, ...samples.map(row => sum(row, 'wildshard_players'))),
+    // SC8: each cell's awake cost, the median of its worker's readings (mean ms per tick it was awake): `workerTable`'s weights.
+    cellMs: (() => { const by = /** @type {Record<string, number[]>} */ ({}); for (const row of ticks) for (const [slug, ms] of Object.entries(row.cellMs ?? {})) (by[slug] ??= []).push(/** @type {number} */ (ms)); return Object.fromEntries(Object.entries(by).map(([slug, list]) => [slug, Number(median(list).toFixed(3))])); })(),
     perThreadHeapMB: Object.fromEntries(Object.entries(last).filter(([name]) => name.startsWith('wildshard_thread_memory_bytes') && name.includes('kind="heap"')).map(([name, value]) => [/thread="([^"]+)"/u.exec(name)?.[1] ?? name, mb(value)])),
   };
 }

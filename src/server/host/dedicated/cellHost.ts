@@ -84,6 +84,8 @@ function installCellIdentity(): void {
 export function runCells(port: CellPort, options: CellHostOptions): { dispose: () => void } {
   const scope = new Scope('dedicated.worker'), started = diagnosticNow(), cells = new Map<string, Cell>();
   let clock: ServerClock | undefined, disposed = false, ready = false, ticks: number[] = [], ticked = 0, readAt = started, dropsAt = 0;
+  /** SC8: each awake cell's own tick time since the last reading (ms summed, ticks counted), so a bench can weigh cells by awake cost. */
+  let spent = new Map<string, { ms: number; ticks: number }>();
   const post = (news: WorkerNews): void => { port.postMessage(news); };
   const fail = (error: unknown): void => { clock?.pause(); post({ kind: 'failed', reason: error instanceof Error ? error.message : String(error) }); };
   // GC15: the road this worker hosts, once its cells are open, and what its cells need of it.
@@ -144,7 +146,16 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
   };
   const step = (): void => {
     const begun = diagnosticNow();
-    try { for (const { room } of cells.values()) if (room.taken > 0) room.tick(); if (road !== undefined && road.taken > 0) road.tick(); } catch (error) { fail(error); return; }
+    try {
+      for (const { slug, room } of cells.values()) {
+        if (room.taken === 0) continue;
+        const at = diagnosticNow();
+        room.tick();
+        const own = spent.get(slug) ?? { ms: 0, ticks: 0 };
+        own.ms += diagnosticNow() - at; own.ticks++; spent.set(slug, own);
+      }
+      if (road !== undefined && road.taken > 0) road.tick();
+    } catch (error) { fail(error); return; }
     ticks.push(diagnosticNow() - begun); ticked++;
     if (ticks.length > TICKS_KEPT) ticks.shift();
   };
@@ -156,8 +167,9 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const row: WorkerReading = { cells: rooms.length, awake: rooms.filter(room => room.taken > 0).length, players: sum(room => room.taken - room.holding) + onRoad, held: sum(room => room.holding) + heldOnRoad, ticks: ticked, ticksPerSecond: ticks.length / ((now - readAt) / 1000),
       p50: percentile(sorted, 0.5), p95: percentile(sorted, 0.95), p99: percentile(sorted, 0.99), max: sorted.at(-1) ?? 0, drops: (clock?.drops ?? 0) - dropsAt, rss: memory.rss, heap: memory.heapUsed,
       refused: sum(room => room.net.stats.refused), dropped: sum(room => room.net.stats.dropped), frameBytes: sum(room => room.net.stats.frameBytes), eventBytes: sum(room => room.net.stats.eventBytes),
+      ...(spent.size === 0 ? {} : { cellMs: Object.fromEntries([...spent].map(([slug, own]) => [slug, own.ms / own.ticks])) }),
       ...(memory.external === undefined ? {} : { external: memory.external }), ...(memory.arrayBuffers === undefined ? {} : { arrayBuffers: memory.arrayBuffers }), ...(options.lag === undefined ? {} : { lag: options.lag() }) };
-    readAt = now; dropsAt = clock?.drops ?? 0; ticks = [];
+    readAt = now; dropsAt = clock?.drops ?? 0; ticks = []; spent = new Map();
     post({ kind: 'reading', reading: row });
   };
   /** One start-over at a time on this worker: each boot stalls the clock of every other cell here, so they never pile up. */

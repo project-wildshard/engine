@@ -12,7 +12,7 @@ const FAMILIES = [
   // The metrics client's defaults: the process monitor's.
   'process_cpu_seconds_total', 'process_resident_memory_bytes', 'nodejs_heap_size_used_bytes', 'nodejs_eventloop_lag_p99_seconds',
   // The server's own.
-  'wildshard_eventloop_lag_seconds', 'wildshard_thread_memory_bytes', 'wildshard_tick_seconds', 'wildshard_ticks_per_second', 'wildshard_tick_drops_total',
+  'wildshard_eventloop_lag_seconds', 'wildshard_thread_memory_bytes', 'wildshard_tick_seconds', 'wildshard_cell_tick_seconds', 'wildshard_ticks_per_second', 'wildshard_tick_drops_total',
   'wildshard_cells_resident', 'wildshard_cells_awake', 'wildshard_players', 'wildshard_players_held', 'wildshard_cell_boot_seconds', 'wildshard_crossing_seconds',
 ];
 let bench: RoomBench | undefined, metrics: ServerMetrics | undefined;
@@ -52,6 +52,8 @@ test('a two-cell world serves every family on 127.0.0.1 only, from boot to a cro
   expect(await a.arrived()).toBe(true);
   // A reading with the player in Driftwood (every 250 ms here): one cell awake.
   await vi.waitFor(async () => { const { rows } = await scrape(at); expect(value(rows, 'wildshard_players')).toBe(1); expect(value(rows, 'wildshard_cells_awake')).toBe(1); }, { timeout: 10_000, interval: 100 });
+  // SC8: the awake cell's own tick time, by name (what the worker table's weights are read from).
+  expect((await scrape(at)).rows.get(`wildshard_cell_tick_seconds{cell="${HOME}"}`)).toBeGreaterThan(0);
   // Off Driftwood's south edge onto the road: one crossing, timed by the door.
   const home = bench.room(HOME), body = home?.bodyOf('device:a');
   if (body === undefined) throw new Error('A stands in Driftwood');

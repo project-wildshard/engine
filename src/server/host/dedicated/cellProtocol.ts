@@ -56,6 +56,8 @@ export interface WorkerReading {
   /** SERVER-CELLS SC1: this worker thread's own memory beyond its heap, and its event-loop lag in ms (`loopLag`), when it measures them. */
   readonly external?: number; readonly arrayBuffers?: number;
   readonly lag?: { readonly p50: number; readonly p99: number; readonly max: number };
+  /** SERVER-CELLS SC8: each cell that ticked in this reading, its mean ms per tick (its awake cost; `workerTable`'s weights come from these). */
+  readonly cellMs?: Readonly<Record<string, number>>;
 }
 /** What a cell tells the worker it runs on. */
 export type RoomNews =
