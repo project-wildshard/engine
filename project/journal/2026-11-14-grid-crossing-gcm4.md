@@ -18,3 +18,4 @@
 - The nightly runner reads the release serial as the number it is and the report's stdout directly (lint:game).
 - GC14: the tour's `--laps=n` goes round every wanted arc n times, each row naming its lap, so the memory at each control reads as
   a soak (lap 2 against lap 1).
+  The cell comes from the probe's `area()` (every build has it), carried into each recorded screen sample.
