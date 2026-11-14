@@ -14,7 +14,7 @@ import { RemoteStrike } from './remoteStrike';
 import { NameTag, type NameTagShown } from './nameTag';
 import { RemoteDeath, type DeathPhase } from './remoteDeath';
 import { RemoteHurt, type HurtShown } from './remoteHurt';
-import { HeldInHand } from './heldOnOthers';
+import { HeldInHand, heldOnOthers } from './heldOnOthers';
 import type { NetClient } from './client';
 import { othersOnMap } from './othersOnMap';
 import { talkerKey, voiceNear, type Talker } from './voiceNear';
@@ -169,8 +169,58 @@ class OtherBody {
 }
 
 /** Every other player's body, kept to the client's rows. */
+/** A body leaving: the castaway's mesh and contact disc are shared by every body (userData.shared), so only its own are freed, its
+ *  skeleton's bone texture with them. A sprite's geometry is three's own, shared by every sprite. Its held item, the kit's copy,
+ *  is let go of first (`undress`). */
+function freeBody(group: THREE.Object3D): void {
+  group.traverse(node => {
+    if (node instanceof THREE.SkinnedMesh) node.skeleton.dispose();
+    if (node instanceof THREE.Mesh) { const geometry = node.geometry as THREE.BufferGeometry; if (geometry.userData['shared'] !== true) geometry.dispose(); }
+    if (node instanceof THREE.Mesh || node instanceof THREE.Sprite) { for (const material of [node.material].flat() as THREE.Material[]) { if (material.userData['shared'] === true) continue; if (material instanceof THREE.SpriteMaterial) material.map?.dispose(); material.dispose(); } }
+  });
+}
+
+/** NET-LAG NL4: the warm body's depth under the world, out of every view; its slots tried for the kit's held items. */
+const WARM_DEPTH = -1000, WARM_SLOTS = 16;
+/**
+ * NET-LAG NL4 (Jake's 60 ms frames in Driftwood): the first other player to come into view linked its body's programs inside
+ * that frame, the castaway's skinned body, its contact disc, its Name and the held item in the world's light (the item's
+ * first-person program is another): 4 programs in a 200 ms frame, 20 in a 440 ms one, on desktop Chromium's Metal. One body
+ * of the same build is drawn from the start, under the world, never culled, so the boot's in-play warm-up links those
+ * programs paced and every body after it draws with programs already built (three keys a program by its material's settings,
+ * so a body's own deck materials share the warm deck's). It holds every slot of the kit lent now, and
+ * takes the new kit's items when a crossing lends one (the old copies are freed with their kit).
+ */
+class WarmBody {
+  readonly group = new THREE.Group();
+  private readonly hand: THREE.Object3D | null;
+  private readonly items = new THREE.Group();
+  private kit = -1;
+  constructor() {
+    this.group.name = 'other-player-warm'; this.group.position.y = WARM_DEPTH;
+    const model = castawayBody(), board = new BoardUnder();
+    board.deck.visible = true; // a rider's deck, shown here so its programs warm too
+    this.group.add(model.root, groundContact(), nameTag('warm'), board.deck);
+    this.hand = model.mounts.rightHand;
+    this.hand.add(this.items);
+    this.unculled();
+  }
+  /** Each frame: a newly lent kit's items replace the last's. */
+  frame(): void {
+    if (this.kit === heldOnOthers.lent) return;
+    this.kit = heldOnOthers.lent;
+    this.items.clear();
+    for (let slot = 0; slot < WARM_SLOTS; slot++) { const held = heldOnOthers.prop(slot); if (held !== null) this.items.add(held.prop.clone()); }
+    this.unculled();
+  }
+  /** Drawn wherever the camera looks, so the warm-up and every frame count its programs as used. */
+  private unculled(): void { this.group.traverse(node => { node.frustumCulled = false; }); }
+  dispose(): void { this.group.removeFromParent(); this.items.clear(); freeBody(this.group); }
+}
+
 export class OtherPlayers {
   private readonly bodies = new Map<number, OtherBody>();
+  private readonly warm: WarmBody | null = null;
   private readonly client: NetClient;
   private readonly scene: THREE.Object3D;
   private readonly row = new Float64Array(PLAYER_CLASS.row.length);
@@ -179,6 +229,8 @@ export class OtherPlayers {
   constructor(client: NetClient, scene: THREE.Object3D, scope: Scope, me: Readonly<THREE.Vector3> | null = null) {
     this.client = client; this.scene = scene; this.me = me;
     scope.onDispose(() => { for (const handle of this.bodies.keys()) this.drop(handle); });
+    try { const warm = new WarmBody(); scene.add(warm.group); this.warm = warm; scope.onDispose(() => { warm.dispose(); }); }
+    catch (error) { console.error('[other players] warm body', error); }
     if (me !== null) scope.onDispose(voiceNear.lend({ distanceTo: talker => this.distanceTo(talker) }));
   }
   /** Metres to a talker's body, as drawn: the body with its row's id, or, from a server that names none, the nearest with its Name. */
@@ -209,6 +261,7 @@ export class OtherPlayers {
     return body !== undefined;
   }
   frame(renderTick: number, dt: number): void {
+    this.warm?.frame();
     const { client, bodies, row } = this, own = client.welcome?.handle ?? 0;
     for (const handle of bodies.keys()) if (!client.entities.has(handle)) this.drop(handle);
     for (const [handle, info] of client.entities) {
@@ -228,12 +281,6 @@ export class OtherPlayers {
     const body = this.bodies.get(handle);
     if (body === undefined) return;
     this.bodies.delete(handle); this.scene.remove(body.group); body.undress();
-    // The castaway's mesh and contact disc are shared by every body (userData.shared): only a body's own are freed, its skeleton's
-    // bone texture with them. A sprite's geometry is three's own, shared by every sprite.
-    body.group.traverse(node => {
-      if (node instanceof THREE.SkinnedMesh) node.skeleton.dispose();
-      if (node instanceof THREE.Mesh) { const geometry = node.geometry as THREE.BufferGeometry; if (geometry.userData['shared'] !== true) geometry.dispose(); }
-      if (node instanceof THREE.Mesh || node instanceof THREE.Sprite) { for (const material of [node.material].flat() as THREE.Material[]) { if (material.userData['shared'] === true) continue; if (material instanceof THREE.SpriteMaterial) material.map?.dispose(); material.dispose(); } }
-    });
+    freeBody(body.group);
   }
 }
