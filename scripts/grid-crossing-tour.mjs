@@ -11,7 +11,9 @@
 // preparing or blocked while frozen), the time the cell step screen shows, and frames over 33 and 50 ms within 3 s of the border.
 // Not measured: grey stand-ins within 60 m (no reader yet).
 //   scripts/browser-lane.sh node scripts/grid-crossing-tour.mjs --base=https://preview.wildshard.io --out=<dir> [--engine=chromium|webkit]
-//     [--layout=phone] [--arcs=<from>:<to>,…] [--limit=<n crossings>]
+//     [--layout=phone] [--arcs=<from>:<to>,…] [--limit=<n crossings>] [--cold] [--lane=<name>]
+// --cold (GC3's cold-cache pass): no HTTP cache and no service worker in any page, so every crossing fetches its cell from the
+// network as a first visit does (Chromium: the DevTools cache switch; WebKit: service workers blocked only).
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
@@ -25,7 +27,7 @@ const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', ''
 // the harness pose is the in-page server's: preview or a loopback page only (never staging's or production's seats, J205)
 if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: grid-crossing-tour.mjs --base=<preview or loopback url> --out=<dir> [--engine=chromium|webkit] [--layout=phone] [--arcs=a:b,…] [--limit=n]');
 if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error(`No engine ${engineName}`);
-const limit = Number(flag('limit', '400')), only = flag('arcs', '').split(',').filter(Boolean);
+const limit = Number(flag('limit', '400')), only = flag('arcs', '').split(',').filter(Boolean), cold = process.argv.includes('--cold'), lane = flag('lane', 'opus-gcm2');
 mkdirSync(out, { recursive: true });
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 
@@ -50,7 +52,7 @@ const HOME = 'driftwood-isle', HOME_CARD = 'Driftwood Isle', EDGE_IN = 238, LEG_
 
 /** @type {Record<string, unknown>[]} */
 const crossings = [];
-const result = { lane: 'opus-gcm2', base, build, engine: engineName, layout: phone ? 'phone 402x874 touch' : 'desktop 1440x900', at: new Date().toISOString(), arcs: wanted.length, crossings, errors: /** @type {string[]} */ ([]), reloads: 0, reentries: 0, lostPage: /** @type {Record<string, unknown>[]} */ ([]), note: '', untried: /** @type {string[]} */ ([]) };
+const result = { lane, base, build, cold, engine: engineName, layout: phone ? 'phone 402x874 touch' : 'desktop 1440x900', at: new Date().toISOString(), arcs: wanted.length, crossings, errors: /** @type {string[]} */ ([]), reloads: 0, reentries: 0, lostPage: /** @type {Record<string, unknown>[]} */ ([]), note: '', untried: /** @type {string[]} */ ([]) };
 const save = () => writeFileSync(join(out, `${engineName}-${phone ? 'phone' : 'desktop'}-tour.json`), `${JSON.stringify(result, null, 2)}\n`);
 const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] : [] });
 let code = 1;
@@ -63,11 +65,13 @@ try {
   const profile = async () => {
     await context?.close();
     context = await browser.newContext(phone ? { viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: engineName === 'chromium', hasTouch: true,
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Mobile/15E148 Safari/604.1' } : { viewport: { width: 1440, height: 900 } });
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Mobile/15E148 Safari/604.1', ...cold ? { serviceWorkers: 'block' } : {} }
+      : { viewport: { width: 1440, height: 900 }, ...cold ? { serviceWorkers: 'block' } : {} });
     await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
     await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: phone ? { tier: 'phone', volume: 0 } : { volume: 0 } });
     page = await context.newPage();
+    if (cold && engineName === 'chromium') await (await context.newCDPSession(page)).send('Network.setCacheDisabled', { cacheDisabled: true });
     const opened = page;
     page.on('pageerror', error => { if (result.errors.length < 20) result.errors.push(error.message.slice(0, 240)); });
     page.on('framenavigated', frame => { if (frame === opened.mainFrame()) navigations++; });

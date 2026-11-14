@@ -17,10 +17,11 @@ const steps = new Map();
 /** @type {{ run: string, from: string, to: string, boost: boolean, cold: boolean, wallMs: number, longTasks: number, longTaskMs: number, bytes: number, decoded: number, files: number, slowest: string }[]} */
 const crossings = [];
 for (const file of files) {
-  const tour = JSON.parse(readFileSync(file, 'utf8')), run = `${String(tour.engine)} ${String(tour.layout).split(' ')[0]}`, seen = new Set(['driftwood-isle']);
+  const tour = JSON.parse(readFileSync(file, 'utf8')), run = `${String(tour.engine)} ${String(tour.layout).split(' ')[0]}${tour.cold === true ? ' cold' : ''}`, seen = new Set(['driftwood-isle']);
   for (const crossing of tour.crossings ?? []) {
     const prepare = crossing.prepare; if (prepare === undefined) continue;
-    const cold = !seen.has(crossing.to); if (crossing.ok === true) seen.add(crossing.to);
+    // a `--cold` tour (no HTTP cache, no service worker) fetches every crossing as a first visit
+    const cold = tour.cold === true || !seen.has(crossing.to); if (crossing.ok === true) seen.add(crossing.to);
     let slowest = '', slowestMs = -1;
     for (const [name, , ms] of prepare.spans ?? []) {
       const step = String(name).replaceAll(crossing.to, '<cell>');
