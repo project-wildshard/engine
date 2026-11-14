@@ -15,16 +15,19 @@ const Encounter = v.strictObject({ attempt: v.boolean(), waitForReturn: v.boolea
 
 /** Install from data. Spawn remains the existing AS director/roster command,
  * rather than an arbitrary callback lent to the encounter. */
-export function installWakeBoss(host: SimHost, input: unknown, placement: { pool: { x: number; z: number }; arena: number }): { encounter: WakeBossEncounter; publish: (event: string) => void } {
+export function installWakeBoss(host: SimHost, input: unknown, placement: { pool: { x: number; z: number }; arena: number }, returned?: () => void): { encounter: WakeBossEncounter; publish: (event: string) => void } {
   const row = parseWakeEncounter(input), { pool, arena } = placement;
   const encounter = new WakeBossEncounter(row, pool);
   const body = () => Array.from(host.entities.values()).find(actor => actor.kind === row.kind) ?? null;
   // J104, J107: whom the fight deals with is the living player nearest the pool, so it runs while anyone is in the arena. Those
   // there when it wakes set its curves. A lone player runs the one-player encounter, unread.
   const near = (point: { readonly x: number; readonly z: number }): boolean => Math.hypot(point.x - pool.x, point.z - pool.z) < row.arena.radius;
-  const party = new BossContenders(host.players, near, () => undefined);
-  const contended = { get engaged() { return encounter.state === 'fight'; }, script: { respawnPoint: () => ({ pos: new Vector3(pool.x, 0, pool.z), yaw: 0 }) },
-    disarm: () => undefined, arm: () => undefined, onPlayerDeath: () => false };
+  // SERVER-CELLS SC10 (J328): a grid cell's world is never rebuilt, so a served world's won fight stands again once nobody has stood
+  // in the arena five minutes: the world's death flag cleared and the body gone (`returned`), so the next wake cue starts it afresh.
+  const party = new BossContenders(host.players, near, () => undefined, { served: () => host.respawn.served, rearm: false });
+  const contended = { get engaged() { return encounter.state === 'fight'; }, get state() { return encounter.state; }, script: { respawnPoint: () => ({ pos: new Vector3(pool.x, 0, pool.z), yaw: 0 }) },
+    disarm: () => undefined, arm: () => undefined, onPlayerDeath: () => false,
+    returnBeaten: () => { host.flags.clear(row.deadFlag); returned?.(); encounter.returnBeaten(); } };
   const observation = (): WakeBossObservation => ({ player: nearestOnGround(host.players, pool.x, pool.z).position, animal: body(), wake: host.flags.has(row.wakeFlag), dead: host.flags.has(row.deadFlag) });
   const flush = (): void => { for (const effect of encounter.takeEffects()) if (effect.kind === 'outcome') host.events.emit('boss.attempt', { boss: row.id, level: row.level, outcome: effect.outcome }); };
   host.events.on('damage.dealt', ({ req, killed }) => {
@@ -37,7 +40,7 @@ export function installWakeBoss(host: SimHost, input: unknown, placement: { pool
     for (const [id, player] of host.players) if (id !== actor.id && player.health.alive && near(player.position)) return;
     encounter.onPlayerDeath(host.players.get(actor.id)?.position ?? host.playerFocus); flush();
   }, host.scope);
-  host.onStep(row.step, () => { party.observe(contended); encounter.update(observation()); flush(); }, {
+  host.onStep(row.step, dt => { party.observe(contended, dt); encounter.update(observation()); flush(); }, {
     snapshot: () => { const { engaged } = party; return JSON.stringify({ ...encounter.encounterSnapshot(), ...(engaged === 0 ? {} : { engaged }) }); },
     restore: value => { const saved = v.parse(Encounter, JSON.parse(v.parse(v.string(), value))); encounter.encounterRestore(saved); party.restoreEngaged(saved.engaged ?? 0); },
   });

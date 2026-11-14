@@ -330,7 +330,7 @@ export function createNativeCreatureRoster<B extends NativeCreatureSlot>(host: S
   /** Identity lifecycle above the native body map, including dormant prewarm and permanent retirement. */
   identities: NativeActors<HuntBody>;
   /** Bind declared return rules to this roster's real identities and death events. */
-  returns: (rows: unknown) => NativeReturns;
+  returns: (rows: unknown, reserved?: (id: string) => boolean) => NativeReturns;
   /** Advance native charge motion and report whether an owned live policy may move. */
   beforeBody: (id: string, dt: number) => boolean;
   /** Integrate the admitted pose, charge contact and hunted-body clearance in order. */
@@ -478,7 +478,7 @@ export function createNativeCreatureRoster<B extends NativeCreatureSlot>(host: S
     const level = saved.entities.find(entity => entity.id === item.id)?.state.flags.levelGround;
     return materialize(item, item.recipe, level ?? found.structure);
   };
-  const returns = (input: unknown): NativeReturns => new NativeReturns(host, byId, hunt, input);
+  const returns = (input: unknown, reserved?: (id: string) => boolean): NativeReturns => new NativeReturns(host, byId, hunt, input, reserved);
   let poseNear = false;
   const beforeBody = (id: string, dt: number): boolean => {
     const actor = byId.get(id)?.actor;

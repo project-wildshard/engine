@@ -37,7 +37,7 @@ export function installNativeChapterDirector(host: SimHost, director: Awaited<Re
     if (!['flag', 'phase', 'cue', 'reward'].includes(effect.kind)) throw new Error('Native chapter requires closed native effects');
   }
   const population = policy.wake === undefined ? null : mixedPopulation(host, policy.wake.population);
-  const encounter = policy.wake === undefined ? null : installWakeBoss(host, policy.wake.encounter, policy.wake.placement);
+  const encounter = policy.wake === undefined || population === null ? null : installWakeBoss(host, policy.wake.encounter, policy.wake.placement, population.retireCaptain);
   const reward = policy.reward === undefined ? null : installNativeQuestChannels(host, policy.reward, { started: false, completed: false });
   const leadBody = host.players.get(books.lead.player); if (leadBody === undefined) throw new Error('Native chapter requires its player');
   const timeline = new ChapterClock(host.scope, director, rows, host.flags,

@@ -89,7 +89,7 @@ export function mixedPopulation(host: SimHost, id: string): ReturnType<typeof in
  * The v8 continuation retains per-body policies, poses, ids and native handles. */
 export function installMixedPopulation(host: SimHost, ports: MixedPopulationInput, saved?: Readonly<Omit<SimSnapshot, 'physics'>>): {
   bodies: () => readonly MixedPopulationBody[]; hunt: ReturnType<typeof createNativeHunt>['hunt'];
-  captain: () => HuntBody | null; spawnCaptain: () => HuntBody; alarm: () => void;
+  captain: () => HuntBody | null; spawnCaptain: () => HuntBody; retireCaptain: () => void; alarm: () => void;
   staggered: (actor: AnimalSim, strength: number, running: boolean) => void;
   settle: () => void; publishPoses: () => void;
 } {
@@ -222,7 +222,9 @@ export function installMixedPopulation(host: SimHost, ports: MixedPopulationInpu
 
   const first = roster.bodies[0]; if (first === undefined) throw new Error('Empty mixed population roster');
   const extra = Array.from({ length: ROSTER - BODY_COUNT - 1 }, () => enemyBody('', first.kind, first.variant, -1, { x: 0, z: 0 }, 0));
-  const returns = intake.returns(roster.ecology);
+  // SC10: the captain is the wake fight's, which brings him back itself; owed as a roster body he would return with no scale row and
+  // throw in the tick (a served world owes every kind since SC5).
+  const returns = intake.returns(roster.ecology, id => captain?.id === id);
   /** A slot a retired body left. Boot slots stay their row's: a continuation rebuilds those from the rows, not the save. */
   const vacated = (): number => { for (let i = BODY_COUNT; i < bodies.length; i++) if (bodies[i]?.actor === null) return i; return -1; };
   const retireFallen = (id: string): void => { const fallen = intake.retireDead(id); if (fallen !== null) fallen.brain = null; };
@@ -310,6 +312,12 @@ export function installMixedPopulation(host: SimHost, ports: MixedPopulationInpu
     if (body.actor === null) throw new Error('The Mixed population captain did not spawn');
     return body.actor;
   };
+  /** SERVER-CELLS SC10 (J328): a served world's beaten captain leaves, so the next wake cue spawns him afresh, as a fresh world would. */
+  const retireCaptain = (): void => {
+    if (captain === null) return;
+    if (captain.actor !== null) intake.retire(captain);
+    captain = null; sight[BODY_COUNT] = null;
+  };
   const alarm = (): void => {
     for (let i = 0; i < Math.min(ROSTER, bodies.length); i++) { const body = bodies[i], a = body?.actor ?? null; if (a !== null && a.alive && (a.aggressive || hunt.sensed(a))) wake(body); }
   };
@@ -325,7 +333,7 @@ export function installMixedPopulation(host: SimHost, ports: MixedPopulationInpu
     if (book.has(rows.step)) throw new Error('Duplicate mixed population');
     book.set(rows.step, value); populations.set(host, book); host.scope.onDispose(() => { book.delete(rows.step); }); return value;
   };
-  const population = { publishPoses, bodies: () => bodies, hunt, captain: () => captain?.actor ?? null, spawnCaptain, alarm, staggered };
+  const population = { publishPoses, bodies: () => bodies, hunt, captain: () => captain?.actor ?? null, spawnCaptain, retireCaptain, alarm, staggered };
   if (saved === undefined) { keep(); return publish({ ...population, settle: () => undefined }); }
 
   const keeper = v.parse(Saved, saved.adapters.find(adapter => adapter.id === ISLAND_STEP)?.state);

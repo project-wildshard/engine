@@ -26,7 +26,8 @@ export class NativeReturns {
   private now = 0;
   private check = 0;
   private readonly host: SimHost;
-  constructor(host: SimHost, bodies: ReadonlyMap<string, ReturnBody>, hunt: StalkerBrain<HuntBody>, input: unknown) {
+  /** `reserved`: a body its owner brings back itself (a wake fight's captain, SC10), never owed as a roster body. */
+  constructor(host: SimHost, bodies: ReadonlyMap<string, ReturnBody>, hunt: StalkerBrain<HuntBody>, input: unknown, reserved: (id: string) => boolean = () => false) {
     this.host = host;
     this.rows = v.parse(NativeReturnRowsSchema, input);
     this.queue = new RespawnQueue(this.rows.rules, this.rows.outOfSight,
@@ -38,7 +39,7 @@ export class NativeReturns {
     };
     host.events.on('actor.died', ({ actor }) => {
       const body = [...bodies.values()].find(row => row.actor?.combatActor() === actor), native = body?.actor;
-      if (body === undefined || native === null || native === undefined || !(this.queue.accepts(body.kind) || host.players.size > 1 || host.respawn.served)) return;
+      if (body === undefined || native === null || native === undefined || reserved(body.id) || !(this.queue.accepts(body.kind) || host.players.size > 1 || host.respawn.served)) return;
       const herd = hunt.herds[body.herd];
       owe(body.kind, body.variant, body.herd, herd?.cx ?? native.position.x, herd?.cz ?? native.position.z, body.id);
     }, host.scope);

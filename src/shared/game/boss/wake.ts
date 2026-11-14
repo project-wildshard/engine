@@ -43,6 +43,12 @@ export class WakeBossEncounter {
   private near(player: { readonly x: number; readonly z: number }): boolean { return Math.hypot(player.x - this.center.x, player.z - this.center.z) < this.row.arena.radius; }
   private finish(outcome: 'won' | 'lost' | 'left'): void { if (this.attempt) { this.attempt = false; this.effects.push({ kind: 'outcome', outcome }); } }
   arm(observation: WakeBossObservation): void { this.wake(observation); }
+  /** SERVER-CELLS SC10 (J328): a served world's beaten fight stands again, as a fresh world's would: no attempt, nobody waited for. */
+  returnBeaten(): void {
+    this.attempt = false; this.waitForReturn = false; this.state = 'dormant'; this.phase = 0;
+    this.boss = { ...this.boss, state: 'dormant', phase: 0, checkpoint: 0, attempts: 1, t: 0, skipT: 0 };
+    this.effects.push({ kind: 'hide' });
+  }
   disarm(): void { this.finish('left'); this.effects.push({ kind: 'hide' }); this.state = 'dormant'; }
   onPlayerDeath(player: { readonly x: number; readonly z: number }): false {
     if (this.attempt && this.near(player)) { this.finish('lost'); this.waitForReturn = true; this.effects.push({ kind: 'hide' }); this.state = 'dormant'; }
