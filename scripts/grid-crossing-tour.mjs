@@ -50,7 +50,7 @@ const HOME = 'driftwood-isle', HOME_CARD = 'Driftwood Isle', EDGE_IN = 238, LEG_
 
 /** @type {Record<string, unknown>[]} */
 const crossings = [];
-const result = { lane: 'opus-gcm2', base, build, engine: engineName, layout: phone ? 'phone 402x874 touch' : 'desktop 1440x900', at: new Date().toISOString(), arcs: wanted.length, crossings, errors: /** @type {string[]} */ ([]), reloads: 0, reentries: 0, note: '', untried: /** @type {string[]} */ ([]) };
+const result = { lane: 'opus-gcm2', base, build, engine: engineName, layout: phone ? 'phone 402x874 touch' : 'desktop 1440x900', at: new Date().toISOString(), arcs: wanted.length, crossings, errors: /** @type {string[]} */ ([]), reloads: 0, reentries: 0, lostPage: /** @type {Record<string, unknown>[]} */ ([]), note: '', untried: /** @type {string[]} */ ([]) };
 const save = () => writeFileSync(join(out, `${engineName}-${phone ? 'phone' : 'desktop'}-tour.json`), `${JSON.stringify(result, null, 2)}\n`);
 const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] : [] });
 let code = 1;
@@ -205,6 +205,7 @@ try {
   const left = new Set(wanted), good = /** @type {Arc[]} */ ([]);
   while (left.size > 0 && crossings.length < limit) {
     if (navigations !== navigationsBefore) { result.note = 'the page reloaded: tour stopped'; break; }
+    if (result.lostPage.length > 4) { result.note = 'the page was lost a fifth time: tour stopped'; break; }
     const outs = [...left].filter(arc => arc.from === here);
     let arc = outs.sort((a, b) => [...left].filter(o => o.from === b.to).length - [...left].filter(o => o.from === a.to).length)[0], repeat = false;
     if (arc === undefined) {
@@ -224,7 +225,19 @@ try {
       arc = /** @type {Arc} */ (via.get(step)); repeat = true;
     }
     left.delete(arc);
-    const row = await cross(arc, repeat);
+    /** @type {Record<string, any>} */ let row;
+    try { row = await cross(arc, repeat); }
+    catch (error) {
+      // the tour's probe (window.__gc3) went with the document: the page navigated or reloaded under the crossing. Record what the
+      // game says about it (its own navigations write a reason first: lastEnd.ts `markReload` / `markUnload`), then enter again.
+      const lost = await page.evaluate(() => { const life = /** @type {Record<string, string>} */ ({}); for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i) ?? ''; if (/life\.|selfReload/u.test(key)) life[key] = (localStorage.getItem(key) ?? '').slice(0, 400); }
+        return { probe: /** @type {any} */ (window).__gc3 !== undefined, url: location.href, life }; }).catch((/** @type {unknown} */ cause) => ({ probe: false, url: '', life: {}, unreadable: String(cause).slice(0, 200) }));
+      if (lost.probe) throw error;
+      const last = crossings.at(-1); if (last !== undefined && last.from === arc.from && last.to === arc.to) { last.ok = false; last.why = 'the page lost the tour probe (navigated or reloaded)'; }
+      result.lostPage.push({ arc: `${arc.from}:${arc.to}`, navigations: navigations - navigationsBefore, error: String(error).slice(0, 200), ...lost });
+      console.log(`LOST ${arc.from} -> ${arc.to}: ${JSON.stringify(lost).slice(0, 400)}`);
+      save(); result.reentries++; await enter(); navigationsBefore = navigations; lastWindowEnd = 0; here = (await sample())?.inside ?? HOME; continue;
+    }
     save(); // after every crossing, so a run cut off by its timeout keeps what it measured
     if (row.ok) { if (!repeat) good.push(arc); here = arc.to; } else { here = (await sample()).inside ?? here; if (repeat) good.splice(good.indexOf(arc), 1); }
   }
