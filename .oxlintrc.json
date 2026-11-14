@@ -242,8 +242,8 @@
       }
     },
     {
-      "files": ["vite.config.ts", "vitest.config.ts", "capacitor.config.ts", "drafts/vite.config.ts", "admin/vite.config.ts"],
-      "rules": { "import/no-default-export": "off" } // Vite / Vitest / the Capacitor CLI read the default export
+      "files": ["vite.config.ts", "vitest.config.ts"],
+      "rules": { "import/no-default-export": "off" } // Vite and Vitest read the default export
     },
     {
       // Untyped JavaScript: every value is `any` to the type-aware rules, so the `any`-tracking rules are noise here.
