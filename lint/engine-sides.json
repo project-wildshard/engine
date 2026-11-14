@@ -1606,6 +1606,7 @@
     "src/shared/engine/world/yawFrame.ts": "shared",
     "src/shared/game/achievements.ts": "shared",
     "src/shared/game/devColliders.ts": "shared",
+    "src/shared/game/devGameplay.ts": "shared",
     "src/shared/game/ambient/flock.ts": "shared",
     "src/shared/game/animation/limbBlend.ts": "shared",
     "src/shared/game/animation/limbRig.ts": "shared",

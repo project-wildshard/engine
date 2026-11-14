@@ -2,6 +2,7 @@ import {readModuleGroups} from '@wildshard/engine/boot/download';
 import { whenControl } from '@wildshard/engine/boot/prefetch';
 import type * as ScriptPresentation from '../plugin/ui';
 import type { Scope } from '@wildshard/engine/app/scope';
+import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type * as LootPresentation from '../loot/runtime';
 import type * as CompendiumPresentation from '../compendium/install';
 
@@ -610,13 +611,29 @@ export class ShardfileClient {
         player: () => world.player.position });
       ctx.debug.expose('shardfileTalks', { talks: () => talks.map(talk => ({ id: talk.id, node: talk.node() ?? null, open: box?.isOpen ?? false })) });
     }
-    for (const declaration of source.quests.quests) {
-      const quest = new QuestState(declaration, flags, ctx.app.events, ctx.scope);
-      const options = declaration.track === false ? { chip: () => ({ label: '', count: '' }) } : {};
-      // a retained (grid) runtime's chip, pins and card are its entered cell's only
-      if (presentation === null) throw new Error('Missing quest presentation module');
-      if (retainsRuntimeServices(ctx)) presentation.installEnteredQuestPresentation(ctx, quest, options); else presentation.installQuestPresentation(ctx, quest, options);
-    }
+    const installQuests = (quests: Shardfile['quests'], at: ShardContext, ui: typeof presentation): void => {
+      for (const declaration of quests.quests) {
+        const quest = new QuestState(declaration, flags, ctx.app.events, at.scope);
+        const options = declaration.track === false ? { chip: () => ({ label: '', count: '' }) } : {};
+        // a retained (grid) runtime's chip, pins and card are its entered cell's only
+        if (ui === null) throw new Error('Missing quest presentation module');
+        if (retainsRuntimeServices(ctx)) ui.installEnteredQuestPresentation(at, quest, options); else ui.installQuestPresentation(at, quest, options);
+      }
+    };
+    // SHARD-SOURCE AP19 (DEVSERVER): `wildshard watch`'s soft restart rebuilds the quest views from a new quest section, so on a
+    // watched (one-shard) page they live in one child scope it replaces; elsewhere they are the context's, as they always were.
+    if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && !retainsRuntimeServices(ctx) && typeof window !== 'undefined') {
+      const views = (scope: Scope): ShardContext => Object.create(ctx, { scope: { value: scope }, system: { value: (spec: SystemSpec) => { ctx.app.addSystem(spec, scope); } } }) as ShardContext;
+      let held = ctx.scope.child('shardfile.quests');
+      installQuests(source.quests, views(held), presentation);
+      ctx.scope.expose(window, '__shardfileDevQuests', async (quests: Shardfile['quests']): Promise<boolean> => {
+        const ui = presentation ?? await import('../plugin/ui');
+        if (ctx.scope.disposed) return false;
+        // the old views go first: a quest's system keeps its id across the swap
+        held.dispose(); held = ctx.scope.child('shardfile.quests');
+        try { installQuests(quests, views(held), ui); return true; } catch (cause) { console.error('[devScene] quest views', cause); return false; }
+      });
+    } else installQuests(source.quests, ctx, presentation);
     if (ctx.product.has('ui/completion') && ctx.product.section('ui/completion').trigger === 'quest') installCompletion(ctx, flags, play.progress);
     runtime.hooks.questFlags = () => flags.all; runtime.hooks.adventureFlags = () => flags.all;
     // An admitted scene installs its own declared profiles once in the play phase.

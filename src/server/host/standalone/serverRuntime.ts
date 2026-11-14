@@ -37,7 +37,7 @@ export function runServerWorker(event: MessageEvent<unknown>): void {
   const [control, game, harness, reads] = event.ports;
   if (control === undefined || game === undefined) return;
   const held = reads === undefined ? undefined : askHeldReads(reads);
-  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, load: async (boot, slug) => fetchServerProduct(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held), held),
+  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, load: async (boot, slug, patch) => fetchServerProduct(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held), held, patch),
     strips: boot => fetchGridCollision(boot.base),
     onSaveRefused: error => { console.warn('Standalone save refused, falling back', error); } });
 }

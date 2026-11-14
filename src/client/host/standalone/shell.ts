@@ -13,10 +13,15 @@ import { ServerMessageSchema, ShellMessageSchema, type ProbedRow, type ServerMes
 import { answerHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import type { HarnessFlag, HarnessGod, HarnessHits, HarnessJoin, HarnessMove, HarnessPlace } from '../../../shared/host/standalone/harnessPlace';
 import type { DevBox, DevCollidersMessage, DevGround, DevGroundMessage } from '@wildshard/engine/game/devColliders';
+import type { DevGameplay, DevPlace, DevRestarted, DevRestartMessage } from '@wildshard/engine/game/devGameplay';
 import type { ServerWorkerStart } from '../../../server/host/standalone/serverRuntime';
 import { WorkerLoopback } from '../../../shared/host/standalone/workerLoopback';
 
-declare global { interface Window { /** SHARD-SOURCE AP18 (DEVSERVER): the dev hook's ground for the in-page server */ __workerClientDevGround?: (ground: DevGround) => void } }
+declare global { interface Window {
+  /** SHARD-SOURCE AP18 (DEVSERVER): the dev hook's ground for the in-page server */ __workerClientDevGround?: (ground: DevGround) => void;
+  /** SHARD-SOURCE AP19 (DEVSERVER): the dev hook's soft restart of the in-page server, on a new link this page's client rejoins */
+  __workerClientDevRestart?: (gameplay: DevGameplay, at: DevPlace | null) => Promise<DevRestarted>;
+} }
 
 /** What the server should run and where the page keeps saves. */
 export interface StandaloneConfig {
@@ -71,6 +76,8 @@ export interface StandaloneShell {
   join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void };
   /** SHARD-SOURCE AP5: a watched part's solid boxes for the server's world (DEVSERVER pages only; elsewhere it does nothing). */
   devColliders: (name: string, boxes: readonly DevBox[]) => void;
+  /** SHARD-SOURCE AP19: restart the in-page server's world on new gameplay rows, its player at `at`; this client rejoins it (DEVSERVER pages only). */
+  devRestart: (gameplay: DevGameplay, at: DevPlace | null) => Promise<DevRestarted>;
   dispose: () => void;
 }
 
@@ -134,6 +141,18 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
   // SHARD-SOURCE AP18: `wildshard watch`'s ground for this server, from the page's dev hook (DEVSERVER pages only)
   if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && harness !== undefined && typeof window !== 'undefined')
     scope.expose(window, '__workerClientDevGround', (ground: DevGround) => { harness.postMessage({ wildshardDevGround: ground } satisfies DevGroundMessage, []); });
+  // SHARD-SOURCE AP19: the soft restart. The server takes a new link with the restart; this page's client rejoins on it at once
+  // (its hello waits in the port until the new world listens), as an online page does when its server comes back.
+  const devRestart = (gameplay: DevGameplay, at: DevPlace | null): Promise<DevRestarted> => new Promise<DevRestarted>(resolve => {
+    if (!(typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) || harness === undefined) { resolve({ ok: false, ms: 0, reason: 'not a DEVSERVER page with an in-page server' }); return; }
+    const line = new MessageChannel(), reply = new MessageChannel();
+    reply.port1.onmessage = (event: MessageEvent<DevRestarted>): void => { reply.port1.close(); resolve(event.data); };
+    const link = new WorkerLoopback(line.port1);
+    link.onClose(reason => { if (reason === 'reload') config.refused?.(); });
+    client.rejoin(link);
+    harness.postMessage({ wildshardDevRestart: gameplay, at } satisfies DevRestartMessage, [line.port2, reply.port2]);
+  });
+  if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && harness !== undefined && typeof window !== 'undefined') scope.expose(window, '__workerClientDevRestart', devRestart);
   post({ kind: 'boot', slug: config.slug, base: config.base, build: config.serverBuild ?? config.build, savePrefix: config.savePrefix, saves: documents, ...(config.lone === true ? { lone: true } : {}) });
   return { client, transport, booted: bootPromise,
     ready: () => { post({ kind: 'ready' }); }, pause: () => { post({ kind: 'pause' }); }, resume: () => { post({ kind: 'resume' }); },
@@ -145,6 +164,7 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
     bossGod: () => { harness?.postMessage({ god: true } satisfies HarnessGod, []); },
     raise: flag => { harness?.postMessage({ flag } satisfies HarnessFlag, []); },
     devColliders: (name, boxes) => { if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) harness?.postMessage({ wildshardDevColliders: name, boxes } satisfies DevCollidersMessage, []); },
+    devRestart,
     join: (id, x, y, z) => {
       const line = new MessageChannel(), second = new NetClient(new WorkerLoopback(line.port1));
       harness?.postMessage({ join: id, x, y, z } satisfies HarnessJoin, [line.port2]);

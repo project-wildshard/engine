@@ -229,3 +229,36 @@ test('AP18: the in-page server swaps its heightfield and height query and lifts 
   owner.dispose();
   expect(terrainColliders(physics)).toBe(0);
 });
+
+test('AP19: a soft restart restarts the server with the player where the page has it, rebuilds the quest views and sends the held boxes and ground again', async () => {
+  const { ports, served } = await page(), groundServed: DevGround[] = [], restarts: [unknown, unknown][] = [], views: unknown[] = [];
+  const player = { position: new THREE.Vector3(3, 1, -2), yaw: 0.25, pitch: 0, spawn: () => undefined };
+  let serverOk = true, viewsOk = true;
+  const hook = createDevHook({ ...ports, player: () => player, serverGround: () => (ground) => { groundServed.push(ground); },
+    restart: () => (gameplay, at) => { restarts.push([gameplay, at]); return Promise.resolve(serverOk ? { ok: true, ms: 40 } : { ok: false, ms: 5, reason: 'refused' }); },
+    quests: () => (quests) => { views.push(quests); return Promise.resolve(viewsOk); } });
+  hook.swapColliders('hut', [{ centre: [0, 1, 0], half: [1, 1, 1], rotation: [0, 0, 0, 1] }]);
+  expect(hook.setGround(encodeTerrainTile(lattice(() => 0)))).toBe(true);
+  served.length = 0; groundServed.length = 0;
+  const quests = { flags: ['a'], quests: [], triggers: [], dialogue: [] };
+  const done = await hook.restartGameplay({ quests });
+  expect(done).toMatchObject({ ok: true, serverMs: 40 });
+  expect(done.questsMs).not.toBeNull();
+  expect(restarts).toEqual([[{ quests }, { x: 3, y: 1, z: -2, yaw: 0.25 }]]);
+  expect(views).toEqual([quests]);
+  // the new world gets what watch had swapped into the old one
+  expect(served).toEqual([['hut', 1]]);
+  expect(groundServed.map(g => g.heights.length)).toEqual([257 ** 2]);
+  // encounters alone: no quest views to rebuild
+  expect((await hook.restartGameplay({ encounters: [] })).questsMs).toBeNull();
+  expect(views).toHaveLength(1);
+  // a refusal from either half asks the page for a reload, and a refused world gets no boxes
+  serverOk = false; served.length = 0;
+  expect(await hook.restartGameplay({ quests })).toMatchObject({ ok: false, reason: 'refused' });
+  expect(served).toEqual([]);
+  serverOk = true; viewsOk = false;
+  expect((await hook.restartGameplay({ quests })).ok).toBe(false);
+  // a page with no in-page server can't restart
+  expect((await createDevHook(ports).restartGameplay({ quests })).ok).toBe(false);
+  ports.scope.dispose();
+});

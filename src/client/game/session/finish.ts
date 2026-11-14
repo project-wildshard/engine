@@ -403,6 +403,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // DEVSERVER imported from grid/menu did not fold across modules and kept the chunk).
   if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) void import('../devScene/hook').then(dev => dev.installDevHook({ scope: game.levelScope, scene: game.rootScene, physics: () => world.physics,
     look: () => game.look, server: () => window.__workerClientDevColliders ?? null, serverGround: () => window.__workerClientDevGround ?? null,
+    restart: () => window.__workerClientDevRestart ?? null, quests: () => window.__shardfileDevQuests ?? null,
     player: () => world.player, terrainField: captureHeightfield, watchFrames: fn => game.watchFrames(fn) }))
     .catch((cause: unknown) => { console.error('[devScene]', cause); });
   ctx.startExplore?.();

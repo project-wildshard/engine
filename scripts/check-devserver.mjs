@@ -18,7 +18,7 @@ export function assertProductionBuild(directory) {
         const code = readFileSync(full, 'utf8');
         if (code.includes('__DEVSERVER__') || code.includes('__PREPARATION_ONLY__')) throw new Error('Production bundle contains an unsubstituted DEVSERVER or PREPARATION_ONLY define');
         // SHARD-SOURCE AP5 (J347): the dev hook (src/client/game/devScene/hook.ts) and its server half are DEVSERVER-only.
-        for (const marker of ['__wildshardDevHook', 'wildshardDevColliders']) if (code.includes(marker)) throw new Error(`Production bundle ${file.name} contains the dev hook (${marker})`);
+        for (const marker of ['__wildshardDevHook', 'wildshardDevColliders', 'wildshardDevRestart', '__shardfileDevQuests']) if (code.includes(marker)) throw new Error(`Production bundle ${file.name} contains the dev hook (${marker})`);
       }
     }
   };

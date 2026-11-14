@@ -1,7 +1,7 @@
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { bootTask, bootProgress, bootTiming } from '@wildshard/engine/boot/timing';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
-import { parseShardfile } from '@wildshard/format/shardSchema';
+import { parseShardfile, type Shardfile } from '@wildshard/format/shardSchema';
 import { contentHash } from '@wildshard/engine/game/shardfile/contentHash';
 import { nodeNamedJsonCheck, nodeOutputDescriptorChecks } from '@wildshard/engine/game/shardfile/outputChecksNode';
 import { carryOutputDescriptor, isBuildValidatedOutput, outputDescriptor, resolveOutputDescriptor, serverReadsFile } from '@wildshard/engine/game/shardfile/outputDescriptor';
@@ -133,12 +133,13 @@ function serverPackReader(root: string, slug: string, build: () => string, sourc
  * P1-E5.2: the worker's product reader, loadHeadlessProduct over `fetch`. It verifies the same index, sizes and SHA-256
  * addresses with the same checks; only where the bytes come from differs.
  */
-export function fetchServerProduct(base: string, rapier: Rapier, held?: HeldRead): Promise<HeadlessRuntimeInput> {
-  return readServerProduct(new URL(base, globalThis.location.href).href, workerBuild, serverBytes, rapier, held);
+export function fetchServerProduct(base: string, rapier: Rapier, held?: HeldRead, patch?: (shard: Shardfile) => Shardfile): Promise<HeadlessRuntimeInput> {
+  return readServerProduct(new URL(base, globalThis.location.href).href, workerBuild, serverBytes, rapier, held, undefined, patch);
 }
 /** A shard's server inputs under `root`, whichever server is reading: `source` is what differs. `hash`, a placed slug's shardfile (SA47),
- *  lets a slug the build's book lacks open from the cook's index. */
-export async function readServerProduct(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead, hash?: string): Promise<HeadlessRuntimeInput> {
+ *  lets a slug the build's book lacks open from the cook's index. `patch` (DEVSERVER, SHARD-SOURCE AP19: `withDevGameplay`) changes
+ *  the read shardfile before the product is made of it. */
+export async function readServerProduct(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead, hash?: string, patch?: (shard: Shardfile) => Shardfile): Promise<HeadlessRuntimeInput> {
   const slug = new URL('.', root).pathname.split('/').at(-2) ?? '';
   // C2: all of it is in the pack this build's book names, the server class only there (J91). The page lends what it holds
   // (DL25), so that moves no bytes. A host with no book, or one offline after a new build, reads what the device kept.
@@ -155,8 +156,9 @@ export async function readServerProduct(root: string, build: () => string, sourc
   // on bytes its build has already checked and the page has just read without checking. As on the page, only a build's own verdict
   // for exactly these bytes spares the checks. A product with none, an outside one, keeps them.
   const assembled = await bootTask('server:descriptor-read-and-verification', () => resolveOutputDescriptor(input, { offline: false, firstParty: true, hash: contentHash, read, checks: nodeOutputDescriptorChecks }));
-  const built = isBuildValidatedOutput(assembled), shard = built ? assembled : parseShardfile(assembled);
-  if (!built) carryOutputDescriptor(assembled, shard);
+  const built = isBuildValidatedOutput(assembled), parsed = built ? assembled : parseShardfile(assembled);
+  if (!built) carryOutputDescriptor(assembled, parsed);
+  const shard = patch === undefined ? parsed : patch(parsed);
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error('Standalone output has no verified index');
   const files = new Map<string, { readonly path: string; readonly hash: string; readonly bytes: number }>();

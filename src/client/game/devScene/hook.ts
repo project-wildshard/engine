@@ -14,12 +14,14 @@ import { swapTerrainCollider } from '@wildshard/engine/physics/terrainTiles';
 import type { HeightfieldBinding } from '@wildshard/engine/world/Heightfield';
 import { decodeTerrainTile, type TerrainTileData } from '@wildshard/format/terrainTileBytes';
 import { refreshTerrainTile } from '@wildshard/engine/world/terrainTileView';
+import type { DevGameplay, DevPlace, DevRestarted } from '@wildshard/engine/game/devGameplay';
+import { diagnosticNow } from '@wildshard/engine/core/clock';
 
 /**
  * SHARD-SOURCE AP5 (J347: engine is the deployed client and server; dev tooling is sharddev's). The dev hook: the one thing
  * a DEVSERVER page carries for `wildshard watch`. sharddev owns the rest, its WebSocket server and protocol, the part diff
  * and a page script `watch` injects into the page it serves; that script owns one scope per part and the swap order, and
- * calls these five functions on `window.__wildshardDevHook`:
+ * calls these functions on `window.__wildshardDevHook`:
  *
  *   addPart(name, part)        draw a new part: meshes, sprites, lamps (the look's lamp lights) and water (the client's water)
  *   replacePart(name, part)    build the new part first, then dispose the old part's scope, in one call: no frame shows neither
@@ -35,16 +37,26 @@ import { refreshTerrainTile } from '@wildshard/engine/world/terrainTileView';
  *                              collider, its terrain field (`heightAt`) and every drawn ground tile whose samples changed are
  *                              swapped; the in-page server takes the same heights; a player under the new ground is lifted
  *                              onto it. True, or false when the page's ground can't take it (the page must reload)
+ *   restartGameplay(gameplay)  v4 (AP19): the shard's quests, encounters, spawns or scripts changed (`DEV_GAMEPLAY_SECTIONS`,
+ *                              the new rows of each). The in-page server saves, puts its world down and boots it again on
+ *                              the new rows from that save, with the player where the page has it; the page's client rejoins
+ *                              it, the held boxes and ground go to it again, and the quest views are built again from the new
+ *                              quest section. Resolves to what ran, or `ok: false` when the page must reload
  *
  * `version` is `DEV_HOOK_VERSION`; sharddev refuses a page with another (its page script) and a client whose build flags
  * say another (`build-flags.json` `devHook`, written by `scripts/app-build-pipeline.mjs`). Bump it on any change to these
  * signatures or to `DevPart`. A production build has none of this: `finish.ts` imports it only behind `__DEVSERVER__`, and
  * `scripts/check-devserver.mjs` refuses a bundle that holds `DEV_HOOK_GLOBAL`.
  */
-export const DEV_HOOK_VERSION = 3;
+export const DEV_HOOK_VERSION = 4;
 
 // the in-page server's half of `setGround`, which the standalone shell puts on the window (client/host/standalone/shell.ts)
-declare global { interface Window { __workerClientDevGround?: (ground: DevGround) => void } }
+declare global { interface Window {
+  __workerClientDevGround?: (ground: DevGround) => void;
+  /** AP19: the in-page server's soft restart (client/host/standalone/shell.ts) and the quest views' (shardfile/client.ts) */
+  __workerClientDevRestart?: (gameplay: DevGameplay, at: DevPlace | null) => Promise<DevRestarted>;
+  __shardfileDevQuests?: (quests: NonNullable<DevGameplay['quests']>) => Promise<boolean>;
+} }
 export const DEV_HOOK_GLOBAL = '__wildshardDevHook';
 
 export type Rgb = readonly [number, number, number];
@@ -121,7 +133,11 @@ export interface DevHook {
   setLook: (look: DevLook) => boolean;
   swapColliders: (name: string, boxes: readonly DevBox[]) => void;
   setGround: (ground: Uint8Array) => boolean;
+  restartGameplay: (gameplay: DevGameplay) => Promise<DevRestart>;
 }
+
+/** What a soft restart did: the server's world restart and the page's quest views, and how long each took (ms). */
+export interface DevRestart { readonly ok: boolean; readonly serverMs: number; readonly questsMs: number | null; readonly reason?: string }
 
 /** The page's player, as a dev swap lifts it out of new solids. */
 export interface DevPlayer { readonly position: { readonly x: number; readonly y: number; readonly z: number }; readonly yaw: number; pitch: number; spawn: (x: number, z: number, yaw: number, y?: number) => void }
@@ -142,6 +158,10 @@ export interface DevHookPorts {
   readonly player?: () => DevPlayer | null;
   /** the page's terrain field now (`captureHeightfield`), which a new ground installs into (v3); absent in a test */
   readonly terrainField?: () => HeightfieldBinding;
+  /** the in-page server's soft restart (v4); null when the page has none */
+  readonly restart?: () => ((gameplay: DevGameplay, at: DevPlace | null) => Promise<DevRestarted>) | null;
+  /** the page's quest views, built again from a new quest section (v4); null when the page can't */
+  readonly quests?: () => ((quests: NonNullable<DevGameplay['quests']>) => Promise<boolean>) | null;
   readonly watchFrames: (fn: (dt: number) => void) => () => void;
 }
 
@@ -319,16 +339,34 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
     lift(heightAt, []);
     return true;
   };
+  // AP19: the server's world restarts on the new rows and the quest views are built again, side by side; then the new world
+  // takes the boxes and ground watch had swapped into the old one.
+  const restartGameplay = async (gameplay: DevGameplay): Promise<DevRestart> => {
+    const server = ports.restart?.() ?? null, views = gameplay.quests === undefined ? null : ports.quests?.() ?? null;
+    if (server === null) return { ok: false, serverMs: 0, questsMs: null, reason: 'the page has no in-page server' };
+    if (gameplay.quests !== undefined && views === null) return { ok: false, serverMs: 0, questsMs: null, reason: 'the page can\'t rebuild its quest views' };
+    const player = ports.player?.() ?? null, at = player === null ? null : { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw };
+    const started = diagnosticNow();
+    const quests = views === null || gameplay.quests === undefined ? Promise.resolve(null) : views(gameplay.quests).then(ok => ok ? diagnosticNow() - started : -1);
+    const [restarted, questsMs] = await Promise.all([server(gameplay, at), quests]);
+    if (restarted.ok) {
+      for (const [name, boxes] of boxesOf) ports.server()?.(name, boxes);
+      if (ground !== null) ports.serverGround?.()?.({ resolution: ground.resolution, x: ground.x, z: ground.z, size: ground.size, heights: ground.heights });
+    }
+    const ok = restarted.ok && questsMs !== -1;
+    return { ok, serverMs: restarted.ms, questsMs: questsMs === null || questsMs < 0 ? null : Math.round(questsMs),
+      ...(restarted.reason !== undefined ? { reason: restarted.reason } : questsMs === -1 ? { reason: 'the quest views refused the new quests' } : {}) };
+  };
   scope.onDispose(ports.watchFrames(() => { if (ground !== null && ++sweep % 15 === 0) recut(ground); }));
   scope.onDispose(() => { for (const held of colliders.values()) held.dispose(); colliders.clear(); });
-  return { version: DEV_HOOK_VERSION, root, addPart, replacePart, removePart, setLook, swapColliders, setGround,
+  return { version: DEV_HOOK_VERSION, root, addPart, replacePart, removePart, setLook, swapColliders, setGround, restartGameplay,
     held: () => ({ geometries: geometries.size, textures: textures.size }) };
 }
 
 /** Put the hook on the window for sharddev's page script, for the page's level. */
 export function installDevHook(ports: DevHookPorts): DevHook {
-  const hook = createDevHook(ports), { version, addPart, replacePart, removePart, setLook, swapColliders, setGround } = hook;
-  ports.scope.expose(window, DEV_HOOK_GLOBAL, Object.freeze({ version, addPart, replacePart, removePart, setLook, swapColliders, setGround } satisfies DevHook));
+  const hook = createDevHook(ports), { version, addPart, replacePart, removePart, setLook, swapColliders, setGround, restartGameplay } = hook;
+  ports.scope.expose(window, DEV_HOOK_GLOBAL, Object.freeze({ version, addPart, replacePart, removePart, setLook, swapColliders, setGround, restartGameplay } satisfies DevHook));
   return hook;
 }
 

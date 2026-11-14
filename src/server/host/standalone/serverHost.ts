@@ -21,14 +21,17 @@ import { StandaloneGrid } from './gridServer';
 import { isHarnessFlag, isHarnessGod, isHarnessHits, isHarnessJoin, isHarnessMove, isHarnessPlace } from '../../../shared/host/standalone/harnessPlace';
 import { WorkerLoopback } from '../../../shared/host/standalone/workerLoopback';
 import { isDevColliders, isDevGround, swapDevBoxes, swapDevGround } from '@wildshard/engine/game/devColliders';
+import { isDevRestart, withDevGameplay, type DevGameplay, type DevPlace, type DevRestarted } from '@wildshard/engine/game/devGameplay';
+import type { Shardfile } from '@wildshard/format/shardSchema';
 import { ProgressSaves, ProgressWatch } from './progressWatch';
 
 type Boot = Extract<ShellMessage, { kind: 'boot' }>;
 /** How the composition reaches what a worker and a Node test get differently. */
 export interface StandaloneServerOptions {
   readonly control: MessagePort; readonly game: MessagePort;
-  /** Read and verify a shard's server inputs: the home cell's, and each cell's as the grid admits it. */
-  readonly load: (boot: Boot, slug: string) => Promise<HeadlessRuntimeInput>;
+  /** Read and verify a shard's server inputs: the home cell's, and each cell's as the grid admits it. `patch` (DEVSERVER, SHARD-SOURCE
+   *  AP19) changes the read shardfile before the input is made of it. */
+  readonly load: (boot: Boot, slug: string, patch?: (shard: Shardfile) => Shardfile) => Promise<HeadlessRuntimeInput>;
   /** The road's collision, read once a grid session boots. A lone cell has no road and never asks; a proof that stays in a cell needs none. */
   readonly strips?: (boot: Boot) => Promise<readonly GridCollisionStrip[]>;
   /** A save read back but would not restore, and boot moved to the one before it. */
@@ -84,16 +87,22 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     changed.poll(now);
   };
 
+  /** The grid's boot options for `message`; `patch` changes each read shardfile (AP19's restart). */
+  const gridOptions = (message: Boot, local: ForwardedStorage, patch?: (shard: Shardfile) => Shardfile): Parameters<typeof StandaloneGrid.boot>[0] => {
+    const { arrival, residents } = options.proof ?? {};
+    return { slug: message.slug, build: message.build, book, saves, storage: local, savePrefix: message.savePrefix, now: diagnosticNow, ...(message.lone === true ? { lone: true } : {}),
+      load: slug => options.load(message, slug, patch), strips: () => options.strips?.(message) ?? Promise.resolve([]), stepped, ...(options.onSaveRefused === undefined ? {} : { refused: options.onSaveRefused }), ...(options.reports === undefined ? {} : { reports: options.reports }),
+      ...(arrival === undefined ? {} : { arrival }), ...(residents === undefined ? {} : { residents }), ...(options.goto === undefined ? {} : { goto: options.goto }) };
+  };
+
   const boot = async (message: Boot): Promise<void> => {
     bootMark('server:boot-configuration');
     storage = new ForwardedStorage(message.saves, write => { post({ kind: 'write', ...write }); });
-    const local = storage, { arrival, residents } = options.proof ?? {};
+    const local = storage;
     installWorkerIdentity(message.savePrefix);
     allowDeveloperBoost(); // this server is the player's own device; a page only sends the button with Developer on
     installSaveEnvironment({ storage: saveScope => saveScope === 'session' ? null : local, persistent: () => true, persist: () => Promise.resolve(false) });
-    const server = await bootTask('server:world-boot', () => StandaloneGrid.boot({ slug: message.slug, build: message.build, book, saves, storage: local, savePrefix: message.savePrefix, now: diagnosticNow, ...(message.lone === true ? { lone: true } : {}),
-      load: slug => options.load(message, slug), strips: () => options.strips?.(message) ?? Promise.resolve([]), stepped, ...(options.onSaveRefused === undefined ? {} : { refused: options.onSaveRefused }), ...(options.reports === undefined ? {} : { reports: options.reports }),
-      ...(arrival === undefined ? {} : { arrival }), ...(residents === undefined ? {} : { residents }), ...(options.goto === undefined ? {} : { goto: options.goto }) }));
+    const server = await bootTask('server:world-boot', () => StandaloneGrid.boot(gridOptions(message, local)));
     grid = server;
     const { restored } = server;
     if (restored?.ledger !== undefined) book.restore(restored.ledger);
@@ -102,11 +111,43 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     // SHARD-SOURCE AP5: `wildshard watch`'s part colliders, in this world as in the page's (DEVSERVER only: the define folds it away)
     // and (AP18) its ground: the heightfield, the height query, and the players lifted out of a hill raised under them
     const devBoxes = new Map<string, Scope>(), devGround: { scope: Scope | null } = { scope: null };
-    const groundPorts = { heightQuery: (heightAt: (x: number, z: number) => number) => { server.host.setHeightQuery(heightAt); }, players: () => server.host.players.entries(),
-      place: (at: { x: number; y: number; z: number; yaw: number }, player: string) => { try { server.place(at, player); } catch (cause) { console.warn('[devGround] a player stays where it was', cause); } } };
-    if (options.harness !== undefined) options.harness.onmessage = (event: MessageEvent<unknown>): void => { const [port] = event.ports; if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && isDevColliders(event.data)) swapDevBoxes(server.host.physics, server.host.scope, devBoxes, event.data.wildshardDevColliders, event.data.boxes); else if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && isDevGround(event.data)) swapDevGround(server.host.physics, server.host.scope, devGround, event.data.wildshardDevGround, groundPorts); else if (isHarnessJoin(event.data) && port !== undefined) server.join(event.data, new WorkerLoopback(port)); else if (isHarnessFlag(event.data)) server.raise(event.data.flag); else if (isHarnessMove(event.data)) server.place(event.data, event.data.move); else if (isHarnessPlace(event.data)) server.place(event.data); else if (isHarnessHits(event.data)) server.hardHits(event.data.hits); else if (isHarnessGod(event.data)) server.bossGod(); };
+    const groundPorts = { heightQuery: (heightAt: (x: number, z: number) => number) => { grid?.host.setHeightQuery(heightAt); }, players: () => (grid ?? server).host.players.entries(),
+      place: (at: { x: number; y: number; z: number; yaw: number }, player: string) => { try { grid?.place(at, player); } catch (cause) { console.warn('[devGround] a player stays where it was', cause); } } };
+    // AP19: `wildshard watch`'s soft restart. Save, put the world down, boot it again on the new sections from that save (its
+    // progress and its player's place), give the page its new link and put the player where the page says it stands. The page
+    // sends its held boxes and ground again once this answers.
+    let restarting = false;
+    const restart = typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ ? async (gameplay: DevGameplay, at: DevPlace | null, link: MessagePort, reply: MessagePort): Promise<void> => {
+      const started = diagnosticNow(), old = grid;
+      const answer = (ok: boolean, reason?: string): void => { reply.postMessage({ ok, ms: Math.round(diagnosticNow() - started), ...(reason === undefined ? {} : { reason }) } satisfies DevRestarted, []); reply.close(); };
+      if (old === undefined || restarting) { answer(false, 'no world to restart'); return; }
+      restarting = true; clock?.pause();
+      try {
+        await saveWorld();
+        old.dispose(); grid = undefined;
+        for (const held of devBoxes.values()) held.dispose();
+        devBoxes.clear(); devGround.scope?.dispose(); devGround.scope = null;
+        const next = await StandaloneGrid.boot(gridOptions(message, local, shard => withDevGameplay(shard, gameplay)));
+        grid = next;
+        next.connect(new WorkerLoopback(link));
+        if (at !== null) next.place(at);
+        watch.look(next.host, book.filed);
+        next.open();
+        answer(true);
+      } catch (cause) { answer(false, cause instanceof Error ? cause.message : String(cause)); }
+      finally { restarting = false; clock?.start(); }
+    } : null;
+    if (options.harness !== undefined) options.harness.onmessage = (event: MessageEvent<unknown>): void => {
+      const [port, reply] = event.ports, live = grid;
+      if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && restart !== null && isDevRestart(event.data) && port !== undefined && reply !== undefined) { void restart(event.data.wildshardDevRestart, event.data.at, port, reply); return; }
+      // while a restart runs there is no world: the page sends its boxes and ground again once it answers
+      if (live === undefined) return;
+      if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && isDevColliders(event.data)) swapDevBoxes(live.host.physics, live.host.scope, devBoxes, event.data.wildshardDevColliders, event.data.boxes);
+      else if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && isDevGround(event.data)) swapDevGround(live.host.physics, live.host.scope, devGround, event.data.wildshardDevGround, groundPorts);
+      else if (isHarnessJoin(event.data) && port !== undefined) live.join(event.data, new WorkerLoopback(port)); else if (isHarnessFlag(event.data)) live.raise(event.data.flag); else if (isHarnessMove(event.data)) live.place(event.data, event.data.move); else if (isHarnessPlace(event.data)) live.place(event.data); else if (isHarnessHits(event.data)) live.hardHits(event.data.hits); else if (isHarnessGod(event.data)) live.bossGod();
+    };
     clock = new ServerClock({ now: diagnosticNow, wait: (ms, run) => { const timer = scope.timeout(ms, run); return () => { scope.cancelTimer(timer); }; },
-      step: () => { try { server.tick(); progress(server); } catch (error) { fail(error); } } });
+      step: () => { const live = grid; if (live === undefined) return; try { live.tick(); progress(live); } catch (error) { fail(error); } } });
     options.proof?.booted?.(server);
     bootMark('server:booted-send');
     post({ kind: 'booted', tick: server.host.state.tick, restored: restored !== undefined });
