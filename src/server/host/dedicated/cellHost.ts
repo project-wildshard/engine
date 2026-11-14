@@ -3,6 +3,7 @@
 import { installAppIdentity } from '@wildshard/engine/app/identity';
 import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { ServerClock } from '@wildshard/engine/net/serverClock';
 import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
@@ -24,6 +25,8 @@ const TICKS_KEPT = 720;
 const SAVE_PREFIX = 'wildshard.room.';
 /** J107: a cell everyone left starts over once it has stood empty this long, on its own timer, before anyone comes back (J320). */
 const EMPTY_MS = 300_000;
+/** GC4: a road walker this near a cell's edge may be about to step in, so the cell does not start over under them; looked at again this often. */
+const NEAR_M = 40, NEAR_RETRY_MS = 5000;
 
 /** A port as `worker_threads` and a `MessageChannel` both give it. */
 export interface CellPort { postMessage: (message: unknown, transfer?: readonly Transferable[]) => void; on?: (event: 'message', listener: (message: unknown) => void) => unknown; onmessage?: ((event: MessageEvent<unknown>) => void) | null }
@@ -142,6 +145,9 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     if (disposed || cell.waking !== null || !cell.used || cell.room.taken > 0 || cell.emptySince !== since) return;
     const left = emptyMs - (diagnosticNow() - since);
     if (left > 0) { scope.timeout(left, () => { later.startOver(cell, since); }); return; }
+    // GC4: never boot a cell under a walker heading back to it: while someone on the road stands within NEAR_M of its edge, look again later
+    const origin = crossing?.assembly.cells.find(row => [cell.slug].includes(row.instance))?.origin;
+    if (origin !== undefined && road?.near(origin, CHUNK_HALF + NEAR_M) === true) { scope.timeout(NEAR_RETRY_MS, () => { later.startOver(cell, since); }); return; }
     const job = overs.then(() => restart(cell)).finally(() => { if (cell.waking === job) cell.waking = null; });
     cell.waking = job; overs = job;
   };

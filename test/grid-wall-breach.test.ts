@@ -63,5 +63,5 @@ test('the road wall in front of a walled cell holds a fall along it, a fall from
   await run('run along it, west', null, -1, 1, NET_BUTTONS.sprint, 5000);
   // The highest a page can stand a player on the road: 60 m (the wall's top). A body set above it is the only way over.
   await run('fall into it from the wall top', { x: 0, y: 58, z: WALL_FACE + 1 }, 0, 1, NET_BUTTONS.sprint, 6000);
-  if (process.env.GC2_MATRIX !== undefined) writeFileSync(process.env.GC2_MATRIX, `${JSON.stringify(rows, null, 2)}\n`);
+  if (process.env['GC2_MATRIX'] !== undefined) writeFileSync(process.env['GC2_MATRIX'], `${JSON.stringify(rows, null, 2)}\n`);
 });

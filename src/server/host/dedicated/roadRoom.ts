@@ -73,6 +73,11 @@ export class RoadRoom implements CrossTarget {
   get holding(): number { let held = 0; for (const seat of this.seats.values()) if (seat.transport === null) held++; return held; }
   holds(device: string): boolean { return this.seats.has(device); }
   bodyId(device: string): string | undefined { return this.seats.get(device)?.body; }
+  /** GC4: someone on this road stands within `reach` of `origin` on both axes (a cell's square grown by how near counts). */
+  near(origin: { readonly x: number; readonly z: number }, reach: number): boolean {
+    for (const seat of this.seats.values()) { const at = this.host.players.get(seat.body)?.position; if (at !== undefined && Math.abs(at.x - origin.x) <= reach && Math.abs(at.z - origin.z) <= reach) return true; }
+    return false;
+  }
   bodyOf(device: string): PlayerSim | undefined { const seat = this.seats.get(device); return seat === undefined ? undefined : this.host.players.get(seat.body); }
 
   admit(entry: SeatEntry, transport: Transport, at: ResumeAt, motion?: PlayerSim): CrossArrival | string {
