@@ -11,6 +11,7 @@ test('an actual hook corrects an inferred row and warm-up names its own work', (
   screen.step(initial);
   screen.step({ ...initial, hybrid: true, hook: 'world' });
   expect(now()).toBe('Region world');
+  expect(screen.stage).toBe('Region world'); // NET-LAG NL7: what a proof times
   screen.step({ ...initial, hybrid: true, hook: 'kit', hooks: new Set(['afterWorld']) });
   expect(now()).toBe('Equipment and HUD');
   screen.step({ ...initial, hybrid: true, hook: 'afterPlay', hooks: new Set(['afterWorld', 'afterKit']),
@@ -22,4 +23,8 @@ test('an actual hook corrects an inferred row and warm-up names its own work', (
   screen.step({ ...initial, hybrid: true, runtime: true, colliders: true, sim: true,
     hooks: new Set(['afterWorld', 'afterKit', 'afterPlay']) });
   expect(now()).toBe('Enter the cell');
+  expect(screen.stage).toBe('Enter the cell');
+  screen.step({ ...initial, hybrid: true, runtime: true, colliders: true, sim: true, entered: true, gameplayReady: true,
+    hooks: new Set(['afterWorld', 'afterKit', 'afterPlay']) });
+  expect(screen.stage).toBeNull();
 });

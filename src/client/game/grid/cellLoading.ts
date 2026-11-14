@@ -95,6 +95,8 @@ export class CellLoading {
   }
   /** The screen's cell (null: none shown). */
   get open(): string | null { return this.instance; }
+  /** NET-LAG NL7: the row the screen shows running now (its label), null when none is shown: a proof times each stage. */
+  get stage(): string | null { return this.instance === null || this.reached < 0 ? null : loadingPath('cell').steps[this.reached]?.label ?? null; }
   /** Hide the screen: `entered`, the cell is ready (the card completes and fades); else it was left or cancelled. */
   close(entered = false): void {
     const was = this.instance; this.instance = null; this.reached = -1;

@@ -93,7 +93,7 @@ try {
     setInterval(() => { try {
       const st = W.__wildshard.shard.grid.state(), p = W.__wildshard.world.player, lv = st.live, wire = W.__workerClient?.();
       q.samples.push({ t: Math.round(performance.now() - t0), x: Number(p.position.x.toFixed(2)), y: Number(p.position.y.toFixed(2)), z: Number(p.position.z.toFixed(2)), inside: st.inside, phase: lv?.crossing?.phase, target: lv?.crossing?.target, issue: lv?.crossing?.issue, site: W.__workerClient?.().site,
-        ready: lv?.live?.gameplayReady, loading: st.cellLoading, closed: st.softWalls?.closed, feet: st.feet, frames: wire?.frames, own: wire?.own });
+        ready: lv?.live?.gameplayReady, loading: st.cellLoading, stage: st.cellStage, closed: st.softWalls?.closed, feet: st.feet, frames: wire?.frames, own: wire?.own });
     } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 100);
   });
   await sleep(500);
@@ -138,7 +138,7 @@ try {
     /** @type {Record<string, unknown>[]} */
     const events = [];
     let stuckSince = 0, stuckMs = 0, worstStuck = 0, last = start, enteredAt = 0, controlAt = 0, roadAt = 0, jumps = 0;
-    const t1 = Date.now(), framesFrom = await page.evaluate(() => /** @type {any} */ (window).__gc15c.frames.length), linksFrom = await page.evaluate(() => /** @type {any} */ (window).__programLinks);
+    const t1 = Date.now(), samplesFrom = await page.evaluate(() => /** @type {any} */ (window).__gc15c.samples.length), framesFrom = await page.evaluate(() => /** @type {any} */ (window).__gc15c.frames.length), linksFrom = await page.evaluate(() => /** @type {any} */ (window).__programLinks);
     await face(yaw);
     await page.keyboard.down('KeyW'); if (leg.boost) await page.keyboard.down('ShiftLeft');
     while (Date.now() - t1 < LEG_MS) {
@@ -164,7 +164,15 @@ try {
     const end = await sample(), frames = /** @type {number[][]} */ (await page.evaluate(n => /** @type {any} */ (window).__gc15c.frames.slice(n), framesFrom));
     await page.screenshot({ path: join(out, `${engineName}-${leg.name}-after.png`) });
     const programLinks = await page.evaluate(() => /** @type {any} */ (window).__programLinks) - linksFrom;
-    const deltas = frames.map(row => row[1] ?? 0), row = { name: leg.name, programLinks, from, target: leg.target, boost: leg.boost, roadAtMs: roadAt, enteredAtMs: enteredAt, controlAtMs: controlAt,
+    // NET-LAG NL7: the crossing as numbers. From the page's 100 ms samples: the border (the first sample outside the cell the leg
+    // left) to the target's gameplay ready, each loading-card row's time on screen, and the longest the feet stood still while the
+    // key was held (the stop above, at 250 ms)
+    const legSamples = /** @type {any[]} */ (await page.evaluate(n => /** @type {any} */ (window).__gc15c.samples.slice(n), samplesFrom)).filter(sample => sample.err === undefined);
+    const border = legSamples.find(sample => sample.inside !== from), ready = legSamples.find(sample => sample.inside === leg.target && sample.ready === true && (sample.phase === undefined || sample.phase === 'settled'));
+    /** @type {Record<string, number>} */
+    const stages = {};
+    for (const [index, sample] of legSamples.entries()) { const next = legSamples[index + 1]; if (next !== undefined && typeof sample.stage === 'string') stages[sample.stage] = (stages[sample.stage] ?? 0) + next.t - sample.t; }
+    const deltas = frames.map(row => row[1] ?? 0), row = { name: leg.name, borderToReadyMs: border === undefined || ready === undefined ? null : Math.max(0, ready.t - border.t), stages, programLinks, from, target: leg.target, boost: leg.boost, roadAtMs: roadAt, enteredAtMs: enteredAt, controlAtMs: controlAt,
       borderToControlMs: enteredAt === 0 || controlAt === 0 ? null : controlAt - enteredAt, worstStopMs: worstStuck, stoppedMs: stuckMs, jumps, frames: deltas.length,
       over50: deltas.filter(ms => ms > 50).length, over100: deltas.filter(ms => ms > 100).length, worstFrameMs: Math.max(0, ...deltas), events, end };
     legs.push(row);
