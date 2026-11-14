@@ -98,7 +98,11 @@ export function deviceRouteMemory(): RouteMemory {
     shards: release => wordShards(kept(release)),
     write: (release, grid, shards = null) => {
       const build = (globalThis as { __WS_BUILD_ID__?: string }).__WS_BUILD_ID__ ?? '';
-      try { slot().write({ of: release, grid, ...(shards === null ? {} : { shards: [...shards] }), build, at: Date.now() }); } catch { /* a device that keeps nothing falls back to today's page */ }
+      try {
+        // OF20: the last placement file shares this slot (placedCells.ts `devicePlacedKeep`); a new word keeps it
+        const prior = slot().read(), placed = typeof prior === 'object' && prior !== null && !Array.isArray(prior) ? prior['placed'] : undefined;
+        slot().write({ of: release, grid, ...(shards === null ? {} : { shards: [...shards] }), build, at: Date.now(), ...(placed === undefined ? {} : { placed }) });
+      } catch { /* a device that keeps nothing falls back to today's page */ }
     },
   };
 }

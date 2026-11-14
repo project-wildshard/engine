@@ -4,9 +4,13 @@
 // Shard Select card and `?chunk=<slug>` landed on the deck. The file is believed only under the API's placement key, as the box and
 // SA35's preview bake believe it. A missing, late, unreadable or refused file keeps the build's grid: boot never waits past
 // `PLACED_DEADLINE_MS` and never fails here. The bucket sends it `no-store`, the read asks `no-store`, and the service worker leaves
-// `/releases/` to the network (sw.js `isContentRead`), so no page keeps an old file.
+// `/releases/` to the network (sw.js `isContentRead`), so no cache serves an old file.
+// OFFLINE OF20: the device keeps the last file it believed (its text, in OF0's `gridRoute` slot, beside the world's kept word), and
+// the next page installs it at once, its signature checked again: offline, or on a link that hangs past the deadline, Shard Select
+// still has the cells this device last saw. A fresh file read in time replaces it, from the build's own catalogue; a 404 drops it.
 import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
+import { jsonSlot, type Json } from '@wildshard/engine/saves/slots';
 import { GRID_RADIUS } from '@wildshard/format/contentBounds';
 import { PLACEMENT_PUBLIC_KEY, PlacementSchema, SignedPlacementSchema, placementsURL, type PlacementFile } from '../../../shared/game/grid/placementRows';
 import { installCatalogue, installedCatalogue, type CatalogueDocument } from '../../../shared/game/grid/catalogueSlot';
@@ -74,7 +78,28 @@ export function addPlacedCells(document: CatalogueDocument, file: PlacementFile,
 
 /** What a page's read of its placement file did, for the console and the tests: `carded` names the added slugs whose card came
  *  from the API's catalogue (SA46). */
-export type PlacedRead = { readonly added: readonly Cell[]; readonly left: readonly string[]; readonly serial: number; readonly carded: readonly string[] } | { readonly kept: string };
+export type PlacedRead = { readonly added: readonly Cell[]; readonly left: readonly string[]; readonly serial: number; readonly carded: readonly string[];
+  /** OF20: the device's kept file, because the fresh one did not come (why) */ readonly cached?: string } | { readonly kept: string };
+/** OF20: the last placement file this device believed, by its address. */
+export interface PlacedKeep { readonly read: (url: string) => string | null; readonly write: (url: string, text: string | null) => void }
+/** OF20: in OF0's device slot `gridRoute` (oneWayIn.ts `deviceRouteMemory`), as `placed: { url, text }`: one store for the world's
+ *  last word and its last layout. */
+export function devicePlacedKeep(): PlacedKeep {
+  const slot = (): ReturnType<typeof jsonSlot> => jsonSlot('gridRoute', 'device');
+  const row = (): Record<string, Json> => { const value = slot().read(); return typeof value === 'object' && value !== null && !Array.isArray(value) ? value : {}; };
+  return {
+    read: url => {
+      try {
+        const placed = row()['placed'];
+        return typeof placed === 'object' && placed !== null && !Array.isArray(placed) && placed['url'] === url && typeof placed['text'] === 'string' ? placed['text'] : null;
+      } catch { return null; }
+    },
+    write: (url, text) => {
+      try { const { placed: _old, ...rest } = row(); slot().write(text === null ? rest : { ...rest, placed: { url, text } }); }
+      catch { /* a device that keeps nothing reads the network only, as before */ }
+    },
+  };
+}
 export interface PlacedPorts {
   readonly fetch?: typeof fetch;
   readonly publicKey?: string;
@@ -92,6 +117,8 @@ export interface PlacedPorts {
   /** SA48: a carded slug's content from the cook (`placedContent.ts`), by the hash its cell names; default: this page's build's index in
    *  the store at the placement file's origin. A slug with none stays out. */
   readonly content?: (slug: string, hash: string | undefined, signal: AbortSignal) => Promise<PlacedContent | undefined>;
+  /** OF20: where the last believed file is kept (default: the device, `devicePlacedKeep`) */
+  readonly keep?: PlacedKeep;
 }
 /** The cook's content for a placed slug, from the store the placement file is in, for this page's build under its own validator. */
 const cookContent = (url: string, read: typeof fetch): NonNullable<PlacedPorts['content']> => (slug, hash, signal) => {
@@ -112,18 +139,43 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     const abort = new AbortController(), stop = (): void => { abort.abort(); };
     scope.timeout(ports.deadlineMs ?? PLACED_DEADLINE_MS, stop);
     if (ports.signal?.aborted === true) stop(); else if (ports.signal !== undefined) scope.listen(ports.signal, 'abort', stop);
-    const response = await (ports.fetch ?? fetch)(url, { cache: 'no-store', credentials: 'omit', redirect: 'error', signal: abort.signal });
-    if (response.status === 404) return { kept: 'no placement file (404): nothing placed on this channel' };
-    if (!response.ok) return { kept: `placement file ${String(response.status)}` };
-    const file = await readSignedPlacement(await response.text(), ports.publicKey);
     const channel = /\/releases\/(staging|production)-placements\.json$/u.exec(new URL(url).pathname)?.[1];
-    if (channel !== undefined && file.channel !== channel) return { kept: `a ${file.channel} placement file at the ${channel} address` };
+    const believe = async (text: string): Promise<PlacementFile> => {
+      const read = await readSignedPlacement(text, ports.publicKey);
+      if (channel !== undefined && read.channel !== channel) throw new Error(`a ${read.channel} placement file at the ${channel} address`);
+      return read;
+    };
     const known = ports.known ?? (slug => findTitleManifest(slug) !== undefined);
     // the page's own deadline, read afresh after each wait: once it fires the boot has gone on
     const wentOn = (): boolean => ports.signal?.aborted === true;
+    // OF20: the kept file first, so a page whose read never comes still has the layout this device last saw
+    const keep = ports.keep ?? devicePlacedKeep(), held = keep.read(url);
+    let cached: { readonly added: readonly Cell[]; readonly left: readonly string[]; readonly serial: number } | undefined;
+    if (held !== null) {
+      try {
+        const file = await believe(held), kept = addPlacedCells(document, file, known);
+        if (!wentOn() && kept.added.length > 0) { installCatalogue(kept.document); cached = { added: kept.added, left: kept.left, serial: file.serial }; }
+      } catch { keep.write(url, null); } // a kept file this build no longer believes is dropped
+    }
+    const fallBack = (why: string): PlacedRead => cached === undefined ? { kept: why } : { ...cached, carded: [], cached: why };
+    let response: Response;
+    try { response = await (ports.fetch ?? fetch)(url, { cache: 'no-store', credentials: 'omit', redirect: 'error', signal: abort.signal }); }
+    catch (error) { return fallBack(error instanceof Error ? error.message : String(error)); }
+    if (response.status === 404) {
+      // nothing placed on this channel now: the kept cells leave too
+      keep.write(url, null);
+      if (cached !== undefined && !wentOn()) installCatalogue(document);
+      return { kept: 'no placement file (404): nothing placed on this channel' };
+    }
+    if (!response.ok) return fallBack(`placement file ${String(response.status)}`);
+    let text: string, file: PlacementFile;
+    try { text = await response.text(); file = await believe(text); }
+    catch (error) { return fallBack(error instanceof Error ? error.message : String(error)); }
     const placed = addPlacedCells(document, file, known);
-    if (wentOn()) return { kept: 'the page went on before the placement file was read' };
-    if (placed.added.length > 0) installCatalogue(placed.document);
+    keep.write(url, text); // only a file that places cleanly is kept
+    if (wentOn()) return fallBack('the page went on before the placement file was read');
+    // from the build's own catalogue, so the fresh file replaces the kept one's cells
+    if (placed.added.length > 0 || cached !== undefined) installCatalogue(placed.document);
     // SA46: a cell the box would open whose slug this build has no card for (an upload after the build) is carded from its catalogue
     // entry, after the build's own cells are in, so a slow or absent API costs them nothing; a slug it does not card stays out
     const unknown = addPlacedCells(placed.document, file).added.map(cell => cell.slug);

@@ -6,12 +6,12 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- It signs as the API does.
 import { generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { installCatalogue, installedCatalogue } from '../src/shared/game/grid/catalogueSlot';
 import { PLACEMENT_PUBLIC_KEY, placementsURL } from '../src/shared/game/grid/placementRows';
 import { readPlacementFile } from '../src/server/host/dedicated/placementFile';
 import { PLACEMENT_PUBLIC_KEY as PREVIEW_GRID_KEY } from '../scripts/preview-grid';
-import { addPlacedCells, learnPlacedCells, placementsOf, readSignedPlacement } from '../src/client/game/grid/placedCells';
+import { addPlacedCells, learnPlacedCells, placementsOf, readSignedPlacement, type PlacedKeep } from '../src/client/game/grid/placedCells';
 import { installTitleManifests, titleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
 import { titleCards } from '../src/client/game/titleDeck';
 import { oneWayIn, shardCell } from '../src/client/game/grid/oneWayIn';
@@ -65,7 +65,10 @@ const cards = (): readonly string[] => titleCards(false, () => null, () => null,
 const gridSlugs = (): readonly string[] => (installedCatalogue()?.grid.cells ?? []).map(cell => cell.slug);
 const player = { developer: false, devserver: false };
 
-beforeEach(() => { installCatalogue(PIN); installTitleManifests(ROWS); });
+/** OF20: each test's own device keep, so no test reads another's kept file */
+let device: PlacedKeep & { readonly kept: Map<string, string> };
+const memoryKeep = (): typeof device => { const kept = new Map<string, string>(); return { kept, read: url => kept.get(url) ?? null, write: (url, text) => { if (text === null) kept.delete(url); else kept.set(url, text); } }; };
+beforeEach(() => { installCatalogue(PIN); installTitleManifests(ROWS); device = memoryKeep(); });
 afterEach(() => { Reflect.deleteProperty(globalThis, Symbol.for('game.catalogue')); });
 
 test('one key: the page, the box and the preview bake believe the same placement key, and the page reads what the box reads', async () => {
@@ -88,7 +91,7 @@ test('the address: a released page reads its own channel\'s file; preview and a 
 test('a verified file adds the cell: Thin Ice gets its card, `?chunk=` enters the grid at ring 3\'s (0,3)', async () => {
   expect(cards()).toEqual(['driftwood-isle']);
   expect(shardCell('open-plot-thin-ice')).toBeUndefined();
-  const read = await learnPlacedCells(URL_AT, { fetch: answering(signed()), publicKey: api.hex });
+  const read = await learnPlacedCells(URL_AT, { keep: device, fetch: answering(signed()), publicKey: api.hex });
   expect(read).toEqual({ added: THIN_ICE, left: [], serial: 1, carded: [] });
   expect(gridSlugs()).toHaveLength(26);
   expect(installedCatalogue()?.placed).toEqual(['open-plot-thin-ice']);
@@ -118,7 +121,7 @@ test('a bad signature, another channel, a 404, a 500, a hung read and nonsense a
     expect(gridSlugs(), why).toEqual(PIN.grid.cells.map(cell => cell.slug));
     expect(cards(), why).toEqual(['driftwood-isle']);
   }
-  expect(await learnPlacedCells(URL_AT, { fetch: answering('', 404), publicKey: api.hex })).toEqual({ kept: 'no placement file (404): nothing placed on this channel' });
+  expect(await learnPlacedCells(URL_AT, { keep: device, fetch: answering('', 404), publicKey: api.hex })).toEqual({ kept: 'no placement file (404): nothing placed on this channel' });
 });
 
 test('cells the box would refuse are left out, and the build\'s own cell is kept once', () => {
@@ -140,12 +143,12 @@ test('cells the box would refuse are left out, and the build\'s own cell is kept
 });
 
 test('a slug neither this build nor the API\'s catalogue cards stays out, and an answer after the page went on installs nothing', async () => {
-  const read = await learnPlacedCells(URL_AT, { fetch: routes({ [ENTRY_AT]: () => new Response('{"error":"no such shard"}', { status: 404 }) }), publicKey: api.hex, api: API });
+  const read = await learnPlacedCells(URL_AT, { keep: device, fetch: routes({ [ENTRY_AT]: () => new Response('{"error":"no such shard"}', { status: 404 }) }), publicKey: api.hex, api: API });
   expect(read).toMatchObject({ added: [], left: [expect.stringContaining('not in this build')] });
   expect(gridSlugs()).toHaveLength(25);
   const late = new AbortController();
   const slow: typeof fetch = () => { late.abort(); return Promise.resolve(new Response(signed(), { status: 200 })); };
-  expect(await learnPlacedCells(URL_AT, { fetch: slow, publicKey: api.hex, signal: late.signal })).toHaveProperty('kept');
+  expect(await learnPlacedCells(URL_AT, { keep: device, fetch: slow, publicKey: api.hex, signal: late.signal })).toHaveProperty('kept');
   expect(gridSlugs()).toHaveLength(25);
   expect(cards()).toEqual(['driftwood-isle']);
 });
@@ -153,7 +156,7 @@ test('a slug neither this build nor the API\'s catalogue cards stays out, and an
 test('SA46: a placed slug the build has no card for is carded from its catalogue entry, and `?chunk=` enters its cell', async () => {
   let init: RequestInit | undefined;
   const fetch = routes({ [ENTRY_AT]: asked => { init = asked; return json(ENTRY); } });
-  const read = await learnPlacedCells(URL_AT, { fetch, publicKey: api.hex, api: API, content: cooked });
+  const read = await learnPlacedCells(URL_AT, { keep: device, fetch, publicKey: api.hex, api: API, content: cooked });
   expect(read).toEqual({ added: FRESH, left: [], serial: 1, carded: ['new-author-shard'] });
   expect(fetch.asked).toEqual([URL_AT, ENTRY_AT]);
   expect(init).toMatchObject({ cache: 'no-store', credentials: 'omit', redirect: 'error' });
@@ -180,7 +183,7 @@ test('SA46: a 404, a 500, offline, no CORS, junk, another slug\'s entry, no name
     ['hung (its own deadline, inside the file\'s)', hung],
   ] as const) {
     installCatalogue(PIN); installTitleManifests(ROWS);
-    const read = await learnPlacedCells(URL_AT, { fetch: routes({ [ENTRY_AT]: entry }), publicKey: api.hex, api: API, cardDeadlineMs: 30 });
+    const read = await learnPlacedCells(URL_AT, { keep: device, fetch: routes({ [ENTRY_AT]: entry }), publicKey: api.hex, api: API, cardDeadlineMs: 30 });
     expect(read, why).toMatchObject({ added: [], carded: [], left: [expect.stringContaining('not in this build')] });
     expect(gridSlugs(), why).toHaveLength(25);
     expect(cards(), why).toEqual(['driftwood-isle']);
@@ -189,11 +192,11 @@ test('SA46: a 404, a 500, offline, no CORS, junk, another slug\'s entry, no name
 
 test('SA46: no catalogue read for a slug the build cards, or for a cell the box would refuse', async () => {
   const known = routes({}, signed(THIN_ICE));
-  expect(await learnPlacedCells(URL_AT, { fetch: known, publicKey: api.hex, api: API })).toMatchObject({ carded: [] });
+  expect(await learnPlacedCells(URL_AT, { keep: device, fetch: known, publicKey: api.hex, api: API })).toMatchObject({ carded: [] });
   expect(known.asked).toEqual([URL_AT]);
   installCatalogue(PIN);
   const squat = routes({ [ENTRY_AT]: () => json(ENTRY) }, signed([{ instance: 'new-author-shard', slug: 'new-author-shard', cell: [0, 1] }]));
-  expect(await learnPlacedCells(URL_AT, { fetch: squat, publicKey: api.hex, api: API })).toMatchObject({ added: [], carded: [] });
+  expect(await learnPlacedCells(URL_AT, { keep: device, fetch: squat, publicKey: api.hex, api: API })).toMatchObject({ added: [], carded: [] });
   expect(squat.asked, 'Pine Hollow\'s spot: the box opens nothing there, so nothing is asked').toEqual([URL_AT]);
 });
 
@@ -204,14 +207,72 @@ test('SA46: the build\'s own cells go in before the catalogue is asked: a page t
     asked?.signal?.addEventListener('abort', () => { reject(new DOMException('aborted', 'AbortError')); });
     page.abort(); // the page's 3 s ran out while the API was slow
   }) }, signed(both));
-  const read = await learnPlacedCells(URL_AT, { fetch: stalled, publicKey: api.hex, api: API, signal: page.signal });
+  const read = await learnPlacedCells(URL_AT, { keep: device, fetch: stalled, publicKey: api.hex, api: API, signal: page.signal });
   expect(read).toMatchObject({ added: THIN_ICE, carded: [] });
   expect(gridSlugs()).toContain('open-plot-thin-ice');
   expect(gridSlugs()).not.toContain('new-author-shard');
   expect(cards()).toEqual(['driftwood-isle', 'open-plot-thin-ice']);
 
   installCatalogue(PIN); installTitleManifests(ROWS.map((row, n) => ({ ...row, order: 40 + n })));
-  const ok = await learnPlacedCells(URL_AT, { fetch: routes({ [ENTRY_AT]: () => json(ENTRY) }, signed(both)), publicKey: api.hex, api: API, content: cooked });
+  const ok = await learnPlacedCells(URL_AT, { keep: device, fetch: routes({ [ENTRY_AT]: () => json(ENTRY) }, signed(both)), publicKey: api.hex, api: API, content: cooked });
   expect(ok).toEqual({ added: both, left: [], serial: 1, carded: ['new-author-shard'] });
   expect(titleManifests().find(row => row.slug === 'new-author-shard')?.order).toBe(42);
+});
+
+// OFFLINE OF20: the last believed file is kept on the device, so an offline Shard Select has the layout it had online
+const offline: typeof fetch = () => Promise.reject(new TypeError('Failed to fetch'));
+const hung: typeof fetch = (_url, init) => new Promise((_resolve, reject) => { init?.signal?.addEventListener('abort', () => { reject(new DOMException('timed out', 'TimeoutError')); }); });
+const layout = (): unknown => ({ slugs: gridSlugs(), cards: cards(), cell: oneWayIn({ online: true, hosted: true, slug: 'open-plot-thin-ice', kept: false }, new GridAssembly(player)),
+  ring: new GridAssembly(player).cells.map(cell => cell.instance) });
+
+test('OF20: offline, the kept file gives the same grid, card, cell and neighbours as online', async () => {
+  await learnPlacedCells(URL_AT, { keep: device, fetch: answering(signed()), publicKey: api.hex });
+  const online = layout();
+  expect(device.kept.get(URL_AT)).toBe(signed());
+  // the next page, offline: the build's grid again, then the kept file
+  installCatalogue(PIN); installTitleManifests(ROWS);
+  const read = await learnPlacedCells(URL_AT, { keep: device, fetch: offline, publicKey: api.hex });
+  expect(read).toEqual({ added: THIN_ICE, left: [], serial: 1, carded: [], cached: 'Failed to fetch' });
+  expect(layout()).toEqual(online);
+});
+
+test('OF20: a read that hangs past the page\'s deadline still leaves the kept layout installed', async () => {
+  device.write(URL_AT, signed());
+  const late = new AbortController();
+  const reading = learnPlacedCells(URL_AT, { keep: device, fetch: hung, publicKey: api.hex, signal: late.signal, deadlineMs: 60_000 });
+  await vi.waitFor(() => { expect(gridSlugs()).toHaveLength(26); });
+  late.abort(); // the boot goes on with what is installed
+  expect(gridSlugs()).toHaveLength(26);
+  await reading;
+});
+
+test('OF20: a fresh file replaces the kept one\'s cells; a 404 drops them; a kept file under another key is dropped', async () => {
+  device.write(URL_AT, signed());
+  const moved = [{ instance: 'open-plot-thin-ice', slug: 'open-plot-thin-ice', cell: [3, 0] }] as const;
+  expect(await learnPlacedCells(URL_AT, { keep: device, fetch: answering(signed(moved, 2)), publicKey: api.hex })).toEqual({ added: moved, left: [], serial: 2, carded: [] });
+  expect(oneWayIn({ online: true, hosted: true, slug: 'open-plot-thin-ice', kept: false }, new GridAssembly(player))).toMatchObject({ cell: [3, 0] });
+  expect(device.kept.get(URL_AT)).toBe(signed(moved, 2));
+  installCatalogue(PIN);
+  expect(await learnPlacedCells(URL_AT, { keep: device, fetch: answering('', 404), publicKey: api.hex })).toHaveProperty('kept');
+  expect(gridSlugs()).toHaveLength(25);
+  expect(device.kept.has(URL_AT)).toBe(false);
+  device.write(URL_AT, signed(THIN_ICE, 1, 'staging', pair().privateKey));
+  expect(await learnPlacedCells(URL_AT, { keep: device, fetch: offline, publicKey: api.hex })).toEqual({ kept: 'Failed to fetch' });
+  expect(gridSlugs()).toHaveLength(25);
+  expect(device.kept.has(URL_AT)).toBe(false);
+});
+
+test('OF20: the device keep shares OF0\'s gridRoute slot and leaves the kept world word alone', async () => {
+  const { devicePlacedKeep } = await import('../src/client/game/grid/placedCells');
+  const { deviceRouteMemory } = await import('../src/client/game/grid/oneWayIn');
+  const route = deviceRouteMemory(), keep = devicePlacedKeep(), release = 'https://packs.example/releases/staging.json';
+  route.write(release, true, ['driftwood-isle']);
+  keep.write(URL_AT, signed());
+  expect(route.read(release)).toBe(true);
+  route.write(release, true, ['driftwood-isle', 'open-plot-thin-ice']);
+  expect(keep.read(URL_AT)).toBe(signed());
+  expect(route.shards(release)).toEqual(['driftwood-isle', 'open-plot-thin-ice']);
+  keep.write(URL_AT, null);
+  expect(keep.read(URL_AT)).toBeNull();
+  expect(route.read(release)).toBe(true);
 });
