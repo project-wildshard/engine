@@ -112,7 +112,8 @@ test('a world built ahead retires when the traveller enters another cell or leav
     player.position.x = CHUNK_HALF - 0.5; (await live.prepare(home.instance, null)).commit();
     player.position.x = CHUNK_HALF + 0.5; live.beforeFixed();
     await expect.poll(() => live.ready(target.instance), { timeout: 5000, interval: 10 }).toBe(true);
-    player.position.x = CHUNK_HALF + 0.5; player.position.z = 2 * assembly.pitch;
+    // mid-road, clear of every cell's wall (a traveller held at a wall keeps that cell building, QA 11-13 row 43)
+    player.position.x = assembly.pitch / 2; player.position.z = 2 * assembly.pitch;
     for (let tick = 0; tick < 3; tick++) live.beforeFixed();
     await settle(); live.beforeFixed(); await settle();
     expect(live.state().residents).toEqual([]);

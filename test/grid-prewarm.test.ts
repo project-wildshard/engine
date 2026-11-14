@@ -56,8 +56,9 @@ async function rig(options: { isolated?: boolean; bytes?: number } = {}) {
 test('boost: the neighbour\'s world is built from inside the source, at its speed\'s lead, and the entry finds it', async () => {
   const r = await rig();
   try {
-    // 6 s default build × 1.25 + 8 m: 143 m at a boost (the road is 50 m: 2.8 s at 18 m/s)
-    const lead = 8 + 18 * 6 * 1.25;
+    // 14 s default build (a product read and a world: Pine's are 6 to 8 s each) × 1.25 + 8 m, capped at 200 m at a boost
+    // (the road is 50 m: 2.8 s at 18 m/s)
+    const lead = Math.min(200, 8 + 18 * 14 * 1.25);
     r.player.position.x = r.east.origin.x - CHUNK_HALF - lead - 40;
     r.live.beforeFixed();
     while (r.toEast() > lead + 2) await r.step(18);
@@ -66,7 +67,7 @@ test('boost: the neighbour\'s world is built from inside the source, at its spee
     await expect.poll(() => r.live.ready(r.east.instance), { timeout: 5000, interval: 10 }).toBe(true);
     expect(r.live.current()).toBe(r.home.instance); // still inside the source
     expect(r.player.position.x).toBeLessThan(CHUNK_HALF - 50);
-    expect(r.live.state().ahead).toEqual({ instance: r.east.instance, warms: 1 });
+    expect(r.live.state().ahead).toEqual({ instance: r.east.instance, warms: 1, refused: null });
     // on to the line, out onto the road and into the neighbour: the world built ahead is the one entered
     while (r.player.position.x < CHUNK_HALF + 10.5) await r.step(18);
     (await r.live.prepare(r.home.instance, null)).commit();
@@ -79,16 +80,20 @@ test('boost: the neighbour\'s world is built from inside the source, at its spee
   expect(r.residency.allocator.entries()).toEqual([]);
 });
 
-test('walk: the lead (40 m) lies on the road, so the source builds nothing and the road builds it as before', async () => {
+test('walk: the lead (83 m at 4.3 m/s) starts the world inside the source, not before, and the road keeps it', async () => {
   const r = await rig();
   try {
-    r.player.position.x = CHUNK_HALF - 60; r.live.beforeFixed();
-    while (r.player.position.x < CHUNK_HALF - 0.5) await r.step(4.3);
+    const lead = 8 + 4.3 * 14 * 1.25;
+    r.player.position.x = r.east.origin.x - CHUNK_HALF - lead - 30; r.live.beforeFixed();
+    while (r.toEast() > lead + 1) await r.step(4.3);
     expect(r.created).toEqual([r.home.instance]); expect(r.live.state().ahead?.warms).toBe(0);
+    while (r.toEast() > lead - 3) await r.step(4.3);
+    await expect.poll(() => r.live.ready(r.east.instance), { timeout: 5000, interval: 10 }).toBe(true);
+    expect(r.live.current()).toBe(r.home.instance); expect(r.live.state().ahead?.warms).toBe(1);
     while (r.player.position.x < CHUNK_HALF + 10.5) await r.step(4.3);
     (await r.live.prepare(r.home.instance, null)).commit();
     await r.step(4.3); await r.step(4.3);
-    await expect.poll(() => r.live.ready(r.east.instance), { timeout: 5000, interval: 10 }).toBe(true);
+    expect(r.live.ready(r.east.instance)).toBe(true);
     expect(r.created).toEqual([r.home.instance, r.east.instance]);
   } finally { r.dispose(); }
 });
@@ -130,4 +135,20 @@ test('no pre-warm beside an opaque runtime, or when both worlds would not fit: t
       expect(r.live.state().ahead?.warms).toBe(0);
     } finally { r.dispose(); }
   }
+});
+
+test('QA 11-13 row 43: a traveller standing at a neighbour\'s wall on the road has that world built, with no heading', async () => {
+  const r = await rig();
+  try {
+    // out onto the road, then stood still 2 m short of the east cell's edge (inside its wall reach): no travel, no heading
+    r.player.position.x = CHUNK_HALF - 0.5; (await r.live.prepare(r.home.instance, null)).commit();
+    r.player.position.x = r.east.origin.x - CHUNK_HALF - 2;
+    for (let tick = 0; tick < 5; tick++) { r.live.beforeFixed(); await settle(); }
+    await expect.poll(() => r.live.ready(r.east.instance), { timeout: 5000, interval: 10 }).toBe(true);
+    expect(r.live.state().ahead?.instance).toBe(r.east.instance);
+    // mid-road between cells, clear of every wall: nothing more is built
+    r.player.position.x = r.east.origin.x - CHUNK_HALF - 30; r.player.position.z = 0;
+    for (let tick = 0; tick < 5; tick++) { r.live.beforeFixed(); await settle(); }
+    expect(r.created.filter(instance => instance !== r.home.instance && instance !== r.east.instance)).toEqual([]);
+  } finally { r.dispose(); }
 });

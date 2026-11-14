@@ -41,3 +41,11 @@ test('entered warm-up reports its actual work while afterPlay has not returned',
   expect(key({ ...waiting, warm, refusal: 'Unavailable' })).toBe('failed');
   expect(key({ ...waiting, warm, entered: true, gameplayReady: true })).toBe('done');
 });
+
+test('QA 11-13 row 43: a cell not building shows its world step, never a past visit\'s hooks as saved state', () => {
+  // Jake on staging: a return visit's hooks had all finished, the world was let go, and nothing was building it again:
+  // the card read "Gameplay and saved state · saved state and its systems" with no progress for 11.6 s
+  const visited = { ...base, product: true, requested: false, hooks: new Set(['afterWorld', 'afterKit', 'afterPlay']) };
+  expect(cellLoadingStep(visited)).toEqual({ kind: 'step', key: 'world', detail: 'waiting for its world to start' });
+  expect(key({ ...visited, hybrid: false })).toBe('world');
+});

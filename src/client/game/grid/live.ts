@@ -89,7 +89,7 @@ export interface LiveGridPorts {
 export interface LiveGridState {
   current: string | null; worldFeet: GridPoint; crossings: number;
   /** GC5: the world built ahead of the traveller (on the road or pre-warmed inside the source), and how many pre-warms began */
-  ahead?: { readonly instance: string | null; readonly warms: number };
+  ahead?: { readonly instance: string | null; readonly warms: number; readonly refused?: string | null };
   /** Last complete world remains fully charged and pressure-evictable on the road. */
   retainedCell?: { readonly instance: string; readonly remainingMs: number; readonly playingBytes: number; readonly capBytes: number } | null;
   transitions: readonly { from: string | null; to: string | null }[];
@@ -120,7 +120,7 @@ const APPROACH_TRAVEL_METRES = 0.1;
 // GC5: the page pre-warms a neighbour's world from inside the source, at the distance the traveller covers at its speed in that
 // world's last measured build time (2 s at least; before it is measured, the slowest build so far or 6 s), times a margin. Kept while the traveller stays within
 // WARM_KEEP_METRES of it; the lead is capped below that, so a pre-warm never starts where it would be dropped.
-const FIXED_HZ = 60, WARM_DEFAULT_SECONDS = 6, WARM_MIN_SECONDS = 2, WARM_MAX_SECONDS = 10, WARM_MARGIN = 1.25, WARM_LEAD_METRES = 8, WARM_LEAD_CAP_METRES = 200, WARM_KEEP_METRES = 240;
+const DEMAND_METRES = 80, HELD_RETRY_MS = 5000, FIXED_HZ = 60, WARM_DEFAULT_SECONDS = 14, WARM_MIN_SECONDS = 2, WARM_MAX_SECONDS = 16, WARM_MARGIN = 1.25, WARM_LEAD_METRES = 8, WARM_LEAD_CAP_METRES = 200, WARM_KEEP_METRES = 240;
 const entryAxes = [['x', 'z'], ['z', 'x']] as const;
 // Distance can decrease while passing parallel to a cell. Only a ray into its first boundary's midpoint mouth
 // predicts entry; product downloads remain radial, but an unrelated native world must not block the real turn-in.
@@ -184,6 +184,10 @@ export class LiveGridHost {
   private readonly transitions: { from: string | null; to: string | null }[] = [];
   private crossings = 0;
   private warms = 0;
+  /** QA row 43: when a traveller held at a cell's wall may next retry its failed build */
+  private readonly heldRetryAt = new Map<string, number>();
+  /** GC5: why the last pre-warm the heading asked for did not start (its product still reading, an exclusive runtime, or the budget) */
+  private warmRefusal: string | null = null;
   private previousFeet: GridPoint | undefined;
   /** fixed steps since `previousFeet` moved, for the traveller's speed (GC5) */
   private stepsSincePrevious = 0;
@@ -543,6 +547,15 @@ export class LiveGridHost {
       const estimate = readinessModel(this.ports.readiness.bundle(cell), this.ports.readiness.link), distance = this.distance(cell, feet);
       if (this.assembly.approaching(distance, estimate.distance) && !this.issues.has(cell.instance) && this.ports.backgroundReady?.() !== false) void background(cell.instance, this.prefetch([cell.instance], 'radial'), () => !this.disposed);
     }
+    // GC5: the neighbour across the source's nearest edge, within DEMAND_METRES, has its product read as demand, standing or
+    // moving: a player at a cell's edge reaches it in seconds at a boost, and the radial read above is only a guess the shared
+    // budget declines while every neighbour competes for it (Pine's read alone is 6 to 8 s). One at a time, the nearest.
+    if (this.active !== null && this.ports.buildAhead === true) {
+      const near = candidates[0];
+      if (near !== undefined && this.distance(near, feet) <= DEMAND_METRES && !this.products.has(near.instance) && !this.residents.has(near.instance)
+        && !this.productRequests.has(near.instance) && !this.issues.has(near.instance) && !this.constructing.has(near.instance)
+        && this.ports.backgroundReady?.() !== false) void background(near.instance, this.prefetchProduct(near.instance, true, 'explicit'), () => !this.disposed);
+    }
     // Approach preparation owns render tiles only, never a regional world or gameplay hooks.
     const moving = !travelled ? undefined : candidates.find(cell => headsToEntry(cell, feet, previous)
       && this.distance(cell, feet) < this.distance(cell, previous) - 0.000001);
@@ -565,11 +578,15 @@ export class LiveGridHost {
     }
     // The world built ahead goes once the traveller is a pitch from it, or heads from the road into another mouth (a stop
     // keeps it). Checked while a build runs too, which the gate below skips.
+    const wallReach = 6 + this.ports.player.motor.opts.radius + 0.5 + this.ports.readiness.link.speed / 60;
+    const departed = this.transitions.at(-1)?.from;
+    // QA 11-13 row 43: on the road within a cell's wall reach the traveller is at that cell's wall, whatever the heading: a
+    // jump or a recoil off the wall reads as a heading back into the cell just left, which let the world built ahead go.
+    const held = this.ports.buildAhead === true && this.active === null && this.assembly.at(feet.x, feet.z) === undefined
+      ? nearby.find(cell => cell.instance !== departed && this.distance(cell, feet) <= wallReach) : undefined;
     if (this.ahead !== null && (this.distance(this.assembly.cell(this.ahead), feet) >= this.assembly.pitch
-      || moving !== undefined && moving.instance !== this.ahead && (this.assembly.at(feet.x, feet.z) === undefined || this.active !== null))) this.ahead = null;
+      || held === undefined && moving !== undefined && moving.instance !== this.ahead && (this.assembly.at(feet.x, feet.z) === undefined || this.active !== null))) this.ahead = null;
     if (this.requests.size === 0) {
-      const wallReach = 6 + this.ports.player.motor.opts.radius + 0.5 + this.ports.readiness.link.speed / 60;
-      const departed = this.transitions.at(-1)?.from;
       const boulevard=work.boulevard;
       if(travelled&&moving===undefined)for(let i=0,length=candidates.length;i<length;i++){
         const cell=candidates[i];if(cell!==undefined&&cell.instance!==departed
@@ -602,7 +619,18 @@ export class LiveGridHost {
       // cell retires first, as the entry would retire it; a U-turn builds it again, as any entry does.
       // Only from the road itself: past a cell's line (inside its square, before the 6 m entry) the heading names the cell
       // beyond it, which would retire the world just built for the one underfoot.
-      if (this.ports.buildAhead === true && moving !== undefined && this.active === null && this.assembly.at(feet.x, feet.z) === undefined
+      // QA 11-13 row 43 (Jake on staging: 11 s at Template's wall, "saved state and its systems", no progress): a traveller
+      // standing at a neighbour's closed wall makes no heading (under 0.1 m a sample), so a world built ahead and then let go
+      // was never asked for again, and online the server crosses only past the line the wall holds them short of. Held at
+      // a closed wall on the road, that cell's world is always building.
+      // A failed build is tried again while they stand there, at most every HELD_RETRY_MS (never on a cleanup failure).
+      if (held !== undefined && this.issues.has(held.instance) && !this.residents.has(held.instance) && !this.requests.has(held.instance) && !this.productRequests.has(held.instance)
+        && diagnosticNow() >= (this.heldRetryAt.get(held.instance) ?? 0)) { this.heldRetryAt.set(held.instance, diagnosticNow() + HELD_RETRY_MS); this.retry(held.instance); }
+      if (held !== undefined && !this.residents.has(held.instance) && !this.issues.has(held.instance)) {
+        this.ahead = held.instance;
+        if (this.retireInactiveRegions(held.instance)) void background(held.instance, this.ensure(held.instance), () => !this.disposed);
+      }
+      else if (held === undefined && this.ports.buildAhead === true && moving !== undefined && this.active === null && this.assembly.at(feet.x, feet.z) === undefined
         && !this.residents.has(moving.instance) && !this.issues.has(moving.instance)
         && this.distance(moving, feet) < this.assembly.pitch && this.retireInactiveRegions(moving.instance)) {
         this.ahead = moving.instance;
@@ -616,10 +644,14 @@ export class LiveGridHost {
         && this.residents.get(this.active)?.retainable === true && !this.residents.has(moving.instance) && !this.issues.has(moving.instance)
         && this.distance(moving, feet) <= this.warmLead(moving.instance, speed)) {
         const product = this.products.get(moving.instance);
-        if (product === undefined) void background(moving.instance, this.prefetch([moving.instance]), () => !this.disposed);
-        else if (product.isolatedPreparation === true && this.ports.allocator.canPrepareAlongside(this.active, moving.instance, product.bytes,
-          { playing: this.ports.allocator.envelope(), loading: CONTENT_CAPS.loading })) {
-          this.ahead = moving.instance; this.warms++;
+        // The heading names it: its product is read as demand (it may evict speculative neighbours' products), not as a radial
+        // guess, which the shared budget declines while the page's other neighbours compete for the same headroom.
+        if (product === undefined) { this.warmRefusal = 'product'; if (!this.productRequests.has(moving.instance)) void background(moving.instance, this.prefetchProduct(moving.instance, true, 'explicit'), () => !this.disposed); }
+        else if (product.isolatedPreparation !== true) this.warmRefusal = 'exclusive';
+        else if (!this.ports.allocator.canPrepareAlongside(this.active, moving.instance, product.bytes,
+          { playing: this.ports.allocator.envelope(), loading: CONTENT_CAPS.loading })) this.warmRefusal = 'budget';
+        else {
+          this.ahead = moving.instance; this.warms++; this.warmRefusal = null;
           void background(moving.instance, this.ensure(moving.instance), () => !this.disposed);
         }
       }
@@ -806,7 +838,7 @@ export class LiveGridHost {
       playingBytes: this.ports.allocator.ownerCost(last.instance).playing, capBytes: Math.min(CONTENT_CAPS.playing, policy.playingBytes) };
   }
   /** Read-only crossing evidence and failures for the real grid physics harness. */
-  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, ahead: { instance: this.ahead, warms: this.warms }, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.productRequests.keys()])].sort(), pendingWork: [
+  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, ahead: { instance: this.ahead, warms: this.warms, refused: this.warmRefusal }, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.productRequests.keys()])].sort(), pendingWork: [
     ...[...this.requests.keys()].sort().map(instance => ({ instance, kind: 'world' as const, trigger: 'entry' as const })),
     ...[...this.productRequests].sort(([a], [b]) => a.localeCompare(b)).map(([instance, request]) => ({ instance, kind: request.required ? 'required-metadata' as const : 'optional-metadata' as const, trigger: request.trigger })),
   ], issues: Object.fromEntries(this.issues), gameplayReady: this.active === null || this.ports.gameplayReady(this.active), ...(this.ports.lastCell === undefined ? {} : { retainedCell: this.retainedState() }), retirements: this.retirements.map(row => ({ ...row })), retiring: [...this.retiring.keys()], ghosts: { count: this.ghosts.count(), regions: this.ghosts.regions() } }; }

@@ -72,7 +72,9 @@ export class ProductInputs {
         const bytes = missing.reduce((sum, ref) => sum + (source.files.find(file => file.hash === ref)?.compressed ?? source.requires.commonsWire[ref.replace(/^commons:/u, '')] ?? 0), 0);
         const lease = this.reserve(bytes, signal !== undefined), loaded = new Map<string, Uint8Array>();
         try {
-          const width = signal === undefined ? 1 : 4;
+          // GC9: a cell's world reads its inputs back from the cache before it builds (Pine: about 1,500 files); one at a time
+          // that read was most of the build behind a moving player's loading wall. Eight in flight; a cancellable approach four.
+          const width = signal === undefined ? 8 : 4;
           for (let i = 0; i < missing.length; i += width) {
             active(); const batch = missing.slice(i, i + width);
             const results = await Promise.allSettled(batch.map(ref => this.reader.read(ref)));

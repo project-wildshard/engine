@@ -49,6 +49,9 @@ export function cellLoadingStep(input: CellLoadingInput): CellLoadingStep {
   }
   const hooksDone = (last: string): boolean => !input.hybrid || input.hooks.has(last);
   if (!input.product) return { kind: 'step', key: 'world', detail: input.requested ? 'reading its region files' : 'requested as you approach' };
+  // QA 11-13 row 43: a resident product but no readiness request is a world nobody is building yet; its hooks are a past
+  // visit's, not progress (a return visit read "saved state and its systems" for 11 s while nothing built it)
+  if (!input.requested) return { kind: 'step', key: 'world', detail: 'waiting for its world to start' };
   const running = input.hook === null ? '' : ` · ${input.hook}`;
   if (!hooksDone('afterWorld')) return { kind: 'step', key: 'world', detail: `${input.claimedMB.toFixed(0)} MB admitted${running}` };
   if (!hooksDone('afterKit')) return { kind: 'step', key: 'loadout', detail: `weapons, held items and HUD${running}` };
