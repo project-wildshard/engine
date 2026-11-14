@@ -5,7 +5,7 @@
 // turned the link away) and its **hold card** (the banner's sibling: what was tapped, the dial's live progress, what happens by itself).
 // The look is the Developer prototypes' (src/client/app/failScreens.ts, FM1b); each root carries the catalogue's `data-failmode` ids.
 import type { Scope } from '@wildshard/engine/app/scope';
-import type { LinkCause, LinkProgress, LinkState } from '@wildshard/engine/net/redial';
+import type { LinkAway, LinkCause, LinkProgress, LinkState } from '@wildshard/engine/net/redial';
 import type { Countdown } from '@wildshard/engine/net/socketFrames';
 import type { TransportStats } from '@wildshard/engine/net/transport';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
@@ -125,6 +125,8 @@ function bannerFor(state: LinkState, cause: LinkCause, dials: number): { ids: st
   if (cause === 'silent') return { ids: 'half-open', tone: 'warn', title: 'Reconnecting', line: dials > 0 ? `try ${String(dials + 1)}` : 'no word from the world' };
   return { ids: 'drop reset', tone: 'warn', title: 'Reconnecting', line: dials > 0 ? `try ${String(dials + 1)}` : 'one moment' };
 }
+/** How long the page was away, in the card's words. */
+const awayFor = (ms: number): string => ms < 90_000 ? `${String(Math.round(ms / 1000))} s` : `${String(Math.round(ms / 60_000))} min`;
 const blockedIds = (ids: string): string => ids.split(' ').map(id => `${id}-blocked`).join(' ');
 
 /** A card's frame: the scrim, the box, a tag and a title. The caller fills the rest. */
@@ -178,7 +180,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   parent.append(banner, deploy);
 
   let state: LinkState = 'live', reason: string | undefined, wasDown = false, quietUntil = 0, deployLeft = 0, deployTicking = false;
-  let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop' | 'offline'; paint: () => void; what?: string; chat?: boolean; key?: string } | null = null;
+  let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop' | 'offline' | 'away'; paint: () => void; what?: string; chat?: boolean; key?: string } | null = null;
   const held: { text: string; send: (text: string) => void; drop: () => void }[] = [];
   const down = (): boolean => state === 'reconnecting' || state === 'resuming';
 
@@ -189,8 +191,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   // a card takes the pointer back from the game (desktop pointer lock), so its buttons can be clicked
   const freePointer = (): void => { if ('exitPointerLock' in document && document.pointerLockElement instanceof Element) document.exitPointerLock(); };
   const paintBanner = (): void => {
-    // offline, the card is the screen (FM4b mode 2): no banner under it
-    const shown = down() && hooks.why() !== 'offline';
+    // offline (FM4b mode 2) or back from away (modes 4 and 45), the card is the screen: no banner under it
+    const shown = down() && hooks.why() !== 'offline' && hooks.progress().away === undefined;
     banner.hidden = !shown;
     // a link that is down takes the top band from the deploy countdown; the countdown comes back with the link
     deploy.hidden = down() || deployLeft <= 0;
@@ -212,7 +214,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   /** The hold card: the banner opened up, on a tap it can't carry. It repaints each second from the dial's progress. */
   const hold = (what: string, chat: boolean): void => {
     // the offline card already says why nothing goes out; a held chat line still waits for the link
-    if (open?.kind === 'stop' || open?.kind === 'offline') return;
+    if (open?.kind === 'stop' || open?.kind === 'offline' || open?.kind === 'away') return;
     remember(); open?.scope.dispose(); open = null;
     const own = scope.child('online.hold'), said = bannerFor(state, hooks.why(), hooks.progress().dials);
     const title = chat ? 'Your message will send when you\'re back' : state === 'resuming' ? 'Still reconnecting' : hooks.why() === 'restart' ? 'The world is restarting' : 'Not connected yet';
@@ -283,6 +285,35 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   };
 
   /**
+   * FM4b modes 4 (`background-long`) and 45 (`sleep-wake`): the page was away for over 30 s (out of view, or its clock stopped ticking)
+   * and came back to a quiet link. The card says how long the page measured itself away and that the link is being checked; it closes
+   * by itself when the link is back. J229: no lost seat or last-save resume is claimed, since the page can't know the world's hold.
+   */
+  const awayCard = (away: LinkAway): void => {
+    if (open?.kind === 'away') { open.paint(); return; }
+    remember(); open?.scope.dispose(); open = null;
+    const asleep = away.how === 'asleep', own = scope.child('online.away');
+    const { root, box } = card(own, asleep ? 'background-long sleep-wake' : 'background-long', 'info', 'Away', 'Welcome back');
+    box.append(make('p', 'ws-link-body', `You were away for ${awayFor(away.ms)}, and the link to the world went quiet. We're checking your connection now.`));
+    const status = make('ul', 'ws-link-facts'), tries = make('li'), next = make('li');
+    status.setAttribute('role', 'status'); status.append(tries, next);
+    const paint = (): void => {
+      const { dials, nextDialMs } = hooks.progress();
+      tries.replaceChildren(ring(), dials > 0 ? `Try ${String(dials + 1)}` : 'Checking your connection');
+      next.textContent = nextDialMs !== null ? `Next dial in ${String(Math.ceil(nextDialMs / 1000))} s` : 'Dialling now';
+    };
+    paint(); own.interval(1000, paint);
+    box.append(status, make('p', 'ws-link-auto', 'This closes by itself when you\'re back in. Game taps wait here; we never send one late.'),
+      buttons(own, [{ label: 'Try now', primary: true, busy: 'Dialling…', act: () => { hooks.dialNow(); } }, ...doctor(asleep ? 'sleep-wake' : 'background-long')]));
+    const details = make('details');
+    details.append(make('summary', '', 'Details'), make('p', '', `${asleep ? 'no page clock tick' : 'hidden'} ${awayFor(away.ms)} · link quiet on return · redialling`));
+    box.append(details);
+    parent.append(root); freePointer();
+    open = { scope: own, root, kind: 'away', paint };
+    root.querySelector('button')?.focus();
+  };
+
+  /**
    * FM4b modes 21 (`slow`) and 22 (`lossy`): a notice chip in the top band while the link is live and measurably slow or unstable.
    * Only what the page measured: the pong RTT, the spread of the last five, the server's `lossPct`. Never a guessed cause or a made-up
    * percentage. A chip waits while a banner is up (it is the bottom layer) and comes back, if still due, with the link.
@@ -326,6 +357,9 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       if (open?.kind === 'stop') close();
       if (hooks.why() === 'offline') { offlineCard(); return; }
       if (open?.kind === 'offline') close();
+      const away = hooks.progress().away;
+      if (away !== undefined) { awayCard(away); return; }
+      if (open?.kind === 'away') close();
       // a hold card follows its banner: a new cause (silent to restart) or 35 s down redraws it, else it just ticks
       if (open?.kind === 'hold' && open.key !== `${state}:${hooks.why()}` && open.what !== undefined) hold(open.what, open.chat === true); else open?.paint();
       return;

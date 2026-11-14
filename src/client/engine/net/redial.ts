@@ -11,7 +11,11 @@ export type LinkState = 'live' | 'reconnecting' | 'resuming' | 'lost' | 'full' |
  *  page was out of view, `offline` is a device that says it has no network (FM4b mode 2). It rides `onState`'s reason for `reconnecting` and `resuming`. */
 export type LinkCause = 'silent' | 'closed' | 'restart' | 'hidden' | 'updating' | 'offline';
 /** Where the dial is, for a screen that shows it: dials so far, the wait to the next (null while one is out), and how long it's been down. */
-export interface LinkProgress { readonly dials: number; readonly nextDialMs: number | null; readonly downMs: number }
+export interface LinkProgress { readonly dials: number; readonly nextDialMs: number | null; readonly downMs: number; readonly away?: LinkAway }
+/** FM4b modes 4 and 45: the page was away for `ms` and came back to a quiet or closed link. `hidden` is time out of view the page
+ *  measured (visibilitychange); `asleep` is a gap in the page's own clock ticks while it wasn't known hidden (a sleep, a frozen tab).
+ *  It says nothing about the world's hold on the seat (J114): only what this page measured. */
+export interface LinkAway { readonly ms: number; readonly how: 'hidden' | 'asleep' }
 
 /** No frame for this long: say so. The predictor's ring is full by then, so the player holds still. */
 const STRIP_MS = 1000;
@@ -24,6 +28,8 @@ const GIVE_UP_MS = 120_000;
 /** The waits between dials, then the last for ever, each ±20%. */
 const DIAL_WAITS_MS = [250, 500, 1000, 2000, 4000], DIAL_JITTER = 0.2;
 const WATCH_MS = 100;
+/** FM4b modes 4 and 45: away this long (out of view, or no clock tick at all) and back to a quiet link is the Welcome back card. */
+const AWAY_MS = 30_000;
 /** Words from a server that a redial would only hear again. */
 const FINAL = new Set(['reload', 'refused', 'replaced']);
 /** J178: the world is full, and a seat frees when someone leaves: this long between tries, for as long as the player waits. */
@@ -81,8 +87,12 @@ export class Redial {
   private cause: LinkCause = 'closed';
   /** When the device last said it went offline while the link was down; null while it has a network. */
   private offlineAt: number | null = null;
+  /** The watch's last tick: a gap after it is time the page did nothing at all (FM4b mode 45). */
+  private tickAt: number;
+  private awayFor: LinkAway | null = null;
   constructor(options: RedialOptions) {
     this.options = options; this.transport = options.transport; this.now = options.now ?? diagnosticNow; this.random = options.random ?? jitterFrom(this.now()); this.online = options.online ?? browserOnline;
+    this.tickAt = this.now();
     this.offFrame = options.client.onFrame(() => { this.heard(); });
     this.offClose = this.watchClose(options.transport);
     this.scope.interval(WATCH_MS, () => { this.watch(); });
@@ -96,11 +106,14 @@ export class Redial {
   /** The dial's progress now. */
   get progress(): LinkProgress {
     const now = this.now(), down = this.phase !== 'up';
-    return { dials: this.dials, nextDialMs: this.phase === 'down' && this.dialled === null ? Math.max(0, this.dialAt - now) : null, downMs: down ? Math.max(0, now - this.lostAt) : 0 };
+    const away = this.awayFor === null ? {} : { away: this.awayFor };
+    return { dials: this.dials, nextDialMs: this.phase === 'down' && this.dialled === null ? Math.max(0, this.dialAt - now) : null, downMs: down ? Math.max(0, now - this.lostAt) : 0, ...away };
   }
-  /** The page came back into view (an iPhone returning to Safari): a link that went quiet while hidden redials at once. */
-  check(): void {
+  /** The page came back into view (an iPhone returning to Safari): a link that went quiet while hidden redials at once.
+   *  `hiddenMs` is how long the page measured itself out of view (FM4b mode 4). */
+  check(hiddenMs = 0): void {
     const now = this.now();
+    this.woke(now, hiddenMs);
     if (this.phase === 'up' && this.heardAt !== null && now - this.heardAt >= STRIP_MS) { this.because('hidden'); this.lose(now); }
     // a link that went silent while the page was away was the page's absence: say welcome back
     if (this.phase === 'down') { if (this.cause === 'silent') this.because('hidden'); this.dialAt = now; }
@@ -118,11 +131,12 @@ export class Redial {
   private heard(): void {
     const now = this.now(), wasDown = this.phase === 'down';
     this.heardAt = now;
-    if (wasDown) { this.phase = 'up'; this.dialled = null; this.dials = 0; this.waitingForSeat = false; this.offlineAt = null; }
+    if (wasDown) { this.phase = 'up'; this.dialled = null; this.dials = 0; this.waitingForSeat = false; this.offlineAt = null; this.awayFor = null; }
     this.show('live');
   }
   private watch(): void {
     const now = this.now();
+    this.woke(now, 0);
     if (this.phase === 'up') {
       if (this.heardAt === null) return;
       const silent = now - this.heardAt;
@@ -179,6 +193,27 @@ export class Redial {
     if (reason === 'full') { this.phase = 'down'; this.waitingForSeat = true; this.dialled = null; this.dialAt = now + FULL_RETRY_MS; this.show('full'); return; }
     if (this.phase === 'up') { if (this.cause !== 'updating') this.because(reason === 'restart' ? 'restart' : this.online() ? 'closed' : 'offline'); this.lose(now, false); }
     else if (this.phase === 'down') { if (reason === 'restart') this.because('restart'); this.failedDial(now); }
+  }
+  /**
+   * FM4b modes 4 and 45: the page was away (out of view for `hiddenMs`, or no clock tick for 30 s) and comes back to a link that is
+   * quiet or down. The time away is not dialling time: a link lost while away counts its give-up clock from the return, and one
+   * already down moves its clock on by the gap no dial could go out in, so a phone back after 4 minutes dials for 2 minutes more
+   * and never opens on Couldn't reconnect. A healthy return (frames heard within the last second) changes nothing.
+   */
+  private woke(now: number, hiddenMs: number): void {
+    const gap = now - this.tickAt;
+    this.tickAt = now;
+    if (gap < AWAY_MS && hiddenMs < AWAY_MS) return;
+    const how = hiddenMs >= AWAY_MS || this.awayFor?.how === 'hidden' ? 'hidden' : 'asleep', ms = Math.max(gap, hiddenMs, this.awayFor?.ms ?? 0);
+    if (this.phase === 'up') {
+      if (this.heardAt === null || now - this.heardAt < STRIP_MS) return;
+      this.awayFor = { ms, how }; this.because('hidden'); this.heardAt = now; this.lose(now);
+    } else if (this.phase === 'down' && !this.waitingForSeat) {
+      // the suspended gap moves the give-up clock on; hidden time with ticks running was dialled through, so it counts
+      if (gap >= AWAY_MS) { this.lostAt += gap; if (this.offlineAt !== null) this.offlineAt += gap; }
+      this.awayFor = { ms, how }; this.dialAt = now;
+      if (this.cause === 'silent' || this.cause === 'closed') this.because('hidden');
+    }
   }
   /** The link is gone or no use: from now it is dialled, and a player's 35 s count from the last frame. */
   private lose(now: number, close = true): void {

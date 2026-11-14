@@ -20,6 +20,7 @@ import { voiceUi } from './voiceUi';
 import { fetchSignedRelease, releaseToDial, type ReleaseKeep } from './release';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
+import { diagnosticNow } from '@wildshard/engine/core/clock';
 
 /** `ready` with this byte is a clean quit: the door drops the body at once instead of holding it (server `socketPump.ts` `LEAVE_FLAG`). */
 const LEAVE_FLAG = 1;
@@ -71,8 +72,8 @@ export interface OnlineShell {
   readonly booted: Promise<{ readonly tick: number; readonly restored: boolean }>;
   /** The page has loaded: the door may seat the body (E7.2's step 4). */
   ready: () => void;
-  /** The page came back into view: check the link now. */
-  visible: () => void;
+  /** The page came back into view after `hiddenMs` out of it (FM4b mode 4): check the link now. */
+  visible: (hiddenMs?: number) => void;
   retry: () => void;
   /** FM4: the dial's progress and why the link is down, for the screens that show them; dial now, from a hold card. */
   progress: () => LinkProgress;
@@ -153,7 +154,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   client.hello(config.build, config.identity);
   const tickOf = (): number => client.latest?.tick ?? 0, idle = (): void => undefined;
   return { client, voice, redials: true, booted, ready: () => { loaded = true; unseated?.control('ready'); unseated = null; },
-    visible: () => { redial.check(); }, retry: () => { redial.retry(); }, progress: () => redial.progress, why: () => redial.why, dialNow: () => { redial.dialNow(); },
+    visible: hiddenMs => { redial.check(hiddenMs); }, retry: () => { redial.retry(); }, progress: () => redial.progress, why: () => redial.why, dialNow: () => { redial.dialNow(); },
     pause: idle, resume: idle, hold: idle, bossGod: idle, hardHits: idle, place: idle, raise: idle,
     // The door hears a quit on any link of this build: seated, still admitted, or handed a held body back. A link that is down (a redial's
     // wait) gets a fresh one to say it on, so a held body goes too. No redial follows: the page is going.
@@ -344,6 +345,12 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   const chat = chatLines(scope, shell.client, document.body, screens.holdChat);
   voiceUi(scope, new VoiceChat(scope, shell.voice), chat);
   scope.listen(window,'pagehide',()=>{shell.flushRecords();});
-  scope.listen(document, 'visibilitychange', () => { if (document.visibilityState === 'visible') { shell.visible(); screens.visible(); } });
+  // FM4b mode 4: how long the page was out of view rides the check, so a long absence back to a quiet link opens Welcome back
+  let hiddenAt: number | null = document.visibilityState === 'hidden' ? diagnosticNow() : null;
+  scope.listen(document, 'visibilitychange', () => {
+    if (document.visibilityState !== 'visible') { hiddenAt ??= diagnosticNow(); return; }
+    const hiddenMs = hiddenAt === null ? 0 : diagnosticNow() - hiddenAt;
+    hiddenAt = null; shell.visible(hiddenMs); screens.visible();
+  });
   return { ...shell, dispose: () => { scope.dispose(); shell.dispose(); } };
 }

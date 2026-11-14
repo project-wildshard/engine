@@ -296,6 +296,37 @@ test('FM4b mode 2: the link back while the card shows closes it at once', () => 
   scope.dispose();
 });
 
+test('FM4b modes 4 and 45: back from away to a quiet link shows Welcome back over play, says how long, and closes with the link', () => {
+  const { scope, screens, calls, set } = harness();
+  set({ why: 'hidden', dials: 0, nextDialMs: 200, downMs: 0, away: { ms: 240_000, how: 'hidden' } });
+  screens.link('reconnecting', 'hidden');
+  const card = document.querySelector<HTMLElement>('.ws-link-scrim[data-failmode="background-long"]');
+  expect(card?.getAttribute('role')).toBe('alertdialog');
+  expect(card?.textContent).toContain('Welcome back');
+  expect(card?.textContent).toContain('away for 4 min');
+  expect(card?.textContent).toContain('Checking your connection');
+  expect(card?.textContent, 'J229: no seat-hold or last-save claim').not.toMatch(/save|let your character go|held for/i);
+  expect(shown('background-short'), 'the card is the screen: no banner under it').toBeNull();
+  expect(screens.allow('Talk')).toBe(false);
+  expect(shown('background-short-blocked')).toBeNull();
+  click(card, 'Try now');
+  click(card, 'Check connection');
+  expect(calls).toEqual(['dialNow', 'doctor:background-long']);
+  screens.link('resuming', 'hidden');
+  expect(document.querySelector('.ws-link-scrim[data-failmode="background-long"]')).toBe(card);
+  screens.link('live');
+  expect(shown('background-long')).toBeNull();
+  expect(shown('reconnected')).not.toBeNull();
+  // asleep: the same card, under mode 45's id, naming what was measured
+  set({ away: { ms: 45_000, how: 'asleep' } });
+  screens.link('reconnecting', 'hidden');
+  const slept = shown('sleep-wake');
+  expect(slept?.dataset['failmode']).toBe('background-long sleep-wake');
+  expect(slept?.textContent).toContain('away for 45 s');
+  expect(slept?.textContent).toContain('no page clock tick 45 s');
+  scope.dispose();
+});
+
 test('FM4b modes 21 and 22: Slow and Unstable chips from measured RTT and server skips, sustained 5 s, cleared after 10 good, once a minute', () => {
   vi.useFakeTimers();
   try {

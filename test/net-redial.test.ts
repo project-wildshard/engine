@@ -17,7 +17,7 @@ class FakeLink implements Transport {
   fail(reason: string): void { for (const listener of [...this.closes]) listener(reason); this.closes.clear(); }
 }
 const frame = { tick: 1 } as DecodedFrame;
-function harness(random = 0.5, online: () => boolean = () => true): { client: NetClient; redial: Redial; links: FakeLink[]; states: LinkState[]; causes: LinkCause[]; dialTimes: number[]; now: () => number; heard: () => void; run: (ms: number) => void; failDials: (reason: string) => void } {
+function harness(random = 0.5, online: () => boolean = () => true): { client: NetClient; redial: Redial; links: FakeLink[]; states: LinkState[]; causes: LinkCause[]; dialTimes: number[]; now: () => number; heard: () => void; run: (ms: number) => void; failDials: (reason: string) => void; away: (ms: number) => void } {
   let clock = 0, failing: string | null = null;
   const first = new FakeLink(), links = [first], states: LinkState[] = [], causes: LinkCause[] = [], dialTimes: number[] = [];
   const client = new NetClient(first, () => clock), frames: ((value: DecodedFrame) => void)[] = [], onFrame = client.onFrame.bind(client);
@@ -25,6 +25,8 @@ function harness(random = 0.5, online: () => boolean = () => true): { client: Ne
   const redial = new Redial({ client, transport: first, now: () => clock, random: () => random, online, onState: state => { states.push(state); }, onCause: cause => { causes.push(cause); },
     dial: () => { const link = new FakeLink(); links.push(link); dialTimes.push(clock); return link; } });
   return { client, redial, links, states, causes, dialTimes, now: () => clock, heard: () => { for (const fn of frames) fn(frame); }, failDials: reason => { failing = reason; },
+    // the page suspended: the clock moves on and no timer runs (an iPhone in the background, a laptop asleep)
+    away: ms => { clock += ms; },
     run: ms => { for (let left = ms; left > 0; left -= 50) { clock += 50; vi.advanceTimersByTime(50); if (failing !== null) links.at(-1)?.fail(failing); } } };
 }
 beforeEach(() => { vi.useFakeTimers(); });
@@ -261,5 +263,58 @@ test('FM4b mode 2: a link closed while offline is told as offline, and a frame c
   expect(dialTimes).toHaveLength(1);
   heard(); run(100);
   expect(states).toEqual(['reconnecting', 'live']);
+  redial.dispose();
+});
+
+test('FM4b mode 4: back after 4 minutes out of view to a dead link dials for 2 minutes more, says how long it was away, never opens on lost', () => {
+  const { heard, run, away, redial, states, links } = harness();
+  heard(); run(200);
+  away(240_000);
+  redial.check(240_000);
+  expect(states, 'not Still reconnecting, not Couldn\'t reconnect: the time away was no dialling time').toEqual(['reconnecting']);
+  expect(redial.progress.away).toEqual({ ms: 240_000, how: 'hidden' });
+  expect(redial.why).toBe('hidden');
+  run(400);
+  expect(links.length, 'it dials at once').toBeGreaterThan(1);
+  run(118_000);
+  expect(states).toEqual(['reconnecting', 'resuming']);
+  run(2000);
+  expect(states.at(-1)).toBe('lost');
+  redial.dispose();
+});
+
+test('FM4b mode 45: a clock gap with no tick (asleep, not known hidden) is told as asleep; a frame clears it', () => {
+  const { heard, run, away, redial, states } = harness();
+  heard(); run(200);
+  away(90_000); run(100);
+  expect(states).toEqual(['reconnecting']);
+  expect(redial.progress.away).toEqual({ ms: 90_100, how: 'asleep' });
+  // the shell's visible check after the same return knows it was out of view: the same absence, told as hidden
+  redial.check(90_000);
+  expect(redial.progress.away?.how).toBe('hidden');
+  run(400); heard(); run(100);
+  expect(states).toEqual(['reconnecting', 'live']);
+  expect(redial.progress.away).toBeUndefined();
+  redial.dispose();
+});
+
+test('FM4b modes 4 and 45, healthy control: a long absence back to a link still carrying frames changes nothing', () => {
+  const { heard, run, away, redial, states, links } = harness();
+  heard(); run(200);
+  away(240_000); heard();
+  redial.check(240_000); run(500);
+  expect(states).toEqual([]);
+  expect(redial.progress.away).toBeUndefined();
+  expect(links).toHaveLength(1);
+  redial.dispose();
+});
+
+test('FM4b mode 45: a link already dialling when the page slept moves its give-up clock on by the gap', () => {
+  const { heard, run, away, redial, states, links } = harness();
+  heard(); links[0]?.fail('lost'); run(10_000);
+  away(200_000); run(100);
+  expect(states).toEqual(['reconnecting']);
+  expect(redial.progress.downMs).toBeLessThan(11_000);
+  expect(redial.progress.away?.how).toBe('asleep');
   redial.dispose();
 });
