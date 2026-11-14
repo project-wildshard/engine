@@ -21,6 +21,7 @@ import {CorrectionSchema} from '@wildshard/engine/net/measurements';
 import type {PlaytestRow} from './playtest';
 import type { ChatReport } from '@wildshard/engine/net/chat';
 import type { CellOrder, ResumeAt, SavedCheckpoint, SeatEntry, WorkerNews, WorkerReading, WorkerResident } from './cellProtocol';
+import type { MotionSnapshot } from '@wildshard/engine/game/grid/simulation';
 import { bodyId } from './seats';
 import { SaveNewerError, type PlayerDoc } from './playerDoc';
 import { LEAVE_FLAG, LEFT, pumpSocket } from './socketPump';
@@ -164,6 +165,12 @@ export class World {
   private readonly drains = new Map<number, () => void>();
   /** GC15: devices whose crossing the door is reading a save for, or whose `cross` order a worker has not answered, and when it began (SC1). */
   private readonly crossings = new Map<string, number>();
+  /** GC15 (3): each seated device's socket and a copy of the hello it was seated with, so a crossing onto another worker can move both. */
+  private readonly seatSockets = new Map<string, { readonly end: SocketTransport; readonly hello: ArrayBuffer }>();
+  /** GC15 (3): a crossing onto another worker, between the source's `handOut` and the socket's `out`: where it arrives and with what save. */
+  private readonly outs = new Map<string, { readonly from: string; readonly to: string; readonly at: ResumeAt; readonly entry: SeatEntry }>();
+  /** GC15 (3): each worker's grid cells whose entryways stand, as its `booted` said. */
+  private readonly stands = new Map<WorkerLink, readonly string[]>();
   /** GC15: devices whose source said `left` while their crossing was in flight: applied if the crossing is abandoned before `cross`. */
   private readonly leftCrossing = new Set<string>();
   private asked = 0;
@@ -205,7 +212,7 @@ export class World {
         this.options.crashed(new Error(reason));
       };
       link.listen(news => {
-        if (news.kind === 'booted') { up = true; this.up.add(link); if (news.resident !== undefined) this.resident.set(link, news.resident); if (late) for (const slug of slugs) this.links.set(slug, link); this.options.log({ at: 'worker.booted', index, slugs, ms: news.ms }); resolve(); }
+        if (news.kind === 'booted') { up = true; this.up.add(link); if (news.resident !== undefined) this.resident.set(link, news.resident); if (news.stands !== undefined) { this.stands.set(link, news.stands); this.openRoads(); } if (late) for (const slug of slugs) this.links.set(slug, link); this.options.log({ at: 'worker.booted', index, slugs, ms: news.ms }); resolve(); }
         else if (news.kind === 'failed') ended(news.reason); else this.heard(index, news);
       }, ended);
     });
@@ -271,6 +278,7 @@ export class World {
     }
     else if (news.kind === 'drained') { this.drains.get(index)?.(); this.drains.delete(index); }
     else if (news.kind === 'crossing') void this.crossing(news.slug, news.device, news.to, news.at);
+    else if (news.kind === 'handedOut') { if (!news.out && this.outs.get(news.device)?.from === news.from) { this.outs.delete(news.device); this.abandon(news.device, news.from); } }
     else if (news.kind === 'crossed') {
       const begun = this.crossings.get(news.device);
       if (begun !== undefined) this.options.crossed?.(diagnosticNow() - begun, news.moved);
@@ -369,6 +377,13 @@ export class World {
   /** Everyone in the grid or on their way: the cap counts all of them, whichever cell they stand in (J182). */
   private get taken(): number { return this.seated.size + this.pending.size; }
   /** The worker a cell runs on, or (GC15) whose road a name is. */
+  /** GC15 (3): every worker's road hears which cells on the other workers a walker can stand in, and drops its walls round them. */
+  private openRoads(): void {
+    for (const link of this.up) {
+      const cells = [...this.stands].filter(([other]) => other !== link && this.up.has(other)).flatMap(([, list]) => list);
+      if (cells.length > 0) link.send({ kind: 'open', cells });
+    }
+  }
   private linkOf(slug: string): WorkerLink | undefined { return this.links.get(roadHome(slug) ?? slug); }
   private link(slug: string): WorkerLink {
     const link = this.linkOf(slug);
@@ -449,6 +464,8 @@ export class World {
    */
   private async crossing(from: string, device: string, to: string, at: ResumeAt): Promise<void> {
     const link = this.linkOf(to), name = this.names.get(device);
+    // GC15 (3): from a worker's road into a cell another worker hosts
+    if (link !== undefined && link !== this.linkOf(from) && roadHome(from) !== null && roadHome(to) === null) { await this.crossWorkers(from, device, to, at); return; }
     if (link === undefined || link !== this.linkOf(from) || this.seated.get(device) !== from || name === undefined || this.draining || this.crossings.has(device)) return;
     this.crossings.set(device, diagnosticNow());
     try {
@@ -458,6 +475,32 @@ export class World {
       link.send({ kind: 'cross', from, to, at, device, name, body: bodyId(this.options.secret, device), doc: saved.doc, seq: saved.seq,
         ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }) });
     } catch (error) { this.abandon(device, from); this.options.log({ at: 'cell.cross-refused', device, from, to, reason: String(error) }); }
+  }
+  /**
+   * GC15 (3): a seat on one worker's road walks into a cell on another worker. The door reads their save on that cell's shard, the road
+   * sends the client `travel` and lets the seat go (`handOut`), and when its port says `out` the door points the same socket at a new port
+   * into the target's worker, which seats them at `at` and hears their hello again (`arrive`). The socket never closes.
+   */
+  private async crossWorkers(from: string, device: string, to: string, at: ResumeAt): Promise<void> {
+    const source = this.linkOf(from), name = this.names.get(device);
+    if (source === undefined || this.seated.get(device) !== from || name === undefined || this.draining || this.crossings.has(device) || !this.seatSockets.has(device)) return;
+    this.crossings.set(device, diagnosticNow());
+    try {
+      const saved = await this.options.saves.read(device, cellShard(to));
+      if (this.seated.get(device) !== from || this.draining || !this.seatSockets.has(device)) { this.abandon(device, from); return; }
+      this.outs.set(device, { from, to, at, entry: { device, name, body: bodyId(this.options.secret, device), doc: saved.doc, seq: saved.seq,
+        ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }) } });
+      source.send({ kind: 'handOut', from, device, to });
+    } catch (error) { this.outs.delete(device); this.abandon(device, from); this.options.log({ at: 'cell.cross-refused', device, from, to, reason: String(error) }); }
+  }
+  /** GC15 (3): the source let the seat go and everything it said is on its way: the socket now pumps into the target's worker. */
+  private movedOut(device: string, end: SocketTransport, motion: unknown): void {
+    const out = this.outs.get(device), kept = this.seatSockets.get(device), link = out === undefined ? undefined : this.linkOf(out.to);
+    this.outs.delete(device);
+    if (out === undefined || kept?.end !== end || link === undefined || !end.isOpen || this.draining) { this.abandon(device, out?.from ?? ''); end.close('retry'); return; }
+    const { port1, port2 } = new MessageChannel(), hello = kept.hello.slice(0);
+    pumpSocket(end, port1, undefined, next => { this.movedOut(device, end, next); });
+    link.send({ kind: 'arrive', from: out.from, to: out.to, at: out.at, port: port2, hello, motion: motion as MotionSnapshot | null, ...out.entry }, [port2, hello]);
   }
   /** A crossing that never reached its worker: a `left` the source said meanwhile counts now. */
   private abandon(device: string, from: string): void {
@@ -485,7 +528,9 @@ export class World {
       });
       end.onClose(off);end.control('playtest');
     }
-    pumpSocket(end, port1);
+    this.seatSockets.set(entry.device, { end, hello: hello.slice(0) });
+    end.onClose(() => { if (this.seatSockets.get(entry.device)?.end === end) this.seatSockets.delete(entry.device); });
+    pumpSocket(end, port1, undefined, motion => { this.movedOut(entry.device, end, motion); });
     const rebody = this.voice.attach(end, slug, entry.name, entry.body);
     this.voiceBodies.set(entry.device, rebody);
     end.onClose(() => { if (this.voiceBodies.get(entry.device) === rebody) this.voiceBodies.delete(entry.device); });

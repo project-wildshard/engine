@@ -23,18 +23,30 @@ const WALL = 0.5, WALL_HEIGHT = 30;
 const WALL_OFF = 2;
 export const ROAD: SimLevel = { version: SIM_API_VERSION, id: 'grid-road', seed: 1, ground: { size: ROAD_HALF_SIZE * 2, height: FALL_FLOOR }, player: { at: { x: 0, y: 0, z: 0 }, yaw: 0, speed: ROAD_SPEED }, entities: [], quests: [], weapon: HOST_PROBE };
 
+/** Each road world's cell walls, by the cell they stand round, so GC15 (3) can open one a walker can now cross into. */
+const walls = new WeakMap<SimHost, Map<string, Collider[]>>();
 /**
  * A wall around every cell in the road's own world, as the page's readiness walls are while a cell loads. A player stops just short of
  * a cell until its world is ready and the crossing takes them in, 6 m out at most; the road never runs on under a cell's own
  * hills, where a late hand-off would set them down inside one. A cell's terrain can end in a bank above road level at its very edge,
  * and a capsule set down touching that bank stays stuck in it, so the wall stands clear of it.
  */
-export function addCellWalls(road: SimHost, cells: readonly Pick<GridCell, 'origin'>[]): void {
+export function addCellWalls(road: SimHost, cells: readonly (Pick<GridCell, 'origin'> & { readonly instance?: string })[]): void {
   const { R, world } = road.physics, reach = CHUNK_HALF + WALL_OFF + WALL / 2, long = reach + WALL / 2;
+  const kept = walls.get(road) ?? new Map<string, Collider[]>();
+  walls.set(road, kept);
   withOwner(road.scope, () => {
-    for (const { origin } of cells) for (const [x, z, hx, hz] of [[reach, 0, WALL / 2, long], [-reach, 0, WALL / 2, long], [0, reach, long, WALL / 2], [0, -reach, long, WALL / 2]] as const)
-      world.createCollider(R.ColliderDesc.cuboid(hx, WALL_HEIGHT, hz).setTranslation(origin.x + x, WALL_HEIGHT, origin.z + z).setCollisionGroups(groups('WORLD')));
+    for (const { origin, instance } of cells) for (const [x, z, hx, hz] of [[reach, 0, WALL / 2, long], [-reach, 0, WALL / 2, long], [0, reach, long, WALL / 2], [0, -reach, long, WALL / 2]] as const) {
+      const collider = world.createCollider(R.ColliderDesc.cuboid(hx, WALL_HEIGHT, hz).setTranslation(origin.x + x, WALL_HEIGHT, origin.z + z).setCollisionGroups(groups('WORLD')));
+      if (instance !== undefined) kept.set(instance, [...kept.get(instance) ?? [], collider]);
+    }
   });
+}
+/** GC15 (3): take down the walls round these cells (on another worker, their entryways standing): the road crosses into them now. */
+export function openCellWalls(road: SimHost, instances: readonly string[]): void {
+  const kept = walls.get(road);
+  if (kept === undefined) return;
+  for (const instance of instances) { for (const collider of kept.get(instance) ?? []) if (collider.isValid()) road.physics.world.removeCollider(collider, false); kept.delete(instance); }
 }
 /** Each road world's void floor colliders, so a placement can lift them (SA34a). */
 const floors = new WeakMap<SimHost, readonly Collider[]>();

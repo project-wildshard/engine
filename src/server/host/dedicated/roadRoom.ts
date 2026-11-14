@@ -7,7 +7,7 @@ import { SimNetWorld } from '@wildshard/engine/net/simWorld';
 import type { Transport } from '@wildshard/engine/net/transport';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
-import { carryMotion } from '@wildshard/engine/game/grid/simulation';
+import { carryMotion, motionOf } from '@wildshard/engine/game/grid/simulation';
 import type { GridAssembly, GridCell } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
@@ -16,8 +16,9 @@ import { LEAD_SEAT } from '../standalone/cellWorld';
 import { HOLD_MS, type ResumeAt, type RoomNews, type SeatEntry } from './cellProtocol';
 import { crossedTo, finite, type CrossArrival, type CrossTarget } from './crossing';
 import { FallFloor } from '../standalone/fallFloor';
-import { placeOnRoad } from '../standalone/roadWorld';
-import { LEFT } from './socketPump';
+import { openCellWalls, placeOnRoad } from '../standalone/roadWorld';
+import { LEFT, SeatTransport } from './socketPump';
+import { cellFrame } from './gridCells';
 
 /** How often a seat whose crossing is asked for asks again, and how often holds are looked at, in ticks. */
 const ASK_TICKS = 30;
@@ -54,6 +55,8 @@ export class RoadRoom implements CrossTarget {
   readonly host: SimHost;
   private readonly options: RoadRoomOptions;
   private readonly seats = new Map<string, RoadSeat>();
+  /** GC15 (3): cells on other workers this road crosses into (`open`), their walls down. */
+  private readonly opened = new Set<string>();
   /** The grid the trigger reads: the options' until a placement grows it (SA34a). */
   private assembly: GridAssembly;
   constructor(options: RoadRoomOptions) {
@@ -104,6 +107,28 @@ export class RoadRoom implements CrossTarget {
     this.bind(seat, transport, this.net.join(transport, this.sim.playerOf(seat.body)));
     hello();
     this.options.post({ kind: 'seated', device: seat.device, body: seat.body, seats: this.seats.size });
+  }
+  /** GC15 (3): cells on other workers whose entryways stand: their walls on this road come down and a walker crosses into them. */
+  open(cells: readonly string[]): void {
+    const fresh = cells.filter(cell => !this.options.hosts(cell) && !this.opened.has(cell));
+    openCellWalls(this.host, fresh);
+    for (const cell of fresh) this.opened.add(cell);
+  }
+  /**
+   * GC15 (3): the seat walks off the road into `to`, a cell on another worker. Its client hears `travel` (`NetRoom.handOut`), the seat goes
+   * from here with no hold, and its port says `out` with the walker's motion, after everything else it was sent: the door moves the socket.
+   * False when nothing went (no live link here).
+   */
+  handOut(device: string, to: string): boolean {
+    const seat = this.seats.get(device), transport = seat?.transport ?? null, player = seat === undefined ? undefined : this.host.players.get(seat.body);
+    if (seat === undefined || !(transport instanceof SeatTransport) || seat.client === null || player === undefined || !this.opened.has(to)) return false;
+    const motion = mountedPlayerOf(this.host, seat.body)?.mounted === true ? null : motionOf(player);
+    if (!this.net.handOut(seat.client, cellFrame(to))) return false;
+    mountedPlayerOf(this.host, seat.body)?.dismount();
+    seat.closeOff?.(); seat.closeOff = null; seat.transport = null; seat.client = null;
+    transport.handOut(motion);
+    this.release(seat);
+    return true;
   }
   /** The seat walks off the road into `target`, a cell on this worker: its body there first, then its link (`DedicatedRoom.handOver`'s order). */
   handOver(device: string, target: CrossTarget, entry: SeatEntry, at: ResumeAt): boolean {
@@ -160,7 +185,7 @@ export class RoadRoom implements CrossTarget {
       if (seat.transport === null || player === undefined || !finite(player.position)) continue;
       const crossed = crossedTo(this.assembly, null, player.position);
       const to = crossed?.cell?.instance ?? null;
-      if (crossed === undefined || to === null || !this.options.hosts(to)) { seat.asked = null; continue; }
+      if (crossed === undefined || to === null || (!this.options.hosts(to) && !this.opened.has(to))) { seat.asked = null; continue; }
       if (seat.asked === to && this.host.state.tick - seat.askedAt < ASK_TICKS) continue;
       seat.asked = to; seat.askedAt = this.host.state.tick;
       this.options.post({ kind: 'crossing', device: seat.device, to, at: { ...crossed.at, yaw: player.yaw } });

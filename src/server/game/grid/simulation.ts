@@ -50,6 +50,29 @@ interface Resident { value: GridResident; touched: number; reservations: number;
  *  board, swim) they had, so a walk across the line never stops (it started from rest: RP1's ~0.3 s stop at x -260 while the page
  *  caught it up), and an owner's seat parked in that cell never mixes the new speed with the mode it was left in. The dedicated server's
  *  handover (`CrossTarget.admit`) carries the same. */
+/**
+ * GC15 (3): a walker's motion as plain data, for a crossing onto another worker (a message between threads carries no class), and
+ * `applyMotion` puts it on the arrival body as `carryMotion` does on one worker. A swim's climb target stays behind.
+ */
+export interface MotionSnapshot {
+  readonly board: { readonly on: boolean; readonly hoverAir: PlayerSim['board']['hoverAir']; readonly hoverBob: PlayerSim['board']['hoverBob'] };
+  readonly swim: Omit<PlayerSim['swim'], 'climbTo'>; readonly footing: PlayerSim['footing']; readonly moveScale: number;
+  readonly velocity: { readonly x: number; readonly y: number; readonly z: number }; readonly impulse: { readonly x: number; readonly y: number; readonly z: number };
+  readonly grounded: boolean; readonly shove: PlayerSim['shove']; readonly dash: PlayerSim['dash']; readonly dodge: PlayerSim['dodge']; readonly jump: PlayerSim['jump'];
+}
+export function motionOf(from: PlayerSim): MotionSnapshot {
+  const { climbTo: _climb, ...swim } = from.swim;
+  return { board: { on: from.board.on, hoverAir: from.board.hoverAir, hoverBob: from.board.hoverBob }, swim: { ...swim }, footing: { ...from.footing }, moveScale: from.moveScale,
+    velocity: { x: from.velocity.x, y: from.velocity.y, z: from.velocity.z }, impulse: { x: from.impulse.x, y: from.impulse.y, z: from.impulse.z }, grounded: from.fall.grounded,
+    shove: { ...from.shove }, dash: { ...from.dash }, dodge: { ...from.dodge }, jump: { ...from.jump } };
+}
+export function applyMotion(from: MotionSnapshot, to: PlayerSim): void {
+  if (to.board.on !== from.board.on) to.setBoard(from.board.on);
+  to.board.hoverAir = from.board.hoverAir; to.board.hoverBob = from.board.hoverBob;
+  Object.assign(to.swim, from.swim); Object.assign(to.footing, from.footing); to.moveScale = from.moveScale;
+  to.velocity.set(from.velocity.x, from.velocity.y, from.velocity.z); to.impulse.set(from.impulse.x, from.impulse.y, from.impulse.z); to.fall.grounded = from.grounded;
+  Object.assign(to.shove, from.shove); Object.assign(to.dash, from.dash); Object.assign(to.dodge, from.dodge); Object.assign(to.jump, from.jump);
+}
 export function carryMotion(from: PlayerSim, to: PlayerSim): void {
   if (to.board.on !== from.board.on) to.setBoard(from.board.on);
   to.board.hoverAir = from.board.hoverAir; to.board.hoverBob = from.board.hoverBob;

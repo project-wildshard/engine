@@ -3,6 +3,7 @@ import type { PlayerDoc } from './playerDoc';
 import type { SaveReceipt, SaveWrite } from './saves/saveStore';
 import type {PlaytestHit} from './playtest';
 import type { PlacedCell } from './gridCells';
+import type { MotionSnapshot } from '@wildshard/engine/game/grid/simulation';
 
 // J182: what the door and a cell worker say to each other. Sockets stay with the door, and a seat's bytes go through its own port.
 
@@ -36,6 +37,15 @@ export type CellOrder =
    * squares, their strips, and walls round any it can't hand a seat to. `open` names the ones this worker opens and hosts.
    */
   | { readonly kind: 'place'; readonly id: number; readonly cells: readonly PlacedCell[]; readonly open: readonly string[] }
+  /**
+   * GC15 (3): a seat on this worker's road (`from`) walks into `to`, a cell on another worker. The road sends the client `travel`, lets the
+   * seat go and says `out` on its port with the walker's motion; the door then points the socket at `to`'s worker (`arrive`).
+   */
+  | { readonly kind: 'handOut'; readonly from: string; readonly device: string; readonly to: string }
+  /** GC15 (3): the seat `handOut` let go on another worker arrives in `to` at `at`: the room hears its `hello` again on the moved socket. */
+  | ({ readonly kind: 'arrive'; readonly from: string; readonly to: string; readonly at: ResumeAt; readonly port: MessagePort; readonly hello: ArrayBuffer; readonly motion: MotionSnapshot | null } & SeatEntry)
+  /** GC15 (3): cells on other workers a walker can stand in at their entryways: this worker's road drops its walls round them and crosses into them. */
+  | { readonly kind: 'open'; readonly cells: readonly string[] }
   | { readonly kind: 'close' };
 /** One 10 s reading of a worker (E7.8). */
 export interface WorkerReading {
@@ -63,7 +73,9 @@ export type RoomNews =
 export interface WorkerResident { readonly cells: number; readonly road: boolean; readonly strips: number }
 /** What a worker says to the door. */
 export type WorkerNews =
-  | { readonly kind: 'booted'; readonly ms: number; readonly resident?: WorkerResident }
+  | { readonly kind: 'booted'; readonly ms: number; readonly resident?: WorkerResident; /** GC15 (3): its grid cells whose entryways stand (GC30), for the other workers' roads. */ readonly stands?: readonly string[] }
+  /** GC15 (3): a `handOut` that let nothing go (the seat had no live link, or was gone): the crossing is off and the seat stays where it was. */
+  | { readonly kind: 'handedOut'; readonly device: string; readonly from: string; readonly out: boolean }
   | { readonly kind: 'failed'; readonly reason: string }
   | { readonly kind: 'found'; readonly id: number; readonly held: boolean; readonly spawn: ResumeAt }
   | { readonly kind: 'report'; readonly slug: string; readonly report: ChatReport }
