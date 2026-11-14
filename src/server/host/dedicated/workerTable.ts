@@ -27,15 +27,26 @@ export function worldCrossing(value: string | undefined): boolean {
 
 /**
  * The table for the cells this server opens: one row a worker, at most `workers` rows. Only an open cell takes a row, so one cell is one
- * worker. Named rows go first; the rest are shared, and if the count runs out the last row takes whatever is left.
+ * worker. Named rows go first; the rest are shared, and if the count runs out the last row takes the named cells left over.
+ * GC13: the unnamed cells then move from that last row to the rows holding fewest, so no worker holds more than its share plus one.
+ * (Before, the last row kept them all: staging's 2 workers held Nalati alone and the other 25 cells together.) A named cell stays
+ * where it was, so Driftwood's crossings to Sunscar and Sky Reach stay on one worker; a crossing between workers is GC15's move.
  */
 export function workerTable(cells: readonly string[], workers: number): readonly (readonly string[])[] {
   const open = new Set(cells), named = new Set([...DEDICATED, ...SHARED.flat()]), rest = cells.filter(slug => !named.has(slug)).sort();
   const rows = [...DEDICATED.map(slug => [slug]), ...SHARED].map(row => row.filter(slug => open.has(slug))).filter(row => row.length > 0);
   const room = Math.max(1, workers - rows.length), share = Array.from({ length: room }, (): string[] => []);
   rest.forEach((slug, index) => { share[index % room]?.push(slug); });
-  const table = [...rows, ...share.filter(row => row.length > 0)], kept = table.slice(0, Math.max(1, workers - 1)), over = table.slice(kept.length).flat();
+  const table = [...rows, ...share.filter(row => row.length > 0)];
   if (table.length <= workers) return table;
-  // GC31: one worker is one row, so a crossing reaches every cell (`kept` keeps a first row whenever it can).
-  return workers <= 1 ? [table.flat()] : [...kept, over];
+  // GC31: one worker is one row, so a crossing reaches every cell.
+  if (workers <= 1) return [table.flat()];
+  const kept = rows.slice(0, workers - 1).map(row => row.slice()), over = [...rows.slice(workers - 1).flat(), ...rest];
+  // the unnamed cells sit at the end of `over`, so the last cell is the one to move while it is unnamed
+  for (let moving = over.at(-1); moving !== undefined && !named.has(moving); moving = over.at(-1)) {
+    const lightest = kept.reduce((best, row) => (row.length < best.length ? row : best));
+    if (over.length <= lightest.length + 1) break;
+    over.pop(); lightest.push(moving);
+  }
+  return [...kept, over];
 }

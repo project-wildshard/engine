@@ -17,14 +17,27 @@ test('at 8 the four big cells each get a worker, Dunes and Sky Reach share one, 
   expect(table.slice(5).map(row => row.length)).toEqual([7, 7, 6]);
 });
 
-test('production\'s 4 and staging\'s 2 hold every cell, and the last row takes what is left', () => {
+test('production\'s 4 and staging\'s 2 hold every cell, and the last row keeps the big cells left over', () => {
   for (const workers of [4, 2]) {
     const table = workerTable(ALL, workers);
     expect(table).toHaveLength(workers);
     expect(sorted(table.flat())).toEqual(sorted(ALL));
   }
-  expect(workerTable(ALL, 4).slice(0, 3)).toEqual([['nalati-grasslands'], ['nine-dragon-stack'], ['pine-hollow']]);
-  expect(workerTable(ALL, 4)[3]?.[0]).toBe('driftwood-isle');
+  expect(workerTable(ALL, 4).map(row => row[0])).toEqual(['nalati-grasslands', 'nine-dragon-stack', 'pine-hollow', 'driftwood-isle']);
+  expect(workerTable(ALL, 4)[3]?.slice(0, 3)).toEqual(['driftwood-isle', 'sunscar-dunes', 'far-reach']);
+  expect(workerTable(ALL, 2)[1]?.slice(0, 5)).toEqual(['nine-dragon-stack', 'pine-hollow', 'driftwood-isle', 'sunscar-dunes', 'far-reach']);
+});
+
+// GRID-CROSSING GC13: when the count runs out, the cells spread over the workers. Staging's table put Nalati alone on one worker
+// and the other 25 cells on the other; production's put 23 on its last. Dunes and Sky Reach still share a worker. (With a worker for
+// each big cell, 6 and up, a big cell is a worker's load, as at 8 above.)
+test('short of workers, no worker holds more than its share plus one', () => {
+  for (const cells of [ALL, [...ALL, 'open-plot-thin-ice']]) for (const workers of [2, 3, 4, 5]) {
+    const table = workerTable(cells, workers), share = cells.length / workers;
+    expect(sorted(table.flat())).toEqual(sorted(cells));
+    for (const row of table) expect(row.length).toBeLessThanOrEqual(Math.floor(share) + 1);
+    expect(table.find(row => row.includes('sunscar-dunes'))).toContain('far-reach');
+  }
 });
 
 // GRID-CROSSING GC31: a crossing runs only between cells on one worker, so staging's `WORLD_WORKERS=1` must open one worker. It opened
