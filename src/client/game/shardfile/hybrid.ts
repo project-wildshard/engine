@@ -399,6 +399,8 @@ export class HybridRuntimeSession {
   timings(): { readonly current: Readonly<Pick<HybridHookTiming, 'instance' | 'hook' | 'start'>> | null; readonly completed: readonly HybridHookTiming[] } {
     return { current: this.currentHook, completed: [...this.completedHooks] };
   }
+  /** GC6: the cells whose entry is being prepared on the road (for the tour's trace) */
+  preparing(): readonly string[] { return [...this.installations.keys()]; }
   /** Finish an actually requested entry before its frame transfer. Neighbours use inert prepare() only.
    * A source must leave first; entered services and parent runtime slots publish only at enter(). */
   prepareEntry(instance: string, signal?: AbortSignal): Promise<boolean> {

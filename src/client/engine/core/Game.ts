@@ -183,6 +183,11 @@ interface BuiltChain { clean: boolean; order: Effect[]; fx: Omit<EngineEffects, 
 /** An entered frame's preparation trace (`Game.entryPreparation`): its destination root, owner, running phase, measured
  *  work counts and scalar timings. A named type, so consumers of the emitted declarations see it (a private field's type
  *  is not emitted). */
+/** GC6: candidates a live display transform gets before it links on its next draw */
+export const POST_PASS_ATTEMPTS = 4;
+/** GC6: the longest an entered frame waits on live display transform preparation */
+export const POST_PREPARATION_WAIT_MS = 12_000;
+
 export interface EntryPreparation {
   root: string; owner: string; completed: boolean; phase: string;
   progress: { done: number; total: number; detail: string } | null;
@@ -1098,8 +1103,13 @@ export class Game {
       const geometry = postTriangle(), mesh = new THREE.Mesh(geometry, pass.fullscreenMaterial), scene = new THREE.Scene();
       const target = pass.renderToScreen ? null : composer.inputBuffer;
       try {
-        let published = false;
-        while (current() && !published) published = await prepareEffectPass(pass, async material => {
+        // GC6 (QA 11-14 row 6): a pass that left the chain, or whose shader keeps changing under each candidate, never
+        // published: the loop ran for ever and every entered frame awaiting it stayed unready. Past a few candidates it
+        // links on its next draw (the boot path).
+        let published = false, attempts = 0;
+        while (current() && composer.passes.includes(pass) && !published) {
+          if (attempts++ >= POST_PASS_ATTEMPTS) { pass.recompile(); break; }
+          published = await prepareEffectPass(pass, async material => {
           mesh.material = material;
           await runPrecompile(this.renderer, this.camera, [{ label: engineString('s_178612197e2b'), root: mesh, target: scene, rt: target }], 1,
             undefined, undefined, current, false, () => waitForDrawnFrame(this.engineScope, () => this.frameCount, current));
@@ -1110,6 +1120,7 @@ export class Game {
           try { this.renderer.compile(mesh, this.camera, scene); }
           finally { this.renderer.setRenderTarget(prior, face, mip); }
         }, current);
+        }
       } finally { geometry.dispose(); }
     };
     const work = prepare();
@@ -1171,10 +1182,16 @@ export class Game {
       // and first draws. An early composer lends only the compiler above; doing
       // the crossing warm-up here would add parked/offscreen frame variants.
       if (this.frameCount === 0) { trace.completed = true; return; }
+      // GC6 (QA 11-14 row 6): a display transform's preparation that never settles (a lost link, a dead owner's frame
+      // wait) held Nalati's on-road entry at afterPlay for ever: in the cell, no control. Past POST_PREPARATION_WAIT_MS
+      // the entry goes on and that pass links on its first draw (D196: a stall reveals with what had linked).
+      const postStarted = diagnosticNow();
       for (;;) {
-        const pending = this.postPreparation;
-        await pending;
+        const pending = this.postPreparation, left = POST_PREPARATION_WAIT_MS - (diagnosticNow() - postStarted);
+        const timedOut = left <= 0 || await Promise.race([pending.then(() => false),
+          new Promise<boolean>(resolve => { this.engineScope.timeout(left, () => { resolve(true); }); })]);
         if (!current()) throw new Error('Shader warm-up owner left');
+        if (timedOut) { trace.stalled = 'post-preparation'; console.warn(`[entry] ${owner.name}: display transform preparation still running after ${String(POST_PREPARATION_WAIT_MS)} ms; entering without it`); break; }
         if (this.postPreparation === pending) break;
       }
       enter('shaders-and-composer');

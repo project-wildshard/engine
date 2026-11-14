@@ -215,6 +215,8 @@ export interface GridSessionState {
   readonly cellStage: string | null;
   /** GC8: the `cell` path step that screen shows now and its detail, so a harness times each step. */
   readonly cellStep: { readonly step: string; readonly detail: string } | null;
+  /** GC6: the hybrid runtime session's entry state (liveSession `hybridState`) */
+  readonly hybrid?: ReturnType<LiveGridSession['hybridState']> | null;
   /** the allocator's grid content (MB) and the §3.2 playing total with the engine base (MB, the 1.0 GB envelope, G65) */
   readonly residentMB: number; readonly playingMB: number;
   /** GC6: the playing envelope the allocator admits against (MB) */
@@ -975,7 +977,8 @@ export class GridSession {
    */
   private cellLoadingInput(): CellLoadingInput | null {
     const live = this.live; if (live === null) return null;
-    const current = live.live.current(), ready = (id: string): boolean => live.live.ready(id) && (current !== id || live.gameplayReady());
+    // GC6: a world built ahead whose entry still prepares holds its crossing on the road: the screen shows it
+    const current = live.live.current(), ready = (id: string): boolean => live.live.ready(id) && !live.entryPending(id) && (current !== id || live.gameplayReady());
     let target: GridCell | undefined = current !== null && !ready(current) ? this.assembly.cell(current) : undefined;
     if (target === undefined) {
       const at = this.world();
@@ -1253,7 +1256,7 @@ export class GridSession {
       pitch: this.assembly.pitch,
       home: this.home.instance, inside: gridCells.cell?.instance ?? null, feet: { x: Math.round(at.x * 100) / 100, z: Math.round(at.z * 100) / 100 },
       cells: this.assembly.cells.map((cell) => { const d = drawn(cell.instance); return { instance: cell.instance, slug: cell.slug, cell: cell.cell, shows: shows(cell.instance, d), drawn: d }; }),
-      strips: this.strips.length, road: this.road, seams: this.seams, softWalls: this.softWalls.state(), shimmer: this.shimmer.state(), cellLoading: this.cellLoading.open, cellStage: this.cellLoading.stage, cellStep: this.cellLoading.now, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
+      strips: this.strips.length, road: this.road, seams: this.seams, softWalls: this.softWalls.state(), shimmer: this.shimmer.state(), cellLoading: this.cellLoading.open, cellStage: this.cellLoading.stage, cellStep: this.cellLoading.now, hybrid: this.live?.hybridState() ?? null, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
       residentMB: Math.round(cost.accounted / 1e4) / 100, playingMB: Math.round(cost.playing / 1e4) / 100, envelopeMB: Math.round(this.allocator.envelope() / 1e4) / 100,
       accountedBytes: cost.accounted,
       rings: { frame: stats.frame, far: stats.resident.far, l1: stats.resident.l1, l0: stats.resident.l0, refused: stats.refused, inFlight: stats.inFlight, queued: stats.queued,

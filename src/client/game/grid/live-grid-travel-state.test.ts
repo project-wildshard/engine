@@ -23,3 +23,17 @@ test('travel facts stay fresh without invoking retained-program and debug reader
   expect(first.live.current).toBe('home'); expect(first.crossing.phase).toBe('idle');
   expect(second).not.toBe(first); expect(reads).toBe(2);
 });
+
+test('GC6: a world built ahead stays unenterable while its entry is deferred or preparing on the road', () => {
+  // QA 11-14 row 6: inside the cell its gameplay gate stops the page's frames, and that preparation waits on drawn frames
+  const value: unknown = Object.create(LiveGridSession.prototype);
+  if (!(value instanceof LiveGridSession)) throw new Error('Missing live session prototype');
+  const deferred = new Map<string, unknown>([['nalati', {}]]), preparing: string[] = [];
+  Reflect.set(value, 'deferredEntries', deferred); Reflect.set(value, 'hybrid', {preparing: () => preparing});
+  expect(value.entryPending('nalati')).toBe(true);
+  deferred.clear(); preparing.push('nalati');
+  expect(value.entryPending('nalati')).toBe(true);
+  preparing.length = 0;
+  expect(value.entryPending('nalati')).toBe(false);
+  expect(value.entryPending('driftwood')).toBe(false);
+});

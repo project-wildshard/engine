@@ -112,7 +112,7 @@ try {
         q.samples.push({ t: Math.round(performance.now() - t0), x: Number(p.position.x.toFixed(2)), y: Number(p.position.y.toFixed(2)), z: Number(p.position.z.toFixed(2)), inside: st.inside,
           phase: lv?.crossing?.phase, ready: lv?.live?.gameplayReady, loading: st.cellLoading, step: st.cellStep?.step ?? null,
           // GC6: whether the crossing's target world (colliders and sim) is resident yet, and the world built ahead (GC5)
-          built: q.target === undefined ? null : lv?.live?.residents?.includes(q.target) === true, ahead: lv?.live?.ahead?.instance ?? null, refused: lv?.live?.ahead?.refused ?? null, deferred: lv?.live?.ahead?.deferred ?? null, env: st.envelopeMB ?? null, pending: lv?.live?.pending ?? null,
+          built: q.target === undefined ? null : lv?.live?.residents?.includes(q.target) === true, ahead: lv?.live?.ahead?.instance ?? null, refused: lv?.live?.ahead?.refused ?? null, hy: st.hybrid ?? null, fc: W.__wildshard.world?.game?.frameCount ?? null, deferred: lv?.live?.ahead?.deferred ?? null, env: st.envelopeMB ?? null, pending: lv?.live?.pending ?? null,
           // GC13: the cells whose worlds the page holds, and what playing costs
           res: lv?.live?.residents ?? null, mb: st.playingMB ?? null,
           // GC12: how many closed walls show (only the ones the walker stands at)
@@ -202,7 +202,7 @@ try {
       steps: speeds.reduce((/** @type {Record<string, number>} */ onScreen, x) => { if (x.t <= untilT && typeof x.r.step === 'string' && x.r.step !== '') onScreen[x.r.step] = (onScreen[x.r.step] ?? 0) + 100; return onScreen; }, {}),
       worstFrameMs: Math.max(0, ...near), jumps, lowestY: Math.min(...rows.map(r => r.y)), end: { inside: last.inside, x: last.x, y: last.y, z: last.z, phase: last.phase } });
     // GC6: each crossing keeps its samples (every 500 ms), so its cause can be read from the json
-    row.trace = rows.filter((_, i) => i % 5 === 0).map(r => ({ t: r.t - tFrom, x: r.x, z: r.z, inside: r.inside, phase: r.phase, ready: r.ready, step: r.step, built: r.built, ahead: r.ahead, refused: r.refused, deferred: r.deferred, mb: r.mb, env: r.env, pending: r.pending, res: r.res }));
+    row.trace = rows.filter((_, i) => i % 5 === 0).map(r => ({ t: r.t - tFrom, x: r.x, z: r.z, inside: r.inside, phase: r.phase, ready: r.ready, step: r.step, built: r.built, ahead: r.ahead, refused: r.refused, hy: r.hy, fc: r.fc, deferred: r.deferred, mb: r.mb, env: r.env, pending: r.pending, res: r.res }));
     // a failed crossing held on the road boosts back into the cell it left, so the tour goes on from there
     if (!row.ok && last.inside !== arc.from && last.inside !== arc.to) {
       await face(yaw + Math.PI); await page.keyboard.down('KeyW'); await page.keyboard.down('ShiftLeft');

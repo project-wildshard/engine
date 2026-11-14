@@ -26,6 +26,8 @@ const phone = process.argv.includes('--layout=phone'), solo = process.argv.inclu
 // it stands: jump into it, jump along it both ways, and boost-jump into it. A case holds when the page never enters the target
 // while its crossing is unready and the walker stays on the road, standing; entering once the neighbour is ready is the crossing.
 const breach = process.argv.includes('--breach');
+// GC6: --viewport=<w>x<h>@<dpr> (desktop): Jake's window is 2992x1434@2 (QA 11-14 row 6)
+const desk = (/^--viewport=(\d+)x(\d+)@([\d.]+)$/u.exec(process.argv.find(arg => arg.startsWith('--viewport=')) ?? '') ?? [0, '1440', '900', '1']).slice(1).map(Number);
 /** The page's memory now: JS heap (Chromium), the grid's resident and playing MB, the owner ledger's totals, the memory warning. */
 const MEMORY_READ = `(() => { const api = window.__wildshard; let ledger = null; try { const mem = ${pageMemoryAttributionExpression}; ledger = mem?.totals ? { gpuMB: Math.round(mem.totals.gpu / 1048576), ramMB: Math.round(mem.totals.ram / 1048576) } : null; } catch {}
   let grid = null; try { const st = api.shard.grid.state(); grid = { inside: st.inside, residentMB: st.residentMB, playingMB: st.playingMB }; } catch {}
@@ -33,7 +35,7 @@ const MEMORY_READ = `(() => { const api = window.__wildshard; let ledger = null;
   return { heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null, ledger, grid, memoryWarning: warning !== null && warning.getClientRects().length > 0 }; })()`;
 /** @param {import('playwright').Browser} b */
 const newContext = b => b.newContext(phone ? { viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: engineName === 'chromium', hasTouch: true,
-  userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Mobile/15E148 Safari/604.1' } : { viewport: { width: 1440, height: 900 } });
+  userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Mobile/15E148 Safari/604.1' } : { viewport: { width: desk[0] ?? 1440, height: desk[1] ?? 900 }, deviceScaleFactor: desk[2] ?? 1 });
 mkdirSync(out, { recursive: true });
 /** Driftwood is cell [0, 0]; its same-worker neighbours Pine Hollow [0, 1] (+z, across the island from the spawn at z -194) and Sunscar
  *  [-1, 0] (-x). Far Reach [0, -1] is sky islands: arriving at road height falls below its death floor (GC15b). */
@@ -70,7 +72,7 @@ const rig = served !== '' ? { base: served.replace(/\/$/, ''), close: () => Prom
   : await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: HOME, more: ['pine-hollow', 'far-reach', 'sunscar-dunes', 'nalati-grasslands'], cells: 'grid', crossing: true, workers });
 let code = 1, browser = /** @type {import('playwright').Browser | null} */ (null);
 /** @type {Record<string, unknown>} */
-const result = { lane: 'opus-gc15c', engine: engineName, layout: phone ? 'phone 402x874 touch' : 'desktop 1440x900', site: served !== '' ? served : 'local rig, WORLD_CELLS=grid, WORLD_CROSSING=worker, WORLD_WORKERS=2 (staging: Nalati alone, Driftwood with Pine Hollow, Sunscar and Far Reach)' };
+const result = { lane: 'opus-gc15c', engine: engineName, layout: phone ? 'phone 402x874 touch' : `desktop ${String(desk[0])}x${String(desk[1])}@${String(desk[2])}`, site: served !== '' ? served : 'local rig, WORLD_CELLS=grid, WORLD_CROSSING=worker, WORLD_WORKERS=2 (staging: Nalati alone, Driftwood with Pine Hollow, Sunscar and Far Reach)' };
 try {
   let open = served !== '' ? { cells: 25 } : null;
   for (let tries = 0; tries < 300 && open === null; tries++) { open = await fetch(`http://127.0.0.1:${String(WORLD_PORT)}/health`).then(found => found.ok ? found.json() : null).catch(() => null); if (open === null) await sleep(200); }

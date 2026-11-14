@@ -398,7 +398,7 @@ export class LiveGridSession {
 
   private installCrossing(): GridCrossingSession {
     return installGridCrossing({ current: () => this.live.current(), prepare: (from, to) => this.prepareCrossing(from, to),
-      ready: (instance) => this.live.ready(instance), checkpoint: (instance) => {
+      ready: (instance) => this.live.ready(instance) && (instance === null || !this.entryPending(instance)), checkpoint: (instance) => {
         if (this.wire !== null) return true; // the server's saves are the session's
         const readiness = this.page.crossingSaveReady?.(instance) ?? true;
         return readiness === true ? this.live.checkpoint(instance) : readiness;
@@ -870,8 +870,12 @@ export class LiveGridSession {
     const current = this.live.current();
     return current !== null && this.runtimeRegions.has(current) ? current : null;
   }
+  /** GC6 (QA 11-14 row 6): a world built ahead whose entry still prepares (deferred inside the source, or running on the
+   *  road). Inside the cell its gameplay gate (`frameReady`) stops the page's frames, and that preparation's warm-up waits on
+   *  drawn frames: the traveller stood in the cell with no control for good. Its crossing holds on the road instead. */
+  entryPending(instance: string): boolean { return this.deferredEntries.has(instance) || this.hybrid.preparing().includes(instance); }
   /** GC9: once the source is left (the hybrid session is neutral), each world pre-warmed inside it prepares its entry, so the
-   *  crossing finds it ready; an entry that arrives first waits for that preparation (`HybridRuntimeSession.enter`). */
+   *  crossing finds it ready; a crossing that arrives first holds on the road until it is (`entryPending`, GC6). */
   private prepareDeferredEntries(): void {
     // one at a time, nearest first: an entry preparation binds the page's one construction environment
     const feet = this.live.worldFeet(), gap = (instance: string): number => {
@@ -897,6 +901,13 @@ export class LiveGridSession {
   }
   /** G555: the entered runtime hooks' timings (the one running and those finished), for the cell loading screen. */
   hookTimings(): ReturnType<HybridRuntimeSession['timings']> { return this.hybrid.timings(); }
+  /** GC6: the entered runtime, whether its hooks finished, the hook running, the last finished, and the entries preparing */
+  hybridState(): { readonly instance: string | null; readonly ready: boolean; readonly hook: string | null; readonly last: string | null; readonly preparing: readonly string[]; readonly deferred: readonly string[]; readonly warm: readonly string[] } {
+    const state = this.hybrid.state(), timings = this.hybrid.timings(), last = timings.completed.at(-1);
+    return { ...state, hook: timings.current === null ? null : `${timings.current.instance}:${timings.current.hook}`,
+      last: last === undefined ? null : `${last.instance}:${last.hook}:${last.outcome}`, preparing: this.hybrid.preparing(), deferred: [...this.deferredEntries.keys()],
+      warm: this.hybrid.preparing().map(id => { const w = this.warmPreparation(id); return w === null ? `${id}:-` : `${id}:${w.phase}:${w.completed ? 'done' : w.progress?.detail ?? ''}`; }) };
+  }
   /** GC2: the server still has this client in `instance` (an online cell is still walled, C5). */
   serverHolds(instance: string): boolean { return this.wire !== null && this.wire.site() === instance; }
 

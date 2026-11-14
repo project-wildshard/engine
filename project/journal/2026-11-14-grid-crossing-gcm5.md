@@ -14,3 +14,11 @@
     drawn frame, and its entry warm-up issues 2 programs a frame.
 - The tour takes `--in=<m>` (start further in, to measure the pre-warm) and `--viewport=<w>x<h>@<dpr>`, and keeps a trace of
   samples per crossing (with the page's warm refusal, deferred reads, playing MB and envelope) and the page's warnings.
+- "In the cell, no control" (also on main): a world built ahead inside the source defers its entry preparation to the road
+  (GC9), but the crossing's readiness counted only the world. A walker faster than that preparation stepped in while it
+  ran; inside the cell the gameplay gate (`frameReady`) stops the page's frames, and the preparation's warm-up waits on drawn
+  frames: the game's frame count froze at the border for good (tour trace `fc`). The crossing now holds on the road while a
+  cell's entry is deferred or preparing (`LiveGridSession.entryPending`), and its screen shows that wait.
+- A live display transform's preparation could also run for ever (a pass that left the chain, or one recompiled under each
+  candidate), and every entered frame awaited it: four candidates, then it links on its next draw; an entry waits at most
+  12 s for it.
