@@ -7,7 +7,7 @@ import { lampLights } from '@wildshard/engine/render/lookLight';
 import type { LookLamp } from '@wildshard/format/look-light';
 import type { ShardWater } from '@wildshard/format/water';
 import { installClientWater } from '../shardfile/clientWater';
-import { swapDevBoxes, type DevBox } from '@wildshard/engine/game/devColliders';
+import { isDevColliders, swapDevBoxes, type DevBox } from '@wildshard/engine/game/devColliders';
 
 /**
  * SHARD-SOURCE AP5 (J347: engine is the deployed client and server; dev tooling is sharddev's). The dev hook: the one thing
@@ -17,7 +17,7 @@ import { swapDevBoxes, type DevBox } from '@wildshard/engine/game/devColliders';
  *
  *   addPart(name, part)        draw a new part: meshes, sprites, lamps (the look's lamp lights) and water (the client's water)
  *   replacePart(name, part)    build the new part first, then dispose the old part's scope, in one call: no frame shows neither
- *   removePart(name)           dispose the part's scope
+ *   removePart(name)           dispose the part's scope (its boxes stay: the page script calls swapColliders(name, []))
  *   setLook(look)              the data look's day keys (sky, fog, sun, ambient) in place: true, or false when the page's look
  *                              can't take them live and the page must reload
  *   swapColliders(name, boxes) the part's solid boxes, in the page's world and the in-page server's (the worker, by its
@@ -109,8 +109,9 @@ export interface DevHook {
 export interface DevHookPorts {
   readonly scope: Scope;
   readonly scene: THREE.Object3D;
-  /** the page's physics world (the player's prediction); null on a page without one */
-  readonly physics: Physics | null;
+  /** the page's physics world now (the player's prediction): a grid crossing swaps it, so the hook reads it per call;
+   *  null on a page without one */
+  readonly physics: () => Physics | null;
   /** the page's look now */
   readonly look: () => LookStrategy | null;
   /** the in-page server's half of `swapColliders` (the worker page's harness port); null when the page has none */
@@ -124,6 +125,8 @@ interface LivePart { readonly scope: Scope; readonly geometries: readonly string
 /** Build the hook over the page's scene and world; `installDevHook` puts it on the window. */
 export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: THREE.Group; held: () => { geometries: number; textures: number } } {
   const { scope } = ports, root = new THREE.Group(), parts = new Map<string, LivePart>(), colliders = new Map<string, Scope>();
+  const boxesOf = new Map<string, readonly DevBox[]>();
+  let collidersIn: Physics | null = null;
   const geometries = new Map<string, Held<THREE.BufferGeometry>>(), textures = new Map<string, Held<THREE.DataTexture>>();
   root.name = 'devScene';
   ports.scene.add(root);
@@ -221,8 +224,20 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
     const current = ports.look();
     return current !== null && 'liveKeys' in current && current.liveKeys !== undefined && current.liveKeys(look.keys);
   };
+  // The boxes go into the page's world as it is now. After a grid crossing that is a new world: every held part's boxes
+  // are made again in it, and the old world's sets are disposed (Physics skips removal from a freed world).
   const swapColliders = (name: string, boxes: readonly DevBox[]): void => {
-    if (ports.physics !== null) swapDevBoxes(ports.physics, scope, colliders, name, boxes);
+    const message = { wildshardDevColliders: name, boxes };
+    if (!isDevColliders(message)) throw new Error(`dev hook: part ${name} has a malformed collider box`);
+    if (boxes.length === 0) boxesOf.delete(name); else boxesOf.set(name, boxes);
+    const physics = ports.physics();
+    if (physics !== collidersIn) {
+      for (const held of colliders.values()) held.dispose();
+      colliders.clear();
+      collidersIn = physics;
+      if (physics !== null) for (const [part, held] of boxesOf) if (part !== name) swapDevBoxes(physics, scope, colliders, part, held);
+    }
+    if (physics !== null) swapDevBoxes(physics, scope, colliders, name, boxes);
     ports.server()?.(name, boxes);
   };
   scope.onDispose(() => { for (const held of colliders.values()) held.dispose(); colliders.clear(); });
@@ -241,7 +256,7 @@ function makeMaterial(row: DevMaterial, shared: THREE.DataTexture | null, owned:
   let map: THREE.Texture | null = null;
   if (shared !== null) {
     // a clone shares the raster (one upload) and keeps its own repeat and offset, as an author's `clone()` does
-    map = shared.clone(); owned.push(map); map.repeat.set(...row.repeat); map.offset.set(...row.offset); map.needsUpdate = true;
+    map = shared.clone(); owned.push(map); map.repeat.set(...row.repeat); map.offset.set(...row.offset); map.version++;
   }
   const colour = new THREE.Color().setRGB(...row.colour);
   const common = { name: row.name, color: colour, map, alphaTest: row.alphaTest, transparent: row.transparent, opacity: row.opacity, depthWrite: row.depthWrite, fog: row.fog,

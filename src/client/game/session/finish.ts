@@ -400,7 +400,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // SHARD-SOURCE AP5 (J347): a DEVSERVER page carries the dev hook sharddev's `watch` page script drives; a production
   // build's define makes this `false` in this module, so the import and its chunk go (scripts/check-devserver.mjs checks;
   // DEVSERVER imported from grid/menu did not fold across modules and kept the chunk).
-  if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) void import('../devScene/hook').then(dev => dev.installDevHook({ scope: game.levelScope, scene: game.rootScene, physics: world.physics,
+  if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) void import('../devScene/hook').then(dev => dev.installDevHook({ scope: game.levelScope, scene: game.rootScene, physics: () => world.physics,
     look: () => game.look, server: () => window.__workerClientDevColliders ?? null, watchFrames: fn => game.watchFrames(fn) }))
     .catch((cause: unknown) => { console.error('[devScene]', cause); });
   ctx.startExplore?.();

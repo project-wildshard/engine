@@ -20,3 +20,8 @@ Production never carries it: `finish.ts`, `clientWorker.ts`, the standalone shel
 `__DEVSERVER__` in their own module (a `DEVSERVER` const imported from `grid/menu` did not fold across modules), and
 `check-devserver.mjs` refuses a bundle holding `__wildshardDevHook` or `wildshardDevColliders`. A devserver build's
 `build-flags.json` names `devHook`, which sharddev checks against its own version before it serves a page.
+
+Review fix: the hook first captured `world.physics` once, so after a grid crossing the watched boxes landed in the retired
+world. The port is a getter now; when the world changes, every held part's boxes are made again in the new one and the
+old sets go (Physics skips removal from a freed world). `swapColliders` refuses a malformed box, and a box needs a
+positive half size.

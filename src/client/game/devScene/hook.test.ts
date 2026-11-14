@@ -31,7 +31,7 @@ async function page(): Promise<{ ports: DevHookPorts; physics: Physics; served: 
   const R = await loadRapier(Uint8Array.from(fixtureBytes(new URL('../../../../node_modules/@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm', import.meta.url))));
   const physics = new Physics(R), served: [string, number][] = [], liveKeys: LookKey[][] = [], frames = new Set<(dt: number) => void>();
   const look = { compose: () => ({ chain: [] }), liveKeys: (keys: readonly LookKey[]) => { liveKeys.push([...keys]); return keys[0]?.fog.near === undefined; } } as unknown as LookStrategy;
-  const ports: DevHookPorts = { scope: new Scope('test.devHook'), scene: new THREE.Scene(), physics, look: () => look,
+  const ports: DevHookPorts = { scope: new Scope('test.devHook'), scene: new THREE.Scene(), physics: () => physics, look: () => look,
     server: () => (name, boxes) => { served.push([name, boxes.length]); }, watchFrames: fn => { frames.add(fn); return () => { frames.delete(fn); }; } };
   return { ports, physics, served, liveKeys, frames };
 }
@@ -91,7 +91,7 @@ test('AP5: the five hook calls: add, replace (new first, old scope gone, shared 
 });
 
 test('AP5: a geometry that moves between parts survives; a part that fails to build leaves the old one drawn and nothing held', async () => {
-  const { ports } = await page(), hook = createDevHook({ ...ports, physics: null });
+  const { ports } = await page(), hook = createDevHook({ ...ports, physics: () => null });
   hook.addPart('a', moved(['g1'])); hook.addPart('b', moved(['g2']));
   hook.replacePart('b', moved(['g1'])); hook.replacePart('a', moved(['g2']));
   expect(hook.held()).toEqual({ geometries: 2, textures: 1 });
@@ -116,4 +116,20 @@ test('AP5: the in-page server takes the same boxes from the harness port message
   scope.dispose();
   n = 0; physics.world.forEachCollider(() => { n++; });
   expect(n).toBe(0);
+});
+
+test('AP5: after a grid crossing swaps the page world, the held parts\' boxes are made again in the new world', async () => {
+  const { ports, physics } = await page(), next = new Physics(physics.R);
+  let world = physics;
+  const hook = createDevHook({ ...ports, physics: () => world });
+  const count = (p: Physics): number => { let n = 0; p.world.forEachCollider(() => { n++; }); return n; };
+  const solid = { centre: [0, 1, 0], half: [1, 1, 1], rotation: [0, 0, 0, 1] } as const;
+  hook.swapColliders('hut', [solid]); hook.swapColliders('wall', [solid, solid]);
+  expect(count(physics)).toBe(3);
+  world = next;
+  hook.swapColliders('wall', [solid]);
+  expect([count(physics), count(next)]).toEqual([0, 2]);
+  expect(() => { hook.swapColliders('wall', [{ ...solid, half: [0, 1, 1] }]); }).toThrow('malformed collider box');
+  ports.scope.dispose();
+  expect(count(next)).toBe(0);
 });

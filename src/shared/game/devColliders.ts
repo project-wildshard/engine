@@ -19,9 +19,10 @@ export interface DevBox {
 /** The harness-port message that carries one part's boxes to the in-page server. */
 export interface DevCollidersMessage { readonly wildshardDevColliders: string; readonly boxes: readonly DevBox[] }
 
-const triple = (value: unknown): boolean => Array.isArray(value) && value.length === 3 && value.every(n => typeof n === 'number' && Number.isFinite(n));
-const isBox = (value: unknown): value is DevBox => typeof value === 'object' && value !== null && 'centre' in value && triple(value.centre)
-  && 'half' in value && triple(value.half) && 'rotation' in value && Array.isArray(value.rotation) && value.rotation.length === 4 && value.rotation.every(n => typeof n === 'number' && Number.isFinite(n));
+const numbers = (value: unknown, length: number, above = -Infinity): boolean => Array.isArray(value) && value.length === length
+  && value.every(n => typeof n === 'number' && Number.isFinite(n) && n > above);
+const isBox = (value: unknown): value is DevBox => typeof value === 'object' && value !== null && 'centre' in value && numbers(value.centre, 3)
+  && 'half' in value && numbers(value.half, 3, 0) && 'rotation' in value && numbers(value.rotation, 4);
 
 export const isDevColliders = (value: unknown): value is DevCollidersMessage => typeof value === 'object' && value !== null
   && 'wildshardDevColliders' in value && typeof value.wildshardDevColliders === 'string' && 'boxes' in value && Array.isArray(value.boxes) && value.boxes.every(isBox);
