@@ -21,7 +21,7 @@ export const eliteSkinFlag = (id: string): string => `elite.${id}.skin`;
  *
  * SERVER-CELLS SC10 (J328): a served world is never rebuilt, so there the skin is each player's own: a kill lays the orb out while a
  * player present has not taken it, a press takes it for the presser (a flag in their own book, which goes with their save), and an
- * owner's press is refused. The lair's world record (`skinTaken`) is a page's or a tape's alone.
+ * owner's press is refused. The orb stays until every player present has taken theirs. The lair's world record (`skinTaken`) is a page's or a tape's alone.
  */
 export function eliteDrops<S extends EliteCoreScript<Body>>(host: SimHost): { readonly hooks: EliteCoreHooks<S>; readonly bind: (core: EliteCore<S>) => void } {
   const routes = actRoutes(host);
@@ -37,8 +37,10 @@ export function eliteDrops<S extends EliteCoreScript<Body>>(host: SimHost): { re
       const feet = host.players.get(player)?.position, { drop } = entry;
       if (feet === undefined || drop === null || (served && owns(player, def.id))) return;
       if (pickPrompt([{ position: { x: drop.x, y: drop.y + PROMPT_ABOVE, z: drop.z }, radius: PROMPT_RADIUS }], { x: feet.x, y: feet.y + REACH_EYE, z: feet.z }, host.physics) === undefined) return;
+      // SC10 review: in a served world the orb stays while anyone present still lacks the skin, so the first press takes it for the
+      // presser only, not for everyone who shared the kill
+      if (served) { questBooks(host).of(player).flags.set(eliteSkinFlag(def.id)); if (!lacking(def.id)) entry.drop = null; return; }
       entry.drop = null;
-      if (served) { questBooks(host).of(player).flags.set(eliteSkinFlag(def.id)); return; }
       const saved = core?.record(def.id);
       if (saved !== undefined) saved.skinTaken = true;
       core?.save();

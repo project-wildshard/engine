@@ -161,7 +161,9 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
   };
   const originalUpdate = law.update.bind(law);
   const session: TamingSeat = { player, law, get shake() { return shake; }, get roll() { return roll; }, holdOffer: held => { heldOffer = held; },
-    release: () => { for (const id of mine) { const a = poseRows.find(row => row.entityId === id); if (a === undefined) mine.delete(id); else retireBonded(a); } }, whistle: () => {
+    // SC10 review: a bonded horse is a mountable too (`addMountable` on adoption); it leaves the mounted owner's rows before it retires,
+    // or the next mounted step finds its pose with no body ("Missing mounted pose actor") and fails the worker
+    release: () => { for (const id of mine) { const a = poseRows.find(row => row.entityId === id); if (a === undefined) { mine.delete(id); continue; } if (mounted.mountables.includes(a)) mounted.removeMountable(id); retireBonded(a); } }, whistle: () => {
     const horse = law.companion;
     if (!mounted.mounted && horse !== null && horse.mem['whistle'] === 1 && mounted.canRide(horse.entityId) && horse.position.distanceTo(player.position) < 150) calling = 30;
   }, tick: (dt, read) => {
@@ -202,6 +204,9 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
   sessions.set(player.id, session); return session;
   };
   const first = sessionFor(firstSeat.player), { law } = first;
+  // SC10 review: the lead seat's session as a fresh world gives it, for when its player leaves a served world (the seat is parked)
+  const fresh = first.save();
+  let leadReleased = false;
   const others = (): TamingSeat[] => [...sessions.values()].filter(session => session !== first);
   host.events.on('creature.signal', ({ name, x, z }) => { for (const session of sessions.values()) session.law.noteEvent(name, x, z); }, host.scope);
   host.events.on('weapon.impact', ({ point }) => {
@@ -226,6 +231,11 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
   };
   law.update = dt => {
     for (const [id, session] of sessions) if (host.players.get(id) !== session.player) { session.release(); sessions.delete(id); }
+    // SC10 review: an empty lead seat (a served world's, parked) keeps no one's taming: its bonded horses go as any leaver's do and
+    // the next player in it starts wild, not on the last one's horse
+    const parked = host.parked.has(first.player.id);
+    if (parked && !leadReleased) { first.release(); first.load(fresh, []); }
+    leadReleased = parked;
     // Trust is the herd's: one voice speaks to it, the wild session closest to a stallion, or a far player would talk it down.
     const heard = sessions.size < 2 ? null : closestToWild();
     if (heard === null || first.law.phase !== 'wild' || heard === first) first.tick(dt, true);

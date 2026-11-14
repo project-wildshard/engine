@@ -39,3 +39,31 @@ test('a thousand visits leave each per-player map at its live players\' size', {
     expect(host.slots.ledgerDedupe.filter(row => row.startsWith('loot:p.v')), 'five minutes away: forgotten, as a start-over forgot it').toEqual([]);
   } finally { room.dispose(); }
 });
+
+// SC10 review: the lead seat's body is one id for whoever holds it, and it used to forget its loot the moment its player left, so a
+// lead who bounced across an edge was paid the same bounty again. Its rows now go under the leaver's own id, as any body's stay.
+test('the lead seat\'s player keeps what it was paid across a bounce, and the next lead starts afresh', { timeout: 300_000 }, async () => {
+  let clock = 0;
+  const room = await DedicatedRoom.boot({ slug: 'nalati-grasslands', build: '', bootId: 'lead', input: await serverInput('nalati-grasslands'), now: () => clock, post: row => { if (row.kind === 'refused') throw new Error(row.reason); } });
+  try {
+    const { host } = room, enter = (device: string): ReturnType<typeof directLoopback> => {
+      const link = directLoopback(), client = new NetClient(link.client);
+      room.seat({ device, name: device, body: `p.${device}`, doc: null, seq: 0 }, link.server, () => { client.hello('', { player: device, name: device }); link.pump(); });
+      link.pump(); return link;
+    };
+    const tick = (): void => { clock += 1000 / 60; room.tick(); };
+    const lead = (): string[] => host.slots.ledgerDedupe.filter(row => row.startsWith('loot:actor.player:'));
+    let a = enter('a'); tick();
+    host.slots.ledgerDedupe.push('loot:actor.player:boar');
+    a.server.close('left'); tick();
+    expect(lead(), 'the empty seat holds nothing').toEqual([]);
+    const b = enter('b'); tick();
+    expect(lead(), 'the next lead\'s bounty is its own (J105)').toEqual([]);
+    b.server.close('left'); tick();
+    a = enter('a'); tick();
+    expect(lead(), 'back in the lead seat: paid already').toEqual(['loot:actor.player:boar']);
+    a.server.close('left');
+    const until = clock + FORGET_PAID_MS + 20_000; while (clock < until) { clock += 500; room.tick(); }
+    expect(host.slots.ledgerDedupe.filter(row => row.startsWith('loot:p.a:') || row.startsWith('loot:actor.player:')), 'five minutes away: forgotten').toEqual([]);
+  } finally { room.dispose(); }
+});

@@ -44,6 +44,8 @@ const DEBOUNCE_MS = 1000, EVERY_MS = 60_000;
 /** A player who holds a seat, with or without a live link. */
 interface Seat {
   readonly device: string; readonly name: string; readonly body: string; readonly store: PlayerStore; readonly fall: FallFloor;
+  /** SC10: this device's own body id (`entry.body`), which `body` is unless it holds the lead seat: what it was paid here is kept under it. */
+  readonly own: string;
   transport: Transport | null;
   /** The link's client in this room's `NetRoom`, and how to stop hearing its close, while it stands. */
   client: number | null; closeOff: (() => void) | null;
@@ -216,9 +218,10 @@ export class DedicatedRoom implements CrossTarget {
     } }
     catch (error) { return `recovery: ${String(error)}`; }
     const store = new PlayerStore(doc?.store ?? {}, () => { const own = this.seats.get(entry.device); if (own !== undefined) this.dirty(own); });
-    const seat: Seat = { device: entry.device, name: entry.name, read: entry.doc, body, store, fall: this.cell.fallFloor(), transport, client: null, closeOff: null, holdEnds: null, seq: entry.seq, receipted: doc?.ledger.serial ?? 0, dirtyAt: null, savedAt: now, stand: null, version: 0 };
+    const seat: Seat = { device: entry.device, name: entry.name, read: entry.doc, body, own: entry.body, store, fall: this.cell.fallFloor(), transport, client: null, closeOff: null, holdEnds: null, seq: entry.seq, receipted: doc?.ledger.serial ?? 0, dirtyAt: null, savedAt: now, stand: null, version: 0 };
     this.seats.set(entry.device, seat); this.bodies.set(body, seat); this.departed.delete(body);
-    if (lead) this.unparkLead();
+    // SC10 review: the lead seat takes back what this device was paid here when it last left (kept under its own id)
+    if (lead) { this.departed.delete(entry.body); this.movePaid(entry.body, LEAD_SEAT); this.unparkLead(); }
     // Two who join together would otherwise stand inside each other.
     const aside = SPAWN_ASIDE[(this.joined++) % SPAWN_ASIDE.length] ?? 0, stand = { ...spawn, x: spawn.x + aside };
     const player = lead ? this.lead : host.addPlayer(body, at ?? doc?.at ?? stand, at?.yaw ?? doc?.at.yaw ?? spawn.yaw);
@@ -230,7 +233,7 @@ export class DedicatedRoom implements CrossTarget {
     catch (error) {
       // No save or live link is installed on a failed continuation. Keep the durable copies intact.
       this.seats.delete(entry.device); this.bodies.delete(body); this.cell.owned.drop(body); book.drop(body);
-      if (lead) this.clearLead(); else host.removePlayer(body);
+      if (lead) this.clearLead(entry.body, false); else host.removePlayer(body);
       return `doc: ${String(error)}`;
     }
     return seat;
@@ -339,7 +342,7 @@ export class DedicatedRoom implements CrossTarget {
     this.playerRefusals.delete(seat.body);
     actRoutes(this.host).identities.delete(seat.body);
     this.seats.delete(seat.device); this.bodies.delete(seat.body); this.cell.owned.drop(seat.body); this.book.drop(seat.body);
-    if (seat.body === LEAD_SEAT) this.clearLead(); else { this.host.removePlayer(seat.body); this.departed.set(seat.body, this.options.now()); }
+    if (seat.body === LEAD_SEAT) this.clearLead(seat.own, true); else { this.host.removePlayer(seat.body); this.departed.set(seat.body, this.options.now()); }
     this.options.post({ kind: 'left', device: seat.device, seats: this.seats.size });
   }
   private flushRefusals(): void {
@@ -353,11 +356,21 @@ export class DedicatedRoom implements CrossTarget {
       transport?.close('refused');
     }
   }
-  /** The seat goes back to how boot left it, and what it was paid goes with who earned it: the next player's bounty is their own (J105). */
-  private clearLead(): void {
+  /**
+   * The seat goes back to how boot left it, and what it was paid goes with who earned it: the next player's bounty is their own (J105).
+   * SC10 review: it goes under the leaver's own id, as any other body's stays, so a lead who bounces across an edge cannot re-farm a
+   * bounty; it is forgotten `FORGET_PAID_MS` on (`left`), or at once when the seat never stood (a failed continuation).
+   */
+  private clearLead(own: string, left: boolean): void {
     actRoutes(this.host).identities.delete(LEAD_SEAT);
-    this.forgetPaid(LEAD_SEAT);
+    this.movePaid(LEAD_SEAT, own);
+    if (left) this.departed.set(own, this.options.now()); else this.forgetPaid(own);
     importPlayer(this.host, this.lead, this.blank); this.parkLead();
+  }
+  /** What `from` was paid here is `to`'s now. */
+  private movePaid(from: string, to: string): void {
+    const { ledgerDedupe } = this.host.slots, paid = `${LOOT_ROW}${from}:`;
+    for (let index = 0; index < ledgerDedupe.length; index++) { const row = ledgerDedupe[index]; if (row?.startsWith(paid) === true) ledgerDedupe[index] = `${LOOT_ROW}${to}:${row.slice(paid.length)}`; }
   }
   /** What a body was paid here goes: the next one to hold it, or its own return after a long while, earns afresh (J105, SC10). */
   private forgetPaid(body: string): void {

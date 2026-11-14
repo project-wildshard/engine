@@ -14,3 +14,4 @@
   bounty; the next lead still starts afresh, J105); an empty lead seat's taming session is released and starts wild again (the
   next lead rode the last one's horse); a retired bonded horse leaves the mounted owner's rows first ("Missing mounted pose
   actor" failed the worker on the next step); an elite's skin orb stays until every player present has taken theirs.
+- Tests: `served-lead-taming` (red without the parked release), `served-world-prunes` (lead bounce), `elite-skin-per-player` (two takers, one kill).

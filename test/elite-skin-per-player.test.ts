@@ -29,16 +29,21 @@ test('in a served world each player takes the lair\'s skin once, and an owner\'s
     const kill = (): void => { entry.drop = null; entry.state = 'idle'; body.alive = true; core.update(0.1, 1); body.alive = false; core.update(0.1, 2); };
     const press = (who: typeof a): void => { const orb = eliteNetView(entry).reward; if (orb !== null) who.position.set(4, orb.y, 5); actRoutes(host).claims.get('lair.reward')?.(who.id); };
     kill(); press(a);
-    expect(eliteNetView(entry).reward, 'a took the first').toBeNull();
+    expect(eliteNetView(entry).reward, 'a took theirs, and b (present, far off) still lacks one: the orb stays').not.toBeNull();
+    press(b);
+    expect(eliteNetView(entry).reward, 'both took theirs from the one kill').toBeNull();
+    expect(books.of(b.id).flags.has(eliteSkinFlag('lair'))).toBe(true);
+    // a third player: the same kill-by-kill rule
     expect(books.of(a.id).flags.has(eliteSkinFlag('lair'))).toBe(true);
-    expect(books.of(b.id).flags.has(eliteSkinFlag('lair')), 'and it is a\'s alone').toBe(false);
+    const c = host.addPlayer('c', { x: 40, y: 0, z: 40 });
+    expect(books.of(c.id).flags.has(eliteSkinFlag('lair')), 'and it is theirs alone').toBe(false);
     kill();
-    expect(eliteNetView(entry).reward, 'b has none yet, so the next kill drops it again').not.toBeNull();
+    expect(eliteNetView(entry).reward, 'c has none yet, so the next kill drops it again').not.toBeNull();
     press(a);
     expect(eliteNetView(entry).reward, 'an owner\'s press takes nothing').not.toBeNull();
-    press(b);
+    press(c);
     expect(eliteNetView(entry).reward).toBeNull();
-    expect(books.of(b.id).flags.has(eliteSkinFlag('lair'))).toBe(true);
+    expect(books.of(c.id).flags.has(eliteSkinFlag('lair'))).toBe(true);
     kill();
     expect(eliteNetView(entry).reward, 'everyone here has it: no orb').toBeNull();
     expect(core.record('lair')?.skinTaken, 'the world record is a page\'s').toBe(false);
