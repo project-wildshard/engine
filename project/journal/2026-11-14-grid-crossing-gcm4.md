@@ -16,3 +16,5 @@
 - GC26: the offline proof reads the grid cell the player stands in; a preview deck entry of a placed shard is red unless it ends
   inside that cell (`not-in-cell`), and preview's grid page, like staging's, reopens on the title by design (QA 11-12 row 35).
 - The nightly runner reads the release serial as the number it is and the report's stdout directly (lint:game).
+- GC14: the tour's `--laps=n` goes round every wanted arc n times, each row naming its lap, so the memory at each control reads as
+  a soak (lap 2 against lap 1).
