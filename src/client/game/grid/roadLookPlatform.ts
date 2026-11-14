@@ -16,7 +16,7 @@ import type { RoadSignSource } from './roadSignPaint';
  */
 import { Mesh, type Camera, type Object3D } from 'three';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
-import { ownRoadMesh } from './roadResources';
+import { ownRoadMesh, type RoadMapShare } from './roadResources';
 import type { RoadTileBacking } from './roadTileBacking';
 import type { RoadGrainSource } from './roadGrain';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
@@ -57,6 +57,8 @@ export interface PlatformRoadInput {
   readonly within?: (x: number, z: number) => boolean;
   /** build the void floor and its rail (default true; one build of a split road draws it) */
   readonly voidFloor?: boolean;
+  /** PZ24: one asphalt and one junction map for every build of this road (a split road's halves pass the same share) */
+  readonly maps?: RoadMapShare;
 }
 /** The readouts and the roots the road budget measures. */
 export interface PlatformRoad {
@@ -152,7 +154,7 @@ function* platformRoadSteps(input: PlatformRoadInput): Generator<void, PlatformR
   const overlayLight = new RoadOverlayLight();
   const road = yield* installRoadLookSteps({ layout, home, scene, scope, solid, cull: culler, admission, overlayLight, retireGeometry,
     ...(input.grain === undefined ? {} : { grain: input.grain }),
-    ...(input.signs === undefined ? {} : { signs: input.signs }) });
+    ...(input.signs === undefined ? {} : { signs: input.signs }), ...(input.maps === undefined ? {} : { maps: input.maps }) });
   const voidLook = input.voidFloor === false ? null : installVoidLook({ rail: layout.rail, edge: layout.edge, holes: layout.holes, home, scene, scope, solid, admission });
   // this build's own boulevard group (a split road adds one per build)
   let boulevard: Object3D | undefined;

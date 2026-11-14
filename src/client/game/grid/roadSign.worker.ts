@@ -1,5 +1,5 @@
 import type { SignLine } from '../../../shared/game/grid/roadLayout';
-import { paintRoadSignCanvas, roadSignPaintLayout } from './roadSignPaint';
+import { paintRoadSignCanvas, roadSignPaintLayout, SIGN_SCALES } from './roadSignPaint';
 import { packRoadSignPixels } from './roadSignPixels';
 import { installWorkerBootTiming } from '@wildshard/engine/boot/workerTiming';
 
@@ -17,9 +17,10 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
   try {
     const input = event.data;
     if (typeof input !== 'object' || input === null) throw new Error('Invalid sign job');
-    const rows: unknown = Reflect.get(input, 'rows'), red: unknown = Reflect.get(input, 'red'), green: unknown = Reflect.get(input, 'green');
+    const rows: unknown = Reflect.get(input, 'rows'), red: unknown = Reflect.get(input, 'red'), green: unknown = Reflect.get(input, 'green'), scale: unknown = Reflect.get(input, 'scale') ?? 1;
     if (!signLines(rows) || !(red instanceof Uint8Array) || !(green instanceof Uint8Array) || red.length !== 256 || green.length !== 256) throw new Error('Invalid sign planes');
-    const layout = roadSignPaintLayout(rows.map(line => ({ lines: [line] })));
+    if (typeof scale !== 'number' || !SIGN_SCALES.includes(scale)) throw new Error('Invalid sign scale');
+    const layout = roadSignPaintLayout(rows.map(line => ({ lines: [line] })), scale);
     if (layout.width * layout.height > 16 * 1024 * 1024) throw new Error('Worker sign plane too large');
     const context = new OffscreenCanvas(layout.width, layout.height).getContext('2d');
     if (context === null) throw new Error('Worker sign has no 2D canvas');

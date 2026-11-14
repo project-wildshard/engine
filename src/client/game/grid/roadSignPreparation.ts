@@ -3,12 +3,13 @@ import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { RoadSign } from '../../../shared/game/grid/roadLayout';
 import { coverageTable } from './roadSolid';
 import { roadSignPaintLayout, type RoadSignSource } from './roadSignPaint';
+import { roadSignScale } from './roadSignScale';
 
 export interface RoadSignPreparation { readonly ready: Promise<void>; readonly get: RoadSignSource; readonly release: () => void }
 /** One road bank's scoped coverage; exact original main-thread painting remains the fallback. */
 export function startRoadSigns(parent: Scope, allocator: ResidencyAllocator, home: string, signs: readonly RoadSign[], phase: 'initial' | 'outer' = 'initial'): RoadSignPreparation | undefined {
   if (typeof Worker !== 'function' || typeof OffscreenCanvas !== 'function' || parent.disposed || parent.disposing) return undefined;
-  const layout = roadSignPaintLayout(signs), rows = [...layout.lines.values()], signature = JSON.stringify(rows), count = layout.width * layout.height;
+  const layout = roadSignPaintLayout(signs, roadSignScale()), rows = [...layout.lines.values()], signature = JSON.stringify(rows), count = layout.width * layout.height;
   if (rows.length > 2048 || count > 16 * 1024 * 1024 || signature.length > 131072) return undefined;
   // Canvas + RGBA readback + final RG8 + conversion lookup; duplicated job text is bounded too.
   // T10: claimed at once: a stepped eviction here (6369cf2558, retired with the rest of it) kept the evicted world
@@ -38,8 +39,8 @@ export function startRoadSigns(parent: Scope, allocator: ResidencyAllocator, hom
     listeners.push(scope.listen(worker, 'messageerror', () => { failed('transfer failed'); }));
     deadline = scope.timeout(30_000, () => { failed('worker deadline'); });
     const colours = { from: '#0d6b3c', to: '#e9ebe6', blueFromRed: 0.45, sentinel: { v: 1.5, colour: '#6f7378' } };
-    worker.postMessage({ rows, red: coverageTable(colours, 0), green: coverageTable(colours, 1) }, { transfer: [] });
+    worker.postMessage({ rows, scale: layout.scale, red: coverageTable(colours, 0), green: coverageTable(colours, 1) }, { transfer: [] });
   } catch (error) { failed(error instanceof Error ? error.message : String(error)); }
-  return { ready, get: current => settled && current.width === layout.width && current.height === layout.height
+  return { ready, get: current => settled && current.width === layout.width && current.height === layout.height && current.scale === layout.scale
     && JSON.stringify([...current.lines.values()]) === signature ? plane : undefined, release: () => { scope.dispose(); } };
 }

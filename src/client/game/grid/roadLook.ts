@@ -15,7 +15,8 @@ import type { GridCell } from '../../../shared/game/grid/assembly';
 import { putRoadGrain, roadGrainSteps, type RoadGrainSource } from './roadGrain';
 import { packRoadSignPixels } from './roadSignPixels';
 import { paintRoadSignCanvas, roadSignPaintLayout, roadSignLineKey as lineKey, SIGN_LINE_W as LINE_W, SIGN_LINE_H as LINE_H, type RoadSignSource } from './roadSignPaint';
-import { ownRoadMesh } from './roadResources';
+import { ownRoadMesh, type RoadMapShare } from './roadResources';
+import { roadSignScale } from './roadSignScale';
 import { ROAD_SKY } from './frameModel';
 import { coverageMaterial, coverageTable, gpuOnlyTextureBytes, uniformPart, type CoverageColours, type SolidPart } from './roadSolid';
 import { bytePlan, cullIntoSteps, gpuOnlyRoad, meshBytesSteps, type CullSource, type RoadCuller } from './roadCull';
@@ -45,6 +46,8 @@ export interface RoadLookInput {
   readonly overlayLight?: RoadOverlayLight;
   /** Bind a source's shrink-only charge after its backing is durable. */
   readonly retireGeometry?: (mesh: Mesh, id: string, retainedBytes: number) => void;
+  /** PZ24: the road system's shared asphalt and junction maps (absent: each build paints its own) */
+  readonly maps?: RoadMapShare;
 }
 
 /**
@@ -370,20 +373,20 @@ const SIGN_BLUE_FROM_RED = 0.45;
 const signCoverage = (): CoverageColours => ({ from: SIGN_GREEN, to: WHITE, blueFromRed: SIGN_BLUE_FROM_RED, sentinel: { v: GREY_V - 0.5, colour: SIGN_GREY } });
 /** The atlas's layout, pure (its size and every uv), so the sign mesh and its byte plan never need the canvas. */
 interface SignAtlasLayout {
-  readonly keys: readonly string[]; readonly lines: ReadonlyMap<string, SignLine>; readonly width: number; readonly height: number;
+  readonly keys: readonly string[]; readonly lines: ReadonlyMap<string, SignLine>; readonly width: number; readonly height: number; readonly scale: number;
   readonly slot: (k: number) => [number, number];
   readonly cell: (line: SignLine) => readonly [number, number, number, number];
   readonly swatch: Readonly<Record<'green' | 'grey' | 'white', readonly [number, number]>>;
 }
-function signAtlasLayout(signs: readonly RoadSign[]): SignAtlasLayout {
-  const { keys, lines, width: W, height: H, slot } = roadSignPaintLayout(signs);
+function signAtlasLayout(signs: readonly RoadSign[], scale: number): SignAtlasLayout {
+  const { keys, lines, width: W, height: H, slot } = roadSignPaintLayout(signs, scale), cellW = LINE_W * scale, cellH = LINE_H * scale;
   const [sx, sy] = slot(keys.length); // swatches in the last cell
   const uv = (px: number, py: number): readonly [number, number] => [px / W, 1 - py / H];
   const index = new Map(keys.map((k, i) => [k, i]));
   return {
-    keys, lines, width: W, height: H, slot,
-    cell: (line) => { const [x, y] = slot(index.get(lineKey(line)) ?? 0); return [x / W, 1 - (y + LINE_H) / H, (x + LINE_W) / W, 1 - y / H]; },
-    swatch: { green: uv(sx + 32, sy + LINE_H / 2), grey: [0.5, GREY_V], white: uv(sx + 160, sy + LINE_H / 2) },
+    keys, lines, width: W, height: H, scale, slot,
+    cell: (line) => { const [x, y] = slot(index.get(lineKey(line)) ?? 0); return [x / W, 1 - (y + cellH) / H, (x + cellW) / W, 1 - y / H]; },
+    swatch: { green: uv(sx + 32 * scale, sy + cellH / 2), grey: [0.5, GREY_V], white: uv(sx + 160 * scale, sy + cellH / 2) },
   };
 }
 function signAtlasTexture(atlas: SignAtlasLayout, signs?: RoadSignSource): DataTexture {
@@ -433,6 +436,8 @@ interface TexturedSource {
   readonly overlay: boolean;
   /** GPU bytes per texel (4: an RGBA8 canvas; 2: the sign atlas's RG8 array) and what holds the texels until upload */
   readonly texelBytes: number; readonly source: 'canvas' | 'data';
+  /** PZ24: its map depends on the grain only, so every build of one road system shares one upload */
+  readonly shared: boolean;
   readonly material: (map: Texture) => MeshLambertMaterial;
 }
 // the map is the emissive map too, black until RoadOverlayLight lights it inside a cell (one program either way)
@@ -440,11 +445,11 @@ const overlayMaterial = (map: Texture): MeshLambertMaterial => new MeshLambertMa
 /** A texture painted in one stretch, as a paint step. */
 function* paintNow(paint: () => Texture): Generator<void, Texture> { yield; return paint(); }
 function texturedSources(layout: RoadLayout, home: GridCell, grain?: RoadGrainSource, signs?: RoadSignSource): TexturedSource[] {
-  const atlas = signAtlasLayout(layout.signs);
+  const atlas = signAtlasLayout(layout.signs, roadSignScale());
   return [
-    { id: 'road.asphalt', name: 'grid-asphalt', mesher: asphalt(layout, home), width: 1024, height: 512, paint: () => roadTextureSteps(grain), overlay: true, texelBytes: 4, source: 'canvas', material: overlayMaterial },
-    { id: 'road.junctions', name: 'grid-junctions', mesher: junctionAsphalt(layout, home), width: 1024, height: 1024, paint: () => junctionTextureSteps(grain), overlay: true, texelBytes: 4, source: 'canvas', material: overlayMaterial },
-    { id: 'road.signs', name: 'grid-signs', mesher: signMesher(layout.signs, home, atlas), width: atlas.width, height: atlas.height, paint: () => paintNow(() => signAtlasTexture(atlas, signs)), overlay: false, texelBytes: 2, source: 'data', material: (map) => coverageMaterial(map, signCoverage(), 'g227-grid-sign-cover') },
+    { id: 'road.asphalt', name: 'grid-asphalt', mesher: asphalt(layout, home), width: 1024, height: 512, paint: () => roadTextureSteps(grain), overlay: true, texelBytes: 4, source: 'canvas', shared: true, material: overlayMaterial },
+    { id: 'road.junctions', name: 'grid-junctions', mesher: junctionAsphalt(layout, home), width: 1024, height: 1024, paint: () => junctionTextureSteps(grain), overlay: true, texelBytes: 4, source: 'canvas', shared: true, material: overlayMaterial },
+    { id: 'road.signs', name: 'grid-signs', mesher: signMesher(layout.signs, home, atlas), width: atlas.width, height: atlas.height, paint: () => paintNow(() => signAtlasTexture(atlas, signs)), overlay: false, texelBytes: 2, source: 'data', shared: false, material: (map) => coverageMaterial(map, signCoverage(), 'g227-grid-sign-cover') },
   ];
 }
 
@@ -461,22 +466,26 @@ export function* installRoadLookSteps(input: RoadLookInput): Generator<void, Roa
   scene.add(group);
   scope.onDispose(() => { group.removeFromParent(); });
   for (const source of sources) {
+    const share = source.shared ? input.maps : undefined;
     const build = function* build(owner: LookScope): Generator<void, Mesh> {
       yield;
-      const map = yield* source.paint(), material = source.material(map);
+      const held = share?.take(source.id), map = held ?? (yield* source.paint()), material = source.material(map);
+      if (share !== undefined && held === undefined) share.hold(source.id, map);
       const mesh = new Mesh(source.mesher.geometry(), material);
-      ownRoadMesh(owner, mesh, [map]);
+      ownRoadMesh(owner, mesh, share === undefined ? [map] : []);
+      if (share !== undefined) owner.onDispose(() => { share.release(source.id, map); });
       mesh.name = source.name; if (source.overlay) { mesh.receiveShadow = true; input.overlayLight?.add(material, owner); }
       mesh.castShadow = false; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
       if (cull !== undefined) yield* cullIntoSteps(cull, mesh); else hook?.(mesh);
       group.add(mesh);
-      if (admission !== undefined) gpuOnlyRoad(mesh, [map]); // G144: admitted, its vertex arrays and canvas go on upload (nothing repaints it)
+      if (admission !== undefined) gpuOnlyRoad(mesh, held === undefined ? [map] : []); // G144: admitted, its vertex arrays and canvas go on upload (nothing repaints it)
       return mesh;
     };
     if (admission === undefined) yield* build(scope);
     else {
       const bytes = yield* meshBytesSteps([mesherSource(source.mesher)], ROAD_FLOATS, cull === undefined ? undefined : { pitch: cull.pitch, ...(cull.tileSize === undefined ? {} : { tileSize: cull.tileSize }) }, true);
-      const textures = gpuOnlyTextureBytes(source.width, source.height, 1, source.source, source.texelBytes);
+      // a shared map another build of this road already holds costs this build nothing (PZ24)
+      const textures = share?.has(source.id) === true ? { jsBytes: 0, gpuBytes: 0 } : gpuOnlyTextureBytes(source.width, source.height, 1, source.source, source.texelBytes);
       const plan = bytePlan(source.id, bytes, textures);
       const mesh = yield* allocateRenderSteps(admission, plan, build);
       if (mesh === undefined) throw new Error('Road construction cancelled');
