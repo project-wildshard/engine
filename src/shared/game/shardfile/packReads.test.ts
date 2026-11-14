@@ -29,8 +29,9 @@ test('complete phase keeps both size and hash refusals', async () => {
     const bad = { ...pack, hash: own };
     const phase = packReads([bad], new Set([a, b]), () => Promise.resolve(bytes), () => Promise.resolve(actual === hash ? own : actual));
     await expect(phase.read(a)).rejects.toThrow('Shardfile pack hash or size mismatch');
-    // PZ7: a pack with other bytes is remembered too, so its members read loose
-    expect(packMissing(bad)).toBe(true); expect(phase.has(a)).toBe(false);
+    // PZ7: a pack with other bytes is refused, never read around, and a repaired read may retry it
+    expect(packMissing(bad)).toBe(false); expect(phase.has(a)).toBe(true);
+    await expect(packOrLoose(() => phase.read(a), () => Promise.resolve(Uint8Array.of(1)))).rejects.toThrow('mismatch');
   }
 });
 

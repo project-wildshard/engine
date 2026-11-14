@@ -13,15 +13,20 @@ const missingPacks = new Set<string>();
 interface PackName { readonly hash: string; readonly bytes: number }
 const packKey = (pack: PackName): string => `${pack.hash}:${pack.bytes}`;
 const aborted = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError';
+/** a pack that came back wrong (other bytes, a partial or oversized response) is refused, never read around: the
+ *  corruption guards stand, and a repaired read may retry it. Only a pack that is gone (404, network) reads loose (PZ7). */
+const refused = (error: unknown): boolean => error instanceof Error && /mismatch|whole response|exceeds/u.test(error.message);
+/** whether a failed pack read means the pack is gone (PZ7): not an abort, not a refusal of its bytes */
+export function packGone(error: unknown): boolean { return !aborted(error) && !refused(error); }
 /** whether a read of `pack` failed earlier in this page (PZ7): read its members loose */
 export function packMissing(pack: PackName): boolean { return missingPacks.has(packKey(pack)); }
-/** remember a pack whose read failed for a reason other than an abort (PZ7) */
-export function markPackMissing(pack: PackName, error: unknown): void { if (!aborted(error)) missingPacks.add(packKey(pack)); }
-/** PZ7: a member from its pack, or from its loose blob when the pack is missing or its read fails (an abort still throws) */
+/** remember a pack that is gone (PZ7): its read failed for a reason other than an abort or a refusal of its bytes */
+export function markPackMissing(pack: PackName, error: unknown): void { if (packGone(error)) missingPacks.add(packKey(pack)); }
+/** PZ7: a member from its pack, or from its loose blob when the pack is gone; an abort or a refused pack still throws */
 export async function packOrLoose(read: () => Promise<Uint8Array>, loose: () => Promise<Uint8Array>): Promise<Uint8Array> {
   let bytes: Uint8Array;
   try { bytes = await read(); }
-  catch (error: unknown) { if (aborted(error)) throw error; return loose(); }
+  catch (error: unknown) { if (!packGone(error)) throw error; return loose(); }
   return bytes;
 }
 
@@ -53,10 +58,7 @@ export function readPackWhole(owner: object, pack: Pack,
     let wire: Uint8Array;
     try { wire = await read(pack.path, pack.bytes, pack.entries); }
     catch (error: unknown) { markPackMissing(pack, error); throw error; }
-    if (wire.length !== pack.bytes || await hash(wire) !== pack.hash) {
-      const error = new Error('Shardfile pack hash or size mismatch');
-      markPackMissing(pack, error); throw error;
-    }
+    if (wire.length !== pack.bytes || await hash(wire) !== pack.hash) throw new Error('Shardfile pack hash or size mismatch');
     return wire;
   })();
   held.set(key, bytes); common.set(key, { pending: bytes }); forget(bytes);

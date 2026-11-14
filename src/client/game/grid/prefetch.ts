@@ -25,7 +25,7 @@ import type { OfflineDownloadEnd } from '@wildshard/engine/ui/offlineDownload';
 import { hasCachedAsset, cacheAsset } from '../shardfile/assetCache';
 import { builtIndexHash, builtIndexHashes } from '@wildshard/format/builtIndexes';
 import { readPrefetchIndex } from './prefetchIndex';
-import { markPackMissing, packMissing } from '../../../shared/game/shardfile/packReads';
+import { markPackMissing, packGone, packMissing } from '../../../shared/game/shardfile/packReads';
 import type { GridAssembly } from '../../../shared/game/grid/assembly';
 import {TIER, MOBILE_DEVICE, type Tier} from '@wildshard/engine/core/tier';
 import { prefetchRing } from './titleOrder';
@@ -187,7 +187,7 @@ class GridPrefetch {
       if (packMissing(pack)) { loose.push(...members); continue; }
       try { await this.pack(pack, members, base, { holds, keepAsset }, quota); }
       catch (error: unknown) {
-        if (error instanceof Error && error.name === 'AbortError') throw error;
+        if (!packGone(error)) throw error; // an abort, or a pack refused for its bytes
         markPackMissing(pack, error); loose.push(...members);
       }
     }
