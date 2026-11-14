@@ -37,6 +37,7 @@
 //
 //   scripts/browser-lane.sh node scripts/offline-proof.mjs [--channel=staging|preview|both] [--mode=offline|slow|nobackend]
 //       [--shard=<slug>[,<slug>]] [--entry=deck|resume|both] [--jobs=<n>] [--base=<served build>] [--out=<dir>] [--require-world] [--staging-port=<n>] [--one-origin] [--cells=<n>] [--cold] [--report]
+//   --real (OF18): with --base=https://staging.wildshard.io, the staging channel loads that site itself; never prod.
 //   scripts/browser-lane.sh node scripts/offline-proof.mjs --walkthrough <slug> [--base=…] [--out=…] [--report]
 // With no `--base` it builds this working tree with scripts/serve-build.sh and stops that server at the end. `--jobs` above 1
 // gives each shard its own profile (one profile can't hold two browsers), which trades the shared-device shape for time.
@@ -82,6 +83,10 @@ const report = argv.includes('--report');
 const cold = argv.includes('--cold');
 /** OF12: both channels on one origin and one profile (see above). */
 const oneOrigin = argv.includes('--one-origin');
+/** OF18 `--real`: the staging channel is the `--base` site itself (real staging's own documents, world stamp, release file and packs),
+ *  never the stamping proxy, whose 127.0.0.1 origin real staging's packs refuse (no CORS). The world door is still the stand-in. */
+const real = argv.includes('--real');
+if (real && (option('base') === undefined || oneOrigin)) throw new Error('--real needs --base=<the staging site> and no --one-origin');
 if (oneOrigin && (jobs !== 1 || walkthrough !== undefined)) throw new Error('--one-origin runs one profile: --jobs=1, no --walkthrough');
 const out = resolvePath(ROOT, option('out') ?? join('tmp', 'offline-proof', new Date().toISOString().replaceAll(/[:.]/gu, '-')));
 mkdirSync(out, { recursive: true });
@@ -115,6 +120,7 @@ if (base === undefined) {
   process.once('SIGINT', () => { spawnSync('bash', ['scripts/serve-build.sh', 'stop', builtPort], { cwd: ROOT, stdio: 'ignore' }); process.exit(130); });
 }
 const upstream = new URL(base);
+if (real && upstream.origin === CHANNELS.production.origin) throw new Error('--real never runs against prod (OF18)');
 const version = /** @type {{ build: string }} */ (await (await fetch(new URL('/version.json', upstream))).json());
 log('build', version.build, 'at', upstream.origin);
 
@@ -187,7 +193,7 @@ await new Promise((resolve, reject) => { stamper.once('error', reject); stamper.
 const stamperAddress = stamper.address();
 if (stamperAddress === null || typeof stamperAddress === 'string') throw new Error('offline-proof: the stamping server has no port');
 /** @type {Record<Channel, string>} */
-const ORIGINS = { preview: oneOrigin ? `http://127.0.0.1:${String(stamperAddress.port)}` : upstream.origin, staging: `http://127.0.0.1:${String(stamperAddress.port)}` };
+const ORIGINS = { preview: oneOrigin ? `http://127.0.0.1:${String(stamperAddress.port)}` : upstream.origin, staging: real ? upstream.origin : `http://127.0.0.1:${String(stamperAddress.port)}` };
 STAMP = `globalThis.__WS_WORLD__=${JSON.stringify({ release: `${ORIGINS.staging}${RELEASE_PATH}`, key: RELEASE_PUBLIC_KEY })};`;
 
 /** A free loopback port for a browser's own DevTools endpoint. */
