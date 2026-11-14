@@ -349,6 +349,7 @@
     "src/client/engine/render/families/painterly.ts": "client",
     "src/client/engine/render/families/pbr.ts": "client",
     "src/client/engine/render/families/registry.ts": "client",
+    "src/client/engine/render/families/sceneSurface.ts": "client",
     "src/client/engine/render/families/toon.ts": "client",
     "src/client/engine/render/fogPatches.ts": "client",
     "src/client/engine/render/frameCounter.ts": "client",

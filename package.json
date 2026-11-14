@@ -531,6 +531,7 @@
     "./world/csmLightBlock": "./src/client/engine/world/csmLightBlock.ts",
     "./world/shadowFilter": "./src/client/engine/world/shadowFilter.ts",
     "./render/families/registry": "./src/client/engine/render/families/registry.ts",
+    "./render/families/sceneSurface": "./src/client/engine/render/families/sceneSurface.ts",
     "./render/families/toon": "./src/client/engine/render/families/toon.ts",
     "./render/hoverboardGeometry": "./src/client/engine/render/hoverboardGeometry.ts",
     "./render/graph/colourFunction": "./src/client/engine/render/graph/colourFunction.ts",

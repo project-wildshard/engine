@@ -16,6 +16,7 @@ import { parseFamilyMaterial, type FamilyMaterialParams } from '@wildshard/forma
 import { compileEmissive, type EmissiveLook } from './emissive';
 import { compilePainterly, type PainterlyLook } from './painterly';
 import { compilePbr, type TextureResolver } from './pbr';
+import { applySceneEmissive, applySceneSurface } from './sceneSurface';
 import { updateGround } from './ground';
 import { compileToon, type ToonLook } from './toon';
 
@@ -39,13 +40,21 @@ const live = new Map<THREE.Material, FamilyMaterialParams>();
 
 function compile(params: FamilyMaterialParams, ctx: FamilyContext): THREE.Material {
   if (params.family === 'toon') return compileToon(params, ctx.toon);
-  if (params.family === 'pbr') return compilePbr(params, ctx.textures, ctx.emitterPools);
+  if (params.family === 'pbr') {
+    // SHARD-SOURCE AP10, AP12: a scene's alpha, decal offset, sway and uv scroll, on the emissive look's clock
+    const m = compilePbr(params, ctx.textures, ctx.emitterPools);
+    applySceneSurface(m, params, ctx.emissive?.uniforms.famEmitTime);
+    return m;
+  }
   if (params.family === 'painterly') {
     if (ctx.painterly === undefined) throw new Error('material family: a painterly entry needs a painterly look in its family context');
     return compilePainterly(params, ctx.painterly, ctx.textures);
   }
   if (ctx.emissive === undefined) throw new Error('material family: an emissive entry needs an emissive look in its family context');
-  return compileEmissive(params, ctx.emissive, ctx.textures);
+  const m = compileEmissive(params, ctx.emissive, ctx.textures);
+  // SHARD-SOURCE AP11, AP12: alpha cards, camera-facing cards and their declared motion
+  applySceneEmissive(m, params, ctx.emissive.uniforms.famEmitTime);
+  return m;
 }
 
 /**

@@ -23,6 +23,7 @@ import { materialGraphIr } from '@wildshard/format/materials';
 import { FAMILY_IDS } from '@wildshard/format/materialFamilies';
 import { propMaterialSlots, propSlotUse, type PropMaterials, type PropTextureSlot } from '@wildshard/format/propMaterials';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import { sceneSurfaceChannels } from '@wildshard/engine/render/families/sceneSurface';
 
 const WRAPS: Readonly<Record<number, Wrapping>> = { 33071: ClampToEdgeWrapping, 33648: MirroredRepeatWrapping, 10497: RepeatWrapping };
 const MAG: Readonly<Record<number, MagnificationTextureFilter>> = { 9728: NearestFilter, 9729: LinearFilter };
@@ -90,7 +91,9 @@ export async function propSurfaces(materials: PropMaterials, ports: {
       for (const [slot, value] of slots) { const param = params[slot]; if (param?.type !== 'texture' && slot === 'colour' && graphUsesMeshMap(graph)) continue; if (param?.type !== 'texture') throw new Error(`props material "${name}": graph ${row.id} has no texture param ${slot}`); params[slot] = { ...param, value: value.file }; }
       material = ownedGraph(ports.compile({ family: 'graph', graph: { ...graph, params } }), `${row.id}:${name}`);
     } else material = base(row.id);
-    resolved.set(name, { material, maps });
+    // SHARD-SOURCE AP11, AP12: a card reads its corners and a swaying surface its sway from their GLB channels
+    const channels = sceneSurfaceChannels(entry);
+    resolved.set(name, { material, maps, ...(channels === null ? {} : { channels }) });
   }
   return (name) => {
     const binding = resolved.get(name);

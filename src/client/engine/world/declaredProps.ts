@@ -189,8 +189,10 @@ export async function installDeclaredProps(props: DeclaredProps, ports: {
         // TEMPLATE-E2E LF1-2: an unlit (emissive) surface is its declared colour × intensity, so it takes the mesh's
         // vertex colours only when it declares them: a lamp baked grey beside measure stone still glows its own amber
         const unlit = base instanceof MeshBasicMaterial;
+        const seeThrough = base.userData['sceneAlpha'] === true;
         const m = acquireVariant(base, { colour: glb?.color ?? null, roughness: standard?.roughness ?? null, metalness: standard?.metalness ?? null, map: undefined, vertexColours: unlit ? base.vertexColors && vertexColours : vertexColours, flat,
-          side: source?.side ?? base.side, transparent: source?.transparent ?? base.transparent, opacity: source?.opacity ?? base.opacity,
+          // SHARD-SOURCE AP10: a see-through family entry (`blend: 'alpha'`, an alpha card) stays see-through whatever the GLB says
+          side: source?.side ?? base.side, transparent: seeThrough || (source?.transparent ?? base.transparent), opacity: seeThrough ? base.opacity : source?.opacity ?? base.opacity,
           named: { maps: binding.maps, emissive: glb?.emissive ?? null } });
         source?.dispose(); held.push(m); bases.set(m, base); return m;
       };
