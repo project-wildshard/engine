@@ -18,3 +18,6 @@
   travel's welcome. Each worker's `booted` names its cells whose entryways stand; the door tells the other roads (`open`),
   which drop their walls round them. `test/dedicated-cross-worker.test.ts`: Driftwood to Nalati on the other worker and back,
   no redial; red with the roads left walled.
+- GC8, first half: the grid's state names the `cell` step the loading screen shows now (`cellStep`, from `CellLoading.now`),
+  and the walk proof and the tour sample it, so each step's time on screen is measured per crossing once preview and
+  staging serve this build. Before, the state named only the waiting cell.

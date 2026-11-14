@@ -74,6 +74,8 @@ export class CellLoading {
   /** the step shown: a running hook's own step, else the furthest reached (a region learns it has hooks only when they
    *  start, so between hooks a row never goes back) */
   private reached = -1;
+  /** GC8: the step the screen shows now and its detail, for a harness to time each step (null while closed). */
+  private shown: { readonly step: string; readonly detail: string } | null = null;
   /** `known`: whether the waiting cell is one of this session's neighbours (no screen for one that is not) */
   constructor(private readonly screen: CellLoadingScreen, private readonly known: (instance: string) => boolean) {}
   /** Show, step or hide the screen from this cell's live state (null: no cell is waiting). */
@@ -90,16 +92,19 @@ export class CellLoading {
     }
     const rows = path.map((row, i): CellLoadingRow => ({ label: row.label, state: i < this.reached ? 'done' : i === this.reached ? 'now' : 'next' }));
     const detail = step.kind === 'step' ? step.detail : '';
-    this.screen.show({ instance: input.instance, name: input.name, step: path[Math.max(0, this.reached)]?.key ?? '', rows, detail,
+    this.shown = { step: path[Math.max(0, this.reached)]?.key ?? '', detail };
+    this.screen.show({ instance: input.instance, name: input.name, step: this.shown.step, rows, detail,
       failed: step.kind === 'failed' ? step.reason : null });
   }
   /** The screen's cell (null: none shown). */
   get open(): string | null { return this.instance; }
   /** NET-LAG NL7: the row the screen shows running now (its label), null when none is shown: a proof times each stage. */
   get stage(): string | null { return this.instance === null || this.reached < 0 ? null : loadingPath('cell').steps[this.reached]?.label ?? null; }
+  /** GC8: the step shown now and its detail, or null. */
+  get now(): { readonly step: string; readonly detail: string } | null { return this.instance === null ? null : this.shown; }
   /** Hide the screen: `entered`, the cell is ready (the card completes and fades); else it was left or cancelled. */
   close(entered = false): void {
-    const was = this.instance; this.instance = null; this.reached = -1;
+    const was = this.instance; this.instance = null; this.reached = -1; this.shown = null;
     if (was !== null) this.screen.hide(entered);
   }
 }
