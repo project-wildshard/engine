@@ -198,6 +198,23 @@ export async function finishPlayProfile(page, session, fromPageMs) {
   const { profile } = await session.send('Profiler.stop');
   await session.detach().catch(() => undefined);
   // the clock mark's own 30 ms of busy work ends the window
-  const stall = playStall(profileBusy(profile, profileAnchor(profile, markPageMs)), fromPageMs, markPageMs);
-  return { stall, faults: playStallFaults(stall) };
+  const anchor = profileAnchor(profile, markPageMs), stall = playStall(profileBusy(profile, anchor), fromPageMs, markPageMs);
+  return { stall, faults: playStallFaults(stall), leaves: busiestLeaves(profile, anchor, fromPageMs + stall.from, STALL_WINDOW_MS) };
+}
+
+/** The leaves that held a window of a profile, most sampled first, as `name (file) ms` (at most three): what a stall was.
+ * @param {CpuProfile & { nodes: readonly { id: number, callFrame: { functionName: string, url?: string } }[] }} profile
+ * @param {{ pageMs: number, profileUs: number }} anchor @param {number} at @param {number} width @returns {string[]} */
+export function busiestLeaves(profile, anchor, at, width) {
+  const byId = new Map(profile.nodes.map(node => [node.id, node.callFrame])), held = new Map();
+  const samples = profile.samples ?? [];
+  let us = profile.startTime;
+  const times = (profile.timeDeltas ?? []).map(delta => (us += delta));
+  for (let i = 0; i + 1 < samples.length; i++) {
+    const start = anchor.pageMs + ((times[i] ?? 0) - anchor.profileUs) / 1000, end = anchor.pageMs + ((times[i + 1] ?? 0) - anchor.profileUs) / 1000;
+    if (end <= at || start >= at + width) continue;
+    const frame = byId.get(samples[i] ?? -1), name = frame === undefined ? '?' : `${frame.functionName || '(anonymous)'}${frame.url ? ` (${frame.url.split('/').pop()})` : ''}`;
+    held.set(name, (held.get(name) ?? 0) + Math.min(end, at + width) - Math.max(start, at));
+  }
+  return [...held].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, ms]) => `${name} ${Math.round(ms)} ms`);
 }

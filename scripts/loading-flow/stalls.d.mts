@@ -48,4 +48,6 @@ export function playStall(busy: readonly Span[], from: number, to: number): Play
 /** A play stall at or over the share, as a fault line. */
 export function playStallFaults(stall: PlayStall): string[];
 /** End a play profile: play's worst window from `fromPageMs` and its fault. */
-export function finishPlayProfile(page: Page, session: CDPSession, fromPageMs: number): Promise<{ stall: PlayStall; faults: string[] }>;
+export function finishPlayProfile(page: Page, session: CDPSession, fromPageMs: number): Promise<{ stall: PlayStall; faults: string[]; leaves: string[] }>;
+/** The leaves that held a window of a profile, most sampled first (at most three), as `name (file) ms`. */
+export function busiestLeaves(profile: CpuProfile, anchor: { pageMs: number; profileUs: number }, at: number, width: number): string[];

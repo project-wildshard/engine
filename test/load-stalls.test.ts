@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { busiestWindow, CLOCK_MARK, idleWithin, PLAY_BUSY_SHARE, playStall, playStallFaults, profileAnchor, profileBusy, profileIdle, stageStalls, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from '../scripts/loading-flow/stalls.mjs';
+import { busiestLeaves, busiestWindow, CLOCK_MARK, idleWithin, PLAY_BUSY_SHARE, playStall, playStallFaults, profileAnchor, profileBusy, profileIdle, stageStalls, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from '../scripts/loading-flow/stalls.mjs';
 
 // NINE-DRAGON-BENCHMAX NB6: the ring-1 boot smoke's props stall ratchet (scripts/loading-flow/stalls.mjs)
 const props = (start: number, ms: number) => ({ operation: 'stage:props', realm: 'page', start, end: start + ms });
@@ -69,4 +69,11 @@ test('play busy keeps script, the clock read and the collector, and leaves out i
     samples: [2, 5, 3, 1, 4, 7, 8, 2, 6], timeDeltas: [0, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000], startTime: 0, endTime: 40_000 };
   // page clock = profile clock (the mark's first sample at 40 ms)
   expect(profileBusy(profile, profileAnchor(profile, 40))).toEqual([{ start: 0, end: 10 }, { start: 30, end: 40 }]);
+});
+
+test('a window\'s leaves name what held it, most first', () => {
+  const profile = { nodes: [{ id: 1, callFrame: { functionName: 'step', url: 'https://x/game.js' } }, { id: 2, callFrame: { functionName: '(idle)', url: '' } },
+    { id: 3, callFrame: { functionName: CLOCK_MARK, url: 'https://x/a.js' } }],
+    samples: [1, 1, 2, 1, 3], timeDeltas: [0, 5000, 5000, 5000, 5000], startTime: 0, endTime: 25_000 };
+  expect(busiestLeaves(profile, profileAnchor(profile, 20), 0, 20)).toEqual(['step (game.js) 15 ms', '(idle) 5 ms']);
 });

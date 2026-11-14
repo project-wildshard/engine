@@ -226,7 +226,7 @@ try {
       const frame = await page.evaluate(`(${sampleFrames.toString()})(${frames})`);
       if (stallSession !== null) {
         const read = await finishPlayProfile(page, stallSession, stallFrom);
-        console.log(`  ${pose.name.padEnd(22)} play stall: worst ${(read.stall.busyMs / 1000).toFixed(2)} s busy of a 1.5 s window${read.faults.length === 0 ? '' : ` · ${read.faults.join('; ')}`}`);
+        console.log(`  ${pose.name.padEnd(22)} play stall: worst ${(read.stall.busyMs / 1000).toFixed(2)} s busy of a 1.5 s window${read.faults.length === 0 ? '' : ` · ${read.faults.join('; ')} · ${read.leaves.join(', ')}`}`);
         if (read.faults.length > 0) process.exitCode = 1;
       }
       if (cdp !== null && values.profile !== undefined) { const { profile } = await cdp.send('Profiler.stop'); writeFileSync(join(values.profile, `${shardName}-${pose.name}.cpuprofile`.replaceAll(/[^\w.-]+/gu, '_')), JSON.stringify(profile)); }

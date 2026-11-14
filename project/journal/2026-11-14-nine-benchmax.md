@@ -25,3 +25,6 @@
 - First land's CI: ring 1 flagged sunscar-dunes 15 s into play (frames 2.4 s apart on SwiftShader): a WebGL wait the named
   list missed (a link finishing under a getter). Play busy now counts only script leaves, `now` and the collector; every
   other native is the browser's or the GPU's. The 2 s busy loop is script and `now`, so it still trips.
+- Second land's CI flagged blender-template too, all script leaves: with frames 1-2.4 s apart on SwiftShader, play's
+  main thread really does run 1.5 s of script (catch-up, not a sleep). Ring 1's play check is report only: it prints the
+  window's top leaves for the next look. Desktop enforces it (`deskbench --capped --stalls`); props still fails Ring 1.
