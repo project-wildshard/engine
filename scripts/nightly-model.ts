@@ -24,7 +24,9 @@ export const read = (path: string): unknown => JSON.parse(readFileSync(path, 'ut
 export function plan(root = process.cwd()): Plan {
   const {shards} = read(`${root}/test/pins/shardfiles.json`) as {shards: Head[]};
   const tests = read(`${root}/test/pins/ring-2-tests.json`) as string[];
-  if (shards.length !== 28 || new Set(shards.map(row => row.slug)).size !== 28) throw new Error('Ring 2 requires 28 distinct pinned heads');
+  // Every pinned head, none twice. The count follows the pins file: a hard 28 turned every night red for days after
+  // `8f613824` dropped open-plot-showcase-template (27 heads, 2026-11-13).
+  if (shards.length === 0 || new Set(shards.map(row => row.slug)).size !== shards.length) throw new Error('Ring 2 requires distinct pinned heads');
   if (shards.some(row => !/^[a-z0-9-]+$/u.test(row.slug) || !/^[a-f0-9]{64}$/u.test(row.hash))) throw new Error('Unsafe pinned head');
   if (tests.length === 0 || new Set(tests).size !== tests.length) throw new Error('Empty or duplicate Ring 2 list');
   const heads = [...shards].sort((a, b) => a.slug.localeCompare(b.slug));
