@@ -8,6 +8,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { dirname, resolve } from "node:path";
 import { bakeAssetTables, writeAssetTables } from "./app-build/assetTables.mjs";
 import { writeChunkReport } from "./app-build/chunkReport.mjs";
+import { writeTitlePreloads } from "./app-build/titlePreloads.mjs";
 import { bakeGridSeams, writeGridSeams } from "./app-build/gridSeams.mjs";
 import { checkNoTopLevelAwait } from "./app-build/noTopLevelAwait.mjs";
 import { checkImportMaps } from "./app-build/importMap.mjs";
@@ -141,7 +142,10 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   // vite/chunkReport.ts); then the boot module bank into index.html and each home's extra file table (was
   // vite/bootModules.ts), and the spawn parts' q11 Brotli bodies (DL15, cached by content).
   try {
-    writeChunkReport(outDir, process.cwd());
+    const report = writeChunkReport(outDir, process.cwd());
+    // PZ18: the title's static closure is preloaded with the entry's own chunks, so the title costs no round trip after it
+    const preloads = writeTitlePreloads(outDir, report);
+    console.log(`title preloads: ${preloads.length} chunks (${preloads.map((file) => file.split("/").pop()).join(", ")})`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     throw new AppBuildFailureError(1);
