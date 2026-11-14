@@ -294,7 +294,8 @@ workerScope.listen(self, 'activate', event => {
     }
     await carryNetworkFirst().catch(() => undefined);
     // OF12: only this channel's older shells (and production's legacy caches) go. Another channel's worker on this origin
-    // also drops the caches it kept under production's names before OF12, once, unless production runs here too.
+    // also drops every cache under production's names (its own from before OF12, and the legacy ws-content-v0) on each
+    // activate, unless production runs here too; nothing on this channel writes them again, so in effect it happens once.
     const productionHere = CHANNEL !== 'production' && await caches.has(PRODUCTION_MARK);
     for (const name of await caches.keys()) {
       if (name === SHELL || name === PRODUCTION_MARK) continue;
