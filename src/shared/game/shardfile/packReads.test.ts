@@ -25,9 +25,12 @@ test('complete phases verify once and return exact detached members', async () =
 });
 
 test('complete phase keeps both size and hash refusals', async () => {
-  for (const [bytes, actual] of [[Uint8Array.of(1, 2, 3), hash], [Uint8Array.of(1, 2, 3, 4), a]] as const) {
-    const phase = packReads([pack], new Set([a, b]), () => Promise.resolve(bytes), () => Promise.resolve(actual));
+  for (const [bytes, actual, own] of [[Uint8Array.of(1, 2, 3), hash, '7'.repeat(64)], [Uint8Array.of(1, 2, 3, 4), a, '8'.repeat(64)]] as const) {
+    const bad = { ...pack, hash: own };
+    const phase = packReads([bad], new Set([a, b]), () => Promise.resolve(bytes), () => Promise.resolve(actual === hash ? own : actual));
     await expect(phase.read(a)).rejects.toThrow('Shardfile pack hash or size mismatch');
+    // PZ7: a pack with other bytes is remembered too, so its members read loose
+    expect(packMissing(bad)).toBe(true); expect(phase.has(a)).toBe(false);
   }
 });
 

@@ -95,6 +95,7 @@ try {
   let index;
   if (o.card !== undefined) index = Number(o.card);
   else { const { loadingCardIndex } = await import(pathToFileURL(join(o.root, 'scripts/loading-benchmark/catalogue.mjs')).href); index = loadingCardIndex(titles, o.shard); }
+  if (!Number.isInteger(index) || index < 0 || index >= titles.length) throw new Error(`No deck card ${String(o.card ?? o.shard)} (index ${index} of ${titles.length})`);
   result.card = { index, title: titles[index] ?? null, of: titles.length };
   // the dots are positional (no data-i on them since the deck redesign); the card keeps its data-i
   await page.locator('.ws-menu-dots i').nth(index).click();

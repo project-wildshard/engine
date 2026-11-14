@@ -9,7 +9,7 @@
 import {existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, rmdirSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {classify, shardNames} from '../page-size.mjs';
+import {carriedPaths, classify, shardNames} from '../page-size.mjs';
 
 /** The content tree beside a page: `dist` → `dist-content`. @param {string} dist */
 export const contentDirOf = dist => `${resolve(dist)}-content`;
@@ -68,7 +68,9 @@ export function splitOutput(dist, content = contentDirOf(dist)) {
   const root = resolve(dist), target = resolve(content), mark = join(root, SPLITTING);
   disjoint(root, target);
   if (!existsSync(join(root, 'index.html'))) throw new Error(`splitOutput: ${root} holds no index.html; give a built page`);
-  const shards = shardNames(root), rows = files(root).filter(row => row.path !== SPLITTING && isContent(row.path, shards));
+  // a kept build's content (MF2 carry, PZ5: an unmarked build reads it from the page) stays on the page until it ages out
+  const carried = carriedPaths(root)?.paths ?? new Set();
+  const shards = shardNames(root), rows = files(root).filter(row => row.path !== SPLITTING && !carried.has(row.path) && isContent(row.path, shards));
   if (rows.length > 0) {
     if (!existsSync(mark)) rmSync(target, {recursive: true, force: true});
     writeFileSync(mark, '');

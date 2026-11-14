@@ -53,7 +53,10 @@ export function readPackWhole(owner: object, pack: Pack,
     let wire: Uint8Array;
     try { wire = await read(pack.path, pack.bytes, pack.entries); }
     catch (error: unknown) { markPackMissing(pack, error); throw error; }
-    if (wire.length !== pack.bytes || await hash(wire) !== pack.hash) throw new Error('Shardfile pack hash or size mismatch');
+    if (wire.length !== pack.bytes || await hash(wire) !== pack.hash) {
+      const error = new Error('Shardfile pack hash or size mismatch');
+      markPackMissing(pack, error); throw error;
+    }
     return wire;
   })();
   held.set(key, bytes); common.set(key, { pending: bytes }); forget(bytes);

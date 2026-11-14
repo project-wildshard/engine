@@ -133,7 +133,12 @@ test('--content publishes the content set before the packs and the page (PAGE-SI
 test('PZ6: a --content build whose page has no content base is refused', async () => {
   const {deps} = rig();
   deps.content = {publish: () => Promise.reject(new Error('unreached'))};
+  const envs: Record<string, string>[] = [];
+  const run = deps.run;
+  deps.run = (file, args, env) => { envs.push(env); run(file, args, env); };
   await expect(runPhase('build', deps)).rejects.toThrow(/index\.html content base is missing/u);
+  // PZ5: the build marks its kept-build graph `content: true`, so the next release carries its code only
+  expect(envs[0]?.['WS_CONTENT_BASE']).toBe('https://packs.wildshard.io/content/');
 });
 
 test('the build bakes the channel release file from packs.wildshard.io', async () => {

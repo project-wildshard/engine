@@ -98,3 +98,16 @@ test('the CLI splits, gates and joins', () => {
   expect(whole.status).toBe(1);
   expect(whole.stderr).toContain(`dist/ holds ${CONTENT.length} content files`);
 });
+
+test('a kept build\'s content stays on the page (its tabs read it there) and the gate lets it pass', () => {
+  const dist = fixture(), old = 'assets/boot-tables-87654321.json';
+  writeFileSync(join(dist, old), 'old tables');
+  writeFileSync(join(dist, 'deploy-chunks.json'), JSON.stringify({format: 2, builds: [
+    {build: 'new', files: [{path: 'b/c/main-aaaaaaaa.js', bytes: 1}]},
+    {build: 'old', files: [{path: old, bytes: 10}]},
+  ]}));
+  splitOutput(dist);
+  expect(existsSync(join(dist, old))).toBe(true);
+  expect(tree(contentDirOf(dist))).toEqual([...CONTENT].sort());
+  expect(gatePage(pageSize(dist))).toEqual([]);
+});

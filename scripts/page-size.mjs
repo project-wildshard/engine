@@ -152,7 +152,8 @@ export const PAGE_LIMITS = Object.freeze({files: 1000, bytes: 100e6});
 export function gatePage(report, limits = PAGE_LIMITS) {
   const errors = [], zero = tally(), maps = report.kinds.maps ?? zero;
   const content = [report.kinds['shard content'] ?? zero, report.kinds['engine art'] ?? zero];
-  const contentFiles = content.reduce((sum, row) => sum + row.files, 0), contentBytes = content.reduce((sum, row) => sum + row.bytes, 0);
+  // a kept build's content stays on the page until it ages out (splitOutput): only this build's content is refused
+  const contentFiles = content.reduce((sum, row) => sum + row.files - row.carriedFiles, 0), contentBytes = content.reduce((sum, row) => sum + row.bytes - row.carriedBytes, 0);
   if (contentFiles > 0) errors.push(`page-size gate: dist/ holds ${n(contentFiles)} content files (${mb(contentBytes)} MB); shard content and engine art go to dist-content/ (node scripts/app-build/splitOutput.mjs)`);
   const pageFiles = report.total.files - maps.files, bytes = report.total.bytes - maps.bytes;
   if (pageFiles > limits.files) errors.push(`page-size gate: the page holds ${n(pageFiles)} files, past the ${n(limits.files)} a page may hold (PAGE-SIZE D1)`);

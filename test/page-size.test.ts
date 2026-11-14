@@ -115,7 +115,8 @@ test('the gate (PZ4, D1 yes) refuses content on the page and a page above 1,000 
   expect(PAGE_LIMITS).toEqual({files: 1000, bytes: 100_000_000});
   const errors = gatePage(report);
   expect(errors).toHaveLength(1);
-  expect(errors[0]).toContain('dist/ holds 26 content files');
+  // 26 content files, one of them the carried build's old manifest, which stays on the page (splitOutput keeps it)
+  expect(errors[0]).toContain('dist/ holds 25 content files');
   const zero = {files: 0, bytes: 0, carriedFiles: 0, carriedBytes: 0};
   const page = (files: number, bytes: number, maps = zero) => ({...report, total: {...zero, files: files + maps.files, bytes: bytes + maps.bytes},
     kinds: {code: {...zero, files, bytes}, maps, 'shard content': zero, 'engine art': zero}});

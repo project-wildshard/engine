@@ -266,7 +266,7 @@ export async function copyFromSets({set, missing, store, origin, log, sleep}) {
  * @returns {{sets: () => Promise<string[]>, copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>, put: (puts: readonly Put[]) => Promise<void>, secrets: string[], close: () => void} | undefined}
  */
 export function r2Copies(env) {
-  const account = env.R2_ACCOUNT_ID, accessKeyId = env.R2_PACKS_ACCESS_KEY_ID, secretAccessKey = env.R2_PACKS_SECRET_ACCESS_KEY;
+  const account = env.R2_ACCOUNT_ID?.trim(), accessKeyId = env.R2_PACKS_ACCESS_KEY_ID?.trim(), secretAccessKey = env.R2_PACKS_SECRET_ACCESS_KEY?.trim();
   if (account === undefined || accessKeyId === undefined || secretAccessKey === undefined || account === '' || accessKeyId === '' || secretAccessKey === '') return undefined;
   if (!/^[0-9a-f]{32}$/u.test(account)) throw new Error('Invalid R2_ACCOUNT_ID');
   const client = new S3Client({region: 'auto', endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials: {accessKeyId, secretAccessKey}});

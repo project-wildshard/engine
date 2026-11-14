@@ -146,7 +146,10 @@ export async function runPhase(phase, deps) {
     for (const line of deps.host.describe('prepare', context)) plan(line);
     if (!dry) await deps.host.prepare(context);
     plan(`run pnpm build:game with ${channel.solo ? 'no release file (solo)' : `WILDSHARD_RELEASE_URL=${env.WILDSHARD_RELEASE_URL}`} WILDSHARD_CATALOGUE=${env.WILDSHARD_CATALOGUE} WS_BUILD_ID=${deps.build} WS_CHANNEL=${channel.channel}`);
-    if (!dry) deps.run('pnpm', ['build:game'], {...env, ...deps.host.buildEnv(context)});
+    // PZ5/PZ6: a build that publishes its content names its code only in deploy-chunks.json (`content: true`), so the
+    // next release carries its code only (app-build-pipeline.mjs reads WS_CONTENT_BASE)
+    const contentEnv = deps.content === undefined ? {} : {WS_CONTENT_BASE: `${PACKS_ORIGIN}/content/`};
+    if (!dry) deps.run('pnpm', ['build:game'], {...env, ...contentEnv, ...deps.host.buildEnv(context)});
     // PAGE-SIZE PZ4: build:game splits the page (dist/) from its content (dist-content/). A release that publishes its
     // content (--content, PZ6) stamps the set's base into the page and keeps the split; one that doesn't joins the two, so
     // the page serves its own content.
