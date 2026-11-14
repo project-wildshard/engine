@@ -45,14 +45,18 @@ export async function bakeWorldMapAtlas(products: readonly string[], read: (slug
 }
 
 /** One up-front map asset from all grid placements, shared by public and Developer, over the built products (was
- *  vite/worldMapAtlas.ts's config hook): scripts/build-app.mjs runs it after the generators. */
+ *  vite/worldMapAtlas.ts's config hook): scripts/build-app.mjs runs it after the generators. The grid's cells and every
+ *  built placement: a released page adds cells from the signed placement file (placedCells.ts), mostly listed shards
+ *  (QA-FEEDBACK 2026-11-13 row 44: open-plot-thin-ice had no tile). A placement this build didn't make, or a shard carded
+ *  from the API after it (SA46), gets no tile: the page draws that cell's own map instead (minimapBlend.ts fullMapOverlay). */
 export async function writeWorldMapAtlas(root: string): Promise<void> {
-  const row = v.object({ slug: v.string() }), catalogue = v.parse(v.object({ grid: v.object({ cells: v.array(row) }) }),
-    JSON.parse(readFileSync(Reflect.get(process.env, 'WILDSHARD_CATALOGUE') ?? resolve(root, 'src/shared/game/grid/singleplayer.json'), 'utf8'))).grid;
-  const slugs = catalogue.cells.map(cell => cell.slug);
+  const row = v.object({ slug: v.string() }), catalogue = v.parse(v.object({ placements: v.exactOptional(v.array(row)), grid: v.object({ cells: v.array(row) }) }),
+    JSON.parse(readFileSync(Reflect.get(process.env, 'WILDSHARD_CATALOGUE') ?? resolve(root, 'src/shared/game/grid/singleplayer.json'), 'utf8')));
+  const cells = catalogue.grid.cells.map(cell => cell.slug), builtHere = (slug: string): boolean => existsSync(resolve(root, 'out', slug, 'shard.json'));
+  const slugs = [...cells, ...(catalogue.placements ?? []).map(placement => placement.slug).filter(builtHere)];
   // A filtered product build (build-shardfiles --shard) leaves only its own products, and the products copy
-  // (outputProducts.mjs) publishes just those: the others draw the plot tile. A cold atlas, none built, still refuses.
-  const built = new Set(slugs.filter(slug => existsSync(resolve(root, 'out', slug, 'shard.json'))));
+  // (outputProducts.mjs) publishes just those: the other cells draw the plot tile. A cold atlas, none built, still refuses.
+  const built = new Set(slugs.filter(builtHere));
   const atlas = await bakeWorldMapAtlas(slugs, slug => built.size === 0 || built.has(slug) ? productMapBytes(root, slug) : null);
   const fileName = `assets/world-map-${hash(atlas.bytes).slice(0, 16)}.webp`;
   mkdirSync(dirname(join(root, WORLD_MAP_ATLAS)), { recursive: true });

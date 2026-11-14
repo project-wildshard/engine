@@ -43,13 +43,15 @@ export interface BrowserErrorTags {
  *   save-failed   the grid's SAVE FAILED, RETRY at a border (game/grid/screenReports.ts), once a session
  *   cell-unavailable   a Shard Select UNAVAILABLE card: a neighbour cell that can't load (game/grid/session.ts refuse),
  *                 once per cell a session; warning
+ *   map-tile-missing   a full-map cell the world map atlas has no tile for, drawn as a plain plot or its own map instead
+ *                 (game/grid/mapAtlas.ts; QA-FEEDBACK 2026-11-13 row 44), once per slug a page; warning
  * Not screens of a fault, so never reported: the player's own reload, back or exit (QA 11-12 row 35), "Playing somewhere else",
  * "The world is full", the reconnect banner (counted in `net` telemetry), title refusal lines and the Connection doctor.
  */
 export const ERROR_SCREENS = ['error-modal', 'stuck-step', 'glitch-chip', 'load-failure', 'title-drop', 'link-lost', 'link-refused', 'stale-build',
-  'loading-stall', 'stale-reload', 'self-reload', 'save-failed', 'cell-unavailable'] as const;
+  'loading-stall', 'stale-reload', 'self-reload', 'save-failed', 'cell-unavailable', 'map-tile-missing'] as const;
 /** S18: screens common enough on a bad network that each is a Sentry warning, never an error */
-export const WARNING_SCREENS: readonly ErrorScreen[] = ['loading-stall', 'stale-reload', 'self-reload', 'cell-unavailable'];
+export const WARNING_SCREENS: readonly ErrorScreen[] = ['loading-stall', 'stale-reload', 'self-reload', 'cell-unavailable', 'map-tile-missing'];
 export type ErrorScreen = typeof ERROR_SCREENS[number];
 
 // A DSN is a public browser endpoint, not an auth token. Only real production pages report.

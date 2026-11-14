@@ -211,6 +211,21 @@ walk('cell-unavailable', 'an UNAVAILABLE neighbour on Shard Select reports once 
   expect(browserErrorLevel(reports[0]?.error, false, 'cell-unavailable')).toBe('warning');
 });
 
+walk('map-tile-missing', 'a full-map cell with no atlas tile reports once per slug, at warning level (QA 2026-11-13 row 44)', async () => {
+  const { loadGridMapAtlas } = await import('../src/client/game/grid/mapAtlas');
+  const { Scope } = await import('../src/shared/engine/app/scope');
+  const { ResidencyAllocator } = await import('../src/shared/game/grid/allocator');
+  const { browserErrorLevel } = await import('../src/client/engine/telemetry/browserErrors');
+  const scope = new Scope('atlas'), image = document.createElement('canvas');
+  const tile = await loadGridMapAtlas(scope, new ResidencyAllocator(), { url: '/a.webp', compressed: 1, width: 256, height: 256, tileSize: 256, slugs: ['_template'] },
+    () => Promise.resolve({ image, width: 256, height: 256, close: () => undefined }));
+  expect(tile('open-plot-thin-ice')).toBeNull(); expect(tile('open-plot-thin-ice')).toBeNull(); expect(tile('_template')).not.toBeNull();
+  expect(opened()).toEqual(['map-tile-missing']);
+  expect(reports[0]?.tags).toMatchObject({ system: 'grid', shard: 'open-plot-thin-ice', bootStage: 'playing', fatal: false, diagnostic: { tiles: 1 } });
+  expect(browserErrorLevel(reports[0]?.error, false, 'map-tile-missing')).toBe('warning');
+  scope.dispose();
+});
+
 test('a stale-build note that is not the inline script\'s shape is dropped, never reported', async () => {
   const { parseStaleBuildNote, takeStaleBuildNote } = await import('../src/client/engine/saves/staleBuildNote');
   for (const raw of [null, '', 'junk', '[]', '{"build":"b"}', JSON.stringify({ build: 1, at: 0, server: '', tries: 0, seen: 0 }), '{"build":"b","at":1e300,"server":"","tries":0,"seen":0}']) expect(parseStaleBuildNote(raw)).toBeNull();

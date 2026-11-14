@@ -30,6 +30,8 @@ const NAME_RANGE = 101 - NAME_ACROSS;
 /** A neighbour's baked map is kept at this many px a side (0.8 px per metre, 0.64 MB): the minimap shows it ~110 m across */
 export const CELL_PX = 400;
 const STRIP = '#3b4038', ROAD = '#2a2e35', LINE = '#c9a640', VOID = '#0b1016', NAME = '#eaf6ff';
+/** A cell the atlas has no tile for, until its own map loads: the build's plain-plot green (scripts/app-build/worldMapAtlas.ts). */
+const PLOT = '#69704f';
 
 /** Each shard's baked map, loaded the first time a cell of it is drawn, downscaled once and shared by its copies. */
 interface MapEntry { image: HTMLCanvasElement | ImageBitmap | null; deferredAt?: number }
@@ -156,21 +158,29 @@ export function minimapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
 }
 
 /** The grid's full map (SF66): every cell's baked map at its cell, the road network, each shard's name near its cell's north
- *  edge; the home's own ground is the map's base layer. Home-frame metres. */
-type AtlasTile = (slug: string) => Pick<MapExtraImage, 'image' | 'crop'>;
+ *  edge; the home's own ground is the map's base layer. Home-frame metres. A cell the atlas has no tile for (a placed cell,
+ *  QA-FEEDBACK 2026-11-13 row 44) draws its own baked map once that loads, and a plain-plot square until then. */
+type AtlasTile = (slug: string) => Pick<MapExtraImage, 'image' | 'crop'> | null;
 export function fullMapOverlay(host: MinimapBlendHost, rects: readonly MapExtraRect[], atlas?: AtlasTile): MapExtras {
   const { assembly, home } = host, ox = home.origin.x, oz = home.origin.z, homeImage = atlas === undefined ? host.image(home.instance) : null;
-  const images: MapExtraImage[] = [], labels: MapExtraLabel[] = [];
+  const images: MapExtraImage[] = [], labels: MapExtraLabel[] = [], plots: MapExtraRect[] = [];
   for (const cell of assembly.cells) {
     const x = cell.origin.x - ox, z = cell.origin.z - oz;
     const text = host.name(cell);
     labels.push({ x, z: z + CHUNK_HALF - 90, text, short: text.split(' · ').at(-1) ?? text, color: NAME, width: CHUNK_HALF * 2 - 32, height: 160 });
-    if (atlas !== undefined) { images.push({ ...atlas(cell.slug), x, z, size: 2 * CHUNK_HALF, alpha: 1 }); continue; }
+    if (atlas !== undefined) {
+      const tile = atlas(cell.slug);
+      if (tile !== null) { images.push({ ...tile, x, z, size: 2 * CHUNK_HALF, alpha: 1 }); continue; }
+      const image = host.image(cell.instance);
+      if (image !== null) images.push({ image, x, z, size: 2 * CHUNK_HALF, alpha: 1 });
+      else plots.push({ x, z, hx: CHUNK_HALF, hz: CHUNK_HALF, color: PLOT });
+      continue;
+    }
     if (cell.instance === home.instance && homeImage === null) continue;
     const image = host.image(cell.instance);
     if (image !== null) images.push({ image, x, z, size: 2 * CHUNK_HALF, alpha: 1 });
   }
-  return { outside: VOID, baseAlpha: atlas === undefined && homeImage === null ? 1 : 0, rects, images, labels };
+  return { outside: VOID, baseAlpha: atlas === undefined && homeImage === null ? 1 : 0, rects: plots.length === 0 ? rects : [...rects, ...plots], images, labels };
 }
 
 interface ExtrasSink { setExtras: (source: (() => MapExtras | null) | null) => void }

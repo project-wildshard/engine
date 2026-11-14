@@ -28,9 +28,12 @@ test('the app build writes one atlas and its define, verifies source hashes, and
   const digest = (value: Uint8Array | string): string => createHash('sha256').update(value).digest('hex');
   try {
     mkdirSync(resolve(root, 'src/shared/game/grid'), { recursive: true });
-    writeFileSync(resolve(root, 'src/shared/game/grid/singleplayer.json'), JSON.stringify({ grid: { cells: [{ slug: 'base' }, { slug: 'plain' }, { slug: 'override' }] } }));
+    // QA-FEEDBACK 2026-11-13 row 44: a built placement the grid's cells lack (a cell the placement file adds) gets its tile too;
+    // an unbuilt one gets none, so the page draws that cell's own map rather than a plot tile for good
+    writeFileSync(resolve(root, 'src/shared/game/grid/singleplayer.json'), JSON.stringify({ placements: [{ slug: 'placed' }, { slug: 'base' }, { slug: 'unbuilt' }],
+      grid: { cells: [{ slug: 'base' }, { slug: 'plain' }, { slug: 'override' }] } }));
     const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#123456' } }).webp().toBuffer();
-    for (const slug of ['base', 'override', 'plain']) {
+    for (const slug of ['base', 'override', 'placed', 'plain']) {
       const map = JSON.stringify(slug === 'plain' ? {} : { map: { image: digest(image) } });
       const out = resolve(root, 'out', slug); mkdirSync(out, { recursive: true });
       writeFileSync(resolve(out, 'map.json'), map); writeFileSync(resolve(out, 'map.webp'), image);
@@ -43,7 +46,7 @@ test('the app build writes one atlas and its define, verifies source hashes, and
     const atlas = readFileSync(resolve(root, 'out/.app/world-map.webp'));
     expect(rows.fileName).toMatch(/^assets\/world-map-[a-f0-9]{16}\.webp$/u);
     expect(rows.fileName).toBe(`assets/world-map-${digest(atlas).slice(0, 16)}.webp`);
-    expect(rows.define).toMatchObject({ url: `/${rows.fileName}`, compressed: atlas.length, slugs: ['base', 'override', 'plain'] });
+    expect(rows.define).toMatchObject({ url: `/${rows.fileName}`, compressed: atlas.length, slugs: ['base', 'override', 'placed', 'plain'] });
     writeFileSync(resolve(root, 'out/base/map.webp'), 'corrupt'); expect(() => productMapBytes(root, 'base')).toThrow('image differs');
     writeFileSync(resolve(root, 'out/base/map.json'), '{}'); expect(() => productMapBytes(root, 'base')).toThrow('section differs');
   } finally { rmSync(root, { recursive: true, force: true }); }
