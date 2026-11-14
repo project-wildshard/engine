@@ -350,7 +350,13 @@ export class TileDriver {
       // NINE-DRAGON-BENCHMAX NB3: under the loader a tile's contents attach together, so the slab keys' publications queue
       // at once and publish as one warm (slabLibrary.ts `publish`); one after another, each waited on its own (~50 serialized
       // warms on Nine's spawn view, ~75 ms each on a cold phone). In play they stay in order, one at a time.
-      if (loaderMode) { if (!(await Promise.all(this.contents.map(stage))).every(Boolean)) return null; }
+      // allSettled: a failed content rethrows only once its siblings have finished, so the settle's retry never starts a
+      // second attach of this key while the first is still running on the scope the catch disposes
+      if (loaderMode) {
+        const settled = await Promise.allSettled(this.contents.map(stage)), failed = settled.find(row => row.status === 'rejected');
+        if (failed !== undefined) throw failed.reason;
+        if (!settled.every(row => row.status === 'fulfilled' && row.value)) return null;
+      }
       else for (const content of this.contents) {
         if (tile.done.has(content)) continue;
         if (!content.tiles().has(key)) { tile.done.add(content); continue; }

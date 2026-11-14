@@ -49,7 +49,7 @@ import { emitFault, makeSystem, setLoopState, systemFault, type GameSystem } fro
 import { frameCost } from '../../../shared/engine/core/frameCost';
 import { sustainedFrames } from './sustainedFrames';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
-import { workSlice, yieldTask } from '../../../shared/engine/core/workSlice';
+import { yieldTask } from '../../../shared/engine/core/workSlice';
 import { buildHeld, heldDrawDeferred, noteFrameDrawn } from '../../../shared/engine/core/framePacing';
 import { isDev, onDev } from './devMode';
 import { activeDevPixels, drawingPixelRatio } from './devPixels';
@@ -1056,14 +1056,9 @@ export class Game {
       // Forced hidden loader draws also increment frameCount. Only the
       // opt-in geometry path distinguishes covered work from live draws;
       // existing shader-only callers keep their original barrier.
-      // NINE-DRAGON-BENCHMAX NB3: under the loading card no frame is presented, so a geometry warm's pauses only keep the
-      // card's task loop turning: a fresh task once a WORK_SLICE_MS slice is spent, not a timer hop per step. Nine's spawn
-      // view warms ~50 slab parts one after another, each with several steps; a hop per step spent the 4 ms nested-timer
-      // clamp each time and left the main thread ~30 % idle across `app:spawn-view-tiles`.
-      const loaderSlice = workSlice(undefined, this.levelScope);
       const pause = options?.drawGeometry === true
         ? (): Promise<void> => this.frameCount > 0 && this.frameGate() && pagePresentation.state === 'play'
-          ? waitForDrawnFrame(this.levelScope, () => this.frameCount, live) : loaderSlice.check() ?? Promise.resolve()
+          ? waitForDrawnFrame(this.levelScope, () => this.frameCount, live) : yieldTask(this.levelScope)
         : this.frameCount > 0 ? () => waitForDrawnFrame(this.levelScope, () => this.frameCount, live) : undefined;
       // before play (no frame drawn yet) the boot's Shaders step builds what the first frame draws and the rest is warmed
       // in play: a region's own warm-up here keeps only its resources then

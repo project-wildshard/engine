@@ -19,3 +19,6 @@
 - NB6 proof: play's clock mark found no sample on its second call (V8 reused the repeated eval's compiled script with
   the mark inlined), so every eval now gets new text. Ring 1's developer group then passed (play busy 20-52 ms) and a 2 s
   busy sleep every 5th frame failed it: "Play stall: the main thread worked 1.50 s of a 1.5 s window".
+- Review (claude -p, one per land): the loader-slice pause in `warmSceneRoots` turned the precompile's GPU fence and link
+  polls into an 8 ms busy spin and broke entered-frame-overlap's harness, so it is reverted (the 49-to-2 warm batch is the
+  cut). Loader attaches settle together before a failure rethrows; deskbench `--stalls` now needs `--capped`.

@@ -28,6 +28,8 @@ const { values } = parseArgs({ options: { base: { type: 'string' }, shards: { ty
   height: { type: 'string', default: '717' }, scale: { type: 'string', default: '2' }, json: { type: 'string' }, shots: { type: 'string' },
   'gfx-dpr': { type: 'string' }, extra: { type: 'string' }, walk: { type: 'string', default: '0' }, ab: { type: 'boolean', default: false }, capped: { type: 'boolean', default: false }, stalls: { type: 'boolean', default: false }, census: { type: 'boolean', default: false }, profile: { type: 'string' }, hide: { type: 'string' }, settle: { type: 'string', default: '2500' } } });
 if (values.base === undefined) { console.error('usage: deskbench.mjs --base <url> [--shards Nine,Nalati,Driftwood] [--frames 240] [--poses 6] [--json <file>] [--shots <dir>] [--profile <dir>] [--census] [--ab]'); process.exit(2); }
+// --stalls reads busy time: an uncapped frame loop keeps the main thread busy by design and would fault every pose
+if (values.stalls && !values.capped) { console.error('deskbench: --stalls needs --capped (an uncapped frame loop is busy by design)'); process.exit(2); }
 const base = values.base.replace(/\/$/u, ''), frames = Number(values.frames), maxPoses = Number(values.poses), settle = Number(values.settle);
 const walkSeconds = Number(values.walk);
 const viewport = { width: Number(values.width), height: Number(values.height) }, scale = Number(values.scale);
