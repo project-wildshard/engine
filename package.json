@@ -1251,6 +1251,8 @@
     "./scripts/shard-outputs.mjs": "./scripts/shard-outputs.mjs",
     "./scripts/node-format.mjs": "./scripts/node-format.mjs",
     "./scripts/output-reader.mjs": "./scripts/output-reader.mjs",
+    "./scripts/shard-platform-format.mjs": "./scripts/node-format.mjs",
+    "./scripts/shard-platform-output.mjs": "./scripts/output-reader.mjs",
     "./scripts/shard-public.mjs": "./scripts/shard-public.mjs",
     "./scripts/shard-runtime-closure.mjs": "./scripts/shard-runtime-closure.mjs",
     "./scripts/shardfile-cache.mjs": "./scripts/shardfile-cache.mjs",

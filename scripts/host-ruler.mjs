@@ -95,7 +95,11 @@ function declarations(program) {
   const out = [];
   for (const statement of program.body) {
     const node = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
-    if (statement.type === 'ExportDefaultDeclaration') { out.push({ names: ['default'], start: statement.start, end: statement.end }); continue; }
+    if (statement.type === 'ExportDefaultDeclaration') {
+      // `export default function Foo` answers to both `#default` and `#Foo`.
+      const named = statement.declaration?.id?.type === 'Identifier' ? [statement.declaration.id.name] : [];
+      out.push({ names: ['default', ...named], start: statement.start, end: statement.end }); continue;
+    }
     if (node === null || node === undefined) continue;
     if (node.type === 'VariableDeclaration') {
       const one = node.declarations.length === 1;
@@ -539,15 +543,18 @@ export function formatTable(report) {
   const byOption = new Map();
   for (const product of report.products) for (const name of product.unmeasuredOptions) byOption.set(name, [...byOption.get(name) ?? [], product.slug]);
   const options = [...byOption].sort(([a], [b]) => a.localeCompare(b)).map(([name, slugs]) => `unmeasured option: ${name} (${slugs.join(', ')})`);
+  // A silly row whose users no longer reach its module charges nobody: say so rather than drop the lines.
+  const orphans = report.ruled.sillyShared.filter(row => row.users.length === 0).map(row => `silly row, no current user: ${row.key} (${row.lines} lines)`);
   return [`format package ${FORMAT} ${report.format}; register ${REGISTER}; today ${report.today}`,
     'one-user lines without register credit: "one-user lines"; with it: "charged" (no row + charged back + silly + option)',
-    line(head), `|${width.map((w, i) => i === 0 ? '-'.repeat(w + 2) : `${'-'.repeat(w + 1)}:`).join('|')}|`, ...rows.map(line), ...noRow, ...option, ...unmeasured, ...options].join('\n');
+    line(head), `|${width.map((w, i) => i === 0 ? '-'.repeat(w + 2) : `${'-'.repeat(w + 1)}:`).join('|')}|`, ...rows.map(line), ...noRow, ...option, ...orphans, ...unmeasured, ...options].join('\n');
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
   const args = process.argv.slice(2), json = args.includes('--json'), sharddevAt = args.indexOf('--sharddev');
   const at = args.indexOf('--products'), todayAt = args.indexOf('--today');
   const dirs = at === -1 ? [] : args.slice(at + 1).filter((arg, i, all) => !arg.startsWith('--') && all.slice(0, i).every(prev => !prev.startsWith('--')));
+  if (todayAt !== -1 && !/^\d{4}-\d{2}-\d{2}$/u.test(args[todayAt + 1] ?? '')) { console.error('--today takes YYYY-MM-DD'); process.exit(2); }
   if (dirs.length === 0) { console.error('usage: node scripts/host-ruler.mjs --products <product-dir>... [--today YYYY-MM-DD] [--json] [--inventory [--sharddev <dir>]]'); process.exit(2); }
   const report = rule(dirs, todayAt === -1 ? {} : { today: args[todayAt + 1] });
   if (json) console.log(JSON.stringify({ format: report.format, today: report.today, products: report.products, modules: Object.fromEntries(report.modules),

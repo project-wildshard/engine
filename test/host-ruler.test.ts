@@ -152,6 +152,15 @@ describe('the platform rule and the register\'s gates (HR6, HA0 f)', () => {
     expect(totals.get('a')).toEqual({ modules: 3, lines: 13, format: 5, platform: 4, pending: 3, 'no-row': 4, 'charged-back': 2, silly: 0, option: 0, charged: 6 });
     expect(totals.get('b')).toEqual({ modules: 1, lines: 3, format: 0, platform: 0, pending: 0, 'no-row': 3, 'charged-back': 0, silly: 1, option: 0, charged: 4 });
   });
+  test('a silly row none of whose users reach the module prints instead of vanishing', () => {
+    const orphan = applyRegister(modules, tree, [row('@wildshard/format/src/format/shared.ts', 'silly', { users: ['gone'] })], { today });
+    expect(orphan.sillyShared).toEqual([{ module: '@wildshard/format/src/format/shared.ts', users: [], lines: 1, key: '@wildshard/format/src/format/shared.ts' }]);
+    const report = { products: [], format: '0.0.0', today, ruled: orphan, options: [], totals: shardTotals(orphan, ['a', 'b']) };
+    expect(formatTable(report)).toContain('silly row, no current user: @wildshard/format/src/format/shared.ts (1 lines)');
+  });
+  test('a named default export answers to its own name too', () => {
+    expect(tree.read('src/client/game/feature/named-default.ts').declarations.map(d => d.names)).toEqual([['default', 'Foo']]);
+  });
   test('a platform verdict without a decision id refuses', () => {
     expect(() => applyRegister(modules, tree, [{ key: 'src/client/game/feature/a.ts', verdict: 'engine', users: [] }], { today })).toThrow(/without a decision id/u);
     expect(() => applyRegister(modules, tree, [{ key: 'src/client/game/feature/a.ts', verdict: 'game', decision: '', users: [] }], { today })).toThrow(/without a decision id/u);
