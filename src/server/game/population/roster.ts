@@ -180,7 +180,7 @@ export function installPopulationRoster(host: SimHost, ports: PopulationRosterPo
 
   // J109, J108: a room's herds fill again; one player's stay as they fell, and their saves never carry this row
   const REFILL_STATE = `${ROSTER_STEP}.refill`, room = (): readonly PlayerSim[] => [...host.players.values()];
-  const refill = new CreatureRefill({ players: room, room: () => BODY_COUNT - list.filter(body => body.actor.alive).length,
+  const refill = new CreatureRefill({ players: room, served: () => host.respawn.served, room: () => BODY_COUNT - list.filter(body => body.actor.alive).length,
     random: () => host.rng.stream('spawn').next(), spawn: ({ kind, variant, herd, x, z, from }, yaw) => {
       const fallen = list.find(body => body.id === from)?.actor, group = hunt.herds[herd];
       if (fallen?.alive === false) retire(fallen);
@@ -191,12 +191,12 @@ export function installPopulationRoster(host: SimHost, ports: PopulationRosterPo
       if (at === -1) group?.members.push(a); else if (group !== undefined) group.members[at] = a;
     } });
   host.events.on('actor.died', ({ actor }) => {
-    if (host.players.size <= 1) return;
+    if (host.players.size <= 1 && !host.respawn.served) return;
     const a = list.find(body => body.actor.combatActor() === actor)?.actor, group = a === undefined ? undefined : hunt.herds[a.herd];
     if (a !== undefined && group !== undefined) refill.left({ kind: a.kind, variant: a.variant, herd: a.herd, x: group.cx, z: group.cz, from: a.entityId });
   }, host.scope);
   host.events.on('creature.tamed', tamed => {
-    if (host.players.size > 1 && list.some(body => body.id === tamed.id)) refill.left({ ...tamed, from: tamed.id });
+    if ((host.players.size > 1 || host.respawn.served) && list.some(body => body.id === tamed.id)) refill.left({ ...tamed, from: tamed.id });
   }, host.scope);
   host.onStep(ROSTER_STEP, dt => {
     cadence.observe(dt); continuation.advance(dt); cadence.decide();

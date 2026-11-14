@@ -28,3 +28,7 @@
   idle Mac went from 29-30 ms to 6 ms.
 - SC5 (J328, grill Q3): J107's start-over is retired for grid cells (`gridCell`); only a cell the grid does not place still
   starts over. A grid world is never rebuilt, so its respawns carry what the start-over used to reset.
+- SC5 gaps (audit of what the start-over used to reset): a served world now refills with one player in it (`CreatureRefill`
+  `served`, the roster, native returns, wild stallions), a player who leaves takes their bonded horses with them (no pile-up past
+  the taming roster's 64), and a beaten boss (boss rows, phase encounters) stands again once its arena has stood empty 5 min,
+  its reward too. Wake fights, open arenas, once-elites, elite skins and some per-player maps are left as a follow-up row.

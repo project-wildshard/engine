@@ -63,6 +63,8 @@ export interface RefillPorts {
   readonly random: () => number;
   /** Put the body back. Nothing else may change the population: the queue has already dropped the entry. */
   readonly spawn: (entry: RefillEntry, yaw: number) => void;
+  /** SC5 (J328): a served world (the MMO server's) is a room with one player in it: what falls comes back, as it does for two. */
+  readonly served?: () => boolean;
 }
 
 /**
@@ -76,10 +78,12 @@ export class CreatureRefill {
   private clock = 0;
   private readonly ports: RefillPorts;
   constructor(ports: RefillPorts) { this.ports = ports; }
+  /** A room's refill runs: two players or more, or a served world's one (SC5: a grid cell never starts over, so this is all that refills it). */
+  private room(players: readonly RefillPlayer[]): boolean { return players.length > 1 || this.ports.served?.() === true; }
 
   /** A body left its spawn point (it fell, or a player tamed it). */
   left(entry: Omit<RefillEntry, 'wait'>): void {
-    if (this.ports.players().length <= 1 || this.pending.length >= REFILL_LIMIT) return;
+    if (!this.room(this.ports.players()) || this.pending.length >= REFILL_LIMIT) return;
     this.pending.push({ ...entry, wait: REFILL_WAIT });
   }
 
@@ -89,7 +93,7 @@ export class CreatureRefill {
     if (this.clock < REFILL_CHECK) return;
     const elapsed = this.clock, players = this.ports.players();
     this.clock = 0;
-    if (players.length <= 1) return; // the room emptied to one: what is owed waits, and that player's game is today's
+    if (!this.room(players)) return; // the room emptied to one: what is owed waits, and that player's game is today's
     const due: RefillEntry[] = [];
     for (const entry of this.pending) {
       entry.wait -= elapsed * refillRate(playersNear(players, entry.x, entry.z));

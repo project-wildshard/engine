@@ -18,7 +18,7 @@ export function installWildRefill(host: SimHost, mounts: BondedMountRoster, herd
   id: string, saved?: Readonly<Omit<SimSnapshot, 'physics'>>): (dt: number) => void {
   const state = `${id}.refill`;
   const herdOf = (actor: AnimalSim): HerdBrain<AnimalSim> | undefined => herds().find(row => row.members.includes(actor)) ?? herds()[0];
-  const refill = new CreatureRefill({ players: () => [...host.players.values()], room: () => mounts.hidden.size,
+  const refill = new CreatureRefill({ players: () => [...host.players.values()], room: () => mounts.hidden.size, served: () => host.respawn.served,
     random: () => host.rng.stream('spawn').next(), spawn: ({ from, x, z }, yaw) => {
       const actor = host.entities.get(from), herd = actor === undefined ? undefined : herdOf(actor);
       if (actor === undefined || herd === undefined) return;
@@ -27,7 +27,7 @@ export function installWildRefill(host: SimHost, mounts: BondedMountRoster, herd
     } });
   if (saved?.adapters.some(row => row.id === state) === true) host.adapters.set(state, refill.state);
   return dt => {
-    if (host.players.size > 1) for (const hidden of mounts.hidden) {
+    if (host.players.size > 1 || host.respawn.served) for (const hidden of mounts.hidden) {
       if (refill.pending.some(entry => entry.from === hidden)) continue;
       const actor = host.entities.get(hidden), herd = actor === undefined ? undefined : herdOf(actor);
       if (actor !== undefined && herd !== undefined) refill.left({ kind: actor.kind, variant: actor.variant, herd: actor.herd, x: herd.cx, z: herd.cz, from: hidden });

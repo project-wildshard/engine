@@ -38,13 +38,13 @@ export class NativeReturns {
     };
     host.events.on('actor.died', ({ actor }) => {
       const body = [...bodies.values()].find(row => row.actor?.combatActor() === actor), native = body?.actor;
-      if (body === undefined || native === null || native === undefined || !(this.queue.accepts(body.kind) || host.players.size > 1)) return;
+      if (body === undefined || native === null || native === undefined || !(this.queue.accepts(body.kind) || host.players.size > 1 || host.respawn.served)) return;
       const herd = hunt.herds[body.herd];
       owe(body.kind, body.variant, body.herd, herd?.cx ?? native.position.x, herd?.cz ?? native.position.z, body.id);
     }, host.scope);
     // J108: a tame leaves its spot empty on this roster too. Only a room owes it: one player's world stays as it was.
     host.events.on('creature.tamed', ({ kind, variant, herd, x, z, id }) => {
-      if (host.players.size > 1 && bodies.has(id)) owe(kind, variant, herd, x, z, id);
+      if ((host.players.size > 1 || host.respawn.served) && bodies.has(id)) owe(kind, variant, herd, x, z, id);
     }, host.scope);
   }
   /** At most one bounded queue scan per declared interval; retry entries keep

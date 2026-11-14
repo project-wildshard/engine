@@ -76,7 +76,8 @@ const Saved = v.strictObject({ version: v.picklist([1, 2]), boss: Boss, fight: v
  * have this shape.
  */
 export function installBossRow(host: SimHost, spec: BossRowSpec): { boss: BossBrain; party: BossContenders; bounty: BossBounty; summon: () => void; locked: () => boolean } {
-  const party = new BossContenders(host.players, point => spec.script.inArena(point), (player, position, yaw) => { player.position.copy(position); player.yaw = yaw; spec.returned?.(player); });
+  const party = new BossContenders(host.players, point => spec.script.inArena(point), (player, position, yaw) => { player.position.copy(position); player.yaw = yaw; spec.returned?.(player); },
+    { served: () => host.respawn.served, rearm: spec.armed === true });
   const bounty = new BossBounty(host, spec.body, spec.step);
   const ports = { events: host.events, player: party.player,
     lockInput: (on: boolean) => { if (actRoutes(host).introLocks === true) for (const player of host.players.values()) if (!on || spec.script.inArena(player.position)) player.moveScale = on ? 0 : 1; },
@@ -93,7 +94,7 @@ export function installBossRow(host: SimHost, spec: BossRowSpec): { boss: BossBr
   if (spec.armed === true) boss.arm();
   host.onStep(spec.step, dt => {
     const body = spec.body(); if (body !== null) host.focusOn(body.position);
-    party.observe(boss);
+    party.observe(boss, dt);
     boss.update(dt, host.clock.now);
   }, {
     snapshot: () => { const { engaged } = party, { earned } = bounty; return JSON.stringify({ version: spec.stages === undefined ? 1 : 2, boss: boss.snapshot(), fight: spec.fight.snapshot(), ...(engaged === 0 ? {} : { engaged }), ...(earned.length === 0 ? {} : { earners: earned }) }); },

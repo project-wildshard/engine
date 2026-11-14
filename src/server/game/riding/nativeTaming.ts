@@ -72,6 +72,8 @@ interface TamingSeat {
   readonly tick: (dt: number, read: boolean) => void;
   readonly shake: number; readonly roll: number;
   readonly holdOffer: (held: boolean) => void; readonly whistle: () => void;
+  /** SC5 (J328): its player left the room: the bodies it bonded go too, or a grid cell that never starts over gathers them past 64. */
+  readonly release: () => void;
   readonly save: () => { [Key in keyof v.InferOutput<typeof SessionSaved>]: v.InferOutput<typeof SessionSaved>[Key] };
   readonly load: (saved: v.InferOutput<typeof SessionSaved>, horses: readonly AnimalSim[]) => void;
 }
@@ -110,6 +112,10 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
   const mounted = mountedPlayerOf(host, player.id); if (mounted === undefined) throw new Error('Missing native mounted owner');
   let bond: string | null = null, pitch = 0, offer = false, heldOffer = false, calling = 0, lean = 0, shake = 0, roll = 0;
   const camera = new Vector3(), eye = new Vector3(), hurtDir = new Vector3(), mine = new Set<string>();
+  const retireBonded = (a: AnimalSim): void => {
+    mine.delete(a.entityId); creatures.retire(a.entityId); poses.delete(a.entityId);
+    const at = poseRows.indexOf(a); if (at === -1) throw new Error('Missing bonded pose'); poseRows.splice(at, 1);
+  };
   const law = new TamingSession<AnimalSim, HerdBrain<AnimalSim>>({
     profile: rows.binding,
     programs: rows.programs,
@@ -124,10 +130,7 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
     hud: { get offer() { return offer; }, get lean() { return lean; } }, herds: () => herds, rest: rows.rest,
     wind: () => wind, random: () => host.rng.stream('ai').next(),
     spawnBonded: (x, z, yaw, upgraded) => { const a = creatures.spawn(x, z, yaw, upgraded, mine.size); mine.add(a.entityId); addPose(a); return a; },
-    hideStallion: a => { creatures.hide(a.entityId); }, retireBonded: a => {
-      mine.delete(a.entityId); creatures.retire(a.entityId); poses.delete(a.entityId);
-      const at = poseRows.indexOf(a); if (at === -1) throw new Error('Missing bonded pose'); poseRows.splice(at, 1);
-    }, hurt: amount => {
+    hideStallion: a => { creatures.hide(a.entityId); }, retireBonded: a => { retireBonded(a); }, hurt: amount => {
       host.combat.hit({ source: 'env', sourceTags: ['env.ride'], target: player.health, amount, throughWalls: true,
         point: player.position, dir: hurtDir, cause: { kind: 'env.ride', label: rows.thrownLabel, text: rows.thrownLabel } });
     },
@@ -157,7 +160,8 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
     return taming;
   };
   const originalUpdate = law.update.bind(law);
-  const session: TamingSeat = { player, law, get shake() { return shake; }, get roll() { return roll; }, holdOffer: held => { heldOffer = held; }, whistle: () => {
+  const session: TamingSeat = { player, law, get shake() { return shake; }, get roll() { return roll; }, holdOffer: held => { heldOffer = held; },
+    release: () => { for (const id of mine) { const a = poseRows.find(row => row.entityId === id); if (a === undefined) mine.delete(id); else retireBonded(a); } }, whistle: () => {
     const horse = law.companion;
     if (!mounted.mounted && horse !== null && horse.mem['whistle'] === 1 && mounted.canRide(horse.entityId) && horse.position.distanceTo(player.position) < 150) calling = 30;
   }, tick: (dt, read) => {
@@ -221,7 +225,7 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
     return best;
   };
   law.update = dt => {
-    for (const [id, session] of sessions) if (host.players.get(id) !== session.player) sessions.delete(id);
+    for (const [id, session] of sessions) if (host.players.get(id) !== session.player) { session.release(); sessions.delete(id); }
     // Trust is the herd's: one voice speaks to it, the wild session closest to a stallion, or a far player would talk it down.
     const heard = sessions.size < 2 ? null : closestToWild();
     if (heard === null || first.law.phase !== 'wild' || heard === first) first.tick(dt, true);

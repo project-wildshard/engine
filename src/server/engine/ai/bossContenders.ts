@@ -8,7 +8,14 @@ interface ContendedBoss {
   readonly engaged: boolean;
   readonly script: { readonly respawnPoint: () => { pos: Vector3; yaw: number } };
   readonly disarm: () => void; readonly arm: () => void; readonly onPlayerDeath: () => boolean;
+  /** SC5: the brain's state, read for a beaten boss's return, and its own way back (else a plain `disarm`). */
+  readonly state?: string; readonly returnBeaten?: () => void;
 }
+/** SERVER-CELLS SC5 (J328): how a served world brings a beaten boss back, since a grid cell's world is never rebuilt. `rearm`: the
+ *  boss stood armed from the start, so it stands armed again; a summoned one goes back to waiting for its summons. */
+export interface BeatenReturn { readonly served: () => boolean; readonly rearm: boolean }
+/** SC5: a served world's beaten boss comes back once nobody has stood in its arena this long, as J107's start-over waited. */
+export const BOSS_RETURN_S = 300;
 type ArenaPlayer = (point: Vector3) => boolean;
 /** Marks a blow's share on a further player, which lands no further shares. */
 const ECHO = 'boss.echo';
@@ -27,10 +34,13 @@ export class BossContenders {
   private readonly players: ReadonlyMap<string, PlayerSim>;
   private readonly inArena: ArenaPlayer;
   private readonly place: (player: PlayerSim, position: Vector3, yaw: number) => void;
+  private readonly beaten: BeatenReturn | undefined;
+  /** SC5: seconds a beaten boss's arena has stood empty. */
+  private emptyFor = 0;
   /** The point `BossBrain` watches, live. */
   readonly player: { readonly position: Vector3 };
-  constructor(players: ReadonlyMap<string, PlayerSim>, inArena: ArenaPlayer, place: (player: PlayerSim, position: Vector3, yaw: number) => void) {
-    this.players = players; this.inArena = inArena; this.place = place;
+  constructor(players: ReadonlyMap<string, PlayerSim>, inArena: ArenaPlayer, place: (player: PlayerSim, position: Vector3, yaw: number) => void, beaten?: BeatenReturn) {
+    this.players = players; this.inArena = inArena; this.place = place; this.beaten = beaten;
     const contender = (): PlayerSim => this.contender();
     this.player = { get position() { return contender().position; } };
   }
@@ -74,12 +84,23 @@ export class BossContenders {
   /** The death checkpoint's answer. A room's only says the fight owns the death (`fell` returns them); a lone player's is the brain's. */
   died(boss: ContendedBoss): boolean { return this.players.size > 1 ? boss.engaged : boss.onPlayerDeath(); }
   /** Each fixed step, before the brain's: count who began the fight, and reset it once nobody is left inside. */
-  observe(boss: ContendedBoss): void {
+  observe(boss: ContendedBoss, dt: number = 1 / 60): void {
+    if (this.beaten !== undefined && boss.state === 'victory' && this.beaten.served()) { this.unbeaten(boss, this.beaten, dt); return; }
+    this.emptyFor = 0;
     if (this.players.size <= 1 && this.counted === 0) return;
     if (!boss.engaged) { this.counted = 0; return; }
     const inside = this.inside().length;
     if (this.counted === 0) this.counted = Math.max(1, inside);
     if (inside === 0) { this.counted = 0; boss.disarm(); boss.arm(); }
+  }
+  /** SC5: a served world's beaten boss, back once its arena has stood empty `BOSS_RETURN_S`; anyone inside starts the wait over. */
+  private unbeaten(boss: ContendedBoss, beaten: BeatenReturn, dt: number): void {
+    if (this.inside().length > 0) { this.emptyFor = 0; return; }
+    this.emptyFor += dt;
+    if (this.emptyFor < BOSS_RETURN_S) return;
+    this.emptyFor = 0; this.counted = 0;
+    if (boss.returnBeaten === undefined) boss.disarm(); else boss.returnBeaten();
+    if (beaten.rearm) boss.arm();
   }
   /** Players counted at the fight's start, for a continuation: 0 in any one-player fight. */
   get engaged(): number { return this.counted; }

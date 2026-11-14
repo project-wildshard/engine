@@ -56,7 +56,7 @@ export class PhaseEncounter {
     const focus = new Vector3(...spec.arena.at), saved = { ...ports.saved };
     const party = this.party = new BossContenders(sim.players, (point) => point.distanceTo(focus) < spec.arena.radius, (player, position, yaw) => {
       player.position.copy(position); player.yaw = yaw; player.health.attributes.health = player.health.attributes.maxHealth;
-    });
+    }, { served: () => sim.respawn.served, rearm: true });
     const phase = (): EncounterPhase => { const value = this.spec.phases[this.boss.phase]; if (!value) throw new Error('Missing encounter phase'); return value; };
     this.boss = new BossBrain({ id: spec.id, name: spec.name, title: spec.title, retryTitle: spec.retry, intro: spec.intro, introShort: spec.introShort,
       phases: spec.phases.map((p) => ({ at: p.at, name: p.name, caption: p.caption })), reward: {} }, {

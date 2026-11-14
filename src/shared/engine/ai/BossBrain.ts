@@ -156,6 +156,13 @@ export class BossBrain {
     this.state = 'dormant';
   }
 
+  /** SERVER-CELLS SC5 (J328): a served world's beaten boss comes back (its world is never rebuilt): forgotten as `disarm` does, and its
+   *  reward stands again for the next win, as a fresh world's would. Who is paid stays the bounty's, once per player. */
+  returnBeaten(): void {
+    this.disarm();
+    this.saved.rewardTaken = false; this.save();
+  }
+
   /** the player died. In this fight → back at the checkpoint (true); anywhere else → not ours (false) */
   onPlayerDeath(): boolean {
     if (!this.engaged) return false;
