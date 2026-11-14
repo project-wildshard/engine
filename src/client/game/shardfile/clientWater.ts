@@ -5,12 +5,17 @@
  * a stream a ribbon through its points at their levels, the sea a cell-wide plane. The surface is `materials.get('water')`
  * when the look declares one, else the default water surface (`defaultWaterMaterial`, LF1-3: a no-code shard has no client
  * plan to draw a graph surface, so this is its pond); a graph surface that declares `stages.outline` draws its hull
- * through `outline` (`clientMaterials().outline`).
+ * through `outline` (`clientMaterials().outline`). A pool that declares its `surface` (TEMPLATES-CLEANROOM M4.6) draws
+ * that instead: a planar mirror on the desktop tier (`reflectingWater.ts`), the default surface in its tint and Fresnel
+ * otherwise.
  */
 import { BufferAttribute, BufferGeometry, CircleGeometry, Mesh, MeshStandardMaterial, PlaneGeometry, Shape, ShapeGeometry, Vector2, type Material, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { patchShader } from '@wildshard/engine/render/shaderPatches';
 import type { ShardWater } from '@wildshard/format/water';
+import type { PoolSurface } from '@wildshard/format/pool-surface';
+import { TIER } from '@wildshard/engine/core/tier';
+import { mirrorPool } from './reflectingWater';
 import type { GraphOutlineHook } from './clientGraphs';
 import type { ClientFeatureRow } from '@wildshard/format/clientPlan';
 
@@ -51,9 +56,9 @@ export function undrawnWater(water: ShardWater, features: readonly ClientFeature
  *  normal rippled from world position (faded with distance, so far water stays flat and does not shimmer), reflected
  *  into a sky made from the shard's own light (its fog colour at the horizon, its hemisphere's sky colour above, its key
  *  light's glint), Fresnel-weighted; the alpha rises with the Fresnel, so water looked into shows its bed. */
-const DEFAULT_WATER_GLSL = `{
+const waterGlsl = (base: string, power: string, ripple: string, alpha: boolean): string => `{
   vec3 wsV = normalize(vViewPosition), wsUpV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
-  vec2 wsP = vWsWaterWorld.xz;
+  vec2 wsP = vWsWaterWorld.xz * ${ripple};
   float wsFade = 1.0 / (1.0 + length(vViewPosition) * 0.06);
   vec2 wsSlope = vec2(sin(wsP.x * 1.7 + sin(wsP.y * 0.9) * 1.3) + 0.6 * sin(wsP.y * 2.3 + wsP.x * 0.6),
     cos(wsP.y * 1.9 + sin(wsP.x * 1.1) * 1.2) + 0.5 * cos(wsP.x * 2.9 - wsP.y * 0.7)) * 0.045 * wsFade;
@@ -71,11 +76,13 @@ const DEFAULT_WATER_GLSL = `{
     float wsSun = max(dot(wsR, directionalLights[ 0 ].direction), 0.0);
     wsWaterSky += directionalLights[ 0 ].color * (pow(wsSun, 600.0) * 2.5 + pow(wsSun, 10.0) * 0.3);
   #endif
-  float wsFres = 0.22 + 0.78 * pow(1.0 - clamp(dot(wsN, wsV), 0.0, 1.0), 3.0);
+  float wsFres = ${base} + (1.0 - ${base}) * pow(1.0 - clamp(dot(wsN, wsV), 0.0, 1.0), ${power});
   outgoingLight = mix(outgoingLight, wsWaterSky, wsFres);
-  diffuseColor.a = mix(diffuseColor.a, 1.0, wsFres);
+  ${alpha ? 'diffuseColor.a = mix(diffuseColor.a, 1.0, wsFres);' : ''}
 }
 `;
+const DEFAULT_WATER_GLSL = waterGlsl('0.22', '3.0', '1.0', true);
+const glslFloat = (n: number): string => n.toFixed(4);
 
 /** The default water surface (LF1-3) for a declared body the look gives no `water` material: three's standard material
  *  (so the engine's fog, shadow and light patches apply as to any other) with a deep tint, a sky reflection and a Fresnel
@@ -94,15 +101,50 @@ export function defaultWaterMaterial(): MeshStandardMaterial {
   return material;
 }
 
+/** M4.6: a declared surface's sky water (`reflect: 'sky'`, or `planar` on the phone tier): the default surface's program
+ *  with the surface's opaque tint, Fresnel and ripple scale (its own program, keyed by those values). */
+export function skyWaterMaterial(look: PoolSurface): MeshStandardMaterial {
+  const material = new MeshStandardMaterial({ roughness: 0.12, metalness: 0 });
+  material.color.setRGB(look.tint[0], look.tint[1], look.tint[2]);
+  material.name = 'water-sky';
+  const glsl = waterGlsl(glslFloat(look.fresnel[0]), glslFloat(look.fresnel[1]), glslFloat(Math.max(0.05, look.ripple.scale / 2)), false);
+  const key = `m46-sky-water-${glsl.length}-${look.fresnel.join('-')}-${String(look.ripple.scale)}`;
+  patchShader(material, key, 100, (shader): void => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWsWaterWorld;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvWsWaterWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWsWaterWorld;')
+      .replace('#include <opaque_fragment>', `${glsl}#include <opaque_fragment>`);
+  }, { key });
+  return material;
+}
+
 /** Draw every declared water body's surface under `root`; the scope takes the meshes, geometry and default material. */
-export function installClientWater(water: ShardWater, ports: { root: Object3D; scope: Scope; materials?: ReadonlyMap<string, Material>; outline?: GraphOutlineHook }): readonly Mesh[] {
+export function installClientWater(water: ShardWater, ports: { root: Object3D; scope: Scope; materials?: ReadonlyMap<string, Material>; outline?: GraphOutlineHook; frame?: (run: (dt: number) => void) => void }, tier: string = TIER): readonly Mesh[] {
   if (water.length === 0) return [];
-  const material = ports.materials?.get('water') ?? ports.scope.own(defaultWaterMaterial());
+  const declared = ports.materials?.get('water');
+  let fallback: Material | null = null;
+  const material = (): Material => declared ?? (fallback ??= ports.scope.own(defaultWaterMaterial()));
   return water.map((body) => {
-    const mesh = new Mesh(ports.scope.own(surface(body)), material);
+    const look = body.kind === 'pool' ? body.surface : undefined;
+    if (body.kind === 'pool' && look !== undefined && declared === undefined) {
+      if (look.reflect === 'planar' && tier !== 'phone') {
+        const pool = mirrorPool(body.shape, body.level, look);
+        pool.mesh.name = `water:${body.id}`; pool.mesh.renderOrder = 1;
+        ports.root.add(pool.mesh); ports.scope.onDispose(() => { pool.mesh.removeFromParent(); pool.dispose(); });
+        ports.frame?.(pool.tick);
+        return pool.mesh;
+      }
+      const sky = ports.scope.own(skyWaterMaterial(look)), mesh = new Mesh(ports.scope.own(surface(body)), sky);
+      mesh.name = `water:${body.id}`; mesh.receiveShadow = true; mesh.castShadow = false; mesh.renderOrder = 1;
+      ports.root.add(mesh); ports.scope.onDispose(() => { mesh.removeFromParent(); });
+      return mesh;
+    }
+    const drawn = material(), mesh = new Mesh(ports.scope.own(surface(body)), drawn);
     mesh.name = `water:${body.id}`; mesh.receiveShadow = true; mesh.castShadow = false; mesh.renderOrder = 1;
     ports.root.add(mesh); ports.scope.onDispose(() => { mesh.removeFromParent(); });
-    ports.outline?.(mesh, material, ports.scope);
+    ports.outline?.(mesh, drawn, ports.scope);
     return mesh;
   });
 }

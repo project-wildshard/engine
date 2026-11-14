@@ -7,3 +7,4 @@
   ACES, the look's exposure (it was parsed and never applied), vignette and bloom radius, lamp decay / halos / flicker,
   motes, and a procedural PBR detail layer (J338: no texture bytes). Phones now gate field by field instead of dropping
   the whole look-light row.
+- The render hosts' tests: test/look-light.test.ts (phone gating, flicker), test/look-render.test.ts.

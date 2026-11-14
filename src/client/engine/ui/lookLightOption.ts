@@ -18,9 +18,9 @@ export function lookLightSaved(): boolean {
   try { return jsonSlot(LOOK_LIGHT_SLOT, 'device').read() !== 'off'; } catch { return true; }
 }
 /**
- * Whether the settings draw on this page: the row on, and the desktop tier. The phone tier draws none of them until
- * Jake picks (its 30 fps lock and program set stay as they are).
+ * Whether the settings draw on this page: the row on. TEMPLATES-CLEANROOM M4.9: the phone tier draws them too, gated per
+ * field (`lookLightManifest`: no bloom or AO, at most 4 lamps, half the motes), not all or nothing; `tier` stays for callers.
  */
-export function lookLightOn(tier: string = TIER): boolean { return tier !== 'phone' && lookLightSaved(); }
+export function lookLightOn(_tier: string = TIER): boolean { return lookLightSaved(); }
 /** Save the row's value (the page reloads to apply it). */
 export function setLookLight(on: boolean): void { jsonSlot(LOOK_LIGHT_SLOT, 'device').write(on ? 'on' : 'off'); }

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
-import { bounceLight, environmentScene, lampLights, lookLightManifest, lightPools, rimPatch, LOOK_RIM_PATCH } from '../src/client/engine/render/lookLight';
+import { bounceLight, environmentScene, lampLights, lookLightManifest, lightPools, rimPatch, LOOK_RIM_PATCH, PHONE_LAMPS } from '../src/client/engine/render/lookLight';
 import { lookLightOn } from '../src/client/engine/ui/lookLightOption';
 import { jsonSlot } from '../src/client/engine/saves/slots';
 
@@ -14,7 +14,7 @@ const LIGHT = {
   heightFog: { density: 0.08, height: -1, falloff: 0.6 },
   pools: { colour: [1, 0.6, 0.2] as [number, number, number], intensity: 1, radius: 3, at: [[0, 0, -9], [3, 0, -6]] as [number, number, number][] },
 };
-const OFF = { atmosphere: { fogHeight: -20, fogHeightFalloff: 0, fogHeightDensity: 0 }, bloom: { intensity: 0, threshold: 1 }, ao: null, rim: null, pools: null, lamps: null, bounce: null, environment: null };
+const OFF = { atmosphere: { fogHeight: -20, fogHeightFalloff: 0, fogHeightDensity: 0 }, bloom: { intensity: 0, threshold: 1, radius: null }, ao: null, rim: null, pools: null, lamps: null, bounce: null, environment: null, shadow: null, motes: null };
 const B2 = {
   lamps: [{ at: [1, 2, -3] as [number, number, number], colour: [1, 0.4, 0.06] as [number, number, number], intensity: 4, distance: 7 }],
   bounce: { colour: [1, 0.28, 0.16] as [number, number, number], intensity: 0.35, lift: 0.25 },
@@ -39,6 +39,16 @@ test('B2 lamps: one shadowless point light per lamp, physical decay, at its poin
   expect(light).toBeInstanceOf(THREE.PointLight);
   expect([light.position.x, light.position.y, light.position.z]).toEqual([1, 2, -3]);
   expect([light.intensity, light.distance, light.decay, light.castShadow]).toEqual([4, 7, 2, false]);
+  expect(group.update).toBeNull();
+});
+
+test('M4.3 lamps: a declared decay, and a flicker that swings the intensity round its base', () => {
+  const group = lampLights([{ ...B2.lamps[0]!, decay: 1.2, flicker: { rate: 8, amount: 0.3 } }]);
+  const light = group.children[0] as THREE.PointLight;
+  expect(light.decay).toBe(1.2);
+  const seen = new Set<number>();
+  for (let t = 0; t < 2; t += 0.05) { group.update?.(t); seen.add(Number(light.intensity.toFixed(3))); expect(light.intensity).toBeGreaterThanOrEqual(4 * 0.7 - 1e-9); expect(light.intensity).toBeLessThanOrEqual(4 + 1e-9); }
+  expect(seen.size).toBeGreaterThan(10);
 });
 
 test('B2 bounce: a shadowless directional light from the anti-sun heading, lifted', () => {
@@ -75,7 +85,7 @@ test('heightFog: the engine fog program’s height term (mist pooled low), not m
 });
 
 test('grade.bloom: a shardfile shard turns bloom on', () => {
-  expect(lookLightManifest({ grade: { bloom: { intensity: 0.8, threshold: 0.6 } } }, true).bloom).toEqual({ intensity: 0.8, threshold: 0.6 });
+  expect(lookLightManifest({ grade: { bloom: { intensity: 0.8, threshold: 0.6 } } }, true).bloom).toEqual({ intensity: 0.8, threshold: 0.6, radius: null });
 });
 
 test('rim: a fresnel term added after the lit colour, its values uniforms (one shader text for any rim)', () => {
@@ -111,22 +121,30 @@ test('pools: one additive instanced decal draw for every lamp, no light objects'
   expect(lights).toBe(0);
 });
 
-test('the phone tier draws none of the settings, even with the row on (its 30 fps lock and programs stay)', () => {
+test('M4.9: the phone tier keeps the cheap settings: no bloom or AO, at most PHONE_LAMPS lamps, half the motes', () => {
   const slot = jsonSlot('debug.lookLight', 'device');
   slot.write('on');
   try {
     expect(lookLightOn('desktop')).toBe(true);
-    expect(lookLightOn('phone')).toBe(false);
+    expect(lookLightOn('phone')).toBe(true);
   } finally { slot.write('off'); }
-  expect(lookLightOn('desktop')).toBe(false);
+  expect(lookLightOn('phone')).toBe(false);
+  const lamps = Array.from({ length: PHONE_LAMPS + 2 }, (_, i) => ({ ...B2.lamps[0]!, at: [i, 2, -3] as [number, number, number] }));
+  const motes = { count: 160, min: [0, 0, 0] as [number, number, number], max: [1, 1, 1] as [number, number, number], colour: [1, 0.8, 0.4] as [number, number, number], gain: 1, size: 0.1 };
+  const look = { light: { ...LIGHT, ...B2, lamps, motes, shadow: { intensity: 0.6, radius: 3, normalBias: 0.03 } }, grade: { bloom: { intensity: 0.8, threshold: 0.6 } } };
+  const phone = lookLightManifest(look, true, 'phone'), desktop = lookLightManifest(look, true, 'desktop');
+  expect(phone.bloom.intensity).toBe(0); expect(phone.ao).toBeNull();
+  expect(phone.lamps).toHaveLength(PHONE_LAMPS); expect(desktop.lamps).toHaveLength(PHONE_LAMPS + 2);
+  expect(phone.motes?.count).toBe(80); expect(desktop.motes?.count).toBe(160);
+  expect(phone.environment).toEqual(B2.environment); expect(phone.shadow).toEqual(desktop.shadow);
 });
 
-test('B2: the row is on by default on the desktop tier; only a saved off turns it off', () => {
+test('B2: the row is on by default (M4.9: on the phone tier too); only a saved off turns it off', () => {
   const slot = jsonSlot('debug.lookLight', 'device');
   slot.reset();
   try {
     expect(lookLightOn('desktop')).toBe(true);
-    expect(lookLightOn('phone')).toBe(false);
+    expect(lookLightOn('phone')).toBe(true);
     slot.write('off');
     expect(lookLightOn('desktop')).toBe(false);
   } finally { slot.reset(); }

@@ -7,9 +7,11 @@
  * shares one program per object variant and a missing map is a uniform, not a recompile (the same trick the sky rig
  * plays on loaded models). Program changes come only from `vertexColours`, `faceted`, `doubleSided`, `alphaCutoff > 0` and a
  * procedural `ground` layer (ground.ts: wind ripples, grain and terrain light shaping, Signal Dunes' sand) or `measure`
- * layer (measure.ts: SF56's dev-map grid, roles and size labels).
+ * layer (measure.ts: SF56's dev-map grid, roles and size labels) or `detail` layer (detail.ts: M4.11's world-space
+ * mottling, grain, bumps and moss).
  */
 import * as THREE from 'three';
+import { applyDetail } from './detail';
 import { applyGround } from './ground';
 import { applyMeasure } from './measure';
 import type { PbrMaterialParams } from '@wildshard/format/materialFamilies';
@@ -63,5 +65,9 @@ export function compilePbr(params: PbrMaterialParams, textures: TextureResolver,
   if (params.ground !== null && params.measure !== null) throw new Error('material family: a PBR surface takes a ground or a measure layer, not both');
   if (params.ground !== null) applyGround(m, params.ground, textures, emitterPools);
   if (params.measure !== null) applyMeasure(m, params.measure);
+  if (params.detail !== undefined) {
+    if (params.ground !== null || params.measure !== null) throw new Error('material family: a PBR surface takes a detail layer alone, not with a ground or measure layer');
+    applyDetail(m, params.detail);
+  }
   return m;
 }

@@ -23,6 +23,8 @@ import { EmissiveLook } from './families/emissive';
 import { familyMaterial } from './families/registry';
 import { ToonLook } from './families/toon';
 import { LOOK_RIM_PATCH, bounceLight, environmentScene, lampLights, lightPools, rimPatch } from './lookLight';
+import { ExposureEffect, lampHalos, lookMotes, tickGlow } from './lookRender';
+import type { LookMotes, LookShadow, LookVignette } from '@wildshard/format/look-render';
 import type { LookBounce, LookEnvironment, LookLamp, LookPools, LookRim } from '@wildshard/format/look-light';
 import { tierPmremGenerator } from './pmremSize';
 
@@ -64,9 +66,17 @@ export interface DataLookSpec {
     readonly rim: LookRim | null; readonly pools: LookPools | null; readonly heightFogDensity: number;
     /** B2: real lamps, a warm bounce and a sky-derived environment; absent or null: none */
     readonly lamps?: readonly LookLamp[] | null; readonly bounce?: LookBounce | null; readonly environment?: LookEnvironment | null;
+    /** TEMPLATES-CLEANROOM M4: the sun's shadow look and glow motes; absent or null: the engine's shadows, no motes */
+    readonly shadow?: LookShadow | null; readonly motes?: LookMotes | null;
   };
   /** B2 (`look.grade.tone` neutral): the Neutral display curve in place of the engine's AgX */
   readonly neutral?: boolean;
+  /** M4.7 (`look.grade.tone` aces): the ACES filmic curve in place of the engine's AgX */
+  readonly aces?: boolean;
+  /** M4.7: `look.grade.exposure` in stops ahead of the tone curve (absent or 0: none), its vignette and bloom radius */
+  readonly exposure?: number;
+  readonly vignette?: LookVignette | null;
+  readonly bloomRadius?: number | null;
 }
 
 /** A sampled look: plain numbers, blended between the two keys around a time of day. */
@@ -200,7 +210,9 @@ ${mist ? `
     shader.fragmentShader = `#ifdef USE_FOG\nuniform float wsLookFogNear; uniform float wsLookFogFar; uniform float wsLookFogEnabled;\n#endif\n${patched}`;
   };
   const owned: { dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null; lut: LookupTexture | null; pools: THREE.Object3D | null; rim: boolean;
-    lamps: THREE.Object3D | null; bounce: ReturnType<typeof bounceLight> | null; environment: THREE.WebGLRenderTarget | null } = { dome: null, lut: null, pools: null, rim: false, lamps: null, bounce: null, environment: null };
+    lamps: ReturnType<typeof lampLights> | null; bounce: ReturnType<typeof bounceLight> | null; environment: THREE.WebGLRenderTarget | null;
+    glow: THREE.Object3D[] | null } = { dome: null, lut: null, pools: null, rim: false, lamps: null, bounce: null, environment: null, glow: null };
+  const shadow = spec.light?.shadow ?? null;
   const bounceRow = spec.light?.bounce ?? null;
   // the bounce exists from the backdrop on (it follows the clock's sun there); compose adds it to the scene
   if (bounceRow !== null) owned.bounce = bounceLight(bounceRow);
@@ -233,6 +245,17 @@ ${mist ? `
         const group = lampLights(lamps);
         owned.lamps = group;
         scene.add(group); scope.onDispose(() => { group.removeFromParent(); for (const light of group.children) if (light instanceof THREE.Light) light.dispose(); if (owned.lamps === group) owned.lamps = null; });
+      }
+      const motes = spec.light?.motes ?? null;
+      if (owned.glow === null && ((lamps?.some((lamp) => lamp.halo !== undefined) ?? false) || motes !== null)) {
+        // M4.8: the lamps' halos (one instanced draw) and the motes (one points draw), once per look like the lamps
+        const glow: (THREE.Mesh | THREE.Points)[] = [];
+        const halos = lamps === null ? null : lampHalos(lamps);
+        if (halos !== null) glow.push(halos);
+        if (motes !== null) glow.push(lookMotes(motes));
+        owned.glow = glow;
+        for (const draw of glow) { scene.add(draw); scope.own(draw.geometry); scope.own(draw.material as THREE.Material); }
+        scope.onDispose(() => { for (const draw of glow) draw.removeFromParent(); if (owned.glow === glow) owned.glow = null; });
       }
       const bounce = owned.bounce;
       if (bounce !== null && bounce.light.parent !== scene) {
@@ -271,22 +294,31 @@ ${mist ? `
       const chain = engineChain('clean');
       // B2: the Neutral curve keeps the look's saturated albedo saturated, where AgX would grey it (asked after the clean chain)
       if (spec.neutral === true) fx.tone.mode = ToneMappingMode.NEUTRAL;
+      // M4.7: ACES, the look's own vignette and bloom spread, and its exposure ahead of the curve
+      if (spec.aces === true) fx.tone.mode = ToneMappingMode.ACES_FILMIC;
+      if (spec.vignette !== undefined && spec.vignette !== null) { fx.vignette.offset = spec.vignette.offset; fx.vignette.darkness = spec.vignette.darkness; }
+      if (spec.bloomRadius !== undefined && spec.bloomRadius !== null) fx.bloom.mipmapBlurPass.radius = spec.bloomRadius;
+      const stops = spec.exposure ?? 0, at = chain.indexOf(fx.tone);
+      if (stops !== 0 && at !== -1) { const exposure = new ExposureEffect(stops); scope.own(exposure); chain.splice(at, 0, exposure); }
       return { chain };
     },
     // G992: no sun disc or corona over the gradient dome. A 1° disc read as a blurred speck with a halo ("half-assed moon
     // or sun", Jake), and a crisp disc alone as a 3 px dot (art/open-plots/sun-disc-g992/board.jpg); the key light is unchanged.
     sky: { clouds: false, planet: false, sun: { disc: false, halo: false } },
+    // M4.7: the look's shadow radius and normal bias (its strength is set on the cascades each frame, below)
+    ...(shadow === null ? {} : { shadows: { rig: 'tier' as const, radius: shadow.radius, normalBias: shadow.normalBias } }),
     backdrop: async ({ sky }) => {
       const clock = dataLookClock(spec.day, spec.dayOverride), now = lookSample();
       const { dome, zenith, horizon } = gradientDome();
       owned.dome = dome;
       const bounce = owned.bounce;
-      let targets: SkyBackdropTargets | null = null;
+      let targets: SkyBackdropTargets | null = null, flicker = 0;
       const apply = (): void => {
         sampleLook(spec.keys, clock.hour / 24, now);
         zenith.copy(now.zenith); horizon.copy(now.horizon);
         sky.setKeyLight(clock.sunDir, now.sun, now.sunIntensity);
         bounce?.aim(clock.sunDir);
+        if (shadow !== null) for (const light of (sky.csm as { lights?: readonly THREE.DirectionalLight[] } | undefined)?.lights ?? []) light.shadow.intensity = shadow.intensity;
         if (targets === null) return;
         targets.hemi.color.copy(now.ambientSky); targets.hemi.groundColor.copy(now.ambientGround); targets.hemi.intensity = now.ambientIntensity;
         fog.wsLookFogEnabled.value = targets.underwater() ? 0 : Number(linear);
@@ -305,7 +337,7 @@ ${mist ? `
       owned.lut = await lutTexture(spec.lut);
       return { clock, horizon: now.fog.clone(), lut: owned.lut, clouds: dome,
         bind: (t) => { targets = t; apply(); },
-        update: (dt) => { clock.update(dt); apply(); },
+        update: (dt) => { clock.update(dt); apply(); flicker += dt; owned.lamps?.update?.(flicker); if (owned.glow !== null) tickGlow(owned.glow, flicker); },
         rebuild: () => undefined, attachPost: () => undefined };
     },
   };

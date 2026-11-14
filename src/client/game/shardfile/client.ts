@@ -285,7 +285,10 @@ export class ShardfileClient {
     worldStep(ctx, 'item models');
     this.skins = await loadClientSkins(this.source, this.assets.retained, presentation.compile, ctx.scope);
     worldStep(ctx, 'skins');
-    installClientWater(undrawnWater(this.source.water, this.plan?.features ?? []), { root: ctx.root, scope: ctx.scope, materials: presentation.materials, outline: presentation.outline });
+    // M4.6: a planar pool's ripples run on the game clock
+    const waterClocks: ((dt: number) => void)[] = [];
+    installClientWater(undrawnWater(this.source.water, this.plan?.features ?? []), { root: ctx.root, scope: ctx.scope, materials: presentation.materials, outline: presentation.outline, frame: (run) => { waterClocks.push(run); } });
+    if (waterClocks.length > 0) ctx.system({ id: 'game.shardfile.water', phase: 'update', run: (dt) => { for (const run of waterClocks) run(dt); } });
     const nativeWorld = this.nativeFeatures || this.mode === 'presentation';
     const start = nativeWorld ? ctx.manifest.spawn : this.source.spawn;
     const collider = nativeWorld && this.source.terrain !== null ? await this.assets.read(this.source.terrain.collider) : undefined;

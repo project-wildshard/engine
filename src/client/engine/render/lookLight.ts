@@ -15,11 +15,17 @@
  *   shadowless warm fill from the anti-sun heading; an environment filtered once from the look's own sky over a ground
  *   colour (`dataLook`).
  *
- * All of it waits behind Settings ▸ Debug ▸ Look ▸ "Look light" (read at load; default on for desktop since TEMPLATES-CLEANROOM
- * B2, off on phones): with the row off, a look that declares every setting draws as one that declares none.
+ * - `shadow`, `motes`, a lamp's `decay`, `halo` and `flicker` (TEMPLATES-CLEANROOM M4): the sun's shadow strength,
+ *   radius and normal bias; drifting glow points; lamp halos and an unsteady fire light (`lookRender.ts`).
+ *
+ * All of it waits behind Settings ▸ Debug ▸ Look ▸ "Look light" (read at load; default on): with the row off, a look that
+ * declares every setting draws as one that declares none. TEMPLATES-CLEANROOM M4.9 gates it per field on the phone tier
+ * instead of all or nothing: a phone keeps the environment, bounce, pools, rim, height fog and shadow look, at most
+ * `PHONE_LAMPS` lamps, half the motes, and no bloom or AO.
  */
 import * as THREE from 'three';
 import type { LookBounce, LookEnvironment, LookLamp, LookLight, LookPools, LookRim } from '@wildshard/format/look-light';
+import type { LookMotes, LookShadow } from '@wildshard/format/look-render';
 import type { ShaderSource } from './shaderPatches';
 
 /** the rim's shader patch id */
@@ -29,8 +35,8 @@ export const LOOK_RIM_PATCH = 'engine.look.rim';
 export interface LookLightResolved {
   /** the engine fog program's height term (`LevelSpec.atmosphere`'s fields) */
   readonly atmosphere: { readonly fogHeight: number; readonly fogHeightFalloff: number; readonly fogHeightDensity: number };
-  /** the engine bloom (intensity 0: none) */
-  readonly bloom: { readonly intensity: number; readonly threshold: number };
+  /** the engine bloom (intensity 0: none) and its spread (null: the engine's) */
+  readonly bloom: { readonly intensity: number; readonly threshold: number; readonly radius: number | null };
   /** the engine AO on the desktop tier; null: none */
   readonly ao: { readonly intensity: number; readonly radius: number } | null;
   readonly rim: LookRim | null;
@@ -38,29 +44,43 @@ export interface LookLightResolved {
   readonly lamps: readonly LookLamp[] | null;
   readonly bounce: LookBounce | null;
   readonly environment: LookEnvironment | null;
+  /** M4.2: the sun's shadow look; null: the engine's */
+  readonly shadow: LookShadow | null;
+  /** M4.4: glow motes; null: none */
+  readonly motes: LookMotes | null;
 }
 
 /** the settings a shardfile look carries (structural: `Shardfile['look']` fits) */
 export interface LookLightSource {
   readonly light?: LookLight | undefined;
-  readonly grade: { readonly bloom?: { readonly intensity: number; readonly threshold: number } | undefined };
+  readonly grade: { readonly bloom?: { readonly intensity: number; readonly threshold: number; readonly radius?: number | undefined } | undefined };
 }
 
 /** No height fog: the fields a shardfile manifest had before LF1-4. */
 const NO_HEIGHT_FOG = { fogHeight: -20, fogHeightFalloff: 0, fogHeightDensity: 0 } as const;
 
-/** Resolve a look's light settings; `on` is the Debug row ("Look light"). Off, or nothing declared: as before. */
-export function lookLightManifest(look: LookLightSource, on: boolean): LookLightResolved {
-  const light = on ? look.light : undefined, bloom = on ? look.grade.bloom : undefined, fog = light?.heightFog;
+/** M4.9: at most this many of a look's lamps light on the phone tier (each costs every lit draw a light-loop step) */
+export const PHONE_LAMPS = 4;
+
+/**
+ * Resolve a look's light settings; `on` is the Debug row ("Look light"), `tier` the page's. Off, or nothing declared: as
+ * before. The phone tier keeps the cheap fields (M4.9): no bloom or AO, the first `PHONE_LAMPS` lamps, half the motes.
+ */
+export function lookLightManifest(look: LookLightSource, on: boolean, tier = 'desktop'): LookLightResolved {
+  const phone = tier === 'phone';
+  const light = on ? look.light : undefined, bloom = on && !phone ? look.grade.bloom : undefined, fog = light?.heightFog;
+  const motes = light?.motes === undefined ? null : phone ? { ...light.motes, count: Math.max(1, Math.floor(light.motes.count / 2)) } : light.motes;
   return {
     atmosphere: fog === undefined ? { ...NO_HEIGHT_FOG } : { fogHeight: fog.height, fogHeightFalloff: fog.falloff, fogHeightDensity: fog.density },
-    bloom: bloom === undefined ? { intensity: 0, threshold: 1 } : { intensity: bloom.intensity, threshold: bloom.threshold },
-    ao: light?.ao === undefined ? null : { intensity: light.ao.intensity, radius: light.ao.radius },
+    bloom: bloom === undefined ? { intensity: 0, threshold: 1, radius: null } : { intensity: bloom.intensity, threshold: bloom.threshold, radius: bloom.radius ?? null },
+    ao: light?.ao === undefined || phone ? null : { intensity: light.ao.intensity, radius: light.ao.radius },
     rim: light?.rim ?? null,
     pools: light?.pools ?? null,
-    lamps: light?.lamps ?? null,
+    lamps: light?.lamps === undefined ? null : phone ? light.lamps.slice(0, PHONE_LAMPS) : light.lamps,
     bounce: light?.bounce ?? null,
     environment: light?.environment ?? null,
+    shadow: light?.shadow ?? null,
+    motes,
   };
 }
 
@@ -136,14 +156,28 @@ export function bounceLight(bounce: LookBounce): { light: THREE.DirectionalLight
   return { light, aim };
 }
 
-/** The look's lamps (B2): one shadowless point light each, physical decay. */
-export function lampLights(lamps: readonly LookLamp[]): THREE.Group {
-  const group = new THREE.Group();
+/**
+ * The look's lamps (B2): one shadowless point light each, physical decay unless the lamp sets its own (M4.3). `update`
+ * flickers the lamps that declare a flicker (two incommensurate sines per lamp, so no two lamps pulse together); it is
+ * null when none does.
+ */
+export function lampLights(lamps: readonly LookLamp[]): THREE.Group & { update: ((time: number) => void) | null } {
+  const group = Object.assign(new THREE.Group(), { update: null as ((time: number) => void) | null });
   group.name = 'look-light-lamps';
-  for (const lamp of lamps) {
-    const light = new THREE.PointLight(new THREE.Color().setRGB(lamp.colour[0], lamp.colour[1], lamp.colour[2], THREE.LinearSRGBColorSpace), lamp.intensity, lamp.distance, 2);
+  const flickering: { light: THREE.PointLight; base: number; rate: number; amount: number; phase: number }[] = [];
+  lamps.forEach((lamp, i) => {
+    const light = new THREE.PointLight(new THREE.Color().setRGB(lamp.colour[0], lamp.colour[1], lamp.colour[2], THREE.LinearSRGBColorSpace), lamp.intensity, lamp.distance, lamp.decay ?? 2);
     light.position.set(lamp.at[0], lamp.at[1], lamp.at[2]); light.castShadow = false;
     group.add(light);
+    if (lamp.flicker !== undefined && lamp.flicker.amount > 0) flickering.push({ light, base: lamp.intensity, rate: lamp.flicker.rate, amount: lamp.flicker.amount, phase: i * 2.399 });
+  });
+  if (flickering.length > 0) {
+    group.update = (time) => {
+      for (const f of flickering) {
+        const w = Math.sin(time * f.rate * 2.1 + f.phase) * 0.6 + Math.sin(time * f.rate * 5.3 + f.phase * 1.7) * 0.4;
+        f.light.intensity = f.base * (1 - f.amount * 0.5 + f.amount * 0.5 * w);
+      }
+    };
   }
   return group;
 }

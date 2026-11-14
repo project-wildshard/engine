@@ -19,6 +19,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { ownedPresentationImages } from '../shardfile/presentation';
 import { lookLightManifest } from '@wildshard/engine/render/lookLight';
 import { lookLightOn } from '@wildshard/engine/ui/lookLightOption';
+import { TIER } from '@wildshard/engine/core/tier';
 import { absentShardProduct, type ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 
 
@@ -163,7 +164,7 @@ export function sourceManifest(source: Pick<Shardfile, 'identity' | 'accent' | '
   const slug = parseShardSlug(source.identity.slug);
   const images = imageOwner === undefined ? undefined : ownedPresentationImages(source, assets, imageOwner);
   // LF1-4: the look's light settings (height fog, bloom, desktop AO) behind Settings ▸ Debug ▸ Look ▸ "Look light"
-  const light = lookLightManifest(source.look, lookLightOn());
+  const light = lookLightManifest(source.look, lookLightOn(), TIER);
   const card = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/%3E';
   return {
     ...(source.navigation === null || source.navigation === undefined || navigation === undefined ? {} : { navigation: { row: source.navigation, bytes: navigation } }),
