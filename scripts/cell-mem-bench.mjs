@@ -14,12 +14,13 @@
 // and each scrape is a loopback curl over ssh (the agent account forwards no ports). Memory is RSS (Linux has no `footprint`). The
 // box fetches its own packs from R2 into the run's cache, kept across counts. The directory goes when the run ends, however it ends.
 // SC4: each count also says `arrivalTickMax`, the worst tick in the worker readings heard in the 20 s after the bots arrived.
-import { execFile, execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseArgs, promisify } from 'node:util';
+import { parseArgs } from 'node:util';
 
 const { values } = parseArgs({ options: { from: { type: 'string' }, counts: { type: 'string', default: '1,2,8,16,25' }, dormant: { type: 'string', default: '30' }, active: { type: 'string', default: '40' },
   workers: { type: 'string', default: '4' }, port: { type: 'string', default: '18896' }, origin: { type: 'string', default: 'https://packs.wildshard.io' },
@@ -35,11 +36,18 @@ if (remote !== undefined && !/^[\w.@-]+$/u.test(remote)) throw new Error('--remo
 if (!/^[\d,-]+$/u.test(values.cpus) || !/^[\d,-]+$/u.test(values['bot-cpus']) || !/^\d{1,3}$/u.test(values.workers) || !/^\d{4,5}$/u.test(values.port)) throw new Error('--cpus and --bot-cpus are taskset lists; --workers and --port are numbers');
 const ALIVE = ['-o', 'BatchMode=yes', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8'];
 const away = `cell-mem/${new Date().toISOString().replaceAll(/[-:]/gu, '').replace(/\..*/u, 'Z')}`;
-const execAsync = promisify(execFile);
+/** One command's output text, without blocking the loop (the replica's and bots' pipes keep draining meanwhile). */
+const execAsync = async (/** @type {string} */ file, /** @type {string[]} */ args, /** @type {number} */ timeout) => {
+  const child = spawn(file, args, { stdio: ['ignore', 'pipe', 'inherit'], timeout }), chunks = /** @type {Buffer[]} */ ([]);
+  child.stdout.on('data', (/** @type {Buffer} */ chunk) => { chunks.push(chunk); });
+  const [code] = await once(child, 'close');
+  if (code !== 0) throw new Error(`${file} exited ${String(code)}`);
+  return Buffer.concat(chunks).toString();
+};
 /** One command on the box, its output as text. */
-const box = async (/** @type {string} */ command, /** @type {Buffer | string | undefined} */ input = undefined) => {
+const box = (/** @type {string} */ command, /** @type {Buffer | string | undefined} */ input) => {
   if (remote === undefined) throw new Error('Not remote');
-  if (input === undefined) return (await execAsync('ssh', [...ALIVE, remote, command], { maxBuffer: 1 << 26, timeout: 120_000 })).stdout;
+  if (input === undefined) return execAsync('ssh', [...ALIVE, remote, command], 120_000);
   return execFileSync('ssh', [...ALIVE, remote, command], { input, maxBuffer: 1 << 26, timeout: 300_000 }).toString();
 };
 /** The box's replica and bots, ended by their own paths, and the run's directory, removed. */
