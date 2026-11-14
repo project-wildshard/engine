@@ -8,3 +8,10 @@
   to the measured bytes with a J338 row (`45bc7c58`).
 - The entry-socket fix (`e5bb69b6`) stays dropped: rev 3's docks are
   real ground, so the server needs no floor sockets to stand on.
+- Preview's Driftwood to Far Reach crash, "proof.worker.present: null
+  pointer passed to rust", reproduced on preview `1b2f1ac8` with a
+  console stack: `NetMovers.frame` posed a mover view whose cell had
+  gone (`FollowedMovers.follow` then `KinematicMover.setPose` on a
+  freed body). `installFollowedMovers` put views on `wirePage.movers`
+  and never took them off; the cell's scope now does, its own only
+  (`followed-movers-dispose.test.ts`, red first).

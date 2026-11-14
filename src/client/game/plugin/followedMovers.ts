@@ -179,6 +179,12 @@ export function installFollowedMovers(ctx: LevelContext, world: World, options: 
   ctx.scope.onDispose(() => { if (movers.riding()) world.player.carried = false; });
   if (options.onDispose !== undefined) ctx.scope.onDispose(options.onDispose);
   ctx.debug.expose(`movers.${options.systemId}`, { showRest: () => { movers.showRest(); } }); // the map bake poses movers at rest
-  for (const row of options.data) wirePage.movers.set(row.id, { pose: pose => { wirePage.posed++; movers.follow(row.id, pose); }, place: (at, next) => { movers.replayPose(row.id, at, next); } });
+  // GC30b: the scope frees these movers' bodies, so their views leave the wire with it, or the next row of that id poses a freed
+  // body ("null pointer passed to rust"). Only this cell's own view: another cell may have lent one under the same id since.
+  for (const row of options.data) {
+    const view: MoverView = { pose: pose => { wirePage.posed++; movers.follow(row.id, pose); }, place: (at, next) => { movers.replayPose(row.id, at, next); } };
+    wirePage.movers.set(row.id, view);
+    ctx.scope.onDispose(() => { if (wirePage.movers.get(row.id) === view) wirePage.movers.delete(row.id); });
+  }
   return movers;
 }
