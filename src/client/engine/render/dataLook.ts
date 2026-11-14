@@ -175,6 +175,34 @@ export class NeutralToneEffect extends Effect {
   constructor() { super('NeutralToneEffect', NEUTRAL_FRAGMENT, { blendFunction: BlendFunction.NORMAL }); }
 }
 
+const ACES_FRAGMENT = `
+uniform float uExposure;
+vec3 acesFit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
+void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+  const mat3 inputMat = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
+  const mat3 outputMat = mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
+  vec3 color = outputMat * acesFit(inputMat * (inputColor.rgb * uExposure / 0.6));
+  outputColor = vec4(clamp(color, 0.0, 1.0), inputColor.a);
+}
+`;
+
+/**
+ * M4.7 (review MUST): the ACES filmic curve (three's `ACESFilmicToneMapping`) as a grid cell's display, with the look's
+ * exposure folded in, for the reason `NeutralToneEffect` exists: a cell never runs `compose`, so the page chain's tone
+ * mode and the spliced `ExposureEffect` never reach it.
+ */
+export class AcesToneEffect extends Effect {
+  constructor(stops: number) {
+    super('AcesToneEffect', ACES_FRAGMENT, { blendFunction: BlendFunction.NORMAL, uniforms: new Map([['uExposure', new THREE.Uniform(2 ** stops)]]) });
+  }
+}
+
+/** a data look's grid-cell display: its own tone curve, when it names one (Neutral, or ACES with its exposure) */
+function cellTone(spec: { readonly neutral?: boolean; readonly aces?: boolean; readonly exposure?: number }): { readonly cell: { readonly replaces: 'tone'; readonly build: () => { display: Effect } } } | Record<string, never> {
+  if (spec.aces === true) { const stops = spec.exposure ?? 0; return { cell: { replaces: 'tone', build: () => ({ display: new AcesToneEffect(stops) }) } }; }
+  return spec.neutral === true ? { cell: { replaces: 'tone', build: () => ({ display: new NeutralToneEffect() }) } } : {};
+}
+
 /**
  * A level look from data: the engine's clean chain, the gradient dome, the engine fog, key light and ambient turned by
  * the keys on the engine clock, and the LUT last in the grade. Nothing is patched into another material.
@@ -217,7 +245,7 @@ ${mist ? `
   // the bounce exists from the backdrop on (it follows the clock's sun there); compose adds it to the scene
   if (bounceRow !== null) owned.bounce = bounceLight(bounceRow);
   return {
-    ...(spec.neutral === true ? { cell: { replaces: 'tone', build: () => ({ display: new NeutralToneEffect() }) } } as const : {}),
+    ...cellTone(spec),
     // the sky builds before the composer: the level scope takes the dome and the LUT here
     mode: 'extend', chain: 'clean', compose: ({ engineChain, scene, scope, fx, renderer }) => {
       const rim = spec.light?.rim ?? null, pools = spec.light?.pools ?? null, lamps = spec.light?.lamps ?? null;
@@ -255,7 +283,7 @@ ${mist ? `
         if (motes !== null) glow.push(lookMotes(motes));
         owned.glow = glow;
         for (const draw of glow) { scene.add(draw); scope.own(draw.geometry); scope.own(draw.material as THREE.Material); }
-        scope.onDispose(() => { for (const draw of glow) draw.removeFromParent(); if (owned.glow === glow) owned.glow = null; });
+        scope.onDispose(() => { for (const draw of glow) { draw.removeFromParent(); if (draw instanceof THREE.InstancedMesh) draw.dispose(); } if (owned.glow === glow) owned.glow = null; });
       }
       const bounce = owned.bounce;
       if (bounce !== null && bounce.light.parent !== scene) {

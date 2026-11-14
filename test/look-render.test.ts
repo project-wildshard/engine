@@ -64,3 +64,8 @@ test('planar pool: a mirror laid flat at the water level, the surface knobs as u
   const centre = plane.boundingBox!.getCenter(new THREE.Vector3());
   expect([centre.x, centre.y]).toEqual([2, 4]); // z negated: a −90° turn about x lays it back at z = −4
 });
+
+test('a grid cell carries an ACES look through its own display, its exposure folded in', async () => {
+  const { AcesToneEffect } = await import('../src/client/engine/render/dataLook');
+  expect(new AcesToneEffect(0.5).uniforms.get('uExposure')?.value).toBeCloseTo(2 ** 0.5, 9);
+});

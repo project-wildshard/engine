@@ -8,3 +8,4 @@
   motes, and a procedural PBR detail layer (J338: no texture bytes). Phones now gate field by field instead of dropping
   the whole look-light row.
 - The render hosts' tests: test/look-light.test.ts (phone gating, flicker), test/look-render.test.ts.
+- Review MUST (claude -p): a grid cell never runs compose, so ACES and the exposure ride the cell's own display (AcesToneEffect), as Neutral does. Halos dispose their instance buffer.
