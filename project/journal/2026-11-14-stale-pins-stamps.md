@@ -17,3 +17,11 @@
 - Canonical: `pnpm pins` (reused from a current worktree in 2 s), now
   Far Reach rev 3; gen:inputs there leaves bytes.generated.ts unchanged.
 - Test: `test/stale-pins.test.ts`.
+
+## Fix forward: main red 43568190100
+
+- CI's ring-1 products job installs its own three-pin list (blender-template
+  revision 1) into `out/` and then runs gen:inputs, so the refusal broke
+  main's `tests (6)`. Only land commits what gen:inputs writes, so only
+  land refuses now: it runs the generator with `WS_STALE_PINS=refuse`;
+  everywhere else stale pin output is a `gen:inputs:` warning.

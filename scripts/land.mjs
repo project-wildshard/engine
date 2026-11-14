@@ -400,7 +400,8 @@ class Landing{
  regenerate(){
   if(!existsSync(join(this.root,GEN[0])))return;
   const before=this.holds('before gen:inputs');
-  const ran=spawnSync(process.execPath,[...GEN],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:300_000,maxBuffer:64<<20});
+  // the stamps it writes are committed here, so stale pin output refuses instead of warning (gen.ts, stalePinProducts)
+  const ran=spawnSync(process.execPath,[...GEN],{cwd:this.root,env:{...this.env,WS_STALE_PINS:'refuse'},encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:300_000,maxBuffer:64<<20});
   const head=this.head();
   if(head!==before){
    this.receipt(`STOP ${GEN.join(' ')} moved HEAD ${short(before)} -> ${short(head)}`);

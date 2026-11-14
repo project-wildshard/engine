@@ -32,8 +32,14 @@ const BYTES_TABLE = 'src/client/game/boot/bytes.generated.ts';
 function bytesModule(): string {
   // A pinned product older than the pins (a tree installed before a pin bump) published its old mounts under public/:
   // stamping them would put that revision's files back in the table, as lands from such worktrees did (Far Reach rev 1).
+  // Only land, which commits what this writes, refuses (`WS_STALE_PINS=refuse`, scripts/land.mjs); elsewhere it warns, since
+  // CI's ring-1 job installs its own pin list into out/ on purpose (main red 43568190100).
   const stale = stalePinProducts('.');
-  if (stale.length > 0) throw new Error(`out/ holds pinned products the pins no longer name (${stale.map(row => `${row.folder} revision ${String(row.revision)}`).join(', ')}): their public/ mounts would go into the boot stamps. Run \`pnpm pins\` in this tree, then gen:inputs again`);
+  if (stale.length > 0) {
+    const why = `out/ holds pinned products the pins no longer name (${stale.map(row => `${row.folder} revision ${String(row.revision)}`).join(', ')}): their public/ mounts would go into the boot stamps. Run \`pnpm pins\` in this tree, then gen:inputs again`;
+    if (process.env['WS_STALE_PINS'] === 'refuse') throw new Error(why);
+    console.warn(`gen:inputs: ${why}`);
+  }
   const rows = Object.fromEntries(Object.entries(JSON.parse(assetIndex()) as Record<string, number>).filter(([name]) => !name.endsWith('.DS_Store')));
   // The staged table is the baseline (HEAD's, unless a fix to it is staged on purpose), not the file a local run last
   // wrote: that may hold an older public/'s sizes.
