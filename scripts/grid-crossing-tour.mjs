@@ -109,7 +109,9 @@ try {
           // GC6: whether the crossing's target world (colliders and sim) is resident yet, and the world built ahead (GC5)
           built: q.target === undefined ? null : lv?.live?.residents?.includes(q.target) === true, ahead: lv?.live?.ahead?.instance ?? null,
           // GC13: the cells whose worlds the page holds, and what playing costs
-          res: lv?.live?.residents ?? null, mb: st.playingMB ?? null });
+          res: lv?.live?.residents ?? null, mb: st.playingMB ?? null,
+          // GC12: how many closed walls show (only the ones the walker stands at)
+          wall: st.softWalls?.shown ?? null });
         if (q.samples.length > 20_000) q.samples.splice(0, 10_000);
       } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 100);
     });
@@ -184,6 +186,8 @@ try {
     const evicted = controlAt === 0 ? undefined : rows.find(r => r.t >= controlT && Array.isArray(r.res) && !r.res.includes(arc.from));
     row.fromEvictedMs = evicted === undefined ? null : evicted.t - controlT;
     row.peakPlayingMB = Math.max(0, ...rows.map(r => (typeof r.mb === 'number' ? r.mb : 0)));
+    // GC12: how long a hex wall showed in this crossing (samples every 100 ms); only a cold crossing held at the edge should show one
+    row.wallShownMs = rows.filter(r => typeof r.wall === 'number' && r.wall > 0).length * 100;
     const border = entered?.t ?? Infinity, near = frames.filter(f => Math.abs((f[0] ?? 0) - border) <= 3000).map(f => f[1] ?? 0);
     Object.assign(row, { ok: controlAt !== 0, why: controlAt !== 0 ? '' : fell ? `fell off ${arc.from}'s entryway (no ground there)` : entered === undefined ? (roadAt === undefined ? `never left ${arc.from}` : `held on the road (${String(last.phase)})`) : 'in the cell, no control',
       borderToControlMs: entered === undefined || controlAt === 0 ? null : controlT - entered.t, controlMs: controlAt === 0 ? null : controlAt, approachMps: Number(approach.toFixed(2)),

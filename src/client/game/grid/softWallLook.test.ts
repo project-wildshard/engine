@@ -5,7 +5,7 @@ import { GridAssembly } from '../../../shared/game/grid/assembly';
 import { parseGridCatalogue } from '../../../shared/game/grid/catalogue';
 import catalogue from '../../../shared/game/grid/singleplayer.json' with { type: 'json' };
 import { neighbourEdges } from '../../../shared/game/grid/readinessEdges';
-import { installSoftWallLook } from './softWallLook';
+import { MEET_METRES, edgeDistance, installSoftWallLook } from './softWallLook';
 
 test('layout curtain height is admitted separately from unchanged readiness edges', () => {
   const assembly = new GridAssembly({ developer: false, devserver: false });
@@ -55,4 +55,19 @@ test('low and default curtains share the same live closed flags and disposal', (
     for (let at = 0; at < 8; at++) expect(flags.getX(at)).toBe(0);
   } finally { scope.dispose(); }
   expect(scene.children).toEqual([]);
+});
+
+// GRID-CROSSING GC12 (Jake, 2026-11-13 ~22:50 Cancún, board A): today's hex wall, shown only when a player meets a closed edge.
+test('a closed wall shows only while the feet stand at it; an open one never', () => {
+  const scene = new Group(), scope = new Scope('gc12-meet');
+  let closed = true, feet = { x: -40, z: 0 };
+  const edge = { instance: 'east', x: 0, z: 0, axis: 'x' as const, halfLength: 250 };
+  const look = installSoftWallLook({ scene, scope, time: () => 0, edges: [edge], ports: { closed: () => closed, feet: () => feet } });
+  try {
+    look.step(); expect(look.state()).toEqual({ closed: 1, shown: 0 });
+    feet = { x: -MEET_METRES + 1, z: 120 }; look.step(); expect(look.state()).toEqual({ closed: 1, shown: 1 });
+    feet = { x: -2, z: 400 }; look.step(); expect(look.state()).toEqual({ closed: 1, shown: 0 });
+    feet = { x: -2, z: 0 }; closed = false; look.step(); expect(look.state()).toEqual({ closed: 0, shown: 0 });
+  } finally { scope.dispose(); }
+  expect(edgeDistance(edge, { x: 3, z: 260 })).toBeCloseTo(Math.hypot(3, 10));
 });
