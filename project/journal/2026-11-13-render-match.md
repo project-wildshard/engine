@@ -9,3 +9,4 @@
   the whole look-light row.
 - The render hosts' tests: test/look-light.test.ts (phone gating, flicker), test/look-render.test.ts.
 - Review MUST (claude -p): a grid cell never runs compose, so ACES and the exposure ride the cell's own display (AcesToneEffect), as Neutral does. Halos dispose their instance buffer.
+- CI: lookRender's halos on the model contract's effect list; the wire lockfile entry kept as main writes it.
