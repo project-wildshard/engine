@@ -129,6 +129,9 @@ if put "$NODE_DROPIN" < <(node_dropin); then units_changed=1; fi
 # promtool comes with the package, so the very first config is checked after the install, before anything restarts.
 check=; if command -v promtool >/dev/null 2>&1; then check='promtool check config'; fi
 if put "$CONFIG" "$check" < <(config); then config_changed=1; fi
+# The box's root umask (027, VH16) leaves a new /etc/prometheus root-only, and the prometheus user then cannot open its
+# config (v0.1.19 staging, 2026-11-14: "open /etc/prometheus/wildshard.yml: permission denied"). It holds no secret.
+chmod 755 "$(dirname "$CONFIG")" || exit 1
 if [ "$units_changed" = 1 ]; then systemctl daemon-reload; fi
 
 installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'ok installed'; }
