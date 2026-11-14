@@ -147,7 +147,7 @@ const earlyProgramsRow: DebugRow = { id: 'earlyPrograms', group: 'loading', labe
   note: 'DL10: compile the spawn view\'s shader programs during loading, as soon as the world is built; default off until a Simulator / iPhone reading.',
   ask: 'E526', reviewBy: '2026-12-30' };
 /** LF1-4 (meta TEMPLATE-E2E-PLAN): a look's optional light and post settings (contact AO, a warm rim, height fog, light
- *  pools, a declared bloom; render/lookLight.ts). Read at load, so a pick reloads; default off until Jake picks. */
+ *  pools, a declared bloom; render/lookLight.ts). Read at load, so a pick reloads; default on for desktop since TEMPLATES-CLEANROOM B2. */
 const lookLightRow: DebugRow = { id: 'lookLight', group: 'look', label: engineString('s_debug_look_light'), reload: true, when: always,
   choices: () => [{ v: 'off', text: engineString('s_ca7981b46ecf') }, { v: 'on', text: engineString('s_130011756125') }],
   get: () => lookLightSaved() ? 'on' : 'off',

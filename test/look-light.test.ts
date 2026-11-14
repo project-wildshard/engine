@@ -1,12 +1,12 @@
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
-import { lookLightManifest, lightPools, rimPatch, LOOK_RIM_PATCH } from '../src/client/engine/render/lookLight';
+import { bounceLight, environmentScene, lampLights, lookLightManifest, lightPools, rimPatch, LOOK_RIM_PATCH } from '../src/client/engine/render/lookLight';
 import { lookLightOn } from '../src/client/engine/ui/lookLightOption';
 import { jsonSlot } from '../src/client/engine/saves/slots';
 
 // TEMPLATE-E2E LF1-4: optional light and post settings for any shard's look (`look.light`, `look.grade.bloom`). Each is
-// off when absent, and all of them wait behind Settings ▸ Debug ▸ Look ▸ "Look light" (default off) until Jake picks:
-// with the row off a look that declares every setting draws exactly as one that declares none.
+// off when absent, and all of them wait behind Settings ▸ Debug ▸ Look ▸ "Look light" (default on for the desktop tier
+// since TEMPLATES-CLEANROOM B2): with the row off a look that declares every setting draws exactly as one that declares none.
 
 const LIGHT = {
   ao: { intensity: 2, radius: 1.5 },
@@ -14,10 +14,52 @@ const LIGHT = {
   heightFog: { density: 0.08, height: -1, falloff: 0.6 },
   pools: { colour: [1, 0.6, 0.2] as [number, number, number], intensity: 1, radius: 3, at: [[0, 0, -9], [3, 0, -6]] as [number, number, number][] },
 };
-const OFF = { atmosphere: { fogHeight: -20, fogHeightFalloff: 0, fogHeightDensity: 0 }, bloom: { intensity: 0, threshold: 1 }, ao: null, rim: null, pools: null };
+const OFF = { atmosphere: { fogHeight: -20, fogHeightFalloff: 0, fogHeightDensity: 0 }, bloom: { intensity: 0, threshold: 1 }, ao: null, rim: null, pools: null, lamps: null, bounce: null, environment: null };
+const B2 = {
+  lamps: [{ at: [1, 2, -3] as [number, number, number], colour: [1, 0.4, 0.06] as [number, number, number], intensity: 4, distance: 7 }],
+  bounce: { colour: [1, 0.28, 0.16] as [number, number, number], intensity: 0.35, lift: 0.25 },
+  environment: { intensity: 0.5, ground: [1, 0.25, 0.1] as [number, number, number] },
+};
 
 test('the Debug row off: every setting is ignored, the look is as before', () => {
-  expect(lookLightManifest({ light: LIGHT, grade: { bloom: { intensity: 0.8, threshold: 0.6 } } }, false)).toEqual(OFF);
+  expect(lookLightManifest({ light: { ...LIGHT, ...B2 }, grade: { bloom: { intensity: 0.8, threshold: 0.6 } } }, false)).toEqual(OFF);
+});
+
+test('B2: lamps, bounce and environment resolve with the row on', () => {
+  const resolved = lookLightManifest({ light: B2, grade: {} }, true);
+  expect(resolved.lamps).toEqual(B2.lamps);
+  expect(resolved.bounce).toEqual(B2.bounce);
+  expect(resolved.environment).toEqual(B2.environment);
+});
+
+test('B2 lamps: one shadowless point light per lamp, physical decay, at its point', () => {
+  const group = lampLights(B2.lamps);
+  expect(group.children).toHaveLength(1);
+  const light = group.children[0] as THREE.PointLight;
+  expect(light).toBeInstanceOf(THREE.PointLight);
+  expect([light.position.x, light.position.y, light.position.z]).toEqual([1, 2, -3]);
+  expect([light.intensity, light.distance, light.decay, light.castShadow]).toEqual([4, 7, 2, false]);
+});
+
+test('B2 bounce: a shadowless directional light from the anti-sun heading, lifted', () => {
+  const { light, aim } = bounceLight(B2.bounce);
+  aim(new THREE.Vector3(-0.79, 0.53, -0.32).normalize());
+  const dir = light.position.clone().sub(light.target.position).normalize();
+  expect(light.castShadow).toBe(false);
+  expect(dir.x).toBeGreaterThan(0.8); // the sun is to -x: the bounce comes from +x
+  expect(dir.y).toBeCloseTo(0.25, 5);
+  expect(light.intensity).toBe(0.35);
+});
+
+test('B2 environment: the dome over a ground disc, for one PMREM', () => {
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(600, 8, 4), new THREE.MeshBasicMaterial());
+  const made = environmentScene(dome, B2.environment);
+  const meshes = made.scene.children.filter((o): o is THREE.Mesh => o instanceof THREE.Mesh);
+  expect(meshes).toHaveLength(2);
+  expect(meshes[0]?.material).toBe(dome.material); // the look's own sky, not a copy
+  const floor = meshes[1]?.material as THREE.MeshBasicMaterial;
+  expect(floor.color.r).toBeCloseTo(1, 5);
+  made.dispose();
 });
 
 test('no settings declared: the row on changes nothing', () => {
@@ -77,6 +119,17 @@ test('the phone tier draws none of the settings, even with the row on (its 30 fp
     expect(lookLightOn('phone')).toBe(false);
   } finally { slot.write('off'); }
   expect(lookLightOn('desktop')).toBe(false);
+});
+
+test('B2: the row is on by default on the desktop tier; only a saved off turns it off', () => {
+  const slot = jsonSlot('debug.lookLight', 'device');
+  slot.reset();
+  try {
+    expect(lookLightOn('desktop')).toBe(true);
+    expect(lookLightOn('phone')).toBe(false);
+    slot.write('off');
+    expect(lookLightOn('desktop')).toBe(false);
+  } finally { slot.reset(); }
 });
 
 test('rim: every lit three shader takes it (toon, lambert, phong, standard), an unlit one does not', () => {

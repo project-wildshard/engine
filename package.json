@@ -67,7 +67,7 @@
     "@sentry/browser": "11.0.0",
     "@sentry/core": "11.0.0",
     "@valibot/to-json-schema": "1.8.0",
-    "@wildshard/format": "npm:@wildshard/shard-format@^0.4.9",
+    "@wildshard/format": "npm:@wildshard/shard-format@^0.4.10",
     "@wildshard/wire": "^0.1.0",
     "ajv": "6.15.0",
     "fflate": "0.8.3",

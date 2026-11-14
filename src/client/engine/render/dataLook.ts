@@ -22,8 +22,9 @@ import { loadLookGraphCompiler } from './graphBackend';
 import { EmissiveLook } from './families/emissive';
 import { familyMaterial } from './families/registry';
 import { ToonLook } from './families/toon';
-import { LOOK_RIM_PATCH, lightPools, rimPatch } from './lookLight';
-import type { LookPools, LookRim } from '@wildshard/format/look-light';
+import { LOOK_RIM_PATCH, bounceLight, environmentScene, lampLights, lightPools, rimPatch } from './lookLight';
+import type { LookBounce, LookEnvironment, LookLamp, LookPools, LookRim } from '@wildshard/format/look-light';
+import { tierPmremGenerator } from './pmremSize';
 
 type Rgb = readonly [number, number, number];
 const mesh = (object: THREE.Object3D): object is THREE.Mesh => object instanceof THREE.Mesh;
@@ -59,7 +60,13 @@ export interface DataLookSpec {
    * its light settings as they resolved at load (LF1-4, `render/lookLight.ts`): a rim patched into every lit material, the
    * light pools' decal draw and the fog program's height density; absent: none of them
    */
-  readonly light?: { readonly rim: LookRim | null; readonly pools: LookPools | null; readonly heightFogDensity: number };
+  readonly light?: {
+    readonly rim: LookRim | null; readonly pools: LookPools | null; readonly heightFogDensity: number;
+    /** B2: real lamps, a warm bounce and a sky-derived environment; absent or null: none */
+    readonly lamps?: readonly LookLamp[] | null; readonly bounce?: LookBounce | null; readonly environment?: LookEnvironment | null;
+  };
+  /** B2 (`look.grade.tone` neutral): the Neutral display curve in place of the engine's AgX */
+  readonly neutral?: boolean;
 }
 
 /** A sampled look: plain numbers, blended between the two keys around a time of day. */
@@ -129,6 +136,35 @@ async function lutTexture(url: string | Uint8Array | null): Promise<LookupTextur
   return lut;
 }
 
+const NEUTRAL_FRAGMENT = `
+vec3 neutralCurve(vec3 color) {
+  const float startCompression = 0.8 - 0.04;
+  const float desaturation = 0.15;
+  float x = min(color.r, min(color.g, color.b));
+  float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+  color -= offset;
+  float peak = max(color.r, max(color.g, color.b));
+  if (peak < startCompression) return color;
+  float d = 1.0 - startCompression;
+  float newPeak = 1.0 - d * d / (peak + d - startCompression);
+  color *= newPeak / peak;
+  float g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0);
+  return mix(color, vec3(newPeak), g);
+}
+void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+  outputColor = vec4(neutralCurve(inputColor.rgb), inputColor.a);
+}
+`;
+
+/**
+ * The NEUTRAL tone curve (Khronos PBR Neutral, three's `NeutralToneMapping` at exposure 1) as a grid cell's display: the
+ * page's colour pass already holds a ToneMappingEffect, and a second one includes three's tone-mapping chunk twice
+ * ('toneMappingExposure' redefinition), so the merged pass would never compile; this is the same curve under its own name.
+ */
+export class NeutralToneEffect extends Effect {
+  constructor() { super('NeutralToneEffect', NEUTRAL_FRAGMENT, { blendFunction: BlendFunction.NORMAL }); }
+}
+
 /**
  * A level look from data: the engine's clean chain, the gradient dome, the engine fog, key light and ambient turned by
  * the keys on the engine clock, and the LUT last in the grade. Nothing is patched into another material.
@@ -163,11 +199,16 @@ ${mist ? `
       #endif`);
     shader.fragmentShader = `#ifdef USE_FOG\nuniform float wsLookFogNear; uniform float wsLookFogFar; uniform float wsLookFogEnabled;\n#endif\n${patched}`;
   };
-  const owned: { dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null; lut: LookupTexture | null; pools: THREE.Object3D | null; rim: boolean } = { dome: null, lut: null, pools: null, rim: false };
+  const owned: { dome: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null; lut: LookupTexture | null; pools: THREE.Object3D | null; rim: boolean;
+    lamps: THREE.Object3D | null; bounce: ReturnType<typeof bounceLight> | null; environment: THREE.Texture | null } = { dome: null, lut: null, pools: null, rim: false, lamps: null, bounce: null, environment: null };
+  const bounceRow = spec.light?.bounce ?? null;
+  // the bounce exists from the backdrop on (it follows the clock's sun there); compose adds it to the scene
+  if (bounceRow !== null) owned.bounce = bounceLight(bounceRow);
   return {
+    ...(spec.neutral === true ? { cell: { replaces: 'tone', build: () => ({ display: new NeutralToneEffect() }) } } as const : {}),
     // the sky builds before the composer: the level scope takes the dome and the LUT here
-    mode: 'extend', chain: 'clean', compose: ({ engineChain, scene, scope }) => {
-      const rim = spec.light?.rim ?? null, pools = spec.light?.pools ?? null;
+    mode: 'extend', chain: 'clean', compose: ({ engineChain, scene, scope, fx }) => {
+      const rim = spec.light?.rim ?? null, pools = spec.light?.pools ?? null, lamps = spec.light?.lamps ?? null;
       if (rim !== null && !owned.rim) {
         owned.rim = true; scope.onDispose(() => { owned.rim = false; });
         // LF1-4: one rim patch over every lit material, present and later (its values are uniforms: one shader text)
@@ -187,6 +228,21 @@ ${mist ? `
         owned.pools = decal;
         scene.add(decal); scope.own(decal.geometry); scope.own(decal.material); scope.onDispose(() => { decal.removeFromParent(); decal.dispose(); if (owned.pools === decal) owned.pools = null; });
       }
+      if (lamps !== null && owned.lamps === null) {
+        // B2: real lamps, once per look like the pools
+        const group = lampLights(lamps);
+        owned.lamps = group;
+        scene.add(group); scope.onDispose(() => { group.removeFromParent(); for (const light of group.children) if (light instanceof THREE.Light) light.dispose(); if (owned.lamps === group) owned.lamps = null; });
+      }
+      const bounce = owned.bounce;
+      if (bounce !== null && bounce.light.parent !== scene) {
+        scene.add(bounce.light, bounce.light.target); scope.onDispose(() => { bounce.light.removeFromParent(); bounce.light.target.removeFromParent(); });
+      }
+      const environment = owned.environment;
+      if (environment !== null) {
+        scene.environment = environment; scene.environmentIntensity = spec.light?.environment?.intensity ?? 1;
+        scope.onDispose(() => { if (scene.environment === environment) scene.environment = null; environment.dispose(); if (owned.environment === environment) owned.environment = null; });
+      }
       if (linear) {
         setInheritedPatch(patchFog, { scope, chain: true });
         const seen = new Set<THREE.Material>();
@@ -201,20 +257,25 @@ ${mist ? `
       const { dome, lut } = owned;
       if (dome !== null) { scope.own(dome.geometry); scope.own(dome.material); scope.onDispose(() => { dome.removeFromParent(); }); }
       if (lut !== null) scope.own(lut);
-      return { chain: engineChain('clean') };
+      const chain = engineChain('clean');
+      // B2: the Neutral curve keeps the look's saturated albedo saturated, where AgX would grey it (asked after the clean chain)
+      if (spec.neutral === true) fx.tone.mode = ToneMappingMode.NEUTRAL;
+      return { chain };
     },
     // G992: no sun disc or corona over the gradient dome. A 1° disc read as a blurred speck with a halo ("half-assed moon
     // or sun", Jake), and a crisp disc alone as a 3 px dot (art/open-plots/sun-disc-g992/board.jpg); the key light is unchanged.
     sky: { clouds: false, planet: false, sun: { disc: false, halo: false } },
-    backdrop: async ({ sky }) => {
+    backdrop: async ({ sky, renderer }) => {
       const clock = dataLookClock(spec.day, spec.dayOverride), now = lookSample();
       const { dome, zenith, horizon } = gradientDome();
       owned.dome = dome;
+      const bounce = owned.bounce;
       let targets: SkyBackdropTargets | null = null;
       const apply = (): void => {
         sampleLook(spec.keys, clock.hour / 24, now);
         zenith.copy(now.zenith); horizon.copy(now.horizon);
         sky.setKeyLight(clock.sunDir, now.sun, now.sunIntensity);
+        bounce?.aim(clock.sunDir);
         if (targets === null) return;
         targets.hemi.color.copy(now.ambientSky); targets.hemi.groundColor.copy(now.ambientGround); targets.hemi.intensity = now.ambientIntensity;
         fog.wsLookFogEnabled.value = targets.underwater() ? 0 : Number(linear);
@@ -229,6 +290,13 @@ ${mist ? `
       };
       sampleLook(spec.keys, clock.hour / 24, now);
       zenith.copy(now.zenith); horizon.copy(now.horizon);
+      bounce?.aim(clock.sunDir);
+      const envRow = spec.light?.environment ?? null;
+      if (envRow !== null && owned.environment === null) {
+        // B2: sky-derived ambient, filtered once from the dome at the look's start (a clock that runs keeps this one)
+        const made = environmentScene(dome, envRow), pmrem = tierPmremGenerator(renderer);
+        try { owned.environment = pmrem.fromScene(made.scene, 0.02).texture; } finally { pmrem.dispose(); made.dispose(); }
+      }
       owned.lut = await lutTexture(spec.lut);
       return { clock, horizon: now.fog.clone(), lut: owned.lut, clouds: dome,
         bind: (t) => { targets = t; apply(); },
@@ -373,34 +441,6 @@ export function headingHaze(row: HeadingHazeRow, sun: LookVec3): (shader: Shader
   };
 }
 
-const NEUTRAL_FRAGMENT = `
-vec3 neutralCurve(vec3 color) {
-  const float startCompression = 0.8 - 0.04;
-  const float desaturation = 0.15;
-  float x = min(color.r, min(color.g, color.b));
-  float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
-  color -= offset;
-  float peak = max(color.r, max(color.g, color.b));
-  if (peak < startCompression) return color;
-  float d = 1.0 - startCompression;
-  float newPeak = 1.0 - d * d / (peak + d - startCompression);
-  color *= newPeak / peak;
-  float g = 1.0 - 1.0 / (desaturation * (peak - newPeak) + 1.0);
-  return mix(color, vec3(newPeak), g);
-}
-void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
-  outputColor = vec4(neutralCurve(inputColor.rgb), inputColor.a);
-}
-`;
-
-/**
- * The NEUTRAL tone curve (Khronos PBR Neutral, three's `NeutralToneMapping` at exposure 1) as a grid cell's display: the
- * page's colour pass already holds a ToneMappingEffect, and a second one includes three's tone-mapping chunk twice
- * ('toneMappingExposure' redefinition), so the merged pass would never compile; this is the same curve under its own name.
- */
-export class NeutralToneEffect extends Effect {
-  constructor() { super('NeutralToneEffect', NEUTRAL_FRAGMENT, { blendFunction: BlendFunction.NORMAL }); }
-}
 
 /** A painted look's dome (its sky layer) and the heading strip its haze reads (null on a painted-strip sky). */
 export interface PaintedSky { readonly dome: THREE.Mesh<THREE.BufferGeometry, THREE.Material>; readonly strip: THREE.Texture | null }

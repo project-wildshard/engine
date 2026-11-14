@@ -1,6 +1,7 @@
 /**
  * Settings ▸ Debug ▸ Look ▸ "Look light" (meta TEMPLATE-E2E-PLAN LF1-4): whether a look's optional light and post settings
- * (`look.light`, `look.grade.bloom`; `render/lookLight.ts`) draw. Default off until Jake picks; read at load, so a pick
+ * (`look.light`, `look.grade.bloom`; `render/lookLight.ts`) draw. Default on for the desktop tier since TEMPLATES-CLEANROOM
+ * B2 (was off until Jake picked; Jake's 2026-11-13 cleanroom port asks for the look as authored); read at load, so a pick
  * reloads the page.
  */
 import { jsonSlot } from '../saves/slots';
@@ -9,9 +10,12 @@ import { TIER } from '../core/tier';
 /** the saved slot's key */
 export const LOOK_LIGHT_SLOT = 'debug.lookLight';
 
-/** The row's saved value: 'on' or 'off' (anything else, or no storage: off). */
+/**
+ * The row's saved value: on unless saved 'off' (TEMPLATES-CLEANROOM B2: a look's declared light is how its author asked
+ * it to look, so it draws by default; no storage: on).
+ */
 export function lookLightSaved(): boolean {
-  try { return jsonSlot(LOOK_LIGHT_SLOT, 'device').read() === 'on'; } catch { return false; }
+  try { return jsonSlot(LOOK_LIGHT_SLOT, 'device').read() !== 'off'; } catch { return true; }
 }
 /**
  * Whether the settings draw on this page: the row on, and the desktop tier. The phone tier draws none of them until

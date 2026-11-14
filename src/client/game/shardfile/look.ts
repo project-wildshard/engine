@@ -18,6 +18,7 @@ export function shardfileLook(look: Shardfile['look'], assets?: ReadonlyMap<stri
   const lut = look.grade.lut === null ? null : assets?.get(look.grade.lut) ?? shardfileFileUrl(look.grade.lut);
   if (assets !== undefined && look.grade.lut !== null && !assets.has(look.grade.lut)) throw new Error('Missing admitted look LUT');
   const resolved = lookLightManifest(look, light);
-  return dataLook({ day: look.day ?? DATA_LOOK_DAY, dayOverride: look.dayOverride, keys: look.keys, lut,
-    light: { rim: resolved.rim, pools: resolved.pools, heightFogDensity: resolved.atmosphere.fogHeightDensity } });
+  // B2: `grade.tone` is a grade choice, not a light setting: it holds on every tier, with or without the row
+  return dataLook({ day: look.day ?? DATA_LOOK_DAY, dayOverride: look.dayOverride, keys: look.keys, lut, neutral: look.grade.tone === 'neutral',
+    light: { rim: resolved.rim, pools: resolved.pools, heightFogDensity: resolved.atmosphere.fogHeightDensity, lamps: resolved.lamps, bounce: resolved.bounce, environment: resolved.environment } });
 }
