@@ -179,7 +179,7 @@ try {
     let arc = outs.sort((a, b) => [...left].filter(o => o.from === b.to).length - [...left].filter(o => o.from === a.to).length)[0], repeat = false;
     if (arc === undefined) {
       // the shortest way over crossed arcs to a cell with arcs left
-      /** @type {Map<string, Arc | null>} */ const via = new Map([[here, null]]); const queue = [here]; let goal = '';
+      /** @type {Map<string, { from: string, to: string, dx: number, dz: number, boost: boolean } | null>} */ const via = new Map([[here, null]]); const queue = [here]; let goal = '';
       while (queue.length > 0 && goal === '') { const cell = /** @type {string} */ (queue.shift()); for (const g of good.filter(o => o.from === cell && !via.has(o.to))) { via.set(g.to, g); queue.push(g.to); if ([...left].some(o => o.from === g.to)) { goal = g.to; break; } } }
       if (goal === '') {
         // stranded (a cell whose every way out failed, Far Reach's sky islands): back in by the title; the arcs out of here count as tried
