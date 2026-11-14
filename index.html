@@ -215,7 +215,7 @@
     <script>
       // Plain launch: the shard selector is the first screen, with no world or loading panel underneath it.
       // BEGIN TITLE URLS
-      const titleAssetURLs = {"/assets/title/driftwood-isle-portrait.jpg":"/assets/title/driftwood-isle-portrait-e9d5c9aedd5c5920.jpg","/assets/title/launch-1206x2622-6afc7dd7eee8.png":"/assets/title/launch-1206x2622-6afc7dd7eee8.png","/assets/title/main-crossroads-landscape.jpg":"/assets/title/main-crossroads-landscape-9437ac10c599548a.jpg","/assets/title/main-crossroads-square.jpg":"/assets/title/main-crossroads-square-24abf23d2606ae3f.jpg","/assets/title/nalati-grasslands-portrait.jpg":"/assets/title/nalati-grasslands-portrait-5ac0c2e430a5a22b.jpg","/assets/title/nine-dragon-stack-portrait.jpg":"/assets/title/nine-dragon-stack-portrait-d92d65e333c1ccba.jpg","/assets/title/pine-hollow-portrait.jpg":"/assets/title/pine-hollow-portrait-30a60f74489265a0.jpg"};
+      const titleAssetURLs = {"/assets/title/driftwood-isle-portrait.jpg":"/assets/title/driftwood-isle-portrait-e9d5c9aedd5c5920.jpg","/assets/title/launch-1206x2622-6afc7dd7eee8.png":"/assets/title/launch-1206x2622-6afc7dd7eee8.png","/assets/title/main-crossroads-landscape-first.jpg":"/assets/title/main-crossroads-landscape-first-f3f196486b3476a0.jpg","/assets/title/main-crossroads-landscape.jpg":"/assets/title/main-crossroads-landscape-9437ac10c599548a.jpg","/assets/title/main-crossroads-square-first.jpg":"/assets/title/main-crossroads-square-first-98ef65b2b3433656.jpg","/assets/title/main-crossroads-square.jpg":"/assets/title/main-crossroads-square-24abf23d2606ae3f.jpg","/assets/title/nalati-grasslands-portrait.jpg":"/assets/title/nalati-grasslands-portrait-5ac0c2e430a5a22b.jpg","/assets/title/nine-dragon-stack-portrait.jpg":"/assets/title/nine-dragon-stack-portrait-d92d65e333c1ccba.jpg","/assets/title/pine-hollow-portrait.jpg":"/assets/title/pine-hollow-portrait-30a60f74489265a0.jpg"};
       // END TITLE URLS
       const homeParams = new URLSearchParams(location.search);
       // The environment flags select no level (src/client/app/bootRoute.ts keeps the same list): a launch with only them is the title.
@@ -224,7 +224,9 @@
       if (document.documentElement.classList.contains('title-first')) {
         const hero = document.createElement('link');
         hero.rel = 'preload'; hero.as = 'image'; hero.fetchPriority = 'high';
-        hero.href = titleAssetURLs['/assets/title/main-crossroads-' + (matchMedia('(orientation: portrait)').matches ? 'square' : 'landscape') + '.jpg'];
+        // PZ19: the shell's hero is the ~30 kB first cut, so it no longer outruns the entry's code on a slow line; the title's
+        // own hero (mainMenu.ts) brings the full image in over it once the title is up
+        hero.href = titleAssetURLs['/assets/title/main-crossroads-' + (matchMedia('(orientation: portrait)').matches ? 'square' : 'landscape') + '-first.jpg'];
         document.head.appendChild(hero);
       }
     </script>
@@ -483,9 +485,9 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       html.standalone #ws-top-edge { display: block; position: fixed; top: 0; left: 0; right: 0; height: 12px; z-index: 2147483647; background: rgba(5, 8, 16, 0.004); pointer-events: none; }
       .ws-launch { display: none; }
       html.title-first .ws-launch { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; background: #0b1622; color: #eaf8ff; font-family: Rajdhani, system-ui, sans-serif; }
-      .ws-launch-hero { position: absolute; inset: 0; background: url('/assets/title/main-crossroads-landscape-9437ac10c599548a.jpg') center / cover no-repeat; }
+      .ws-launch-hero { position: absolute; inset: 0; background: url('/assets/title/main-crossroads-landscape-first-f3f196486b3476a0.jpg') center / cover no-repeat; }
       .ws-launch-brand { position: relative; margin: calc(24px + env(safe-area-inset-top, 0px)) 24px 0; font-size: 44px; font-weight: 700; line-height: 1; letter-spacing: .16em; text-shadow: 0 0 18px #8fe3ff73; }
-      @media (orientation: portrait) { .ws-launch-hero { top: 50%; bottom: auto; width: 100%; aspect-ratio: 1; transform: translateY(-50%); background-image: url('/assets/title/main-crossroads-square-24abf23d2606ae3f.jpg'); } }
+      @media (orientation: portrait) { .ws-launch-hero { top: 50%; bottom: auto; width: 100%; aspect-ratio: 1; transform: translateY(-50%); background-image: url('/assets/title/main-crossroads-square-first-98ef65b2b3433656.jpg'); } }
       /* QA 11-13 (Jake: "is it broken? Is it doing something?"): before any bundle the static title wears the build pill
          (update.css's .ws-update, copied, 5 px higher so it clears the wordmark: no module may be needed to see or tap it) and a bar that moves until StartTitle removes it */
       .ws-launch-pill { position: absolute; right: 16px; top: calc(14px + env(safe-area-inset-top, 0px)); transform: translateY(-50%); z-index: 1; display: flex; align-items: center; gap: 6px; box-sizing: border-box; height: 19px; max-width: calc(100vw - 32px); margin: 0; padding: 0 8px; background: var(--ws-glass-deep); border: 1px solid var(--ws-cyan-line); color: var(--ws-text-dim); font: 8px/1 var(--ws-mono); letter-spacing: .14em; text-transform: uppercase; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }

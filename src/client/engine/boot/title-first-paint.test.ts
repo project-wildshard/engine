@@ -68,8 +68,8 @@ test('plain launch paints only the approved hero and WILDSHARD, the launch image
   const hero = panel.querySelector('.ws-launch-hero');
   if (hero === null) throw new Error('Missing title art');
   expect([...panel.children].map(child => child.className)).toEqual(['ws-launch-hero', 'ws-launch-brand', 'ws-launch-pill', 'ws-launch-load']);
-  expect(window.getComputedStyle(hero).backgroundImage).toMatch(/main-crossroads-square-[a-f0-9]{16}\.jpg/u);
-  expect(window.document.querySelector('link[as="image"]')?.getAttribute('href')).toMatch(/^\/assets\/title\/main-crossroads-square-[a-f0-9]{16}\.jpg$/u);
+  expect(window.getComputedStyle(hero).backgroundImage).toMatch(/main-crossroads-square-first-[a-f0-9]{16}\.jpg/u); // PZ19: the ~30 kB first cut
+  expect(window.document.querySelector('link[as="image"]')?.getAttribute('href')).toMatch(/^\/assets\/title\/main-crossroads-square-first-[a-f0-9]{16}\.jpg$/u);
   expect(window.document.querySelector('#hud')?.childElementCount).toBe(0);
 });
 
@@ -77,7 +77,7 @@ test('environment flags alone (the phone harness, ?v=) launch the same title and
   for (const search of ['?v=build', '?tier=phone&touch=1&mute=1&nolock=1&sw=0']) {
     const window = firstDocument(search);
     expect(window.document.documentElement.classList.contains('title-first')).toBe(true);
-    expect(window.document.querySelector('link[as="image"]')?.getAttribute('href')).toMatch(/^\/assets\/title\/main-crossroads-square-[a-f0-9]{16}\.jpg$/u);
+    expect(window.document.querySelector('link[as="image"]')?.getAttribute('href')).toMatch(/^\/assets\/title\/main-crossroads-square-first-[a-f0-9]{16}\.jpg$/u);
   }
   expect(firstDocument('?tier=phone&chunk=driftwood-isle').document.documentElement.classList.contains('title-first')).toBe(false);
 });

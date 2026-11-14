@@ -11,7 +11,7 @@ import {serviceWorkerCore} from '../scripts/app-build/serviceWorker';
 
 test('every title URL names its exact original bytes and shell/runtime use the same URL',async()=>{
   const root=process.cwd(),urls=titleAssetURLs(root),tables=titleAssetTables(root);
-  expect(Object.keys(urls)).toHaveLength(7);
+  expect(Object.keys(urls)).toHaveLength(9); // PZ19: the two heroes' ~30 kB first cuts
   expect(tables['index.html']).toBe(readFileSync('index.html','utf8'));
   expect(tables['scripts/title-assets.generated.json']).toBe(readFileSync('scripts/title-assets.generated.json','utf8'));
   mkdirSync('tmp',{recursive:true});const out=mkdtempSync(resolve('tmp/title-assets-'));
@@ -30,6 +30,7 @@ test('every title URL names its exact original bytes and shell/runtime use the s
     const result=await serviceWorkerCore({'index.html':{type:'asset',source:new TextEncoder().encode(html)}},root,'title');
     expect(result.core).toContain(urls['/assets/title/main-crossroads-square.jpg']);
     expect(result.core).toContain(urls['/assets/title/main-crossroads-landscape.jpg']);
+    expect(result.core).toContain(urls['/assets/title/main-crossroads-square-first.jpg']);
     const literal=/^\s*(?:const|var) SHELL_FILES = JSON.parse\((.+)\);$/mu.exec(result.core)?.[1];
     if(literal===undefined)throw new Error('Missing installed shell inventory');
     const encoded:unknown=JSON.parse(literal);
