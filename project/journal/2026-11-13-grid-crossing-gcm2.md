@@ -38,3 +38,7 @@
   late at 18 m/s: GC5). Every walk out of Far Reach falls, since its entryway has no ground. The ratchet is seeded from it.
   The tour now writes its JSON after every crossing (this run hit its 90 min limit before writing and was read back from the
   log), and the report reads one 100 ms sample as the floor of a stop, not a stop.
+- GC3, Chromium desktop on its own: 53 crossings, 48 reached control, border-to-control median 97 ms; 7 held at a wall, 5
+  of them boosts (Template 2 to Pine 12.2 s, Pine to Pastel Plain 8.1 s), and the walk from Driftwood to Pine 4.1 s. The
+  run ended when the page lost the tour's probe after Open Plot 4-3 to Template 2 (a reload, likely); the tour should
+  reinstall its probe there. The ratchet now holds both runs.
