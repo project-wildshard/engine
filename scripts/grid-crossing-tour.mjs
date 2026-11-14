@@ -7,8 +7,8 @@
 // picks another; when a cell has no arc left it goes back over crossings that worked (scored too, marked `repeat`), and when none
 // leads anywhere (a cell it can't leave) it enters again by the title.
 // Per crossing, from the in-page samples (every 100 ms) and every frame: border to control, the longest run under 90 % of the
-// approach speed (slow) and under 0.1 m per 100 ms with the key held (freeze), the time held at an unready neighbour (wall: phase
-// preparing or blocked while frozen), the time the cell step screen shows, and frames over 33 and 50 ms within 3 s of the border.
+// approach speed (slow) and under 0.1 m per 100 ms with the key held (freeze), the time held at an unready neighbour (wall: phase preparing, blocked or ready, the last a world built whose entry still prepares, GC6;
+// while frozen), the time the cell step screen shows, and frames over 33 and 50 ms within 3 s of the border.
 // Not measured: grey stand-ins within 60 m (no reader yet).
 //   scripts/browser-lane.sh node scripts/grid-crossing-tour.mjs --base=https://preview.wildshard.io --out=<dir> [--engine=chromium|webkit]
 //     [--layout=phone] [--arcs=<from>:<to>,…] [--limit=<n crossings>] [--cold] [--lane=<name>] [--hold=<ms>] [--laps=<n>]
@@ -34,6 +34,7 @@ const limit = Number(flag('limit', '400')), only = flag('arcs', '').split(',').f
 // --viewport=<w>x<h>@<dpr> (desktop): Jake's window is 2992x1434@2 (QA 11-14 row 6)
 const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '1440x900@1')) ?? [0, '1440', '900', '1']).slice(1).map(Number);
 let currentLap = 1;
+const profileFirst = process.argv.includes('--profile'), latency = Number(flag('latency', '0'));
 mkdirSync(out, { recursive: true });
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 
@@ -79,6 +80,8 @@ try {
     await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: phone ? { tier: 'phone', volume: 0 } : { volume: 0 } });
     page = await context.newPage();
     if (cold && engineName === 'chromium') await (await context.newCDPSession(page)).send('Network.setCacheDisabled', { cacheDisabled: true });
+    // --latency=<ms> (GC6): a CDN's round trip on every request of a loopback page (Chromium), so a local build's fetches cost what a site's do
+    if (latency > 0 && engineName === 'chromium') { const cdp = await context.newCDPSession(page); await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', { offline: false, latency, downloadThroughput: 25e6, uploadThroughput: 5e6 }); }
     const opened = page;
     page.on('pageerror', error => { if (result.errors.length < 20) result.errors.push(error.message.slice(0, 240)); });
     // GC6: the page's own warnings name a stuck entry preparation (`[grid] <cell>: entry preparation on the road`)
@@ -145,6 +148,9 @@ try {
       return { at_, ok: at_.inside === arc.from && Math.hypot(at_.x - px, at_.z - pz) <= 4 };
     };
     const { at_: placed, ok: placedOk } = await place(EDGE_IN);
+    // --profile (GC6): a CPU profile of the first crossing (Chromium), for what its preparation spends
+    const profiler = profileFirst && crossings.length === 1 && engineName === 'chromium' ? await page.context().newCDPSession(page) : null;
+    if (profiler !== null) { await profiler.send('Profiler.enable'); await profiler.send('Profiler.setSamplingInterval', { interval: 500 }); await profiler.send('Profiler.start'); row.profileStartPageMs = await page.evaluate(() => performance.now()); }
     row.placed = { x: placed.x, y: placed.y, z: placed.z, inside: placed.inside };
     if (!placedOk) { row.why = `not placed on ${arc.from}'s entryway (inside ${String(placed.inside)})`; return row; }
     await face(yaw);
@@ -164,13 +170,18 @@ try {
           controlAt = now; controlT = s.t;
           // GC14: the page's memory at each control, so the tour doubles as the long-walk soak
           row.memory = await page.evaluate(() => { const W = /** @type {any} */ (window); let st = null; try { st = W.__wildshard.shard.grid.state(); } catch { /* no grid yet */ }
-            const perf = /** @type {any} */ (performance); return { playingMB: st?.playingMB ?? null, residentMB: st?.residentMB ?? null, heapMB: perf.memory ? Math.round(perf.memory.usedJSHeapSize / 1048576) : null }; }).catch(() => null);
+            // GC13: what the playing cost is made of (the allocator's input per category, MB) and the biggest owners' claims
+            let parts = null, owners = null; try { const r = W.__wildshard.shard.grid.residency(); parts = Object.fromEntries(Object.entries(r.cost.input).map(([k, v]) => [k, typeof v === 'number' ? Math.round(v / 1e5) / 10 : v]));
+              /** @type {Record<string, number>} */ const by = {}; for (const c of r.claims) { const key = `${String(c.owner)}:${String(c.category)}`; by[key] = (by[key] ?? 0) + (c.accountedBytes ?? c.bytes) / 1e6; }
+              owners = Object.fromEntries(Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 16).map(([k, v]) => [k, Math.round(v * 10) / 10])); } catch { /* no residency probe */ }
+            const perf = /** @type {any} */ (performance); return { playingMB: st?.playingMB ?? null, residentMB: st?.residentMB ?? null, heapMB: perf.memory ? Math.round(perf.memory.usedJSHeapSize / 1048576) : null, parts, owners }; }).catch(() => null);
         }
       } else if (now - controlAt > 2500) break;
       last = s;
       if (jumps >= 4 && stuckSince !== 0 && now - stuckSince > 10_000) break;
     }
     await page.keyboard.up('KeyW'); if (arc.boost) await page.keyboard.up('ShiftLeft');
+    if (profiler !== null) { const stopped = await profiler.send('Profiler.stop'); writeFileSync(join(out, `${engineName}-${arc.from}-${arc.to}.cpuprofile`), JSON.stringify(stopped.profile)); await profiler.detach(); }
     // GC13 `--hold`: stand in the cell reached, so the page can let the cell behind go
     await sleep(controlAt === 0 ? 400 : Math.max(400, hold));
     const rows =/** @type {any[]} */ (await page.evaluate(t => /** @type {any} */ (window).__gc3.samples.filter((/** @type {any} */ r) => r.err === undefined && r.t >= t), tFrom));
@@ -196,7 +207,7 @@ try {
     const border = entered?.t ?? Infinity, near = frames.filter(f => Math.abs((f[0] ?? 0) - border) <= 3000).map(f => f[1] ?? 0);
     Object.assign(row, { ok: controlAt !== 0, why: controlAt !== 0 ? '' : fell ? `fell off ${arc.from}'s entryway (no ground there)` : entered === undefined ? (roadAt === undefined ? `never left ${arc.from}` : `held on the road (${String(last.phase)})`) : 'in the cell, no control',
       borderToControlMs: entered === undefined || controlAt === 0 ? null : controlT - entered.t, controlMs: controlAt === 0 ? null : controlAt, approachMps: Number(approach.toFixed(2)),
-      slowMs: approach > 0 ? longest(s => s.v < approach * 0.9) : null, freezeMs: longest(s => s.v * 0.1 < 0.1), wallMs: sum(s => (s.r.phase === 'preparing' || s.r.phase === 'blocked') && s.v * 0.1 < 0.1),
+      slowMs: approach > 0 ? longest(s => s.v < approach * 0.9) : null, freezeMs: longest(s => s.v * 0.1 < 0.1), wallMs: sum(s => (s.r.phase === 'preparing' || s.r.phase === 'blocked' || s.r.phase === 'ready') && s.v * 0.1 < 0.1),
       stepScreenMs: sum(s => s.r.loading !== null && s.r.loading !== undefined && s.r.loading !== false), over33: near.filter(ms => ms > 33).length, over50: near.filter(ms => ms > 50).length,
       // GC8: how long each `cell` step stood on the loading screen in this crossing (samples every 100 ms; a build before GC8 reads none)
       steps: speeds.reduce((/** @type {Record<string, number>} */ onScreen, x) => { if (x.t <= untilT && typeof x.r.step === 'string' && x.r.step !== '') onScreen[x.r.step] = (onScreen[x.r.step] ?? 0) + 100; return onScreen; }, {}),
@@ -213,15 +224,21 @@ try {
     // GC8: what preparing the target cost in this window: its `wildshard.prepare:<slug>:<step>` spans (wall ms, developer pages
     // only), the main thread's long tasks, and the bytes fetched under its shardfile folder (resource timing transfer sizes)
     const slug = cells.find(cell => cell.instance === arc.to)?.slug ?? arc.to;
-    Object.assign(row, await page.evaluate(([from, name]) => {
+    Object.assign(row, await page.evaluate(([from, name, target]) => {
       const W = /** @type {any} */ (window), end = performance.now();
       const spans = performance.getEntriesByType('measure').filter(entry => entry.name.startsWith(`wildshard.prepare:${name}:`) && entry.startTime >= from)
         .map(entry => [entry.name.slice(`wildshard.prepare:${name}:`.length), Math.round(entry.startTime - from), Math.round(entry.duration)]);
       const tasks = /** @type {number[][]} */ (W.__gc3.longTasks ?? []).filter(task => (task[0] ?? 0) >= from && (task[0] ?? 0) <= end);
       const files = /** @type {PerformanceResourceTiming[]} */ (performance.getEntriesByType('resource')).filter(entry => entry.startTime >= from && entry.name.includes(`/${name}/`));
-      return { prepare: { windowMs: Math.round(end - from), spans: spans.slice(0, 200), longTasks: tasks.length, longTaskMs: tasks.reduce((total, task) => total + (task[1] ?? 0), 0),
-        files: files.length, bytes: files.reduce((total, entry) => total + (entry.transferSize || 0), 0), decodedBytes: files.reduce((total, entry) => total + (entry.decodedBodySize || 0), 0) }, windowEnd: end };
-    }, /** @type {[number, string]} */ ([windowStart, slug])).then(({ prepare, windowEnd }) => { lastWindowEnd = windowEnd; return { prepare }; }).catch(() => ({})));
+      // GC6: the hybrid hooks run for this cell in the window ([hook, start, ms, outcome]; the grid probe's `hookTimings`, the last 32)
+      let hooks = /** @type {unknown[]} */ ([]);
+      try { hooks = (W.__wildshard.shard.grid.hookTimings?.()?.completed ?? []).filter((/** @type {any} */ h) => h.start >= from && h.instance === target).map((/** @type {any} */ h) => [h.hook, Math.round(h.start - from), Math.round(h.end - h.start), h.outcome]); } catch { /* no live session */ }
+      return { prepare: { windowMs: Math.round(end - from), hooks, spans: spans.slice(0, 200), longTasks: tasks.length, longTaskMs: tasks.reduce((total, task) => total + (task[1] ?? 0), 0),
+        files: files.length, bytes: files.reduce((total, entry) => total + (entry.transferSize || 0), 0), decodedBytes: files.reduce((total, entry) => total + (entry.decodedBodySize || 0), 0),
+        // GC6: every fetch in the window (at most 3000), as [path tail, start, ms, transfer bytes], to see what a preparation waits on
+        fetches: (/** @type {PerformanceResourceTiming[]} */ (performance.getEntriesByType('resource'))).filter(entry => entry.startTime >= from)
+          .slice(-3000).map(entry => [new URL(entry.name).pathname.split('/').slice(-2).join('/').slice(0, 24), Math.round(entry.startTime - from), Math.round(entry.duration), entry.transferSize || 0]) }, windowEnd: end };
+    }, /** @type {[number, string, string]} */ ([windowStart, slug, arc.to])).then(({ prepare, windowEnd }) => { lastWindowEnd = windowEnd; return { prepare }; }).catch(() => ({})));
     if (!row.ok || row.wallMs > 0) await page.screenshot({ path: join(out, `${engineName}-${arc.from}-${arc.to}.png`) }).catch(() => undefined);
     console.log(`${row.ok ? 'ok  ' : 'FAIL'} ${arc.from} -> ${arc.to}${arc.boost ? ' boost' : ''}${repeat ? ' (repeat)' : ''} ${JSON.stringify({ why: row.why, b2c: row.borderToControlMs, wall: row.wallMs, freeze: row.freezeMs, over50: row.over50 })}`);
     return row;

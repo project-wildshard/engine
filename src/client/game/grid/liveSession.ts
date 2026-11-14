@@ -876,6 +876,9 @@ export class LiveGridSession {
   entryPending(instance: string): boolean { return this.deferredEntries.has(instance) || this.queuedEntries.has(instance) || this.hybrid.preparing().includes(instance); }
   /** GC6: whether any world built ahead still prepares its entry (the road then builds with the urgent budget) */
   entriesPending(): boolean { return this.deferredEntries.size > 0 || this.queuedEntries.size > 0 || this.hybrid.preparing().length > 0; }
+  /** GC6: whether an entry is preparing on the road now (or queued for it): the traveller is about to need it, so optional
+   *  neighbour work (the near views' loads) waits for it rather than sharing its frames (`GridSession` near `load`) */
+  entriesPreparing(): boolean { return this.queuedEntries.size > 0 || this.hybrid.preparing().length > 0; }
   /** GC6: entries taken from `deferredEntries` and waiting their turn behind another's preparation (`prepareInTurn`) */
   private readonly queuedEntries = new Set<string>();
   /** GC9: once the source is left (the hybrid session is neutral), each world pre-warmed inside it prepares its entry, so the

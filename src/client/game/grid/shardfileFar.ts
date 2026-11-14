@@ -1,4 +1,4 @@
-import { Mesh, type BufferGeometry, type Object3D } from 'three';
+import { Matrix4, Mesh, type BufferGeometry, type Object3D } from 'three';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
 import { workSlice } from '@wildshard/engine/core/workSlice';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -52,6 +52,17 @@ function shardfileHaze(fog: ShardfileFarRows['fog']): FarPrepared['look'] {
   return { family: 'pbr', haze: { colour: fog ?? [1, 1, 1] } };
 }
 
+const IDENTITY = new Matrix4();
+/** GC6: a mesh's geometry in its scene pose. The loader's accessor bounds would be recomputed from every vertex by
+ *  `applyMatrix4` (two passes; ~45 % of the near bake's main-thread time on Driftwood to Nalati, where the neighbours' near
+ *  views load on the road beside the entry's preparation), and nothing reads a part's bounds: the merged draw computes its
+ *  own once. An identity pose is no transform at all. */
+export function bakePose(node: Mesh): BufferGeometry {
+  const geometry = node.geometry;
+  geometry.boundingBox = null; geometry.boundingSphere = null;
+  return node.matrixWorld.equals(IDENTITY) ? geometry : geometry.applyMatrix4(node.matrixWorld);
+}
+
 /**
  * G348: any shardfile's own near placeholder (its admitted `near` row, which `wildshard build` bakes for every terrain
  * shardfile, an unknown uploaded one included): its content GLBs' meshes merged into the near view's one draw, masked by
@@ -77,7 +88,7 @@ export async function loadShardfileNear(rows: ShardfileNearRows, read: (ref: str
         await slice.check();
         for (const material of Array.isArray(node.material) ? node.material : [node.material]) material.dispose();
         // NM13: the light layer stays apart from the lit draw (drawn additively, unlit)
-        (node.name === NEAR_LIGHT ? lights : node.name === NEAR_COLOUR ? colours : parts).push(node.geometry.applyMatrix4(node.matrixWorld));
+        (node.name === NEAR_LIGHT ? lights : node.name === NEAR_COLOUR ? colours : parts).push(bakePose(node));
       }
     }
   } catch (error) { for (const part of [...parts, ...lights, ...colours]) part.dispose(); throw error; }
