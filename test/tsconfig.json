@@ -563,6 +563,7 @@
     "../scripts/pin-assets.ts",
     "../scripts/pins-catalogue.ts",
     "../scripts/preview-grid.ts",
+    "../scripts/nightly-model.ts",
     "../scripts/pin-format.ts",
     "../scripts/engine-ci-plan.ts",
     "../scripts/engine-ci-budget.ts",

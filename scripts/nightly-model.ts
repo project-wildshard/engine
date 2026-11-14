@@ -53,21 +53,22 @@ export function verdict(expected: Plan, reports: Receipt[], previous?: Verdict, 
       .flatMap(report => report.results ?? []).filter(row => row.slug === head.slug && row.hash === head.hash);
     for (const phase of phases) {
       const witnesses = matches.flatMap(row => row.phases ?? []).filter(row => row.name === phase);
-      const ok = witnesses.length === 1 && witnesses[0].ok;
+      const [only] = witnesses, ok = witnesses.length === 1 && only !== undefined && only.ok;
       const key = `${browser}/${head.slug}@${head.hash}/${phase}`;
-      const error = witnesses.length === 1 ? witnesses[0].error ?? 'phase did not pass' : `Expected one receipt, got ${witnesses.length}`;
+      const error = witnesses.length === 1 ? only?.error ?? 'phase did not pass' : `Expected one receipt, got ${witnesses.length}`;
       rows.push({browser, slug: head.slug, hash: head.hash, phase, ok, ...(ok ? {} : {error})});
       if (!ok) failures.push({key, error});
     }
   }
   const suites = reports.filter((row): row is TestsReport => row.version === expected.version && row.kind === 'tests' && row.sha === expected.sha && row.pins === expected.pins && row.testList === expected.testList);
-  if (suites.length !== 1) failures.push({key: 'shared/tests', error: `Expected one suite, got ${suites.length}`});
+  const [suite] = suites;
+  if (suites.length !== 1 || suite === undefined) failures.push({key: 'shared/tests', error: `Expected one suite, got ${suites.length}`});
   else {
-    const suite = suites[0];
     if (suite.exitCode !== 0 || suite.kitExitCode !== 0 || suite.totalTests < 1) failures.push({key: 'shared/tests', error: `Vitest exit ${suite.exitCode}, kit exit ${suite.kitExitCode}, ${suite.totalTests} tests`});
     for (const path of expected.tests) {
       const executions = suite.files.filter(row => row.path === path);
-      if (executions.length !== 1 || !executions[0].ok || executions[0].assertions < 1 || executions[0].skipped !== 0) failures.push({key: `shared/${path}`, error: 'Listed test missing, skipped or failed'});
+      const [run] = executions;
+      if (executions.length !== 1 || run === undefined || !run.ok || run.assertions < 1 || run.skipped !== 0) failures.push({key: `shared/${path}`, error: 'Listed test missing, skipped or failed'});
     }
     for (const file of suite.files.filter(row => !row.ok)) {
       if (!failures.some(row => row.key === `shared/${file.path}`)) failures.push({key: `shared/${file.path}`, error: 'Suite failure outside the slow-test list'});
