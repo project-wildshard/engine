@@ -303,7 +303,7 @@ export class LiveGridHost {
         // GC6 (QA 11-14 row 6): inside Driftwood the page held 3 to 5 neighbours' radial products (1199 of 1200 MB), pinned
         // while held, so Nalati's demand read was refused the whole approach and its world was built only on the road. A
         // refused demand read lets the speculative products of other cells go, farthest first, and is read again.
-        if (required && speculative && refused) { if (this.releaseSpeculative(instance) > 0) this.deferredDemand.delete(instance); else this.deferredDemand.set(instance, this.ports.allocator.revision); }
+        if (required && speculative && refused) { if (this.releaseSpeculative(instance) > 0) this.deferredDemand.delete(instance); else { this.deferredDemand.set(instance, this.ports.allocator.revision); if (this.demanded === instance) this.demanded = null; } }
         else if (!required && refused) this.deferredProducts.set(instance, this.ports.allocator.revision);
         else { this.issues.set(instance, error instanceof Error ? error.message : String(error)); this.refusals.set(instance, error); }
         try { admission?.cancel?.(); }
@@ -317,7 +317,8 @@ export class LiveGridHost {
    *  its claim, so the allocator's revision moves and a deferred demand read is tried again). Returns how many went. */
   private releaseSpeculative(kept: string): number {
     const feet = this.worldFeet(), keep = (id: string): boolean => id === kept || id === this.active || id === this.ahead
-      || this.constructing.has(id) || this.requests.has(id) || this.residents.has(id);
+      || this.constructing.has(id) || this.requests.has(id) || this.residents.has(id)
+      || id === this.tileApproach?.instance || id === this.transportApproach?.instance;
     const idle = [...this.products.keys()].filter(id => !keep(id))
       .sort((a, b) => this.distance(this.assembly.cell(b), feet) - this.distance(this.assembly.cell(a), feet));
     for (const id of idle) {

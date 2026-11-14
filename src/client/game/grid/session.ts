@@ -1019,7 +1019,7 @@ export class GridSession {
     setBuildHeldTimed(this.cellLoading.open !== null);
     // GC6: a world the traveller heads into, or the road (where its entry prepares), builds with the urgent budget
     const live = this.live;
-    setBuildUrgent(live !== null && (live.live.building() || live.live.current() === null));
+    setBuildUrgent(live !== null && (live.live.building() || live.entriesPending()));
   }
   private refusal(instance: string): ShardRefusal | null {
     const live = this.live?.refusal(instance);

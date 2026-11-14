@@ -22,3 +22,7 @@
 - A live display transform's preparation could also run for ever (a pass that left the chain, or one recompiled under each
   candidate), and every entered frame awaited it: four candidates, then it links on its next draw; an entry waits at most
   12 s for it.
+- Review fixes: an entry queued behind another's road preparation counts as pending too, and the entered cell is never
+  deferred again; a released product never takes one an approach still reads; a demand that cannot fit stops blocking
+  radial reads; urgent builds run only while a world or an entry builds. Staging v0.1.19 before these (walk proof at
+  2992x1434@2): Nalati crossings showed a "Region world" card for 2.2 s and 1.6 s.

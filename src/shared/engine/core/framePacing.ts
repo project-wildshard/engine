@@ -186,5 +186,5 @@ export function paceYield(plain: () => Promise<void>, owner?: Scope, budgetMs?: 
 }
 
 function yieldDue(budgetMs: number | undefined, now: number): boolean {
-  return !held && !urgent && frameDue(now) || (budgetMs !== undefined && frameBudgetSpent(budgetMs, now));
+  return !held && (!urgent || budgetMs === undefined) && frameDue(now) || (budgetMs !== undefined && frameBudgetSpent(budgetMs, now));
 }

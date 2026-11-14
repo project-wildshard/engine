@@ -180,14 +180,14 @@ const ARRIVAL_RADIUS = 125;
 /** one engine colour chain, built (Game.buildComposer): its effects, in order, and by name */
 interface BuiltChain { clean: boolean; order: Effect[]; fx: Omit<EngineEffects, 'order'> }
 
-/** An entered frame's preparation trace (`Game.entryPreparation`): its destination root, owner, running phase, measured
- *  work counts and scalar timings. A named type, so consumers of the emitted declarations see it (a private field's type
- *  is not emitted). */
 /** GC6: candidates a live display transform gets before it links on its next draw */
 export const POST_PASS_ATTEMPTS = 4;
 /** GC6: the longest an entered frame waits on live display transform preparation */
 export const POST_PREPARATION_WAIT_MS = 12_000;
 
+/** An entered frame's preparation trace (`Game.entryPreparation`): its destination root, owner, running phase, measured
+ *  work counts and scalar timings. A named type, so consumers of the emitted declarations see it (a private field's type
+ *  is not emitted). */
 export interface EntryPreparation {
   root: string; owner: string; completed: boolean; phase: string;
   progress: { done: number; total: number; detail: string } | null;
@@ -1110,16 +1110,16 @@ export class Game {
         while (current() && composer.passes.includes(pass) && !published) {
           if (attempts++ >= POST_PASS_ATTEMPTS) { pass.recompile(); break; }
           published = await prepareEffectPass(pass, async material => {
-          mesh.material = material;
-          await runPrecompile(this.renderer, this.camera, [{ label: engineString('s_178612197e2b'), root: mesh, target: scene, rt: target }], 1,
-            undefined, undefined, current, false, () => waitForDrawnFrame(this.engineScope, () => this.frameCount, current));
-        }, material => {
-          mesh.material = material;
-          const prior = this.renderer.getRenderTarget(), face = this.renderer.getActiveCubeFace(), mip = this.renderer.getActiveMipmapLevel();
-          this.renderer.setRenderTarget(target);
-          try { this.renderer.compile(mesh, this.camera, scene); }
-          finally { this.renderer.setRenderTarget(prior, face, mip); }
-        }, current);
+            mesh.material = material;
+            await runPrecompile(this.renderer, this.camera, [{ label: engineString('s_178612197e2b'), root: mesh, target: scene, rt: target }], 1,
+              undefined, undefined, current, false, () => waitForDrawnFrame(this.engineScope, () => this.frameCount, current));
+          }, material => {
+            mesh.material = material;
+            const prior = this.renderer.getRenderTarget(), face = this.renderer.getActiveCubeFace(), mip = this.renderer.getActiveMipmapLevel();
+            this.renderer.setRenderTarget(target);
+            try { this.renderer.compile(mesh, this.camera, scene); }
+            finally { this.renderer.setRenderTarget(prior, face, mip); }
+          }, current);
         }
       } finally { geometry.dispose(); }
     };
@@ -1188,8 +1188,10 @@ export class Game {
       const postStarted = diagnosticNow();
       for (;;) {
         const pending = this.postPreparation, left = POST_PREPARATION_WAIT_MS - (diagnosticNow() - postStarted);
+        let timer: ReturnType<Scope['timeout']> | undefined;
         const timedOut = left <= 0 || await Promise.race([pending.then(() => false),
-          new Promise<boolean>(resolve => { this.engineScope.timeout(left, () => { resolve(true); }); })]);
+          new Promise<boolean>(resolve => { timer = this.engineScope.timeout(left, () => { resolve(true); }); })])
+          .finally(() => { if (timer !== undefined) this.engineScope.cancelTimer(timer); });
         if (!current()) throw new Error('Shader warm-up owner left');
         if (timedOut) { trace.stalled = 'post-preparation'; console.warn(`[entry] ${owner.name}: display transform preparation still running after ${String(POST_PREPARATION_WAIT_MS)} ms; entering without it`); break; }
         if (this.postPreparation === pending) break;

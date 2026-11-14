@@ -29,9 +29,12 @@ test('GC6: a world built ahead stays unenterable while its entry is deferred or 
   const value: unknown = Object.create(LiveGridSession.prototype);
   if (!(value instanceof LiveGridSession)) throw new Error('Missing live session prototype');
   const deferred = new Map<string, unknown>([['nalati', {}]]), preparing: string[] = [];
-  Reflect.set(value, 'deferredEntries', deferred); Reflect.set(value, 'hybrid', {preparing: () => preparing});
+  const queued = new Set<string>();
+  Reflect.set(value, 'deferredEntries', deferred); Reflect.set(value, 'queuedEntries', queued); Reflect.set(value, 'hybrid', {preparing: () => preparing});
   expect(value.entryPending('nalati')).toBe(true);
-  deferred.clear(); preparing.push('nalati');
+  deferred.clear(); queued.add('nalati');
+  expect(value.entryPending('nalati')).toBe(true); // queued behind another entry's preparation
+  queued.clear(); preparing.push('nalati');
   expect(value.entryPending('nalati')).toBe(true);
   preparing.length = 0;
   expect(value.entryPending('nalati')).toBe(false);

@@ -873,7 +873,11 @@ export class LiveGridSession {
   /** GC6 (QA 11-14 row 6): a world built ahead whose entry still prepares (deferred inside the source, or running on the
    *  road). Inside the cell its gameplay gate (`frameReady`) stops the page's frames, and that preparation's warm-up waits on
    *  drawn frames: the traveller stood in the cell with no control for good. Its crossing holds on the road instead. */
-  entryPending(instance: string): boolean { return this.deferredEntries.has(instance) || this.hybrid.preparing().includes(instance); }
+  entryPending(instance: string): boolean { return this.deferredEntries.has(instance) || this.queuedEntries.has(instance) || this.hybrid.preparing().includes(instance); }
+  /** GC6: whether any world built ahead still prepares its entry (the road then builds with the urgent budget) */
+  entriesPending(): boolean { return this.deferredEntries.size > 0 || this.queuedEntries.size > 0 || this.hybrid.preparing().length > 0; }
+  /** GC6: entries taken from `deferredEntries` and waiting their turn behind another's preparation (`prepareInTurn`) */
+  private readonly queuedEntries = new Set<string>();
   /** GC9: once the source is left (the hybrid session is neutral), each world pre-warmed inside it prepares its entry, so the
    *  crossing finds it ready; a crossing that arrives first holds on the road until it is (`entryPending`, GC6). */
   private prepareDeferredEntries(): void {
@@ -883,6 +887,7 @@ export class LiveGridSession {
     };
     const rows = [...this.deferredEntries].sort(([a], [b]) => gap(a) - gap(b));
     this.deferredEntries.clear();
+    for (const [instance] of rows) this.queuedEntries.add(instance);
     this.deferredPreparation = this.prepareInTurn(this.deferredPreparation, rows);
   }
   private async prepareInTurn(previous: Promise<void>, rows: readonly (readonly [string, { readonly prepared: PreparedRegionalRuntime; readonly signal: AbortSignal | undefined }])[]): Promise<void> {
@@ -892,12 +897,15 @@ export class LiveGridSession {
   private deferredPreparation: Promise<void> = Promise.resolve();
   private async prepareEntryOnRoad(instance: string, row: { readonly prepared: PreparedRegionalRuntime; readonly signal: AbortSignal | undefined }): Promise<void> {
     const live = (): boolean => this.runtimeRegions.get(instance) === row.prepared && row.signal?.aborted !== true;
-    if (!live() || this.hybrid.state().instance !== null) { if (live()) this.deferredEntries.set(instance, row); return; }
+    // prepareEntry registers its installation synchronously, so the entry stays pending across this hand-over
+    this.queuedEntries.delete(instance);
+    const entered = (): boolean => this.hybrid.state().instance === instance;
+    if (!live() || this.hybrid.state().instance !== null) { if (live() && !entered()) this.deferredEntries.set(instance, row); return; }
     let prepared = false;
     try { prepared = await this.hybrid.prepareEntry(instance, row.signal); }
     catch (error) { console.warn(`[grid] ${instance}: entry preparation on the road`, error); }
     // a turn back into the source meanwhile (its entry made the session active) waits for the next leave
-    if (!prepared && live() && this.hybrid.state().instance !== null) this.deferredEntries.set(instance, row);
+    if (!prepared && live() && this.hybrid.state().instance !== null && !entered()) this.deferredEntries.set(instance, row);
   }
   /** G555: the entered runtime hooks' timings (the one running and those finished), for the cell loading screen. */
   hookTimings(): ReturnType<HybridRuntimeSession['timings']> { return this.hybrid.timings(); }
