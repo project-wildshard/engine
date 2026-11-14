@@ -682,7 +682,9 @@ export class GridSession {
         const look = { instance: cell.instance, x: edge.x, z: edge.z, axis: edge.axis, halfLength: edge.halfLength };
         return cell.edgeLook === undefined ? look : Object.assign(look, { height: cell.edgeLook.height });
       })),
-      ports: { closed: (id) => this.live === null || !this.live.live.ready(id) } });
+      // GC12: drawn only while the traveller stands at that edge (the feet in the home frame)
+      ports: { closed: (id) => this.live === null || !this.live.live.ready(id),
+        feet: () => { const at = this.world(); return { x: at.x - home.origin.x, z: at.z - home.origin.z }; } } });
     // QA 2026-11-13: a waiting cell's loading steps on SHARD SELECT's loading card, inset over the live world
     this.cellLoading = new CellLoading(new CellLoadingCard(), (waiting) => this.neighbours.some(row => row.instance === waiting));
     setParkedMatricesFrozen(true); // G580 T2: a hidden parked world skips matrix updates during its warm-up

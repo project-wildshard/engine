@@ -6,6 +6,10 @@
  *
  * One draw for every wall (a curtain quad per edge, additive, faded out past ~70 m so a 500 m wall never dominates the
  * view). Which walls are closed comes from the session each fixed step; a wall opens the moment its neighbour is ready.
+ *
+ * GC12 (Jake, 2026-11-13 ~22:50 Cancún, board A): the wall shows only when a player meets a closed edge. A closed wall is drawn
+ * while the traveller's feet stand within `MEET_METRES` of it, so a warm crossing (or a wall seen from across the cell) never
+ * shows it; the readiness wall itself still holds at every closed edge.
  */
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DoubleSide, DynamicDrawUsage, Group, Mesh, type Object3D, ShaderMaterial } from 'three';
 import type { LookScope } from '../../../shared/game/grid/roadLayout';
@@ -15,9 +19,19 @@ export interface SoftWallEdge { readonly instance: string; readonly x: number; r
 /** What the look reads each fixed step. */
 export interface SoftWallPorts {
   readonly closed: (instance: string) => boolean;
+  /** the traveller's feet in the home frame; absent: every closed wall shows, as before GC12 */
+  readonly feet?: () => { readonly x: number; readonly z: number };
 }
-/** The readout: how many neighbour edges are closed. */
-export interface SoftWallState { readonly closed: number }
+/** GC12: how near a closed edge the feet must stand for its wall to show (a player at the wall, a stride or two short of it). */
+export const MEET_METRES = 6;
+/** Distance from the feet to an edge's wall segment, in the home frame. */
+export function edgeDistance(edge: SoftWallEdge, feet: { readonly x: number; readonly z: number }): number {
+  const dx = feet.x - edge.x, dz = feet.z - edge.z;
+  const across = edge.axis === 'x' ? dx : dz, along = edge.axis === 'x' ? dz : dx;
+  return Math.hypot(across, Math.max(0, Math.abs(along) - edge.halfLength));
+}
+/** The readout: how many neighbour edges are closed, and how many of those show (GC12: the ones the traveller meets). */
+export interface SoftWallState { readonly closed: number; readonly shown: number }
 
 const HEIGHT = 7, CYAN = new Color(0x38e6ff);
 
@@ -99,18 +113,21 @@ export function installSoftWallLook(input: { readonly edges: readonly SoftWallEd
   const closedAttr = wall.geometry.getAttribute('aClosed');
   group.add(wall); scene.add(group);
   const flags = edges.map(() => -1);
-  let closedCount = 0;
+  let closedCount = 0, shownCount = 0;
   const step = (): void => {
     uTime.value = input.time();
-    closedCount = 0;
+    closedCount = 0; shownCount = 0;
+    const feet = ports.feet?.();
     for (let k = 0; k < edges.length; k++) {
       const edge = edges[k];
       if (edge === undefined) continue;
-      const closed = ports.closed(edge.instance) ? 1 : 0;
-      if (closed === 1) closedCount++;
-      if (flags[k] !== closed) { flags[k] = closed; for (let c = 0; c < 4; c++) closedAttr.setX(k * 4 + c, closed); closedAttr.needsUpdate = true; }
+      const closed = ports.closed(edge.instance);
+      if (closed) closedCount++;
+      const shown = closed && (feet === undefined || edgeDistance(edge, feet) <= MEET_METRES) ? 1 : 0;
+      shownCount += shown;
+      if (flags[k] !== shown) { flags[k] = shown; for (let c = 0; c < 4; c++) closedAttr.setX(k * 4 + c, shown); closedAttr.needsUpdate = true; }
     }
   };
   scope.onDispose(() => { group.removeFromParent(); wall.geometry.dispose(); material.dispose(); });
-  return { step, state: () => ({ closed: closedCount }) };
+  return { step, state: () => ({ closed: closedCount, shown: shownCount }) };
 }

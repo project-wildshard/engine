@@ -19,3 +19,5 @@
 - GC14: the tour's `--laps=n` goes round every wanted arc n times, each row naming its lap, so the memory at each control reads as
   a soak (lap 2 against lap 1).
   The cell comes from the probe's `area()` (every build has it), carried into each recorded screen sample.
+- GC12 (Jake 22:50, board A): the hex wall shows only while the traveller stands within 6 m of a closed edge (`softWallLook`
+  `feet` port, `MEET_METRES`); the readiness wall still holds at every closed edge. The tour records `wallShownMs` per crossing.
