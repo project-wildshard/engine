@@ -10,6 +10,7 @@
 //     [--shots <dir>] [--profile <dir>] [--census] [--ab]
 //   --ab: at the last pose, each lever against the baseline, interleaved over 6 rounds so a busy machine's drift cancels
 //   (render scale 1 and 0.75, the shadow maps held, AO off, the post passes off, the viewmodel hidden).
+//   --hide <regex>: at each pose a second shot with every object whose name matches and everything under it drawn on no layer (what is behind it).
 //   --census: one frame's renderer.render calls (target, draws, CPU ms) and the scene graph's size.
 //   --profile: a Chromium CPU profile of each pose's sample. GPU timer queries are left out: ANGLE Metal's TIME_ELAPSED
 //   read 17-24 ms for frames drawn every 7-10 ms (2026-11-14), so a cost here is a drawn interval or a subtraction.
@@ -23,7 +24,7 @@ import { NAME_ASKED, developerSettings, saveFixture, levelDownloadFixtures, hide
 const { values } = parseArgs({ options: { base: { type: 'string' }, shards: { type: 'string', default: 'Nine,Nalati,Driftwood' },
   frames: { type: 'string', default: '240' }, poses: { type: 'string', default: '6' }, width: { type: 'string', default: '1496' },
   height: { type: 'string', default: '717' }, scale: { type: 'string', default: '2' }, json: { type: 'string' }, shots: { type: 'string' },
-  'gfx-dpr': { type: 'string' }, extra: { type: 'string' }, walk: { type: 'string', default: '0' }, ab: { type: 'boolean', default: false }, census: { type: 'boolean', default: false }, profile: { type: 'string' }, settle: { type: 'string', default: '2500' } } });
+  'gfx-dpr': { type: 'string' }, extra: { type: 'string' }, walk: { type: 'string', default: '0' }, ab: { type: 'boolean', default: false }, census: { type: 'boolean', default: false }, profile: { type: 'string' }, hide: { type: 'string' }, settle: { type: 'string', default: '2500' } } });
 if (values.base === undefined) { console.error('usage: deskbench.mjs --base <url> [--shards Nine,Nalati,Driftwood] [--frames 240] [--poses 6] [--json <file>] [--shots <dir>] [--profile <dir>] [--census] [--ab]'); process.exit(2); }
 const base = values.base.replace(/\/$/u, ''), frames = Number(values.frames), maxPoses = Number(values.poses), settle = Number(values.settle);
 const walkSeconds = Number(values.walk);
@@ -218,6 +219,17 @@ try {
       rows.push({ pose, frame });
       console.log(`  ${pose.name.padEnd(22)} ${(1000 / frame.p50).toFixed(0).padStart(4)} fps · p50 ${frame.p50} p95 ${frame.p95} max ${frame.max} ms · work p50 ${frame.workP50} (update ${frame.updateP50} render ${frame.renderP50}) p95 ${frame.workP95} · ${frame.calls} draws · ${(frame.triangles / 1e6).toFixed(2)} M tris · ratio ${frame.pixelRatio} ${frame.buffer.join('x')} (${frame.mpx} Mpx)`);
       if (values.shots !== undefined) await page.screenshot({ path: join(values.shots, `${shardName}-${pose.name}.jpg`.replaceAll(/[^\w.-]+/gu, '_')), type: 'jpeg', quality: 82, scale: 'css' });
+      if (values.shots !== undefined && values.hide !== undefined) {
+        // --hide: every scene the frame draws (the shard's own and each region's), matching objects off every layer
+        const hidden = await page.evaluate(`(() => { const g = window.__wildshard.world.game, re = new RegExp(${JSON.stringify(values.hide)}, 'u'), names = new Map();
+          window.__deskHide = [];
+          for (const scene of [g.scene, ...(g.sceneFrames ?? []).map(f => f.scene)]) scene.traverse(o => { if (re.test(o.name)) { o.traverse(c => { window.__deskHide.push([c, c.layers.mask]); c.layers.mask = 0; }); names.set(o.name, (names.get(o.name) ?? 0) + 1); } });
+          return [...names].map(([n, c]) => n + ' x' + c).join(', '); })()`);
+        await sleep(600);
+        await page.screenshot({ path: join(values.shots, `${shardName}-${pose.name}-hidden.jpg`.replaceAll(/[^\w.-]+/gu, '_')), type: 'jpeg', quality: 82, scale: 'css' });
+        await page.evaluate(`(() => { for (const [o, m] of window.__deskHide) o.layers.mask = m; })()`);
+        console.log(`    hidden: ${hidden === '' ? 'nothing matched' : hidden}`);
+      }
     }
     if (values.census) {
       const c = await page.evaluate(`(${frameCensus.toString()})()`);
