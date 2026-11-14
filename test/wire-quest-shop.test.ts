@@ -9,19 +9,19 @@ import { createLevelInstallation } from '../src/client/engine/level/installation
 import { WorldRegistry } from '../src/client/engine/world/registry';
 import { shardContext, sourceManifest } from '../src/client/game/plugin/context';
 import { QuestViews } from '../src/client/game/plugin/ui';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { Owned } from '../src/shared/game/loot/Owned';
 import { OWNED_ROW } from '../src/shared/game/loot/ownedRows';
 import { Purse, publishPurse, enteredPurse } from '../src/shared/game/loot/Purse';
 import { installQuestTrader, installQuestShop } from '../src/client/game/quest/trader';
 import { wirePage } from '../src/client/game/shardfile/wirePage';
 import { NetClient } from '../src/client/engine/net/client';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from './fixtures/builtFolder';
 import { declaredLootEconomy } from '../src/shared/game/shard/declaredRows';
 import type { Transport } from '../src/shared/engine/net/transport';
 
-const { shardfile: source } = await loadHeadlessProduct(builtProduct('driftwood-isle'));
+const { shardfile: source } = await loadHeadlessFolder(builtFolder('driftwood-isle'));
 const TEMPLATE = sourceManifest({ identity: source.identity, accent: source.accent, spawn: source.spawn, look: source.look });
 const coinRows = { name: 'Maren', reopen: false, shop: {
   place: 'Driftwood Isle', barter: false, lifetime: 'resident', modal: { restartOnClose: true, stow: true, resumeSwimming: true },
@@ -34,7 +34,7 @@ const coinRows = { name: 'Maren', reopen: false, shop: {
 function page(loot: unknown = source.rows.loot) {
   const scope = new Scope('shop-entry'), host = new App(), events: string[] = [], owned = new Owned('shop-entry');
   for (const id of owned.all) owned.revoke(id);
-  const product = createShardProduct({ slug: source.identity.slug, revision: source.identity.revision, shardfile: source,
+  const product = createShardFolder({ slug: source.identity.slug, revision: source.identity.revision, shardfile: source,
     sections: new Map([['economy/loot', { rows: { loot } }]]), files: new Map(), read: () => Promise.reject(new Error('No shop file read')) });
   const level = createLevelInstallation(host, scope, {}, () => ({ set: () => undefined, detail: () => undefined }));
   const ctx = shardContext(level.context, TEMPLATE, { shard: TEMPLATE, rows: new Map(), bag: { tab: () => () => undefined, fragment: () => () => undefined } }, product);

@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import * as v from 'valibot';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
@@ -18,7 +18,7 @@ import type { Animal } from '../src/client/engine/entities/AnimalView';
 import type { ThinkCtx } from '../src/shared/engine/entities/species/registry';
 import type { DamageRequest } from '../src/shared/engine/combat/pipeline';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { createNativeProofResident } from './fixtures/headless-native';
 import { prepareNalatiWorld } from './fixtures/nalati-world';
 import { readPatrolIntake } from '../src/server/game/boss/patrolNative';
@@ -26,7 +26,7 @@ import { canonicalSimDigest } from './fake/simState';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 test('a bound ghost rider decides and scales hits through its law natively, and binding alone changes nothing', async () => {
-  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard); if (descriptor === undefined) throw new Error('Missing admitted native inventory');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const input = await readPatrolIntake(product, {rows:'combat/timed-encounters.json',actors:'actors/sheep.json'}), book = v.parse(SpeciesActorsFileSchema, await product.json<unknown>('actors/sheep.json')).species.lookBook;

@@ -8,7 +8,7 @@ import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { installManifestShardfile, shardfileSource } from '../src/client/game/shardfile/clientSource';
 import type { ShardfileClientBindings } from '../src/client/game/shardfile/client';
-import type { ProductOptions } from '../src/client/game/shardfile/product';
+import type { FolderOptions } from '../src/client/game/shardfile/folder';
 import { NO_AUDIO } from '../src/client/engine/audio/levelAudio';
 
 await installCatalogueFixture();
@@ -16,7 +16,7 @@ await installCatalogueFixture();
 const bindings: ShardfileClientBindings = { instance: 'audio-owner', recipes: new Map(), items: new Map(),
   voices: () => new Map(), catalogue: [], icon: () => { throw new Error('No fixture items'); } };
 
-function fixture(scene: boolean): { options: ProductOptions; index: ReturnType<typeof parseOutputIndex> } {
+function fixture(scene: boolean): { options: FolderOptions; index: ReturnType<typeof parseOutputIndex> } {
   const source = emptyShardfile({ slug: 'open-plot-lantern-bayou', name: 'Audio owner', author: 'Test', seed: 1, revision: 1 });
   const wires = new Map<string, Uint8Array>();
   const encode = (value: unknown): Uint8Array => new TextEncoder().encode(encodeCanonicalJson(value));

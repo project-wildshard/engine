@@ -1,9 +1,9 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The scenario reads the admitted product and native physics.
 import { readFileSync } from 'node:fs';
-import { builtProduct } from '../fixtures/builtProduct';
+import { builtFolder } from '../fixtures/builtFolder';
 import { beforeAll, expect, test, vi } from 'vitest';
 import * as v from 'valibot';
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
 import { actorDecisionRows, parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import { parseActorMoves } from '@wildshard/format/actorMoves';
 import { parseWorldTargets } from '@wildshard/format/worldTargets';
@@ -24,10 +24,10 @@ import { borrowedDecisionControl } from '../../src/server/game/shardfile/borrowe
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 let directory: string;
-beforeAll(() => { directory = builtProduct('sunscar-dunes'); });
+beforeAll(() => { directory = builtFolder('sunscar-dunes'); });
 
 async function pack(seed = 6511) {
-  const product = await loadHeadlessProduct(directory), source = product.shardfile, descriptor = outputDescriptor(source);
+  const product = await loadHeadlessFolder(directory), source = product.shardfile, descriptor = outputDescriptor(source);
   if (descriptor === undefined) throw new Error('Missing admitted product');
   const { sections } = descriptor;
   const rows = parseDecisionScripts(sections.get('sim/scripts'));
@@ -60,7 +60,7 @@ test('one pack row surfaces, ring-runs, retreats and burrows with independent se
   if (first === undefined || script === undefined) throw new Error('Missing first member');
   for (const p of [a, b]) { for (const binding of p.bindings) p.host.enqueue(binding.id, [1, 0, 0, 0, 0, 0]); p.step(7); }
   expect(a.host.snapshot()).toEqual(b.host.snapshot()); expect(a.bindings).toHaveLength(10);
-  const disk = await scenario('sunscar-dunes', 'sunscar.skitterer.decision', { productDirectory: directory, seed: 6511,
+  const disk = await scenario('sunscar-dunes', 'sunscar.skitterer.decision', { folderDirectory: directory, seed: 6511,
     actors: a.world.snapshot().actors ?? [], players: a.world.snapshot().players ?? [] });
   disk.send('start');
   expect(disk.host.snapshot().bindings.map(binding => binding.slots)).toEqual(a.host.snapshot().bindings.map(binding => binding.slots));
@@ -87,7 +87,7 @@ test('one pack row surfaces, ring-runs, retreats and burrows with independent se
 }, 5_000);
 
 test('native pack uses one module, real contacts and an exact fresh-host continuation', async () => {
-  const product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing product');
   const plan = parseNativeRuntimePlan(product.section('sim/runtime-plan'));
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash,

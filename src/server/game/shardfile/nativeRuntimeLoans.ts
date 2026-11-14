@@ -7,16 +7,16 @@ import { onSimHostRestored } from '@wildshard/engine/sim/snapshot';
 import type { NativeCombatFrame } from '../plugin/nativeItems';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { installNativeBodyScripts } from '../quest/nativeBodyScripts';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 
-interface ProductInput { readonly product: ShardProduct; readonly assets: ReadonlyMap<string, Uint8Array> }
+interface FolderInput { readonly product: ShardFolder; readonly assets: ReadonlyMap<string, Uint8Array> }
 /** SS7: the server never loads a `view` return row; only the page runs it (timer, cue and channel, no gameplay). */
 export function serverReturnRows(input: unknown): ReturnModuleRow[] {
   return parse(ReturnModulesSchema, input).filter(row => row.side !== 'view');
 }
 /** Retain full program admission before prepare and the original per-host module loan on install. */
-export async function prepareReturns(preparation: ProductInput): Promise<(host: SimHost) => void> {
+export async function prepareReturns(preparation: FolderInput): Promise<(host: SimHost) => void> {
   const returns = preparation.product.has('actors/return-scripts') ? serverReturnRows(preparation.product.section('actors/return-scripts')) : [];
   if (returns.length > 0) await ReturnProgram.prepareModules(preparation.product, preparation.assets, returns);
   return host => { if (returns.length > 0) ReturnProgram.lendModules(host.scope, preparation.assets, returns); };
@@ -41,7 +41,7 @@ export function installCombatMotion(host: SimHost, context: { readonly combat?: 
   };
 }
 /** The original direct body-script admission and deferred restored-ground fence. */
-export function installBodyScripts(host: SimHost, context: { readonly restoring: boolean }, preparation: ProductInput): void {
+export function installBodyScripts(host: SimHost, context: { readonly restoring: boolean }, preparation: FolderInput): void {
   if (host.scope.disposed || host.scope.disposing) throw new Error('Native capability owner has ended');
   const requireGround = (): void => { if (!hasStaticGround(host.physics)) throw new Error('Native body scripts require admitted ground'); };
   if (context.restoring) onSimHostRestored(host, requireGround); else requireGround();

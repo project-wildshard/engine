@@ -9,10 +9,10 @@ import { shardRows } from '../src/shared/engine/sim/shardRows';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { SimHost } from '../src/server/engine/sim';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // SERVER-PARITY HS2. Driftwood's moored boat is a `platform` mover on the swell. The page stands its player on the boat's planks,
 // posed from the room's `script:driftwood.boat` row (`FollowedMovers.follow`). Before HS2 the room (`createTrustedHeadlessResident`,
@@ -28,7 +28,7 @@ const boatColliders = (host: SimHost): number => {
 };
 
 test('a room player standing on Driftwood\'s moored boat for 30 s rides the deck the page draws', async () => {
-  const directory = builtProduct(SLUG), product = await loadHeadlessProduct(directory), shard = product.shardfile, descriptor = outputDescriptor(shard);
+  const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile, descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const row = shard.movers.find(mover => mover.id === BOAT);
   if (row === undefined || row.kind !== 'platform' || row.carry !== undefined) throw new Error('Driftwood\'s boat is no longer a moored platform');

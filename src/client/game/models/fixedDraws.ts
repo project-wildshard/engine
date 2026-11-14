@@ -4,7 +4,7 @@ import { FixedDrawRowsSchema } from '@wildshard/format/fixedDraws';
 import * as v from 'valibot';
 import type { BufferGeometry } from 'three';
 import { createOwnedGeometry, type OwnedGeometry } from '@wildshard/engine/models/ownedGeometry';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { bakedGeometryBytes, expandBakedGeometry, fetchLaneBake, readBakedGeometry, type readWholeGeometry } from '../plugin/geometry';
 import { timeClientPreparation } from '../shardfile/preparationTiming';
@@ -66,7 +66,7 @@ function admitSlot(row: FixedDrawRow, template: OwnedGeometry, value: Uint8Array
 
 /** A row's source bytes: a supplied blob (under its file or lane url), a lane bake (one read per url),
  *  or the product's verified file. `undefined` only when supplied blobs lack it. */
-function sourceOf(product: Pick<ShardProduct, 'file'>, lane: LaneBakeReader, lanes: Map<string, Promise<Uint8Array>>,
+function sourceOf(product: Pick<ShardFolder, 'file'>, lane: LaneBakeReader, lanes: Map<string, Promise<Uint8Array>>,
   row: FixedDrawRow, supplied?: ReadonlyMap<string, Uint8Array | BufferGeometry>): Promise<Uint8Array | BufferGeometry | undefined> {
   if ('lane' in row) {
     const source=row.lane,name='url'in source?source.url:source.file,given=supplied?.get(name);
@@ -80,7 +80,7 @@ function sourceOf(product: Pick<ShardProduct, 'file'>, lane: LaneBakeReader, lan
 
 /** G571 / G602: a product's fixed draws (rows: `FixedDrawRowsSchema`) as owned geometry templates, loaded together:
  *  product GLB or baked files and baked blocks in a lane bake. Client-only. */
-export function fixedDraws(product: Pick<ShardProduct, 'file' | 'slug'>, input: unknown, intake: typeof createOwnedGeometry = createOwnedGeometry,
+export function fixedDraws(product: Pick<ShardFolder, 'file' | 'slug'>, input: unknown, intake: typeof createOwnedGeometry = createOwnedGeometry,
   lane: LaneBakeReader = fetchLaneBake): FixedDraws {
   const rows = fileRows(input), templates = new Map(rows.map(row => [row.slot, intake(row.slot, Object.fromEntries(row.channels))]));
   if (templates.size !== rows.length) throw new Error('Repeated fixed draw slot');
@@ -118,14 +118,14 @@ export function fixedDraws(product: Pick<ShardProduct, 'file' | 'slug'>, input: 
   };
 }
 
-const productDraws = new WeakMap<object, Map<string, Promise<FixedDraws>>>();
+const folderDraws = new WeakMap<object, Map<string, Promise<FixedDraws>>>();
 /** A product's fixed draws from its named JSON file of rows: one library (one promise, its
  *  failure included) per exact product and file, so every world built from that product shares its loaded geometry. The
  *  product's readers must not change during intake. File rows require its actual file reader and slug;
  *  metadata-only callers retain the original binary lane path. */
-export function productFixedDraws(product: { readonly json: (name: string) => Promise<unknown> } & Partial<Pick<ShardProduct, 'file' | 'slug'>>, file: string): Promise<FixedDraws> {
-  let files = productDraws.get(product);
-  if (files === undefined) { files = new Map(); productDraws.set(product, files); }
+export function folderFixedDraws(product: { readonly json: (name: string) => Promise<unknown> } & Partial<Pick<ShardFolder, 'file' | 'slug'>>, file: string): Promise<FixedDraws> {
+  let files = folderDraws.get(product);
+  if (files === undefined) { files = new Map(); folderDraws.set(product, files); }
   const known = files.get(file);
   if (known !== undefined) return known;
   const read = product.json, readFile = product.file, made = read(file).then(input => {
@@ -151,7 +151,7 @@ export function productFixedDraws(product: { readonly json: (name: string) => Pr
  *  same loader and format, owned by `cardScope` (never the live world's library, and no cache). Every slot's read and
  *  decode settles before the result: a card closed or retiring meanwhile, or any failed slot, releases exactly the
  *  templates that did load and refuses; the card's retirement releases them later. Looks and materials stay the caller's. */
-export async function coldFixedDraws(product: Pick<ShardProduct, 'file' | 'slug'>, input: unknown, cardScope: Scope, slots: readonly string[],
+export async function coldFixedDraws(product: Pick<ShardFolder, 'file' | 'slug'>, input: unknown, cardScope: Scope, slots: readonly string[],
   intake: typeof createOwnedGeometry = createOwnedGeometry, lane: LaneBakeReader = fetchLaneBake): Promise<FixedDraws> {
   const wanted = new Set(slots), rows = fileRows(input).filter(row => wanted.has(row.slot));
   if (wanted.size !== slots.length || rows.length !== wanted.size) throw new Error('Cold fixed draws name an undeclared or repeated slot');

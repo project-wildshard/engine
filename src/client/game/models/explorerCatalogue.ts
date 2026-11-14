@@ -14,14 +14,14 @@ import { trainingDummy } from '@wildshard/engine/models/trainingDummy';
 import { hoverboard } from '@wildshard/engine/models/hoverboard';
 import { swimHands } from '@wildshard/engine/models/swimHands';
 import type { ExplorerEntryRow } from '@wildshard/format/explorerCatalogue';
-import { ProductError, type ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { FolderError, type ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { prepareSceneSources, prepareSceneSpecimens, sceneModelDefinition, sceneModelDefinitions, sceneModelSource } from '../shardfile/sceneSources';
 import { declaredHeldSpecimen, declaredNpcSpecimen } from './sceneSpecimens';
 import { scenePartSpecimen } from './scenePartSpecimen';
-import { ProductFigureCatalogue } from './figureCatalogue';
+import { FolderFigureCatalogue } from './figureCatalogue';
 import { KitFigureCardsSchema } from '@wildshard/format/questFigures';
 import { atlasFigureCard, kitFigureCard } from './kitFigureCard';
-import { productSkinUrl } from '../systems/npc/figureSkins';
+import { folderSkinUrl } from '../systems/npc/figureSkins';
 import { declaredSocketRigCreatures } from './socketRigCreature';
 import { PosedDraw } from '../looks/posedInstances';
 import { heldGear, heldArmsGear } from './heldGear';
@@ -34,15 +34,15 @@ import { HeldGraphCardsSchema } from '@wildshard/format/heldArms';
 
 /** Resolve declarations before registering any card, so an invalid reference
  * refuses the complete catalogue instead of publishing a partial roster. */
-export async function explorerRoster(product: ShardProduct, native: readonly RosterEntry[] = []): Promise<readonly RosterEntry[]> {
+export async function explorerRoster(product: ShardFolder, native: readonly RosterEntry[] = []): Promise<readonly RosterEntry[]> {
   try { return await resolveExplorerRoster(product, native); }
   catch (error) {
-    if (error instanceof ProductError && error.item === 'explore/catalogue') throw error;
-    throw new ProductError(product.slug, 'explore/catalogue', 'schema', error instanceof Error ? error.message : 'Catalogue source admission failed');
+    if (error instanceof FolderError && error.item === 'explore/catalogue') throw error;
+    throw new FolderError(product.slug, 'explore/catalogue', 'schema', error instanceof Error ? error.message : 'Catalogue source admission failed');
   }
 }
 
-async function resolveExplorerRoster(product: ShardProduct, native: readonly RosterEntry[]): Promise<readonly RosterEntry[]> {
+async function resolveExplorerRoster(product: ShardFolder, native: readonly RosterEntry[]): Promise<readonly RosterEntry[]> {
   if (!product.has('explore/catalogue')) return [];
   const rows = product.section('explore/catalogue');
   const sourceKinds = rows.entries.some(row => row.kind === 'rigs' || row.kind === 'held' && row.cards === undefined || row.kind === 'npc' || row.kind === 'scene');
@@ -121,9 +121,9 @@ async function resolveExplorerRoster(product: ShardProduct, native: readonly Ros
       } else entries.push(present(book.sites.model(row.model), row));
     } else if (row.kind === 'figure') {
       const { file, ...card } = row;
-      entries.push(present((await ProductFigureCatalogue.fromProduct(product, file)).model(row.figure), card));
+      entries.push(present((await FolderFigureCatalogue.fromFolder(product, file)).model(row.figure), card));
     } else if (row.kind === 'kit-figure' && 'atlases' in row) {
-      entries.push(present(atlasFigureCard(row, productSkinUrl(product)), row));
+      entries.push(present(atlasFigureCard(row, folderSkinUrl(product)), row));
     } else if (row.kind === 'kit-figure') {
       const book = parse(KitFigureCardsSchema, await product.json<unknown>(row.file));
       entries.push(present(kitFigureCard(product, book, row.figure), row));
@@ -159,12 +159,12 @@ async function resolveExplorerRoster(product: ShardProduct, native: readonly Ros
       entries.push(present(scenePartSpecimen(product, match), row));
     } else throw refusal(product, row, `Unresolved catalogue kind ${row.kind}`);
   }
-  if (new Set(entries.map(entry => entry.id)).size !== entries.length) throw new ProductError(product.slug, 'explore/catalogue', 'schema', 'Expanded catalogue repeats a model identity');
+  if (new Set(entries.map(entry => entry.id)).size !== entries.length) throw new FolderError(product.slug, 'explore/catalogue', 'schema', 'Expanded catalogue repeats a model identity');
   return [...entries, ...native.filter(entry => !entries.some(declared => declared.id === entry.id))];
 }
 
-function refusal(product: ShardProduct, row: ExplorerEntryRow, detail: string): ProductError {
-  return new ProductError(product.slug, 'explore/catalogue', 'schema', `${row.id ?? row.kind}: ${detail}`);
+function refusal(product: ShardFolder, row: ExplorerEntryRow, detail: string): FolderError {
+  return new FolderError(product.slug, 'explore/catalogue', 'schema', `${row.id ?? row.kind}: ${detail}`);
 }
 
 /** Metadata belongs to the roster reference; the existing builder stays intact. */

@@ -5,8 +5,8 @@ import type { ShardContext } from '../plugin/context';
 import { clientTileViews } from './clientViews';
 import { prepareClientTile, ring, type ResidentTile, type TileContent } from './tileContent';
 import { tileOf } from '../../../shared/game/shardfile/tileOrder';
-import { productTileRing } from './tileDriver';
-import { runtimeLookMaterials, runtimeProduct } from './runtimeProduct';
+import { folderTileRing } from './tileDriver';
+import { runtimeLookMaterials, runtimeFolder } from './runtimeFolder';
 import { lendLooks } from './lentLooks';
 
 /** Declared L1 props cover a native library. Every parent precedes entry, the spawn ring's first, then the rest nearest
@@ -15,7 +15,7 @@ import { lendLooks } from './lentLooks';
 export function wholeRefinementCover(ctx: ShardContext, owner: Scope, entry: { readonly x: number; readonly z: number }): {
   readonly content: TileContent; readonly ensure: (tile: number) => Promise<void>;
 } {
-  const source = ctx.product.shardfile, props = source.props, product = runtimeProduct(source);
+  const source = ctx.product.shardfile, props = source.props, product = runtimeFolder(source);
   if (props === null) throw new Error('Fine refinement requires declared coarse props');
   const parents = new Map(props.tiles.filter(tile => tile.lod === 1).map(tile => [tile.z * 4 + tile.x, tile]));
   const pending = new Map<number, Promise<void>>(), masks = new Map<number, readonly ResidentTile[]>();
@@ -52,7 +52,7 @@ export function wholeRefinementCover(ctx: ShardContext, owner: Scope, entry: { r
   };
   const ensure = (tile: number): Promise<void> => load(Math.floor(tile / 16) * 4 + Math.floor(tile % 8 / 2));
   const content: TileContent = { id: 'whole.refinement.coarse', tiles: () => new Set(), attach: () => Promise.resolve(), coarse: async (scope, rendered) => {
-    const at = entry, spawn = new Set([...ring(tileOf(at.x, at.z), productTileRing(source)())].map(tile => Math.floor(tile / 16) * 4 + Math.floor(tile % 8 / 2)));
+    const at = entry, spawn = new Set([...ring(tileOf(at.x, at.z), folderTileRing(source)())].map(tile => Math.floor(tile / 16) * 4 + Math.floor(tile % 8 / 2)));
     const distance = (key: number): number => (-250 + (key % 4 + 0.5) * 125 - at.x) ** 2 + (-250 + (Math.floor(key / 4) + 0.5) * 125 - at.z) ** 2;
     const order = [...parents.keys()].sort((a, b) => distance(a) - distance(b));
     for (const key of order) if (spawn.has(key)) await load(key);

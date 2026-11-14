@@ -2,7 +2,7 @@ import { parseWorldScenes, type WorldScenesSection } from '@wildshard/format/wor
 import { isJsonData } from '@wildshard/format/json';
 import { TIER } from '@wildshard/engine/core/tier';
 import { createModelLibrary, type ModelLibrary } from '../plugin/geometry';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** A world-scene pool library row (format/worldScenes `kind: 'pool'`). */
 export type WorldScenePoolRow = Extract<WorldScenesSection['libraries'][number], { readonly kind: 'pool' }>;
@@ -16,7 +16,7 @@ export const tierFile = (file: string | { readonly phone: string; readonly deskt
  * pool whole; the scene catalogue's cold intake passes only the files holding its declared parts (`files`), each with
  * its full parts roster and channel rules.
  */
-export function worldScenePool(product: Pick<ShardProduct, 'file' | 'url'>, row: WorldScenePoolRow, selected?: WorldScenePoolRow['files']): ModelLibrary<never, never> {
+export function worldScenePool(product: Pick<ShardFolder, 'file' | 'url'>, row: WorldScenePoolRow, selected?: WorldScenePoolRow['files']): ModelLibrary<never, never> {
   // Admit and detach all rows before URL lookup, decoder construction or verified reads.
   const admitted = parseWorldScenes({ version: 1, libraries: [row], materials: [], steps: [] }).libraries[0];
   if (admitted?.kind !== 'pool') throw new Error('Expected a scene pool');

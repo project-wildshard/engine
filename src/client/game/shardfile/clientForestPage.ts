@@ -41,7 +41,7 @@ import { lendLooks, type LentLooks } from './lentLooks';
 import { punchPageTerrain } from './pagePreparation';
 import { bindPageWater, preparePageWater } from './pageWater';
 import { preloadWaterRipples } from '@wildshard/engine/world/water/ripples';
-import { runtimeLookMaterials } from './runtimeProduct';
+import { runtimeLookMaterials } from './runtimeFolder';
 import { timeClientPreparation } from './preparationTiming';
 
 type ForestPageRow = Extract<ClientFeatureRow, { kind: 'world.forest-page' }>;

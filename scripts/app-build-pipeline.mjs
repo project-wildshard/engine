@@ -16,11 +16,11 @@ import { checkImportMaps } from "./app-build/importMap.mjs";
 import { nameChunksByFinalBytes } from "./app-build/finalChunkNames.mjs";
 import { writeTitleAssets } from "./title-assets.mjs";
 import {
-  copyOutputProducts,
+  copyOutputFolders,
   checkPublishedMounts,
   copyDeferredPublic,
   pruneLooseCopies,
-} from "./app-build/outputProducts.mjs";
+} from "./app-build/outputFolders.mjs";
 import { buildLabelOf, stampBuildDocuments } from "./app-build/buildIdentity.mjs";
 import { engineRelease } from "./changelog.mjs";
 import { homeIconChannel, writeHomeIcons } from "./app-build/homeIcons.mjs";
@@ -237,8 +237,8 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
     JSON.stringify({ devserver: mode === "devserver" }),
   );
 
-  // the data products beside the app (was vite/outputProducts.ts)
-  copyOutputProducts(process.cwd(), outDir);
+  // the data products beside the app (was vite/outputFolders.ts)
+  copyOutputFolders(process.cwd(), outDir);
   // DL20: the deploy drops the loose copies nothing reads by URL
   const dropped = pruneLooseCopies(outDir);
   checkBakedTextures(process.cwd(), outDir);

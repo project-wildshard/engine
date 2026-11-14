@@ -5,7 +5,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import type { Bounds } from '@wildshard/engine/level/spec';
 import { declaredPlayArea, type PlayArea } from '@wildshard/engine/game/shardfile/playArea';
-import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 
 /** Below this a player has left a cell's world (half a chunk down): what recovery falls back to where a shard declares no floor. */
 export const FALL_FLOOR: number = -CHUNK_HALF;
@@ -13,7 +13,7 @@ export const FALL_FLOOR: number = -CHUNK_HALF;
 export const shardFallFloor = (declared: number | undefined): number => Math.max(FALL_FLOOR, declared ?? FALL_FLOOR);
 /** SS6: a shard's play area as its page reads it, the manifest's bounds under its `client/plan` rows (`playArea.ts`), each
  *  floor never under the chunk's own. A shard that declares none has no x/z edge and the chunk's floor. */
-export function shardPlayArea(authored: Bounds | undefined, product: Pick<ShardProduct, 'has' | 'section'> | undefined): PlayArea {
+export function shardPlayArea(authored: Bounds | undefined, product: Pick<ShardFolder, 'has' | 'section'> | undefined): PlayArea {
   const area = declaredPlayArea(authored, product);
   if (area === undefined) return { x0: -Infinity, x1: Infinity, z0: -Infinity, z1: Infinity, floorAt: () => FALL_FLOOR };
   return { x0: area.x0, x1: area.x1, z0: area.z0, z1: area.z1, floorAt: (x, z) => shardFallFloor(area.floorAt(x, z)) };

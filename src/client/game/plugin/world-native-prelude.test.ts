@@ -10,10 +10,10 @@ import * as model from '@wildshard/engine/models/model';
 import type { ShardContext } from './context';
 import type { ShardWorld } from '../../../server/game/shard/world';
 import type { ShardRuntime } from '../../../shared/game/shard/runtime';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { WorldAssembly } from '../shardfile/worldAssembly';
 import { entryOwner } from '../../../shared/game/shardfile/entryOwners';
-import { productFixedDraws } from '../models/fixedDraws';
+import { folderFixedDraws } from '../models/fixedDraws';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
 const rows = { construction: { prelude: { draws: 'models/ornaments.json' }, seed: 0,
@@ -34,10 +34,10 @@ function fixture() {
   function read<T>(name: string): Promise<T>;
   function read(name: string): Promise<unknown> { events.push(`read:${name}`); afterRead(); return Promise.resolve(drawRows); }
   const file = vi.fn(() => Promise.resolve(data));
-  const productSurface = { json: read, file, slug: 'fixture' };
-  const product = legacyDouble<ShardProduct>(productSurface);
+  const folderSurface = { json: read, file, slug: 'fixture' };
+  const product = legacyDouble<ShardFolder>(folderSurface);
   const surface = { scope, product, game: legacyDouble<ShardContext['game']>({runtime}) }, ctx = legacyDouble<ShardContext>(surface);
-  return { parent, scope, ctx, surface, nativeSurface, productSurface, product, runtime, events,
+  return { parent, scope, ctx, surface, nativeSurface, folderSurface, product, runtime, events,
     afterRead(fn: () => void) { afterRead = fn; } };
 }
 
@@ -46,14 +46,14 @@ test('metadata precedes native program/progress while loading and publication st
   try {
     const draws = await WorldAssembly.prepareNative(rows, f.ctx);
     expect(draws.ready).toBe(false); expect(() => entryOwner(f.scope, 'fixed-draws', 'ornaments')).toThrow();
-    expect(f.productSurface.file).not.toHaveBeenCalled();
+    expect(f.folderSurface.file).not.toHaveBeenCalled();
     f.events.push('program', 'progress:0');
     expect(await WorldAssembly.prepareNative(rows, f.ctx)).toBe(draws);
     const load = vi.spyOn(draws, 'load');
     await WorldAssembly.construct(rows, { native: f.ctx, runtime: f.runtime, product: f.product, scope: f.scope, draws, baked: new Map() });
     expect(f.events).toEqual(['read:models/ornaments.json', 'program', 'progress:0']);
     expect(load).toHaveBeenCalledTimes(1); expect(entryOwner(f.scope, 'fixed-draws', 'ornaments')).toBe(draws);
-    expect(f.productSurface.file).toHaveBeenCalledExactlyOnceWith('geometry/triangle.bin');
+    expect(f.folderSurface.file).toHaveBeenCalledExactlyOnceWith('geometry/triangle.bin');
     const copy = draws.handle('triangle').copy();
     expect(copy.getIndex()?.count).toBe(3);
     expect(Array.from(copy.getAttribute('position').array)).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0]);
@@ -66,8 +66,8 @@ test.each(['scope', 'product', 'reader', 'native-scope'] as const)('prelude refu
   const f = fixture();
   f.afterRead(() => {
     if (mode === 'scope') f.parent.dispose();
-    else if (mode === 'product') f.surface.product = legacyDouble<ShardProduct>({});
-    else if (mode === 'reader') f.productSurface.json = legacyDouble<ShardProduct>( { json: () => Promise.reject(new Error('replacement')) }).json;
+    else if (mode === 'product') f.surface.product = legacyDouble<ShardFolder>({});
+    else if (mode === 'reader') f.folderSurface.json = legacyDouble<ShardFolder>( { json: () => Promise.reject(new Error('replacement')) }).json;
     else f.nativeSurface.levelScope = new Scope('replacement');
   });
   try { await expect(WorldAssembly.prepareNative(rows, f.ctx)).rejects.toThrow(/left|changed/); expect(f.events).toHaveLength(1); }
@@ -91,7 +91,7 @@ test('construction refuses a different prepared library before stage allocation'
   const f = fixture();
   try {
     await WorldAssembly.prepareNative(rows, f.ctx);
-    const foreign = await productFixedDraws({json: () => Promise.resolve(drawRows), file: f.productSurface.file, slug: 'fixture'}, 'models/ornaments.json');
+    const foreign = await folderFixedDraws({json: () => Promise.resolve(drawRows), file: f.folderSurface.file, slug: 'fixture'}, 'models/ornaments.json');
     const admit = vi.spyOn(WorldAssembly, 'admit');
     await expect(WorldAssembly.construct(rows, { native:f.ctx, runtime:f.runtime, product:f.product, scope:f.scope, draws:foreign, baked:new Map() })).rejects.toThrow('replaced its native prelude draws');
     expect(admit).not.toHaveBeenCalled();

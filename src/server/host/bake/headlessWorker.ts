@@ -23,7 +23,7 @@ import { simPlayerCommand, MAX_TICK_SNAPSHOT_CHARS, type HeadlessEffect, type He
 import { headlessSections } from '../../../shared/host/headlessSections';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
-import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/product';
+import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 await runTickWorker(async raw => {
@@ -34,8 +34,8 @@ await runTickWorker(async raw => {
   validateShardfileAssets(shard, payload.assets, bytes => createHash('sha256').update(bytes).digest('hex'), offlineMemoryAdmission('refuse'), undefined, scriptAdmissionRows(sections));
   if (payload.product !== undefined) {
     // A native assembly's server-class files live only in the built product, never in the client's sections or assets.
-    const { loadHeadlessProduct } = await import('../headlessProduct');
-    return openWorldAdapter({ shard, assets: payload.assets, rapier, product: await loadHeadlessProduct(payload.product) }, payload.snapshot);
+    const { loadHeadlessFolder } = await import('../headlessFolder');
+    return openWorldAdapter({ shard, assets: payload.assets, rapier, product: await loadHeadlessFolder(payload.product) }, payload.snapshot);
   }
   // SERVER-PARITY HS1 left: a runtime plan carried as sections, with no product, still ticks the bare resident. Far Reach's and
   // Dunes' proof witnesses build their checkpoints that way; moving it to `openWorldAdapter` re-records them.

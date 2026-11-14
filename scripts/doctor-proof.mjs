@@ -26,7 +26,7 @@ const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 const run = (args, what) => { const done = spawnSync(process.execPath, args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' }); if (done.status !== 0) throw new Error(`${what} stopped: ${String(done.status)}`); return done.stdout; };
 
 // The world: this build's server, its book and parts, a release file the test can re-sign, and the page.
-const folder = run(['--input-type=module', '-e', `console.log((await import('./scripts/built-product.mjs')).readBuiltShardfile(process.cwd(), '${SHARD}'))`], 'the product read').trim();
+const folder = run(['--input-type=module', '-e', `console.log((await import('./scripts/built-folder.mjs')).readBuiltShardfile(process.cwd(), '${SHARD}'))`], 'the product read').trim();
 const origin = join(work, 'origin'), server = join(work, 'server');
 run(['scripts/server-origin.mjs', origin, build, `${SHARD}=${folder}`], 'the server book');
 run(['scripts/build-server.mjs', '--build', build, '--out', server], 'the server build');

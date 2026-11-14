@@ -9,18 +9,18 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { installSaveEnvironment, saveEnvironment } from '../src/shared/engine/saves/environment';
 import type { SaveStorage } from '../src/shared/engine/saves/store';
 import { CompendiumState } from '../src/shared/game/compendium/state';
-import { declaredProductCompendium } from '../src/shared/game/shard/declaredRows';
+import { declaredFolderCompendium } from '../src/shared/game/shard/declaredRows';
 import { SkinLocker } from '../src/client/game/cosmetics/locker';
 import { WirePage } from '../src/client/game/shardfile/wirePage';
 import { compendiumSave, skinSave, finishPickupSave, creatureRewardSave, syncPageRewards } from '../src/shared/game/saves';
 import { populationRoster } from '../src/server/game/population/roster';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { connectStandalone } from '../src/client/host/standalone/shell';
 import { importPageSaves } from '../src/client/engine/saves/indexed';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 const PREFIX = 'wildshard.save.v2.', KEY = `${PREFIX}pine-hollow`;
 class PageStorage implements SaveStorage {
@@ -40,7 +40,7 @@ afterEach(() => {
   if (inheritedEnvironment !== undefined) installSaveEnvironment(inheritedEnvironment);
 });
 beforeAll(async () => {
-  const directory = process.env['PINE_PROOF_PRODUCT'] ?? builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory);
+  const directory = process.env['PINE_PROOF_PRODUCT'] ?? builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory);
   const assets = runtimeAssets(product, directory);
   input = { product, shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
   rosterStep = (await product.json('actors/roster.json') as { step: string }).step;
@@ -234,7 +234,7 @@ test('a lower real server frame cannot rewind the page journal', async () => {
   const first = await boot(worker, true), scope = new Scope('pine.old-frame'), wire = new WirePage();
   const journal = onPage(page, () => {
     if (input.product === undefined) throw new Error('Missing product');
-    return new CompendiumState(declaredProductCompendium(input.product, input.shard.rows.compendiums[0]?.id ?? ''));
+    return new CompendiumState(declaredFolderCompendium(input.product, input.shard.rows.compendiums[0]?.id ?? ''));
   });
   try {
     wire.bind(first.shell.client, () => undefined, () => undefined, () => false); wire.hold({ journal }, scope);
@@ -253,7 +253,7 @@ test('two stores keep a kill and claim after the worker crashes without another 
   const first = await boot(worker, true), wire = new WirePage(), scope = new Scope('pine.two-stores');
   const journal = onPage(page, () => {
     if (input.product === undefined) throw new Error('Missing product');
-    return new CompendiumState(declaredProductCompendium(input.product, input.shard.rows.compendiums[0]?.id ?? ''));
+    return new CompendiumState(declaredFolderCompendium(input.product, input.shard.rows.compendiums[0]?.id ?? ''));
   });
   wire.bind(first.shell.client, () => undefined, () => undefined, () => false); wire.hold({ journal }, scope);
   try {
@@ -346,7 +346,7 @@ test('a shared-storage host preserves page discovery and worn finishes across re
   const scope = new Scope('pine.page'), wire = new WirePage();
   const journal = onPage(storage, () => {
     if (input.product === undefined) throw new Error('Missing product');
-    return new CompendiumState(declaredProductCompendium(input.product, input.shard.rows.compendiums[0]?.id ?? ''));
+    return new CompendiumState(declaredFolderCompendium(input.product, input.shard.rows.compendiums[0]?.id ?? ''));
   });
   const skins = onPage(storage, () => new SkinLocker('pine-hollow', ['scarback-furnace', 'hollow-ash', 'ghost-stag'].map(id => ({ id, weapon: 'crossbow', name: id, blurb: '', mats: {} }))));
   wire.bind(first.shell.client, () => undefined, () => undefined, () => false);

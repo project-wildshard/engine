@@ -3,12 +3,12 @@ import { parseItems } from '@wildshard/format/items';
 import { expect, test } from 'vitest';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
 import { emptyShardfile } from '../src/shared/host/author';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { DRIFTWOOD as source } from './fixtures/driftwood-program';
 
 const shardfile = emptyShardfile({ slug: 'sword-profiles-test', name: 'Sword', author: 'Wildshard', revision: 1, seed: 1 });
 function context(items: unknown) {
-  return { product: createShardProduct({ slug: shardfile.identity.slug, revision: 1, shardfile: { ...shardfile, items: parseItems(items) },
+  return { product: createShardFolder({ slug: shardfile.identity.slug, revision: 1, shardfile: { ...shardfile, items: parseItems(items) },
     sections: new Map([['combat/items', { items }]]), files: new Map(), check: true,
     read: () => Promise.reject(new Error('Sword profiles must already be admitted')) }) };
 }

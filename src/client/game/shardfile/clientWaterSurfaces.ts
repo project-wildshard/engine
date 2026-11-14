@@ -6,15 +6,15 @@ import type { BakedSource } from '@wildshard/format/bakedTiles';
 import type { ClientFeatureRow } from '@wildshard/format/clientPlan';
 import { WaterSurface,waterSurfaceLook } from '../systems/looks/waterSurface';
 import type { ShardContext } from '../plugin/context';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { hasLentLook,lendLooks,lentLooksOf } from './lentLooks';
-import { runtimeLookMaterials } from './runtimeProduct';
+import { runtimeLookMaterials } from './runtimeFolder';
 import { toonLookState } from '../looks/toonLook';
 import { readContent } from '@wildshard/engine/boot/contentRead';
 
 type WaterRow = Extract<ClientFeatureRow,{kind:'world.water'}>['rows'][number];
 /** A declared draw's file: a product file, or an immutable public asset fetched once into the page cache. */
-function bytesOf(product:ShardProduct,source:BakedSource):Promise<Uint8Array>{
+function bytesOf(product:ShardFolder,source:BakedSource):Promise<Uint8Array>{
   if('file' in source)return product.file(source.file);
   return readContent(source.url,25_000_000,{fetch:(url,init)=>fetch(url,{cache:'force-cache',...init})});
 }
@@ -22,7 +22,7 @@ interface WaterInputs { readonly key:string; readonly bytes:Uint8Array; readonly
 const inputKey=(water:WaterRow):string=>JSON.stringify('geometry' in water?['geometry',water.geometry]:['draw',water.draw.grid[buildTier()],water.draw.floor??null]);
 /** Bytes only: the first row may read during look preparation, but never creates
  * geometry, a material or a published surface before its original cursor. */
-async function readInputs(product:ShardProduct,water:WaterRow):Promise<WaterInputs>{
+async function readInputs(product:ShardFolder,water:WaterRow):Promise<WaterInputs>{
   const key=inputKey(water);
   if('geometry' in water)return {key,bytes:await product.file(water.geometry),floorBytes:null};
   const draw=water.draw;
@@ -55,7 +55,7 @@ async function drawRow(ctx:ShardContext,water:WaterRow,check:()=>void,prepared?:
   gpuOnlyTrees([surface.group],`client.water.${water.id}`,['position']);
   return surface;
 }
-const owners=new WeakMap<Scope,WeakMap<ShardProduct,ReadonlyMap<string,WaterSurface>>>();
+const owners=new WeakMap<Scope,WeakMap<ShardFolder,ReadonlyMap<string,WaterSurface>>>();
 /** Z1 binds the existing water-surface host to declared product geometry and graph looks. */
 export async function installClientWaterSurfaces(ctx:ShardContext,row:ClientFeatureRow):Promise<void>{
   if(row.kind!=='world.water')throw new Error('Invalid water feature');

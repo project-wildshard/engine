@@ -11,7 +11,7 @@ import { NetClient } from '../../src/client/engine/net/client.ts'
 import { NetRoom } from '../../src/server/engine/net/room.ts'
 import { SimNetWorld } from '../../src/server/engine/net/simWorld.ts'
 import { PlayerStore } from '../../src/server/host/dedicated/playerStore.ts'
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct.ts'
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder.ts'
 import { openCellWorld } from '../../src/server/host/standalone/cellWorld.ts'
 import { ledgerFilings } from '../../src/server/host/standalone/ledgerFilings.ts'
 import { loadRapier } from '../../src/shared/engine/physics/rapier.ts'
@@ -21,7 +21,7 @@ import { leadPlayer } from '../../src/shared/engine/sim/leadPlayer.ts'
 import { shardRows } from '../../src/shared/engine/sim/shardRows.ts'
 import { netBuys } from '../../src/shared/host/standalone/netInput.ts'
 import { directLoopback } from '../../src/test/engine/netLoopback.ts'
-import { runtimeAssets } from '../fixtures/engine-lift/product.ts'
+import { runtimeAssets } from '../fixtures/engine-lift/folder.ts'
 
 const limit = 9500
 const idle = {
@@ -42,7 +42,7 @@ async function native(slug, work) {
       ),
     ),
   )
-  const product = await loadHeadlessProduct(directory),
+  const product = await loadHeadlessFolder(directory),
     stores = new Map(),
     rewards = new PlayerStore({}, () => undefined).rewards
   // Real server stores acknowledge their in-process forwarder. This proves transactions, not database durability.

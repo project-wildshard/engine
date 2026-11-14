@@ -48,7 +48,7 @@ export interface GridPrefetchStatus {
    * storage, a newer deployment; `error`: the run itself failed (one product's failure only skips that product) */
   readonly phase: 'running' | 'done' | 'quota' | 'stopped' | 'error';
   readonly reason: string | null;
-  readonly products: number; readonly productsRead: number;
+  readonly products: number; readonly foldersRead: number;
   /** distinct files (by hash) and their wire bytes known from the product indexes read so far */
   readonly knownFiles: number; readonly knownBytes: number;
   /** of those, already on disk before this run looked, and stored by this run */
@@ -111,7 +111,7 @@ class GridPrefetch {
    * This does not widen the phone ring or the device's admitted file tier. */
   title = false;
   private status: Omit<{ -readonly [K in keyof GridPrefetchStatus]: GridPrefetchStatus[K] }, 'inFlightBytes' | 'peakInFlightBytes' | 'limitInFlightBytes'> = { phase: 'running', reason: null,
-    products: 0, productsRead: 0, knownFiles: 0, knownBytes: 0, presentFiles: 0, presentBytes: 0, storedFiles: 0, storedBytes: 0 };
+    products: 0, foldersRead: 0, knownFiles: 0, knownBytes: 0, presentFiles: 0, presentBytes: 0, storedFiles: 0, storedBytes: 0 };
   /** Queue these slugs ahead of the rest (already read ones are skipped); start the run if it is not running. */
   prioritize(slugs: readonly string[], ring: readonly string[]): void {
     for (const id of ring) this.ring.add(id);
@@ -143,7 +143,7 @@ class GridPrefetch {
             console.warn(`[grid prefetch] ${next} skipped`, error);
           }
         } // an ordinary grid run still skips only the failed product
-        this.status.productsRead++;
+        this.status.foldersRead++;
       }
       if (this.status.reason === null) this.status.phase = 'done';
     } finally {
@@ -282,7 +282,7 @@ export function startTitlePrefetch(target: string, flow: 'client' | 'grid' = 'cl
   return {stop: () => {stopTap(); held.stop();}, snapshot: () => {
     const row = held.download.snapshot();
     return {phase: row.error !== null ? 'error' : row.complete ? 'done' : 'running', reason: row.error,
-      products: 1, productsRead: row.complete ? 1 : 0, knownFiles: row.filesTotal, knownBytes: row.totalBytes,
+      products: 1, foldersRead: row.complete ? 1 : 0, knownFiles: row.filesTotal, knownBytes: row.totalBytes,
       presentFiles: row.complete && row.cachedBytes === row.totalBytes ? row.filesDone : 0, presentBytes: row.cachedBytes,
       storedFiles: row.filesDone, storedBytes: row.completedBytes - row.cachedBytes,
       inFlightBytes: row.totalBytes - row.completedBytes, peakInFlightBytes: 0, limitInFlightBytes: 0};
@@ -292,7 +292,7 @@ export function startTitlePrefetch(target: string, flow: 'client' | 'grid' = 'cl
 export function gridPrefetchStatus(): GridPrefetchStatus | null { return pageRuns.get(window)?.snapshot() ?? null; }
 
 /** Every product the title list knows (G727's "everything"). */
-function everyProduct(): string[] {
+function everyFolder(): string[] {
   return titleManifests().filter(row => (row.shardfile ?? row.gridShardfile) !== undefined).map(row => row.slug);
 }
 /** G727 / I9: the wire bytes "Download everything" still has to fetch: each product's files of this device's tier (I1's
@@ -305,7 +305,7 @@ export async function remainingDownloadBytes(owner?: Scope): Promise<number | nu
   const tier = (await import('@wildshard/engine/core/tier')).TIER;
   const indexes = import.meta.env.DEV ? null : builtIndexHashes(), seen = new Set<string>();
   let bytes = 0;
-  for (const slug of everyProduct()) {
+  for (const slug of everyFolder()) {
     live();
     const manifest = findTitleManifest(slug), descriptor = manifest?.shardfile ?? manifest?.gridShardfile;
     if (descriptor === undefined) continue;
@@ -329,7 +329,7 @@ export async function remainingDownloadBytes(owner?: Scope): Promise<number | nu
  *  one; the worker warms the whole code bundle beside it. `progress` gets the stored and present bytes of the known set. */
 export async function downloadEverything(owner: Scope, progress: (done: number, total: number) => void): Promise<OfflineDownloadEnd> {
   if (typeof caches === 'undefined' || !('storage' in navigator)) return 'stopped';
-  const slugs = everyProduct(), running = pageRuns.get(window);
+  const slugs = everyFolder(), running = pageRuns.get(window);
   if (running?.snapshot().phase !== 'running') pageRuns.delete(window); // a finished run makes way for a new one
   startGridPrefetch(slugs, slugs, true);
   navigator.serviceWorker?.controller?.postMessage({ type: 'WARM_ALL_CODE' });

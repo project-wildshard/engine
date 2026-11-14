@@ -4,7 +4,7 @@ import { registeredJsonContract, validateRegisteredJson } from '@wildshard/forma
 import { namedJsonSchema, registeredJsonSchema } from '@wildshard/engine/host/formatJsonSchema';
 import { nameBlob } from '@wildshard/sharddev/blobs';
 import { emptyShardfile } from '@wildshard/engine/host/author';
-import { createShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import { createShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 
 const names = ['look/creature-looks.json', 'actors/species-looks.json'] as const;
 const raw = { poses: {}, rows: [] };
@@ -26,7 +26,7 @@ test('both existing look names bind one original schema and preserve authored by
 test('wire reads do not promise or insert defaults owned by the native consumer', async () => {
   const identity = { slug: 'looks-fixture', name: 'Looks', author: 'Test', revision: 1, seed: 1 };
   for (const name of names) for (const builtJson of [false, true]) {
-    const product = createShardProduct({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity), sections: new Map(),
+    const product = createShardFolder({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity), sections: new Map(),
       files: new Map([[name, { hash: 'a'.repeat(64), url: '/original', jsonSchema: registeredJsonSchema(name) }]]),
       read: () => Promise.resolve(bytes()), builtJson });
     const value = await product.json(name);

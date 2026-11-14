@@ -4,11 +4,11 @@ import '../src/shared/engine/core/portableMathFirst.ts';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
-import {loadHeadlessProduct} from '../src/server/host/headlessProduct.ts';
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder.ts';
 import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime.ts';
 import {loadRapier} from '../src/shared/engine/physics/rapier.ts';
 import {admitSimSnapshotBytes,decodeSimSnapshotBytes,serializeSimSnapshot,snapshotSimHostBytes} from '../src/shared/engine/sim/snapshot.ts';
-import {readBuiltShardfile} from './built-product.mjs';
+import {readBuiltShardfile} from './built-folder.mjs';
 import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor.ts';
 import {installEngineStrings} from '../src/shared/engine/strings.ts';
 import {ENGINE_CONTENT_STRINGS} from '../src/client/game/engineStrings.ts';
@@ -18,7 +18,7 @@ installEngineStrings(ENGINE_CONTENT_STRINGS);
 /** @param {()=>unknown} run */
 const refusal=run=>{try{run();}catch(error){if(!(error instanceof Error))throw error;return [error.name,error.message];}throw new Error('Expected strict snapshot refusal');};
 try{
- const directory=readBuiltShardfile(resolve('.'),'nalati-grasslands'),product=await loadHeadlessProduct(directory),rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+ const directory=readBuiltShardfile(resolve('.'),'nalati-grasslands'),product=await loadHeadlessFolder(directory),rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
  const descriptor=outputDescriptor(product.shardfile);if(descriptor===undefined)throw new Error('Missing admitted product inventory');
  const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
  const preparation={shard:product.shardfile,product,assets,rapier};

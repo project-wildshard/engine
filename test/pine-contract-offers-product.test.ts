@@ -1,6 +1,6 @@
 import { beforeAll, expect, test } from 'vitest';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from './fixtures/builtFolder';
 import { claim, contractKill, loadBoard, ownContractCatalogue, recordKill, saveBoard } from '../src/shared/game/quest/contracts';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
@@ -13,7 +13,7 @@ const oldPageSave = "{\"next\":17,\"slots\":[{\"serial\":16,\"kind\":\"rarity\",
 
 let admitted: ContractCatalogue | undefined;
 beforeAll(async () => {
-  const loaded = await loadHeadlessProduct(builtProduct('pine-hollow'));
+  const loaded = await loadHeadlessFolder(builtFolder('pine-hollow'));
   const bytes = await loaded.file('quests/contracts.json');
   const parsed = parseContractCatalogue(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
   // GR8 (B5): the file carries the guest's row with no bytes; the board borrows the named Wasm's loan.

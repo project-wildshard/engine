@@ -29,7 +29,7 @@ import { filterCombatAimTargets } from '../../../shared/game/shardfile/aimTarget
 import { heldBowBase } from '../../../shared/game/weapons/heldBowBase';
 import { HeldDecision } from '../../../shared/game/weapons/heldDecision';
 import { JavelinFlight, type JavelinSlot } from '../../../shared/game/weapons/javelinFlight';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { SWORD_WOOD } from '../../../shared/game/weapons/starterMeleeProfile';
 import { MountedPassLaw } from '../../../shared/game/weapons/mountedPass';
 import { PolearmDecision } from '../../../shared/game/weapons/polearmDecision';
@@ -81,7 +81,7 @@ const owners = new WeakMap<SimHost, PlayerSeats<HeldSeat>>();
 export function heldArmsOf(host: SimHost): PlayerSeats<HeldSeat> | undefined { return owners.get(host); }
 
 /** Read the arms' rows now; the returned step installs them on one host. */
-export async function prepareHeldArms(product: Pick<ShardProduct, 'json' | 'section' | 'shardfile'>, arms: HeldArmsRow): Promise<(host: SimHost, context: HeldArmsContext) => void> {
+export async function prepareHeldArms(product: Pick<ShardFolder, 'json' | 'section' | 'shardfile'>, arms: HeldArmsRow): Promise<(host: SimHost, context: HeldArmsContext) => void> {
   const slots=parseHeldSlots(await product.json(arms.slots));
   const aimRows=v.parse(ClientPlanSchema,product.section('client/plan')).features.find(row=>row.kind==='combat.targets')?.rows.aim;
   if(aimRows===undefined)throw new Error('Weapons require their admitted aim exclusions');

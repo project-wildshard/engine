@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createNativeProofAdapter, createNativeProofResident } from '../headless-native.ts';
 import { prepareHeadlessRuntime } from './trustedRuntime.ts';
-import { createShardProduct } from '../../../src/shared/game/shardfile/shardProduct.ts';
+import { createShardFolder } from '../../../src/shared/game/shardfile/shardFolder.ts';
 import { emptyShardfile } from '../../../src/shared/host/author.ts';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier.ts';
 import { serializeSimSnapshot, snapshotSimHost } from '../../../src/shared/engine/sim/snapshot.ts';
@@ -19,7 +19,7 @@ import { ResidencyAllocator } from '../../../src/shared/game/grid/allocator.ts';
 
 const shard = emptyShardfile({ slug: 'trusted-fixture', name: 'Trusted fixture', author: 'Test', revision: 1, seed: 435 });
 const rapier = await loadRapier(readFileSync(new URL('../../../public/assets/physics/rapier.wasm', import.meta.url)));
-const product=createShardProduct({slug:shard.identity.slug,revision:shard.identity.revision,shardfile:shard,sections:new Map(),files:new Map(),read:()=>Promise.reject(new Error('No named files in direct fixture'))});
+const product=createShardFolder({slug:shard.identity.slug,revision:shard.identity.revision,shardfile:shard,sections:new Map(),files:new Map(),read:()=>Promise.reject(new Error('No named files in direct fixture'))});
 const preparation = { shard, product, assets: new Map(), rapier }, entry = prepareHeadlessRuntime;
 const tape = tick => [{ kind: 'player', moveX: 0, moveZ: 0, yaw: 0, ...(tick === 0 ? { attack: { targetId: 'fixture.actor' } } : {}) }, { kind: 'script', actorId: 'fixture.actor', value: tick }];
 const wire = host => serializeSimSnapshot(snapshotSimHost(host));

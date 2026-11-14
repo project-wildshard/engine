@@ -33,7 +33,7 @@ export class DurationSequencer extends BaseSequencer {
     if(cohort===undefined)return files;
     const {root}=this.ctx.config;
     // A missing/malformed registry must refuse, never move every test into the free cohort.
-    const products=v.parse(v.record(v.string(),v.array(v.string())),JSON.parse(readFileSync(resolve(root,'scripts/test-products.json'),'utf8')));
+    const products=v.parse(v.record(v.string(),v.array(v.string())),JSON.parse(readFileSync(resolve(root,'scripts/test-folders.json'),'utf8')));
     const key=(spec:TestSpecification):string=>relative(root,spec.moduleId).replaceAll('\\','/');
     const selected=new Set(selectTestCohort(files.map(key),products,cohort));
     return files.filter(spec=>selected.has(key(spec)));
@@ -41,25 +41,25 @@ export class DurationSequencer extends BaseSequencer {
   override async sort(candidates: TestSpecification[]): Promise<TestSpecification[]> {
     let files=this.cohort(candidates);
     const { root } = this.ctx.config;
-    const registry = resolve(root, 'scripts/test-products.json');
+    const registry = resolve(root, 'scripts/test-folders.json');
     if (existsSync(registry)) {
       const selected = files.map(spec => relative(root, spec.moduleId).replaceAll('\\', '/'));
       const products = v.parse(v.record(v.string(), v.array(v.string())), JSON.parse(readFileSync(registry, 'utf8')));
       // Pure suites must not load the product reader's native image dependencies.
       if (selected.some(file => (products[file]?.length ?? 0) > 0)) {
-        const { assertBuiltTestProducts,selectBuiltTestProducts } = await import('./built-product.mjs');
+        const { assertBuiltTestFolders,selectBuiltTestFolders } = await import('./built-folder.mjs');
         const {CI:ci,GITHUB_ACTIONS:actions,WS_PUSH_GATE_PROFILE:pushProfile}=process.env;
         // Only local dependency walks may defer unavailable product suites.
         // Explicit file runs and CI retain the original strict preflight.
         if(((this.ctx.config.related?.length??0)>0||COMMIT_RELATED)&&!ci&&!actions&&pushProfile!=='full-v1'){
-          const selection=selectBuiltTestProducts(root,selected);
+          const selection=selectBuiltTestFolders(root,selected);
           if(selection.blocked.length>0){
             console.warn(`Local related: skipping ${selection.blocked.length} product suites (CI still runs them): ${selection.blocked.join(', ')}. Missing current products: ${selection.missing.join(', ')}. Build: python3 scripts/heavy-lane.py build -- ${selection.buildCommand}`);
             if(selection.ready.length===0)throw new Error('No runnable related suites; build the named products first');
             const ready=new Set(selection.ready);
             files=files.filter(spec=>ready.has(relative(root,spec.moduleId).replaceAll('\\','/')));
           }
-        } else assertBuiltTestProducts(root, selected);
+        } else assertBuiltTestFolders(root, selected);
       }
     }
     const started = performance.now();

@@ -73,11 +73,11 @@ import { TIER } from '@wildshard/engine/core/tier';
 import { GridFrame, type GridFrameHost, type GridFrameState } from './frame';
 import { installHazeBand } from './hazeBand';
 import { LiveGridSession, type LiveGridPage, type LiveGridSessionState } from './liveSession';
-import { gridShardfileEdges, gridShardfileFarBytes, gridShardfileProduct, readGridShardfileFar, readGridShardfileNear } from './products';
-import { ApproachInputsDeferredError } from './productInputs';
+import { gridShardfileEdges, gridShardfileFarBytes, gridShardfileFolder, readGridShardfileFar, readGridShardfileNear } from './folders';
+import { ApproachInputsDeferredError } from './folderInputs';
 import { GridViewAdmissions } from './viewAdmissions';
 import { loadShardfileFar, loadShardfileNear } from './shardfileFar';
-import { jsonResidentBytes } from '../shardfile/productCost';
+import { jsonResidentBytes } from '../shardfile/folderCost';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { roadLayout } from '../../../shared/game/grid/roadLayout';
 import { installVoidFloor, rimWalls } from '../../../shared/game/grid/voidFloor';
@@ -117,7 +117,7 @@ import { startRoadSigns } from './roadSignPreparation';
 import { RoadMapShare } from './roadResources';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
 
-import { admittedRuntimeProduct } from '../shardfile/runtimeProduct';
+import { admittedRuntimeFolder } from '../shardfile/runtimeFolder';
 import { gridArea } from './area';
 import type { ProbeArea } from '@wildshard/engine/debug/probe';
 
@@ -393,7 +393,7 @@ export class GridSession {
   startInitialHomeMetadata(): void {
     if (this.initialHomeMetadata !== null) return;
     this.initialHomeMetadata = prepareHomeMetadata(this.host.scope, () =>
-      gridShardfileProduct(this.home.slug, { allocator: this.allocator, scope: this.host.scope }, 'metadata'));
+      gridShardfileFolder(this.home.slug, { allocator: this.allocator, scope: this.host.scope }, 'metadata'));
   }
   /** Preserve the original Home failure barrier; construction is never started here. */
   waitInitialHomeMetadata(): Promise<void> { return this.initialHomeMetadata ?? Promise.resolve(); }
@@ -552,7 +552,7 @@ export class GridSession {
     finally { timing?.finish(); }
     };
     const completed = await (initialHomeMetadata ? withInitialHomeMetadata(host.scope,
-      () => gridShardfileProduct(home.slug, { allocator, scope: host.scope }, 'metadata'), create) : create());
+      () => gridShardfileFolder(home.slug, { allocator, scope: host.scope }, 'metadata'), create) : create());
     return completed;
   }
 
@@ -572,11 +572,11 @@ export class GridSession {
     const mapReads = new AbortController(); host.scope.onDispose(() => { mapReads.abort(); });
     this.mapImages = new CellMinimaps(host.scope, async slug => {
       const owner = { allocator: this.allocator, scope: host.scope };
-      const metadata = await gridShardfileProduct(slug, owner, 'optional-metadata');
+      const metadata = await gridShardfileFolder(slug, owner, 'optional-metadata');
       if (metadata === null) return undefined;
       try {
         const map = metadata.admitted.source.map; if (map === undefined) return undefined;
-        const product = await gridShardfileProduct(slug, owner, { signal: mapReads.signal, files: [map.image] });
+        const product = await gridShardfileFolder(slug, owner, { signal: mapReads.signal, files: [map.image] });
         if (product === null) return undefined;
         try { return leaseMapImage(product.admitted.source, product.admitted.assets, this.allocator, host.scope, true); }
         finally { try { await product.releaseInputs(); } finally { product.release(); } }
@@ -907,7 +907,7 @@ export class GridSession {
       const root = roots.get(cell.instance); if (root === undefined) return;
       try {
         const owner = { allocator: this.allocator, scope };
-        const product = required ? gridShardfileProduct(cell.slug, owner) : gridShardfileProduct(cell.slug, owner, { signal: optional.signal });
+        const product = required ? gridShardfileFolder(cell.slug, owner) : gridShardfileFolder(cell.slug, owner, { signal: optional.signal });
         if (product === null) { if (!required) throw new ApproachInputsDeferredError(); return; }
         const retained = await product; let pageOwned = false;
         try {
@@ -1151,7 +1151,7 @@ export class GridSession {
     }));
     // T5: each L0 tile's declared resident bytes, from the entered cell's admitted product (none while it is not resident)
     const bytes = new Map<number, number>();
-    for (const tile of admittedRuntimeProduct(cell.slug)?.source.tiles ?? []) if (tile.lod === 0) bytes.set(tile.z * 8 + tile.x, tile.decoded + tile.gpu);
+    for (const tile of admittedRuntimeFolder(cell.slug)?.source.tiles ?? []) if (tile.lod === 0) bytes.set(tile.z * 8 + tile.x, tile.decoded + tile.gpu);
     return { origin: { x: cell.origin.x - this.home.origin.x, z: cell.origin.z - this.home.origin.z }, render, bytes };
   }
 

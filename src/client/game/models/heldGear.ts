@@ -9,7 +9,7 @@ import { HeldEquipment } from '../plugin/heldEquipment';
 import { heldBowArrow, heldBowDisplay, heldLauncherBolt, heldLauncherDisplay } from '../weapons/heldLauncher';
 import { heldToolSpecimen, heldToolRows } from '../plugin/heldTool';
 import { HeldFinishes } from '../loadout/finishes';
-import { loadFirstPartyProduct } from '../shardfile/runtimeProduct';
+import { loadFirstPartyFolder } from '../shardfile/runtimeFolder';
 
 /** Client-only presentation: define held gear from pre-admission card rows; all family builders and preparation live here. */
 export function heldGear(input: unknown): readonly RosterEntry[] {
@@ -17,7 +17,7 @@ export function heldGear(input: unknown): readonly RosterEntry[] {
   const catalogue = (): HeldEquipment => HeldEquipment.current(rows.slug);
   const finishes = (): HeldFinishes => HeldFinishes.current(rows.slug);
   const prepare = async (): Promise<void> => {
-    const product = await loadFirstPartyProduct(rows.slug);
+    const product = await loadFirstPartyFolder(rows.slug);
     await HeldEquipment.prepare(product);
     finishes();
   };
@@ -65,12 +65,12 @@ export function heldArmsGear(input: unknown): readonly RosterEntry[] {
     const { slug, file } = rows;
     return rows.cards.map(row => live(defineModel<object>({ id: row.id, name: row.name, category: 'gear', pipeline: row.pipeline, file: row.file,
       defaults: {}, rig: { clips: row.clips },
-      build: context => loadingSpecimen(row.id, row.size, async () => (await HeldView.fromProduct(slug, file)).specimen({ settleFrames: row.settleFrames, renderer: context.renderer })) }),
+      build: context => loadingSpecimen(row.id, row.size, async () => (await HeldView.fromFolder(slug, file)).specimen({ settleFrames: row.settleFrames, renderer: context.renderer })) }),
     { copies: row.copies }));
   }
   const arms = HeldView.admit({ kind: 'toon', ...rows.look });
   return rows.cards.map(row => live(defineModel<object>({ id: row.id, name: row.name, category: 'gear', pipeline: ['blender','code'], file: row.file, defaults: {},
     build: context => loadingSpecimen(row.id, row.size, async () => {
-      await arms.prepareExplorer(context, await loadFirstPartyProduct(rows.slug)); return arms.specimen({ sky: context.sky, blade: row.kind });
+      await arms.prepareExplorer(context, await loadFirstPartyFolder(rows.slug)); return arms.specimen({ sky: context.sky, blade: row.kind });
     }) }), { copies: row.copies }));
 }

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { parse } from 'valibot';
 import { Vector3 } from 'three';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
@@ -23,14 +23,14 @@ import type { ShardContext } from '../src/client/game/plugin/context';
 import type { ShardPlayHost, ShardRuntime } from '../src/shared/game/shard/runtime';
 import { RowBodies } from '../src/client/engine/entities/RowBodies';
 import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // P1-E3.1: population and creature spawning on the shipped headless host (`createTrustedHeadlessResident`, the tick
 // worker's own composition) for a real shard. Sunscar Dunes' homes keeper spawns, thinks, moves, kills and refills
 // its creatures in the fixed tick; the census is their serialisable read model.
 
-async function shipped(slug: string): Promise<{ resident: (snapshot?: string) => Promise<TrustedHeadlessResident>; product: Awaited<ReturnType<typeof loadHeadlessProduct>> }> {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+async function shipped(slug: string): Promise<{ resident: (snapshot?: string) => Promise<TrustedHeadlessResident>; product: Awaited<ReturnType<typeof loadHeadlessFolder>> }> {
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${slug} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

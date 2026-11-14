@@ -10,7 +10,7 @@ import {nameBlob} from '../src/sharddev/blobs';
 import {originalPoiPaintFiles} from './fixtures/nalati-poi-paint-original';
 import {FixedDrawRowsSchema} from '@wildshard/format/fixedDraws';
 import {SceneBakedGeometrySchema} from '@wildshard/format/sceneDressing';
-import {productFixedDraws} from '../src/client/game/models/fixedDraws';
+import {folderFixedDraws} from '../src/client/game/models/fixedDraws';
 import source from './fixtures/nalati-shape-book-original.json' with {type:'json'};
 import original from './fixtures/nalati-shape-blocks.json' with {type:'json'};
 
@@ -37,7 +37,7 @@ test('the product owner restores every original painted shape through file intak
   const product={slug:'nalati-shape-proof',json:()=>Promise.resolve(rows),file:(name:string)=>{
     const blob=blobs.find(entry=>entry.file.name===name);if(blob===undefined)throw new Error(`Missing named shape ${name}`);return Promise.resolve(blob.bytes);
   }};
-  const draws=await productFixedDraws(product,'models/shape-book.json');await draws.load();
+  const draws=await folderFixedDraws(product,'models/shape-book.json');await draws.load();
   for(const row of paint.rows){
     const bytes=blobs.find(blob=>blob.file.name===row.name)?.bytes;if(bytes===undefined)throw new Error('Missing raw original shape');
     const decoded=readBakedGeometry(bytes,0,row.geometry),before=row.geometry.expand?expandBakedGeometry(decoded):decoded,after=draws.handle(row.key).copy();

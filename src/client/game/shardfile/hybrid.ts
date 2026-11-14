@@ -1,6 +1,6 @@
 import type { GridCellEvents } from '../../../shared/game/grid/cellEvents';
 import { enterDeclaredAudioPhase } from '../audio/sceneDirector';
-import { admittedProductClientPlan, installClientPhase, type ClientPhase } from './clientPlan';
+import { admittedFolderClientPlan, installClientPhase, type ClientPhase } from './clientPlan';
 import { bindResidentWorldScope, boundResidentWorldScope, residentWorldScope } from './hybridPresentation';
 import { enterMovers, type BorrowedMoverRow } from '../plugin/moverViews';
 import { ownerTask, withOwner } from '@wildshard/engine/app/ownership';
@@ -15,11 +15,11 @@ import { RetainedRuntimeHooks, installEnteredRuntimeService } from "../shard/ret
 import { enterSkyClock } from '../session/clockSettings';
 
 import { shardfileSource } from './clientSource';
-import type { ProductOptions } from './product';
+import type { FolderOptions } from './folder';
 import { configureLevel, selectedLevel } from '@wildshard/engine/level/selection';
 import { reserveMapImage } from './mapImage';
-import { browserShardfileOptions, productBase, provideHybridDeclaration } from './runtimeProduct';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { browserShardfileOptions, folderBase, provideHybridDeclaration } from './runtimeFolder';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { ShardfileClientBindings } from './client';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 
@@ -28,15 +28,15 @@ import type { AudioData } from '@wildshard/format/audio';
 
 async function runtimeClientPhase(ctx: ShardContext, phase: ClientPhase, resident: Scope, lifetime?: 'entered'): Promise<void> {
   if (!ctx.product.has('client/plan')) return;
-  const plan = admittedProductClientPlan(ctx.product);
+  const plan = admittedFolderClientPlan(ctx.product);
   await installClientPhase(ctx, plan, phase, resident, lifetime);
 }
 
 /** A finite data runtime has no source entry or hooks of its own. */
 class ClientPlanRuntime extends ShardPlugin {}
-function preparePageRuntime(product: ShardProduct, firstParty: boolean): new () => ShardPlugin {
+function preparePageRuntime(product: ShardFolder, firstParty: boolean): new () => ShardPlugin {
   if (!firstParty || !product.has('client/plan')) throw new Error('Data resident requires its admitted client plan');
-  admittedProductClientPlan(product);
+  admittedFolderClientPlan(product);
   return ClientPlanRuntime;
 }
 
@@ -46,7 +46,7 @@ export interface HybridResident {
   readonly slug: string;
   readonly declaration: RuntimeDeclaration | null;
   /** Required actual admitted product when compiled client features own every stage. */
-  readonly product?: ShardProduct;
+  readonly product?: ShardFolder;
   readonly firstParty: boolean;
   readonly scope: Scope;
   readonly runtime: ShardRuntime;
@@ -292,7 +292,7 @@ export class HybridShardPlugin extends ShardPlugin {
 }
 
 /** Admit declared data and trusted hooks; catalogue placement and cell activation stay in the game layer. */
-export async function prepareHybridShard(product: ShardProduct, options: ProductOptions | { firstParty: true },
+export async function prepareHybridShard(product: ShardFolder, options: FolderOptions | { firstParty: true },
   bindings: Omit<ShardfileClientBindings, 'instance' | 'trustedRuntime'> & {
     /** The game adapter forwards the page owner; the shard need not read or own another service. */
     readonly residencyContext?: Pick<ShardContext, 'game' | 'scope'>;
@@ -303,7 +303,7 @@ export async function prepareHybridShard(product: ShardProduct, options: Product
     readonly stagesOwner?: 'declared' | 'runtime';
   }): Promise<ShardPlugin> {
   // Every entry passes the product already loaded before its hooks.
-  const productOptions = 'base' in options ? options : browserShardfileOptions(productBase(product.slug), options.firstParty);
+  const folderOptions = 'base' in options ? options : browserShardfileOptions(folderBase(product.slug), options.firstParty);
   const source = product.shardfile;
   if (source.runtime === null) throw new Error('Hybrid requires a compiled client-plan runtime declaration');
   provideHybridDeclaration(source);
@@ -327,10 +327,10 @@ export async function prepareHybridShard(product: ShardProduct, options: Product
       ...(binding.residency === undefined ? {} : { residency: binding.residency }),
     });
   };
-  const { load, mapImage } = await shardfileSource(source, productOptions, { ...clientBindings, instance, trustedRuntime: true, runtimeStagesOnly: stagesOwner === 'runtime', planLifetime: 'resident', audioOwner: clientBindings.audioOwner ?? 'runtime', worldOwner: clientBindings.worldOwner ?? 'runtime', onSimulationExpected, ...(onSimulation === undefined ? {} : { onSimulation }) })
+  const { load, mapImage } = await shardfileSource(source, folderOptions, { ...clientBindings, instance, trustedRuntime: true, runtimeStagesOnly: stagesOwner === 'runtime', planLifetime: 'resident', audioOwner: clientBindings.audioOwner ?? 'runtime', worldOwner: clientBindings.worldOwner ?? 'runtime', onSimulationExpected, ...(onSimulation === undefined ? {} : { onSimulation }) })
     .then(data => ({ load: data.load, mapImage: data.minimap?.image }));
   if (load === undefined) throw new Error('Missing admitted hybrid data plugin');
-  const Runtime = preparePageRuntime(product, productOptions.firstParty);
+  const Runtime = preparePageRuntime(product, folderOptions.firstParty);
   const installed = await load().then(({ default: Data }) => new Data());
   const mapped: ShardPlugin = source.map === undefined ? installed : {
     async world(ctx) {
@@ -374,7 +374,7 @@ export class HybridRuntimeSession {
     const prior = this.prepared.get(instance); if (prior !== undefined) return prior;
     const product = resident.product;
     if (!resident.firstParty || product === undefined || !product.has('client/plan')) return Promise.reject(new Error('Data resident requires its admitted client plan'));
-    admittedProductClientPlan(product);
+    admittedFolderClientPlan(product);
     const prepared = Promise.resolve(ClientPlanRuntime);
     this.prepared.set(instance, prepared);
     void prepared.catch(() => { if (this.prepared.get(instance) === prepared) this.prepared.delete(instance); });

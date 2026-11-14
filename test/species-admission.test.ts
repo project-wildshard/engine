@@ -1,18 +1,18 @@
 import { expect,test } from 'vitest';
 import { registeredJsonSchema } from '@wildshard/engine/host/formatJsonSchema';
-import { fixtureJsonCheck } from './fixtures/productFile';
+import { fixtureJsonCheck } from './fixtures/folderFile';
 import { nameBlob } from '@wildshard/sharddev/blobs';
 import { emptyShardfile } from '@wildshard/engine/host/author';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
-import { admittedSheepProduct } from './fake/admittedSheep';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { admittedSheepFolder } from './fake/admittedSheep';
 
 const encode=(value:unknown):Uint8Array=>new TextEncoder().encode(JSON.stringify(value));
 
 test('species named-file admission precedes native catalogue allocation',async()=>{
-  const file=admittedSheepProduct().metadata,schema=registeredJsonSchema('actors/sheep.json');
+  const file=admittedSheepFolder().metadata,schema=registeredJsonSchema('actors/sheep.json');
   const blob=nameBlob('actors/sheep.json','json',encode(file),{jsonSchema:schema});
   const identity={slug:'species-admission',name:'Species admission',author:'Wildshard',revision:1,seed:1};
-  const product=(payload:unknown)=>createShardProduct({slug:identity.slug,revision:1,jsonCheck:fixtureJsonCheck,shardfile:emptyShardfile(identity),sections:new Map(),
+  const product=(payload:unknown)=>createShardFolder({slug:identity.slug,revision:1,jsonCheck:fixtureJsonCheck,shardfile:emptyShardfile(identity),sections:new Map(),
     files:new Map([['actors/sheep.json',{...blob.file,url:'https://example.test/species'}]]),read:()=>Promise.resolve(encode(payload))});
   expect(await product(file).json('actors/sheep.json')).toEqual(file);
   expect(encode(await product(file).json('actors/sheep.json'))).toEqual(encode(file));

@@ -14,7 +14,7 @@ import { Worker } from 'node:worker_threads';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
 import type { WorkerNews } from './cellProtocol';
 import type { CellWorkerData } from './cellWorker';
-import { readPackProduct, type PackReads } from './packReader';
+import { readPackFolder, type PackReads } from './packReader';
 import { openPlayerSaves, memoryPlayerSaves } from './playerSaves';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { fetchReleaseFile, servingRelease, ReleaseWatch } from './releaseFile';
@@ -139,7 +139,7 @@ async function pullBundle(script: string): Promise<void> {
 const watch = new ReleaseWatch({ read: readRelease, serving: release, cells: shards, ...(poll === undefined ? {} : { everyMs: Number(poll) }), failed: error => { log({ at: 'release.failed', error: String(error) }); },
   changed: async next => {
     if (pullScript !== undefined) await pullBundle(pullScript);
-    for (const slug of shards) await readPackProduct(slug, next.engineBuild, await rapier(), { origin, cache }, reads);
+    for (const slug of shards) await readPackFolder(slug, next.engineBuild, await rapier(), { origin, cache }, reads);
     world.beginGrace(next.engineBuild);
   } });
 // SA33: a cell the API placed opens on this running server within a look, on a worker of its own, with no grace and no restart. Its shard's
@@ -152,7 +152,7 @@ placements = placementAt === undefined || placementKey === undefined || listed.t
     const ready: string[] = [];
     for (const row of rows) {
       // SA34a: the pack first, so the door's placed list (and so every worker's frame numbers) holds only cells it opens.
-      try { await readPackProduct(row.slug, build, await rapier(), { origin, cache }, reads, row.hash); placeCell(row); ready.push(row.instance); }
+      try { await readPackFolder(row.slug, build, await rapier(), { origin, cache }, reads, row.hash); placeCell(row); ready.push(row.instance); }
       catch (error) { log({ at: 'placement.refused', instance: row.instance, slug: row.slug, error: String(error) }); }
     }
     return ready.length === 0 ? [] : world.openCells(ready);

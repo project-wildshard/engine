@@ -2,7 +2,7 @@ import { Matrix4, type BufferGeometry } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { WorldScenesSection } from '@wildshard/format/worldScenes';
 import { readWholeGeometry } from '../plugin/geometry';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { App } from '@wildshard/engine/app/app';
 import { readReusableWholeLibrary } from './reusableWholeLibrary';
 
@@ -11,7 +11,7 @@ type WholeLibrary = Extract<WorldScenesSection['libraries'][number], { kind: 'wh
 /** The models `ids` of a declared whole-geometry library, read from only the shardfile tiles that hold them.
  * `geometry` hands each partition out once as is and any repeat or posed alias as a copy; `done` frees the rest.
  * Client-only presentation. */
-export async function readWholeLibrary(owner: Scope, product: ShardProduct, row: WholeLibrary, ids: ReadonlySet<string>, pause?: () => Promise<void>, assets?: Pick<App['assets'], 'register' | 'acquireResource' | 'evictCached'>): Promise<{ geometry: (id: string) => BufferGeometry | null; done: () => void }> {
+export async function readWholeLibrary(owner: Scope, product: ShardFolder, row: WholeLibrary, ids: ReadonlySet<string>, pause?: () => Promise<void>, assets?: Pick<App['assets'], 'register' | 'acquireResource' | 'evictCached'>): Promise<{ geometry: (id: string) => BufferGeometry | null; done: () => void }> {
   if ('storage' in row) throw new Error('Slab identities have no cold whole source');
   if (assets !== undefined && (owner.disposed || owner.disposing)) throw new Error('Whole library owner is disposed or retiring');
   const models = new Map(row.models.filter(model => ids.has(model.id)).map(model => [model.id, model]));

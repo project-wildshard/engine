@@ -6,11 +6,11 @@ import type { SaveStorage } from '../src/shared/engine/saves/store';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { serializeSimSnapshot, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // TE-ENG8: a solo server saves as progress moves, so a page reloaded a moment later keeps it. Nothing here asks for a save:
 // the page's 30 s timer never runs, and a reload ends the worker before a save the page asks for on leaving comes back.
@@ -25,7 +25,7 @@ class PageStorage implements SaveStorage {
   removeItem(key: string): void { this.writes++; this.items.delete(key); }
 }
 async function product(slug: string): Promise<HeadlessRuntimeInput> {
-  const directory = builtProduct(slug), loaded = await loadHeadlessProduct(directory), descriptor = outputDescriptor(loaded.shardfile);
+  const directory = builtFolder(slug), loaded = await loadHeadlessFolder(directory), descriptor = outputDescriptor(loaded.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return { shard: loaded.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product: loaded };

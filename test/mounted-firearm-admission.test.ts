@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest';
 import { parseHeldFirearmRows, parseHeldFirearmView } from '@wildshard/format/weaponProfiles';
 import { registeredJsonSchema } from '@wildshard/engine/host/formatJsonSchema';
-import { fixtureJsonCheck } from './fixtures/productFile';
+import { fixtureJsonCheck } from './fixtures/folderFile';
 import { nameBlob } from '@wildshard/sharddev/blobs';
 import { emptyShardfile } from '@wildshard/engine/host/author';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import source from './fixtures/nalati-rifle-original.json' with { type: 'json' };
 
 const encode = (input: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(input));
@@ -12,7 +12,7 @@ test('baked firearm admission preserves every feel and playback row and refuses 
   const schema = registeredJsonSchema('weapons/rifle-page.json'), bytes = encode(source);
   const blob = nameBlob('weapons/rifle-page.json', 'json', bytes, { jsonSchema: schema });
   const identity = { slug: 'firearm-admission', name: 'Firearm admission', author: 'Wildshard', revision: 1, seed: 1 };
-  const product = (input: unknown) => createShardProduct({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity), sections: new Map(), jsonCheck: fixtureJsonCheck,
+  const product = (input: unknown) => createShardFolder({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity), sections: new Map(), jsonCheck: fixtureJsonCheck,
     files: new Map([['weapons/rifle-page.json', { ...blob.file, url: 'https://example.test/firearm' }]]), read: () => Promise.resolve(encode(input)) });
   const admitted = await product(source).json<typeof source>('weapons/rifle-page.json');
   expect(encode(admitted)).toEqual(bytes);

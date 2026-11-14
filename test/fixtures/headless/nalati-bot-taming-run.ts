@@ -5,8 +5,8 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native behavior assertions run in this bounded child.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {NET_BUTTONS} from '../../../src/shared/engine/input/netButtons';
@@ -19,7 +19,7 @@ import {prepareHeadlessRuntime} from '../nalati-verbs';
 // J108, on the real Nalati stallion: a bot offers beside it, is put to the break (the approach is the first player's own
 // tested law, and a chase is only a matter of ticks) and rides out every bucking round on its own session, and the horse leaves the wild for the bot's own mount. The first player cannot ride it, and later the wild has
 // a stallion again for anyone else.
-const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),shard=product.shardfile;
 const descriptor=outputDescriptor(shard);assert.ok(descriptor);
 const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,
   Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

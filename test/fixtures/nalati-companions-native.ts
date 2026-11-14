@@ -7,7 +7,7 @@ import {ClientRidingSessionSchema,cleanMountName} from '@wildshard/format/riding
 import {pickPrompt} from '../../src/shared/engine/world/interact/prompts';
 import type {AnimalSim} from '../../src/shared/engine/entities/AnimalSim';
 import type {PrepareHeadlessRuntime} from '../../src/server/host/headlessRuntime';
-import {prepareProductPlan as prepareNalati} from './headless-native';
+import {prepareFolderPlan as prepareNalati} from './headless-native';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const finite=v.pipe(v.number(),v.finite());

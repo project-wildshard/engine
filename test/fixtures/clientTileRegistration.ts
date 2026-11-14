@@ -33,7 +33,7 @@ export function clientTileFixture(coarse = true, fail = false, holdDistant = fal
     const root = new Group(); root.name = name;
     const assets = new ClientAssets(source, wire, { base: 'https://example.invalid/', firstParty: true, offline: true,
       hash: bytes => Promise.resolve(hashImmutableBytes(bytes)), fetch: () => Promise.reject(new Error('Unexpected network')), cache: {
-        product: () => Promise.resolve(null), putProduct: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
+        product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
         asset: (_base, hash) => Promise.resolve(wire.get(hash) ?? null),
         pin: () => { pins++; return () => { pins--; }; },
       } });

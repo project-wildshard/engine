@@ -3,10 +3,10 @@ import '../../../src/shared/engine/core/portableMathFirst';
 // oxlint-disable-next-line import/no-nodejs-modules -- Assertions run in the strict native child.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {openProductSession} from './productSession';
+import {openFolderSession} from './folderSession';
 import {nalatiWorldTape} from '../../proof/nalati-grasslands/worldTape';
 
-const {sim}=await openProductSession('nalati-grasslands','nalati-world');
+const {sim}=await openFolderSession('nalati-grasslands','nalati-world');
 try{
   const report=await sim.verbTape(nalatiWorldTape());
   const observation=(id:string)=>{const found=report.observations.find(row=>row.id===id);assert.ok(found);return found;};

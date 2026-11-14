@@ -31,7 +31,7 @@ export default defineConfig(withTestEnvironments({
     // Native product/hash readers own filesystem URLs, even in DOM suites.
     // Vite's browser query injection must not rewrite the hash CLI's hashbang.
     // Format ships raw .ts from the shardfile repo (J42): Vite transforms it, because Node will not under node_modules.
-    server: { deps: { external: [/\/scripts\/(?:built-product|bake-input-hashes)\.mjs$/u], inline: [/@wildshard\/format/u] } },
+    server: { deps: { external: [/\/scripts\/(?:built-folder|bake-input-hashes)\.mjs$/u], inline: [/@wildshard\/format/u] } },
     include: ['src/{client,shared,server,cook}/{engine,game,host}/**/*.test.ts', 'src/client/app/**/*.test.ts', 'src/test/{engine,game}/**/*.test.ts', 'test/**/*.test.ts', 'test/**/*.test.mjs', ...(process.argv.includes('test/e7-owned-effects.proof.ts') ? ['test/e7-owned-effects.proof.ts'] : [])],
     exclude: ['**/node_modules/**', WORKTREE_GLOB, ...quarantined, ...readLiftPending(undefined, exclusionAt).excluded, ...(process.env.WILDSHARD_RING === '1' ? JSON.parse(readFileSync('test/pins/ring-2-tests.json', 'utf8')) as string[] : [])],
     setupFiles: ['scripts/vitest-cpu.ts','test/setup.ts'], restoreMocks: true },

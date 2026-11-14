@@ -9,15 +9,15 @@ import {heldBowBase} from '../../../src/shared/game/weapons/heldBowBase';
 import {bowLaunchSpeed} from '../../../src/shared/engine/combat/bowLaw';
 import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {earnNalatiPasture} from './nalati-pasture-session';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const {resident,product,population,flock,sheep,originalWolves,checkpoint,checkpointTick}=await earnNalatiPasture();
-let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginProductSession>>['ready']>>|undefined;
+let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;
 try{
   const source=v.parse(HeldBowFileSchema,await product.json('weapons/bow-page.json')),bow=heldBowBase({bow:source.bow,base:source.base});
-  const pending=await beginProductSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();
+  const pending=await beginFolderSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();
   const frames:HeadlessCommand[][]=[],head=new Vector3();
   const step=(commands:readonly HeadlessCommand[]):void=>{frames.push(structuredClone([...commands]));resident.step(commands);};
   for(let tick=0;tick<660;tick++)step([]);

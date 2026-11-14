@@ -1,15 +1,15 @@
 import {afterAll,beforeAll,describe,expect,it} from 'vitest';
 import * as v from 'valibot';
 import {HeadlessJourneyPlanSchema} from '../../src/shared/host/headlessJourney';
-import {beginProductSession,type openProductSession} from './headless/productSession';
+import {beginFolderSession,type openFolderSession} from './headless/folderSession';
 import {physicsRoutes} from './headless/physicsRoutes';
 import {ownedSetup} from './ownedSetup';
 
 // The original browser ruler keeps one world alive for each shard. In Nine,
 // the final shaft fall explicitly depends on the safe floor from prior legs.
-export function physicsShardCases(include:(slug:string)=>boolean,startSession:typeof beginProductSession=beginProductSession):void {
+export function physicsShardCases(include:(slug:string)=>boolean,startSession:typeof beginFolderSession=beginFolderSession):void {
 for(const slug of new Set(physicsRoutes.map(row=>row.slug).filter(candidate=>candidate!=='driftwood-isle'&&include(candidate))))describe(slug,{concurrent:false,shuffle:false},()=>{
-  let session:Awaited<ReturnType<typeof openProductSession>>|undefined;
+  let session:Awaited<ReturnType<typeof openFolderSession>>|undefined;
   const setup=ownedSetup(async()=>{
     const start=performance.now(),phase=(name:string):void=>{console.info(JSON.stringify({diagnostic:'native-physics-setup',slug,phase:name,elapsedMs:Math.round(performance.now()-start)}));};
     phase('start');

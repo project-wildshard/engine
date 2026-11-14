@@ -1,19 +1,19 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- the built product's verified bytes are read from its output folder
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { playLibrarySource, scopedSpecimenLibrarySource, tierLibrarySource, urlImageLibrarySource } from '../src/client/game/shardfile/productCost';
+import { playLibrarySource, scopedSpecimenLibrarySource, tierLibrarySource, urlImageLibrarySource } from '../src/client/game/shardfile/folderCost';
 import { textureLibrarySource } from '@wildshard/format/deviceMemoryCost';
 import { nearbyContentCost } from '@wildshard/format/budget';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 /** D122: Nine Dragon's spawn, phone tier, read on HEAD preview a423f4d305 (Chromium, 2026-10-27): labelled GPU 245.6 MB +
  *  labelled RAM 287.1 MB. The admission's estimate there may shed what is never resident, never fall below this. */
 const MEASURED_SPAWN_RESIDENT = 245_600_000 + 287_100_000;
 
 test('Nine\'s play estimate at spawn never falls below its measured resident memory', async () => {
-  const folder = builtProduct('nine-dragon-stack'), product = await loadHeadlessProduct(folder), source = product.shardfile;
+  const folder = builtFolder('nine-dragon-stack'), product = await loadHeadlessFolder(folder), source = product.shardfile;
   const descriptor = outputDescriptor(source);
   if (descriptor === undefined) throw new Error('Nine product has no output descriptor');
   // the bytes the projections read, as the admission holds them: the JSON files, the library's textures and images

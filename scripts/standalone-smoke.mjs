@@ -14,7 +14,7 @@ import { build } from 'vite';
 import { rapierAlias } from '../vite/rapier.ts';
 import { codeDirectory, stampBuildHtml } from './app-build/buildIdentity.mjs';
 import { standaloneDirectory, writeStandaloneOutput } from './app-build/standaloneOutput.mjs';
-import { readBuiltShardfile } from './built-product.mjs';
+import { readBuiltShardfile } from './built-folder.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { documentIsolation } from './app-build/isolation.mjs';
 

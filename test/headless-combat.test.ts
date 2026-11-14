@@ -30,13 +30,13 @@ import { weaponRow } from '../src/server/game/plugin/simulation';
 import { FakeGame, legacyDouble } from '../src/test/engine/FakeGame';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands, type HeadlessCommand } from '../src/shared/host/tickProtocol';
 import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 // P1-E3.2: hits and damage settled by the shipped headless host (`createTrustedHeadlessResident`, what the standalone
@@ -56,7 +56,7 @@ function shipped(slug: string): ReturnType<typeof load> {
   return found;
 }
 async function load(slug: string) {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), shard = product.shardfile, descriptor = outputDescriptor(shard);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), shard = product.shardfile, descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${slug} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier: Rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));

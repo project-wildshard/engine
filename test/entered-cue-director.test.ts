@@ -4,16 +4,16 @@ import type { Game } from '../src/client/engine/core/Game';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import { CueDirector } from '../src/client/game/audio/cueDirector';
 import { clientNativeBook } from '../src/client/game/shardfile/clientNativeBook';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { emptyShardfile } from '@wildshard/engine/host/author';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
 test('entered cue identities stay isolated by product and entered lifetime',()=>{
   const scope=new Scope('cue-entry'),other=new Scope('other-cue-entry');
-  const product=(slug:string)=>createShardProduct({slug,revision:1,shardfile:emptyShardfile({slug,name:slug,author:'Wildshard',revision:1,seed:1}),sections:new Map(),files:new Map(),read:()=>Promise.reject(new Error('No asset reads'))});
-  const firstProduct=product('first-cue'),secondProduct=product('second-cue');
-  const first=legacyDouble<ShardContext>({scope,product:firstProduct}),second=legacyDouble<ShardContext>({scope,product:secondProduct});
-  const reentered=legacyDouble<ShardContext>({scope:other,product:firstProduct});
+  const product=(slug:string)=>createShardFolder({slug,revision:1,shardfile:emptyShardfile({slug,name:slug,author:'Wildshard',revision:1,seed:1}),sections:new Map(),files:new Map(),read:()=>Promise.reject(new Error('No asset reads'))});
+  const firstFolder=product('first-cue'),secondFolder=product('second-cue');
+  const first=legacyDouble<ShardContext>({scope,product:firstFolder}),second=legacyDouble<ShardContext>({scope,product:secondFolder});
+  const reentered=legacyDouble<ShardContext>({scope:other,product:firstFolder});
   const rows={version:1,fields:[],rows:[]},game=legacyDouble<Game>({levelScope:scope});
   const a=new CueDirector(game,rows,scope),b=new CueDirector(game,rows,scope);
   try{

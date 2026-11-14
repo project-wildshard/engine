@@ -9,7 +9,7 @@ import {canonicalSimDigest} from '../../fake/simState';
 import {BladeRowsSchema} from '@wildshard/format/heldMelee';
 import {MeleeWeaponProfileSchema} from '@wildshard/format/weaponProfiles';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {checkedReplayPipeline} from './checkedReplayPipeline';
 import {earnNalatiMountedRaid} from './nalati-mounted-raid';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
@@ -17,7 +17,7 @@ import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 const State=v.object({passes:v.number(),moves:v.array(v.string()),pass:v.object({passChain:v.number(),chainT:v.number()}),
   blade:v.object({contacts:v.number(),struck:v.array(v.string())})});
 const {resident,product,mount,pack,ridden,riddenHealth,move,reins}=await earnNalatiMountedRaid();
-let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginProductSession>>['ready']>>|undefined;
+let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;
 let stopReplay:(()=>Promise<void>)|undefined;
 try{
   const host=resident.host;
@@ -30,7 +30,7 @@ try{
   const rear=new Vector3(),front=new Vector3(),aimPoint=new Vector3();
   const before=new Map([...host.entities.values()].map(actor=>[actor.entityId,{kind:actor.kind,hp:actor.hp}]));
   const checkpoint=serializeSimSnapshot(snapshotSimHost(host)),checkpointTick=host.state.tick;
-  const pending=await beginProductSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();const worker=replay;
+  const pending=await beginFolderSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();const worker=replay;
   const owner=host.adapters.get('nalati.weapons');assert.ok(owner);
   const read=()=>{const raw=owner.snapshot();assert.equal(typeof raw,'string');if(typeof raw!=='string')throw new Error('Missing native mounted weapon state');return v.parse(State,JSON.parse(raw));};
   const frames:HeadlessCommand[][]=[],contacts:{tick:number;struck:string[]}[]=[];
@@ -86,7 +86,7 @@ try{
   assert.ok(damage.length>0,'the chain must accompany real native damage, never synthetic hit messages');
   await flush();await pipeline.finish();assert.equal(replayed,frames.length);assert.equal(replay.quarantined,false);
   await replay.dispose();replay=undefined;
-  const restored=await beginProductSession('nalati-grasslands','nalati-predators',middle);replay=await restored.ready();
+  const restored=await beginFolderSession('nalati-grasslands','nalati-predators',middle);replay=await restored.ready();
   let suffix=0;
   for(const part of parts.filter(row=>row.tick>middleTick)){
     assert.equal(part.start,middleTick+suffix);

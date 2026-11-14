@@ -1,16 +1,16 @@
 import * as v from 'valibot';
 import {afterAll,beforeAll,describe,expect,it} from 'vitest';
 import {HeadlessJourneyPlanSchema} from '../src/shared/host/headlessJourney';
-import {beginProductSession,type openProductSession} from './fixtures/headless/productSession';
+import {beginFolderSession,type openFolderSession} from './fixtures/headless/folderSession';
 import {physicsRoutes} from './fixtures/headless/physicsRoutes';
 import {ownedSetup} from './fixtures/ownedSetup';
 
 describe('driftwood-isle',{concurrent:false,shuffle:false},()=>{
-let session:Awaited<ReturnType<typeof openProductSession>>|undefined;
+let session:Awaited<ReturnType<typeof openFolderSession>>|undefined;
 const setup=ownedSetup(async()=>{
   const start=performance.now(),phase=(name:string):void=>{console.info(JSON.stringify({diagnostic:'native-physics-setup',slug:'driftwood-isle',phase:name,elapsedMs:Math.round(performance.now()-start)}));};
   phase('start');
-  const pending=await beginProductSession('driftwood-isle');phase('product-and-worker-started');
+  const pending=await beginFolderSession('driftwood-isle');phase('product-and-worker-started');
   const ready={sim:await pending.ready(),product:pending.product};phase('worker-ready');
   return ready;
 },async({sim})=>{

@@ -3,14 +3,14 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import type { RigidBody } from '@dimforge/rapier3d-simd';
 import type { SimHost } from '../src/server/engine/sim';
 import { tagOf } from '../src/shared/engine/physics/surface';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // NET-LAG NL5 (Jake, 2026-11-12: "i fucking clipped through the rope bridge because of the lag lol"). The room's own resident
 // (`createTrustedHeadlessResident`, what `cellWorld` runs) walks Driftwood's rope bridge. Before NL5 it built no rope chain:
@@ -33,7 +33,7 @@ const planks = (host: SimHost): number => {
 };
 
 test('the room stands a walker on Driftwood\'s rope bridge, and a restore keeps one chain', async () => {
-  const directory = builtProduct(SLUG), product = await loadHeadlessProduct(directory), shard = product.shardfile, descriptor = outputDescriptor(shard);
+  const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile, descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const assets = new Map(descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'))
     .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

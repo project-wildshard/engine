@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
@@ -15,7 +15,7 @@ import { hasNativeAssembly } from '../src/server/game/shardfile/nativeAssembly';
 import { populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
 import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { fencedNativeOracle } from './fixtures/native-oracle';
 import { pineNativeOracleInputs } from './fixtures/pine-native-oracle-inputs';
 import { pineNativeOracleSpec } from './fixtures/pine-native-oracle-spec';
@@ -24,7 +24,7 @@ import { pineNativeOracleSpec } from './fixtures/pine-native-oracle-spec';
 // navmesh or story lent by a fixture. The roster lands, lives, falls and answers the night in the fixed tick.
 
 async function shipped() {
-  const directory = builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+  const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error('Missing admitted Pine output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

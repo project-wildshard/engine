@@ -17,7 +17,7 @@ import { loanedSha256, sha256 } from '../plugin/moduleHash';
 import { isJsonData } from '@wildshard/format/json';
 import { checkReturnProjectionV2Rows } from '@wildshard/format/returnProjectionV2';
 import { ReturnProjectionV2,type PreparedProjectionV2 } from './returnProjectionV2';
-import type {ShardProduct} from '../shardfile/shardProduct';
+import type {ShardFolder} from '../shardfile/shardFolder';
 import {outputDescriptor} from '../shardfile/outputDescriptor';
 
 type RawReturnRow = ReturnModuleRow;
@@ -223,7 +223,7 @@ export class ReturnProgram {
   }
   /** Read selected modules and their direct declared dependencies into the
    * original asset map. Witness sidecars are data, never executable admissions. */
-  static async prepareModules(product:ShardProduct,assets:ReadonlyMap<string,Uint8Array>,rows:readonly ReturnModuleRow[]):Promise<void> {
+  static async prepareModules(product:ShardFolder,assets:ReadonlyMap<string,Uint8Array>,rows:readonly ReturnModuleRow[]):Promise<void> {
     if(!(assets instanceof Map))throw new Error('Return modules require the original asset map');
     const files=outputDescriptor(product.shardfile)?.index.files;
     for(const row of rows){

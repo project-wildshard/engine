@@ -1,6 +1,6 @@
-import { runtimeAssets } from './fixtures/engine-lift/product';
+import { runtimeAssets } from './fixtures/engine-lift/folder';
 // oxlint-disable-next-line import/no-nodejs-modules -- The server half runs the shipped product bytes and physics module.
-import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
+import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '@wildshard/engine/host/headlessRuntime';
 import { readFileSync } from 'node:fs';
 import { expect,test,vi } from 'vitest';
@@ -12,7 +12,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import type { SaveStorage } from '../src/shared/engine/saves/store';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { WorkerLoopback } from '../src/shared/host/standalone/workerLoopback';
-import { builtProduct } from './fixtures/engine-lift/product';
+import { builtFolder } from './fixtures/engine-lift/folder';
 
 // P1-E5.2 (E5-REPLICATION §6.3): the standalone target's two halves over real MessagePorts, on the server's own clock. The
 // page's half and the worker's are the same code a browser runs; scripts/standalone-smoke.mjs runs them in a real Worker.
@@ -28,7 +28,7 @@ class PageStorage implements SaveStorage {
 }
 
 async function sunscarInput(): Promise<HeadlessRuntimeInput> {
-  const directory = builtProduct('sunscar-dunes'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('sunscar-dunes'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing Sunscar output');
   const assets = runtimeAssets(product, directory);
   return { shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product };

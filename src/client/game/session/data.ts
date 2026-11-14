@@ -4,8 +4,8 @@ import {isDev} from '@wildshard/engine/core/devMode';
 import type { MusicStyle } from '@wildshard/engine/audio/bootAudio';
 import type { FieldModelsContext, ShardManifest } from '../shard/manifest';
 
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
-import { checkProductClientModules } from '../shardfile/clientModules';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
+import { checkFolderClientModules } from '../shardfile/clientModules';
 
 import { imagesFirstPlayingBytes } from '../grid/runtimeCost';
 import { consumeTravelHandoff } from '../travel/travel';
@@ -28,14 +28,14 @@ import { gridPrefetchStatus } from '../grid/prefetch';
 import { currentPageMode } from '../../../shared/game/grid/pageMode';
 import { NO_AUDIO, type LevelAudioProfile } from '@wildshard/engine/audio/levelAudio';
 
-async function buildData(ctx: SessionContext) : Promise<{ loading: Loading; audioProfile: LevelAudioProfile | undefined; files: Readonly<Record<"sky" | "baked" | "terrain" | "trees" | "physics" | "cabins" | "props" | "art" | "music" | "sfx", readonly string[]>>; plan: Plan<"audio" | "sky" | "terrain" | "physics" | "cabins" | "props" | "renderer" | "cards" | "forest" | "edge" | "grass" | "animals" | "weapon" | "assembly" | "menu" | "shaders" | "firstFrame">; step: StepRunner; menuLoad: Preload<void> | null; audioLoad: Preload<AudioBanks> | null; deferredAudio: (Preload<void> & { readonly style: MusicStyle; decode: () => Promise<AudioBanks>; }) | null; fieldModels: Promise<(ctx: FieldModelsContext) => void> | null; manifest: ShardManifest; slug: string; stage: LoadStage; boot: StagedBoot; session: SessionState; kit: KitPorts; product: ShardProduct; }> {
+async function buildData(ctx: SessionContext) : Promise<{ loading: Loading; audioProfile: LevelAudioProfile | undefined; files: Readonly<Record<"sky" | "baked" | "terrain" | "trees" | "physics" | "cabins" | "props" | "art" | "music" | "sfx", readonly string[]>>; plan: Plan<"audio" | "sky" | "terrain" | "physics" | "cabins" | "props" | "renderer" | "cards" | "forest" | "edge" | "grass" | "animals" | "weapon" | "assembly" | "menu" | "shaders" | "firstFrame">; step: StepRunner; menuLoad: Preload<void> | null; audioLoad: Preload<AudioBanks> | null; deferredAudio: (Preload<void> & { readonly style: MusicStyle; decode: () => Promise<AudioBanks>; }) | null; fieldModels: Promise<(ctx: FieldModelsContext) => void> | null; manifest: ShardManifest; slug: string; stage: LoadStage; boot: StagedBoot; session: SessionState; kit: KitPorts; product: ShardFolder; }> {
   const { manifest, stage, boot, session } = ctx;
 
   // level.data consumes the per-tab intent before any expensive build can fail.
   boot.handoff = consumeTravelHandoff(manifest.slug);
   if (boot.handoff !== null) session.arrival = { slug: boot.handoff.to, mode: boot.handoff.mode };
   setTexturePolicy(manifest.tiers?.[TIER]?.textures, manifest.slug, imagesFirstPlayingBytes(manifest.runtimeCost));
-  checkProductClientModules(ctx.product);
+  checkFolderClientModules(ctx.product);
   if (isDev() && session.arrival?.mode === 'arena') readModuleGroups(['practice.models']);
 
   const loading = beginLoading({ id: manifest.slug, name: manifest.name, trace: manifest.boot?.phone?.trace === true });

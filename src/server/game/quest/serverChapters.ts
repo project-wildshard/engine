@@ -26,7 +26,7 @@ import { commitSeatEffects } from '../../../shared/game/quest/effects';
 import { featOutcome, witnessSavedFeats, type FeatCounterPorts } from '../../../shared/game/quest/featCounters';
 import { questObservation, type ObservedRecords } from '../../../shared/game/quest/questObservation';
 import type { QuestStepEffect } from '../../../shared/game/quest/steps';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { mountedPlayerOf } from '../riding/native';
 import { registerInstalled } from '../shardfile/installedSides';
 
@@ -56,7 +56,7 @@ const questDef = (row: Shardfile['quests']['quests'][number]): QuestDef => ({ id
 const presents = (effect: QuestStepEffect): boolean => effect.kind === 'toast' || effect.kind === 'sting' || effect.kind === 'reading';
 
 /** Put a chapter story on `host`, for every player. False when this shard has none. */
-export async function installServerChapters(host: SimHost, product: ShardProduct | undefined, shard: Shardfile, file: (fact: string, entity: string) => void): Promise<boolean> {
+export async function installServerChapters(host: SimHost, product: ShardFolder | undefined, shard: Shardfile, file: (fact: string, entity: string) => void): Promise<boolean> {
   if (product === undefined || !product.hasFile(CHAPTER_CONTENT) || (shard.questHost !== undefined && shard.questHost !== null)) return false;
   const content = await product.json<ChapterViewRows>(CHAPTER_CONTENT), view = content.view;
   const [storyInput, carriedInput, persistence, riding] = await Promise.all([product.json<unknown>(view.story), product.json<unknown>(view.carried), product.json<unknown>('quests/persistence.json'), product.hasFile(RIDING) ? product.json<unknown>(RIDING) : null]);

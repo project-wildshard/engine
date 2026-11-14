@@ -11,16 +11,16 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // P1-E3.3: Driftwood's real quest, in a room of two. A bot takes the same steps as the verb tape's and the quest is the
 // bot's: the headless host runs it from the built product, on script commands that name the bot.
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 async function resident(snapshot?: string): Promise<TrustedHeadlessResident> {
-  const directory = builtProduct('driftwood-isle'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }, snapshot);

@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Milestone witnesses execute in plain Node against admitted in-tree bytes.
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
-import { inkProofProduct } from './product';
+import { inkProofFolder } from './folder';
 import { createShardfileSim, bindShardfileSim, type ShardfileSimulation, type ShardfileSimPorts } from '../../../src/server/game/plugin/simulation';
 import { loadRapier, type Rapier } from '../../../src/shared/engine/physics/rapier';
 import { canonicalSimDigest } from '../../fake/simState';
@@ -24,7 +24,7 @@ class ProfileStorage implements SaveStorage {
   removeItem(key: string): void { this.data.delete(key); }
   copy(): ProfileStorage { const next = new ProfileStorage(); for (const [key, value] of this.data) next.setItem(key, value); return next; }
 }
-const { source, assets } = inkProofProduct();
+const { source, assets } = inkProofFolder();
 const identity = { instance: 'ink-solo', shard: source.identity.slug, revision: source.identity.revision };
 const origin = { kind: 'engine' as const, source: 'quest.complete' };
 /** A continuation's hash: the snapshot in canonical form (test/fake/simState.ts: Rapier's snapshot bytes are not canonical) */

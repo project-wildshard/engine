@@ -3,7 +3,7 @@ import { packReads } from './packReads';
 import type { OutputIndex } from '@wildshard/format/outputIndex';
 import { assembleOutputTransport } from '@wildshard/format/outputFields';
 import { isJsonDataWithFileSchemas } from '@wildshard/format/json';
-import { builtValidationReceipt, builtProductResidency, validationSourceBytes, validationSourceBytesPaced, type ValidationReceipt } from '@wildshard/format/validationReceipt';
+import { builtValidationReceipt, builtShardfileResidency, validationSourceBytes, validationSourceBytesPaced, type ValidationReceipt } from '@wildshard/format/validationReceipt';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { parseOutputLineageIndex } from '@wildshard/format/stateLineage';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -167,7 +167,7 @@ async function readBuiltOutput(index:OutputIndex,reader:OutputDescriptorReader,b
   for(const value of values){if(value.status==='rejected')throw value.reason;sections.set(...value.value);}
   const source=assembleOutputTransport(index,sections);
   if(!isBuiltClientSource(source,reader))throw new Error('Built output needs its first-party reader');
-  const residentBytes=builtProductResidency(index.build.sourceHash);
+  const residentBytes=builtShardfileResidency(index.build.sourceHash);
   buildValidated.add(source);descriptors.set(source.files,{index,sections,cached:false,indexHash:built.indexHash,built:true,...(residentBytes===undefined?{}:{residentBytes})});
   return source;
 }

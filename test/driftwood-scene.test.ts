@@ -2,14 +2,14 @@ import { expect, it } from 'vitest';
 import { projectPlaceholders } from '../src/sharddev/bake/placeholders';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
-import { prepareAssetDecoders } from '@wildshard/format/product';
+import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { productClosureFile } from '../src/shared/game/shardfile/shardProduct';
-import { driftwoodEmittedProduct } from './fixtures/driftwood-emitted-product';
+import { folderClosureFile } from '../src/shared/game/shardfile/shardFolder';
+import { driftwoodEmittedFolder } from './fixtures/driftwood-emitted-product';
 
 async function readEmittedWorld() {
-  const product = await driftwoodEmittedProduct(), shard = product.shardfile;
+  const product = await driftwoodEmittedFolder(), shard = product.shardfile;
   const output = outputDescriptor(shard);
   if (output === undefined) throw new Error('Missing emitted Driftwood output');
   const assets = new Map<string, Uint8Array>();
@@ -18,7 +18,7 @@ async function readEmittedWorld() {
   // ring. The ordinary build owns production; this reader never regenerates.
   for (let offset = 0; offset < refs.length; offset += 16) {
     const batch = refs.slice(offset, offset + 16);
-    const bytes = await Promise.all(batch.map(hash => productClosureFile(product, hash)));
+    const bytes = await Promise.all(batch.map(hash => folderClosureFile(product, hash)));
     for (const [index, hash] of batch.entries()) {
       const value = bytes[index]; if (value === undefined) throw new Error('Missing emitted asset read'); assets.set(hash, value);
     }

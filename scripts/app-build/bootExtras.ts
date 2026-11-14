@@ -107,7 +107,7 @@ export function homeExtraFiles(root: string, directory: string): Files | null {
     const bytes = readFileSync(resolve(product, file.path));
     if (bytes.length !== file.compressed || createHash('sha256').update(bytes).digest('hex') !== file.hash) throw new Error('Boot model source differs from its index');
     // Product-owned names already count in the product download bank. The
-    // runtime resolves them through ShardProduct.url, never the public tree.
+    // runtime resolves them through ShardFolder.url, never the public tree.
     const owned = new Set(index.files.flatMap(candidate => candidate.name === undefined ? [] : [candidate.name]));
     urls.push(...sceneSourceUrls(kind, JSON.parse(bytes.toString('utf8'))).filter(url => !owned.has(url)));
   }

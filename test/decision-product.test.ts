@@ -9,12 +9,12 @@ import { nameBlob, emitNamedBlobs, readNamedBlob } from '../src/sharddev/blobs';
 import { buildProject } from '../src/sharddev/project';
 import { mergeProjectBlobs, prepareProjectOutput } from '../src/sharddev/projectOutput';
 import { emitPlatformSections } from '../src/sharddev/platformSections';
-import { writeOutputProduct, validateOutputProduct } from '../src/sharddev/outputProduct';
+import { writeOutputFolder, validateOutputFolder } from '../src/sharddev/outputFolder';
 import { encodeCanonicalJson, hashImmutableBytes } from '../src/shared/host/immutable';
-import { admitProduct as admitBrowser, readProductDescriptor, type ProductOptions } from '../src/client/game/shardfile/product';
+import { admitFolder as admitBrowser, readFolderDescriptor, type FolderOptions } from '../src/client/game/shardfile/folder';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import { admitScriptContract, decisionModuleContracts, decisionScriptsFromSections } from '@wildshard/format/scriptContract';
-import { assetCost } from '@wildshard/format/product';
+import { assetCost } from '@wildshard/format/shardfileAssets';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { HeadlessSimulation } from '../src/server/host/headless';
 import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';
@@ -65,17 +65,17 @@ test('source and in-memory named bytes retain explicit contracts, without an ind
 
 test('writer, disk validator and untrusted browser use the exact verified sim/scripts contract', async () => {
   const { shard, assets, namedFiles, platform, blob, scripts } = fixture(), root = directory();
-  const index = writeOutputProduct(shard, assets, root, { namedFiles, platform });
-  expect(validateOutputProduct(root).assets.get(blob.file.hash)).toEqual(bytes);
+  const index = writeOutputFolder(shard, assets, root, { namedFiles, platform });
+  expect(validateOutputFolder(root).assets.get(blob.file.hash)).toEqual(bytes);
   const base = 'https://example.test/decision/';
-  const options: ProductOptions = { base, offline: false, firstParty: false, hash: wire => Promise.resolve(hashImmutableBytes(wire)), fetch: url => {
+  const options: FolderOptions = { base, offline: false, firstParty: false, hash: wire => Promise.resolve(hashImmutableBytes(wire)), fetch: url => {
     const path = url.slice(base.length); return Promise.resolve(new Response(Uint8Array.from(readFileSync(resolve(root, path)))));
   } };
-  const source = await readProductDescriptor(options);
+  const source = await readFolderDescriptor(options);
   expect((await admitBrowser(source, options)).assets.get(blob.file.hash)).toEqual(bytes);
   expect(() => validateShardfileAssets(shard, assets, hashImmutableBytes, undefined, undefined, scripts)).not.toThrow();
-  expect(() => writeOutputProduct(shard, assets, directory())).toThrow();
-  expect(() => writeOutputProduct(shard, assets, directory(), { platform: emitPlatformSections(new Map([['sim/scripts', rows(blob.file.hash, 1)]])) })).toThrow('fixed pages');
+  expect(() => writeOutputFolder(shard, assets, directory())).toThrow();
+  expect(() => writeOutputFolder(shard, assets, directory(), { platform: emitPlatformSections(new Map([['sim/scripts', rows(blob.file.hash, 1)]])) })).toThrow('fixed pages');
   const decisionSection = index.sections.find(value => value.name === 'sim/scripts');
   if (decisionSection === undefined) throw new Error('Missing decision section');
   const wrong = new TextEncoder().encode(encodeCanonicalJson(rows(blob.file.hash, 1)));
@@ -83,8 +83,8 @@ test('writer, disk validator and untrusted browser use the exact verified sim/sc
   // the rewritten section no longer matches its pack (I5), which refuses first; this case checks the section contract
   const { packs: _packs, ...unpacked } = index;
   writeFileSync(resolve(root, 'shard.json'), encodeCanonicalJson(unpacked));
-  expect(() => validateOutputProduct(root)).toThrow('fixed pages');
-  await expect(admitBrowser(await readProductDescriptor(options), options)).rejects.toThrow('fixed pages');
+  expect(() => validateOutputFolder(root)).toThrow('fixed pages');
+  await expect(admitBrowser(await readFolderDescriptor(options), options)).rejects.toThrow('fixed pages');
 });
 
 
@@ -114,7 +114,7 @@ export const output = {
   const { shard, assets } = fixture();
   const unbound = new Map<string, unknown>([['sim/scripts', rows(hashImmutableBytes(bytes), 2, { approach: 'sample.approach' })]]);
   await expect(HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory', sections: unbound })).rejects.toThrow('Missing moves registry target for approach');
-  expect(validateOutputProduct(destination).index.files[0]?.kind).toBe('wasm');
+  expect(validateOutputFolder(destination).index.files[0]?.kind).toBe('wasm');
   // A platform row can also refer to an existing root declaration, without a named-blob overlay.
   await expect(prepareProjectOutput(root, { platform: fixture().platform })).resolves.toMatchObject({ blobs: [] });
 });

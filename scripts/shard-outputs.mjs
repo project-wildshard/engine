@@ -70,7 +70,7 @@ export function shardOutputs(root, folder) {
 }
 /** Every product of the shard folders: `{ slug, folder, output }` (output null for a one-product folder), sorted by slug.
  * @param {string} root @param {readonly string[]} folders */
-export function shardProducts(root, folders) {
+export function builtShardFolders(root, folders) {
   const products = folders.flatMap((folder) => shardOutputs(root, folder)?.map((output) => ({ slug: output.slug, folder, output: output.row })) ?? [{ slug: folder, folder, output: null }]);
   const slugs = products.map((row) => row.slug);
   if (new Set(slugs).size !== slugs.length) throw new Error('shard outputs: a product slug is declared twice');
@@ -87,12 +87,12 @@ export function manifestFolders(root) {
   return shardSourceFolders(root, ['manifest.ts', 'manifest.json']);
 }
 /** The source folder of a product slug (itself for a one-product folder). @param {string} root @param {string} slug */
-export function productFolder(root, slug) {
-  return shardProducts(root, manifestFolders(root)).find((row) => row.slug === slug)?.folder ?? slug;
+export function builtFolder(root, slug) {
+  return builtShardFolders(root, manifestFolders(root)).find((row) => row.slug === slug)?.folder ?? slug;
 }
 /** The built product that stands for a source shard in per-shard measures: a folder that emits several outputs (all from
  * one source, sharing its structure and scripts) is read through its first output; any other folder is its own product.
  * Section inventories union every output (scripts/output-reader.mjs). @param {string} root @param {string} slug */
-export function representativeProduct(root, slug) {
+export function representativeFolder(root, slug) {
   return (/^[a-z0-9_-]+$/u.test(slug) ? shardOutputs(root, slug)?.[0]?.slug : undefined) ?? slug;
 }

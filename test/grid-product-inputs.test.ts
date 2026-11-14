@@ -1,9 +1,9 @@
 import { expect, test, vi } from 'vitest';
 import { emptyShardfile } from '@wildshard/engine/host/author';
 import { hashImmutableBytes } from '@wildshard/engine/host/immutable';
-import type { AdmittedProduct, ProductOptions } from '../src/client/game/shardfile/product';
-import { ProductInputs } from '../src/client/game/grid/productInputs';
-import { accountTransportRelease } from '../src/client/game/grid/products';
+import type { AdmittedFolder, FolderOptions } from '../src/client/game/shardfile/folder';
+import { FolderInputs } from '../src/client/game/grid/folderInputs';
+import { accountTransportRelease } from '../src/client/game/grid/folders';
 
 function fixture(transportOnly = false) {
   const source = emptyShardfile({ slug: 'input-lease', name: 'Inputs', author: 'Test', revision: 1, seed: 1 });
@@ -11,16 +11,16 @@ function fixture(transportOnly = false) {
   source.files.push({ hash: ref, kind: 'binary', compressed: bytes.length, decoded: bytes.length, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false });
   let durable = true, corrupted = false, held = 0;
   const fetch = vi.fn(() => Promise.resolve(new Response(corrupted ? Uint8Array.of(3, 2, 1) : bytes)));
-  const options: ProductOptions = { base: 'https://inputs.test/', offline: false, firstParty: true, fetch, hash: value => Promise.resolve(hashImmutableBytes(value)),
-    cache: { product: () => Promise.resolve(null), putProduct: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
+  const options: FolderOptions = { base: 'https://inputs.test/', offline: false, firstParty: true, fetch, hash: value => Promise.resolve(hashImmutableBytes(value)),
+    cache: { product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
       asset: async () => new Uint8Array(await (await fetch()).arrayBuffer()) } };
   const releasePreparedTransport = vi.fn((refs: Iterable<string>) => {
     const released = durable ? [...refs] : [];
     for (const key of released) wire.delete(key);
     return Promise.resolve(released);
   });
-  const admitted: AdmittedProduct = { source, assets: wire, cached: false, releasePreparedTransport };
-  const inputs = new ProductInputs(admitted, options, count => {
+  const admitted: AdmittedFolder = { source, assets: wire, cached: false, releasePreparedTransport };
+  const inputs = new FolderInputs(admitted, options, count => {
     held += count; let remaining = count;
     return { shrink: next => { held += next - remaining; remaining = next; }, release: () => { held -= remaining; remaining = 0; } };
   }, new Set(), transportOnly ? [ref] : undefined);
@@ -50,12 +50,12 @@ test('approach cancellation drains its four started reads and starts no suffix',
   const bytes = Array.from({ length: 6 }, (_, i) => Uint8Array.of(i + 1)), hashes = bytes.map(hashImmutableBytes);
   for (const [i, hash] of hashes.entries()) source.files.push({ hash, kind: 'binary', compressed: bytes[i]?.length ?? 0, decoded: 1, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false });
   const finish: (() => void)[] = [], started: string[] = [];
-  const options: ProductOptions = { base: 'https://inputs.test/', offline: false, firstParty: true, fetch: () => Promise.reject(new Error('Unexpected network')),
-    hash: value => Promise.resolve(hashImmutableBytes(value)), cache: { product: () => Promise.resolve(null), putProduct: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
+  const options: FolderOptions = { base: 'https://inputs.test/', offline: false, firstParty: true, fetch: () => Promise.reject(new Error('Unexpected network')),
+    hash: value => Promise.resolve(hashImmutableBytes(value)), cache: { product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
       asset: (_base, hash) => new Promise(resolve => { started.push(hash); finish.push(() => { resolve(bytes[hashes.indexOf(hash)] ?? null); }); }) } };
   let held = 0;
-  const admitted: AdmittedProduct = { source, assets: new Map(), cached: false };
-  const inputs = new ProductInputs(admitted, options, count => { held += count; return { shrink: next => { held = next; }, release: () => { held = 0; } }; }, new Set(), hashes);
+  const admitted: AdmittedFolder = { source, assets: new Map(), cached: false };
+  const inputs = new FolderInputs(admitted, options, count => { held += count; return { shrink: next => { held = next; }, release: () => { held = 0; } }; }, new Set(), hashes);
   const controller = new AbortController(), pending = inputs.acquireTransport(controller.signal);
   const refused = expect(pending).rejects.toThrow('Approach input acquisition cancelled');
   await vi.waitFor(() => { expect(started).toHaveLength(4); });
@@ -127,7 +127,7 @@ test('failed persistence after a refill keeps its wire claim until a verified re
 
 test('the charged lazy-input subset survives completed preparation without extra reads', async () => {
   const f = fixture(), reserve = vi.fn(() => ({ shrink: vi.fn(), release: vi.fn() }));
-  const inputs = new ProductInputs(f.admitted, f.options, reserve, new Set([f.ref]));
+  const inputs = new FolderInputs(f.admitted, f.options, reserve, new Set([f.ref]));
   const first = await inputs.acquire(); await first.release();
   expect(first.assets.get(f.ref)).toBe(f.bytes); expect(inputs.reader.retained.get(f.ref)).toBe(f.bytes);
   const next = await inputs.acquire(); expect(next.assets.get(f.ref)).toBe(f.bytes);

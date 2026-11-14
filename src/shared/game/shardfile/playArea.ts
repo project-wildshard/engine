@@ -2,7 +2,7 @@
 // rows that override them: `player.enter` replaces them (Sky Reach: floor −8, ±250), `world.runtime-hooks` keeps the authored floor
 // near the middle and drops it past a radius (Nine Dragon: −20 past 200 m). A room reads the same rows here, so the two agree.
 import type { Bounds } from '@wildshard/engine/level/spec';
-import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 
 /** A `world.runtime-hooks` play area: its x/z, and the floor past `maxAbsXZ` from the origin. */
 export interface RuntimeBoundsRows {
@@ -23,7 +23,7 @@ export interface PlayArea {
 
 /** The play area the page selects for `authored` (the manifest's bounds) under the product's `client/plan`, or none. The
  *  runtime hooks install after `player.enter` (phase `world-bindings` after `world`), so theirs wins when a shard has both. */
-export function declaredPlayArea(authored: Bounds | undefined, product: Pick<ShardProduct, 'has' | 'section'> | undefined): PlayArea | undefined {
+export function declaredPlayArea(authored: Bounds | undefined, product: Pick<ShardFolder, 'has' | 'section'> | undefined): PlayArea | undefined {
   let enter: Bounds | undefined, hooks: RuntimeBoundsRows | undefined;
   if (product?.has('client/plan') === true) for (const feature of product.section('client/plan').features) {
     if (feature.kind === 'player.enter' && feature.bounds !== undefined) enter = feature.bounds;

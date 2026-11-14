@@ -15,7 +15,7 @@ import type { NativePopulationField } from '../population/environment';
 import type { PastureCues } from '../../../shared/game/riding/pastureCues';
 import type { WeatherReactions } from '../weather/reactions';
 import type { NativeCollisionBake } from '../population/nativeBake';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** What a server host hands one install. The tick protocol belongs to the SDK: `ports` adapts it. */
 export interface NativeAssemblyContext { readonly combat?: NativeCombatFrame; readonly restoring: boolean; readonly snapshot?: Readonly<Omit<SimSnapshot, 'physics'>>;
@@ -49,9 +49,9 @@ export function need<T>(value: T, message: string): NonNullable<T> {
   return value;
 }
 /** One plan input. A file is parsed unchanged: its build admitted it, and its owning host admits its rows. */
-export async function readAssemblyInput<T>(product: ShardProduct, read: NativeAssemblyRead): Promise<T> {
+export async function readAssemblyInput<T>(product: ShardFolder, read: NativeAssemblyRead): Promise<T> {
   if ('value' in read) return read.value as T;
-  let at: unknown = 'file' in read ? JSON.parse(new TextDecoder('utf-8').decode(await product.file(read.file))) : product.section(read.section as Parameters<ShardProduct['section']>[0]);
+  let at: unknown = 'file' in read ? JSON.parse(new TextDecoder('utf-8').decode(await product.file(read.file))) : product.section(read.section as Parameters<ShardFolder['section']>[0]);
   for (const part of read.path ?? []) at = need(typeof at === 'object' && at !== null ? Reflect.get(at, part) : undefined, `Missing native assembly input ${part}`);
   return at as T;
 }
@@ -59,7 +59,7 @@ export async function readAssemblyInput<T>(product: ShardProduct, read: NativeAs
 export interface AssemblyGround { readonly grid: BakedGrid | null; readonly samplers: ReturnType<typeof bakedSamplers> | null; readonly heightAt: (x: number, z: number) => number }
 /** Everything the plan's hosts share: read once, before any host is touched. */
 export interface AssemblyPrepared<C extends NativeAssemblyContext> extends AssemblyGround {
-  readonly product: ShardProduct; readonly assets: ReadonlyMap<string, Uint8Array>; readonly ports: NativeAssemblyPorts<C>; readonly plan: NativeAssemblyPlan;
+  readonly product: ShardFolder; readonly assets: ReadonlyMap<string, Uint8Array>; readonly ports: NativeAssemblyPorts<C>; readonly plan: NativeAssemblyPlan;
   readonly bake: NativeCollisionBake & Readonly<Record<string, unknown>>; readonly nav: ReturnType<typeof readNavmesh>;
   readonly boot: unknown; readonly field: NativePopulationField | null; readonly world: unknown; readonly pond: { readonly file: string; readonly bytes: Uint8Array } | null; readonly wet: { readonly file: string; readonly bytes: Uint8Array } | undefined;
 }

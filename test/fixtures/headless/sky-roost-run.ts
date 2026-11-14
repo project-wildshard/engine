@@ -4,7 +4,7 @@ import '../../../src/shared/engine/core/portableMathFirst';
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the unchanged checked-in physics module.
 import {readFileSync} from 'node:fs';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {decodeSimSnapshot,snapshotSimHost} from '../../../src/shared/engine/sim/snapshot';
 import {physicsState} from '../../fake/simState';
@@ -24,8 +24,8 @@ import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 const stage=process.argv[2]??'roost';
 if(stage!=='roost'&&stage!=='vanes'&&stage!=='winch'&&stage!=='roc')throw new Error('Unknown Sky progression tape');
 const earned=stage==='roost'?'far.roost':stage==='vanes'?'far.vanes':stage==='winch'?'far.bridge':'far.roc.down';
-const started=performance.now(),session=await beginProductSession('far-reach','sky-verbs'),{product,assets}=session;
-let negativeSession:Awaited<ReturnType<typeof beginProductSession>>|undefined;
+const started=performance.now(),session=await beginFolderSession('far-reach','sky-verbs'),{product,assets}=session;
+let negativeSession:Awaited<ReturnType<typeof beginFolderSession>>|undefined;
 let resident:Awaited<ReturnType<typeof createNativeProofResident>>|undefined,releaseRopes=()=>{ /* No ropes are installed before the resident is ready. */ };
 /** The existing controller's world axes enter the actual camera-relative phone stick law. */
 function controls(command:HeadlessCommand):HeadlessCommand {
@@ -43,7 +43,7 @@ try{
   assert.ok(actors.every(actor=>actor.alive));assert.equal(host.flags.has('far.roost'),false);
   const parts:HeadlessTapeSegment[]=[];
   let firstRocDamagePart:string|undefined,rocDamageChanges=0,negativeThroughTick=0;
-  negativeSession=await beginProductSession('far-reach','sky-verbs');
+  negativeSession=await beginFolderSession('far-reach','sky-verbs');
   const negativeOwner=negativeSession;
   const negativeOutcome=(async()=>{
     try{

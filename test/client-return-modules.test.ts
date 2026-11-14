@@ -8,7 +8,7 @@ import {prepareClientReturnModules} from '../src/client/game/shardfile/clientRet
 import {clientNativeBook} from '../src/client/game/shardfile/clientNativeBook';
 import * as descriptors from '../src/shared/game/shardfile/outputDescriptor';
 import type {OutputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
-import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
+import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
 import {emptyShardfile} from '../src/shared/host/author';
 import type {ShardContext} from '../src/client/game/plugin/context';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
@@ -24,7 +24,7 @@ test('page preparation lends the same verified book to sibling construction and 
     pages:artifact.pages,ioBytes:artifact.ioBytes,compilerRevision:artifact.compilerRevision,admissionRevision:artifact.admissionRevision}];
   const source=emptyShardfile({slug:'fixture-place',name:'Place',author:'Fixture',revision:1,seed:7});
   const read=vi.fn((hash:string)=>Promise.resolve(hash===artifact.hash?bytes:witness));
-  const product=createShardProduct({slug:'fixture-place',revision:1,shardfile:source,
+  const product=createShardFolder({slug:'fixture-place',revision:1,shardfile:source,
     sections:new Map([['actors/return-scripts',returns]]),files:new Map([[name,{hash:artifact.hash,url:'fixture.wasm'}],[witnessName,{hash:witnessHash,url:'witness.bin'}]]),read});
   const ctx=legacyDouble<ShardContext>({scope,product,game:legacyDouble<ShardContext['game']>({
     runtime:legacyDouble<NonNullable<ShardContext['game']['runtime']>>({world:legacyDouble<NonNullable<NonNullable<ShardContext['game']['runtime']>['world']>>({
@@ -48,7 +48,7 @@ test('preparation reads ABI1 named modules into the original map',async()=>{
   const hash=weatherRaw.script.module.slice('blobs/wasm/'.length,-'.wasm'.length),name='behaviour/nalati.weather.wasm';
   const source=emptyShardfile({slug:'weather-place',name:'Weather',author:'Fixture',revision:1,seed:7});
   const read=vi.fn(()=>Promise.resolve(weatherModuleBytes));
-  const product=createShardProduct({slug:'weather-place',revision:1,shardfile:source,
+  const product=createShardFolder({slug:'weather-place',revision:1,shardfile:source,
     sections:new Map(),files:new Map([[name,{hash,url:'weather.wasm'}]]),read});
   const descriptor=vi.spyOn(descriptors,'outputDescriptor').mockReturnValue(legacyDouble<OutputDescriptor>({
     index:legacyDouble<OutputDescriptor['index']>({files:[legacyDouble<OutputDescriptor['index']['files'][number]>({kind:'wasm',hash,name,dependencies:[]})]})}));

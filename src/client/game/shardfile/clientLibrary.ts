@@ -46,7 +46,7 @@ export async function leaseClientLibrary(source: Shardfile, assets: ReadonlyMap<
   }
   for (const hash of source.requires.commons) {
     const bytes = assets.get(`commons:${hash}`) ?? await ports.read?.(`commons:${hash}`); if (bytes === undefined) throw new Error('Missing admitted commons residency');
-    const { assetCost, prepareAssetDecoders } = await import('@wildshard/format/product');
+    const { assetCost, prepareAssetDecoders } = await import('@wildshard/format/shardfileAssets');
     await prepareAssetDecoders();
     const cost = assetCost('commons', bytes);
     claims.push({ id: `commons:${hash}`, category: 'commons', bytes: cost.decoded + cost.gpu, owner: 'platform', distance: 0, needed: true });

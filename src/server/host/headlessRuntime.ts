@@ -3,7 +3,7 @@ import * as v from 'valibot';
 import { runHeadlessJourney } from '../../shared/host/headlessJourney';
 import { registerNativeQuestInputs } from '@wildshard/engine/game/quest/nativeInputs';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
-import { prepareAssetDecoders } from '@wildshard/format/product';
+import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
 import { MoverScriptDriver, type MoverRuntime } from '@wildshard/engine/game/plugin/mover';
 import { installRopeDecks } from './ropeDecks';
@@ -34,16 +34,16 @@ import type { Rapier } from '@wildshard/engine/physics/rapier';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { MAX_TICK_SNAPSHOT_CHARS, simPlayerCommand, TickCommandSchema, type HeadlessCommand, type HeadlessEffect } from '../../shared/host/tickProtocol';
 import type { TickWorkerAdapter } from './tickWorkerLoop';
-import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
-import { prepareProductRuntimePlan } from '@wildshard/engine/game/shardfile/nativePlan';
+import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
+import { prepareFolderRuntimePlan } from '@wildshard/engine/game/shardfile/nativePlan';
 import { holdPageState, type RuntimeStateValue } from '@wildshard/engine/game/shardfile/runtimeState';
 import type { NativeAssemblyPorts } from '@wildshard/engine/game/shardfile/nativeAssemblyInput';
 
 /** The same admitted bytes and native physics implementation used by the ordinary headless worker. */
-export interface HeadlessRuntimePreparation { shard: Shardfile; assets: ReadonlyMap<string, Uint8Array>; rapier: Rapier; readonly product: ShardProduct }
+export interface HeadlessRuntimePreparation { shard: Shardfile; assets: ReadonlyMap<string, Uint8Array>; rapier: Rapier; readonly product: ShardFolder }
 /** Build workers carry verified native sections before any output exists.
  * Existing native callers may instead supply or explicitly load their built product. */
-export type HeadlessRuntimeInput = Omit<HeadlessRuntimePreparation, 'product'> & { readonly product?: ShardProduct; readonly sections?: ReadonlyMap<string, unknown> };
+export type HeadlessRuntimeInput = Omit<HeadlessRuntimePreparation, 'product'> & { readonly product?: ShardFolder; readonly sections?: ReadonlyMap<string, unknown> };
 /** Current tick inputs and buffered effects; only a completed tick publishes them to the parent. */
 /** What a page's save held, for a world's first boot: its quest flags and its declared fields, up before its fights install. */
 export interface PageProgress { readonly flags: readonly string[]; readonly state: ReadonlyMap<string, RuntimeStateValue> }
@@ -186,13 +186,13 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
   } else {
     let product = provided.product;
     if (product === undefined) {
-      const { loadHeadlessProduct } = await import('./headlessProduct');
-      product = await loadHeadlessProduct(`out/${provided.shard.identity.slug}`);
+      const { loadHeadlessFolder } = await import('./headlessFolder');
+      product = await loadHeadlessFolder(`out/${provided.shard.identity.slug}`);
     }
     const { slug: actualIdentity } = product, { slug: expectedIdentity } = provided.shard.identity;
     if (actualIdentity !== expectedIdentity || product.revision !== provided.shard.identity.revision) throw new Error('Native product and trusted identity differ');
     source = product.shardfile; decks = product;
-    plan = await prepareProductRuntimePlan(product, provided.assets, headlessAssemblyPorts(provided.rapier, room));
+    plan = await prepareFolderRuntimePlan(product, provided.assets, headlessAssemblyPorts(provided.rapier, room));
     if (product.has('economy/loot')) plan = { ...plan, economy: product.section('economy/loot') };
     places = await serverPlaces(product);
   }

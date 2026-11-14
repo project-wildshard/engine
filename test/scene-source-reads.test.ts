@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { emptyShardfile } from '../src/shared/host/author';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { prepareSceneSources, sceneModelDefinition, sceneBakeSource } from '../src/client/game/shardfile/sceneSources';
 import { parseWorldScenes } from '@wildshard/format/worldScenes';
 
@@ -10,7 +10,7 @@ test('scene declarations read in bounded batches and publish models before depen
   const section = parseWorldScenes({ version: 1, libraries: [...models, ...baked], materials: [], steps: [] });
   const started: string[] = [], pending = new Map<string, (bytes: Uint8Array) => void>();
   const library = { rows: { meshes: [], hd: [], meshUrls: {}, hdUrls: {}, hdLooks: {}, aoFloor: 1 } };
-  const product = createShardProduct({ slug: 'source-read-order', revision: 1,
+  const product = createShardFolder({ slug: 'source-read-order', revision: 1,
     shardfile: emptyShardfile({ slug: 'source-read-order', name: 'Reads', author: 'Fixture', revision: 1, seed: 1 }),
     sections: new Map([['world/scenes', section]]),
     files: new Map([...models, ...baked].map(row => [row.file, { hash: row.file, url: row.file }])),

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {expect,test} from 'vitest';
 import * as v from 'valibot';
-import {openProductSession} from './fixtures/headless/productSession';
+import {openFolderSession} from './fixtures/headless/folderSession';
 import {parseNativeFirearmProfile} from '@wildshard/format/weaponProfiles';
 import type {HeadlessTapeObservation} from '../src/shared/host/headlessTape';
 import VERBS from '../docs/plans/foundations/verbs/pine-hollow.json' with {type:'json'};
@@ -13,7 +13,7 @@ function ammunition(row:HeadlessTapeObservation|undefined){
 }
 
 test('Pine fires once, auto-reloads and exhausts the real crossbow over the listed five-minute session',async()=>{
-  const fixture=await openProductSession('pine-hollow');
+  const fixture=await openFolderSession('pine-hollow');
   try{
     const source=fixture.product.shardfile,row=source.items.rows.find(item=>item.id==='weapon.crossbow');
     if(row?.kind!=='weapon'||row.ranged===undefined)throw new Error('Missing admitted crossbow owner');

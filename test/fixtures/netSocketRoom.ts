@@ -12,12 +12,12 @@ import { SimNetWorld } from '../../src/server/engine/net/simWorld';
 import { loadRapier, type Rapier } from '../../src/shared/engine/physics/rapier';
 import { leadPlayer } from '../../src/shared/engine/sim/leadPlayer';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
 import { ledgerFilings } from '../../src/server/host/standalone/ledgerFilings';
 import { netTickCommands } from '../../src/shared/host/standalone/netInput';
 import { tickCommands } from '../../src/shared/host/tickProtocol';
-import { builtProduct } from './builtProduct';
+import { builtFolder } from './builtFolder';
 
 // E7.1a: `net-bots`' room on real localhost sockets. Both ends are the shipped ones, and Node 24's global `WebSocket` stands in
 // for the browser's. Set WS_SOCKET_REPORT=<file> to keep the run's numbers.
@@ -26,7 +26,7 @@ export let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
 export async function resident(slug: string): Promise<TrustedHeadlessResident> {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });

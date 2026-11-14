@@ -35,7 +35,7 @@ import { pageSavedFlags } from '@wildshard/engine/world/interact/flags';
 import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../headlessRuntime';
 import { registerInstalled } from '@wildshard/engine/game/shardfile/installedSides';
-import { productHeadlessSections } from '@wildshard/engine/host/headlessSections';
+import { folderHeadlessSections } from '@wildshard/engine/host/headlessSections';
 import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
 import { FallFloor, shardFallFloor, shardPlayArea } from './fallFloor';
 import { stepResident } from '../../../shared/host/standalone/netInput';
@@ -98,7 +98,7 @@ async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimS
   const { shard, assets, rapier } = input;
   // A data shard's decisions, moves and targets ride its product sections (TE-ENG1's boss rows): without them the
   // encounter runs no decision and the boss falls back to its native phase chase.
-  const sections = input.sections ?? (input.product === undefined ? undefined : productHeadlessSections(input.product));
+  const sections = input.sections ?? (input.product === undefined ? undefined : folderHeadlessSections(input.product));
   const ports: ShardfileSimPorts = { rapier, ...(sections === undefined ? {} : { sections }),
     quest: { fact: (name, actorId) => { effects.push({ kind: 'fact', name, actorId }); }, coins: (amount, actorId) => { effects.push({ kind: 'coins', amount, actorId }); } } };
   // SR11: the kit items install with the simulation, so a restore finds their seats where the save put them.

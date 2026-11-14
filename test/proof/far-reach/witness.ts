@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { readWitnessManifest } from '../../../scripts/witness-checkpoints.mjs';
 import * as v from 'valibot';
-import { productClosureFile } from '../../../src/shared/game/shardfile/shardProduct';
+import { folderClosureFile } from '../../../src/shared/game/shardfile/shardFolder';
 import { createSimHost, type SimHost } from '../../../src/server/engine/sim';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost } from '../../../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../../../src/server/engine/sim/restore';
@@ -12,7 +12,7 @@ import { loadRapier, type Rapier } from '../../../src/shared/engine/physics/rapi
 import { canonicalSimDigest, simWireV1 } from '../../fake/simState';
 import { SaveStore, type SaveStorage } from '../../../src/shared/engine/saves/store';
 import { Ledger, LedgerEmitter, type LedgerReceipt } from '../../../src/shared/game/ledger';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 import { prepareNativeRuntime, type HeadlessRuntimeInstallation, type HeadlessRuntimePlan } from '../../../src/server/host/headlessRuntime';
 import type { HeadlessCommand, HeadlessEffect } from '../../../src/shared/host/tickProtocol';
 import { HeadlessSimulation } from '../../../src/server/host/headless';
@@ -35,9 +35,9 @@ import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
  */
 export const ENTRY = 'runtime/headless.ts';
 const ROOT = new URL('../../../', import.meta.url);
-const product = await loadHeadlessProduct('out/far-reach'), source = product.shardfile;
+const product = await loadHeadlessFolder('out/far-reach'), source = product.shardfile;
 const refs = [...source.files.map(file => file.hash), ...source.requires.commons.map(hash => `commons:${hash}`)];
-const assets = new Map(await Promise.all(refs.map(async (ref): Promise<[string, Uint8Array]> => [ref, await productClosureFile(product, ref)])));
+const assets = new Map(await Promise.all(refs.map(async (ref): Promise<[string, Uint8Array]> => [ref, await folderClosureFile(product, ref)])));
 const identity = { instance: 'far-reach-witness', shard: source.identity.slug, revision: source.identity.revision };
 
 class ProfileStorage implements SaveStorage {

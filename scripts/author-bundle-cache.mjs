@@ -5,7 +5,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSy
 import { relative, resolve, sep } from 'node:path';
 import * as v from 'valibot';
 import { InputHashMemo } from './bake-input-hashes.mjs';
-import { captureProductInputs, matchingProductInputKey, productInputKey, publishProductInputs, replayProductInputs } from './shardfile-inputs.mjs';
+import { captureFolderInputs, matchingFolderInputKey, folderInputKey, publishFolderInputs, replayFolderInputs } from './shardfile-inputs.mjs';
 import { shardfileCacheRoot } from './shardfile-cache.mjs';
 import { authorBundleUseLine } from './author-bundle-usage.mjs';
 
@@ -108,11 +108,11 @@ export async function authorBundleCached(root, recipe, compile, cacheRoot = shar
     if (line !== undefined) console.info(line);
   };
   const receipts = resolve(directory, 'inputs'), memo = new InputHashMemo(root);
-  const key = matchingProductInputKey(root, receipts, args, memo);
+  const key = matchingFolderInputKey(root, receipts, args, memo);
   if (key !== undefined) try {
     const saved = v.parse(Saved, JSON.parse(readFileSync(resolve(directory, `${key}.json`), 'utf8')));
     if (saved.key === key && saved.seal === digest(JSON.stringify(saved.bundle))) {
-      replayProductInputs(root, resolve(receipts, `${key}.json`));
+      replayFolderInputs(root, resolve(receipts, `${key}.json`));
       used(key);
       return { ...saved.bundle, reused: true };
     }
@@ -123,14 +123,14 @@ export async function authorBundleCached(root, recipe, compile, cacheRoot = shar
   try {
     /** @type {{code:string,modules:string[]}|undefined} */
     let bundle;
-    await captureProductInputs(root, receipt, async () => { bundle = v.parse(Bundle, await compile()); });
+    await captureFolderInputs(root, receipt, async () => { bundle = v.parse(Bundle, await compile()); });
     if (bundle === undefined) throw new Error('Author compiler produced no bundle');
-    const captured = productInputKey(root, receipt, args, new InputHashMemo(root));
+    const captured = folderInputKey(root, receipt, args, new InputHashMemo(root));
     if (captured === undefined || JSON.stringify(linkedSources(root)) !== linked) throw new Error('Author compiler inputs changed');
     writeFileSync(temporary, JSON.stringify({ key: captured, bundle, seal: digest(JSON.stringify(bundle)) }));
     renameSync(temporary, resolve(directory, `${captured}.json`));
-    publishProductInputs(receipts, receipt, captured);
-    replayProductInputs(root, receipt);
+    publishFolderInputs(receipts, receipt, captured);
+    replayFolderInputs(root, receipt);
     used(captured);
     return { ...bundle, reused: false };
   } finally { rmSync(receipt, { force: true }); rmSync(temporary, { force: true }); }

@@ -18,7 +18,7 @@ import { actorDecisionRows, decisionScriptContract } from '@wildshard/format/dec
 import { ScriptStrikes, type ScriptStrikeHit } from './scriptStrikes';
 import { canReach } from '@wildshard/engine/ai/reach';
 import type { Physics } from '@wildshard/engine/physics/Physics';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { DecisionHost, simDecisionRow, type DecisionContext, type DecisionScript, type DecisionWorld, type DecisionSnapshot,type DecisionExternalCommand } from '@wildshard/engine/script/decision';
 import { ActorMoveRunner } from '@wildshard/engine/ai/moves';
@@ -783,7 +783,7 @@ export function installNativeSpawnScript(host: SimHost, day: Pick<DayCycleClock,
 }
 
 /** Resolve a spawn-owned catalogue row and its exact admitted module bytes before installing the synchronous owner. */
-export async function readSpawnScript(product: ShardProduct, step: string, rawModules?: Map<string,Uint8Array>): Promise<SpawnScriptRows> {
+export async function readSpawnScript(product: ShardFolder, step: string, rawModules?: Map<string,Uint8Array>): Promise<SpawnScriptRows> {
   const rows = v.parse(SpawnScriptsSchema, product.section('actors/spawn-scripts'));
   const row = value(rows.find(item => item.step === step), 'catalogue step');
   const descriptor = value(outputDescriptor(product.shardfile), 'admitted product');

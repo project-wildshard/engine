@@ -12,10 +12,10 @@ import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../
 import { populationCensus } from '../src/shared/game/population/census';
 import { RespawnQueue } from '../src/shared/game/population/respawn';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { installBoarWorldFixture } from './fixtures/boar-world';
 
 // J109: a spawn point refills on a timer, faster with more players near it, up to the shard's budget. J108: taming owes
@@ -135,9 +135,9 @@ test('the herd sim refills a kill and a tame in a room, and neither for one play
 });
 
 test('a shipped host runs a home twice as fast with two players near, and one player keeps the 50 s clock', async () => {
-  const shard = await loadHeadlessProduct(builtProduct('sunscar-dunes')), product = shard.shardfile, descriptor = outputDescriptor(product);
+  const shard = await loadHeadlessFolder(builtFolder('sunscar-dunes')), product = shard.shardfile, descriptor = outputDescriptor(product);
   if (descriptor === undefined) throw new Error('Missing Sunscar output');
-  const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${builtProduct('sunscar-dunes')}/${file.path}`))]));
+  const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${builtFolder('sunscar-dunes')}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const resident = (): ReturnType<typeof createTrustedHeadlessResident> => createTrustedHeadlessResident({ shard: product, assets, rapier, product: shard });
   const solo = await resident(), room = await resident();
@@ -166,7 +166,7 @@ test('a shipped host runs a home twice as fast with two players near, and one pl
 }, 120_000);
 
 test('a shipped room refills a fallen herd animal through a save, and its solo twin never gains the row', async () => {
-  const directory = builtProduct('pine-hollow'), shard = await loadHeadlessProduct(directory), product = shard.shardfile, descriptor = outputDescriptor(product);
+  const directory = builtFolder('pine-hollow'), shard = await loadHeadlessFolder(directory), product = shard.shardfile, descriptor = outputDescriptor(product);
   if (descriptor === undefined) throw new Error('Missing Pine output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));

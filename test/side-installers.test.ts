@@ -3,12 +3,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { CLIENT_FEATURE_SIDES, WORLD_ASSEMBLY_STAGE_SIDES } from '@wildshard/format/featureSides';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { missingInstallers, SERVER_INSTALLERS, serverSides } from '../src/server/host/installers';
 import { installedKeys } from '../src/server/game/shardfile/installedSides';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { SaveStore } from '../src/shared/engine/saves/store';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 // SERVER-PARITY SS3 (meta docs/plans/SERVER-PARITY-PLAN.md). SS2 gives every `client/plan` kind a side and, for a `both` or
 // `server` kind, the key its server installer registers under (src/server/host/installers.ts). This boots every pinned product
@@ -38,9 +38,9 @@ test('every SS2 server key has an installer entry, and every entry is an SS2 key
 describe('side installers: a room installs every server half its product declares', { concurrent: false }, () => {
   for (const slug of pins) test(slug, async () => {
     // the pinned `template` installs as out/_template
-    const directory = builtProduct(slug === 'template' ? '_template' : slug);
+    const directory = builtFolder(slug === 'template' ? '_template' : slug);
     if (!existsSync(directory)) throw new Error(`${slug} is pinned but not installed: pnpm pins`);
-    const product = await loadHeadlessProduct(directory);
+    const product = await loadHeadlessFolder(directory);
     expect(serverSides(product).length > 0, `${slug}: declares a server half`).toBe(SIDED.includes(slug));
     if (!SIDED.includes(slug)) { expect(KNOWN[slug]).toBeUndefined(); return; }
     const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));

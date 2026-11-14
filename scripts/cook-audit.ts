@@ -8,14 +8,14 @@ import {readSpawnManifest} from '../src/shared/game/shardfile/spawnManifest';
 import {cookRevision,type CookRevision} from './cook-revision';
 
 interface ManifestAudit {tier:string;set:string;hash:string;raw:number;wire:number;parts:{url:string;bytes:number;hash:string}[]}
-interface ProductAudit {slug:string;shardfile:string;manifests:ManifestAudit[]}
-export interface CookAudit {version:1;cook:CookRevision;products:ProductAudit[]}
+interface FolderAudit {slug:string;shardfile:string;manifests:ManifestAudit[]}
+export interface CookAudit {version:1;cook:CookRevision;products:FolderAudit[]}
 
 /** Read the actual served manifests and compressed bodies, not a serialization of private cook state. */
 export async function auditCook(receiptFile:string):Promise<CookAudit> {
   const receipt=JSON.parse(readFileSync(receiptFile,'utf8')) as {cook?:CookRevision;store:string;heads:{slug:string;hash:string}[];indexes:CookIndex[]};
   if(receipt.cook===undefined)throw new Error('Cook receipt has no source revision; run ring-cook again');
-  const store=folderStore(receipt.store),products:ProductAudit[]=[];
+  const store=folderStore(receipt.store),products:FolderAudit[]=[];
   const hash=(bytes:Uint8Array):string=>createHash('sha256').update(bytes).digest('hex');
   const read=async(key:string):Promise<Uint8Array>=>{const body=await store.get(key);if(body===undefined)throw new Error(`Cook has no ${key}`);return body;};
   for(const index of receipt.indexes) {

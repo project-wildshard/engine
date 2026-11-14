@@ -9,7 +9,7 @@ import { expect, test, vi } from 'vitest';
 import * as v from 'valibot';
 import { parseDiscoveryValues } from '@wildshard/format/discoveryValues';
 import { emptyShardfile } from '../src/shared/host/author';
-import { writeOutputProduct } from '../src/sharddev/outputProduct';
+import { writeOutputFolder } from '../src/sharddev/outputFolder';
 import { encodeCanonicalJson, hashImmutableBytes } from '../src/shared/host/immutable';
 import { parseManifestMetadata } from '@wildshard/format/minimap';
 import { readProgramDiscovery, usesProgramDiscovery } from '../scripts/program-discovery.mjs';
@@ -41,7 +41,7 @@ function putReceipt(root: string, input: unknown): void {
   writeFileSync(resolve(root, 'out', slug, 'validation.json'), JSON.stringify(input));
 }
 function build(root: string): void {
-  writeOutputProduct(emptyShardfile({ slug, name: 'Discovery', author: 'Test', revision: 1, seed: 1 }), new Map(), resolve(root, 'out', slug), { discovery });
+  writeOutputFolder(emptyShardfile({ slug, name: 'Discovery', author: 'Test', revision: 1, seed: 1 }), new Map(), resolve(root, 'out', slug), { discovery });
 }
 
 function providerFixture(): { readonly root: string; readonly directory: string; readonly file: string } {
@@ -177,7 +177,7 @@ test('a receipt-owned GPU table emits the existing native callback and registers
   writeFileSync(resolve(folder, 'manifest.json'), JSON.stringify(manifest));
   try {
     expect(usesProgramDiscovery(manifest)).toBe(true);
-    writeOutputProduct(emptyShardfile({ slug, name: 'Discovery', author: 'Test', revision: 1, seed: 1 }), new Map(), resolve(root, 'out', slug), { discovery: values });
+    writeOutputFolder(emptyShardfile({ slug, name: 'Discovery', author: 'Test', revision: 1, seed: 1 }), new Map(), resolve(root, 'out', slug), { discovery: values });
     const admitted = readProgramDiscovery(root, slug, options);
     const source = authoredManifestSource(root, slug, { discovery: admitted });
     expect(source).not.toContain('generators/'); expect(source).not.toContain('ktx2.generated');

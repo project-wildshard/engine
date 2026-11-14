@@ -2,7 +2,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { installScopeEnvironment, scopeEnvironment } from '../src/shared/engine/app/scopeEnvironment';
 import { isDev, setDev } from '../src/client/engine/core/devMode';
-import { browserShardfileOptions } from '../src/client/game/shardfile/runtimeProduct';
+import { browserShardfileOptions } from '../src/client/game/shardfile/runtimeFolder';
 
 const original = scopeEnvironment(), developer = isDev();
 afterEach(() => { installScopeEnvironment(original); setDev(developer); vi.restoreAllMocks(); });

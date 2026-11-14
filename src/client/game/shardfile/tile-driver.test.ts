@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
-import { TileDriver, tileKeys, residentTiles, followResidentTiles, tileRing, productTileRing, settleTileDrivers, settlingTiles } from './tileDriver';
+import { TileDriver, tileKeys, residentTiles, followResidentTiles, tileRing, folderTileRing, settleTileDrivers, settlingTiles } from './tileDriver';
 import { FENCE_LANES } from './controlRefinement';
 import { ring, type TileContent } from './tileContent';
 import { tileOrder, tileOf } from '../../../shared/game/shardfile/tileOrder';
@@ -443,7 +443,7 @@ test('a resident cell retains its slab owner while the player stands on the fart
   const source: TileContent = { id: 'cell-slab-key', tiles: () => new Set([owner]), attach: (_tile, child) => {
     attached(); child.onDispose(retired); return Promise.resolve();
   } };
-  const driver = new TileDriver(scope, [source], productTileRing({ ring: 'cell' }), () => Promise.resolve());
+  const driver = new TileDriver(scope, [source], folderTileRing({ ring: 'cell' }), () => Promise.resolve());
   try {
     await driver.require([owner]);
     await settle(driver, 249, 249, 160);

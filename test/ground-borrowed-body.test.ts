@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The proof uses official product and physics bytes.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { Vector3 } from 'three';
 import * as v from 'valibot';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
@@ -9,8 +9,8 @@ import type { SimValue } from '@wildshard/engine/sim';
 import { snapshotSimHost } from '@wildshard/engine/sim/snapshot';
 import { borrowedDecisionControl } from '@wildshard/engine/game/shardfile/borrowedDecisions';
 import { outputDescriptor } from '@wildshard/engine/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
-import { createNativeProofResident, prepareProductPlan } from './fixtures/headless-native';
+import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
+import { createNativeProofResident, prepareFolderPlan } from './fixtures/headless-native';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const savedControl = v.object({ version:v.literal(1),actor:v.string(),phase:v.number(),fighting:v.boolean(),decision:v.string(),strike:v.unknown() });
@@ -20,12 +20,12 @@ function record(value:SimValue):Record<string,SimValue> {
 }
 for (const [slug,kind] of [['driftwood-isle','captain'],['pine-hollow','antler-king']] as const) {
   test(`${kind} uses the same native body through guest phases and restore`, async () => {
-    const directory=builtProduct(slug),product=await loadHeadlessProduct(directory),descriptor=outputDescriptor(product.shardfile);
+    const directory=builtFolder(slug),product=await loadHeadlessFolder(directory),descriptor=outputDescriptor(product.shardfile);
     if(descriptor===undefined)throw new Error('Missing verified product');
     const rapier=await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
     const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,
       Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-    const preparation={product,shard:product.shardfile,assets,rapier},resident=await createNativeProofResident(preparation,prepareProductPlan);
+    const preparation={product,shard:product.shardfile,assets,rapier},resident=await createNativeProofResident(preparation,prepareFolderPlan);
     let resumed:Awaited<ReturnType<typeof createNativeProofResident>>|undefined;
     try {
       const host=resident.host,spawn=product.shardfile.runtime?.spawns?.bosses.find(row=>row.kind===kind);
@@ -55,14 +55,14 @@ for (const [slug,kind] of [['driftwood-isle','captain'],['pine-hollow','antler-k
       const damage=kind==='captain'?[16,24]:[9,20,24,32];
       expect(incoming.every(amount=>damage.includes(amount)),JSON.stringify(incoming)).toBe(true);
       body.startAttack(1.4);
-      const attacking = await createNativeProofResident(preparation, prepareProductPlan, snapshotSimHost(host));
+      const attacking = await createNativeProofResident(preparation, prepareFolderPlan, snapshotSimHost(host));
       try {
         expect(attacking.host.entities.get(body.entityId)?.snapshot()).toEqual(body.snapshot());
       } finally { attacking.dispose(); }
       body.stagger(new Vector3(1, 0, 0), 1);
       expect(body.stunned).toBe(true);
       const saved=snapshotSimHost(host),before=control.snapshot();
-      resumed=await createNativeProofResident(preparation,prepareProductPlan,saved);
+      resumed=await createNativeProofResident(preparation,prepareFolderPlan,saved);
       { const live = resumed; live.host.events.answer('damage.modify',request=>request?.target===leadPlayer(live.host).health?null:request,live.host.scope); }
       const restored=resumed.host.entities.get(body.entityId);if(restored===undefined)throw new Error('Missing restored body');
       expect(borrowedDecisionControl(restored).snapshot()).toBe(before);
@@ -87,7 +87,7 @@ for (const [slug,kind] of [['driftwood-isle','captain'],['pine-hollow','antler-k
         delete fight['decision'];wire['fight']=fight;king.state=JSON.stringify(wire);
         for(const name of Object.keys(entryState.state.mem))if(name.startsWith('king.'))delete entryState.state.mem[name];
       }
-      const upgraded=await createNativeProofResident(preparation,prepareProductPlan,legacy);
+      const upgraded=await createNativeProofResident(preparation,prepareFolderPlan,legacy);
       try {for(let i=0;i<30;i++)upgraded.step([]);
         const actor=upgraded.host.entities.get(body.entityId);if(actor===undefined)throw new Error('Old continuation lost its body');
         const migrated=v.parse(savedControl,JSON.parse(v.parse(v.string(),borrowedDecisionControl(actor).snapshot())));

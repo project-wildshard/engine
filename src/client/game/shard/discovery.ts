@@ -1,4 +1,4 @@
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { declaredForestQueries, declaredGround, declaredPondClip, defineAuthoredShard, type ShardManifest } from './manifest';
 import type { keyedSkyRender } from '../looks/keyedSky';
 import type { postGraphLook } from '../looks/postGraphLook';
@@ -15,8 +15,8 @@ type Row = Readonly<Record<string, unknown>>;
 const isRow = (value: unknown): value is Row => typeof value === 'object' && value !== null && !Array.isArray(value);
 const held = () => import('../systems/viewmodel/heldView');
 const looks = {
-  toon: async (product: ShardProduct) => (await import('../looks/toonLook')).toonLook(product),
-  painted: async (product: ShardProduct) => (await import('../looks/paintedLook')).productPaintedLook(product),
+  toon: async (product: ShardFolder) => (await import('../looks/toonLook')).toonLook(product),
+  painted: async (product: ShardFolder) => (await import('../looks/paintedLook')).folderPaintedLook(product),
 };
 /** The styles a client plan's entry names, as text in its document: the page adds each once, when the entry loads. */
 function addStyles(styles: readonly string[]): void {
@@ -33,12 +33,12 @@ const CALLS: Readonly<Record<string, (...args: readonly never[]) => unknown>> = 
   groundDeclared: (rows: Parameters<typeof declaredGround>[0], extra: Row) => ({...declaredGround(rows), ...extra}),
   pageModeBoot: (rows: unknown) => pageModeBoot(rows),
   pageModeKtx2: (rows: unknown) => () => Promise.resolve(pageModeKtx2(rows)),
-  swordGraph: (slug: string, file: string) => async () => (await (await held()).HeldView.fromProduct(slug, file)).sword(),
+  swordGraph: (slug: string, file: string) => async () => (await (await held()).HeldView.fromFolder(slug, file)).sword(),
   swordRows: (rows: {readonly look: Row}) => async () => (await held()).HeldView.admit({kind: 'toon', ...rows.look}).sword(),
   renderToon: () => looks.toon,
   renderPainted: () => looks.painted,
-  renderPost: (options: Parameters<typeof postGraphLook>[1]) => async (product: ShardProduct) => (await import('../looks/postGraphLook')).postGraphLook(product, options),
-  renderKeyed: (options: Parameters<typeof keyedSkyRender>[1]) => async (product: ShardProduct) => (await import('../looks/keyedSky')).keyedSkyRender(product, options),
+  renderPost: (options: Parameters<typeof postGraphLook>[1]) => async (product: ShardFolder) => (await import('../looks/postGraphLook')).postGraphLook(product, options),
+  renderKeyed: (options: Parameters<typeof keyedSkyRender>[1]) => async (product: ShardFolder) => (await import('../looks/keyedSky')).keyedSkyRender(product, options),
   rosterHeld: (rows: Parameters<typeof heldArmsGear>[0]) => async () => (await import('../models/heldGear')).heldArmsGear(rows),
   planEntry: (policy: Parameters<typeof declaredClientPlanEntry>[0], styles: readonly string[]) => async () => { addStyles(styles); return (await import('./declaredEntry')).declaredClientPlanEntry(policy); },
 };

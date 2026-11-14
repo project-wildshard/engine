@@ -3,7 +3,7 @@ import {placesWithDiscovery} from '../../src/shared/engine/quest/discovery';
 import {ChapterViewSchema} from '@wildshard/format/questPageComposition';
 import {mountedPlayerOf} from '../../src/server/game/riding/native';
 import type {PrepareHeadlessRuntime} from '../../src/server/host/headlessRuntime';
-import {prepareProductPlan as prepareNalati} from './headless-native';
+import {prepareFolderPlan as prepareNalati} from './headless-native';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 /** Observe the native motor/water modes and run the same admitted discovery

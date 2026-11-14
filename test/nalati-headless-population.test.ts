@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { Vector3 } from 'three';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
@@ -12,7 +12,7 @@ import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../
 import { populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
 import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
 import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { jumpOwnerClock } from './fixtures/ownerClock';
 
 // P1-E3.1b: Nalati Grasslands' population on the shipped headless host, from its built product alone. The world's every
@@ -20,8 +20,8 @@ import { jumpOwnerClock } from './fixtures/ownerClock';
 
 const SLUG = 'nalati-grasslands', Roster = v.looseObject({ roster: v.looseObject({ bodies: v.array(v.looseObject({ id: v.string(), kind: v.string(), variant: v.looseObject({ id: v.string() }) })) }) });
 
-async function shipped(): Promise<{ directory: string; product: Awaited<ReturnType<typeof loadHeadlessProduct>>; assets: Map<string, Uint8Array>; rapier: Rapier; resident: (snapshot?: string) => Promise<TrustedHeadlessResident> }> {
-  const directory = builtProduct(SLUG), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+async function shipped(): Promise<{ directory: string; product: Awaited<ReturnType<typeof loadHeadlessFolder>>; assets: Map<string, Uint8Array>; rapier: Rapier; resident: (snapshot?: string) => Promise<TrustedHeadlessResident> }> {
+  const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

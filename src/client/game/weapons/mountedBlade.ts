@@ -6,7 +6,7 @@ import { MeleeWeaponProfileSchema } from '@wildshard/format/weaponProfiles';
 import { createModelLibrary } from '@wildshard/engine/game/plugin/geometry';
 import { ItemCatalogue } from '@wildshard/engine/game/loadout/itemCatalogue';
 import { SWORD_WOOD } from '@wildshard/engine/game/weapons/starterMeleeProfile';
-import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 import { painterlyMaterial } from '@wildshard/engine/world/painterly';
 import { viewmodelRowMaterial } from '@wildshard/engine/combat/view/ranged';
 import { app } from '@wildshard/engine/app/runtime';
@@ -105,7 +105,7 @@ export class BladeSet {
    super(world,targets,{profile:opts.profile??data.profile,rig:owner.build(material,viewmodelRowMaterial(world.sky,'held-steel',{metalness:.55,roughness:.38,envMapIntensity:.7,transparent:true,depthWrite:true})),passes:data.passes,allowUnlocked:opts.allowUnlocked??false,...(opts.power===undefined?{}:{power:opts.power}),program:data.rows.program});
   }
  })(this);
- async prepare(product:Pick<ShardProduct,'file'|'shardfile'|'hasFile'|'url'>):Promise<void>{
+ async prepare(product:Pick<ShardFolder,'file'|'shardfile'|'hasFile'|'url'>):Promise<void>{
   const rows=schema.parse(BladeRowsSchema,JSON.parse(new TextDecoder().decode(await product.file(this.declaration.file))));
   // a pool the product names (GR6) loads by its content-addressed URL; any other pool URL is fetched as written
   const pool=product.hasFile(rows.pool.url)?{...rows.pool,url:product.url(rows.pool.url)}:rows.pool;

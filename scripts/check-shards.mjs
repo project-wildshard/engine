@@ -53,7 +53,7 @@ function generatedOnly(root, path, outputs) {
 // storage (pinned or wholly regenerated), beside the SDK writer's receipt. Unknown
 // files, source modules, symlinks and other hidden folders still
 // belong to the source layout check. Staged paths retain the pure layout policy.
-function generatedProduct(root, slug) {
+function generatedFolder(root, slug) {
   const base = `src/shards/${slug}/.wildshard`;
   const homes = readdirSync(resolve(root, base), { withFileTypes: true }).filter(entry => !entry.isDirectory() || hasFiles(resolve(root, base, entry.name)));
   const policy = homes.find(entry => entry.name === 'build-policy.json');
@@ -83,7 +83,7 @@ export function checkShards(root, selected) {
     if (products !== null) outputs[dir.name] = products.map(product => product.slug);
     entries[dir.name] = readdirSync(resolve(root, 'src/shards', dir.name), { withFileTypes: true })
       .filter(entry => !entry.isDirectory() || hasFiles(resolve(root, 'src/shards', dir.name, entry.name)))
-      .filter(entry => entry.name !== '.wildshard' || !entry.isDirectory() || !generatedProduct(root, dir.name))
+      .filter(entry => entry.name !== '.wildshard' || !entry.isDirectory() || !generatedFolder(root, dir.name))
       .filter(entry => entry.name === '.wildshard' || (entry.isDirectory()
         ? !generatedOnly(root, `src/shards/${dir.name}/${entry.name}`, generated)
         : !entry.isFile() || !generated.has(`src/shards/${dir.name}/${entry.name}`)))

@@ -4,13 +4,13 @@ import '../../../src/shared/engine/core/portableMathFirst';
 import assert from 'node:assert/strict';
 import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
 import {earnNalatiPasture} from './nalati-pasture-session';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const {resident,population,flock,sheep,originalWolves,delay,arrivalTick,checkpoint,checkpointTick}=await earnNalatiPasture();
-let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginProductSession>>['ready']>>|undefined;
+let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;
 try{
-  const pending=await beginProductSession('nalati-grasslands','nalati-predators',checkpoint);
+  const pending=await beginFolderSession('nalati-grasslands','nalati-predators',checkpoint);
   replay=await pending.ready();
   const report=runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,{version:1,observe:['nalati.predators'],segments:[{
     id:'ordinary-raid-and-shepherd-defense',ticks:1800,commands:[],

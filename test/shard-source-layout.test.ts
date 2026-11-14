@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { hasShardSource, manifestFolders, outputManifest, productFolder, shardOutputs, shardSourceDir, singleShardFolder } from '../scripts/shard-outputs.mjs';
+import { hasShardSource, manifestFolders, outputManifest, builtFolder, shardOutputs, shardSourceDir, singleShardFolder } from '../scripts/shard-outputs.mjs';
 import { mapShards } from '../scripts/map-hash.mjs';
 
 const roots: string[] = [];
@@ -29,7 +29,7 @@ test('a multi-shard repo reads src/shards/<folder>/, as before', () => {
   expect(manifestFolders(root)).toEqual(['cove', 'reef']);
   expect(shardSourceDir(root, 'reef')).toBe(join(root, 'src/shards/reef'));
   expect(mapShards(root)).toEqual([{ slug: 'cove', dir: join(root, 'src/shards/cove') }, { slug: 'reef', dir: join(root, 'src/shards/reef') }]);
-  expect(productFolder(root, 'cove-night')).toBe('cove');
+  expect(builtFolder(root, 'cove-night')).toBe('cove');
 });
 
 test('a single-shard repo reads src/ as one folder named by its manifest slug', () => {
@@ -41,7 +41,7 @@ test('a single-shard repo reads src/ as one folder named by its manifest slug', 
   expect(mapShards(root)).toEqual([{ slug: 'cove', dir: join(root, 'src') }]);
   const [night] = shardOutputs(root, 'cove') ?? [];
   expect(night?.slug).toBe('cove-night');
-  expect(productFolder(root, 'cove-night')).toBe('cove');
+  expect(builtFolder(root, 'cove-night')).toBe('cove');
   expect(outputManifest(root, 'cove', night?.row ?? { slug: 'x' })).toMatchObject({ slug: 'cove-night', look: { tint: 'night' }, shardfile: '/shardfiles/cove-night/shard.json' });
 });
 

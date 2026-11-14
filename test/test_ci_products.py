@@ -11,12 +11,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-spec = importlib.util.spec_from_file_location('ci_products', Path(__file__).resolve().parents[1] / 'scripts' / 'ci-products.py')
+spec = importlib.util.spec_from_file_location('ci_products', Path(__file__).resolve().parents[1] / 'scripts' / 'ci-folders.py')
 products = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(products)
 
 
-class PreparedProducts(unittest.TestCase):
+class PreparedFolders(unittest.TestCase):
     retained_cases = {
         'test_dirty_tracked_output_is_transferred_not_retained_even_when_staged',
         'test_missing_or_changed_retained_output_refuses_before_writes',
@@ -424,7 +424,7 @@ class PreparedProducts(unittest.TestCase):
 
     def run_prepared_checks(self, read_product=False):
         repo = Path(__file__).resolve().parents[1]
-        for name in ['ci-checks.mjs', 'ci-products.py']:
+        for name in ['ci-checks.mjs', 'ci-folders.py']:
             (self.root / 'scripts' / name).write_bytes((repo / 'scripts' / name).read_bytes())
         (self.root / 'package.json').write_text(json.dumps({'type': 'module', 'scripts': {
             'test:checks': 'pnpm gen && node check.mjs'}}))
@@ -436,7 +436,7 @@ class PreparedProducts(unittest.TestCase):
         (self.root / 'extra.mjs').write_text("import {writeFileSync} from 'node:fs';writeFileSync('extra-ran','once');")
         if read_product:
             (self.root / 'check.mjs').write_text(f"""
-              import {{readBuiltShardfile}} from '{(repo/'scripts/built-product.mjs').as_uri()}';
+              import {{readBuiltShardfile}} from '{(repo/'scripts/built-folder.mjs').as_uri()}';
               import {{resolve}} from 'node:path';
               import {{existsSync,writeFileSync}} from 'node:fs';
               if(existsSync('absent-cache'))throw new Error('Unexpected local product cache');

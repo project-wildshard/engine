@@ -1,14 +1,14 @@
 // @vitest-environment node
 import {expect,test} from 'vitest';
 import * as v from 'valibot';
-import {openProductSession} from './fixtures/headless/productSession';
+import {openFolderSession} from './fixtures/headless/folderSession';
 import type {HeadlessTapeSegment} from '../src/shared/host/headlessTape';
 
 const marksSchema=v.object({version:v.literal(1),marks:v.record(v.string(),v.boolean())});
 const walk=(id:string,points:[number,number][]):HeadlessTapeSegment=>({id,ticks:5000,commands:[],route:points.map(([x,z])=>({x,z}))});
 
 test('Signal walks every listed prompt and lights the tower through real oil and timed lash owners',async()=>{
-  const f=await openProductSession('sunscar-dunes');
+  const f=await openFolderSession('sunscar-dunes');
   try{
     const declared=f.product.shardfile.questHost;
     if(declared===undefined||declared===null)throw new Error('Missing admitted Signal quest host');

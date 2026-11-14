@@ -1,13 +1,13 @@
 import { expect, test, vi } from 'vitest';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
-import { readIndexBytes, StaleClientError, type ProductOptions } from '../src/client/game/shardfile/product';
+import { readIndexBytes, StaleClientError, type FolderOptions } from '../src/client/game/shardfile/folder';
 import { staleClientRecovery } from '../src/client/engine/boot/stuck';
 
 const hash = (bytes: Uint8Array): Promise<string> => Promise.resolve(hashImmutableBytes(bytes));
 const known = new TextEncoder().encode('{"format":"known"}');
 // Newer products may carry fields an old client rejects; the stale path must never parse them.
 const newer = new TextEncoder().encode('{"feature":"population.wildlife"');
-function options(firstParty: boolean, stale = vi.fn(() => Promise.resolve())): { options: ProductOptions; stale: typeof stale } {
+function options(firstParty: boolean, stale = vi.fn(() => Promise.resolve())): { options: FolderOptions; stale: typeof stale } {
   return { stale, options: { base: 'https://example.test/shardfiles/a/', offline: false, firstParty, hash,
     fetch: () => Promise.reject(new Error('unused')), built: { indexes: new Set([hashImmutableBytes(known)]), stale } } };
 }

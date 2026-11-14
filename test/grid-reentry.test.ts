@@ -4,27 +4,27 @@ import { expect, test, vi } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost, serializeSimSnapshot, decodeSimSnapshot } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from './fixtures/builtFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { createShardfileSim, bindShardfileSim, prepareShardfileSimRestore } from '../src/server/game/plugin/simulation';
 import { createTrustedHeadlessResident, type PrepareHeadlessRuntime } from '../src/server/host/headlessRuntime';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { ScriptHost } from '../src/shared/engine/script/host';
-import { productHeadlessSections } from '../src/shared/host/headlessSections';
-import { createNativeProofResident, prepareProductPlan } from './fixtures/headless-native';
+import { folderHeadlessSections } from '../src/shared/host/headlessSections';
+import { createNativeProofResident, prepareFolderPlan } from './fixtures/headless-native';
 import { prepareHeadlessRuntime as ninePlan } from './fixtures/nine-headless';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const shards = ['_template', 'blender-template', 'ink-cel-valley', 'pastel-plain', 'driftwood-isle', 'pine-hollow', 'nalati-grasslands',
   'nine-dragon-stack', 'sunscar-dunes', 'far-reach'] as const;
-const directPlans = new Map<string, PrepareHeadlessRuntime>([['driftwood-isle', prepareProductPlan], ['pine-hollow', prepareProductPlan], ['nine-dragon-stack', ninePlan]]);
+const directPlans = new Map<string, PrepareHeadlessRuntime>([['driftwood-isle', prepareFolderPlan], ['pine-hollow', prepareFolderPlan], ['nine-dragon-stack', ninePlan]]);
 
 // G498: eviction, then return through the actual native installer/restore path.
 // All ten live products are tested; sealed legacy products are never grid destinations.
 // Renderer-owned kit parts have a separate mandatory quick check (Pine King).
 for (const slug of shards) test(`${slug}: evict and re-enter with kit, held items and quest progress`, async () => {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error('Missing admitted product inventory');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash,
@@ -33,7 +33,7 @@ for (const slug of shards) test(`${slug}: evict and re-enter with kit, held item
   const trusted = product.has('sim/runtime-plan');
   const preparation = { shard, assets, rapier, product };
   const direct = trusted ? undefined : directPlans.get(slug);
-  const sections = productHeadlessSections(product);
+  const sections = folderHeadlessSections(product);
   const questPorts = { fact: () => undefined, coins: () => undefined };
   const first = direct !== undefined ? await createNativeProofResident(preparation, direct) : trusted ? await createTrustedHeadlessResident(preparation)
     : createShardfileSim(shard, assets, { rapier, sections, quest: questPorts });
@@ -82,11 +82,11 @@ test('generic grid data destinations restore exact modules with one installation
   const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));let dataCells=0;
   const questPorts={fact:()=>undefined,coins:()=>undefined};
   for(const slug of shards){
-    const directory=builtProduct(slug),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+    const directory=builtFolder(slug),product=await loadHeadlessFolder(directory),shard=product.shardfile;
     if(shard.runtime!==null||hasDeclaredClientPage(shard))continue;
     const descriptor=outputDescriptor(shard);if(descriptor===undefined)throw new Error('Missing admitted product inventory');
     const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-    const sections=productHeadlessSections(product),install=vi.spyOn(ScriptHost.prototype,'install');
+    const sections=folderHeadlessSections(product),install=vi.spyOn(ScriptHost.prototype,'install');
     const first=createShardfileSim(shard,assets,{rapier,sections,quest:questPorts});
     const installs=install.mock.calls.length;first.host.step();const saved=snapshotSimHost(first.host);first.dispose();install.mockClear();
     const prepared=prepareShardfileSimRestore(shard,assets,{rapier,sections,quest:questPorts,playerBody:false});

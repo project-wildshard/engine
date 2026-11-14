@@ -12,12 +12,12 @@ import { SaveStore } from '../src/shared/engine/saves/store';
 import { buildingDoorFlag, buildingSave, pageOpenDoors } from '../src/shared/game/shardfile/buildingDoor';
 import { instanceSave } from '../src/shared/game/instanceSaves';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 async function pine(opened?: ReadonlySet<string>) {
-  const directory = builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = runtimeAssets(product, directory);
   const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });

@@ -6,13 +6,13 @@ import * as v from 'valibot';
 import { runTickWorker } from '../../../src/server/host/tickWorkerLoop';
 import { parseShardfile } from '../../../src/shared/host/shardfile';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier';
-import { prepareAssetDecoders, offlineMemoryAdmission } from '@wildshard/format/product';
+import { prepareAssetDecoders, offlineMemoryAdmission } from '@wildshard/format/shardfileAssets';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { hashImmutableBytes } from '../../../src/shared/host/immutable';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
-import { createShardProduct } from '../../../src/shared/game/shardfile/shardProduct';
-import { createNativeProofAdapter, prepareProductPlan } from '../headless-native';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
+import { createShardFolder } from '../../../src/shared/game/shardfile/shardFolder';
+import { createNativeProofAdapter, prepareFolderPlan } from '../headless-native';
 import type { PrepareHeadlessRuntime } from '../../../src/server/host/headlessRuntime';
 
 await runTickWorker(async raw => {
@@ -39,12 +39,12 @@ await runTickWorker(async raw => {
     driftwoodPhase('factory-import-ready');
   }
   else if (payload.kind === 'driftwood-trade') prepare = (await import('../driftwood-trade-native')).prepareHeadlessRuntime;
-  else if (payload.kind === 'pine') prepare = prepareProductPlan;
+  else if (payload.kind === 'pine') prepare = prepareFolderPlan;
   else if (payload.kind === 'pine-verbs') prepare = (await import('../pine-verbs')).prepareHeadlessRuntime;
   else if (payload.kind === 'sky-verbs') prepare = (await import('../sky-verbs')).prepareHeadlessRuntime;
   else if (payload.kind === 'nine-flat') prepare = (await import('../nine-headless')).nineHeadlessRuntime(false);
   else if (payload.kind === 'nine') prepare = (await import('../nine-headless')).prepareHeadlessRuntime;
-  else if (payload.kind === 'nalati') prepare = prepareProductPlan;
+  else if (payload.kind === 'nalati') prepare = prepareFolderPlan;
   else if (payload.kind === 'nalati-companions') prepare = (await import('../nalati-companions-native')).prepareHeadlessRuntime;
   else if (payload.kind === 'nalati-weapons') prepare = (await import('../nalati-weapons-native')).prepareHeadlessRuntime;
   else if (payload.kind === 'nalati-predators') prepare = (await import('../nalati-predators-native')).prepareHeadlessRuntime;
@@ -60,9 +60,9 @@ await runTickWorker(async raw => {
   else if (payload.kind === 'trusted') prepare = (await import('./trustedRuntime')).prepareHeadlessRuntime;
   else prepare = (await import('./deferredRuntime')).prepareHeadlessRuntime;
   const product = payload.kind === 'trusted' || payload.kind === 'deferred'
-    ? createShardProduct({ slug: shard.identity.slug, revision: shard.identity.revision, shardfile: shard, sections: payload.sections,
+    ? createShardFolder({ slug: shard.identity.slug, revision: shard.identity.revision, shardfile: shard, sections: payload.sections,
       files: new Map(), read: () => Promise.reject(new Error('Direct native fixture has no named files')) })
-    : await loadHeadlessProduct(payload.directory);
+    : await loadHeadlessFolder(payload.directory);
   driftwoodPhase('product-ready');
   const adapter = await createNativeProofAdapter({ shard, assets: payload.assets, rapier, product }, prepare, payload.snapshot);
   driftwoodPhase('world-ready');

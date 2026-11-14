@@ -5,7 +5,7 @@ import type { createDeclaredHeldMelee } from '../plugin/weaponFamily';
 import type { RuntimeHomes, RuntimeCoins } from '../../../shared/game/plugin/runtimeRows';
 import type { PersistedQuest, bindDeclaredFight, PageQuestStages } from '../plugin/ui';
 import type { DeclaredPage } from '../quest/declaredPage';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** Internal references shared by compiled feature installers. Every entry is
  * the actual native owner; this book has no actor, flag, clock or save copy. */
@@ -22,7 +22,7 @@ export interface ClientNativeBook {
   returnModules:Promise<void>|null;
   readonly decisionAssets: Map<string, Uint8Array>;
 }
-const owners = new WeakMap<Scope, WeakMap<ShardProduct, ClientNativeBook>>();
+const owners = new WeakMap<Scope, WeakMap<ShardFolder, ClientNativeBook>>();
 /** Feature admission precedes this book. Its lifetime is the entered scope,
  * independently of the world's resident scene/material scope. */
 export function clientNativeBook(ctx: ShardContext): ClientNativeBook {

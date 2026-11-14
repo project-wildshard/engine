@@ -42,10 +42,10 @@ import { registerLevelDebugRow } from '@wildshard/engine/ui/debugOptions';
 import { showLoadFailure } from '@wildshard/engine/ui/errorScreen';
 import { installWorldRegistry } from '@wildshard/engine/world/registry';
 
-import { installProductGround, installProductSampling } from '../shardfile/productGround';
-import { installProductNavigation } from '../shardfile/productNavigation';
-import { loadManifestProduct, manifestAdmittedSource } from '../shardfile/runtimeProduct';
-import { absentShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { installFolderGround, installFolderSampling } from '../shardfile/folderGround';
+import { installFolderNavigation } from '../shardfile/folderNavigation';
+import { loadManifestFolder, manifestAdmittedSource } from '../shardfile/runtimeFolder';
+import { absentShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { gridLevel } from '../../../shared/game/grid/pageMode';
 import type { PageResidency } from '../grid/pageResidency';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
@@ -59,9 +59,9 @@ export interface SessionOptions { readonly mode?: PageMode; readonly residency?:
 /** Game presentation and plugin discovery belong to the game adapter, after the root selects content. */
 export async function startSession(manifest: ShardManifest, kit: KitPorts, options: SessionOptions = {}): Promise<void> {
   installWorldRegistry(); // the level's pieces and colliders register here (before the boot builds anything)
-  installProductGround(); // a required manifest ground reads its shard's own admitted product (before any level loads)
-  installProductSampling(); // an optional bake its shard admitted as query terrain reads that product, never terrain.bin too
-  installProductNavigation(); // declared navigation its shard's product admitted reads that product, never navmesh.bin too
+  installFolderGround(); // a required manifest ground reads its shard's own admitted product (before any level loads)
+  installFolderSampling(); // an optional bake its shard admitted as query terrain reads that product, never terrain.bin too
+  installFolderNavigation(); // declared navigation its shard's product admitted reads that product, never navmesh.bin too
   // DL20: every boot's level download outcome (cached, downloaded, failed or cancelled) reaches telemetry once, including
   // one that settled before this session and one whose failure stops the boot
   const confirmOutcomes = reportSpawnOutcomes(outcome => { app.events.emit('download.parts', outcome); });
@@ -134,14 +134,14 @@ async function buildSession(manifest: ShardManifest, stage: LoadStage, kit: KitP
     progress: { set: () => undefined, detail: () => undefined }, worldHook: (work) => work() };
   const loadPlugin = session.ownedGridHome ? () => Promise.resolve({ default: GridPageShellPlugin }) : manifest.load;
   if (loadPlugin === undefined) {
-    const sequence = sessionStages({ kit, manifest, slug: manifest.slug, stage, session, boot, product: absentShardProduct(manifest.slug) });
+    const sequence = sessionStages({ kit, manifest, slug: manifest.slug, stage, session, boot, product: absentShardFolder(manifest.slug) });
     let next = await sequence.next();
     while (!next.done) next = await sequence.next();
     return next.value;
   }
   const scope = currentOwner();
   if (scope === null) throw new Error('Plugin boot needs a level scope');
-  const product = await stage('product', () => loadManifestProduct(manifest, scope));
+  const product = await stage('product', () => loadManifestFolder(manifest, scope));
   const sequence = sessionStages({ kit, manifest, slug: manifest.slug, stage, session, boot, product });
   const { default: Plugin } = await stage('manifest.load', () => retried(loadPlugin));
   const plugin = new Plugin();

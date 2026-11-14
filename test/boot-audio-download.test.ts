@@ -9,7 +9,7 @@ import { bootFiles } from '../src/client/engine/boot/extras';
 import * as settings from '../src/client/engine/ui/Settings';
 import { shardBootAudio } from '../src/cook/game/entryTotals';
 import { openShardfile, shardHalf } from '../src/cook/game/shardCook';
-import { productTarball } from '../src/cook/game/productTarball';
+import { folderTarball } from '../src/cook/game/folderTarball';
 import { defaultBootAudio } from '../src/shared/engine/audio/bootAudio';
 import { installAssetTables, type AssetTables } from '../src/shared/engine/boot/tables';
 import { PUBLIC_BYTES } from '../src/client/game/boot/bytes.generated';
@@ -58,7 +58,7 @@ for (const [shard, fenceAudio, pageAudio] of [['driftwood-isle', 18, 91], ['pine
   const product = `out/${shard}`;
   test.skipIf(!existsSync(`${product}/shard.json`) || !existsSync(bootTables))(`${shard}: its fence audio and its default boot set are on the download`, async () => {
     const common = JSON.parse((JSON.parse(readFileSync(bootTables, 'utf8')) as { common: string }).common) as AssetTables;
-    const half = shardHalf(openShardfile(productTarball(product)), (_url, bytes) => bytes.length);
+    const half = shardHalf(openShardfile(folderTarball(product)), (_url, bytes) => bytes.length);
     const mounts = half.mountRows('phone', 'entry').map(row => row.url);
     const fence = mounts.map(url => url.split('?')[0] ?? url).filter(url => /^\/assets\/(?:music|sfx)\//u.test(url));
     const listed = shardBootAudio(half.shard.sections, common, mounts, shard);

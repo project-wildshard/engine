@@ -3,16 +3,16 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 
 const WHIP = 'weapon.pastel-whip', BOT = 'bot.one';
 const rapier = await loadRapier(readFileSync(new URL('../public/assets/physics/rapier.wasm', import.meta.url)));
 // CI21 (J232): Pastel Plain's pinned product, read as a server reads it, instead of compiling its source (J65).
-const directory = builtProduct('pastel-plain'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+const directory = builtFolder('pastel-plain'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
 if (descriptor === undefined) throw new Error('Missing pastel-plain output');
 const source = product.shardfile;
 const assets: ReadonlyMap<string, Uint8Array> = new Map(descriptor.index.files

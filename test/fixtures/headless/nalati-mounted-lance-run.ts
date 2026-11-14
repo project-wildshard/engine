@@ -9,7 +9,7 @@ import {canonicalSimDigest} from '../../fake/simState';
 import {parseHeldSlots} from '@wildshard/format/heldArms';
 import {PolearmRowsSchema} from '@wildshard/format/heldMelee';
 import type {HeadlessCommand,HeadlessEffect,HeadlessTapePartReport} from '../../../src/shared/host/tickProtocol';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {checkedReplayPipeline} from './checkedReplayPipeline';
 import {earnNalatiMountedRaid} from './nalati-mounted-raid';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
@@ -18,7 +18,7 @@ const State=v.object({slot:v.string(),thrusts:v.number(),throws:v.number(),ammo:
   polearm:v.object({lanceActive:v.boolean(),rehit:v.array(v.tuple([v.string(),v.number()]))})});
 console.info(JSON.stringify({phase:'mounted-approach-start'}));
 const {resident,product,mount,pack,ridden,riddenHealth,move,reins}=await earnNalatiMountedRaid();
-let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginProductSession>>['ready']>>|undefined;
+let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;
 let stopReplay:(()=>Promise<void>)|undefined;
 try{
   const host=resident.host,slots=parseHeldSlots(await product.json('held/slots.json'));
@@ -29,7 +29,7 @@ try{
   assert.ok(bodies.size>0);
   const checkpoint=serializeSimSnapshot(snapshotSimHost(host)),checkpointTick=host.state.tick;
   console.info(JSON.stringify({phase:'mounted-approach-done',tick:checkpointTick}));
-  const pending=await beginProductSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();const worker=replay;
+  const pending=await beginFolderSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();const worker=replay;
   const owner=host.adapters.get('nalati.weapons');assert.ok(owner);
   const read=()=>{const raw=owner.snapshot();assert.equal(typeof raw,'string');if(typeof raw!=='string')throw new Error('Missing actual lance continuation');return v.parse(State,JSON.parse(raw));};
   const initial=read(),frames:HeadlessCommand[][]=[];
@@ -97,7 +97,7 @@ try{
     (command.actorId==='nalati.weapon.swap'||command.actorId==='nalati.weapon.pitch'))),'the input tape cannot request attacks, hits, damage or throws');
   await flush();await pipeline.finish();assert.equal(replayed,frames.length);assert.equal(replay.quarantined,false);
   await replay.dispose();replay=undefined;
-  const restored=await beginProductSession('nalati-grasslands','nalati-predators',middle);replay=await restored.ready();
+  const restored=await beginFolderSession('nalati-grasslands','nalati-predators',middle);replay=await restored.ready();
   let suffix=0;
   for(const part of parts.filter(row=>row.tick>landed.tick)){
     assert.equal(part.start,landed.tick+suffix);

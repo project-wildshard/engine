@@ -1,11 +1,11 @@
 import {expect,test,vi} from 'vitest';
 import * as THREE from 'three';
 import * as v from 'valibot';
-import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
+import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
 import {explorerRoster} from '../src/client/game/models/explorerCatalogue';
 import {emptyShardfile} from '../src/shared/host/author';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
-import {fixtureProductFile} from './fixtures/productFile';
+import {fixtureFolderFile} from './fixtures/folderFile';
 import {SpecimenBookSchema} from '@wildshard/format/specimenCatalogue';
 import {parseExplorerCatalogue} from '@wildshard/format/explorerCatalogue';
 import {initializeTier,TIER} from '../src/client/engine/core/tier';
@@ -18,10 +18,10 @@ function fixture(offset=false){
   const book={rows:[{key:'leaf',model:{id:'orchard/leaf',name:'Pear leaf',file:'orchard.json',category:'nature',pipeline:'code',defaults:{}},source:{kind:'file',file:'models/leaf.bin',geometry:{attrs:[['position','f32',3,false]],count:3,index:null,indexCount:0,box:false,expand:false},material:{id:'orchard-leaf',family:'painterly',side:'double'}}}],materials:{}};
   // CI21 (J232): the named rows engine reads, built here; sharddev's nameBlob is the SDK writer of the same rows.
   const named=[['models/cover-phone.json',new TextEncoder().encode(JSON.stringify(book))],['models/leaf.bin',new Uint8Array(vertices.buffer)]] as const;
-  const declared={files:named.map(([name,bytes])=>{const hash=hashImmutableBytes(bytes);return {name,...fixtureProductFile(name,{hash,url:hash})};}),
+  const declared={files:named.map(([name,bytes])=>{const hash=hashImmutableBytes(bytes);return {name,...fixtureFolderFile(name,{hash,url:hash})};}),
     assets:new Map(named.map(([,bytes])=>[hashImmutableBytes(bytes),bytes]))};
   const catalogue=parseExplorerCatalogue({version:1,entries:[{kind:'specimen',books:{phone:'models/cover-phone.json',desktop:'models/cover-phone.json'},model:'leaf',tierCopies:{phone:7,desktop:18},drawnAs:'instanced'}]});
-  return createShardProduct({slug:'orchard',revision:1,shardfile:emptyShardfile({slug:'orchard',name:'Orchard',author:'Fixture',revision:1,seed:7}),sections:new Map([['explore/catalogue',catalogue]]),files:new Map(declared.files.map(({name,...file})=>[name,file])),read:hash=>{const bytes=declared.assets.get(hash);if(bytes===undefined)throw new Error('Missing leaf book');if(offset){const backing=new Uint8Array(bytes.byteLength+4);backing.set(bytes,4);return Promise.resolve(backing.subarray(4));}return Promise.resolve(bytes);},check:true});
+  return createShardFolder({slug:'orchard',revision:1,shardfile:emptyShardfile({slug:'orchard',name:'Orchard',author:'Fixture',revision:1,seed:7}),sections:new Map([['explore/catalogue',catalogue]]),files:new Map(declared.files.map(({name,...file})=>[name,file])),read:hash=>{const bytes=declared.assets.get(hash);if(bytes===undefined)throw new Error('Missing leaf book');if(offset){const backing=new Uint8Array(bytes.byteLength+4);backing.set(bytes,4);return Promise.resolve(backing.subarray(4));}return Promise.resolve(bytes);},check:true});
 }
 
 test.each([false,true])('an unrelated shard lists and builds its cold specimen book at both tiers (offset=%s)',async offset=>{

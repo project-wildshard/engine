@@ -11,7 +11,7 @@ import type { Shardfile } from '../../src/shared/host/shardfile';
 import { headlessSections } from '../../src/shared/host/headlessSections';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
-import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/product';
+import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { hashImmutableBytes } from '../../src/shared/host/immutable';
 

@@ -24,13 +24,13 @@ const { DialogueBox } = await import('../../src/client/engine/quest/view/ui.ts')
 const { GridCellEvents } = await import('../../src/shared/game/grid/cellEvents.ts');
 const { HybridShardPlugin } = await import('../../src/client/game/shardfile/hybrid.ts');
 const { emptyShardfile } = await import('../../src/shared/host/author.ts');
-const { createShardProduct } = await import('../../src/shared/game/shardfile/shardProduct.ts');
+const { createShardFolder } = await import('../../src/shared/game/shardfile/shardFolder.ts');
 const limit = 9500;
 
 function context(scope) {
   const source = emptyShardfile({ slug: 'dialogue-home', name: 'Dialogue home', author: 'Lifecycle proof', revision: 1, seed: 1 });
   const manifest = sourceManifest(source);
-  const product = createShardProduct({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(), files: new Map(), read: () => Promise.reject(new Error('Dialogue lifecycle has no external file input')) });
+  const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(), files: new Map(), read: () => Promise.reject(new Error('Dialogue lifecycle has no external file input')) });
   const unused = () => { throw new Error('Dialogue lifecycle must not request an unrelated game service'); };
   const progress = { set: unused, detail: unused };
   const installation = createLevelInstallation(app, scope, {}, () => progress);

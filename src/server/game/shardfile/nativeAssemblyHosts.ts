@@ -28,7 +28,7 @@ import { prepareSlots } from '../boss/slotsNative';
 import type { Wind } from '@wildshard/engine/world/steppeWind';
 import { dayClock } from '../../../shared/game/looks/dayClock';
 import { keyedSkyDaySpec } from '../../../shared/game/looks/keyedSkyClock';
-import { readDirectorProduct } from '../../../shared/game/plugin/director';
+import { readDirectorDocument } from '../../../shared/game/plugin/director';
 import { installNativeItems, otherCombatFrame } from '../plugin/nativeItems';
 import { addBakedPieces, bindNativeLoadout, weaponRow } from '../plugin/simulation';
 import { installHostPortalRide, type PortalRideRows } from '../../../shared/game/shardfile/portalRide';
@@ -87,7 +87,7 @@ async function prepareQuest<C extends NativeAssemblyContext>(row: Extract<Native
   const counters = parseAchievementCounterData(await read(row.counters)), content = row.document === undefined ? undefined : parse(QuestRuntimeDocumentSchema, await read(row.document));
   const spots = await read<NativeQuestCompositionInput['spots']>(row.spots), contracts = row.contracts === undefined ? undefined : await read<NonNullable<NativeQuestCompositionInput['contracts']>>(row.contracts);
   const table = row.table === undefined ? need(content, 'Native quest needs a table').table : await read<NativeQuestCompositionInput['table']>(row.table);
-  const rows = parseNativeQuestComposition(await read(row.rows)), director = row.director === true ? await readDirectorProduct(product) : undefined;
+  const rows = parseNativeQuestComposition(await read(row.rows)), director = row.director === true ? await readDirectorDocument(product) : undefined;
   const feats = counters.feats.filter(feat => feat.kind === undefined);
   const native = row.nativeFeats !== true ? counters : parseAchievementCounterData({ ...counters, feats, write: 'each',
     flags: feats.map(feat => counters.flags.find(flag => flag.id === feat.id) ?? { id: feat.id, method: 'count', value: { constant: 0 } }) });
@@ -301,7 +301,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
       return run => { installQuestKillSteps(run.host, input, counters.feats, need(run.island, 'Kill steps need the island population').bodies, need(run.input, 'Kill steps need their commands').ledger.fact); };
     }
     case 'quest.chapter': {
-      const director = await readDirectorProduct(product), input = parseChapterDirector(await readAssemblyInput(product, row.rows)), wake = parseChapterWake(await readAssemblyInput(product, row.wake));
+      const director = await readDirectorDocument(product), input = parseChapterDirector(await readAssemblyInput(product, row.rows)), wake = parseChapterWake(await readAssemblyInput(product, row.wake));
       const captain = rows['captain'] as { pool: { x: number; z: number }; arena: unknown };
       return run => { installNativeChapterDirector(run.host, director, { id: row.id, rows: input, reward: row.reward, wake: { population: row.population, encounter: wake.encounter, placement: { pool: { x: captain.pool.x, z: captain.pool.z }, arena: captain.arena }, cues: wake.cues.map(({ id, operation }) => ({ id, operation })) } }, run.context.restoring); };
     }

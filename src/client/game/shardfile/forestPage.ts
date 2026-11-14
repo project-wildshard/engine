@@ -12,11 +12,11 @@ import { LightPool } from '@wildshard/engine/fx/LightPool';
 import { floorAtRects } from '@wildshard/engine/physics/box';
 import { defineModel, sharedModelContext, type ModelDef, type Placement } from '@wildshard/engine/models/model';
 import { placeSliced } from '@wildshard/engine/models/place';
-import { productTreePool, treeSetModel, TreeSetFactory, type TreeSetParams } from '../models/treeSet';
+import { folderTreePool, treeSetModel, TreeSetFactory, type TreeSetParams } from '../models/treeSet';
 import { farStandIn } from './farStandIn';
 import { ForestPageSchema, LivingPageSitesSchema, type ForestPageRows } from '@wildshard/format/forestPage';
 import { ForestGround } from '../looks/forestGround';
-import { productCoverAppearance } from '../looks/coverAppearance';
+import { folderCoverAppearance } from '../looks/coverAppearance';
 import { emptyBuildingLifeRows } from '@wildshard/format/buildings';
 import { Particles } from '../systems/looks/particles';
 import { trample, TRAMPLE_GLSL } from '../systems/looks/trample';
@@ -25,12 +25,12 @@ import { LivingBuildings } from './livingBuildings';
 import { installWorldScenes } from './worldScenes';
 import { hydrateWorldSceneWeld } from './worldSceneWeld';
 import { residentWorldScope } from './hybridPresentation';
-import { runtimeLookMaterials } from './runtimeProduct';
+import { runtimeLookMaterials } from './runtimeFolder';
 import { timeClientPreparation } from './preparationTiming';
 import { lendLooks, setLentParam } from './lentLooks';
 import type { SceneHandles } from './sceneHandles';
 import type { ShardContext } from '../plugin/context';
-import { followResidentTiles, noteTileBytes, productTileRing, residentTiles } from './tileDriver';
+import { followResidentTiles, noteTileBytes, folderTileRing, residentTiles } from './tileDriver';
 import { StreamingCamera } from './streamingView';
 import { bucketByTile, followTile, ring, tileKey } from './tileContent';
 import { tileOf, type CellTile } from '../../../shared/game/shardfile/tileOrder';
@@ -154,7 +154,7 @@ export async function prepareForestPage(ctx: ShardContext, input: unknown): Prom
         if (rows.farStandIn === true && !resources.tiled().some(content => content.id === `${ctx.product.slug}.far-stand-in`)) {
           const standIn = farStandIn(ctx); if (standIn !== null) resources.addTiled(standIn);
         }
-        noteTileBytes(owner, shard.tiles); await residentTiles(owner, resources.tiled(), shard.spawn, shard.entryways, productTileRing(shard)); // NT1: the product's ring
+        noteTileBytes(owner, shard.tiles); await residentTiles(owner, resources.tiled(), shard.spawn, shard.entryways, folderTileRing(shard)); // NT1: the product's ring
         const camera = new StreamingCamera(ctx.root, () => game.camera);
         const follow = followResidentTiles(owner, () => player.position, undefined, () => camera.read());
         if (follow !== null) ctx.system({ id: `client.forest.tiles.${rows.id}`, phase: 'update', run: () => { follow(); } }); }); },
@@ -182,7 +182,7 @@ export function forestFieldModels(ctx: ShardContext, id: string): FieldModelsCon
 /** The page's lanterns: one additive glow point each (banked by day, full at night, a slow flicker, not drawn past
  *  `range` of the nearest lit one) and a pooled lamp site each in the living buildings. */
 async function forestLanterns(ctx: ShardContext, rows: ForestPageRows, cabins: LivingPage): Promise<{ points: Points; set: (id: string, lit: boolean) => void; present: (time: number, eye: Vector3, lamps: number) => void }> {
-  const row = rows.lanterns, glow = await (await productCoverAppearance(ctx.product, rows.ground.appearance)).texture(ctx.product, row.texture);
+  const row = rows.lanterns, glow = await (await folderCoverAppearance(ctx.product, rows.ground.appearance)).texture(ctx.product, row.texture);
   const geometry = new BufferGeometry(), lit = row.rows.map(() => true); geometry.setAttribute('position', new BufferAttribute(Float32Array.from(row.rows.flatMap(entry => entry.at)), 3));
   const material = new PointsMaterial({ map: glow, color: row.color, size: row.size, sizeAttenuation: true, transparent: true, blending: AdditiveBlending, depthWrite: false, fog: false });
   const points = new Points(geometry, material); points.name = 'lantern-glow'; points.renderOrder = row.order;
@@ -219,11 +219,11 @@ function groundModel(kind: ForestPageRows['ground']['kinds'][number], under: For
  *  whose factory is not the declared set (a build without its files) draws itself and collides as its own capsules. */
 export async function placeForestPageModels(ctx: ShardContext, id: string): Promise<void> {
   const page = forestPage(ctx.scope, id), due = slicer(page.rows.sliceMs).due, h = forestFieldModels(ctx, id), { forest, registry } = h, under = page.under;
-  const models = sharedModelContext(h.sky, h), trees = treeSetModel(productTreePool(ctx.product, ctx.product.section('world/trees')));
+  const models = sharedModelContext(h.sky, h), trees = treeSetModel(folderTreePool(ctx.product, ctx.product.section('world/trees')));
   const variants = trees.model.variants; if (variants === undefined) throw new Error('Forest model requires its variants');
   // tile streaming P3/P4: the trees and the floor cover keep to the tiles around the viewer (the trees' follower moves the ring);
   // a whole-cell level (`ring: 'cell'`, DL17) keeps every tile, so nothing streams in play (sp-o1, as Nalati's ground)
-  const radius = productTileRing(ctx.product.shardfile)(), residency = { resident: (_x: number, _z: number): boolean => true };
+  const radius = folderTileRing(ctx.product.shardfile)(), residency = { resident: (_x: number, _z: number): boolean => true };
   if (forest !== null && forest.trees.length > 0) {
     if (forest.drawer !== 'model' || forest.factory.variants.length !== variants.length) {
       const own = forest.drawer === 'model'; forest.drawItself();

@@ -6,20 +6,20 @@ import { createSimHost, type SimHost, type SimValue } from '../src/server/engine
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from './fixtures/builtFolder';
 import { installCableModes } from '../src/shared/engine/player/modes';
 import { createNativeCombatFrame } from '../src/server/game/plugin/nativeItems';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { prepareProductPlan } from './fixtures/headless-native';
+import { prepareFolderPlan } from './fixtures/headless-native';
 import { canonicalSimDigest } from './fake/simState';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const Value: v.GenericSchema<SimValue> = v.lazy(() => v.union([v.null(), v.boolean(), v.number(), v.string(), v.array(Value), v.record(v.string(), Value)]));
 const object = v.record(v.string(), v.unknown());
-for (const [slug, prepare, step] of [['pine-hollow', prepareProductPlan, 'pine.elites'], ['nalati-grasslands', prepareProductPlan, 'nalati.elites']] as const) {
+for (const [slug, prepare, step] of [['pine-hollow', prepareFolderPlan, 'pine.elites'], ['nalati-grasslands', prepareFolderPlan, 'nalati.elites']] as const) {
   test(`${slug}: encounter wire resumes fights and refuses malformed bindings quietly`, async () => {
-    const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+    const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
     if (descriptor === undefined) throw new Error('Missing product inventory');
     const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
     const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));

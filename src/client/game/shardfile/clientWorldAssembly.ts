@@ -4,25 +4,25 @@ import { WorldEntry } from './worldEntry';
 import type { SceneHandles } from './sceneHandles';
 import { publishClientSceneHandles } from './clientSceneHandles';
 import type { IslandLibrary } from '../models/islandLibrary';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { buildProgress, type ShardContext } from '../plugin/context';
 import { admittedIslandBook, preflightIslandBook } from './islandBook';
 import { WorldAssembly } from './worldAssembly';
 import { HybridResidentWorld } from './hybrid';
 import { boundResidentWorldScope } from './hybridPresentation';
-import { runtimeLookMaterials } from './runtimeProduct';
+import { runtimeLookMaterials } from './runtimeFolder';
 import { lendLooks } from './lentLooks';
 import { installWorldScenes } from './worldScenes';
 import { bakedTileContents, residentBakedTiles, type BakedTiles } from './bakedTiles';
 import { publishEntryOwner, lendEntryOwner, entryOwner, presentEntryOwner } from '../../../shared/game/shardfile/entryOwners';
 import { timeClientPreparation } from './preparationTiming';
-import { cameraCone, followResidentTiles, noteTileBytes, productTileRing, residentTiles } from './tileDriver';
+import { cameraCone, followResidentTiles, noteTileBytes, folderTileRing, residentTiles } from './tileDriver';
 import { StreamingCamera } from './streamingView';
 import { farStandIn } from './farStandIn';
 import { wholeRefinementCover } from './wholeRefinementCover';
 
 const enteredScopes = new WeakSet<ShardContext['scope']>();
-const residents = new WeakMap<IslandLibrary<unknown> | ShardProduct, {
+const residents = new WeakMap<IslandLibrary<unknown> | ShardFolder, {
   readonly recipe: string; readonly scenes: unknown; readonly world: HybridResidentWorld<SceneHandles>;
 }>();
 /** Construction remains on its original bound owner; entered reads borrow only
@@ -122,7 +122,7 @@ export async function installClientWorldAssembly(ctx: ShardContext, row: Extract
   // DL21: the resident tiles (coarse cover and the spawn's tiles before controls) are a named span: on Nine they were the
   // untimed ~1.9 s tail of world assembly, the card on 'Props · world ready' meanwhile
   noteTileBytes(owner, source.tiles);
-  await timeClientPreparation(product.slug, 'assembly:resident-tiles', () => residentTiles(owner, scenes.tiled(), source.spawn, source.entryways, productTileRing(source))); live();
+  await timeClientPreparation(product.slug, 'assembly:resident-tiles', () => residentTiles(owner, scenes.tiled(), source.spawn, source.entryways, folderTileRing(source))); live();
   const camera = new StreamingCamera(ctx.root, () => world.game.camera);
   const follow = followResidentTiles(owner, () => world.player.position, () => cameraCone(world.game.camera), () => camera.read());
   if (follow !== null) ctx.system({ id: 'client.world.tiles', phase: 'update', run: () => { follow(); } });

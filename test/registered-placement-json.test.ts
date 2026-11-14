@@ -4,7 +4,7 @@ import { WorldScenePlacementSchema, parseWorldScenePlacement } from '@wildshard/
 import { registeredJsonSchema, namedJsonSchema } from '@wildshard/engine/host/formatJsonSchema';
 import { nameBlob } from '@wildshard/sharddev/blobs';
 import { emptyShardfile } from '@wildshard/engine/host/author';
-import { createShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import { createShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 
 const names: readonly RegisteredPlacementJsonName[] = ['world/placements/arch.rim.json', 'scenes/placements/roof.one.json', 'world/foliage/reeds-phone.json', 'world/piers/deck-2.json'];
 const row = { id: 'arch', model: 'arch', draw: 'instanced', poses: [{ x: 1, y: 2, z: 3, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 2, 3, 1], color: [0.3, 0.6, 0.9] }],
@@ -48,7 +48,7 @@ test('the original cross-field and reference-shape checks survive structural sch
 test('checked and trusted reads retain original decoded placement values', async () => {
   for (const builtJson of [false, true]) {
     const name = 'world/placement-pages/arch.json', page = { version: 1, rows: [row] };
-    const bytes = encode(page), product = createShardProduct({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity),
+    const bytes = encode(page), product = createShardFolder({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity),
       sections: new Map(), files: new Map([[name, { hash: 'a'.repeat(64), url: 'x', jsonSchema: registeredJsonSchema(name) }]]),
       read: () => Promise.resolve(bytes), builtJson, check: true });
     const value = await product.json(name);
@@ -60,7 +60,7 @@ test('checked and trusted reads retain original decoded placement values', async
 
 test('a family read refuses missing provenance before its asset reader runs', async () => {
   let reads = 0;
-  const name = 'world/placements/arch.json', product = createShardProduct({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity),
+  const name = 'world/placements/arch.json', product = createShardFolder({ slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity),
     sections: new Map(), files: new Map([[name, { hash: 'a'.repeat(64), url: 'x', jsonSchema: namedJsonSchema(WorldScenePlacementSchema) }]]),
     read: () => { reads++; return Promise.resolve(encode(row)); }, builtJson: true });
   await expect(product.json(name)).rejects.toThrow('unregistered named JSON is retired');

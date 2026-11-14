@@ -3,10 +3,10 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the same admitted product bytes for independent native workers.
 import { readFile } from 'node:fs/promises';
 import { expect, it } from 'vitest';
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
-import { builtProduct } from './builtProduct';
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
+import { builtFolder } from './builtFolder';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
-import { productHeadlessSections } from '../../src/shared/host/headlessSections';
+import { folderHeadlessSections } from '../../src/shared/host/headlessSections';
 import { HeadlessSimulation } from '../../src/server/host/headless';
 import { OBSERVATION_TICKS } from '../../src/shared/host/headlessObservation';
 
@@ -16,12 +16,12 @@ export function nativeRuntimeObservationCases(slugs: readonly string[]): void {
 it.for(slugs)('%s offline observation retains all ticks and the complete restored continuation', {timeout: 60_000}, async (slug, {signal, onTestFinished}) => {
   const started = performance.now();
   const stage = (name: string): void => { console.info('native-observation-stage', JSON.stringify({ slug, name, milliseconds: performance.now() - started })); };
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error('Missing native product descriptor');
   const assets = new Map(await Promise.all(descriptor.index.files.map(async file =>
     [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(await readFile(`${directory}/${file.path}`))] as const)));
-  const options = { deadline: 'advisory' as const, sections: productHeadlessSections(product) };
+  const options = { deadline: 'advisory' as const, sections: folderHeadlessSections(product) };
   const owned = new Set<HeadlessSimulation>();
   onTestFinished(async () => { await Promise.all([...owned].map(sim => sim.dispose())); });
   const create = async (snapshot?: string): Promise<HeadlessSimulation> => {

@@ -1,6 +1,6 @@
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
-import { ApproachInputsDeferredError } from '../grid/productInputs';
+import { ApproachInputsDeferredError } from '../grid/folderInputs';
 import { stillImageObjectUrl } from './stillImage';
 
 /** Lease the admitted map's conservative image residency before decoding or retaining its inert URL. */

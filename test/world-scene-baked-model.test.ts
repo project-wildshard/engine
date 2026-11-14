@@ -21,7 +21,7 @@ import * as assets from '../src/client/engine/core/assets';
 import { withOwner } from '../src/shared/engine/app/ownership';
 import { worldSceneSurfaceMaterial } from '../src/client/game/shardfile/worldSceneSurface';
 import { SkyRig } from '../src/client/engine/world/skyRig';
-import type { ShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { emptyShardfile } from '../src/shared/host/author';
 import { WorldRegistry } from '../src/client/engine/world/registry';
 import * as colliderReader from '../src/client/engine/models/colliders';
@@ -107,7 +107,7 @@ test('fictional scan rows share original PBR material identity and release it on
   const map = new Texture(), normalMap = new Texture(), armMap = new Texture(), owner = new Scope('fixture-quay-surfaces');
   const load = vi.spyOn(assets, 'loadPBR').mockResolvedValue({ map, normalMap, armMap });
   const setupMaterial = vi.fn<SkyRig['setupMaterial']>(), sky = fixtureSky(setupMaterial);
-  const product = { shardfile: emptyShardfile({ slug: 'fixture-quay', name: 'Quay', author: 'Fixture', revision: 1, seed: 1 }) } as ShardProduct;
+  const product = { shardfile: emptyShardfile({ slug: 'fixture-quay', name: 'Quay', author: 'Fixture', revision: 1, seed: 1 }) } as ShardFolder;
   const row = v.parse(WorldSceneSurfaceSchema, { id: 'stone', kind: 'surface', scan: 'quay_stone',
     properties: { color: [0.2, 0.3, 0.4], metalness: 0, normalScale: [0.8, 1.3] } });
   try {
@@ -128,7 +128,7 @@ test('surface leases survive the first owner and evict after the last owner', as
   let finish: ((value: assets.PBRSet) => void) | undefined;
   const load = vi.spyOn(assets, 'loadPBR').mockImplementation(() => new Promise(resolve => { finish = resolve; }));
   const sky = fixtureSky();
-  const product = { shardfile: emptyShardfile({ slug: 'fixture-quay', name: 'Quay', author: 'Fixture', revision: 1, seed: 1 }) } as ShardProduct;
+  const product = { shardfile: emptyShardfile({ slug: 'fixture-quay', name: 'Quay', author: 'Fixture', revision: 1, seed: 1 }) } as ShardFolder;
   const row = v.parse(WorldSceneSurfaceSchema, { id: 'stone', kind: 'surface', scan: 'quay_stone', properties: {} });
   const root = new Group(), shape = new BufferGeometry(); ownSceneTree(root, second, { isAcquired: () => false });
   try {
@@ -158,7 +158,7 @@ test('surface appearance references refuse before geometry allocation', async ()
   const files = new Map([['look/appearance.json', new TextEncoder().encode(JSON.stringify(book))], ['models/invalid.glb', new Uint8Array()]]);
   const product = { shardfile: source, hasFile: (name: string) => files.has(name), file: (name: string) => {
     reads.push(name); return Promise.resolve(files.get(name) ?? new Uint8Array());
-  } } as ShardProduct;
+  } } as ShardFolder;
   const context = { scope: owner, product } as ShardContext;
   const input = (appearance: string, texture: string) => parseWorldScenes({ version: 1,
     libraries: [{ id: 'bake', kind: 'owned', models: [{ id: 'wall', file: 'models/invalid.glb' }] }],
@@ -178,7 +178,7 @@ test('scene surfaces prepare matching scans together before plain materials', as
     waiting.push(resolve);
     if (waiting.length === 2) for (const finish of waiting) finish({ map: texture, normalMap: texture, armMap: texture });
   }));
-  const product = { shardfile: emptyShardfile({ slug: 'fixture-quay', name: 'Quay', author: 'Fixture', revision: 1, seed: 1 }) } as ShardProduct;
+  const product = { shardfile: emptyShardfile({ slug: 'fixture-quay', name: 'Quay', author: 'Fixture', revision: 1, seed: 1 }) } as ShardFolder;
   const context = { scope: owner, product, game: { runtime: { world: { sky } } } } as ShardContext;
   try {
     const handles = await installWorldScenes(context, parseWorldScenes({ version: 1, libraries: [], steps: [],

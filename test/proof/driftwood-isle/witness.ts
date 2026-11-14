@@ -1,7 +1,7 @@
-import { productHeadlessSections } from '../../../src/shared/host/headlessSections';
-import type { ShardProduct } from '../../../src/shared/game/shardfile/shardProduct';
+import { folderHeadlessSections } from '../../../src/shared/host/headlessSections';
+import type { ShardFolder } from '../../../src/shared/game/shardfile/shardFolder';
 import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the actual shard, tape and committed native checkpoints.
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Pin the admitted product independently of the mutable out alias.
@@ -21,7 +21,7 @@ import { serializeSimSnapshot, snapshotSimHost } from '../../../src/shared/engin
 import { SaveStore, type SaveStorage } from '../../../src/shared/engine/saves/store';
 import { Ledger, LedgerEmitter, type LedgerReceipt } from '../../../src/shared/game/ledger';
 import type { TrustedHeadlessResident } from '../../../src/server/host/headlessRuntime';
-import { createNativeProofResident, prepareProductPlan } from '../../fixtures/headless-native';
+import { createNativeProofResident, prepareFolderPlan } from '../../fixtures/headless-native';
 import type { TickWorkerHost } from '../../../src/server/host/tickWorkerHost';
 import { createNativeProofWorker } from '../../fixtures/headless-worker';
 import { TickCommandSchema, TickEffectSchema, type HeadlessCommand, type HeadlessEffect } from '../../../src/shared/host/tickProtocol';
@@ -35,19 +35,19 @@ const { actions: DRIFTWOOD_ACT, actor: DRIFTWOOD_INTERACT, step: QUEST_STEP } = 
 
 export const ENTRY = 'data/headlessAssembly.json';
 const ROOT = new URL('../../../', import.meta.url);
-let productDirectory: string | undefined;
+let folderDirectory: string | undefined;
 /** One immutable product for the recorder and every restored/native-worker fork. */
-export function witnessProductDirectory(): string {
-  productDirectory ??= realpathSync(new URL('out/driftwood-isle', ROOT));
-  return productDirectory;
+export function witnessFolderDirectory(): string {
+  folderDirectory ??= realpathSync(new URL('out/driftwood-isle', ROOT));
+  return folderDirectory;
 }
 let DIR = new URL('checkpoints/', import.meta.url), MANIFEST = new URL('manifest.json', DIR);
 /** Select a generator-owned output directory; native recorders and replay readers share this explicit port. */
 export function setCheckpointDirectory(directory: URL): void { DIR = directory; MANIFEST = new URL('manifest.json', DIR); }
 // The native witness consumes the admitted product's bytes, never authoring
 // geometry constructors (which legitimately depend on renderer materials).
-const witnessProduct = await loadHeadlessProduct(witnessProductDirectory());
-const source = witnessProduct.shardfile;
+const witnessFolder = await loadHeadlessFolder(witnessFolderDirectory());
+const source = witnessFolder.shardfile;
 const natural = v.pipe(v.number(), v.integer(), v.minValue(0));
 const Frame = v.pipe(v.array(TickCommandSchema), v.maxLength(1024));
 const Tape = v.pipe(v.array(Frame), v.maxLength(60_000));
@@ -69,19 +69,19 @@ export const OPEN = [
 ];
 export const SCOPE = 'Real Sealed Ring, reef and spawn-to-zipline journeys, earned chest pack, Captain/swim and golden-hour reward carry continuations and emitted ledger facts; not whole-shard compatibility';
 export function driftwoodRapier(): Promise<Rapier> { return loadRapier(readFileSync(new URL('public/assets/physics/rapier.wasm', ROOT))); }
-function nativeFiles(product: ShardProduct): NonNullable<ReturnType<typeof outputDescriptor>>['index']['files'] {
+function nativeFiles(product: ShardFolder): NonNullable<ReturnType<typeof outputDescriptor>>['index']['files'] {
   const descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing admitted native output');
   const required = new Set(product.shardfile.files.map(file => file.hash));
   return descriptor.index.files.filter(file => file.kind === 'wasm' || required.has(file.commons === true ? `commons:${file.hash}` : file.hash));
 }
 /** Fingerprint the same pinned native byte closure used by every recorder/fork. */
-export function witnessProductInputFiles(): readonly string[] {
-  const root = pathToFileURL(`${witnessProductDirectory()}/`);
-  return ['shard.json', ...nativeFiles(witnessProduct).map(file => file.path)].map(path => new URL(path, root).href);
+export function witnessFolderInputFiles(): readonly string[] {
+  const root = pathToFileURL(`${witnessFolderDirectory()}/`);
+  return ['shard.json', ...nativeFiles(witnessFolder).map(file => file.path)].map(path => new URL(path, root).href);
 }
-function readNativeAssets(product: ShardProduct): Map<string, Uint8Array> {
-  const assets = new Map<string, Uint8Array>(), root = pathToFileURL(`${witnessProductDirectory()}/`);
+function readNativeAssets(product: ShardFolder): Map<string, Uint8Array> {
+  const assets = new Map<string, Uint8Array>(), root = pathToFileURL(`${witnessFolderDirectory()}/`);
   for (const file of nativeFiles(product)) {
     const bytes = Uint8Array.from(readFileSync(new URL(file.path, root)));
     if (bytes.byteLength !== file.compressed || hash(bytes) !== file.hash) throw new Error(`Native witness product blob differs: ${file.path}`);
@@ -93,11 +93,11 @@ function readNativeAssets(product: ShardProduct): Map<string, Uint8Array> {
 // resident/fresh worker gets its own byte arrays, never another host's loans.
 let checkedNativeAssets: ReadonlyMap<string, Uint8Array> | undefined;
 function nativeAssets(): Map<string, Uint8Array> {
-  checkedNativeAssets ??= readNativeAssets(witnessProduct);
+  checkedNativeAssets ??= readNativeAssets(witnessFolder);
   return new Map([...checkedNativeAssets].map(([name, bytes]) => [name, bytes.slice()]));
 }
 function boot(rapier: Rapier, snapshot?: string): Promise<TrustedHeadlessResident> {
-  return createNativeProofResident({ shard: witnessProduct.shardfile, assets: nativeAssets(), rapier, product: witnessProduct }, prepareProductPlan, snapshot);
+  return createNativeProofResident({ shard: witnessFolder.shardfile, assets: nativeAssets(), rapier, product: witnessFolder }, prepareFolderPlan, snapshot);
 }
 function manifest(): Recorded { return v.parse(Manifest, readWitnessManifest(MANIFEST)); }
 function tape(m: Recorded): HeadlessCommand[][] {
@@ -251,8 +251,8 @@ export async function reefProof(rapier: Rapier): Promise<object> {
     if (!leadPlayer(session.host).swim.diving) throw new Error('Real held DIVE never entered a dive');
     const restoreTick = session.host.state.tick, checkpoint = save(session);
     fork = await boot(rapier, checkpoint);
-    const product = witnessProduct;
-    worker = await createNativeProofWorker(product.shardfile, nativeAssets(), 'driftwood', checkpoint, productHeadlessSections(product), witnessProductDirectory());
+    const product = witnessFolder;
+    worker = await createNativeProofWorker(product.shardfile, nativeAssets(), 'driftwood', checkpoint, folderHeadlessSections(product), witnessFolderDirectory());
     const initial = worker.checkpoint;
     if (digest(fork) !== digest(session) || initial === undefined || canonicalSimDigest(initial.snapshot) !== digest(session)) throw new Error('Mid-dive restore was not exact');
     const wetStep = async (commands: HeadlessCommand[]): Promise<void> => {
@@ -327,8 +327,8 @@ export async function ziplineProof(rapier: Rapier): Promise<object> {
     if (checkpoint === undefined || fork === undefined || frames.length !== 60 || !session.host.flags.has('used:zipline') || digest(fork) !== digest(session)) throw new Error('Zipline continuation did not land exactly');
     const earned = Object.values(profile(local).state().achievements).find(row => row.id === 'zipline');
     if (earned?.count !== 1) throw new Error('Real landing did not persist its single zipline fact');
-    const product = witnessProduct;
-    worker = await createNativeProofWorker(product.shardfile, nativeAssets(), 'driftwood', checkpoint, productHeadlessSections(product), witnessProductDirectory());
+    const product = witnessFolder;
+    worker = await createNativeProofWorker(product.shardfile, nativeAssets(), 'driftwood', checkpoint, folderHeadlessSections(product), witnessFolderDirectory());
     if (worker.checkpoint === undefined || canonicalSimDigest(worker.checkpoint.snapshot) !== canonicalSimDigest(checkpoint)) throw new Error('SDK mid-ride restore diverged');
     for (const frame of frames) {
       const commit = await worker.step([{ source: 'witness.zipline', commands: frame.commands }]);
@@ -376,8 +376,8 @@ export async function replayProof(rapier: Rapier, workerTicks = 60): Promise<obj
     if (captain === undefined || !captain.alive || captain.hp >= 200 || typeof encounter !== 'string') throw new Error('Checkpoint is not the living mid-fight Captain');
     const hp = captain.hp, checkpoint = save(original); restored = await boot(rapier, checkpoint);
     if (digest(original) !== digest(restored)) throw new Error('Mid-fight restore not exact');
-    const product = witnessProduct;
-    worker = await createNativeProofWorker(product.shardfile, nativeAssets(), 'driftwood', checkpoint, productHeadlessSections(product), witnessProductDirectory());
+    const product = witnessFolder;
+    worker = await createNativeProofWorker(product.shardfile, nativeAssets(), 'driftwood', checkpoint, folderHeadlessSections(product), witnessFolderDirectory());
     const until = Math.min(m.ticks, cp.tick + 1000), a: Recorded['effects'] = [], b: Recorded['effects'] = [];
     if (until - cp.tick < workerTicks) throw new Error('Captain tape is shorter than the requested worker replay');
     if (until - cp.tick > 10_000) throw new Error('Captain replay exceeded its 10k window');

@@ -1,5 +1,5 @@
 import { parsePlatformDataSection } from '@wildshard/format/platformDataSections';
-import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 
 /** One defining context catalogue for author-build intake and worker transport. */
 export const HEADLESS_CONTEXT_SECTIONS = ['view/modules', 'sim/scripts', 'actors/spawn-scripts', 'actors/return-scripts', 'actors/moves', 'actors/strikes', 'world/targets', 'sim/runtime-plan', 'sim/bodies'] as const;
@@ -13,6 +13,6 @@ export function headlessSections(input?: ReadonlyMap<string, unknown>): Map<stri
   return sections;
 }
 /** Forward the complete verified native context, including targets and plan selection. */
-export function productHeadlessSections(product: ShardProduct): Map<string, unknown> {
+export function folderHeadlessSections(product: ShardFolder): Map<string, unknown> {
   return headlessSections(new Map(HEADLESS_CONTEXT_SECTIONS.filter(name => product.has(name)).map(name => [name, product.section(name)])));
 }

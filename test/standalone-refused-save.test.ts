@@ -11,13 +11,13 @@ import { instanceSave } from '../src/shared/game/instanceSaves';
 import { captureClientState, clientStateSave } from '../src/shared/game/shardfile/clientState';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
 import { bakedGridCollision } from './fixtures/gridCollision';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // An exact save is one build's: a later build that changes a level, a creature or an adapter refuses the whole world. The player's progress still
 // goes on, through the real worker code, or every such deploy takes it from them.
@@ -31,7 +31,7 @@ class PageStorage implements SaveStorage {
   removeItem(key: string): void { this.items.delete(key); }
 }
 async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

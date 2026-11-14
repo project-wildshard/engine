@@ -13,7 +13,7 @@ import { SimNetWorld } from "../../src/server/engine/net/simWorld.ts";
 import { createSimHost } from "../../src/server/engine/sim.ts";
 import { installDeclaredClimate } from "../../src/server/game/shardfile/declaredClimate.ts";
 import { publishWeather } from "../../src/server/game/weather/wire.ts";
-import { loadHeadlessProduct } from "../../src/server/host/headlessProduct.ts";
+import { loadHeadlessFolder } from "../../src/server/host/headlessFolder.ts";
 import { BitWriter } from "../../src/shared/engine/net/bits.ts";
 import { decodeAct, encodeAct } from "../../src/shared/engine/net/messages.ts";
 import { NET_SCHEMA_HASH } from "../../src/shared/engine/net/netSchemas.ts";
@@ -63,7 +63,7 @@ async function room(work, options = {}) {
     let air = null,
       program = null;
     if (options.weather !== false) {
-      const product = await loadHeadlessProduct(
+      const product = await loadHeadlessFolder(
         "out/" + (options.pine ? "pine-hollow" : "nalati-grasslands"),
       );
       const data = await product.json("world/weather.json");

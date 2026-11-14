@@ -8,15 +8,15 @@ import { actRoutes } from '../../src/shared/engine/sim/actRoutes';
 import { ELITE_MOMENTS, shardRows } from '../../src/shared/engine/sim/shardRows';
 import type { SimHost } from '../../src/server/engine/sim';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
-import { builtProduct } from './builtProduct';
+import { builtFolder } from './builtFolder';
 
 // Qyran in a room: the page's wind law on a body the world raises, on the shipped product. His own save joins a world's, and an older one loads.
 
 export const ADAPTER = 'nalati.patrol.wind';
 export async function nalati(snapshot?: string) {
-  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, snapshot, { room: true });

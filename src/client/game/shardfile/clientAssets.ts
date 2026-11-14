@@ -2,7 +2,7 @@ import { pacedResolve } from '@wildshard/engine/core/workSlice';
 import { isDev } from '@wildshard/engine/core/devMode';
 import { memoryAttribution } from '@wildshard/engine/core/memoryAttribution';
 
-import { boundedResponse, type ProductOptions } from './product';
+import { boundedResponse, type FolderOptions } from './folder';
 import { outputBlobUrl, outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { readPackWhole, releasePackWholes } from '../../../shared/game/shardfile/packReads';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -12,10 +12,10 @@ export class ClientAssets {
   private readonly wire: Map<string, Uint8Array>;
   private readonly pending = new Map<string, Promise<Uint8Array>>();
   private readonly source: Shardfile;
-  private readonly options: ProductOptions;
+  private readonly options: FolderOptions;
   // The admitted source's files by hash, built on the first lease (every tile scope leases its closure at boot).
   private byHash: Map<string, Shardfile['files'][number]> | undefined;
-  constructor(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, options: ProductOptions) {
+  constructor(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, options: FolderOptions) {
     this.source = source; this.wire = new Map(assets); this.options = options;
     if (isDev()) for (const [ref, bytes] of this.wire) this.observe(ref, bytes);
   }

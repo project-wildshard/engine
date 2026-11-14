@@ -1,7 +1,7 @@
 import { canoeRow } from './fixtures/engine-lift/canoe';
-import { runtimeAssets } from './fixtures/engine-lift/product';
+import { runtimeAssets } from './fixtures/engine-lift/folder';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise real native carry and its physics continuation.
-import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
+import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
 import { createTrustedHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
@@ -19,7 +19,7 @@ import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { emptyShardfile } from '../src/shared/host/author';
 import { directLoopback } from '../src/test/engine/netLoopback';
-import { builtProduct } from './fixtures/engine-lift/product';
+import { builtFolder } from './fixtures/engine-lift/folder';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 // P1-E3.10: a carry mover carries whoever called it, not the host's first player.
@@ -94,7 +94,7 @@ test('a stand trigger reads every player in the world', async () => {
 });
 
 test('built Pine: a bot rides the canoe on a scripted tape and a client sees the boat and the flag', async () => {
-  const directory = builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory), source = product.shardfile;
+  const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), source = product.shardfile;
   const descriptor = outputDescriptor(source); if (descriptor === undefined) throw new Error('Missing admitted inventory');
   const assets = runtimeAssets(product, directory);
   const resident = await createTrustedHeadlessResident({ shard: source, assets, rapier: await rapierNow(), product });

@@ -7,7 +7,7 @@ import original from './fixtures/nalati-shape-book-original.json' with { type: '
 
 const compressed=await originalPlaceBinary(),raw=unshuffleLanes(unzlibSync(compressed));
 const actors=original.draws.filter(row=>'lane'in row);
-function productShapeRow(row:typeof original.draws[number]){
+function folderShapeRow(row:typeof original.draws[number]){
   if(!('lane'in row))throw new Error('Expected original actor lane');
   return {...row,lane:{file:'world/places.bin',offset:row.lane.offset}};
 }
@@ -18,7 +18,7 @@ test('all 36 original actor shapes use the admitted bank with complete geometry 
   const legacy=fixedDraws({slug:'before',file:()=>Promise.reject(new Error('No raw block'))},actors);
   await legacy.load(new Map([[first.lane.url,raw]]));
   const file=vi.fn(()=>Promise.resolve(compressed)),url=vi.fn(()=>Promise.reject(new Error('Retired public bank must not be fetched')));
-  const current=fixedDraws({slug:'nalati-grasslands',file},actors.map(productShapeRow),undefined,url);
+  const current=fixedDraws({slug:'nalati-grasslands',file},actors.map(folderShapeRow),undefined,url);
   await current.load();expect(file).toHaveBeenCalledExactlyOnceWith('world/places.bin');expect(url).not.toHaveBeenCalled();
   for(const row of actors){
     const before=legacy.handle(row.slot).take(),after=current.handle(row.slot).take();

@@ -40,15 +40,15 @@ export function outputSections(root,slug,products=resolve(root,'out')) {
   const outputs=shardOutputs(root,slug);
   if(outputs!==null) {
     if(outputs.length===0)throw new Error(`${slug}: section inventory missing; build every shard before measuring`);
-    const rows=outputs.map(output=>productSections(output.slug,products)),first=rows[0];
+    const rows=outputs.map(output=>folderSections(output.slug,products)),first=rows[0];
     const named=new Map();
     for(const row of rows)for(const section of row.sections)if(!named.has(section.name))named.set(section.name,section);
     return {index:first.index,sections:[...named.values()],customSections:rows.flatMap(row=>row.customSections),customSectionBytes:rows.reduce((sum,row)=>sum+row.customSectionBytes,0)};
   }
-  return productSections(slug,products);
+  return folderSections(slug,products);
 }
 /** One built product's verified sections. @param {string} slug @param {string} products */
-function productSections(slug,products) {
+function folderSections(slug,products) {
   const folder=resolve(products,slug), indexPath=resolve(folder,'shard.json');
   if(!existsSync(indexPath))throw new Error(`${slug}: section inventory missing; build every shard before measuring`);
   const index=parseOutputIndex(JSON.parse(readFileSync(indexPath,'utf8')));

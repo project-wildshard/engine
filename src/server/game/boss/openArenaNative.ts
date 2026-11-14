@@ -20,7 +20,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { arenaTie, arenaTieWord, arenaBoundary } from '../../../shared/game/boss/arenaAnswers';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { publishOwned, sayFightView } from '@wildshard/engine/sim/shardRows';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { arenaWords } from './arenaWords';
 import { OpenArenaRoom } from './openArenaRoom';
 import { OpenArenaSaved } from './openArenaState';
@@ -68,7 +68,7 @@ export interface OpenArenaPlan {
 }
 
 /** Read the arena's rows now; nothing here touches a host. */
-export async function prepareOpenArena(product: Pick<ShardProduct, 'json' | 'section' | 'file' | 'shardfile'>, row: OpenArenaRow): Promise<OpenArenaPlan> {
+export async function prepareOpenArena(product: Pick<ShardFolder, 'json' | 'section' | 'file' | 'shardfile'>, row: OpenArenaRow): Promise<OpenArenaPlan> {
   const data = await readArenaScriptData(product, { fight: row.fight, geometry: row.geometry });
   const plan = parseClientPlan(product.section('client/plan')), view = plan.features.find(entry => entry.kind === 'view.program' && entry.id === row.view);
   if (view?.kind !== 'view.program') throw new Error('Open arena requires its admitted pose view');

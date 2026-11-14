@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read only the admitted product and actual physics bytes.
 import {readFileSync} from 'node:fs';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHost,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
@@ -16,7 +16,7 @@ import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 interface EarnedPasture {
   resident:Awaited<ReturnType<typeof createNativeProofResident>>;
-  product:Awaited<ReturnType<typeof loadHeadlessProduct>>;
+  product:Awaited<ReturnType<typeof loadHeadlessFolder>>;
   assets:Map<string,Uint8Array>;rapier:Awaited<ReturnType<typeof loadRapier>>;
   population:NativePopulation;flock:NativePopulation['flocks'][number];
   sheep:number;originalWolves:string[];delay:number;arrivalTick:number;checkpoint:string;checkpointTick:number;
@@ -24,7 +24,7 @@ interface EarnedPasture {
 
 /** Earn a checkpoint through the physical entry and unchanged natural raid clock. */
 export async function earnNalatiPasture(interception?:readonly WalkPoint[]):Promise<EarnedPasture>{
-  const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+  const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);assert.ok(descriptor);
   const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,
     Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

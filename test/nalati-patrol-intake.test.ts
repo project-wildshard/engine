@@ -1,13 +1,13 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The native comparison uses the unchanged shipped physics bytes.
 import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
-import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {snapshotSimHost} from '../src/shared/engine/sim/snapshot';
 import {nativePopulationOf} from '../src/server/game/riding/nativePopulation';
-import {builtProduct} from './fixtures/builtProduct';
-import {createNativeProofResident,prepareProductPlan as prepareHeadlessRuntime} from './fixtures/headless-native';
+import {builtFolder} from './fixtures/builtFolder';
+import {createNativeProofResident,prepareFolderPlan as prepareHeadlessRuntime} from './fixtures/headless-native';
 import {prepareNalatiWorld} from './fixtures/nalati-world';
 import {readPatrolIntake,readPatrolPoses} from '../src/server/game/boss/patrolNative';
 import {canonicalSimDigest} from './fake/simState';
@@ -18,7 +18,7 @@ import * as v from 'valibot';
 import {TimedEncountersSchema} from '@wildshard/format/encounterRows';
 
 test('admitting conditional patrol recipes preserves the complete page-joined initial population and every RNG draw',async()=>{
-  const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+  const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);if(descriptor===undefined)throw new Error('Missing admitted native inventory');
   const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const input=await readPatrolIntake(product,{rows:'combat/timed-encounters.json',actors:'actors/sheep.json'}),original=JSON.stringify(input);
@@ -51,7 +51,7 @@ test('admitting conditional patrol recipes preserves the complete page-joined in
 },30_000);
 
 test('patrol contact seats use admitted moving joints and preserve their quiet continuation',async()=>{
-  const product=await loadHeadlessProduct(builtProduct('nalati-grasslands'));
+  const product=await loadHeadlessFolder(builtFolder('nalati-grasslands'));
   const [intake,poses,encounters]=await Promise.all([readPatrolIntake(product,{rows:'combat/timed-encounters.json',actors:'actors/sheep.json'}),readPatrolPoses(product,{rows:'combat/timed-encounters.json',actors:'actors/sheep.json',looks:'actors/species-looks.json'}),
     product.json<unknown>('combat/timed-encounters.json').then(value=>v.parse(TimedEncountersSchema,value))]);
   expect(poses.rows.map(row=>[row.kind,row.variant])).toEqual(intake.recipes.map(row=>[row.kind,row.variant]));

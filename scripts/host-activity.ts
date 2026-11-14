@@ -5,7 +5,7 @@ import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {Session} from 'node:inspector/promises';
 import {dirname,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {outputDescriptor,serverReadsFile} from '../src/shared/game/shardfile/outputDescriptor';
@@ -17,7 +17,7 @@ const products=[];
 try {
   for(const slug of ['sunscar-dunes','far-reach','driftwood-isle','nalati-grasslands','pine-hollow','nine-dragon-stack']) {
     const started=performance.now(),directory=slug==='sunscar-dunes'?`out/${slug}`:`out/.slices/${slug}`;
-    const product=await loadHeadlessProduct(directory),descriptor=outputDescriptor(product.shardfile);
+    const product=await loadHeadlessFolder(directory),descriptor=outputDescriptor(product.shardfile);
     if(descriptor===undefined)throw new Error(`No admitted index for ${slug}`);
     const assets=new Map(descriptor.index.files.filter(file=>serverReadsFile(file,product.shardfile.terrain?.collider)&&(file.name===undefined||file.kind==='wasm'||file.kind==='tile'))
       .map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

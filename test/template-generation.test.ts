@@ -13,7 +13,7 @@ import { generate } from '../src/shards/_template/shard.config';
 import { templateTerrain } from '../src/shards/_template/generators/terrain';
 import { TEMPLATE_BEHAVIOUR, TEMPLATE_BOSS } from './fixtures/templateSource';
 import { templateBehaviour } from '../src/shards/_template/generators/behaviour';
-import { templateProduct } from '../src/shards/_template/generators/product';
+import { templateFolder } from '../src/shards/_template/generators/folder';
 import { templatePropRows } from '../src/shards/_template/generators/props';
 import { createProjectGeneration, isProjectGenerator } from '../src/sharddev/projectGeneration';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
@@ -27,7 +27,7 @@ test('template direct generation and a cache hit retain every original world row
     const assets = new Map<string, Uint8Array>(), root = resolve('src/shards/_template');
     const coldAt = performance.now(), cold = await generate(createProjectGeneration(root, 'c'.repeat(64), assets, cache)), coldMs = performance.now() - coldAt;
     const hitAt = performance.now(), hit = await generate(createProjectGeneration(root, 'c'.repeat(64), assets, cache)), hitMs = performance.now() - hitAt;
-    expect(JSON.stringify(cold.shard)).toBe(JSON.stringify(templateProduct(rows, props, TEMPLATE_BEHAVIOUR, TEMPLATE_BOSS))); expect(hit.shard).toEqual(cold.shard); expect(hit.output).toEqual(cold.output);
+    expect(JSON.stringify(cold.shard)).toBe(JSON.stringify(templateFolder(rows, props, TEMPLATE_BEHAVIOUR, TEMPLATE_BOSS))); expect(hit.shard).toEqual(cold.shard); expect(hit.output).toEqual(cold.output);
     if (hit.map === undefined || cold.map === undefined) throw new Error('Missing Template map');
     expect(Buffer.compare(hit.map.pixels, cold.map.pixels)).toBe(0);
     const expected = new Map([...original, ...props.assets]);
@@ -68,7 +68,7 @@ test('the actual template build closure bundles and executes through the unchang
 
 
 test('Template boss and output sources use the unchanged SDK-only author import surface', () => {
-  for (const file of ['boss.ts', 'productOutput.ts']) {
+  for (const file of ['boss.ts', 'folderOutput.ts']) {
     const path = resolve('src/shards/_template/generators', file), parsed = parseSync(path, readFileSync(path, 'utf8'));
     expect(parsed.errors).toEqual([]);
     for (const node of parsed.program.body) if (node.type === 'ImportDeclaration') expect(generatorImportViolation(path, node.source.value), node.source.value).toBeNull();

@@ -58,10 +58,10 @@ test.each([false, true])('compiler function text keeps original input identities
   writeFileSync(compiler, '/** original docs */ export const compile=()=>1;');
   expect(native(`
     import {readFileSync,writeFileSync} from 'node:fs';
-    const {captureProductInputs,recordBundle,productInputKey}=await import(process.argv[2]);
+    const {captureFolderInputs,recordBundle,folderInputKey}=await import(process.argv[2]);
     const {InputHashMemo}=await import(process.argv[3]);
     const root=process.argv[4],compiler=root+'/compiler.mjs',receipt=root+'/receipt.json',source=readFileSync(compiler,'utf8');
-    await captureProductInputs(root,receipt,async()=>{
+    await captureFolderInputs(root,receipt,async()=>{
       recordBundle({output:[{type:'chunk',moduleIds:[compiler]}]},{execution:true});
       const module=await importBundle(source);
       assert.equal(module.compile(),1);
@@ -69,7 +69,7 @@ test.each([false, true])('compiler function text keeps original input identities
     });
     const saved=JSON.parse(readFileSync(receipt,'utf8'));
     assert.equal(saved.inputs.some(row=>row.includes('author-module-')),false);
-    const memo=new InputHashMemo(root),key=()=>productInputKey(root,receipt,[],memo),before=key();
+    const memo=new InputHashMemo(root),key=()=>folderInputKey(root,receipt,[],memo),before=key();
     assert.match(before,/^[a-f0-9]{64}$/u);
     writeFileSync(compiler,'/** changed docs */ export const compile=()=>1;');
     ${inspect ? 'assert.equal(key(),undefined);' : 'assert.equal(key(),before);'}

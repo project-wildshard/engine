@@ -364,7 +364,7 @@ export const TILE_RING = 2;
 /** G956: the shipped 5 x 5. Creatures sleep beyond it (`followRing`'s default). */
 export function tileRing(): number { return TILE_RING; }
 /** FR2: a product's ring radius as a driver's `radius`: its whole cell where it declares `ring: 'cell'`, else `tileRing`. */
-export function productTileRing(source: Pick<Shardfile, 'ring'>): () => number { return () => ringRadius(source, tileRing); }
+export function folderTileRing(source: Pick<Shardfile, 'ring'>): () => number { return () => ringRadius(source, tileRing); }
 
 /**
  * T6: the render ring as a viewer-following test (a creature manager's residency, `AnimalManager.setResidency`): given the

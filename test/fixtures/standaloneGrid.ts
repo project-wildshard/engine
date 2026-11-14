@@ -5,12 +5,12 @@ import { loadRapier } from '../../src/shared/engine/physics/rapier';
 import type { SaveStorage } from '../../src/shared/engine/saves/store';
 import { GridAssembly, type GridPoint } from '../../src/shared/game/grid/assembly';
 import { outputDescriptor, serverReadsFile } from '../../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../../src/server/host/headlessRuntime';
 import type { StandaloneGrid } from '../../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../../src/server/host/standalone/serverHost';
 import { connectStandalone, type StandaloneShell } from '../../src/client/host/standalone/shell';
-import { builtProduct } from './builtProduct';
+import { builtFolder } from './builtFolder';
 import { bakedGridCollision } from './gridCollision';
 
 // P1-E3.9, E5.2b: the grid in the server's half, over real MessagePorts on the server's own clock. Shared by
@@ -26,7 +26,7 @@ export class PageStorage implements SaveStorage {
 }
 
 export async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

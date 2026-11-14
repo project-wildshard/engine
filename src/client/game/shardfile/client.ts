@@ -38,7 +38,7 @@ import { TIER } from '@wildshard/engine/core/tier';
 import type { ShardContext } from "../plugin/context";
 import type { ShardPlayHost } from '../../../shared/game/shard/runtime';
 import { installDeclaredPlumbing } from '../shard/declaredPlumbing';
-import { declaredProductCompendium, declaredDay, declaredWeather } from '../../../shared/game/shard/declaredRows';
+import { declaredFolderCompendium, declaredDay, declaredWeather } from '../../../shared/game/shard/declaredRows';
 import { installDeclaredTargets, spentUses } from '../shard/declaredTargets';
 import { installDeclaredTalks } from './declaredTalks';
 import { mountDeclaredUi } from '../shard/declaredUi';
@@ -353,7 +353,7 @@ export class ShardfileClient {
     ctx.rows.species(pageSpecies(source.rows.species.map((row) => ({ ...row, variants: row.variants.map((variant) => ({ ...variant, scale: [...variant.scale] })) })), kinds));
     ctx.rows.speciesLook(pageSpecies(clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins), kinds));
     const sketches = compendiumSketches(source.rows, this.assets.retained);
-    for (const row of source.rows.compendiums) ctx.rows.compendium({ id: row.id, ...declaredProductCompendium(ctx.product, row.id, sketches) });
+    for (const row of source.rows.compendiums) ctx.rows.compendium({ id: row.id, ...declaredFolderCompendium(ctx.product, row.id, sketches) });
     ctx.rows.lootTable(source.rows.loot);
     runtime.hooks.animalsReady = (manager) => {
       for (const spawn of source.creatures.spawns) {

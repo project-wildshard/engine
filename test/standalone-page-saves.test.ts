@@ -14,13 +14,13 @@ import { regionalRuntimeCheckpoint } from '../src/shared/game/grid/runtimeCheckp
 import { instanceSave } from '../src/shared/game/instanceSaves';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { importPageSaves, type IndexedSaves } from '../src/client/engine/saves/indexed';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // A player's saves are the page's: the server opens them, with its own world rebuilt, and carries on from what they say.
 const PREFIX = 'wildshard.save.v2.';
@@ -33,7 +33,7 @@ class PageStorage implements SaveStorage {
   removeItem(key: string): void { this.items.delete(key); }
 }
 async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

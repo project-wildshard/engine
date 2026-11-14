@@ -13,11 +13,11 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { ConditionedTransport, directLoopback } from '../src/test/engine/netLoopback';
 import { readNativeRangedItem } from '../src/server/game/plugin/nativeItems';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands, type HeadlessCommand } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // P1-E5.3-I4 (J50, J127, E5-REPLICATION §6.2, §9): a real room on the shipped Pine product, a real client over conditioned
 // links, Pine's lever rifle, and a boar crossing the crosshair at 6 m/s. The client fires at the boar it has been shown and
@@ -32,7 +32,7 @@ const FREE_SHOT = { aim: { origin: { x: 0, y: 0, z: 0 }, direction: { x: 0, y: 0
 
 async function shard(slug: string): Promise<TrustedHeadlessResident> {
   const rapier: Rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });

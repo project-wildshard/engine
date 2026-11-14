@@ -1,15 +1,15 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the admitted quest composition on the shipped native physics module.
 import { readFileSync } from 'node:fs';
 import { expect,test } from 'vitest';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { creditNativeInventory,debitNativeInventory } from '../src/shared/game/inventoryLaw';
-import { builtProduct,runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder,runtimeAssets } from './fixtures/engine-lift/folder';
 
 test('a published quest restores its earned pack and physical props without granting stock or spawning twice', async () => {
-  const directory = builtProduct('driftwood-isle'), product = await loadHeadlessProduct(directory);
+  const directory = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(directory);
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const input = { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier };
   const first = await createTrustedHeadlessResident(input);

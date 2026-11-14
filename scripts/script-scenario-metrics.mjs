@@ -1,5 +1,5 @@
 // KR1 metrics are observations from the real DecisionHost, not declarations.
-import { representativeProduct } from './shard-outputs.mjs';
+import { representativeFolder } from './shard-outputs.mjs';
 import {existsSync,readdirSync,readFileSync,statSync} from 'node:fs';
 import {relative,resolve} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -67,8 +67,8 @@ export function scriptScenarioMetrics(slug,index,read,paths,hostHash) {
 }
 /** Missing products cannot supply a zero-cost script claim.
  * @param {string} root @param {string} slug @param {string} products @param {readonly string[]} paths */
-export function productScriptMetrics(root,slug,products,paths) {
-  const directory=resolve(products,representativeProduct(root,slug)),path=resolve(directory,'shard.json');
+export function folderScriptMetrics(root,slug,products,paths) {
+  const directory=resolve(products,representativeFolder(root,slug)),path=resolve(directory,'shard.json');
   if(!existsSync(path))return {status:'unknown',scripts:[],scenarios:[]};
   const index=outputFormat.parseOutputIndex(JSON.parse(readFileSync(path,'utf8')));
   return scriptScenarioMetrics(slug,index,file=>readFileSync(paths.includes(file)?resolve(root,file):resolve(directory,file)),paths,scenarioHostHash(root));

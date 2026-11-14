@@ -5,8 +5,8 @@ import { emptyShardfile } from '../src/shared/host/author';
 import { encodeCanonicalJson, hashImmutableBytes } from '../src/shared/host/immutable';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import type { resolveOutputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import type { admitProduct, ProductOptions } from '../src/client/game/shardfile/product';
-import type { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import type { admitFolder, FolderOptions } from '../src/client/game/shardfile/folder';
+import type { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import type { readCheckedOutputIndex } from '../src/shared/game/shardfile/outputIndexChecks';
 // oxlint-disable-next-line import/no-nodejs-modules -- Execute and remove one real browser build as an owned temporary module.
 import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
@@ -15,11 +15,11 @@ import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native import evaluates the bundled browser entry without a browser or eval shim.
 import { pathToFileURL } from 'node:url';
 
-function resolverModule(input: unknown): input is { resolveOutputDescriptor: typeof resolveOutputDescriptor; admitProduct: typeof admitProduct;
-  createShardProduct: typeof createShardProduct; readCheckedOutputIndex: typeof readCheckedOutputIndex } {
+function resolverModule(input: unknown): input is { resolveOutputDescriptor: typeof resolveOutputDescriptor; admitFolder: typeof admitFolder;
+  createShardFolder: typeof createShardFolder; readCheckedOutputIndex: typeof readCheckedOutputIndex } {
   return typeof input === 'object' && input !== null && 'resolveOutputDescriptor' in input && typeof input.resolveOutputDescriptor === 'function'
-    && 'admitProduct' in input && typeof input.admitProduct === 'function'
-    && 'createShardProduct' in input && typeof input.createShardProduct === 'function'
+    && 'admitFolder' in input && typeof input.admitFolder === 'function'
+    && 'createShardFolder' in input && typeof input.createShardFolder === 'function'
     && 'readCheckedOutputIndex' in input && typeof input.readCheckedOutputIndex === 'function';
 }
 
@@ -35,16 +35,16 @@ test('browser products need a build proof and bundle no checked host intake', as
       return { name, path, bytes: bytes.length, hash: hashImmutableBytes(bytes), schema: `wildshard:${name}@1` };
     }), schemas: [], files: [], runtime: null };
   const entry = new URL('../descriptor-check-boundary', import.meta.url).pathname;
-  const productEntry = new URL('../src/client/game/shardfile/product.ts', import.meta.url).pathname;
+  const folderEntry = new URL('../src/client/game/shardfile/folder.ts', import.meta.url).pathname;
   const metadataEntry = new URL('../src/shared/game/shardfile/outputIndexChecks.ts', import.meta.url).pathname;
   const result = await build({ configFile: false, publicDir: false, logLevel: 'silent',
     define: { __SHARDFILE_VALIDATOR__: JSON.stringify('browser-boundary'), __SHARDFILE_VERDICTS__: JSON.stringify([{ revision: 'browser-boundary',
       sourceHash: index.build.sourceHash, indexHash: hashImmutableBytes(encode(index)), worst: { playing: 0, loading: 0, accounted: 0, location: [0, 0] } }]) },
     plugins: [{ name: 'descriptor-check-boundary', resolveId(id) { return id === entry ? '\0descriptor-check-boundary' : null; },
       load(id) { return id === '\0descriptor-check-boundary' ? `export {resolveOutputDescriptor} from '@wildshard/engine/game/shardfile/outputDescriptor';
-        export {admitProduct} from ${JSON.stringify(productEntry)};
+        export {admitFolder} from ${JSON.stringify(folderEntry)};
         export {readCheckedOutputIndex} from ${JSON.stringify(metadataEntry)};
-        export {createShardProduct} from '@wildshard/engine/game/shardfile/shardProduct';` : null; } }],
+        export {createShardFolder} from '@wildshard/engine/game/shardfile/shardFolder';` : null; } }],
     build: { write: false, minify: false, lib: { entry, formats: ['es'] }, rolldownOptions: { output: { codeSplitting: false } } } });
   const built = Array.isArray(result) ? result[0] : result;
   if (built === undefined || !('output' in built)) throw new Error('Missing descriptor bundle');
@@ -86,35 +86,35 @@ test('browser products need a build proof and bundle no checked host intake', as
     const bytes = wires.get(url.slice('https://fixture.test/'.length));
     return Promise.resolve(bytes === undefined ? new Response(null, { status: 404 }) : new Response(Uint8Array.from(bytes)));
   });
-  const options: ProductOptions = { base: 'https://fixture.test/', offline: false, firstParty: true, hash, fetch,
+  const options: FolderOptions = { base: 'https://fixture.test/', offline: false, firstParty: true, hash, fetch,
     firstPartyRead:async(url,size)=>{
       const response=await fetch(url);if(!response.ok)throw new Error('Missing emitted fixture file');
       const bytes=new Uint8Array(await response.arrayBuffer());
       if(size!==undefined&&bytes.length!==size)throw new Error('Emitted fixture size mismatch');return bytes;
     }};
-  const admitted = await loaded.admitProduct(index, options);
+  const admitted = await loaded.admitFolder(index, options);
   expect(admitted.source).toEqual(source);
-  expect((await loaded.admitProduct(admitted.source, options)).source).toBe(admitted.source);
+  expect((await loaded.admitFolder(admitted.source, options)).source).toBe(admitted.source);
   fetch.mockClear();
   admitted.source.identity.name = 'Changed exposed source';
-  const unprovedOptions:ProductOptions={base:options.base,offline:false,firstParty:true,hash,fetch};
-  expect(()=>loaded.admitProduct(admitted.source, unprovedOptions)).toThrow('build-owned reader');
+  const unprovedOptions:FolderOptions={base:options.base,offline:false,firstParty:true,hash,fetch};
+  expect(()=>loaded.admitFolder(admitted.source, unprovedOptions)).toThrow('build-owned reader');
   expect(fetch).not.toHaveBeenCalled();
-  expect(()=>loaded.admitProduct(structuredClone(source), unprovedOptions)).toThrow('build-owned reader');
+  expect(()=>loaded.admitFolder(structuredClone(source), unprovedOptions)).toThrow('build-owned reader');
   expect(fetch).not.toHaveBeenCalled();
-  expect(()=>loaded.admitProduct(index, { ...options, firstParty: false })).toThrow('build-owned reader');
+  expect(()=>loaded.admitFolder(index, { ...options, firstParty: false })).toThrow('build-owned reader');
   expect(fetch).not.toHaveBeenCalled();
   await expect(loaded.readCheckedOutputIndex(index)).rejects.toThrow('server validation');
   const value = {rows:{},urls:{}}, jsonBytes = encode(value), jsonHash = hashImmutableBytes(jsonBytes);
   const jsonInput = { slug: source.identity.slug, revision: 1, shardfile: source, sections: values,
     files: new Map([['world/sources/bakes.json', { hash: jsonHash, url: '/value.json', jsonSchema: registeredJsonSchema('world/sources/bakes.json') }]]),
     read: vi.fn(() => Promise.resolve(jsonBytes)) };
-  expect(await loaded.createShardProduct({ ...jsonInput, builtJson: true }).json('world/sources/bakes.json')).toEqual(value);
+  expect(await loaded.createShardFolder({ ...jsonInput, builtJson: true }).json('world/sources/bakes.json')).toEqual(value);
   jsonInput.read.mockClear();
-  await expect(loaded.createShardProduct(jsonInput).json('world/sources/bakes.json')).rejects.toThrow('server validation');
+  await expect(loaded.createShardFolder(jsonInput).json('world/sources/bakes.json')).rejects.toThrow('server validation');
   expect(jsonInput.read).not.toHaveBeenCalled();
-  await expect(loaded.createShardProduct({ ...jsonInput, builtJson: true, read: () => Promise.resolve(new TextEncoder().encode('{broken')) }).json('world/sources/bakes.json')).rejects.toThrow();
-  await expect(loaded.createShardProduct({ ...jsonInput, builtJson: true, read: () => Promise.resolve(new Uint8Array([255])) }).json('world/sources/bakes.json')).rejects.toThrow();
+  await expect(loaded.createShardFolder({ ...jsonInput, builtJson: true, read: () => Promise.resolve(new TextEncoder().encode('{broken')) }).json('world/sources/bakes.json')).rejects.toThrow();
+  await expect(loaded.createShardFolder({ ...jsonInput, builtJson: true, read: () => Promise.resolve(new Uint8Array([255])) }).json('world/sources/bakes.json')).rejects.toThrow();
   const first = index.sections[0]; if (first === undefined) throw new Error('Missing section');
   wires.set(first.path, new Uint8Array(first.bytes));
   await expect(loaded.resolveOutputDescriptor(index, reader)).rejects.toMatchObject({name:'SyntaxError'});

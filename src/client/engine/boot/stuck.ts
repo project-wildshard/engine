@@ -60,7 +60,7 @@ export function recover(): Promise<void> {
 }
 
 /**
- * A cached app met a newer deployment's first-party product (src/client/game/shardfile/product.ts `readIndexBytes`): recover()
+ * A cached app met a newer deployment's first-party product (src/client/game/shardfile/folder.ts `readIndexBytes`): recover()
  * once, so the reload comes up on the new build. False, without reloading, when a counted reload is already inside the
  * window (it did not bring the new build): the caller shows its error instead of looping. Concurrent callers share one.
  */

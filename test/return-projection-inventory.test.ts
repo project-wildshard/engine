@@ -10,12 +10,12 @@ import { emptyShardfile } from '../src/shared/host/author';
 import { nameBlob,emitNamedBlobs } from '../src/sharddev/blobs';
 import { prepareProjectOutput,mergeProjectBlobs } from '../src/sharddev/projectOutput';
 import { emitPlatformSections } from '../src/sharddev/platformSections';
-import { writeOutputProduct,validateOutputProduct } from '../src/sharddev/outputProduct';
+import { writeOutputFolder,validateOutputFolder } from '../src/sharddev/outputFolder';
 import { scriptAdmissionRows,decisionModuleContracts,ReturnModulesSchema,ScriptV2ContractSchema } from '@wildshard/format/scriptContract';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
-import { readProductDescriptor,admitProduct,type ProductOptions } from '../src/client/game/shardfile/product';
+import { readFolderDescriptor,admitFolder,type FolderOptions } from '../src/client/game/shardfile/folder';
 import { HeadlessSimulation } from '../src/server/host/headless';
 import {titanPrograms as programs} from './fixtures/titanInlineWitness';
 
@@ -41,13 +41,13 @@ test('project ABI survives named reconstruction, disk, browser and native withou
   expect(validateNamedJsonSchema(namedJsonSchema(ReturnModulesSchema),new TextEncoder().encode(JSON.stringify(rows)))).toStrictEqual(rows);
   const prepared=await prepareProjectOutput(f.root,{platform:f.platform,namedFiles:emitted.files,assets:emitted.assets});
   expect(prepared.blobs[0]?.script).toStrictEqual(f.contract);
-  const index=writeOutputProduct(f.shard,f.assets,f.root,{platform:f.platform,namedFiles:f.namedFiles});
+  const index=writeOutputFolder(f.shard,f.assets,f.root,{platform:f.platform,namedFiles:f.namedFiles});
   expect(index.files.find(row=>row.hash===f.blob.file.hash)).not.toHaveProperty('script');
-  expect(validateOutputProduct(f.root).assets.get(f.blob.file.hash)).toStrictEqual(f.bytes);
+  expect(validateOutputFolder(f.root).assets.get(f.blob.file.hash)).toStrictEqual(f.bytes);
   const base='https://example.test/projection/';
-  const options:ProductOptions={base,offline:false,firstParty:false,hash:wire=>Promise.resolve(hashImmutableBytes(wire)),
+  const options:FolderOptions={base,offline:false,firstParty:false,hash:wire=>Promise.resolve(hashImmutableBytes(wire)),
     fetch:url=>Promise.resolve(new Response(Uint8Array.from(readFileSync(resolve(f.root,url.slice(base.length))))))};
-  expect((await admitProduct(await readProductDescriptor(options),options)).assets.get(f.blob.file.hash)).toStrictEqual(f.bytes);
+  expect((await admitFolder(await readFolderDescriptor(options),options)).assets.get(f.blob.file.hash)).toStrictEqual(f.bytes);
   const sim=await HeadlessSimulation.create(f.shard,f.assets,undefined,{deadline:'advisory',sections:f.sections});
   try{expect((await sim.step()).tick).toBe(1);}finally{await sim.dispose();}
 },30000);
@@ -60,7 +60,7 @@ test('missing or mismatched project contracts refuse without guessing the ABI',a
   expect(()=>v.parse(ReturnModulesSchema,[f.module,f.module])).toThrow();
   expect(()=>decisionModuleContracts(rows,[{...f.blob.file,hash:'0'.repeat(64)}])).toThrow('exact declared');
   const wrong=emitPlatformSections(new Map([['actors/return-scripts',[{...f.module,pages:2}]]]));
-  expect(()=>writeOutputProduct(f.shard,f.assets,f.root,{platform:wrong,namedFiles:f.namedFiles})).toThrow('fixed pages');
+  expect(()=>writeOutputFolder(f.shard,f.assets,f.root,{platform:wrong,namedFiles:f.namedFiles})).toThrow('fixed pages');
 });
 
 test('legacy return inventories keep the original parser normalization and refusals',()=>{

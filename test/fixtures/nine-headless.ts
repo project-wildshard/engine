@@ -1,8 +1,8 @@
 import * as v from 'valibot';
 import { NATIVE_ASSEMBLY_FILE, parseNativeAssembly } from '@wildshard/format/nativeAssembly';
-import type { ShardProduct } from '../../src/shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../src/shared/game/shardfile/shardFolder';
 import type { PrepareHeadlessRuntime } from '../../src/server/host/headlessRuntime';
-import { prepareProductPlan } from './headless-native';
+import { prepareFolderPlan } from './headless-native';
 import { registerNativeWalkBounds } from './headless/nativeBounds';
 
 // CI21 (J232): engine's copy reads Nine's walk bounds from the pinned product's own `ui/level` manifest section, not from
@@ -12,7 +12,7 @@ const LevelBounds = v.object({ manifest: v.object({ bounds: v.optional(v.object(
 })) }) });
 
 /** Nine's own plan with the claw's rise turned off: the path a lifting crossing used to take. */
-async function flatProduct(product: ShardProduct): Promise<ShardProduct> {
+async function flatFolder(product: ShardFolder): Promise<ShardFolder> {
   const plan = parseNativeAssembly(await product.json(NATIVE_ASSEMBLY_FILE));
   const bytes = new TextEncoder().encode(JSON.stringify({ ...plan, features: plan.features.map(row => row.host === 'grapple' ? { ...row, rise: false } : row) }));
   return { ...product, file: name => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : product.file(name) };
@@ -23,7 +23,7 @@ export function nineHeadlessRuntime(rise: boolean): PrepareHeadlessRuntime {
   return async preparation => {
     const bounds = v.parse(LevelBounds, preparation.product.section('ui/level')).manifest.bounds;
     if (bounds === undefined) throw new Error('Nine product declares no walk bounds');
-    const product = rise ? preparation.product : await flatProduct(preparation.product), plan = await prepareProductPlan({ ...preparation, product });
+    const product = rise ? preparation.product : await flatFolder(preparation.product), plan = await prepareFolderPlan({ ...preparation, product });
     return { ...plan, install: (host, context) => { registerNativeWalkBounds(host, bounds); plan.install(host, context); } };
   };
 }

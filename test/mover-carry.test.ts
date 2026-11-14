@@ -1,7 +1,7 @@
 import { canoeRow } from './fixtures/engine-lift/canoe';
-import { runtimeAssets } from './fixtures/engine-lift/product';
+import { runtimeAssets } from './fixtures/engine-lift/folder';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise real native carry and its physics continuation.
-import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
+import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
 import { leadCommands,leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
@@ -13,8 +13,8 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { emptyShardfile } from '../src/shared/host/author';
-import { builtProduct } from './fixtures/engine-lift/product';
-import { createNativeProofResident,prepareProductPlan } from './fixtures/headless-native';
+import { builtFolder } from './fixtures/engine-lift/folder';
+import { createNativeProofResident,prepareFolderPlan } from './fixtures/headless-native';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 const row = structuredClone(canoeRow), level = { ...SIM_LEVEL, entities: [] };
@@ -51,12 +51,12 @@ test.each([180, 539])('native ride at tick %i owns carry/release, blocks walking
 });
 
 test('built Pine installs and commands its admitted carry without a shard ride installer', async () => {
-  const directory = builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory), source = product.shardfile;
+  const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), source = product.shardfile;
   const descriptor = outputDescriptor(source); if (descriptor === undefined) throw new Error('Missing admitted inventory');
   expect(descriptor.index.files.some(file => file.name === 'movers/canoe.json')).toBe(false);
   const assets = runtimeAssets(product, directory);
   const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
-  const resident = await createNativeProofResident({ shard: source, product, assets, rapier }, prepareProductPlan);
+  const resident = await createNativeProofResident({ shard: source, product, assets, rapier }, prepareFolderPlan);
   try {
     const admitted = source.movers.find(value => value.id === 'pine.canoe');
     if (admitted?.carry === undefined) throw new Error('Missing admitted carry row');

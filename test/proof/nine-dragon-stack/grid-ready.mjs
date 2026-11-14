@@ -4,12 +4,12 @@ import { prepareHeadlessRuntime } from '../../fixtures/nine-headless.ts';
 // Read the ordinary checked runtime product; authoring generators need build-only raw imports.
 // oxlint-disable-next-line import/no-nodejs-modules -- Native proof reads the admitted local payload inventory.
 import { readFileSync } from 'node:fs';
-import { builtProduct } from '../../fixtures/builtProduct.ts';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct.ts';
+import { builtFolder } from '../../fixtures/builtFolder.ts';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder.ts';
 import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor.ts';
 import { proveTrustedGridReady } from '../compatibility/gridReady.mjs';
 
-const directory = builtProduct('nine-dragon-stack'), product = await loadHeadlessProduct(directory);
+const directory = builtFolder('nine-dragon-stack'), product = await loadHeadlessFolder(directory);
 const descriptor = outputDescriptor(product.shardfile);
 if (descriptor === undefined) throw new Error('Nine readiness proof requires an admitted output inventory');
 const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash,

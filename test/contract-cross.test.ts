@@ -38,11 +38,11 @@ import { SimNetWorld } from '../src/server/engine/net/simWorld';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // WIRE-STABILITY WR6, engine's half of the cross-version harness (plan section 7). `@wildshard/wire-released` is the wire
 // at the last release (shardfile 669d1fc, WR4's last codec commit, until `wire-v1.0.0` exists) installed beside the wire
@@ -109,7 +109,7 @@ function packageDigest(root: string): string {
 }
 
 async function sunscar(): Promise<TrustedHeadlessResident> {
-  const directory = builtProduct('sunscar-dunes'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('sunscar-dunes'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing Sunscar output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });

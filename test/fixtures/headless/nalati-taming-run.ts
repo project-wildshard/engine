@@ -5,14 +5,14 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Assert actual native ownership and checkpoint continuation.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHostBytes,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
 import {nativeTamingOf} from '../../../src/server/game/riding/nativeTaming';
 import {mountedPlayerOf} from '../../../src/server/game/riding/native';
-import {createNativeProofResident,prepareProductPlan as prepareHeadlessRuntime} from '../headless-native';
+import {createNativeProofResident,prepareFolderPlan as prepareHeadlessRuntime} from '../headless-native';
 import {canonicalSimDigest} from '../../fake/simState';
 import {walkNalatiHorsePlains} from '../../proof/nalati-grasslands/horsePlainsWalk';
 import {createNalatiTamingPilot} from '../../proof/nalati-grasslands/tamingPilot';
@@ -51,7 +51,7 @@ interface Stallion {
 }
 
 async function nalatiPreparation():Promise<{preparation:Preparation;spawn:{readonly x:number;readonly z:number}}> {
-  const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+  const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);assert.ok(descriptor);
   const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,
     Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

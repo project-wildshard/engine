@@ -2,7 +2,7 @@ import { readFileSync, lstatSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import * as v from 'valibot';
-import { readBuiltShardfile } from './built-product.mjs';
+import { readBuiltShardfile } from './built-folder.mjs';
 import { discoveryFormat, outputFormat } from './node-format.mjs';
 import { encodeCanonicalJson } from '@wildshard/engine/host/immutable';
 

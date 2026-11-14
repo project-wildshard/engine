@@ -2,7 +2,7 @@ import { sceneLivingBytes } from '@wildshard/format/worldScenePages';
 // @vitest-environment node
 import {expect,test} from 'vitest';
 import * as v from 'valibot';
-import {openProductSession} from './fixtures/headless/productSession';
+import {openFolderSession} from './fixtures/headless/folderSession';
 import type {HeadlessTapeObservation} from '../src/shared/host/headlessTape';
 import {ForestPageSchema} from '@wildshard/format/forestPage';
 import VERBS from '../docs/plans/foundations/verbs/pine-hollow.json' with {type:'json'};
@@ -14,7 +14,7 @@ function doors(row:HeadlessTapeObservation|undefined){
 }
 
 test('Pine walks from spawn and opens and closes the actual cabin leaf; remote use does nothing',async()=>{
-  const fixture=await openProductSession('pine-hollow','pine-verbs');
+  const fixture=await openFolderSession('pine-hollow','pine-verbs');
   try{
     const page=v.parse(ForestPageSchema,await fixture.product.json('world/forest-page.json'));
     const profile=page.buildings.variants.find(row=>row.tier==='phone'&&!row.shadow&&!row.shared);

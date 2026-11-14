@@ -5,7 +5,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { parseStillImage } from '@wildshard/format/stillImage';
 import { shardfileSource } from '../src/client/game/shardfile/clientSource';
 import type { ShardfileClientBindings } from '../src/client/game/shardfile/client';
-import type { ProductOptions } from '../src/client/game/shardfile/product';
+import type { FolderOptions } from '../src/client/game/shardfile/folder';
 import { emptyShardfile } from '../src/shared/host/author';
 import { encodeCanonicalJson, hashImmutableBytes } from '../src/shared/host/immutable';
 import { OUTPUT_SECTIONS, outputSectionPayloads } from '@wildshard/format/outputFields';
@@ -46,7 +46,7 @@ function bindings(imageOwner?: Scope): ShardfileClientBindings {
     voices: () => new Map(), icon: () => { throw new Error('No fixture items'); },
     ...(imageOwner === undefined ? {} : { imageOwner }) };
 }
-function options(wires: ReadonlyMap<string, Uint8Array>, fetch?: ProductOptions['fetch']): ProductOptions {
+function options(wires: ReadonlyMap<string, Uint8Array>, fetch?: FolderOptions['fetch']): FolderOptions {
   return { base: 'https://example.test/', offline: false, firstParty: true, fetch: fetch ?? (url => {
     const bytes = wires.get(url.slice('https://example.test/'.length));
     return Promise.resolve(bytes === undefined ? new Response(null, { status: 404 }) : new Response(Uint8Array.from(bytes)));

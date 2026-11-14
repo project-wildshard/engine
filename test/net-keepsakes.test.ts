@@ -15,11 +15,11 @@ import { isCosmetic, isOwnedId, Owned } from '../src/shared/game/loot/Owned';
 import { OWNED_ROW, WORN_LINE } from '../src/shared/game/loot/ownedRows';
 import { declaredLootEconomy } from '../src/shared/game/shard/declaredRows';
 import type { OwnedSlots } from '../src/server/game/loot/playerOwned';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { installedKeys } from '../src/server/game/shardfile/installedSides';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { ledgerFilings } from '../src/server/host/standalone/ledgerFilings';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 /** One player's goods, kept in memory: each seat its own, as a dedicated room keeps them. */
 function memorySlots(): OwnedSlots {
@@ -29,7 +29,7 @@ function memorySlots(): OwnedSlots {
 
 /** Driftwood as a room whose goods are kept per seat; `open` says whose goods may be read (a dedicated room throws for an empty seat). */
 async function driftwood(open: (player: string) => boolean = () => true) {
-  const directory = builtProduct('driftwood-isle'), product = await loadHeadlessProduct(directory), stores = new Map<string, OwnedSlots>();
+  const directory = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(directory), stores = new Map<string, OwnedSlots>();
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const world = await openCellWorld({ instance: 'driftwood-isle' }, { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier }, undefined,
     { saves: new SaveStore({ local: null, session: null }), lone: true, pageless: true, owned: player => {

@@ -14,9 +14,9 @@ import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { RESPAWN_NOW_ACT } from '../src/shared/engine/net/acts';
 import { netInteractCommands } from '../src/shared/host/standalone/netInput';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 // J107: a fallen player returns to their own last place, alone, while the room carries on.
@@ -83,12 +83,12 @@ test('a restored tracker keeps a place it has not stood in yet', () => {
 });
 
 test.each([['pine-hollow', 18], ['nalati-grasslands', 17], ['driftwood-isle', 3]])('%s publishes %i places the server can place', async (slug, count) => {
-  const product = await loadHeadlessProduct(builtProduct(slug));
+  const product = await loadHeadlessFolder(builtFolder(slug));
   expect(await serverPlaces(product)).toHaveLength(count);
 });
 
 test('Pine: a bot falls on the real shard, comes back, and a save carries its place', async () => {
-  const directory = builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const live = await createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }), { host } = live;

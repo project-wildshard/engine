@@ -45,7 +45,7 @@ export function mapSettingsPath(shardDir) {
 /** Source-layout projects keep their stamp in data/; old projects retain look/. */
 /** @param {string} shardDir */
 export function mapStampPath(shardDir) {
-  return existsSync(join(shardDir, 'data', 'map.json')) ? join(shardDir, 'data', 'productMap.json') : join(shardDir, 'look', 'map.baked.json');
+  return existsSync(join(shardDir, 'data', 'map.json')) ? join(shardDir, 'data', 'folderMap.json') : join(shardDir, 'look', 'map.baked.json');
 }
 
 /**
@@ -138,7 +138,7 @@ export function mapShards(repoRoot) {
 export async function writeMapStamp(shardDir, image, stamp) {
   if (stamp.tilesHash !== mapTilesHash(shardDir)) throw new Error(`${shardDir}: map world inputs changed before publication`);
   await verifyMapPixels(image, stamp.pixelHash);
-  const companion = join(shardDir, 'data', 'productMap.json');
+  const companion = join(shardDir, 'data', 'folderMap.json');
   const authoredImage = join(shardDir, 'assets', 'map.webp');
   if (existsSync(companion) !== existsSync(authoredImage)) throw new Error(`${shardDir}: incomplete authored map companion`);
   const bytes = `${JSON.stringify(stamp, null, 2)}\n`;

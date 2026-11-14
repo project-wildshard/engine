@@ -30,7 +30,7 @@ import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
 import { gridPrefetchOrder, startGridPrefetch } from '../grid/prefetch';
 import { shardArea } from '../grid/area';
-import { admittedRuntimeProduct, completeManifestCache, releaseManifestTransport } from '../shardfile/runtimeProduct';
+import { admittedRuntimeFolder, completeManifestCache, releaseManifestTransport } from '../shardfile/runtimeFolder';
 import { enterSkyClock } from './clockSettings';
 import { settleEntryPrograms } from './settlePrograms';
 import { prepareSpawnView } from '../shardfile/controlRefinement';
@@ -313,7 +313,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   if (level === undefined) app.events.emit('level.loaded', { id: slug });
   // DL20: the download's outcome reaches telemetry from its own settle (reportSpawnOutcomes, session.ts), failures too
   // js-heap H6: the boot has built everything its admitted product's transport fed (clientAssets.ts `releaseAll`)
-  admittedRuntimeProduct(slug)?.assets.releaseAll();
+  admittedRuntimeFolder(slug)?.assets.releaseAll();
   // and a solo page's own admission (its manifest's); an offline cache check never holds the boot
   void releaseManifestTransport(manifest);
   // the programs the first frame did not draw, a few a frame in play (the Shaders step built only the drawn ones)

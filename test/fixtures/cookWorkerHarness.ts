@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {afterAll, beforeAll} from 'vitest';
 import {readTar} from '@wildshard/format/tar';
-import {productTarball} from '../../src/cook/game/productTarball';
+import {folderTarball} from '../../src/cook/game/folderTarball';
 import {createCookWorker, type JobLauncher, type ShardfileSource} from '../../src/cook/game/cookWorker';
 import {folderStore, type PackStore} from '../../src/cook/game/packStore';
 import {compileCookWorker} from './compileCookWorker';
@@ -59,7 +59,7 @@ export function useCookHarness(): CookHarness {
   };
   beforeAll(async () => {
     scratch = mkdtempSync(join(tmpdir(), 'cook-worker-'));
-    real = productTarball(join('out', slug)); files = new Map(readTar(real)); store = folderStore(join(scratch, 'store'));
+    real = folderTarball(join('out', slug)); files = new Map(readTar(real)); store = folderStore(join(scratch, 'store'));
     preparing = compileCookWorker(preparationScope.signal); prepared = await preparing;
   });
   afterAll(async () => { preparationScope.abort(); await preparing?.catch(() => undefined); prepared?.dispose(); if (scratch !== undefined) rmSync(scratch, {recursive: true, force: true}); });

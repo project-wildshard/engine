@@ -47,7 +47,7 @@ import type { ModelLibrary } from '../plugin/geometry';
 import { tierFile, worldScenePool } from './scenePools';
 import { createWorldScene, bindWorldSceneParts } from '../plugin/scene';
 import { hasLentLook, lentLook, lentMappedLook, lendLooks, sceneMaterial } from './lentLooks';
-import { runtimeLookMaterials } from './runtimeProduct';
+import { runtimeLookMaterials } from './runtimeFolder';
 import { loadingUnits } from '@wildshard/engine/boot/waits';
 import { timeClientPreparation } from './preparationTiming';
 import { tiledMesh } from './tiledMesh';

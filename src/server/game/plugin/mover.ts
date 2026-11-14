@@ -163,7 +163,7 @@ export interface MoverInstallation {
   shared?: { host: ScriptHost; tick: () => number };
   /** Additional consuming item roles join this installer's single host and tick. Incompatible with an injected shared host. */
   composition?: MoverRoleComposition;
-  /** A grid cell's admitted product bytes by module hash (`runtimeProduct(...).assets.retained`): a module present here is
+  /** A grid cell's admitted product bytes by module hash (`runtimeFolder(...).assets.retained`): a module present here is
    *  read from them (hash-checked again by {@link createMoverHost}) instead of fetched a second time from `modules`. */
   admitted?: ReadonlyMap<string, Uint8Array>;
   /** Read a declared module through its existing product reader; SHA verification and tick ownership stay here. */

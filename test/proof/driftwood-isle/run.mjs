@@ -18,7 +18,7 @@ const { installAppIdentity } = await import('../../../src/shared/engine/app/iden
 const { WILDSHARD_IDENTITY } = await import('../../../src/client/game/identity.ts'); installAppIdentity(WILDSHARD_IDENTITY);
 await import('./worker.ts');
 const witness = await import('./witness.ts');
-function inputFiles() { return new Set([...loaded, ...witness.witnessProductInputFiles(), ...['src/shards/driftwood-isle/data/headlessAssembly.json', 'test/proof/driftwood-isle/run.mjs', 'test/fixtures/headless/worker.ts', 'scripts/sim-node-loader.mjs', 'pnpm-lock.yaml', 'public/assets/physics/rapier.wasm'].map(path => new URL(path, ROOT).href)]); }
+function inputFiles() { return new Set([...loaded, ...witness.witnessFolderInputFiles(), ...['src/shards/driftwood-isle/data/headlessAssembly.json', 'test/proof/driftwood-isle/run.mjs', 'test/fixtures/headless/worker.ts', 'scripts/sim-node-loader.mjs', 'pnpm-lock.yaml', 'public/assets/physics/rapier.wasm'].map(path => new URL(path, ROOT).href)]); }
 function inputs() {
   const files = inputFiles();
   const hash = createHash('sha256');

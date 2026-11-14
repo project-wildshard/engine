@@ -11,14 +11,14 @@ import {
   installWeatherReactions,
   nativeWeatherBundle,
 } from "../../src/server/game/weather/reactions.ts";
-import { loadHeadlessProduct } from "../../src/server/host/headlessProduct.ts";
+import { loadHeadlessFolder } from "../../src/server/host/headlessFolder.ts";
 import { loadRapier } from "../../src/shared/engine/physics/rapier.ts";
 import { WeatherContinuation } from "../../src/shared/engine/world/weatherContinuation.ts";
 import { prepareReturns } from "../../src/server/game/shardfile/nativeRuntimeLoans.ts";
-import { runtimeAssets } from "../fixtures/engine-lift/product.ts";
+import { runtimeAssets } from "../fixtures/engine-lift/folder.ts";
 import { SIM_LEVEL } from "../fixtures/sim-level/level.ts";
 
-const pine = async () => (await loadHeadlessProduct("out/pine-hollow")).json("world/weather.json");
+const pine = async () => (await loadHeadlessFolder("out/pine-hollow")).json("world/weather.json");
 function timed(name, work) {
   void test(name, { timeout: 9500 }, async () => {
     const start = performance.now();
@@ -42,7 +42,7 @@ async function native(work) {
   }
 }
 async function storm(host, seed, points = [], circles = []) {
-  const product = await loadHeadlessProduct("out/nalati-grasslands");
+  const product = await loadHeadlessFolder("out/nalati-grasslands");
   const assets = runtimeAssets(product, "out/nalati-grasslands");
   (await prepareReturns({ product, assets }))(host);
   const bundle = nativeWeatherBundle(await product.json("world/weather.json"), circles);

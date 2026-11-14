@@ -17,11 +17,11 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { ConditionedTransport, directLoopback } from '../src/test/engine/netLoopback';
 import type { NetCommand } from '@wildshard/wire/netCommand';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 // P1-E5.2 (E5-REPLICATION §3.3, §9): a real room over the shipped Sunscar Dunes product, on the real codec. Only the carrier
@@ -31,7 +31,7 @@ let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
 async function sunscar(): Promise<TrustedHeadlessResident> {
-  const directory = builtProduct('sunscar-dunes'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('sunscar-dunes'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing Sunscar output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });

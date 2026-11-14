@@ -4,8 +4,8 @@ import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import * as v from 'valibot';
 import {packsBookPath, readSpawnManifest} from '../../src/shared/game/shardfile/spawnManifest';
-import {prepareAssetDecoders} from '@wildshard/format/product';
-import {validateShardfileProduct} from '@wildshard/format/productValidation';
+import {prepareAssetDecoders} from '@wildshard/format/shardfileAssets';
+import {validateShardfileFolder} from '@wildshard/format/shardfileValidation';
 import {assertKtx2TableTargets} from '../../src/shared/game/shardfile/ktx2Targets';
 import {StandaloneCatalogueSchema, type StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
 import {readTar} from '@wildshard/format/tar';
@@ -13,7 +13,7 @@ import type {CookIndex} from '../../src/cook/game/cookWorker';
 import type {PackStore} from '../../src/cook/game/packStore';
 import {bareSlug} from '../../src/shared/game/grid/catalogueSlot';
 import {serverPackBookPath} from '../../src/shared/game/shardfile/serverPack';
-import {productTarball} from '../../src/cook/game/productTarball';
+import {folderTarball} from '../../src/cook/game/folderTarball';
 import {titleMetadata, type TitleManifest} from '../../src/client/game/shard/titleList';
 import {servedDiscoveryPath} from '../../src/cook/game/entryTotals';
 
@@ -46,7 +46,7 @@ export function titleRowOf(bytes: Uint8Array, home = ''): TitleManifest {
   return {...titleMetadata(data), card: {thumb: at(thumb), portrait: at(portrait), landscape: at(landscape)}, discovery: `${home}/shardfiles/${data.slug}/discovery.json?v=${hash8(bytes)}`};
 }
 /** Every built product's title row, in title order. */
-export function productTitleRows(products: string, outDir?: string): readonly TitleManifest[] {
+export function folderTitleRows(products: string, outDir?: string): readonly TitleManifest[] {
   const rows = readdirSync(products, {withFileTypes: true}).flatMap(entry => {
     // S12d: the document as this build serves it (`servedDiscoveryPath`, the phone tier's table), so the title's `?v=` is its hash.
     const own = join(products, entry.name, 'mounts/shardfiles', entry.name, 'discovery.json'), served = outDir === undefined ? undefined : servedDiscoveryPath(outDir, entry.name);
@@ -79,7 +79,7 @@ export function inTreeCatalogue(root: string, products: string, listed: readonly
     const folder = join(products, row.slug), header = join(folder, 'shard.json');
     if (!existsSync(header)) { missing.push(row.slug); continue; }
     const index = JSON.parse(readFileSync(header, 'utf8')) as {readonly identity: {readonly slug: string; readonly name: string}};
-    shards.push({slug: index.identity.slug, name: index.identity.name, revision: 1, hash: createHash('sha256').update(productTarball(folder)).digest('hex')});
+    shards.push({slug: index.identity.slug, name: index.identity.name, revision: 1, hash: createHash('sha256').update(folderTarball(folder)).digest('hex')});
   }
   return {version: grid.version, stage: 'live', placements, grid: grid.grid, shards, missing};
 }
@@ -87,7 +87,7 @@ export function inTreeCatalogue(root: string, products: string, listed: readonly
 /** The build's step: the file a deploy names, else the tree's. */
 export function bakeCatalogue(outDir: string, root: string): void {
   const {WILDSHARD_CATALOGUE: source} = process.env;
-  const rows = productTitleRows(join(root, 'out'), outDir);
+  const rows = folderTitleRows(join(root, 'out'), outDir);
   const document = source === undefined ? inTreeCatalogue(root, join(root, 'out'), rows) : v.parse(StandaloneCatalogueSchema, JSON.parse(readFileSync(source, 'utf8')));
   writeCatalogueDocument(outDir, document);
   writeTitleRows(outDir, rows);
@@ -151,10 +151,10 @@ export function addCookedShards(outDir: string, shards: readonly CookedShard[], 
 
 /** What a page takes on trust for one tarball: a verdict is earned here, by this build's format validator, whichever validator
  *  stamped its receipt, because a page trusts it by its index hash. */
-export async function productVerdict(tarball: Uint8Array, out: string): Promise<{readonly verdict: unknown; readonly discovery?: Uint8Array}> {
+export async function folderVerdict(tarball: Uint8Array, out: string): Promise<{readonly verdict: unknown; readonly discovery?: Uint8Array}> {
   await prepareAssetDecoders();
   const files = readTar(tarball);
-  validateShardfileProduct({read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path}`); return bytes; }, paths: () => files.keys()},
+  validateShardfileFolder({read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path}`); return bytes; }, paths: () => files.keys()},
     {hash: bytes => createHash('sha256').update(bytes).digest('hex')});
   // S11: a deploy's added shard serves its KTX2 targets itself, or the build already holds them.
   assertKtx2TableTargets({paths: () => files.keys(), read: path => { const bytes = files.get(path); if (bytes === undefined) throw new Error(`No ${path}`); return bytes; }},
@@ -203,7 +203,7 @@ export async function addStoredShards(out: string, heads: readonly {readonly slu
       for (const row of index.manifests) await copy(row.url.slice(1), scratch);
       await copy(index.header, out);
       for (const key of index.keys) if (key.startsWith('assets/spawn/server/')) await copy(key, out);
-      const proved = await productVerdict(await read(head.hash), out);
+      const proved = await folderVerdict(await read(head.hash), out);
       const server = index.serverPack?.index.slice(1);
       added.push({slug: index.slug, hash: head.hash, header: index.header, manifests: index.manifests,
         entryPrograms: index.keys.includes(`programs/${index.slug}.json`), ...proved,

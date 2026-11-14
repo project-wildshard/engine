@@ -381,7 +381,7 @@
   },
   {
     "path": "src/shards",
-    "file": "scripts/built-product.mjs",
+    "file": "scripts/built-folder.mjs",
     "why": "Left with sharddev or a shard at P3"
   },
   {
@@ -631,537 +631,537 @@
   },
   {
     "path": "test/quest-message-rows.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/npc-figure-rows.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/product-in-look.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/authored-manifest.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/quadruped-rig-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/ambient-flock-host.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/client-plan-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/pine-night-emits.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/world-scenes-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-spear-pool.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-generation-order.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/boss-fight-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "src/sharddev/bake/whole-geometry-pacing.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/hybrid-product-rows.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/matriarch-borrowed-body.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-strike-assembly.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/shard-headless.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/pine-npc-figure-product.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/scripts/nine-casts.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/scripts/nine-sign-atlas.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/painted-look-rows.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/population-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/quest-step-runner.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/quest-step-traces.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/held-equipment-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/held-loadout-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/collections-display.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/held-finishes-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/driftwood-sword-scene.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nine-cloth-bake.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/living-buildings-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/declared-audio-gameplay.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/elites-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/keyed-sky-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/streamed-cover-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/toon-look-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/pine-quest-actions-product.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/pine-crag-scenes.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/declared-input-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/driftwood-shore-boulders.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/pine-prop-product.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/driftwood-foliage-scenes.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/quest-catalogue-sites.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/page-life.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/pine-building-owner.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/population-environment.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/explorer-catalogue.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/light-emitters.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/eased-weather-fields.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/signal-skirt-scene.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/quest.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/look-regressions.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-kokpar.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-people-loader.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-camp-fallback.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/quest-page-refs.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/scene-motion-refs.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/scene-buffers.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/native-runtime-plan.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/sampled-ambience.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/quest-story.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/chapter-story.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-adventure-errors.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/shard-stands-alone.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-quest-content-product.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nine-look-graphs.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nine-architecture-graphs.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/practice-course-scene.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/riding-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/boss-arena-room.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/grapple-platform.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-layout-bake.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/template-map-generation.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/held-weapon-laws.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-riding-rules.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/audio-voice-patches.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/field-presentation.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-flock-view.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/mover-carry.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/pine-quest-content-product.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/audio-authoring.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/registered-quest-catalogues.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/registered-native-population.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/driftwood-trail-layout.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/driftwood-mover-entry.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/driftwood-plan-rows.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/quest-continuation-product.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/quest-page-composition.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/pine-life-authoring.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/pine-trade-catalogue.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/driftwood-product-reads.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-dressing-inputs.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-dressing-placement-program.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-dressing-source.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-native-dressing-reader.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-place-construction.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-places-program.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-dressing-product.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/audio-scene-binary.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-entry-construction.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-boss-fights.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/nalati-render-tiles.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/cue-director.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/pine-stag-walk.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/hybrid-entry-preparation.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/sdk-rigged-hull-files.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   },
   {
     "path": "test/chapter-director-product.test.ts",
-    "file": "scripts/test-products.json",
+    "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"
   }
 ]

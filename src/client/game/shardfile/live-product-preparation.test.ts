@@ -5,10 +5,10 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 // oxlint-disable-next-line import/no-nodejs-modules -- Do not construct a renderer or a real browser worker in this unit control.
 import { runInNewContext } from 'node:vm';
-import { preflightProduct } from './productPreflight';
+import { preflightFolder } from './folderPreflight';
 
 test.each([false, true])('boot stays main and only live decoding uses bounded pages: live=%s', async live => {
-  const source = readFileSync(new URL('runtimeProduct.ts', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('runtimeFolder.ts', import.meta.url), 'utf8');
   const start = source.indexOf('export function browserShardfileOptions('), end = source.indexOf('\n/** Paint before admission', start);
   if (start === -1 || end < start) throw new Error('Product options factory missing');
   const parsed = { rows: [1, 2, 3] }, calls: string[] = [], pause = (): Promise<void> => Promise.resolve();
@@ -19,8 +19,8 @@ test.each([false, true])('boot stays main and only live decoding uses bounded pa
     expect([...bytes]).toEqual([1,2]); expect(actualPause).toBe(pause); calls.push('parse'); return Promise.resolve(parsed);
   } };
   const method: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end).replace('export function', 'function')}\nbrowserShardfileOptions`), {
-    productControlsReady: live, observesProductControl: false, document: undefined, caches: {}, navigator: { onLine: true },
-    URL, productResourceRole: () => 'data', waitFor: (_label: string, pending: Promise<Uint8Array>) => pending,
+    folderControlsReady: live, observesFolderControl: false, document: undefined, caches: {}, navigator: { onLine: true },
+    URL, folderResourceRole: () => 'data', waitFor: (_label: string, pending: Promise<Uint8Array>) => pending,
     entryTransport: () => ({ take: () => { loanReads++; throw new Error('Retry must bypass early loan'); }, expand: () => { expanded++; } }),
     readAsset: async (url: string, _bytes: number | undefined, options: { fetch: (path: string, init: RequestInit) => Promise<Response> }) => {
       const response = await options.fetch(url, { cache: 'reload', headers: { 'x-test': 'native' } });
@@ -30,7 +30,7 @@ test.each([false, true])('boot stays main and only live decoding uses bounded pa
     currentSpawnDownload: () => undefined, contentURL: (url: string) => url, // PZ3: no content base
     browserLiveJsonParser: () => { calls.push('parser'); return parser; },
     TIER_CONFIG: {}, TIER: 'phone', splatDrawTier: () => 'phone', builtIndexes: null, ktx2TranscodeSupport: () => ({}),
-    pauseDescriptor: () => pause, browserProductCache: (_storage: unknown, options: unknown) => { cachePreparation = options; return {}; },
+    pauseDescriptor: () => pause, browserFolderCache: (_storage: unknown, options: unknown) => { cachePreparation = options; return {}; },
   });
   if (typeof method !== 'function') throw new Error('Product options factory is not callable');
   const result: unknown = Reflect.apply(method, undefined, ['https://game.test/shardfiles/fixture/', true]);
@@ -52,14 +52,14 @@ test.each([false, true])('boot stays main and only live decoding uses bounded pa
 });
 
 test('visited cache bodies use the same parser and paced complete fence before publication', async () => {
-  const source = readFileSync(new URL('product.ts', import.meta.url), 'utf8');
-  const start = source.indexOf('export function browserProductCache('), end = source.indexOf('\n}', start) + 2;
+  const source = readFileSync(new URL('folder.ts', import.meta.url), 'utf8');
+  const start = source.indexOf('export function browserFolderCache('), end = source.indexOf('\n}', start) + 2;
   if (start === -1 || end < start) throw new Error('Browser product cache missing');
   const bytes = new Uint8Array([1, 2]), calls: string[] = [];
   let value: unknown = { source: { rows: Array.from({ length: 1000 }, (_, id) => ({ id })) }, firstParty: true };
-  const method: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end).replace('export function', 'function')}\nbrowserProductCache`), {
+  const method: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end).replace('export function', 'function')}\nbrowserFolderCache`), {
     URL, ASSET_CACHE_NAME: 'test-asset-cache', HASH: /^[a-f0-9]{64}$/u,
-    boundedResponse: (): Promise<Uint8Array> => Promise.resolve(bytes), limits: { sourceBytes: 4000000 }, preflightProduct,
+    boundedResponse: (): Promise<Uint8Array> => Promise.resolve(bytes), limits: { sourceBytes: 4000000 }, preflightFolder,
   });
   if (typeof method !== 'function') throw new Error('Browser product cache is not callable');
   const storage = { open: (): Promise<{ match: () => Promise<Response> }> => Promise.resolve({ match: (): Promise<Response> => Promise.resolve(new Response('owned')) }) };

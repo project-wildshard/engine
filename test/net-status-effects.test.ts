@@ -14,19 +14,19 @@ import { FIXED_STEP } from '../src/shared/engine/core/fixedStep';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
 import { NetRoom, type NetTickInput } from '../src/server/engine/net/room';
 import { SimNetWorld } from '../src/server/engine/net/simWorld';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { installStatusEffects } from '../src/server/game/shardfile/statusEffects';
 import { statusLine } from '../src/shared/game/systems/effects/starterEffects';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import STARTER from '../src/shared/game/systems/effects/starterRows.json' with { type: 'json' };
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 const POISON = STARTER.find(row => row.id === 'effect.poison');
 const BLOB = 'grey-blob:1', HEAVY = 30;
 
 async function templateCell() {
-  const directory = builtProduct('_template'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

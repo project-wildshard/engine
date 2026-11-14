@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Device-cost source fixture uses one tracked bounded KTX2 file.
 import { readFileSync } from 'node:fs';
 import { parseKtx2, ktx2DeviceCosts, ktx2DeviceGpu } from '@wildshard/format/ktx2Cost';
-import { runtimeOnlyProductFiles, deviceLibraryCostPaced, productResidentBytes, productResidentBytesSteps, productPostCost } from '../src/client/game/shardfile/productCost';
+import { runtimeOnlyFolderFiles, deviceLibraryCostPaced, folderResidentBytes, folderResidentBytesSteps, folderPostCost } from '../src/client/game/shardfile/folderCost';
 import { expect, test, vi } from 'vitest';
 import { emptyShardfile } from '../src/shared/host/author';
 import { encodeCanonicalJson as canonicalJson, hashImmutableBytes } from '../src/shared/host/immutable';
@@ -9,21 +9,21 @@ import { parseOutputIndex, type OutputIndex } from '@wildshard/format/outputInde
 import { OUTPUT_SECTIONS, outputSectionPayloads } from '@wildshard/format/outputFields';
 import { parseShardfile, type Shardfile } from '@wildshard/format/shardSchema';
 import { parseStateLineage } from '@wildshard/format/stateLineage';
-import { readProductDescriptor, admitProduct, type CachedProduct, type ProductCache, type ProductOptions } from '../src/client/game/shardfile/product';
-import { provideHybridDeclaration, runtimeProduct, loadShardProduct, completeManifestCache } from '../src/client/game/shardfile/runtimeProduct';
+import { readFolderDescriptor, admitFolder, type CachedFolder, type FolderCache, type FolderOptions } from '../src/client/game/shardfile/folder';
+import { provideHybridDeclaration, runtimeFolder, loadShardFolder, completeManifestCache } from '../src/client/game/shardfile/runtimeFolder';
 import { ClientAssets } from '../src/client/game/shardfile/clientAssets';
 import { isBuildValidatedOutput, outputBlobUrl, outputDescriptor, resolveOutputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { saves } from '../src/shared/engine/saves/runtime';
-import { installManifestShardfile, installShardfileProduct } from '../src/client/game/shardfile/clientSource';
+import { installManifestShardfile, installShardfileFolder } from '../src/client/game/shardfile/clientSource';
 import { prepareBootImports } from '../src/client/app/bootDownloads';
 import { sourceManifest } from '../src/client/game/plugin/context';
 import { installShards, shards } from '../src/client/game/shard/list';
 import { findShard, game, setActiveChunk } from '../src/client/game/shard/registry';
 import { Scope } from '../src/shared/engine/app/scope';
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
-import { ProductLeases } from '../src/client/game/grid/productLeases';
-import { accountTransportRelease } from '../src/client/game/grid/products';
-import type { AdmittedProduct } from '../src/client/game/shardfile/product';
+import { FolderLeases } from '../src/client/game/grid/folderLeases';
+import { accountTransportRelease } from '../src/client/game/grid/folders';
+import type { AdmittedFolder } from '../src/client/game/shardfile/folder';
 import { leaseClientLibrary } from '../src/client/game/shardfile/clientLibrary';
 import { entryReadPlan } from '../src/client/game/grid/entryReadPrefetch';
 import { parseEntryReadSet } from '@wildshard/format/entryReads';
@@ -63,7 +63,7 @@ function fixture(blob = false, spawnX = 0, revision = 1, slug = 'loader-fixture'
   wires.set('shard.json', encodeCanonicalJson(index));
   return { source, index, wires };
 }
-function options(wires: ReadonlyMap<string, Uint8Array>, cache?: ProductCache): ProductOptions {
+function options(wires: ReadonlyMap<string, Uint8Array>, cache?: FolderCache): FolderOptions {
   // Each fixture owns its transport/verifier service. Repeated reads through
   // these options still coalesce; unrelated fixtures cannot lend verified packs.
   return { base, offline: false, firstParty: true, hash: bytes => hash(bytes), ...(cache === undefined ? {} : { cache }), fetch: url => {
@@ -71,27 +71,27 @@ function options(wires: ReadonlyMap<string, Uint8Array>, cache?: ProductCache): 
     return Promise.resolve(bytes === undefined ? new Response(null, { status: 404 }) : new Response(Uint8Array.from(bytes)));
   } };
 }
-function cacheStore(): { cache: ProductCache; bytes: Map<string, Uint8Array>; product: () => CachedProduct | null } {
-  const bytes = new Map<string, Uint8Array>(); let product: CachedProduct | null = null;
+function cacheStore(): { cache: FolderCache; bytes: Map<string, Uint8Array>; product: () => CachedFolder | null } {
+  const bytes = new Map<string, Uint8Array>(); let product: CachedFolder | null = null;
   return { bytes, product: () => product, cache: {
     product: () => Promise.resolve(product), asset: (_base, ref) => Promise.resolve(bytes.get(ref) ?? null),
     putAsset: (_base, ref, wire) => { bytes.set(ref, Uint8Array.from(wire)); return Promise.resolve(true); },
-    putProduct: (_base, value) => { product = structuredClone(value); return Promise.resolve(); },
+    putFolder: (_base, value) => { product = structuredClone(value); return Promise.resolve(); },
   } };
 }
 
 test('a rejected descriptor request uses a checked revisit, never elapsed time', async () => {
   const f = fixture(), store = cacheStore(), opts = options(f.wires, store.cache);
-  await admitProduct(await readProductDescriptor(opts), opts);
+  await admitFolder(await readFolderDescriptor(opts), opts);
   let fail = (_error: Error): void => { throw new Error('Missing request'); };
   const transport = new Promise<Response>((_resolve, reject) => { fail = reject; });
   const refreshes: (() => Promise<void>)[] = [];
-  const held: ProductOptions = { ...opts, descriptorHash: hashImmutableBytes(encodeCanonicalJson(f.index)),
+  const held: FolderOptions = { ...opts, descriptorHash: hashImmutableBytes(encodeCanonicalJson(f.index)),
     revalidateAfterControl: run => { refreshes.push(run); }, fetch: () => transport };
   vi.useFakeTimers();
   try {
     let resolved = false;
-    const pending = readProductDescriptor(held).then(value => { resolved = true; return value; });
+    const pending = readFolderDescriptor(held).then(value => { resolved = true; return value; });
     await vi.advanceTimersByTimeAsync(180_000); expect(resolved).toBe(false); expect(refreshes).toHaveLength(0);
     expect(vi.getTimerCount()).toBe(0);
     fail(new TypeError('Native connection failed'));
@@ -105,14 +105,14 @@ test('a rejected descriptor request uses a checked revisit, never elapsed time',
 test('a failed request cannot admit an absent, foreign, changed or incomplete visited product', async () => {
   for (const refused of ['absent', 'foreign', 'changed', 'catalogue', 'incomplete'] as const) {
     const f = fixture(), store = cacheStore(), opts = options(f.wires, store.cache);
-    if (refused !== 'absent') await admitProduct(await readProductDescriptor(opts), opts);
-    if (refused === 'foreign') await store.cache.putProduct(base, { source: f.index, firstParty: false });
+    if (refused !== 'absent') await admitFolder(await readFolderDescriptor(opts), opts);
+    if (refused === 'foreign') await store.cache.putFolder(base, { source: f.index, firstParty: false });
     if (refused === 'incomplete') store.bytes.clear();
-    const held: ProductOptions = { ...opts, ...(refused === 'changed' ? { descriptorHash: 'f'.repeat(64) } : {}),
+    const held: FolderOptions = { ...opts, ...(refused === 'changed' ? { descriptorHash: 'f'.repeat(64) } : {}),
       ...(refused === 'catalogue' ? { built: { indexes: new Set<string>(), stale: () => Promise.resolve() } } : {}), fetch: () => Promise.reject(new TypeError('Native connection failed')) };
     vi.useFakeTimers();
     try {
-      const expected = expect(readProductDescriptor(held)).rejects.toThrow(refused === 'changed' ? 'descriptor hash mismatch'
+      const expected = expect(readFolderDescriptor(held)).rejects.toThrow(refused === 'changed' ? 'descriptor hash mismatch'
         : refused === 'catalogue' ? 'older than the shard' : refused === 'incomplete' ? 'incomplete section cache' : 'Native connection failed');
       await expected;
       expect(vi.getTimerCount()).toBe(0);
@@ -122,16 +122,16 @@ test('a failed request cannot admit an absent, foreign, changed or incomplete vi
 
 test('descriptor deadline retains immediate network hash, HTTP and size refusals even on a revisit', async () => {
   const f = fixture(), store = cacheStore(), opts = options(f.wires, store.cache);
-  await admitProduct(await readProductDescriptor(opts), opts);
-  await expect(readProductDescriptor({ ...opts, descriptorHash: 'f'.repeat(64) })).rejects.toThrow('descriptor hash mismatch');
-  await expect(readProductDescriptor({ ...opts, fetch: () => Promise.resolve(new Response(null, { status: 503 })) })).rejects.toThrow('Unavailable');
-  await expect(readProductDescriptor({ ...opts, fetch: () => Promise.resolve(new Response('{}', { headers: { 'content-length': '999999999' } })) })).rejects.toThrow('size exceeds cap');
+  await admitFolder(await readFolderDescriptor(opts), opts);
+  await expect(readFolderDescriptor({ ...opts, descriptorHash: 'f'.repeat(64) })).rejects.toThrow('descriptor hash mismatch');
+  await expect(readFolderDescriptor({ ...opts, fetch: () => Promise.resolve(new Response(null, { status: 503 })) })).rejects.toThrow('Unavailable');
+  await expect(readFolderDescriptor({ ...opts, fetch: () => Promise.resolve(new Response('{}', { headers: { 'content-length': '999999999' } })) })).rejects.toThrow('size exceeds cap');
 });
 
 test('descriptor deadline does not make a healthy first visit depend on a failed cache read', async () => {
   const f = fixture(), store = cacheStore(), opts = options(f.wires, store.cache);
   store.cache.product = () => { throw new Error('Disk unavailable'); };
-  expect(await readProductDescriptor(opts)).toStrictEqual(f.source);
+  expect(await readFolderDescriptor(opts)).toStrictEqual(f.source);
 });
 
 test('descriptor deadline retains the declared index filename and refuses crossed or qualified URLs', async () => {
@@ -140,12 +140,12 @@ test('descriptor deadline retains the declared index filename and refuses crosse
   f.wires.delete('shard.json'); f.wires.set('entry.json', wire);
   const opts = options(f.wires), fetcher = opts.fetch, requests: string[] = [];
   opts.fetch = (url, signal) => { requests.push(url); return fetcher(url, signal); };
-  expect(await readProductDescriptor(opts, new URL('entry.json', base))).toStrictEqual(f.source);
+  expect(await readFolderDescriptor(opts, new URL('entry.json', base))).toStrictEqual(f.source);
   expect(requests).toContain(new URL('entry.json', base).href);
   expect(requests).not.toContain(new URL('shard.json', base).href);
   requests.length = 0;
   for (const path of ['../other/entry.json', 'https://other.test/entry.json', 'entry.json?v=1', 'entry.json#part', './']) {
-    await expect(readProductDescriptor(opts, new URL(path, base))).rejects.toThrow('unqualified file in its product directory');
+    await expect(readFolderDescriptor(opts, new URL(path, base))).rejects.toThrow('unqualified file in its product directory');
   }
   expect(requests).toEqual([]);
 });
@@ -174,7 +174,7 @@ test('receipted phone admission defers unused bytes and publishes offline only a
   const scope = new Scope('offline-completion'), requests: string[] = [], opts = options(row.wires, store.cache), fetcher = opts.fetch;
   opts.tier = 'phone'; opts.fetch = url => { requests.push(url); return fetcher(url); };
   try {
-    const admitted = await admitProduct(row.index, opts), finish = admitted.completeCache;
+    const admitted = await admitFolder(row.index, opts), finish = admitted.completeCache;
     if (finish === undefined) throw new Error('Missing deferred offline completion');
     expect(admitted.assets.size).toBe(0); expect(store.product()).toBeNull();
     expect(requests.some(url => url.includes('/blobs/'))).toBe(false);
@@ -190,7 +190,7 @@ test('poisoned late cache or a retired owner cannot publish a complete offline p
     const row = fixture(true, 0, 1, 'loader-fixture', true), restore = installIndexReceipt(row.index), store = cacheStore();
     const scope = new Scope('offline-refusal'), opts = options(row.wires, store.cache); opts.tier = 'phone';
     try {
-      const admitted = await admitProduct(row.index, opts), finish = admitted.completeCache;
+      const admitted = await admitFolder(row.index, opts), finish = admitted.completeCache;
       if (finish === undefined) throw new Error('Missing deferred offline completion');
       if (retired) scope.dispose();
       else { const file = row.source.files[0]; if (file === undefined) throw new Error('Missing fixture file'); store.bytes.set(file.hash, new Uint8Array([9, 9, 9])); }
@@ -297,7 +297,7 @@ test.each([true, false])('first-party data admission retains Explore=%s without 
 });
 
 // GO7, opus-tplseat: Shard select → the Template shard boots a grid page whose home is `_template`. The page admits that product
-// here, then the grid admits the same cell through the installed manifest's descriptor (`gridShardfileProduct`) and hands the home
+// here, then the grid admits the same cell through the installed manifest's descriptor (`gridShardfileFolder`) and hands the home
 // claim off at the cell's regional charge (session.ts claims it, T7). This admission lost the descriptor ("not a shardfile shard")
 // and claimed the home at the one-shard page's cost ("Home residency differs"): the template card never reached its cell.
 test('a grid page\'s data home keeps its descriptor and leaves its home claim to the grid', async () => {
@@ -324,7 +324,7 @@ test.each(['manifest', 'external'] as const)('%s admission finishes during kit i
   const imports = prepareBootImports(new Promise<void>(resolve => { release = resolve; }));
   let admitted = (): void => { throw new Error('Uninitialized admission'); };
   const admission = new Promise<void>(resolve => { admitted = resolve; });
-  const opts = { ...options(wires), progress: (row: Parameters<NonNullable<ProductOptions['progress']>>[0]) => {
+  const opts = { ...options(wires), progress: (row: Parameters<NonNullable<FolderOptions['progress']>>[0]) => {
     if (row.phase === 'complete') admitted();
   } };
   const bindings = { instance: 'template-solo', recipes: new Map(), items: new Map(), catalogue: [],
@@ -333,7 +333,7 @@ test.each(['manifest', 'external'] as const)('%s admission finishes during kit i
   try {
     const installing = kind === 'manifest'
       ? installManifestShardfile(manifest, opts, bindings, imports.ready)
-      : installShardfileProduct(source, opts, bindings, imports.ready);
+      : installShardfileFolder(source, opts, bindings, imports.ready);
     await admission;
     expect(game.shard).toBe(active);
     expect(shards()).toBe(previous);
@@ -388,16 +388,16 @@ test.each([true, false])('a real admission refusal drains before cleanup and ret
 
 test('v2 sections reconstruct host values and refuse the old monolithic transport', async () => {
   const { source, wires } = fixture(true), opts = options(wires);
-  const read = await readProductDescriptor(opts);
+  const read = await readFolderDescriptor(opts);
   expect(read).toEqual(parseShardfile(source));
   provideHybridDeclaration(read);
-  expect(runtimeProduct(parseShardfile(source)).source).toBe(read);
+  expect(runtimeFolder(parseShardfile(source)).source).toBe(read);
   const file = read.files[0]; if (file === undefined) throw new Error('Missing blob');
   expect(outputBlobUrl(read, file.hash, base)).toBe(`${base}blobs/bin/${file.hash}.bin`);
   expect(await new ClientAssets(read, new Map(), opts).read(file.hash)).toEqual(new Uint8Array([1, 2, 3]));
   expect(() => outputBlobUrl(read, '0'.repeat(64), base)).toThrow('Undeclared');
   const v1 = new Map([['shard.json', encodeCanonicalJson(source)], [file.hash, new Uint8Array([1, 2, 3])]]);
-  await expect(readProductDescriptor(options(v1))).rejects.toThrow('format-2');
+  await expect(readFolderDescriptor(options(v1))).rejects.toThrow('format-2');
   expect(() => outputBlobUrl(source, file.hash, base)).toThrow('format-2');
 });
 
@@ -477,26 +477,26 @@ test('historical inventory rejects authored getters without invoking them', asyn
 
 test('admission preserves v2 addressing across parser copies and offline section reassembly', async () => {
   const { source, wires, index } = fixture(), store = cacheStore(), opts = options(wires, store.cache);
-  const read = await readProductDescriptor(opts), admitted = await admitProduct(read, opts);
+  const read = await readFolderDescriptor(opts), admitted = await admitFolder(read, opts);
   expect(admitted.source).toEqual(source);
   expect(outputDescriptor(admitted.source)?.index).toEqual(index);
   expect(store.product()?.source).toEqual(index);
   const offline = { ...opts, offline: true, fetch: () => Promise.reject(new Error('Offline network')) };
-  expect((await admitProduct(null, offline)).source).toEqual(source);
-  expect(await readProductDescriptor(offline)).toEqual(source);
+  expect((await admitFolder(null, offline)).source).toEqual(source);
+  expect(await readFolderDescriptor(offline)).toEqual(source);
   const section = index.sections[0]; if (section === undefined) throw new Error('Missing section');
   store.bytes.delete(section.hash);
-  await expect(readProductDescriptor(offline)).rejects.toThrow('incomplete section cache');
+  await expect(readFolderDescriptor(offline)).rejects.toThrow('incomplete section cache');
 });
 
 test('a product stored whole asks for persistent storage once (iPhone downloads I10)', async () => {
   const { wires } = fixture(), store = cacheStore(), opts = options(wires, store.cache);
   const persist = vi.spyOn(saves, 'persist').mockResolvedValue(true);
   try {
-    await admitProduct(await readProductDescriptor(opts), opts);
+    await admitFolder(await readFolderDescriptor(opts), opts);
     expect(store.product()).not.toBeNull(); expect(persist).toHaveBeenCalledTimes(1);
     persist.mockClear();
-    await admitProduct(await readProductDescriptor(options(wires)), options(wires));
+    await admitFolder(await readFolderDescriptor(options(wires)), options(wires));
     expect(persist).not.toHaveBeenCalled();
   } finally { persist.mockRestore(); }
 });
@@ -521,7 +521,7 @@ test('online packed descriptors pass a pending disk recovery after one hint turn
   const pending = new Promise<Uint8Array | null>(resolve => { release = () => { resolve(null); }; });
   const plain = options(f.wires, { ...store.cache, asset: () => pending });
   try {
-    const source = await readProductDescriptor({ ...plain, cacheHintTurn: () => Promise.resolve(),
+    const source = await readFolderDescriptor({ ...plain, cacheHintTurn: () => Promise.resolve(),
       fetch: url => { reads.push(url.slice(base.length)); return plain.fetch(url); } });
     expect(source).toEqual(parseShardfile(f.source));
     expect(reads).toEqual(['shard.json', f.path]);
@@ -534,7 +534,7 @@ test('ready descriptor cache bytes cancel the hint turn without reading a pack',
     const section = f.index.sections.find(row => row.hash === digest);
     return Promise.resolve(section === undefined ? null : f.wires.get(section.path) ?? null);
   } });
-  await expect(readProductDescriptor({ ...plain, cacheHintTurn: signal => new Promise<void>(resolve => {
+  await expect(readFolderDescriptor({ ...plain, cacheHintTurn: signal => new Promise<void>(resolve => {
     signal.addEventListener('abort', () => { cancelled++; resolve(); }, { once: true });
   }), fetch: url => { reads.push(url.slice(base.length)); return plain.fetch(url); } })).resolves.toEqual(parseShardfile(f.source));
   expect(reads).toEqual(['shard.json']); expect(cancelled).toBe(f.index.sections.length);
@@ -557,7 +557,7 @@ test('a slow descriptor cache never excuses corrupt fallback pack bytes', async 
   f.wires.set(f.path, corrupt);
   const plain = options(f.wires, { ...store.cache, asset: () => new Promise<Uint8Array | null>(() => { /* Cache stays pending while the pack refuses. */ }) });
   const reads: string[] = [];
-  await expect(readProductDescriptor({ ...plain, fetch: url => { reads.push(url.slice(base.length)); return plain.fetch(url); },
+  await expect(readFolderDescriptor({ ...plain, fetch: url => { reads.push(url.slice(base.length)); return plain.fetch(url); },
     cacheHintTurn: () => Promise.resolve() })).rejects.toThrow('pack hash or size mismatch');
   expect(reads).toEqual(['shard.json', f.path]);
 });
@@ -573,8 +573,8 @@ test('packed sections and files come from one read of each pack (iPhone download
     wires.set(path, bytes); packs.push({ path, hash: packHash, bytes: bytes.length, entries });
   }
   wires.set('shard.json', encodeCanonicalJson(parseOutputIndex({ ...index, packs })));
-  const reads: string[] = [], plain = options(wires), opts: ProductOptions = { ...plain, fetch: url => { reads.push(url.slice(base.length)); return plain.fetch(url); } };
-  const admitted = await admitProduct(await readProductDescriptor(opts), opts), file = index.files[0];
+  const reads: string[] = [], plain = options(wires), opts: FolderOptions = { ...plain, fetch: url => { reads.push(url.slice(base.length)); return plain.fetch(url); } };
+  const admitted = await admitFolder(await readFolderDescriptor(opts), opts), file = index.files[0];
   if (file === undefined) throw new Error('Missing fixture blob');
   expect(admitted.assets.get(file.hash)).toEqual(wires.get(file.path));
   expect(reads.filter(path => path.startsWith('blobs/pack/')).sort()).toEqual(packs.map(pack => pack.path).sort());
@@ -592,7 +592,7 @@ async function demandPackFixture(corruptMember = false) {
     budgets:{...original.budgets,library:{resident:6,compressed:6}}},packs:[{path,hash:packHash,bytes:6,entries:[
     {hash:first.hash,offset:0,bytes:3},{hash:secondHash,offset:3,bytes:3}]}]});
   wires.set(path,wire);wires.set('shard.json',encodeCanonicalJson(packed));
-  const source=await readProductDescriptor(options(wires));
+  const source=await readFolderDescriptor(options(wires));
   return {source,wires,first,second,path,wire};
 }
 
@@ -639,10 +639,10 @@ test('a private build-verified admission does not reread its matching historical
   const old = fixture(), store = cacheStore(), initial = options(old.wires, store.cache);
   const restore = installIndexReceipt(old.index);
   try {
-    await admitProduct(old.index, initial);
+    await admitFolder(old.index, initial);
     const asset = vi.spyOn(store.cache, 'asset');
     const present = vi.fn(() => Promise.resolve(true));
-    await admitProduct(old.index, { ...initial, cache: { ...store.cache, verifiedPresent: present } });
+    await admitFolder(old.index, { ...initial, cache: { ...store.cache, verifiedPresent: present } });
     expect(asset).toHaveBeenCalledTimes(old.index.sections.length);
     expect(present).toHaveBeenCalled(); // Durable publication is still checked.
     asset.mockRestore();
@@ -652,47 +652,47 @@ test('a private build-verified admission does not reread its matching historical
 test('an evicted section of an older visit refetches online and replaces the offline record', async () => {
   const old = fixture(), current = fixture(false, 4), store = cacheStore();
   const oldOptions = options(old.wires, store.cache);
-  await admitProduct(await readProductDescriptor(oldOptions), oldOptions);
+  await admitFolder(await readFolderDescriptor(oldOptions), oldOptions);
   const section = old.index.sections.find(value => value.name === 'world/spawn');
   if (section === undefined) throw new Error('Missing spawn section');
   store.bytes.delete(section.hash);
   const offline = { ...oldOptions, offline: true, fetch: () => Promise.reject(new Error('Offline network')) };
-  await expect(readProductDescriptor(offline)).rejects.toThrow('needs a connection');
-  await expect(admitProduct(null, offline)).rejects.toThrow('needs a connection');
+  await expect(readFolderDescriptor(offline)).rejects.toThrow('needs a connection');
+  await expect(admitFolder(null, offline)).rejects.toThrow('needs a connection');
   expect(store.product()?.source).toEqual(old.index); // No partial publication.
 
   const online = options(current.wires, store.cache), fetch = online.fetch, requests: string[] = [];
   online.fetch = url => { requests.push(url); return fetch(url); };
-  const admitted = await admitProduct(await readProductDescriptor(online), online);
+  const admitted = await admitFolder(await readFolderDescriptor(online), online);
   expect(requests).toContain(`${base}shard.json`);
   expect(requests).toContain(`${base}${section.path}`);
   expect(admitted.source).toEqual(current.source);
   expect(store.product()?.source).toEqual(current.index);
-  expect(await readProductDescriptor(offline)).toEqual(current.source);
-  expect((await admitProduct(null, offline)).source).toEqual(current.source);
+  expect(await readFolderDescriptor(offline)).toEqual(current.source);
+  expect((await admitFolder(null, offline)).source).toEqual(current.source);
 });
 
 test('an offline descriptor resolves every original section without a network read', async () => {
   const {source, wires} = fixture(), store = cacheStore(), opts = options(wires, store.cache);
-  await admitProduct(await readProductDescriptor(opts), opts);
+  await admitFolder(await readFolderDescriptor(opts), opts);
   const fetch = vi.fn(() => Promise.reject(new Error('Offline network')));
-  expect(await readProductDescriptor({...opts, offline: true, fetch})).toEqual(source);
+  expect(await readFolderDescriptor({...opts, offline: true, fetch})).toEqual(source);
   expect(fetch).not.toHaveBeenCalled();
 });
 
 test('a complete older visit still enforces saved-state compatibility', async () => {
   const visited = fixture(false, 0, 2), older = fixture(), store = cacheStore();
   const savedOptions = options(visited.wires, store.cache);
-  await admitProduct(await readProductDescriptor(savedOptions), savedOptions);
+  await admitFolder(await readFolderDescriptor(savedOptions), savedOptions);
   const downgrade = options(older.wires, store.cache);
-  await expect(admitProduct(await readProductDescriptor(downgrade), downgrade)).rejects.toThrow('revisions cannot move backwards');
+  await expect(admitFolder(await readFolderDescriptor(downgrade), downgrade)).rejects.toThrow('revisions cannot move backwards');
   expect(store.product()?.source).toEqual(visited.index);
 });
 
 // G531 retired the manifest's `entries.public`: a phone that visited before it holds sections this build's strict schemas
 // refuse. The visit is compared by identity and state only, so the shard still loads and the record is replaced.
 test('an older visit this build no longer parses is compared by its state lineage only', async () => {
-  const stale = (revision: number): { visited: CachedProduct; bytes: Map<string, Uint8Array> } => {
+  const stale = (revision: number): { visited: CachedFolder; bytes: Map<string, Uint8Array> } => {
     const old = fixture(false, 0, revision), section = old.index.sections.find(value => value.name === 'world/spawn');
     const wire = section === undefined ? undefined : old.wires.get(section.path);
     if (section === undefined || wire === undefined) throw new Error('Missing spawn section');
@@ -706,35 +706,35 @@ test('an older visit this build no longer parses is compared by its state lineag
   const seed = (store: ReturnType<typeof cacheStore>, revision: number): void => {
     const { visited, bytes } = stale(revision);
     for (const [ref, wire] of bytes) store.bytes.set(ref, wire);
-    void store.cache.putProduct(base, visited);
+    void store.cache.putFolder(base, visited);
   };
   const current = fixture(false, 4, 2), store = cacheStore(), online = options(current.wires, store.cache);
   seed(store, 1);
-  await expect(readProductDescriptor({ ...online, offline: true })).rejects.toThrow('undeclared field');
-  expect((await admitProduct(await readProductDescriptor(online), online)).source).toEqual(current.source);
+  await expect(readFolderDescriptor({ ...online, offline: true })).rejects.toThrow('undeclared field');
+  expect((await admitFolder(await readFolderDescriptor(online), online)).source).toEqual(current.source);
   expect(store.product()?.source).toEqual(current.index);
   const downgrade = cacheStore(), older = options(fixture().wires, downgrade.cache);
   seed(downgrade, 3);
-  await expect(admitProduct(await readProductDescriptor(older), older)).rejects.toThrow('revisions cannot move backwards');
+  await expect(admitFolder(await readFolderDescriptor(older), older)).rejects.toThrow('revisions cannot move backwards');
 });
 
 test('index, section integrity and path/version refusals happen before any host or blob read', async () => {
   const { wires, index } = fixture(); let fetched = 0;
   const opts = options(wires), fetch = opts.fetch;
   opts.fetch = url => { fetched++; return fetch(url); };
-  await expect(readProductDescriptor({ ...opts, descriptorHash: '0'.repeat(64) })).rejects.toThrow('descriptor hash');
+  await expect(readFolderDescriptor({ ...opts, descriptorHash: '0'.repeat(64) })).rejects.toThrow('descriptor hash');
   expect(fetched).toBe(1);
-  await expect(readProductDescriptor({ ...opts, descriptorHash: await hash(encodeCanonicalJson(index)) })).resolves.toBeDefined();
+  await expect(readFolderDescriptor({ ...opts, descriptorHash: await hash(encodeCanonicalJson(index)) })).resolves.toBeDefined();
   wires.set('shard.json', encodeCanonicalJson({ ...index, formatVersion: 3 }));
-  await expect(readProductDescriptor(opts)).rejects.toThrow();
+  await expect(readFolderDescriptor(opts)).rejects.toThrow();
   const first = index.sections[0]; if (first === undefined) throw new Error('Missing section');
   wires.set('shard.json', encodeCanonicalJson({ ...index, sections: [{ ...first, path: '../escape.json' }, ...index.sections.slice(1)] }));
-  await expect(readProductDescriptor(opts)).rejects.toThrow();
+  await expect(readFolderDescriptor(opts)).rejects.toThrow();
   wires.set('shard.json', encodeCanonicalJson(index));
   wires.set(first.path, new Uint8Array(first.bytes).fill(32));
-  await expect(readProductDescriptor(opts)).rejects.toThrow('section hash or size');
+  await expect(readFolderDescriptor(opts)).rejects.toThrow('section hash or size');
   wires.set(first.path, new Uint8Array(first.bytes + 1));
-  await expect(readProductDescriptor(opts)).rejects.toThrow('wire size');
+  await expect(readFolderDescriptor(opts)).rejects.toThrow('wire size');
 });
 
 test('every section request starts before a slow first response completes', async () => {
@@ -767,10 +767,10 @@ test.each(['network', 'cache', 'quota', 'packed-cache'] as const)('verified %s s
     store.bytes.set(section.hash, wire);
   }
   const raw = vi.fn(store.cache.asset), put = vi.fn(store.cache.putAsset);
-  const opts: ProductOptions = { ...options(f.wires), hash: pageHash, fetch, transport: checked,
+  const opts: FolderOptions = { ...options(f.wires), hash: pageHash, fetch, transport: checked,
     cache: { ...store.cache, asset: raw, putAsset: put,
       verifiedAsset: address => Promise.resolve(store.bytes.get(address) ?? null) } };
-  const source = await readProductDescriptor(opts);
+  const source = await readFolderDescriptor(opts);
   expect(source).toEqual(f.source);
   const sectionHashes = new Set(f.index.sections.map(section => section.hash));
   expect(pageHash.mock.calls.filter(([wire]) => sectionHashes.has(hashImmutableBytes(wire)))).toHaveLength(0);
@@ -778,24 +778,24 @@ test.each(['network', 'cache', 'quota', 'packed-cache'] as const)('verified %s s
   expect(checked).toHaveBeenCalledTimes(mode === 'cache' || mode === 'packed-cache' ? 0 : f.index.sections.length);
   expect(raw).not.toHaveBeenCalled(); expect(put).not.toHaveBeenCalled();
   expect(outputDescriptor(source)?.cached).toBe(mode !== 'quota');
-  await admitProduct(source, opts);
+  await admitFolder(source, opts);
   expect(store.product() === null).toBe(mode === 'quota');
 });
 
 test('verified section transport retains size refusals, failure and ordinary hash fallback', async () => {
   const f = fixture(), opts = options(f.wires);
-  await expect(readProductDescriptor({ ...opts, transport: () => Promise.resolve({ bytes: new Uint8Array(), cached: false, stored: true }) }))
+  await expect(readFolderDescriptor({ ...opts, transport: () => Promise.resolve({ bytes: new Uint8Array(), cached: false, stored: true }) }))
     .rejects.toThrow('section hash or size mismatch');
-  await expect(readProductDescriptor({ ...opts, transport: () => Promise.reject(new Error('Worker hash mismatch')) }))
+  await expect(readFolderDescriptor({ ...opts, transport: () => Promise.reject(new Error('Worker hash mismatch')) }))
     .rejects.toThrow('Worker hash mismatch');
   const first = f.index.sections[0]; if (first === undefined) throw new Error('Missing section');
   f.wires.set(first.path, new Uint8Array(first.bytes));
-  await expect(readProductDescriptor({ ...opts, transport: () => Promise.resolve(null) })).rejects.toThrow('section hash or size mismatch');
+  await expect(readFolderDescriptor({ ...opts, transport: () => Promise.resolve(null) })).rejects.toThrow('section hash or size mismatch');
 });
 
 test('verified packed cache still refuses a wrong-sized section', async () => {
   const f = packedSectionFixture(), store = cacheStore();
-  await expect(readProductDescriptor({ ...options(f.wires), cache: { ...store.cache,
+  await expect(readFolderDescriptor({ ...options(f.wires), cache: { ...store.cache,
     verifiedAsset: () => Promise.resolve(new Uint8Array()),
   } })).rejects.toThrow('section hash or size mismatch');
 });
@@ -804,7 +804,7 @@ test('a verified-cache miss retains whole-pack transport and member verification
   const f = packedSectionFixture(), store = cacheStore(), plain = options(f.wires), fetch = vi.fn(plain.fetch);
   const transport = vi.fn(() => Promise.reject(new Error('Packed cache miss must not fetch one member')));
   const pageHash = vi.fn(hash);
-  const result = await readProductDescriptor({ ...plain, fetch, hash: pageHash, transport,
+  const result = await readFolderDescriptor({ ...plain, fetch, hash: pageHash, transport,
     cache: { ...store.cache, verifiedAsset: () => Promise.resolve(null) } });
   expect(result).toEqual(f.source);
   expect(fetch.mock.calls.map(([url]) => url.slice(base.length))).toEqual(['shard.json', f.path]);
@@ -817,34 +817,34 @@ test('cold sections build before disk writes while offline publication waits for
   const f = fixture(), store = cacheStore();
   let release = (): void => { throw new Error('Missing cache write gate'); };
   const blocked = new Promise<void>(resolve => { release = resolve; });
-  const cache: ProductCache = { ...store.cache, putAssetBackground: async (productBase, address, bytes) => {
-    const copy = Uint8Array.from(bytes); await blocked; return await store.cache.putAsset(productBase, address, copy) !== false;
+  const cache: FolderCache = { ...store.cache, putAssetBackground: async (folderBase, address, bytes) => {
+    const copy = Uint8Array.from(bytes); await blocked; return await store.cache.putAsset(folderBase, address, copy) !== false;
   } };
   const opts = options(f.wires, cache);
   try {
-    const source = await readProductDescriptor(opts);
+    const source = await readFolderDescriptor(opts);
     expect(source).toEqual(f.source);
     expect(outputDescriptor(source)?.cached).toBe(false);
     expect(store.product()).toBeNull(); expect(store.bytes.size).toBe(0);
-    const admitted = admitProduct(source, opts);
+    const admitted = admitFolder(source, opts);
     await new Promise<void>(resolve => { setTimeout(resolve, 0); });
     expect(store.product()).toBeNull();
     release(); await admitted;
     expect(outputDescriptor(source)?.cached).toBe(true);
     expect(store.product()?.source).toEqual(f.index);
-    expect(await readProductDescriptor({ ...opts, offline: true })).toEqual(f.source);
+    expect(await readFolderDescriptor({ ...opts, offline: true })).toEqual(f.source);
   } finally { release(); }
 });
 
 test('a refused background section write cannot advertise a complete offline product', async () => {
   const f = fixture(), store = cacheStore(), opts = options(f.wires, { ...store.cache, putAssetBackground: () => Promise.resolve(false) });
-  const source = await readProductDescriptor(opts);
+  const source = await readFolderDescriptor(opts);
   expect(source).toEqual(f.source);
   expect(await outputDescriptor(source)?.cacheStored).toBe(false);
   expect(outputDescriptor(source)?.cached).toBe(false);
-  await admitProduct(source, opts);
+  await admitFolder(source, opts);
   expect(store.product()).toBeNull();
-  await expect(readProductDescriptor({ ...opts, offline: true })).rejects.toThrow('not been visited offline');
+  await expect(readFolderDescriptor({ ...opts, offline: true })).rejects.toThrow('not been visited offline');
 });
 
 test('custom sections and their schema inventory refuse before reads or cache adoption', async () => {
@@ -906,22 +906,22 @@ test('an off-page transport supplies verified stored blobs without a page read o
   const { wires, index } = fixture(true), store = cacheStore(), file = index.files[0];
   if (file === undefined) throw new Error('Missing blob');
   const writes: string[] = [], pageReads: string[] = [];
-  const cache: ProductCache = { ...store.cache, putAsset: (productBase, ref, wire) => { writes.push(ref); return store.cache.putAsset(productBase, ref, wire); } };
+  const cache: FolderCache = { ...store.cache, putAsset: (folderBase, ref, wire) => { writes.push(ref); return store.cache.putAsset(folderBase, ref, wire); } };
   const page = options(wires, cache);
-  const opts: ProductOptions = { ...page, fetch: url => { pageReads.push(url); return page.fetch(url); },
+  const opts: FolderOptions = { ...page, fetch: url => { pageReads.push(url); return page.fetch(url); },
     transport: (url, address, bytes) => {
       const wire = wires.get(url.slice(base.length));
       if (wire === undefined || wire.length !== bytes) throw new Error('Unexpected transport read');
       store.bytes.set(address, Uint8Array.from(wire)); // the worker stored it
       return Promise.resolve({ bytes: Uint8Array.from(wire), cached: false, stored: true });
     } };
-  const admitted = await admitProduct(await readProductDescriptor(opts), opts);
+  const admitted = await admitFolder(await readFolderDescriptor(opts), opts);
   expect(admitted.assets.get(file.hash)).toEqual(new Uint8Array([1, 2, 3]));
   expect(pageReads.some(url => url.endsWith(file.path))).toBe(false);
   expect(writes).not.toContain(file.hash);
   // No live worker: the page reads, hashes and writes it as before.
-  const fallback: ProductOptions = { ...opts, transport: () => Promise.resolve(null) }, cold = cacheStore();
-  const again = await admitProduct(await readProductDescriptor(fallback), { ...fallback, cache: cold.cache });
+  const fallback: FolderOptions = { ...opts, transport: () => Promise.resolve(null) }, cold = cacheStore();
+  const again = await admitFolder(await readFolderDescriptor(fallback), { ...fallback, cache: cold.cache });
   expect(again.assets.get(file.hash)).toEqual(new Uint8Array([1, 2, 3]));
   expect(cold.bytes.get(file.hash)).toEqual(new Uint8Array([1, 2, 3]));
   expect(pageReads.some(url => url.endsWith(file.path))).toBe(true);
@@ -932,7 +932,7 @@ test('exact receipted library costs reserve all bytes without reading unused bod
   const row = fixture(true), restore = installIndexReceipt(row.index), store = cacheStore(), opts = options(row.wires, store.cache);
   const scope = new Scope('receipt-costs'), allocator = new ResidencyAllocator();
   try {
-    const source = await readProductDescriptor(opts), read = vi.fn(() => Promise.reject(new Error('Cost-only body read')));
+    const source = await readFolderDescriptor(opts), read = vi.fn(() => Promise.reject(new Error('Cost-only body read')));
     expect(isBuildValidatedOutput(source)).toBe(true);
     // A host may project rows, but only exact original file objects inherit its build proof.
     await leaseClientLibrary({ ...source }, new Map(), { allocator, scope, owner: 'home', read, validatedSource: source });
@@ -948,7 +948,7 @@ test('a replaced cost row cannot borrow an original receipt to skip its byte rea
   const row = fixture(true), restore = installIndexReceipt(row.index), store = cacheStore();
   const scope = new Scope('receipt-cost-refusal'), allocator = new ResidencyAllocator();
   try {
-    const source = await readProductDescriptor(options(row.wires, store.cache));
+    const source = await readFolderDescriptor(options(row.wires, store.cache));
     const projected = { ...source, files: source.files.map(file => ({ ...file, decoded: file.decoded + 1 })) };
     const read = vi.fn(() => Promise.reject(new Error('Unproven cost row')));
     await expect(leaseClientLibrary(projected, new Map(), { allocator, scope, owner: 'home', read, validatedSource: source })).rejects.toThrow('Unproven cost row');
@@ -962,9 +962,9 @@ test('declared late library round-trips into phone admission and native after-co
   const scope = new Scope('late-native'), opts = options(row.wires, store.cache), original = opts.fetch, reads: string[] = [];
   opts.tier = 'phone'; opts.fetch = url => { reads.push(url); return original(url); };
   try {
-    const product = await loadShardProduct('loader-fixture', opts, scope);
+    const product = await loadShardFolder('loader-fixture', opts, scope);
     expect(product.shardfile.late).toStrictEqual(row.source.late);
-    const admitted = await admitProduct(row.index, opts);
+    const admitted = await admitFolder(row.index, opts);
     expect(admitted.assets.size).toBe(0); expect(reads.some(url => url.includes('/blobs/'))).toBe(false);
     expect(store.product()).toBeNull();
     await product.file('late.bin'); // actual demand can precede the optional warm queue
@@ -977,7 +977,7 @@ test('declared late library round-trips into phone admission and native after-co
 test('an unreceipted late hint never skips byte validation or admits an undeclared root', async () => {
   const row = fixture(true, 0, 1, 'loader-fixture', false, true), opts = options(row.wires), reads: string[] = [], original = opts.fetch;
   opts.tier = 'phone'; opts.fetch = url => { reads.push(url); return original(url); };
-  const admitted = await admitProduct(row.index, opts);
+  const admitted = await admitFolder(row.index, opts);
   expect(admitted.assets.size).toBe(1); expect(reads.filter(url => url.includes('/blobs/'))).toHaveLength(1);
   expect(() => parseOutputIndex({...row.index,admission:{...row.index.admission,late:[{hash:'f'.repeat(64)}]}})).toThrow('declared library root');
 });
@@ -986,9 +986,9 @@ test('an unreceipted late hint never skips byte validation or admits an undeclar
 test('late scheduling hints do not create synchronous transport ownership', () => {
   const row = fixture(true,0,1,'loader-fixture',false,true), file = row.source.files[0];
   if (file === undefined) throw new Error('Missing scheduled fixture file');
-  expect(runtimeOnlyProductFiles(row.source)).toEqual([file.hash]);
+  expect(runtimeOnlyFolderFiles(row.source)).toEqual([file.hash]);
   row.source.look.grade.lut = file.hash;
-  expect(runtimeOnlyProductFiles(row.source)).toEqual([]);
+  expect(runtimeOnlyFolderFiles(row.source)).toEqual([]);
 });
 
 
@@ -997,7 +997,7 @@ test('receipted KTX2 device costs preserve the exact claim without fetching a bo
   for (const support of [{astc:false,bc7:false},{astc:true,bc7:false},{astc:false,bc7:true}]) {
     const row = fixture(true,0,1,'loader-fixture',false,false,bytes), restore = installIndexReceipt(row.index), scope = new Scope('device-costs'), allocator = new ResidencyAllocator();
     try {
-      const source = await readProductDescriptor(options(row.wires)), read = vi.fn(() => Promise.reject(new Error('Cost-only KTX2 transfer')));
+      const source = await readFolderDescriptor(options(row.wires)), read = vi.fn(() => Promise.reject(new Error('Cost-only KTX2 transfer')));
       await leaseClientLibrary({...source},new Map(),{validatedSource:source,scope,allocator,owner:'home',textures:support,read});
       expect(read).not.toHaveBeenCalled();
       expect(allocator.cost().input.libraries).toBe(parseKtx2(bytes,support).gpu);
@@ -1011,7 +1011,7 @@ test('old receipted KTX2 products still parse the body when device metadata is a
   delete row.index.ktx2Costs;row.wires.set('shard.json',encodeCanonicalJson(row.index));
   const restore = installIndexReceipt(row.index), scope = new Scope('old-device-costs'), allocator = new ResidencyAllocator();
   try {
-    const source = await readProductDescriptor(options(row.wires)), read = vi.fn(() => Promise.resolve(bytes));
+    const source = await readFolderDescriptor(options(row.wires)), read = vi.fn(() => Promise.resolve(bytes));
     await leaseClientLibrary(source,new Map(),{validatedSource:source,scope,allocator,owner:'home',read});
     expect(read).toHaveBeenCalledTimes(1);expect(allocator.cost().input.libraries).toBe(parseKtx2(bytes).gpu);
   } finally {scope.dispose();restore();}
@@ -1029,7 +1029,7 @@ test('late KTX2 cost projection uses exact receipt facts without admitting its b
   const bytes = Uint8Array.from(readFileSync('test/fixtures/shard-assets/pixel.ktx2'));
   const row = fixture(true,0,1,'loader-fixture',false,true,bytes), restore = installIndexReceipt(row.index);
   try {
-    const source = await readProductDescriptor(options(row.wires));
+    const source = await readFolderDescriptor(options(row.wires));
     for (const support of [{astc:true,bc7:false},{astc:false,bc7:true}]) {
       const projected = {...source};
       const actual = await deviceLibraryCostPaced(projected,new Map(),support,undefined,source);
@@ -1051,7 +1051,7 @@ async function rangeDemandFixture() {
     budgets:{...f.source.budgets,library:{resident:9,compressed:9}}},packs:[{path,hash:packHash,bytes:9,entries:[
       {hash:f.first.hash,offset:0,bytes:3},{hash:f.second.hash,offset:3,bytes:3},{hash:thirdHash,offset:6,bytes:3}]}]});
   f.wires.set(third.path,thirdBytes);f.wires.set(path,wire);f.wires.set('shard.json',encodeCanonicalJson(packed));
-  return {...f,third,wire,path,source:await readProductDescriptor(options(f.wires))};
+  return {...f,third,wire,path,source:await readFolderDescriptor(options(f.wires))};
 }
 
 test('adjacent native demands share one whole pack and release detached member backing',async()=>{
@@ -1115,7 +1115,7 @@ test('a partial response refuses without per-file fallback and a repaired whole 
 
 
 test('low-priority read-ahead and actual demand share one exact verified body', async () => {
-  const row = fixture(true), opts = options(row.wires), source = await readProductDescriptor(opts);
+  const row = fixture(true), opts = options(row.wires), source = await readFolderDescriptor(opts);
   const file = source.files[0], bytes = row.wires.get(`blobs/bin/${file?.hash ?? ''}.bin`);
   if (file === undefined || bytes === undefined) throw new Error('Native body fixture missing');
   let finish = (_value: Response): void => undefined;
@@ -1164,7 +1164,7 @@ test('a build-addressed descriptor uses its exact version and healthy progress o
   };
   opts.revalidateAfterControl=refresh;vi.useFakeTimers();
   try{
-    const pending=readProductDescriptor(opts);await vi.advanceTimersByTimeAsync(4000);
+    const pending=readFolderDescriptor(opts);await vi.advanceTimersByTimeAsync(4000);
     if(body===undefined)throw new Error('Descriptor request not started');
     body.enqueue(wire.slice(0,Math.floor(wire.length/2)));await vi.advanceTimersByTimeAsync(4000);
     body.enqueue(wire.slice(Math.floor(wire.length/2)));body.close();
@@ -1175,13 +1175,13 @@ test('a build-addressed descriptor uses its exact version and healthy progress o
 
 test.each([false, true])('versioned transfer waits for actual headers/body and retains native failure (body=%s)', async body => {
   const f = fixture(), store = cacheStore(), opts = options(f.wires, store.cache);
-  await admitProduct(await readProductDescriptor(opts), opts);
+  await admitFolder(await readFolderDescriptor(opts), opts);
   const release = installIndexReceipt(f.index, new URL('shard.json', base).pathname);
   const refresh = vi.fn<(run: () => Promise<void>) => void>();
   let fail = (_error: Error): void => { throw new Error('Transfer not started'); };
   let settled = false;
   const error = new TypeError('Native descriptor transfer failed');
-  const held: ProductOptions = { ...opts, revalidateAfterControl: refresh, fetch: (_url, signal) => {
+  const held: FolderOptions = { ...opts, revalidateAfterControl: refresh, fetch: (_url, signal) => {
     expect(signal?.aborted).toBe(false);
     if (body) return Promise.resolve(new Response(new ReadableStream<Uint8Array>({ start(controller) {
       controller.enqueue(Uint8Array.of(123)); fail = reason => { controller.error(reason); };
@@ -1190,7 +1190,7 @@ test.each([false, true])('versioned transfer waits for actual headers/body and r
   } };
   vi.useFakeTimers();
   try {
-    const rejected = expect(readProductDescriptor(held).finally(() => { settled = true; })).rejects.toBe(error);
+    const rejected = expect(readFolderDescriptor(held).finally(() => { settled = true; })).rejects.toBe(error);
     await vi.advanceTimersByTimeAsync(180_000); expect(settled).toBe(false); expect(vi.getTimerCount()).toBe(0);
     fail(error); await rejected; expect(refresh).not.toHaveBeenCalled();
   } finally { release(); vi.useRealTimers(); }
@@ -1200,24 +1200,24 @@ test('build-addressed descriptor bytes and caller digests retain exact refusal b
   const f=fixture(),opts=options(f.wires),release=installIndexReceipt(f.index,new URL('shard.json',base).pathname),calls:string[]=[];
   const read=opts.fetch;opts.fetch=(url,signal)=>{calls.push(url);const address=new URL(url);address.search='';return read(address.href,signal);};
   try{
-    await expect(readProductDescriptor({...opts,descriptorHash:'f'.repeat(64)})).rejects.toThrow('descriptor hash mismatch');expect(calls).toEqual([]);
+    await expect(readFolderDescriptor({...opts,descriptorHash:'f'.repeat(64)})).rejects.toThrow('descriptor hash mismatch');expect(calls).toEqual([]);
     const changed=fixture(false,10).wires.get('shard.json');if(changed===undefined)throw new Error('Missing changed index');
     f.wires.set('shard.json',changed);
-    await expect(readProductDescriptor(opts)).rejects.toThrow('descriptor hash mismatch');
+    await expect(readFolderDescriptor(opts)).rejects.toThrow('descriptor hash mismatch');
     expect(calls).toHaveLength(1);expect(new URL(calls[0]??'').pathname).toBe(new URL('shard.json',base).pathname);
   }finally{release();}
 });
 
 test('offline build-addressed products retain complete-index and visited-origin verification',async()=>{
   const f=fixture(),store=cacheStore(),opts=options(f.wires,store.cache);
-  await admitProduct(await readProductDescriptor(opts),opts);
-  const release=installIndexReceipt(f.index,new URL('shard.json',base).pathname),fetcher=vi.fn<ProductOptions['fetch']>();
+  await admitFolder(await readFolderDescriptor(opts),opts);
+  const release=installIndexReceipt(f.index,new URL('shard.json',base).pathname),fetcher=vi.fn<FolderOptions['fetch']>();
   try{
-    expect(await readProductDescriptor({...opts,offline:true,fetch:fetcher})).toStrictEqual(f.source);
-    await store.cache.putProduct(base,{source:fixture(false,10).index,firstParty:true});
-    await expect(readProductDescriptor({...opts,offline:true,fetch:fetcher})).rejects.toThrow('descriptor hash mismatch');
-    await store.cache.putProduct(base,{source:f.index,firstParty:false});
-    await expect(readProductDescriptor({...opts,offline:true,fetch:fetcher})).rejects.toThrow('not been visited offline');
+    expect(await readFolderDescriptor({...opts,offline:true,fetch:fetcher})).toStrictEqual(f.source);
+    await store.cache.putFolder(base,{source:fixture(false,10).index,firstParty:true});
+    await expect(readFolderDescriptor({...opts,offline:true,fetch:fetcher})).rejects.toThrow('descriptor hash mismatch');
+    await store.cache.putFolder(base,{source:f.index,firstParty:false});
+    await expect(readFolderDescriptor({...opts,offline:true,fetch:fetcher})).rejects.toThrow('not been visited offline');
     expect(fetcher).not.toHaveBeenCalled();
   }finally{release();}
 });
@@ -1226,13 +1226,13 @@ test('offline build-addressed products retain complete-index and visited-origin 
 test('live parsing retains main-thread receipts and the original hash refusal', async () => {
   const f = packedSectionFixture();
   const parse = vi.fn((bytes: Uint8Array): Promise<unknown> => Promise.resolve(JSON.parse(new TextDecoder('utf-8', {fatal:true}).decode(structuredClone(bytes)))));
-  const source = await readProductDescriptor({ ...options(f.wires), parseJson: parse });
+  const source = await readFolderDescriptor({ ...options(f.wires), parseJson: parse });
   expect(source).toEqual(f.source); expect(parse).toHaveBeenCalledTimes(f.index.sections.length + 1);
   const bad = fixture(), section = bad.index.sections[0];
   if (section === undefined) throw new Error('No section');
   bad.wires.set(section.path, new Uint8Array(section.bytes).fill(32));
   parse.mockClear();
-  await expect(readProductDescriptor({ ...options(bad.wires), parseJson: parse })).rejects.toThrow('section hash or size mismatch');
+  await expect(readFolderDescriptor({ ...options(bad.wires), parseJson: parse })).rejects.toThrow('section hash or size mismatch');
   expect(parse.mock.calls.some(([bytes]) => bytes.length === section.bytes && bytes.every(byte => byte === 32))).toBe(false);
 });
 
@@ -1265,20 +1265,20 @@ test('native first-party loading has no visited fallback, digest or client admis
   const f=fixture(true),ordinary=options(f.wires),store=cacheStore(),phases:string[]=[],requests:string[]=[];
   const digest=vi.fn<(bytes:Uint8Array)=>Promise<string>>(()=>{throw new Error('No first-party digest');});
   const visited=vi.spyOn(store.cache,'product').mockRejectedValue(new Error('No visited fallback'));
-  const native:ProductOptions={...ordinary,cache:store.cache,hash:digest,progress:row=>{phases.push(row.phase);},
+  const native:FolderOptions={...ordinary,cache:store.cache,hash:digest,progress:row=>{phases.push(row.phase);},
     firstPartyRead:(url,expected,read)=>{
       const path=new URL(url).pathname.slice(new URL(base).pathname.length),bytes=f.wires.get(path);requests.push(path);
       if(bytes===undefined||(expected!==undefined&&expected!==bytes.length))throw new Error('Missing build file');
       read?.(bytes.length);return Promise.resolve(bytes);
     }};
-  const source=await readProductDescriptor(native),loaded=await admitProduct(source,native);
+  const source=await readFolderDescriptor(native),loaded=await admitFolder(source,native);
   expect(loaded.source).toStrictEqual(f.source);expect([...loaded.assets.values()]).toStrictEqual([new Uint8Array([1,2,3])]);
   expect(digest).not.toHaveBeenCalled();expect(visited).not.toHaveBeenCalled();expect(phases.every(phase=>phase==='assets')).toBe(true);
   expect(requests.filter(path=>path==='shard.json')).toHaveLength(1);expect(store.product()).toBeNull();
 });
 
 test('built product residency is the emitted value without another source walk',async()=>{
-  const f=fixture(),expected=productResidentBytes(f.source);
+  const f=fixture(),expected=folderResidentBytes(f.source);
   const previous=Object.getOwnPropertyDescriptor(globalThis,'__SHARDFILE_VERDICTS__');
   const postCost={passes:1,instructions:7,inputs:{colour:true,depth:false,normal:false}};
   Object.defineProperty(globalThis,'__SHARDFILE_VERDICTS__',{configurable:true,value:[{sourceHash:f.index.build.sourceHash,residentBytes:expected,postCost}]});
@@ -1286,9 +1286,9 @@ test('built product residency is the emitted value without another source walk',
     const source=await resolveOutputDescriptor(f.index,{firstParty:true,offline:false,hash:()=>{throw new Error('No client hash');},read:()=>{throw new Error('No checked fallback');},
       built:{indexHash:'compiled',read:path=>{const bytes=f.wires.get(path);if(bytes===undefined)throw new Error('Missing section');return Promise.resolve(bytes);}}});
     if(!isBuildValidatedOutput(source))throw new Error('Missing built source');
-    expect(productResidentBytes(source)).toBe(expected);
-    expect(productPostCost(source,()=>{throw new Error('No entry-time graph validation');})).toStrictEqual(postCost);
-    const steps=productResidentBytesSteps(source,1);expect(steps.next()).toEqual({done:true,value:expected});
+    expect(folderResidentBytes(source)).toBe(expected);
+    expect(folderPostCost(source,()=>{throw new Error('No entry-time graph validation');})).toStrictEqual(postCost);
+    const steps=folderResidentBytesSteps(source,1);expect(steps.next()).toEqual({done:true,value:expected});
   }finally{if(previous===undefined)Reflect.deleteProperty(globalThis,'__SHARDFILE_VERDICTS__');else Object.defineProperty(globalThis,'__SHARDFILE_VERDICTS__',previous);}
 });
 
@@ -1301,21 +1301,21 @@ test('a built product stamped below its own wire still releases all of its trans
   const previous=Object.getOwnPropertyDescriptor(globalThis,'__SHARDFILE_VERDICTS__');
   const postCost={passes:1,instructions:7,inputs:{colour:true,depth:false,normal:false}};
   Object.defineProperty(globalThis,'__SHARDFILE_VERDICTS__',{configurable:true,value:[{sourceHash:f.index.build.sourceHash,residentBytes:stale,postCost}]});
-  const allocator=new ResidencyAllocator(),leases=new ProductLeases<string>(allocator,'grid');
+  const allocator=new ResidencyAllocator(),leases=new FolderLeases<string>(allocator,'grid');
   try{
     const source=await resolveOutputDescriptor(f.index,{firstParty:true,offline:false,hash:()=>{throw new Error('No client hash');},read:()=>{throw new Error('No checked fallback');},
       built:{indexHash:'compiled',read:path=>{const bytes=f.wires.get(path);if(bytes===undefined)throw new Error('Missing section');return Promise.resolve(bytes);}}});
     if(!isBuildValidatedOutput(source))throw new Error('Missing built source');
     const lease=await leases.acquire('blender-template',async(reserve,releaseBytes)=>{
       await reserve(source);
-      const admitted:AdmittedProduct={source,assets:new Map(),cached:false,releaseTransport:refs=>Promise.resolve([...refs])};
+      const admitted:AdmittedFolder={source,assets:new Map(),cached:false,releaseTransport:refs=>Promise.resolve([...refs])};
       accountTransportRelease(admitted,releaseBytes);
       await admitted.releaseTransport?.(source.files.map(file=>file.hash),'cache-or-fetch');
       return 'admitted';
     });
     expect(lease.value).toBe('admitted');
     expect(allocator.entries().find(row=>row.id==='product:grid:blender-template')?.bytes).toBe(0);
-    expect(productResidentBytes(source)).toBe(wire);expect(productResidentBytesSteps(source,1).next()).toEqual({done:true,value:wire});
+    expect(folderResidentBytes(source)).toBe(wire);expect(folderResidentBytesSteps(source,1).next()).toEqual({done:true,value:wire});
     lease.release();
   }finally{leases.dispose();if(previous===undefined)Reflect.deleteProperty(globalThis,'__SHARDFILE_VERDICTS__');else Object.defineProperty(globalThis,'__SHARDFILE_VERDICTS__',previous);}
 });
@@ -1324,11 +1324,11 @@ test('the browser cannot fall back to Node admission when its native build reade
   const f=fixture(),native=options(f.wires);
   vi.stubEnv('SSR',false);
   try{
-    await expect(readProductDescriptor(native)).rejects.toThrow('build-owned reader');
-    expect(()=>admitProduct(f.index,native)).toThrow('build-owned reader');
-    expect(()=>productResidentBytes(f.source)).toThrow('build-owned residency');
-    expect(()=>productResidentBytesSteps(f.source).next()).toThrow('build-owned residency');
-    expect(()=>productPostCost(f.source,()=>undefined)).toThrow('build-owned post cost');
+    await expect(readFolderDescriptor(native)).rejects.toThrow('build-owned reader');
+    expect(()=>admitFolder(f.index,native)).toThrow('build-owned reader');
+    expect(()=>folderResidentBytes(f.source)).toThrow('build-owned residency');
+    expect(()=>folderResidentBytesSteps(f.source).next()).toThrow('build-owned residency');
+    expect(()=>folderPostCost(f.source,()=>undefined)).toThrow('build-owned post cost');
     await expect(resolveOutputDescriptor(f.index,{firstParty:true,offline:false,read:()=>Promise.resolve(new Uint8Array()),hash:native.hash})).rejects.toThrow('build-owned reader');
   }finally{vi.unstubAllEnvs();}
 });

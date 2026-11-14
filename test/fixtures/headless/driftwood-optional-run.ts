@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- The existing checked-in native physics binary is immutable input.
 import {readFileSync} from 'node:fs';
 import * as v from 'valibot';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {checkedReplayPipeline} from './checkedReplayPipeline';
 import {createNativeProofResident} from '../headless-native';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
@@ -29,15 +29,15 @@ if(stage!=='bench'&&stage!=='reef')throw new Error('Unknown optional Driftwood t
 const earned=stage==='bench'?'used:vista-bench':'open:reef-treasure';
 const started=performance.now();
 const trace=(phase:string):void=>{console.info(JSON.stringify({stage,phase,ms:performance.now()-started}));};
-const session=await beginProductSession('driftwood-isle','driftwood'),{product,assets}=session;
+const session=await beginFolderSession('driftwood-isle','driftwood'),{product,assets}=session;
 trace('product-started');
 let stopReplay:(()=>Promise<void>)|undefined;
-let negativeSession:Awaited<ReturnType<typeof beginProductSession>>|undefined;
+let negativeSession:Awaited<ReturnType<typeof beginFolderSession>>|undefined;
 let resident:Awaited<ReturnType<typeof createNativeProofResident>>|undefined,releaseRopes=()=>{ /* No rope owner before installation. */ };
 try{
   // Admit the independent counterfactual before recording, rather than after
   // the entire checked positive route has consumed the child budget.
-  negativeSession=await beginProductSession('driftwood-isle','driftwood');trace('negative-product-started');
+  negativeSession=await beginFolderSession('driftwood-isle','driftwood');trace('negative-product-started');
   // Admission failure is observed even while the recorder is initializing.
   const negativeOwner=negativeSession;
   const negativeOutcome=(async()=>{

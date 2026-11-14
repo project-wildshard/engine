@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { isJsonData, isJsonDataSteps, jsonDataHeapBytes } from '@wildshard/format/json';
 import { assertCellBounds, assertCellBoundsSteps } from '@wildshard/format/cellBounds';
 import { preflightShardfile, preflightShardfileSteps } from '@wildshard/format/preflight';
-import { productResidentBytes, productResidentBytesSteps } from '../src/client/game/shardfile/productCost';
+import { folderResidentBytes, folderResidentBytesSteps } from '../src/client/game/shardfile/folderCost';
 import { emptyShardfile } from '../src/shared/host/author';
 
 // T10: product admission's walks run in steps between drawn frames; each must give exactly its one-shot original's verdict,
@@ -103,11 +103,11 @@ test('repeated escaped text spends the exact serialized UTF-8 source cap', () =>
   expect(() => drain(preflightShardfileSteps(source, 64))).toThrow('source exceeds admission cap');
 });
 
-test('stepped residency bytes equal productResidentBytes', () => {
+test('stepped residency bytes equal folderResidentBytes', () => {
   const source = emptyShardfile({ slug: 'steps', name: 'Steps', author: 'T', revision: 1, seed: 1 });
   Reflect.set(source, 'rows', Array.from({ length: 3000 }, (_, i) => ({ id: `row-${i}`, x: i * 0.5, tags: ['a', 'é'] })));
-  const stepped = drain(productResidentBytesSteps(source, 500));
-  expect(stepped.value).toBe(productResidentBytes(source));
+  const stepped = drain(folderResidentBytesSteps(source, 500));
+  expect(stepped.value).toBe(folderResidentBytes(source));
   const heap = jsonDataHeapBytes(source);
   if (heap === undefined) throw new Error('Invalid accounting fixture');
   expect(stepped.value).toBe(heap * 2 + 1024);

@@ -2,7 +2,7 @@ import {expect,test,vi} from 'vitest';
 import {SceneDressing} from '../../../client/game/shardfile/sceneDressing';
 import {Scope} from '@wildshard/engine/app/scope';
 import type {ShardContext} from '../../../client/game/plugin/context';
-import type {ShardProduct} from '../../../shared/game/shardfile/shardProduct';
+import type {ShardFolder} from '../../../shared/game/shardfile/shardFolder';
 import type {ShardRuntime} from '../../../shared/game/shard/runtime';
 import type {ShardWorld} from '../shard/world';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
@@ -19,7 +19,7 @@ function fixture(){
   const pending=new Promise<Uint8Array>(resolve=>{finish=resolve;}),read=vi.fn(()=>pending);
   const product={hasFile:()=>true,file:read},runtime={world:legacyDouble<ShardWorld>({})};
   const game={runtime:legacyDouble<ShardRuntime>(runtime)},system=vi.fn();
-  const surface={scope,product:legacyDouble<ShardProduct>(product),game:legacyDouble<ShardContext['game']>(game),system},ctx=legacyDouble<ShardContext>(surface);
+  const surface={scope,product:legacyDouble<ShardFolder>(product),game:legacyDouble<ShardContext['game']>(game),system},ctx=legacyDouble<ShardContext>(surface);
   return{parent,scope,product,runtime,game,surface,ctx,read,system,finish};
 }
 
@@ -34,7 +34,7 @@ test.each(['scope','product','reader','hasFile','world','retired','ancestor'] as
   const f=fixture(),loading=SceneDressing.install(f.ctx,rows);expect(f.read).toHaveBeenCalledTimes(1);
   const replacement=new Scope('replacement');
   if(kind==='scope')f.surface.scope=replacement;
-  else if(kind==='product')f.surface.product=legacyDouble<ShardProduct>({hasFile:()=>true,file:vi.fn(()=>Promise.resolve(new Uint8Array()))});
+  else if(kind==='product')f.surface.product=legacyDouble<ShardFolder>({hasFile:()=>true,file:vi.fn(()=>Promise.resolve(new Uint8Array()))});
   else if(kind==='reader')f.product.file=vi.fn(()=>Promise.resolve(new Uint8Array()));
   else if(kind==='hasFile')f.product.hasFile=()=>true;
   else if(kind==='world')f.runtime.world=legacyDouble<ShardWorld>({});

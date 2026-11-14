@@ -11,7 +11,7 @@ import {parseChapterStoryPresentation} from '@wildshard/format/questStory';
 import {createReadingRoster} from '../../src/shared/game/plugin/quests';
 import {eyeReaches} from '../../src/shared/game/quest/interactionRows';
 import {stepFigureOrbit} from '../../src/client/game/quest/figureOrbit';
-import {prepareProductPlan as prepareNalati} from './headless-native';
+import {prepareFolderPlan as prepareNalati} from './headless-native';
 import {installNalatiMountInputs} from './nalati-mount-inputs';
 import {installNalatiChapterObservation} from './nalati-chapter-observation';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { InputHashMemo } from './bake-input-hashes.mjs';
-import { programDiscoveryProducts } from './gen-programs.mjs';
+import { programDiscoveryFolders } from './gen-programs.mjs';
 
 /** @typedef {'shards-before'|'boot'|'shards-after'} TailStep */
 /** @param {unknown} value */
@@ -31,7 +31,7 @@ export async function sourceTablesCached(inputRoot, step, run) {
   const root = realpathSync(resolve(inputRoot));
   // Product metadata is outside the source-table cache's input inventory.
   // Always run the defining receipt reader; a table hit cannot vouch for it.
-  if (step !== 'boot' && programDiscoveryProducts(root).length > 0) { await run(); return false; }
+  if (step !== 'boot' && programDiscoveryFolders(root).length > 0) { await run(); return false; }
   const directory = resolve(root, '.cache/generation-tail');
   const memo = new InputHashMemo(root, resolve(directory, 'hashes.json'));
   const receipt = resolve(directory, `${step}.json`);

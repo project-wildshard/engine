@@ -21,7 +21,7 @@ import { SpecimenTextureSchema } from '@wildshard/format/specimenCatalogue';
 import { loadSpecimenTexture } from '../models/specimenCatalogue';
 import { createClientScene } from '../plugin/scene';
 import { lentLook, setLentParam, setLentTexture } from '../shardfile/lentLooks';
-import { loadFirstPartyProduct, runtimeProduct } from '../shardfile/runtimeProduct';
+import { loadFirstPartyFolder, runtimeFolder } from '../shardfile/runtimeFolder';
 import type { StaticCaptureUniforms } from './staticCapture';
 import { GroundMerge } from '../shardfile/groundMerge';
 import { paintedGroundMerge } from './paintedGroundMerge';
@@ -48,7 +48,7 @@ export function paintedGroundPainter(slug: string, input: unknown, tiles: unknow
   return { build: async (terrain, field, scope) => {
     const [, textures, product] = await Promise.all([field.ready(), Promise.all(rows.layers.map(name => {
       const texture = materials[name]?.texture; if (texture === undefined) throw new Error(`Missing painted tile ${name}`); return loadSpecimenTexture(texture);
-    })), loadFirstPartyProduct(slug)]);
+    })), loadFirstPartyFolder(slug)]);
     const material = painterlyMaterial(null, rows.material);
     const colour = product.section('look/colour-functions')[rows.colour];
     if (colour === undefined) throw new Error(`Missing ground colour graph ${rows.colour}`);
@@ -75,7 +75,7 @@ export function paintedGroundPainter(slug: string, input: unknown, tiles: unknow
       // tile streaming N1a: the tiles draw as one merged mesh (the terrain's mesh, its flags kept) and only the player's
       // 5 x 5 of them stays loaded, followed from the merged mesh's own draws; N1b: the 16 L1 squares (named pair GLBs,
       // world/terrain/ground-l1-<x>-<z>.glb) stay loaded beyond it, each leaving out the quadrants its drawn L0 tiles cover
-      const assets = runtimeProduct(product.shardfile).assets, parent = ground.parent === scene.root ? terrain.group : ground.parent;
+      const assets = runtimeFolder(product.shardfile).assets, parent = ground.parent === scene.root ? terrain.group : ground.parent;
       if (parent === null) throw new Error('Painted ground mesh has no parent');
       // DL17: a product whose level is complete at control (`ring: 'cell'`) loads its whole cell of ground tiles before play
       const radius = ringRadius(product.shardfile, tileRing), loaded = new Map<number, Scope>();

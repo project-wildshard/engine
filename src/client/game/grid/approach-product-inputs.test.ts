@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { holdApproachInputs } from './approachProductInputs';
+import { holdApproachInputs } from './approachFolderInputs';
 import { Scope } from '@wildshard/engine/app/scope';
 
 function run(acquire: Parameters<typeof holdApproachInputs>[0], signal: AbortSignal): Promise<void> {

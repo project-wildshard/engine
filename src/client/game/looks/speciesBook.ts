@@ -9,7 +9,7 @@ import type { AnimalRigContext } from '@wildshard/engine/entities/animalRig';
 import * as v from 'valibot';
 import { packedCreatureBodies,readBakedGeometry,type BakedGeometryRow } from '../plugin/geometry';
 import { Color, MeshBasicMaterial, SkinnedMesh, type BufferGeometry } from 'three';
-import { productRiggedHulls } from './riggedHulls';
+import { folderRiggedHulls } from './riggedHulls';
 import { HullLookBookSchema, parsePackedCreatureLooks, type CompactSpeciesBodiesRows } from '@wildshard/format/speciesLooks';
 import type { NativeSpeciesLookBookRows, SpeciesPresentationRows } from '@wildshard/format/speciesBookRows';
 import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
@@ -34,7 +34,7 @@ export class HullLookBook {
       || new Set(this.book.rows.map(row => row.id)).size !== this.book.rows.length
       || this.book.rows.some(row => row.base === 'definition' && this.book.definitions[row.kind] === undefined)) throw new Error('Invalid hull look references');
     const packed = this.book.body ?? (this.book.compactBody === undefined ? undefined : expandCompactBodies(this.book.compactBody));
-    this.hulls = packed === undefined ? productRiggedHulls(this.book.slug) : undefined;
+    this.hulls = packed === undefined ? folderRiggedHulls(this.book.slug) : undefined;
     this.bodies = packed === undefined ? undefined : packedCreatureBodies(packed, undefined, files === null ? undefined : name => files.file(name));
   }
   /** The same packed owner supplies custom rigs and ordinary fauna without retaining another bake. */
@@ -96,8 +96,8 @@ export class HullLookBook {
       const envelope = envelopes.get(id); if (envelope !== undefined) poseRidingEnvelopes(context, envelope, pageAir.wind);
       programme(context);
     };
-    let hulls: ReturnType<typeof productRiggedHulls> | undefined;
-    const skins = (): ReturnType<typeof productRiggedHulls> => { hulls ??= productRiggedHulls(this.book.slug); return hulls; };
+    let hulls: ReturnType<typeof folderRiggedHulls> | undefined;
+    const skins = (): ReturnType<typeof folderRiggedHulls> => { hulls ??= folderRiggedHulls(this.book.slug); return hulls; };
     const all = book.rows.map((row): SpeciesLook => {
       const look = base.get(row.kind), kind = row.kind, post = row.postPose, material = row.material;
       if (post !== undefined && (!programmes.has(post.alive) || post.dead !== undefined && !programmes.has(post.dead))) throw new Error('Missing species pose programme');
@@ -166,25 +166,25 @@ function registeredLook(def: SpeciesDef): Pick<SpeciesLook, 'rigContract' | 'fur
     ...(animate === undefined ? {} : { animate }), ...(eyeGlow === undefined ? {} : { eyeGlow }), ...(eyeGlowIntensity === undefined ? {} : { eyeGlowIntensity }) };
 }
 
-const productBooks = new Map<string, HullLookBook>();
+const folderBooks = new Map<string, HullLookBook>();
 /** A product's declared hull look book (`look/hull-book`), admitted once per book slug: every entry, installer
  * and cold specimen of that product shares one book and one packed body owner. */
-export function productHullBook(product: { readonly section: (name: 'look/hull-book') => { readonly slug: string }; readonly file: (name: string) => Promise<Uint8Array> }): HullLookBook {
-  const row = product.section('look/hull-book'), cached = productBooks.get(row.slug);
+export function folderHullBook(product: { readonly section: (name: 'look/hull-book') => { readonly slug: string }; readonly file: (name: string) => Promise<Uint8Array> }): HullLookBook {
+  const row = product.section('look/hull-book'), cached = folderBooks.get(row.slug);
   if (cached !== undefined) return cached;
-  const book = new HullLookBook(row, product); productBooks.set(row.slug, book); return book;
+  const book = new HullLookBook(row, product); folderBooks.set(row.slug, book); return book;
 }
 
 /** One product catalogue: admitted behaviour controls, packed looks and the
  * original packed-body owner, shared through world and kit installation. */
-export function productSpeciesCatalogue(product:Parameters<typeof productHullBook>[0],data:Pick<SpeciesPresentationRows,'lookBook'>,lookRows:unknown):SpeciesCatalogue{
-  const book=productHullBook(product);
+export function folderSpeciesCatalogue(product:Parameters<typeof folderHullBook>[0],data:Pick<SpeciesPresentationRows,'lookBook'>,lookRows:unknown):SpeciesCatalogue{
+  const book=folderHullBook(product);
   return speciesCatalogue(book,speciesBehaviour(data.lookBook),book.packedLooks(lookRows));
 }
-/** `productSpeciesCatalogue` with a `pause` between its book, its behaviour rules and its packed looks: in one task they
+/** `folderSpeciesCatalogue` with a `pause` between its book, its behaviour rules and its packed looks: in one task they
  *  were ~102 ms of a cold Nine Dragon crossing's world step at phone 4x. Same catalogue. */
-export async function productSpeciesCatalogueSliced(product:Parameters<typeof productHullBook>[0],data:Pick<SpeciesPresentationRows,'lookBook'>,lookRows:unknown,pause:()=>Promise<void>):Promise<SpeciesCatalogue>{
-  const book=productHullBook(product);await pause();
+export async function folderSpeciesCatalogueSliced(product:Parameters<typeof folderHullBook>[0],data:Pick<SpeciesPresentationRows,'lookBook'>,lookRows:unknown,pause:()=>Promise<void>):Promise<SpeciesCatalogue>{
+  const book=folderHullBook(product);await pause();
   const rules=speciesBehaviour(data.lookBook);await pause();
   return speciesCatalogue(book,rules,book.packedLooks(lookRows));
 }

@@ -2,7 +2,7 @@ import type { Scope } from "@wildshard/engine/app/scope";
 import { loadingUnits } from "@wildshard/engine/boot/waits";
 import type { SkyBackdropContext } from "@wildshard/engine/render/look";
 import type { Shardfile } from "@wildshard/format/shardSchema";
-import type { runtimeLookMaterials } from "../shardfile/runtimeProduct";
+import type { runtimeLookMaterials } from "../shardfile/runtimeFolder";
 import { AddEquation, AdditiveBlending, BackSide, Color, CustomBlending, DoubleSide, FrontSide, NoBlending, OneFactor, OneMinusSrcAlphaFactor, ShaderMaterial, SrcAlphaFactor, Vector2, Vector3, Vector4, ZeroFactor, type IUniform, type ShaderMaterialParameters } from "three";
 
 /**
@@ -219,7 +219,7 @@ export class ShaderFamily<P extends string = string> {
  * Nalati's camp smoke and water.
  */
 export async function lookGraphMaterials(scope: Scope, backdrop: Pick<SkyBackdropContext, 'renderer'>, source: Shardfile, ids: readonly string[]): ReturnType<typeof runtimeLookMaterials> {
-  const { runtimeLookMaterials: compile } = await import('../shardfile/runtimeProduct');
+  const { runtimeLookMaterials: compile } = await import('../shardfile/runtimeFolder');
   // LS8 (J204): a backdrop builds these inside the sky step; count them on it
   return compile({ scope, renderer: backdrop.renderer }, source, true, ids, total => loadingUnits('Sky look materials', total));
 }

@@ -4,7 +4,7 @@ import '../../../src/shared/engine/core/portableMathFirst';
 import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Behavior assertions run in the bounded native child.
 import assert from 'node:assert/strict';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {createNativeProofResident} from '../headless-native';
 import {installWalkRopeBodies} from './ropeBodies';
@@ -19,7 +19,7 @@ const started=performance.now();
 const phase=(stage:string):void=>{console.info(JSON.stringify({phase:stage,milliseconds:performance.now()-started}));};
 // The independent replay owner may prepare while the real input author walks.
 // It still admits its own assets and starts from a fresh native checkpoint.
-const session=await beginProductSession('driftwood-isle','driftwood'),{product,assets}=session,source=product.shardfile;
+const session=await beginFolderSession('driftwood-isle','driftwood'),{product,assets}=session,source=product.shardfile;
 phase('product');
 try{
   const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));

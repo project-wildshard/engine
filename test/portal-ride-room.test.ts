@@ -3,17 +3,17 @@ import { readFileSync } from 'node:fs';
 import { expect,test } from 'vitest';
 import { createSimHost,type SimHost } from '../src/server/engine/sim';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { tagCollider } from '../src/shared/engine/physics/surface';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { installHostPortalRide } from '../src/shared/game/shardfile/portalRide';
 import portals from './fixtures/engine-lift/portals.json';
-import { builtProduct } from './fixtures/engine-lift/product';
+import { builtFolder } from './fixtures/engine-lift/folder';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 test('a bot enters the admitted portal alone and resumes its fade on a fresh real host', async () => {
-  const source = (await loadHeadlessProduct(builtProduct('nine-dragon-stack'))).shardfile;
+  const source = (await loadHeadlessFolder(builtFolder('nine-dragon-stack'))).shardfile;
   const portal = source.entryways.find(row => row.portal !== undefined)?.portal;
   const road = portal?.road;
   if (road === undefined) throw new Error('Missing admitted portal');

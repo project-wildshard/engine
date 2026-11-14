@@ -9,7 +9,7 @@ import { installRuntimeAudio } from '../plugin/audio';
 import { installRuntimeLoot } from '../loot/runtime';
 import { installBoundQuestFlags, publishQuestFacts } from '../../../shared/game/quest/boundState';
 import { resolveSceneNpc } from '../models/sceneSpecimens';
-import { productPainterLight } from '../looks/paintedLook';
+import { folderPainterLight } from '../looks/paintedLook';
 import { clientNativeBook } from './clientNativeBook';
 import { sceneMotion } from './sceneMotion';
 import { bindDeclaredPage } from '../quest/declaredPage';
@@ -34,7 +34,7 @@ export function installClientQuestPage(ctx: ShardContext, input: unknown, reside
     player: world.player.position, flags, coins, model: model.source,
     dress: group => {
       ctx.scope.ownPrimitives(group, { instances: true });
-      if (ctx.product.section('look/painted').look.lightScope === 'material') productPainterLight(ctx.product, group, ctx.scope);
+      if (ctx.product.section('look/painted').look.lightScope === 'material') folderPainterLight(ctx.product, group, ctx.scope);
     },
   });
   book.quest = Object.assign(quest, { coins });

@@ -7,10 +7,10 @@ import { NET_BUTTONS } from '../src/shared/engine/input/netButtons';
 import { PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // REMOTE-PLAYERS RP6: what another page needs to animate a player. Before RP6 a row for others carried only position,
 // facing, board, swim, hp and held; a swing, its weight and a jump reached only the player who made them.
@@ -22,7 +22,7 @@ let live: DedicatedRoom | undefined, clock = 0;
 afterEach(() => { live?.dispose(); live = undefined; });
 
 async function open(): Promise<DedicatedRoom> {
-  const directory = builtProduct('driftwood-isle'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing driftwood-isle output');
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

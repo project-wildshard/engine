@@ -9,9 +9,9 @@ import { BitWriter } from '../src/shared/engine/net/bits';
 import { LedgerBookSchema } from '../src/server/engine/net/ledgerBook';
 import * as v from 'valibot';
 import { installPersonalLoot, personalItemTable, type PersonalLootPorts } from '../src/server/game/loot/personal';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { ledgerFilings } from '../src/server/host/standalone/ledgerFilings';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 // J105: an item is a personal roll too, through the ledger, for each player who earned it.
@@ -65,7 +65,7 @@ test('an item grant files to its player and survives the wire and a save', () =>
 });
 
 test.each(['driftwood-isle', 'pine-hollow'])('%s rolls real trophy rows', async (slug) => {
-  const product = await loadHeadlessProduct(builtProduct(slug)), economy: unknown = product.section('economy/loot');
+  const product = await loadHeadlessFolder(builtFolder(slug)), economy: unknown = product.section('economy/loot');
   const roll = personalItemTable(economy);
   expect(roll).not.toBeNull();
   expect(JSON.stringify(economy)).toContain('trophies');

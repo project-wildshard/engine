@@ -6,12 +6,12 @@ import { cookGridPack } from '../../../src/cook/game/gridCollision';
 import { cookShardServerPack } from '../../../src/cook/game/shardCook';
 import { createPartEncoder } from '../../../src/cook/game/spawnParts';
 import { serverPackBookPath } from '../../../src/shared/game/shardfile/serverPack';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 
 const args = process.argv.slice(2), gridRoot = args.find(arg => arg.startsWith('--grid='))?.slice(7) ?? process.cwd();
 const [out = 'tmp/origin', build = 'dev', ...shards] = args.filter(arg => !arg.startsWith('--grid=')), encoder = createPartEncoder(), packs: Record<string, unknown> = {};
 for (const row of shards) {
-  const [slug = '', folder = ''] = row.split('='), product = await loadHeadlessProduct(folder), header = readFileSync(join(folder, 'shard.json'));
+  const [slug = '', folder = ''] = row.split('='), product = await loadHeadlessFolder(folder), header = readFileSync(join(folder, 'shard.json'));
   const index: unknown = JSON.parse(header.toString('utf8'));
   packs[slug] = await cookShardServerPack({ slug, index, source: product.shardfile, sections: new Map(), cook: undefined, header, read: (path: string) => new Uint8Array(readFileSync(join(folder, path))) } as never, out, encoder);
 }

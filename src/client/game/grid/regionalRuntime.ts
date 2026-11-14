@@ -24,8 +24,8 @@ import type { ShardManifest } from '../shard/manifest';
 import type { ShardPlayHost, ShardRuntime } from '../../../shared/game/shard/runtime';
 import type { ShardWorld } from '../../../server/game/shard/world';
 import type { HybridResident } from '../shardfile/hybrid';
-import type { AdmittedProduct } from '../shardfile/product';
-import { admittedRuntimeProduct, shardProductFromAdmission } from '../shardfile/runtimeProduct';
+import type { AdmittedFolder } from '../shardfile/folder';
+import { admittedRuntimeFolder, shardFolderFromAdmission } from '../shardfile/runtimeFolder';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import { enteredFullMap, shiftedFullMap, shiftedMinimap } from './mapFrame';
 import type { ResidencyAllocator, ResidencyLease } from '../../../shared/game/grid/allocator';
@@ -58,7 +58,7 @@ function sameMeasurement(a: RuntimeCost, b: RuntimeCost): boolean {
  * The selected image path uses its separate images-first measurement when declared. The caller reserves these bytes
  * through the page's ordinary allocator before constructing the regional shell.
  */
-export function regionalRuntimeAccountedBytes(admitted: Pick<AdmittedProduct, 'source'>, manifest: Pick<ShardManifest, 'slug' | 'runtimeCost'>, textureMode?: 'img' | 'ktx2'): number {
+export function regionalRuntimeAccountedBytes(admitted: Pick<AdmittedFolder, 'source'>, manifest: Pick<ShardManifest, 'slug' | 'runtimeCost'>, textureMode?: 'img' | 'ktx2'): number {
   const { source } = admitted;
   const { slug: declaredIdentity } = source.identity, { slug: registeredIdentity } = manifest;
   if (declaredIdentity !== registeredIdentity) throw new Error('Regional runtime identity differs from its trusted manifest');
@@ -92,7 +92,7 @@ export interface RegionalRuntimeRequest {
   readonly cell: GridCell;
   /** Actual requested approach in destination cell metres; absent for non-crossing callers. */
   readonly entryPoint?: Readonly<{ x: number; z: number }>;
-  readonly admitted: AdmittedProduct;
+  readonly admitted: AdmittedFolder;
   readonly manifest: ShardManifest;
   readonly page: RegionalRuntimePage;
   /** Resolved before the whole-runtime claim; absent only in renderer-free compositions. */
@@ -267,7 +267,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
       };
       const resident: HybridResident = { instance: request.cell.instance, slug: request.cell.slug, declaration, firstParty: true,
         ...(foundation.renderReady === undefined ? {} : { renderReady: foundation.renderReady }),
-        scope, product: shardProductFromAdmission(request.admitted, scope), runtime: parent, retainRuntime: true, context: (owner, runtime) => {
+        scope, product: shardFolderFromAdmission(request.admitted, scope), runtime: parent, retainRuntime: true, context: (owner, runtime) => {
           viewmodelSets ??= startViewmodelTextures(request.manifest.boot?.viewmodelSets ?? false);
           localRuntime = runtime; runtime.world = { ...world, registry: view.registry }; runtime.play = null;
           runtime.interactables.length = 0; runtime.overhead.length = 0;
@@ -280,7 +280,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
           view.root.add(installation.context.root);
           const base = shardContext(installation.context, request.manifest, { ...request.page.context.game,
             runtime, shard: request.manifest, rows: new Map(), declaredAudio: request.admitted.source.audio },
-            shardProductFromAdmission(request.admitted, scope));
+            shardFolderFromAdmission(request.admitted, scope));
           const context: ShardContext = { ...base, rows: { ...base.rows, skin: values => {
             base.rows.skin(values);
             const list: readonly SkinDef[] = Array.isArray(values) ? values : [values as SkinDef];
@@ -455,7 +455,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
               // its admitted transport fed, so keep none of it (Nalati's 45 MB of product files stayed in a Simulator
               // interior's JS heap, T10). A later read rechecks the immutable cache or the network, as a released tile does;
               // a file with no reread stays.
-              admittedRuntimeProduct(request.admitted.source.identity.slug)?.assets.releaseAll();
+              admittedRuntimeFolder(request.admitted.source.identity.slug)?.assets.releaseAll();
               void request.admitted.releaseTransport?.(request.admitted.assets.keys(), 'cache-or-fetch').catch(() => undefined);
             },
           };

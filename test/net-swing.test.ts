@@ -15,18 +15,18 @@ import { directLoopback } from '../src/test/engine/netLoopback';
 import { readNativeRangedItem } from '../src/server/game/plugin/nativeItems';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { STARTER_MELEE_PROFILE } from '../src/shared/game/weapons/starterCombat';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // P1-E5.3-E1, E4 (J47): what the client predicts of an attack against what the server ran, in a real room on a real shard.
 const DT = 1 / 60;
 
 async function shard(slug: string): Promise<TrustedHeadlessResident> {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });

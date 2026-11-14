@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** The files a shard's named places are published in. */
 const PLACE_FILES = ['quests/page-composition.json', 'quests/discovery.json', 'quests/content.json'];
@@ -13,7 +13,7 @@ const File = v.object({ places: v.optional(v.array(Row)) });
  * Every authored discovery. Scene-relative places have no server position, but remain valid names.
  * Only those authored names may use the page's distance assertion.
  */
-export async function serverDiscoveries(product: Pick<ShardProduct, 'hasFile' | 'json'>): Promise<readonly { readonly id: string; readonly area: PlaceArea | null }[]> {
+export async function serverDiscoveries(product: Pick<ShardFolder, 'hasFile' | 'json'>): Promise<readonly { readonly id: string; readonly area: PlaceArea | null }[]> {
   for (const name of PLACE_FILES) {
     if (!product.hasFile(name)) continue;
     const { places } = v.parse(File, await product.json<unknown>(name));
@@ -27,6 +27,6 @@ export async function serverDiscoveries(product: Pick<ShardProduct, 'hasFile' | 
 }
 
 /** Positioned discoveries used for respawn; scene-relative discoveries remain in the admission allowlist. */
-export async function serverPlaces(product: Pick<ShardProduct, 'hasFile' | 'json'>): Promise<readonly PlaceArea[]> {
+export async function serverPlaces(product: Pick<ShardFolder, 'hasFile' | 'json'>): Promise<readonly PlaceArea[]> {
   return (await serverDiscoveries(product)).flatMap(row => row.area === null ? [] : [row.area]);
 }

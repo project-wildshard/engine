@@ -49,7 +49,7 @@ import type { NeighbourRegion } from './neighbourLife';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { HomeResidencyClaim } from './pageResidency';
 import { LiveGridHost, type LiveGridAdmission, type LiveGridFrame, type LiveGridRegion, type LiveGridState } from './live';
-import { prepareApproachProductInputs } from './approachProductInputs';
+import { prepareApproachFolderInputs } from './approachFolderInputs';
 import { installGridCrossing, type GridCheckpointResult, type GridCrossingSession, type GridCrossingState } from '../../../shared/game/grid/crossing';
 import { GridWallet, stowGridMount } from '../../../shared/game/grid/wallet';
 import type { LedgerCatalogueItem } from '../../../shared/game/ledger';
@@ -58,10 +58,10 @@ import { installGridTravellerCombat } from '../../../shared/game/grid/travellerC
 import { gridHomeSim, gridCells, type GridHomeSimulation } from '../plugin/context';
 import { gateEnters } from './cellPresence';
 import { findShard } from '../shard/registry';
-import { gridPostCosts, gridShardfileProduct, prioritizeGridProduct, type GridProductMetadata } from './products';
+import { gridPostCosts, gridShardfileFolder, prioritizeGridFolder, type GridFolderMetadata } from './folders';
 import { preparationAdmission, type GridAdmissionMetadata } from './preparationAdmission';
 import { gridPostPairRefusal } from '../../../shared/game/grid/postPairs';
-import {productPostCost} from '../shardfile/productCost';
+import {folderPostCost} from '../shardfile/folderCost';
 import { SERVER_PLACED } from './pageEntry';
 import { gridRecovery, type GridRecoveryReason, type GridRecoveryRecord } from '../../../shared/game/grid/recovery';
 import { RoadRecovery, onRoad, type RoadPoint, type RoadRecoveryCell } from '../../../shared/game/grid/roadRecovery';
@@ -79,7 +79,7 @@ import { yieldGridAdmission, yieldGridConstruction } from './admissionYield';
 import { HybridRuntimeSession, type HybridResident } from '../shardfile/hybrid';
 
 import { enterPlotAudio, pagePlotAudioPorts, plotAudioScene, type PlotAudioPorts, type PlotAudioScene } from './plotAudio';
-import { shardProductFromAdmission } from '../shardfile/runtimeProduct';
+import { shardFolderFromAdmission } from '../shardfile/runtimeFolder';
 import { createRegionalRuntimeFactory, regionalRuntimeAccountedBytes, type PreparedRegionalRuntime, type RegionalRuntimePage, type RegionalRuntimeTextures } from './regionalRuntime';
 import { bindHomeBuildCache } from '../shardfile/homeBuildCache';
 import type { ClientTileRegistration } from '../shardfile/tileContent';
@@ -87,7 +87,7 @@ import { createRegionalWorldFoundation, hangCellDataSky, registerRegionalTexture
 import { regionalDataCellBytes } from './runtimeCost';
 import { resolveLevelBounds } from '../../../shared/game/shard/runtime';
 import { declaredPlayArea, type PlayArea } from '@wildshard/engine/game/shardfile/playArea';
-import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 import type { Bounds } from '@wildshard/engine/level/spec';
 import { pinFrameOffset } from '@wildshard/engine/ui/hudAdapters';
 
@@ -210,8 +210,8 @@ async function disposeInSteps(region: PreparedRegionalRuntime['region']): Promis
 }
 
 /** SS6b: each region product's declared play area, read once (the grid asks every fixed step). */
-const regionAreas = new WeakMap<ShardProduct, { readonly area: PlayArea | undefined }>();
-const regionArea = (product: ShardProduct, authored: Bounds | undefined): PlayArea | undefined => {
+const regionAreas = new WeakMap<ShardFolder, { readonly area: PlayArea | undefined }>();
+const regionArea = (product: ShardFolder, authored: Bounds | undefined): PlayArea | undefined => {
   let held = regionAreas.get(product);
   if (held === undefined) { held = { area: declaredPlayArea(authored, product) }; regionAreas.set(product, held); }
   return held.area;
@@ -306,9 +306,9 @@ export class LiveGridSession {
       } },
       admit: (cell, required) => this.admit(cell, required),
       buildAhead: true, // GC5 / GC36: the road builds the world ahead of its line
-      prepareTransport: (cell, signal) => prepareApproachProductInputs(cell.slug, { allocator: ports.allocator, scope }, signal, assembly.local(traveller.position, cell)),
+      prepareTransport: (cell, signal) => prepareApproachFolderInputs(cell.slug, { allocator: ports.allocator, scope }, signal, assembly.local(traveller.position, cell)),
       ...(ports.prepareNeighbourTiles === undefined ? {} : { prepareNeighbour: ports.prepareNeighbourTiles }),
-      prioritize: (cell) => prioritizeGridProduct(cell.slug, { allocator: ports.allocator, scope }),
+      prioritize: (cell) => prioritizeGridFolder(cell.slug, { allocator: ports.allocator, scope }),
       pause: () => yieldGridAdmission(scope),
       prefetchable: (cell) => { const manifest = findShard(cell.slug); return (manifest?.shardfile ?? manifest?.gridShardfile) !== undefined; },
       ...(ports.backgroundReady === undefined ? {} : { backgroundReady: ports.backgroundReady }),
@@ -666,8 +666,8 @@ export class LiveGridSession {
   private async prepareAdmission(cell: GridCell, choice: RegionalPreparationChoice, metadata: boolean, required = true): Promise<GridAdmissionMetadata | LiveGridAdmission> {
     if (!metadata) await this.ports.prepareStrips?.(cell);
     if (this.ports.scope.disposed || this.ports.scope.disposing) throw new Error('Grid admission scope disposed');
-    const productOwner = { allocator: this.ports.allocator, scope: this.ports.scope };
-    const pending = metadata ? gridShardfileProduct(cell.slug, productOwner, required ? 'metadata' : 'optional-metadata') : gridShardfileProduct(cell.slug, productOwner);
+    const folderOwner = { allocator: this.ports.allocator, scope: this.ports.scope };
+    const pending = metadata ? gridShardfileFolder(cell.slug, folderOwner, required ? 'metadata' : 'optional-metadata') : gridShardfileFolder(cell.slug, folderOwner);
     if (pending === null) throw new GridCellWaitingError(`${cell.slug} is not a shardfile shard (it stays a far proxy until M3)`);
     const product = await pending;
     const retained = metadata ? { ...product, release: () => undefined } : product;
@@ -682,7 +682,7 @@ export class LiveGridSession {
     // SF59: the original metadata admission owns the adjacent post-stack check.
     // Rehydration verifies input bytes without moving that policy check to each visit.
     if (metadata) {
-      const costs = gridPostCosts(this.ports.allocator), own = productPostCost(source, (hash) => assets.get(hash));
+      const costs = gridPostCosts(this.ports.allocator), own = folderPostCost(source, (hash) => assets.get(hash));
       const pair = gridPostPairRefusal(this.ports.assembly, cell, own, (slug) => costs.get(slug));
       if (pair !== null) throw new Error(pair);
     }
@@ -709,7 +709,7 @@ export class LiveGridSession {
           // the admitted terrain inside the cell (one source of truth); its strips are road level (the terrain tile ends at the cell edge)
           queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: copyPrompts(copySource),
           // AU20: the cell's declared audio scene, bound only while the feet stand in it (no entered hooks run here)
-          audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(shardProductFromAdmission(retained.admitted, shell.scope))) : null });
+          audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(shardFolderFromAdmission(retained.admitted, shell.scope))) : null });
         this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: source.entryways });
         // G321: its own sky inside its cell (its data look's dome and light), laid while it is resident
         {
@@ -745,9 +745,9 @@ export class LiveGridSession {
     } catch (error) { try { retained.release(); } finally { product.release(); } throw error; }
   }
 
-  private admitRuntime(cell: GridCell, retained: GridProductMetadata, choice: RegionalPreparationChoice, metadata: true): Promise<GridAdmissionMetadata>;
-  private admitRuntime(cell: GridCell, retained: GridProductMetadata, choice: RegionalPreparationChoice, metadata: false): Promise<LiveGridAdmission>;
-  private async admitRuntime(cell: GridCell, retained: GridProductMetadata, choice: RegionalPreparationChoice, metadata: boolean): Promise<GridAdmissionMetadata | LiveGridAdmission> {
+  private admitRuntime(cell: GridCell, retained: GridFolderMetadata, choice: RegionalPreparationChoice, metadata: true): Promise<GridAdmissionMetadata>;
+  private admitRuntime(cell: GridCell, retained: GridFolderMetadata, choice: RegionalPreparationChoice, metadata: false): Promise<LiveGridAdmission>;
+  private async admitRuntime(cell: GridCell, retained: GridFolderMetadata, choice: RegionalPreparationChoice, metadata: boolean): Promise<GridAdmissionMetadata | LiveGridAdmission> {
     const manifest = findShard(cell.slug), declaration = retained.admitted.source.runtime;
     const dataPage = hasDeclaredClientPage(retained.admitted.source);
     if (manifest === undefined || !dataPage && declaration === null) throw new GridCellWaitingError('Missing declared regional page owner');

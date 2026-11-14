@@ -5,10 +5,10 @@ import { socketLiftEntries } from '@wildshard/format/socketLiftAssets';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { carryPrompt, liftPrompt } from '../src/shared/game/shardfile/wirePrompts';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { tickCommands } from '../src/shared/host/tickProtocol';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 // J130: what a page's traversal prompts say to a server, on shipped products: a carry and a lift by name, a cable by its mode.
 let rapier: Rapier;
@@ -16,10 +16,10 @@ beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/ph
 
 const opened: TrustedHeadlessResident[] = [];
 afterEach(() => { for (const live of opened.splice(0)) live.dispose(); });
-let product: Awaited<ReturnType<typeof loadHeadlessProduct>>;
+let product: Awaited<ReturnType<typeof loadHeadlessFolder>>;
 async function resident(slug: string): Promise<TrustedHeadlessResident> {
-  const directory = builtProduct(slug);
-  product = await loadHeadlessProduct(directory);
+  const directory = builtFolder(slug);
+  product = await loadHeadlessFolder(directory);
   const assets = runtimeAssets(product, directory);
   const live = await createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });
   opened.push(live); return live;

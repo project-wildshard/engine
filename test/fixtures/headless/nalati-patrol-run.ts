@@ -4,8 +4,8 @@ import '../../../src/shared/engine/core/portableMathFirst';
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Load only the admitted product and unchanged native physics bytes.
 import {readFileSync} from 'node:fs';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHostBytes,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
@@ -22,8 +22,8 @@ const phase = (name: string, tick?: number): void => {
   priorPhase = at;
 };
 phase('imports-ready');
-const directory=builtProduct('nalati-grasslands'); phase('product-selected');
-const product=await loadHeadlessProduct(directory),shard=product.shardfile; phase('product-loaded');
+const directory=builtFolder('nalati-grasslands'); phase('product-selected');
+const product=await loadHeadlessFolder(directory),shard=product.shardfile; phase('product-loaded');
 const descriptor=outputDescriptor(shard);assert.ok(descriptor);
 const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
 phase('assets-loaded');

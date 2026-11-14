@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterEach, expect, test, vi } from 'vitest';
 import { authorBundleCached } from '../scripts/author-bundle-cache.mjs';
-import { captureProductInputs, productInputKey, recordBundle, recordResolution } from '../scripts/shardfile-inputs.mjs';
+import { captureFolderInputs, folderInputKey, recordBundle, recordResolution } from '../scripts/shardfile-inputs.mjs';
 import { InputHashMemo } from '../scripts/bake-input-hashes.mjs';
 
 const owned:string[]=[];
@@ -40,18 +40,18 @@ test('reuses completed compilation and invalidates source or new resolution cand
 test('warm compiler replay keeps source and absent resolution dependencies in every product',async()=>{
   const f=fixture();await f.run();
   const receipt=resolve(f.root,'product.json');
-  await captureProductInputs(f.root,receipt,async()=>{
+  await captureFolderInputs(f.root,receipt,async()=>{
     const bundle=await f.run();expect(bundle.reused).toBe(true);
     recordBundle({output:[{type:'chunk',moduleIds:bundle.modules}]},{execution:true});
   });
-  expect(productInputKey(f.root,receipt,[],new InputHashMemo(f.root))).toBeDefined();
+  expect(folderInputKey(f.root,receipt,[],new InputHashMemo(f.root))).toBeDefined();
   writeFileSync(resolve(f.root,'dependency.ts'),'export const added=true;');
-  expect(productInputKey(f.root,receipt,[],new InputHashMemo(f.root))).toBeUndefined();
+  expect(folderInputKey(f.root,receipt,[],new InputHashMemo(f.root))).toBeUndefined();
 });
 
 test('a replayed compiler still refuses a foreign edit before the product finishes',async()=>{
   const f=fixture();await f.run();
-  await expect(captureProductInputs(f.root,resolve(f.root,'product.json'),async()=>{
+  await expect(captureFolderInputs(f.root,resolve(f.root,'product.json'),async()=>{
     const bundle=await f.run();expect(bundle.reused).toBe(true);
     recordBundle({output:[{type:'chunk',moduleIds:bundle.modules}]},{execution:true});
     execFileSync(process.execPath,['-e','require("node:fs").writeFileSync(process.argv[1],"changed")',f.source]);

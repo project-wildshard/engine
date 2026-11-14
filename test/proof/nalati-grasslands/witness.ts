@@ -1,5 +1,5 @@
 import { originalNalatiPhysics } from '../../fixtures/nalati-physics-original';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 // oxlint-disable-next-line import/no-nodejs-modules -- The renderer-denying native witness asserts the actual captured world.
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the admitted in-repository native terrain and navmesh.
@@ -11,7 +11,7 @@ import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes, type Sim
 import { restoreSimHost } from '../../../src/server/engine/sim/restore';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier';
 import { createNativeBakeReader } from '@wildshard/engine/game/population/nativeBake';
-import { prepareProductPlan as prepareHeadlessRuntime } from '../../fixtures/headless-native';
+import { prepareFolderPlan as prepareHeadlessRuntime } from '../../fixtures/headless-native';
 import { nalatiTamingWitness } from './taming';
 import { canonicalSimDigest, sameBytes } from '../../fake/simState';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
@@ -27,7 +27,7 @@ export async function nalatiNativeWitness(replay: boolean, gameplay = true): Pro
   assert.equal(typeof window, 'undefined'); assert.equal(typeof document, 'undefined');
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const assets = nalatiNativeAssets(source);
-  const plan = await prepareHeadlessRuntime({ shard: source, assets, rapier, product: await loadHeadlessProduct('out/nalati-grasslands') });
+  const plan = await prepareHeadlessRuntime({ shard: source, assets, rapier, product: await loadHeadlessFolder('out/nalati-grasslands') });
   const ports = { ...plan.ports, rapier };
   const effects = { commands: () => [], emit: (): never => { throw new Error('Partial native witness must not fabricate ledger ingress'); } };
   const first = createSimHost(plan.level, ports); let restored: SimHost | undefined;

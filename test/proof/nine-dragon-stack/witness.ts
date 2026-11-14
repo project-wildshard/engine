@@ -14,7 +14,7 @@ import { canonicalSimDigest, simWireV1 } from '../../fake/simState';
 import { decodeSimSnapshot } from '../../../src/shared/engine/sim/snapshot';
 import { createNativeProofAdapter } from '../../fixtures/headless-native';
 import { prepareHeadlessRuntime } from '../../fixtures/nine-headless';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 import type { TickWorkerHost } from '../../../src/server/host/tickWorkerHost';
 import { createNativeProofWorker } from '../../fixtures/headless-worker';
 import type { HeadlessCommand, HeadlessEffect } from '../../../src/shared/host/tickProtocol';
@@ -68,7 +68,7 @@ export const SCOPE = {
 } as const;
 
 const ROOT = new URL('../../../', import.meta.url);
-const product=await loadHeadlessProduct(fileURLToPath(new URL('out/nine-dragon-stack',ROOT)));
+const product=await loadHeadlessFolder(fileURLToPath(new URL('out/nine-dragon-stack',ROOT)));
 const source=product.shardfile,descriptor=outputDescriptor(source);
 if(descriptor===undefined)throw new Error('Missing verified Nine output');
 const assets = new Map(descriptor.index.files.map(file => {

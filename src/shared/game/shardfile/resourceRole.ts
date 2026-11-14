@@ -1,5 +1,5 @@
 /** Describe a transport's purpose without exposing content addresses as work. */
-export function productResourceRole(input: string, base = 'https://product.invalid/'): string {
+export function folderResourceRole(input: string, base = 'https://product.invalid/'): string {
   let path: string;
   try {path = new URL(input, base).pathname;}
   catch {return 'Product data';} // A label never replaces the transport's own refusal.

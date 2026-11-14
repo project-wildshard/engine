@@ -76,12 +76,12 @@ export interface CookIndex {
   readonly preparation?: CookJobReport['cook']['preparation'];
   /** SA48: where this upload's loose files are again (`looseFolder`); an index from before SA48 names none. */
   readonly loose?: string;
-  /** SA48: the page's admission row for these bytes (`productVerdict`'s, but for its path), under the validator revision the worker
+  /** SA48: the page's admission row for these bytes (`folderVerdict`'s, but for its path), under the validator revision the worker
    *  cooks with (`CookWorkerOptions.validator`). A page whose validator differs, or an index with none, leaves the shard out. */
   readonly verdict?: NonNullable<CookJobReport['receipt']> & {readonly revision: string};
 }
 
-/** SA47: a box reads the same key (`serverProduct.ts`), so it lives with the server pack's paths. */
+/** SA47: a box reads the same key (`serverFolder.ts`), so it lives with the server pack's paths. */
 export const indexKey: (build: string, hash: string) => string = cookIndexPath;
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 const CONTENT_NAMED = /(?:^|\/)[a-f0-9]{16,64}\.[a-z0-9.]+$|-[a-f0-9]{16}\.json$/u;

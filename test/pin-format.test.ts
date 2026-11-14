@@ -2,8 +2,8 @@
 // `brasscap-mesa`; `pins.ts install --from-format <slug>` admits either from the installed package alone.
 import { createHash } from 'node:crypto';
 import { expect, test } from 'vitest';
-import { prepareAssetDecoders } from '@wildshard/format/product';
-import { validateShardfileProduct } from '@wildshard/format/productValidation';
+import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
+import { validateShardfileFolder } from '@wildshard/format/shardfileValidation';
 import { readTar } from '@wildshard/format/tar';
 import { FORMAT_PRODUCTS, formatTemplate } from '../scripts/pin-format.ts';
 
@@ -15,7 +15,7 @@ test.each(Object.entries(FORMAT_PRODUCTS))('%s is admitted from the format depen
   expect(product.pin.hash).toBe(sha256(product.bytes));
   expect(product.source).toMatchObject({ kind: 'format-dependency', path: `@wildshard/format/${folder}` });
   await prepareAssetDecoders();
-  expect(() => validateShardfileProduct({
+  expect(() => validateShardfileFolder({
     read: path => { const body = files.get(path); if (body === undefined) throw new Error(`no ${path}`); return body; },
     paths: () => files.keys(),
   }, { hash: sha256 })).not.toThrow();

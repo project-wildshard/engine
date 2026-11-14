@@ -10,9 +10,9 @@ import { questBooks } from '../src/shared/engine/quest/players';
 import { talkChoice, talkFinish, talkLine } from '../src/shared/game/shardfile/talks';
 import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // TE-ENG3: a quest-giver from rows alone (`test/fixtures/declared-talk/rows.json`), on Template's product. Its talk offers a quest;
 // the accept starts it, a region lights the lamp, the report finishes it, and it pays its coins and files its fact.
@@ -24,7 +24,7 @@ interface TalkFixture {
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The fixture is the author's rows, typed as the format reads them.
 const fixture = JSON.parse(readFileSync('test/fixtures/declared-talk/rows.json', 'utf8')) as TalkFixture;
 async function withTalk(): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array>; rapier: Awaited<ReturnType<typeof loadRapier>> }> {
-  const directory = builtProduct('_template'), product = await loadHeadlessProduct(directory), base = product.shardfile, descriptor = outputDescriptor(base);
+  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), base = product.shardfile, descriptor = outputDescriptor(base);
   if (descriptor === undefined) throw new Error('Missing _template output');
   const server = descriptor.index.files.filter(file => serverReadsFile(file, base.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

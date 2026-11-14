@@ -15,11 +15,11 @@ import type { WorldSceneLentTexture } from '@wildshard/format/worldScenes';
 import { prepareLentLooks, setLentParam, setLentTexture } from './lentLooks';
 import { applyTextureSampler } from './clientMaterials';
 import type { SceneHandles } from './sceneHandles';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** Client-only: load each declared texture under `owner`, lend it to its compiled looks (they are lent first) and
  * publish a product texture that names a handle, and a volume with its numbers for the world's variant (`cube`). */
-export async function lendWorldSceneTextures(rows: readonly WorldSceneLentTexture[], owner: Scope, product: Pick<ShardProduct, 'file' | 'url'>, handles: SceneHandles, renderer: Renderer | undefined,
+export async function lendWorldSceneTextures(rows: readonly WorldSceneLentTexture[], owner: Scope, product: Pick<ShardFolder, 'file' | 'url'>, handles: SceneHandles, renderer: Renderer | undefined,
   cube: 'standalone' | 'cell'): Promise<void> {
   const products = rows.filter(row => row.kind === 'product');
   if (products.length > 0 && renderer === undefined) throw new Error('Product textures need the world renderer');
@@ -36,7 +36,7 @@ export async function lendWorldSceneTextures(rows: readonly WorldSceneLentTextur
         if (row.publish !== undefined) handles.publish(row.publish, texture);
         return;
       }
-      const texture = owner.own(row.kind === 'image' ? await loadTextureRow(row) : row.kind === 'layers' ? await loadLayers(row) : await loadProduct(row, product, loader));
+      const texture = owner.own(row.kind === 'image' ? await loadTextureRow(row) : row.kind === 'layers' ? await loadLayers(row) : await loadFolder(row, product, loader));
       if (owner.disposed) throw new Error('World scene textures unloaded while loading');
       if (row.kind === 'product') {
         if (row.publish !== undefined) handles.publish(row.publish, texture);
@@ -54,7 +54,7 @@ export async function lendWorldSceneTextures(rows: readonly WorldSceneLentTextur
 
 /** A baked volume: its deflated RGBA8 voxels as a linear 3D texture (GPU-only once uploaded), lent with its box to its looks. */
 async function lendVolume(row: Extract<WorldSceneLentTexture, { kind: 'volume' }>, volume: Extract<WorldSceneLentTexture, { kind: 'volume' }>['files']['cell']['phone'],
-  owner: Scope, product: Pick<ShardProduct, 'url'>, handles: SceneHandles): Promise<void> {
+  owner: Scope, product: Pick<ShardFolder, 'url'>, handles: SceneHandles): Promise<void> {
   const bytes = await fetchDeflatedBytes(product.url(volume.file)), [x, y, z] = volume.size;
   if (owner.disposed) throw new Error('World scene textures unloaded while loading');
   if (bytes.length !== x * y * z * 4) throw new Error(`Lent volume ${row.label} size differs`);
@@ -70,7 +70,7 @@ async function lendVolume(row: Extract<WorldSceneLentTexture, { kind: 'volume' }
 }
 
 /** A product's raw r8 texels as a data texture (its wrap and magnification; trilinear with mipmaps, else linear). */
-async function loadRaster(row: Extract<WorldSceneLentTexture, { kind: 'raster' }>, product: Pick<ShardProduct, 'file'>): Promise<Texture> {
+async function loadRaster(row: Extract<WorldSceneLentTexture, { kind: 'raster' }>, product: Pick<ShardFolder, 'file'>): Promise<Texture> {
   const bytes = Uint8Array.from(await product.file(row.file)), [width, height] = row.size;
   if (bytes.length !== width * height) throw new Error(`Lent raster ${row.label} size differs`);
   const texture = new DataTexture(bytes, width, height, RedFormat, UnsignedByteType);
@@ -81,7 +81,7 @@ async function loadRaster(row: Extract<WorldSceneLentTexture, { kind: 'raster' }
 }
 
 /** A product's own KTX2 blob for the tier (its encoded orientation, flipY false), sampled by its row; GPU-only once uploaded. */
-async function loadProduct(row: Extract<WorldSceneLentTexture, { kind: 'product' }>, product: Pick<ShardProduct, 'file'>, loader: KTX2Loader | null): Promise<Texture> {
+async function loadFolder(row: Extract<WorldSceneLentTexture, { kind: 'product' }>, product: Pick<ShardFolder, 'file'>, loader: KTX2Loader | null): Promise<Texture> {
   if (loader === null) throw new Error('Product textures need a KTX2 reader');
   const bytes = Uint8Array.from(await product.file(row.file[TIER]));
   const texture = await new Promise<Texture>((resolve, reject) => { loader.parse(bytes.buffer, resolve, reject); });

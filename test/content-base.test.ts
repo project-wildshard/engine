@@ -6,7 +6,7 @@ import {contentBase, contentURL, isContentOrigin, pageURL, readContentBase} from
 import {versionedUrl} from '../src/client/engine/boot/bytes';
 import {downloadSpawnManifest, releaseSpawnMembers, setSpawnPacks, shardPackBase, spawnHeldBytes, startSpawnDownload} from '../src/client/game/boot/spawnDownload';
 import {prefetchEntryReads} from '../src/client/game/grid/entryReadPrefetch';
-import {readServerProduct} from '../src/server/host/standalone/serverProduct';
+import {readServerFolder} from '../src/server/host/standalone/serverFolder';
 import type {Rapier} from '../src/shared/engine/physics/rapier';
 import {installAssetTables} from '../src/shared/engine/boot/tables';
 import {readAssetTables} from '../src/client/app/assetTables';
@@ -94,7 +94,7 @@ test('the solo server worker reads its book and parts under a set path', async (
   bank({contentBase: SET});
   const base = contentURL('/shardfiles/driftwood-isle/'), asked: string[] = [];
   const book = JSON.stringify({book: 'server', build: 'b1', shards: {'driftwood-isle': {parts: [{url: '/assets/spawn/server/0123456789abcdef.pack.br', bytes: 1, hash: 'a'.repeat(64), files: [['shard.json', 0, 1, 'b'.repeat(64)]]}]}}});
-  await readServerProduct(base, () => 'b1', url => { asked.push(url.href); return Promise.resolve(url.pathname.endsWith('.json') ? new TextEncoder().encode(book) : new Uint8Array([123])); }, {} as Rapier).catch(() => undefined);
+  await readServerFolder(base, () => 'b1', url => { asked.push(url.href); return Promise.resolve(url.pathname.endsWith('.json') ? new TextEncoder().encode(book) : new Uint8Array([123])); }, {} as Rapier).catch(() => undefined);
   expect(asked[0]).toBe(`${SET}assets/spawn/server-b1.json`);
   expect(asked.length).toBeGreaterThan(1);
   expect(asked.filter(url => !url.startsWith(SET))).toEqual([]);
@@ -134,11 +134,11 @@ test('a base moves shard products, programs, books, parts and art; code and phys
 });
 
 test('the runtime product reads from the content base', async () => {
-  const {productBase} = await import('../src/client/game/shardfile/runtimeProduct');
+  const {folderBase} = await import('../src/client/game/shardfile/runtimeFolder');
   bank({});
-  expect(productBase('driftwood-isle')).toBe(`${page()}shardfiles/driftwood-isle/`);
+  expect(folderBase('driftwood-isle')).toBe(`${page()}shardfiles/driftwood-isle/`);
   bank({contentBase: CDN});
-  expect(productBase('driftwood-isle')).toBe(`${CDN}shardfiles/driftwood-isle/`);
+  expect(folderBase('driftwood-isle')).toBe(`${CDN}shardfiles/driftwood-isle/`);
 });
 
 test('the entry-read record is read from the content base', async () => {
@@ -201,7 +201,7 @@ test('the solo server worker reads its book and parts from the base it is handed
   const base = contentURL('/shardfiles/driftwood-isle/'), asked: string[] = [];
   expect(base).toBe(`${CDN}shardfiles/driftwood-isle/`);
   const book = JSON.stringify({book: 'server', build: 'b1', shards: {'driftwood-isle': {parts: [{url: '/assets/spawn/server/0123456789abcdef.pack.br', bytes: 1, hash: 'a'.repeat(64), files: [['shard.json', 0, 1, 'b'.repeat(64)]]}]}}});
-  await readServerProduct(base, () => 'b1', url => { asked.push(url.href); return Promise.resolve(url.pathname.endsWith('.json') ? new TextEncoder().encode(book) : new Uint8Array([123])); }, {} as Rapier).catch(() => undefined);
+  await readServerFolder(base, () => 'b1', url => { asked.push(url.href); return Promise.resolve(url.pathname.endsWith('.json') ? new TextEncoder().encode(book) : new Uint8Array([123])); }, {} as Rapier).catch(() => undefined);
   expect(asked[0]).toBe(`${CDN}assets/spawn/server-b1.json`);
   expect(asked.length).toBeGreaterThan(0);
   expect(asked.every(url => url.startsWith(CDN))).toBe(true);

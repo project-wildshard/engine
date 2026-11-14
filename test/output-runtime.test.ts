@@ -64,7 +64,7 @@ it('admits the compiled Driftwood source without copying retired runtime data', 
   expect(writeRuntimeFiles(resolve('src/shards/driftwood-isle'), output)).toEqual({ files: [], lines: 0 });
 });
 
-it.each(['runtime/sections.ts','runtime/productSections.d.ts'])('refuses retired custom registry %s before deleting any output', path => {
+it.each(['runtime/sections.ts','runtime/folderSections.d.ts'])('refuses retired custom registry %s before deleting any output', path => {
   const {project,output}=fixture();
   put(project,path,'export {};');put(output,'runtime/keep.d.ts','keep');
   expect(()=>writeRuntimeFiles(project,output)).toThrow('Custom runtime registries are retired');

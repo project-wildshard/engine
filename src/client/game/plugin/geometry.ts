@@ -1911,8 +1911,8 @@ export function assembleWholeGeometryViews(nodes: readonly Mesh[], ownership: 'b
  * Source-object callers default to L0 tiles only. Explicit refs are unchanged; L1 proxies cannot rebuild exact originals.
  */
 export async function readWholeGeometry(scope: ResourceScope, source: Shardfile | string, refs?: readonly string[], pause?: () => Promise<void>): Promise<Map<string, WholeGeometryView>> {
-  const { runtimeProduct, slugRuntimeProduct } = await import('../shardfile/runtimeProduct');
-  const product = typeof source === 'string' ? slugRuntimeProduct(source) : runtimeProduct(source);
+  const { runtimeFolder, slugRuntimeFolder } = await import('../shardfile/runtimeFolder');
+  const product = typeof source === 'string' ? slugRuntimeFolder(source) : runtimeFolder(source);
   if (product === null) throw new Error('Whole geometry needs an admitted or declared product');
   const timing = clientPreparationBatch(product.source.identity.slug, 'whole', WHOLE_TIMING_PHASES);
   const props = typeof source === 'string' ? product.source.props : source.props;

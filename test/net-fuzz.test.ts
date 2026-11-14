@@ -1,7 +1,7 @@
 import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
-import { runtimeAssets } from './fixtures/engine-lift/product';
+import { runtimeAssets } from './fixtures/engine-lift/folder';
 // oxlint-disable-next-line import/no-nodejs-modules -- The server half runs the shipped product bytes and physics module.
-import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
+import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
 import { createTrustedHeadlessResident,type HeadlessRuntimeInput,type TrustedHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
@@ -26,7 +26,7 @@ import { serializeSimSnapshot,snapshotSimHostBytes } from '../src/shared/engine/
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { stepResident } from '../src/shared/host/standalone/netInput';
 import { directLoopback,type DirectLoopback } from '../src/test/engine/netLoopback';
-import { builtProduct } from './fixtures/engine-lift/product';
+import { builtFolder } from './fixtures/engine-lift/folder';
 import { bakedGridCollision } from './fixtures/gridCollision';
 import { Fuzz,Hostile } from './fixtures/net-hostile';
 import { ownedSetup } from './fixtures/ownedSetup';
@@ -58,7 +58,7 @@ function resident(input: HeadlessRuntimeInput, snapshot?: string): Promise<Trust
 async function product(slug: string): Promise<HeadlessRuntimeInput> {
   const held = products.get(slug);
   if (held !== undefined) return held;
-  const directory = builtProduct(slug), loaded = await loadHeadlessProduct(directory), descriptor = outputDescriptor(loaded.shardfile);
+  const directory = builtFolder(slug), loaded = await loadHeadlessFolder(directory), descriptor = outputDescriptor(loaded.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = runtimeAssets(loaded, directory);
   const input = { shard: loaded.shardfile, assets, rapier, product: loaded };

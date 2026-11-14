@@ -157,7 +157,7 @@ export interface ShardHalf {
   /** The header row, kept loose: it carries the build's validator stamp, so it changes every build (DL18). */
   readonly header: SpawnFile;
   /** The product's rows of one manifest, in manifest order. */
-  readonly productRows: (tier: CookTier, set: CookSet) => readonly SpawnFile[];
+  readonly folderRows: (tier: CookTier, set: CookSet) => readonly SpawnFile[];
   /** The mounts of one manifest. */
   readonly mountRows: (tier: CookTier, set: CookSet) => readonly SpawnFile[];
   readonly read: (url: string) => Uint8Array;
@@ -207,7 +207,7 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
   // S3: a shard's `fence` set is a phone's recorded reads, so a desktop always lists its whole level.
   const wholeSet = (tier: CookTier, set: CookSet): boolean => set === 'whole' && (!fenceSet || tier === 'desktop');
   const sources = new Map<string, () => Uint8Array>(), stableKeys = new Map<string, string>(), rows = new Map<string, SpawnFile>();
-  const productFile = (path: string, bytes: number, hash: string, name?: string): SpawnFile => {
+  const folderFile = (path: string, bytes: number, hash: string, name?: string): SpawnFile => {
     const url = CONTENT_NAMED.test(path) ? `${prefix}${path}` : `${prefix}${path}?v=${hash.slice(0, 8)}`;
     const kept = rows.get(url); if (kept !== undefined) return kept;
     const body = shard.read(path);
@@ -248,12 +248,12 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
     read: url => { const read = sources.get(url); if (read === undefined) throw new Error(`Spawn file has no source: ${url}`); return read(); },
     stableKey: url => stableKeys.get(url),
     mountBytes: row => (row.url === document?.url && documentBytes !== undefined ? documentBytes : shard.read(row.path)),
-    productRows: (tier, set) => {
+    folderRows: (tier, set) => {
       const selected: SpawnFile[] = [header, ...discovery];
-      for (const row of index.sections) selected.push(productFile(row.path, row.bytes, row.hash, `section:${row.name}`));
-      for (const row of index.schemas) selected.push(productFile(row.path, row.bytes, row.hash, `schema:${row.path}`));
+      for (const row of index.sections) selected.push(folderFile(row.path, row.bytes, row.hash, `section:${row.name}`));
+      for (const row of index.schemas) selected.push(folderFile(row.path, row.bytes, row.hash, `schema:${row.path}`));
       const wanted = entryReadSet(source, tier, index, sections, wholeSet(tier, set), fence.hashes);
-      for (const row of index.files) if (wanted.has(row.hash) || row.name?.startsWith('ui/images/card-') === true) selected.push(productFile(row.path, row.compressed, row.hash, row.name));
+      for (const row of index.files) if (wanted.has(row.hash) || row.name?.startsWith('ui/images/card-') === true) selected.push(folderFile(row.path, row.compressed, row.hash, row.name));
       return selected;
     },
     mountRows: (tier, set) => {
@@ -373,7 +373,7 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
   if (shard.preparation === 'stale') options.warn?.(stalePreparationLine(shard.slug));
   const half = await preparedShardHalf(shard, options.wireBytes, options.warn, shard.slug, options.tiers ?? await defaultCookTiers());
   const before = encoder.stats();
-  const table = COOK_TIERS.flatMap(tier => COOK_SETS.map(set => ({tier, set, rows: [...half.productRows(tier, set), ...half.mountRows(tier, set)]})));
+  const table = COOK_TIERS.flatMap(tier => COOK_SETS.map(set => ({tier, set, rows: [...half.folderRows(tier, set), ...half.mountRows(tier, set)]})));
   const whole = table.filter(row => row.set === 'whole');
   const parts = await writeSpawnParts(out, whole.map(row => ({rows: row.rows, public: row.tier === 'phone'})), half.read, half.stableKey, encoder);
   const after = encoder.stats(), manifests: CookReport['manifests'][number][] = [];

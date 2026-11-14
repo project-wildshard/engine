@@ -3,12 +3,12 @@ import '../../../src/shared/engine/core/portableMathFirst';
 // oxlint-disable-next-line import/no-nodejs-modules -- Assert real native input observations in the bounded child.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {openProductSession} from './productSession';
+import {openFolderSession} from './folderSession';
 import {nalatiCampIntroTape} from '../../proof/nalati-grasslands/verbTape';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import type {HeadlessTapeObservation,HeadlessTapePlan} from '../../../src/shared/host/headlessTape';
 
-const session=await openProductSession('nalati-grasslands','nalati-verbs');
+const session=await openFolderSession('nalati-grasslands','nalati-verbs');
 try{
   const {product,sim}=session;
   const press=(value:number):HeadlessCommand=>({kind:'script',actorId:'nalati.talk',value});

@@ -4,18 +4,18 @@ import { afterEach, beforeAll, expect, test } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
 import type { RoomNews } from '../src/server/host/dedicated/cellProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
 async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

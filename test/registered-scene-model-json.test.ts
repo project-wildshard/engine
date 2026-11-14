@@ -4,7 +4,7 @@ import {registeredJsonContract,validateRegisteredJson} from '@wildshard/format/r
 import {namedJsonSchema,registeredJsonSchema} from '@wildshard/engine/host/formatJsonSchema';
 import {nameBlob} from '@wildshard/sharddev/blobs';
 import {emptyShardfile} from '@wildshard/engine/host/author';
-import {createShardProduct} from '@wildshard/engine/game/shardfile/shardProduct';
+import {createShardFolder} from '@wildshard/engine/game/shardfile/shardFolder';
 
 const name='models/world-scenes.json';
 const raw={product:'orchard',models:[{key:'crate',id:'orchard/crate',name:'Crate',file:'crate.glb',category:'props',pipeline:'code',defaults:{},
@@ -21,7 +21,7 @@ test('scene catalogues bind their original shared schema without rewriting the w
 test('catalogue reads retain consumer-owned defaults and mutable authored data',async()=>{
   const identity={slug:'catalogue-fixture',name:'Catalogue',author:'Test',revision:1,seed:1};
   for(const builtJson of [false,true]){
-    const product=createShardProduct({slug:identity.slug,revision:1,shardfile:emptyShardfile(identity),sections:new Map(),
+    const product=createShardFolder({slug:identity.slug,revision:1,shardfile:emptyShardfile(identity),sections:new Map(),
       files:new Map([[name,{hash:'a'.repeat(64),url:'/original',jsonSchema:registeredJsonSchema(name)}]]),read:()=>Promise.resolve(bytes()),builtJson});
     const value=await product.json(name);expectTypeOf(value).toBeUnknown();expect(value).toEqual(raw);
     expect(Object.isFrozen(value)).toBe(false);

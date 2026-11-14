@@ -139,13 +139,13 @@ export async function prepareEmbeddedDirector(data: unknown, module: { readonly 
   return () => create(seed);
 }
 
-const embeddedProduct = v.strictObject({ declaration: v.unknown(), module: v.strictObject({ module: v.string(), bytes: v.string(), file: v.exactOptional(v.pipe(v.string(),v.minLength(1),v.maxLength(240))) }),
+const embeddedFolder = v.strictObject({ declaration: v.unknown(), module: v.strictObject({ module: v.string(), bytes: v.string(), file: v.exactOptional(v.pipe(v.string(),v.minLength(1),v.maxLength(240))) }),
   stages: v.unknown(), bindings: v.unknown(), seed: v.number() });
 /** Read the verified binary file and stage contracts from the admitted product; inline modules refuse. */
-export async function readDirectorProduct(product: { file: (name: string) => Promise<Uint8Array> }, scope?: { readonly disposed: boolean; readonly disposing?: boolean }): Promise<{
+export async function readDirectorDocument(product: { file: (name: string) => Promise<Uint8Array> }, scope?: { readonly disposed: boolean; readonly disposing?: boolean }): Promise<{
   readonly create: () => DirectorLane; readonly bytes: Uint8Array; readonly stages: unknown;
 }> {
-  const data = v.parse(embeddedProduct, JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await product.file('directors/main.json'))));
+  const data = v.parse(embeddedFolder, JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await product.file('directors/main.json'))));
   if (data.module.file === undefined) throw new Error('Director requires a named binary file');
   if (data.module.bytes !== '' || data.module.module !== parseDirector(data.declaration).module) throw new Error('Raw director module is stale or mixed');
   const module = { ...data.module, bytes: await product.file(data.module.file) };

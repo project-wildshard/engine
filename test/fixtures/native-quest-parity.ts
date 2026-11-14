@@ -3,8 +3,8 @@ import { expect, test, vi } from 'vitest';
 import { ReturnProgram } from '../../src/shared/game/population/returnProgram';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read only admitted product and native physics bytes.
 import { readFileSync } from 'node:fs';
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
-import { createNativeProofResident, prepareProductPlan } from './headless-native';
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
+import { createNativeProofResident, prepareFolderPlan } from './headless-native';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier } from '../../src/shared/engine/physics/rapier';
 import legacy from './quest-step-legacy-saves.json' with { type: 'json' };
@@ -33,12 +33,12 @@ export function nativeQuestParity(slug: 'driftwood-isle' | 'pine-hollow', witnes
   }, 300_000);
 
   test(`${slug}: an existing native quest envelope retains its exact bytes`, async () => {
-    const product = await loadHeadlessProduct(`out/${slug}`), descriptor = outputDescriptor(product.shardfile);
+    const product = await loadHeadlessFolder(`out/${slug}`), descriptor = outputDescriptor(product.shardfile);
     if (descriptor === undefined) throw new Error('Missing admitted native product');
     const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash,
       Uint8Array.from(readFileSync(`out/${slug}/${file.path}`))]));
     const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
-    const resident = await createNativeProofResident({ product, shard: product.shardfile, assets, rapier }, prepareProductPlan);
+    const resident = await createNativeProofResident({ product, shard: product.shardfile, assets, rapier }, prepareFolderPlan);
     try {
       const fixture = legacy[slug], owner = resident.host.adapters.get(fixture.adapter);
       if (owner === undefined) throw new Error('Missing existing quest save owner');

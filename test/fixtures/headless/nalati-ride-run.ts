@@ -5,21 +5,21 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native behavior assertions run in this bounded child.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {mountedPlayerOf} from '../../../src/server/game/riding/native';
 import {createNativeProofResident} from '../headless-native';
 import {createNativeProofWorker} from '../headless-worker';
-import {productHeadlessSections} from '../../../src/shared/host/headlessSections';
+import {folderHeadlessSections} from '../../../src/shared/host/headlessSections';
 import {runTrustedHeadlessTape,type HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {prepareHeadlessRuntime} from '../nalati-verbs';
 import {nalatiCampTalkTape} from '../../proof/nalati-grasslands/verbTape';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
-const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),source=product.shardfile;
+const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),source=product.shardfile;
 const descriptor=outputDescriptor(source);assert.ok(descriptor);
 const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,
   Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
@@ -54,7 +54,7 @@ try{
   step([{kind:'script',actorId:'nalati.ride',value:2}]);assert.equal(mounted.mounted,false);mark('dismount');
 }finally{resident.dispose();}
 
-const replay=await createNativeProofWorker(source,assets,'nalati-verbs',undefined,productHeadlessSections(product),directory);
+const replay=await createNativeProofWorker(source,assets,'nalati-verbs',undefined,folderHeadlessSections(product),directory);
 try{
   const segments:HeadlessTapeSegment[]=[];let start=0;
   for(const mark of marks){segments.push({id:mark.id,ticks:mark.tick-start,commands:[],frames:frames.slice(start,mark.tick)});start=mark.tick;}

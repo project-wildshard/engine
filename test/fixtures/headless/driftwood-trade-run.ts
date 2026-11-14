@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- The native worker uses the original checked-in physics binary.
 import { readFileSync,writeFileSync,statSync } from 'node:fs';
 import * as v from 'valibot';
-import { beginProductSession } from './productSession';
+import { beginFolderSession } from './folderSession';
 import { checkedReplayPipeline } from './checkedReplayPipeline';
 import { createNativeProofResident } from '../headless-native';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier';
@@ -28,16 +28,16 @@ if(stage!=='counter'){
   const wire=readFileSync(inputPath,'utf8');assert.equal(tradeHash(wire),inputHash);
   inherited=v.parse(TradeHandoffSchema,tradeRead(wire));
 }
-const started=performance.now(), session=await beginProductSession('driftwood-isle','driftwood-trade',inherited?.positive), {product,assets}=session;
+const started=performance.now(), session=await beginFolderSession('driftwood-isle','driftwood-trade',inherited?.positive), {product,assets}=session;
 const source=outputDescriptor(product.shardfile)?.indexHash;assert.ok(source);
 if(inherited!==undefined)checkTradeHandoff(inherited,source,stage==='purse'?'counter':'purse');
 const inheritedLength=inherited?.parts.length??0,prefix=inherited===undefined?undefined:tradeHash(tradeWire(inherited.parts,true));
 const trace=(phase:string)=>console.info(JSON.stringify({phase,ms:performance.now()-started}));
-let restoredSession:Awaited<ReturnType<typeof beginProductSession>>|undefined;
-let stopReplay:(()=>Promise<void>)|undefined, negativeSession:Awaited<ReturnType<typeof beginProductSession>>|undefined;
+let restoredSession:Awaited<ReturnType<typeof beginFolderSession>>|undefined;
+let stopReplay:(()=>Promise<void>)|undefined, negativeSession:Awaited<ReturnType<typeof beginFolderSession>>|undefined;
 let resident:Awaited<ReturnType<typeof createNativeProofResident>>|undefined, releaseRopes=()=>{ /* No walk owner before installation. */ };
 try {
-  negativeSession=await beginProductSession('driftwood-isle','driftwood-trade',inherited?.negative);
+  negativeSession=await beginFolderSession('driftwood-isle','driftwood-trade',inherited?.negative);
   const negativeOwner=negativeSession;
   const negativeOutcome=(async()=>{try{return {ok:true as const,sim:await negativeOwner.ready()};}
     catch(error){return {ok:false as const,error};}})();
@@ -156,7 +156,7 @@ try {
     console.info(JSON.stringify({story:`driftwood-trade-${stage}`,ticks,commands:commandsCount,parts:parts.length,coins:economy.purse().coins,omitted,hash:tradeHash(wire),milliseconds:performance.now()-started}));
   }else{
   assert.ok(omitted>=4);const before=economy.purse().coins+price;
-  restoredSession=await beginProductSession('driftwood-isle','driftwood-trade',finalSnapshot);
+  restoredSession=await beginFolderSession('driftwood-isle','driftwood-trade',finalSnapshot);
   const restored=await restoredSession.ready(),suffixTicks=120,suffixEffects:HeadlessEffect[]=[];
   let suffixPeakY=leadPlayer(host).position.y;assert.ok(parts.length+1<=128);
   for(let i=0;i<suffixTicks;i++){ticks++;assert.ok(ticks<=30_000);active.step([]);suffixEffects.push(...structuredClone(active.effects));suffixPeakY=Math.max(suffixPeakY,leadPlayer(host).position.y);}

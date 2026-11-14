@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import { CellMinimaps } from './minimapBlend';
-import { ApproachInputsDeferredError } from './productInputs';
+import { ApproachInputsDeferredError } from './folderInputs';
 
 test('optional map headroom retries only after cost changes and stops at disposal', async () => {
   const previous = globalThis.document; vi.stubGlobal('document', {});

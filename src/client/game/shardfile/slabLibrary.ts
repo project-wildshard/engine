@@ -7,8 +7,8 @@ import { workSlice } from '@wildshard/engine/core/workSlice';
 import { nativeWholeGeometry } from '@wildshard/engine/models/nativeGeometry';
 import type { WorldScenesSection } from '@wildshard/format/worldScenes';
 import type { WorldSceneSlabChunk, WorldSceneSlabFile, WorldSceneSlabKey, WorldSceneSlabLibrary } from '@wildshard/format/worldSceneSlabs';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
-import { runtimeProduct } from './runtimeProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
+import { runtimeFolder } from './runtimeFolder';
 import { SharedTileBuilds, type TileContent } from './tileContent';
 import type { ControlRefinement } from './controlRefinement';
 
@@ -29,11 +29,11 @@ const chunksOf = (entry: SlabTile): readonly WorldSceneSlabChunk[] => entry.file
  * key, tile and place), taken with its native channels exactly as baked and its frozen bounds from the row. Parser
  * staging never outlives the read.
  */
-async function readSlabChunks(owner: Scope, product: ShardProduct, tile: number, file: WorldSceneSlabFile): Promise<BufferGeometry[]> {
+async function readSlabChunks(owner: Scope, product: ShardFolder, tile: number, file: WorldSceneSlabFile): Promise<BufferGeometry[]> {
   const live = (): void => { if (owner.disposed || owner.disposing) throw new Error('Slab owner is retired'); };
   live();
   if (product.shardfile.files.find(row => row.hash === file.file)?.kind !== 'glb') throw new Error('Slab file needs a declared GLB');
-  const admitted = runtimeProduct(product.shardfile);
+  const admitted = runtimeFolder(product.shardfile);
   if (admitted === null) throw new Error('Slab file needs an admitted product');
   const staging = new Set<BufferGeometry>(), materials = new Set<Material>(), out: BufferGeometry[] = [];
   try {
@@ -77,7 +77,7 @@ export class SlabLibrary {
   private readonly keys = new Map<string, WorldSceneSlabKey>();
   private serial = 0;
   private publication: Promise<void> = Promise.resolve();
-  constructor(owner: Scope, product: ShardProduct, private readonly whole: WholeLibrary, private readonly row: WorldSceneSlabLibrary,
+  constructor(owner: Scope, product: ShardFolder, private readonly whole: WholeLibrary, private readonly row: WorldSceneSlabLibrary,
     private readonly queue: ControlRefinement, private readonly cover: (tile: number) => Promise<void>,
     private readonly prepare?: (part: InstancedMesh, owner: Scope, anchor: Mesh) => Promise<void>) {
     if (row.of !== whole.id) throw new Error('Slab library covers another library');

@@ -9,7 +9,7 @@ import { loadRapier } from '../../../src/shared/engine/physics/rapier';
 import { leadPlayer } from '../../../src/shared/engine/sim/leadPlayer';
 import { NetRoom } from '../../../src/server/engine/net/room';
 import { SimNetWorld } from '../../../src/server/engine/net/simWorld';
-import { readPackProduct } from '../../../src/server/host/dedicated/packReader';
+import { readPackFolder } from '../../../src/server/host/dedicated/packReader';
 import { createTrustedHeadlessResident } from '../../../src/server/host/headlessRuntime';
 import { netTickCommands } from '../../../src/shared/host/standalone/netInput';
 import { tickCommands } from '../../../src/shared/host/tickProtocol';
@@ -18,7 +18,7 @@ import { directLoopback, type DirectLoopback } from '../../../src/test/engine/ne
 // E7.3e's headroom reading: `net-bots`' 32-player room, its same thumb, on whatever core this runs on. A reading, not a gate.
 const [origin = '', cache = '', slug = 'driftwood-isle', build = 'dev', wasm = ''] = process.argv.slice(2), PLAYERS = 32, WARM = 300, TICKS = 1800;
 installAppIdentity({ name: '', wordmark: '', tagline: '', savePrefix: 'wildshard.room.', saveFormat: '', fileSlug: '', exposeProbe: () => undefined, harness: () => undefined });
-const rapier = await loadRapier(readFileSync(wasm)), input = await readPackProduct(slug, build, rapier, { origin, cache }, { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 });
+const rapier = await loadRapier(readFileSync(wasm)), input = await readPackFolder(slug, build, rapier, { origin, cache }, { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 });
 const live = await createTrustedHeadlessResident(input), { host } = live, world = new SimNetWorld(host), spawn = leadPlayer(host).position;
 const room = new NetRoom({ world, step: inputs => {
   const [lead, ...others] = inputs, commands = new Map<string, NetCommand>();

@@ -5,8 +5,8 @@ import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { baselineCeilings } from './parity/budgetCeilings.mjs';
 import { shardFolders } from './shard-folders.mjs';
-import { productManifestPath } from './authored-manifest.mjs';
-import { shardProducts } from './shard-outputs.mjs';
+import { folderManifestPath } from './authored-manifest.mjs';
+import { builtShardFolders } from './shard-outputs.mjs';
 import { keptBudgets } from './budget-ratchet.mjs';
 
 await import('./bake-loader.mjs');
@@ -30,7 +30,7 @@ if (options.reports) for (const file of readdirSync(options.reports).filter((nam
 const measured = baselineCeilings(records), ratchetPath = join(root, 'lint/ratchet.json'), ratchet = JSON.parse(readFileSync(ratchetPath, 'utf8'));
 const current = join(root, 'budgets/calibration.json'), calibration = existsSync(current) ? parseCalibration(readFileSync(current, 'utf8')) : null;
 const specs = new Map();
-for (const product of shardProducts(root, shardFolders(root))) { const { default: manifest } = await import(join(root, productManifestPath(root, product))); specs.set(product.slug, manifest.budgets ?? {}); }
+for (const product of builtShardFolders(root, shardFolders(root))) { const { default: manifest } = await import(join(root, folderManifestPath(root, product))); specs.set(product.slug, manifest.budgets ?? {}); }
 const next = { ...ratchet.budgets };
 for (const [slug, inputs] of specs) for (const [tier, poses] of Object.entries(inputs.ceilings ?? {})) for (const [pose, limits] of Object.entries(poses)) for (const [metric, ceiling] of Object.entries(limits)) {
   const key = `${slug}.${tier}.${pose}.${metric}`; next[key] = Math.min(next[key] ?? ceiling, ceiling);

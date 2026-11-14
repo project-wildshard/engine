@@ -9,7 +9,7 @@ import {channel} from 'node:diagnostics_channel';
 import {afterEach,expect,test} from 'vitest';
 import {trimGenerationCache} from '../scripts/generation-cache-prune.mjs';
 import {InputHashMemo} from '../scripts/bake-input-hashes.mjs';
-import {captureProductInputs,productInputKey,productToolchainKey,publishProductInputs,recordBundle} from '../scripts/shardfile-inputs.mjs';
+import {captureFolderInputs,folderInputKey,folderToolchainKey,publishFolderInputs,recordBundle} from '../scripts/shardfile-inputs.mjs';
 import {publishSourceSnapshot,sourceSnapshotIdentity} from '../scripts/source-input-proof.mjs';
 import {shardfileValidationRevision} from '../scripts/shardfile-validation-revision.mjs';
 
@@ -28,11 +28,11 @@ async function fixture() {
  const env={WS_GENERATION_TREE_ROOT:root,WS_GENERATION_TREE_FILES:inventory};
  const receipts:string[]=[];
  for(const product of products) {
-  const source=`src/shards/${product}/shard.config.ts`,memo=new InputHashMemo(root),recipe=[product,'--copy-runtime',`${productToolchainKey(root,memo)}:${shardfileValidationRevision(root)}`];
+  const source=`src/shards/${product}/shard.config.ts`,memo=new InputHashMemo(root),recipe=[product,'--copy-runtime',`${folderToolchainKey(root,memo)}:${shardfileValidationRevision(root)}`];
   const at=resolve(root,`${product}.inputs`);
-  await captureProductInputs(root,at,async()=>{readFileSync(resolve(root,source));recordBundle({output:[]});channel('wildshard.generation-key').publish({key:product==='alpha'?live:shared});await Promise.resolve();});
-  const key=productInputKey(root,at,recipe,memo);if(key===undefined)throw new Error('Missing receipt');
-  const directory=resolve(cache,'.inputs-v2',product,digest(JSON.stringify(recipe)));publishProductInputs(directory,at,key);receipts.push(resolve(directory,`${key}.json`));
+  await captureFolderInputs(root,at,async()=>{readFileSync(resolve(root,source));recordBundle({output:[]});channel('wildshard.generation-key').publish({key:product==='alpha'?live:shared});await Promise.resolve();});
+  const key=folderInputKey(root,at,recipe,memo);if(key===undefined)throw new Error('Missing receipt');
+  const directory=resolve(cache,'.inputs-v2',product,digest(JSON.stringify(recipe)));publishFolderInputs(directory,at,key);receipts.push(resolve(directory,`${key}.json`));
   for(const target of [resolve(root,'out',product),resolve(cache,product,key)]) {
    write(target,'.build-key',key);write(target,'shard.json','{}');write(target,'validation.json',JSON.stringify({buildKey:key,indexHash:digest('{}')}));
   }

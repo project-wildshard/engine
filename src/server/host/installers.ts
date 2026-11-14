@@ -6,7 +6,7 @@
 // installer registered: NET-LAG NL5's rope bridge (a page-built `rope-deck` the room never built) is that shape.
 import { CLIENT_FEATURE_SIDES, WORLD_ASSEMBLY_STAGE_SIDES, type SideEntry } from '@wildshard/format/featureSides';
 import type { ServerInstallerKey } from '@wildshard/engine/game/shardfile/installedSides';
-import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 
 /** Every SS2 server key, and the engine owner(s) that register it. A key SS2 adds without an entry here fails
  *  `test/side-installers.test.ts`. */
@@ -41,7 +41,7 @@ export interface ServerSide { readonly where: 'client/plan' | 'world.assembly'; 
 const serverKey = (entry: SideEntry | undefined): string | null => entry === undefined || entry.side === 'view' ? null : entry.server;
 
 /** Every `both` or `server` kind a product's `client/plan` declares, once each. A product with no plan has none. */
-export function serverSides(product: Pick<ShardProduct, 'has' | 'section'>): readonly ServerSide[] {
+export function serverSides(product: Pick<ShardFolder, 'has' | 'section'>): readonly ServerSide[] {
   if (!product.has('client/plan')) return [];
   const out = new Map<string, ServerSide>(), add = (where: ServerSide['where'], kind: string, entry: SideEntry | undefined): void => {
     // admission (SS2) refuses an unsided kind, so a kind with no entry never reaches a room
@@ -57,6 +57,6 @@ export function serverSides(product: Pick<ShardProduct, 'has' | 'section'>): rea
 }
 
 /** Each sided kind of `product` whose server key is not in `keys` (a booted host's `installedKeys`), as `<where> <kind> (<key>)`. */
-export function missingInstallers(product: Pick<ShardProduct, 'has' | 'section'>, keys: ReadonlySet<string>): readonly string[] {
+export function missingInstallers(product: Pick<ShardFolder, 'has' | 'section'>, keys: ReadonlySet<string>): readonly string[] {
   return serverSides(product).filter(side => !keys.has(side.key)).map(side => `${side.where} ${side.kind} (${side.key})`);
 }

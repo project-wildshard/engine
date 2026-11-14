@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the shipped native physics bytes.
 import {readFileSync} from 'node:fs';
 import * as v from 'valibot';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {createNativeProofResident} from '../headless-native';
 import {prepareHeadlessRuntime} from '../nalati-weapons-native';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
@@ -24,7 +24,7 @@ const State=v.object({slot:v.string(),shots:v.number(),bolts:v.number(),fullDraw
   moves:v.array(v.string()),passes:v.number(),passDamage:v.number(),thrusts:v.number(),throws:v.number(),ammo:v.number(),
   draw:v.object({drawT:v.number()}),swing:v.object({charging:v.boolean(),chargeT:v.number()}),
   javelins:v.array(v.object({state:v.number()}))});
-const session=await beginProductSession('nalati-grasslands','nalati-weapons'),{product,assets}=session;
+const session=await beginFolderSession('nalati-grasslands','nalati-weapons'),{product,assets}=session;
 const replay=await session.ready();
 const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
 const resident=await createNativeProofResident({shard:product.shardfile,product,assets,rapier},prepareHeadlessRuntime).catch(async(error:unknown)=>{

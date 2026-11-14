@@ -8,7 +8,7 @@
  *  file at `/shardfiles/<slug>/<path>`, or an engine file: the caller says which URLs its host serves itself. */
 
 /** Read access to one product: the paths it holds and the bytes of one of them. */
-export interface Ktx2TableProduct {
+export interface Ktx2TableFolder {
   readonly paths: () => Iterable<string>;
   readonly read: (path: string) => Uint8Array;
 }
@@ -35,7 +35,7 @@ export function ktx2TableTargets(table: unknown): readonly string[] {
 }
 
 /** The table's targets nothing serves, each once, first missing first. */
-export function missingKtx2Targets(product: Ktx2TableProduct, engineFile: (url: string) => boolean = () => false): { readonly total: number; readonly missing: readonly string[] } {
+export function missingKtx2Targets(product: Ktx2TableFolder, engineFile: (url: string) => boolean = () => false): { readonly total: number; readonly missing: readonly string[] } {
   const paths = new Set(product.paths());
   const discovery = [...paths].find(path => DISCOVERY.test(path));
   if (discovery === undefined) return { total: 0, missing: [] };
@@ -55,7 +55,7 @@ export function missingKtx2Targets(product: Ktx2TableProduct, engineFile: (url: 
 }
 
 /** Refuse a product whose KTX2 table names a file nothing serves. */
-export function assertKtx2TableTargets(product: Ktx2TableProduct, engineFile?: (url: string) => boolean): void {
+export function assertKtx2TableTargets(product: Ktx2TableFolder, engineFile?: (url: string) => boolean): void {
   const { total, missing } = missingKtx2Targets(product, engineFile);
   const [first] = missing;
   if (first !== undefined) throw new Error(`KTX2 table names a missing file: ${first} (${missing.length} of ${total} targets missing)`);

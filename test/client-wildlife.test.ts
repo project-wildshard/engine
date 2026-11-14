@@ -1,7 +1,7 @@
-import {fixtureProductFile,fixtureJsonCheck} from './fixtures/productFile';
+import {fixtureFolderFile,fixtureJsonCheck} from './fixtures/folderFile';
 import {nalatiWetBlock} from './fixtures/nalati-wet';
 import {lendNalatiPasture} from './fixtures/nalati-return-modules';
-import { createShardProduct, type ShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder, type ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { emptyShardfile } from '../src/shared/host/author';
 import { expect, test, vi } from 'vitest';
 import { BufferGeometry, Scene, Vector3 } from 'three';
@@ -19,7 +19,7 @@ import { PageWildlifeView, installClientWildlife } from '../src/client/game/popu
 import { clientWildlife } from '../src/shared/game/population/wildlifeOwner';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { NALATI_HEADLESS_ASSEMBLY as headlessAssembly } from './fixtures/nalati-headless-assembly';
-import { admittedSheepProduct } from './fake/admittedSheep';
+import { admittedSheepFolder } from './fake/admittedSheep';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
 const feature = parseClientPlan({ version: 1, features: [{ kind: 'population.wildlife', file: 'actors/wildlife.json',
@@ -40,10 +40,10 @@ test('declared wildlife waits for animals, owns one frame and retires its hook',
     game: legacyDouble<NonNullable<ShardRuntime['world']>['game']>({ scene: new Scene(),levelScope:scope }),
     sky: legacyDouble<NonNullable<ShardRuntime['world']>['sky']>({}), chunk: legacyDouble<NonNullable<ShardRuntime['world']>['chunk']>({ seed: 7 }),
     player: legacyDouble<Player>({ position: new Vector3(), yaw: .4, crouching: true }) }) });
-  const real = admittedSheepProduct(), encode = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
+  const real = admittedSheepFolder(), encode = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
   const metadata = {...real.metadata,draws:real.metadata.draws.map(row=>({...row,slot:feature.crowd.binary,file:feature.crowd.binary}))};
-  const readJson = vi.fn<ShardProduct['file']>(hash=>Promise.resolve(hash==='wet'?nalatiWetBlock.bytes:hash==='population'?encode(rows):hash==='crowd'?encode(metadata):real.bytes));
-  const fixture = createShardProduct({ slug: 'orchard', revision: 1, shardfile: emptyShardfile({ slug: 'orchard', name: 'Orchard', author: 'Fixture', revision: 1, seed: 7 }), sections: new Map(), files: new Map([[nalatiWetBlock.file,fixtureProductFile(nalatiWetBlock.file,{hash:'wet',url:'/wet'})],[feature.file, fixtureProductFile(feature.file,{ hash: 'population', url: '/population' })], [feature.crowd.json, fixtureProductFile(feature.crowd.json,{ hash: 'crowd', url: '/crowd' })], [feature.crowd.binary,{hash:'body',url:'/body'}]]), read: readJson,jsonCheck:fixtureJsonCheck });
+  const readJson = vi.fn<ShardFolder['file']>(hash=>Promise.resolve(hash==='wet'?nalatiWetBlock.bytes:hash==='population'?encode(rows):hash==='crowd'?encode(metadata):real.bytes));
+  const fixture = createShardFolder({ slug: 'orchard', revision: 1, shardfile: emptyShardfile({ slug: 'orchard', name: 'Orchard', author: 'Fixture', revision: 1, seed: 7 }), sections: new Map(), files: new Map([[nalatiWetBlock.file,fixtureFolderFile(nalatiWetBlock.file,{hash:'wet',url:'/wet'})],[feature.file, fixtureFolderFile(feature.file,{ hash: 'population', url: '/population' })], [feature.crowd.json, fixtureFolderFile(feature.crowd.json,{ hash: 'crowd', url: '/crowd' })], [feature.crowd.binary,{hash:'body',url:'/body'}]]), read: readJson,jsonCheck:fixtureJsonCheck });
   const ctx = legacyDouble<ShardContext>({ answer:(name,handler)=>{application.events.answer(name,handler,scope);}, scope, app: application, game: legacyDouble<ShardContext['game']>({ runtime }), system: row => { systems.push(row); },
     product: fixture });
   const animals = legacyDouble<AnimalManager>({ animals: [], herds: [], wetAt: () => false, navSteer: false, factory: legacyDouble<AnimalManager['factory']>({ *prepareSteps() { /* no bodies in this fixture */ } }) });
@@ -107,17 +107,17 @@ test('wildlife rows refuse callbacks and reflected ordering knobs', () => {
 
 test('wildlife retains joint/bound guards and refuses retired fixed-draw intake', async () => {
   if(feature?.kind!=='population.wildlife')throw new Error('Missing feature');
-  const original=admittedSheepProduct();
+  const original=admittedSheepFolder();
   const metadata={...original.metadata,draws:original.metadata.draws.map(row=>({...row,slot:feature.crowd.binary,file:feature.crowd.binary}))};
   const encode=(value:unknown):Uint8Array=>new TextEncoder().encode(JSON.stringify(value));
   const create=(owner:Scope,body:typeof metadata,readBody:()=>Promise<Uint8Array>):ShardContext=>{
     lendNalatiPasture(owner);
     const identity={slug:'orchard',name:'Orchard',author:'Fixture',revision:1,seed:7};
-    const product=createShardProduct({slug:identity.slug,revision:1,shardfile:emptyShardfile(identity),sections:new Map(),
+    const product=createShardFolder({slug:identity.slug,revision:1,shardfile:emptyShardfile(identity),sections:new Map(),
       // Simulate a build-validated read so the unchanged native joint/bound
       // checks are reached even when these controls corrupt an admitted row.
       builtJson:true,
-      files:new Map([[nalatiWetBlock.file,fixtureProductFile(nalatiWetBlock.file,{hash:'wet',url:'/wet'})],[feature.file,fixtureProductFile(feature.file,{hash:'population',url:'/population'})],[feature.crowd.json,fixtureProductFile(feature.crowd.json,{hash:'crowd',url:'/crowd'})],[feature.crowd.binary,{hash:'body',url:'/body'}]]),
+      files:new Map([[nalatiWetBlock.file,fixtureFolderFile(nalatiWetBlock.file,{hash:'wet',url:'/wet'})],[feature.file,fixtureFolderFile(feature.file,{hash:'population',url:'/population'})],[feature.crowd.json,fixtureFolderFile(feature.crowd.json,{hash:'crowd',url:'/crowd'})],[feature.crowd.binary,{hash:'body',url:'/body'}]]),
       read:hash=>hash==='wet'?Promise.resolve(nalatiWetBlock.bytes):hash==='population'?Promise.resolve(encode(headlessAssembly.constants.pageWildlife)):hash==='crowd'?Promise.resolve(encode(body)):readBody()});
     return legacyDouble<ShardContext>({scope:owner,app:new App(),product,
       game:legacyDouble<ShardContext['game']>({runtime:legacyDouble<ShardRuntime>({hooks:{},world:legacyDouble<NonNullable<ShardRuntime['world']>>({

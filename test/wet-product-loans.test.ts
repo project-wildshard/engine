@@ -6,7 +6,7 @@ import {app} from '../src/client/engine/app/runtime';
 import {Vector3} from 'three';
 import type {ShardContext} from '../src/client/game/plugin/context';
 import type {ShardRuntime} from '../src/shared/game/shard/runtime';
-import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
+import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
 import {emptyShardfile} from '../src/shared/host/author';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
 import {parseClientPlan} from '@wildshard/format/clientPlan';
@@ -15,7 +15,7 @@ import { pageAir } from '../src/client/game/population/pageAir';
 import { NALATI_HEADLESS_ASSEMBLY as headlessAssembly } from './fixtures/nalati-headless-assembly';
 import {lendNalatiPasture} from './fixtures/nalati-return-modules';
 import {prepareNalatiPopulation} from './fixtures/nalati-world';
-import {fixtureJsonCheck,fixtureProductFile} from './fixtures/productFile';
+import {fixtureJsonCheck,fixtureFolderFile} from './fixtures/folderFile';
 import * as population from '../src/server/game/population/environment';
 import * as riding from '../src/server/game/riding/native';
 import type {SimHost} from '../src/server/engine/sim';
@@ -32,8 +32,8 @@ function wildlife(owner:Scope,read:()=>Promise<Uint8Array>){
   const original=headlessAssembly.constants.pageWildlife,rows={...original,groups:{...original.groups,world:worldRows}};
   const reads:string[]=[],systems=vi.fn<ShardContext['system']>();
   const source=emptyShardfile({slug:'wet-loan',name:'Wet loan',author:'Fixture',revision:1,seed:7});
-  const product=createShardProduct({slug:'wet-loan',revision:1,jsonCheck:fixtureJsonCheck,shardfile:source,sections:new Map(),
-    files:new Map([['actors/wildlife.json',fixtureProductFile('actors/wildlife.json',{hash:'rows',url:'/rows'})],[wetFile,{hash:'wet',url:'/wet'}]]),read:hash=>{
+  const product=createShardFolder({slug:'wet-loan',revision:1,jsonCheck:fixtureJsonCheck,shardfile:source,sections:new Map(),
+    files:new Map([['actors/wildlife.json',fixtureFolderFile('actors/wildlife.json',{hash:'rows',url:'/rows'})],[wetFile,{hash:'wet',url:'/wet'}]]),read:hash=>{
       reads.push(hash);if(hash==='rows')return Promise.resolve(new TextEncoder().encode(JSON.stringify(rows)));if(hash==='wet')return read();throw new Error('Unexpected product read');
     }});
   const runtime=legacyDouble<ShardRuntime>({hooks:{},world:legacyDouble<NonNullable<ShardRuntime['world']>>({

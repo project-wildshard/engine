@@ -1,6 +1,6 @@
-import { runtimeAssets } from './fixtures/engine-lift/product';
+import { runtimeAssets } from './fixtures/engine-lift/folder';
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads official immutable output bytes.
-import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
+import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
 import { readFileSync } from 'node:fs';
@@ -12,12 +12,12 @@ import { prepareRuntimeWorld } from '../src/server/game/plugin/simulation';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { builtProduct } from './fixtures/engine-lift/product';
+import { builtFolder } from './fixtures/engine-lift/folder';
 
 const savedPolicy = v.object({ phase: v.number(), fighting: v.boolean(), decision: v.string() });
 const logical = v.object({ decision: v.object({ bindings: v.array(v.object({ failures: v.number(), slots: v.record(v.string(), v.union([v.number(), v.boolean()])) })) }) });
 test('the Matriarch guest borrows each encounter body and resumes its grounded continuation', async () => {
-  const directory = builtProduct('sunscar-dunes'), product = await loadHeadlessProduct(directory), declaration = parseNativeRuntimePlan(product.section('sim/runtime-plan'));
+  const directory = builtFolder('sunscar-dunes'), product = await loadHeadlessFolder(directory), declaration = parseNativeRuntimePlan(product.section('sim/runtime-plan'));
   const descriptor = outputDescriptor(product.shardfile); if (descriptor === undefined) throw new Error('Missing verified product');
   const assets = runtimeAssets(product, directory);
   const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));

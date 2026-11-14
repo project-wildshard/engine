@@ -7,7 +7,7 @@ import { fixtureBytes } from '@wildshard/engine/test/nativeBytes';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { LiveGridHost } from '../src/client/game/grid/live';
 import { PageResidency } from '../src/client/game/grid/pageResidency';
-import { ApproachInputsDeferredError } from '../src/client/game/grid/productInputs';
+import { ApproachInputsDeferredError } from '../src/client/game/grid/folderInputs';
 import { NearPlaceholders } from '../src/client/game/grid/nearPlaceholderView';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 

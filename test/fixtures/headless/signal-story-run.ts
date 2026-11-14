@@ -5,10 +5,10 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Actual native command record/replay behavior, never stored goldens.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {openProductSession} from './productSession';
-import {builtProduct} from '../builtProduct';
+import {openFolderSession} from './folderSession';
+import {builtFolder} from '../builtFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
-import {productHeadlessSections} from '../../../src/shared/host/headlessSections';
+import {folderHeadlessSections} from '../../../src/shared/host/headlessSections';
 import {createTrustedHeadlessResident} from '../../../src/server/host/headlessRuntime';
 import type {HeadlessCommand,HeadlessEffect} from '../../../src/shared/host/tickProtocol';
 import type {HeadlessTapeObservation,HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
@@ -23,15 +23,15 @@ const encounterSchema=v.object({boss:v.object({state:v.string(),phase:v.number()
 const bossState=(value:unknown)=>v.parse(encounterSchema,typeof value==='string'?JSON.parse(value):value).boss;
 
 installAppIdentity(WILDSHARD_IDENTITY);
-const slug='sunscar-dunes',session=await openProductSession(slug),{product}=session;
+const slug='sunscar-dunes',session=await openFolderSession(slug),{product}=session;
 let resident:Awaited<ReturnType<typeof createTrustedHeadlessResident>>|undefined;
 try{
   const descriptor=outputDescriptor(product.shardfile);assert.ok(descriptor);
-  const directory=builtProduct(slug),assets=new Map(descriptor.index.files.map(file=>[
+  const directory=builtFolder(slug),assets=new Map(descriptor.index.files.map(file=>[
     file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`)),
   ]));
   const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  resident=await createTrustedHeadlessResident({shard:product.shardfile,assets,product,rapier,sections:productHeadlessSections(product)});
+  resident=await createTrustedHeadlessResident({shard:product.shardfile,assets,product,rapier,sections:folderHeadlessSections(product)});
   const {SignalTape}=await import('../../proof/sunscar-dunes/witness');
   const controller=new SignalTape(),{host}=resident,quest=host.quests[0];assert.ok(quest);
   const bossOwner=host.adapters.get(MATRIARCH_ID);assert.ok(bossOwner);

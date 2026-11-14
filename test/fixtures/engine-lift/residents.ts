@@ -1,13 +1,13 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise admitted products on their shipped native physics binary.
 import { readFileSync } from 'node:fs';
 import { beforeAll } from 'vitest';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../../../src/server/host/headlessRuntime';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier';
 import type { snapshotSimHostBytes } from '../../../src/shared/engine/sim/snapshot';
 import { actRoutes } from '../../../src/shared/engine/sim/actRoutes';
 import type { HeadlessCommand } from '../../../src/shared/host/tickProtocol';
-import { builtProduct, runtimeAssets } from './product';
+import { builtFolder, runtimeAssets } from './folder';
 
 export interface AdmittedResidents {
   input: (slug: string) => HeadlessRuntimeInput;
@@ -21,7 +21,7 @@ export function admittedResidents(slugs: readonly string[]): AdmittedResidents {
   beforeAll(async () => {
     const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
     for (const slug of slugs) {
-      const directory = builtProduct(slug), product = await loadHeadlessProduct(directory);
+      const directory = builtFolder(slug), product = await loadHeadlessFolder(directory);
       products.set(slug, { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier });
     }
   });

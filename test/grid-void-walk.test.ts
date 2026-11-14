@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { onTestFinished, expect, test } from 'vitest';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
@@ -16,7 +16,7 @@ import { tagOf } from '../src/shared/engine/physics/surface';
 import { gridRail } from '../src/shared/game/grid/roadLayout';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import type { SaveStorage } from '../src/shared/engine/saves/store';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 import { bakedGridCollision } from './fixtures/gridCollision';
 
 const PLAYER = 'actor.player', SLUG = 'sunscar-dunes', P = CONTENT_CAPS.pitch;
@@ -33,7 +33,7 @@ class PageStorage implements SaveStorage {
 let rapier: Rapier | undefined;
 async function product(slug: string): Promise<HeadlessRuntimeInput> {
   rapier ??= await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const directory = builtProduct(slug), loaded = await loadHeadlessProduct(directory);
+  const directory = builtFolder(slug), loaded = await loadHeadlessFolder(directory);
   return { shard: loaded.shardfile, assets: runtimeAssets(loaded, directory), rapier, product: loaded };
 }
 const turn = (): Promise<void> => new Promise(resolve => { setImmediate(resolve); });

@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { parseWeatherProgram } from "@wildshard/format/weatherProgram";
-import { loadHeadlessProduct } from "../../src/server/host/headlessProduct.ts";
+import { loadHeadlessFolder } from "../../src/server/host/headlessFolder.ts";
 import { WeatherContinuation } from "../../src/shared/engine/world/weatherContinuation.ts";
 import { encodeCanonicalJson, hashImmutableBytes } from "../../src/shared/host/immutable.ts";
 const fixture = (name) =>
   JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url), "utf8"));
-const pine = async () => (await loadHeadlessProduct("out/pine-hollow")).json("world/weather.json");
+const pine = async () => (await loadHeadlessFolder("out/pine-hollow")).json("world/weather.json");
 function timed(name, work) {
   void test(name, { timeout: 9500 }, async () => {
     const start = performance.now();

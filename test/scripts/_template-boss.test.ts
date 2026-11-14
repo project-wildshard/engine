@@ -3,15 +3,15 @@ import { beforeAll, expect, test } from 'vitest';
 import { writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Optional scenario receipts use the caller environment.
 import { env } from 'node:process';
-import { builtProduct } from '../fixtures/builtProduct';
+import { builtFolder } from '../fixtures/builtFolder';
 import { scenario as diskScenario } from '../../src/sharddev/test/scriptScenario';
 import { scenarioHostHash, scriptScenarioReceipt } from '../../scripts/script-scenario-metrics.mjs';
 
 let directory: string;
-beforeAll(() => { directory = builtProduct('_template'); });
+beforeAll(() => { directory = builtFolder('_template'); });
 
 test('Template boss runs published Wasm decisions and resumes a logical save', async () => {
-  const create = () => diskScenario('_template', 'template.boss.decision', { productDirectory: directory, seed: 437,
+  const create = () => diskScenario('_template', 'template.boss.decision', { folderDirectory: directory, seed: 437,
     players: [{ id: 101, at: [-15, 0, -18] }],
   });
   const scenario = await create();

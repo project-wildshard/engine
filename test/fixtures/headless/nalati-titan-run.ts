@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the admitted named product and shipped physics binary.
 import {readFileSync,writeFileSync,statSync} from 'node:fs';
 import * as v from 'valibot';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
-import {productHeadlessSections} from '../../../src/shared/host/headlessSections';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
+import {folderHeadlessSections} from '../../../src/shared/host/headlessSections';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHostBytes,serializeSimSnapshot,decodeSimSnapshotBytes} from '../../../src/shared/engine/sim/snapshot';
@@ -36,7 +36,7 @@ if(stage!=='entry'){
   assert.equal(inherited.stage,stage==='opening'?'storm':stage==='retry'?'fire':'retry','consume only the immediately preceding earned stage');
   if(stage==='opening'||stage==='retry')assert.ok(outputPath);
 }
-const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),shard=product.shardfile;
 const descriptor=outputDescriptor(shard);assert.ok(descriptor);
 const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
 const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
@@ -99,7 +99,7 @@ try{
     checkpointTick=host.state.tick;
   }
   const checkpoint=snapshotSimHostBytes(host),checkpointDigest=canonicalSimDigest(checkpoint);peakY=leadPlayer(host).position.y;
-  pending=(async()=>{try{return {ok:true as const,worker:await createNativeProofWorker(shard,assets,'nalati-titan',serializeSimSnapshot(checkpoint),productHeadlessSections(product),directory)};}
+  pending=(async()=>{try{return {ok:true as const,worker:await createNativeProofWorker(shard,assets,'nalati-titan',serializeSimSnapshot(checkpoint),folderHeadlessSections(product),directory)};}
     catch(error){return {ok:false as const,error};}})();
   const ready=pending;
   const checkedWorker=async():Promise<Replay>=>{

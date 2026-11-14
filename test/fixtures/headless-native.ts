@@ -5,10 +5,10 @@ import { installNativeWalkBounds } from './headless/nativeBounds';
 import { installWalkRopeBodies } from './headless/ropeBodies';
 import { runHeadlessJourney } from '../../src/shared/host/headlessJourney';
 import { fillNativeCombatFrame, headlessAssemblyPorts, validateHeadlessCommandOwners, type HeadlessRuntimeInput, type HeadlessRuntimeInstallation, type HeadlessRuntimePreparation, type HeadlessRuntimePlan, type PrepareHeadlessRuntime, type TrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
-import { prepareAssetDecoders } from '@wildshard/format/product';
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
+import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
-import { prepareProductRuntimePlan } from '../../src/server/game/shardfile/nativePlan';
+import { prepareFolderRuntimePlan } from '../../src/server/game/shardfile/nativePlan';
 import { MoverScriptDriver, type MoverRuntime } from '../../src/server/game/plugin/mover';
 import { installCableModes } from '../../src/shared/engine/player/modes';
 import { createNativeCombatFrame } from '../../src/server/game/plugin/nativeItems';
@@ -20,13 +20,13 @@ import type { TickWorkerAdapter } from '../../src/server/host/tickWorkerLoop';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 /** The world a product's own native plan builds: what the tick worker runs, for proofs that wrap or drive it. */
-export const prepareProductPlan: PrepareHeadlessRuntime = ({ product, assets, rapier }) => prepareProductRuntimePlan(product, assets, headlessAssemblyPorts(rapier));
+export const prepareFolderPlan: PrepareHeadlessRuntime = ({ product, assets, rapier }) => prepareFolderRuntimePlan(product, assets, headlessAssemblyPorts(rapier));
 
 /** Direct typed proof composition; no module URL, dynamic code lookup or authored factory selection. */
 export async function prepareNativeProof(provided: HeadlessRuntimeInput, prepare: PrepareHeadlessRuntime): Promise<HeadlessRuntimePlan> {
   if (!/^[a-z0-9][a-z0-9-]*$/u.test(provided.shard.identity.slug)) throw new Error('Invalid native product identity');
   await prepareAssetDecoders();
-  const product=provided.product ?? await loadHeadlessProduct(`out/${provided.shard.identity.slug}`);
+  const product=provided.product ?? await loadHeadlessFolder(`out/${provided.shard.identity.slug}`);
   if(product.slug!==provided.shard.identity.slug || product.revision!==provided.shard.identity.revision) throw new Error('Native product and trusted identity differ');
   const preparation: HeadlessRuntimePreparation={...provided,product};
   const source=product.shardfile,plan=await prepare(preparation);

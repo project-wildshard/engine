@@ -5,10 +5,10 @@ import { expect, test } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { HeadlessJourneyPlanSchema } from '../src/shared/host/headlessJourney';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
-import { createNativeProofResident, prepareProductPlan } from './fixtures/headless-native';
+import { builtFolder } from './fixtures/builtFolder';
+import { createNativeProofResident, prepareFolderPlan } from './fixtures/headless-native';
 import { installNativeWalkBounds } from './fixtures/headless/nativeBounds';
 import { installWalkRopeBodies } from './fixtures/headless/ropeBodies';
 import { physicsRoutes } from './fixtures/headless/physicsRoutes';
@@ -20,13 +20,13 @@ import { captureJourney, replayOnClient, type MotionCapture } from './fixtures/h
 const SLUG = 'driftwood-isle', LIMIT = .02;
 
 test('a Driftwood journey replays on the client step', async () => {
-  const directory = builtProduct(SLUG), product = await loadHeadlessProduct(directory), shard = product.shardfile, descriptor = outputDescriptor(shard);
+  const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile, descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   /** The world test/physics-headless.test.ts walks: the shipped plan, with the ruler's rope bodies and walk bounds. */
   const walkingResident = async (): Promise<TrustedHeadlessResident & { retire: () => void }> => {
-    const resident = await createNativeProofResident({ shard, assets, rapier, product }, prepareProductPlan), retire = installWalkRopeBodies(resident.host, product);
+    const resident = await createNativeProofResident({ shard, assets, rapier, product }, prepareFolderPlan), retire = installWalkRopeBodies(resident.host, product);
     installNativeWalkBounds(resident.host);
     return Object.assign(resident, { retire });
   };

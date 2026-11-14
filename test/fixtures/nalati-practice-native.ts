@@ -9,7 +9,7 @@ import {practiceRoomState} from '../../src/shared/engine/core/practiceRoomState'
 import {parseHeldSlots} from '@wildshard/format/heldArms';
 import {ItemCatalogue} from '../../src/shared/game/loadout/itemCatalogue';
 import type {PrepareHeadlessRuntime} from '../../src/server/host/headlessRuntime';
-import {prepareProductPlan as prepareNalati} from './headless-native';
+import {prepareFolderPlan as prepareNalati} from './headless-native';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 /** The inventory port borrows admitted equipment identities only. Weapon

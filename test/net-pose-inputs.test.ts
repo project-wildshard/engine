@@ -12,15 +12,15 @@ import { NET_POSE } from '../src/shared/engine/sim/shardRows';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { numericCreaturePose, poseInputNames } from '../src/shared/game/plugin/channelPrograms';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netWorldInput, stepResident } from '../src/shared/host/standalone/netInput';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // `mem` holds a body's pose inputs and its brain's memory side by side, and a server pack has no pose program to tell them apart,
 // so a page names what it reads. Whether a page poses a body by them is the row's browser proof, not this.
 test('a server says the pose inputs a page names and nothing else of a body', { timeout: 60_000 }, async () => {
-  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });

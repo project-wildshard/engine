@@ -7,7 +7,7 @@ import * as v from 'valibot';
 import {InputHashMemo} from './bake-input-hashes.mjs';
 import {generationPlan} from './gen-programs.mjs';
 import {committedSourceFiles,sourceSnapshotIdentity,verifiedSourceSnapshot} from './source-input-proof.mjs';
-import {readBuiltShardfile} from './built-product.mjs';
+import {readBuiltShardfile} from './built-folder.mjs';
 import {readBuildKey,shardfileCacheRoot} from './shardfile-cache.mjs';
 
 const hash=v.pipe(v.string(),v.regex(/^[a-f0-9]{64}$/u));

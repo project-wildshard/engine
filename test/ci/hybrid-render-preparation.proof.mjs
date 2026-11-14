@@ -42,7 +42,7 @@ const { installEnteredRuntimeService } =
   await import("../../src/client/game/shard/retainedHooks.ts");
 const { HybridRuntimeSession } = await import("../../src/client/game/shardfile/hybrid.ts");
 const { emptyShardfile } = await import("../../src/shared/host/author.ts");
-const { createShardProduct } = await import("../../src/shared/game/shardfile/shardProduct.ts");
+const { createShardFolder } = await import("../../src/shared/game/shardfile/shardFolder.ts");
 
 function fixture(refusal) {
   const scope = new Scope("hybrid-render-owner"),
@@ -57,7 +57,7 @@ function fixture(refusal) {
       seed: 7,
     }),
     manifest = sourceManifest(source);
-  const original = createShardProduct({
+  const original = createShardFolder({
     slug: manifest.slug,
     revision: 1,
     shardfile: source,

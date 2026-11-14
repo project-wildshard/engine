@@ -1,7 +1,7 @@
 import {afterAll,expect,test} from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the committed pin list and the products `pnpm pins` installed from it.
 import {existsSync,readFileSync,readdirSync} from 'node:fs';
-import {builtProduct} from './fixtures/builtProduct';
+import {builtFolder} from './fixtures/builtFolder';
 import {shippedGraphCosts,type ShippedGraphCost} from './fixtures/shipped-graph-costs';
 
 // CI21 (J232): engine holds no shard source now; every shipped product it reads is a pinned one (`pnpm pins`).
@@ -16,7 +16,7 @@ const installed=(existsSync('out')?readdirSync('out'):[]).filter(folder=>existsS
 const products=installed.map(({folder,slug})=>({folder,slug})),reports:ShippedGraphCost[]=[];
 test('the census covers every pinned shipped product',()=>{expect(new Set(installed.map(row=>row.hash))).toEqual(pinned);expect(installed).toHaveLength(pinned.size);});
 for(const {folder,slug} of products)test(`emitted shader work for every admitted graph in ${slug}`,async()=>{
- const rows=await shippedGraphCosts(builtProduct(folder));
+ const rows=await shippedGraphCosts(builtFolder(folder));
  expect(new Set(rows.map(row=>row.graphHash)).size).toBe(rows.length);
  for(const row of rows){
   expect(row.slug).toBe(slug);expect(row.aliases.length).toBeGreaterThan(0);

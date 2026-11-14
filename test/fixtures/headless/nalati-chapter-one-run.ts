@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixed child uses the admitted physics bytes and its owned continuation file.
 import {readFileSync,writeFileSync,statSync} from 'node:fs';
 import * as v from 'valibot';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {createNativeProofResident} from '../headless-native';
 import {prepareHeadlessRuntime} from '../nalati-chapter-native';
 import {prepareHeadlessRuntime as prepareKing} from '../nalati-king-native';
@@ -46,7 +46,7 @@ const started=performance.now();
 // visible so a late initialization cannot look like a replay/finalization stall.
 const phase=(name:string):void=>{console.info(JSON.stringify({stage,phase:name,ms:performance.now()-started,childMs:process.uptime()*1000}));};
 phase('imports-ready');
-const session=await beginProductSession('nalati-grasslands',kingStage?'nalati-king':'nalati-chapter',inherited?.snapshot),{product,assets}=session;
+const session=await beginFolderSession('nalati-grasslands',kingStage?'nalati-king':'nalati-chapter',inherited?.snapshot),{product,assets}=session;
 phase('product-session-started');
 // Observe the original readiness promise without moving its admission or
 // changing the point where recording/replay must await its complete commit.

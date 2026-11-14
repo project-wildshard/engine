@@ -14,9 +14,9 @@ import { entryOwner } from '../src/shared/game/shardfile/entryOwners';
 import { bindResidentWorldScope } from '../src/client/game/shardfile/hybridPresentation';
 import { preflightIslandBook } from '../src/client/game/shardfile/islandBook';
 import { SceneHandles } from '../src/client/game/shardfile/sceneHandles';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { WorldAssembly } from '../src/client/game/shardfile/worldAssembly';
-import * as runtimeProduct from '../src/client/game/shardfile/runtimeProduct';
+import * as runtimeFolder from '../src/client/game/shardfile/runtimeFolder';
 import * as sceneHost from '../src/client/game/shardfile/worldScenes';
 import * as bakedHost from '../src/client/game/shardfile/bakedTiles';
 import { emptyShardfile } from '../src/shared/host/author';
@@ -46,7 +46,7 @@ function fixture() {
   const sections = new Map<string, unknown>([['client/plan', { version: 1, features: [feature()] }],
     ['world/scenes', { version: 1, libraries: [], materials: [], steps: [], entry: { blocks: { pieces } } }]]);
   const read = vi.fn<() => Promise<Uint8Array>>(() => Promise.reject(new Error('No library or cell file exists')));
-  const product = createShardProduct({ slug: source.identity.slug, revision: 1, shardfile: source, sections, files: new Map(), read });
+  const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections, files: new Map(), read });
   const resident = new Scope('resident'), handles = new SceneHandles(), closed = new Group(), open = new Group();
   handles.publish('closed-door', closed); handles.publish('open-door', open);
   const world = legacyDouble<ShardWorld>({ game: legacyDouble<ShardWorld['game']>({ scene: new Scene(), camera: new PerspectiveCamera(), tier: 'desktop', renderer: legacyDouble<ShardWorld['game']['renderer']>({}) }),
@@ -63,14 +63,14 @@ function fixture() {
   };
   return { product, sections, read, resident, handles, closed, open, enter, world, runtime };
 }
-function emptyLooks(): Awaited<ReturnType<typeof runtimeProduct.runtimeLookMaterials>> {
-  return { toon: legacyDouble<Awaited<ReturnType<typeof runtimeProduct.runtimeLookMaterials>>['toon']>({}),
+function emptyLooks(): Awaited<ReturnType<typeof runtimeFolder.runtimeLookMaterials>> {
+  return { toon: legacyDouble<Awaited<ReturnType<typeof runtimeFolder.runtimeLookMaterials>>['toon']>({}),
     materials: new Map<string, Material>(), textures: new Map(), setParam: () => undefined, setTexture: () => undefined,
     compile: () => { throw new Error('No compilation'); }, bindMeshMap: () => { throw new Error('No mesh'); }, tick: () => undefined,
     outline: () => [], graphs: { bind: () => undefined, readout: { compiled: 0, fallback: 0, reasons: [] } }, surfaces: null };
 }
 function hosts(f: ReturnType<typeof fixture>) {
-  const looks = vi.spyOn(runtimeProduct, 'runtimeLookMaterials').mockResolvedValue(emptyLooks());
+  const looks = vi.spyOn(runtimeFolder, 'runtimeLookMaterials').mockResolvedValue(emptyLooks());
   const scenes = vi.spyOn(sceneHost, 'installWorldScenes').mockResolvedValue(f.handles);
   const baked = vi.spyOn(bakedHost, 'residentBakedTiles');
   const release = vi.spyOn(gpu, 'gpuOnlyTrees');

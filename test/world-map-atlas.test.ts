@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, rmSync, readFileSync } from 'nod
 import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Give the fixture the same measured hash checks as the product reader.
 import { createHash } from 'node:crypto';
-import { bakeWorldMapAtlas, productMapBytes, writeWorldMapAtlas } from '../scripts/app-build/worldMapAtlas';
+import { bakeWorldMapAtlas, folderMapBytes, writeWorldMapAtlas } from '../scripts/app-build/worldMapAtlas';
 
 test('one atlas includes every unique map with stable crops and an explicit nonblank plain-plot tile', async () => {
   const red = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#ff0000' } }).png().toBuffer();
@@ -44,8 +44,8 @@ test('the app build writes one atlas and its define, verifies source hashes, and
     expect(rows.fileName).toMatch(/^assets\/world-map-[a-f0-9]{16}\.webp$/u);
     expect(rows.fileName).toBe(`assets/world-map-${digest(atlas).slice(0, 16)}.webp`);
     expect(rows.define).toMatchObject({ url: `/${rows.fileName}`, compressed: atlas.length, slugs: ['base', 'override', 'plain'] });
-    writeFileSync(resolve(root, 'out/base/map.webp'), 'corrupt'); expect(() => productMapBytes(root, 'base')).toThrow('image differs');
-    writeFileSync(resolve(root, 'out/base/map.json'), '{}'); expect(() => productMapBytes(root, 'base')).toThrow('section differs');
+    writeFileSync(resolve(root, 'out/base/map.webp'), 'corrupt'); expect(() => folderMapBytes(root, 'base')).toThrow('image differs');
+    writeFileSync(resolve(root, 'out/base/map.json'), '{}'); expect(() => folderMapBytes(root, 'base')).toThrow('section differs');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

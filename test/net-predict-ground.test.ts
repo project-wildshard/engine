@@ -5,8 +5,8 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the built product and the shipped native Wasm.
 import { readFileSync } from 'node:fs';
 import { afterAll, expect, test } from 'vitest';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from './fixtures/builtFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { clientPageGround } from '../src/shared/game/shardfile/clientGround';
 import { admittedTerrain } from '../src/server/game/plugin/simulation';
@@ -24,7 +24,7 @@ const disposers: (() => void)[] = [];
 afterAll(() => { for (const dispose of disposers.reverse()) dispose(); });
 
 test('Signal Dunes: the page predicts on the server\'s ground, sample for sample', { timeout: 60_000 }, async () => {
-  const directory = builtProduct('sunscar-dunes'), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+  const directory = builtFolder('sunscar-dunes'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard); if (descriptor === undefined) throw new Error('Missing native product descriptor');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))] as const));
   const R = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));

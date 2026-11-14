@@ -75,7 +75,7 @@ test('completed prefetch releases dedupe hashes after their last live reader', a
     expect(history.size).toBe(0);
     expect(writes.filter(url => hashes.some(hash => url.endsWith(`/${hash}.bin`)))).toHaveLength(2);
     const done = gridPrefetchStatus();
-    expect(done).toMatchObject({products: 2, productsRead: 2, knownFiles: 2, knownBytes: 2, storedFiles: 2, storedBytes: 2, inFlightBytes: 0});
+    expect(done).toMatchObject({products: 2, foldersRead: 2, knownFiles: 2, knownBytes: 2, storedFiles: 2, storedBytes: 2, inFlightBytes: 0});
     expect(window.__ws_gridPrefetch?.()).toEqual(done);
     startGridPrefetch(['blender-template']);
     expect(gridPrefetchStatus()).toEqual(done);

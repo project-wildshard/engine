@@ -23,7 +23,7 @@ Three files run in Ring 2: hostile network/seam tests also use Pastel
 Plain; ABI2 browser transport needs the complete Driftwood product;
 the read-only budget report needs the sealed Night Market product.
 Their names are in `test/pins/ring-2-tests.json`. Product dependencies
-are recorded in `scripts/test-products.json`.
+are recorded in `scripts/test-folders.json`.
 
 Tests use short bounded scenarios. The default network fuzz tape is
 120 ticks per product and seed; `NET_FUZZ_TICKS` and

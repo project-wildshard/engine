@@ -5,10 +5,10 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { readTar } from '@wildshard/format/tar';
-import { assertKtx2TableTargets, missingKtx2Targets, type Ktx2TableProduct } from '../src/shared/game/shardfile/ktx2Targets';
+import { assertKtx2TableTargets, missingKtx2Targets, type Ktx2TableFolder } from '../src/shared/game/shardfile/ktx2Targets';
 
 const json = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
-function product(files: Readonly<Record<string, unknown>>): Ktx2TableProduct {
+function product(files: Readonly<Record<string, unknown>>): Ktx2TableFolder {
   const bytes = new Map(Object.entries(files).map(([path, value]) => [path, value instanceof Uint8Array ? value : json(value)]));
   return { paths: () => bytes.keys(), read: path => { const body = bytes.get(path); if (body === undefined) throw new Error(`no ${path}`); return body; } };
 }
@@ -55,7 +55,7 @@ describe('the KTX2 table rule', () => {
 const CACHE = process.env['WILDSHARD_PIN_CACHE'] ?? join(homedir(), '.cache/wildshard/pins');
 const REV1 = '0e246ab03210d777619bf1fb09bbaa9da1bbcaea5093a8adfce913508762f084';
 const REV2 = '1c334833af01bc70dd9096f9ac3b5ab9b9b33498e5aca8c7bf259eae280ca518';
-const tarball = (hash: string): Ktx2TableProduct => {
+const tarball = (hash: string): Ktx2TableFolder => {
   const files = readTar(readFileSync(join(CACHE, `${hash}.tar`)));
   return { paths: () => files.keys(), read: path => { const body = files.get(path); if (body === undefined) throw new Error(`no ${path}`); return body; } };
 };

@@ -1,13 +1,13 @@
 import { QuestPageSchema } from '@wildshard/format/questPageComposition';
 import * as v from 'valibot';
 import { expect,test } from 'vitest';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { builtProduct } from './fixtures/engine-lift/product';
+import { builtFolder } from './fixtures/engine-lift/folder';
 
 test('the published page continuation admits its document and refuses executable owners and corrupt loot', async () => {
-  const product = await loadHeadlessProduct(builtProduct('driftwood-isle'));
+  const product = await loadHeadlessFolder(builtFolder('driftwood-isle'));
   const file = outputDescriptor(product.shardfile)?.index.files.find(row => row.name === 'quests/page-composition.json');
   if (file?.jsonSchema === undefined) throw new Error('Missing defining continuation schema');
   const bytes = await product.file('quests/page-composition.json');

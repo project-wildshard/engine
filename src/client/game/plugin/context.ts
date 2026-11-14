@@ -19,7 +19,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { ownedPresentationImages } from '../shardfile/presentation';
 import { lookLightManifest } from '@wildshard/engine/render/lookLight';
 import { lookLightOn } from '@wildshard/engine/ui/lookLightOption';
-import { absentShardProduct, type ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { absentShardFolder, type ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 
 /** The page's chosen entry mode. */
@@ -97,16 +97,16 @@ export interface ShardContext extends LevelContext {
   readonly cube: ShardCube | null;
   /**
    * The shard's built output as its runtime reads it (SHARD-PLATFORM P2a): `section()`, `strings()`, `file()`. The loader
-   * passes the admitted product; an entry with no built output gets one whose every read refuses (`absentShardProduct`).
+   * passes the admitted product; an entry with no built output gets one whose every read refuses (`absentShardFolder`).
    */
-  readonly product: ShardProduct;
+  readonly product: ShardFolder;
 }
 /** A grid cell's extent in shard-local metres (G99): the cube's half width, its centre at the shard's origin. */
 interface ShardCube { readonly half: number }
 const GRID_CUBE: ShardCube = Object.freeze({ half: CHUNK_HALF });
 
 /** Construct the owned game context without installing services at import time. */
-export function shardContext(ctx: LevelContext, manifest: ShardManifest, game: GameServices, product: ShardProduct = absentShardProduct(manifest.slug)): ShardContext {
+export function shardContext(ctx: LevelContext, manifest: ShardManifest, game: GameServices, product: ShardFolder = absentShardFolder(manifest.slug)): ShardContext {
   const live = (): void => { if (ctx.scope.disposed) throw new Error('The shard scope is disposed'); };
   const add = <K extends keyof GameRowMap>(kind: K, values: GameRowMap[K] | readonly GameRowMap[K][]): void => {
     ctx.app.levelRegistrations.assertKit(ctx.scope);

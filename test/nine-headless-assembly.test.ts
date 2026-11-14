@@ -13,11 +13,11 @@ import { directLoopback } from '../src/test/engine/netLoopback';
 import { hasNativeAssembly } from '../src/server/game/shardfile/nativeAssembly';
 import { GRAPPLE_PHASES, grappleRow, NO_HOOK } from '../src/shared/game/grapple/feed';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
 import { stepResident } from '../src/shared/host/standalone/netInput';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { nineNativeConstants } from './fixtures/nine-native-constants';
 import { nineNativeOracle } from './fixtures/nine-native-oracle';
 
@@ -25,7 +25,7 @@ import { nineNativeOracle } from './fixtures/nine-native-oracle';
 // proves is its pieces, its hooks and its claw, over the wire, as a client plays them.
 
 async function shipped() {
-  const directory = builtProduct('nine-dragon-stack'), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+  const directory = builtFolder('nine-dragon-stack'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error('Missing admitted Nine output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

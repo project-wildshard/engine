@@ -5,8 +5,8 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native behavior assertions run in this bounded child.
 import assert from 'node:assert/strict';
 import type {NetCommand} from '@wildshard/wire/netCommand';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {NET_BUTTONS} from '../../../src/shared/engine/input/netButtons';
@@ -16,7 +16,7 @@ import {prepareHeadlessRuntime} from '../nalati-verbs';
 
 // E3.6: in real Nalati a bot walks up to a camp horse, takes it on its own seat and gallops off on its own reins while the
 // first player rides another. Nothing here touches the bot but a mount call and the same NetCommand a client sends.
-const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),source=product.shardfile;
+const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),source=product.shardfile;
 const descriptor=outputDescriptor(source);assert.ok(descriptor);
 const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,
   Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

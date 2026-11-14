@@ -12,10 +12,10 @@ import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {createNativeProofResident} from '../headless-native';
 import {prepareHeadlessRuntime} from '../nalati-stealth-native';
 import {nalatiHorsePlainsInputs} from '../../proof/nalati-grasslands/horsePlainsWalk';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {checkedReplayPipeline} from './checkedReplayPipeline';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
@@ -25,11 +25,11 @@ console.info(JSON.stringify({phase:'prepare-start'}));
 // independent replay worker starts from that save and replays every input from there, through Visible, Noticed and
 // Detected, so the replay no longer re-walks the empty first 3,200 ticks with a full checkpoint per 512.
 const PRELUDE=3200;
-const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),descriptor=outputDescriptor(product.shardfile);
+const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),descriptor=outputDescriptor(product.shardfile);
 assert.ok(descriptor);
 const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginProductSession>>['ready']>>|undefined;
-let session:Awaited<ReturnType<typeof beginProductSession>>|undefined,restoring:ReturnType<typeof beginProductSession>|undefined;
+let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;
+let session:Awaited<ReturnType<typeof beginFolderSession>>|undefined,restoring:ReturnType<typeof beginFolderSession>|undefined;
 const resident=await createNativeProofResident({product,assets,shard:product.shardfile,
   rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))},prepareHeadlessRuntime);
 const State=v.object({law:v.object({state:v.string(),threat:v.number(),observation:v.object({threats:v.array(v.object({awareness:v.number(),alert:v.number(),hunting:v.number()}))})}),
@@ -50,7 +50,7 @@ try{
     assert.equal(v.parse(State,JSON.parse(read())).law.state,'none','no herd senses the player during the prelude');
   }
   const base=resident.host.state.tick;
-  session=await beginProductSession('nalati-grasslands','nalati-stealth',serializeSimSnapshot(snapshotSimHostBytes(resident.host)));
+  session=await beginFolderSession('nalati-grasslands','nalati-stealth',serializeSimSnapshot(snapshotSimHostBytes(resident.host)));
   console.info(JSON.stringify({phase:'startup',base}));
   replay=await session.ready();const worker=replay;
   interface Part {id:string;start:number;tick:number;state:string;position:number[];flags:string[]}
@@ -95,7 +95,7 @@ try{
         assert.ok(state.law.observation.threats.some(threat=>threat.awareness>0),'live animals supply the actual rising awareness');
         checkpoint=serializeSimSnapshot(snapshotSimHostBytes(resident.host));checkpointTick=base+frames.length;
         // FS7: the restored worker starts admitting the earned checkpoint now, beside the rest of the capture.
-        restoring=beginProductSession('nalati-grasslands','nalati-stealth',checkpoint);restoring.catch(()=>undefined);
+        restoring=beginFolderSession('nalati-grasslands','nalati-stealth',checkpoint);restoring.catch(()=>undefined);
       }
       if(state.law.state==='detected'){assert.equal(state.label,'Detected');assert.equal(state.law.threat,1);}
       await flush(`awareness-${state.law.state}`);

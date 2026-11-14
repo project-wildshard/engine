@@ -13,9 +13,9 @@ import { defineModel, type ModelDef } from '@wildshard/engine/models/model';
 import { declaredSpawnTables } from '@wildshard/engine/ai/encounters';
 import type { VariantDef } from '@wildshard/engine/entities/species/registry';
 import { SocketRigCreatureSchema } from '@wildshard/format/socketRigCreature';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { SocketRigCard } from '../boss/socketRig';
-import { productHullBook } from '../looks/speciesBook';
+import { folderHullBook } from '../looks/speciesBook';
 import { HeldEquipment } from '../plugin/heldEquipment';
 import type { ShardContext } from '../plugin/context';
 
@@ -37,7 +37,7 @@ export class SocketRigCreature {
 export async function prepareHullBookKit(ctx: ShardContext, cards: readonly SocketRigCreature[]): Promise<void> {
   const live = (): void => { if (ctx.scope.disposed || ctx.scope.disposing) throw new Error('Hull book kit owner left'); };
   live();
-  const book = productHullBook(ctx.product), programs = ctx.product.section('actors/species-programs');
+  const book = folderHullBook(ctx.product), programs = ctx.product.section('actors/species-programs');
   book.registerDerived(); ctx.rows.species(programs.page);
   ctx.rows.speciesLook(book.looks);
   ctx.rows.spawnTable(declaredSpawnTables(programs.spawns));
@@ -46,9 +46,9 @@ export async function prepareHullBookKit(ctx: ShardContext, cards: readonly Sock
   held.install(ctx);
 }
 
-const declaredCards = new WeakMap<ShardProduct, readonly SocketRigCreature[]>();
+const declaredCards = new WeakMap<ShardFolder, readonly SocketRigCreature[]>();
 /** One product's immutable card definitions are shared by kit and Explorer. All references preflight before construction. */
-export function declaredSocketRigCreatures(product: ShardProduct): readonly SocketRigCreature[] {
+export function declaredSocketRigCreatures(product: ShardFolder): readonly SocketRigCreature[] {
   const cached = declaredCards.get(product); if (cached !== undefined) return cached;
   const { slug: identity } = product;
   const rows = product.section('explore/catalogue').entries.flatMap(row => row.kind === 'socket-creature' ? [row.rows] : []);

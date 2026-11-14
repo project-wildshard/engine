@@ -29,7 +29,7 @@ import { PolearmContact } from '../../../shared/game/weapons/polearmContact';
 import { createModelLibrary } from '@wildshard/engine/game/plugin/geometry';
 import { ItemCatalogue } from '@wildshard/engine/game/loadout/itemCatalogue';
 import { SWORD_WOOD } from '@wildshard/engine/game/weapons/starterMeleeProfile';
-import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 import { painterlyMaterial } from '@wildshard/engine/world/painterly';
 import { PolearmDecision } from '../../../shared/game/weapons/polearmDecision';
 import { JavelinFlight } from '../../../shared/game/weapons/javelinFlight';
@@ -475,7 +475,7 @@ export class PolearmSet {
   }
  })(this);
  private need():NonNullable<PolearmSet['data']>{if(this.data===null)throw new Error('Polearm rows not prepared');return this.data;}
- async prepare(product:Pick<ShardProduct,'file'|'shardfile'|'hasFile'|'url'>,options?:{readonly geometry:'on-select'}):Promise<void>{
+ async prepare(product:Pick<ShardFolder,'file'|'shardfile'|'hasFile'|'url'>,options?:{readonly geometry:'on-select'}):Promise<void>{
   const rows=schema.parse(PolearmRowsSchema,JSON.parse(new TextDecoder().decode(await product.file(this.rows.file))));
   // a pool the product names (GR6) loads by its content-addressed URL; any other pool URL is fetched as written
   const pool=product.hasFile(rows.pool.url)?{...rows.pool,url:product.url(rows.pool.url)}:rows.pool;

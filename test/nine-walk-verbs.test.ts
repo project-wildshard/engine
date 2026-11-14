@@ -3,7 +3,7 @@
 import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
 import * as v from 'valibot';
-import {openProductSession} from './fixtures/headless/productSession';
+import {openFolderSession} from './fixtures/headless/folderSession';
 import type {HeadlessTapePlan} from '../src/shared/host/headlessTape';
 
 const walkDocs=v.parse(v.object({verbs:v.array(v.object({id:v.string(),
@@ -15,7 +15,7 @@ const walkDocs=v.parse(v.object({verbs:v.array(v.object({id:v.string(),
 for(const id of ['stairs','street','well-rim'])test(`Nine ${id} follows the listed route on actual capsule collision`,async()=>{
   const verb=walkDocs.verbs.find(row=>row.id===id),goal=verb?.expect.to,ms=verb?.input.walkMs;
   if(verb===undefined||goal===undefined||ms===undefined)throw new Error(`Missing listed Nine route ${id}`);
-  const f=await openProductSession('nine-dragon-stack');
+  const f=await openFolderSession('nine-dragon-stack');
   try{
     const spawn=f.product.shardfile.spawn,ticks=Math.round(ms*60/1000);
     let plan:HeadlessTapePlan;

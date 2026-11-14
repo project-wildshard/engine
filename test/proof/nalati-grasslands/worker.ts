@@ -1,5 +1,5 @@
 import type { PrepareHeadlessRuntime } from '../../../src/server/host/headlessRuntime';
-import { prepareProductPlan as prepareNalati } from '../../fixtures/headless-native';
+import { prepareFolderPlan as prepareNalati } from '../../fixtures/headless-native';
 import { nalatiNativeAssets } from './nativeAssets';
 
 /** Worker proof transport for Nalati's still-path-addressed terrain grid (and its navigation row's bytes when the host

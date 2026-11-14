@@ -7,4 +7,4 @@ export function scriptReceiptPaths(root:string):string[];
 export function scriptScenarioMetrics(slug:string,index:{sections:{name:string;path:string;hash:string}[]},read:(path:string)=>Uint8Array,paths:readonly string[],hostHash:string|null):{
  status:string;scripts:{id:string;measured:boolean}[];scenarios:(ScriptScenarioReceipt&{path:string;receiptHash:string})[];
 };
-export function productScriptMetrics(root:string,slug:string,products:string,paths:readonly string[]):ReturnType<typeof scriptScenarioMetrics>;
+export function folderScriptMetrics(root:string,slug:string,products:string,paths:readonly string[]):ReturnType<typeof scriptScenarioMetrics>;

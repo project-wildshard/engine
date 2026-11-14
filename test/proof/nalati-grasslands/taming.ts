@@ -2,13 +2,13 @@ import { originalNalatiPhysics } from '../../fixtures/nalati-physics-original';
 // oxlint-disable-next-line import/no-nodejs-modules -- read the original native proof input without inferring its full generated JSON type
 import {readFileSync} from 'node:fs';
 import * as v from 'valibot';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 // oxlint-disable-next-line import/no-nodejs-modules -- The witness refuses incomplete native gameplay rather than report a passing flag.
 import assert from 'node:assert/strict';
 import type { SimHost } from '../../../src/server/engine/sim';
 import { snapshotSimHostBytes, serializeSimSnapshot } from '../../../src/shared/engine/sim/snapshot';
 import type { Rapier } from '../../../src/shared/engine/physics/rapier';
-import { createNativeProofResident, prepareProductPlan as prepareHeadlessRuntime } from '../../fixtures/headless-native';
+import { createNativeProofResident, prepareFolderPlan as prepareHeadlessRuntime } from '../../fixtures/headless-native';
 import {createNalatiTamingPilot} from './tamingPilot';
 import source from '../../fixtures/nalati-product-source';
 import { createNativeBakeReader } from '@wildshard/engine/game/population/nativeBake';
@@ -39,7 +39,7 @@ export async function nalatiTamingWitness(rapier: Rapier, assets: ReadonlyMap<st
   if (spawn === undefined) throw new Error('Missing authored wild stallion placement');
   const [spawnX, , spawnZ] = spawn.at;
   if (spawnX === undefined || spawnZ === undefined) throw new Error('Missing authored wild stallion coordinates');
-  const product = await loadHeadlessProduct('out/nalati-grasslands');
+  const product = await loadHeadlessFolder('out/nalati-grasslands');
   const originalPlan = await prepareHeadlessRuntime({ shard: source, assets, rapier, product });
   const heightAt = originalPlan.ports?.heightAt; if (heightAt === undefined) throw new Error('Missing actual terrain');
   // Declared assembly reads the product's shardfile, including its spawn.

@@ -8,7 +8,7 @@ import { readFile } from 'node:fs/promises';
 // oxlint-disable-next-line import/no-nodejs-modules -- A worker is one row of the table (J182).
 import { parentPort, workerData } from 'node:worker_threads';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
-import { readPackGrid, readPackProduct, type PackReads } from './packReader';
+import { readPackGrid, readPackFolder, type PackReads } from './packReader';
 import { runCells, type CellPort } from './cellHost';
 import { placeCell, placedHash, type PlacedCell } from './gridCells';
 import { loopLag } from './loopLag';
@@ -36,7 +36,7 @@ runCells(port as unknown as CellPort, { slugs, build, bootId: () => randomBytes(
     return strips;
   } } : {}),
   load: async slug => {
-    const input = await readPackProduct(slug, build, rapier, { origin, cache }, reads, placedHash(slug));
+    const input = await readPackFolder(slug, build, rapier, { origin, cache }, reads, placedHash(slug));
     console.info(JSON.stringify({ at: 'cell.pack', slug, ...reads }));
     return input;
   } });

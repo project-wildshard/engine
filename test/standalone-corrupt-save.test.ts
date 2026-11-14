@@ -4,11 +4,11 @@ import { expect, test, vi } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import type { SaveStorage } from '../src/shared/engine/saves/store';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // P1-E5.2c (J102): a corrupt save falls back without losing the last good one, through the real worker code and a real restore.
 const SLUG = 'sunscar-dunes', FIRST = `wildshard.standalone-${SLUG}`, SECOND = `wildshard.standalonealt-${SLUG}`;
@@ -22,7 +22,7 @@ class PageStorage implements SaveStorage {
   removeItem(key: string): void { this.items.delete(key); }
 }
 async function sunscar(): Promise<HeadlessRuntimeInput> {
-  const directory = builtProduct(SLUG), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return { shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product };

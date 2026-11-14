@@ -15,7 +15,7 @@ import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
 import { TIER } from '@wildshard/engine/core/tier';
 import { FigureRowSchema } from '@wildshard/format/figures';
 import { installChannelPrograms } from '../../../shared/game/plugin/channelPrograms';
-import { atlasFigureSkin, productSkinUrl } from '../systems/npc/figureSkins';
+import { atlasFigureSkin, folderSkinUrl } from '../systems/npc/figureSkins';
 import { QuestFiguresSchema, type QuestFigureRows, type QuestFiguresRows } from '@wildshard/format/questFigures';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { ownSceneResource } from '@wildshard/engine/app/sceneOwnership';
@@ -108,7 +108,7 @@ export function installQuestFigures(ctx: ShardContext, input: unknown, ports?: Q
   // A merged group stands alone and needs none of the kit figures' ports; both checks precede any allocation.
   if (ports === undefined) {
     if (parsed.group === undefined) throw new Error('Quest kit figures require their placement, draws and catalogue ports');
-    return figureGroup({ scope: ctx.scope, sky: world.sky, registry: world.registry, channels: ctx.product.shardfile.clientChannels, skinUrl: productSkinUrl(ctx.product) }, parsed.group);
+    return figureGroup({ scope: ctx.scope, sky: world.sky, registry: world.registry, channels: ctx.product.shardfile.clientChannels, skinUrl: folderSkinUrl(ctx.product) }, parsed.group);
   }
   if (parsed.group !== undefined) throw new Error('A merged quest figure group installs without kit figure ports');
   // Check all placed-model descriptors before the first figure is constructed.

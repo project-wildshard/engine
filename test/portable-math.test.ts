@@ -93,7 +93,7 @@ test('no sim source goes round the table', () => {
   expect(files.flatMap(unportable)).toEqual([]);
 });
 
-test.each(['src/client/app/entry.ts', 'src/server/host/standalone/serverWorker.ts', 'src/server/host/bake/headlessWorker.ts', 'test/fixtures/headless/worker.ts', 'test/fixtures/headless/productSession.ts',
+test.each(['src/client/app/entry.ts', 'src/server/host/standalone/serverWorker.ts', 'src/server/host/bake/headlessWorker.ts', 'test/fixtures/headless/worker.ts', 'test/fixtures/headless/folderSession.ts',
   'test/fixtures/headless-native.ts', 'test/fixtures/headless-worker.ts', ...globSync('test/fixtures/headless/*-run.{ts,mjs}')])('%s puts the Math in first', file => {
   const first = /^(?:\s*(?:\/\/.*)?\n)*\s*import ['"]([^'"]+)['"]/u.exec(readFileSync(file, 'utf8'));
   expect(first?.[1]).toMatch(/portableMathFirst(?:\.ts)?$/u);

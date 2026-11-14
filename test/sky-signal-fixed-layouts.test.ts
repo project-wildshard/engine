@@ -15,7 +15,7 @@ import * as crownSource from '../src/shards/far-reach/generators/crownLayout';
 import { createProjectGeneration } from '../src/sharddev/projectGeneration';
 import { skyCreatureRigOutput } from '../src/shards/far-reach/generators/creatureRigOutput';
 import { skyRigAssetSources } from '../src/shards/far-reach/generators/rigAssetSources';
-import { skyProductBoot } from '../src/shards/far-reach/generators/bootInventory';
+import { skyFolderBoot } from '../src/shards/far-reach/generators/bootInventory';
 import { skyViewDiscovery } from '../src/shards/far-reach/generators/viewData';
 import { GPU_FILES } from '../src/shards/far-reach/ktx2.generated';
 import { originalSkyNavigation } from './fixtures/sky-navigation';
@@ -37,7 +37,7 @@ async function skyDiscovery(): Promise<ReturnType<typeof parseDiscoveryValues>> 
       { prefix: '/assets/', directory: resolve('public/assets') },
     ]);
     const rigs = await skyCreatureRigOutput(context);
-    return parseDiscoveryValues({ ...skyProductBoot(skyRigAssetSources(rigs.files, GPU_FILES)),
+    return parseDiscoveryValues({ ...skyFolderBoot(skyRigAssetSources(rigs.files, GPU_FILES)),
       ...skyViewDiscovery(), mapPalette: skyMapPalette(), navigation: originalSkyNavigation() });
   } finally { rmSync(cache, { recursive: true, force: true }); }
 }

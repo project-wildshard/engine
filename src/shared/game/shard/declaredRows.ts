@@ -6,7 +6,7 @@ import { DayCycle } from '@wildshard/engine/world/dayCycle';
 import type { Rng } from '@wildshard/engine/core/rng';
 import type { ShardCompendium, EntryDef, EntryStats } from '../compendium/types';
 import type { JournalRow } from '@wildshard/format/compendiumRows';
-import type { ShardProduct } from '../shardfile/shardProduct';
+import type { ShardFolder } from '../shardfile/shardFolder';
 import { outputDescriptor } from '../shardfile/outputDescriptor';
 import type { LootPresentation } from '../../../client/game/loot/runtime';
 import type { ShardRows } from '@wildshard/format/rows';
@@ -65,7 +65,7 @@ function declaredJournal(row: JournalRow, image?: (ref: string) => string): Shar
 }
 /** Resolve images through the product's logical blob inventory, never adjacent URL guesses.
  * Vector rows use an already-admitted sketch map or their bounded inline data. */
-export function declaredProductCompendium(product: ShardProduct, id: string, sketches: ReadonlyMap<string, CompendiumSketch> = new Map()): ShardCompendium {
+export function declaredFolderCompendium(product: ShardFolder, id: string, sketches: ReadonlyMap<string, CompendiumSketch> = new Map()): ShardCompendium {
   const rows = product.shardfile.rows, row = product.section('ui/compendium').rows.compendiums.find(value => value.id === id);
   if (row === undefined) throw new Error('Missing admitted compendium row');
   return declaredCompendium(row, rows, product.slug, ref => {

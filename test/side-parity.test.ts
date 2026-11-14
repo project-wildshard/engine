@@ -2,11 +2,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { chunkCopyKey, colliderInventory, MEASURED_SHAPES, ownerGroup, sideParityDiff, SIDE_PARITY_SHARDS } from '../scripts/side-parity.mjs';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 // SERVER-PARITY SS1 (meta docs/plans/SERVER-PARITY-PLAN.md). The page stands the player on colliders it builds live from the
 // product; the room simulates the colliders `openCellWorld` builds. NET-LAG NL5 (f5424420) was a gap between the two: the page
@@ -61,7 +61,7 @@ describe('side parity: the page and the room build the same gameplay colliders',
   for (const slug of SIDE_PARITY_SHARDS) test(slug, async () => {
     const rows = page.shards[slug];
     if (rows === undefined) throw new Error(`${slug} has no recorded page half: node scripts/side-parity.mjs --record --shard=${slug}`);
-    const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+    const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), shard = product.shardfile;
     const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
     const world = await openCellWorld({ instance: slug }, { shard, product, assets: runtimeAssets(product, directory), rapier }, undefined,
       { saves: new SaveStore({ local: null, session: null }), lone: true, wholeSolids: true, pageless: true });

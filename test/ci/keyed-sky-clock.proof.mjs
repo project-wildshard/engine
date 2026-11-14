@@ -5,13 +5,13 @@ import { test } from 'node:test'
 import { parseKeyedSky, SKY_PRESET } from '@wildshard/format/keyedSky'
 
 import { overcastOver } from '../../src/client/game/looks/overcast.ts'
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct.ts'
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder.ts'
 import { DayCycle } from '../../src/shared/engine/world/dayCycle.ts'
 import { dayClock } from '../../src/shared/game/looks/dayClock.ts'
 import { keyedSkyDay } from '../../src/shared/game/looks/keyedSkyClock.ts'
 
 async function sky() {
-  return (await loadHeadlessProduct('out/pine-hollow')).section(
+  return (await loadHeadlessFolder('out/pine-hollow')).section(
     'look/keyed-sky',
   )
 }

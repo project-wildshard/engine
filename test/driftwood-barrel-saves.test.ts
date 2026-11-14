@@ -15,14 +15,14 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { BARREL_BODY,BARREL_HALF } from '../src/shared/engine/world/interact/barrel';
 import { NativeQuestProps } from '../src/shared/game/quest/nativeProps';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { emptyShardfile } from '../src/shared/host/author';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { builtProduct } from './fixtures/engine-lift/product';
-const published = await loadHeadlessProduct(builtProduct('driftwood-isle'));
+import { builtFolder } from './fixtures/engine-lift/folder';
+const published = await loadHeadlessFolder(builtFolder('driftwood-isle'));
 const BARREL_DECISION = parseDecisionScripts(published.section('sim/scripts'));
 const BARREL_BODIES = v.parse(DeclaredBodyOpsSchema, published.section('sim/bodies'));
 // G566: Driftwood's tide barrel moved from the quest props' kit watch into its decision script over a declared body. The
@@ -51,7 +51,7 @@ beforeAll(async () => {
     // exact legacy decision contract carried by the barrel's save envelope.
     ['world/targets', { targets: [], spots: [{ id: 'fixture.unchanged', at: [3, 4, 5], yaw: .25 }] }]]);
   assets = new Map([[row.module.slice('blobs/wasm/'.length, -'.wasm'.length), blob.bytes]]);
-  const product = createShardProduct({ slug: source.identity.slug, revision: 1, shardfile: source, sections,
+  const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections,
     files: new Map(), read: () => Promise.reject(new Error('Body-script proof reads admitted sections only')) });
   const preparation = { shard: source, product, assets, rapier: await rapier };
   nativePlan = { level, install: (host, context) => { installBodyScripts(host, context, preparation); } };

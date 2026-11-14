@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,statSync} from 'node:fs';
 import * as v from 'valibot';
 import {Vector3} from 'three';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {canonicalSimDigest} from '../../fake/simState';
@@ -21,7 +21,7 @@ import type {HeadlessCommand,HeadlessEffect,HeadlessTickCommit} from '../../../s
 import {createNativeProofResident} from '../headless-native';
 import {prepareHeadlessRuntime,nalatiQaraOf} from '../nalati-qara-native';
 import {nalatiPatrolOf} from '../nalati-patrol-native';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {checkedReplayPipeline} from './checkedReplayPipeline';
 import {QaraHandoffSchema,checkQaraLedger,qaraWireHash,qaraObservationHash,qaraCommandHash,type QaraHandoff,type QaraPart} from './qaraHandoff';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
@@ -37,7 +37,7 @@ if(stage!=='night'){
 const started=performance.now(),phases:{id:string;tick:number;ms:number}[]=[];
 const trace=(id:string,tick:number):void=>{console.info(JSON.stringify({stage,id,tick,ms:performance.now()-started}));};
 const mark=(id:string,tick:number):void=>{phases.push({id,tick,ms:performance.now()-started});trace(id,tick);};
-const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),shard=product.shardfile;
 const descriptor=outputDescriptor(shard);assert.ok(descriptor);
 const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
 const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
@@ -45,8 +45,8 @@ if(inherited!==undefined)assert.equal(canonicalSimDigest(decodeSimSnapshot(inher
 assert.ok(descriptor.indexHash,'the handoff requires its independently verified product index');
 const sourceHash=descriptor.indexHash;if(inherited!==undefined)assert.equal(inherited.source,sourceHash);
 const resident=await createNativeProofResident({shard,assets,rapier,product},prepareHeadlessRuntime,inherited?.snapshot);
-let session:Awaited<ReturnType<typeof beginProductSession>>|undefined;
-let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginProductSession>>['ready']>>|undefined;
+let session:Awaited<ReturnType<typeof beginFolderSession>>|undefined;
+let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;
 let failed=false;
 let pipeline:ReturnType<typeof checkedReplayPipeline<QaraPart>>|undefined;
 const dispose=async():Promise<void>=>{await pipeline?.stop();resident.dispose();const worker=replay??await session?.ready();await worker?.dispose();};
@@ -80,7 +80,7 @@ try{
   };
   if(stage==='night'){mark('earned-night',host.state.tick);save();}
   else{
-  session=await beginProductSession('nalati-grasslands','nalati-qara',checkpoint);
+  session=await beginFolderSession('nalati-grasslands','nalati-qara',checkpoint);
   const source=v.parse(HeldBowFileSchema,await product.json('weapons/bow-page.json')),bow=heldBowBase({bow:source.bow,base:source.base});
   const head=new Vector3(),observed=['nalati.patrol','nalati.qara','nalati.weapons'];
   const ready=session.ready();

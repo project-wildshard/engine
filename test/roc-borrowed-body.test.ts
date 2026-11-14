@@ -2,18 +2,18 @@
 import { readFileSync } from 'node:fs';
 import * as v from 'valibot';
 import { expect, test } from 'vitest';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const policySchema = v.object({ phase: v.number(), fighting: v.boolean(), decision: v.string(), strike: v.object({ clock: v.number(), currentId: v.nullable(v.string()) }) });
 const logicalSchema = v.object({ decision: v.object({ tick: v.number(), bindings: v.array(v.object({ slots: v.record(v.string(), v.union([v.number(), v.boolean()])), failures: v.number() })) }) });
 test('the published Roc guest drives the retained native body through phases and logical restore', async () => {
-  const directory = builtProduct('far-reach'), product = await loadHeadlessProduct(directory);
+  const directory = builtFolder('far-reach'), product = await loadHeadlessFolder(directory);
   const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
   const descriptor = outputDescriptor(product.shardfile); if (descriptor === undefined) throw new Error('Missing admitted output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash,

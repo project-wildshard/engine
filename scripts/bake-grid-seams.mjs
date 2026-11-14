@@ -11,7 +11,7 @@ import { GridAssembly } from '../src/shared/game/grid/assembly.ts';
 import { installCatalogue } from '../src/shared/game/grid/catalogueSlot.ts';
 import { loadGridEdgeProfiles } from '../src/shared/game/grid/edgeProfiles.ts';
 import { readGridEdges } from '../src/client/game/grid/edgeSources.ts';
-import { readGridProductEdges } from '../src/client/game/grid/products.ts';
+import { readGridFolderEdges } from '../src/client/game/grid/folders.ts';
 import { findShard } from '../src/client/game/shard/registry.ts';
 import { platformInputs } from '../src/shared/game/grid/platformInputs.ts';
 import { generatePlatform } from '../src/shared/engine/sim/strips.ts';
@@ -54,7 +54,7 @@ for (const developer of modes) for (const devserver of modes) for (const nineDra
         let pending = products.get(slug);
         if (pending === undefined) {
           const url = new URL(descriptor, base).href;
-          pending = readGridProductEdges(url, slug, { base, firstParty: true, offline: false, fetch: fetchFile,
+          pending = readGridFolderEdges(url, slug, { base, firstParty: true, offline: false, fetch: fetchFile,
             hash: bytes => Promise.resolve(createHash('sha256').update(bytes).digest('hex')) });
           products.set(slug, pending);
         }

@@ -9,7 +9,7 @@ import { NetRoom } from '../../src/server/engine/net/room.ts'
 import { SimNetWorld } from '../../src/server/engine/net/simWorld.ts'
 import { createSimHost } from '../../src/server/engine/sim.ts'
 import { PlayerStore } from '../../src/server/host/dedicated/playerStore.ts'
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct.ts'
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder.ts'
 import { openCellWorld } from '../../src/server/host/standalone/cellWorld.ts'
 import { ledgerFilings } from '../../src/server/host/standalone/ledgerFilings.ts'
 import { withOwner } from '../../src/shared/engine/app/ownership.ts'
@@ -26,7 +26,7 @@ import {
   readInteractPlacements,
 } from '../../src/shared/engine/world/interact/types.ts'
 import { directLoopback } from '../../src/test/engine/netLoopback.ts'
-import { runtimeAssets } from '../fixtures/engine-lift/product.ts'
+import { runtimeAssets } from '../fixtures/engine-lift/folder.ts'
 import { SIM_LEVEL } from '../fixtures/sim-level/level.ts'
 
 const limit = 9500
@@ -58,7 +58,7 @@ function timed(name, work) {
 
 async function island(work) {
   const directory = 'out/driftwood-isle',
-    product = await loadHeadlessProduct(directory),
+    product = await loadHeadlessFolder(directory),
     rapier = await physics()
   const stores = new Map(),
     rewards = new PlayerStore({}, () => undefined).rewards
@@ -282,7 +282,7 @@ timed(
       assert.equal(lever.locked(), null)
       assert.equal(f.client.phased.has('talked:castaway'), true)
       assert.equal(f.client.quests.get('sealed-ring')?.started, true)
-      const pine = await loadHeadlessProduct('out/pine-hollow'),
+      const pine = await loadHeadlessFolder('out/pine-hollow'),
         grove = (await pine.json('quests/runtime.json')).table
       const rest = await pine.json('quests/native-spots.json'),
         placed = bindInteractPlacements(grove, rest.rows)

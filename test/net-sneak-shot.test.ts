@@ -11,17 +11,17 @@ import { DAMAGE, type AnimalSim } from '../src/shared/engine/entities/AnimalSim'
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { nativeStealthOf } from '../src/server/game/stealth/nativeStealth';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { HeadlessCommand } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // The long grass the native stealth proof walks into (test/fixtures/headless/nalati-stealth-run.ts).
 const GRASS = { x: 34, z: 198 }, RANGE = 3;
 
 test('a room bow shot from Hidden deals double damage on the server', { timeout: 180_000 }, async () => {
-  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });

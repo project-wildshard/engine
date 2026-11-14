@@ -9,7 +9,7 @@ import type { ShardContext } from '../src/client/game/plugin/context';
 import { CLIENT_FEATURES } from '../src/client/game/shardfile/clientPlan';
 import { clientSceneHandles } from '../src/client/game/shardfile/clientSceneHandles';
 import { SceneHandles } from '../src/client/game/shardfile/sceneHandles';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { tiledMesh } from '../src/client/game/shardfile/tiledMesh';
 import * as sceneInstaller from '../src/client/game/shardfile/worldScenes';
 import { jsonSlot } from '../src/client/engine/saves/slots';
@@ -30,7 +30,7 @@ function fixture(slug: string, host?: 'world.assembly' | 'world.forest-page') {
   if (host === 'world.forest-page') features.push({ kind: host, file: 'forest.json' });
   const plan = parseClientPlan({ version: 1, features });
   const sections = new Map<string, unknown>([['client/plan', plan], ['world/scenes', { version: 1, libraries: [], materials: [], steps: [] }]]);
-  const product = createShardProduct({ slug, revision: 1, shardfile: source, sections, files: new Map(),
+  const product = createShardFolder({ slug, revision: 1, shardfile: source, sections, files: new Map(),
     read: () => Promise.reject(new Error('This driver fixture has no external payloads')) });
   const geometry = new BufferGeometry();
   // Two triangles straddle x=0, just as Far Reach's mill spans a tile edge.

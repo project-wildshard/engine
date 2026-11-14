@@ -21,14 +21,14 @@ import { hydrateWorldSceneWeld, admitWorldSceneModelGraphs, weldSceneMaterial } 
 import { sceneFileKey, type WorldSceneWeld } from '@wildshard/format/worldSceneWeld';
 import { SceneHandles } from '../shardfile/sceneHandles';
 import { hasLentLook, lendLooks, lentLook } from '../shardfile/lentLooks';
-import { loadFirstPartyProduct, runtimeLookMaterials } from '../shardfile/runtimeProduct';
+import { loadFirstPartyFolder, runtimeLookMaterials } from '../shardfile/runtimeFolder';
 import { libraryModel } from './libraryModel';
 import { worldSceneSourceMaterial } from '../shardfile/worldSceneMaterials';
 import { readWholeLibrary } from '../shardfile/wholeLibrary';
 import { ownSceneResource } from '@wildshard/engine/app/sceneOwnership';
 import { worldScenePool } from '../shardfile/scenePools';
 import type { ModelLibrary } from '../plugin/geometry';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 interface Sources {
   readonly catalogue: WorldSceneModels;
@@ -120,7 +120,7 @@ function ready(sources: Sources | undefined, catalogue: WorldSceneModels, select
   return needed.geometry.every(ref => sources.geometries.has(JSON.stringify([ref.library, ref.model]))) && needed.materials.every(id => sources.materials.has(id));
 }
 
-async function load(ctx: ModelContext, product: string, catalogue: WorldSceneModels, selection: Selection, lifetime: Scope, pinnedProduct?: ShardProduct): Promise<Sources> {
+async function load(ctx: ModelContext, product: string, catalogue: WorldSceneModels, selection: Selection, lifetime: Scope, pinnedFolder?: ShardFolder): Promise<Sources> {
   const current = state(ctx, product);
   requireLive(lifetime);
   if (ready(current.value, catalogue, selection) && current.value !== undefined) return current.value;
@@ -128,12 +128,12 @@ async function load(ctx: ModelContext, product: string, catalogue: WorldSceneMod
   // captured tier/profile and never reuse another choice's incomplete resources.
   if (current.pending !== undefined) {
     try { await current.pending; } catch { /* An abandoned view does not cancel the next requested choice. */ }
-    return load(ctx, product, catalogue, selection, lifetime, pinnedProduct);
+    return load(ctx, product, catalogue, selection, lifetime, pinnedFolder);
   }
   current.pending ??= (async () => {
     const owner = lifetime.child(`scene-models/${product}`);
     try {
-    const admitted = pinnedProduct ?? await loadFirstPartyProduct(product, owner), rows = admitted.section('world/scenes');
+    const admitted = pinnedFolder ?? await loadFirstPartyFolder(product, owner), rows = admitted.section('world/scenes');
     requireLive(owner);
     if (!Object.is(admitted.shardfile.identity.slug, product)) throw new Error('Scene model product identity differs');
     if (rows.catalogue === undefined || !same(parseWorldSceneModels(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await admitted.file(rows.catalogue)))), catalogue)) throw new Error('Scene model boot metadata differs from its admitted catalogue');
@@ -217,13 +217,13 @@ async function load(ctx: ModelContext, product: string, catalogue: WorldSceneMod
 }
 
 /** Client-only, cold-loadable model catalogue. Metadata, choices, draws and site facts are rows. */
-export function defineWorldSceneCatalogue(input: unknown, pinnedProduct?: ShardProduct): {
+export function defineWorldSceneCatalogue(input: unknown, pinnedFolder?: ShardFolder): {
   readonly model: (key: string) => ModelDef<Record<string, unknown>>;
   readonly site: (key: string, choice: string, ctx: ModelContext, registry: WorldRegistry | null) => ModelSite;
   readonly material: (id: string, ctx: ModelContext) => Material;
 } {
   const rows = parseWorldSceneModels(input);
-  if (pinnedProduct !== undefined && !Object.is(pinnedProduct.slug, rows.product)) throw new Error('Pinned scene catalogue product differs');
+  if (pinnedFolder !== undefined && !Object.is(pinnedFolder.slug, rows.product)) throw new Error('Pinned scene catalogue product differs');
   const definitions = new Map<string, ModelDef<Record<string, unknown>>>();
   for (const row of rows.models) {
     for (const choice of row.choices) colliders(choice.colliders);
@@ -290,7 +290,7 @@ export function defineWorldSceneCatalogue(input: unknown, pinnedProduct?: ShardP
         const resident = state(ctx, rows.product).value;
         if (ready(resident, rows, selection) && resident !== undefined) return build(resident);
         return loadingSpecimen(row.id, choice.size, async () => {
-          const sources = await load(ctx, rows.product, rows, selection, owner, pinnedProduct), made = build(sources); if (made instanceof Object3D) return made;
+          const sources = await load(ctx, rows.product, rows, selection, owner, pinnedFolder), made = build(sources); if (made instanceof Object3D) return made;
           const root = new Group();
           for (const part of made) { const mesh = new Mesh(part.geometry, part.material); mesh.castShadow = part.castShadow ?? false; mesh.receiveShadow = part.receiveShadow ?? false; mesh.renderOrder = part.renderOrder ?? 0; root.add(mesh); }
           return root;

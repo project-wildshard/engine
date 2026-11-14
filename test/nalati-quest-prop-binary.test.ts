@@ -6,14 +6,14 @@ import {prepareSpecimenCatalogue} from '../src/client/game/models/specimenCatalo
 import {hashImmutableBytes} from '../src/shared/host/immutable';
 import {nameBlob} from '../src/sharddev/blobs';
 import {Scope} from '../src/shared/engine/app/scope';
-import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
+import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
 import {emptyShardfile} from '../src/shared/host/author';
 
 test('the carried specimen prepares the exact original geometry through its named product file',async()=>{
   const source={name:'models/specimens/quest-prop.bin'};
   const bytes=Uint8Array.from(readFileSync('test/fixtures/nalati-quest-prop-original.bin')),scope=new Scope('quest-prop.raw');
   const hash=hashImmutableBytes(bytes);
-  const product=createShardProduct({slug:'raw-delivery',revision:1,shardfile:emptyShardfile({slug:'raw-delivery',name:'Delivery',author:'Fixture',revision:1,seed:1}),
+  const product=createShardFolder({slug:'raw-delivery',revision:1,shardfile:emptyShardfile({slug:'raw-delivery',name:'Delivery',author:'Fixture',revision:1,seed:1}),
     sections:new Map(),files:new Map([[source.name,{hash,url:source.name}]]),read:()=>Promise.resolve(bytes)});
   try{
     const files=await prepareSpecimenCatalogue(product,carriedQuestRows.model,scope);

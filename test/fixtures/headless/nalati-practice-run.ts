@@ -11,12 +11,12 @@ import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import type {HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
 import {createNativeProofResident} from '../headless-native';
 import {prepareHeadlessRuntime} from '../nalati-practice-native';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const State=v.object({state:v.object({open:v.boolean(),pitch:v.number(),current:v.string(),available:v.array(v.string()),swapping:v.boolean(),rifle:v.string(),
   at:v.object({x:v.number(),y:v.number(),z:v.number()}),board:v.boolean()})});
-const session=await beginProductSession('nalati-grasslands','nalati-practice'),{product,assets}=session;
+const session=await beginFolderSession('nalati-grasslands','nalati-practice'),{product,assets}=session;
 // The independent worker is already admitting its inputs. Build the existing
 // direct owner alongside it, then join both before recording or replaying.
 // Observe both failures immediately and retire either successful peer.
@@ -71,7 +71,7 @@ try{
     assert.deepEqual(observation.position,row.position);assert.equal(observation.adapters.find(value=>value.id==='nalati.practice')?.state,row.state,
       'fresh input replay matches actual ownership, selected identity, animation and loan history');}
   assert.equal(repeated.ticks,frames.length);assert.equal(replay.quarantined,false);await replay.dispose();
-  const restored=await beginProductSession('nalati-grasslands','nalati-practice',checkpoint);replay=await restored.ready();
+  const restored=await beginFolderSession('nalati-grasslands','nalati-practice',checkpoint);replay=await restored.ready();
   const continuation=await replay.verbTape({version:1,observe:['nalati.practice'],segments:[
     {id:'restore-selected-loan',ticks:frames.length-checkpointTick,commands:[],frames:frames.slice(checkpointTick)},
   ]});

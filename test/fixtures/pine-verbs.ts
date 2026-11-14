@@ -6,7 +6,7 @@ import {ForestPageSchema} from '@wildshard/format/forestPage';
 import {buildingDoor,toggleBuildingDoor,stepBuildingDoor,buildingDoorYaw,buildingDoorCollides} from '../../src/shared/game/shardfile/buildingDoor';
 import {eyeReaches} from '../../src/shared/game/quest/interactionRows';
 import type {PrepareHeadlessRuntime} from '../../src/server/host/headlessRuntime';
-import {prepareProductPlan} from './headless-native';
+import {prepareFolderPlan} from './headless-native';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const finite=v.pipe(v.number(),v.finite());
@@ -14,7 +14,7 @@ const savedDoor=v.strictObject({id:v.string(),open:v.boolean(),t:v.pipe(finite,v
 /** The shipping door state and physics primitive over the admitted cabin
  * topology. Fixed test commands can use a real nearby door, never set a pose. */
 export const prepareHeadlessRuntime:PrepareHeadlessRuntime=async preparation=>{
-  const base=await prepareProductPlan(preparation),page=v.parse(ForestPageSchema,await preparation.product.json('world/forest-page.json'));
+  const base=await prepareFolderPlan(preparation),page=v.parse(ForestPageSchema,await preparation.product.json('world/forest-page.json'));
   const variant=page.buildings.variants.find(row=>row.tier==='phone'&&!row.shadow&&!row.shared);
   if(variant===undefined)throw new Error('Missing admitted phone cabins');
   const living=sceneLivingBytes(await preparation.product.file(variant.file),variant);

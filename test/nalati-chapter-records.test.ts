@@ -2,7 +2,7 @@
 import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
 import * as v from 'valibot';
-import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {snapshotSimHost,serializeSimSnapshot} from '../src/shared/engine/sim/snapshot';
 import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
@@ -11,13 +11,13 @@ import {AdventurePersistenceSchema} from '@wildshard/format/namedJsonContracts';
 import {parseChapterStoryPresentation} from '@wildshard/format/questStory';
 import type {PrepareHeadlessRuntime} from '../src/server/host/headlessRuntime';
 import type {SimHost} from '../src/server/engine/sim';
-import {builtProduct} from './fixtures/builtProduct';
-import {createNativeProofResident,prepareProductPlan as prepareNalati} from './fixtures/headless-native';
+import {builtFolder} from './fixtures/builtFolder';
+import {createNativeProofResident,prepareFolderPlan as prepareNalati} from './fixtures/headless-native';
 import {prepareChapterRecords,type ChapterRecords} from '../src/server/game/quest/chapterRecords';
 import {canonicalSimDigest} from './fake/simState';
 
 test('chapter saved reads borrow actual native records and restore without granting outcomes',async()=>{
-  const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+  const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);if(descriptor===undefined)throw new Error('Missing admitted native files');
   const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,
     Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

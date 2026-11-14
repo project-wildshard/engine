@@ -3,14 +3,14 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import * as v from 'valibot';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { mixedPopulation } from '../src/server/game/population/mixedRoster';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 import { jumpOwnerClock } from './fixtures/ownerClock';
 
 // A long session on Driftwood's shipped rows, solo. The roster held 34 bodies and room for 221 returns, and the 222nd
@@ -21,7 +21,7 @@ import { jumpOwnerClock } from './fixtures/ownerClock';
 const SLUG = 'driftwood-isle', STEP = 'driftwood.island', FULL = 255;
 
 async function shipped(): Promise<(snapshot?: string) => Promise<TrustedHeadlessResident>> {
-  const directory = builtProduct(SLUG), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+  const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

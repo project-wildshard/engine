@@ -1,4 +1,4 @@
-import { ApproachInputsDeferredError } from './productInputs';
+import { ApproachInputsDeferredError } from './folderInputs';
 
 interface Request { complete: Promise<void>; offered: Promise<void>; deferred: boolean; revision: number }
 /** Share view preparation, retry optional headroom only after accounting changes,

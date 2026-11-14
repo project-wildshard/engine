@@ -8,7 +8,7 @@ import { defineBakedModels } from '@wildshard/engine/models/model';
 import { loadingSpecimen } from '@wildshard/engine/models/gear';
 import { live, type RosterEntry } from '@wildshard/engine/models/live';
 import { posedAssets, type PosedAssetSet } from '../plugin/geometry';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { lentLook, setLentParam, setLentTexture } from '../shardfile/lentLooks';
 import type { PosedBufferPool, PosedBufferView } from './posedBufferPool';
 
@@ -155,13 +155,13 @@ export class PosedDraw {
 
   /** Admit a named product library without eagerly loading its model assets.
    * Cards retain the normal loading specimen until their shared geometry is ready. */
-  static library(product: Pick<ShardProduct, 'file' | 'url'>, name: string, load: typeof posedAssets = posedAssets): Promise<PosedLibrary> {
+  static library(product: Pick<ShardFolder, 'file' | 'url'>, name: string, load: typeof posedAssets = posedAssets): Promise<PosedLibrary> {
     const key = product.url(name);
     let library = this.libraries.get(key);
     if (library === undefined) { library = this.admitLibrary(product, name, load); this.libraries.set(key, library); }
     return library;
   }
-  private static async admitLibrary(product: Pick<ShardProduct, 'file' | 'url'>, name: string, load: typeof posedAssets): Promise<PosedLibrary> {
+  private static async admitLibrary(product: Pick<ShardFolder, 'file' | 'url'>, name: string, load: typeof posedAssets): Promise<PosedLibrary> {
     const row = v.parse(PosedLibrarySchema, JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await product.file(name))));
     let assets: PosedAssetSet | null = null, loading: Promise<void> | null = null;
     const preload = (): Promise<void> => (loading ??= (async () => {

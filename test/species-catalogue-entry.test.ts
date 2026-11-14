@@ -6,7 +6,7 @@ import { HullLookBookSchema, PackedCreatureLooksSchema } from '@wildshard/format
 import { SpeciesPresentationSchema } from '@wildshard/format/speciesBookRows';
 import { Scope } from '../src/shared/engine/app/scope';
 import { emptyShardfile } from '../src/shared/host/author';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { CLIENT_FEATURES } from '../src/client/game/shardfile/clientPlan';
 import { entryOwner } from '../src/shared/game/shardfile/entryOwners';
 import { installClientSpeciesProgram, prepareClientSpeciesCatalogue } from '../src/client/game/shardfile/clientSpeciesProgram';
@@ -24,7 +24,7 @@ function fixture() {
   const shardfile = emptyShardfile({slug: 'orchard-catalogue', name: 'Orchard', author: 'Fixture', revision: 1, seed: 1});
   const files = new Map([[row.catalogue.actors, {hash: 'actors', url: '/actors'}], [row.catalogue.looks, {hash: 'looks', url: '/looks'}]]);
   let onRead: (hash: string) => void = () => undefined;
-  const product = createShardProduct({slug: shardfile.identity.slug, revision: 1, shardfile, files,
+  const product = createShardFolder({slug: shardfile.identity.slug, revision: 1, shardfile, files,
     sections: new Map([['look/hull-book', {...source.hullBook, slug: shardfile.identity.slug}]]), read: hash => {
       trace.push(hash); onRead(hash);
       return Promise.resolve(new TextEncoder().encode(JSON.stringify(hash === 'actors' ? {species: source.presentation} : source.looks)));

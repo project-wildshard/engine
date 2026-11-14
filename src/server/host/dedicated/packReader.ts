@@ -9,7 +9,7 @@ import { brotliDecompressSync } from 'node:zlib';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
-import { readGridCollisionPack, readServerProduct, type ServerRead } from '../standalone/serverProduct';
+import { readGridCollisionPack, readServerFolder, type ServerRead } from '../standalone/serverFolder';
 
 /** What a reader counts, so a boot can say where its bytes came from. */
 export interface PackReads { fetched: number; fetchedBytes: number; cached: number; refused: number }
@@ -63,6 +63,6 @@ export function readPackGrid(build: string, options: PackReaderOptions, reads: P
   return readGridCollisionPack(new URL('shards/', options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, build, packRead(options, reads));
 }
 /** One shard's server inputs, through its build's book, or for a placed slug the book lacks, the cook's index of `hash` (SA47). */
-export function readPackProduct(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads, hash?: string): Promise<HeadlessRuntimeInput> {
-  return readServerProduct(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, () => build, packRead(options, reads), rapier, undefined, hash);
+export function readPackFolder(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads, hash?: string): Promise<HeadlessRuntimeInput> {
+  return readServerFolder(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, () => build, packRead(options, reads), rapier, undefined, hash);
 }

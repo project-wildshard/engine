@@ -2,7 +2,7 @@ import type { ShardContext } from '../plugin/context';
 import { nextDrawnFrame, presenting } from '@wildshard/engine/core/framePacing';
 import { loadBakedSky, skyHorizonColor } from '@wildshard/engine/boot/bakedApi';
 import type { LookStrategy, SkyBackdropContext, SkyBackdropFactory, SkyBackdropPost, SkyBackdropTargets } from '@wildshard/engine/render/look';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { pageModeValue } from '../shard/pagePolicy';
 import { DayCycle, compassDir, type DayCycleClock } from '@wildshard/engine/world/dayCycle';
 import type { Game } from '@wildshard/engine/core/Game';
@@ -130,9 +130,9 @@ class KeyedSky {
   private readonly scene: THREE.Scene;
   private readonly opts: KeyedSkyOptions;
   private readonly graphs: KeyedSkyGraphs;
-  private readonly product: ShardProduct;
+  private readonly product: ShardFolder;
 
-  constructor(product: ShardProduct, day: KeyedSkyDay, renderer: SkyBackdropContext['renderer'], scene: THREE.Scene, opts: KeyedSkyOptions, dome: THREE.Mesh, env: THREE.Material, graphs: KeyedSkyGraphs) {
+  constructor(product: ShardFolder, day: KeyedSkyDay, renderer: SkyBackdropContext['renderer'], scene: THREE.Scene, opts: KeyedSkyOptions, dome: THREE.Mesh, env: THREE.Material, graphs: KeyedSkyGraphs) {
     this.product = product;
     const style = day.style;
     this.day = day; this.renderer = renderer; this.scene = scene; this.opts = opts; this.graphs = graphs;
@@ -367,13 +367,13 @@ export function skyFaceOf(sky: SkyRig): SkyFace | null {
 /** A keyed-sky look from declared rows (G571, the manifest's `render: { platform: 'keyed' }`): the engine's chain under the
  *  shard's keyed day / night sky (its look/keyed-sky section), its channels, its dome / env looks; the page-mode trim (`trim`, its policy
  *  row) packs the keys and halves the environment, read when the level asks for its look. */
-export function keyedSkyRender(product: ShardProduct, rows: { readonly channels: string;
+export function keyedSkyRender(product: ShardFolder, rows: { readonly channels: string;
   readonly looks: { readonly dome: string; readonly env: string }; readonly trim: { readonly shard: boolean; readonly grid: boolean } }): LookStrategy {
   const trim = pageModeValue(rows.trim);
   return { compose: () => ({}), backdrop: keyedSkyBackdrop(product.section('look/keyed-sky'), { packKeys: trim, smallEnv: trim, channels: rows.channels }, { product, ...rows.looks }) };
 }
 
-export function keyedSkyBackdrop(input: unknown, options: { readonly packKeys: boolean; readonly smallEnv: boolean; readonly channels: string }, looks: { readonly product: ShardProduct; readonly dome: string; readonly env: string }): SkyBackdropFactory {
+export function keyedSkyBackdrop(input: unknown, options: { readonly packKeys: boolean; readonly smallEnv: boolean; readonly channels: string }, looks: { readonly product: ShardFolder; readonly dome: string; readonly env: string }): SkyBackdropFactory {
   const day = keyedSkyDay(input), dome = day.style.dome;
   if (options.packKeys) for (const id of Object.keys(day.style.keys)) {
     const row = day.style.packedKeys?.[id];
@@ -430,7 +430,7 @@ export interface PaintedSky extends SkyFace {
  * hemisphere, the environment and the fog, the cloud and planet light, the disc and its corona (a moon smaller and
  * cooler) — the dome kept on the camera and the panorama's re-grade (`panoramaTint`). Uniforms, colours and intensities only.
  */
-export async function paintedSky(product: ShardProduct, game: Game, sky: SkyRig, rows: PaintedSkyRows, params: URLSearchParams, brightness: number, source?: ShardContext): Promise<PaintedSky> {
+export async function paintedSky(product: ShardFolder, game: Game, sky: SkyRig, rows: PaintedSkyRows, params: URLSearchParams, brightness: number, source?: ShardContext): Promise<PaintedSky> {
   const scope = source?.scope, runtime = source?.game.runtime, world = runtime?.world;
   const scene = game.scene, owner = game.levelScope, read = product.json;
   const live = (): void => {

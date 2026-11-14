@@ -2,7 +2,7 @@ import { Color, Mesh, SphereGeometry, type Scene, type Vector3 } from 'three';
 import { weatherFog, type WeatherFog } from '@wildshard/engine/world/Atmosphere';
 import type { MarkedBossPresentation } from '@wildshard/format/bossProfiles';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import { prepareClientWorld } from '../shardfile/runtimeProduct';
+import { prepareClientWorld } from '../shardfile/runtimeFolder';
 import type { ShardContext } from './context';
 
 /**

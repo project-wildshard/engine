@@ -10,7 +10,7 @@ import { installTextureUploadEvents, type TextureUploadRenderer } from '@wildsha
 import type { BakedTilesRow } from '@wildshard/format/bakedTiles';
 import { installBakedTiles } from './bakedTiles';
 import { lendLooks } from './lentLooks';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 class DecodedImage {
   readonly width = 512;
@@ -66,7 +66,7 @@ test('baked lightmaps release decoded pixels only after native upload, keeping t
     };
     installTextureUploadEvents(renderer);
     try {
-      const baked = await installBakedTiles({ product: legacyDouble<ShardProduct>({ url: name => `/lightmap-fixture/${name}` }),
+      const baked = await installBakedTiles({ product: legacyDouble<ShardFolder>({ url: name => `/lightmap-fixture/${name}` }),
         parent, sky: legacyDouble<SkyRig>({}), registry: legacyDouble<WorldRegistry>({}), scope: owner }, row);
       expect(baked.tiles).toHaveLength(1); expect(baked.group.parent).toBe(parent);
       expect(baked.tiles[0]?.geometry).toBe(geometry); expect(baked.tiles[0]?.matrix.elements.slice(12, 15)).toEqual([2, 3, 4]);

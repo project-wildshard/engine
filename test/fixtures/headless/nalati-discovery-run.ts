@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the original native physics bytes.
 import {readFileSync} from 'node:fs';
 import * as v from 'valibot';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {createNativeProofResident} from '../headless-native';
 import {prepareHeadlessRuntime} from '../nalati-world-verbs';
 import {ChapterViewSchema} from '@wildshard/format/questPageComposition';
@@ -14,8 +14,8 @@ import type {HeadlessTapeObservation} from '../../../src/shared/host/headlessTap
 import {PhysicsRouteCursor} from '../../../src/shared/host/headlessJourney';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {checkedReplayPipeline} from './checkedReplayPipeline';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {serializeSimSnapshot,snapshotSimHostBytes} from '../../../src/shared/engine/sim/snapshot';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
@@ -37,7 +37,7 @@ if(leg==='cave'){
   // earns each one and its notice once, then stands where the entry leg leaves the snow leopard cave. That world is
   // saved; the recorder and the replay worker both start from the save, so the tour below runs on every earlier
   // discovery and a duplicate notice or a quest fact from the whole set still fails.
-  const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+  const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);assert.ok(descriptor);
   const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const placed=await createNativeProofResident({shard,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm')),product},prepareHeadlessRuntime);
@@ -62,7 +62,7 @@ if(leg==='cave'){
     start=serializeSimSnapshot(snapshotSimHostBytes(placed.host));
   }finally{placed.dispose();}
 }
-const session=await beginProductSession('nalati-grasslands','nalati-world',start);
+const session=await beginFolderSession('nalati-grasslands','nalati-world',start);
 let first:Awaited<ReturnType<typeof createNativeProofResident>>|undefined;
 let stopReplay:(()=>Promise<void>)|undefined;
 try{

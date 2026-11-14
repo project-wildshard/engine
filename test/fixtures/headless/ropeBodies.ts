@@ -3,7 +3,7 @@ import {tagOf} from '../../../src/shared/engine/physics/surface';
 import {isSimHostRestoring} from '../../../src/shared/engine/sim/snapshot';
 import {RopeChain} from '../../../src/shared/engine/physics/ropeChain';
 import type {SimHost} from '../../../src/server/engine/sim';
-import type {ShardProduct} from '../../../src/shared/game/shardfile/shardProduct';
+import type {ShardFolder} from '../../../src/shared/game/shardfile/shardFolder';
 import type {WorldAssemblyStage} from '@wildshard/format/worldAssembly';
 
 const restoredWalkBodies=new WeakSet<SimHost>();
@@ -20,7 +20,7 @@ export function retainRestoredWalkBodies(host:SimHost):void {
  * The chain consumes admitted rest poses, as RopeDeck.chainSpec does; its
  * physics API has no terrain query. The model's separate analytic-ground
  * admission remains in RopeDeckSite. No drawn or guessed deck enters Node. */
-export function installWalkRopeBodies(host:SimHost,product:ShardProduct|undefined):()=>void {
+export function installWalkRopeBodies(host:SimHost,product:ShardFolder|undefined):()=>void {
   const chains:RopeChain[]=[];
   if(product?.has('client/plan')!==true)return ()=>{ /* No admitted rope inventory. */ };
   const decks=new Map<string,Extract<WorldAssemblyStage,{kind:'rope-deck'}>>();

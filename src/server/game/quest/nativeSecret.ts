@@ -12,7 +12,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import type { QuestBook, QuestBooks } from '@wildshard/engine/quest/players';
 import { parseQuestStory } from '@wildshard/format/questStory';
 import type { QuestPageRows } from '@wildshard/format/questPageComposition';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { chapterDecide } from '../../../shared/game/quest/chapterDecision';
 import { commitSeatEffects } from '../../../shared/game/quest/effects';
@@ -36,7 +36,7 @@ export interface NativeQuestSecret {
 
 /** The page's quest-view secret, from the rows the page reads: the `quest.views` file's `secret`, its quest composition's chapter
  *  program and the story's decision. Undefined when a shard's quest views declare none. */
-export async function readNativeQuestSecret(product: ShardProduct): Promise<NativeQuestSecret | undefined> {
+export async function readNativeQuestSecret(product: ShardFolder): Promise<NativeQuestSecret | undefined> {
   if (!product.has('client/plan')) return undefined;
   const features = product.section('client/plan').features, views = features.find(row => row.kind === 'quest.views');
   if (views === undefined) return undefined;

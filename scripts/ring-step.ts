@@ -27,16 +27,16 @@ const sha256 = (text: string): string => createHash('sha256').update(text).diges
 const line = (tick: number): HeadlessCommand => ({ kind: 'player', moveX: 0.3 * Math.sin(tick / 90), moveZ: -1, yaw: 0, ...(tick % 47 === 0 ? { jump: true as const } : {}), ...(tick % 97 === 0 ? { dodge: true as const } : {}) });
 const only = option('only')?.split(',');
 
-const { prepareAssetDecoders } = await import('@wildshard/format/product');
+const { prepareAssetDecoders } = await import('@wildshard/format/shardfileAssets');
 const { loadRapier } = await import('../src/shared/engine/physics/rapier.ts');
-const { loadHeadlessProduct } = await import('../src/server/host/headlessProduct.ts');
+const { loadHeadlessFolder } = await import('../src/server/host/headlessFolder.ts');
 const { createTrustedHeadlessResident } = await import('../src/server/host/headlessRuntime.ts');
 const { HeadlessSimulation } = await import('../src/server/host/headless.ts');
 const { outputDescriptor, serverReadsFile } = await import('../src/shared/game/shardfile/outputDescriptor.ts');
 const { serializeSimSnapshot, snapshotSimHostBytes } = await import('../src/shared/engine/sim/snapshot.ts');
 
 /** A declared shard runs in the tick worker on its whole asset table, as the cook's proof does. */
-async function stepDeclared(shard: Awaited<ReturnType<typeof loadHeadlessProduct>>['shardfile'], assets: ReadonlyMap<string, Uint8Array>): Promise<string[]> {
+async function stepDeclared(shard: Awaited<ReturnType<typeof loadHeadlessFolder>>['shardfile'], assets: ReadonlyMap<string, Uint8Array>): Promise<string[]> {
   const sim = await HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory' }), chain: string[] = [];
   try {
     for (let tick = 1; tick <= TICKS; tick++) {
@@ -49,7 +49,7 @@ async function stepDeclared(shard: Awaited<ReturnType<typeof loadHeadlessProduct
 }
 
 /** Held-melee and native-assembly shards: the resident a worker composes, in this process, walking a fixed line. */
-async function stepResident(input: { shard: Awaited<ReturnType<typeof loadHeadlessProduct>>['shardfile']; assets: ReadonlyMap<string, Uint8Array>; product: Awaited<ReturnType<typeof loadHeadlessProduct>> }): Promise<string[]> {
+async function stepResident(input: { shard: Awaited<ReturnType<typeof loadHeadlessFolder>>['shardfile']; assets: ReadonlyMap<string, Uint8Array>; product: Awaited<ReturnType<typeof loadHeadlessFolder>> }): Promise<string[]> {
   const rapier = await loadRapier(readFileSync(createRequire(resolve('package.json')).resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm')));
   const resident = await createTrustedHeadlessResident({ ...input, rapier }), chain: string[] = [];
   try {
@@ -63,7 +63,7 @@ async function stepResident(input: { shard: Awaited<ReturnType<typeof loadHeadle
 }
 
 async function step(folder: string): Promise<Stepped> {
-  const started = performance.now(), product = await loadHeadlessProduct(folder), shard = product.shardfile, descriptor = outputDescriptor(shard);
+  const started = performance.now(), product = await loadHeadlessFolder(folder), shard = product.shardfile, descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`${folder}: no verified index`);
   const declared = shard.runtime === null && !product.has('sim/runtime-plan'), assets = new Map<string, Uint8Array>();
   for (const file of descriptor.index.files) {
@@ -75,7 +75,7 @@ async function step(folder: string): Promise<Stepped> {
 }
 
 /** A product's folder is its discovery folder, the one `pins.ts` wrote. */
-function productFolder(slug: string): string {
+function builtFolder(slug: string): string {
   for (const name of [slug, `_${slug}`]) if (existsSync(join('out', name, 'validation.json'))) return join('out', name);
   throw new Error(`${slug}: not installed: run pins.ts install --ring 1`);
 }
@@ -83,7 +83,7 @@ function productFolder(slug: string): string {
 await prepareAssetDecoders();
 const ring = (JSON.parse(readFileSync('test/pins/rings.json', 'utf8')) as Record<string, Ring>)['1'];
 if (ring === undefined) throw new Error('No ring 1');
-const rows = [...ring.products.map(slug => [slug, productFolder(slug)] as const), ...ring.slices.map(slug => [slug, join('out/.slices', slug)] as const)].filter(([slug]) => only === undefined || only.includes(slug));
+const rows = [...ring.products.map(slug => [slug, builtFolder(slug)] as const), ...ring.slices.map(slug => [slug, join('out/.slices', slug)] as const)].filter(([slug]) => only === undefined || only.includes(slug));
 const baseline = (existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {}) as Digests, held = baseline[PLATFORM]?.[String(TICKS)] ?? {};
 const measured: Record<string, readonly string[]> = {};
 let failed = 0;

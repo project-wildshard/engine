@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseSync } from 'vite';
-import { manifestFolders, outputManifest, shardProducts } from './shard-outputs.mjs';
+import { manifestFolders, outputManifest, builtShardFolders } from './shard-outputs.mjs';
 import { usesProgramDiscovery } from './program-discovery.mjs';
 
 /** The SDK's named, value-level generate export is the conversion boundary.
@@ -28,7 +28,7 @@ export function generationPlan(root, requested) {
   const directory = resolve(root, 'src/shards');
   const folders = readdirSync(directory, { withFileTypes: true }).filter(row => row.isDirectory()
     && existsSync(resolve(directory, row.name, 'shard.config.ts'))).map(row => row.name).sort();
-  const products = shardProducts(root, folders);
+  const products = builtShardFolders(root, folders);
   const selected = requested === undefined ? products.map(row => row.slug) : requested.split(',');
   if (selected.length === 0 || new Set(selected).size !== selected.length
     || selected.some(slug => !/^[a-z0-9_-]+$/u.test(slug) || !products.some(row => row.slug === slug))) throw new Error(`Generation unknown or duplicate shard: ${requested}`);
@@ -44,9 +44,9 @@ export function buildPrograms(root, plan, reuse = false) {
 /** Discovery and boot tables cover every manifest even for a scoped build.
  * Read declarations only; a config is never executed to discover prerequisites.
  * @param {string} root */
-export function programDiscoveryProducts(root) {
+export function programDiscoveryFolders(root) {
   if (!existsSync(resolve(root, 'src/shards'))) return [];
-  return shardProducts(root, manifestFolders(root)).filter(product => {
+  return builtShardFolders(root, manifestFolders(root)).filter(product => {
     const file = resolve(root, 'src/shards', product.folder, 'manifest.json');
     return existsSync(file) && usesProgramDiscovery(product.output === null
       ? JSON.parse(readFileSync(file, 'utf8')) : outputManifest(root, product.folder, product.output));
@@ -57,7 +57,7 @@ export function programDiscoveryProducts(root) {
  * @param {string} root @param {GenerationPlan} plan @returns {GenerationPlan} */
 export function programInputPlan(root, plan) {
   if (!plan.scoped) return plan;
-  const products = [...new Set([...plan.products, ...programDiscoveryProducts(root)])];
+  const products = [...new Set([...plan.products, ...programDiscoveryFolders(root)])];
   return products.length === plan.products.length ? plan : generationPlan(root, products.join(','));
 }
 
@@ -68,7 +68,7 @@ export function programInputPlan(root, plan) {
  * @param {string} root @param {GenerationPlan} plan
  * @param {{inputsOnly:boolean,reuse?:boolean,writeTables:()=>Promise<void>,build?:typeof buildPrograms}} options */
 export async function emitProgramTables(root, plan, { inputsOnly, reuse = false, writeTables, build = buildPrograms }) {
-  const required = programDiscoveryProducts(root);
+  const required = programDiscoveryFolders(root);
   if (required.length > 0) {
     // Provider products can run headless validation before boot tables. Publish
     // the same installed physics bytes that the later boot stage already uses.

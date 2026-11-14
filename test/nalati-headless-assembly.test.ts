@@ -8,16 +8,16 @@ import { createSimHost, type SimHost } from '../src/server/engine/sim';
 import { snapshotSimHostBytes, serializeSimSnapshot, decodeSimSnapshot } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
-import { prepareProductPlan as prepareHeadlessRuntime } from './fixtures/headless-native';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from './fixtures/builtFolder';
+import { prepareFolderPlan as prepareHeadlessRuntime } from './fixtures/headless-native';
 import { nalatiNativeAssets } from './proof/nalati-grasslands/nativeAssets';
 import { canonicalSimDigest } from './fake/simState';
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 
 test('Nalati declared assembly retains its native 100 + 30 tick continuation', async () => {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const plan = await prepareHeadlessRuntime({ shard: source, assets: nalatiNativeAssets(source), rapier, product: await loadHeadlessProduct(builtProduct('nalati-grasslands')) });
+  const plan = await prepareHeadlessRuntime({ shard: source, assets: nalatiNativeAssets(source), rapier, product: await loadHeadlessFolder(builtFolder('nalati-grasslands')) });
   const ports = { ...plan.ports, rapier }, effects = { commands: () => [], emit: () => undefined };
   const host = createSimHost(plan.level, ports);
   let restored: SimHost | undefined;

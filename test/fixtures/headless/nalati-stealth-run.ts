@@ -12,10 +12,10 @@ import {StealthRowsSchema} from '@wildshard/format/stealth';
 import type {HeadlessCommand,HeadlessEffect} from '../../../src/shared/host/tickProtocol';
 import {createNativeProofResident} from '../headless-native';
 import {prepareHeadlessRuntime} from '../nalati-stealth-native';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
-const session=await beginProductSession('nalati-grasslands','nalati-stealth'),{product,assets}=session;
+const session=await beginFolderSession('nalati-grasslands','nalati-stealth'),{product,assets}=session;
 const hiddenCover=v.parse(v.number(),v.parse(StealthRowsSchema,product.section('player/stealth')).tuning['hiddenCover']);
 let replay:Awaited<ReturnType<typeof session.ready>>|undefined;
 const resident=await createNativeProofResident({product,assets,shard:product.shardfile,
@@ -63,7 +63,7 @@ try{
   ]});
   assert.deepEqual(repeated.observations.at(-1),report.observations[0],'fresh inputs reproduce grass, threats, crouch state, latch and one-time hint');
   await replay.dispose();replay=undefined;
-  const restored=await beginProductSession('nalati-grasslands','nalati-stealth',checkpoint);replay=await restored.ready();
+  const restored=await beginFolderSession('nalati-grasslands','nalati-stealth',checkpoint);replay=await restored.ready();
   const continuation=await replay.verbTape({version:1,observe:['nalati.stealth'],segments:[
     {id:'release-and-leave-grass',ticks:suffix.length,commands:[],frames:suffix},{id:'after-stealth-walk',ticks:1,commands:[]},
   ]});

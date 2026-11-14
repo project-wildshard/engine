@@ -6,7 +6,7 @@ import {mountedPlayerOf} from '../../src/server/game/riding/native';
 import {nativeTamingOf} from '../../src/server/game/riding/nativeTaming';
 import {practiceRoom} from '../../src/client/engine/core/practiceRoom';
 import type {PrepareHeadlessRuntime} from '../../src/server/host/headlessRuntime';
-import {prepareProductPlan as prepareNalati} from './headless-native';
+import {prepareFolderPlan as prepareNalati} from './headless-native';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const finite=v.pipe(v.number(),v.finite()),truth=v.boolean();

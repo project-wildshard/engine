@@ -15,7 +15,7 @@ import type { SkyRig } from '@wildshard/engine/world/skyRig';
 import type { InferOutput } from 'valibot';
 import type { PlumbingData } from '@wildshard/format/plumbing';
 import { worldSceneModelGraphs, type WorldSceneModels } from '@wildshard/format/worldSceneModels';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { plumbingKnob } from '../shard/declaredPlumbing';
 import { createBuildingCloud } from './buildingCloud';
 import type { SceneHandles } from './sceneHandles';
@@ -80,7 +80,7 @@ export function worldSceneWeldFile(row: InferOutput<typeof WorldSceneWeldSourceS
   return worldSceneWeldReference(row, plumbing).file;
 }
 /** Admit bounded specimen blobs separately from the small catalogue, before geometry intake. */
-export async function admitWorldSceneModelGraphs(product: Pick<ShardProduct, 'hasFile' | 'file'>, catalogue: WorldSceneModels): Promise<ReadonlyMap<string, WorldSceneWeld>> {
+export async function admitWorldSceneModelGraphs(product: Pick<ShardFolder, 'hasFile' | 'file'>, catalogue: WorldSceneModels): Promise<ReadonlyMap<string, WorldSceneWeld>> {
   const result = new Map<string, WorldSceneWeld>();
   const seen = new Set<string>();
   const leaves = catalogue.models.flatMap(model => model.choices.flatMap(worldSceneModelGraphs)).filter(leaf => {

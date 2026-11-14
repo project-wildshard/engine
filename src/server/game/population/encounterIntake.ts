@@ -3,7 +3,7 @@ import { SpeciesSchema, type SpeciesData } from '@wildshard/format/speciesProgra
 import { nativeBodySchema } from '@wildshard/format/nativePhysics';
 import type { AnimalSimSpec } from '@wildshard/engine/entities/AnimalSim';
 import type { NativePopulationBootRows, NativePopulationConfig } from '../riding/nativePopulation';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** Optional encounter intake comes from the same admitted species/body book;
  * it adds no initial body, identity or random draw. Ordinary consumers retain
@@ -65,7 +65,7 @@ function admitEncounters(boot: Parameters<typeof validateEncounterLoans>[0], int
   }
 }
 /** The product with an encounter's species lent into its own boot and population server files: no initial body, identity or draw. */
-export async function withEncounters(product: ShardProduct, intake: EncounterIntake): Promise<ShardProduct> {
+export async function withEncounters(product: ShardFolder, intake: EncounterIntake): Promise<ShardFolder> {
   const boot = await product.json<NativePopulationBootRows>('server/boot.json'), config = await product.json<NativePopulationConfig>('server/population.json');
   admitEncounters(boot, intake);
   const lent = intake.species.map(row => row.kind), encode = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));

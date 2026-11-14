@@ -122,7 +122,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
         if (admissionFailure !== undefined) throw admissionFailure;
         events.push('admission:end'); return shard;
       }},
-    '@wildshard/engine/game/shardfile/runtimeProduct': {browserShardfileOptions: (_base: string, firstParty = false) => {firstParties.push(firstParty); return {};}},
+    '@wildshard/engine/game/shardfile/runtimeFolder': {browserShardfileOptions: (_base: string, firstParty = false) => {firstParties.push(firstParty); return {};}},
     '@wildshard/engine/game/boot/loadingPaths': {loadingPath: noop},
     '@wildshard/engine/game/grid/prefetch': {gridPrefetchStatus: noop},
     '@wildshard/engine/script/moduleV2': {prepareScriptMemoryBank: async () => {
@@ -131,7 +131,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     '@wildshard/engine/core/workSlice': {yieldTask: resolved},
     '@wildshard/engine/core/clock': {diagnosticNow: () => 0},
     './assetTables': {prepareAssetPacks: resolved},
-    '@wildshard/engine/game/shardfile/product': {},
+    '@wildshard/engine/game/shardfile/folder': {},
     '@wildshard/engine/boot/tables': {publicBytes: () => ({})},
   };
   for (const name of ['@wildshard/engine/game/systems/species/install', '@wildshard/engine/game/icons',

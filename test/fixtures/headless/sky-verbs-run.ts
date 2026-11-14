@@ -4,8 +4,8 @@ import '../../../src/shared/engine/core/portableMathFirst';
 import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Assertions describe actual current input execution, never golden output.
 import assert from 'node:assert/strict';
-import {openProductSession} from './productSession';
-import {builtProduct} from '../builtProduct';
+import {openFolderSession} from './folderSession';
+import {builtFolder} from '../builtFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {createNativeProofResident} from '../headless-native';
@@ -20,7 +20,7 @@ import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const mode=process.argv[2]??'priority';
 if(mode!=='priority'&&mode!=='gust')throw new Error('Unknown Sky verb tape');
-const session=await openProductSession('far-reach','sky-verbs'),{product}=session;
+const session=await openFolderSession('far-reach','sky-verbs'),{product}=session;
 let resident:Awaited<ReturnType<typeof createNativeProofResident>>|undefined,releaseRopes=()=>{};
 /** Version-one camera-relative stick input feeds the shared page foot law.
  * Board motion still consumes its ordinary native axes and HOVER presses. */
@@ -32,7 +32,7 @@ function controls(command:HeadlessCommand):HeadlessCommand {
 }
 try{
   const descriptor=outputDescriptor(product.shardfile);assert.ok(descriptor);
-  const directory=builtProduct('far-reach'),assets=new Map(descriptor.index.files.map(file=>[
+  const directory=builtFolder('far-reach'),assets=new Map(descriptor.index.files.map(file=>[
     file.commons===true?`commons:${file.hash}`:file.hash,Uint8Array.from(readFileSync(`${directory}/${file.path}`)),
   ]));
   const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));

@@ -5,10 +5,10 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Outcomes must come from actual mounted input and native events.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {builtProduct} from '../builtProduct';
-import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
+import {builtFolder} from '../builtFolder';
+import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
-import {productHeadlessSections} from '../../../src/shared/host/headlessSections';
+import {folderHeadlessSections} from '../../../src/shared/host/headlessSections';
 import {snapshotSimHostBytes,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
 import {canonicalSimDigest} from '../../fake/simState';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
@@ -23,7 +23,7 @@ import {nalatiCampTalkTape} from '../../proof/nalati-grasslands/verbTape';
 import {SKY_ROAD} from '../../../src/shards/nalati-grasslands/generators/layout';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
-const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory);
+const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory);
 const descriptor=outputDescriptor(product.shardfile);assert.ok(descriptor);
 const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,
   Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
@@ -99,7 +99,7 @@ try{
   // supplied as a pose or fabricated save. Replay every pickup/delivery input.
   const saved=snapshotSimHostBytes(host);checkpointTick=frames.length;checkpointDigest=canonicalSimDigest(saved);
   pending=createNativeProofWorker(product.shardfile,assets,'nalati-kokpar',serializeSimSnapshot(saved),
-    productHeadlessSections(product),directory).then(worker=>({ok:true as const,worker}),(error:unknown)=>({ok:false as const,error}));
+    folderHeadlessSections(product),directory).then(worker=>({ok:true as const,worker}),(error:unknown)=>({ok:false as const,error}));
   drive(rows.home.x,rows.home.z,true,2.8);
   for(let tick=0;tick<12&&!round().carrying;tick++)step([reins(0,0)]);
   assert.equal(round().carrying,true,'actual mounted proximity must pick up the admitted goat');mark('goat-picked-up');

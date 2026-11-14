@@ -12,7 +12,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { GraphIr } from '@wildshard/format/materialGraph';
 import { parsePaintedLook } from '@wildshard/format/paintedLook';
 import { loadPaintedTexture } from '../plugin/geometry';
-import { productClosureFile, type ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { folderClosureFile, type ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { materialGraphIr } from '@wildshard/format/materials';
 import { sceneScalar } from '../shardfile/sceneInputs';
 import type { LentLooks } from '../shardfile/lentLooks';
@@ -20,13 +20,13 @@ import { prepareBinarySources } from '../models/binarySource';
 
 /** Client-only painted presentation. All images, geometry and graph ids come from
  * admitted product rows; renderer construction and lifetime hooks stay here. */
-const productImages = new WeakMap<object, ReadonlyMap<string, Texture>[]>();
+const folderImages = new WeakMap<object, ReadonlyMap<string, Texture>[]>();
 /** Borrow an image already prepared by the actual product's painted look. */
-export function productPaintedImage(product: ShardProduct, id: string): Texture {
-  const texture = productImages.get(product.shardfile.files)?.at(-1)?.get(id);
+export function folderPaintedImage(product: ShardFolder, id: string): Texture {
+  const texture = folderImages.get(product.shardfile.files)?.at(-1)?.get(id);
   if (texture === undefined) throw new Error(`Missing prepared painted image: ${id}`); return texture;
 }
-export async function productPaintedLook(product: ShardProduct): Promise<LookStrategy> {
+export async function folderPaintedLook(product: ShardFolder): Promise<LookStrategy> {
   const row = parsePaintedLook(product.section('look/painted'));
   const attributeFiles=await prepareBinarySources(product,(row.dressing?.draws??[]).flatMap(draw=>draw.geometry.kind==='plane'
     ?Object.values(draw.geometry.instances??{}).map(attribute=>{
@@ -49,8 +49,8 @@ export async function productPaintedLook(product: ShardProduct): Promise<LookStr
     if (texture === null) throw new Error(`Missing painted image: ${image.url}`);
     images.set(id, texture);
   }));
-  const prepared = productImages.get(product.shardfile.files) ?? [];
-  prepared.push(images); productImages.set(product.shardfile.files, prepared);
+  const prepared = folderImages.get(product.shardfile.files) ?? [];
+  prepared.push(images); folderImages.set(product.shardfile.files, prepared);
   const image = (id: string): Texture => {
     const texture = images.get(id);
     if (texture === undefined) throw new Error(`Missing painted image binding: ${id}`);
@@ -59,7 +59,7 @@ export async function productPaintedLook(product: ShardProduct): Promise<LookStr
   // D74: the catalogue's graph files, read once (their IR is resolved per graph below)
   const graphFiles = new Map<string, Uint8Array>();
   await Promise.all(Object.values(product.shardfile.look.materials).flatMap(entry => entry.family === 'graph' && 'file' in entry ? [entry.file] : [])
-    .map(async hash => { graphFiles.set(hash, await productClosureFile(product, hash)); }));
+    .map(async hash => { graphFiles.set(hash, await folderClosureFile(product, hash)); }));
   const graph = (id: string): GraphIr => {
     const entry = product.shardfile.look.materials[id];
     if (entry?.family !== 'graph' || 'preset' in entry) throw new Error(`Missing painted graph: ${id}`);
@@ -113,25 +113,25 @@ export async function productPaintedLook(product: ShardProduct): Promise<LookStr
   });
   return { ...look, dispose: () => {
     const at = prepared.indexOf(images); if (at !== -1) prepared.splice(at, 1);
-    if (prepared.length === 0 && productImages.get(product.shardfile.files) === prepared) productImages.delete(product.shardfile.files);
+    if (prepared.length === 0 && folderImages.get(product.shardfile.files) === prepared) folderImages.delete(product.shardfile.files);
     look.dispose?.();
-  }, ...(row.look.lightScope === 'page' ? { lighting: { install: () => { productPainterLight(product, null); } } } : {}) };
+  }, ...(row.look.lightScope === 'page' ? { lighting: { install: () => { folderPainterLight(product, null); } } } : {}) };
 }
 
 /** Prepared relief maps bind the original compiled material before any mapped
  * model copies are made. The look retains image ownership; this scope owns UV clones. */
-export function bindPaintedMaterialMaps(product: ShardProduct, scope: Scope, looks: LentLooks): void {
+export function bindPaintedMaterialMaps(product: ShardFolder, scope: Scope, looks: LentLooks): void {
   for (const row of product.section('look/painted').bumps ?? []) {
     const material = looks.materials.get(row.material);
     if (material === undefined || !('bumpMap' in material)) throw new Error(`Missing painted relief material: ${row.material}`);
-    const map = scope.own(productPaintedImage(product, row.image).clone()); map.channel = row.channel;
+    const map = scope.own(folderPaintedImage(product, row.image).clone()); map.channel = row.channel;
     Object.assign(material, { bumpMap: map, bumpScale: row.scale }); material.needsUpdate = true;
   }
 }
 
 /** Apply the product's material-scoped painter to original props/held bodies.
  * The inherited page path and this scoped path use the same numeric light row. */
-export function productPainterLight(product: ShardProduct, root: Object3D | null, scope?: Scope): void {
+export function folderPainterLight(product: ShardFolder, root: Object3D | null, scope?: Scope): void {
   const row = product.section('look/painted'), seen = new Set<MeshStandardMaterial>();
   const sun = row.materialSun ?? row.look.sun.dir;
   if (root === null) { painterLight(row.look.light, sun).install(); return; }

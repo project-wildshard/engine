@@ -1,7 +1,7 @@
 import { hashImmutableBytes } from '../../src/shared/host/immutable';
 import { BufferAttribute, type BufferGeometry } from 'three';
 import { driftwoodIslandFactsFrom } from '../../src/shards/driftwood-isle/generators/islandFacts';
-import { driftwoodIslandPlan } from '../../src/shards/driftwood-isle/generators/productPageFiles';
+import { driftwoodIslandPlan } from '../../src/shards/driftwood-isle/generators/folderPageFiles';
 import { shoreBoulderFacts } from '../../src/shards/driftwood-isle/generators/shoreBoulders';
 import { bakeRockScenes } from '../../src/shards/driftwood-isle/generators/rockScenes';
 

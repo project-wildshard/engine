@@ -23,10 +23,10 @@ export const SECTION_HOSTS = Object.freeze({
   'explore/catalogue': ['src/client/game/models/explorerCatalogue.ts#explorerRoster'],
   'collections/displays': ['src/client/game/models/collectionDisplay.ts#CollectionCatalogue'],
   'models/island-library': ['src/client/game/models/islandLibrary.ts#IslandLibrary'],
-  'world/trees': ['src/client/game/models/treeSet.ts#productTreeSet', 'src/client/game/shardfile/forestPage.ts#placeForestPageModels'],
-  'look/rigged-hulls': ['src/client/game/looks/riggedHulls.ts#productRiggedHulls'],
-  'look/hull-book': ['src/client/game/looks/speciesBook.ts#productHullBook'],
-  'look/painted': ['src/client/game/looks/paintedLook.ts#productPaintedLook'],
+  'world/trees': ['src/client/game/models/treeSet.ts#folderTreeSet', 'src/client/game/shardfile/forestPage.ts#placeForestPageModels'],
+  'look/rigged-hulls': ['src/client/game/looks/riggedHulls.ts#folderRiggedHulls'],
+  'look/hull-book': ['src/client/game/looks/speciesBook.ts#folderHullBook'],
+  'look/painted': ['src/client/game/looks/paintedLook.ts#folderPaintedLook'],
   'look/colour-functions': ['src/client/engine/render/graph/colourFunction.ts#materialColourGraph'],
   'look/toon': ['src/client/game/looks/toonLook.ts#toonLook'],
   'client/plan': [CLIENT_PLAN_ROOT],
@@ -34,7 +34,7 @@ export const SECTION_HOSTS = Object.freeze({
   'world/terrain': ['src/shared/game/shardfile/clientGround.ts#clientGround'],
   'world/edge': ['src/shared/game/shardfile/portalTraversal.ts#createPortalTraversal'],
   'world/collision': ['src/shared/game/shardfile/collisionBindings.ts#installShardfileColliders'],
-  'world/navigation': ['src/client/game/shardfile/productNavigation.ts#installProductNavigation'],
+  'world/navigation': ['src/client/game/shardfile/folderNavigation.ts#installFolderNavigation'],
   'world/props': ['src/shared/game/shardfile/props.ts#propColliderDescriptors'],
   'world/water': ['src/client/game/shardfile/clientWater.ts#installClientWater', 'src/client/game/shardfile/water.ts#shardfileWater'],
   'world/movers': ['src/server/game/plugin/mover.ts#createComposedMoverHost', 'src/client/game/shardfile/clientMoverOwners.ts#installClientMoverOwners'],
@@ -75,7 +75,7 @@ export const SECTION_HOSTS = Object.freeze({
   'state/state': ['src/server/game/shardfile/scripts.ts#numericScriptState'],
   'state/migrations': ['src/shared/game/shardfile/logicalState.ts#logicalStateFromLane'],
   'state/modes': ['src/shared/engine/player/modes.ts#playerModes'],
-  'sim/runtime-plan': ['src/server/game/shardfile/nativePlan.ts#prepareProductRuntimePlan'],
+  'sim/runtime-plan': ['src/server/game/shardfile/nativePlan.ts#prepareFolderRuntimePlan'],
   'world/scenes': ['src/client/game/shardfile/worldScenes.ts#installWorldScenes'],
   'world/targets': ['src/shared/game/shardfile/worldTargets.ts#WorldTargetHost'],
   'sim/scripts': ['src/server/engine/script/decision.ts#DecisionHost', '@wildshard/format/decisionScripts#parseDecisionScripts'],
@@ -89,7 +89,7 @@ export const SECTION_HOSTS = Object.freeze({
   'ui/card': [], // Discovery metadata; no per-shard executable implementation.
   'ui/level': [],
   'ui/ui': ['src/client/game/shard/declaredUi.ts#mountDeclaredUi', 'src/client/game/shard/declaredTargets.ts#installDeclaredTargets'],
-  'ui/compendium': ['src/shared/game/shard/declaredRows.ts#declaredProductCompendium'],
+  'ui/compendium': ['src/shared/game/shard/declaredRows.ts#declaredFolderCompendium'],
   'ui/completion': ['src/client/game/complete/declared.ts#installCompletion'],
   'ui/strings': [], // Read by an explicitly imported consumer, not executed.
 });
@@ -238,7 +238,7 @@ const hostRow = selector => {
 /** The roots one product reaches, from its parsed shard.json and client plan. An unknown kind or section refuses.
  * @param {{ slug: string, sections: readonly string[], kinds: readonly string[] }} product
  * @param {ReturnType<typeof clientPlanRoots>} [plan] */
-export function productRootsFrom(product, plan = clientPlanRoots()) {
+export function folderRootsFrom(product, plan = clientPlanRoots()) {
   /** @type {{ from: string, module: string, bindings: string[] }[]} */
   const roots = [];
   if (product.kinds.length > 0 && !product.sections.includes('client/plan')) throw new Error(`${product.slug}: client plan kinds without a client/plan section`);
@@ -315,19 +315,19 @@ export const sectionHostRows = () => Object.values(SECTION_HOSTS).flat().filter(
 
 /** Read a built product dir (`shard.json`, its `client/plan` section file) and list its roots.
  * @param {string} dir @param {ReturnType<typeof clientPlanRoots>} [plan] */
-export function productRoots(dir, plan = clientPlanRoots()) {
+export function folderRoots(dir, plan = clientPlanRoots()) {
   const shard = json(join(dir, 'shard.json'));
   if (!Array.isArray(shard.sections)) throw new Error(`${dir}: shard.json has no sections list`);
   const sections = shard.sections.map((/** @type {any} */ row) => row.name);
   const planRow = shard.sections.find((/** @type {any} */ row) => row.name === 'client/plan');
   const kinds = planRow === undefined ? [] : json(join(dir, planRow.path)).features.map((/** @type {any} */ row) => row.kind);
   const slug = typeof shard.identity?.slug === 'string' ? shard.identity.slug : basename(resolve(dir));
-  return productRootsFrom({ slug, sections, kinds }, plan);
+  return folderRootsFrom({ slug, sections, kinds }, plan);
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
   const dirs = process.argv.slice(2);
   if (dirs.length === 0) { console.error('usage: node scripts/host-ruler/roots.mjs <product-dir>...'); process.exit(2); }
   const plan = clientPlanRoots();
-  console.log(JSON.stringify(dirs.map(dir => productRoots(dir, plan)), null, 2));
+  console.log(JSON.stringify(dirs.map(dir => folderRoots(dir, plan)), null, 2));
 }

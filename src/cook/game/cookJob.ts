@@ -11,8 +11,8 @@ import {createHash} from 'node:crypto';
 import {mkdirSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {dirname, join} from 'node:path';
-import {prepareAssetDecoders} from '@wildshard/format/product';
-import {validateShardfileProduct, type ValidatedProduct} from '@wildshard/format/productValidation';
+import {prepareAssetDecoders} from '@wildshard/format/shardfileAssets';
+import {validateShardfileFolder, type ValidatedShardfile} from '@wildshard/format/shardfileValidation';
 import type {Shardfile} from '@wildshard/format/shardSchema';
 import {readTar} from '@wildshard/format/tar';
 import {cookShard, openShardfile, serverRows, type CookReport, type OpenShardfile, type WireBytes} from './shardCook';
@@ -51,18 +51,18 @@ export interface CookJobReport {
   /** SA48: what a page's admission row needs of these bytes, from the receipt the validator just held (`cookReceipt`). */
   readonly receipt?: CookReceipt;
 }
-/** SHARD-AUTHORING SA48: the facts a bake's `productVerdict` stamps on a page, read here from a product the format's validator has
+/** SHARD-AUTHORING SA48: the facts a bake's `folderVerdict` stamps on a page, read here from a product the format's validator has
  *  just admitted, so a page whose build never saw the shard can admit it from the cook's index. The worker stamps its validator
  *  revision beside them (`CookIndex.verdict`), and a page believes them only under its own. */
 export interface CookReceipt {readonly sourceHash: string; readonly indexHash: string; readonly residentBytes: number; readonly postCost: unknown; readonly worst?: unknown}
 
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
-function admit(tarball: Uint8Array, cap: number): {readonly product: ValidatedProduct; readonly receipt?: CookReceipt} {
+function admit(tarball: Uint8Array, cap: number): {readonly product: ValidatedShardfile; readonly receipt?: CookReceipt} {
   if (tarball.length > cap) throw new ShardfileRefusedError(`Shardfile is ${tarball.length} bytes, past the ${cap} cap`);
   try {
     const files = readTar(tarball);
-    const product = validateShardfileProduct({
+    const product = validateShardfileFolder({
       read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path} within ${maximum} bytes`); return bytes; },
       paths: () => files.keys(),
     }, {hash: sha256});
@@ -87,7 +87,7 @@ export function cookReceipt(files: ReadonlyMap<string, Uint8Array>): CookReceipt
 }
 
 /** A failed proof is a verdict on these bytes: another try walks the same lanes. A dead child never reaches this. */
-async function proved(product: ValidatedProduct, ports: CookJobPorts): Promise<SimulationProof | 'unmeasured'> {
+async function proved(product: ValidatedShardfile, ports: CookJobPorts): Promise<SimulationProof | 'unmeasured'> {
   try {
     const proof = await ports.prove(product.shard, product.assets, product.sections);
     // A successful empty traversal is not evidence that gameplay was exercised.

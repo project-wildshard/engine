@@ -5,8 +5,8 @@ import type { LookStrategy, TerrainPainter, WorldLookContext } from '@wildshard/
 import { createOwnedGeometry } from '@wildshard/engine/models/ownedGeometry';
 import { bindLowPolyMaterial } from '@wildshard/engine/world/lowpolyKit';
 import { parseToonLook, type ToonLookRow } from '@wildshard/format/toonLook';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
-import { runtimeLookMaterials } from '../shardfile/runtimeProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
+import { runtimeLookMaterials } from '../shardfile/runtimeFolder';
 import { lentToon } from '../shardfile/lentLooks';
 import { followToonLighting, toonLighting } from './toonLighting';
 import { toonSkyBackdrop } from './toonSky';
@@ -21,18 +21,18 @@ export function prepareToonLook(input: unknown): ReturnType<typeof createState> 
   return state;
 }
 /** Resolve the product's prepared toon state. Missing render setup refuses. */
-export function toonLookState(product: ShardProduct): ReturnType<typeof createState> {
+export function toonLookState(product: ShardFolder): ReturnType<typeof createState> {
   const row = product.section('look/toon'), state = states.get(row.id);
   if (state === undefined) throw new Error(`Toon look requires render preparation: ${row.id}`);
   return state;
 }
 /** A host-owned follow for a lent graph id; authors supply no update callback. */
-export function followToonLook(product: ShardProduct, look: string): () => void {
+export function followToonLook(product: ShardFolder, look: string): () => void {
   return followToonLighting(product.section('look/toon').lighting.id, lentToon(look));
 }
 
 interface GroundLoan { readonly ground: THREE.Material; readonly slab: THREE.Material; readonly follow: () => void }
-async function prepareGround(context: WorldLookContext, product: ShardProduct, row: ToonLookRow): Promise<GroundLoan> {
+async function prepareGround(context: WorldLookContext, product: ShardFolder, row: ToonLookRow): Promise<GroundLoan> {
   const g = row.ground;
   const { materials, toon } = await runtimeLookMaterials(context, product.shardfile, true, [g.materials.ground, g.materials.slab, ...Object.values(g.kit)]);
   const ground = materials.get(g.materials.ground), slab = materials.get(g.materials.slab);
@@ -47,7 +47,7 @@ async function prepareGround(context: WorldLookContext, product: ShardProduct, r
 
 /** Client-only toon look from a single admitted platform section. All rendering hooks are owned here.
  * The terrain painter decodes the existing baked ground/slab and never regenerates terrain at runtime. */
-export function toonLook(product: ShardProduct): LookStrategy {
+export function toonLook(product: ShardFolder): LookStrategy {
   const row = parseToonLook(product.section('look/toon')), state = prepareToonLook(row);
   const loans = new WeakMap<Scope, GroundLoan>();
   const painter: TerrainPainter = { build: async (terrain, field, scope) => {

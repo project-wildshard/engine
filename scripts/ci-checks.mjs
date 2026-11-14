@@ -63,7 +63,7 @@ const t0 = Date.now();
 if (prepared) {
   // This restores only a matching full SHA/run/checksum/inventory, refusing
   // missing or foreign artifacts before any checks/build can use their bytes.
-  if (spawnSync('python3', ['scripts/ci-products.py','unpack'], { stdio:'inherit' }).status !== 0) process.exit(1);
+  if (spawnSync('python3', ['scripts/ci-folders.py','unpack'], { stdio:'inherit' }).status !== 0) process.exit(1);
   const sha = process.env.GITHUB_SHA;
   if (sha === undefined || !/^[a-f0-9]{40}$/u.test(sha)) throw new Error('Verified preparation requires the exact CI SHA');
   // The unpacker has verified checkout SHA, run, checksum and full inventory.

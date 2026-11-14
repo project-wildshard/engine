@@ -12,7 +12,7 @@ import type { FixedDraws } from '../src/client/game/models/fixedDraws';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import type { ShardWorld } from '../src/server/game/shard/world';
 import type { ShardRuntime } from '../src/shared/game/shard/runtime';
-import { createShardProduct, type ShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder, type ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { entryOwner } from '../src/shared/game/shardfile/entryOwners';
 import { SceneDressing } from '../src/client/game/shardfile/sceneDressing';
 import * as arena from '../src/client/game/boss/arenaRoomView';
@@ -32,7 +32,7 @@ function fixture() {
     registry: new WorldRegistry(), physics: legacyDouble<Physics>({}) });
   const runtimeSurface = { world, viewer: () => new Vector3() }, runtime = legacyDouble<ShardRuntime>(runtimeSurface);
   const json = vi.fn(() => Promise.reject(new Error('Unexpected JSON read'))), file = vi.fn(() => Promise.reject(new Error('Unexpected file read')));
-  const product = legacyDouble<ShardProduct>({json, file});
+  const product = legacyDouble<ShardFolder>({json, file});
   const contextSurface = {scope, product, game: legacyDouble<ShardContext['game']>({runtime})}, ctx = legacyDouble<ShardContext>(contextSurface);
   let onCopy = (): void => undefined;
   const draws: FixedDraws = {ready: true, load: vi.fn(() => Promise.resolve()), handle: (slot: string) => {
@@ -92,7 +92,7 @@ test.each(['world', 'product', 'native-scope'] as const)('a replaced %s refuses 
   try {
     f.onCopy(() => {
       if (changed === 'world') f.runtimeSurface.world = legacyDouble<ShardWorld>({});
-      else if (changed === 'product') f.contextSurface.product = legacyDouble<ShardProduct>({});
+      else if (changed === 'product') f.contextSurface.product = legacyDouble<ShardFolder>({});
       else f.gameSurface.levelScope = f.parent.child('foreign');
     });
     await expect(WorldAssembly.construct(stages, f.ports)).rejects.toThrow(/owners changed|owner left or changed/u);
@@ -132,7 +132,7 @@ function roomFixture(){
   const data={room:{id:'orchard.layout'},encounter:{definition:{id:'orchard.boss'},reward:'fruit',program:{id:'orchard.attack'}}};
   const bytes=new TextEncoder().encode(JSON.stringify(data)),reads:string[]=[];
   let afterRead=():void=>undefined;
-  const product=createShardProduct({slug:source.identity.slug,revision:1,shardfile:source,sections:new Map(),
+  const product=createShardFolder({slug:source.identity.slug,revision:1,shardfile:source,sections:new Map(),
     files:new Map([['combat/room.json',{hash:'room',url:'/room'}]]),read:hash=>{reads.push(hash);afterRead();return Promise.resolve(bytes);}});
   // The native room builder is stubbed below: this fixture owns only its
   // minimal projection and the original byte/owner retirement boundary.

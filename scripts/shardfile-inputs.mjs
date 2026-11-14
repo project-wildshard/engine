@@ -310,7 +310,7 @@ export function recordBundle(result,options={}) {
 }
 /** A successful, complete compiler writes its receipt after checking read stability.
  * @param {string} root @param {string} receipt @param {()=>Promise<void>} run */
-export async function captureProductInputs(root,receipt,run) {
+export async function captureFolderInputs(root,receipt,run) {
   if(generationScope!==undefined)generationScope.opaque?.add('nested-product-compiler');
   installInputRecorder();
   const scope = {root:raw.real(root),reads:new Map(),writes:new Set(),bundles:0,invalid:[],observing:false};
@@ -330,7 +330,7 @@ export async function captureProductInputs(root,receipt,run) {
 /** Replay a verified compiler's reads into the current product scope. The
  * compiler cache does not replace dependencies with its own opaque file path.
  * @param {string} root @param {string} receipt */
-export function replayProductInputs(root,receipt) {
+export function replayFolderInputs(root,receipt) {
   const saved=v.parse(Receipt,JSON.parse(raw.read(receipt,'utf8')));
   const scope=inputScope(),canonical=raw.real(root);
   if(saved.node!==process.version || scope!==undefined&&scope.root!==canonical
@@ -341,7 +341,7 @@ export function replayProductInputs(root,receipt) {
     if(value(canonical,entry)!==saved.values[entry])throw new Error(`Compiler input changed: ${entry}`);
     // The check above already read these exact bytes/types. Repeating it in
     // note() doubles filesystem work for thousands of resolver candidates.
-    // Keep the first observation; captureProductInputs still checks every
+    // Keep the first observation; captureFolderInputs still checks every
     // joined dependency again when the enclosing product finishes.
     if(scope?.traceOnly===true&&!entry.startsWith('G '))note(entry.slice(0,1),resolve(canonical,entry.slice(2)));
     else if(scope!==undefined&&!scope.reads.has(entry))scope.reads.set(entry,saved.values[entry]);
@@ -349,7 +349,7 @@ export function replayProductInputs(root,receipt) {
 }
 /** A missing/malformed receipt always misses. Unread generated files never enter it.
  * @param {string} root @param {string} receipt @param {string[]} args @param {import('./bake-input-hashes.mjs').InputHashMemo} memo */
-export function productInputKey(root,receipt,args,memo) {
+export function folderInputKey(root,receipt,args,memo) {
   try {
     if(memo.root!==raw.real(root))return undefined;
     const saved = v.parse(Receipt,JSON.parse(raw.read(receipt,'utf8')));
@@ -372,13 +372,13 @@ export function productInputKey(root,receipt,args,memo) {
 /** Keep immutable read-set variants: simultaneous revisions cannot overwrite
  * another build's evidence. Only a byte-matching captured snapshot can hit.
  * @param {string} root @param {string} directory @param {string[]} args @param {import('./bake-input-hashes.mjs').InputHashMemo} memo */
-export function matchingProductInputKey(root,directory,args,memo) {
+export function matchingFolderInputKey(root,directory,args,memo) {
   const release=borrowShardfileEntry(directory);
   try {
     if(fs.existsSync(`${directory}.lock`))return undefined;
     const receipts=raw.list(directory).filter(file=>/^[a-f0-9]{64}\.json$/u.test(file)).map(file=>({file,mtime:raw.stat(resolve(directory,file)).mtimeMs})).sort((a,b)=>b.mtime-a.mtime);
     for(const row of receipts.slice(0,12)) {
-      const key=productInputKey(root,resolve(directory,row.file),args,memo);
+      const key=folderInputKey(root,resolve(directory,row.file),args,memo);
       if(key !== undefined && row.file === `${key}.json`) {
         const now=new Date();fs.utimesSync(directory,now,now);
         return key;
@@ -390,7 +390,7 @@ export function matchingProductInputKey(root,directory,args,memo) {
 }
 /** Publish one complete immutable receipt atomically.
  * @param {string} directory @param {string} receipt @param {string} key */
-export function publishProductInputs(directory,receipt,key) {
+export function publishFolderInputs(directory,receipt,key) {
   const release=borrowShardfileEntry(directory);
   try {
     // An eviction already in flight may omit this optional warm receipt;
@@ -406,7 +406,7 @@ if (process.execArgv.some((arg,index)=>arg==='--import' && process.execArgv[inde
 /** Workspace/dependency installation identity. Compiler execution and runtime
  * source enter complete per-product receipts; unused SDK files do not.
  * @param {string} root @param {import('./bake-input-hashes.mjs').InputHashMemo} memo */
-export function productToolchainKey(root,memo) {
+export function folderToolchainKey(root,memo) {
   const files=['package.json','pnpm-lock.yaml','pnpm-workspace.yaml'];
   return digest(JSON.stringify(files.map(file=>[file,memo.hash(file)])));
 }

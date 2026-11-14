@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {expect,test} from 'vitest';
-import {openProductSession} from './fixtures/headless/productSession';
+import {openFolderSession} from './fixtures/headless/folderSession';
 import {decodeSimSnapshotBytes} from '../src/shared/engine/sim/snapshot';
 import type {HeadlessTickCommit} from '../src/shared/host/tickProtocol';
 
@@ -12,9 +12,9 @@ function doorState(commit:HeadlessTickCommit){
 test('the actual moving cabin leaf reconnects its existing physics handles and continues after restore',async()=>{
   const started=performance.now();
   const stage=(name:string)=>{console.info('pine-door-stage',JSON.stringify({name,milliseconds:performance.now()-started}));};
-  const original=await openProductSession('pine-hollow','pine-verbs');
+  const original=await openFolderSession('pine-hollow','pine-verbs');
   stage('original-ready');
-  let restored:Awaited<ReturnType<typeof openProductSession>>|undefined;
+  let restored:Awaited<ReturnType<typeof openFolderSession>>|undefined;
   try{
     await original.sim.walkLeg({ticks:6000,once:true,points:[[0,-190],[-8,-150],[-30,-95],[-12,-52],[-1,-40],[-5.71,-31.7],[-7.99,-35.02],[-9.56,-34.66]].map(([x,z])=>{
       if(x===undefined||z===undefined)throw new Error('Missing actual porch waypoint');return {x,z};
@@ -22,7 +22,7 @@ test('the actual moving cabin leaf reconnects its existing physics handles and c
     stage('walk-complete');
     const opened=await original.sim.step([{source:'door.use',commands:[{kind:'script',actorId:'pine.door',value:0}]}]);
     stage('opened');
-    restored=await openProductSession('pine-hollow','pine-verbs',opened.snapshot);
+    restored=await openFolderSession('pine-hollow','pine-verbs',opened.snapshot);
     stage('restored-ready');
     const [continued,replayed]=await Promise.all([original.sim.step(),restored.sim.step()]);
     stage('continued');

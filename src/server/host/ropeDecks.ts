@@ -4,14 +4,14 @@ import type { SimHost } from '@wildshard/engine/sim';
 import { rideable } from '@wildshard/engine/physics/CharacterMotor';
 import { RopeChain } from '@wildshard/engine/physics/ropeChain';
 import { tagOf } from '@wildshard/engine/physics/surface';
-import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 import { registerInstalled } from '@wildshard/engine/game/shardfile/installedSides';
 
 type RopeDeckStage = Extract<WorldAssemblyStage, { kind: 'rope-deck' }>;
 type RopeChainStage = Extract<WorldAssemblyStage, { kind: 'rope-chain' }>;
 
 /** Each admitted rope chain with the deck rows and baked span facts it is built from. */
-export function ropeChainStages(product: ShardProduct | undefined): { readonly stage: RopeChainStage; readonly deck: RopeDeckStage; readonly facts: RopeDeckStage['site']['spans'][number] }[] {
+export function ropeChainStages(product: ShardFolder | undefined): { readonly stage: RopeChainStage; readonly deck: RopeDeckStage; readonly facts: RopeDeckStage['site']['spans'][number] }[] {
   if (product?.has('client/plan') !== true) return [];
   const decks = new Map<string, RopeDeckStage>(), out: ReturnType<typeof ropeChainStages> = [];
   for (const feature of product.section('client/plan').features) {
@@ -42,7 +42,7 @@ export function ropeChainStages(product: ShardProduct | undefined): { readonly s
  * saved chain's bodies and joints (Rapier owns them). So the chain's adapter does the work once the saved world is in: it
  * lends the saved bodies back to the motor as rideable, or builds them for a room saved before NL5 (`joined`: none in it).
  */
-export function installRopeDecks(host: SimHost, product: ShardProduct | undefined, coming: boolean): void {
+export function installRopeDecks(host: SimHost, product: ShardFolder | undefined, coming: boolean): void {
   const stages = ropeChainStages(product), owners = stages.map(({ deck }) => JSON.stringify(deck.site.deck.owner));
   // a saved chain is found by its planks' owner: two decks of one site would each find both chains
   if (new Set(owners).size !== owners.length) throw new Error('Native rope decks need an owner each');

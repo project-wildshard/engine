@@ -6,8 +6,8 @@ import {loadRapier} from '@wildshard/engine/physics/rapier';
 import { snapshotSimHost, snapshotSimHostBytes, serializeSimSnapshot, decodeSimSnapshot } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 import {SIM_LEVEL,fightCommand} from './fixtures/sim-level/level';
-import {builtProduct} from './fixtures/builtProduct';
-import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
+import {builtFolder} from './fixtures/builtFolder';
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {createNativeProofAdapter,createNativeProofResident} from './fixtures/headless-native';
 import {prepareHeadlessRuntime} from './fixtures/headless/trustedRuntime';
 import type {HeadlessCommand} from '../src/shared/host/tickProtocol';
@@ -39,7 +39,7 @@ test('trusted adapter retains legacy wire, effects and exact restored native suf
  try{
   // CI21 (J232): the trusted runtime fixture owns the actor and its reward; the product is only the admitted shell, so the
   // pinned Template product stands in for a freshly built SDK template project (engine can't run the SDK, J65).
-  const product=await loadHeadlessProduct(builtProduct('_template')),rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const product=await loadHeadlessFolder(builtFolder('_template')),rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const preparation={product,shard:product.shardfile,assets:new Map<string,Uint8Array>(),rapier};
   adapter=await createNativeProofAdapter(preparation,prepareHeadlessRuntime);resident=await createNativeProofResident(preparation,prepareHeadlessRuntime);
   let rewards=0;

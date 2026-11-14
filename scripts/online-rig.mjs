@@ -54,7 +54,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgDat
   const memory = pgBin === 'memory:';
   const key = JSON.parse(readFileSync(keyFile, 'utf8')), build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist), DATABASE = memory ? 'memory:' : database('saves_online');
   mkdirSync(work, { recursive: true });
-  const slugs = [shard, ...more], books = slugs.map(slug => `${slug}=${run(['--input-type=module', '-e', `console.log((await import('./scripts/built-product.mjs')).readBuiltShardfile(process.cwd(), '${slug}'))`], 'the product read').trim()}`);
+  const slugs = [shard, ...more], books = slugs.map(slug => `${slug}=${run(['--input-type=module', '-e', `console.log((await import('./scripts/built-folder.mjs')).readBuiltShardfile(process.cwd(), '${slug}'))`], 'the product read').trim()}`);
   const origin = join(work, 'origin'), server = join(work, 'server');
   rmSync(join(work, 'packs'), { recursive: true, force: true });
   run(['scripts/server-origin.mjs', origin, build, ...books], 'the server book');

@@ -27,7 +27,7 @@ import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { NativeCreaturePose, type NativeCreaturePoseRecipe } from '../../../shared/game/plugin/animation';
 import { numericCreaturePoseFromBook } from '../../../shared/game/plugin/channelPrograms';
 import { poseRidingEnvelopes } from '../../../shared/game/riding/presentation';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { PATROL_SHOT, PATROL_TEAR } from '../../../shared/game/shardfile/wirePrompts';
 import type { nativeRangedHit } from '../plugin/nativeItems';
 import type { EncounterIntake } from '../population/encounterIntake';
@@ -76,7 +76,7 @@ export interface PatrolLoans {
 
 /** Conditional riders borrow the page's exact metadata and packed skeleton
  * dimensions. No body, random draw, model build or generated output is made. */
-export async function readPatrolIntake(product:Pick<ShardProduct,'json'>,files:Pick<PatrolRow,'rows'|'actors'>):Promise<EncounterIntake> {
+export async function readPatrolIntake(product:Pick<ShardFolder,'json'>,files:Pick<PatrolRow,'rows'|'actors'>):Promise<EncounterIntake> {
   const [actors,timed]=await Promise.all([
     product.json<unknown>(files.actors).then(value=>v.parse(SpeciesActorsFileSchema,value)),
     product.json<unknown>(files.rows).then(value=>v.parse(TimedEncountersSchema,value)),
@@ -105,7 +105,7 @@ export async function readPatrolIntake(product:Pick<ShardProduct,'json'>,files:P
 
 /** The real patrol's contact joints and horse overlay, from the same admitted
  * skeleton and pose book the page uses. No geometry or body is manufactured. */
-export async function readPatrolPoses(product:Pick<ShardProduct,'json'>,files:Pick<PatrolRow,'rows'|'actors'|'looks'>):Promise<{
+export async function readPatrolPoses(product:Pick<ShardFolder,'json'>,files:Pick<PatrolRow,'rows'|'actors'|'looks'>):Promise<{
   readonly kind:string;
   readonly rows:readonly {readonly kind:string;readonly variant:string;readonly pose:NativeCreaturePoseRecipe}[];
   readonly postPose:(context:AnimalRigContext,wind:{x:number;z:number;strength:number})=>void;
@@ -148,7 +148,7 @@ export async function readPatrolPoses(product:Pick<ShardProduct,'json'>,files:Pi
 }
 
 /** Read the patrol's rows now. `begin` registers its place in the tick; what it returns finishes the install, over the world's bodies. */
-export async function preparePatrol(product:Pick<ShardProduct,'json'>,files:PatrolRow):Promise<{readonly begin:(host:SimHost,loans:PatrolLoans)=>()=>void}>{
+export async function preparePatrol(product:Pick<ShardFolder,'json'>,files:PatrolRow):Promise<{readonly begin:(host:SimHost,loans:PatrolLoans)=>()=>void}>{
   const [poseRows,rows,actors]=await Promise.all([
     readPatrolPoses(product,files),
     product.json<unknown>(files.rows).then(value=>v.parse(TimedEncountersSchema,value)),

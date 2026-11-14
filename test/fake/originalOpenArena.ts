@@ -26,7 +26,7 @@ import { Rng } from '@wildshard/engine/core/rng';
 import type { ShardContext } from '../../src/client/game/plugin/context';
 import { installChannelPrograms } from '../../src/shared/game/plugin/channelPrograms';
 import type { WeatherReactions } from '../../src/server/game/weather/reactions';
-import type { ShardProduct } from '../../src/shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../src/shared/game/shardfile/shardFolder';
 import { installBossEncounter, type Boss } from '../../src/client/game/Boss';
 import { ProjectedState, ReturnProgram } from '../../src/shared/game/population/returnProgram';
 import { wildEnv } from '../fixtures/pageWildEnvironment';
@@ -43,7 +43,7 @@ import {pageRidingMount,respawnPageMounted,arenaBlockedAt,installArenaBoundary,t
 import type { Mount } from '../../src/client/game/riding/mount';
 
 /** Read schema-checked named products; no validator is imported into play. */
-export async function readArenaScriptData(product: Pick<ShardProduct,'json'>, files: { fight: string; geometry: string }): Promise<ArenaScriptData> {
+export async function readArenaScriptData(product: Pick<ShardFolder,'json'>, files: { fight: string; geometry: string }): Promise<ArenaScriptData> {
   const [root,geometry]=await Promise.all([product.json<ArenaScriptFightFile>(files.fight),product.json<ArenaScriptData['geometry']>(files.geometry)]);
   return {...root.arenaScript,programs:root.programs,arenaFire:root.arenaFire,geometry};
 }

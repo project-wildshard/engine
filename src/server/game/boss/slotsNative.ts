@@ -20,7 +20,7 @@ import { SpeciesActorsFileSchema } from '@wildshard/format/speciesBookRows';
 import { SlotEncounterLaw, slotAwakeRows, type SlotTell } from '../../../shared/game/boss/slotLaw';
 import { attachNativeCreaturePose, type NativeCreaturePose } from '../../../shared/game/plugin/animation';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { ActorProjectionV2, type ActorProjectionContext } from '../population/actorProjectionV2';
 import { readEncounterIntake, readEncounterPoses } from '../population/encounterBook';
 import type { EncounterIntake } from '../population/encounterIntake';
@@ -48,7 +48,7 @@ const owners = new WeakMap<SimHost, NativeSlots>();
 export function slotsOf(host: SimHost): NativeSlots | undefined { return owners.get(host); }
 
 /** The slot species' place in the population, when these rows have a slot encounter at all. */
-export async function readSlotIntake(product: Pick<ShardProduct, 'json'>, files: Pick<SlotFiles, 'rows' | 'actors'>): Promise<EncounterIntake> {
+export async function readSlotIntake(product: Pick<ShardFolder, 'json'>, files: Pick<SlotFiles, 'rows' | 'actors'>): Promise<EncounterIntake> {
   const timing = v.parse(TimedEncountersSchema, await product.json<unknown>(files.rows)), kind = timing.slots.actors?.kind;
   return kind === undefined ? { species: [], recipes: [] } : readEncounterIntake(product, [kind], files.actors);
 }
@@ -65,7 +65,7 @@ export interface SlotPlan {
   readonly install: (host: SimHost, elite: NativeEliteBindings, restoring: boolean, heldBy?: SlotHeld) => void;
 }
 /** Read the encounter's rows now; nothing here touches a host. Null for rows with no slot actors. */
-export async function prepareSlots(product: Pick<ShardProduct, 'json' | 'section' | 'file'>, files: SlotFiles): Promise<SlotPlan | null> {
+export async function prepareSlots(product: Pick<ShardFolder, 'json' | 'section' | 'file'>, files: SlotFiles): Promise<SlotPlan | null> {
   const timing = v.parse(TimedEncountersSchema, await product.json<unknown>(files.rows)), declared = timing.slots.actors;
   if (declared === undefined) return null;
   const plan = parseClientPlan(product.section('client/plan')), timed = plan.features.find(row => row.kind === 'timed.encounters'), view = plan.features.find(row => row.kind === 'view.program' && row.id === 'creature-views');

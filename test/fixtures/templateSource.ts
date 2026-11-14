@@ -3,7 +3,7 @@ import fs from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- These fixture programs run from the repository root.
 import { resolve } from 'node:path';
 import { templateTerrain } from '../../src/shards/_template/generators/terrain';
-import { templateProduct } from '../../src/shards/_template/generators/product';
+import { templateFolder } from '../../src/shards/_template/generators/folder';
 import { compileDeclaredDecisionScripts as compileDecisionScripts } from '../../src/sharddev/buildDecisionScripts';
 import { compileTemplateBoss, TEMPLATE_BOSS_INPUTS } from '../../src/shards/_template/generators/boss';
 import { compileScript } from '../../src/sharddev/bake/compileScript';
@@ -17,7 +17,7 @@ export const TEMPLATE_BOSS = { hash: hashImmutableBytes(bossBytes), compressed: 
 export const TEMPLATE_BEHAVIOUR = templateBehaviourMetadata(scripts);
 const { assets: terrain, ...rows } = templateTerrain(), props = templatePropRows(), generated = new Map([...terrain, ...props.assets, ...[...scripts.values()].map(bytes => [hashImmutableBytes(bytes), bytes] as const)]);
 /** Native tests consume the same producer rows and bytes as the executable build entry. */
-export const TEMPLATE_SOURCE = templateProduct(rows, props, TEMPLATE_BEHAVIOUR, TEMPLATE_BOSS);
+export const TEMPLATE_SOURCE = templateFolder(rows, props, TEMPLATE_BEHAVIOUR, TEMPLATE_BOSS);
 /** Preserve independently owned input bytes for each admission. Other producers migrate in subsequent GR1 slices. */
 export function templateAssets(): Map<string, Uint8Array> {
   return new Map(TEMPLATE_SOURCE.files.map(file => [file.hash,

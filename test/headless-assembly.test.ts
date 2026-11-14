@@ -10,7 +10,7 @@ import { hasStaticGround } from '../src/shared/engine/physics/query';
 import { loadRapier,type Rapier } from '../src/shared/engine/physics/rapier';
 import { tagCollider } from '../src/shared/engine/physics/surface';
 import { onSimHostRestored,snapshotSimHost } from '../src/shared/engine/sim/snapshot';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { emptyShardfile } from '../src/shared/host/author';
 
 let rapier: Rapier;
@@ -24,7 +24,7 @@ function directPlan(shard: ReturnType<typeof emptyShardfile>, install: HeadlessR
 
 test('refuses native body scripts before real ground admission or after its host ends', () => {
   const shard = emptyShardfile({ slug: 'native-ground', name: 'Native Ground', author: 'Test', revision: 1, seed: 1 });
-  const product = createShardProduct({ slug: 'native-ground', revision: 1, shardfile: shard, sections: new Map(),
+  const product = createShardFolder({ slug: 'native-ground', revision: 1, shardfile: shard, sections: new Map(),
     files: new Map(),
     read: () => Promise.reject(new Error('Direct body proof reads sections only')) });
   const plan = directPlan(shard, (host, context) => installBodyScripts(host, context, {product,assets:new Map()}));
@@ -53,7 +53,7 @@ test('refuses native body scripts before real ground admission or after its host
 
 test('native restore checks the restored ground before releasing the host', () => {
   const shard = emptyShardfile({ slug: 'native-restore-ground', name: 'Restore Ground', author: 'Test', revision: 1, seed: 1 });
-  const product = createShardProduct({ slug: shard.identity.slug, revision: 1, shardfile: shard,
+  const product = createShardFolder({ slug: shard.identity.slug, revision: 1, shardfile: shard,
     sections: new Map<string, unknown>([['sim/scripts', []], ['sim/bodies', {}]]),
     files: new Map(),
     read: () => Promise.reject(new Error('Direct body proof reads sections only')) });

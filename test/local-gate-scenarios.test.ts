@@ -13,7 +13,7 @@ test.each([
   'template-map-generation',
 ])('%s consumes an existing product without building an app or starting a server', name => {
   const source = readFileSync(`test/${name}.test.ts`, 'utf8');
-  expect(source).toContain('builtProduct(');
+  expect(source).toContain('builtFolder(');
   expect(source).not.toMatch(/node:child_process|scripts\/build-shardfiles|createServer\(|localhost:3000/u);
 });
 
@@ -21,7 +21,7 @@ test('selected disk readers require exactly their published products', () => {
   const result = execFileSync('python3', ['-c', `
 import json, runpy
 select = runpy.run_path('scripts/test_products.py')['required_test_products']
-registry = json.load(open('scripts/test-products.json'))
+registry = json.load(open('scripts/test-folders.json'))
 cases = [
  ['test/scripts/_template-boss.test.ts'],
  ['test/unit.test.ts', 'test/scripts/far-reach-roc.test.ts'],

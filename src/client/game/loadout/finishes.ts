@@ -6,7 +6,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { GeometryPack } from '@wildshard/engine/models/geometryPack';
 import { packedRows } from '@wildshard/format/geometryPack';
 import { fetchDeflatedBytes } from '@wildshard/engine/core/deflate';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 const admitted = new Map<string, HeldFinishes>();
 
@@ -14,7 +14,7 @@ const admitted = new Map<string, HeldFinishes>();
 export class HeldFinishes {
   readonly cards: HeldFinishesRows['cards'];
   private readonly definitions = new Map<string, SkinDef>();
-  private constructor(private readonly product: ShardProduct, readonly rows: HeldFinishesRows, geometry: ReadonlyMap<number, THREE.BufferGeometry>) {
+  private constructor(private readonly product: ShardFolder, readonly rows: HeldFinishesRows, geometry: ReadonlyMap<number, THREE.BufferGeometry>) {
     this.cards = rows.cards;
     for (const id of rows.order) {
       const row = rows.rows[id]; if (row === undefined) throw new Error('Held finish order has an invalid identity');
@@ -28,7 +28,7 @@ export class HeldFinishes {
     }
   }
   /** Admit atomically: malformed identities or a failed geometry loan leave the previous catalogue intact. */
-  static async prepare(product: ShardProduct, scope: Scope): Promise<HeldFinishes> {
+  static async prepare(product: ShardFolder, scope: Scope): Promise<HeldFinishes> {
     const ready = admitted.get(product.slug); if (ready?.product === product) return ready;
     const rows = v.parse(HeldFinishesSchema, product.section('held/finishes'));
     for (const [id, row] of Object.entries(rows.rows)) if (id !== row.id) throw new Error('Held finish key differs from its identity');

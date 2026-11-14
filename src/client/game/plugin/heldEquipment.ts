@@ -13,7 +13,7 @@ import type { SkyRig } from '@wildshard/engine/world/skyRig';
 import { parseNativeFirearmProfile, parseHeldFirearmRows, parseHeldFirearmView, type FirearmWeaponProfileSchema } from '@wildshard/format/weaponProfiles';
 import { HeldEquipmentSchema, type HeldEquipmentRows } from '@wildshard/format/heldEquipment';
 import * as v from 'valibot';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { createModelLibrary, type ModelLibrary } from './geometry';
 import { HeldFirearm, heldFirearmDisplay, type HeldFirearmModel, type HeldHandRow } from './heldFirearm';
 import { HeldLauncher, bindHeldBow, type HeldLauncherRows, type HeldLauncherProfile } from '../weapons/heldLauncher';
@@ -67,7 +67,7 @@ export class HeldEquipment {
   private toolLoad: Promise<HeldToolFile> | null = null;
   private toolReady: HeldToolFile | null = null;
 
-  constructor(private readonly product: ShardProduct) {
+  constructor(private readonly product: ShardFolder) {
     this.rows = v.parse(HeldEquipmentSchema, product.section('held/equipment'));
     const { launcher, hands, firearm } = this.rows;
     this.library = createModelLibrary({ meshes: [], meshUrls: {}, hd: [], hdUrls: {}, aoFloor: 1, hdLooks: {}, geometryPools: [
@@ -80,7 +80,7 @@ export class HeldEquipment {
     ] }, '[held firearm]');
   }
   /** Prepare once per admitted slug; the current owner is available to the cold Explorer after admission. */
-  static async prepare(product: ShardProduct): Promise<HeldEquipment> {
+  static async prepare(product: ShardFolder): Promise<HeldEquipment> {
     let host = catalogues.get(product.slug);
     if (host === undefined) { host = new HeldEquipment(product); catalogues.set(product.slug, host); }
     await host.library.preload(); await host.preloadFirearm(); await host.preloadTool(); return host;

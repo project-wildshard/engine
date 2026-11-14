@@ -11,9 +11,9 @@ import { declaredKitSlots, leverLines } from '../src/shared/game/shardfile/items
 import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { installDeclaredKitItems, type DeclaredKitItems } from '../src/server/game/shardfile/declaredKitItems';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // TE-ENG2: a lever-action rifle from rows alone (`test/fixtures/declared-lever/rows.json`), on Template's product. It starts on its
 // rack; the rack's scene takes it; six rounds leave the tube, each a hitscan that lands on a declared body; R feeds one round at a time.
@@ -24,7 +24,7 @@ interface LeverFixture {
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The fixture is the author's rows, typed as the format reads them.
 const fixture = JSON.parse(readFileSync('test/fixtures/declared-lever/rows.json', 'utf8')) as LeverFixture;
 async function withLever(): Promise<HeadlessRuntimeInput> {
-  const directory = builtProduct('_template'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

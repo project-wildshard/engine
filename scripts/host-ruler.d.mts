@@ -28,7 +28,7 @@ export interface TreeReader {
 }
 export interface ModuleUse { lines: number; layer: string; users: string[] }
 export interface OneUserTotal { modules: number; lines: number; format: number }
-export interface ProductRootModules {
+export interface FolderRootModules {
   readonly slug: string;
   readonly roots: readonly string[];
   readonly rootKeys: readonly string[];
@@ -42,7 +42,7 @@ export interface RulerReport {
   readonly ruled: Ruled;
   readonly options: readonly OptionCharge[];
   readonly totals: ReadonlyMap<string, ShardTotal>;
-  readonly products: readonly ProductRootModules[];
+  readonly products: readonly FolderRootModules[];
   readonly format: string;
   readonly modules: ReadonlyMap<string, ModuleUse>;
   readonly oneUser: ReadonlyMap<string, OneUserTotal>;
@@ -60,7 +60,7 @@ export function formatPackage(dir: string): FormatPackage;
 export function createTreeReader(options?: { readonly root?: string; readonly format?: boolean; readonly formatDir?: string }): TreeReader;
 export function layerOf(module: string): string;
 export function reach(roots: Iterable<string>, reader: TreeReader, tables?: Readonly<Record<string, TableRule>>, held?: ReadonlySet<string>): Set<string>;
-export function productRootModules(dir: string, tables?: { readonly plan?: ClientPlanRoots; readonly native?: NativeAssemblyRoots }, options?: readonly OptionRow[]): ProductRootModules;
+export function folderRootModules(dir: string, tables?: { readonly plan?: ClientPlanRoots; readonly native?: NativeAssemblyRoots }, options?: readonly OptionRow[]): FolderRootModules;
 export function measure(users: readonly { readonly slug: string; readonly roots: Iterable<string>; readonly held?: ReadonlySet<string> }[], reader: TreeReader, options?: MeasureOptions): Map<string, ModuleUse>;
 export function oneUserLines(modules: ReadonlyMap<string, ModuleUse>, slugs: readonly string[]): Map<string, OneUserTotal>;
 export function rule(dirs: readonly string[], options?: { readonly root?: string; readonly today?: string; readonly register?: readonly RegisterRule[] }): RulerReport;

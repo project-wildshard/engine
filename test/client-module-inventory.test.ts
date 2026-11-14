@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest';
 import { readModuleFiles, readModuleGroups, preloadModuleFiles, preloadModuleGroups } from '../src/client/engine/boot/download';
-import { checkClientPlanModules, checkProductClientModules, prepareClientModuleGroups } from '../src/client/game/shardfile/clientModules';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { checkClientPlanModules, checkFolderClientModules, prepareClientModuleGroups } from '../src/client/game/shardfile/clientModules';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { emptyShardfile } from '../src/shared/host/author';
 
 afterEach(() => { document.body.replaceChildren(); for (const link of document.querySelectorAll('link[rel="modulepreload"]')) link.remove(); });
@@ -75,9 +75,9 @@ test('replacement module elements get their own complete admission', () => {
 test('selected product plans retain their actual feature guard without fetching extra graphs', () => {
   bank({files:[['/assets/shared.js',4],['/assets/scenes.js',6],['/assets/meadow.js',8]],groups:{'world.scenes':[0,1],'world.meadow':[0,2]}});
   const source = emptyShardfile({slug:'module-fixture',name:'Modules',author:'Fixture',revision:1,seed:7});
-  const product = createShardProduct({slug:source.identity.slug,revision:1,shardfile:source,
+  const product = createShardFolder({slug:source.identity.slug,revision:1,shardfile:source,
     sections:new Map([['client/plan',{version:1,features:[{kind:'world.scenes'}]}]]),files:new Map(),read:()=>Promise.reject(new Error('No read expected'))});
-  checkProductClientModules(product);
+  checkFolderClientModules(product);
   expect(readModuleGroups(['world.scenes'])).toEqual([['/assets/shared.js',4],['/assets/scenes.js',6]]);
   expect(readModuleGroups(['world.scenes','world.meadow'])).toHaveLength(3);
   document.body.replaceChildren(); bank({files:[],groups:{}});

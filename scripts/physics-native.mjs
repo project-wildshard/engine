@@ -1,7 +1,7 @@
 import {spawnSync} from 'node:child_process';
 import {mkdirSync,readFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
-import {assertBuiltTestProducts} from './built-product.mjs';
+import {assertBuiltTestFolders} from './built-folder.mjs';
 import {OPEN_PLOTS_2,OPEN_PLOTS_3} from '../test/fixtures/openPlotGroups.ts';
 
 /** @param {readonly string[]} args @param {string} name @param {string} fallback */
@@ -59,7 +59,7 @@ export function runNativePhysicsWalk(root,args){
   const selection=nativeWalkSelection(JSON.parse(readFileSync(route,'utf8')),args);
   const files=nativeWalkTestFiles(selection.slugs);
   if(!args.includes('--no-build')){
-    const products=JSON.parse(readFileSync(join(root,'scripts/test-products.json'),'utf8'));
+    const products=JSON.parse(readFileSync(join(root,'scripts/test-folders.json'),'utf8'));
     const slugs=[...new Set(files.flatMap(file=>products[file]??[]))];
     if(slugs.length===0)throw new Error('Missing native physics product inventory');
     const build=spawnSync('python3',[join(root,'scripts/heavy-lane.py'),'build','--',process.execPath,
@@ -67,7 +67,7 @@ export function runNativePhysicsWalk(root,args){
     if(build.status!==0)return {status:build.status??1,legs:selection.count,report:null};
   }
   // Use the same strict reader as CI before the reporter can omit blocked suites.
-  assertBuiltTestProducts(root,files);
+  assertBuiltTestFolders(root,files);
   const out=resolve(root,flag(args,'out','tmp/physics'));mkdirSync(out,{recursive:true});
   const report=join(out,`${flag(args,'label','native-walk')}-${new Date().toISOString().replaceAll(':','-')}-${process.pid}.json`);
   const run=spawnSync(process.execPath,[join(root,'scripts/vitest-tmp.ts'),'run',

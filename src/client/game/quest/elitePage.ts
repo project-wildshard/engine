@@ -12,11 +12,11 @@ import { DomePuffs } from '@wildshard/engine/fx/groundFx';
 import { wirePage } from '../shardfile/wirePage';
 import { ELITE_TELL } from '../../../shared/game/shardfile/wirePrompts';
 import { parseEliteFeature, type EliteFeatureRows } from '@wildshard/format/eliteFeature';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 
 /** An elite feature's rows, as a page reads them. The programme catalogue they name is the server's to check. */
-export async function readPageEliteRows(product: ShardProduct, name: string): Promise<EliteFeatureRows> {
+export async function readPageEliteRows(product: ShardFolder, name: string): Promise<EliteFeatureRows> {
   return parseEliteFeature(JSON.parse(new TextDecoder().decode(await product.file(name))));
 }
 

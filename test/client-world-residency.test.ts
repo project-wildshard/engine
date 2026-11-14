@@ -48,7 +48,7 @@ function fixture() {
   };
   const assets = new ClientAssets(source, wire, { base: 'https://example.invalid/', offline: true, firstParty: true,
     fetch: () => Promise.reject(new Error('Unexpected network')), hash: bytes => Promise.resolve(hashImmutableBytes(bytes)), cache: {
-      product: () => Promise.resolve(null), putProduct: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
+      product: () => Promise.resolve(null), putFolder: () => Promise.resolve(), putAsset: () => Promise.resolve(true),
       pin: () => { leases++; return () => { leases--; }; },
       asset: (_base, hash) => {
         const pending = hold; if (pending === undefined) return Promise.resolve(wire.get(hash) ?? null);

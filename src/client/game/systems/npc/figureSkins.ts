@@ -98,7 +98,7 @@ export class FigureSkins {
  *  order, painted on one painterly material from the original images packed onto the atlas's canvas cells. The owner
  *  owns the draw; joints are left for the caller to publish and drive. */
 /** A product's content URL for a skin it names (GR6: built skins ship as product files); any other URL as written. */
-export function productSkinUrl(product: { readonly hasFile: (name: string) => boolean; readonly url: (name: string) => string }): (url: string) => string {
+export function folderSkinUrl(product: { readonly hasFile: (name: string) => boolean; readonly url: (name: string) => string }): (url: string) => string {
   return url => product.hasFile(url) ? product.url(url) : url;
 }
 export async function atlasFigureSkin(input: unknown, sky: SkyRig, owner: Scope, skinUrl: (url: string) => string = url => url): Promise<THREE.SkinnedMesh> {

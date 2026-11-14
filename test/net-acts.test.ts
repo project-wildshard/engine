@@ -11,11 +11,11 @@ import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 // P1-E5.2c: `interact` and `equip` over DirectLoopback, on shipped products, for whoever sends them. The worker's half of
 // the same round trip is in test/standalone-acts.test.ts.
@@ -23,7 +23,7 @@ let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
 
 async function resident(slug: string): Promise<TrustedHeadlessResident> {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = runtimeAssets(product, directory);
   return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product });

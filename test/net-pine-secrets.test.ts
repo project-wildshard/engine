@@ -8,14 +8,14 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { questBooks } from '../src/shared/engine/quest/players';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 const FLAG = 'secret:log';
 
 test('a room player who enters the hollow log finds its secret in their own book', { timeout: 120_000 }, async () => {
-  const directory = builtProduct('pine-hollow'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const { secret } = await product.json<{ readonly secret: { readonly mid: readonly [number, number, number]; readonly floorY: number } }>('quests/forest-story.json');

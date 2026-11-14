@@ -1,8 +1,8 @@
 import { GeometryPack } from '@wildshard/engine/models/geometryPack';
 import { fetchDeflatedBytes as fetchDeflated } from '@wildshard/engine/core/deflate';
 import { resourceScope } from '@wildshard/engine/app/resources';
-import { loadFirstPartyProduct } from '../shardfile/runtimeProduct';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { loadFirstPartyFolder } from '../shardfile/runtimeFolder';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 /** Client-only product catalogue for fallback and baked figure rows. */
 import * as THREE from 'three';
 import * as v from 'valibot';
@@ -113,23 +113,23 @@ export class FigureCatalogue {
   kit(id: string): unknown { const kit = this.row(id).row.kit; if (kit === undefined) throw new Error(`Figure ${id} has no kit`); return kit; }
 }
 
-const admitted = new WeakMap<ShardProduct, Map<string, { readonly catalogue: ProductFigureCatalogue; readonly owner: Scope }>>();
+const admitted = new WeakMap<ShardFolder, Map<string, { readonly catalogue: FolderFigureCatalogue; readonly owner: Scope }>>();
 
 /** Admit existing product packs into the shared figure model owner.
  * Public callers supply product/file ids and resident scene handles only.
  */
-export class ProductFigureCatalogue {
+export class FolderFigureCatalogue {
   /** Share the admitted catalogue; source `owner` is captured before reads and
    * retires its cache and geometry. Omitted owners use the construction scope. */
-  static async fromProduct(product: ShardProduct, file: string, owner: Scope = resourceScope()): Promise<ProductFigureCatalogue> {
+  static async fromFolder(product: ShardFolder, file: string, owner: Scope = resourceScope()): Promise<FolderFigureCatalogue> {
     if (owner.disposed || owner.disposing) throw new Error('Figure catalogue owner left');
     const ready = admitted.get(product)?.get(file); if (ready !== undefined && !ready.owner.disposed && !ready.owner.disposing) return ready.catalogue;
-    const catalogue = new ProductFigureCatalogue(product.slug, file); await catalogue.admit(product, owner); return catalogue;
+    const catalogue = new FolderFigureCatalogue(product.slug, file); await catalogue.admit(product, owner); return catalogue;
   }
   private readonly figures = new FigureCatalogue();
   private pending: Promise<void> | undefined;
-  constructor(private readonly productId: string, private readonly file: string) {}
-  async admit(product: ShardProduct, owner: Scope = resourceScope(), allowPacked = true): Promise<void> {
+  constructor(private readonly folderId: string, private readonly file: string) {}
+  async admit(product: ShardFolder, owner: Scope = resourceScope(), allowPacked = true): Promise<void> {
     const check = (): void => { if (owner.disposed || owner.disposing) throw new Error('Figure catalogue owner left'); };
     check();
     const data = v.parse(FigureCatalogueSchema, JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await product.file(this.file))));
@@ -152,14 +152,14 @@ export class ProductFigureCatalogue {
       }
     }
     await owner.run(() => this.figures.admit(data, resources, owner)); check();
-    const book = admitted.get(product) ?? new Map<string, { readonly catalogue: ProductFigureCatalogue; readonly owner: Scope }>();
+    const book = admitted.get(product) ?? new Map<string, { readonly catalogue: FolderFigureCatalogue; readonly owner: Scope }>();
     const admission = { catalogue: this, owner };
     book.set(this.file, admission); admitted.set(product, book);
     owner.onDispose(() => { if (book.get(this.file) === admission) book.delete(this.file); });
   }
   prepare(): Promise<void> {
     this.pending ??= (async () => {
-      try { await this.admit(await loadFirstPartyProduct(this.productId)); }
+      try { await this.admit(await loadFirstPartyFolder(this.folderId)); }
       catch (error: unknown) { this.pending = undefined; throw error; }
     })();
     return this.pending;

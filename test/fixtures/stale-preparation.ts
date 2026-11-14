@@ -7,8 +7,8 @@ import {cookPreparationBytes} from '@wildshard/format/cookPreparation';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {readTar, writeTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
-import {productTarball} from '../../src/cook/game/productTarball';
-import {builtProduct} from './engine-lift/product';
+import {folderTarball} from '../../src/cook/game/folderTarball';
+import {builtFolder} from './engine-lift/folder';
 
 export const digest = (bytes: Readonly<Uint8Array>): string => createHash('sha256').update(bytes).digest('hex');
 export const json = (bytes: Uint8Array | undefined): unknown => JSON.parse(new TextDecoder().decode(bytes));
@@ -24,7 +24,7 @@ export function unprepared(tar: Uint8Array): Uint8Array {
   files.set('shard.json', validationSourceBytes({...held, sdk: '0.2', cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
   return writeTar(files);
 }
-export const legacy = unprepared(productTarball(builtProduct('_template')));
+export const legacy = unprepared(folderTarball(builtFolder('_template')));
 /** Two renderer fingerprints, neither this engine's: the cook is told which one it runs on. */
 export const PREPARED = '7d1dd888'.padEnd(64, '0'), MOVED = '6d0a0a78'.padEnd(64, '0');
 

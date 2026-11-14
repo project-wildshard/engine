@@ -9,10 +9,10 @@ import { PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // opus-slotsync (J293, REMOTE-PLAYERS RP5's gap): on a native kit with no slot map (Driftwood's swords, Nalati's bow, sabre and
 // spear) a page had no slot to send for the item it switched to, and Driftwood's server had no route for one, so another player
@@ -25,7 +25,7 @@ let live: DedicatedRoom | undefined, clock = 0;
 afterEach(() => { live?.dispose(); live = undefined; });
 
 async function open(slug: string): Promise<DedicatedRoom> {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

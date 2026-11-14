@@ -128,7 +128,7 @@ try {
     const otherContent = pageLog.filter(row => row.slug === slug && isContent(row.path) && !shardContent(row.path)).map(row => row.path);
     const cdn = contentLog.filter(row => row.slug === slug);
     const serverBook = cdn.some(row => row.path === `/assets/spawn/server-${build}.json`), serverParts = cdn.filter(row => row.path.startsWith('/assets/spawn/server/')).length;
-    const row = { slug, ms: Date.now() - started, frames: booted.frames, onlineWorld: booted.world, cdnReads: cdn.length, cdnProduct: cdn.filter(entry => entry.path.startsWith(`/shardfiles/${slug}/`)).length,
+    const row = { slug, ms: Date.now() - started, frames: booted.frames, onlineWorld: booted.world, cdnReads: cdn.length, cdnFolder: cdn.filter(entry => entry.path.startsWith(`/shardfiles/${slug}/`)).length,
       serverBook, serverParts, preflights: cdn.filter(entry => entry.method === 'OPTIONS').length, cookies: cdn.filter(entry => entry.cookie && entry.origin !== undefined).length,
       // CSS background art (the title cards): a stylesheet image is a no-cors read, which no fetch layer can make CORS
       noCors: cdn.filter(entry => entry.method === 'GET' && entry.origin !== pageOrigin).map(entry => entry.path),
@@ -141,7 +141,7 @@ try {
     results.push(row);
     if (booted.frames === 0) failures.push(`${slug}: no worker client frame`);
     if (booted.world) failures.push(`${slug}: page carries an online world`);
-    if (row.cdnProduct === 0) failures.push(`${slug}: no product read from the content base`);
+    if (row.cdnFolder === 0) failures.push(`${slug}: no product read from the content base`);
     if (!serverBook || serverParts === 0) failures.push(`${slug}: the server worker did not read its book and parts from the content base`);
     if (ownContent.length > 0) failures.push(`${slug}: ${ownContent.length} shard content reads on the page origin: ${ownContent.slice(0, 5).join(' ')}`);
     if (row.pageMissing.length > 0) failures.push(`${slug}: ${row.pageMissing.length} 404s on the page origin: ${row.pageMissing.slice(0, 5).join(' ')}`);

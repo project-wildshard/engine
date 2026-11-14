@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pastelTerrain } from '../../src/shards/pastel-plain/generators/terrain';
 import { pastelProps } from '../../src/shards/pastel-plain/generators/props';
-import { pastelProduct } from '../../src/shards/pastel-plain/generators/product';
+import { pastelFolder } from '../../src/shards/pastel-plain/generators/folder';
 import { compilePastelBehaviour, pastelBehaviourMetadata, PASTEL_BEHAVIOUR_INPUTS } from '../../src/shards/pastel-plain/generators/behaviour';
 import { compileScript } from '../../src/sharddev/bake/compileScript';
 import { bakeProps } from '../../src/sharddev/bake/props';
@@ -20,7 +20,7 @@ export const PASTEL_SOURCE = (() => {
   try {
     const props = bakeProps(fixture.source), { assets: _assets, ...terrain } = produced;
     for (const [hash, bytes] of props.assets) generated.set(hash, bytes);
-    return pastelProduct(terrain, props, PASTEL_BEHAVIOUR);
+    return pastelFolder(terrain, props, PASTEL_BEHAVIOUR);
   } finally { fixture.dispose(); }
 })();
 /** Each native admission receives detached immutable bytes. */

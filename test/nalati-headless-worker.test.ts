@@ -1,16 +1,16 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The worker journey runs the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { openWorldAdapter, type WorldAdapter } from '../src/server/host/openWorld';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
-import { compileProductWorker } from './fixtures/headless/compileProductWorker';
-import { productHeadlessSections } from '../src/shared/host/headlessSections';
+import { compileFolderWorker } from './fixtures/headless/compileFolderWorker';
+import { folderHeadlessSections } from '../src/shared/host/headlessSections';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtFolder } from './fixtures/builtFolder';
 
 // P1-E3.1b: Nalati Grasslands' worker runs the same world as a resident, from its built product alone. FAST-SLOW-TESTS
 // FS1: this case moved here unchanged from nalati-headless-population.test.ts as it stood before FAST-SLOW-TESTS (the
@@ -19,8 +19,8 @@ import { builtProduct } from './fixtures/builtProduct';
 
 const SLUG = 'nalati-grasslands';
 
-async function shipped(): Promise<{ directory: string; product: Awaited<ReturnType<typeof loadHeadlessProduct>>; assets: Map<string, Uint8Array>; rapier: Rapier; resident: (snapshot?: string) => Promise<WorldAdapter> }> {
-  const directory = builtProduct(SLUG), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+async function shipped(): Promise<{ directory: string; product: Awaited<ReturnType<typeof loadHeadlessFolder>>; assets: Map<string, Uint8Array>; rapier: Rapier; resident: (snapshot?: string) => Promise<WorldAdapter> }> {
+  const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`Missing admitted ${SLUG} output`);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
@@ -29,11 +29,11 @@ async function shipped(): Promise<{ directory: string; product: Awaited<ReturnTy
 }
 test('Nalati\'s worker runs the product\'s world: a route and its checkpoint match a resident exactly', async ({signal}) => {
   const { directory, product, assets, resident } = await shipped();
-  const shard = product.shardfile, sections = productHeadlessSections(product), plan = { ticks: 240, points: [{ x: 0, z: 232 }, { x: 40, z: 180 }] };
+  const shard = product.shardfile, sections = folderHeadlessSections(product), plan = { ticks: 240, points: [{ x: 0, z: 232 }, { x: 40, z: 180 }] };
   const options = { deadline: 'advisory' as const, product: directory, sections };
   // Fresh fixed code only: both workers still admit every original byte and own
   // independent worlds. Compilation and startup remain inside this case clock.
-  const prepared = await compileProductWorker(undefined, signal);
+  const prepared = await compileFolderWorker(undefined, signal);
   let worker: Awaited<ReturnType<typeof prepared.create>> | undefined;
   let second: Awaited<ReturnType<typeof prepared.create>> | undefined;
   let live: WorldAdapter | undefined;

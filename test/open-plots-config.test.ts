@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import configSource from '../src/shards/open-plots/shard.config.ts?raw';
 import declared from '../src/shards/open-plots/outputs.json' with { type: 'json' };
 import project, { outputs } from '../src/shards/open-plots/shard.config';
-import { audioOutputs, outputs as worldDeclarations } from '../src/shards/open-plots/generators/product';
+import { audioOutputs, outputs as worldDeclarations } from '../src/shards/open-plots/generators/folder';
 import layout from '../src/shards/open-plots/data/layouts/night-market.json' with { type: 'json' };
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 

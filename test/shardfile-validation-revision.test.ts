@@ -11,7 +11,7 @@ function put(root: string, path: string, text: string): void { mkdirSync(dirname
 it('invalidates on admission, schemas and verified transport changes, while gameplay and generated tables stay independent', () => {
   mkdirSync('tmp', { recursive: true }); const root = mkdtempSync(resolve('tmp/validation-revision-')); owned.push(root);
   put(root, 'package.json', '{"version":"1.0.0","dependencies":{"valibot":"1.0.0"}}'); put(root, 'pnpm-lock.yaml', 'lock');
-  const paths = ['src/client/game/shardfile/product.ts', 'src/client/game/shardfile/readAsset.ts', 'src/client/engine/pwa/cacheNames.ts'];
+  const paths = ['src/client/game/shardfile/folder.ts', 'src/client/game/shardfile/readAsset.ts', 'src/client/engine/pwa/cacheNames.ts'];
   for (const path of paths) put(root, path, 'first');
   let before = shardfileValidationRevision(root);
   for (const path of paths) { put(root, path, 'second'); const after = shardfileValidationRevision(root); expect(after).not.toBe(before); before = after; }
@@ -29,7 +29,7 @@ it('an installed engine (no lockfile, no tests) computes the checkout\'s value w
   mkdirSync('tmp', { recursive: true }); const checkout = mkdtempSync(resolve('tmp/validation-checkout-')), installed = mkdtempSync(resolve('tmp/validation-installed-')); owned.push(checkout, installed);
   for (const root of [checkout, installed]) {
     put(root, 'package.json', '{"version":"1.0.0","dependencies":{"valibot":"1.0.0"}}');
-    put(root, 'src/client/game/shardfile/product.ts', 'product'); put(root, 'src/client/engine/pwa/Cache_Names.ts', 'names'); put(root, 'src/client/engine/pwa/cacheNames.ts', 'names');
+    put(root, 'src/client/game/shardfile/folder.ts', 'product'); put(root, 'src/client/engine/pwa/Cache_Names.ts', 'names'); put(root, 'src/client/engine/pwa/cacheNames.ts', 'names');
     mkdirSync(resolve(root, 'scripts'), { recursive: true }); copyFileSync(resolve('scripts/shardfile-validation-revision.mjs'), resolve(root, 'scripts/shardfile-validation-revision.mjs'));
   }
   put(checkout, 'pnpm-lock.yaml', 'lock'); put(checkout, 'src/client/game/shardfile/product.test.ts', 'a test the package does not ship');

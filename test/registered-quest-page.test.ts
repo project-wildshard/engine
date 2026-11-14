@@ -5,8 +5,8 @@ import { registeredJsonSchema, namedJsonSchema } from '@wildshard/engine/host/fo
 import { encodeCanonicalJson } from '@wildshard/engine/host/immutable';
 import { nameBlob } from '@wildshard/sharddev/blobs';
 import { emptyShardfile } from '@wildshard/engine/host/author';
-import { createShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
-import { fixtureJsonCheck } from './fixtures/productFile';
+import { createShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
+import { fixtureJsonCheck } from './fixtures/folderFile';
 
 const names = ['quests/trader.json', 'quests/mill-door.json', 'quests/lanterns.json'] as const;
 const source = '@wildshard/format/questInteractions#QuestPageInteractionsSchema';
@@ -50,7 +50,7 @@ test('missing or foreign metadata refuses before any registered payload read', a
   for (const name of names) {
     for (const schema of [undefined, {}, { $comment: 'foreign' }]) {
       let reads = 0;
-      const product = createShardProduct({
+      const product = createShardFolder({
         slug: identity.slug, revision: 1, shardfile: emptyShardfile(identity), sections: new Map(),
         files: new Map([[name, { hash: 'a'.repeat(64), url: 'https://example.test/page', ...(schema === undefined ? {} : { jsonSchema: schema }) }]]),
         read: () => { reads++; return Promise.resolve(encode(good)); }, builtJson: true,
@@ -69,9 +69,9 @@ test('built reads retain canonical parsing and external reads retain native sema
       read: () => Promise.resolve(encode(good)), builtJson: true,
       jsonCheck: () => Promise.reject(new Error('Unexpected external checker')),
     };
-    expect(await createShardProduct(input).json(name)).toEqual(good);
-    await expect(createShardProduct({ ...input, builtJson: false, jsonCheck: fixtureJsonCheck,
+    expect(await createShardFolder(input).json(name)).toEqual(good);
+    await expect(createShardFolder({ ...input, builtJson: false, jsonCheck: fixtureJsonCheck,
       read: () => Promise.resolve(encode({ actions: [...good.actions, ...good.actions] })) }).json(name)).rejects.toThrow('unique page interaction ids');
-    await expect(createShardProduct({ ...input, read: () => Promise.resolve(new TextEncoder().encode('{"actions":[],"bindings":{"calls":[{"target":"turn","owner":"world","path":["turn"],"args":[-0]}]}}')) }).json(name)).rejects.toThrow('canonical numbers');
+    await expect(createShardFolder({ ...input, read: () => Promise.resolve(new TextEncoder().encode('{"actions":[],"bindings":{"calls":[{"target":"turn","owner":"world","path":["turn"],"args":[-0]}]}}')) }).json(name)).rejects.toThrow('canonical numbers');
   }
 });

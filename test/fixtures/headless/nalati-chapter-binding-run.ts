@@ -4,7 +4,7 @@ import '../../../src/shared/engine/core/portableMathFirst';
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- The original shipped Rapier module is part of the native product proof.
 import {readFileSync} from 'node:fs';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import {createNativeProofResident} from '../headless-native';
 import {prepareHeadlessRuntime} from '../nalati-chapter-native';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
@@ -17,7 +17,7 @@ import { leadSnapshot } from '@wildshard/engine/sim/snapshot';
 let priorPhase=0;
 const phase=(name:string,tick?:number):void=>{const now=performance.now();console.info(JSON.stringify({diagnostic:'nalati-chapter-binding-phase',phase:name,atMs:Math.round(now),phaseMs:Math.round(now-priorPhase),...(tick===undefined?{}:{tick})}));priorPhase=now;};
 phase('imports-ready');
-const session=await beginProductSession('nalati-grasslands','nalati-chapter'),{product,assets}=session;
+const session=await beginFolderSession('nalati-grasslands','nalati-chapter'),{product,assets}=session;
 phase('product-session-started');
 const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
 phase('physics-loaded');
