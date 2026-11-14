@@ -211,7 +211,7 @@ try {
   note('no page reload through every crossing', sentinel && navigations === navigationsBefore, { sentinel, navigations: navigations - navigationsBefore });
   note('no page errors', errors.length === 0, errors.slice(0, 5));
   result.legs = legs;
-  note('no memory warning at home or any control', result.memoryAtHome?.memoryWarning !== true && !legs.some(row => /** @type {any[]} */ (row.events).some(e => e.memory?.memoryWarning === true)));
+  note('no memory warning at home or any control', /** @type {{ memoryWarning?: boolean } | undefined} */ (result.memoryAtHome)?.memoryWarning !== true && !legs.some(row => /** @type {any[]} */ (row.events).some(e => e.memory?.memoryWarning === true)));
   if (solo) {
     // the same two shards' one-shard pages, each in a fresh profile at the same layout, read 10 s after their world boots
     /** @type {Record<string, any>} */ const pages = {}; result.solo = pages;
