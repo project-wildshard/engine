@@ -10,6 +10,7 @@
 // Indicative, not a phone: calibrate against the plan's phone table before trusting a ranking (NB1's done-when).
 //   scripts/browser-lane.sh node scripts/loading-flow/benchmax.mjs --base <url> [--shard 'Nine'] [--throttle 4]
 //     [--seconds 60] [--dpr 2] [--json <out.json>] [--profile <cpuprofile.json>]
+//   --window 1496x717@2: a desktop window (Jake's Mac, 2992x1434 device pixels) on the desktop tier instead of the phone (NB5).
 //   --dpr: the render scale the game draws at (Graphics' saved pick; the viewport stays a 2x phone); NB5 reads 1 and 2.
 //   --seconds 600: NINE-DRAGON-BENCHMAX NB5's sustained run, printed per minute.
 import { writeFileSync } from 'node:fs';
@@ -21,16 +22,20 @@ import { bootTimelineEntries, CLOCK_MARK_EXPRESSION, profileAnchor, profileIdle,
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shard: { type: 'string', default: 'Nine' }, throttle: { type: 'string', default: '4' },
   seconds: { type: 'string', default: '60' }, json: { type: 'string' }, profile: { type: 'string' },
-  dpr: { type: 'string', default: '2' } } });
+  dpr: { type: 'string', default: '2' }, window: { type: 'string' } } });
 if (values.base === undefined) { console.error('usage: benchmax.mjs --base <url> [--shard <card title regex>] [--throttle 4] [--seconds 60] [--dpr 2] [--json <file>] [--profile <file>]'); process.exit(2); }
+// --window <css W>x<css H>@<scale>: a desktop browser window instead of the phone (NB5, Jake's Mac: 1496x717@2 is 2992x1434), desktop tier
+const desktop = /^(\d+)x(\d+)@([\d.]+)$/u.exec(values.window ?? '');
+if (values.window !== undefined && desktop === null) { console.error('--window wants <W>x<H>@<scale>, e.g. 1496x717@2'); process.exit(2); }
 const base = values.base.replace(/\/$/u, ''), shard = new RegExp(values.shard ?? 'Nine', 'iu'), throttle = Number(values.throttle), seconds = Number(values.seconds);
 /** @param {number} ms */
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
 const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 try {
-  const context = await browser.newContext({ ...devices['iPhone 16 Pro'], viewport: { width: 402, height: 874 }, deviceScaleFactor: 2 });
-  await developerSettings(context, { tier: 'phone', volume: 0 });
+  const context = desktop === null ? await browser.newContext({ ...devices['iPhone 16 Pro'], viewport: { width: 402, height: 874 }, deviceScaleFactor: 2 })
+    : await browser.newContext({ viewport: { width: Number(desktop[1]), height: Number(desktop[2]) }, deviceScaleFactor: Number(desktop[3]) });
+  await developerSettings(context, { tier: desktop === null ? 'phone' : 'desktop', volume: 0 });
   await saveFixture(context, { scope: 'global', key: 'gfx', data: { dpr: values.dpr ?? '2', aa: 'auto' } });
   for (const fixture of levelDownloadFixtures('packs')) await saveFixture(context, fixture);
   // a phone's first PLAY goes straight to Driftwood's first-play card (MOBILE-GRAPHICS MG5): this device has done it
@@ -164,7 +169,7 @@ try {
   const s = ms => `${(ms / 1000).toFixed(1)} s`;
   /** @param {number} n */
   const f = n => n.toFixed(1);
-  console.log(`benchmax: ${titles[target]} at ${base}, Chromium headless, CPU x${throttle}, 402x874 @2, packs, cold`);
+  console.log(`benchmax: ${titles[target]} at ${base}, Chromium headless, CPU x${throttle}, ${desktop === null ? '402x874 @2 (phone)' : `${desktop[1]}x${desktop[2]} @${desktop[3]} (desktop)`}, packs, cold`);
   console.log(`control ${s(load.phases.control)} after the world page's navigation · its first boot stage at ${s(load.phases.firstStage)}`);
   console.log('stages, longest first:'); for (const e of load.stage.slice(0, 10)) console.log(`  ${e.op.slice(6).padEnd(16)} ${s(e.ms)}`);
   console.log('named waits >= 200 ms:'); for (const e of load.waits.slice(0, 10)) console.log(`  ${e.op.slice(5, 90).padEnd(60)} ${s(e.ms)}`);
