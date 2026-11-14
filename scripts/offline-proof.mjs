@@ -36,7 +36,7 @@
 // when START, DOWNLOAD and LOAD finish from the cache, the player is in the world, and then the connection card shows.
 //
 //   scripts/browser-lane.sh node scripts/offline-proof.mjs [--channel=staging|preview|both] [--mode=offline|slow|nobackend]
-//       [--shard=<slug>[,<slug>]] [--entry=deck|resume|both] [--jobs=<n>] [--base=<served build>] [--out=<dir>] [--require-world] [--staging-port=<n>] [--one-origin] [--cells=<n>] [--report]
+//       [--shard=<slug>[,<slug>]] [--entry=deck|resume|both] [--jobs=<n>] [--base=<served build>] [--out=<dir>] [--require-world] [--staging-port=<n>] [--one-origin] [--cells=<n>] [--cold] [--report]
 //   scripts/browser-lane.sh node scripts/offline-proof.mjs --walkthrough <slug> [--base=…] [--out=…] [--report]
 // With no `--base` it builds this working tree with scripts/serve-build.sh and stops that server at the end. `--jobs` above 1
 // gives each shard its own profile (one profile can't hold two browsers), which trades the shared-device shape for time.
@@ -78,6 +78,8 @@ if (!Number.isInteger(jobs) || jobs < 1) throw new Error(`--jobs is a whole numb
 /** OF5 and OF9 on: an entry that ends anywhere but in the world is red (a staging-like seat wait included). */
 const requireWorld = argv.includes('--require-world');
 const report = argv.includes('--report');
+/** OF13: `--cold` enters a shard this profile never visited (no warm visits), as a device that downloaded only other shards. */
+const cold = argv.includes('--cold');
 /** OF12: both channels on one origin and one profile (see above). */
 const oneOrigin = argv.includes('--one-origin');
 if (oneOrigin && (jobs !== 1 || walkthrough !== undefined)) throw new Error('--one-origin runs one profile: --jobs=1, no --walkthrough');
@@ -467,6 +469,7 @@ async function proveShard(channel, mode, slug, profile) {
   /** @type {Set<string> | undefined} */
   let warm;
   if (existsSync(warmFile)) warm = new Set(/** @type {string[]} */ (JSON.parse(readFileSync(warmFile, 'utf8'))));
+  else if (cold) { log(`${channel}-${slug}: --cold, never visited on this profile`); warm = new Set(); }
   else {
     const label = `${channel}-warm-${slug}`;
     // Two visits: the first installs the worker (a fresh page isn't controlled), the second reads through it. A staging-like
@@ -498,7 +501,7 @@ function record(channel, mode, slug, entry, visit, warm, extra = {}) {
   const label = `${channel}-${mode}-${slug}-${entry}`;
   writeFileSync(join(out, `${label}-requests.json`), JSON.stringify(visit.rows));
   writeFileSync(join(out, `${label}-screens.json`), JSON.stringify({ samples: visit.samples, console: visit.consoleLines }));
-  const layout = channel === 'staging' && mode === 'offline' && (entry === 'deck' || extra.walkthrough === true);
+  const layout = channel === 'staging' && mode === 'offline' && WORD_CELLS > 1 && (entry === 'deck' || extra.walkthrough === true); // a one-cell world (--cells=1) enters no grid
   const failures = judge({ shard: slug, channel, mode, entry, rows: visit.rows, samples: visit.samples,
     outcome: visit.outcome, ...warm === undefined ? {} : { warm }, layout, proofError: visit.proofError, leaks: visit.leaks,
     requireWorld: requireWorld && !mode.startsWith('warm'), placed: gridPlaces(slug, CATALOGUE), ...extra });
