@@ -16,7 +16,7 @@
  */
 import { BufferAttribute, BufferGeometry, Mesh, type Material, type Object3D } from 'three';
 import type { Scope } from '../../../shared/engine/app/scope';
-import { gpuOnlyTrees } from '../core/gpuOnly';
+import { gpuOnlyTrees, refillGpuOnly } from '../core/gpuOnly';
 import { decodeTerrainTile, type TerrainTileData } from '@wildshard/format/terrainTileBytes';
 import { keepShadowWhole } from './shadowChunks';
 
@@ -25,6 +25,8 @@ const COARSE = { resolution: 17, size: 125, half: 8 } as const;
 
 interface TileState { readonly indices: BufferAttribute; readonly resolution: number }
 const coarseTiles = new WeakMap<Mesh, TileState>();
+/** Where each installed tile sits on the ground, for `refreshTerrainTile`. */
+const shapes = new WeakMap<Mesh, Pick<TerrainTileData, 'resolution' | 'x' | 'z' | 'size'>>();
 
 /** True when this tile is a coarse tile whose quadrants refinement may hide. */
 function isCoarse(data: TerrainTileData): boolean { return data.resolution === COARSE.resolution && data.size === COARSE.size; }
@@ -98,29 +100,17 @@ function perimeter(r: number): number[] {
  */
 export function installTerrainTile(bytes: Uint8Array | TerrainTileData, ports: { root: Object3D; scope: Scope; material: Material; shadow: boolean; lattice?: TerrainTileData }): Mesh {
   if (ports.scope.disposed) throw new Error('terrain tile: its scope is already disposed');
-  const data = bytes instanceof Uint8Array ? decodeTerrainTile(bytes) : bytes, r = data.resolution, colours = data.colours;
-  if (colours === undefined) throw new Error('terrain tile: a render tile needs vertex colours (a heights-only payload is a collider)');
-  const coarse = isCoarse(data), ring = coarse ? [] : perimeter(r), grid = r * r, vertices = grid + ring.length;
-  const gridIndices = (r - 1) ** 2 * 6, total = gridIndices + ring.length * 6;
-  // a coarse tile has no skirt, so it draws the decoded colours as they are; a skirted tile extends a copy
-  const positions = new Float32Array(vertices * 3), normals = new Float32Array(vertices * 3), colour = coarse ? colours : new Float32Array(vertices * 3);
-  const indices = vertices > 65535 ? new Uint32Array(total) : new Uint16Array(total), cell = data.size / (r - 1);
-  for (let z = 0; z < r; z++) for (let x = 0; x < r; x++) {
-    const vertex = z * r + x, at = vertex * 3;
-    positions[at] = x * cell; positions[at + 1] = data.heights[vertex] ?? 0; positions[at + 2] = z * cell;
+  const data = bytes instanceof Uint8Array ? decodeTerrainTile(bytes) : bytes, r = data.resolution, coarse = isCoarse(data);
+  const { positions, normals, colour, vertices } = tileVertices(data, ports.lattice);
+  const ring = coarse ? 0 : vertices - r * r, gridIndices = (r - 1) ** 2 * 6, total = gridIndices + ring * 6;
+  const indices = vertices > 65535 ? new Uint32Array(total) : new Uint16Array(total);
+  for (let z = 0; z < r - 1; z++) for (let x = 0; x < r - 1; x++) {
     // Rapier's split: the triangles (x, z) (x, z+1) (x+1, z) and (x+1, z) (x, z+1) (x+1, z+1), diagonal (x+1, z)–(x, z+1).
-    if (x < r - 1 && z < r - 1) indices.set([vertex, vertex + r, vertex + 1, vertex + 1, vertex + r, vertex + r + 1], (z * (r - 1) + x) * 6);
+    const vertex = z * r + x;
+    indices.set([vertex, vertex + r, vertex + 1, vertex + 1, vertex + r, vertex + r + 1], (z * (r - 1) + x) * 6);
   }
-  if (!coarse) colour.set(colours);
-  if (ports.lattice === undefined || !latticeNormals(data, ports.lattice, normals)) gridNormals(data, normals);
-  const depth = data.size / 16;
-  ring.forEach((border, i) => {
-    const skirt = grid + i, next = (i + 1) % ring.length, from = border * 3, to = skirt * 3;
-    positions[to] = positions[from] ?? 0; positions[to + 1] = (positions[from + 1] ?? 0) - depth; positions[to + 2] = positions[from + 2] ?? 0;
-    for (let c = 0; c < 3; c++) { normals[to + c] = normals[from + c] ?? 0; colour[to + c] = colour[from + c] ?? 0; }
-    const b = ring[next] ?? border;
-    indices.set([border, b, skirt, b, grid + next, skirt], gridIndices + i * 6);
-  });
+  const edge = coarse ? [] : perimeter(r), grid = r * r;
+  edge.forEach((border, i) => { const next = (i + 1) % edge.length, b = edge[next] ?? border; indices.set([border, b, grid + i, b, grid + next, grid + i], gridIndices + i * 6); });
   const geometry = ports.scope.own(new BufferGeometry());
   geometry.setAttribute('position', new BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new BufferAttribute(normals, 3));
@@ -135,8 +125,58 @@ export function installTerrainTile(bytes: Uint8Array | TerrainTileData, ports: {
   // a tile is already one shadow-culling piece, and the caller's shadow disc switches its castShadow: never split it (SF16)
   keepShadowWhole(mesh);
   if (coarse) coarseTiles.set(mesh, { indices: index, resolution: r });
+  shapes.set(mesh, { resolution: r, x: data.x, z: data.z, size: data.size });
   ports.root.add(mesh); ports.scope.onDispose(() => { mesh.removeFromParent(); coarseTiles.delete(mesh); });
   return mesh;
+}
+
+/** A tile's vertex arrays, its skirt ring after the grid on a fine tile: what `installTerrainTile` uploads. */
+function tileVertices(data: TerrainTileData, lattice: TerrainTileData | undefined): { positions: Float32Array; normals: Float32Array; colour: Float32Array; vertices: number } {
+  const r = data.resolution, colours = data.colours;
+  if (colours === undefined) throw new Error('terrain tile: a render tile needs vertex colours (a heights-only payload is a collider)');
+  const coarse = isCoarse(data), ring = coarse ? [] : perimeter(r), grid = r * r, vertices = grid + ring.length;
+  // a coarse tile has no skirt, so it draws the decoded colours as they are; a skirted tile extends a copy
+  const positions = new Float32Array(vertices * 3), normals = new Float32Array(vertices * 3), colour = coarse ? colours : new Float32Array(vertices * 3);
+  const cell = data.size / (r - 1);
+  for (let z = 0; z < r; z++) for (let x = 0; x < r; x++) {
+    const at = (z * r + x) * 3;
+    positions[at] = x * cell; positions[at + 1] = data.heights[z * r + x] ?? 0; positions[at + 2] = z * cell;
+  }
+  if (!coarse) colour.set(colours);
+  if (lattice === undefined || !latticeNormals(data, lattice, normals)) gridNormals(data, normals);
+  const depth = data.size / 16;
+  ring.forEach((border, i) => {
+    const from = border * 3, to = (grid + i) * 3;
+    positions[to] = positions[from] ?? 0; positions[to + 1] = (positions[from + 1] ?? 0) - depth; positions[to + 2] = positions[from + 2] ?? 0;
+    for (let c = 0; c < 3; c++) { normals[to + c] = normals[from + c] ?? 0; colour[to + c] = colour[from + c] ?? 0; }
+  });
+  return { positions, normals, colour, vertices };
+}
+
+/**
+ * SHARD-SOURCE AP18 (dev only: `wildshard watch`'s ground swap). Cut this installed tile again from a new whole-ground
+ * lattice (heights and colours, the 257² the tiles were baked from) and rewrite its vertices in their buffers: the same
+ * vertices `installTerrainTile` makes from a tile the bake cut from that lattice. False, and nothing written, when the tile
+ * is not one of this module's or its vertices are not the lattice's samples.
+ */
+export function refreshTerrainTile(mesh: Mesh, lattice: TerrainTileData): boolean {
+  const shape = shapes.get(mesh), colours = lattice.colours;
+  if (shape === undefined || colours === undefined) return false;
+  const r = shape.resolution, n = lattice.resolution, step = lattice.size / (n - 1), cell = shape.size / (r - 1);
+  const heights = new Float32Array(r * r), colour = new Float32Array(r * r * 3);
+  for (let z = 0; z < r; z++) for (let x = 0; x < r; x++) {
+    const lx = latticeIndex(shape.x + x * cell, lattice.x, step, n), lz = latticeIndex(shape.z + z * cell, lattice.z, step, n);
+    if (lx < 0 || lz < 0) return false;
+    const at = lz * n + lx, i = z * r + x;
+    heights[i] = lattice.heights[at] ?? 0; colour.set(colours.subarray(at * 3, at * 3 + 3), i * 3);
+  }
+  const fresh = tileVertices({ ...shape, heights, colours: colour }, lattice);
+  const geometry = mesh.geometry, position = geometry.getAttribute('position'), normal = geometry.getAttribute('normal'), tint = geometry.getAttribute('color');
+  if (!(position instanceof BufferAttribute) || !(normal instanceof BufferAttribute) || !(tint instanceof BufferAttribute) || position.count !== fresh.vertices) return false;
+  position.array.set(fresh.positions); position.needsUpdate = true;
+  refillGpuOnly(normal, fresh.normals); refillGpuOnly(tint, fresh.colour);
+  geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+  return true;
 }
 
 /**

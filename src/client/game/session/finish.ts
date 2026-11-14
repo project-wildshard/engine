@@ -1,6 +1,7 @@
 import type { BuiltWorld } from './context';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { captureHeightfield } from '@wildshard/engine/world/Heightfield';
 import { sustainedFrames } from '@wildshard/engine/core/sustainedFrames';
 import { Rng } from '@wildshard/engine/core/rng';
 import { gridCells } from '../plugin/context';
@@ -401,7 +402,8 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // build's define makes this `false` in this module, so the import and its chunk go (scripts/check-devserver.mjs checks;
   // DEVSERVER imported from grid/menu did not fold across modules and kept the chunk).
   if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) void import('../devScene/hook').then(dev => dev.installDevHook({ scope: game.levelScope, scene: game.rootScene, physics: () => world.physics,
-    look: () => game.look, server: () => window.__workerClientDevColliders ?? null, watchFrames: fn => game.watchFrames(fn) }))
+    look: () => game.look, server: () => window.__workerClientDevColliders ?? null, serverGround: () => window.__workerClientDevGround ?? null,
+    player: () => world.player, terrainField: captureHeightfield, watchFrames: fn => game.watchFrames(fn) }))
     .catch((cause: unknown) => { console.error('[devScene]', cause); });
   ctx.startExplore?.();
   document.dispatchEvent(new Event('ws:ready')); // booted to the title

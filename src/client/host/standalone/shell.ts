@@ -12,9 +12,11 @@ import type { SaveStorage } from '@wildshard/engine/saves/store';
 import { ServerMessageSchema, ShellMessageSchema, type ProbedRow, type ServerMessage, type ShellMessage } from '@wildshard/format/standaloneControl';
 import { answerHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import type { HarnessFlag, HarnessGod, HarnessHits, HarnessJoin, HarnessMove, HarnessPlace } from '../../../shared/host/standalone/harnessPlace';
-import type { DevBox, DevCollidersMessage } from '@wildshard/engine/game/devColliders';
+import type { DevBox, DevCollidersMessage, DevGround, DevGroundMessage } from '@wildshard/engine/game/devColliders';
 import type { ServerWorkerStart } from '../../../server/host/standalone/serverRuntime';
 import { WorkerLoopback } from '../../../shared/host/standalone/workerLoopback';
+
+declare global { interface Window { /** SHARD-SOURCE AP18 (DEVSERVER): the dev hook's ground for the in-page server */ __workerClientDevGround?: (ground: DevGround) => void } }
 
 /** What the server should run and where the page keeps saves. */
 export interface StandaloneConfig {
@@ -129,6 +131,9 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
   const visibility = (): void => { if (!held) post({ kind: document.visibilityState === 'hidden' ? 'pause' : 'resume' }); };
   const scope = new Scope('standalone.shell');
   if (typeof document !== 'undefined') scope.listen(document, 'visibilitychange', visibility);
+  // SHARD-SOURCE AP18: `wildshard watch`'s ground for this server, from the page's dev hook (DEVSERVER pages only)
+  if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && harness !== undefined && typeof window !== 'undefined')
+    scope.expose(window, '__workerClientDevGround', (ground: DevGround) => { harness.postMessage({ wildshardDevGround: ground } satisfies DevGroundMessage, []); });
   post({ kind: 'boot', slug: config.slug, base: config.base, build: config.serverBuild ?? config.build, savePrefix: config.savePrefix, saves: documents, ...(config.lone === true ? { lone: true } : {}) });
   return { client, transport, booted: bootPromise,
     ready: () => { post({ kind: 'ready' }); }, pause: () => { post({ kind: 'pause' }); }, resume: () => { post({ kind: 'resume' }); },

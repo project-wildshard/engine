@@ -7,7 +7,11 @@ import { Physics } from '@wildshard/engine/physics/Physics';
 import type { LookKey } from '@wildshard/engine/render/dataLook';
 import type { LookStrategy } from '@wildshard/engine/render/look';
 import { createDevHook, DEV_HOOK_VERSION, type DevGeometry, type DevHookPorts, type DevPart } from './hook';
-import { isDevColliders, swapDevBoxes, type DevBox } from '@wildshard/engine/game/devColliders';
+import { isDevColliders, isDevGround, liftedFeet, swapDevBoxes, swapDevGround, type DevBox, type DevGround } from '@wildshard/engine/game/devColliders';
+import { addBakedTerrainCollider } from '@wildshard/engine/physics/terrainTiles';
+import { isTerrainCollider } from '@wildshard/engine/physics/surface';
+import { installTerrainTile } from '@wildshard/engine/world/terrainTileView';
+import { encodeTerrainTile, type TerrainTileData } from '@wildshard/format/terrainTileBytes';
 
 const box = new THREE.BoxGeometry(2, 1, 2);
 const geometry = (key: string): DevGeometry => ({ key, position: box.attributes['position']?.array as Float32Array, normal: box.attributes['normal']?.array as Float32Array,
@@ -132,4 +136,96 @@ test('AP5: after a grid crossing swaps the page world, the held parts\' boxes ar
   expect(() => { hook.swapColliders('wall', [{ ...solid, half: [0, 1, 1] }]); }).toThrow('malformed collider box');
   ports.scope.dispose();
   expect(count(next)).toBe(0);
+});
+
+/** A whole-ground lattice as sharddev's bake makes one (257², 500 m), and a tile cut from it as the bake cuts one. */
+const lattice = (heightAt: (x: number, z: number) => number, tint = 0.3): TerrainTileData => {
+  const heights = new Float32Array(257 ** 2), colours = new Float32Array(257 ** 2 * 3);
+  for (let z = 0; z < 257; z++) for (let x = 0; x < 257; x++) { heights[z * 257 + x] = heightAt(-250 + x * 500 / 256, -250 + z * 500 / 256); colours.set([tint, 0.4, 0.2], (z * 257 + x) * 3); }
+  return { resolution: 257, x: -250, z: -250, size: 500, heights, colours };
+};
+const tileOf = (whole: TerrainTileData, lod: 0 | 1, tx: number, tz: number): TerrainTileData => {
+  const size = lod === 0 ? 62.5 : 125, resolution = lod === 0 ? 33 : 17, stride = lod === 0 ? 1 : 4;
+  const heights = new Float32Array(resolution ** 2), colours = new Float32Array(resolution ** 2 * 3);
+  for (let z = 0; z < resolution; z++) for (let x = 0; x < resolution; x++) {
+    const g = (tz * size / (500 / 256) + z * stride) * 257 + tx * size / (500 / 256) + x * stride;
+    heights[z * resolution + x] = whole.heights[g] ?? 0; colours.set((whole.colours ?? new Float32Array(0)).subarray(g * 3, g * 3 + 3), (z * resolution + x) * 3);
+  }
+  return { resolution, x: -250 + tx * size, z: -250 + tz * size, size, heights, colours };
+};
+const hill = (cx: number, cz: number, height: number) => (x: number, z: number): number => height * Math.max(0, 1 - Math.hypot(x - cx, z - cz) / 20);
+const groundUnder = (physics: Physics, x: number, z: number): number | null => {
+  physics.world.step(); // the scene queries see the swapped colliders after a step, as the page's next frame does
+  const hit = physics.world.castRay(new physics.R.Ray({ x, y: 80, z }, { x: 0, y: -1, z: 0 }), 200, true);
+  return hit === null ? null : 80 - hit.timeOfImpact;
+};
+const terrainColliders = (physics: Physics): number => { let n = 0; physics.world.forEachCollider(c => { if (isTerrainCollider(c)) n++; }); return n; };
+
+test('AP18: a new ground swaps the page collider and the changed tiles (as a fresh tile would draw them), lifts the player and goes to the server', async () => {
+  const { ports, physics } = await page(), flat = lattice(() => 0), boot = new Scope('test.boot');
+  const heightsOnly = (whole: TerrainTileData): DevGround => ({ resolution: whole.resolution, x: whole.x, z: whole.z, size: whole.size, heights: whole.heights });
+  addBakedTerrainCollider(physics, encodeTerrainTile(heightsOnly(flat)), boot);
+  const material = new THREE.MeshStandardMaterial(), at = (lod: 0 | 1, tx: number, tz: number, whole: TerrainTileData, root: THREE.Object3D, scope: Scope): THREE.Mesh =>
+    installTerrainTile(tileOf(whole, lod, tx, tz), { root, scope, material, shadow: false, lattice: whole });
+  // the boot's tiles: the L0 under the player (4, 4: x 0 to 62.5), a far L0 (0, 0) and the L1 under the player (2, 2)
+  const near = at(0, 4, 4, flat, ports.scene, boot), far = at(0, 0, 0, flat, ports.scene, boot), coarse = at(1, 2, 2, flat, ports.scene, boot);
+  const placed: number[][] = [], served: DevGround[] = [];
+  const player = { position: new THREE.Vector3(10, 0, 10), yaw: 0.3, pitch: 0.2, spawn: (x: number, z: number, yaw: number, y?: number) => { placed.push([x, z, yaw, y ?? Number.NaN]); player.position.set(x, y ?? 0, z); player.pitch = 0; } };
+  const hook = createDevHook({ ...ports, player: () => player, serverGround: () => (ground) => { served.push(ground); } });
+  expect(groundUnder(physics, 10, 10)).toBeCloseTo(0, 3);
+
+  const raised = lattice(hill(10, 10, 5));
+  expect(hook.setGround(encodeTerrainTile(raised))).toBe(true);
+  // one ground collider, the new one: the player's feet are on the hill
+  expect(terrainColliders(physics)).toBe(1);
+  expect(groundUnder(physics, 10, 10)).toBeGreaterThan(4.5);
+  expect(placed).toHaveLength(1);
+  expect(placed[0]?.[3]).toBeGreaterThan(4.5);
+  expect(player.pitch).toBe(0.2);
+  expect(served.map(g => g.heights.length)).toEqual([257 ** 2]);
+  // each tile's vertices are a fresh tile's, cut from the new ground
+  const scratch = new Scope('test.fresh'), fresh = new THREE.Group();
+  for (const [mesh, lod, tx, tz] of [[near, 0, 4, 4], [coarse, 1, 2, 2], [far, 0, 0, 0]] as const) {
+    const truth = at(lod, tx, tz, raised, fresh, scratch);
+    for (const name of ['position', 'normal', 'color']) expect(Array.from(mesh.geometry.getAttribute(name).array)).toEqual(Array.from(truth.geometry.getAttribute(name).array));
+  }
+  scratch.dispose();
+
+  // a change in one corner cuts only the tiles that hold it: the far tile, not the near one
+  const versions = (): number[] => [near, far].map(mesh => (mesh.geometry.getAttribute('position') as THREE.BufferAttribute).version);
+  const before = versions();
+  expect(hook.setGround(encodeTerrainTile(lattice((x, z) => hill(10, 10, 5)(x, z) + hill(-240, -240, 3)(x, z))))).toBe(true);
+  const after = versions();
+  expect([after[0] === before[0], after[1] === before[1]]).toEqual([true, false]);
+  expect(placed).toHaveLength(1); // already on the hill: no second lift
+  expect(terrainColliders(physics)).toBe(1);
+  // a colour edit alone cuts the tiles again
+  expect(hook.setGround(encodeTerrainTile(lattice((x, z) => hill(10, 10, 5)(x, z) + hill(-240, -240, 3)(x, z), 0.6)))).toBe(true);
+  expect(versions().every((v, i) => v !== after[i])).toBe(true);
+  // a heights-only payload is no ground the tiles can be cut from
+  expect(hook.setGround(encodeTerrainTile(heightsOnly(raised)))).toBe(false);
+  ports.scope.dispose(); boot.dispose();
+  expect(terrainColliders(physics)).toBe(0);
+});
+
+test('AP18: the in-page server swaps its heightfield and height query and lifts its players; a box lifts feet inside it', async () => {
+  const { physics } = await page(), owner = new Scope('test.server'), held: { scope: Scope | null } = { scope: null };
+  const raised = lattice(hill(0, 0, 4)), ground: DevGround = { resolution: 257, x: -250, z: -250, size: 500, heights: raised.heights };
+  const message: unknown = { wildshardDevGround: ground };
+  expect(isDevGround(message)).toBe(true);
+  expect(isDevGround({ wildshardDevGround: { ...ground, heights: new Float32Array(4) } })).toBe(false);
+  let query: ((x: number, z: number) => number) | null = null;
+  const places: [string, number][] = [];
+  const players = new Map([['me', { position: { x: 0, y: 0, z: 0 }, yaw: 1 }], ['far', { position: { x: 100, y: 0, z: 100 }, yaw: 0 }]]);
+  swapDevGround(physics, owner, held, ground, { heightQuery: (h) => { query = h; }, players: () => players.entries(), place: (at, id) => { places.push([id, at.y]); } });
+  swapDevGround(physics, owner, held, ground, { heightQuery: (h) => { query = h; }, players: () => [], place: () => undefined });
+  expect(terrainColliders(physics)).toBe(1);
+  expect((query as ((x: number, z: number) => number) | null)?.(0, 0)).toBeCloseTo(4, 1);
+  expect(places.map(([id, y]) => [id, Math.round(y)])).toEqual([['me', 4]]);
+  // a box: feet inside it stand on its top; a quarter turn about y keeps the top
+  const crate: DevBox = { centre: [0, 1, 0], half: [2, 1, 2], rotation: [0, Math.SQRT1_2, 0, Math.SQRT1_2] };
+  expect(liftedFeet(0.5, 0.5, 0.5, null, [crate])).toBeCloseTo(2, 5);
+  expect(liftedFeet(5, 0.5, 0, null, [crate])).toBeNull();
+  owner.dispose();
+  expect(terrainColliders(physics)).toBe(0);
 });

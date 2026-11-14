@@ -48,6 +48,16 @@ function releaseCpuCopy(this: BufferAttribute): void {
   this.array = this.array.slice(0, 0);
   Object.defineProperty(this, 'needsUpdate', { configurable: true, get: () => false, set: (value: boolean) => { if (value) lateWrite(this); } });
 }
+/**
+ * SHARD-SOURCE AP18 (dev only: `wildshard watch`'s ground swap): upload a whole new copy of a GPU-only attribute into its
+ * buffer. The array is the same length as the first upload's, so the buffer is rewritten in place (no second buffer); its
+ * CPU copy goes again once uploaded.
+ */
+export function refillGpuOnly(attribute: BufferAttribute, array: Float32Array): void {
+  if (array.length !== attribute.count * attribute.itemSize) throw new Error(`gpu-only: a refill of ${array.length} values for ${attribute.count * attribute.itemSize}`);
+  Reflect.deleteProperty(attribute, 'needsUpdate');
+  attribute.array = array; attribute.needsUpdate = true;
+}
 function lateWrite(attribute: BufferAttribute): void {
   const where = releasedAs.get(attribute) ?? 'gpu-only';
   if (lateWriters.has(where)) return;

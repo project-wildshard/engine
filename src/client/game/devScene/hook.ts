@@ -9,7 +9,11 @@ import type { ShardWater } from '@wildshard/format/water';
 import { installClientWater } from '../shardfile/clientWater';
 import { shardfileLiveLook } from './liveLook';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import { isDevColliders, swapDevBoxes, type DevBox } from '@wildshard/engine/game/devColliders';
+import { devGroundHeight, isDevColliders, liftedFeet, swapDevBoxes, type DevBox, type DevGround } from '@wildshard/engine/game/devColliders';
+import { swapTerrainCollider } from '@wildshard/engine/physics/terrainTiles';
+import type { HeightfieldBinding } from '@wildshard/engine/world/Heightfield';
+import { decodeTerrainTile, type TerrainTileData } from '@wildshard/format/terrainTileBytes';
+import { refreshTerrainTile } from '@wildshard/engine/world/terrainTileView';
 
 /**
  * SHARD-SOURCE AP5 (J347: engine is the deployed client and server; dev tooling is sharddev's). The dev hook: the one thing
@@ -24,14 +28,23 @@ import { isDevColliders, swapDevBoxes, type DevBox } from '@wildshard/engine/gam
  *                              ambient), the sun's arc, exposure, tone, vignette and bloom (`shardfileLiveLook`); v1 sent
  *                              the keys only. True, or false when the page's look can't take it live and the page must reload
  *   swapColliders(name, boxes) the part's solid boxes, in the page's world and the in-page server's (the worker, by its
- *                              harness port), new set first, then the old one goes
+ *                              harness port), new set first, then the old one goes; a player inside a new box is lifted
+ *                              onto it (v3)
+ *   setGround(bytes)           v3 (AP18): the whole ground as one terrain tile's wire bytes (`encodeTerrainTile`: the 257²
+ *                              heights and colours the shard's tiles and collider are cut from). The page's heightfield
+ *                              collider, its terrain field (`heightAt`) and every drawn ground tile whose samples changed are
+ *                              swapped; the in-page server takes the same heights; a player under the new ground is lifted
+ *                              onto it. True, or false when the page's ground can't take it (the page must reload)
  *
  * `version` is `DEV_HOOK_VERSION`; sharddev refuses a page with another (its page script) and a client whose build flags
  * say another (`build-flags.json` `devHook`, written by `scripts/app-build-pipeline.mjs`). Bump it on any change to these
  * signatures or to `DevPart`. A production build has none of this: `finish.ts` imports it only behind `__DEVSERVER__`, and
  * `scripts/check-devserver.mjs` refuses a bundle that holds `DEV_HOOK_GLOBAL`.
  */
-export const DEV_HOOK_VERSION = 2;
+export const DEV_HOOK_VERSION = 3;
+
+// the in-page server's half of `setGround`, which the standalone shell puts on the window (client/host/standalone/shell.ts)
+declare global { interface Window { __workerClientDevGround?: (ground: DevGround) => void } }
 export const DEV_HOOK_GLOBAL = '__wildshardDevHook';
 
 export type Rgb = readonly [number, number, number];
@@ -107,7 +120,11 @@ export interface DevHook {
   removePart: (name: string) => void;
   setLook: (look: DevLook) => boolean;
   swapColliders: (name: string, boxes: readonly DevBox[]) => void;
+  setGround: (ground: Uint8Array) => boolean;
 }
+
+/** The page's player, as a dev swap lifts it out of new solids. */
+export interface DevPlayer { readonly position: { readonly x: number; readonly y: number; readonly z: number }; readonly yaw: number; pitch: number; spawn: (x: number, z: number, yaw: number, y?: number) => void }
 
 export interface DevHookPorts {
   readonly scope: Scope;
@@ -119,6 +136,12 @@ export interface DevHookPorts {
   readonly look: () => LookStrategy | null;
   /** the in-page server's half of `swapColliders` (the worker page's harness port); null when the page has none */
   readonly server: () => ((name: string, boxes: readonly DevBox[]) => void) | null;
+  /** the in-page server's half of `setGround` (v3); null when the page has none */
+  readonly serverGround?: () => ((ground: DevGround) => void) | null;
+  /** the page's player now, for the lift out of new solids (v3); null on a page without one */
+  readonly player?: () => DevPlayer | null;
+  /** the page's terrain field now (`captureHeightfield`), which a new ground installs into (v3); absent in a test */
+  readonly terrainField?: () => HeightfieldBinding;
   readonly watchFrames: (fn: (dt: number) => void) => () => void;
 }
 
@@ -229,6 +252,16 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
     if (look.look !== undefined) return current.liveLook !== undefined && current.liveLook(shardfileLiveLook(look.look));
     return current.liveKeys !== undefined && current.liveKeys(look.keys);
   };
+  /** A player now inside new solids stands on them (the server lifts its own: `swapDevGround`). */
+  const lift = (heightAt: ((x: number, z: number) => number) | null, boxes: readonly DevBox[]): void => {
+    const player = ports.player?.() ?? null;
+    if (player === null) return;
+    const { x, y, z } = player.position, feet = liftedFeet(x, y, z, heightAt, boxes);
+    if (feet === null) return;
+    const pitch = player.pitch;
+    player.spawn(x, z, player.yaw, feet); player.pitch = pitch;
+  };
+
   // The boxes go into the page's world as it is now. After a grid crossing that is a new world: every held part's boxes
   // are made again in it, and the old world's sets are disposed (Physics skips removal from a freed world).
   const swapColliders = (name: string, boxes: readonly DevBox[]): void => {
@@ -244,17 +277,78 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
     }
     if (physics !== null) swapDevBoxes(physics, scope, colliders, name, boxes);
     ports.server()?.(name, boxes);
+    lift(null, boxes);
   };
+  // AP18: each drawn ground tile keeps a signature of the lattice samples it was last cut from; a swap cuts again only the
+  // tiles whose samples changed, and a tile the page streams in later (cut from the boot's bytes) is cut on the next frame.
+  let ground: TerrainTileData | null = null, groundScope: Scope | null = null, sweep = 0;
+  const cut = new WeakMap<THREE.Mesh, number>();
+  const tiles = (): THREE.Mesh[] => {
+    const out: THREE.Mesh[] = [];
+    ports.scene.traverse(object => { if (object instanceof THREE.Mesh && object.name.startsWith('terrain:')) out.push(object as THREE.Mesh); });
+    return out;
+  };
+  /** Cut every tile whose samples differ from the ones it holds; false when one can't be cut from this lattice. */
+  const recut = (lattice: TerrainTileData): boolean => {
+    let ok = true;
+    for (const mesh of tiles()) {
+      const signature = tileSignature(mesh, lattice);
+      if (signature === null) { ok = false; continue; }
+      if (cut.get(mesh) === signature) continue;
+      if (refreshTerrainTile(mesh, lattice)) cut.set(mesh, signature); else ok = false;
+    }
+    return ok;
+  };
+  const setGround = (bytes: Uint8Array): boolean => {
+    let lattice: TerrainTileData;
+    try { lattice = decodeTerrainTile(bytes); } catch { return false; }
+    if (lattice.colours === undefined) return false;
+    const heights: DevGround = { resolution: lattice.resolution, x: lattice.x, z: lattice.z, size: lattice.size, heights: lattice.heights };
+    if (!recut(lattice)) return false;
+    const physics = ports.physics(), next = scope.child('devGround');
+    if (physics !== null) swapTerrainCollider(physics, heights, next);
+    groundScope?.dispose(); groundScope = next;
+    const heightAt = devGroundHeight(heights), field = ports.terrainField?.();
+    const normalAt = (x: number, z: number, eps = 0.25): [number, number, number] => {
+      const dx = heightAt(x - eps, z) - heightAt(x + eps, z), dz = heightAt(x, z - eps) - heightAt(x, z + eps), length = Math.hypot(dx, 2 * eps, dz);
+      return [dx / length, 2 * eps / length, dz / length];
+    };
+    field?.install({ heightAt, normalAt, splatAt: field.field.splatAt });
+    ports.serverGround?.()?.(heights);
+    ground = lattice;
+    lift(heightAt, []);
+    return true;
+  };
+  scope.onDispose(ports.watchFrames(() => { if (ground !== null && ++sweep % 15 === 0) recut(ground); }));
   scope.onDispose(() => { for (const held of colliders.values()) held.dispose(); colliders.clear(); });
-  return { version: DEV_HOOK_VERSION, root, addPart, replacePart, removePart, setLook, swapColliders,
+  return { version: DEV_HOOK_VERSION, root, addPart, replacePart, removePart, setLook, swapColliders, setGround,
     held: () => ({ geometries: geometries.size, textures: textures.size }) };
 }
 
 /** Put the hook on the window for sharddev's page script, for the page's level. */
 export function installDevHook(ports: DevHookPorts): DevHook {
-  const hook = createDevHook(ports), { version, addPart, replacePart, removePart, setLook, swapColliders } = hook;
-  ports.scope.expose(window, DEV_HOOK_GLOBAL, Object.freeze({ version, addPart, replacePart, removePart, setLook, swapColliders } satisfies DevHook));
+  const hook = createDevHook(ports), { version, addPart, replacePart, removePart, setLook, swapColliders, setGround } = hook;
+  ports.scope.expose(window, DEV_HOOK_GLOBAL, Object.freeze({ version, addPart, replacePart, removePart, setLook, swapColliders, setGround } satisfies DevHook));
   return hook;
+}
+
+/** A tile's lattice window (heights and colours), as one number: the samples a tile at its place and size is cut from. Null
+ *  when the tile's corners are off the lattice. */
+function tileSignature(mesh: THREE.Mesh, lattice: TerrainTileData): number | null {
+  const box = mesh.geometry.boundingBox, colours = lattice.colours;
+  if (box === null || colours === undefined) return null;
+  const n = lattice.resolution, step = lattice.size / (n - 1), size = box.max.x - box.min.x;
+  const x0 = Math.round((mesh.position.x - lattice.x) / step), z0 = Math.round((mesh.position.z - lattice.z) / step), span = Math.round(size / step);
+  // one sample more on each side: a tile's normals read its neighbours' heights
+  if (x0 < 0 || z0 < 0 || x0 + span >= n || z0 + span >= n) return null;
+  let hash = 2166136261;
+  const bits = new Uint32Array(1), float = new Float32Array(bits.buffer);
+  const mix = (value: number): void => { float[0] = value; hash = Math.imul(hash ^ (bits[0] ?? 0), 16777619); };
+  for (let z = Math.max(0, z0 - 1); z <= Math.min(n - 1, z0 + span + 1); z++) for (let x = Math.max(0, x0 - 1); x <= Math.min(n - 1, x0 + span + 1); x++) {
+    const at = z * n + x;
+    mix(lattice.heights[at] ?? 0); mix(colours[at * 3] ?? 0); mix(colours[at * 3 + 1] ?? 0); mix(colours[at * 3 + 2] ?? 0);
+  }
+  return hash >>> 0;
 }
 
 function makeMaterial(row: DevMaterial, shared: THREE.DataTexture | null, owned: { dispose: () => void }[]): THREE.Material {
