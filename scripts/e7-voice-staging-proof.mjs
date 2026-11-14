@@ -15,7 +15,7 @@ import {VOICE_FULL_M} from '../src/client/engine/net/voiceNear.ts';
 const [base,build,key,out=new URL('../tmp/e7-voice-staging/',import.meta.url).pathname]=process.argv.slice(2);
 assert.equal(new URL(base).origin,'https://staging.wildshard.io','J205 requires the isolated staging page');
 assert.match(build,/^[a-f0-9]{40}$/u);assert.match(key,/^[a-f0-9]+$/u);mkdirSync(out,{recursive:true});
-const releaseURL='https://wildshard-packs.wildshard.workers.dev/releases/staging.json',sockets=['wss://rooms-staging.wildshard.io','wss://wildshard.tailb41b20.ts.net:8443'];
+const releaseURL='https://packs.wildshard.io/releases/staging.json',sockets=['wss://rooms-staging.wildshard.io','wss://wildshard.tailb41b20.ts.net:8443'];
 const signed=await(await fetch(releaseURL,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(30000)})).json();
 assert.ok(verify(null,Buffer.from(signed.body),createPublicKey({key:Buffer.from(key,'hex'),format:'der',type:'spki'}),Buffer.from(signed.signature,'hex')));
 const release=JSON.parse(signed.body);assert.equal(release.channel,'staging');assert.equal(release.engineBuild,build);const socket=release.socket.replace(/\/$/u,'');assert.ok(sockets.includes(socket),socket);
