@@ -11,3 +11,7 @@
   and whether it was pre-warmed. `scripts/grid-crossing-stages.mjs` turns tours into STAGES.md's tables. First read, loopback
   Chromium: Driftwood to Nalati's world was built 0.65 s before the border yet the walker held 7.1 s at the wall, so the hold
   is the entry (hooks, warm-up), not the world build.
+- The tour's lost probe (gcm2's Chromium run stopped after Open Plot 4-3 to Template 2 on "Cannot read properties of undefined
+  (reading 'samples')"): `window.__gc3` went with the document, so the page navigated or reloaded under that crossing. The tour now
+  records it (`lostPage`: the arc, the URL and the game's own `life.*` end records, which name a reason for every navigation the
+  game makes), marks the crossing failed and enters again, instead of ending the run.
