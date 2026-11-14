@@ -87,11 +87,21 @@ describe('offline proof rules (OF1)', () => {
     expect(end({ placed: true })).toEqual(['outside-world']);
     expect(end({ placed: false, channel: 'preview' })).toEqual(['outside-world']);
   });
+  it('GC26: a preview deck entry of a placed shard ends inside its own grid cell', () => {
+    const at = (inside?: string | null) => judge({ ...base, channel: 'preview', placed: true, rows: greenLog, outcome: 'play',
+      samples: [screen({ t: 0 }), screen({ t: 900, phase: 'page', card: false, player: true, text: '', ...inside === undefined ? {} : { inside } })] }).map(failure => failure.rule);
+    expect(at('nalati-grasslands')).toEqual([]);
+    expect(at('driftwood-isle')).toEqual(['not-in-cell']);
+    expect(at(null)).toEqual(['not-in-cell']);
+    expect(at()).toEqual(['not-in-cell']);
+  });
   it('fails the load error screen, the proof\'s own error, a resume never offered, a leak, and (OF5, OF9) any end outside the world', () => {
     const rules = (extra: Partial<Parameters<typeof judge>[0]>) => judge({ ...base, rows: greenLog, samples: inPlay, outcome: 'play', ...extra }).map(failure => failure.rule);
     expect(rules({ outcome: 'error' })).toEqual(['load-error-screen']);
     expect(rules({ outcome: 'error', proofError: 'TimeoutError: .ws-main-select' })).toEqual(['proof-error']);
     expect(rules({ outcome: 'no-resume', channel: 'preview' })).toEqual(['no-resume']);
+    // GC26: preview's grid page reopens on the title as staging's does, for a shard its grid places
+    expect(rules({ outcome: 'no-resume', channel: 'preview', placed: true })).toEqual([]);
     // OF9: a world build's reopened page lands on the title by design (QA 11-12 row 35); the deck is the way back in
     expect(rules({ outcome: 'no-resume', channel: 'staging', entry: 'resume', requireWorld: true })).toEqual([]);
     expect(rules({ leaks: 3 })).toEqual(['offline-leak']);

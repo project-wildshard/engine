@@ -34,7 +34,7 @@ export const CRITICAL_PHASES = Object.freeze(['start', 'download', 'load', 'none
  *   servedBy: 'service-worker' | 'network' | 'failed' | 'pending', status: number, fail: string }} RequestRow */
 /** One poll of the screen.
  * @typedef {{ t: number, phase: string, step: string, card: boolean, title: boolean, player: boolean, failCard: string,
- *   text: string }} ScreenSample */
+ *   text: string, inside?: string | null }} ScreenSample */
 /** One reason a run is red.
  * @typedef {{ shard: string, rule: string, url?: string, detail?: string }} Failure */
 /** @typedef {'play' | 'seat-wait' | 'title' | 'stalled' | 'error' | 'no-resume' | 'outside-world'} Outcome */
@@ -116,10 +116,17 @@ export function judge(run) {
   }
   // OF9: on a world build, reopening the page lands on the title by design (QA 11-12 row 35, Jake: "I expected reload to go back to
   // main menu"; GO1: only a tap enters a world that seats a body), so its resume is the title, and the deck is the way back in.
-  const titleByDesign = channel === 'staging' && run.outcome === 'no-resume';
+  // GC26: preview's grid page is a world page too (its deck enters the grid), so a placed shard's resume is the title there as well.
+  const titleByDesign = (channel === 'staging' || run.placed === true) && run.outcome === 'no-resume';
   if (run.outcome === 'no-resume' && !titleByDesign) out.push({ shard, rule: 'no-resume', detail: 'reopening the page showed the title, not the shard' });
   if ((run.leaks ?? 0) > 0) out.push({ shard, rule: 'offline-leak', detail: `${String(run.leaks)} reads reached the server while offline (the URLs are in the run's screens log)` });
   if (run.requireWorld === true && run.outcome !== 'play' && !titleByDesign && !(run.outcome === 'outside-world' && run.placed === false)) out.push({ shard, rule: 'not-in-world', detail: run.outcome });
+  // GC26 (J311): preview's deck enters a placed shard in its grid cell, so the player ends inside that cell (the grid's `inside`), not
+  // on a one-shard page (no grid: `inside` absent) or another cell.
+  if (channel === 'preview' && run.placed === true && run.entry === 'deck' && run.outcome === 'play') {
+    let last; for (const sample of samples) if (sample.player) last = sample;
+    if (last !== undefined && last.inside !== shard) out.push({ shard, rule: 'not-in-cell', detail: last.inside === undefined ? 'a one-shard page, not the grid' : `inside ${last.inside ?? 'the road'}` });
+  }
   // OF3: a world build never enters a shard its grid doesn't place (a draft such as Thin Ice): the title's "Not in this world yet"
   // is the right end there, and wrong for a placed shard or a build with no world (preview opens every shard).
   if (run.outcome === 'outside-world' && !(channel === 'staging' && run.placed === false))

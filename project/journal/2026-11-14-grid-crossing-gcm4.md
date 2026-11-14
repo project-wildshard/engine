@@ -13,3 +13,5 @@
   `--hold` stands in each cell reached and records when the cell behind let its world go (`fromEvictedMs`) and the page's peak
   playing cost, for GC13's straight walk.
 - Tour types: the probe's `target`, the prepare window's tuple and the page handle now typecheck (the commit lane read them).
+- GC26: the offline proof reads the grid cell the player stands in; a preview deck entry of a placed shard is red unless it ends
+  inside that cell (`not-in-cell`), and preview's grid page, like staging's, reopens on the title by design (QA 11-12 row 35).
