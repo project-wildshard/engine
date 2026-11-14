@@ -21,6 +21,10 @@ if (dist === '' || work === '' || keyFile === '') throw new Error('usage: grid-c
 const engineName = process.argv.find(arg => arg.startsWith('--engine='))?.slice(9) ?? 'chromium', out = absolute(process.argv.find(arg => arg.startsWith('--out='))?.slice(6) ?? join(work, 'shots'));
 if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error(`No engine ${engineName}`);
 const phone = process.argv.includes('--layout=phone'), solo = process.argv.includes('--solo');
+// GRID-CROSSING GC2: --breach, when the last leg is held at a closed wall (a cell on another worker, GC30's Far Reach wall, a
+// neighbour still loading), throws the breach cases at it by real input from where it stands: jump into it, jump along it both
+// ways, and boost-jump into it. A case holds when the page never enters the target and the walker stays on the road, standing.
+const breach = process.argv.includes('--breach');
 /** The page's memory now: JS heap (Chromium), the grid's resident and playing MB, the owner ledger's totals, the memory warning. */
 const MEMORY_READ = `(() => { const api = window.__wildshard; let ledger = null; try { const mem = ${pageMemoryAttributionExpression}; ledger = mem?.totals ? { gpuMB: Math.round(mem.totals.gpu / 1048576), ramMB: Math.round(mem.totals.ram / 1048576) } : null; } catch {}
   let grid = null; try { const st = api.shard.grid.state(); grid = { inside: st.inside, residentMB: st.residentMB, playingMB: st.playingMB }; } catch {}
@@ -206,6 +210,36 @@ try {
     legs.push(row);
     note(`${leg.name}: arrives in ${leg.target} with control`, controlAt !== 0, { enteredAt, controlAt, end: { inside: end.inside, z: end.z, ready: end.ready } });
     note(`${leg.name}: no stop or wall on the way`, worstStuck <= STUCK_MS && jumps === 0, { worstStuck, jumps });
+  }
+  if (breach) {
+    const held = /** @type {any} */ (legs.at(-1));
+    if (held === undefined || held.controlAtMs !== 0) note('breach: the last leg is held at a wall', false, { skipped: 'the target took the walker: no closed wall to test' });
+    else {
+      /** @type {Record<string, unknown>[]} */ const cases = []; result.breach = cases;
+      const keys = /** @type {Record<string, string[]>} */ ({ 'jump into it': ['KeyW'], 'jump along it, right': ['KeyW', 'KeyD'], 'jump along it, left': ['KeyW', 'KeyA'], 'boost-jump into it': ['KeyW', 'ShiftLeft'] });
+      await face(north);
+      for (const [name, held_] of Object.entries(keys)) {
+        const start = await sample();
+        let entered = false, lowest = Infinity, furthest = -Infinity;
+        for (const key of held_) await page.keyboard.down(key);
+        for (let jump = 0; jump < 8; jump++) {
+          await page.keyboard.press('Space');
+          for (let tick = 0; tick < 3; tick++) {
+            await sleep(250);
+            const at = await sample();
+            if (at === undefined || at.err !== undefined) continue;
+            entered ||= at.inside === NEXT; lowest = Math.min(lowest, at.y); furthest = Math.max(furthest, at[to.axis] * to.sign);
+          }
+        }
+        for (const key of held_) await page.keyboard.up(key);
+        await sleep(800);
+        const end = await sample();
+        await page.screenshot({ path: join(out, `${engineName}-breach-${name.replaceAll(/[^a-z]+/gu, '-')}.png`) });
+        const row = { name, entered, past: Number((furthest - start[to.axis] * to.sign).toFixed(2)), lowest: Number(lowest.toFixed(2)), end: { inside: end.inside, x: end.x, y: end.y, z: end.z, phase: end.phase } };
+        cases.push(row);
+        note(`breach: ${name} holds`, !entered && end.inside === null && lowest > -2, row);
+      }
+    }
   }
   const sentinel = await page.evaluate(() => /** @type {any} */ (window).__gc15c?.sentinel === 1).catch(() => false);
   note('no page reload through every crossing', sentinel && navigations === navigationsBefore, { sentinel, navigations: navigations - navigationsBefore });
