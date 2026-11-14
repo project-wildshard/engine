@@ -3,7 +3,8 @@
 // on preview or a loopback page) and the online walks (`grid-crossing-qa.mjs`'s `rows.json` on staging: the pairs a walker can reach by
 // input), writes report.html (pairs × the goal's measures, worst first, and thumbnails of the failed or walled crossings in shots/) and checks every
 // crossing against the ratchet `test/grid-crossing-ratchet.json`: a pair worse than its ratchet makes the run exit 1.
-//   node scripts/grid-crossing-report.mjs <out dir> --runs=<tour dir or rows.json>,… [--tighten]
+//   node scripts/grid-crossing-report.mjs <out dir> --runs=<tour dir or rows.json>,… [--tighten] [--ratchet=<file>]
+//   --ratchet reads another ratchet file (GC17's seeded break proves a worse pair turns the run red)
 //   --tighten writes the ratchet after the run (new pairs join, numbers only go down); without it the ratchet is read only.
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve as absolute } from 'node:path';
@@ -15,7 +16,7 @@ const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${na
 const out = absolute(process.argv.slice(2).find(arg => !arg.startsWith('--')) ?? '');
 const sources = flag('runs', '').split(',').filter(Boolean).map(path => absolute(path));
 if (out === absolute('') || sources.length === 0) throw new Error('usage: grid-crossing-report.mjs <out dir> --runs=<tour dir or rows.json>,… [--tighten]');
-const RATCHET = join(import.meta.dirname, '../test/grid-crossing-ratchet.json');
+const RATCHET = absolute(flag('ratchet', join(import.meta.dirname, '../test/grid-crossing-ratchet.json')));
 
 /** @typedef {{ site: string, run: string, from: string, to: string, boost: boolean, repeat: boolean, ok: boolean, why: string, borderToControlMs: number | null, freezeMs: number | null, wallMs: number | null, over50: number | null, over33: number | null, build: string, shot: string | null }} Row */
 /** @type {Row[]} */
