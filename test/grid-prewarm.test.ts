@@ -8,6 +8,8 @@ import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { LiveGridHost } from '../src/client/game/grid/live';
 import { PageResidency } from '../src/client/game/grid/pageResidency';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import type { TraversalReadiness } from '@wildshard/engine/sim/readiness';
+import type { ReadinessWalls } from '@wildshard/engine/physics/readinessWalls';
 
 // GC5 (QA-FEEDBACK 11-13 row 39): a boost crosses the 50 m road in under 3 s, and the world built on the road took 4 to 7.6 s,
 // so every boost held at the neighbour's loading wall. The page now builds the neighbour's world from inside the source, at
@@ -17,7 +19,7 @@ const level: SimLevel = { version: 3, id: 'platform', seed: 1, ground: { size: 5
   weapon: { id: 'none', shape: { kind: 'point', radius: 0 }, windup: 0, active: 0, recover: 0, cooldown: 0, range: 0, damage: 0, tags: [] } };
 const settle = (): Promise<void> => new Promise(resolve => { setTimeout(resolve, 5); });
 
-async function rig(options: { isolated?: boolean; bytes?: number; optional?: (cell: string) => Promise<void> } = {}) {
+async function rig(options: { isolated?: boolean; bytes?: number; optional?: (cell: string) => Promise<void>; walls?: (readiness: TraversalReadiness) => void; lastCell?: boolean } = {}) {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const assembly = new GridAssembly({ developer: false, devserver: false });
   const home = assembly.cell('driftwood-isle');
@@ -30,7 +32,10 @@ async function rig(options: { isolated?: boolean; bytes?: number; optional?: (ce
   const live = new LiveGridHost(assembly, {
     home: { mode: 'owned', instance: home.instance, bytes: 1000, residency: residency.admitHome(home.instance, 1000) },
     player, allocator: residency.allocator, bindFrame: () => undefined, gameplayReady: () => true, buildAhead: true,
-    highway: { bytes: 1000, create: () => ({ physics: page.physics, dispose: () => undefined }) },
+    // the page's own policy (liveSession.ts): the cell just left stays 30 s on the road
+    ...(options.lastCell === true ? { lastCell: { windowMs: 30_000, playingBytes: 2_000_000_000, schedule: (expire: () => void, ms: number) => { const timer = setTimeout(expire, ms); return () => { clearTimeout(timer); }; } } } : {}),
+    highway: { bytes: 1000, create: () => ({ physics: page.physics, dispose: () => undefined,
+      ...(options.walls === undefined ? {} : { walls: { sync: options.walls } as unknown as ReadinessWalls }) }) },
     prefetchable: () => true,
     readiness: { link: { speed: 30, linkBitsPerSecond: 5_000_000, requestLatencySeconds: 0.25, maxStallSeconds: 3 },
       bundle: () => ({ criticalWireBytes: 1000, hybridWireBytes: 1000, decodeSeconds: 0, runtimeParseSeconds: 0 }) },
@@ -171,5 +176,30 @@ test('GC9: a radial read the budget holds pending is raised to demand once, so t
     expect(r.live.state().issues).toEqual({});
     // one raise, not one per tick
     expect(r.admits.filter(row => row === `${r.east.instance}:required`)).toHaveLength(1);
+  } finally { r.dispose(); }
+});
+
+test('ROAD-PRELOAD RP4b: the road never closes a readiness wall on the home cell\'s own edge while the home is resident', async () => {
+  // J320 / Jake ~10:20: "never a wall between the player's own cell and the road". The road's walls close at a cell's edge
+  // while that cell is not ready; the home kept as the last cell (liveSession's 30 s policy) stays ready on the road beside
+  // it, a boost along its edge and back. (Heading into another cell's mouth retires it for that cell's world: a home left
+  // that way is a loading cell on return, the wall GC36 allows.)
+  let syncs = 0, closed = 0, home = '';
+  const r = await rig({ lastCell: true, walls: readiness => { syncs++; if (!readiness.isReady(home)) closed++; } });
+  home = r.home.instance;
+  try {
+    // committed onto the road's strip beside the cell's east edge (a committed placement is no heading)
+    r.player.position.x = CHUNK_HALF + 8; (await r.live.prepare(r.home.instance, null)).commit();
+    expect(r.live.current()).toBeNull();
+    expect(r.live.retainDeparted(r.home.instance)).toBe(true); // as liveSession does on every leave
+    // a boost north along the edge and back, a walk south, back to the edge
+    for (let tick = 0; tick < 5; tick++) { r.live.beforeFixed(); await settle(); }
+    while (r.player.position.z < CHUNK_HALF - 40) await r.step(18, 1, 'z');
+    while (r.player.position.z > -100) await r.step(18, -1, 'z');
+    while (r.player.position.z < 0) await r.step(4.3, 1, 'z');
+    while (r.player.position.x > CHUNK_HALF + 1) await r.step(4.3, -1);
+    expect(r.live.state().residents).toContain(r.home.instance);
+    expect(syncs).toBeGreaterThan(100);
+    expect(closed, 'a readiness wall closed on the home cell\'s own edge').toBe(0);
   } finally { r.dispose(); }
 });
