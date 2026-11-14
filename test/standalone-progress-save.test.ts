@@ -62,7 +62,8 @@ test('an opened door (a public field) is in the page\'s storage within a second,
   const first = await open('_template', storage, input), door = (shell: StandaloneShell): number | undefined => shell.client.latest === null ? undefined : shell.client.stateField(shell.client.latest, 'template.door.open');
   expect(door(first)).toBe(0);
   // A data shard's world has no headless resident to stand a save in: the harness stands the player at the hut door
-  first.place(0, 0, -7.5, Math.PI);
+  // (rev 5's door prompt is at (-4, -11.5), on the hut's south wall)
+  first.place(-4, 0, -9.5, Math.PI);
   // Settle the boot's own writes, then take what the page holds as the line
   await sleep(1000);
   const before = storage.continued;

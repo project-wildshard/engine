@@ -67,6 +67,9 @@ test('in a room the whip heavy poisons a creature: the row\'s damage on the row\
 
     // The attacker stands a step and a half short of the blob, holds the whip (slot 0) and presses heavy at its body.
     player.position.set(blob.position.x, blob.position.y, blob.position.z + 1.5); player.motor.resetAt(player.position);
+    // Template rev 5 keeps the blob inside Greyback's arena: the step in starts the elite's zero-length intro, which refuses a
+    // player's blow on its tick. One tick to stand there first.
+    pump(); player.position.set(blob.position.x, blob.position.y, blob.position.z + 1.5); player.motor.resetAt(player.position);
     const at = { x: 0, y: blob.dims.bodyY * blob.scale - 1.68, z: -1.5 }, length = Math.hypot(at.x, at.y, at.z);
     strike = { player: id, command: { seq: 9_000, viewTick: 0, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw: 0, pitch: 0, buttons: NET_BUTTONS.heavy,
       attack: { aim: { origin: { x: 0, y: 0, z: 0 }, direction: { x: at.x / length, y: at.y / length, z: at.z / length } } } } };

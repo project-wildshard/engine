@@ -47,7 +47,10 @@ test('a whip press strikes with the declared runtime, and the lantern burns and 
     const at = { x: 0, y: blob.dims.bodyY * blob.scale - 1.68, z: -1.5 }, length = Math.hypot(at.x, at.y, at.z);
     return { aim: { origin: { x: 500, y: 0, z: 500 }, direction: { x: at.x / length, y: at.y / length, z: at.z / length } } };
   };
+  // Template rev 5 keeps the blob inside Greyback's arena: the step in starts the elite's zero-length intro, which refuses a
+  // player's blow on its tick. One tick to stand there first.
   const hp = blob.hp;
+  close(); tick(sim, kit);
   tick(sim, kit, command({ attack: close() }));
   expect(blob.hp).toBe(hp - 18); // the whip's light blow, not the host's zero-damage probe
 
