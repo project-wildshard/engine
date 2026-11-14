@@ -48,6 +48,8 @@ for (const source of sources) {
 const scored = new Map();
 for (const row of rows) { const key = pairKey(row.site, row.run, row.from, row.to), had = scored.get(key); if (had === undefined || (had.repeat && !row.repeat)) scored.set(key, row); }
 const now = Object.fromEntries([...scored].map(([key, row]) => [key, { ok: row.ok, borderToControlMs: row.borderToControlMs, freezeMs: row.freezeMs, wallMs: row.wallMs, over50: row.over50 }]));
+// a named --ratchet that is missing would read as {} and pass everything (GC17's seeded break must not go green by a typo)
+if (!existsSync(RATCHET) && process.argv.some(arg => arg.startsWith('--ratchet='))) throw new Error(`No ratchet file at ${RATCHET}`);
 const ratchet = existsSync(RATCHET) ? JSON.parse(readFileSync(RATCHET, 'utf8')) : {};
 const worsened = worse(ratchet, now);
 if (process.argv.includes('--tighten')) writeFileSync(RATCHET, `${JSON.stringify(tighten(ratchet, now), null, 2)}\n`);

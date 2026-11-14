@@ -148,11 +148,11 @@ try {
       return { at_, ok: at_.inside === arc.from && Math.hypot(at_.x - px, at_.z - pz) <= 4 };
     };
     const { at_: placed, ok: placedOk } = await place(EDGE_IN);
+    row.placed = { x: placed.x, y: placed.y, z: placed.z, inside: placed.inside };
+    if (!placedOk) { row.why = `not placed on ${arc.from}'s entryway (inside ${String(placed.inside)})`; return row; }
     // --profile (GC6): a CPU profile of the first crossing (Chromium), for what its preparation spends
     const profiler = profileFirst && crossings.length === 1 && engineName === 'chromium' ? await page.context().newCDPSession(page) : null;
     if (profiler !== null) { await profiler.send('Profiler.enable'); await profiler.send('Profiler.setSamplingInterval', { interval: 500 }); await profiler.send('Profiler.start'); row.profileStartPageMs = await page.evaluate(() => performance.now()); }
-    row.placed = { x: placed.x, y: placed.y, z: placed.z, inside: placed.inside };
-    if (!placedOk) { row.why = `not placed on ${arc.from}'s entryway (inside ${String(placed.inside)})`; return row; }
     await face(yaw);
     const t1 = Date.now(), tFrom = (await sample()).t;
     await page.keyboard.down('KeyW'); if (arc.boost) await page.keyboard.down('ShiftLeft');

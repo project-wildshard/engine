@@ -14,11 +14,11 @@
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const root = flag('root', join(homedir(), '.cache/wildshard/plan-artifacts/grid/nightly')), force = flag('force', ''), dry = process.argv.includes('--dry-run'), ratchet = flag('ratchet', '');
+const root = flag('root', join(homedir(), '.cache/wildshard/plan-artifacts/grid/nightly')), force = flag('force', ''), dry = process.argv.includes('--dry-run'), ratchet = flag('ratchet', '') === '' ? '' : resolve(flag('ratchet', ''));
 const RECEIPTS = join(homedir(), '.cache/wildshard/lane-receipts.log'), STATE = join(root, 'state.json'), here = join(import.meta.dirname, '..');
 mkdirSync(root, { recursive: true });
 /** @type {{ serial: number | null, night: string | null }} */
