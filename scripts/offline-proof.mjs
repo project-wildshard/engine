@@ -216,6 +216,8 @@ const readScreen = () => {
   const title = main instanceof HTMLElement && main.offsetParent !== null;
   const fail = [...document.querySelectorAll('[class^="ws-fail"],[class*=" ws-fail"]')].find(node => node instanceof HTMLElement && node.offsetParent !== null);
   const world = /** @type {{ __wildshard?: { world?: { player?: unknown } } }} */ (/** @type {unknown} */ (window)).__wildshard?.world;
+  /** @type {string | null | undefined} */ let grid;
+  try { grid = /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().inside; } catch { grid = undefined; }
   return {
     card, title: title && !card, player: world?.player !== undefined && world.player !== null && !card,
     phase: card ? (on instanceof HTMLElement ? on.dataset.phase ?? 'none' : 'none') : title ? 'title' : 'page',
@@ -227,6 +229,8 @@ const readScreen = () => {
     failCard: fail instanceof HTMLElement ? fail.innerText.replaceAll(/\s+/gu, ' ').slice(0, 300) : '',
     // oxlint-disable-next-line unicorn/prefer-dom-node-text-content -- the text a player sees, not hidden templates
     text: (document.body?.innerText ?? '').replaceAll(/\s+/gu, ' ').slice(0, 3000), url: location.href, world: Reflect.get(globalThis, '__WS_WORLD__') !== undefined,
+    // GC26: the grid cell the player stands in (absent on a one-shard page, null on the road)
+    ...grid === undefined ? {} : { inside: grid },
   };
 };
 
