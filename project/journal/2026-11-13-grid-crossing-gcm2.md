@@ -33,3 +33,8 @@
   turns runs into one page with thumbnails and holds them to `test/grid-crossing-ratchet.json`
   (`scripts/grid-crossing-ratchet.mjs`: a pair may not get worse past its slack; `--tighten` lowers the bar). First
   preview read: Chromium desktop, run beside WebKit, held 73 s on the road into Nalati and never reached control.
+- GC3 first report (preview, WebKit phone, 56 crossings, 52 reached control): border-to-control median 103 ms, but 13
+  crossings were held at the neighbour's loading wall for 0.1 to 7.6 s, most of them boosts (the page's warm-up starts too
+  late at 18 m/s: GC5). Every walk out of Far Reach falls, since its entryway has no ground. The ratchet is seeded from it.
+  The tour now writes its JSON after every crossing (this run hit its 90 min limit before writing and was read back from the
+  log), and the report reads one 100 ms sample as the floor of a stop, not a stop.

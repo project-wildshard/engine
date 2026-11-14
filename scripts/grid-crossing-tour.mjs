@@ -51,6 +51,7 @@ const HOME = 'driftwood-isle', HOME_CARD = 'Driftwood Isle', EDGE_IN = 238, LEG_
 /** @type {Record<string, unknown>[]} */
 const crossings = [];
 const result = { lane: 'opus-gcm2', base, build, engine: engineName, layout: phone ? 'phone 402x874 touch' : 'desktop 1440x900', at: new Date().toISOString(), arcs: wanted.length, crossings, errors: /** @type {string[]} */ ([]), reloads: 0, reentries: 0, note: '', untried: /** @type {string[]} */ ([]) };
+const save = () => writeFileSync(join(out, `${engineName}-${phone ? 'phone' : 'desktop'}-tour.json`), `${JSON.stringify(result, null, 2)}\n`);
 const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] : [] });
 let code = 1;
 try {
@@ -195,6 +196,7 @@ try {
     }
     left.delete(arc);
     const row = await cross(arc, repeat);
+    save(); // after every crossing, so a run cut off by its timeout keeps what it measured
     if (row.ok) { if (!repeat) good.push(arc); here = arc.to; } else { here = (await sample()).inside ?? here; if (repeat) good.splice(good.indexOf(arc), 1); }
   }
   result.reloads = navigations - navigationsBefore;
@@ -203,7 +205,7 @@ try {
   await /** @type {import('playwright').BrowserContext | null} */ (/** @type {unknown} */ (context))?.close();
 } catch (error) { result.note = `the run: ${String(error).slice(0, 400)}`; }
 finally {
-  writeFileSync(join(out, `${engineName}-${phone ? 'phone' : 'desktop'}-tour.json`), `${JSON.stringify(result, null, 2)}\n`);
+  save();
   await browser.close();
 }
 console.log(`grid-crossing tour: ${String(crossings.filter(row => row.ok).length)} of ${String(crossings.length)} crossings reached control; ${out}`);
