@@ -17,6 +17,12 @@ test("Jake's window keeps the tier's 1.5; a big window is held to the pixel budg
   expect(2560 * 1440 * big * big).toBeLessThanOrEqual(DESKTOP_PIXEL_BUDGET);
   // never past the screen's own density
   expect(budgetCeiling(800, 600, 1, 1.5)).toBe(1);
+  // a screen density off the eighths (browser zoom, 110 % scaling) snaps down to one, so the ceiling is a step itself
+  for (const device of [0.9, 1.1, 1.2]) {
+    const ceiling = budgetCeiling(1280, 720, device, 1.5);
+    expect(ceiling).toBeLessThanOrEqual(device);
+    expect(new RenderBudget(ceiling).ceiling).toBe(ceiling);
+  }
 });
 
 test('the floor is one buffer pixel per CSS pixel, or 3/4 of a ceiling already under it', () => {

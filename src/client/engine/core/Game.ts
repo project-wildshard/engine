@@ -552,6 +552,7 @@ export class Game {
     // change tells the page (Settings, the first-play card) and lands in the next drawn frame
     this.engineScope.listen(document, 'visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
+      this.budget?.reset(); // NB5: the frames from before the page went away are not this page's pace
       const stamps: number[] = [];
       const tick = (now: number): void => {
         if (this.engineScope.disposed || document.visibilityState !== 'visible') return;
@@ -1692,7 +1693,9 @@ export class Game {
    *  (MG8's Pixel density; Jake 2026-10-20, no dynamic resolution on the phone), a Developer's pixel pick or a player's saved
    *  render scale (Settings ▸ Graphics, gfxPrefs.dpr) */
   private budget: RenderBudget | null = null;
-  private budgetOn(): boolean { return !this.phoneGraphics && activeDevPixels() === null && gfxPrefs.dpr === 'auto'; }
+  private budgetOn(): boolean { return !this.phoneGraphics && activeDevPixels() === null && gfxPrefs.dpr === 'auto' && this.slowPacing === null; }
+  /** NB5: the next drawn frame follows vsyncs skipped on purpose (a build hold): its interval is not the frame's cost */
+  private budgetSkip = false;
   /** The drawing buffer's pixel ratio the page wants now: the budget's on the desktop's own scale, else drawingPixelRatio. */
   private wantedRatio(): number {
     const base = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, this.phoneGraphics);
@@ -1747,8 +1750,9 @@ export class Game {
       if (pacedSkip(pacing, lastRun, this.pacedStart, forceFrame, buildHeld())) return;
       // G782: held at a cell's wall with build slices running, skip vsyncs up to the 30 fps held floor (framePacing.ts);
       // like a capped vsync, a skipped one does nothing, so the drawn frame's dt is the whole interval
-      if (!forceFrame && heldDrawDeferred()) return;
+      if (!forceFrame && heldDrawDeferred()) { this.budgetSkip = true; return; }
       const cap = frameCapFps();
+      if (cap > 0) this.budget?.restore(); // NB5: a cap sets its own pace; the tier's own scale under it
       if (cap > 0 && !forceFrame) {
         const anchor = frameCapAnchor(lastDrawn, now ?? lastRun, cap);
         if (anchor === null) return;
@@ -1788,7 +1792,7 @@ export class Game {
         // QA row 25: a Developer pixel pick (core/devPixels.ts) holds against the software pacing's scale while it is set
         const paced = this.stepOnly ? null : this.slowPacing?.takeRatio() ?? null, picked = this.stepOnly ? null : this.pickedRatio;
         if (picked !== null) this.pickedRatio = null;
-        const budgeted = this.stepOnly ? null : this.budget?.takeRatio() ?? null;
+        const budgeted = this.stepOnly || picked !== null || paced !== null ? null : this.budget?.takeRatio() ?? null;
         const ratio = picked ?? (paced !== null && activeDevPixels() === null ? paced : null) ?? (this.budgetOn() ? budgeted : null);
         if (ratio !== null) { this.renderer.setPixelRatio(ratio); this.fitSize(); }
         sky.update(realDt);
@@ -1825,7 +1829,8 @@ export class Game {
       this.app.cpu.end();
       if (pacing !== null) this.measurePacedFrame(lastRun);
       // NB5: dynamic resolution reads the drawn frame's interval (uncapped play only: a cap or a capture sets its own pace)
-      else if (this.budget !== null && !capture && cap === 0 && !forceFrame && !this.app.clock.paused) this.budget.measured(liveDt * 1000);
+      else if (this.budget !== null && !capture && cap === 0 && !forceFrame && !this.app.clock.paused && !this.budgetSkip) this.budget.measured(liveDt * 1000);
+      this.budgetSkip = false;
       this.workMs[this.frameI] = work;
       this.frameRafTime = now ?? null;
       this.frameCount++;

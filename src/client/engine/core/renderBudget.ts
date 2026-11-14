@@ -40,7 +40,8 @@ const SNAP = 8;
 export function budgetCeiling(cssWidth: number, cssHeight: number, device: number, tierCap: number, budget: number = DESKTOP_PIXEL_BUDGET): number {
   const cap = Math.min(device, tierCap), css = Math.max(1, cssWidth * cssHeight);
   const fits = Math.sqrt(budget / css);
-  return Math.max(1 / SNAP, Math.min(cap, Math.floor(fits * SNAP) / SNAP));
+  // snapped as a whole, so the ceiling is always one of budgetSteps' own eighths (a 1.1 screen draws at 1, never 1.125)
+  return Math.max(1 / SNAP, Math.floor(Math.min(cap, fits) * SNAP) / SNAP);
 }
 
 /** The lowest ratio dynamic resolution takes: one buffer pixel per CSS pixel, or 3/4 of a ceiling already under that. */
