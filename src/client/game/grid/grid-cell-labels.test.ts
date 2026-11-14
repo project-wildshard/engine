@@ -28,3 +28,15 @@ test('an actual hook corrects an inferred row and warm-up names its own work', (
     hooks: new Set(['afterWorld', 'afterKit', 'afterPlay']) });
   expect(screen.stage).toBeNull();
 });
+
+test('GC8: the step the screen shows is readable while it is open, and null once it closes', () => {
+  const screen = new CellLoading({ show: () => undefined, hide: () => undefined }, () => true);
+  const input: CellLoadingInput = { instance: 'target', slug: 'pine-hollow', name: 'Pine Hollow', refusal: null,
+    product: true, claimedMB: 120, requested: true, runtime: true, colliders: false, sim: true,
+    hooks: new Set(), hook: null, hybrid: false, entered: false, gameplayReady: false };
+  expect(screen.now).toBeNull();
+  screen.step(input);
+  expect(screen.now).toEqual({ step: 'colliders', detail: 'colliders · simulation ready' });
+  screen.step({ ...input, colliders: true, entered: true, gameplayReady: true });
+  expect(screen.now).toBeNull();
+});

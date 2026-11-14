@@ -119,7 +119,7 @@ try {
     setInterval(() => { try {
       const st = W.__wildshard.shard.grid.state(), p = W.__wildshard.world.player, lv = st.live, wire = W.__workerClient?.();
       q.samples.push({ t: Math.round(performance.now() - t0), x: Number(p.position.x.toFixed(2)), y: Number(p.position.y.toFixed(2)), z: Number(p.position.z.toFixed(2)), inside: st.inside, phase: lv?.crossing?.phase, target: lv?.crossing?.target, issue: lv?.crossing?.issue, site: W.__workerClient?.().site,
-        ready: lv?.live?.gameplayReady, loading: st.cellLoading, stage: st.cellStage, closed: st.softWalls?.closed, feet: st.feet, frames: wire?.frames, own: wire?.own });
+        ready: lv?.live?.gameplayReady, loading: st.cellLoading, stage: st.cellStage, step: st.cellStep?.step ?? null, closed: st.softWalls?.closed, feet: st.feet, frames: wire?.frames, own: wire?.own });
     } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 100);
   });
   await sleep(500);
