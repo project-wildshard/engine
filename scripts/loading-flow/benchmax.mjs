@@ -4,7 +4,7 @@
 // level download on packs, a cold profile: it enters a shard through the title as Jake does (SHARD SELECT, the card,
 // ENTER WORLD), then plays (walk 10 s, hoverboard at boost) and prints what Copy diagnostics would name:
 //   · the load: control's time from the world page's navigation, the boot stages longest first, the named waits of 200 ms
-//     or more, and every stretch of 200 ms or more inside readyFrame that no boot entry covers (NB3's "unlogged");
+//     or more, and every stretch of 100 ms or more inside readyFrame that no boot entry covers (NB3's "unlogged");
 //   · the play: each 10 s and the whole window's fps, frame p50 / p95, gpu~ p50 / p95 (the game's own frame ring: a
 //     frame's wait beyond its work and the cap, src/shared/engine/core/frameCost.ts), draws and triangles.
 // Indicative, not a phone: calibrate against the plan's phone table before trusting a ranking (NB1's done-when).
@@ -95,8 +95,8 @@ try {
       const inside = done.filter(e => e !== ready && !e.op.startsWith('stage:') && e.start < ready.start + ready.ms && e.start + e.ms > ready.start)
         .map(e => [Math.max(e.start, ready.start), Math.min(e.start + e.ms, ready.start + ready.ms)]).sort((a, b) => a[0] - b[0]);
       let at = ready.start;
-      for (const [from, to] of inside) { if (from - at >= 200) gaps.push({ from: at - ready.start, ms: from - at }); at = Math.max(at, to); }
-      if (ready.start + ready.ms - at >= 200) gaps.push({ from: at - ready.start, ms: ready.start + ready.ms - at });
+      for (const [from, to] of inside) { if (from - at >= 100) gaps.push({ from: at - ready.start, ms: from - at }); at = Math.max(at, to); }
+      if (ready.start + ready.ms - at >= 100) gaps.push({ from: at - ready.start, ms: ready.start + ready.ms - at });
     }
     const control = entries.find(e => e.operation === 'app:control-ready')?.start ?? Number.NaN, first = Math.min(...stage.map(e => e.start));
     const timeline = entries.map(e => ({ op: e.operation, realm: e.realm, start: Math.round(e.start), ms: e.end === null ? null : Math.round(e.end - e.start), result: e.result }));
@@ -176,7 +176,7 @@ try {
   console.log('readyFrame parts >= 100 ms:'); for (const e of load.readyParts.slice(0, 12)) console.log(`  +${s(e.from)} ${e.op.slice(0, 60).padEnd(60)} ${s(e.ms)}`);
   const bank = (/** @type {{ hits: number, misses: number, retained: number } | null} */ m) => m === null ? 'n/a' : `hits ${m.hits} · misses ${m.misses} · retained ${m.retained}`;
   console.log(`script memory bank: at control ${bank(load.scriptMemory)} · after play ${bank(play.scriptMemory)}`);
-  console.log(`readyFrame unlogged >= 200 ms: ${load.readyGaps.length === 0 ? 'none' : load.readyGaps.map((/** @type {{ ms: number, from: number }} */ g) => `${s(g.ms)} at +${s(g.from)}`).join(', ')}`);
+  console.log(`readyFrame unlogged >= 100 ms: ${load.readyGaps.length === 0 ? 'none' : load.readyGaps.map((/** @type {{ ms: number, from: number }} */ g) => `${s(g.ms)} at +${s(g.from)}`).join(', ')}`);
   console.log(`play ${seconds} s: ${f(play.all.fps)} fps · frame p50 ${f(play.all.p50)} / p95 ${f(play.all.p95)} ms · gpu~ p50 ${f(play.all.gpu50)} / p95 ${f(play.all.gpu95)} ms · ${play.draws} draws · ${(play.triangles / 1e6).toFixed(2)} M tris · pixel ratio ${play.pixelRatio}`);
   console.log('triangles by material (visible, in view):'); for (const row of where) console.log(`  ${row.name.padEnd(48)} ${(row.tris / 1e6).toFixed(3)} M · ${row.draws} draws`);
   console.log(`shadow pass: ${shadow.draws} of ${shadow.allDraws} draws · ${(shadow.triangles / 1e6).toFixed(2)} of ${(shadow.allTriangles / 1e6).toFixed(2)} M tris`);
