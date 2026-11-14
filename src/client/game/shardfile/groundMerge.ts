@@ -12,9 +12,15 @@
  * tile's vertex colours, say, are left out when a fine tile has none). A merged mesh receives shadow and never casts (as
  * the tiles), and leaves with its block's last member. Each tile keeps its transformed attributes and its kept triangles
  * (refreshed when its transform, an attribute's version or its hidden quadrants change), so a rebuild is copies.
+ *
+ * SHARD-SOURCE AP8: static props and fine terrain tiles merge the same way (`propMerge`): one view mesh per material,
+ * receive flag and render order per 250 m block and vertex layout, normals and tangents turned with their positions, so a
+ * view draws a material once across tiles. The merged mesh never casts: a member that casts keeps casting itself from
+ * SHADOW_LAYER (the shadow pass only, `castShadow` still its tile's shadow disc), so each light's cascades cull it as before.
  */
-import { Box3, BufferAttribute, BufferGeometry, InterleavedBufferAttribute, Matrix4, Mesh, Sphere, Vector3, type Material, type Object3D } from 'three';
+import { Box3, BufferAttribute, BufferGeometry, InterleavedBufferAttribute, Matrix3, Matrix4, Mesh, Sphere, Vector3, type Material, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
+import { SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
 
 const HALF = 250, COARSE = 125, BLOCK = 250;
 /** an attribute's change count (an interleaved one counts on its buffer) */
@@ -36,11 +42,15 @@ interface Member {
 }
 interface Block { readonly members: Map<Mesh, Member>; merged: Mesh | null; queued: boolean }
 
+/** How members group into blocks: `quadrant` 250 m blocks (a ground's channels are those every member has), `cell` the
+ *  500 m cell by vertex layout, `block` 250 m blocks by vertex layout (props: a member never loses a channel). */
+export type MergeGrouping = 'quadrant' | 'cell' | 'block';
+
 export class GroundMerge {
   private readonly blocks = new Map<string, Block>();
   /** `onRebuild`: each new merged mesh, before it draws (its shadow flags, render order or a terrain's mesh slot) */
-  constructor(private readonly parent: Object3D, private readonly material: Material, private readonly name: string, private readonly onRebuild?: (mesh: Mesh) => void, readonly grouping: 'quadrant' | 'cell' = 'quadrant') {
-    if (grouping !== 'quadrant' && grouping !== 'cell') throw new Error('Unknown ground merge grouping');
+  constructor(private readonly parent: Object3D, private readonly material: Material, private readonly name: string, private readonly onRebuild?: (mesh: Mesh) => void, readonly grouping: MergeGrouping = 'quadrant') {
+    if (grouping !== 'quadrant' && grouping !== 'cell' && grouping !== 'block') throw new Error('Unknown ground merge grouping');
   }
 
   /** The tile's ground `mesh` joins (hidden itself) until `scope` ends. Detached meshes are already parent-local;
@@ -100,7 +110,7 @@ export class GroundMerge {
     const size = this.grouping === 'cell' ? HALF * 2 : BLOCK;
     const cell = `${String(Math.floor((x + HALF) / size))},${String(Math.floor((z + HALF) / size))}`;
     if (this.grouping === 'quadrant') return cell;
-    // A cell merge never drops a channel supplied by another quadrant.
+    // A cell (or block) merge never drops a channel supplied by another member.
     const layout = Object.entries(member.mesh.geometry.attributes).map(([name, attribute]) => `${name}:${String(attribute.itemSize)}:${String(attribute.normalized)}`).sort().join('|');
     return `${cell}|${layout}`;
   }
@@ -131,10 +141,13 @@ export class GroundMerge {
       if (member.mesh.parent === null) toParent.copy(member.mesh.matrix);
       else toParent.multiplyMatrices(parentInverse, member.mesh.matrixWorld);
       const transform = toParent.elements.join(',');
+      // AP8: a prop's normals and tangents turn with it (a ground's channels copy as they are)
+      const turned = this.grouping === 'block' && !isTranslation(toParent), normalMatrix = turned ? new Matrix3().getNormalMatrix(toParent) : null;
       const attributes = names.map(name => {
         const attribute = geometry.getAttribute(name);
         if (attribute.count !== position.count) throw new Error(`Ground merge member lacks ${name}`);
-        const key = name === 'position' ? transform : '', known = member.attributes.get(name);
+        const directed = turned && (name === 'normal' || name === 'tangent') && attribute.itemSize >= 3;
+        const key = name === 'position' || directed ? transform : '', known = member.attributes.get(name);
         if (known !== undefined && known.key === key && known.version === versionOf(attribute)) return known.values;
         const size = attribute.itemSize, out = new Float32Array(attribute.count * size);
         if (name === 'position') {
@@ -147,6 +160,14 @@ export class GroundMerge {
             out[i * 3] = ((e[0] ?? 1) * x + (e[4] ?? 0) * y + (e[8] ?? 0) * z + (e[12] ?? 0)) * w;
             out[i * 3 + 1] = ((e[1] ?? 0) * x + (e[5] ?? 1) * y + (e[9] ?? 0) * z + (e[13] ?? 0)) * w;
             out[i * 3 + 2] = ((e[2] ?? 0) * x + (e[6] ?? 0) * y + (e[10] ?? 1) * z + (e[14] ?? 0)) * w;
+          }
+        } else if (directed) {
+          const m = name === 'normal' ? normalMatrix : new Matrix3().setFromMatrix4(toParent), v = new Vector3();
+          if (m === null) throw new Error('Ground merge normal without its matrix');
+          for (let i = 0; i < attribute.count; i++) {
+            v.set(attribute.getComponent(i, 0), attribute.getComponent(i, 1), attribute.getComponent(i, 2)).applyMatrix3(m).normalize();
+            out[i * size] = v.x; out[i * size + 1] = v.y; out[i * size + 2] = v.z;
+            if (size === 4) out[i * size + 3] = attribute.getComponent(i, 3);
           }
         } else {
           const plain = plainFloats(attribute);
@@ -220,6 +241,12 @@ export class GroundMerge {
   }
 }
 
+/** a transform with no rotation or scale (its upper 3 x 3 the identity) */
+function isTranslation(m: Matrix4): boolean {
+  const e = m.elements;
+  return e[0] === 1 && e[1] === 0 && e[2] === 0 && e[4] === 0 && e[5] === 1 && e[6] === 0 && e[8] === 0 && e[9] === 0 && e[10] === 1;
+}
+
 const merges = new WeakMap<Object3D, Map<Material, GroundMerge>>();
 /** The one merge of `material` under `parent` (made on first use; each block empties itself as its last member leaves). */
 export function groundMerge(parent: Object3D, material: Material, name: string, grouping: 'quadrant' | 'cell' = 'quadrant'): GroundMerge {
@@ -229,4 +256,29 @@ export function groundMerge(parent: Object3D, material: Material, name: string, 
   if (merge === undefined) { merge = new GroundMerge(parent, material, name, undefined, grouping); byMaterial.set(material, merge); }
   if (merge.grouping !== grouping) throw new Error('Ground merge grouping changed for its material');
   return merge;
+}
+
+/** How a merged prop mesh draws: whether it receives shadow, and its render order (each its own merge). */
+export interface PropDraw { readonly receive: boolean; readonly order: number }
+const propMerges = new WeakMap<Object3D, Map<Material, Map<string, GroundMerge>>>();
+/** SHARD-SOURCE AP8: the one static prop merge of `material` drawn as `draw` under `parent`: 250 m blocks by vertex layout. */
+export function propMerge(parent: Object3D, material: Material, draw: PropDraw): GroundMerge {
+  let byMaterial = propMerges.get(parent);
+  if (byMaterial === undefined) { byMaterial = new Map(); propMerges.set(parent, byMaterial); }
+  let byDraw = byMaterial.get(material);
+  if (byDraw === undefined) { byDraw = new Map(); byMaterial.set(material, byDraw); }
+  const key = `${String(draw.receive)}|${String(draw.order)}`;
+  let merge = byDraw.get(key);
+  if (merge === undefined) {
+    merge = new GroundMerge(parent, material, 'props.merged', (mesh) => { mesh.castShadow = false; mesh.receiveShadow = draw.receive; mesh.renderOrder = draw.order; }, 'block');
+    byDraw.set(key, merge);
+  }
+  return merge;
+}
+
+/** AP8: `mesh` joins its merge for the view; it keeps drawing only into the shadow maps (SHADOW_LAYER) while it may cast. */
+export function mergeView(parent: Object3D, mesh: Mesh, material: Material, scope: Scope): void {
+  if (mesh.material !== material) throw new Error('Prop merge member draws another material');
+  propMerge(parent, material, { receive: mesh.receiveShadow, order: mesh.renderOrder }).add(mesh, scope);
+  mesh.visible = true; mesh.layers.set(SHADOW_LAYER);
 }

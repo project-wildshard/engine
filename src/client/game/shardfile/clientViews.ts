@@ -6,15 +6,15 @@
  * the optional `outline` hook (`clientMaterials().outline`): a graph that declares `stages.outline` draws its hull as each
  * mesh's second draw (terrain tiles, fine prop tiles, library panels and models; the coarse L1 proxy keeps one draw).
  */
-import { AdditiveBlending, Box3, BufferAttribute, BufferGeometry, Material, Mesh, StaticDrawUsage, type Object3D, type Texture } from 'three';
+import { AdditiveBlending, Box3, BufferAttribute, BufferGeometry, Material, Mesh, ShaderMaterial, StaticDrawUsage, type Object3D, type Texture } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
-import type { TerrainTileData } from '@wildshard/format/terrainTileBytes';
-import { installTerrainTile, maskTerrainTile } from '@wildshard/engine/world/terrainTileView';
+import { installTerrainTile, isCoarse, maskTerrainTile } from '@wildshard/engine/world/terrainTileView';
+import { decodeTerrainTile, type TerrainTileData } from '@wildshard/format/terrainTileBytes';
 import { coarseTileMask } from '@wildshard/engine/world/coarseTileMask';
 import { installDeclaredProps, type PropSurfaceBinding } from '@wildshard/engine/world/declaredProps';
 import type { ClientWorldViews, ResidentTile } from './tileContent';
 import type { GraphOutlineHook } from './clientGraphs';
-import { groundMerge } from './groundMerge';
+import { groundMerge, mergeView } from './groundMerge';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { geometryBoundsSteps } from '@wildshard/engine/world/geometryBounds';
 import { workSlice } from '@wildshard/engine/core/workSlice';
@@ -28,6 +28,19 @@ const FLAT = 0.01, FLOOR = 0.1;
 const isGlow = (material: Material): boolean => material.userData['graphRawOutput'] === true && material.userData['graphMeshMap'] !== true;
 
 function isMesh(object: Object3D): object is Mesh { return object instanceof Mesh; }
+/**
+ * SHARD-SOURCE AP8: a fine tile mesh that may draw in its material's cross-tile merge: a plain drawn mesh (not instanced or
+ * skinned, no morphs, no groups, no hull under it) on one opaque built-in family material. Left out: see-through surfaces
+ * and cards (they sort or face the camera one by one), swaying ones (a phase per prop) and graph shaders (they may read
+ * the mesh's own space).
+ */
+function mergeable(mesh: Mesh): mesh is Mesh<BufferGeometry, Material> {
+  const material: unknown = mesh.material, geometry: unknown = mesh.geometry;
+  if (Object.getPrototypeOf(mesh) !== Mesh.prototype || !mesh.visible || mesh.children.length > 0 || !isMaterial(material) || !isGeometry(geometry)) return false;
+  if (material instanceof ShaderMaterial || material.transparent || material.userData['sceneAlpha'] === true || material.userData['sceneCard'] === true) return false;
+  if (geometry.groups.length > 0 || Object.keys(geometry.morphAttributes).length > 0 || !geometry.hasAttribute('position')) return false;
+  return Object.keys(geometry.attributes).every((name) => !name.startsWith('_') && !name.startsWith('ws'));
+}
 /** a fine tile has nothing under it to hide */
 function noMask(excluded: ReadonlySet<number>): void { if (excluded.size > 0) throw new Error('shardfile views: only a coarse tile masks quadrants'); }
 
@@ -37,7 +50,8 @@ function noMask(excluded: ReadonlySet<number>): void { if (excluded.size > 0) th
  * only attaches it. Terrain takes wire bytes or `TerrainTileData` already decoded off the main thread.
  */
 export interface ClientTileViews {
-  terrain: (input: Uint8Array | TerrainTileData, root: Object3D, scope: Scope, shadow: boolean) => ResidentTile;
+  /** `ground`: where fine tiles merge (AP8; absent: `root`); a ring passes its shared root, as for props */
+  terrain: (input: Uint8Array | TerrainTileData, root: Object3D, scope: Scope, shadow: boolean, ground?: Object3D) => ResidentTile;
   /** `ground`: where a drawn splat ground's tiles merge (absent: `root`); a ring passes its shared root, as each tile's
    *  `root` is its own group */
   props: (props: NonNullable<Shardfile['props']>, key: string, bytes: Uint8Array, root: Object3D, scope: Scope, additional?: ReadonlyMap<string, Uint8Array>, ground?: Object3D) => Promise<ResidentTile | null>;
@@ -60,7 +74,9 @@ interface ViewPorts { terrain: string | NonNullable<Shardfile['terrain']> | null
   /** The terrain's shadow flags (`terrain.shadow`): a tile casts only when `cast` (and the shadow disc says so), receives only when `receive` (absent: both). */
   terrainShadow?: NonNullable<Shardfile['terrain']>['shadow'] | undefined;
   /** The tiles' draw order among the opaque surfaces (`terrain.order`, three's renderOrder; absent: TERRAIN_ORDER). */
-  terrainOrder?: number | undefined }
+  terrainOrder?: number | undefined;
+  /** SHARD-SOURCE AP8: a fine tile's static props draw merged per material across tiles (`propMerge`; absent: true) */
+  mergeProps?: boolean }
 
 /** G784: absent `terrain.order`, the ground draws before the opaque surfaces laid on it (a road, a yard, a path), so a
  *  surface at the ground's depth always wins its tie. At renderOrder 0 three broke those ties by material id: a world's
@@ -88,12 +104,16 @@ export function clientTileViews(ports: ViewPorts): ClientTileViews {
   if (material === undefined) throw new Error('shardfile views: the terrain family has no resolved material');
   const cast = ports.terrainShadow?.cast ?? true, receive = ports.terrainShadow?.receive ?? true;
   return {
-    terrain: (input, root, scope, shadow) => {
+    terrain: (input, root, scope, shadow, groundRoot) => {
       if (material === null) throw new Error('shardfile views: a terrain tile in a shard without terrain');
-      const mesh = installTerrainTile(input, { root, scope, material, shadow: cast && shadow, ...(ports.lattice === undefined ? {} : { lattice: ports.lattice }) });
+      const data = input instanceof Uint8Array ? decodeTerrainTile(input) : input;
+      const mesh = installTerrainTile(data, { root, scope, material, shadow: cast && shadow, ...(ports.lattice === undefined ? {} : { lattice: ports.lattice }) });
       if (!receive) mesh.receiveShadow = false;
       mesh.renderOrder = ports.terrainOrder ?? TERRAIN_ORDER;
       const hulls = ports.outline?.(mesh, material, scope) ?? [];
+      // AP8: a fine tile with no hull draws in the terrain's merge, one view draw a 250 m block; it still casts itself
+      // (the shadow pass only) while its shadow disc says so. A coarse tile keeps its own mesh for its quadrant mask.
+      if ((ports.mergeProps ?? true) && hulls.length === 0 && !isCoarse(data)) mergeView(groundRoot ?? root, mesh, material, scope);
       // a coarse tile's mask moves its draw range; its hull (a shallow geometry copy) follows
       const mask = (excluded: ReadonlySet<number>): void => { maskTerrainTile(mesh, excluded); for (const hull of hulls) hull.geometry.setDrawRange(mesh.geometry.drawRange.start, mesh.geometry.drawRange.count); };
       return { mask, shadow: cast ? (enabled) => { mesh.castShadow = enabled; } : () => undefined };
@@ -170,6 +190,12 @@ export function clientTileViews(ports: ViewPorts): ClientTileViews {
       const casters: Mesh[] = [];
       for (const { mesh, box } of lit) {
         if (box.max.y - box.min.y < FLAT && box.max.y <= floor + FLOOR) mesh.castShadow = false; else casters.push(mesh);
+      }
+      // AP8: a fine tile's plain static meshes join their material's merge under the shared root, so a view draws each
+      // material once a 250 m block, not once a tile; each still casts itself (the shadow pass only) as its disc says
+      if (row.lod === 0 && (ports.mergeProps ?? true)) {
+        const meshes: Mesh[] = []; root.traverse((object) => { if (isMesh(object)) meshes.push(object); });
+        for (const mesh of meshes) if (mergeable(mesh)) mergeView(parent, mesh, mesh.material, scope);
       }
       const shadow = (enabled: boolean): void => { for (const mesh of casters) mesh.castShadow = enabled; };
       if (row.lod === 1) {

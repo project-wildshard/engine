@@ -29,7 +29,8 @@ const coarseTiles = new WeakMap<Mesh, TileState>();
 const shapes = new WeakMap<Mesh, Pick<TerrainTileData, 'resolution' | 'x' | 'z' | 'size'>>();
 
 /** True when this tile is a coarse tile whose quadrants refinement may hide. */
-function isCoarse(data: TerrainTileData): boolean { return data.resolution === COARSE.resolution && data.size === COARSE.size; }
+/** a coarse (L1) terrain tile: no skirt, its quadrants masked under fine tiles */
+export function isCoarse(data: TerrainTileData): boolean { return data.resolution === COARSE.resolution && data.size === COARSE.size; }
 
 /** A grid's slope along one axis at sample `at` of `n`: central inside, second-order one-sided on the grid's edge. Sample
  * `i` of the line is `heights[base + i * stride]` (no closure per vertex: a tile's normals run once per sample at boot). */

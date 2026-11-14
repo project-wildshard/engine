@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
-import { GroundMerge } from './groundMerge';
+import { GroundMerge, propMerge } from './groundMerge';
 
 // Tile streaming P1 (draws): a splat ground's resident tiles draw as one merged mesh per material; a coarse tile leaves out
 // the quadrants its fine tiles cover, and the merge follows its members' tile scopes.
@@ -212,4 +212,35 @@ test('cell ground keeps differing vertex channel layouts in separate submissions
   merge.add(first,a); merge.add(second,b); await settle();
   expect(merge.meshes).toHaveLength(2); expect(merge.meshes.filter(mesh => mesh.geometry.hasAttribute('color'))).toHaveLength(1);
   a.dispose(); b.dispose(); await settle(); expect(parent.children).toHaveLength(0);
+});
+
+test('AP8: props merge per material and receive flag; a turned prop turns its normals; layouts never mix', async () => {
+  const parent = new THREE.Group(), material = new THREE.MeshStandardMaterial(), a = new Scope('a'), b = new Scope('b');
+  const prop = (x: number, uv: boolean): THREE.Mesh => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1], 3));
+    if (uv) g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2));
+    const mesh = new THREE.Mesh(g, material); mesh.position.set(x, 0, 5); return mesh;
+  };
+  const first = prop(0, true), turned = prop(10, true), plain = prop(20, true), bare = prop(30, false); turned.rotation.y = Math.PI / 2;
+  const tileA = new THREE.Group(), tileB = new THREE.Group();
+  tileA.add(first, turned); tileB.add(plain, bare);
+  parent.add(tileA, tileB);
+  const cast = { receive: true, order: 0 };
+  for (const mesh of [first, turned]) propMerge(parent, material, cast).add(mesh, a);
+  propMerge(parent, material, cast).add(plain, b); propMerge(parent, material, cast).add(bare, b);
+  await settle();
+  const merged = propMerge(parent, material, cast).meshes;
+  expect(merged).toHaveLength(2);                                // the uv layout and the bare one draw apart
+  const withUv = merged.find(mesh => mesh.geometry.hasAttribute('uv'));
+  if (withUv === undefined) throw new Error('no uv merge');
+  expect(withUv.geometry.getIndex()?.count).toBe(9);             // the three uv props, one draw
+  expect([withUv.castShadow, withUv.receiveShadow, withUv.name]).toEqual([false, true, 'props.merged']);   // members cast themselves
+  const normal = withUv.geometry.getAttribute('normal');
+  expect([normal.getX(3), normal.getY(3), normal.getZ(3)].map(v => Math.round(v))).toEqual([1, 0, 0]);  // the turned prop faces +x
+  expect([normal.getX(0), normal.getZ(0)]).toEqual([0, 1]);
+  expect(propMerge(parent, material, { receive: false, order: 0 })).not.toBe(propMerge(parent, material, cast));
+  a.dispose(); b.dispose(); await settle();
+  expect(propMerge(parent, material, cast).meshes).toHaveLength(0);
 });

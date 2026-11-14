@@ -331,7 +331,7 @@ export function clientRingPorts(instances: ReadonlyMap<string, ClientRingInstanc
     const tiles = await prepareClientTile(source, assets, key, scope, {
       terrain: async (bytes, owner) => {
         const data = await ports.decoder.decode(bytes); if (owner.disposed || owner.disposing) throw new Error('shardfile rings: tile dropped while decoding');
-        return views.terrain(data, group, owner, false);
+        return views.terrain(data, group, owner, false, instance.root);
       },
       props: (props, address, bytes, owner, additional) => views.props(props, address, bytes, group, owner, additional, instance.root),
     });
