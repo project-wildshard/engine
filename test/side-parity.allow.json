@@ -24,7 +24,7 @@
    "known": []
   },
   "nalati-grasslands": {
-   "row": "SERVER-PARITY SS10b (trunks closed: the bake's spruce capsules are the page's 146, re-captured by shard-nalati scripts/forest-trunks.mjs; open: its solids carry no owner or material, which needs a tagged bake, a Nalati upload and re-pin)",
+   "row": "SERVER-PARITY SS10b (trunks closed: the bake's spruce capsules are the page's 146, re-captured by shard-nalati scripts/forest-trunks.mjs; tags: shard-nalati eb64606 names every bake solid's piece and material and this engine reads it, so both untagged lines leave on the re-pin of the Nalati upload that carries it, SHARD-SIZE S12d's)",
    "known": [
     "(untagged server): 35 server-side match(es) where the server collider has no owner or material",
     "(untagged server): 526 page-side match(es) where the server collider has no owner or material"
