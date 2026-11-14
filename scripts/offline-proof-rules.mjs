@@ -77,7 +77,7 @@ const failed = row => (row.servedBy === 'failed' && row.fail !== 'net::ERR_ABORT
  * The red rules of one entry. `warm` is the paths the warm visit read (undefined for the warm visit itself).
  * @param {{ shard: string, channel: 'staging' | 'preview', mode: string, entry: string, rows: readonly RequestRow[],
  *   samples: readonly ScreenSample[], outcome: Outcome, warm?: ReadonlySet<string>, layout?: boolean, walkthrough?: boolean,
- *   requireWorld?: boolean, proofError?: string, leaks?: number, placed?: boolean }} run
+ *   requireWorld?: boolean, proofError?: string, leaks?: number, placed?: boolean, linked?: boolean }} run
  * @returns {Failure[]}
  */
 export function judge(run) {
@@ -122,8 +122,9 @@ export function judge(run) {
   if ((run.leaks ?? 0) > 0) out.push({ shard, rule: 'offline-leak', detail: `${String(run.leaks)} reads reached the server while offline (the URLs are in the run's screens log)` });
   if (run.requireWorld === true && run.outcome !== 'play' && !titleByDesign && !(run.outcome === 'outside-world' && run.placed === false)) out.push({ shard, rule: 'not-in-world', detail: run.outcome });
   // GC26 (J311): preview's deck enters a placed shard in its grid cell, so the player ends inside that cell (the grid's `inside`), not
-  // on a one-shard page (no grid: `inside` absent) or another cell.
-  if (channel === 'preview' && run.placed === true && run.entry === 'deck' && run.outcome === 'play') {
+  // on a one-shard page (no grid: `inside` absent) or another cell. A shard with no card (the Open Plots, Pastel Plain, Ink & Cel) is
+  // entered by its `?chunk=` link, which opens its one-shard page (GC25/GC27: the deck shows 7 grid cards), so it is judged as that page.
+  if (channel === 'preview' && run.placed === true && run.entry === 'deck' && run.linked !== true && run.outcome === 'play') {
     let last; for (const sample of samples) if (sample.player) last = sample;
     if (last !== undefined && last.inside !== shard) out.push({ shard, rule: 'not-in-cell', detail: last.inside === undefined ? 'a one-shard page, not the grid' : `inside ${last.inside ?? 'the road'}` });
   }

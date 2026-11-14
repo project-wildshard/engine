@@ -510,7 +510,8 @@ function record(channel, mode, slug, entry, visit, warm, extra = {}) {
   const layout = channel === 'staging' && mode === 'offline' && WORD_CELLS > 1 && (entry === 'deck' || extra.walkthrough === true); // a one-cell world (--cells=1) enters no grid
   const failures = judge({ shard: slug, channel, mode, entry, rows: visit.rows, samples: visit.samples,
     outcome: visit.outcome, ...warm === undefined ? {} : { warm }, layout, proofError: visit.proofError, leaks: visit.leaks,
-    requireWorld: requireWorld && !mode.startsWith('warm'), placed: gridPlaces(slug, CATALOGUE), ...extra });
+    requireWorld: requireWorld && !mode.startsWith('warm'), placed: gridPlaces(slug, CATALOGUE),
+    linked: entry === 'deck' && (OPEN_PLOTS.includes(slug) || visit.consoleLines.some(line => line.startsWith('no deck card'))), ...extra });
   if (channel === 'staging' && !visit.world) failures.unshift({ shard: slug, rule: 'proof-not-a-world-build', detail: 'the page had no __WS_WORLD__ stamp' });
   const result = { shard: slug, channel, mode, entry, outcome: visit.outcome, ms: visit.ms, lastCard: visit.lastCard, served: servedCounts(visit.rows),
     swSoloReads: visit.rows.filter(row => row.origin === 'sw' && /serverWorker|serverRuntime|\/assets\/spawn\/server\//u.test(row.url)).length,
