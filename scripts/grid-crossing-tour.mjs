@@ -235,9 +235,9 @@ try {
       try { hooks = (W.__wildshard.shard.grid.hookTimings?.()?.completed ?? []).filter((/** @type {any} */ h) => h.start >= from && h.instance === target).map((/** @type {any} */ h) => [h.hook, Math.round(h.start - from), Math.round(h.end - h.start), h.outcome]); } catch { /* no live session */ }
       return { prepare: { windowMs: Math.round(end - from), hooks, spans: spans.slice(0, 200), longTasks: tasks.length, longTaskMs: tasks.reduce((total, task) => total + (task[1] ?? 0), 0),
         files: files.length, bytes: files.reduce((total, entry) => total + (entry.transferSize || 0), 0), decodedBytes: files.reduce((total, entry) => total + (entry.decodedBodySize || 0), 0),
-        // GC6: every fetch in the window (at most 3000), as [path tail, start, ms, transfer bytes], to see what a preparation waits on
+        // GC6: every fetch in the window (at most 3000), as [the path's last folders and its name's first 8, start, ms, transfer bytes, initiator], to see what a preparation waits on
         fetches: (/** @type {PerformanceResourceTiming[]} */ (performance.getEntriesByType('resource'))).filter(entry => entry.startTime >= from)
-          .slice(-3000).map(entry => [new URL(entry.name).pathname.split('/').slice(-2).join('/').slice(0, 24), Math.round(entry.startTime - from), Math.round(entry.duration), entry.transferSize || 0]) }, windowEnd: end };
+          .slice(-3000).map(entry => { const parts = new URL(entry.name).pathname.split('/'); return [`${parts.slice(-4, -1).join('/')}/${(parts.at(-1) ?? '').slice(0, 8)}`, Math.round(entry.startTime - from), Math.round(entry.duration), entry.transferSize || 0, entry.initiatorType]; }) }, windowEnd: end };
     }, /** @type {[number, string, string]} */ ([windowStart, slug, arc.to])).then(({ prepare, windowEnd }) => { lastWindowEnd = windowEnd; return { prepare }; }).catch(() => ({})));
     if (!row.ok || row.wallMs > 0) await page.screenshot({ path: join(out, `${engineName}-${arc.from}-${arc.to}.png`) }).catch(() => undefined);
     console.log(`${row.ok ? 'ok  ' : 'FAIL'} ${arc.from} -> ${arc.to}${arc.boost ? ' boost' : ''}${repeat ? ' (repeat)' : ''} ${JSON.stringify({ why: row.why, b2c: row.borderToControlMs, wall: row.wallMs, freeze: row.freezeMs, over50: row.over50 })}`);

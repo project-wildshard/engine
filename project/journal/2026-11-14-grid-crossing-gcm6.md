@@ -5,7 +5,16 @@
   that preparation took 6.2, 8.8 and 19 s, and the tour's wall missed the 8.7 s hold in the slow one (the crossing waits in
   phase `ready` while an entry prepares; it now counts). A CPU profile of the window (`--profile`) put a fifth of the main
   thread in `loadShardfileNear`: the neighbours' near views load on the road beside the entry, and `applyMatrix4` rebuilt
-  bounds the loader had set (two passes per part, ~45 % of that bake). Their fetches also queued with the entry's reads.
-- Near view loads now wait while an entry prepares on the road (`LiveGridSession.entriesPreparing`, 20 s cap; the far proxy
-  draws meanwhile), and a near part bakes its pose without bounds (an identity pose not at all). Same setup after: 3.5 to
-  3.8 s, the play hooks 2.5 to 4.8 s -> 0.25 to 0.34 s.
+  bounds the loader had set (two passes per part, ~45 % of that bake). A near part now bakes its pose without bounds (an
+  identity pose not at all).
+- First try, withdrawn: near view loads (then also speculative product reads) waited while an entry prepared on the road.
+  Three sequential tours said 3.5 s; interleaved before/after pairs on a loaded box (load average 25 to 30) said no gain,
+  and 2 of 8 "after" tours held 12 to 17 s with Nalati's world hook at 15 to 28 s (the wait's 20 s cap), against 0 of 8
+  "before". Interleave before and after; sequential runs on this shared Mac lie.
+- The real waste: the per-crossing fetch log showed far-reach's, pine-hollow's and nine-dragon's whole products (descriptor
+  and every section) and their near bakes read 4 to 12 times each during the entry window. A page at its envelope refuses
+  them; the refusal was keyed on the allocator's revision, which every claim anywhere moves, so each was read, parsed and
+  refused again many times a second. `BudgetDeferrals` retries a refused optional read only once room was freed or 3 s
+  passed (the cell ahead's demand read keeps the revision rule).
+- GC13: the phone tier's allocator admits against G65's 1.0 GB (`PHONE_PLAYING_BYTES`), not the shared caps' 1.2 GB
+  Explorer figure, and last-cell retention reads the allocator's envelope.

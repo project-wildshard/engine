@@ -27,7 +27,7 @@ import { Vector3, type PerspectiveCamera } from 'three';
 import { createProgramKeeper, RETAINED_PROGRAM_BYTES, RETAINED_PROGRAM_LIMIT, type ProgramKeeper } from '@wildshard/engine/render/programRetention';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { WORK_SLICE_MS, workSlice } from '@wildshard/engine/core/workSlice';
-import { CHUNK_HALF, CONTENT_CAPS, ENTRY_ASPHALT } from '@wildshard/engine/core/config';
+import { CHUNK_HALF, ENTRY_ASPHALT } from '@wildshard/engine/core/config';
 import type { DisposeStep, Scope } from '@wildshard/engine/app/scope';
 import type { Events } from '@wildshard/engine/events/events';
 import type { Physics } from '@wildshard/engine/physics/Physics';
@@ -293,7 +293,7 @@ export class LiveGridSession {
     const highwayBytes = (ports.initialStripBytes ?? ports.strips.reduce((sum, strip) => sum + strip.mesh.positions.byteLength + strip.mesh.indices.byteLength, 0))
       + assembly.cells.length * TRANSFER_WALL_BYTES;
     try { this.live = new LiveGridHost(assembly, {
-      lastCell: { windowMs: 30_000, playingBytes: CONTENT_CAPS.playing, schedule: (expire, ms) => {
+      lastCell: { windowMs: 30_000, playingBytes: ports.allocator.envelope(), schedule: (expire, ms) => {
         const timer = scope.child('grid.last-cell-expiry');
         timer.timeout(ms, () => { timer.dispose(); scope.run(expire); });
         return () => { timer.dispose(); };
@@ -876,9 +876,6 @@ export class LiveGridSession {
   entryPending(instance: string): boolean { return this.deferredEntries.has(instance) || this.queuedEntries.has(instance) || this.hybrid.preparing().includes(instance); }
   /** GC6: whether any world built ahead still prepares its entry (the road then builds with the urgent budget) */
   entriesPending(): boolean { return this.deferredEntries.size > 0 || this.queuedEntries.size > 0 || this.hybrid.preparing().length > 0; }
-  /** GC6: whether an entry is preparing on the road now (or queued for it): the traveller is about to need it, so optional
-   *  neighbour work (the near views' loads) waits for it rather than sharing its frames (`GridSession` near `load`) */
-  entriesPreparing(): boolean { return this.queuedEntries.size > 0 || this.hybrid.preparing().length > 0; }
   /** GC6: entries taken from `deferredEntries` and waiting their turn behind another's preparation (`prepareInTurn`) */
   private readonly queuedEntries = new Set<string>();
   /** GC9: once the source is left (the hybrid session is neutral), each world pre-warmed inside it prepares its entry, so the

@@ -40,17 +40,3 @@ test('GC6: a world built ahead stays unenterable while its entry is deferred or 
   expect(value.entryPending('nalati')).toBe(false);
   expect(value.entryPending('driftwood')).toBe(false);
 });
-
-test('GC6: near views wait only for an entry preparing on the road, never for one still deferred inside the source', () => {
-  const value: unknown = Object.create(LiveGridSession.prototype);
-  if (!(value instanceof LiveGridSession)) throw new Error('Missing live session prototype');
-  const deferred = new Map<string, unknown>([['nalati', {}]]), preparing: string[] = [], queued = new Set<string>();
-  Reflect.set(value, 'deferredEntries', deferred); Reflect.set(value, 'queuedEntries', queued); Reflect.set(value, 'hybrid', {preparing: () => preparing});
-  expect(value.entriesPreparing()).toBe(false); // the traveller is still inside the source: its neighbours load as before
-  deferred.clear(); queued.add('nalati');
-  expect(value.entriesPreparing()).toBe(true);
-  queued.clear(); preparing.push('nalati');
-  expect(value.entriesPreparing()).toBe(true);
-  preparing.length = 0;
-  expect(value.entriesPreparing()).toBe(false);
-});

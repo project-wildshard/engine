@@ -178,12 +178,17 @@ test('passive metadata deferral is revision bounded and cannot close a required 
   } });
   try {
     await f.enter(f.home.instance); expect(await f.leave()).toBe(true);
+    const held = f.residency.allocator.reserveIfFits({ id: 'freed', owner: 'freed', category: 'library', bytes: 1_000_000, needed: false, distance: 0 });
+    if (held === null) throw new Error('Missing held claim');
     await expect(f.live.prefetch([f.next.instance])).rejects.toBeInstanceOf(ApproachInputsDeferredError);
     expect(f.live.state().issues).toEqual({}); expect(f.live.refusal(f.next.instance)).toBeUndefined();
     await f.live.prefetch([f.next.instance]); expect(attempts).toBe(1);
+    // GC6: a budget change that frees nothing does not read it again (BudgetDeferrals); one that frees room does
     const change = f.residency.allocator.reserveIfFits({ id: 'revision', owner: 'revision', category: 'library', bytes: 1, needed: false, distance: 0 });
     if (change === null) throw new Error('Missing budget revision');
     try {
+      await f.live.prefetch([f.next.instance]); expect(attempts).toBe(1);
+      held.release();
       await expect(f.live.prefetch([f.next.instance])).rejects.toBeInstanceOf(ApproachInputsDeferredError);
       expect(attempts).toBe(2); expect(f.live.state().retainedCell?.instance).toBe(f.home.instance);
       await f.enter(f.next.instance);

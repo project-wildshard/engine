@@ -5,6 +5,7 @@ import { TraversalReadiness, readinessModel, type ReadinessBundle, type Readines
 import type { ReadinessWalls } from '@wildshard/engine/physics/readinessWalls';
 import { CHUNK_HALF, CONTENT_CAPS, ENTRY_WIDTH } from '@wildshard/engine/core/config';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { BudgetDeferrals } from './budgetDeferral';
 import { GhostWorlds, type GhostRegion } from '../../../shared/game/grid/ghosts';
 import { WORK_SLICE_MS, workSlice } from '@wildshard/engine/core/workSlice';
 import type { DisposeStep } from '@wildshard/engine/app/scope';
@@ -175,7 +176,8 @@ export class LiveGridHost {
   private readonly tileMetadata = new Set<string>();
   private readonly productRequests = new Map<string, { work: Promise<LiveGridAdmission>; required: boolean;
     trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' }>();
-  private readonly deferredProducts = new Map<string, number>();
+  /** GC6: speculative product reads the budget refused, tried again once room was freed or BUDGET_RETRY_MS passed */
+  private readonly deferredProducts: BudgetDeferrals;
   /** GC6: a demand read (the neighbour ahead) the budget refused, by allocator revision: kept apart from the radial reads'
    *  deferrals, since a radial read deferred for want of headroom must not stop the demand read that may make room */
   private readonly deferredDemand = new Map<string, number>();
@@ -219,7 +221,7 @@ export class LiveGridHost {
   private readonly ports: LiveGridPorts;
 
   constructor(assembly: GridAssembly, ports: LiveGridPorts) {
-    this.assembly = assembly; this.ports = ports;
+    this.assembly = assembly; this.ports = ports; this.deferredProducts = new BudgetDeferrals(ports.allocator);
     if (ports.lastCell !== undefined && (!Number.isFinite(ports.lastCell.windowMs) || ports.lastCell.windowMs <= 0 || ports.lastCell.windowMs > 60_000
       || !Number.isSafeInteger(ports.lastCell.playingBytes) || ports.lastCell.playingBytes <= 0)) throw new RangeError('Invalid last-cell retention policy');
     this.active = null; this.initialHomePending = true;
@@ -266,7 +268,7 @@ export class LiveGridHost {
     return resident !== undefined && !resident.evicting && !resident.disposalFailed && this.readiness.isReady(instance);
   }
   /** Submit whole-shard requests in stable order. Failed attempts remain closed until an explicit retry. */
-  prefetch(instances: readonly string[], trigger: 'explicit' | 'radial' | 'boulevard' = 'explicit'): Promise<void> { return Promise.all([...new Set(instances)].sort().map((id) => this.residents.has(id) || (!this.disposed && this.constructing.has(id)) || this.deferredProducts.get(id) === this.ports.allocator.revision ? Promise.resolve() : this.prefetchProduct(id, false, trigger))).then(() => undefined); }
+  prefetch(instances: readonly string[], trigger: 'explicit' | 'radial' | 'boulevard' = 'explicit'): Promise<void> { return Promise.all([...new Set(instances)].sort().map((id) => this.residents.has(id) || (!this.disposed && this.constructing.has(id)) || this.deferredProducts.waiting(id) ? Promise.resolve() : this.prefetchProduct(id, false, trigger))).then(() => undefined); }
   private async requireProduct(instance: string, pending: Promise<LiveGridAdmission>, trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' = 'entry', speculative = false): Promise<LiveGridAdmission> {
     try { return await pending; }
     catch (error) {
@@ -304,7 +306,7 @@ export class LiveGridHost {
         // while held, so Nalati's demand read was refused the whole approach and its world was built only on the road. A
         // refused demand read lets the speculative products of other cells go, farthest first, and is read again.
         if (required && speculative && refused) { if (this.releaseSpeculative(instance) > 0) this.deferredDemand.delete(instance); else { this.deferredDemand.set(instance, this.ports.allocator.revision); if (this.demanded === instance) this.demanded = null; } }
-        else if (!required && refused) this.deferredProducts.set(instance, this.ports.allocator.revision);
+        else if (!required && refused) this.deferredProducts.defer(instance);
         else { this.issues.set(instance, error instanceof Error ? error.message : String(error)); this.refusals.set(instance, error); }
         try { admission?.cancel?.(); }
         catch (cleanup) { throw new AggregateError([error, cleanup], 'Live product admission and cancellation failed', { cause: cleanup }); }
@@ -466,7 +468,7 @@ export class LiveGridHost {
   }
   private retainedFits(instance: string): boolean {
     const policy = this.ports.lastCell;
-    return policy !== undefined && this.ports.allocator.ownerCost(instance).playing <= Math.min(CONTENT_CAPS.playing, policy.playingBytes);
+    return policy !== undefined && this.ports.allocator.ownerCost(instance).playing <= Math.min(this.ports.allocator.envelope(), policy.playingBytes);
   }
   /** Call only after entered leave hooks finish. Keep the same ready world,
    * without a second claim, snapshot, physics host or shader preparation. */
@@ -897,7 +899,7 @@ export class LiveGridHost {
   private retainedState(): Exclude<LiveGridState['retainedCell'], undefined> {
     const last = this.lastCell, policy = this.ports.lastCell;
     return last === null || policy === undefined ? null : { instance: last.instance, remainingMs: Math.max(0, last.until - diagnosticNow()),
-      playingBytes: this.ports.allocator.ownerCost(last.instance).playing, capBytes: Math.min(CONTENT_CAPS.playing, policy.playingBytes) };
+      playingBytes: this.ports.allocator.ownerCost(last.instance).playing, capBytes: Math.min(this.ports.allocator.envelope(), policy.playingBytes) };
   }
   /** Read-only crossing evidence and failures for the real grid physics harness. */
   state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, ahead: { instance: this.ahead, warms: this.warms, refused: this.warmRefusal, deferred: [...new Set([...this.deferredProducts.keys(), ...this.deferredDemand.keys()])], demanded: this.demanded, released: this.released }, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.productRequests.keys()])].sort(), pendingWork: [

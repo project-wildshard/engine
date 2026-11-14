@@ -193,9 +193,6 @@ export type GridCellShows = 'playing' | 'frozen' | 'near' | 'far proxy' | 'tiles
 /** Which of a cell's presentation layers draw now (meshes visible), for the readout and the captures. */
 export interface GridCellDrawn { readonly far: boolean; readonly near: boolean; readonly l1: number; readonly l0: number }
 /** The session's readout (tests, harness, the board). */
-/** GC6: the longest a near view's load waits behind an entry preparing on the road (ms) */
-const ROAD_ENTRY_WAIT_MS = 20_000;
-
 export interface GridSessionState {
   /** Actual world-space placement pitch; diagnostic routes must use the served build's lattice. */
   readonly pitch: number;
@@ -801,9 +798,7 @@ export class GridSession {
       allocator: this.allocator, cells: this.assembly.cells, pitch: this.assembly.pitch, root: (id) => roots.get(id),
       readyToRefine: () => this.initialFarReady,
       ...(TIER === 'phone' ? { limit: PHONE_NEAR_CELLS } : {}),
-      // GC6: a near view loads after an entry preparing on the road (on the road the neighbours' near bakes took a fifth of the
-      // main thread while Nalati's entry prepared, Driftwood to Nalati at Jake's 2992x1434@2): the far proxy draws meanwhile
-      load: async (id) => { await this.afterRoadEntries(host.scope); return loadNear(this.assembly.cell(id).slug); },
+      load: (id) => loadNear(this.assembly.cell(id).slug),
       cover: (id, covered) => { const drawn = drawnFar.get(id); if (drawn !== undefined) drawn.view.mesh.visible = !covered && drawn.excluded.size < 16; },
       mask: (id) => drawnFar.get(id)?.excluded ?? new Set<number>(),
       ...(host.prepareView === undefined ? {} : { prepare: async (view: FarProxyView, current: () => boolean) => {
@@ -1015,13 +1010,6 @@ export class GridSession {
       claimedMB: claimed / 1e6, requested: stages.requested, runtime: stages.runtime, colliders: stages.colliders, sim: stages.sim,
       hooks, hook, hybrid: hooks.size > 0 || hook !== null, entered: current === id, gameplayReady: current === id && live.gameplayReady(),
       warm: live.warmPreparation(id) };
-  }
-  /** GC6: resolves once no entry prepares on the road (polled every 100 ms), or after ROAD_ENTRY_WAIT_MS at most. */
-  private async afterRoadEntries(scope: Scope): Promise<void> {
-    for (const ends = diagnosticNow() + ROAD_ENTRY_WAIT_MS; this.live?.entriesPreparing() === true && diagnosticNow() < ends;) {
-      await new Promise<void>(resolve => { const forget = scope.capture('disposers', resolve); scope.timeout(100, () => { forget(); resolve(); }); });
-      if (scope.disposed || scope.disposing) throw new Error('Grid session left while a near view waited');
-    }
   }
   /** At most four times a second: the loading screen reads the allocator and the live session. */
   private stepCellLoading(): void {
