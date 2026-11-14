@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { busiestWindow, CLOCK_MARK, idleWithin, profileAnchor, profileIdle, stageStalls, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from '../scripts/loading-flow/stalls.mjs';
+import { busiestWindow, CLOCK_MARK, idleWithin, PLAY_BUSY_SHARE, playStall, playStallFaults, profileAnchor, profileBusy, profileIdle, stageStalls, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from '../scripts/loading-flow/stalls.mjs';
 
 // NINE-DRAGON-BENCHMAX NB6: the ring-1 boot smoke's props stall ratchet (scripts/loading-flow/stalls.mjs)
 const props = (start: number, ms: number) => ({ operation: 'stage:props', realm: 'page', start, end: start + ms });
@@ -45,4 +45,27 @@ test('the clock mark pins profile samples to the page clock, whatever the stop r
   expect(anchor).toEqual({ pageMs: 5030, profileUs: 30_000 });
   expect(profileIdle(profile, anchor)).toEqual([{ start: 5000, end: 5010 }, { start: 5020, end: 5030 }]);
   expect(() => profileAnchor({ ...profile, samples: [1, 2, 1, 2, 2] }, 0)).toThrow('no clock mark');
+});
+
+// NB6, widened to play: the boot smoke's ten gameplay frames refuse a stretch of unbroken main-thread work
+test('a 2 s busy sleep in a frame is a play stall; frames waiting on the GPU or idle are not', () => {
+  const sleep = playStall([{ start: 3000, end: 5000 }], 1000, 9000);
+  expect(sleep).toEqual({ from: 2000, busyMs: 1500, playMs: 8000 });
+  expect(playStallFaults(sleep)[0]).toMatch(/^Play stall: the main thread worked 1\.50 s of a 1\.5 s window/u);
+  // a slow GPU's frames: 30 ms of work every 3 s (CI's SwiftShader), or 12 ms in every 16 ms frame
+  expect(playStallFaults(playStall(Array.from({ length: 3 }, (_, i) => ({ start: 1000 + i * 3000, end: 1030 + i * 3000 })), 1000, 10_000))).toEqual([]);
+  expect(playStallFaults(playStall(Array.from({ length: 500 }, (_, i) => ({ start: i * 16, end: i * 16 + 12 })), 0, 8000))).toEqual([]);
+  // exact limit
+  const limit = STALL_WINDOW_MS * PLAY_BUSY_SHARE;
+  expect(playStallFaults(playStall([{ start: 0, end: limit - 1 }], 0, 5000))).toEqual([]);
+  expect(playStallFaults(playStall([{ start: 0, end: limit }], 0, 5000))).toHaveLength(1);
+});
+
+test('play busy leaves out idle, the browser\'s own bookkeeping and WebGL calls, and keeps script and its natives', () => {
+  const profile = { nodes: [{ id: 1, callFrame: { functionName: '(idle)', url: '' } }, { id: 2, callFrame: { functionName: 'step', url: 'https://x/a.js' } },
+    { id: 3, callFrame: { functionName: 'drawElements', url: '' } }, { id: 4, callFrame: { functionName: '(program)', url: '' } },
+    { id: 5, callFrame: { functionName: 'now', url: '' } }, { id: 6, callFrame: { functionName: CLOCK_MARK, url: 'https://x/a.js' } }],
+    samples: [2, 5, 3, 1, 4, 2, 6], timeDeltas: [0, 5000, 5000, 5000, 5000, 5000, 5000], startTime: 0, endTime: 30_000 };
+  // page clock = profile clock (the mark's first sample at 30 ms)
+  expect(profileBusy(profile, profileAnchor(profile, 30))).toEqual([{ start: 0, end: 10 }, { start: 25, end: 30 }]);
 });

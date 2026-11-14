@@ -12,7 +12,7 @@ import { captureBootFrame } from './black-frame.mjs';
 import { observeTitleCapture } from './title-trace.mjs';
 import { gridBootWaitHistory } from './grid-boot-waits.mjs';
 import { gridFloorDocumentIdentity, runFloorGridRoute, gridFloorWitnessFailures } from '../frame-floor-grid.mjs';
-import { finishStallProfile, startStallProfile } from '../loading-flow/stalls.mjs';
+import { finishPlayProfile, finishStallProfile, startStallProfile } from '../loading-flow/stalls.mjs';
 
 /** A locked experimental card is not a public gameplay entry. Its direct chunk
  * page must still hydrate under the unwaived public playing envelope (call44).
@@ -530,14 +530,19 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
       const overhead = await page.evaluate(spawnOverhead);
       if (overhead !== null) throw new Error(`grid spawn is under a collider: ${JSON.stringify(overhead)}`);
     }
+    // NINE-DRAGON-BENCHMAX NB6 (play): the ten gameplay frames are profiled too, and a stretch in which the main thread
+    // worked without a break (a 2 s busy sleep in a frame) is refused, whatever the GPU (scripts/loading-flow/stalls.mjs)
+    const playProfile = await startStallProfile(page), playFrom = Number(await page.evaluate('performance.now()'));
     await until(page, faults, async () => (await page.evaluate(bootObservation)).frame >= initial.frame + 10, 'ten live gameplay frames', deadline);
     gameplayFrames.final = (await page.evaluate(bootObservation)).frame;
+    /** @type {{ from: number, busyMs: number, playMs: number } | null} */ let playStall = null;
+    if (playProfile !== null) { const read = await finishPlayProfile(page, playProfile, playFrom); playStall = read.stall; faults.push(...read.faults); }
     phases.framesCompleteMs = Date.now() - started;
     await captureBootFrame(page, mode === 'grid' ? 'grid HOME' : `${shard} gameplay`, deadline, frames);
     const roadDeadline = Date.now() + 90000;
     const templateRoad = mode === 'grid' ? await bootTemplateRoad(page, faults, frames, roadDeadline) : null;
     const road = mode === 'grid' ? await bootSignalRoad(page, faults, frames, roadDeadline) : null;
-    const result = { mode, phases, frames, gameplayFrames, stalls, gridWaits: gridWaits.samples, templateRoad, road, telemetryPosts, lifecycleReports, gridNavigationObserved, elapsedMs: Date.now() - started, ...await page.evaluate(bootObservation), faults, reports };
+    const result = { mode, phases, frames, gameplayFrames, stalls, playStall, gridWaits: gridWaits.samples, templateRoad, road, telemetryPosts, lifecycleReports, gridNavigationObserved, elapsedMs: Date.now() - started, ...await page.evaluate(bootObservation), faults, reports };
     if (faults.length > 0 || result.fatal.length > 0) throw new Error(JSON.stringify(result));
     if (afterGameplay !== null) await afterGameplay(page);
     if (faults.length > 0) throw new Error(JSON.stringify(faults));

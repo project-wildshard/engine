@@ -7,7 +7,8 @@
 // the drawing buffer (pixel ratio, megapixels).
 //   scripts/browser-lane.sh node scripts/loading-flow/deskbench.mjs --base <url> [--shards Nine,Nalati,Driftwood]
 //     [--frames 240] [--poses 6] [--width 1496 --height 717 --scale 2] [--gfx-dpr 1|1.5|2|native] [--json <out.json>]
-//     [--shots <dir>] [--profile <dir>] [--census] [--ab]
+//     [--shots <dir>] [--profile <dir>] [--census] [--ab] [--capped] [--stalls]
+//   --stalls: NB6's play-stall ratchet at each pose (exits 1 on a stall); with --capped, the desktop check Ring 1 can't run.
 //   --ab: at the last pose, each lever against the baseline, interleaved over 6 rounds so a busy machine's drift cancels
 //   (render scale 1 and 0.75, the shadow maps held, AO off, the post passes off, the viewmodel hidden).
 //   --hide <regex>: at each pose a second shot with every object whose name matches and everything under it drawn on no layer (what is behind it).
@@ -19,12 +20,13 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
+import { finishPlayProfile, startStallProfile } from './stalls.mjs';
 import { NAME_ASKED, developerSettings, saveFixture, levelDownloadFixtures, hideDeveloperOverlays, harnessPins } from '../debug-settings.mjs';
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shards: { type: 'string', default: 'Nine,Nalati,Driftwood' },
   frames: { type: 'string', default: '240' }, poses: { type: 'string', default: '6' }, width: { type: 'string', default: '1496' },
   height: { type: 'string', default: '717' }, scale: { type: 'string', default: '2' }, json: { type: 'string' }, shots: { type: 'string' },
-  'gfx-dpr': { type: 'string' }, extra: { type: 'string' }, walk: { type: 'string', default: '0' }, ab: { type: 'boolean', default: false }, census: { type: 'boolean', default: false }, profile: { type: 'string' }, hide: { type: 'string' }, settle: { type: 'string', default: '2500' } } });
+  'gfx-dpr': { type: 'string' }, extra: { type: 'string' }, walk: { type: 'string', default: '0' }, ab: { type: 'boolean', default: false }, capped: { type: 'boolean', default: false }, stalls: { type: 'boolean', default: false }, census: { type: 'boolean', default: false }, profile: { type: 'string' }, hide: { type: 'string' }, settle: { type: 'string', default: '2500' } } });
 if (values.base === undefined) { console.error('usage: deskbench.mjs --base <url> [--shards Nine,Nalati,Driftwood] [--frames 240] [--poses 6] [--json <file>] [--shots <dir>] [--profile <dir>] [--census] [--ab]'); process.exit(2); }
 const base = values.base.replace(/\/$/u, ''), frames = Number(values.frames), maxPoses = Number(values.poses), settle = Number(values.settle);
 const walkSeconds = Number(values.walk);
@@ -148,7 +150,10 @@ async function abCosts(/** @type {any} */ sampler) {
   return [...rows].map(([variant, xs]) => { const p50 = med(xs.map((x) => x.p50)); return { variant, p50, saves: Math.round((baseline - p50) * 10) / 10, work: med(xs.map((x) => x.workP50)), render: med(xs.map((x) => x.renderP50)), calls: med(xs.map((x) => x.calls)) }; });
 }
 
-const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'] });
+// --capped: vsync and the frame-rate limit kept (shots, look checks, CI): Jake plays on this Mac, and an uncapped page halves
+// his frame rate (meta lane rules, opus-deskperf 11-14); uncapped only to read a frame's real cost
+const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist',
+  ...(values.capped ? [] : ['--disable-gpu-vsync', '--disable-frame-rate-limit'])] });
 /** @type {any[]} */
 const report = [];
 try {
@@ -214,7 +219,14 @@ try {
       await page.evaluate(`window.__wildshard.pose(${JSON.stringify(pose)})`);
       await sleep(settle);
       if (cdp !== null) await cdp.send('Profiler.start');
+      // --stalls (NB6, desktop): ring 1's play-stall ratchet over this pose's sample (scripts/loading-flow/stalls.mjs)
+      const stallSession = values.stalls && cdp === null ? await startStallProfile(page) : null, stallFrom = Number(await page.evaluate('performance.now()'));
       const frame = await page.evaluate(`(${sampleFrames.toString()})(${frames})`);
+      if (stallSession !== null) {
+        const read = await finishPlayProfile(page, stallSession, stallFrom);
+        console.log(`  ${pose.name.padEnd(22)} play stall: worst ${(read.stall.busyMs / 1000).toFixed(2)} s busy of a 1.5 s window${read.faults.length === 0 ? '' : ` · ${read.faults.join('; ')}`}`);
+        if (read.faults.length > 0) process.exitCode = 1;
+      }
       if (cdp !== null && values.profile !== undefined) { const { profile } = await cdp.send('Profiler.stop'); writeFileSync(join(values.profile, `${shardName}-${pose.name}.cpuprofile`.replaceAll(/[^\w.-]+/gu, '_')), JSON.stringify(profile)); }
       rows.push({ pose, frame });
       console.log(`  ${pose.name.padEnd(22)} ${(1000 / frame.p50).toFixed(0).padStart(4)} fps · p50 ${frame.p50} p95 ${frame.p95} max ${frame.max} ms · work p50 ${frame.workP50} (update ${frame.updateP50} render ${frame.renderP50}) p95 ${frame.workP95} · ${frame.calls} draws · ${(frame.triangles / 1e6).toFixed(2)} M tris · ratio ${frame.pixelRatio} ${frame.buffer.join('x')} (${frame.mpx} Mpx)`);
