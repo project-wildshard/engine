@@ -8,3 +8,6 @@
   crossing was a start-over (J107): a walker who stepped onto the road and turned back met Driftwood booting again at the
   line. `cellHost.ts` now defers a start-over while anyone on the worker's road stands within 40 m of that cell's edge
   (`RoadRoom.near`), and looks again every 5 s. `test/dedicated-start-over-near.test.ts`, red first.
+- GC7: the page's readiness wall gets GC2's cases as a physics test (`grid-readiness-wall-breach.test.ts`): walk, boost at
+  18 m/s, jump, a fall from 40 m and a slide along it, all four sides, held while closed and through once ready. Red under
+  a 2 m wall and under a wall that never opens.
