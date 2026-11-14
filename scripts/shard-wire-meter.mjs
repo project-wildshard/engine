@@ -80,13 +80,16 @@ try {
   result.build = await page.evaluate(() => fetch('/version.json').then(r => r.json()).then(v => v.build ?? v.sha ?? null)).catch(() => null);
   await page.locator('.ws-main-select').waitFor({ timeout });
   await page.waitForTimeout(Number(o.dwell));
-  if (o.flow === 'grid') { stage = 'entry'; await page.locator('.ws-main-grid').click({ timeout }); }
+  // a first visit names its player before the deck or the grid opens
+  const named = async () => {
+    if (await page.locator('#ws-name-box input').waitFor({ timeout: 15_000 }).then(() => true).catch(() => false)) {
+      await page.locator('#ws-name-box input').fill('wiremeter'); await page.locator('#ws-name-box button[type=submit]').click();
+    }
+  };
+  if (o.flow === 'grid') { stage = 'entry'; await page.locator('.ws-main-grid').click({ timeout }); await named(); }
   else {
   await page.locator('.ws-main-select').click({ timeout });
-  // a first visit names its player before the deck opens
-  if (await page.locator('#ws-name-box input').waitFor({ timeout: 15_000 }).then(() => true).catch(() => false)) {
-    await page.locator('#ws-name-box input').fill('wiremeter'); await page.locator('#ws-name-box button[type=submit]').click();
-  }
+  await named();
   await page.locator('.ws-menu-card').first().waitFor({ timeout });
   const titles = await page.locator('.ws-menu-card b').allTextContents();
   let index;
