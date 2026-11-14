@@ -151,6 +151,16 @@ export class NetPlayer implements PlayerLink {
   get heldSlot(): number { return this.held; }
   /** The server has put this body somewhere: a frame has been heard. */
   get joined(): boolean { return this.seen !== null; }
+  /** OFFLINE OF10 (J298, Jake 2026-11-12: "do a very limited amount of client-side emulation"): a world page that opened without
+   *  its seat (OF9) plays its input on the predictor alone until the ring is full (PREDICTION_RING, about 1 s), then holds. Nothing
+   *  goes on the wire: these moves are the page's own, and the seat's first frame takes the server's place, gliding to it when it
+   *  is near (under PREDICTION_SNAP). A rejoin or a crossing still holds still until its first frame. */
+  private unseated = false;
+  private unseatedSeq = 0;
+  /** OF10: play unseated until the first frame (a page that has heard one is seated, and this does nothing). */
+  playUnseated(): void { if (this.seen === null) this.unseated = true; }
+  /** OF10: unseated, and the ring is spent: movement holds until the seat. */
+  get unseatedHeld(): boolean { return this.unseated && this.predictor.full; }
   /** A death's authoritative pose is already reset on the server. Keep this page at the death until its overlay is dark. */
   holdRespawn(): void { this.respawnHeld = true; }
   /** Adopt the newest server pose under the dark, dropping commands from before the death. */
@@ -158,7 +168,8 @@ export class NetPlayer implements PlayerLink {
 
   /** A fixed step. False, with nothing sent, before the first frame or when a full ring says the server stopped answering. */
   step(input: PlayerWireInput): boolean {
-    if (this.respawnHeld || this.seen === null || this.predictor.full) return false;
+    if (this.respawnHeld || this.predictor.full) return false;
+    if (this.seen === null) return this.unseated && this.deviceMode !== 'paused' && this.stepUnseated(input);
     if (!this.claimInputTick(0)) return false;
     const armed = this.armed(input);
     return this.sendCommand(armed, true, this.hooked(armed));
@@ -187,6 +198,12 @@ export class NetPlayer implements PlayerLink {
     this.sendCommand(input, false);
     for (let at = 1; at < MAX_FIXED_STEPS && !this.predictor.full && this.claimInputTick(MAX_FIXED_STEPS); at++) this.sendCommand(input, false);
     this.client.flush();
+  }
+  /** OF10: one step of the page's own, unsent, with a seq of its own; world actions wait for the link (the hold cards). */
+  private stepUnseated(input: PlayerWireInput): boolean {
+    const seq = this.unseatedSeq = (this.unseatedSeq % 0xffff) + 1;
+    this.world.poseFor(seq, false);
+    return this.predictor.step(quantiseCommand({ ...input, seq, viewTick: 0 }));
   }
   private claimInputTick(reserve: number): boolean {
     if (this.deviceMode === 'frame') return true;
@@ -234,7 +251,7 @@ export class NetPlayer implements PlayerLink {
     this.world.frame(frame.tick, frame.lastSeq);
     for (const event of this.heard.splice(0)) if (event.kind === 'mount') seat?.enter(event.mount); else seat?.leave();
     const ridden = seat === null ? null : frame.ride;
-    if (first) { this.predictor.adopt(frame.lastSeq, frame.owner, frame.tick, ridden); return; }
+    if (first) { const glide = this.unseated; this.unseated = false; this.predictor.adopt(frame.lastSeq, frame.owner, frame.tick, ridden, glide); return; }
     this.predictor.reconcile(frame.lastSeq, frame.owner, frame.tick, ridden);
     const swung = PLAYER_CLASS.owner[LAST_SWING]?.value(frame.owner[LAST_SWING] ?? 0), held = PLAYER_CLASS.owner[HELD]?.value(frame.owner[HELD] ?? 0);
     this.attacks.frame(frame.lastSeq, typeof swung === 'number' ? swung : 0);

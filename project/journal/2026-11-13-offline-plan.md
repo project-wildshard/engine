@@ -19,3 +19,8 @@ prod should never try to play offline versions ... Load into the world. And then
   `SEAT_GRACE_MS` (1.5 s; none when `navigator.onLine` is false, `seatGrace.ts`), then opens the world unseated: the first-rows
   waits are skipped, the shell keeps dialling, `ready()` is said early (the online shell already held it until a seat), and the
   seat, when it comes, places the player (GO5). A seat inside the grace keeps QA row 29's reveal at the saved place.
+- **OF10, a little held play.** `NetPlayer` stepped nothing before its first frame. An unseated world page (`playUnseated`,
+  set by OF9's path only) now steps its own input on the predictor with page-only seqs and sends nothing, until the ring is
+  full (`PREDICTION_RING`, 64 steps, about 1 s), then movement holds while the key stays down. A rejoin or a crossing still
+  holds still until its first frame. The seat's first frame adopts the server's place and, when it is under `PREDICTION_SNAP`,
+  glides the camera onto it (`adopt(..., glide)`). World actions are already gated by FM4's hold cards (`gateActions`).

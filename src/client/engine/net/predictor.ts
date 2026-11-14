@@ -174,8 +174,8 @@ export class Predictor {
   }
 
   /** A session's first frame: this body stands where the server says, with nothing to compare it to. */
-  adopt(lastSeq: number, owner: ArrayLike<number>, tick?: number, ridden: ArrayLike<number> | null = null): void {
-    const { body, table } = this, s = body.motionState, { yaw } = s;
+  adopt(lastSeq: number, owner: ArrayLike<number>, tick?: number, ridden: ArrayLike<number> | null = null, glide = false): void {
+    const { body, table } = this, s = body.motionState, { yaw } = s, was = { x: s.position.x, y: s.position.y, z: s.position.z };
     if (tick !== undefined) s.tick = tick;
     this.acked = lastSeq; this.led = this.flag(table.led, owner) === 1; this.resets = this.value(table.resets, owner); this.aboard = ridden !== null;
     this.head = 0; this.count = 0;
@@ -185,6 +185,11 @@ export class Predictor {
     this.write(s, owner); // the reset cleared the ground the owner block had just landed
     if (ridden !== null) body.ride?.adopt(ridden);
     body.renderOffset.set(0, 0, 0);
+    // OFFLINE OF10: a page that played unseated glides onto its seat when it is near, as a correction does; a far seat snaps
+    if (glide) {
+      const dx = was.x - s.position.x, dy = was.y - s.position.y, dz = was.z - s.position.z;
+      if (Math.hypot(dx, dy, dz) < PREDICTION_SNAP) body.renderOffset.set(dx, dy, dz);
+    }
   }
 
   /** Each render frame: the camera glides back onto the predicted feet. */

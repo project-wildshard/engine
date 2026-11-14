@@ -457,7 +457,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const unseated = shell.redials === true
     && !await seatedInTime(shell.booted, SEAT_GRACE_MS, navigator.onLine, ms => new Promise<void>(resolve => { scope.timeout(ms, resolve); }));
   const { restored } = unseated ? { restored: false } : await bootTask('server:await-booted', () => shell.booted);
-  if (unseated) bootMark('server:unseated');
+  // OF10: unseated, the page plays its own input for the predictor's ring, then holds until the seat
+  if (unseated) { bootMark('server:unseated'); net.playUnseated(); }
   // E7.6: only a world has anyone else in it.
   let others: OtherPlayers | null = null;
   if (shell.redials === true) others = new (await import('@wildshard/engine/net/otherPlayers')).OtherPlayers(client, ports.scene, scope, player.position);
