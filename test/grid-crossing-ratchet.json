@@ -1,0 +1,422 @@
+{
+  "preview/chromium-desktop/driftwood-isle:far-reach": {
+    "ok": false,
+    "borderToControlMs": null,
+    "freezeMs": null,
+    "wallMs": null,
+    "over50": null
+  },
+  "preview/chromium-desktop/driftwood-isle:nalati-grasslands": {
+    "ok": false,
+    "borderToControlMs": null,
+    "freezeMs": 73100,
+    "wallMs": 73000,
+    "over50": 0
+  },
+  "preview/chromium-desktop/driftwood-isle:pine-hollow": {
+    "ok": false,
+    "borderToControlMs": null,
+    "freezeMs": null,
+    "wallMs": null,
+    "over50": null
+  },
+  "preview/chromium-desktop/driftwood-isle:sunscar-dunes": {
+    "ok": false,
+    "borderToControlMs": null,
+    "freezeMs": null,
+    "wallMs": null,
+    "over50": null
+  },
+  "preview/webkit-phone/blender-template:far-reach": {
+    "ok": true,
+    "borderToControlMs": 138,
+    "freezeMs": 628,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/blender-template:open-plot-0-1": {
+    "ok": true,
+    "borderToControlMs": 103,
+    "freezeMs": 524,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/blender-template:sunscar-dunes": {
+    "ok": true,
+    "borderToControlMs": 213,
+    "freezeMs": 516,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/driftwood-isle:nalati-grasslands": {
+    "ok": true,
+    "borderToControlMs": 106,
+    "freezeMs": 1764,
+    "wallMs": 1700,
+    "over50": 2
+  },
+  "preview/webkit-phone/driftwood-isle:pine-hollow": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 308,
+    "wallMs": 0,
+    "over50": 2
+  },
+  "preview/webkit-phone/driftwood-isle:sunscar-dunes": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 229,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/far-reach:blender-template": {
+    "ok": false,
+    "borderToControlMs": null,
+    "freezeMs": 620,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/far-reach:driftwood-isle": {
+    "ok": false,
+    "borderToControlMs": null,
+    "freezeMs": 739,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/far-reach:nine-dragon-stack": {
+    "ok": false,
+    "borderToControlMs": null,
+    "freezeMs": 618,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/far-reach:open-plot-2-0": {
+    "ok": false,
+    "borderToControlMs": null,
+    "freezeMs": 517,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/ink-cel-valley:open-plot-0-4": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/ink-cel-valley:pastel-plain": {
+    "ok": true,
+    "borderToControlMs": 102,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 3
+  },
+  "preview/webkit-phone/nalati-grasslands:nine-dragon-stack": {
+    "ok": true,
+    "borderToControlMs": 112,
+    "freezeMs": 8275,
+    "wallMs": 7600,
+    "over50": 4
+  },
+  "preview/webkit-phone/nalati-grasslands:open-plot-4-2": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/nalati-grasslands:template-2": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/nine-dragon-stack:open-plot-3-0": {
+    "ok": true,
+    "borderToControlMs": 110,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/nine-dragon-stack:open-plot-4-1": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 204,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-0-0:open-plot-1-0": {
+    "ok": true,
+    "borderToControlMs": 103,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-0-1:blender-template": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 413,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-0-1:open-plot-0-0": {
+    "ok": true,
+    "borderToControlMs": 109,
+    "freezeMs": 4923,
+    "wallMs": 4600,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-0-2:open-plot-0-1": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 4784,
+    "wallMs": 4500,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-0-2:open-plot-0-3": {
+    "ok": true,
+    "borderToControlMs": 209,
+    "freezeMs": 206,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-0-3:open-plot-0-2": {
+    "ok": true,
+    "borderToControlMs": 114,
+    "freezeMs": 201,
+    "wallMs": 0,
+    "over50": 7
+  },
+  "preview/webkit-phone/open-plot-0-3:pastel-plain": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-0-4:ink-cel-valley": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 417,
+    "wallMs": 0,
+    "over50": 3
+  },
+  "preview/webkit-phone/open-plot-1-0:blender-template": {
+    "ok": true,
+    "borderToControlMs": 105,
+    "freezeMs": 203,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-1-0:open-plot-2-0": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 204,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-2-0:open-plot-1-0": {
+    "ok": true,
+    "borderToControlMs": 208,
+    "freezeMs": 4363,
+    "wallMs": 4200,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-2-0:open-plot-3-0": {
+    "ok": true,
+    "borderToControlMs": 212,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 4
+  },
+  "preview/webkit-phone/open-plot-2-4:ink-cel-valley": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-2-4:open-plot-3-4": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-3-0:open-plot-2-0": {
+    "ok": true,
+    "borderToControlMs": 105,
+    "freezeMs": 204,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-3-0:open-plot-4-0": {
+    "ok": true,
+    "borderToControlMs": 210,
+    "freezeMs": 4909,
+    "wallMs": 4600,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-3-4:open-plot-2-4": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 208,
+    "wallMs": 0,
+    "over50": 2
+  },
+  "preview/webkit-phone/open-plot-3-4:open-plot-4-4": {
+    "ok": true,
+    "borderToControlMs": 104,
+    "freezeMs": 204,
+    "wallMs": 0,
+    "over50": 6
+  },
+  "preview/webkit-phone/open-plot-4-0:open-plot-4-1": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-4-1:nine-dragon-stack": {
+    "ok": true,
+    "borderToControlMs": 206,
+    "freezeMs": 100,
+    "wallMs": 100,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-4-1:open-plot-4-2": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-4-2:nalati-grasslands": {
+    "ok": true,
+    "borderToControlMs": 105,
+    "freezeMs": 2429,
+    "wallMs": 2300,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-4-2:open-plot-4-1": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 1
+  },
+  "preview/webkit-phone/open-plot-4-2:open-plot-4-3": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 204,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-4-3:open-plot-4-2": {
+    "ok": true,
+    "borderToControlMs": 105,
+    "freezeMs": 203,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-4-3:template-2": {
+    "ok": true,
+    "borderToControlMs": 101,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/open-plot-4-4:open-plot-3-4": {
+    "ok": true,
+    "borderToControlMs": 205,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/pastel-plain:open-plot-0-3": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 207,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/pastel-plain:pine-hollow": {
+    "ok": true,
+    "borderToControlMs": 1613,
+    "freezeMs": 934,
+    "wallMs": 800,
+    "over50": 3
+  },
+  "preview/webkit-phone/pastel-plain:sunscar-dunes": {
+    "ok": true,
+    "borderToControlMs": 205,
+    "freezeMs": 100,
+    "wallMs": 100,
+    "over50": 0
+  },
+  "preview/webkit-phone/pine-hollow:open-plot-2-4": {
+    "ok": true,
+    "borderToControlMs": 98,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 8
+  },
+  "preview/webkit-phone/pine-hollow:pastel-plain": {
+    "ok": true,
+    "borderToControlMs": 96,
+    "freezeMs": 516,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/pine-hollow:template-2": {
+    "ok": true,
+    "borderToControlMs": 108,
+    "freezeMs": 204,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/sunscar-dunes:blender-template": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 7108,
+    "wallMs": 6500,
+    "over50": 1
+  },
+  "preview/webkit-phone/sunscar-dunes:driftwood-isle": {
+    "ok": true,
+    "borderToControlMs": 109,
+    "freezeMs": 306,
+    "wallMs": 0,
+    "over50": 2
+  },
+  "preview/webkit-phone/sunscar-dunes:open-plot-0-2": {
+    "ok": true,
+    "borderToControlMs": 104,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/template-2:nalati-grasslands": {
+    "ok": true,
+    "borderToControlMs": 0,
+    "freezeMs": 5377,
+    "wallMs": 4600,
+    "over50": 0
+  },
+  "preview/webkit-phone/template-2:open-plot-4-3": {
+    "ok": true,
+    "borderToControlMs": 105,
+    "freezeMs": 100,
+    "wallMs": 0,
+    "over50": 0
+  },
+  "preview/webkit-phone/template-2:pine-hollow": {
+    "ok": true,
+    "borderToControlMs": 1897,
+    "freezeMs": 3589,
+    "wallMs": 3300,
+    "over50": 6
+  }
+}
