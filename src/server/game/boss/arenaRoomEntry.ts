@@ -75,7 +75,11 @@ export function installArenaEntry(host: SimHost, input: unknown, row: ArenaEntry
     spawnBody: () => spawn(`${row.id}.body`, row.body.kind, row.body.variant, room.origin.x, room.origin.z, 0),
     spawnAdd: (_index, ax, az, yaw) => spawn(`${row.id}.add.${String(adds++ % ADDS)}`, add.kind, add.variant, ax, az, yaw),
     retire: actor => { actor.hidden = true; }, find: id => body(id), seal, saved,
-    persist: value => { if (value.defeated) host.flags.set(flag('defeated')); if (value.rewardTaken) host.flags.set(flag('paid')); },
+    // SC10 (J328): back to not beaten only when a served world's King stands again: the world's flags clear and the orb goes with them
+    persist: value => {
+      if (!value.defeated) { host.flags.clear(flag('defeated')); host.flags.clear(flag('paid')); orb = null; return; }
+      host.flags.set(flag('defeated')); if (value.rewardTaken) host.flags.set(flag('paid'));
+    },
     // a lone player earned it alone; a room's earners come from the book at the killing blow
     spawnReward: () => { if (!fight.bounty.room) fight.bounty.award([...host.players.keys()]); orb = orbAt; }, rewardPoint: () => orb });
   // J105: the orb on the pedestal is each earner's own, through the ledger, and it stands until the last of them has taken theirs.

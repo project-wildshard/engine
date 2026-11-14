@@ -38,3 +38,6 @@
   `dead:captain` clears and the captain's body retires, so the next wake cue spawns him afresh. Found on the way: since SC5 a served
   world owed the dead captain as a roster body, which has no scale row and threw in the tick 5 min later (failing the worker); the
   captain is now reserved from native returns.
+- SC10 item 3: a served world's returned boss is a fresh world's record: `BossBrain.returnBeaten` sets `defeated` false too, and the
+  arena room's `boss.<id>.defeated/paid` (and any boss row's flag record) clear with it, the room's unclaimed orb too. The flags still
+  only ever set otherwise, so a page's or tape's record is unchanged.

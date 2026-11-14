@@ -5,13 +5,14 @@ import { pageStateOf } from '../shardfile/runtimeState';
 /** A boss row's two durable flags: beaten (its record's `defeated`) and paid (its record's `rewardTaken`). */
 export interface BossRowFlagNames { readonly defeated: string; readonly paid: string }
 /** The shard flags a boss record reads and writes. */
-export interface BossRowFlags { has: (flag: string) => boolean; set: (flag: string) => void }
+export interface BossRowFlags { has: (flag: string) => boolean; set: (flag: string, on?: boolean) => void }
 
 /** A boss row's record kept on the shard's own flags (no save of its own): `saved` to start from, `persist` to write. */
 export function bossFlagRecord(flags: BossRowFlags, names: BossRowFlagNames): { saved: BossSaved; persist: (value: BossSaved) => void } {
   const defeated = flags.has(names.defeated);
   return { saved: { defeated, rewardTaken: flags.has(names.paid), kills: defeated ? 1 : 0 },
-    persist: (value) => { if (value.defeated) flags.set(names.defeated); if (value.rewardTaken) flags.set(names.paid); } };
+    // SC10: a record goes back to not beaten only when a served world's boss stands again (`returnBeaten`), and both flags clear with it
+    persist: (value) => { if (!value.defeated) { flags.set(names.defeated, false); flags.set(names.paid, false); return; } flags.set(names.defeated); if (value.rewardTaken) flags.set(names.paid); } };
 }
 
 const finite = v.pipe(v.number(), v.finite());
