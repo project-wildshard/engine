@@ -2,7 +2,7 @@ import { pageScope } from '../../../shared/engine/app/resources';
 import { saveStorage } from '../saves/slots';
 /** A small durable breadcrumb for an enabled level boot. A terminated WebContent process cannot run a final handler. */
 import { deliverBrowserError, flushScreenReports, screenReportsEnabled } from '../telemetry/browserErrors';
-import { reportStaleBuild } from '../telemetry/staleBuildReport';
+import { reportSelfReload, reportStaleBuild, selfReloadClaim } from '../telemetry/staleBuildReport';
 import type { ProgressView } from './plan';
 import { markDropStep } from './dropNotice';
 
@@ -49,7 +49,8 @@ export interface BootTrace {
   bootTraceActive: () => boolean;
   previousBootLevel: () => string;
   flushBootReports: () => Promise<void>;
-  inspectPreviousBoot: () => void;
+  /** `markedReload`: the page before marked its reload (lastEnd.ts), so a self-reload claim is never index.html's (S18) */
+  inspectPreviousBoot: (markedReload?: boolean) => void;
   previousBootLine: () => string;
   bootDiagnostic: () => Record<string, unknown>;
   bootDiagnosticJson: () => string;
@@ -81,6 +82,8 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
   interface PendingReport { record: BootRecord; reason: string; inbox: boolean; sentry: boolean }
   let flushing = false;
   let retryListener = false;
+  /** S18: index.html's self-reload claim as this page found it, and whether the page before marked its reload */
+  let selfReload: { claim: string | null; marked: boolean } | undefined;
 
   function reports(): PendingReport[] {
     try {
@@ -181,7 +184,12 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
   }
 
   /** Called by lastEnd on every new document, before its own boot can replace the old record. */
-  function inspectPreviousBoot(): void {
+  function inspectPreviousBoot(markedReload = false): void {
+    // S18: the claim, read before an online settle clears it; lastEnd and entry.ts both call this, one report a page
+    const firstCall = selfReload === undefined;
+    selfReload ??= { claim: selfReloadClaim(), marked: false };
+    if (markedReload) selfReload.marked = true;
+    const self = selfReload;
     if (!retryListener && typeof window !== 'undefined') {
       retryListener = true;
       pageScope.listen(window, 'online', () => { void flushBootReports(); });
@@ -209,7 +217,7 @@ export function createBootTrace(transports: BootTraceTransports = PAGE_TRANSPORT
     // SENTRY-TRIAGE S13: an error screen an earlier page opened and could not deliver goes now, off the boot's hot path (title too).
     // STALE-BUILD SB6: a stale-build screen an earlier page showed (index.html's note) joins the outbox first.
     // No DSN (dev, tests): nothing can be sent, so no timer joins the page's own (the sw tests count them).
-    if (typeof window !== 'undefined' && screenReportsEnabled()) pageScope.timeout(8000, () => { reportStaleBuild(); flushScreenReports(); });
+    if (typeof window !== 'undefined' && screenReportsEnabled()) pageScope.timeout(8000, () => { reportStaleBuild(); if (firstCall) reportSelfReload(() => (self.marked ? null : self.claim)); flushScreenReports(); });
   }
 
   /** Shown in the loader and the Loading & memory Debug row after a restart. */

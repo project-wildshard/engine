@@ -713,6 +713,7 @@
     "src/client/game/grid/roadTileWrite.worker.ts": "client",
     "src/client/game/grid/roadTileWriter.ts": "client",
     "src/client/game/grid/runtimeCost.ts": "client",
+    "src/client/game/grid/screenReports.ts": "client",
     "src/client/game/grid/seamLook.ts": "client",
     "src/client/game/grid/session.ts": "client",
     "src/client/game/grid/shardfileFar.ts": "client",

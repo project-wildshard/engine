@@ -145,6 +145,72 @@ walk('loading-stall', "a content read past its own retry offers the card's RETRY
   expect(opened()).toEqual(['loading-stall']);
 });
 
+walk('stale-reload', "a build whose files are gone puts up RELOADING and reports it once, before the reload (S18)", async () => {
+  sessionStorage.clear();
+  // the reload waits on the cover and a painted frame: the walk holds it, and sees the report came first
+  const leaves: number[] = [];
+  vi.doMock('../src/client/engine/boot/leaveAfterPaint', () => ({ leaveAfterPaint: () => { leaves.push(reports.length); } }));
+  (await import('../src/client/engine/saves/view/storage')).installBrowserSaveEnvironment(); // its once-per-build claim is in session storage
+  vi.stubGlobal('fetch', () => Promise.resolve(Response.json({ build: 'live-build' })));
+  const { reloadIfStaleBuild } = await import('../src/client/engine/boot/browserChunkRecovery');
+  const { browserErrorLevel } = await import('../src/client/engine/telemetry/browserErrors');
+  expect(await reloadIfStaleBuild()).toBe(true);
+  // once per build and tab: a second failure on the same build neither reloads nor reports again
+  expect(await reloadIfStaleBuild()).toBe(false);
+  expect(opened()).toEqual(['stale-reload']);
+  expect(reports[0]?.tags).toMatchObject({ system: 'chunk-recovery', build: 'fixture', fatal: false, diagnostic: { live: 'live-build' } });
+  expect(browserErrorLevel(reports[0]?.error, false, 'stale-reload')).toBe('warning');
+  await vi.waitFor(() => { expect(leaves).toEqual([1]); });
+  // the same live build is no stale screen
+  reports.length = 0; sessionStorage.clear();
+  vi.stubGlobal('fetch', () => Promise.resolve(Response.json({ build: 'fixture' })));
+  expect(await reloadIfStaleBuild()).toBe(false);
+  expect(opened()).toEqual([]);
+  vi.doUnmock('../src/client/engine/boot/leaveAfterPaint');
+});
+
+walk('self-reload', "index.html's 12 s self-reload is reported by the page it reloaded into, and only that page (S18)", async () => {
+  const { reportSelfReload, selfReloadClaim } = await import('../src/client/engine/telemetry/staleBuildReport');
+  const started = 1_800_000_000_000;
+  reportSelfReload(() => String(started - 400), started);
+  expect(opened()).toEqual(['self-reload']);
+  expect(reports[0]?.tags).toMatchObject({ system: 'boot', fatal: false, bootStage: 'loading' });
+  // an older claim (an earlier page's), a later one, chunk recovery's '1', nothing: no report
+  for (const value of [String(started - 3000), String(started + 500), '1', null]) reportSelfReload(() => value, started);
+  expect(selfReloadClaim(() => { throw new Error('no session storage'); })).toBeNull();
+  // stuck.ts's retry stamps a time too, but marks its reload: bootTrace passes no claim then (one report a page)
+  const trace = readFileSync('src/client/engine/boot/bootTrace.ts', 'utf8');
+  expect(trace).toMatch(/if \(firstCall\) reportSelfReload\(\(\) => \(self\.marked \? null : self\.claim\)\)/u);
+  expect(readFileSync('src/client/engine/boot/lastEnd.ts', 'utf8')).toMatch(/inspectPreviousBoot\(this\.thisEnd\.kind === 'intentional' && this\.thisEnd\.player !== true/u);
+  expect(opened()).toEqual(['self-reload']);
+});
+
+walk('save-failed', 'SAVE FAILED, RETRY at a border reports the first time a session shows it, naming both cells (S18)', async () => {
+  const { saveFailedReporter } = await import('../src/client/game/grid/screenReports');
+  const { browserErrorLevel } = await import('../src/client/engine/telemetry/browserErrors');
+  const report = saveFailedReporter((id) => (id === 'a' ? 'driftwood-isle' : id === 'b' ? 'nalati' : ''));
+  const failed = { current: 'a', target: 'b', phase: 'save-failed', issue: 'quota' } as const;
+  report('saving', { ...failed, phase: 'save-pending', issue: null });
+  report(null, failed);
+  report('failed', failed); report('failed', failed);
+  expect(opened()).toEqual(['save-failed']);
+  expect(reports[0]?.tags).toMatchObject({ system: 'grid', shard: 'driftwood-isle', bootStage: 'playing', fatal: false, diagnostic: { phase: 'save-failed', target: 'nalati' } });
+  expect(browserErrorLevel(reports[0]?.error, false, 'save-failed')).toBe('error');
+});
+
+walk('cell-unavailable', 'an UNAVAILABLE neighbour on Shard Select reports once per cell a session, at warning level (S18)', async () => {
+  const { refusalReporter } = await import('../src/client/game/grid/screenReports');
+  const { browserErrorLevel } = await import('../src/client/engine/telemetry/browserErrors');
+  const report = refusalReporter();
+  report('cell-1', 'nalati', 'incompatible', new Error('wrong format'));
+  report('cell-1', 'nalati', 'incompatible', new Error('wrong format again'));
+  report('cell-2', 'driftwood-isle', 'missing', 'a 404');
+  expect(opened()).toEqual(['cell-unavailable', 'cell-unavailable']);
+  expect(reports.map((r) => r.tags.shard)).toEqual(['nalati', 'driftwood-isle']);
+  expect(reports[1]?.tags.diagnostic).toEqual({ refusal: 'missing', cell: 'cell-2' });
+  expect(browserErrorLevel(reports[0]?.error, false, 'cell-unavailable')).toBe('warning');
+});
+
 test('a stale-build note that is not the inline script\'s shape is dropped, never reported', async () => {
   const { parseStaleBuildNote, takeStaleBuildNote } = await import('../src/client/engine/saves/staleBuildNote');
   for (const raw of [null, '', 'junk', '[]', '{"build":"b"}', JSON.stringify({ build: 1, at: 0, server: '', tries: 0, seen: 0 }), '{"build":"b","at":1e300,"server":"","tries":0,"seen":0}']) expect(parseStaleBuildNote(raw)).toBeNull();

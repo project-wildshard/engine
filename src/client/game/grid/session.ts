@@ -104,6 +104,7 @@ import { copyMarks } from './copyIdentity';
 import { CellMinimaps } from './minimapBlend';
 import { leaseMapImage } from '../shardfile/mapImage';
 import { crossingSaveStatus, installBorderShimmer, type BorderShimmerState, type CrossingSaveStatus } from './borderShimmer';
+import { refusalReporter, saveFailedReporter } from './screenReports';
 import { GAME_STRINGS } from '../../../shared/game/strings';
 import { GridCellWaitingError, classifyRefusal, pageShardRefusals, refusalReason, type ShardRefusal } from './refusal';
 import { tileRing } from '../shardfile/tileDriver';
@@ -371,6 +372,8 @@ export class GridSession {
   private readonly shimmer: { readonly step: () => void; readonly state: () => BorderShimmerState };
   /** G167: why a neighbour's shard can't load (its product refused, with the admission's message) and its far view's status */
   private readonly refusals = new Map<string, ShardRefusal>();
+  /** SENTRY-TRIAGE S18: UNAVAILABLE reports once per cell a session (screenReports.ts) */
+  private readonly reportRefusal = refusalReporter();
   private readonly issues = new Map<string, string>();
   private readonly farViews = new Set<string>();
   private readonly farPreparation: () => readonly FarPreparationWait[];
@@ -682,10 +685,15 @@ export class GridSession {
     // G78: a shimmer line at every shard border on its real ground; G119: SAVING… / SAVE FAILED, RETRY while a crossing waits
     const rows = new Map((edges ?? []).map((cell) => [cell.instance, cell.edges]));
     let status: CrossingSaveStatus = null, polled = 0;
+    // S18: SAVE FAILED, RETRY reports the first time a session shows it
+    const reportSave = saveFailedReporter((id) => { try { return id === null ? '' : this.assembly.cell(id).slug; } catch { return ''; } });
     this.shimmer = installBorderShimmer({ scene: host.scene, scope: host.scope, time: () => app.clock.now,
       cells: this.assembly.cells.map((cell) => ({ x: cell.origin.x - home.origin.x, z: cell.origin.z - home.origin.z, edges: rows.get(cell.instance) ?? null })),
       ports: { feet: () => { const at = this.world(); return { x: at.x - home.origin.x, z: at.z - home.origin.z }; },
-        status: () => { if (++polled % 4 === 0) status = crossingSaveStatus(this.live?.state().crossing); return status; },
+        status: () => {
+          if (++polled % 4 === 0) { const crossing = this.live?.state().crossing; status = crossingSaveStatus(crossing); reportSave(status, crossing); }
+          return status;
+        },
         text: (shown) => (shown === 'saving' ? GAME_STRINGS.grid.saving : GAME_STRINGS.grid.saveFailed) } });
     this.constructorTiming?.('presentation');
     const nativeOrigin = { origin: { x: 0, z: 0 } };
@@ -947,6 +955,7 @@ export class GridSession {
     const refusal = classifyRefusal(error);
     if (refusal === null || this.host.scope.disposed) return;
     console.warn(`[grid] ${cell.instance} can't load (${refusal}):`, error);
+    this.reportRefusal(cell.instance, cell.slug, refusal, error);
     this.refusals.set(cell.instance, refusal); this.issues.set(cell.instance, error instanceof Error ? error.message : String(error)); pageShardRefusals().note(cell.slug, refusal);
   }
   /**

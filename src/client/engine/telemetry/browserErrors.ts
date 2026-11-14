@@ -35,14 +35,21 @@ export interface BrowserErrorTags {
  *   stale-build   the stale-build screen (index.html data-stale-build, STALE-BUILD SB6), reported by the next build that boots
  *                 (telemetry/staleBuildReport.ts) since that page stops before Sentry can load
  *   loading-stall the loading card's RETRY for a content read that failed past its own retry (boot/contentRead.ts
- *                 retryFromCard, SENTRY-TRIAGE S18), once per stall; a common screen, so it reports at warning level
+ *                 retryFromCard, SENTRY-TRIAGE S18), once per page; a common screen, so it reports at warning level
+ *   stale-reload  the RELOADING cover over a build whose files are gone from the server (boot/browserChunkRecovery.ts
+ *                 reloadIfStaleBuild); the outbox carries it across the reload; warning (every deploy meets open tabs)
+ *   self-reload   index.html's 12 s self-reload of a page whose entry never arrived, reported by the page it reloads into
+ *                 (telemetry/staleBuildReport.ts reportSelfReload), since the inline script has no Sentry; warning
+ *   save-failed   the grid's SAVE FAILED, RETRY at a border (game/grid/screenReports.ts), once a session
+ *   cell-unavailable   a Shard Select UNAVAILABLE card: a neighbour cell that can't load (game/grid/session.ts refuse),
+ *                 once per cell a session; warning
  * Not screens of a fault, so never reported: the player's own reload, back or exit (QA 11-12 row 35), "Playing somewhere else",
  * "The world is full", the reconnect banner (counted in `net` telemetry), title refusal lines and the Connection doctor.
  */
 export const ERROR_SCREENS = ['error-modal', 'stuck-step', 'glitch-chip', 'load-failure', 'title-drop', 'link-lost', 'link-refused', 'stale-build',
-  'loading-stall'] as const;
+  'loading-stall', 'stale-reload', 'self-reload', 'save-failed', 'cell-unavailable'] as const;
 /** S18: screens common enough on a bad network that each is a Sentry warning, never an error */
-export const WARNING_SCREENS: readonly ErrorScreen[] = ['loading-stall'];
+export const WARNING_SCREENS: readonly ErrorScreen[] = ['loading-stall', 'stale-reload', 'self-reload', 'cell-unavailable'];
 export type ErrorScreen = typeof ERROR_SCREENS[number];
 
 // A DSN is a public browser endpoint, not an auth token. Only real production pages report.

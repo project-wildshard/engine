@@ -128,7 +128,8 @@ export class PageLife {
     this.nav = nav;
     this.page = page;
     this.thisEnd = this.classify();
-    inspectPreviousBoot();
+    // S18: a reload the page before marked is never index.html's self-reload
+    inspectPreviousBoot(this.thisEnd.kind === 'intentional' && this.thisEnd.player !== true && this.thisEnd.bootedAt - this.thisEnd.at < INTENT_MS);
     if (this.thisEnd.kind !== 'fresh' || this.thisEnd.discarded) writeJson(this.storage('local'), END_KEY, this.thisEnd);
     if (this.thisEnd.kind !== 'fresh') console.info(`[lastEnd] the previous page: ${this.thisEnd.reason}${this.thisEnd.resident === '' ? '' : ` · resident ${this.thisEnd.resident}`}`);
     // the beat: the page's own timer (this module loads before any shard scope exists)

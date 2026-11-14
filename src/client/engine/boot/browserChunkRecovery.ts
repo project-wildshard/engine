@@ -5,6 +5,7 @@ import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot
 import { markReload, type ReloadReason } from './lastEnd';
 import { leaveAfterPaint } from './leaveAfterPaint';
 import { createChunkRecovery, reloadIntoNewerBuild, type ChunkRecoveryPorts } from './chunkRecovery';
+import { captureBrowserError, engineScreenTags } from '../telemetry/browserErrors';
 
 declare const __BUILD_ID__: string;
 function bootSelfReloadClaimed(): boolean {
@@ -104,6 +105,9 @@ export async function reloadIfStaleBuild(): Promise<boolean> {
     if (store.getItem('boot.staleBuild') === __BUILD_ID__) return false;
     store.setItem('boot.staleBuild', __BUILD_ID__);
   } catch { return false; }
+  // SENTRY-TRIAGE S18: the cover is a screen of a fault; the outbox keeps the report across the reload below
+  try { captureBrowserError(new Error(`stale build ${__BUILD_ID__}: its files are gone; the server runs ${live}`), engineScreenTags('stale-reload', 'chunk-recovery', 'running', { live })); }
+  catch { /* a report never holds the reload */ }
   const cover = showReloadingSoon('This build is out of date · getting the new one');
   void leavePastWorker('stale build: its files are gone from the server', cover);
   return true;
