@@ -33,8 +33,8 @@ importers:
         specifier: 1.8.0
         version: 1.8.0(valibot@1.5.0(typescript@6.0.3))
       '@wildshard/format':
-        specifier: npm:@wildshard/shard-format@^0.5.3
-        version: '@wildshard/shard-format@0.5.3(typescript@6.0.3)'
+        specifier: npm:@wildshard/shard-format@^0.5.7
+        version: '@wildshard/shard-format@0.5.7(typescript@6.0.3)'
       '@wildshard/wire':
         specifier: ^0.1.0
         version: 0.1.0(typescript@6.0.3)
@@ -786,8 +786,8 @@ packages:
   '@vitest/spy@5.0.1':
     resolution: {integrity: sha512-rbto/mF/SGERxEgYOek7Xm6B9b+y+mVoo+f4b2LymYO8zM1b7uB5nHuhVMTP2hxdzgxvGiZYGxGIaMvL5y180Q==}
 
-  '@wildshard/shard-format@0.5.3':
-    resolution: {integrity: sha512-hEi+PVrFEjLwYfPWNyFE670/PoWj61vrpCxEwIkOndnV5K/0BjQVkKKt46cEwBEfK3rQ7Qm1GvzzwrQVO8Qi5Q==}
+  '@wildshard/shard-format@0.5.7':
+    resolution: {integrity: sha512-4EBuf5L7hmYHNUPf8SWTqYHeZ91SB6A+StQQYhASbYgN9iX/fWerMPbbz8lH5zRTkhkoEYgPjtp6L7OvNx6JsA==}
     engines: {node: '>=24.18.0'}
     hasBin: true
 
@@ -796,7 +796,7 @@ packages:
     hasBin: true
 
   '@wildshard/wire@https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire':
-    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
+    resolution: {gitHosted: true, path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
     version: 0.0.0
     hasBin: true
 
@@ -2038,7 +2038,7 @@ snapshots:
 
   '@vitest/spy@5.0.1': {}
 
-  '@wildshard/shard-format@0.5.3(typescript@6.0.3)':
+  '@wildshard/shard-format@0.5.7(typescript@6.0.3)':
     dependencies:
       meshoptimizer: 1.2.0
       valibot: 1.5.0(typescript@6.0.3)

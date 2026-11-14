@@ -1,7 +1,10 @@
 /** J233: Template 2 is published in the frozen format dependency. This reads
  * that installed product without a producer checkout, cook or network.
  * BM-2: Brasscap Mesa, Template 2's own product, sits beside Template 1's
- * `blender-template` in shardfile's corpus and is admitted the same way. */
+ * `blender-template` in shardfile's corpus and is admitted the same way.
+ * SHARD-SOURCE SS4: its folder is `corpus/exports/brasscap-mesa`, shard-format's
+ * export of a pinned shard-brasscap commit (built by `wildshard build`, pinned
+ * by `corpus/exports/brasscap-mesa.pin.json`), not a hand-written source. */
 import {createHash} from 'node:crypto';
 import {readFileSync, readdirSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
@@ -17,7 +20,7 @@ interface FormatTemplate {
 /** Each product the format dependency ships, by slug: its folder under the package root. */
 export const FORMAT_PRODUCTS: Readonly<Record<string, string>> = Object.freeze({
   'blender-template': 'corpus/handwritten',
-  'brasscap-mesa': 'corpus/brasscap-mesa',
+  'brasscap-mesa': 'corpus/exports/brasscap-mesa',
 });
 export function formatTemplate(slug: string): FormatTemplate {
   const folder = Object.hasOwn(FORMAT_PRODUCTS, slug) ? FORMAT_PRODUCTS[slug] : undefined;
