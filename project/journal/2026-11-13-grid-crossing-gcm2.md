@@ -11,3 +11,10 @@
 - GC7: the page's readiness wall gets GC2's cases as a physics test (`grid-readiness-wall-breach.test.ts`): walk, boost at
   18 m/s, jump, a fall from 40 m and a slide along it, all four sides, held while closed and through once ready. Red under
   a 2 m wall and under a wall that never opens.
+- GC15 (3), the between-worker move. A seat on one worker's road now walks into a cell another worker hosts on the same
+  socket: the door reads the save there, the road sends `travel` and lets the seat go (`RoadRoom.handOut`, `NetRoom.handOut`),
+  its port says `out` with the walker's motion after everything else it sent, and the door points the socket at a new port
+  into the target worker (`arrive`), whose room seats the body at the arrival pose and hears the client's hello again, as a
+  travel's welcome. Each worker's `booted` names its cells whose entryways stand; the door tells the other roads (`open`),
+  which drop their walls round them. `test/dedicated-cross-worker.test.ts`: Driftwood to Nalati on the other worker and back,
+  no redial; red with the roads left walled.

@@ -226,6 +226,19 @@ export class NetRoom {
     this.remove(client);
     return to.adopt(client.transport, player, client.queue, { identity: client.identity, reader: client.reader, capabilities: client.capabilities ?? [] });
   }
+  /**
+   * GC15 (3): a player crossed into cell `toFrame` on another worker. Their client hears `travel` here, then this room lets it go with its
+   * link left open: the target room on the other worker hears the client's hello again and welcomes it (`travel`, `welcome`, full frame,
+   * as `handOff` does on one worker). False when there is nobody live to send.
+   */
+  handOut(id: number, toFrame: number): boolean {
+    const client = this.clients.find(entry => entry.id === id);
+    if (client?.state !== 'live') return false;
+    const tick = this.world.tick(), travel: NetEvent = { kind: 'travel', tick, from: this.world.cell(), to: toFrame };
+    client.transport.send('reliable', eventsMessage(tick, [travel]).buffer);
+    this.remove(client);
+    return true;
+  }
   private adopt(transport: Transport, player: NetPlayer, queue: CommandQueue, said: { readonly identity: NetIdentity; readonly reader: WireClientReader | undefined; readonly capabilities: readonly number[] }): number | null {
     const id = this.join(transport, player, queue), client = this.clients.find(entry => entry.id === id), { identity } = said;
     if (client !== undefined) {

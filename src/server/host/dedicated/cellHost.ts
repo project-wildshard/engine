@@ -11,6 +11,7 @@ import type { Rapier } from '@wildshard/engine/physics/rapier';
 import { DedicatedRoom, type DedicatedRoomRoad } from './dedicatedRoom';
 import { cellShard, gridAssembly, placeCell, roadName } from './gridCells';
 import { RoadRoom } from './roadRoom';
+import { applyMotion } from '@wildshard/engine/game/grid/simulation';
 import { placedStrips } from '@wildshard/engine/game/grid/voidFloor';
 import { openRoad } from '../standalone/roadWorld';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
@@ -207,6 +208,23 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const moved = source.handOver(entry.device, target, entry, at);
     post({ kind: 'crossed', device: entry.device, name: entry.name, from: fromSlug, to: toSlug, moved, stays: source.holds(entry.device), body: moved ? target.bodyId(entry.device) ?? entry.body : entry.body });
   };
+  /**
+   * GC15 (3): a seat another worker's road let go walks into cell `to` here, on the socket the door moved to `port`: its body first, at `at`
+   * with the walker's motion, then the room hears the client's hello again and welcomes it (the client heard `travel` first).
+   */
+  const arrive = async (order: Extract<CellOrder, { kind: 'arrive' }>): Promise<void> => {
+    const { kind: _kind, from, to: slug, at, port: seatPort, hello, motion, ...entry } = order, cell = cells.get(slug), transport = new SeatTransport(seatPort);
+    const refuse = (): void => { transport.close('retry'); post({ kind: 'crossed', device: entry.device, name: entry.name, from, to: slug, moved: false, stays: false, body: entry.body }); };
+    if (cell === undefined || !await settled(cell)) { refuse(); return; }
+    const arrived = cell.room.admit(entry, transport, at);
+    if (typeof arrived === 'string') { refuse(); return; }
+    const player = cell.room.host.players.get(arrived.body);
+    if (motion !== null && player !== undefined) applyMotion(motion, player);
+    const client = cell.room.net.join(transport, cell.room.sim.playerOf(arrived.body));
+    transport.deliver('reliable', hello);
+    const moved = arrived.land(cell.room.net.live(client) ? client : null);
+    post({ kind: 'crossed', device: entry.device, name: entry.name, from, to: slug, moved, stays: false, body: cell.room.bodyId(entry.device) ?? entry.body });
+  };
   const handle = (order: CellOrder): void => {
     if (order.kind === 'close') { dispose(); return; }
     // MP4.1: a line from the world reaches each awake cell here but the one that said it. A cell asleep or starting over hears nothing.
@@ -219,6 +237,10 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     if (!ready) { fail(new Error('A worker was told something before it booted')); return; }
     if (order.kind === 'drain') { clock?.pause(); for (const { room } of cells.values()) room.drain(); road?.drain(); post({ kind: 'drained' }); return; }
     if (order.kind === 'cross') { cross(order).catch(fail); return; }
+    // GC15 (3): crossings between workers, and which cells on the others a walker can stand in
+    if (order.kind === 'open') { road?.open(order.cells); return; }
+    if (order.kind === 'handOut') { const out = road !== undefined && road.name === order.from && road.handOut(order.device, order.to); if (!out) post({ kind: 'handedOut', device: order.device, from: order.from, out }); return; }
+    if (order.kind === 'arrive') { arrive(order).catch(fail); return; }
     if (order.kind === 'place') { placing = placing.then(() => place(order)); return; }
     const cell = named(order.slug);
     if (cell === undefined) { fail(new Error(`${order.slug} is not on this worker`)); return; }
@@ -245,7 +267,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     clock = new ServerClock({ now: diagnosticNow, wait: (ms, run) => { const timer = scope.timeout(ms, run); return () => { scope.cancelTimer(timer); }; }, step });
     clock.start();
     scope.interval(options.readingMs ?? READING_MS, reading);
-    post({ kind: 'booted', ms: diagnosticNow() - started, resident: resident() });
+    // GC15 (3): this worker's grid cells a walker off another worker's road can stand in (GC30's entryway ground)
+    post({ kind: 'booted', ms: diagnosticNow() - started, resident: resident(), ...(road === undefined ? {} : { stands: [...cells.keys()].filter(enterable) }) });
   })().catch(fail);
   return { dispose };
 }
