@@ -11,7 +11,8 @@
 // preparing or blocked while frozen), the time the cell step screen shows, and frames over 33 and 50 ms within 3 s of the border.
 // Not measured: grey stand-ins within 60 m (no reader yet).
 //   scripts/browser-lane.sh node scripts/grid-crossing-tour.mjs --base=https://preview.wildshard.io --out=<dir> [--engine=chromium|webkit]
-//     [--layout=phone] [--arcs=<from>:<to>,…] [--limit=<n crossings>] [--cold] [--lane=<name>] [--hold=<ms>]
+//     [--layout=phone] [--arcs=<from>:<to>,…] [--limit=<n crossings>] [--cold] [--lane=<name>] [--hold=<ms>] [--laps=<n>]
+// --laps (GC14, the soak): cross every wanted arc, then again, n times; each row names its lap, with the memory at its control.
 // --hold (GC13): after control, stand this long in the cell reached before the next crossing; each row then says when the cell left
 // behind let its world go (`fromEvictedMs`) and the most the page's playing cost reached (`peakPlayingMB`).
 // --cold (GC3's cold-cache pass): no HTTP cache and no service worker in any page, so every crossing fetches its cell from the
@@ -29,7 +30,8 @@ const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', ''
 // the harness pose is the in-page server's: preview or a loopback page only (never staging's or production's seats, J205)
 if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: grid-crossing-tour.mjs --base=<preview or loopback url> --out=<dir> [--engine=chromium|webkit] [--layout=phone] [--arcs=a:b,…] [--limit=n]');
 if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error(`No engine ${engineName}`);
-const limit = Number(flag('limit', '400')), only = flag('arcs', '').split(',').filter(Boolean), cold = process.argv.includes('--cold'), lane = flag('lane', 'opus-gcm2'), hold = Number(flag('hold', '0'));
+const limit = Number(flag('limit', '400')), only = flag('arcs', '').split(',').filter(Boolean), cold = process.argv.includes('--cold'), lane = flag('lane', 'opus-gcm2'), hold = Number(flag('hold', '0')), laps = Number(flag('laps', '1'));
+let currentLap = 1;
 mkdirSync(out, { recursive: true });
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 
@@ -121,7 +123,7 @@ try {
 
   /** One crossing over `arc` from where the walker stands (in `arc.from`). @param {Arc} arc @param {boolean} repeat */
   const cross = async (arc, repeat) => {
-    const row = /** @type {Record<string, any>} */ ({ from: arc.from, to: arc.to, boost: arc.boost, repeat, ok: false, why: '' });
+    const row = /** @type {Record<string, any>} */ ({ from: arc.from, to: arc.to, boost: arc.boost, repeat, lap: currentLap, ok: false, why: '' });
     crossings.push(row);
     // GC8: the target's preparation work since the last crossing ended (a pre-warm starts inside the source, GC5)
     const windowStart = lastWindowEnd;
@@ -217,7 +219,10 @@ try {
   // the tour: from the cell the walker is in, the arc not yet crossed whose target has the most arcs left; else back over a crossed arc
   let here = (await sample()).inside ?? HOME;
   const left = new Set(wanted), good = /** @type {Arc[]} */ ([]);
-  while (left.size > 0 && crossings.length < limit) {
+  for (let lap = 1; ; ) {
+    // GC14 `--laps`: once every arc is crossed, go round them all again (the soak), each row naming its lap
+    if (left.size === 0 && lap < laps && good.length > 0) { lap++; currentLap = lap; for (const arc of wanted) left.add(arc); }
+    if (left.size === 0 || crossings.length >= limit) break;
     if (navigations !== navigationsBefore) { result.note = 'the page reloaded: tour stopped'; break; }
     if (result.lostPage.length > 4) { result.note = 'the page was lost a fifth time: tour stopped'; break; }
     const outs = [...left].filter(arc => arc.from === here);
