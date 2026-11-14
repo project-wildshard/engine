@@ -41,3 +41,8 @@
 - SC10 item 3: a served world's returned boss is a fresh world's record: `BossBrain.returnBeaten` sets `defeated` false too, and the
   arena room's `boss.<id>.defeated/paid` (and any boss row's flag record) clear with it, the room's unclaimed orb too. The flags still
   only ever set otherwise, so a page's or tape's record is unchanged.
+- SC10 item 4 (skins): in a served world an elite's skin is each player's own: a kill lays the orb out while a present player lacks
+  it, a press takes it for the presser (`elite.<id>.skin` in their own book, claimed, so it rides their save), an owner's press takes
+  nothing. Not done: the once-elite (Nalati's Argymaq) still retires its lair for the world when tamed; per-player taming needs the
+  world-single bond, the companion and the projected lair's respawn reworked ("respawn is not hosted"), and the shard author's word
+  that Argymaq is not meant to be unique.
