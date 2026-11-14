@@ -2,7 +2,7 @@ export interface RequestRow {
   n: number; t: number; url: string; type: string; origin: 'page' | 'sw'; phase: string; step: string;
   servedBy: 'service-worker' | 'network' | 'failed' | 'pending'; status: number; fail: string;
 }
-export interface ScreenSample { t: number; phase: string; step: string; card: boolean; title: boolean; player: boolean; failCard: string; text: string }
+export interface ScreenSample { t: number; phase: string; step: string; card: boolean; title: boolean; player: boolean; failCard: string; text: string; inside?: string | null }
 export interface Failure { shard: string; rule: string; url?: string; detail?: string }
 export type Outcome = 'play' | 'seat-wait' | 'title' | 'stalled' | 'error' | 'no-resume' | 'outside-world';
 export const DECK_SHARDS: readonly { slug: string; card: string }[];

@@ -313,6 +313,7 @@ async function enter(run) {
       if (screen !== undefined) {
         last = screen; phase = screen.phase; step = screen.step;
         const previous = samples.at(-1);
+        /** @type {ScreenSample} */
         const sample = { t: at(), phase: screen.phase, step: screen.step, card: screen.card, title: screen.title, player: screen.player, failCard: screen.failCard, text: screen.text, ...screen.inside === undefined ? {} : { inside: screen.inside } };
         if (previous === undefined || previous.phase !== sample.phase || previous.step !== sample.step || previous.title !== sample.title || previous.player !== sample.player || previous.failCard !== sample.failCard || previous.inside !== sample.inside || previous.text.slice(0, 400) !== sample.text.slice(0, 400)) samples.push(sample);
       }
