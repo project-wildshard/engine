@@ -347,7 +347,8 @@ export function gridShardfileProduct(slug: string, owner: GridProductOwner, mode
       : await readProductDescriptor(options,url);
     // GC9: the runtime-only wires released below are never read here (Pine's read fetched and hashed ~1,500 files twice)
     const admitted = await timeClientPreparation(slug, 'product.read', () => admitProduct(input, { ...options, reserve, deferred: source => neighbourProductFilesPaced(source, options.pause) }));
-    const selectedInputs = [...admitted.assets.keys()];
+    // GC9: the files admission left unread stay selected inputs (approach and tile admissions read them back by name)
+    const selectedInputs = [...admitted.assets.keys(), ...admitted.unread ?? []];
     // admission already refused a stack past the budget on its own; the cost is what placement sums per adjacent pair
     gridPostCosts(owner.allocator).record(slug, productPostCost(admitted.source, (hash) => admitted.assets.get(hash)));
     const preparation: { inputs?: ProductInputs } = {};

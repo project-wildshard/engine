@@ -870,20 +870,32 @@ export class LiveGridSession {
     const current = this.live.current();
     return current !== null && this.runtimeRegions.has(current) ? current : null;
   }
-  /** G555: the entered runtime hooks' timings (the one running and those finished), for the cell loading screen. */
   /** GC9: once the source is left (the hybrid session is neutral), each world pre-warmed inside it prepares its entry, so the
    *  crossing finds it ready; an entry that arrives first waits for that preparation (`HybridRuntimeSession.enter`). */
   private prepareDeferredEntries(): void {
-    for (const [instance, row] of this.deferredEntries) {
-      this.deferredEntries.delete(instance);
-      if (this.runtimeRegions.get(instance) !== row.prepared || row.signal?.aborted === true || this.hybrid.state().instance !== null) continue;
-      void this.prepareEntryOnRoad(instance, row.signal);
-    }
+    // one at a time, nearest first: an entry preparation binds the page's one construction environment
+    const feet = this.live.worldFeet(), gap = (instance: string): number => {
+      const origin = this.ports.assembly.cell(instance).origin; return Math.hypot(origin.x - feet.x, origin.z - feet.z);
+    };
+    const rows = [...this.deferredEntries].sort(([a], [b]) => gap(a) - gap(b));
+    this.deferredEntries.clear();
+    this.deferredPreparation = this.prepareInTurn(this.deferredPreparation, rows);
   }
-  private async prepareEntryOnRoad(instance: string, signal: AbortSignal | undefined): Promise<void> {
-    try { await this.hybrid.prepareEntry(instance, signal); }
+  private async prepareInTurn(previous: Promise<void>, rows: readonly (readonly [string, { readonly prepared: PreparedRegionalRuntime; readonly signal: AbortSignal | undefined }])[]): Promise<void> {
+    await previous;
+    for (const [instance, row] of rows) await this.prepareEntryOnRoad(instance, row);
+  }
+  private deferredPreparation: Promise<void> = Promise.resolve();
+  private async prepareEntryOnRoad(instance: string, row: { readonly prepared: PreparedRegionalRuntime; readonly signal: AbortSignal | undefined }): Promise<void> {
+    const live = (): boolean => this.runtimeRegions.get(instance) === row.prepared && row.signal?.aborted !== true;
+    if (!live() || this.hybrid.state().instance !== null) { if (live()) this.deferredEntries.set(instance, row); return; }
+    let prepared = false;
+    try { prepared = await this.hybrid.prepareEntry(instance, row.signal); }
     catch (error) { console.warn(`[grid] ${instance}: entry preparation on the road`, error); }
+    // a turn back into the source meanwhile (its entry made the session active) waits for the next leave
+    if (!prepared && live() && this.hybrid.state().instance !== null) this.deferredEntries.set(instance, row);
   }
+  /** G555: the entered runtime hooks' timings (the one running and those finished), for the cell loading screen. */
   hookTimings(): ReturnType<HybridRuntimeSession['timings']> { return this.hybrid.timings(); }
   /** GC2: the server still has this client in `instance` (an online cell is still walled, C5). */
   serverHolds(instance: string): boolean { return this.wire !== null && this.wire.site() === instance; }

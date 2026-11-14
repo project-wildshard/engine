@@ -148,6 +148,8 @@ export interface AdmittedProduct {
   releasePreparedTransport?: (refs: Iterable<string>, reread?: 'cache-or-fetch') => Promise<readonly string[]>;
   /** Complete verified offline storage after control, without retaining the distant files on the page. */
   completeCache?: (scope: Scope) => Promise<void>;
+  /** GC9: selected files a first-party read left unread (`ProductOptions.deferred`): still this product's inputs, read back on demand. */
+  unread?: readonly string[];
 }
 
 // Construct outside admission's decoding context: the owner must not retain the temporary hash/transport maps.
@@ -411,17 +413,19 @@ async function readBuiltProduct(input:unknown,options:ProductOptions,read:NonNul
     }
   };
   await Promise.all(Array.from({length:Math.min(16,addresses.length)},load));
-  // GC9: the files left unread are fetched once more in the background, low priority and unhashed, so the entry's own
-  // verified reads of them find the HTTP cache warm (Pine's scene libraries read them one by one at entry)
-  const warm=options.backgroundFetch;
-  if(deferred!==undefined&&warm!==undefined)void warmTransport(control.filter(file=>deferred.has(file.hash)).map(file=>outputBlobUrl(source,file.hash,base)),warm);
   const wires=new Map<string,Uint8Array>();
   for(const [at,row] of addresses.entries()){
     const result=results[at];if(result===undefined)throw new Error('Missing built file result');if(!result.ok)throw result.error;
     wires.set(row.ref.replace(/^commons:/u,''),result.bytes);
   }
   for(const row of refs){const bytes=wires.get(row.ref.replace(/^commons:/u,''));if(bytes===undefined)throw new Error('Missing built file bytes');assets.set(row.ref,bytes);}
-  return {source,assets,cached:false,releaseTransport:transportRelease(source,assets,options),releasePreparedTransport:transportRelease(source,assets,options,true)};
+  const unread=deferred===undefined?[]:control.filter(file=>deferred.has(file.hash));
+  // GC9: the files left unread are fetched once more in the background, low priority and unhashed, so the entry's own
+  // verified reads of them find the HTTP cache warm (Pine's scene libraries read them one by one at entry); only after a read
+  // that succeeded
+  const warm=options.backgroundFetch;
+  if(unread.length>0&&warm!==undefined)void warmTransport(unread.map(file=>outputBlobUrl(source,file.hash,base)),warm);
+  return {source,assets,cached:false,...(deferred===undefined?{}:{unread:unread.map(file=>file.hash)}),releaseTransport:transportRelease(source,assets,options),releasePreparedTransport:transportRelease(source,assets,options,true)};
 }
 /** GC9: fetch immutable product files into the HTTP cache, eight at a time, ignoring failures (a later verified read fetches again). */
 async function warmTransport(urls:readonly string[],fetchLow:NonNullable<ProductOptions['backgroundFetch']>):Promise<void>{

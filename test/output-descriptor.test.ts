@@ -1290,7 +1290,7 @@ test('first-party admission leaves deferred files unread, warms them, and still 
       read?.(bytes.length);return Promise.resolve(bytes);
     }};
   const source=await readProductDescriptor(native),loaded=await admitProduct(source,native);
-  expect([...loaded.assets.keys()].filter(ref=>files.includes(ref))).toEqual([]);
+  expect([...loaded.assets.keys()].filter(ref=>files.includes(ref))).toEqual([]);expect(loaded.unread).toEqual(files);
   const blobs=files.map(ref=>new URL(outputBlobUrl(loaded.source,ref,base)).pathname.slice(new URL(base).pathname.length));
   expect(requests.filter(path=>blobs.includes(path))).toEqual([]);
   await vi.waitFor(()=>{expect(warmed.sort()).toEqual([...blobs].sort());});
