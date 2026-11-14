@@ -8,7 +8,9 @@ import { RoomBot } from './fixtures/dedicated/roomBot';
 // GRID-CROSSING GC4: the server has a neighbour awake before the player arrives. Since J320 every cell is resident from the worker's
 // boot and sleeping is only not ticking, so the one boot left on the way is a start-over (J107: a cell everyone left starts over once
 // it has stood empty). A walker who steps out onto the road and turns back met that boot at the line (staging logs single
-// `cell.booted` lines mid-session). A cell does not start over while a road walker is within reach of its edge; it does once they go.
+// `cell.booted` lines mid-session). A cell does not start over while a road walker is within reach of its edge. SERVER-CELLS SC5
+// (J328) then retired the start-over for every grid cell: its world stays resident and refills by its own respawns, so a grid cell
+// never boots again, near walker or far (a cell the grid doesn't place, a local run's WORLD_CELLS, still starts over).
 const HOME = 'driftwood-isle', CELLS = [HOME, 'far-reach', 'sunscar-dunes', 'nalati-grasslands'];
 let bench: RoomBench | undefined;
 const bots: RoomBot[] = [];
@@ -36,7 +38,7 @@ test('a cell left empty does not start over while its walker stands on the road 
   expect(boots(bench, HOME), 'and none on the way in').toBe(booted);
 });
 
-test('a cell left empty starts over once its walker is far from it', { timeout: 120_000 }, async () => {
+test('SC5 (J328): a grid cell left empty never starts over, even once its walker is far from it', { timeout: 120_000 }, async () => {
   bench = await roomBench({ cells: CELLS, workers: 2, crossing: true, emptyMs: 300 });
   const a = new RoomBot(bench.url, 'bench', 'device:a', 'A'); bots.push(a);
   expect(await a.arrived()).toBe(true);
@@ -46,6 +48,8 @@ test('a cell left empty starts over once its walker is far from it', { timeout: 
   body.resetPose({ x: 0, y: 1, z: -(CHUNK_HALF - 5) }, 0);
   a.thumb = () => ({ viewTick: 0, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, yaw: 0, pitch: 0, buttons: NET_BUTTONS.sprint });
   await vi.waitFor(() => { expect(road.holds('device:a'), 'onto the road').toBe(true); }, { timeout: 20_000, interval: 50 });
-  // Far Reach's road wall holds the walker 60 m out, past the reach: Driftwood starts over.
-  await vi.waitFor(() => { expect(boots(bench as RoomBench, HOME), 'Driftwood starts over').toBeGreaterThan(booted); }, { timeout: 30_000, interval: 100 });
+  // Out past the reach (into Far Reach since its rev 3 docks, or held on the road): Driftwood stood empty 10x its 300 ms and stays as it is
+  await vi.waitFor(() => { expect(home.holds('device:a'), 'gone from Driftwood').toBe(false); }, { timeout: 20_000, interval: 50 });
+  await sleep(3000);
+  expect(boots(bench, HOME), 'a grid cell never starts over (SC5)').toBe(booted);
 });
