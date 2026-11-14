@@ -57,6 +57,8 @@ export class LedgerBook {
   }
   /** Seat a player's book as it was saved: their serial goes on from there, so a client that remembers a higher one still hears what comes next (E7.4). */
   seat(player: string, saved: LedgerBookSave[string]): void { this.books.set(player, { serial: saved.serial, rows: saved.rows.slice(), ids: new Set(saved.rows.map(row => row.id)) }); }
+  /** A player who has left: their serial and receipts went with their save (SC10: a long-lived world keeps only its live players'). */
+  drop(player: string): void { this.books.delete(player); }
   private of(player: string): Book {
     let book = this.books.get(player);
     if (book === undefined) { book = { serial: 0, rows: [], ids: new Set() }; this.books.set(player, book); }

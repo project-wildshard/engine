@@ -46,3 +46,7 @@
   nothing. Not done: the once-elite (Nalati's Argymaq) still retires its lair for the world when tamed; per-player taming needs the
   world-single bond, the companion and the projected lair's respawn reworked ("respawn is not hosted"), and the shard author's word
   that Argymaq is not meant to be unique.
+- SC10 item 6: per-player maps a served world kept forever now hold only live players: a leaving seat's `LedgerBook` entry is dropped
+  (its receipts ride its save), the trample's `others` and the arena room's `doors` forget anyone gone, the quest's `purchases` lines
+  too, and what a body was paid here (`ledgerDedupe` `loot:<body>:`) is forgotten once it has stayed away 5 min (`FORGET_PAID_MS`, as
+  J107's start-over forgot it), so bouncing across a cell edge cannot re-farm a bounty. Test: `served-world-prunes` (1,000 visits).

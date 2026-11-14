@@ -88,6 +88,9 @@ export interface DedicatedRoomOptions {
 
 /** How `loot/personal` marks what a player has been paid. */
 const LOOT_ROW = 'loot:';
+/** SERVER-CELLS SC10 (J328): a grid cell's world is never rebuilt, so what one who left was paid here is forgotten once they have stayed
+ *  away this long, as J107's start-over forgot it after five empty minutes; one who comes back sooner (a crossing's bounce) keeps it. */
+export const FORGET_PAID_MS = 300_000;
 /** A fact's entity with the seat taken out of it: a player who comes back to another seat is the same player, and the same fact (E7.4). */
 const portableEntity = (entity: string, body: string): string => entity === body ? 'player' : entity.startsWith(`${body}:`) ? entity.slice(body.length + 1) : entity;
 
@@ -179,6 +182,8 @@ export class DedicatedRoom implements CrossTarget {
   /** The lead's body leaves the world, and its seat stays for the systems bound to it. `removePlayer` refuses it. */
   /** Seats taken since this world began. */
   private joined = 0;
+  /** SC10: bodies that left, and when: what they were paid here is forgotten `FORGET_PAID_MS` on. */
+  private readonly departed = new Map<string, number>();
   /** GC15: bodies a crossing set down that haven't had a tick yet. A world that slept has no scene queries until it steps. */
   private readonly arriving = new Set<string>();
   private parkLead(): void { const { lead } = this; lead.motor.setEnabled(false); this.host.parked.add(lead.id); }
@@ -212,7 +217,7 @@ export class DedicatedRoom implements CrossTarget {
     catch (error) { return `recovery: ${String(error)}`; }
     const store = new PlayerStore(doc?.store ?? {}, () => { const own = this.seats.get(entry.device); if (own !== undefined) this.dirty(own); });
     const seat: Seat = { device: entry.device, name: entry.name, read: entry.doc, body, store, fall: this.cell.fallFloor(), transport, client: null, closeOff: null, holdEnds: null, seq: entry.seq, receipted: doc?.ledger.serial ?? 0, dirtyAt: null, savedAt: now, stand: null, version: 0 };
-    this.seats.set(entry.device, seat); this.bodies.set(body, seat);
+    this.seats.set(entry.device, seat); this.bodies.set(body, seat); this.departed.delete(body);
     if (lead) this.unparkLead();
     // Two who join together would otherwise stand inside each other.
     const aside = SPAWN_ASIDE[(this.joined++) % SPAWN_ASIDE.length] ?? 0, stand = { ...spawn, x: spawn.x + aside };
@@ -224,7 +229,7 @@ export class DedicatedRoom implements CrossTarget {
     try { this.cell.owned.of(body); if (doc !== null) importPlayer(this.host, player, doc); if (at !== undefined) player.resetPose(at, at.yaw); }
     catch (error) {
       // No save or live link is installed on a failed continuation. Keep the durable copies intact.
-      this.seats.delete(entry.device); this.bodies.delete(body); this.cell.owned.drop(body); book.seat(body, { serial: 0, rows: [] });
+      this.seats.delete(entry.device); this.bodies.delete(body); this.cell.owned.drop(body); book.drop(body);
       if (lead) this.clearLead(); else host.removePlayer(body);
       return `doc: ${String(error)}`;
     }
@@ -333,8 +338,8 @@ export class DedicatedRoom implements CrossTarget {
   private release(seat: Seat): void {
     this.playerRefusals.delete(seat.body);
     actRoutes(this.host).identities.delete(seat.body);
-    this.seats.delete(seat.device); this.bodies.delete(seat.body); this.cell.owned.drop(seat.body); this.book.seat(seat.body, { serial: 0, rows: [] });
-    if (seat.body === LEAD_SEAT) this.clearLead(); else this.host.removePlayer(seat.body);
+    this.seats.delete(seat.device); this.bodies.delete(seat.body); this.cell.owned.drop(seat.body); this.book.drop(seat.body);
+    if (seat.body === LEAD_SEAT) this.clearLead(); else { this.host.removePlayer(seat.body); this.departed.set(seat.body, this.options.now()); }
     this.options.post({ kind: 'left', device: seat.device, seats: this.seats.size });
   }
   private flushRefusals(): void {
@@ -351,9 +356,13 @@ export class DedicatedRoom implements CrossTarget {
   /** The seat goes back to how boot left it, and what it was paid goes with who earned it: the next player's bounty is their own (J105). */
   private clearLead(): void {
     actRoutes(this.host).identities.delete(LEAD_SEAT);
-    const { ledgerDedupe } = this.host.slots, paid = `${LOOT_ROW}${LEAD_SEAT}:`;
-    ledgerDedupe.splice(0, ledgerDedupe.length, ...ledgerDedupe.filter(row => !row.startsWith(paid)));
+    this.forgetPaid(LEAD_SEAT);
     importPlayer(this.host, this.lead, this.blank); this.parkLead();
+  }
+  /** What a body was paid here goes: the next one to hold it, or its own return after a long while, earns afresh (J105, SC10). */
+  private forgetPaid(body: string): void {
+    const { ledgerDedupe } = this.host.slots, paid = `${LOOT_ROW}${body}:`;
+    ledgerDedupe.splice(0, ledgerDedupe.length, ...ledgerDedupe.filter(row => !row.startsWith(paid)));
   }
   private step(inputs: readonly NetTickInput[]): void {
     const { host, cell } = this, routes = actRoutes(host);
@@ -423,6 +432,7 @@ export class DedicatedRoom implements CrossTarget {
       if (stand !== seat.stand || version !== seat.version) { seat.stand = stand; seat.version = version; this.dirty(seat); }
       if ((seat.dirtyAt !== null && now - seat.dirtyAt >= DEBOUNCE_MS) || now - seat.savedAt >= EVERY_MS) this.write(seat, 'checkpoint');
     }
+    for (const [body, left] of this.departed) if (now - left >= FORGET_PAID_MS) { this.departed.delete(body); this.forgetPaid(body); }
   }
   /** Everyone goes, as at SIGTERM: their last checkpoint now, and a close that says a restart is why. */
   drain(): void {

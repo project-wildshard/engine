@@ -475,7 +475,11 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
     value => ammunition.prepareRestore(v.parse(v.optional(NativeAmmunitionSavedSchema), value)));
   const keys = new Set<string>(rows.saved.snapshot);
   if (rows.saved.snapshot.some(key => !parts.has(key))) throw new Error('Native saved role has no mechanic');
-  host.onStep(rows.step, dt => { for (const phase of rows.phases) need(phases.get(phase), 'phase')(dt); secret?.(dt); countSeatFeats(); }, {
+  host.onStep(rows.step, dt => {
+    for (const phase of rows.phases) need(phases.get(phase), 'phase')(dt); secret?.(dt); countSeatFeats();
+    // SC10 (J328): a long-lived world forgets the purchase lines of those who left (their goods are in their own save)
+    if (purchases.size > 0) for (const player of purchases.keys()) if (!host.players.has(player)) purchases.delete(player);
+  }, {
     snapshot: () => entry.saved.encode(Object.fromEntries(rows.saved.snapshot.flatMap(key => {
       const value = need(parts.get(key), 'saved role').capture(); return value === undefined ? [] : [[key, value]];
     }))),

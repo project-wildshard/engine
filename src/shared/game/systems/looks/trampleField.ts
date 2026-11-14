@@ -76,6 +76,8 @@ export function installTrampleTrail(host: SimHost, map: TrampleField, rows: { id
       own.push(dt, at, rows.radius, rows.strength);
     }
     if (window !== null) map.update(dt, window);
+    // SC10 (J328): a long-lived world forgets the trails of those who left
+    if (others.size >= host.players.size) for (const id of others.keys()) if (!host.players.has(id)) others.delete(id);
   }, { snapshot: () => others.size === 0 ? trail.snapshot() : { ...trail.snapshot(), others: Object.fromEntries([...others].map(([id, own]) => [id, own.last()])) },
     restore: saved => {
       trail.restore(saved); others.clear();
