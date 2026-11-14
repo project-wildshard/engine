@@ -73,13 +73,17 @@ test('a rows-only lever: taken at its rack, six rounds that land, then a reload 
   expect(line(sim, LINES.rounds)).toBe(6);
   expect(line(sim, LINES.reserve)).toBe(12);
 
-  // Ten metres off the blob, looking at its body: beyond any melee reach, well inside the rifle's 120.
+  // Ten metres off the blob, looking at its body: beyond any melee reach, well inside the rifle's 120. South of it: rev 5's
+  // yard wall stands ten metres east and the hut ten west.
   const aimed = (): NonNullable<NetCommand['attack']> => {
-    player.position.set(blob.position.x + 10, blob.position.y, blob.position.z); player.motor.resetAt(player.position);
-    const at = { x: -10, y: blob.dims.bodyY * blob.scale - 1.68, z: 0 }, length = Math.hypot(at.x, at.y, at.z);
+    player.position.set(blob.position.x, blob.position.y, blob.position.z + 10); player.motor.resetAt(player.position);
+    const at = { x: 0, y: blob.dims.bodyY * blob.scale - 1.68, z: -10 }, length = Math.hypot(at.x, at.y, at.z);
     return { aim: { origin: { x: 500, y: 0, z: 500 }, direction: { x: at.x / length, y: at.y / length, z: at.z / length } } };
   };
   const settle = (): void => { for (let i = 0; i < 60; i++) tick(sim, kit); }; // past the 0.68 s cycle
+  // Template rev 5 keeps the blob inside Greyback's arena: the step in starts the elite's zero-length intro, which refuses a
+  // player's blow until the next step ends it. A pull lands before its tick's step, so two ticks to stand there first.
+  aimed(); tick(sim, kit); tick(sim, kit);
   const hp = blob.hp;
   for (let shot = 1; shot <= 5; shot++) {
     tick(sim, kit, command({ attack: aimed() }));
