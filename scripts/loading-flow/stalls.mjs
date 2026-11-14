@@ -153,16 +153,18 @@ export async function finishStallProfile(page, session) {
 // length whatever the GPU. Ring 1's boot smoke refuses one over the ten gameplay frames it already waits on, every case.
 /** The share of a STALL_WINDOW_MS stretch of play that unbroken main-thread work must reach to be a stall. */
 export const PLAY_BUSY_SHARE = 0.8;
-/** A profile leaf that is the GPU's time, not the page's: a WebGL entry point (its native frame, no script url). */
-const GPU_CALL = /^(?:draw\w*|buffer\w*|tex\w*|readPixels|getProgram\w*|getShader\w*|getError|finish|flush|clientWaitSync|getSync\w*|fenceSync|compileShader|linkProgram|uniform\w*|vertexAttrib\w*|bind\w*|clear\w*|blitFramebuffer|framebuffer\w*|renderbuffer\w*|getParameter|copyTex\w*|invalidate\w*|useProgram|enable|disable|viewport|scissor|colorMask|depth\w*|stencil\w*|blend\w*|pixelStorei|generateMipmap|deleteBuffer|deleteTexture|createBuffer|createTexture|getExtension|getContextAttributes|isContextLost)$/u;
+/** Native leaves that are still the page's own work: the clock read a busy loop spins on, and the collector. Every other
+ * native leaf (no script url) is left out: on CI's SwiftShader any WebGL entry point can wait seconds on the GPU process
+ * (a link finishing under `getUniformLocation`, a fence under `getError`), and a named list missed some (ring 1, sunscar
+ * dunes, 2026-11-14: a 1.5 s "stall" 15 s into play at 2.4 s a frame). A page stall is script; its builtins undercount it. */
+const PAGE_NATIVE = new Set(['now', '(garbage collector)']);
 
-/** A Chromium CPU profile's main-thread work on the page clock: every sample that is neither idle, nor the GPU's (a WebGL
- * call's native leaf), nor the browser's own `(program)` bookkeeping, over [its time, the next sample's).
+/** A Chromium CPU profile's main-thread work on the page clock: every sample whose leaf is script (it has a url) or one of
+ * PAGE_NATIVE, over [its time, the next sample's).
  * @param {CpuProfile & { nodes: readonly { id: number, callFrame: { functionName: string, url?: string } }[] }} profile
  * @param {{ pageMs: number, profileUs: number }} anchor @returns {Span[]} */
 export function profileBusy(profile, anchor) {
-  const quiet = new Set(profile.nodes.filter(node => node.callFrame.functionName === '(idle)' || node.callFrame.functionName === '(program)'
-    || ((node.callFrame.url ?? '') === '' && GPU_CALL.test(node.callFrame.functionName))).map(node => node.id));
+  const quiet = new Set(profile.nodes.filter(node => (node.callFrame.url ?? '') === '' && !PAGE_NATIVE.has(node.callFrame.functionName)).map(node => node.id));
   const samples = profile.samples ?? [], page = (/** @type {number} */ us) => anchor.pageMs + (us - anchor.profileUs) / 1000;
   let at = profile.startTime;
   const times = (profile.timeDeltas ?? []).map(delta => (at += delta));

@@ -61,11 +61,12 @@ test('a 2 s busy sleep in a frame is a play stall; frames waiting on the GPU or 
   expect(playStallFaults(playStall([{ start: 0, end: limit }], 0, 5000))).toHaveLength(1);
 });
 
-test('play busy leaves out idle, the browser\'s own bookkeeping and WebGL calls, and keeps script and its natives', () => {
+test('play busy keeps script, the clock read and the collector, and leaves out idle, (program) and every other native', () => {
   const profile = { nodes: [{ id: 1, callFrame: { functionName: '(idle)', url: '' } }, { id: 2, callFrame: { functionName: 'step', url: 'https://x/a.js' } },
     { id: 3, callFrame: { functionName: 'drawElements', url: '' } }, { id: 4, callFrame: { functionName: '(program)', url: '' } },
-    { id: 5, callFrame: { functionName: 'now', url: '' } }, { id: 6, callFrame: { functionName: CLOCK_MARK, url: 'https://x/a.js' } }],
-    samples: [2, 5, 3, 1, 4, 2, 6], timeDeltas: [0, 5000, 5000, 5000, 5000, 5000, 5000], startTime: 0, endTime: 30_000 };
-  // page clock = profile clock (the mark's first sample at 30 ms)
-  expect(profileBusy(profile, profileAnchor(profile, 30))).toEqual([{ start: 0, end: 10 }, { start: 25, end: 30 }]);
+    { id: 5, callFrame: { functionName: 'now', url: '' } }, { id: 6, callFrame: { functionName: CLOCK_MARK, url: 'https://x/a.js' } },
+    { id: 7, callFrame: { functionName: 'getUniformLocation', url: '' } }, { id: 8, callFrame: { functionName: '(garbage collector)', url: '' } }],
+    samples: [2, 5, 3, 1, 4, 7, 8, 2, 6], timeDeltas: [0, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000], startTime: 0, endTime: 40_000 };
+  // page clock = profile clock (the mark's first sample at 40 ms)
+  expect(profileBusy(profile, profileAnchor(profile, 40))).toEqual([{ start: 0, end: 10 }, { start: 30, end: 40 }]);
 });

@@ -22,3 +22,6 @@
 - Review (claude -p, one per land): the loader-slice pause in `warmSceneRoots` turned the precompile's GPU fence and link
   polls into an 8 ms busy spin and broke entered-frame-overlap's harness, so it is reverted (the 49-to-2 warm batch is the
   cut). Loader attaches settle together before a failure rethrows; deskbench `--stalls` now needs `--capped`.
+- First land's CI: ring 1 flagged sunscar-dunes 15 s into play (frames 2.4 s apart on SwiftShader): a WebGL wait the named
+  list missed (a link finishing under a getter). Play busy now counts only script leaves, `now` and the collector; every
+  other native is the browser's or the GPU's. The 2 s busy loop is script and `now`, so it still trips.
