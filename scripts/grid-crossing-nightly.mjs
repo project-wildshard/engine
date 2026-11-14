@@ -26,7 +26,7 @@ const state = existsSync(STATE) ? JSON.parse(readFileSync(STATE, 'utf8')) : { se
 const now = new Date(), pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
 const today = `${String(now.getFullYear())}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`, stamp = `${today}T${pad(now.getHours())}${pad(now.getMinutes())}`;
 const signed = /** @type {{ body: string }} */ (await (await fetch('https://packs.wildshard.io/releases/staging.json', { cache: 'no-store' })).json());
-const serial = Number(/** @type {{ serial: number }} */ (JSON.parse(signed.body)).serial);
+const serial = /** @type {{ serial: number }} */ (JSON.parse(signed.body)).serial;
 
 /** @type {('release' | 'nightly')[]} */
 const due = [];
@@ -48,7 +48,7 @@ for (const kind of due) {
   const runs = kind === 'release' ? join(dir, 'walks/rows.json') : join(dir, 'tour');
   const report = spawnSync('node', ['scripts/grid-crossing-report.mjs', join(dir, 'report'), `--runs=${runs}`], { cwd: here, encoding: 'utf8' });
   writeFileSync(join(dir, 'report.log'), `${report.stdout}${report.stderr}`);
-  const worse = `${report.stdout}`.split('\n').filter(line => line.startsWith('WORSE ')).slice(0, 8).join('; ');
+  const worse = report.stdout.split('\n').filter(line => line.startsWith('WORSE ')).slice(0, 8).join('; ');
   const ok = report.status === 0;
   red ||= !ok;
   const what = kind === 'release' ? `staging serial ${String(serial)} walks` : 'preview every-pair tour';
