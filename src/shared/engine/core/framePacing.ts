@@ -50,6 +50,16 @@ const HELD_SLICE_MIN_MS = 4;
 let heldSliceAt = Number.NEGATIVE_INFINITY;
 /** Frames drawn while held, for `heldFrameTurn`. */
 let heldFrames = 0;
+/** GRID-CROSSING GC6 (QA 11-14 row 6, Jake on staging: a 37 s card crossing into Nalati at 2992x1434@2): a build the traveller
+ *  is about to need (the world of the cell ahead, its entry on the road) is on the crossing's critical path. Its slices then
+ *  get URGENT_BUILD_MS after each drawn frame, whatever the display's rate and whether the next vsync is due: the ordinary
+ *  quarter of the fastest display interval gave a 120 Hz screen 2 ms a frame, and at 30 fps that is 6% of the wall clock, so
+ *  an 11 s world took 30 s. The grid sets it while such a build runs; off by default. */
+export const URGENT_BUILD_MS = 8;
+let urgent = false;
+export function setBuildUrgent(on: boolean): void { urgent = on; }
+/** Whether a build the traveller is about to need is running (`setBuildUrgent`). */
+export function buildUrgent(): boolean { return urgent; }
 /** Whether the traveller waits for the build (a grid cell's loading screen shows); the grid sets it, off by default.
  *  The page sets it through `setBuildHeldTimed` (`heldTiming.ts`), which also times each held interval on Developer pages. */
 export function setBuildHeld(on: boolean): void {
@@ -104,6 +114,7 @@ export function frameBudgetSpent(budgetMs: number, now: number = diagnosticNow()
   // D110: a frame that overran its interval (drawn after the next was due: a phone at 4x CPU) is due the moment it lands,
   // so the due rule would end every slice before it starts and no sliced build would run again; after such a frame the
   // builds get their ordinary slice instead
+  if (urgent) return presenting(now) && now - lastDrawn >= Math.min(budgetMs, URGENT_BUILD_MS);
   const overran = lastDrawn - lastFrameAt >= interval - DUE_SLACK_MS;
   return presenting(now) && (now - lastDrawn >= Math.min(budgetMs, interval / 4, BUILD_FRAME_MS / 2) || (!overran && frameDue(now)));
 }
@@ -175,5 +186,5 @@ export function paceYield(plain: () => Promise<void>, owner?: Scope, budgetMs?: 
 }
 
 function yieldDue(budgetMs: number | undefined, now: number): boolean {
-  return !held && frameDue(now) || (budgetMs !== undefined && frameBudgetSpent(budgetMs, now));
+  return !held && !urgent && frameDue(now) || (budgetMs !== undefined && frameBudgetSpent(budgetMs, now));
 }

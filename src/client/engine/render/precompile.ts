@@ -25,7 +25,7 @@ import { shadowDepthResolver, type ShadowDepthResolver } from './shadowDepthVari
 import { boundEntryWarmup } from './entryWarmupBound';
 import { workSlice } from '../../../shared/engine/core/workSlice';
 import { SHADOW_LAYER } from '../core/shadowLayer';
-import { buildHeld, heldBudget, nativeBudgetSpent, presenting } from '../../../shared/engine/core/framePacing';
+import { buildHeld, buildUrgent, heldBudget, nativeBudgetSpent, presenting } from '../../../shared/engine/core/framePacing';
 import { countedWait, waitFor } from '../../../shared/engine/boot/waits';
 import { isDev } from '../core/devMode';
 
@@ -940,7 +940,9 @@ export const LIVE_HELD_PROGRAMS_PER_FRAME = 4;
 let warmUpHeld = false;
 /** Whether the traveller waits for a live warm-up (a grid cell's loading screen shows); the grid sets it, off by default. */
 export function setWarmUpHeld(held: boolean): void { warmUpHeld = held; }
-const programsPerFrame = (): number => (warmUpHeld ? LIVE_HELD_PROGRAMS_PER_FRAME : LIVE_PROGRAMS_PER_FRAME);
+/** GC6: an entry warm-up on the road, for the cell the traveller heads into (`buildUrgent`), issues this many a frame. */
+export const LIVE_URGENT_PROGRAMS_PER_FRAME = 2;
+const programsPerFrame = (): number => (warmUpHeld ? LIVE_HELD_PROGRAMS_PER_FRAME : buildUrgent() ? LIVE_URGENT_PROGRAMS_PER_FRAME : LIVE_PROGRAMS_PER_FRAME);
 let parkedFrozen = false;
 /** G580 T2: whether a live warm-up freezes its parked (invisible) future root's matrices (`freezeParkedMatrices`); the grid
  *  sets it, off by default. */

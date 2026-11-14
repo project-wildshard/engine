@@ -5,7 +5,7 @@ import { installGltfKtx2 } from '../core/ktx2';
 import { pageScope } from '../../../shared/engine/app/resources';
 import { waitFor } from '../../../shared/engine/boot/waits';
 import { buildYield, WORK_SLICE_MS, workSlice, type WorkSlice } from '../../../shared/engine/core/workSlice';
-import { buildHeld, frameBudgetSpent, frameDue, presenting } from '../../../shared/engine/core/framePacing';
+import { buildHeld, buildUrgent, frameBudgetSpent, frameDue, presenting } from '../../../shared/engine/core/framePacing';
 
 // FileLoader starts every network read immediately. Only the parser's temporary
 // meshopt/image/geometry allocations share this page-wide decode slot.
@@ -38,7 +38,7 @@ class BoundedRigLoader extends GLTFLoader implements RigLoader {
         // The previous read/consumer can span drawn frames. Its wall clock
         // cannot charge that wait to this parse's current live CPU budget.
         const pause = presenting()
-          ? (buildHeld() || !frameDue()) && !frameBudgetSpent(WORK_SLICE_MS) ? undefined : buildYield(pageScope)
+          ? (buildHeld() || buildUrgent() || !frameDue()) && !frameBudgetSpent(WORK_SLICE_MS) ? undefined : buildYield(pageScope)
           : (decodeSlice ??= workSlice(undefined, pageScope)).check();
         await waitFor('GLTF decode pacing', Promise.resolve(pause), 'work');
       }

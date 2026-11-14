@@ -98,6 +98,7 @@ import { clientTileViews, type ClientTileViews } from '../shardfile/clientViews'
 import type { ClientSkin } from '../shardfile/clientSkins';
 import { setParkedMatricesFrozen, setWarmUpHeld } from '@wildshard/engine/render/precompile';
 import { setBuildHeldTimed } from '@wildshard/engine/core/heldTiming';
+import { setBuildUrgent } from '@wildshard/engine/core/framePacing';
 import { NeighbourLife, type NeighbourLifeCell } from './neighbourLife';
 import { NeighbourPanels } from './neighbourPanels';
 import { copyMarks } from './copyIdentity';
@@ -216,6 +217,8 @@ export interface GridSessionState {
   readonly cellStep: { readonly step: string; readonly detail: string } | null;
   /** the allocator's grid content (MB) and the §3.2 playing total with the engine base (MB, the 1.0 GB envelope, G65) */
   readonly residentMB: number; readonly playingMB: number;
+  /** GC6: the playing envelope the allocator admits against (MB) */
+  readonly envelopeMB?: number;
   /** Exact category sum before engine base, overlap allowance or calibration factor; used by the soak harness. */
   readonly accountedBytes: number;
   readonly rings: { readonly frame?: number; readonly far: number; readonly l1: number; readonly l0: number; readonly refused: number; readonly inFlight: number; readonly queued: number;
@@ -688,7 +691,7 @@ export class GridSession {
     // QA 2026-11-13: a waiting cell's loading steps on SHARD SELECT's loading card, inset over the live world
     this.cellLoading = new CellLoading(new CellLoadingCard(), (waiting) => this.neighbours.some(row => row.instance === waiting));
     setParkedMatricesFrozen(true); // G580 T2: a hidden parked world skips matrix updates during its warm-up
-    host.scope.onDispose(() => { this.cellLoading.close(); if (host.heldFrame !== undefined) host.heldFrame.enabled = false; setWarmUpHeld(false); setParkedMatricesFrozen(false); setBuildHeldTimed(false); });
+    host.scope.onDispose(() => { this.cellLoading.close(); if (host.heldFrame !== undefined) host.heldFrame.enabled = false; setWarmUpHeld(false); setParkedMatricesFrozen(false); setBuildHeldTimed(false); setBuildUrgent(false); });
     // G78: a shimmer line at every shard border on its real ground; G119: SAVING… / SAVE FAILED, RETRY while a crossing waits
     const rows = new Map((edges ?? []).map((cell) => [cell.instance, cell.edges]));
     let status: CrossingSaveStatus = null, polled = 0;
@@ -1011,6 +1014,9 @@ export class GridSession {
     // G580 T2 / T5: a held traveller's warm-up issues more programs a frame and its builds run a bigger budget
     setWarmUpHeld(this.cellLoading.open !== null);
     setBuildHeldTimed(this.cellLoading.open !== null);
+    // GC6: a world the traveller heads into, or the road (where its entry prepares), builds with the urgent budget
+    const live = this.live;
+    setBuildUrgent(live !== null && (live.live.building() || live.live.current() === null));
   }
   private refusal(instance: string): ShardRefusal | null {
     const live = this.live?.refusal(instance);
@@ -1248,7 +1254,7 @@ export class GridSession {
       home: this.home.instance, inside: gridCells.cell?.instance ?? null, feet: { x: Math.round(at.x * 100) / 100, z: Math.round(at.z * 100) / 100 },
       cells: this.assembly.cells.map((cell) => { const d = drawn(cell.instance); return { instance: cell.instance, slug: cell.slug, cell: cell.cell, shows: shows(cell.instance, d), drawn: d }; }),
       strips: this.strips.length, road: this.road, seams: this.seams, softWalls: this.softWalls.state(), shimmer: this.shimmer.state(), cellLoading: this.cellLoading.open, cellStage: this.cellLoading.stage, cellStep: this.cellLoading.now, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
-      residentMB: Math.round(cost.accounted / 1e4) / 100, playingMB: Math.round(cost.playing / 1e4) / 100,
+      residentMB: Math.round(cost.accounted / 1e4) / 100, playingMB: Math.round(cost.playing / 1e4) / 100, envelopeMB: Math.round(this.allocator.envelope() / 1e4) / 100,
       accountedBytes: cost.accounted,
       rings: { frame: stats.frame, far: stats.resident.far, l1: stats.resident.l1, l0: stats.resident.l0, refused: stats.refused, inFlight: stats.inFlight, queued: stats.queued,
         ghosts: { count: this.tileGhosts.count(), tiles: this.tileGhosts.regions() } },

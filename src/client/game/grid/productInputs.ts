@@ -10,6 +10,22 @@ export class ApproachInputsDeferredError extends Error {
   constructor() { super('Product input residency admission deferred'); this.name = 'ApproachInputsDeferredError'; }
 }
 
+/** GC6: reads in flight for a world's input read-back, and for a cancellable approach's. */
+export const INPUT_READS = 16, APPROACH_INPUT_READS = 12;
+/** Run `read` over `refs` with at most `width` in flight; the first failure stops new reads, waits for those in flight and
+ *  throws. `active` is checked before each new read (it throws on cancellation). */
+export async function readWindow(refs: readonly string[], width: number, active: () => void, read: (ref: string) => Promise<void>): Promise<void> {
+  let next = 0, failure: { readonly error: unknown } | undefined;
+  const lane = async (): Promise<void> => {
+    while (failure === undefined && next < refs.length) {
+      const ref = refs[next++]; if (ref === undefined) return;
+      try { active(); await read(ref); } catch (error) { failure ??= { error }; }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(width, refs.length) }, lane));
+  if (failure !== undefined) throw failure.error;
+}
+
 /** One admitted grid product's transient inputs, shared by overlapping preparations, never by finished promises. */
 export class ProductInputs {
   readonly reader: ClientAssets;
@@ -73,17 +89,12 @@ export class ProductInputs {
         const lease = this.reserve(bytes, signal !== undefined), loaded = new Map<string, Uint8Array>();
         try {
           // GC9: a cell's world reads its inputs back from the cache before it builds (Pine: about 1,500 files); one at a time
-          // that read was most of the build behind a moving player's loading wall. Eight in flight; a cancellable approach four.
-          const width = signal === undefined ? 8 : 4;
-          for (let i = 0; i < missing.length; i += width) {
-            active(); const batch = missing.slice(i, i + width);
-            const results = await Promise.allSettled(batch.map(ref => this.reader.read(ref)));
-            for (const [index, result] of results.entries()) {
-              if (result.status === 'rejected') throw result.reason;
-              const ref = batch[index]; if (ref === undefined) throw new Error('Missing approach transport identity');
-              loaded.set(ref, result.value);
-            }
-          }
+          // that read was most of the build behind a moving player's loading wall.
+          // GC6 (QA 11-14 row 6): each read is a cache round trip that waits on drawn frames, so it is latency-bound, not
+          // byte-bound: Nalati's ~860 inputs in lockstep batches of four took 20 s of its world's 30 s at Jake's 2992x1434@2.
+          // A sliding window keeps INPUT_READS (a cancellable approach APPROACH_INPUT_READS) in flight; the bytes held are
+          // the same (all of them are kept, and the lease above already charges them).
+          await readWindow(missing, signal === undefined ? INPUT_READS : APPROACH_INPUT_READS, active, async ref => { loaded.set(ref, await this.reader.read(ref)); });
           active();
           for (const [ref, value] of loaded) this.assets.set(ref, value);
           this.claims.push({ refs: new Set(missing), bytes, lease });

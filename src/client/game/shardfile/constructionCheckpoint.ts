@@ -1,5 +1,5 @@
 import type { Scope } from '@wildshard/engine/app/scope';
-import { buildHeld, frameBudgetSpent, frameDue, presenting } from '@wildshard/engine/core/framePacing';
+import { buildHeld, buildUrgent, frameBudgetSpent, frameDue, presenting } from '@wildshard/engine/core/framePacing';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { buildYield, WORK_SLICE_MS } from '@wildshard/engine/core/workSlice';
 
@@ -26,6 +26,6 @@ export function constructionCheckpoint(owner: Scope): Promise<void> | undefined 
     return buildYield(owner).then(() => { requireOwner(owner); loadingAt = diagnosticNow(); return undefined; });
   }
   loadingAt = undefined;
-  if (live && (buildHeld() || !frameDue()) && !frameBudgetSpent(WORK_SLICE_MS)) return undefined;
+  if (live && (buildHeld() || buildUrgent() || !frameDue()) && !frameBudgetSpent(WORK_SLICE_MS)) return undefined;
   return buildYield(owner).then(() => { requireOwner(owner); return undefined; });
 }

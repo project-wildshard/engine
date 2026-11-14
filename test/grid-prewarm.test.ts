@@ -10,6 +10,8 @@ import { PageResidency } from '../src/client/game/grid/pageResidency';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import type { TraversalReadiness } from '@wildshard/engine/sim/readiness';
 import type { ReadinessWalls } from '@wildshard/engine/physics/readinessWalls';
+import { PRODUCT_DEFERRED } from '../src/client/game/grid/productLeases';
+import { ApproachInputsDeferredError } from '../src/client/game/grid/productInputs';
 
 // GC5 (QA-FEEDBACK 11-13 row 39): a boost crosses the 50 m road in under 3 s, and the world built on the road took 4 to 7.6 s,
 // so every boost held at the neighbour's loading wall. The page now builds the neighbour's world from inside the source, at
@@ -19,7 +21,9 @@ const level: SimLevel = { version: 3, id: 'platform', seed: 1, ground: { size: 5
   weapon: { id: 'none', shape: { kind: 'point', radius: 0 }, windup: 0, active: 0, recover: 0, cooldown: 0, range: 0, damage: 0, tags: [] } };
 const settle = (): Promise<void> => new Promise(resolve => { setTimeout(resolve, 5); });
 
-async function rig(options: { isolated?: boolean; bytes?: number; optional?: (cell: string) => Promise<void>; walls?: (readiness: TraversalReadiness) => void; lastCell?: boolean } = {}) {
+async function rig(options: { isolated?: boolean; bytes?: number; optional?: (cell: string) => Promise<void>; walls?: (readiness: TraversalReadiness) => void; lastCell?: boolean;
+  /** GC6: the products the page holds for cells other than home; with `scarce`, a demand read is refused while any is held */
+  scarce?: Set<string> } = {}) {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const assembly = new GridAssembly({ developer: false, devserver: false });
   const home = assembly.cell('driftwood-isle');
@@ -41,8 +45,15 @@ async function rig(options: { isolated?: boolean; bytes?: number; optional?: (ce
       bundle: () => ({ criticalWireBytes: 1000, hybridWireBytes: 1000, decodeSeconds: 0, runtimeParseSeconds: 0 }) },
     admit: async (cell, required) => { admits.push(`${cell.instance}:${required ? 'required' : 'optional'}`);
       if (!required && options.optional !== undefined && cell.instance !== home.instance) await options.optional(cell.instance);
+      const scarce = options.scarce;
+      if (scarce !== undefined && cell.instance !== home.instance) {
+        // room for one neighbour's product: an optional read is deferred, a demand read refused (held products are pinned)
+        if ([...scarce].some(id => id !== cell.instance)) throw required ? new Error(PRODUCT_DEFERRED) : new ApproachInputsDeferredError();
+        scarce.add(cell.instance);
+      }
       return {bytes: cell.instance === home.instance ? 1000 : options.bytes ?? 1000, exclusiveRuntime: true,
       ...options.isolated === false ? {} : { isolatedPreparation: true }, prepareRuntime: () => Promise.resolve(),
+      cancel: () => { options.scarce?.delete(cell.instance); },
       create: () => {
         created.push(cell.instance);
         const host = createSimHost(level, { rapier, playerBody: false, ground: false });
@@ -74,7 +85,7 @@ test('boost: the neighbour\'s world is built from inside the source, at its spee
     await expect.poll(() => r.live.ready(r.east.instance), { timeout: 5000, interval: 10 }).toBe(true);
     expect(r.live.current()).toBe(r.home.instance); // still inside the source
     expect(r.player.position.x).toBeLessThan(CHUNK_HALF - 50);
-    expect(r.live.state().ahead).toEqual({ instance: r.east.instance, warms: 1, refused: null });
+    expect(r.live.state().ahead).toMatchObject({ instance: r.east.instance, warms: 1, refused: null });
     // on to the line, out onto the road and into the neighbour: the world built ahead is the one entered
     while (r.player.position.x < CHUNK_HALF + 10.5) await r.step(18);
     (await r.live.prepare(r.home.instance, null)).commit();
@@ -201,5 +212,23 @@ test('ROAD-PRELOAD RP4b: the road never closes a readiness wall on the home cell
     expect(r.live.state().residents).toContain(r.home.instance);
     expect(syncs).toBeGreaterThan(100);
     expect(closed, 'a readiness wall closed on the home cell\'s own edge').toBe(0);
+  } finally { r.dispose(); }
+});
+
+test('GC6: a demand read the held radial products crowd out lets them go and builds the neighbour from inside the source', async () => {
+  // QA 11-14 row 6: inside Driftwood the page held 3 to 5 neighbours' radial products (1199 of 1200 MB); Nalati's demand read
+  // was refused the whole approach, so its world was built only on the road and Jake waited at its card
+  const scarce = new Set<string>(), r = await rig({ scarce });
+  try {
+    // the page holds the north neighbour's product (a radial read), which leaves no room for another
+    r.player.position.x = CHUNK_HALF - 90; r.live.beforeFixed();
+    await r.live.prefetch([r.north.instance], 'radial');
+    expect(scarce.has(r.north.instance)).toBe(true);
+    // walk east toward the neighbour: inside the source its demand read lets the north product go and its world is built
+    while (r.player.position.x < CHUNK_HALF - 2 && !r.live.ready(r.east.instance)) await r.step(4.3);
+    expect(r.live.current()).toBe(r.home.instance); // still inside the source
+    await expect.poll(() => r.live.ready(r.east.instance), { timeout: 5000, interval: 10 }).toBe(true);
+    expect(r.live.state().ahead).toMatchObject({ instance: r.east.instance, demanded: null, released: 1 });
+    expect([...scarce]).toEqual([r.east.instance]);
   } finally { r.dispose(); }
 });

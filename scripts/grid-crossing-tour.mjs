@@ -31,6 +31,8 @@ const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', ''
 if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: grid-crossing-tour.mjs --base=<preview or loopback url> --out=<dir> [--engine=chromium|webkit] [--layout=phone] [--arcs=a:b,…] [--limit=n]');
 if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error(`No engine ${engineName}`);
 const limit = Number(flag('limit', '400')), only = flag('arcs', '').split(',').filter(Boolean), cold = process.argv.includes('--cold'), lane = flag('lane', 'opus-gcm2'), hold = Number(flag('hold', '0')), laps = Number(flag('laps', '1'));
+// --viewport=<w>x<h>@<dpr> (desktop): Jake's window is 2992x1434@2 (QA 11-14 row 6)
+const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '1440x900@1')) ?? [0, '1440', '900', '1']).slice(1).map(Number);
 let currentLap = 1;
 mkdirSync(out, { recursive: true });
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
@@ -52,11 +54,12 @@ for (const cell of cells) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -
   if (next !== undefined) arcs.push({ from: cell.instance, to: next.instance, dx, dz, boost: dx + dz < 0 });
 }
 const wanted = only.length === 0 ? arcs : arcs.filter(arc => only.includes(`${arc.from}:${arc.to}`));
-const HOME = 'driftwood-isle', HOME_CARD = 'Driftwood Isle', EDGE_IN = 238, LEG_MS = 90_000, STUCK_MS = 1500;
+// --in=<m>: how far inside its cell's edge each walk starts (default 12 m), so a walk from deeper in measures the pre-warm (GC6)
+const HOME = 'driftwood-isle', HOME_CARD = 'Driftwood Isle', EDGE_IN = 250 - Number(flag('in', '12')), LEG_MS = 90_000, STUCK_MS = 1500;
 
 /** @type {Record<string, unknown>[]} */
 const crossings = [];
-const result = { lane, base, build, cold, engine: engineName, layout: phone ? 'phone 402x874 touch' : 'desktop 1440x900', at: new Date().toISOString(), arcs: wanted.length, crossings, errors: /** @type {string[]} */ ([]), reloads: 0, reentries: 0, lostPage: /** @type {Record<string, unknown>[]} */ ([]), note: '', untried: /** @type {string[]} */ ([]) };
+const result = { lane, base, build, cold, engine: engineName, layout: phone ? 'phone 402x874 touch' : `desktop ${String(desk[0])}x${String(desk[1])}@${String(desk[2])}`, at: new Date().toISOString(), arcs: wanted.length, crossings, errors: /** @type {string[]} */ ([]), console: /** @type {string[]} */ ([]), reloads: 0, reentries: 0, lostPage: /** @type {Record<string, unknown>[]} */ ([]), note: '', untried: /** @type {string[]} */ ([]) };
 const save = () => writeFileSync(join(out, `${engineName}-${phone ? 'phone' : 'desktop'}-tour.json`), `${JSON.stringify(result, null, 2)}\n`);
 const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] : [] });
 let code = 1;
@@ -70,7 +73,7 @@ try {
     await context?.close();
     context = await browser.newContext(phone ? { viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: engineName === 'chromium', hasTouch: true,
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Mobile/15E148 Safari/604.1', ...cold ? { serviceWorkers: 'block' } : {} }
-      : { viewport: { width: 1440, height: 900 }, ...cold ? { serviceWorkers: 'block' } : {} });
+      : { viewport: { width: desk[0], height: desk[1] }, deviceScaleFactor: desk[2], ...cold ? { serviceWorkers: 'block' } : {} });
     await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
     await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: phone ? { tier: 'phone', volume: 0 } : { volume: 0 } });
@@ -78,6 +81,8 @@ try {
     if (cold && engineName === 'chromium') await (await context.newCDPSession(page)).send('Network.setCacheDisabled', { cacheDisabled: true });
     const opened = page;
     page.on('pageerror', error => { if (result.errors.length < 20) result.errors.push(error.message.slice(0, 240)); });
+    // GC6: the page's own warnings name a stuck entry preparation (`[grid] <cell>: entry preparation on the road`)
+    page.on('console', message => { if ((message.type() === 'warning' || message.type() === 'error') && result.console.length < 60) result.console.push(`${message.type()} ${message.text().slice(0, 300)}`); });
     page.on('framenavigated', frame => { if (frame === opened.mainFrame()) navigations++; });
   };
   /** Into the grid by Driftwood's deck card, and the sampler on: at the start, and again when the tour is stranded in a cell it can't leave. */
@@ -107,7 +112,7 @@ try {
         q.samples.push({ t: Math.round(performance.now() - t0), x: Number(p.position.x.toFixed(2)), y: Number(p.position.y.toFixed(2)), z: Number(p.position.z.toFixed(2)), inside: st.inside,
           phase: lv?.crossing?.phase, ready: lv?.live?.gameplayReady, loading: st.cellLoading, step: st.cellStep?.step ?? null,
           // GC6: whether the crossing's target world (colliders and sim) is resident yet, and the world built ahead (GC5)
-          built: q.target === undefined ? null : lv?.live?.residents?.includes(q.target) === true, ahead: lv?.live?.ahead?.instance ?? null,
+          built: q.target === undefined ? null : lv?.live?.residents?.includes(q.target) === true, ahead: lv?.live?.ahead?.instance ?? null, refused: lv?.live?.ahead?.refused ?? null, deferred: lv?.live?.ahead?.deferred ?? null, env: st.envelopeMB ?? null, pending: lv?.live?.pending ?? null,
           // GC13: the cells whose worlds the page holds, and what playing costs
           res: lv?.live?.residents ?? null, mb: st.playingMB ?? null,
           // GC12: how many closed walls show (only the ones the walker stands at)
@@ -196,6 +201,8 @@ try {
       // GC8: how long each `cell` step stood on the loading screen in this crossing (samples every 100 ms; a build before GC8 reads none)
       steps: speeds.reduce((/** @type {Record<string, number>} */ onScreen, x) => { if (x.t <= untilT && typeof x.r.step === 'string' && x.r.step !== '') onScreen[x.r.step] = (onScreen[x.r.step] ?? 0) + 100; return onScreen; }, {}),
       worstFrameMs: Math.max(0, ...near), jumps, lowestY: Math.min(...rows.map(r => r.y)), end: { inside: last.inside, x: last.x, y: last.y, z: last.z, phase: last.phase } });
+    // GC6: each crossing keeps its samples (every 500 ms), so its cause can be read from the json
+    row.trace = rows.filter((_, i) => i % 5 === 0).map(r => ({ t: r.t - tFrom, x: r.x, z: r.z, inside: r.inside, phase: r.phase, ready: r.ready, step: r.step, built: r.built, ahead: r.ahead, refused: r.refused, deferred: r.deferred, mb: r.mb, env: r.env, pending: r.pending, res: r.res }));
     // a failed crossing held on the road boosts back into the cell it left, so the tour goes on from there
     if (!row.ok && last.inside !== arc.from && last.inside !== arc.to) {
       await face(yaw + Math.PI); await page.keyboard.down('KeyW'); await page.keyboard.down('ShiftLeft');

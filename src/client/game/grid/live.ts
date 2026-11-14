@@ -90,7 +90,7 @@ export interface LiveGridPorts {
 export interface LiveGridState {
   current: string | null; worldFeet: GridPoint; crossings: number;
   /** GC5: the world built ahead of the traveller (on the road or pre-warmed inside the source), and how many pre-warms began */
-  ahead?: { readonly instance: string | null; readonly warms: number; readonly refused?: string | null };
+  ahead?: { readonly instance: string | null; readonly warms: number; readonly refused?: string | null; readonly deferred?: readonly string[]; readonly demanded?: string | null; readonly released?: number };
   /** Last complete world remains fully charged and pressure-evictable on the road. */
   retainedCell?: { readonly instance: string; readonly remainingMs: number; readonly playingBytes: number; readonly capBytes: number } | null;
   transitions: readonly { from: string | null; to: string | null }[];
@@ -176,6 +176,9 @@ export class LiveGridHost {
   private readonly productRequests = new Map<string, { work: Promise<LiveGridAdmission>; required: boolean;
     trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' }>();
   private readonly deferredProducts = new Map<string, number>();
+  /** GC6: a demand read (the neighbour ahead) the budget refused, by allocator revision: kept apart from the radial reads'
+   *  deferrals, since a radial read deferred for want of headroom must not stop the demand read that may make room */
+  private readonly deferredDemand = new Map<string, number>();
   private readonly issues = new Map<string, string>();
   private readonly refusals = new Map<string, unknown>();
   /** One failed cold unload per excursion; quota failures retain their full claim until retry or re-approach. */
@@ -191,6 +194,9 @@ export class LiveGridHost {
   private turnedSince: { instance: string; at: number } | null = null;
   /** GC5: why the last pre-warm the heading asked for did not start (its product still reading, an exclusive runtime, or the budget) */
   private warmRefusal: string | null = null;
+  /** GC6: the neighbour whose product is read as demand (the nearest edge's, or the heading's) and not yet admitted: radial
+   *  reads of other cells wait while it is missing, so they don't take back the headroom its read needs. */
+  private demanded: string | null = null;
   private previousFeet: GridPoint | undefined;
   /** fixed steps since `previousFeet` moved, for the traveller's speed (GC5) */
   private stepsSincePrevious = 0;
@@ -289,12 +295,16 @@ export class LiveGridHost {
         if ((bundle.hybridWireBytes > 0 || admission.exclusiveRuntime === true) && admission.prepareRuntime === undefined) throw new Error('Hybrid runtime admission is missing');
         await (timing === undefined ? admission.prepareRuntime?.() : timing.run('runtime', async () => { await admitted.prepareRuntime?.(); }));
         this.assertAlive();
-        this.deferredProducts.delete(instance); this.products.set(instance, admission); return admission;
+        this.deferredProducts.delete(instance); this.deferredDemand.delete(instance); this.products.set(instance, admission); return admission;
       } catch (error) {
         this.tileMetadata.delete(instance);
         if (this.tileApproach?.instance === instance) { this.tileApproach.controller.abort(); this.tileApproach = null; }
         const refused = error instanceof ApproachInputsDeferredError || (error instanceof Error && error.message.includes(PRODUCT_DEFERRED));
-        if ((!required || speculative) && refused) this.deferredProducts.set(instance, this.ports.allocator.revision);
+        // GC6 (QA 11-14 row 6): inside Driftwood the page held 3 to 5 neighbours' radial products (1199 of 1200 MB), pinned
+        // while held, so Nalati's demand read was refused the whole approach and its world was built only on the road. A
+        // refused demand read lets the speculative products of other cells go, farthest first, and is read again.
+        if (required && speculative && refused) { if (this.releaseSpeculative(instance) > 0) this.deferredDemand.delete(instance); else this.deferredDemand.set(instance, this.ports.allocator.revision); }
+        else if (!required && refused) this.deferredProducts.set(instance, this.ports.allocator.revision);
         else { this.issues.set(instance, error instanceof Error ? error.message : String(error)); this.refusals.set(instance, error); }
         try { admission?.cancel?.(); }
         catch (cleanup) { throw new AggregateError([error, cleanup], 'Live product admission and cancellation failed', { cause: cleanup }); }
@@ -303,6 +313,22 @@ export class LiveGridHost {
     })();
     this.productRequests.set(instance, { work: request, required, trigger }); return request;
   }
+  /** GC6: let every admitted product nobody builds, enters or reads ahead go except `kept`'s, farthest first (each releases
+   *  its claim, so the allocator's revision moves and a deferred demand read is tried again). Returns how many went. */
+  private releaseSpeculative(kept: string): number {
+    const feet = this.worldFeet(), keep = (id: string): boolean => id === kept || id === this.active || id === this.ahead
+      || this.constructing.has(id) || this.requests.has(id) || this.residents.has(id);
+    const idle = [...this.products.keys()].filter(id => !keep(id))
+      .sort((a, b) => this.distance(this.assembly.cell(b), feet) - this.distance(this.assembly.cell(a), feet));
+    for (const id of idle) {
+      const admission = this.products.get(id); this.products.delete(id); this.tileMetadata.delete(id);
+      try { admission?.cancel?.(); } catch (error) { console.warn(`[grid] ${id}: releasing a speculative product`, error); }
+    }
+    this.released += idle.length;
+    return idle.length;
+  }
+  /** GC6: how many speculative products a demand read let go (`releaseSpeculative`), for the tour */
+  private released = 0;
   /** GC5 / GC36: the cell whose world the road is building or built ahead of its line (`buildAhead`), kept until the
    *  traveller enters a cell or heads into another's mouth. */
   private ahead: string | null = null;
@@ -507,10 +533,13 @@ export class LiveGridHost {
     }
     return released;
   }
+  /** GC6: whether a world is being built (pre-warmed inside the source, built ahead on the road, or entered): every world build
+   *  is for a cell the traveller heads into, so its slices are urgent (`setBuildUrgent`). */
+  building(): boolean { return this.requests.size > 0; }
   /** Retry after a durability/budget change, instead of fetching the same failed request every tick. */
   retry(instance: string): void {
     if (this.requests.has(instance) || this.productRequests.has(instance)) throw new Error('Live admission is still pending');
-    this.coldUnloadRefused.delete(instance); this.deferredProducts.delete(instance);
+    this.coldUnloadRefused.delete(instance); this.deferredProducts.delete(instance); this.deferredDemand.delete(instance);
     // A quota-refused unload kept a complete native region: retry must not invalidate its valid readiness ticket.
     if (this.residents.has(instance)) return;
     this.issues.delete(instance); this.refusals.delete(instance); this.readiness.invalidate(instance);
@@ -552,8 +581,13 @@ export class LiveGridHost {
     if (this.active !== null && this.ahead !== null && (this.ahead === this.active
       || this.distance(this.assembly.cell(this.ahead), feet) > WARM_KEEP_METRES)) this.ahead = null;
     this.retireInactiveRegions();
+    // GC6: the demanded neighbour stays demanded until its product is in, it is entered, or the traveller is far from it
+    const demanded = this.demanded;
+    if (demanded !== null && (this.products.has(demanded) || this.residents.has(demanded) || demanded === this.active || this.issues.has(demanded)
+      || this.distance(this.assembly.cell(demanded), feet) > DEMAND_METRES + WARM_LEAD_METRES * 4)) this.demanded = null;
     for (const cell of nearby) {
       const estimate = readinessModel(this.ports.readiness.bundle(cell), this.ports.readiness.link), distance = this.distance(cell, feet);
+      if (this.demanded !== null && this.demanded !== cell.instance) continue;
       if (this.assembly.approaching(distance, estimate.distance) && !this.issues.has(cell.instance) && this.ports.backgroundReady?.() !== false) void background(cell.instance, this.prefetch([cell.instance], 'radial'), () => !this.disposed);
     }
     // GC5: the neighbour across the source's nearest edge, within DEMAND_METRES, has its product read as demand, standing or
@@ -566,8 +600,9 @@ export class LiveGridHost {
       const pending = near === undefined ? undefined : this.productRequests.get(near.instance);
       if (near !== undefined && this.distance(near, feet) <= DEMAND_METRES && !this.products.has(near.instance) && !this.residents.has(near.instance)
         && (pending === undefined || !pending.required && this.raised !== pending.work) && !this.issues.has(near.instance) && !this.constructing.has(near.instance)
-        && this.deferredProducts.get(near.instance) !== this.ports.allocator.revision && this.ports.backgroundReady?.() !== false) {
+        && this.deferredDemand.get(near.instance) !== this.ports.allocator.revision && this.ports.backgroundReady?.() !== false) {
         if (pending !== undefined) this.raised = pending.work;
+        this.demanded = near.instance;
         void background(near.instance, this.prefetchProduct(near.instance, true, 'explicit', true), () => !this.disposed);
       }
     }
@@ -669,7 +704,8 @@ export class LiveGridHost {
         // guess, which the shared budget declines while the page's other neighbours compete for the same headroom.
         if (product === undefined) {
           this.warmRefusal = 'product';
-          if (!this.productRequests.has(moving.instance) && this.deferredProducts.get(moving.instance) !== this.ports.allocator.revision)
+          this.demanded = moving.instance;
+          if (!this.productRequests.has(moving.instance) && this.deferredDemand.get(moving.instance) !== this.ports.allocator.revision)
             void background(moving.instance, this.prefetchProduct(moving.instance, true, 'explicit', true), () => !this.disposed);
         }
         else if (product.isolatedPreparation !== true) this.warmRefusal = 'exclusive';
@@ -863,7 +899,7 @@ export class LiveGridHost {
       playingBytes: this.ports.allocator.ownerCost(last.instance).playing, capBytes: Math.min(CONTENT_CAPS.playing, policy.playingBytes) };
   }
   /** Read-only crossing evidence and failures for the real grid physics harness. */
-  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, ahead: { instance: this.ahead, warms: this.warms, refused: this.warmRefusal }, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.productRequests.keys()])].sort(), pendingWork: [
+  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, ahead: { instance: this.ahead, warms: this.warms, refused: this.warmRefusal, deferred: [...new Set([...this.deferredProducts.keys(), ...this.deferredDemand.keys()])], demanded: this.demanded, released: this.released }, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.productRequests.keys()])].sort(), pendingWork: [
     ...[...this.requests.keys()].sort().map(instance => ({ instance, kind: 'world' as const, trigger: 'entry' as const })),
     ...[...this.productRequests].sort(([a], [b]) => a.localeCompare(b)).map(([instance, request]) => ({ instance, kind: request.required ? 'required-metadata' as const : 'optional-metadata' as const, trigger: request.trigger })),
   ], issues: Object.fromEntries(this.issues), gameplayReady: this.active === null || this.ports.gameplayReady(this.active), ...(this.ports.lastCell === undefined ? {} : { retainedCell: this.retainedState() }), retirements: this.retirements.map(row => ({ ...row })), retiring: [...this.retiring.keys()], ghosts: { count: this.ghosts.count(), regions: this.ghosts.regions() } }; }
@@ -903,7 +939,7 @@ export class LiveGridHost {
       try { this.highway.dispose(); this.highwayDisposed = true; this.highwayLease.release(); }
       catch (error) { failures.push(error); }
     }
-    this.deferredProducts.clear();
+    this.deferredProducts.clear(); this.deferredDemand.clear();
     if (failures.length > 0) throw new AggregateError(failures, 'Live grid disposal failed');
   }
 }

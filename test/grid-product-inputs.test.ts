@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { emptyShardfile } from '@wildshard/engine/host/author';
 import { hashImmutableBytes } from '@wildshard/engine/host/immutable';
 import type { AdmittedProduct, ProductOptions } from '../src/client/game/shardfile/product';
-import { ProductInputs } from '../src/client/game/grid/productInputs';
+import { APPROACH_INPUT_READS, ProductInputs, readWindow } from '../src/client/game/grid/productInputs';
 import { accountTransportRelease } from '../src/client/game/grid/products';
 
 function fixture(transportOnly = false) {
@@ -45,9 +45,9 @@ test('corrupt selected approach transport never publishes or retains its tempora
   expect(f.held()).toBe(0); const actual = await f.inputs.acquire(); expect(actual.assets.size).toBe(0); await actual.release();
 });
 
-test('approach cancellation drains its four started reads and starts no suffix', async () => {
+test('approach cancellation drains its started window of reads and starts no suffix', async () => {
   const source = emptyShardfile({ slug: 'approach-window', name: 'Window', author: 'Test', revision: 1, seed: 1 });
-  const bytes = Array.from({ length: 6 }, (_, i) => Uint8Array.of(i + 1)), hashes = bytes.map(hashImmutableBytes);
+  const bytes = Array.from({ length: APPROACH_INPUT_READS + 2 }, (_, i) => Uint8Array.of(i + 1)), hashes = bytes.map(hashImmutableBytes);
   for (const [i, hash] of hashes.entries()) source.files.push({ hash, kind: 'binary', compressed: bytes[i]?.length ?? 0, decoded: 1, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false });
   const finish: (() => void)[] = [], started: string[] = [];
   const options: ProductOptions = { base: 'https://inputs.test/', offline: false, firstParty: true, fetch: () => Promise.reject(new Error('Unexpected network')),
@@ -58,10 +58,10 @@ test('approach cancellation drains its four started reads and starts no suffix',
   const inputs = new ProductInputs(admitted, options, count => { held += count; return { shrink: next => { held = next; }, release: () => { held = 0; } }; }, new Set(), hashes);
   const controller = new AbortController(), pending = inputs.acquireTransport(controller.signal);
   const refused = expect(pending).rejects.toThrow('Approach input acquisition cancelled');
-  await vi.waitFor(() => { expect(started).toHaveLength(4); });
-  controller.abort(); expect(held).toBe(6);
+  await vi.waitFor(() => { expect(started).toHaveLength(APPROACH_INPUT_READS); });
+  controller.abort(); expect(held).toBe(APPROACH_INPUT_READS + 2);
   for (const release of finish) release(); await refused;
-  expect(started).toEqual(hashes.slice(0, 4)); expect(held).toBe(0);
+  expect(started).toEqual(hashes.slice(0, APPROACH_INPUT_READS)); expect(held).toBe(0);
   const actual = await inputs.acquire(); expect(actual.assets.size).toBe(0); await actual.release();
 });
 
@@ -143,4 +143,18 @@ test('decoder releases do not shrink bytes still pinned by preparation mirrors',
   expect(released).toHaveBeenLastCalledWith(0); expect(input.assets.get(f.ref)).toBe(f.bytes);
   await input.release(); expect(released).toHaveBeenLastCalledWith(3);
   await input.release(); expect(released.mock.calls.map(([count]) => count)).toEqual([0, 3]);
+});
+
+test('GC6: the read window slides: one slow read never holds the reads after it, and a failure starts no more', async () => {
+  // QA 11-14 row 6: lockstep batches of four waited on each batch's slowest read (Nalati's 860 inputs: 20 s at 18 fps)
+  const started: string[] = [], finish = new Map<string, () => void>();
+  const refs = ['slow', 'a', 'b', 'c', 'd', 'e'];
+  const done = readWindow(refs, 2, () => undefined, ref => new Promise<void>(resolve => { started.push(ref); finish.set(ref, resolve); }));
+  await vi.waitFor(() => { expect(started).toEqual(['slow', 'a']); });
+  for (const ref of ['a', 'b', 'c', 'd']) { finish.get(ref)?.(); await vi.waitFor(() => { expect(started).toContain(refs[refs.indexOf(ref) + 1]); }); }
+  expect(started).toEqual(refs); // 'slow' still in flight while every other read started
+  finish.get('e')?.(); finish.get('slow')?.(); await done;
+  const tried: string[] = [];
+  await expect(readWindow(['x', 'y', 'z'], 1, () => undefined, ref => { tried.push(ref); return ref === 'y' ? Promise.reject(new Error('bad y')) : Promise.resolve(); })).rejects.toThrow('bad y');
+  expect(tried).toEqual(['x', 'y']);
 });

@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Scope } from './scope';
 import { installScopeEnvironment, scopeEnvironment } from './scopeEnvironment';
-import { frameBudgetSpent, nativeBudgetSpent, noteFrameDrawn, paceYield, setBuildHeld } from '../core/framePacing';
+import { frameBudgetSpent, nativeBudgetSpent, noteFrameDrawn, paceYield, setBuildHeld, setBuildUrgent } from '../core/framePacing';
 
 const environment = scopeEnvironment();
 const messageChannel = globalThis.MessageChannel, animationFrame = globalThis.requestAnimationFrame;
 let now = 1000;
 beforeEach(() => { vi.spyOn(performance, 'now').mockImplementation(() => now); });
 afterEach(() => {
-  installScopeEnvironment(environment); setBuildHeld(false); noteFrameDrawn(Number.NEGATIVE_INFINITY);
+  installScopeEnvironment(environment); setBuildHeld(false); setBuildUrgent(false); noteFrameDrawn(Number.NEGATIVE_INFINITY);
   vi.restoreAllMocks();
   Reflect.set(globalThis, 'MessageChannel', messageChannel); Reflect.set(globalThis, 'requestAnimationFrame', animationFrame);
 });
@@ -32,6 +32,21 @@ test('busy draws retain the ordinary allowance until the actual frame deadline',
   expect(frameBudgetSpent(8, 1031.4)).toBe(true);
   expect(nativeBudgetSpent(8, 1027)).toBe(false);
   expect(nativeBudgetSpent(8, 1028)).toBe(true);
+});
+
+test('an urgent build (GC6) gets 8 ms after each drawn frame on a 120 Hz screen at 30 fps, not a quarter of the vsync', () => {
+  // uncapped 120 Hz: two rAF stamps 8.3 ms apart set the interval; then the game draws a 33 ms frame
+  noteFrameDrawn(1004, 1000, 0); noteFrameDrawn(1012.3, 1008.3, 0); noteFrameDrawn(1050, 1016.6, 0);
+  // QA 11-14 row 6: the ordinary slice is a quarter of 8.3 ms, so a crossing's world built at 2 ms a 33 ms frame
+  expect(frameBudgetSpent(8, 1052)).toBe(false);
+  expect(frameBudgetSpent(8, 1052.2)).toBe(true);
+  setBuildUrgent(true);
+  expect(frameBudgetSpent(8, 1057.9)).toBe(false);
+  expect(frameBudgetSpent(8, 1058)).toBe(true);
+  // a caller's tighter budget still wins, and the next vsync being due no longer ends an urgent slice
+  expect(frameBudgetSpent(1, 1051)).toBe(true);
+  noteFrameDrawn(1060, 1058.3, 0);
+  expect(frameBudgetSpent(8, 1067)).toBe(false);
 });
 
 test('a frame that overran its interval still admits the ordinary slice after it is drawn (D110)', () => {
