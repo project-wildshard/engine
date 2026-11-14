@@ -88,6 +88,8 @@ export interface LiveGridPorts {
 /** Crossing telemetry is a production port: the harness verifies real fixed-boundary commits, never a page/debug probe. */
 export interface LiveGridState {
   current: string | null; worldFeet: GridPoint; crossings: number;
+  /** GC5: the world built ahead of the traveller (on the road or pre-warmed inside the source), and how many pre-warms began */
+  ahead?: { readonly instance: string | null; readonly warms: number };
   /** Last complete world remains fully charged and pressure-evictable on the road. */
   retainedCell?: { readonly instance: string; readonly remainingMs: number; readonly playingBytes: number; readonly capBytes: number } | null;
   transitions: readonly { from: string | null; to: string | null }[];
@@ -115,6 +117,10 @@ interface Resident { region: LiveGridRegion; lease: ResidencyLease; reservations
 // Contact corrections at a closed readiness wall are not a U-turn. Accumulate real horizontal travel
 // before selecting another approach, so sub-centimetre capsule recoil cannot evict the world just prepared.
 const APPROACH_TRAVEL_METRES = 0.1;
+// GC5: the page pre-warms a neighbour's world from inside the source, at the distance the traveller covers at its speed in that
+// world's last measured build time (2 s at least; before it is measured, the slowest build so far or 6 s), times a margin. Kept while the traveller stays within
+// WARM_KEEP_METRES of it; the lead is capped below that, so a pre-warm never starts where it would be dropped.
+const FIXED_HZ = 60, WARM_DEFAULT_SECONDS = 6, WARM_MIN_SECONDS = 2, WARM_MAX_SECONDS = 10, WARM_MARGIN = 1.25, WARM_LEAD_METRES = 8, WARM_LEAD_CAP_METRES = 200, WARM_KEEP_METRES = 240;
 const entryAxes = [['x', 'z'], ['z', 'x']] as const;
 // Distance can decrease while passing parallel to a cell. Only a ray into its first boundary's midpoint mouth
 // predicts entry; product downloads remain radial, but an unrelated native world must not block the real turn-in.
@@ -177,7 +183,12 @@ export class LiveGridHost {
   private frameGeneration = 0;
   private readonly transitions: { from: string | null; to: string | null }[] = [];
   private crossings = 0;
+  private warms = 0;
   private previousFeet: GridPoint | undefined;
+  /** fixed steps since `previousFeet` moved, for the traveller's speed (GC5) */
+  private stepsSincePrevious = 0;
+  /** GC5: each cell's last measured world build, in seconds (product to colliders and sim ready) */
+  private readonly builtSeconds = new Map<string, number>();
   private readonly candidateDistances = new Map<GridCell,number>();
   private readonly approachWork:{candidates:GridCell[];boulevard:GridCell[]}[]=[];
   /** This host already owns the assembly and its frozen cells for its whole lifetime. */
@@ -352,6 +363,7 @@ export class LiveGridHost {
       await (timing === undefined ? previous : timing.run('queue', () => previous));
       await this.retiredTransport;
       this.assertAlive();
+      const buildStart = diagnosticNow();
       const admitted = timing === undefined ? await this.prefetchProduct(instance, true) : await timing.run('metadata', () => this.prefetchProduct(instance, true));
       admission = admitted;
       this.assertAlive();
@@ -386,6 +398,7 @@ export class LiveGridHost {
         this.assertAlive();
         this.residents.set(instance, { region, lease, reservations: 0, evicting: false, retainable: admitted.isolatedPreparation === true });
         this.readiness.complete(ticket, 'colliders'); this.readiness.complete(ticket, 'sim');
+        this.builtSeconds.set(instance, (diagnosticNow() - buildStart) / 1000);
         lease.update({ needed: false, distance: this.distance(cell) });
       } catch (error) {
         try { region?.dispose(); }
@@ -457,6 +470,13 @@ export class LiveGridHost {
     resident.lease.update({ needed: false, distance: this.distance(this.assembly.cell(instance)) });
     return this.lastCell === last;
   }
+  /** GC5: how far from a neighbour's square its world starts building at `speed` (m/s): its measured build time, or the
+   *  slowest measured so far or the default, at least WARM_MIN_SECONDS, with a margin; capped below the keep distance. */
+  private warmLead(instance: string, speed: number): number {
+    const measured = this.builtSeconds.get(instance) ?? Math.max(WARM_DEFAULT_SECONDS, ...this.builtSeconds.values());
+    const seconds = Math.min(WARM_MAX_SECONDS, Math.max(WARM_MIN_SECONDS, measured));
+    return Math.min(WARM_LEAD_CAP_METRES, WARM_LEAD_METRES + speed * seconds * WARM_MARGIN);
+  }
   private distance(cell: GridCell, p = this.worldFeet()): number { return Math.hypot(Math.max(0, Math.abs(p.x - cell.origin.x) - CHUNK_HALF), Math.max(0, Math.abs(p.z - cell.origin.z) - CHUNK_HALF)); }
   /** Only the active/reserved world and one bounded departed world can remain.
    * A different actual entry retires the departure before any new allocation. */
@@ -500,7 +520,8 @@ export class LiveGridHost {
     // More than a second of modeled travel between fixed samples is a pose/portal jump.
     // Establish a new origin instead of spending a constructor on its accidental direction.
     const travelled = previous !== undefined && travelledDistance >= APPROACH_TRAVEL_METRES && travelledDistance <= this.ports.readiness.link.speed;
-    if (previous === undefined || travelledDistance >= APPROACH_TRAVEL_METRES) this.previousFeet = feet;
+    const steps = ++this.stepsSincePrevious, speed = travelled ? travelledDistance * FIXED_HZ / steps : 0;
+    if (previous === undefined || travelledDistance >= APPROACH_TRAVEL_METRES) { this.previousFeet = feet; this.stepsSincePrevious = 0; }
     // Prefetch the closest cells' products (never their worlds: G663). Unsupported far proxies do not consume the count
     // before enterable cells inside the cold readiness bound.
     const candidates=work.candidates,cells=this.assembly.cells;
@@ -513,8 +534,10 @@ export class LiveGridHost {
     // Immutable products are selected by distance, without a whole-world count cap.
     const nearby = candidates;
     // The frame-transfer reservation protects an actual entry; inactive whole worlds retire in steps. A world built ahead
-    // (`buildAhead`) stays while the traveller is on the road and has not turned into another mouth (below).
-    if (this.active !== null) this.ahead = null;
+    // (`buildAhead`) stays while the traveller is on the road and has not turned into another mouth (below); one pre-warmed
+    // from inside the source (GC5) stays while the traveller is within WARM_KEEP_METRES of it.
+    if (this.active !== null && this.ahead !== null && (this.ahead === this.active
+      || this.distance(this.assembly.cell(this.ahead), feet) > WARM_KEEP_METRES)) this.ahead = null;
     this.retireInactiveRegions();
     for (const cell of nearby) {
       const estimate = readinessModel(this.ports.readiness.bundle(cell), this.ports.readiness.link), distance = this.distance(cell, feet);
@@ -543,7 +566,7 @@ export class LiveGridHost {
     // The world built ahead goes once the traveller is a pitch from it, or heads from the road into another mouth (a stop
     // keeps it). Checked while a build runs too, which the gate below skips.
     if (this.ahead !== null && (this.distance(this.assembly.cell(this.ahead), feet) >= this.assembly.pitch
-      || moving !== undefined && moving.instance !== this.ahead && this.assembly.at(feet.x, feet.z) === undefined)) this.ahead = null;
+      || moving !== undefined && moving.instance !== this.ahead && (this.assembly.at(feet.x, feet.z) === undefined || this.active !== null))) this.ahead = null;
     if (this.requests.size === 0) {
       const wallReach = 6 + this.ports.player.motor.opts.radius + 0.5 + this.ports.readiness.link.speed / 60;
       const departed = this.transitions.at(-1)?.from;
@@ -584,6 +607,21 @@ export class LiveGridHost {
         && this.distance(moving, feet) < this.assembly.pitch && this.retireInactiveRegions(moving.instance)) {
         this.ahead = moving.instance;
         void background(moving.instance, this.ensure(moving.instance), () => !this.disposed);
+      }
+      // GC5 (QA 11-13 row 39: boosts held 4 to 7.6 s at the neighbour's loading wall, the road being under 3 s at 18 m/s):
+      // inside the source, heading into a neighbour's mouth, its world is built once the traveller is its measured build
+      // time away at this speed. Only beside an isolated source and for an isolated product (opaque runtimes stay exclusive,
+      // built only on the road), and only when both fit beside each other (G723); else the road builds it as before.
+      if (this.ports.buildAhead === true && moving !== undefined && this.active !== null && this.ahead === null
+        && this.residents.get(this.active)?.retainable === true && !this.residents.has(moving.instance) && !this.issues.has(moving.instance)
+        && this.distance(moving, feet) <= this.warmLead(moving.instance, speed)) {
+        const product = this.products.get(moving.instance);
+        if (product === undefined) void background(moving.instance, this.prefetch([moving.instance]), () => !this.disposed);
+        else if (product.isolatedPreparation === true && this.ports.allocator.canPrepareAlongside(this.active, moving.instance, product.bytes,
+          { playing: this.ports.allocator.envelope(), loading: CONTENT_CAPS.loading })) {
+          this.ahead = moving.instance; this.warms++;
+          void background(moving.instance, this.ensure(moving.instance), () => !this.disposed);
+        }
       }
       if (approach !== undefined && this.ports.prepareNeighbour !== undefined && this.tileMetadata.has(approach.instance)
         && !this.residents.has(approach.instance) && !this.issues.has(approach.instance)
@@ -710,8 +748,9 @@ export class LiveGridHost {
   /** Prepare disabled replacement controllers while the existing page stays authoritative; no entered runtime hooks run here. */
   async prepare(from: string | null, to: string | null): Promise<PreparedGridCrossing> {
     if (this.disposed || this.active !== from || from === to) throw new Error('Stale live frame preparation');
-    // An entry anywhere but the world built ahead lets that world go, so it retires before this one allocates.
-    if (this.ahead !== to) this.ahead = null;
+    // An entry anywhere but the world built ahead lets that world go, so it retires before this one allocates. Stepping out
+    // onto the road keeps one pre-warmed from inside the source (GC5).
+    if (to !== null && this.ahead !== to) this.ahead = null;
     if (from !== null && to !== null) throw new Error('Owned runtime crossing must commit onto the neutral road first');
     // Protect a ready return before yielding: expiry/pressure cannot free it
     // between its selection and the final prepared-frame reservation.
@@ -767,7 +806,7 @@ export class LiveGridHost {
       playingBytes: this.ports.allocator.ownerCost(last.instance).playing, capBytes: Math.min(CONTENT_CAPS.playing, policy.playingBytes) };
   }
   /** Read-only crossing evidence and failures for the real grid physics harness. */
-  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.productRequests.keys()])].sort(), pendingWork: [
+  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, ahead: { instance: this.ahead, warms: this.warms }, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.productRequests.keys()])].sort(), pendingWork: [
     ...[...this.requests.keys()].sort().map(instance => ({ instance, kind: 'world' as const, trigger: 'entry' as const })),
     ...[...this.productRequests].sort(([a], [b]) => a.localeCompare(b)).map(([instance, request]) => ({ instance, kind: request.required ? 'required-metadata' as const : 'optional-metadata' as const, trigger: request.trigger })),
   ], issues: Object.fromEntries(this.issues), gameplayReady: this.active === null || this.ports.gameplayReady(this.active), ...(this.ports.lastCell === undefined ? {} : { retainedCell: this.retainedState() }), retirements: this.retirements.map(row => ({ ...row })), retiring: [...this.retiring.keys()], ghosts: { count: this.ghosts.count(), regions: this.ghosts.regions() } }; }

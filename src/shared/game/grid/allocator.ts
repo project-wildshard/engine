@@ -108,6 +108,9 @@ export class ResidencyAllocator {
     if (!Number.isFinite(this.playing) || this.playing <= 0) throw new RangeError('Invalid residency envelope');
   }
 
+  /** The playing envelope this allocator admits against (the tier's, else §3.2's). */
+  envelope(): number { return this.playing; }
+
   /** Admit a claim, or share one already held under the same id; null when it cannot fit even after eviction. */
   reserve(claim: ResidencyClaim): ResidencyLease | null { return this.reserveClaim(claim, 0); }
   /** Speculative IO may use existing headroom, never evict another owner's ready world. */
