@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.19 (2026-11-13)
+
+- Mossgate Hollow and Brasscap Mesa have new looks: sunset sky, warm lamps, mossy stone, and a beach edge on Mossgate's pond.
+- Walking from one shard into the next no longer stops at a loading wall: the shard ahead warms up while you are on the road.
+- The game keeps playing through a dropped connection, loads from cache offline, and reconnects once you are back online.
+- Far Reach is on its third version with docks at its exits, and the map tab no longer breaks on a missing tile.
+- Behind the scenes: shards can ask for mirror water, lamp halos, glowing motes and exposure; the server reports to monitoring.
+
 ## v0.1.18 (2026-11-13)
 
 - Share a shard with a link: play.wildshard.io/slug/driftwood-isle opens that shard and shows its name and picture in chat previews.
