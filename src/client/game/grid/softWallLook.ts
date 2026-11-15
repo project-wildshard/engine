@@ -10,6 +10,11 @@
  * GC12 (Jake, 2026-11-13 ~22:50 Cancún, board A): the wall shows only when a player meets a closed edge. A closed wall is drawn
  * while the traveller's feet stand within `MEET_METRES` of it, so a warm crossing (or a wall seen from across the cell) never
  * shows it; the readiness wall itself still holds at every closed edge.
+ *
+ * ZE5 (J352, Jake 2026-11-15 ~11:02 Cancún: "the wall needs to be this see-through wall like we have right now [...] Like we want
+ * people to kind of be enticed to kind of enter and go in"): the zone walls round every cell but the home take this look, and
+ * the session passes no `feet`, so a wall shows from wherever it is seen. Past 70 m it eases to a faint line rather than going,
+ * so the walls read from across the road while the cell behind stays in view.
  */
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DoubleSide, DynamicDrawUsage, Group, Mesh, type Object3D, ShaderMaterial } from 'three';
 import type { LookScope } from '../../../shared/game/grid/roadLayout';
@@ -69,7 +74,7 @@ float hexEdge(vec2 p) {
 void main() {
   if (vClosed < 0.5) discard;
   float d = length(vWorld.xz - cameraPosition.xz);
-  float near = 1.0 - smoothstep(25.0, 70.0, d);
+  float near = mix(0.3, 1.0, 1.0 - smoothstep(25.0, 70.0, d)) * (1.0 - smoothstep(600.0, 1400.0, d));
   if (near <= 0.0) discard;
   float e = hexEdge(vUv);
   float line = 1.0 - smoothstep(0.0, 0.06, e);

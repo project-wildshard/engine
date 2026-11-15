@@ -39,3 +39,7 @@
   stays resident with all it holds, so its capture is owed and taken at its eviction (parking the owner's seat for the
   capsule a capture reads); progress saves still write a cell as its progress moves. A reload while on the road loses only
   what moved in the cell since its last progress save. `test/grid-leave-owed-capture.test.ts`, red first.
+- ZE5 (opus-gcm8): the page walls every cell but its home with `zoneWalls.ts`: the edge line, open at the four entryways, a
+  10 m buffer with its two sides and the gate. They replace the 5 m-out neighbour readiness edges in the session's road
+  physics and the look; the hex look now shows at any distance (faint past 70 m). `readinessEdges.ts` is left only for the
+  continuous-crossing tests ZE1 retires. The server's road (ZE6) is Codex's.

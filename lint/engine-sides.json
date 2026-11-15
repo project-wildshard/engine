@@ -1668,6 +1668,7 @@
     "src/shared/game/grid/platformInputs.ts": "shared",
     "src/shared/game/grid/postPairs.ts": "shared",
     "src/shared/game/grid/readinessEdges.ts": "shared",
+    "src/shared/game/grid/zoneWalls.ts": "shared",
     "src/shared/game/grid/recovery.ts": "shared",
     "src/shared/game/grid/roadLayout.ts": "shared",
     "src/shared/game/grid/roadRecovery.ts": "shared",

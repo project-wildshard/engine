@@ -51,7 +51,7 @@ import { WATER_UNBOUNDED, waterExtent } from '@wildshard/engine/world/waves';
 import type { Renderer } from '@wildshard/engine/render/renderer';
 import { generatePlatform, generatePlatformSliced, type GeneratedStrip, type PlatformCell, type StripProfile } from '@wildshard/engine/sim/strips';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
-import { neighbourEdges } from '../../../shared/game/grid/readinessEdges';
+import { walledCells, zoneWallEdges } from '../../../shared/game/grid/zoneWalls';
 import { DEVSERVER, gridMode } from './menu';
 import { gridCells, pageGridInstance } from '../plugin/context';
 import { prepareHomeMetadata, withInitialHomeMetadata } from './homeMetadata';
@@ -679,16 +679,15 @@ export class GridSession {
     // tiles) stays drawn from inside it: the neighbours are the grid's horizon (G321 part 4's fade beyond the cell is gone)
     // SF17b's per-view road budget (§3.2, G101): what the view camera draws of the road system, and what stays resident
     this.roadBudget = { view: () => { const camera = host.frame?.camera; return camera === undefined ? null : roadViewCost(this.roadRoots, camera, this.roadPlans); }, resident: () => roadResident(this.roadRoots, this.roadPlans) };
-    // G85: a closed neighbour edge shows as a cyan hex shimmer
+    // G85: a closed neighbour edge shows as a cyan hex shimmer; ZE5 (J352): every cell but the home is walled, and its wall shows
+    // from wherever it is seen, so the cell behind it reads as there to enter
     this.constructorTiming?.('road');
     this.softWalls = installSoftWallLook({ scene: host.scene, scope: host.scope, time: () => app.clock.now,
-      edges: this.neighbours.flatMap((cell) => neighbourEdges(cell, home).map((edge) => {
+      edges: walledCells(this.assembly, home).flatMap((cell) => zoneWallEdges(cell, home).map((edge) => {
         const look = { instance: cell.instance, x: edge.x, z: edge.z, axis: edge.axis, halfLength: edge.halfLength };
         return cell.edgeLook === undefined ? look : Object.assign(look, { height: cell.edgeLook.height });
       })),
-      // GC12: drawn only while the traveller stands at that edge (the feet in the home frame)
-      ports: { closed: (id) => this.live === null || !this.live.live.ready(id),
-        feet: () => { const at = this.world(); return { x: at.x - home.origin.x, z: at.z - home.origin.z }; } } });
+      ports: { closed: (id) => this.live === null || !this.live.live.ready(id) } });
     setParkedMatricesFrozen(true); // G580 T2: a hidden parked world skips matrix updates during its warm-up
     host.scope.onDispose(() => { if (host.heldFrame !== undefined) host.heldFrame.enabled = false; setWarmUpHeld(false); setParkedMatricesFrozen(false); setBuildHeldTimed(false); setBuildUrgent(false); });
     // G78: a shimmer line at every shard border on its real ground; G119: SAVING… / SAVE FAILED, RETRY while a crossing waits
@@ -711,7 +710,7 @@ export class GridSession {
     withOwner(host.scope, () => installVoidFloor(host.physics, this.assembly.cells, this.assembly.pitch, false));
     // The normal world stage owns the home's sockets; this scope adds only rebased neighbours.
     installEntrySockets(host.physics, host.scope, this.neighbours.map((cell) => ({ x: cell.origin.x - nativeOrigin.origin.x, z: cell.origin.z - nativeOrigin.origin.z })));
-    this.walls = new ReadinessWalls(host.physics, [...this.neighbours.flatMap((cell) => neighbourEdges(cell, nativeOrigin)), ...rimEdges(this.assembly, nativeOrigin)], host.scope);
+    this.walls = new ReadinessWalls(host.physics, [...walledCells(this.assembly, home).flatMap((cell) => zoneWallEdges(cell, nativeOrigin)), ...rimEdges(this.assembly, nativeOrigin)], host.scope);
     // a cell's PMREM of a new cube height fading in (drawnEnvironment.ts): the road's views take its variants before it lights
     // them (G639 desktop: Pine's 1024 and Nalati's 512 ring / road variants linked on the first road frame beside each)
     host.scope.onDispose(onPageEnvironment(() => { this.prelinkViews(); }));
@@ -1031,7 +1030,7 @@ export class GridSession {
           await prepare(cell.instance, owner, start);
         } catch (error) { owner.dispose(); throw error; }
       } }),
-      neighbourEdges: (cell, origin) => neighbourEdges(cell, { origin }), rimEdges: (origin) => rimEdges(this.assembly, { origin }) }, page);
+      neighbourEdges: (cell, origin) => zoneWallEdges(cell, { origin }), rimEdges: (origin) => rimEdges(this.assembly, { origin }) }, page);
     return this.live;
   }
 
