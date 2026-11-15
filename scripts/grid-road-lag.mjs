@@ -2,7 +2,7 @@
 // Road lag (Jake, 2026-11-15: "Last time I tried going to the road, there was a lot of lag"): from a home cell, step out of its
 // entryway onto the road and back in, by real input, a few times, and measure what the player feels at each line: every frame's
 // time (requestAnimationFrame) in the window from 1 s before to 3 s after the feet cross, any loading card on screen in it, and the
-// longest stop with the key held. One JSON per run, plus a printed line per crossing.
+// longest stretch under 90 % of the approach speed with the key held (the road bar's stop). One JSON per run, plus a printed line per crossing.
 //   scripts/browser-lane.sh node scripts/grid-road-lag.mjs --base=<staging, preview or loopback> --out=<dir> [--home=driftwood|nalati]
 //     [--viewport=2992x1434@2] [--reps=3] [--engine=chromium|webkit]
 // On preview or a loopback page the walker is set 20 m inside the home cell's road-facing entryway by the in-page harness pose; on
@@ -59,7 +59,8 @@ try {
     requestAnimationFrame(raf);
     setInterval(() => { try {
       const st = W.__wildshard.shard.grid.state(), p = W.__wildshard.world.player;
-      q.samples.push({ t: Math.round(performance.now()), x: Number(p.position.x.toFixed(2)), z: Number(p.position.z.toFixed(2)), inside: st.inside, phase: st.live?.crossing?.phase ?? null, card: st.cellLoading ?? null, stage: st.cellStage ?? null, ready: st.live?.live?.gameplayReady, res: st.live?.live?.residents ?? null, hy: st.hybrid?.instance ?? null, hook: st.hybrid?.hook ?? null });
+      const wf = st.live?.live?.worldFeet ?? p.position;
+      q.samples.push({ t: Math.round(performance.now()), x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), inside: st.inside, phase: st.live?.crossing?.phase ?? null, card: st.cellLoading ?? null, stage: st.cellStage ?? null, ready: st.live?.live?.gameplayReady, res: st.live?.live?.residents ?? null, cx: st.live?.live?.crossings ?? null, cur: st.live?.live?.current ?? null, hy: st.hybrid?.instance ?? null, hook: st.hybrid?.hook ?? null });
     } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 50);
   });
   const sample = () => page.evaluate(() => { const rows = /** @type {any[]} */ (/** @type {any} */ (window).__road.samples); for (let at = rows.length - 1; at >= 0; at--) if (rows[at].err === undefined) return rows[at]; return undefined; });
@@ -80,13 +81,17 @@ try {
     await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [x, z]);
   }
   await sleep(4000);
+  // the walk's lines are in the home's own coordinates: world feet less the home cell's origin
+  const originAt = /** @type {{ x: number, z: number }} */ (await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; }));
+  const local = (/** @type {any} */ s) => s[along] - originAt[along];
   const outward = along === 'x' ? (home.sign > 0 ? -Math.PI / 2 : Math.PI / 2) : (home.sign > 0 ? Math.PI : 0);
+  let heldUntil = Infinity;
   /** Walk with W held until `done(sample)` or 40 s; returns the wall time it took. */
   const walk = async (/** @type {number} */ yaw, /** @type {(s: any) => boolean} */ done) => {
     await face(yaw); await page.keyboard.down('KeyW');
     const t0 = Date.now();
     for (let s = await sample(); Date.now() - t0 < 40_000 && !done(s); s = await sample()) await sleep(100);
-    await page.keyboard.up('KeyW'); return Date.now() - t0;
+    heldUntil = await t(); await page.keyboard.up('KeyW'); return Date.now() - t0;
   };
   /** One crossing's numbers from the page's frames and samples around the first sample past the line */
   const measure = async (/** @type {string} */ name, /** @type {number} */ fromT) => {
@@ -95,26 +100,31 @@ try {
     if (line === undefined) return { name, crossed: false };
     const window = frames.filter(r => (r[0] ?? 0) >= line.t - 1000 && (r[0] ?? 0) <= line.t + 3000).map(r => r[1] ?? 0), sorted = [...window].sort((a, b) => a - b);
     const cards = samples.filter(s => s.t >= line.t - 1000 && s.t <= line.t + 3000 && s.card !== null);
+    // the road bar's stop: ground speed under 90 % of the approach's median, counted only while the key is held
     let stop = 0, worstStop = 0;
-    const near = samples.filter(s => s.t >= line.t - 1000 && s.t <= line.t + 3000);
-    for (let i = 1; i < near.length; i++) { const moved = Math.hypot(near[i].x - near[i - 1].x, near[i].z - near[i - 1].z); stop = moved < 0.02 ? stop + (near[i].t - near[i - 1].t) : 0; worstStop = Math.max(worstStop, stop); }
-    return { name, crossed: true, frames: window.length, worstFrameMs: sorted.at(-1) ?? 0, p95Ms: sorted[Math.floor(sorted.length * 0.95)] ?? 0, medianMs: sorted[Math.floor(sorted.length / 2)] ?? 0,
+    const near = samples.filter(s => s.t >= line.t - 1000 && s.t <= line.t + 3000), held = near.filter(s => s.t <= heldUntil);
+    const speed = (/** @type {number} */ i) => Math.hypot(held[i].x - held[i - 1].x, held[i].z - held[i - 1].z) / Math.max(1, held[i].t - held[i - 1].t);
+    const approach = held.map((_, i) => i > 0 && held[i].t < line.t - 200 ? speed(i) : NaN).filter(v => Number.isFinite(v)).sort((a, b) => a - b), cruise = approach[Math.floor(approach.length / 2)] ?? 0;
+    let stopAt = null;
+    for (let i = 1; i < held.length; i++) { stop = speed(i) < cruise * 0.9 ? stop + (held[i].t - held[i - 1].t) : 0; if (stop > worstStop) { worstStop = stop; stopAt = { endsMs: held[i].t - line.t, x: held[i].x, z: held[i].z }; } }
+    return { name, crossed: true, lineAt: line.t, frames: window.length, worstFrameMs: sorted.at(-1) ?? 0, p95Ms: sorted[Math.floor(sorted.length * 0.95)] ?? 0, medianMs: sorted[Math.floor(sorted.length / 2)] ?? 0,
       over33: window.filter(ms => ms > 33.4).length, over50: window.filter(ms => ms > 50).length, over100: window.filter(ms => ms > 100).length,
-      trace: near.filter((_, i) => i % 4 === 0).map(s => [s.t - line.t, s.inside, s.phase, s.card, s.stage, s.res, s.hy, s.hook]), cardMs: cards.length * 50, cards: [...new Set(cards.map(s => `${String(s.card)}:${String(s.stage)}`))], worstStopMs: worstStop, phases: [...new Set(near.map(s => s.phase))] };
+      trace: near.filter((_, i) => i % 2 === 0).map(s => [s.t - line.t, s.x, s.z, s.inside, s.cur, s.cx, s.phase, s.card, s.stage, s.res, s.hy, s.hook]), cardMs: cards.length * 50, cards: [...new Set(cards.map(s => `${String(s.card)}:${String(s.stage)}`))], worstStopMs: worstStop, stopAt, cruiseMps: Number((cruise * 1000).toFixed(2)), phases: [...new Set(near.map(s => s.phase))] };
   };
   const t = () => page.evaluate(() => Math.round(performance.now()));
   for (let rep = 1; rep <= reps; rep++) {
     let from = await t();
-    await walk(outward, s => s.inside === null && Math.abs(s[along]) >= edge + 12);
+    await walk(outward, s => s.inside === null && Math.abs(local(s)) >= edge + 12);
     await sleep(2500);
     result.crossings.push({ rep, ...await measure('out (cell to road)', from) });
     from = await t();
-    await walk(outward + Math.PI, s => s.inside === home.slug && Math.abs(s[along]) <= edge - 12);
+    await walk(outward + Math.PI, s => s.inside === home.slug && Math.abs(local(s)) <= edge - 12);
     await sleep(2500);
     result.crossings.push({ rep, ...await measure('back (road to cell)', from) });
     for (const row of result.crossings.slice(-2)) console.log(`${row.crossed === true ? 'ok  ' : 'FAIL'} ${homeName} rep ${String(rep)} ${String(row.name)} ${JSON.stringify({ worst: row.worstFrameMs, p95: row.p95Ms, over50: row.over50, over100: row.over100, card: row.cardMs, stop: row.worstStopMs })}`);
   }
   await page.screenshot({ path: join(out, `${engineName}-${homeName}-road-lag.png`) });
+  result.crossingTiming = await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().live?.crossingTiming ?? null);
   await context.close();
   code = result.crossings.every(row => row.crossed === true) && result.errors.length === 0 ? 0 : 1;
 } catch (error) { result.note = String(error).slice(0, 400); console.log(`FAIL ${result.note}`); }
