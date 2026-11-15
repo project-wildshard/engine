@@ -1,110 +1,10 @@
-import { devices, expect, test as base } from '@playwright/test'
+import { errors as playwrightErrors, expect } from '@playwright/test'
 
-import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
-import { openT1OnlineRig } from '../../../scripts/t1-online-rig.mjs'
 import { enterTemplate } from './fixtures.ts'
+import { device, test } from './online-fixtures.ts'
 
 import type { T1OnlineRig } from '../../../scripts/t1-online-rig.mjs'
-import type { Browser, BrowserContext, Page } from '@playwright/test'
-
-interface Entered {
-  readonly context: BrowserContext
-  readonly page: Page
-  readonly errors: readonly string[]
-}
-interface Peers {
-  readonly first: Entered
-  readonly second: Entered
-}
-interface Workers {
-  readonly rig: T1OnlineRig
-  readonly peers: Peers
-}
-
-async function device(browser: Browser, rig: T1OnlineRig): Promise<Entered> {
-  const context = await browser.newContext({
-    ...devices['Desktop Chrome'],
-    baseURL: rig.base,
-  })
-  try {
-    await saveFixture(context, { scope: 'device', key: 'devMode', data: true })
-    await saveFixture(context, {
-      scope: 'device',
-      key: 'firstPlayDone',
-      data: true,
-    })
-    await harnessPins(context, { seed: 357 })
-    await context.addInitScript((stamp): void => {
-      Reflect.set(globalThis, '__WS_WORLD__', stamp)
-    }, rig.stamp)
-    const page = await context.newPage()
-    const errors: string[] = []
-    page.on('pageerror', (error: Readonly<Error>): void => {
-      errors.push(`page: ${error.message}`)
-    })
-    page.on('console', (message): void => {
-      if (message.type() === 'error') {
-        errors.push(`console: ${message.text()}`)
-      }
-    })
-    return { context, page, errors }
-  } catch (error) {
-    await context.close()
-    throw error
-  }
-}
-
-async function enter(
-  browser: Browser,
-  rig: T1OnlineRig,
-  name: string,
-): Promise<Entered> {
-  const opened = await device(browser, rig)
-  try {
-    await opened.page.goto('/?mute=1&nolock=1&sw=0&fps=30')
-    await enterTemplate(opened.page, name)
-    return opened
-  } catch (error) {
-    await opened.context.close()
-    throw error
-  }
-}
-
-const test = base.extend<object, Workers>({
-  rig: [
-    async ({ browserName }, provide): Promise<void> => {
-      expect(browserName).toBe('chromium')
-      const dist = process.env['WS_T1_BUILD_DIR']
-      if (dist === undefined) {
-        throw new Error('Missing shared client build')
-      }
-      const lane = process.env['WS_LANE_NAME'] ?? 't1-e2e'
-      const rig = await openT1OnlineRig(dist, `tmp/${lane}`)
-      try {
-        await provide(rig)
-      } finally {
-        await rig.close()
-      }
-    },
-    { scope: 'worker', timeout: 120_000 },
-  ],
-  peers: [
-    async ({ browser, rig }, provide): Promise<void> => {
-      const first = await enter(browser, rig, 'T1 Alice')
-      try {
-        const second = await enter(browser, rig, 'T1 Bob')
-        try {
-          await provide({ first, second })
-        } finally {
-          await second.context.close()
-        }
-      } finally {
-        await first.context.close()
-      }
-    },
-    { scope: 'worker', timeout: 120_000 },
-  ],
-})
+import type { Browser, Page } from '@playwright/test'
 
 test('two Template pages see bodies, names and chat on memory saves', async ({
   peers,
@@ -235,29 +135,41 @@ async function seatedResult(page: Page, name: string): Promise<unknown> {
   }
 }
 
-test('a matched release 503 shows its page and heals to Template control', async ({
-  browser,
-  rig,
-}): Promise<void> => {
+async function load503(
+  browser: Browser,
+  rig: T1OnlineRig,
+  route: 'release' | 'packs',
+): Promise<void> {
   const opened = await device(browser, rig)
+  const id = route === 'release' ? 'release-5xx' : 'packs-5xx'
   let result: Promise<unknown> | undefined = undefined
   try {
-    const before = await rig.matches('release')
-    await rig.arm('release-5xx', [
-      { route: 'release', kind: 'status', code: 503 },
-    ])
+    const before = await rig.matches(route)
+    await rig.arm(id, [{ route, kind: 'status', code: 503 }])
     await opened.page.goto('/?mute=1&nolock=1&sw=0&fps=30')
-    // Observe the load while it is blocked; keep rejection owned if its UI check fails.
-    result = seatedResult(opened.page, 'T1 Release')
+    // Observe the blocked load while keeping an early rejection owned.
+    result = seatedResult(opened.page, `T1 ${route}`)
     await expect
-      .poll(async (): Promise<number> => await rig.matches('release'))
+      .poll(async (): Promise<number> => await rig.matches(route))
       .toBeGreaterThan(before)
-    const screen = opened.page.locator('[data-failmode~="release-5xx"]')
-    await expect(screen).toBeVisible({ timeout: 10_000 })
+    const screen = opened.page.locator(`[data-failmode~="${id}"]`)
+    await expect(screen).toBeVisible({ timeout: 15_000 })
+    // A 503 body must never be credited as admitted bytes and reach play.
+    const blocked = await opened.page.evaluate(
+      (): string | undefined => globalThis.__wildshard?.app.state,
+    )
+    expect(blocked).not.toBe('play')
     await rig.arm('healthy', [])
-    const retry = screen.getByRole('button', { name: /Try/u })
-    if (await retry.isVisible()) {
-      await retry.click()
+    const retry =
+      route === 'release'
+        ? screen.getByRole('button', { name: /Try/u })
+        : opened.page.locator('.ws-load-retry:visible').first()
+    try {
+      await retry.click({ timeout: 5000 })
+    } catch (error) {
+      if (!(error instanceof playwrightErrors.TimeoutError)) {
+        throw error
+      }
     }
     expect(await result).toBeUndefined()
     await expect(screen).toBeHidden()
@@ -274,4 +186,18 @@ test('a matched release 503 shows its page and heals to Template control', async
     await opened.context.close()
     await result
   }
+}
+
+test('a matched release 503 shows its page and heals to Template control', async ({
+  browser,
+  rig,
+}): Promise<void> => {
+  await load503(browser, rig, 'release')
+})
+
+test('a matched pack 503 keeps bad bytes out and heals to Template control', async ({
+  browser,
+  rig,
+}): Promise<void> => {
+  await load503(browser, rig, 'packs')
 })
