@@ -40,9 +40,12 @@ export async function doctorPreflight(url: string, read: typeof fetch = fetch, d
   } catch { return abort.signal.aborted ? engineString('s_doctor_http_slow', [Math.round(deadlineMs / 1000)]) : engineString('s_doctor_http_none'); }
   finally { clearTimeout(timer); }
 }
-/** FM8 mode 14's card: the doctor didn't open, and this page stays as it was. Try again re-checks; Back closes the card. */
-function doctorHttpCard(measured: string, again: () => void): void {
-  document.querySelector('[data-failmode="doctor-http"]')?.remove();
+/** The doctor-http card on screen, if any: a new one (or a repeated `ws:doctor`) closes it, scope and all. */
+let doctorCardClose: (() => void) | null = null;
+/** FM8 mode 14's card: the doctor didn't open, and this page stays as it was. Try again re-checks with the card up (a failure
+ *  replaces it, a pass leaves the page); Back closes the card. */
+function doctorHttpCard(measured: string, again: () => Promise<boolean>): void {
+  doctorCardClose?.();
   const card = document.createElement('div'), box = document.createElement('div'), title = document.createElement('h1'), body = document.createElement('p');
   const retry = document.createElement('button'), back = document.createElement('button'), details = document.createElement('details'), summary = document.createElement('summary'), fact = document.createElement('p');
   card.dataset['failmode'] = 'doctor-http'; card.dataset['tone'] = 'warn'; card.setAttribute('role', 'alertdialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', engineString('s_doctor_http_title'));
@@ -55,18 +58,20 @@ function doctorHttpCard(measured: string, again: () => void): void {
   back.type = 'button'; back.textContent = engineString('s_doctor_http_back'); back.style.cssText = button;
   summary.textContent = engineString('s_doctor_http_details'); fact.textContent = engineString('s_doctor_http_fact', [measured]); fact.style.cssText = 'margin:8px 0 0;opacity:.6';
   details.append(summary, fact);
-  const owner = new Scope('doctor-http', scope), close = (): void => { owner.dispose(); card.remove(); };
-  owner.listen(retry, 'click', () => { retry.disabled = true; retry.textContent = engineString('s_doctor_http_checking'); close(); again(); });
+  const owner = new Scope('doctor-http', scope), close = (): void => { if (doctorCardClose === close) doctorCardClose = null; owner.dispose(); card.remove(); };
+  doctorCardClose = close;
+  owner.listen(retry, 'click', () => { retry.disabled = true; retry.textContent = engineString('s_doctor_http_checking'); void again(); });
   owner.listen(back, 'click', close);
   box.append(title, body, retry, back, details); card.append(box);
   mountUi(card, owner, document.body);
+  retry.focus();
 }
 
 /** Leave for the doctor: a held session saves first, and the page's report and the way back go with it. FM8 mode 14: a doctor page
  *  that doesn't answer its preflight leaves this page as it was, with a card saying so. Resolves true when the page leaves. */
 export async function openDoctorPage(from: string, read: typeof fetch = fetch): Promise<boolean> {
   const url = doctorUrl(from), failed = await doctorPreflight(url, read);
-  if (failed !== null) { doctorHttpCard(failed, () => { void openDoctorPage(from, read); }); return false; }
+  if (failed !== null) { doctorHttpCard(failed, () => openDoctorPage(from, read)); return false; }
   const report = diagnosticsSource();
   try {
     // oxlint-disable-next-line wildshard/no-raw-save -- one tab-scoped handoff key the doctor's page reads; that page loads no save service

@@ -33,3 +33,15 @@ two-peer voice harness, so the manifest case stays blocked, and 32b (talking whi
 In hold mode, holding talk while every peer on voice is unreachable shows `voice-failed-blocked` ("Voice can't connect here,
 so no one hears you") for 6 s with Try again. The mic still opens, so a link that comes up mid-hold carries the voice.
 Toggle mode's press is voice off, mode 32's own recovery, so it is not held.
+
+## Review fixes (one claude -p pass, NO-GO on one MUST)
+
+- MUST: a 429 with `Retry-After: 0` read the release file again at once, forever. A 429 now waits at least the ladder's
+  first step, and without a header never less than the first refusal's 20 s.
+- Voice Try again stops if voice went off or reseated while the TURN list loaded, skips peers that left, and two offers
+  that cross keep the lower id's (the other side answers it), so two players pressing Try again together still link.
+- The loading footer's fault comes from the card's own waits; a page-wide note (owner none) shows only when nothing of
+  the card's is stalled.
+- The doctor-http card: one at a time (the old one's scope goes too), Try again stays on the card while it checks, focus
+  on it. The release page stops its countdown once it reads ("Trying…"). Voice tip buttons listen in a per-tip scope.
+- Left for a row: `Retry-After` is not CORS-safelisted, so a cross-origin content or release server must expose it.

@@ -133,7 +133,10 @@ try {
         await page.locator('#ws-name-box button[type=submit]').click();
       }
       if (await page.evaluate(() => typeof window.__workerClient === 'function' && window.__wildshard?.world?.player !== undefined).catch(() => false)) break;
-      if (Date.now() > until) throw new Error('the page never reached the world');
+      if (Date.now() > until) {
+        const marks = await page.evaluate(() => ({ ...document.documentElement.dataset, sw: navigator.serviceWorker?.controller?.state ?? 'none', url: location.href })).catch(() => null);
+        throw new Error(`the page never reached the world (${JSON.stringify({ marks, seen: await visibleIds(page), errors: entered.errors.slice(-4) }).slice(0, 900)})`);
+      }
       await sleep(250);
     }
     await page.evaluate(FLOOR_GRID_ENTER);
@@ -326,14 +329,15 @@ try {
       const entered = await fresh(); const { page, context } = entered;
       try {
         await page.goto(URL_PLAY); await intoWorld(entered);
-        // a first visit's worker takes control from the next load (no clients.claim on a world page): a second online visit is the warm one
+        // a first visit's worker takes control from the next load (no clients.claim on a world page): a second online visit is the warm one.
+        // Visits open the play address: the page drops its query once it starts, so a reload would land on the title
         const controlling = () => page.waitForFunction(() => navigator.serviceWorker?.controller !== null && navigator.serviceWorker?.controller !== undefined, undefined, { timeout: 20_000 }).then(() => true, () => false);
-        if (!await controlling()) { await page.waitForFunction(async () => (await navigator.serviceWorker?.getRegistration())?.active !== undefined, undefined, { timeout: 60_000 }).catch(() => undefined); await page.reload(); await intoWorld(entered); }
+        if (!await controlling()) { await page.waitForFunction(async () => (await navigator.serviceWorker?.getRegistration())?.active !== undefined, undefined, { timeout: 60_000 }).catch(() => undefined); await page.goto(URL_PLAY); await intoWorld(entered); }
         const controlled = await controlling();
         if (!controlled) return { outcome: 'unsupported', reason: `${engine}: no controlling service worker after the warm visit, so nothing can launch offline` };
         await sleep(3000);
         await context.setOffline(true);
-        const started = Date.now(); await page.reload().catch(() => undefined);
+        const started = Date.now(); await page.goto(URL_PLAY).catch(() => undefined);
         await intoWorld(entered, 60_000).catch(() => undefined);
         const seen = await screen(page, item.screen, 15_000, started), shot = seen === null ? await shoot(page, item.id, 'missing') : await shoot(page, item.id, 'card');
         await context.setOffline(false);

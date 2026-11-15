@@ -106,7 +106,8 @@ export function releaseRetryMs(fault: ReleaseFault, attempt: number): number | n
   const ladder = LADDER_MS[attempt] ?? LADDER_END_MS;
   if (fault.kind === 'offline' || fault.kind === 'portal' || fault.kind === 'unsigned') return null;
   if (fault.kind !== 'status') return ladder;
-  if (fault.status === 429) return fault.retryAfterMs ?? (attempt === 0 ? BUSY_MS : ladder);
+  // a Retry-After of 0 is no licence to loop: never sooner than the ladder's first step, and never sooner than the first refusal's wait
+  if (fault.status === 429) return Math.max(fault.retryAfterMs ?? BUSY_MS, LADDER_MS[0] ?? 2000, fault.retryAfterMs === null ? ladder : 0);
   return fault.status === 404 ? MISSING_MS : ladder;
 }
 /** FM5: what a page shows while it has no release file to dial from. `after` shows the fault and settles when the page should read again

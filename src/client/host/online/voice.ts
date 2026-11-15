@@ -315,6 +315,9 @@ export class VoiceChat {
         return;
       }
       if (signal.sdp.type === 'offer') {
+        // Two offers crossed (both sides pressed FM8's Try again): the lower id keeps its own and the other side answers it.
+        const held = this.links.get(from);
+        if (held?.offerer === true && held.pc.signalingState === 'have-local-offer' && this.me !== null && this.me < from) return;
         // A fresh offer replaces whatever link there was: the offerer started again.
         this.drop(from);
         const link = this.open(from, false);
@@ -477,11 +480,15 @@ export class VoiceChat {
   async retryUnreachable(): Promise<void> {
     const stuck = this.unreachable;
     if (stuck.length === 0 || this.state !== 'on') return;
+    const session = this.session, me = this.me;
     this.turn = null;
     const fresh = await this.ask();
+    // voice off, or a new seat, while the list loaded: nothing of this attempt is anyone's any more
+    if (session !== this.session || me !== this.me || this.state !== 'on') return;
     if (fresh !== null && fresh.length > 0) { this.turned = fresh; this.ice = fresh; }
     const now = diagnosticNow();
     for (const peer of stuck) {
+      if (this.roster.get(peer.id) !== peer) continue;
       this.waiting.set(peer.id, now); peer.unreachable = false;
       void this.offer(peer.id);
     }

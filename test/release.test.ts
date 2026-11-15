@@ -134,14 +134,16 @@ test('Retry-After is seconds or an HTTP date, bounded; anything else is no answe
   expect(retryAfterMs(null, NOW)).toBeNull();
 });
 
-test('the policy: 2, 4, 8, 16 then 30 s; 429 as told or 20 s first; 404 each minute; offline, portal and bad signature wait for a cause', () => {
+test('the policy: 2, 4, 8, 16 then 30 s; 429 as told (at least 2 s) or 20 s, then the ladder past it; 404 each minute; offline, portal and bad signature wait for a cause', () => {
   const down: ReleaseFault = { kind: 'status', status: 503, retryAfterMs: null };
   expect([0, 1, 2, 3, 4, 9].map(attempt => releaseRetryMs(down, attempt))).toEqual([2000, 4000, 8000, 16_000, 30_000, 30_000]);
   expect(releaseRetryMs({ kind: 'timeout', ms: 8000 }, 0)).toBe(2000);
   expect(releaseRetryMs({ kind: 'network' }, 5)).toBe(30_000);
   expect(releaseRetryMs({ kind: 'status', status: 429, retryAfterMs: 3000 }, 4)).toBe(3000);
   expect(releaseRetryMs({ kind: 'status', status: 429, retryAfterMs: null }, 0)).toBe(20_000);
-  expect(releaseRetryMs({ kind: 'status', status: 429, retryAfterMs: null }, 1)).toBe(4000);
+  expect(releaseRetryMs({ kind: 'status', status: 429, retryAfterMs: null }, 1)).toBe(20_000); // never sooner than the first refusal's wait
+  expect(releaseRetryMs({ kind: 'status', status: 429, retryAfterMs: null }, 5)).toBe(30_000);
+  expect(releaseRetryMs({ kind: 'status', status: 429, retryAfterMs: 0 }, 0)).toBe(2000); // Retry-After 0 is no licence to loop
   expect(releaseRetryMs({ kind: 'status', status: 404, retryAfterMs: null }, 3)).toBe(60_000);
   for (const fault of [{ kind: 'offline' }, { kind: 'portal', why: 'html' }, { kind: 'unsigned' }] as const) expect(releaseRetryMs(fault, 0)).toBeNull();
 });

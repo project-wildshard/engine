@@ -60,7 +60,8 @@ export function releaseScreens(scope: Scope, hooks: ReleaseScreenHooks, parent: 
       root.classList.add('ws-link-page');
       box.append(make('p', 'ws-link-body', words.body));
       let settled = false;
-      const go = (): void => { if (settled) return; settled = true; resolve(); };
+      let trying = (): void => undefined;
+      const go = (): void => { if (settled) return; settled = true; trying(); resolve(); };
       const leave = (): void => { if (settled) return; settled = true; reject(new Error('The player left the release wait for the title')); hooks.title(); };
       page.onDispose(() => { if (!settled) { settled = true; resolve(); } });
       // the next read, counted from what is actually scheduled: never a made-up clock
@@ -68,7 +69,9 @@ export function releaseScreens(scope: Scope, hooks: ReleaseScreenHooks, parent: 
       if (retryMs !== null) {
         const due = diagnosticNow() + retryMs, line = make('span');
         const tick = (): void => { const left = Math.max(0, Math.ceil((due - diagnosticNow()) / 1000)); line.textContent = `Next try in ${String(left)} s · ${attempt === 0 ? 'first try failed' : `${String(attempt + 1)} tries so far`}`; };
-        tick(); page.interval(500, tick); page.timeout(retryMs, go);
+        const counting = page.interval(500, tick);
+        trying = () => { page.cancelTimer(counting); line.textContent = 'Trying…'; };
+        tick(); page.timeout(retryMs, go);
         status.append(ring(), line);
         box.append(status);
       } else if (id === 'offline-launch') {

@@ -14,7 +14,7 @@ import { loadShellTemplate, START_STEPS, stopShellClock } from '../boot/shell';
 import { appIdentity } from '../../../shared/engine/app/identity';
 import { recordBootCheckpoint, recordBootProgress, startBoot } from '../boot/bootTrace';
 import { adoptLoadingWait } from '../boot/download';
-import { beginLoadingWait, reportLoadingWait, finishLoadingWait, loadingWaitState } from '../../../shared/engine/boot/loadingWaits';
+import { beginLoadingWait, reportLoadingWait, finishLoadingWait, loadingWaitState, type LoadingWaitEntry } from '../../../shared/engine/boot/loadingWaits';
 import { loadingCacheText, loadingDownloadText, loadingDownloadFraction, loadingPrefetchFraction, loadingPrefetchText, type LoadingPrefetchSnapshot, type LoadingDownloadSnapshot } from '../boot/loadingDownloadText';
 import { LoadingTimeline, installLoadingTimeline, type LoadingPath, type LoadingRow, type LoadingGap } from '../../../shared/engine/boot/timeline';
 import {loadingFraction} from '../boot/weights';
@@ -617,8 +617,9 @@ export class Loading {
     // an action; a long pending operation remains pending.
     // FM6 (meta MMO-FAILURE-MODES-PLAN modes 33 to 35, 43, 44): a failed read says what failed in a player's words, how long it has
     // waited, and the retry actually scheduled; the catalogue's ids ride on the line. A RETRY wait wins over a note (storage full).
-    const faults = [...loadingWaitState().pending.values()].filter(row => row.failmode !== undefined && row.line !== undefined);
-    const fault = faults.find(row => row.retry !== null) ?? faults.find(row => row.dueAt !== undefined) ?? faults[0];
+    const said = (row: LoadingWaitEntry): boolean => row.failmode !== undefined && row.line !== undefined;
+    const pick = (rows: readonly LoadingWaitEntry[]): LoadingWaitEntry | undefined => rows.find(row => row.retry !== null) ?? rows.find(row => row.dueAt !== undefined) ?? rows[0];
+    const fault = pick(pending.filter(said)) ?? (stalled ? undefined : pick([...loadingWaitState().pending.values()].filter(row => said(row) && row.owner === null)));
     if (fault?.failmode !== undefined && fault.line !== undefined) {
       const due = fault.dueAt === undefined ? '' : ` · next try in ${String(Math.max(0, Math.ceil((fault.dueAt - now) / 1000)))} s`;
       this.els.foot.dataset['failmode'] = fault.failmode;

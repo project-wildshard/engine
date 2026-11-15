@@ -1,4 +1,4 @@
-import type { Scope } from '@wildshard/engine/app/scope';
+import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { listenPage } from '@wildshard/engine/input/dom';
 import type { ChatBox } from './chatLines';
@@ -138,7 +138,7 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
     if (now < firstUntil) return { key: 'first', text: touch ? 'Tap the mic to talk with players here.' : `${act()} (or click the mic) to talk with players here.`, tone: 'ok' };
     return null;
   };
-  let drawnOff: string | null = null, drawnTip: string | null = null;
+  let drawnOff: string | null = null, drawnTip: string | null = null, tipScope: Scope | null = null;
   const chips = new Map<string, { readonly chip: HTMLButtonElement; readonly label: HTMLSpanElement; readonly action: HTMLElement }>();
   const chipFor = (peer: VoicePeer): HTMLButtonElement => {
     let held = chips.get(peer.id);
@@ -181,11 +181,12 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
         tip.dataset['tone'] = shown.tone; tip.dataset['key'] = shown.key.split(':')[0] ?? shown.key;
         const text = document.createElement('span'), close = document.createElement('button');
         text.textContent = shown.text; close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Dismiss');
-        scope.listen(close, 'click', () => { dismissed = shown.key; if (shown.key === 'first') seen(); render(); });
+        tipScope?.dispose(); tipScope = new Scope('voice-tip', scope);
+        tipScope.listen(close, 'click', () => { dismissed = shown.key; if (shown.key === 'first') seen(); render(); });
         tip.replaceChildren(text, close);
         if (tip.dataset['key'] === 'voice-failed' || tip.dataset['key'] === 'voice-failed-blocked') {
           const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Try again'; again.dataset['action'] = 'retry';
-          scope.listen(again, 'click', () => { again.disabled = true; again.textContent = 'Trying…'; void voice.retryUnreachable(); });
+          tipScope.listen(again, 'click', () => { again.disabled = true; again.textContent = 'Trying…'; void voice.retryUnreachable(); });
           close.before(again);
         }
       }
