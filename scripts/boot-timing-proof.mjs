@@ -36,12 +36,15 @@ const shard=option('shard')??(delayKind==='server'||handoff||serverNetwork?'suns
 const swDelay=delayKind==='sw-open'||delayKind==='sw-put';
 const controlled = option('sw') === 'warm' || swDelay;
 const remote=option('base');
-if(remote!==undefined&&remote!=='https://play.wildshard.io')throw new Error('Remote proof requires the real production origin');
 if(remote!==undefined){
+  const target=new URL(remote);
+  assert.ok((target.protocol==='http:'&&target.hostname==='127.0.0.1')||remote==='https://staging.wildshard.io','Boot proof requires a loopback or staging origin');
+  assert.equal(target.pathname,'/','Boot proof requires an origin without a path');
+  assert.equal(target.search,'');assert.equal(target.hash,'');assert.equal(target.username,'');assert.equal(target.password,'');
   assert.equal(delayKind,undefined,'Network fault proxies require a local finished build');
   const response=await fetch(`${remote}/version.json`,{cache:'no-store'}),version=await response.json();
   assert.ok(response.ok);assert.equal(version.build,option('expect-build-id'));assert.equal(version.saveEpoch,1);
-  console.log('Exact production timing proof',JSON.stringify(version));
+  console.log('Exact served timing proof',JSON.stringify(version));
 }
 const html = remote === undefined ? readFileSync(resolvePath(root, 'dist/index.html'), 'utf8') : await (await fetch(remote)).text();
 const rowsText = /id="ws-title-rows"[^>]*>(.*?)<\/script>/su.exec(html)?.[1];
@@ -107,7 +110,7 @@ if(expectedBuild!==undefined) {
       const page = await context.newPage();
       /** @type {string[]} */ const faults=[];
       page.on('pageerror',error=>faults.push(error.message));
-      const address=`${proxy?.url??preview.url}/?chunk=${encodeURIComponent(shard)}&tier=phone&mute=1&nolock=1&sw=${controlled?'1':'0'}`;
+      const address=`${proxy?.url??preview.url}/?chunk=${encodeURIComponent(shard)}&tier=phone&mute=1&nolock=1&fps=30&sw=${controlled?'1':'0'}`;
       if(grid) {
         const title=new URL(address);title.searchParams.delete('chunk');
         await page.goto(title.href,{waitUntil:'domcontentloaded',timeout:30000});
@@ -181,6 +184,17 @@ if(expectedBuild!==undefined) {
       }
       const timing=await page.evaluate(snapshot);
       assert.ok(timing);
+      if(process.argv.includes('--gpu')) {
+        const renderer=await page.evaluate(()=>{
+          const gl=document.createElement('canvas').getContext('webgl2');
+          if(gl===null)return null;
+          const info=gl.getExtension('WEBGL_debug_renderer_info');
+          const value=String(gl.getParameter(info?.UNMASKED_RENDERER_WEBGL??gl.RENDERER));
+          gl.getExtension('WEBGL_lose_context')?.loseContext();return value;
+        });
+        assert.ok(typeof renderer==='string'&&/Metal/u.test(renderer)&&!/SwiftShader/u.test(renderer),`Metal proof used ${renderer}`);
+        console.log(`${name}: renderer=${renderer}`);
+      }
       if(process.argv.includes('--inspect')) console.log(JSON.stringify({stretches:timing.entries.filter(row=>row.end!==null&&row.end-row.start>500).map(row=>({operation:row.operation,ms:Math.round((row.end??row.start)-row.start)}))}));
       assert.equal(Object.keys(timing.overflow??{}).length,0,'bounded collector overflowed');
       if(process.argv.includes('--inspect')) console.log(JSON.stringify({server:timing.entries.filter(row=>row.operation.startsWith('server:')).map(row=>({operation:row.operation,realm:row.realm,start:row.start,end:row.end})),clientPreloads:timing.entries.filter(row=>row.operation==='app:client-module-preload').map(row=>row.detail),workerResources:timing.resources.filter(row=>row.realm!=='page').map(row=>row.url)}));
