@@ -218,7 +218,7 @@ export class StandaloneGrid {
     netWorldInput(routes, inputs); netBuys(routes, inputs);
     const stepping = sessionPlayer(this.grid.hostOf(site));
     this.grid.hostOf(site).physics.near?.update(stepping.position.x, stepping.position.z);
-    if (world === undefined) this.grid.stepSite(site, commandsOf(inputs)); else world.step(inputs);
+    if (world === undefined) this.grid.stepSite(site, commandsOf(inputs)); else { this.grid.capBoards(site); world.step(inputs); }
     const host = this.grid.hostOf(site), player = sessionPlayer(host);
     // The page used to catch a fall, on its own body. The server's world has nothing below it, so it would fall for ever.
     world?.fall.step(player, () => { host.combat.fall(player.health, player.position, { kind: 'out-of-world', label: '' }); });

@@ -22,3 +22,8 @@ Meta QA 11-15 rows 8 and 9.
   HOVER (`.ws-hover-boost`, shown only while boost is shown); a keyboard page
   has no tab, so `mountBoostTag` stands the same word alone on the left edge
   (`.ws-boost-tag`) while boost is on (my pick, so desktop says it too).
+- The probe (`scripts/hover-speed-probe.mjs`) on a local build showed the
+  in-page server had the same drift on the road: `GridSimulation` installed the
+  cap only in `stepAll`, and the standalone grid server steps rooms through
+  `stepSite` (and a cell world steps itself), so the road ran 14 / 56.
+  `capBoards(site)` now runs on every step path.

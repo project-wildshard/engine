@@ -342,7 +342,7 @@ export class GridSimulation {
   /** One tick for every world with a player in it: each player's command goes to the host it stands in. */
   stepAll(commands?: ReadonlyMap<string, SimTickCommand>): void {
     if (this.disposed) throw new Error('Grid simulation is disposed');
-    for (const [player, site] of this.sites) this.seat(this.hostAt(site), player).hoverSpeedLimit ??= () => this.boardLimit(player);
+    this.capBoards();
     const sites = new Set(this.sites.values());
     for (const site of sites) {
       const host = this.hostAt(site); this.ports.beforeMove?.(site, host);
@@ -355,7 +355,16 @@ export class GridSimulation {
   /** One tick of one world, for a room stepping its own (`stepAll` does every world). */
   stepSite(site: string | null, commands: ReadonlyMap<string, SimTickCommand>): void {
     if (this.disposed) throw new Error('Grid simulation is disposed');
+    this.capBoards(site);
     const host = this.hostAt(site); this.ports.beforeMove?.(site, host); host.step(commands);
+  }
+  /**
+   * Every seat's board takes the page's grid cap (`boardLimit`) before its world steps, by whichever path steps it. QA 11-15 row 8:
+   * only `stepAll` installed it, so the in-page server's rooms (`stepSite`, and a cell world stepping itself) ran 14 m/s on the road
+   * and 56 boosted against the page's 30 and 60. `site` limits it to that world's seats.
+   */
+  capBoards(site?: string | null): void {
+    for (const [player, at] of this.sites) if (site === undefined || at === site) this.seat(this.hostAt(at), player).hoverSpeedLimit ??= () => this.boardLimit(player);
   }
   /** Every world with a player in it. */
   occupiedSites(): ReadonlySet<string | null> { return new Set(this.sites.values()); }

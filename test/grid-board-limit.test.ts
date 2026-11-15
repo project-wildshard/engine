@@ -84,3 +84,12 @@ test('QA 11-15 row 8: one world-feet read for every host, off the origin and in 
   expect(strip).toBeGreaterThan(14); expect(strip).toBeLessThan(30);
   expect(hoverSpeed(14, true)).toBe(56); expect(hoverSpeed(30, true)).toBe(60); // G540
 });
+
+test('QA 11-15 row 8: a room stepping its own world (the in-page server\'s road) caps the board as stepAll does', async () => {
+  const { grid, assembly, highway } = await gridOn(), cell = assembly.cells.find(row => row.speedClass === undefined), lead = leadPlayer(highway);
+  if (cell === undefined) throw new Error('Missing cell');
+  expect(lead.hoverSpeedLimit).toBeNull();
+  grid.stepSite(null, new Map());
+  lead.position.set(cell.origin.x + CHUNK_HALF + STRIP + 1, 0, cell.origin.z);
+  expect(limitAt(highway), 'the deck: 30 m/s, not the uncapped 14').toBe(30);
+});
