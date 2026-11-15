@@ -13,3 +13,12 @@ names, error origins, cell presence and borrowed methods. Isolated 21/21:
 4.03 CPU-s / 3.93 s wall; shared shuffled seeds 7 and 73: 21/21 each,
 2.86 and 2.87 CPU-s / 2.67 and 2.72 s wall. No mocks, global writes,
 installers or fresh-import contracts occur in those suites.
+
+TS6b shares six more node suites after source audit: draw checks, worker
+resource timing, road atlas/resources, terrain edge decoding, clip-light
+uniform ownership and near-pose baking. All 14 cases pass isolated and in
+shared shuffled seeds 7/73. Isolated: 7.238 CPU-s / 7.296 s wall;
+shared: 3.819/3.765 CPU-s / 3.464/3.373 s wall. Each suite owns its
+input objects and leaves no mock, environment, installer or clock change.
+The aggregate TS6 census remains open.
+The existing reviewed list keeps its original order.

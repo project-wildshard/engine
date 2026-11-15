@@ -615,5 +615,11 @@
  "test/wire-page-quest.test.ts",
  "test/wire-page.test.ts",
  "test/world-map-atlas.test.ts",
- "test/world-ports.test.ts"
+ "test/world-ports.test.ts",
+ "src/client/engine/render/draw-check.test.ts",
+ "src/shared/engine/boot/workerTiming.test.ts",
+ "src/client/game/grid/road-page-textures.test.ts",
+ "src/shared/engine/sim/edge-profile-boundaries.test.ts",
+ "src/client/game/grid/cell-clip-lights.test.ts",
+ "src/client/game/grid/near-pose-bake.test.ts"
 ]
