@@ -18,7 +18,11 @@ export const CI_NATIVE_GROUPS = {
     // MP1C.4: a real crossing on the real clock, then a reboot; kept off sibling workers like net-fuzz's crossing.
     'test/grid-crossing-crash.test.ts',
   ],
-  'native-direct-worker': ['test/headless-direct-worker.test.ts'],
+  'native-direct-worker': [
+    'test/headless-direct-worker.test.ts',
+    // Six real SDK workers, with a fixed 20 s parent fence: no sibling files.
+    'test/headless-verb-tape-worker.test.ts',
+  ],
   'native-host-transport': ['test/sim-transport.test.ts'],
   'native-restores': [
     'test/pinned-restore-play.test.ts',
