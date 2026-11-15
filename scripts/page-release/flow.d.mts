@@ -52,6 +52,7 @@ export interface Deps {
 }
 export const PACKS_ORIGIN: string;
 export const RELEASE_PUBLIC_KEY: string;
+export function pinnedReleaseKey(configured?: string): string;
 export const PHASES: readonly Phase[];
 export const CHECKED_DOCUMENTS: readonly ['version.json', 'index.html', 'sw.js', 'deploy-chunks.json'];
 export const CHANNELS: { staging: WorldChannelConfig; production: WorldChannelConfig; preview: SoloChannelConfig };

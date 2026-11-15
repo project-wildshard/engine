@@ -55,6 +55,14 @@ export class RefusedError extends Error {
   constructor(message) { super(message); this.name = 'RefusedError'; }
 }
 
+/** Configuration may confirm the reviewed trust root, never replace it.
+ * @param {string|undefined} configured @returns {string} */
+export function pinnedReleaseKey(configured) {
+  const value = configured?.trim();
+  if (value !== undefined && value !== '' && value !== RELEASE_PUBLIC_KEY) throw new RefusedError('E7_RELEASE_PUBLIC_KEY differs from the pinned release key');
+  return RELEASE_PUBLIC_KEY;
+}
+
 /**
  * @typedef {{id: string, url: string}} Deployment
  * @typedef {{algorithm: 'sha1'|'sha256', digest: string}} Digest

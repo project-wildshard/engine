@@ -73,7 +73,10 @@ build, epoch and serial at check and again before go-live, and rejects a
 socket or server bundle. The signer uses the same CAS and fix-forward
 rules as staging. Its workflow needs `E7_RELEASE_SIGNING_KEY` and the
 existing bucket-scoped R2 keys. The page never reads this gate and
-remains fully solo and offline-capable.
+remains fully solo and offline-capable. Preview rollback to an older
+commit is refused: publish a green descendant to fix forward.
+`E7_RELEASE_PUBLIC_KEY`, when set, must equal the reviewed key pinned
+in `page-release/flow.mjs`; it cannot replace the trust root.
 
 Preview borrows staging's grid (SHARD-AUTHORING SA35): before the build,
 `scripts/preview-grid.ts` reads staging's signed placement file (the one

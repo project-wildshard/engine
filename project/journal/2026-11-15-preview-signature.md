@@ -22,3 +22,12 @@ publisher receives the key; the workflow also checks dispatch CI on
 main. The publisher validates upload state, matching content, and a
 published/unchanged result. Content pools drain in-flight requests
 before a failed batch can be retried, so concurrency remains bounded.
+
+
+The complete branch review caught a trust-root regression: the CLI let
+E7_RELEASE_PUBLIC_KEY override its reviewed constant. All channels now
+use the pinned key, and an environment mismatch refuses before build
+or publication. The isolated preview publisher uses the same check.
+Tests may still inject a key into the pure flow dependency; the real
+CLI and publisher cannot. Signed preview is forward-only, as the
+server publisher already is.

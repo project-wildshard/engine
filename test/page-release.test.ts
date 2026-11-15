@@ -8,7 +8,7 @@ import {join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The CLI's usage check runs as a child, before any git or host call.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {CHANNELS, CHECKED_DOCUMENTS, PHASES, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
+import {CHANNELS, CHECKED_DOCUMENTS, PHASES, RELEASE_PUBLIC_KEY, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
 import {runRedacted} from '../scripts/page-release/redact.mjs';
 import {CONFIG, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
@@ -524,4 +524,16 @@ test('the Workers upload refuses a dist/ that still holds a source map (PAGE-SIZ
   writeFileSync(join(root, 'dist/assets/late.js.map'), '{}');
   await expect(runPhase('upload', deps)).rejects.toThrow(/source maps/);
   expect(verbs(wrangler)).toEqual([]);
+});
+
+test('page publication configuration cannot replace the pinned trust root', () => {
+  for (const value of [undefined, '', '  ', RELEASE_PUBLIC_KEY, `  ${RELEASE_PUBLIC_KEY} `]) expect(pinnedReleaseKey(value)).toBe(RELEASE_PUBLIC_KEY);
+  expect(() => pinnedReleaseKey(key)).toThrow('differs from the pinned release key');
+  for (const channel of ['preview', 'staging', 'production']) {
+    const run = spawnSync(process.execPath, ['scripts/page-release.mjs', '--print-env', channel], {
+      encoding: 'utf8', timeout: 20_000, env: {...process.env, E7_RELEASE_PUBLIC_KEY: key},
+    });
+    expect(run.status).not.toBe(0); expect(run.stderr).toContain('differs from the pinned release key');
+    expect(run.stdout).toBe('');
+  }
 });

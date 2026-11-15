@@ -7,7 +7,7 @@ import * as v from 'valibot';
 import {HeadObjectCommand, S3Client} from '@aws-sdk/client-s3';
 import {publishChannel} from '../server-release/publish.mjs';
 import {COMMIT, releaseShards} from '../server-release/sign.mjs';
-import {RELEASE_PUBLIC_KEY} from './flow.mjs';
+import {pinnedReleaseKey} from './flow.mjs';
 
 const UploadState = v.object({
   build: v.object({build: v.string(), contentBase: v.optional(v.string())}),
@@ -42,8 +42,7 @@ const need = (/** @type {string} */ name) => {
 const account = need('R2_ACCOUNT_ID');
 if (!/^[0-9a-f]{32}$/u.test(account)) throw new Error('Invalid R2_ACCOUNT_ID');
 const privateKey = need('E7_RELEASE_SIGNING_KEY');
-const configuredKey = process.env.E7_RELEASE_PUBLIC_KEY?.trim();
-const publicKey = configuredKey === undefined || configuredKey === '' ? RELEASE_PUBLIC_KEY : configuredKey;
+const publicKey = pinnedReleaseKey(process.env.E7_RELEASE_PUBLIC_KEY);
 const client = new S3Client({region: 'auto', endpoint: `https://${account}.r2.cloudflarestorage.com`,
   credentials: {accessKeyId: need('R2_PACKS_ACCESS_KEY_ID'), secretAccessKey: need('R2_PACKS_SECRET_ACCESS_KEY')}});
 const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8'));
