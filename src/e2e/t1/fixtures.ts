@@ -32,7 +32,7 @@ interface Workers {
 }
 
 /** Enter the installed Template 1 through the same controls as a player. */
-async function enterTemplate(page: Page): Promise<void> {
+async function enterTemplate(page: Page, name?: string): Promise<void> {
   await page.locator('.ws-main-select').waitFor()
   const dismiss = page.locator('#wsdrop .dismiss')
   if ((await dismiss.count()) > 0) {
@@ -49,7 +49,12 @@ async function enterTemplate(page: Page): Promise<void> {
     .first()
     .waitFor()
   if ((await skip.count()) > 0) {
-    await skip.click()
+    if (name === undefined) {
+      await skip.click()
+    } else {
+      await page.locator('#ws-name-box input').fill(name)
+      await page.locator('#ws-name-box button[type=submit]').click()
+    }
   }
   const catalogue: unknown = JSON.parse(
     (await page.locator('#ws-title-rows').textContent()) ?? 'null',

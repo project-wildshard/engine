@@ -40,6 +40,9 @@ interface SmokeProbe {
 }
 
 declare global {
+  var __onlinePlayers:
+    | (() => readonly { readonly name: string; readonly modelled: boolean }[])
+    | undefined
   var __barLog: readonly BarRow[] | undefined
   var __countLog: readonly { readonly serverFiles: number }[] | undefined
   var __wildshard: SmokeProbe | undefined

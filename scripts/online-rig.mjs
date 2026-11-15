@@ -89,16 +89,25 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     return room;
   };
   /** @param {import('node:child_process').ChildProcess} room */
-  const stopped = room => new Promise(resolve => { room.on('exit', resolve); room.kill('SIGTERM'); setTimeout(resolve, 8000); });
+  const stopped = room => new Promise(resolve => {
+    if (room.exitCode !== null || room.signalCode !== null) { resolve(undefined); return; }
+    const deadline = setTimeout(() => { room.kill('SIGKILL'); }, 8000);
+    room.once('exit', () => { clearTimeout(deadline); resolve(undefined); });
+    room.kill('SIGTERM');
+  });
   /** @param {import('node:child_process').ChildProcess} room */
   const exited = room => new Promise(resolve => { room.on('exit', resolve); setTimeout(resolve, 15_000); });
   /** The page host's half of a deploy: the page's origin serves this build from now on. @param {string} built */
   const serve = async built => {
-    const pageServer = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', absolute(built), '--port', String(PAGE_PORT)], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
+    const pageServer = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', absolute(built), '--port', String(PAGE_PORT), '--telemetry-dir', join(work, 'telemetry')], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
     for (let tries = 0; tries < 100 && !(await fetch(`http://127.0.0.1:${String(PAGE_PORT)}/version.json`).then(found => found.ok).catch(() => false)); tries++) await sleep(100);
     return pageServer;
   };
-  let main = world(), pages = await serve(dist);
+  let main = world();
+  /** @type {import('node:child_process').ChildProcess} */
+  let pages;
+  try { pages = await serve(dist); }
+  catch (error) { await stopped(main); await new Promise(resolve => { release.close(resolve); }); log.end(); throw error; }
   return { shard, build, nextBuild, publish, DATABASE, base: `http://127.0.0.1:${String(PAGE_PORT)}`, Client,
     /** The server goes down, for a test of its coming back. */
     stop: () => stopped(main),
@@ -109,9 +118,9 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     /** The page's origin moves to this build. @param {string} built */
     pagesServe: async built => { pages.kill('SIGTERM'); await sleep(200); pages = await serve(built); },
     close: async () => {
-      pages.kill('SIGTERM');
-      await stopped(main);
-      release.close();
+      await Promise.all([stopped(pages), stopped(main)]);
+      await new Promise(resolve => { release.close(resolve); });
+      log.end();
       if (!memory) spawnSync(pgCtl, ['-D', pgData, '-m', 'fast', '-w', 'stop'], { stdio: 'ignore' });
     } };
 }

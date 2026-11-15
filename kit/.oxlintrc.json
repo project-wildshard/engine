@@ -188,6 +188,7 @@
               "__workerClientRow",
               "__workerClient",
               "__barLog",
+              "__onlinePlayers",
               "__countLog"
             ]
           }
