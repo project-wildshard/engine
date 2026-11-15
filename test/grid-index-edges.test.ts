@@ -147,6 +147,43 @@ test('TEMPLATE-E2E: with no baked far folder, a world without mesh collision rea
   expect(new Set(f.fetch.mock.calls.map(([url]) => url))).toEqual(new Set([f.url, ...urls]));
 });
 
+// Brasscap rev 6's far row (shard-brasscap 1e8c369): a GLB and an impostor image, no props row naming either.
+const GLB = '0056'.padEnd(64, '0'), IMAGE = '30fd'.padEnd(64, '0');
+const SCENE_FAR = { bounds: { max: [250, 0.25, 250], min: [-250, -20, -250] }, compressed: 2, decoded: 2, draws: 1, files: [GLB, IMAGE], gpu: 2,
+  impostor: { bottom: -28.17, cols: 2, file: IMAGE, range: 3, tile: [256, 64], top: 8.17, views: 8, width: 711.11 }, triangles: 6144 };
+function sceneFar(mesh: boolean, glbRow: { commons?: boolean; kind: string }) {
+  const f = fixture(mesh ? 'mesh-far-fixture' : 'scene-far-fixture');
+  const index = JSON.parse(new TextDecoder().decode(f.wires.get(f.url))) as { files: unknown[]; sections: { name: string; hash: string; bytes: number }[] };
+  const costs = { compressed: 1, critical: false, decoded: 1, dependencies: [], gpu: 1 };
+  index.files = [{ ...costs, draws: 1, triangles: 6144, hash: GLB, path: `blobs/glb/${GLB}.glb`, ...glbRow },
+    { ...costs, draws: 0, triangles: 0, hash: IMAGE, kind: 'image', path: `blobs/image/${IMAGE}.png` }];
+  for (const name of ['world/collision', 'world/tiles', 'world/props', 'look/look'] as const) {
+    const payload = outputSectionPayloads(f.source).get(name); if (payload === undefined) throw new Error(`Missing ${name} fixture`);
+    const value = name === 'world/tiles' ? { ...(payload as object), far: SCENE_FAR } : name === 'world/collision' && mesh ? { ...(payload as object), meshCollision: {} } : payload;
+    const bytes = new TextEncoder().encode(encodeCanonicalJson(value)), row = index.sections.find(section => section.name === name);
+    if (row === undefined) throw new Error(`Missing ${name} index row`);
+    row.hash = hashImmutableBytes(bytes); row.bytes = bytes.length;
+    f.wires.set(new URL(`sections/${name}.json`, f.url).href, bytes);
+  }
+  f.wires.set(f.url, new TextEncoder().encode(encodeCanonicalJson(index)));
+  return f;
+}
+
+test('TEMPLATE-E2E: a scene upload\'s far GLB is the far file its index lists as a GLB, never a commons one by hash', async () => {
+  const f = sceneFar(false, { kind: 'glb' });
+  expect((await readGridProductFar(f.url, f.source.identity.slug, f.options, true))?.rows.farRef).toBe(GLB);
+  expect(await readGridProductFar(f.url, f.source.identity.slug, f.options)).toBeNull();
+  const commons = sceneFar(false, { kind: 'glb', commons: true });
+  expect(await readGridProductFar(commons.url, commons.source.identity.slug, commons.options, true)).toBeNull();
+});
+
+test('TEMPLATE-E2E: a mesh-collision world keeps its own rows whether or not the build baked a far folder', async () => {
+  for (const anyWorld of [false, true]) {
+    const f = sceneFar(true, { kind: 'glb' });
+    expect((await readGridProductFar(f.url, f.source.identity.slug, f.options, anyWorld))?.rows).toMatchObject({ farRef: null });
+  }
+});
+
 test('G608: a product without near content reads only the index and its tiles section for its near view', async () => {
   const f = fixture(), tiles = new URL('sections/world/tiles.json', f.url).href, payload = outputSectionPayloads(f.source).get('world/tiles');
   if (payload === undefined) throw new Error('Missing tiles fixture');

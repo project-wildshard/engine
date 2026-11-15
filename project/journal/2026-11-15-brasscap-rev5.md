@@ -35,3 +35,8 @@
   tree's build; two pages entered Brasscap by Shard Select, each drew
   13 bandits and 6 wyrm-look bodies (the Wyrm, 3 wyrmlings, 2 drakes),
   page A shot a bandit (one kill) while B watched.
+- Review (claude -p): a mesh-collision world now keeps its own rows
+  whether or not the build baked a far folder (the first cut returned
+  null for one with no far row), and the derived far GLB must match the
+  index row's commons flag, as `read` does. Tests cover the derived GLB,
+  the commons mismatch and both mesh cases.

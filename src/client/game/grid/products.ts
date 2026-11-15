@@ -179,7 +179,8 @@ export function gridShardfileFarBytes(slug: string): Promise<number | null> | nu
  * GLB), look/look (the haze colour) and world/collision sections, and the far files, each hash-verified, without admitting
  * the whole product first (its admission, ~8-20 s a product at 4x CPU, held every shardfile neighbour's far proxy and so the
  * grid reveal's ringsReady). No residency claim: the far ring's own lease charges the proxy. Null when the slug has no
- * shardfile or no mesh-collision world (its far proxy is the baked folder's).
+ * shardfile or no mesh-collision world (its far proxy is the baked folder's), unless `anyWorld` (no baked folder): then
+ * null only when the product's tiles carry no far row.
  */
 export function readGridShardfileFar(slug: string, anyWorld = false): Promise<GridShardfileFar | null> {
   const descriptor = findShard(slug)?.shardfile;
@@ -195,15 +196,21 @@ export interface GridShardfileFar { readonly rows: ShardfileFarRows; readonly re
 export async function readGridProductFar(url: string, identity: string, options: ProductOptions, anyWorld = false): Promise<GridShardfileFar | null> {
   const at = await readGridProductIndex(url, identity, options);
   const collision = await readGridSection(at, 'world/collision');
-  if (!anyWorld && (collision === null || v.parse(farRows.collision, collision).meshCollision === null)) return null;
+  const mesh = collision !== null && v.parse(farRows.collision, collision).meshCollision !== null;
+  if (!mesh && !anyWorld) return null;
   const [tiles, props, look] = await Promise.all([readGridSection(at, 'world/tiles'), readGridSection(at, 'world/props'), readGridSection(at, 'look/look')]);
   const fog = look === null ? null : v.parse(farRows.look, look).look.keys[0]?.fog.colour ?? null;
-  const far = tiles === null ? null : v.parse(farRows.tiles, tiles).far, declared = props === null ? null : v.parse(farRows.props, props).props?.far ?? null;
-  // with no props row naming it (a scene upload), the far GLB is the one far file the index lists as a GLB
-  const farRef = declared ?? (!anyWorld || far === null ? null
-    : far.files.find(ref => at.index.files.some(row => row.hash === ref.replace(/^commons:/u, '') && row.kind === 'glb')) ?? null);
+  const far = tiles === null ? null : v.parse(farRows.tiles, tiles).far;
+  const declared = props === null ? null : v.parse(farRows.props, props).props?.far ?? null;
+  const isGlb = (ref: string): boolean => {
+    const hash = ref.replace(/^commons:/u, ''), commons = ref.startsWith('commons:');
+    return at.index.files.some(row => row.hash === hash && (row.commons === true) === commons && row.kind === 'glb');
+  };
+  // A mesh-collision world keeps its rows as they are. Any other world (a scene upload) has no props row naming its far GLB,
+  // so it is the first far file the index lists as a GLB; with none, its far proxy is the baked folder's after all.
+  const farRef = declared ?? (mesh || far === null ? null : far.files.find(isGlb) ?? null);
+  if (!mesh && (far === null || farRef === null)) return null;
   const rows: ShardfileFarRows = { far, farRef, fog };
-  if (anyWorld && (far === null || farRef === null)) return null;
   const read = (ref: string): Promise<Uint8Array> => {
     const hash = ref.replace(/^commons:/u, ''), commons = ref.startsWith('commons:');
     const file = at.index.files.find(row => row.hash === hash && (row.commons === true) === commons);
