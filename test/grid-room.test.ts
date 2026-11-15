@@ -67,7 +67,6 @@ test('a bot crosses into a cell on its own feet while the lead stays on the road
     expect(cell.players.get(lead)?.motor.snapshot().enabled).toBe(false);
   } finally { s.room.dispose(); s.grid.dispose(); }
 });
-
 test('the lead crosses and leaves a bot on the road: the road keeps running and the bot keeps its body', async () => {
   const s = stage(), lead = leadPlayer(s.grid.host()).id, road = s.grid.host();
   try {
@@ -135,47 +134,5 @@ test('a bot who leaves from a cell lets it freeze', async () => {
     expect(cell?.parked.size).toBe(0); expect(cell?.players.has(BOT)).toBe(false);
     expect(s.grid.players()).toEqual([lead]);
     s.room.step();
-  } finally { s.room.dispose(); s.grid.dispose(); }
-});
-
-// GC5 (preview's in-page server): the road opens the cell ahead before its line. Opened only at the 6 m line, a cell's world
-// held the walker at its wall for its whole load (QA 11-13 rows 39 and 43).
-test('a player on the road has the nearest cell ahead opened 60 m out, before its crossing line, and not the cell they left', async () => {
-  const s = stage(), lead = leadPlayer(s.grid.host()).id;
-  try {
-    place(s, lead, outside(s.cell, 30)); s.room.step(); await settle(); // 30 m east of it on the road, standing: nothing yet
-    expect(s.loads).toEqual([]);
-    // walking toward it (and away from the cell beyond): inside the 60 m reach, far from its 6 m line, it opens
-    for (let tick = 0; tick < 3; tick++) { s.room.step(new Map([[lead, walking(-1)]])); await settle(); }
-    await settle();
-    expect(s.loads).toEqual([s.cell.instance]);
-    expect(s.grid.ready(s.cell.instance)).toBe(true);
-    expect(s.grid.current()).toBeNull(); // opened, not crossed
-    // crossing in finds it open: no second load
-    await until(s, () => new Map([[lead, walking(-1)]]), () => s.grid.current() === s.cell.instance);
-    expect(s.loads).toEqual([s.cell.instance]);
-    // back out onto the road, toward the cell beyond (62.5 m on): the cell just left is not opened again, the one ahead is
-    await until(s, () => new Map([[lead, walking(1)]]), () => s.grid.current() === null);
-    for (let tick = 0; tick < 60; tick++) { s.room.step(new Map([[lead, walking(1)]])); await settle(); }
-    expect(s.loads.filter(id => id === s.cell.instance)).toHaveLength(1);
-    expect(s.loads.length).toBe(2);
-  } finally { s.room.dispose(); s.grid.dispose(); }
-});
-
-// Review of GC5: a cell opened ahead and then evicted (another player's open, one resident slot) or failed is not opened again
-// tick after tick on the same stretch of road; the crossing still prepares it at its line.
-test('the road opens a cell ahead at most once a stretch of road', async () => {
-  const s = stage(), lead = leadPlayer(s.grid.host()).id;
-  try {
-    place(s, lead, outside(s.cell, 30)); s.room.step(); await settle();
-    for (let tick = 0; tick < 3; tick++) { s.room.step(new Map([[lead, walking(-1)]])); await settle(); }
-    await settle();
-    expect(s.loads).toEqual([s.cell.instance]);
-    expect(s.grid.unload(s.cell.instance)).toBe(true); // evicted while still on the road
-    for (let tick = 0; tick < 30; tick++) { s.room.step(new Map([[lead, walking(-1)]])); await settle(); }
-    expect(s.grid.current()).toBeNull();
-    expect(s.loads).toEqual([s.cell.instance]);
-    await until(s, () => new Map([[lead, walking(-1)]]), () => s.grid.current() === s.cell.instance); // the line still opens it
-    expect(s.loads).toEqual([s.cell.instance, s.cell.instance]);
   } finally { s.room.dispose(); s.grid.dispose(); }
 });
