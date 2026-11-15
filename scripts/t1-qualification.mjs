@@ -10,6 +10,7 @@ import { scratchDir } from './scratch-dir.mjs';
 
 const WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 const SUITES = ['A', 'B', 'C', 'D'];
+/** @typedef {{id:number,name:string,created_at:string,expired:boolean,workflow_run?:{id:number,head_branch:string}}} GithubArtifact */
 /** Changing the suite resets qualification; ordinary game changes do not. */
 export function t1Scope() {
   const files = readdirSync('src/e2e/t1').filter(name => name.endsWith('.ts')).sort().map(name => `src/e2e/t1/${name}`);
@@ -70,6 +71,7 @@ export async function readT1Qualification(env, now = Date.now()) {
   const token = env.GH_TOKEN, repo = env.GITHUB_REPOSITORY;
   if (!token || !repo || !/^[-\w.]+\/[-\w.]+$/u.test(repo)) return { ...t1Qualification([], now, scope), reason: 'No Actions history credentials' };
   const deadline = Date.now() + 60_000;
+  /** @param {string} path @param {boolean} [binary] */
   const api = async (path, binary = false) => {
     if (Date.now() >= deadline) throw new Error('T1 history exceeded its one-minute lookup budget');
     const response = await fetch(`https://api.github.com/repos/${repo}/${path}`, {
@@ -78,11 +80,13 @@ export async function readT1Qualification(env, now = Date.now()) {
     if (!response.ok) throw new Error(`Actions history HTTP ${response.status}`);
     return binary ? Buffer.from(await response.arrayBuffer()) : response.json();
   };
+  /** @type {GithubArtifact[]} */
   const candidates = [];
   for (let page = 1; page <= 5; page++) {
     const data = await api(`actions/artifacts?name=template-e2e-A&per_page=100&page=${page}`);
     if (!Array.isArray(data.artifacts)) throw new Error('Malformed Actions artifact list');
-    candidates.push(...data.artifacts.filter(row => !row.expired && row.workflow_run?.head_branch === 'main'));
+    const artifacts = /** @type {GithubArtifact[]} */ (data.artifacts);
+    candidates.push(...artifacts.filter(row => !row.expired && row.workflow_run?.head_branch === 'main'));
     if (data.artifacts.length < 100) break;
   }
   // Probe the report-window boundary and recent pushes. This bounds API work
@@ -94,15 +98,17 @@ export async function readT1Qualification(env, now = Date.now()) {
     .sort((left, right) => Date.parse(left.created_at) - Date.parse(right.created_at));
   const runs = [];
   for (const candidate of selected) {
+    if (candidate.workflow_run === undefined) continue;
     const id = candidate.workflow_run.id;
     const run = await api(`actions/runs/${id}`);
     if (run.status !== 'completed' || run.event !== 'push' || run.head_branch !== 'main'
       || run.path !== '.github/workflows/ci.yml' || run.head_repository?.full_name !== repo) continue;
     const data = await api(`actions/runs/${id}/artifacts?per_page=100`);
     if (!Array.isArray(data.artifacts)) throw new Error('Malformed run artifact list');
+    const available = /** @type {GithubArtifact[]} */ (data.artifacts);
     const receipts = [];
     for (const suite of SUITES) {
-      const artifacts = data.artifacts.filter(row => row.name === `template-e2e-${suite}` && !row.expired);
+      const artifacts = available.filter(row => row.name === `template-e2e-${suite}` && !row.expired);
       if (artifacts.length !== 1) continue;
       const archive = await api(`actions/artifacts/${artifacts[0].id}/zip`, true);
       if (archive.length > 1_000_000) throw new Error('T1 receipt archive exceeds its size bound');
