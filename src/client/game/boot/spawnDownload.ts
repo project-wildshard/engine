@@ -858,9 +858,10 @@ const PACKS_BOOK_MS = 20_000;
 /** FM6 mode 35 (meta MMO-FAILURE-MODES-PLAN): a server error or busy answer on the book is read again on content's ladder (a
  *  429's Retry-After as told, at least 2 s) for up to BOOK_TRIES reads, the loading card saying `book-5xx` meanwhile, before the
  *  named refusal. FM3's proof found a single 503 refusing the whole start ("Something broke"). A 404 still refuses at once. */
+const BOOK_LINE = 'The world\'s book didn\'t arrive';
 const BOOK_TRIES = 6, BOOK_LADDER_MS: readonly number[] = [2000, 4000, 8000, 16_000, 30_000];
 async function bookResponse(url: string, fresh: () => AbortSignal, stalled: (error: unknown) => never): Promise<Response> {
-  let wait: number | undefined;
+  let wait: number | undefined, shellFoot: HTMLElement | null = null;
   try {
     for (let attempt = 0; ; attempt++) {
       // each read has its own 20 s limit (DL21), body included; the waits between reads are the ladder's, not a stall
@@ -871,12 +872,18 @@ async function bookResponse(url: string, fresh: () => AbortSignal, stalled: (err
       void response.body?.cancel().catch(() => undefined);
       const told = Number(response.headers.get('retry-after'));
       const ms = Math.max(2000, response.status === 429 && Number.isFinite(told) && told > 0 ? Math.min(told, 60) * 1000 : BOOK_LADDER_MS[attempt] ?? 30_000);
-      if (wait === undefined) wait = beginLoadingWait('Packs book', {kind: 'file', resource: url, failmode: 'book-5xx', line: 'The world\'s book didn\'t arrive', dueAt: diagnosticNow() + ms});
-      else { finishLoadingWait(wait); wait = beginLoadingWait('Packs book', {kind: 'file', resource: url, failmode: 'book-5xx', line: 'The world\'s book didn\'t arrive', dueAt: diagnosticNow() + ms}); }
+      // at START, before Loading owns the card, only the shell's foot is on screen: it says so too (Loading repaints it later)
+      const foot = document.querySelector?.<HTMLElement>('.ws-load [data-el="foot"]') ?? null;
+      if (foot !== null) { foot.textContent = BOOK_LINE; foot.dataset['failmode'] = 'book-5xx'; shellFoot = foot; }
+      if (wait === undefined) wait = beginLoadingWait('Packs book', {kind: 'file', resource: url, failmode: 'book-5xx', line: BOOK_LINE, dueAt: diagnosticNow() + ms});
+      else { finishLoadingWait(wait); wait = beginLoadingWait('Packs book', {kind: 'file', resource: url, failmode: 'book-5xx', line: BOOK_LINE, dueAt: diagnosticNow() + ms}); }
       const pause = new Scope('packs-book-retry');
       try { await new Promise<void>(resolve => { pause.timeout(ms, resolve); }); } finally { pause.dispose(); }
     }
-  } finally { if (wait !== undefined) finishLoadingWait(wait); }
+  } finally {
+    if (wait !== undefined) finishLoadingWait(wait);
+    if (shellFoot?.dataset['failmode'] === 'book-5xx') { delete shellFoot.dataset['failmode']; shellFoot.textContent = ''; }
+  }
 }
 function readPacksBook(): Promise<unknown> {
   const url = contentURL(new URL(`/${packsBookPath(__BUILD_ID__)}`, document.baseURI).href);
