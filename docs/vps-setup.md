@@ -227,6 +227,15 @@ a disposable test database. No production wipe or sudo SQL cleanup is
 part of setup or proof preparation. Codex-port owns the page/proof guard;
 codex-j189 owns the runbook and VPS channel setup.
 
+A player a proof or a bot left behind is cleared by an agent, never by
+Jake's hand SQL (QA 11-15 row 24): `sudo -n wildshard-config saves list
+[--production]` prints each player's id, name and created_at, and
+`sudo -n wildshard-config saves delete-test <id>... [--production]`
+shows what would go; add `--yes` to delete. Only test and bot names
+(`r<N><shard>`, `Agent X`, `Bot`) can go. Every `player_id` table and
+`player` lose them in one transaction, and the box journal records it
+(`journalctl -t wildshard-saves`).
+
 ## Bots (MMO-PLAN MP0.4)
 
 `node scripts/mmo-bots.mjs replica|staging` runs real-socket bots from
