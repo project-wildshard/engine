@@ -9310,5 +9310,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "b49f8a21f42ec2264165f5fb69d9cbc9711bb835",
     "retirementProof": "Restored current manifest-emitter boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/boot-dist-transfer.test.ts",
+    "outcome": "restored",
+    "target": "test/boot-dist-transfer.test.ts",
+    "decision": "Restored in place (CI21 E-TOOL): the archive and title checks remain direct. Its route-closure check now gives boot-dist-plan an engine-owned two-product catalogue, because authored shard manifests have moved to their shard repositories; it retains the live/experimental journey partition and subset law.",
+    "originalTests": [],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "7f85655c5e7a22528898594c38d6a12efd334a96",
+    "retirementProof": "Restored current boot distribution boundary; no J186 retirement or successor equivalence claimed."
   }
 ]

@@ -16,7 +16,6 @@
   "test/balbal-program.test.ts",
   "test/balbal-v2.test.ts",
   "test/basis-glb-variant.test.ts",
-  "test/boot-dist-transfer.test.ts",
   "test/boot-settings-interaction.test.ts",
   "test/build-cache-report.test.ts",
   "test/carried-quest-host.test.ts",
