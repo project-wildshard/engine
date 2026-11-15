@@ -8,6 +8,9 @@
 #   wildshard-config cook <tag>                                     AUTO-RELEASE AR4 (J355): move the cook worker to vX.Y.Z and
 #                                                                   the build a signed release names for it; roll back on failure
 #   wildshard-config show cook                                      print the cook worker's tag and build
+#   wildshard-config saves list [--production]                      QA 11-15 row 24: every player's id, name and created_at
+#   wildshard-config saves delete-test <id>... [--production] [--yes]
+#                                                                   a test or bot player's rows, a dry run unless --yes
 # Settings live in /etc/wildshard/<channel>.settings (640 root:wildshard-<channel>), which the units read after <channel>.env.
 # Secrets stay in the root-only .env, and this never prints one or writes one (it reads only the placement rows there, for
 # the pair check below): only the keys in SETTINGS below, each
@@ -274,9 +277,111 @@ def cook(args):
     return 1
 
 
+# QA 11-15 row 24 (Jake: "why dont you have an admin tool you can run on the VPS to clean it up yourself"): the agents clear
+# the players their own probes and bots left in a saves database, and nobody else. Staging unless --production; a delete is a
+# dry run unless --yes. Only a name a test or a bot takes can go: a probe's r<N><shard> (r13pine), the live proofs' Agent X,
+# and Bot. Every table with a player_id column loses that player's rows and `player` its row, in one transaction that checks
+# the names again under a row lock; the box journal (tag wildshard-saves) records each delete.
+SAVES_ID = r'[A-Za-z0-9:._-]{1,128}'
+TEST_NAMES = r'r[0-9]+[a-z][a-z0-9-]*|Agent( [A-Za-z0-9]+)+|[Bb]ot([ _-]?[A-Za-z0-9]+)?'
+SAVES_MAX = 50
+SAVES_TABLE = r'[a-z_][a-z0-9_]{0,62}'
+
+
+def psql(channel, sql, variables=None):
+    """Rows (tab-separated fields) from SQL on the channel's saves database, run as postgres. The ids reach it only as psql
+    variables (:'ids'), never inside the SQL text."""
+    if TEST:
+        command = os.environ.get('WILDSHARD_CONFIG_TEST_PSQL', '/nonexistent').split(' ')
+    else:
+        command = ['/usr/sbin/runuser', '-u', 'postgres', '--', '/usr/bin/psql', '--cluster', '16/main', '-d', f'saves_{channel}']
+    command += ['-X', '-q', '-t', '-A', '-F', '\t', '-v', 'ON_ERROR_STOP=1']
+    for key, value in (variables or {}).items():
+        command += ['-v', f'{key}={value}']
+    try:
+        run = subprocess.run(command, input=sql, capture_output=True, text=True, cwd='/', env=helper_env())
+    except OSError as error:
+        stop(f'psql did not start: {error}')
+    if run.returncode != 0:
+        stop(f'psql on saves_{channel} exited {run.returncode}: {(run.stderr.strip().splitlines() or ["no message"])[-1]}')
+    return [line.split('\t') for line in run.stdout.splitlines() if line != '']
+
+
+def journal(line):
+    """One line in the box journal, tag wildshard-saves; the test's stand-in logger instead (never as root)."""
+    logger = os.environ.get('WILDSHARD_CONFIG_TEST_LOGGER') if TEST else '/usr/bin/logger'
+    if logger:
+        subprocess.run([logger, '-t', 'wildshard-saves', '-p', 'auth.notice', '--', line], cwd='/', env=helper_env())
+
+
+def saves(args, production):
+    channel = 'production' if production else 'staging'
+    if args[1:2] == ['list'] and len(args) == 2:
+        for row in psql(channel, "select id, name, to_char(created_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') "
+                                 'from player order by created_at, id;'):
+            print('  '.join(row))
+        return 0
+    if args[1:2] != ['delete-test']:
+        stop('usage: wildshard-config saves list [--production] | saves delete-test <id>... [--production] [--yes]')
+    sure = '--yes' in args
+    ids = [arg for arg in args[2:] if arg != '--yes']
+    if not ids or len(ids) > SAVES_MAX or len(set(ids)) != len(ids):
+        stop(f'name 1 to {SAVES_MAX} player ids, none twice')
+    for player in ids:
+        if re.fullmatch(SAVES_ID, player) is None:
+            stop(f'{player!r} is not a player id (A-Z a-z 0-9 : . _ -)')
+    variables = {'ids': '{' + ','.join(f'"{player}"' for player in ids) + '}', 'names': f'^({TEST_NAMES})$', 'n': str(len(ids))}
+    names = dict(psql(channel, "select id, name from player where id = any(:'ids'::text[]);", variables))
+    missing = [player for player in ids if player not in names]
+    if missing:
+        stop(f'no player {", ".join(missing)} in saves_{channel}; nothing deleted')
+    kept = [f'{player} ({names[player]!r})' for player in ids if re.fullmatch(TEST_NAMES, names[player]) is None]
+    if kept:
+        stop(f'not a test or bot name, so refused: {", ".join(kept)}; nothing deleted')
+    tables = [row[0] for row in psql(channel, "select table_name from information_schema.columns where table_schema = 'public' "
+                                              "and column_name = 'player_id' and table_name <> 'player' order by table_name;")]
+    for table in tables:
+        if re.fullmatch(SAVES_TABLE, table) is None:
+            stop(f'unexpected table name {table!r}; nothing deleted')
+    counts = {}
+    if tables:
+        union = ' union all '.join(f"select '{table}', player_id, count(*) from public.\"{table}\" where player_id = any(:'ids'::text[]) "
+                                   'group by player_id' for table in tables)
+        for table, player, count in psql(channel, union + ';', variables):
+            counts.setdefault(player, []).append(f'{table} {count}')
+    for player in ids:
+        print(f'{"delete" if sure else "would":<7} saves_{channel} {player} {names[player]!r}: {", ".join(counts.get(player, [])) or "no rows"} and its player row')
+    if not sure:
+        print('dry run: nothing deleted; add --yes to delete')
+        return 0
+    # Under a row lock the names are read again, so a player who took a real name since is never deleted.
+    deletes = '\n'.join(f"with gone as (delete from public.\"{table}\" where player_id = any(:'ids'::text[]) returning 1) "
+                        f"select '{table}', count(*) from gone;" for table in tables)
+    done = psql(channel, f"""begin;
+select count(*) = :n as matched from (select id from player where id = any(:'ids'::text[]) and name ~ :'names' for update) locked \\gset
+\\if :matched
+{deletes}
+with gone as (delete from player where id = any(:'ids'::text[]) returning 1) select 'player', count(*) from gone;
+commit;
+\\else
+rollback;
+select 'changed', 0;
+\\endif
+""", variables)
+    if ['changed', '0'] in done:
+        stop('a player changed its name or left while this ran; nothing deleted')
+    summary = ', '.join(f'{table} {count}' for table, count in done)
+    who = os.environ.get('SUDO_USER', 'root')
+    journal(f'saves delete-test saves_{channel} by {who}: ' + ' '.join(f'{player}={names[player]!r}' for player in ids) + f' ({summary})')
+    print(f'ok      saves_{channel} deleted {summary}; the box journal has it (journalctl -t wildshard-saves)')
+    return 0
+
+
 def main(argv):
     production = '--production' in argv
     args = [arg for arg in argv if arg != '--production']
+    if args and args[0] == 'saves':
+        return saves(args, production)
     if args and args[0] == 'cook':
         return cook(args)
     if args[:2] == ['show', 'cook'] and len(args) == 2:
@@ -285,7 +390,7 @@ def main(argv):
         stop('the cook worker moves with: wildshard-config cook vX.Y.Z')
     if not args or args[0] not in ('show', 'set', 'split'):
         stop('usage: wildshard-config show <channel> | set <channel> <KEY> <value> [<KEY> <value>]... [--production] | split <channel> '
-             '| cook vX.Y.Z | show cook')
+             '| cook vX.Y.Z | show cook | saves list|delete-test ...')
     verb = args[0]
     if len(args) < 2 or args[1] not in CHANNELS:
         stop('the channel is production or staging')
