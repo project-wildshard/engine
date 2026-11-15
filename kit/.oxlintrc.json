@@ -182,7 +182,15 @@
         "eslint/id-length": ["error", { "exceptions": ["x", "y", "z"] }],
         "eslint/no-underscore-dangle": [
           "error",
-          { "allow": ["__wildshard", "__workerClientRow", "__workerClient"] }
+          {
+            "allow": [
+              "__wildshard",
+              "__workerClientRow",
+              "__workerClient",
+              "__barLog",
+              "__countLog"
+            ]
+          }
         ]
       }
     },

@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 
+import { expect } from '@playwright/test'
+
 import { FLOOR_GRID_ENTER } from '../../../scripts/frame-floor-navigation.mjs'
 
 import type { SmokeVec3 } from '../smoke/page-globals.d.ts'
@@ -71,12 +73,19 @@ async function inPlay(page: Page): Promise<void> {
   await page.waitForFunction((): boolean => {
     const probe = globalThis.__wildshard
     return (
-      probe?.app.state === 'play' &&
+      (probe?.app.state === 'play' || probe?.app.state === 'paused') &&
       probe.area()?.slug === '_template' &&
       (probe.area()?.targets.length ?? 0) > 0 &&
       (probe.world?.game.frameCount ?? 0) > 5
     )
   })
+  const resume = page.locator('.ws-gmenu.show:not([inert]) .ws-gmenu-close')
+  if (await resume.isVisible()) {
+    await resume.click()
+  }
+  await page.waitForFunction(
+    (): boolean => globalThis.__wildshard?.app.state === 'play',
+  )
   const address = new URL(page.url())
   address.searchParams.set('fps', '30')
   await page.evaluate((href): void => {
@@ -86,10 +95,9 @@ async function inPlay(page: Page): Promise<void> {
   await page.waitForFunction(
     (): boolean => (globalThis.__workerClient?.().frames ?? 0) > 30,
   )
-  const resume = page.locator('.ws-gmenu.show:not([inert]) .ws-gmenu-close')
-  if (await resume.isVisible()) {
-    await resume.click()
-  }
+  await expect(page.locator('#hud.intro,.ws-reveal')).toHaveCount(0, {
+    timeout: 10_000,
+  })
 }
 
 async function state(page: Page): Promise<State> {

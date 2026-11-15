@@ -2,6 +2,8 @@
 // (src/client/engine/debug/probe.ts) and the worker client's hooks (src/client/game/shardfile/clientWorker.ts), as
 // far as the smoke uses them. The kit tsconfig has no DOM; `document` and `Event` are the two DOM names it touches.
 
+import type { BarRow } from '../../../scripts/loading-bar-rule.mjs'
+
 type SmokeVec3 = Readonly<Record<'x' | 'y' | 'z', number>>
 
 interface SmokeProbe {
@@ -16,7 +18,17 @@ interface SmokeProbe {
     readonly flags: readonly string[]
   } | null
   readonly app: { readonly state: string }
-  readonly world?: { readonly game: { readonly frameCount: number } }
+  readonly world?: {
+    readonly game: { readonly frameCount: number }
+    readonly player: { readonly hover: boolean; readonly hoverBlend: number }
+    readonly weapons: {
+      readonly tools: readonly {
+        readonly id: string
+        readonly enabled: boolean
+        readonly model?: { readonly visible: boolean }
+      }[]
+    }
+  }
   readonly state: () => {
     readonly player: { readonly pos: SmokeVec3; readonly health: number }
   }
@@ -28,6 +40,8 @@ interface SmokeProbe {
 }
 
 declare global {
+  var __barLog: readonly BarRow[] | undefined
+  var __countLog: readonly { readonly serverFiles: number }[] | undefined
   var __wildshard: SmokeProbe | undefined
   var __workerClientRow: ((name: string) => number | undefined) | undefined
   var __workerClient:

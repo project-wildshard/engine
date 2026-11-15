@@ -1,6 +1,9 @@
+import { setTimeout as delay } from 'node:timers/promises'
+
 import { devices, expect, test as base } from '@playwright/test'
 
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
+import { recordBars } from '../../../scripts/loading-card-recorder.mjs'
 import { inPlay } from './probe.ts'
 
 import type { Browser, BrowserContext, Page } from '@playwright/test'
@@ -15,8 +18,17 @@ interface Fixtures {
   readonly freshPage: () => Promise<Page>
 }
 
+type DeviceProfile = 'desktop' | 'phone'
+
+interface WorldOptions {
+  readonly profile: DeviceProfile
+  readonly entryDelayMs: number
+}
+
 interface Workers {
   readonly world: SeatedWorld
+  readonly deviceProfile: DeviceProfile
+  readonly entryDelayMs: number
 }
 
 /** Enter the installed Template 1 through the same controls as a player. */
@@ -74,14 +86,35 @@ async function seat(page: Page): Promise<void> {
 async function openWorld(
   browser: Browser,
   baseURL: string,
+  options: WorldOptions,
 ): Promise<SeatedWorld> {
+  const { profile, entryDelayMs } = options
   const context = await browser.newContext({
-    ...devices['Desktop Chrome'],
+    ...devices[profile === 'phone' ? 'iPhone 16 Pro' : 'Desktop Chrome'],
+    ...(profile === 'phone' ? { viewport: { width: 402, height: 874 } } : {}),
     baseURL,
   })
   try {
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true })
+    await saveFixture(context, {
+      scope: 'device',
+      key: 'firstPlayDone',
+      data: true,
+    })
     await harnessPins(context, { seed: 357 })
+    if (profile === 'phone') {
+      await context.addInitScript(recordBars)
+    }
+    if (entryDelayMs > 0) {
+      await context.route('**/*.js', async (route): Promise<void> => {
+        if (
+          /\/entry-[^/]+\.js$/u.test(new URL(route.request().url()).pathname)
+        ) {
+          await delay(entryDelayMs)
+        }
+        await route.continue()
+      })
+    }
     const page = await context.newPage()
     const errors: string[] = []
     page.on('pageerror', (error: Readonly<Error>): void => {
@@ -103,13 +136,22 @@ async function openWorld(
 
 /** A worker keeps one seated world; independent saves need freshPage. */
 const test = base.extend<Fixtures, Workers>({
+  deviceProfile: ['desktop', { scope: 'worker', option: true }],
+  entryDelayMs: [0, { scope: 'worker', option: true }],
   world: [
-    async ({ browser }, provide, workerInfo): Promise<void> => {
+    async (
+      { browser, deviceProfile, entryDelayMs },
+      provide,
+      workerInfo,
+    ): Promise<void> => {
       const { baseURL } = workerInfo.project.use
       if (baseURL === undefined) {
         throw new Error('Missing T1 origin')
       }
-      const world = await openWorld(browser, baseURL)
+      const world = await openWorld(browser, baseURL, {
+        profile: deviceProfile,
+        entryDelayMs,
+      })
       try {
         await provide(world)
       } finally {
@@ -122,14 +164,20 @@ const test = base.extend<Fixtures, Workers>({
     await provide(world.page)
     expect(world.errors).toEqual([])
   },
-  freshPage: async ({ browser, baseURL }, provide): Promise<void> => {
+  freshPage: async (
+    { browser, baseURL, deviceProfile, entryDelayMs },
+    provide,
+  ): Promise<void> => {
     if (baseURL === undefined) {
       throw new Error('Missing T1 origin')
     }
     const worlds: SeatedWorld[] = []
     try {
       await provide(async (): Promise<Page> => {
-        const world = await openWorld(browser, baseURL)
+        const world = await openWorld(browser, baseURL, {
+          profile: deviceProfile,
+          entryDelayMs,
+        })
         worlds.push(world)
         return world.page
       })
