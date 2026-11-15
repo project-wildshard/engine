@@ -8,7 +8,7 @@ const fixture = {
   slug: 'fixture',
   bindings: { accent: '#123456', budgets: { module: './budgets.generated', export: 'default' } },
 };
-const { boot: _boot, ktx2: _ktx2, ...bindings } = fixture.bindings;
+const bindings = fixture.bindings;
 const boot = { platform: 'page-mode', rows: { module: './data/boot.generated.json', export: 'default' } };
 const ktx2 = { platform: 'page-mode', rows: { module: './data/gpu.generated.json', export: 'default' } };
 
