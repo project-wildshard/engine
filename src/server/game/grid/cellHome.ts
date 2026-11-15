@@ -1,3 +1,5 @@
+import type { Actor } from '@wildshard/engine/combat/pipeline';
+import { gridZone } from '../../../shared/game/grid/rules';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import { CELL_ABOVE, CELL_BELOW, CHUNK_HALF } from '@wildshard/engine/core/config';
@@ -21,6 +23,16 @@ function bindHome(host: SimHost, actor: AnimalSim, mounted: readonly AnimalSim[]
 /** MP5.1: one cell's unmounted creatures stay home. Players and their mounted traveller remain free to cross. */
 export function installCellHome(host: SimHost): void {
   const bound = new WeakSet<AnimalSim>(), mounted: AnimalSim[] = [];
+  // Resolve the live object on every request: ids repeat between cells, and
+  // seats and creatures can join or leave after installation.
+  const interior = (actor: Actor): boolean => {
+    const player = host.players.get(actor.id);
+    if (player?.health === actor) return gridZone(player.position) === 'shard';
+    const creature = host.entities.get(actor.id);
+    return creature?.combatActor() === actor && gridZone(creature.position) === 'shard';
+  };
+  host.events.answer('damage.admit', request => request !== null && interior(request.target)
+    && (request.source === 'env' || interior(request.source)) ? request : null, host.scope);
   const sync = (): void => {
     mounted.length = 0;
     for (const player of host.players.values()) { const ride = mountedPlayerOf(host, player.id); if (ride?.mounted === true && ride.horse !== null) mounted.push(ride.horse); }

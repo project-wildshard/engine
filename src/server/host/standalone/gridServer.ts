@@ -33,7 +33,7 @@ import { landedBy } from '@wildshard/engine/combat/damageBook';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { openCellWorld, type CellWorld, type CellWorldOptions } from './cellWorld';
-import { addCellWalls, addVoidFloor, renewVoidFloor, ROAD } from './roadWorld';
+import { addCellWalls, addVoidFloor, installRoadCombat, renewVoidFloor, ROAD } from './roadWorld';
 import { netBuys, netWorldInput } from '../../../shared/host/standalone/netInput';
 import { cellDocuments, CONTINUATION, ContinuationSlots, SITE, siteDocuments, type SavedContinuation, type SavedSite } from './continuation';
 import { ledgerFilings } from './ledgerFilings';
@@ -198,11 +198,13 @@ export class StandaloneGrid {
       try {
         const restored = restoreSimHost(ROAD, { rapier }, decodeSimSnapshot(saved)), player = sessionPlayer(restored);
         if (renewVoidFloor(restored, cells, player.position, ROAD_SKIN)) player.motor.resetAt(player.position);
+        installRoadCombat(restored);
         holdStrips(restored, strips.map(strip => strip.mesh));
         return restored;
       } catch (error) { refused?.(error); } // a road holds no progress but where the player stood
     }
     const road = createSimHost(ROAD, { rapier }), [x, y, z] = readableSnapshot(saved ?? '')?.players[0]?.position ?? [], stood = arrival ?? (x === undefined || y === undefined || z === undefined ? undefined : { x, y, z });
+    installRoadCombat(road);
     addCellWalls(road, cells);
     addVoidFloor(road, cells);
     holdStrips(road, strips.map(strip => strip.mesh));

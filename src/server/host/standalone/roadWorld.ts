@@ -85,12 +85,18 @@ export function renewVoidFloor(road: SimHost, cells: readonly Pick<GridCell, 'ce
 export function buildStrips(host: SimHost, meshes: readonly GridCollisionStrip['mesh'][]): void {
   withOwner(host.scope, () => { for (const mesh of meshes) stripCollider(host.physics, mesh); });
 }
+/** The road admits no ordinary damage, including scripted environmental hits.
+ * Terminal out-of-world falls retain CombatPipeline.fall's recovery path. */
+export function installRoadCombat(road: SimHost): void {
+  road.events.answer('damage.admit', () => null, road.scope);
+}
 /**
  * GC15: a dedicated worker's road, with nobody on it yet: every strip built, the void's floor round `placed` (SA34), and walls only round `walled`, the cells it can't hand a
  * seat to (those on another worker: GC7's one line). Its lead seat is the room's to park.
  */
 export function openRoad(rapier: Rapier, walled: readonly Pick<GridCell, 'origin'>[], strips: readonly GridCollisionStrip[], placed: readonly Pick<GridCell, 'cell'>[]): SimHost {
   const road = createSimHost(ROAD, { rapier });
+  installRoadCombat(road);
   addCellWalls(road, walled);
   addVoidFloor(road, placed);
   buildStrips(road, strips.map(strip => strip.mesh));

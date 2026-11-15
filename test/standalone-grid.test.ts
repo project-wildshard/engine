@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import type { NetTravel } from '../src/shared/engine/net/messages';
-import { cell, NEIGHBOUR, ownerX, PageStorage, start, until, walk } from './fixtures/standaloneGrid';
+import { Vector3 } from 'three';
+import { cell, NEIGHBOUR, ownerX, PageStorage, running, start, until, walk } from './fixtures/standaloneGrid';
 
 // P1-E3.9, E5.2b: the grid in the server's half, over real MessagePorts on the server's own clock. A client walks off the road
 // into a cell and back, hearing `travel` both ways, and a reload resumes it wherever it stood. Only a server's bytes are read.
@@ -44,4 +45,22 @@ test('a client walks off the road into a cell and back, and a reload resumes it 
   await until(() => third.shell.client.latest !== null);
   expect(third.shell.client.latest?.cell).toBe(0);
   third.stop();
+});
+
+
+test('fresh and restored standalone roads refuse combat', { timeout: 120_000 }, async () => {
+  const storage = new PageStorage();
+  for (let boot = 0; boot < 2; boot++) {
+    const session = start(storage, boot === 0 ? { x: -259, y: 0, z: 0 } : undefined);
+    try {
+      expect((await session.shell.booted).restored).toBe(boot === 1);
+      const road = running()?.grid.hostOf(null), player = road?.players.get('actor.player');
+      if (road === undefined || player === undefined) throw new Error('Missing running road');
+      const hp = player.health.attributes.health;
+      expect(road.combat.hit({ source: 'env', target: player.health, sourceTags: ['dmg.melee'], amount: 1,
+        point: new Vector3(), dir: new Vector3(), throughWalls: true })).toBeNull();
+      expect(player.health.attributes.health).toBe(hp);
+      expect((await session.shell.save()).ok).toBe(true);
+    } finally { session.stop(); }
+  }
 });
