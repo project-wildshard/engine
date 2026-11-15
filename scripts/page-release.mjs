@@ -35,7 +35,8 @@ import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
 // The world-signing key reaches only the deployment publisher, never build tools or the host.
 const signingKey = process.env.E7_RELEASE_SIGNING_KEY;
 delete process.env.E7_RELEASE_SIGNING_KEY;
-const releaseKey = process.env.E7_RELEASE_PUBLIC_KEY?.trim() || RELEASE_PUBLIC_KEY;
+const configuredKey = process.env.E7_RELEASE_PUBLIC_KEY?.trim();
+const releaseKey = configuredKey === undefined || configuredKey === '' ? RELEASE_PUBLIC_KEY : configuredKey;
 const args = process.argv.slice(2);
 const flag = (/** @type {string} */ name) => args.find(arg => arg === `--${name}` || arg.startsWith(`--${name}=`));
 const value = (/** @type {string} */ name) => flag(name)?.split('=').slice(1).join('=');
