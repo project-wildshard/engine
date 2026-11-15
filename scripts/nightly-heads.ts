@@ -49,7 +49,7 @@ try {
     const phase = async (name: string, run: () => unknown): Promise<boolean> => {
       const started = Date.now();
       try {const detail = await run(); result.phases.push({name, ok: true, ms: Date.now() - started, detail}); checkpoint(); return true;}
-      catch (error) {result.phases.push({name, ok: false, ms: Date.now() - started, error: String(error).slice(0, 4000)}); checkpoint(); return false;}
+      catch (error) {result.phases.push({name, ok: false, ms: Date.now() - started, error: (error instanceof Error ? error.stack ?? String(error) : String(error)).slice(0, 4000)}); checkpoint(); return false;}
     };
     const cooked = join(work, head.slug), evidence = join(work, `${head.slug}-evidence`);
     mkdirSync(evidence);
@@ -95,7 +95,7 @@ try {
       if (bankText === undefined) throw new Error('Missing build bank');
       const bank = JSON.parse(bankText) as {spawnManifests: {client: Record<string, unknown>}};
       for (const slug of Object.keys(bank.spawnManifests.client)) if (bareSlug(slug) === bareSlug(head.slug)) delete bank.spawnManifests.client[slug];
-      writeFileSync(join(dist, 'index.html'), originalHTML.replace(expression, (_, before, _body, after) => `${before}${JSON.stringify(bank)}${after}`));
+      writeFileSync(join(dist, 'index.html'), originalHTML.replace(expression, (_, before, _body, after) => `${before}${JSON.stringify(bank).replaceAll('<', String.raw`\u003c`)}${after}`));
       const added = await addStoredShards(dist, [head], store,
         hash => Promise.resolve(readFileSync(join(process.env.WILDSHARD_PIN_CACHE ?? join(homedir(), '.cache/wildshard/pins'), `${hash}.tar`))),
         {base: `http://127.0.0.1:${address.port}`, shards: []}, live);
@@ -160,7 +160,7 @@ try {
       });
       await phase('explorer', async () => {await sweepExplorer(activeBrowser, url, route, evidence, true); return {route, rendered: true};});
     } catch (error) {
-      if (!result.phases.some(row => row.name === 'boot')) result.phases.push({name: 'boot', ok: false, error: String(error).slice(0, 4000)});
+      if (!result.phases.some(row => row.name === 'boot')) result.phases.push({name: 'boot', ok: false, error: (error instanceof Error ? error.stack ?? String(error) : String(error)).slice(0, 4000)});
       checkpoint();
     } finally {
       await browser?.close().catch(retirementFailed);

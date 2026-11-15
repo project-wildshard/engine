@@ -9,6 +9,7 @@ import * as v from 'valibot';
 import {packsBookPath} from '../src/shared/game/shardfile/spawnManifest';
 import {StandaloneCatalogueSchema} from '@wildshard/format/standaloneCatalogue';
 import {addCookedShards, appendValidationVerdicts, catalogueWithAdded, writeCatalogueDocument} from '../scripts/app-build/catalogue';
+import {stampBuildHtml} from '../scripts/app-build/buildIdentity.mjs';
 import {refreshServiceWorker, workerScripts} from '../scripts/app-build/serviceWorker';
 import {installTitleManifests, titleManifests, withCatalogueHeads, type TitleManifest} from '../src/client/game/shard/titleList';
 import {GridAssembly} from '../src/shared/game/grid/assembly';
@@ -137,12 +138,17 @@ describe('the bake', () => {
       const book = join(out, packsBookPath('build-1'));
       writeFileSync(book, JSON.stringify({book: 'packs', build: 'build-1', client: {}}));
       const verdict = (slug: string): unknown => ({path: `/shardfiles/${slug}/shard.json`});
-      writeFileSync(join(out, 'index.html'), `<head><script>globalThis.__WS_SHARDFILE_VERDICTS__=${JSON.stringify([verdict('a')])};</script><script type="application/json" id="boot-module-files">{"spawnManifests":{"client":{}}}</script></head>`);
+      // The real stamp continues after verdicts. The old whole-script regex
+      // swallowed those assignments and failed every nightly head at JSON.parse.
+      const world = {release: 'release-1', key: 'key-1', recordTag: 'quoted ];globalThis.fake=[];'};
+      writeFileSync(join(out, 'index.html'), stampBuildHtml('<head><script type="application/json" id="boot-module-files">{"spawnManifests":{"client":{}}}</script></head>', 'build-1',
+        {validator: 'a'.repeat(64), verdicts: [verdict('a')], world, label: 'staging'}));
       const row = (url: string, set: 'entry' | 'whole'): {url: string; tier: 'phone'; set: 'entry' | 'whole'; files: number; totalBytes: number; wireBytes: number} => ({url, tier: 'phone', set, files: 0, totalBytes: 0, wireBytes: 0});
       addCookedShards(out, [{slug: 'test-shard', hash: fresh.hash, header: '', verdict: verdict('test-shard'), manifests: [row('/assets/spawn/entry.json', 'entry'), row('/assets/spawn/whole.json', 'whole')]}]);
       const html = readFileSync(join(out, 'index.html'), 'utf8');
       expect(html).toContain('"spawnManifests":{"client":{"test-shard":{"phone":{"url":"/assets/spawn/entry.json"');
       expect(html).toContain('__WS_SHARDFILE_VERDICTS__=[{"path":"/shardfiles/a/shard.json"},{"path":"/shardfiles/test-shard/shard.json"}]');
+      expect(html).toContain(`globalThis.__WS_WORLD__=${JSON.stringify(world)};globalThis.__WS_BUILD_LABEL__="staging";</script>`);
       expect(JSON.parse(readFileSync(book, 'utf8'))).toMatchObject({client: {'test-shard': {phone: {url: '/assets/spawn/whole.json'}}}});
     } finally { rmSync(out, {recursive: true, force: true}); }
   });

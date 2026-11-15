@@ -28,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -44,6 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -82,6 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -97,6 +100,14 @@ jobs:
           path: ~/.cache/wildshard/pins
           key: ${{ steps.pins.outputs.cache-primary-key }}
       - run: bash scripts/ci-playwright-install.sh ${{ matrix.browser }}
+      # Pure input-addressed encodes are reusable; each head's cook store remains cold.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: nightly-encodes-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            nightly-encodes-${{ runner.os }}-
+            ring1-spawn-parts-br-
       - run: pnpm build:game
       # PAGE-SIZE PZ4: build:game splits dist/ from dist-content/; this job serves the whole game from dist.
       - run: node scripts/app-build/splitOutput.mjs dist --join
@@ -120,6 +131,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
