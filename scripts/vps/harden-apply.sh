@@ -363,9 +363,18 @@ if put /usr/local/sbin/wildshard-alert 755 root:root VH14 <<'EOF'
 # sudo runs PAM with an empty environment, so the path is its own.
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 [ "${PAM_TYPE:-open_session}" = open_session ] || exit 0
+# SENTRY-TRIAGE S16: an SSH login over the tailnet (100.64.0.0/10, fd7a:115c:a1e0::/48) is our own operator or agent, so it sends
+# nothing. A login from any other address, sudo, the console and fail2ban's bans (the failed logins) still report.
+if [ $# -eq 0 ] && [ "${PAM_SERVICE:-}" = sshd ]; then
+  case ${PAM_RHOST:-} in
+    100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*|[Ff][Dd]7[Aa]:115[Cc]:[Aa]1[Ee]0:*) exit 0 ;;
+  esac
+fi
+line=${1:-"${PAM_SERVICE:-?}: ${PAM_USER:-?}${PAM_RUSER:+ (by $PAM_RUSER)} from ${PAM_RHOST:-the box}"}
+# Tests only: print the line instead of sending it. PAM and fail2ban never set it.
+[ -z "${WILDSHARD_ALERT_PRINT:-}" ] || { printf '%s\n' "$line"; exit 0; }
 dsn=$(sed -n 's/^SENTRY_CRON_DSN=//p' /etc/wildshard/ops.env 2>/dev/null | tail -n 1)
 [ -n "$dsn" ] || exit 0
-line=${1:-"${PAM_SERVICE:-?}: ${PAM_USER:-?}${PAM_RUSER:+ (by $PAM_RUSER)} from ${PAM_RHOST:-the box}"}
 key=${dsn#*://} key=${key%%@*} rest=${dsn#*@}
 body=$(python3 -I -c 'import json, sys, socket, uuid; print(json.dumps({"event_id": uuid.uuid4().hex, "level": "warning", "logger": "wildshard-auth", "platform": "other", "server_name": socket.gethostname(), "environment": "production", "message": {"formatted": sys.argv[1]}, "tags": {"kind": "auth"}}))' "$line" 2>/dev/null) || exit 0
 ( curl -fsS -m 5 -o /dev/null -H 'Content-Type: application/json' \
