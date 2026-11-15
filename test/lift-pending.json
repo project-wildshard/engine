@@ -233,7 +233,6 @@
   "test/scripts/sunscar-matriarch.test.ts",
   "test/seated-figure-file-only.test.ts",
   "test/shard-discovery.test.ts",
-  "test/shard-words-pin.test.ts",
   "test/shardfile-inputs.test.ts",
   "test/sheep-file-contract.test.ts",
   "test/signal-quest-verbs.test.ts",

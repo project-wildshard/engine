@@ -9332,5 +9332,15 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "2e8dada0d0899e9c82c8cf5eec8930e9ebd17184",
     "retirementProof": "Restored current manifest and discovery boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/shard-words-pin.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: this source-freshness test executes gen-shard-words over src/shards, a private multi-shard source tree that is no longer part of engine. The retained lint/shard-words.pin.json remains the engine's immutable word boundary; updates are now produced by the owning shard export workflow, so engine cannot truthfully regenerate or compare its private inputs.",
+    "originalTests": ["the pinned shard words match src/shards"],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "be3209090eee14962d4cb48d3e6f05f4909f7cbb",
+    "retirementProof": "Individual body-reviewed J186 disposition: retired source freshness, not the retained engine lint pin or a flaky test."
   }
 ]
