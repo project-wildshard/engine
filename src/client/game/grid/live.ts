@@ -72,6 +72,9 @@ export interface LiveGridPorts {
   /** Keep only the last departed isolated world on the road. Its original
    * full claim stays unneeded/evictable; no new world may overlap it. */
   lastCell?: { readonly windowMs: number; readonly playingBytes: number;
+    /** ZE3 (J352): the owned home, once departed onto the road, has no expiry: it stays resident while the traveller is on
+     *  the road (still pressure-evictable, and retired before any other cell's allocation). Absent: every cell expires. */
+    readonly keepHome?: boolean;
     readonly schedule: (expire: () => void, delayMs: number) => () => void };
   /** G580 T2: told once before a resident's retirement or unload disposes its world, so its compiled programs can be kept
    *  for the next world; never refuses a retirement. Absent keeps nothing. */
@@ -388,8 +391,13 @@ export class LiveGridHost {
       } catch { return false; }
     }
     this.forgetLastCell();
-    const last = { instance, until: diagnosticNow() + policy.windowMs, cancel: (): void => undefined };
+    const kept = policy.keepHome === true && instance === this.ports.home.instance;
+    const last = { instance, until: kept ? Number.POSITIVE_INFINITY : diagnosticNow() + policy.windowMs, cancel: (): void => undefined };
     this.lastCell = last;
+    if (kept) {
+      resident.lease.update({ needed: false, distance: this.distance(this.assembly.cell(instance)) });
+      return true;
+    }
     try {
       last.cancel = policy.schedule(() => {
         if (this.lastCell !== last) return;

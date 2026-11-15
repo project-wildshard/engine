@@ -66,3 +66,8 @@
   released and relinked material programs (the edge swaps lights and kit, so each side's programs are now pinned by the
   G580 keeper as the feet leave it), and the cell clip walked every forest copy's exact box when the forest re-chose its
   copies (`computeBoundingBox`, 46 to 75 ms): each copy's sphere now settles it, and only a crossing copy is boxed exactly.
+- 15:30 (opus-gcm9) ZE3's whole-road drive on the laptop (Driftwood, board, 80 segments, 26 min): 0 frames over 50 ms,
+  worst 16.8 ms, no card, back in with control and no card. Two misses: the home left residency 30 s after the step out
+  (the last-cell window expired it; the road bar says the home is never retired on the road, so the owned home now has no
+  expiry and stays pressure-evictable), and stops of 400 to 750 ms, every one the board's ramp back to cruise out of a
+  90° corner: the proof now counts a stop only after the segment first reaches cruise, and a ramp over 1.5 s fails it.

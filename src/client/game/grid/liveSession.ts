@@ -297,7 +297,7 @@ export class LiveGridSession {
     const highwayBytes = (ports.initialStripBytes ?? ports.strips.reduce((sum, strip) => sum + strip.mesh.positions.byteLength + strip.mesh.indices.byteLength, 0))
       + assembly.cells.length * TRANSFER_WALL_BYTES;
     try { this.live = new LiveGridHost(assembly, {
-      lastCell: { windowMs: 30_000, playingBytes: ports.allocator.envelope(), schedule: (expire, ms) => {
+      lastCell: { windowMs: 30_000, playingBytes: ports.allocator.envelope(), keepHome: true, schedule: (expire, ms) => {
         const timer = scope.child('grid.last-cell-expiry');
         timer.timeout(ms, () => { timer.dispose(); scope.run(expire); });
         return () => { timer.dispose(); };

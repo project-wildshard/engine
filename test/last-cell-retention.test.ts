@@ -15,7 +15,7 @@ const level: SimLevel = { version: 3, id: 'platform', seed: 1, ground: { size: 5
   player: { at: { x: 0, y: 0, z: 0 }, yaw: 0, speed: 30 }, entities: [], quests: [],
   weapon: { id: 'none', shape: { kind: 'point', radius: 0 }, windup: 0, active: 0, recover: 0, cooldown: 0, range: 0, damage: 0, tags: [] } };
 
-async function fixture(options: { cap?: number; isolated?: boolean; beforeAdmit?: (instance: string, required: boolean) => Promise<void> } = {}) {
+async function fixture(options: { cap?: number; isolated?: boolean; keepHome?: boolean; beforeAdmit?: (instance: string, required: boolean) => Promise<void> } = {}) {
   const rapier = await loadRapier(Uint8Array.from(fixtureBytes(new URL('../node_modules/@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm', import.meta.url))));
   const assembly = new GridAssembly({ developer: false, devserver: false }), home = assembly.cell('driftwood-isle');
   const next = assembly.cells.find(cell => cell.instance !== home.instance);
@@ -28,7 +28,7 @@ async function fixture(options: { cap?: number; isolated?: boolean; beforeAdmit?
   const live = new LiveGridHost(assembly, {
     home: { mode: 'owned', instance: home.instance, bytes: 50_000_000, residency: residency.admitHome(home.instance, 50_000_000) },
     player, allocator: residency.allocator,
-    lastCell: { windowMs: 30_000, playingBytes: options.cap ?? CONTENT_CAPS.playing, schedule: (run, delay) => {
+    lastCell: { windowMs: 30_000, playingBytes: options.cap ?? CONTENT_CAPS.playing, ...(options.keepHome === true ? { keepHome: true } : {}), schedule: (run, delay) => {
       const expiry = { run, delay, cancelled: false }; expiries.push(expiry); return () => { expiry.cancelled = true; };
     } },
     bindFrame: () => undefined, gameplayReady: () => true, prefetchable: () => false,
@@ -276,4 +276,21 @@ test('an optional near view cannot evict the real retained world needed for retu
     await f.enter(f.home.instance);
     expect(f.created).toEqual([f.home.instance]); expect(f.objects.get(f.home.instance)).toBe(world);
   } finally { near?.dispose(); f.close(); }
+});
+
+test('ZE3: the owned home stays resident on the road for as long as the traveller is on it', async () => {
+  const f = await fixture({ keepHome: true });
+  try {
+    await f.enter(f.home.instance); const object = f.objects.get(f.home.instance);
+    expect(await f.leave()).toBe(true); await f.settle();
+    // no expiry: the road bar's home is never retired by time (ZONE-ENTRY: "the home stays resident (never retired) while on the road")
+    expect(f.expiries).toEqual([]);
+    for (let tick = 0; tick < 5; tick++) await f.settle();
+    expect(f.live.state().retainedCell?.instance).toBe(f.home.instance); expect(f.disposed).toEqual([]);
+    await f.enter(f.home.instance);
+    expect(f.created).toEqual([f.home.instance]); expect(f.objects.get(f.home.instance)).toBe(object);
+    // any other cell still retires it before its own allocation
+    await f.leave(); await f.enter(f.next.instance);
+    expect(f.disposed).toEqual([f.home.instance]);
+  } finally { f.close(); }
 });

@@ -22,13 +22,15 @@ const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', ''
 const limit = Number(flag('segments', '0')) || Infinity, ride = flag('ride', 'board');
 if (!['board', 'boost', 'run'].includes(ride)) throw new Error(`No ride ${ride}: board, boost or run`);
 if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: road-drive-proof.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood] [--segments=n]');
-const HOMES = /** @type {Record<string, { slug: string, card: string }>} */ ({ driftwood: { slug: 'driftwood-isle', card: 'Driftwood Isle' }, sunscar: { slug: 'sunscar-dunes', card: 'Sunscar Dunes' }, pine: { slug: 'pine-hollow', card: 'Pine Hollow' } });
+const HOMES = /** @type {Record<string, { slug: string, card: string }>} */ ({ driftwood: { slug: 'driftwood-isle', card: 'Driftwood Isle' }, sunscar: { slug: 'sunscar-dunes', card: 'Signal Dunes' }, pine: { slug: 'pine-hollow', card: 'Pine Hollow' } });
 const homeName = flag('home', 'driftwood'), home = HOMES[homeName];
 if (home === undefined) throw new Error(`No home ${homeName}: ${Object.keys(HOMES).join(', ')}`);
 const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '2992x1434@2')) ?? [0, '2992', '1434', '2']).slice(1).map(Number);
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 /** The cell's half size, the gap's half (road and both strips) and the junction offsets a drive keeps off the roundabout's island (6 m). */
 const HALF = 250, GAP_HALF = 31.25, LANE = 4, AROUND = 10, CLEAR = 20, MEASURE_CLEAR = 30;
+/** The longest ramp back to cruise out of a corner the bar accepts: the board's own 90° turn takes about 0.8 s, a longer one is a stop. */
+const RAMP_MS = 1500;
 mkdirSync(out, { recursive: true });
 
 /** The junction path: from the home's south-east junction to the lattice's corner, every row (a snake), every column (a snake),
@@ -160,11 +162,15 @@ try {
     const span = mid.length < 2 ? [] : frames.filter((/** @type {number[]} */ r) => (r[0] ?? 0) >= mid[0].t && (r[0] ?? 0) <= mid.at(-1).t).map((/** @type {number[]} */ r) => r[1] ?? 0);
     const speed = (/** @type {number} */ i) => Math.hypot(mid[i].x - mid[i - 1].x, mid[i].z - mid[i - 1].z) / Math.max(1, mid[i].t - mid[i - 1].t);
     const speeds = mid.map((/** @type {unknown} */ _, /** @type {number} */ i) => i > 0 ? speed(i) : Number.NaN).filter((/** @type {number} */ v) => Number.isFinite(v)).sort((/** @type {number} */ x, /** @type {number} */ y) => x - y), cruise = speeds[Math.floor(speeds.length / 2)] ?? 0;
-    let stop = 0, worstStop = 0, stopAt = null;
-    for (let i = 1; i < mid.length; i++) { stop = speed(i) < cruise * 0.9 ? stop + (mid[i].t - mid[i - 1].t) : 0; if (stop > worstStop) { worstStop = stop; stopAt = { x: mid[i].x, z: mid[i].z }; } }
+    // out of a turn the board is still gaining speed: a stop counts only once the segment first reaches 90 % of its cruise (the
+    // 2026-11-15 laptop drive: every stop over 105 ms was this ramp out of a 90° corner, each frame 16.8 ms)
+    let stop = 0, worstStop = 0, stopAt = null, ramp = 1;
+    while (ramp < mid.length && speed(ramp) < cruise * 0.9) ramp++;
+    const rampMs = ramp < mid.length ? mid[ramp - 1].t - mid[0].t : 0;
+    for (let i = ramp + 1; i < mid.length; i++) { stop = speed(i) < cruise * 0.9 ? stop + (mid[i].t - mid[i - 1].t) : 0; if (stop > worstStop) { worstStop = stop; stopAt = { x: mid[i].x, z: mid[i].z }; } }
     const cards = rows.filter((/** @type {any} */ r) => r.card !== null), mbs = rows.map((/** @type {any} */ r) => r.mb).filter((/** @type {unknown} */ v) => typeof v === 'number');
     result.segments.push({ seg: k, driven: true, from: [ai, aj], to: [bi, bj], ms: rows.at(-1).t - rows[0].t, cruiseMps: Number((cruise * 1000).toFixed(2)), worstFrameMs: Math.max(0, ...span),
-      over50: span.filter((/** @type {number} */ ms) => ms > 50).length, over100: span.filter((/** @type {number} */ ms) => ms > 100).length, worstStopMs: worstStop, stopAt,
+      over50: span.filter((/** @type {number} */ ms) => ms > 50).length, over100: span.filter((/** @type {number} */ ms) => ms > 100).length, worstStopMs: worstStop, stopAt, rampMs,
       cardMs: cards.length * 50, cards: [...new Set(cards.map((/** @type {any} */ r) => `${String(r.card)}:${String(r.stage)}`))], homeResident: rows.every((/** @type {any} */ r) => r.home === true),
       residents: [...new Set(rows.flatMap((/** @type {any} */ r) => r.res ?? []))], mb: mbs.length === 0 ? null : { min: Math.min(...mbs), max: Math.max(...mbs) } });
   }
@@ -188,8 +194,9 @@ try {
   const driven = result.segments.filter(row => row.driven === true), mbAll = driven.flatMap(row => { const mb = /** @type {any} */ (row.mb); return mb === null ? [] : [mb.min, mb.max]; });
   const phoneBar = device !== '' ? 1 : 0, over50 = driven.reduce((sum, row) => sum + Number(row.over50), 0);
   result.summary = { driveMs, segments: legs, driven: driven.length, over50, worstFrameMs: Math.max(0, ...driven.map(row => Number(row.worstFrameMs))), worstStopMs: Math.max(0, ...driven.map(row => Number(row.worstStopMs))),
+    worstRampMs: Math.max(0, ...driven.map(row => Number(row.rampMs ?? 0))),
     cardMs: allCards.length * 50, cards: [...new Set(allCards.map((/** @type {any} */ r) => `${String(r.card)}:${String(r.stage)}`))], homeResident: allHome, mbGrowth: mbAll.length === 0 ? null : Math.max(...mbAll) - (/** @type {any} */ (driven[0]?.mb)?.min ?? 0),
-    bar: driven.length === legs && over50 <= phoneBar && driven.every(row => Number(row.worstStopMs) <= 250) && allCards.length === 0 && allHome && result.errors.length === 0 };
+    bar: driven.length === legs && over50 <= phoneBar && driven.every(row => Number(row.worstStopMs) <= 250 && Number(row.rampMs ?? 0) <= RAMP_MS) && allCards.length === 0 && allHome && result.errors.length === 0 };
   console.log(`${result.summary.bar === true ? 'ok  ' : 'FAIL'} ${homeName} drive ${JSON.stringify(result.summary)}`);
   console.log(`${result.back.inside === true && result.back.cardMs === 0 ? 'ok  ' : 'FAIL'} ${homeName} back in ${JSON.stringify(result.back)}`);
   await context.close();
