@@ -39,11 +39,14 @@ const readTitleRows = (outDir: string): readonly TitleManifest[] => {
 };
 const hash8 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex').slice(0, 8);
 /** A title row from a shard's discovery document: `home` is an origin for a shard cooked to R2 (J138). */
-export function titleRowOf(bytes: Uint8Array, home = ''): TitleManifest {
+export function titleRowOf(bytes: Uint8Array, home = '', resourceSlug?: string): TitleManifest {
   const {data} = JSON.parse(new TextDecoder().decode(bytes)) as {readonly data: TitleManifest};
-  const at = (url: string): string => (url.startsWith('/shardfiles/') ? `${home}${url}` : url);
+  const base = home.replace(/\/$/u, ''), from = `/shardfiles/${data.slug}/`, to = `/shardfiles/${resourceSlug ?? data.slug}/`;
+  // A stored cook serves blobs under its canonical identity (template),
+  // while an older discovery can still name its authored folder (_template).
+  const at = (url: string): string => (url.startsWith(from) ? `${base}${to}${url.slice(from.length)}` : url.startsWith('/shardfiles/') ? `${base}${url}` : url);
   const {thumb, portrait, landscape} = data.card;
-  return {...titleMetadata(data), card: {thumb: at(thumb), portrait: at(portrait), landscape: at(landscape)}, discovery: `${home}/shardfiles/${data.slug}/discovery.json?v=${hash8(bytes)}`};
+  return {...titleMetadata(data), ...(data.shardfile === undefined ? {} : {shardfile: at(data.shardfile)}), card: {thumb: at(thumb), portrait: at(portrait), landscape: at(landscape)}, discovery: `${base}/shardfiles/${data.slug}/discovery.json?v=${hash8(bytes)}`};
 }
 /** Every built product's title row, in title order. */
 export function productTitleRows(products: string, outDir?: string): readonly TitleManifest[] {
@@ -142,7 +145,11 @@ export function addCookedShards(outDir: string, shards: readonly CookedShard[], 
   }
   html = html.replace(expression, () => `<script type="application/json" id="boot-module-files">${JSON.stringify(bank).replaceAll('<', String.raw`\u003c`)}</script>`);
   writeFileSync(file, appendValidationVerdicts(html, verdicts));
-  const added = shards.flatMap(row => (row.discovery === undefined ? [] : [titleRowOf(row.discovery, home?.shards.includes(row.slug) === true ? home.base : '')]));
+  const added = shards.flatMap(row => {
+    if (row.discovery === undefined) return [];
+    const stored = home?.shards.includes(row.slug) === true;
+    return [titleRowOf(row.discovery, stored ? home.base : '', stored ? row.slug : undefined)];
+  });
   if (added.length > 0) writeTitleRows(outDir, [...readTitleRows(outDir).filter(row => !added.some(next => next.slug === row.slug)), ...added]);
 }
 

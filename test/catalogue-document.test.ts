@@ -127,7 +127,7 @@ describe('the bake', () => {
     } finally { rmSync(out, {recursive: true, force: true}); }
   });
 
-  it('names a cooked shard in the tables a page reads', () => {
+  it.each(['test-shard', '_test-shard'])('names a cooked shard in the tables a page reads (discovery folder %s)', discoverySlug => {
     const out = folder();
     try {
       const manifest = {version: 1, shard: 'test-shard', tier: 'phone', flow: 'client', files: [], totalBytes: 0, wireBytes: 0};
@@ -144,11 +144,17 @@ describe('the bake', () => {
       writeFileSync(join(out, 'index.html'), stampBuildHtml('<head><script type="application/json" id="boot-module-files">{"spawnManifests":{"client":{}}}</script></head>', 'build-1',
         {validator: 'a'.repeat(64), verdicts: [verdict('a')], world, label: 'staging'}));
       const row = (url: string, set: 'entry' | 'whole'): {url: string; tier: 'phone'; set: 'entry' | 'whole'; files: number; totalBytes: number; wireBytes: number} => ({url, tier: 'phone', set, files: 0, totalBytes: 0, wireBytes: 0});
-      addCookedShards(out, [{slug: 'test-shard', hash: fresh.hash, header: '', verdict: verdict('test-shard'), manifests: [row('/assets/spawn/entry.json', 'entry'), row('/assets/spawn/whole.json', 'whole')]}]);
+      const discovery = new TextEncoder().encode(JSON.stringify({data: {...title(discoverySlug), shardfile: `/shardfiles/${discoverySlug}/shard.json`,
+        card: {thumb: `/shardfiles/${discoverySlug}/blobs/image/thumb.jpg`, portrait: 'portrait', landscape: 'landscape'}}}));
+      addCookedShards(out, [{slug: 'test-shard', hash: fresh.hash, header: '', verdict: verdict('test-shard'), discovery, manifests: [row('/assets/spawn/entry.json', 'entry'), row('/assets/spawn/whole.json', 'whole')]}], out,
+        {base: 'https://packs.example/', shards: ['test-shard']});
       const html = readFileSync(join(out, 'index.html'), 'utf8');
       expect(html).toContain('"spawnManifests":{"client":{"test-shard":{"phone":{"url":"/assets/spawn/entry.json"');
       expect(html).toContain('__WS_SHARDFILE_VERDICTS__=[{"path":"/shardfiles/a/shard.json"},{"path":"/shardfiles/test-shard/shard.json"}]');
       expect(html).toContain(`globalThis.__WS_WORLD__=${JSON.stringify(world)};globalThis.__WS_BUILD_LABEL__="staging";</script>`);
+      const titles = JSON.parse(/id="ws-title-rows">([^<]*)<\/script>/u.exec(html)?.[1] ?? '[]') as TitleManifest[];
+      expect(titles[0]).toMatchObject({slug: discoverySlug, shardfile: 'https://packs.example/shardfiles/test-shard/shard.json', card: {thumb: 'https://packs.example/shardfiles/test-shard/blobs/image/thumb.jpg'}});
+      expect(titles[0]?.discovery).toContain(`https://packs.example/shardfiles/${discoverySlug}/discovery.json?v=`);
       expect(JSON.parse(readFileSync(book, 'utf8'))).toMatchObject({client: {'test-shard': {phone: {url: '/assets/spawn/whole.json'}}}});
     } finally { rmSync(out, {recursive: true, force: true}); }
   });
