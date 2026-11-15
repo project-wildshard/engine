@@ -30,12 +30,17 @@ export interface VoiceLink {
 /** Where voice stands for this player. */
 export type VoiceState = 'off' | 'asking' | 'joining' | 'on' | 'denied' | 'unsupported' | 'full' | 'failed';
 /** One other player on voice; `body` is their player row's id (V7, V8), and `far` is out of earshot: 40 m or more away or out of sight. */
-export interface VoicePeer { readonly id: string; readonly name: string; body?: string | null; speaking: boolean; muted: boolean; linked: boolean; far: boolean }
+export interface VoicePeer { readonly id: string; readonly name: string; body?: string | null; speaking: boolean; muted: boolean; linked: boolean; far: boolean;
+  /** FM8 mode 32: on voice, still not linked after every offer retry had its time (`VOICE_GIVE_UP_MS`). */
+  unreachable?: boolean }
 
 /** A remote level past this is talking; held this long after it drops, so a word's gaps don't flicker. */
 const SPEAKING_LEVEL = 0.03, SPEAKING_HOLD_MS = 450, LEVEL_POLL_MS = 150;
 /** An offerer retries a failed or silent link this many times, the silent one after this long. */
 const RETRIES = 3, UNANSWERED_MS = 15_000;
+/** FM8 mode 32: a peer on voice still unlinked this long has had every retry (four offers, 15 s each) and some slack: voice can't
+ *  reach it on this network. No peers, an empty room or a TURN list that didn't arrive is never this on its own. */
+export const VOICE_GIVE_UP_MS: number = (RETRIES + 1) * UNANSWERED_MS + 10_000;
 /** Signalling in pieces: a half-heard message is dropped after this long, and no peer holds more than a few at once. */
 const PIECES_MS = 10_000, PIECES_PER_PEER = 4, MAX_PIECES = 64;
 /** Pieces sent per 50 ms: signalling shares the game socket's message budget, so a burst is spread out. */
@@ -109,6 +114,8 @@ export class VoiceChat {
   /** Bumped on every new seat, stop and disposal: an await that comes back to an older one does nothing. */
   private session = 0;
   private readonly muted = new Set<string>();
+  /** FM8 mode 32: since when each peer on voice has been unlinked */
+  private readonly waiting = new Map<string, number>();
   private readonly changes = new Set<() => void>();
   private me: string | null = null;
   private mic: MediaStream | null = null;
@@ -447,8 +454,38 @@ export class VoiceChat {
       if (speaking !== peer.speaking) { peer.speaking = speaking; moved = true; }
     }
     for (const peer of this.roster.values()) if (!this.links.has(peer.id)) { const far = voiceNear.gain(talker(peer)) === 0; if (far !== peer.far) { peer.far = far; moved = true; } }
+    if (this.reach(now)) moved = true;
     this.tellTalking();
     if (moved) this.changed();
+  }
+  /** FM8 mode 32: mark the peers voice can't reach. True when any mark changed. */
+  private reach(now: number): boolean {
+    let moved = false;
+    for (const id of this.waiting.keys()) if (!this.roster.has(id)) this.waiting.delete(id);
+    for (const peer of this.roster.values()) {
+      if (this.state !== 'on' || peer.linked) this.waiting.delete(peer.id);
+      else if (!this.waiting.has(peer.id)) this.waiting.set(peer.id, now);
+      const since = this.waiting.get(peer.id), unreachable = since !== undefined && now - since >= VOICE_GIVE_UP_MS;
+      if (unreachable !== (peer.unreachable === true)) { peer.unreachable = unreachable; moved = true; }
+    }
+    return moved;
+  }
+  /** FM8 mode 32: the peers on voice it couldn't reach on this network. */
+  get unreachable(): readonly VoicePeer[] { return [...this.roster.values()].filter(peer => peer.unreachable === true); }
+  /** FM8 mode 32's Try again: ask for the TURN list afresh, then offer again to each peer it couldn't reach
+   *  (a fresh offer replaces whatever link the other side held, so this side may start it). Text chat never waited on any of it. */
+  async retryUnreachable(): Promise<void> {
+    const stuck = this.unreachable;
+    if (stuck.length === 0 || this.state !== 'on') return;
+    this.turn = null;
+    const fresh = await this.ask();
+    if (fresh !== null && fresh.length > 0) { this.turned = fresh; this.ice = fresh; }
+    const now = diagnosticNow();
+    for (const peer of stuck) {
+      this.waiting.set(peer.id, now); peer.unreachable = false;
+      void this.offer(peer.id);
+    }
+    this.changed();
   }
   private set(state: VoiceState): void { this.state = state; this.changed(); }
   private changed(): void { for (const listener of this.changes) listener(); }

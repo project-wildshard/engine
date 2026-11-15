@@ -19,3 +19,11 @@
 - FM8 (doctor half, mode 14): `openDoctorPage` HEADs the doctor's own page first (8 s); one that doesn't answer leaves
   the player's page as it was, with the `doctor-http` card (Try again, Back to the game; the measured status in Details,
   and no claim that a passing HEAD proves the later reads). The callers re-enable their buttons when the page stays.
+
+## FM8 mode 32: voice that can't reach a peer says so
+
+A peer on voice still unlinked after every offer retry (four offers, 15 s each, plus 10 s: `VOICE_GIVE_UP_MS`) is marked
+`unreachable`; the voice tip says "Voice couldn't connect to <name> on this network. Text chat still works." with
+`data-failmode="voice-failed"` and a Try again that asks for the TURN list afresh and offers again. Voice stays on for
+everyone else. Proved in `chat-corner.test.ts` over a stub peer connection whose offers always fail; the rig has no
+two-peer voice harness, so the manifest case stays blocked, and 32b (talking while it shows) is left.

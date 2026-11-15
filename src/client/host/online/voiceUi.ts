@@ -121,6 +121,9 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
     if (state === 'denied') return { key: 'denied', text: deniedHelp(), tone: 'bad' };
     if (state === 'failed') return { key: 'failed', text: 'No microphone was found. Check it is plugged in and allowed.', tone: 'bad' };
     if (state === 'full') return { key: 'full', text: 'Voice is full here: 8 players are on it already.', tone: 'bad' };
+    // FM8 mode 32: a peer voice couldn't reach after every retry; text chat goes on, and Try again asks afresh
+    const stuck = voice.unreachable;
+    if (state === 'on' && stuck.length > 0) return { key: `voice-failed:${stuck.map(peer => peer.id).join(',')}`, text: `Voice couldn't connect${stuck.length === 1 ? ` to ${stuck[0]?.name ?? 'a player'}` : ` to ${String(stuck.length)} players`} on this network. Text chat still works.`, tone: 'bad' };
     if (state === 'on') return others.length === 0 && now < aloneUntil ? { key: 'alone', text: voice.mode === 'hold' && !touch ? `You're on voice. Hold ${voiceTalkKey()} to talk.` : 'You\'re on voice. Players here hear you once they join.', tone: 'ok' } : null;
     if (state !== 'off') return null;
     if (now < offUntil) return { key: 'off', text: `Voice off. ${act()} to talk again.`, tone: 'ok' };
@@ -173,7 +176,13 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
         text.textContent = shown.text; close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Dismiss');
         scope.listen(close, 'click', () => { dismissed = shown.key; if (shown.key === 'first') seen(); render(); });
         tip.replaceChildren(text, close);
+        if (tip.dataset['key'] === 'voice-failed') {
+          const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Try again'; again.dataset['action'] = 'retry';
+          scope.listen(again, 'click', () => { again.disabled = true; again.textContent = 'Trying…'; void voice.retryUnreachable(); });
+          close.before(again);
+        }
       }
+      if (shown?.key.startsWith('voice-failed:') === true) tip.dataset['failmode'] = 'voice-failed'; else delete tip.dataset['failmode'];
     }
     for (const id of chips.keys()) if (!voice.roster.has(id)) { chips.get(id)?.chip.remove(); chips.delete(id); }
     peers.hidden = voice.state !== 'on' || voice.roster.size === 0;

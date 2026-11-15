@@ -4,7 +4,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import type { NetClient } from '@wildshard/engine/net/client';
 import { CHAT_FADE_MS, CHAT_FRESH_MS, cornerOpen, cornerShown, lineLook } from './chatCorner';
 import { chatDock, chatLines } from './chatLines';
-import { VoiceChat, type VoiceHeard, type VoicePeer } from './voice';
+import { VOICE_GIVE_UP_MS, VoiceChat, type VoiceHeard, type VoicePeer } from './voice';
 import { voiceUi } from './voiceUi';
 import { voiceSettings } from '@wildshard/engine/ui/voiceSettings';
 
@@ -22,7 +22,7 @@ function corner(peers: readonly VoicePeer[] = []): { box: HTMLElement; field: HT
   const client = { welcome: { handle: 1 }, onChat: (fn: (said: Said) => void) => { heard.push(fn); return () => undefined; },
     say: (_to: string, text: string) => { sent.push(text); }, report: (line: number) => { reported.push(line); } } as unknown as NetClient;
   const roster = new Map(peers.map(peer => [peer.id, peer]));
-  const voice = { state: 'on', speaking: false, level: 0, roster, mode: 'toggle', sending: true, onChange: () => () => undefined, toggle: () => undefined, press: () => undefined, release: () => undefined,
+  const voice = { state: 'on', speaking: false, level: 0, roster, unreachable: [], mode: 'toggle', sending: true, onChange: () => () => undefined, toggle: () => undefined, press: () => undefined, release: () => undefined,
     mute: (id: string, on: boolean) => { muted.push([id, on]); } } as unknown as VoiceChat;
   const chat = chatLines(scope, client);
   voiceUi(scope, voice, chat);
@@ -171,7 +171,7 @@ function voiceCorner(state: 'off' | 'on' | 'denied' | 'unsupported'): { box: HTM
   const scope = new Scope('voice-feedback-test'); owners.push(scope);
   const client = { welcome: { handle: 1 }, onChat: () => () => undefined, say: () => undefined, report: () => undefined } as unknown as NetClient;
   const changes = new Set<() => void>();
-  const voice = { state: state as string, toggles: 0, speaking: false, level: 0, roster: new Map<string, VoicePeer>(), onChange: (fn: () => void) => { changes.add(fn); return () => { changes.delete(fn); }; },
+  const voice = { state: state as string, toggles: 0, speaking: false, level: 0, roster: new Map<string, VoicePeer>(), unreachable: [], onChange: (fn: () => void) => { changes.add(fn); return () => { changes.delete(fn); }; },
     toggle() { this.toggles++; this.state = this.state === 'on' ? 'off' : this.state === 'denied' || this.state === 'off' ? (state === 'denied' ? 'denied' : 'on') : this.state; for (const fn of changes) fn(); },
     mode: 'toggle', get sending() { return this.state === 'on'; }, press() { this.toggle(); }, release: () => undefined, mute: () => undefined };
   const chat = chatLines(scope, client);
@@ -377,4 +377,47 @@ test('MK5: the open chat on a phone without a keyboard sizes to its lines, no em
   expect(portrait).toMatch(/top:calc\([^;]*var\(--ws-chat-open-h\)\)/u);
   // the keyboard dock still wins while the keyboard is up: a fixed compact height
   expect(rules(`html[data-ws-keyboard] #ws-chat[data-open]`).join(';')).toMatch(/height:var\(--ws-chat-dock/u);
+});
+
+// MMO-FAILURE-MODES FM8 mode 32 (meta docs/plans/MMO-FAILURE-MODES-PLAN.md): a peer voice can't reach after every retry says so,
+// text chat goes on, and Try again asks for the relay list afresh and offers again.
+test('FM8 mode 32: voice that cannot reach a peer says voice-failed, and Try again offers afresh', async () => {
+  const scope = new Scope('voice-failed-test'); owners.push(scope);
+  const hear = new Set<(word: VoiceHeard) => void>();
+  const say = (word: VoiceHeard): void => { for (const fn of hear) fn(word); };
+  let offers = 0;
+  // a network where no link ever comes up: every offer fails before it is sent
+  vi.stubGlobal('RTCPeerConnection', class { connectionState = 'new'; ontrack = null; onicecandidate = null; onconnectionstatechange = null;
+    addTrack(): void { /* no track */ } close(): void { /* nothing open */ } getReceivers(): never[] { return []; } createOffer(): Promise<never> { offers++; return Promise.reject(new Error('no route')); } });
+  const stream = { getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream;
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: () => Promise.resolve(stream) } });
+  try {
+    const client = { welcome: { handle: 1 }, onChat: () => () => undefined, say: () => undefined, report: () => undefined } as unknown as NetClient;
+    const voice = new VoiceChat(scope, { send: () => undefined, on: fn => { hear.add(fn); return () => { hear.delete(fn); }; } }, '');
+    const chat = chatLines(scope, client);
+    voiceUi(scope, voice, chat);
+    const el = (): HTMLElement | null => chat.box.querySelector<HTMLElement>('#ws-voice-tip');
+    const tip = (): string | null => { const node = el(); return node === null || node.hidden === true ? null : node.querySelector('span')?.textContent ?? null; };
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b', bubbles: true }));
+    say({ k: 'you', id: 'me' });
+    await vi.waitFor(() => { expect(voice.state).toBe('joining'); });
+    say({ k: 'roster', peers: [{ id: 'ann', name: 'Ann#4821' }] });
+    say({ k: 'hi', ice: [], peers: ['ann'] });
+    expect(voice.state).toBe('on');
+    await vi.waitFor(() => { expect(offers).toBe(1); });
+    // still trying: no word of failure before every retry had its time
+    await vi.advanceTimersByTimeAsync(VOICE_GIVE_UP_MS - 1000);
+    expect(voice.unreachable).toEqual([]);
+    expect(el()?.dataset['failmode']).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(voice.unreachable.map(peer => peer.id)).toEqual(['ann']);
+    expect(tip()).toBe('Voice couldn\'t connect to Ann#4821 on this network. Text chat still works.');
+    expect(el()?.dataset['failmode']).toBe('voice-failed');
+    expect(voice.state).toBe('on'); // voice stays on for everyone it can reach; text chat never waited on it
+    el()?.querySelector<HTMLButtonElement>('button[data-action="retry"]')?.click();
+    await vi.waitFor(() => { expect(offers).toBe(2); });
+    expect(voice.unreachable).toEqual([]);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(el()?.dataset['failmode']).toBeUndefined();
+  } finally { vi.unstubAllGlobals(); Reflect.deleteProperty(navigator, 'mediaDevices'); }
 });
