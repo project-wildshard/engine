@@ -1,0 +1,97 @@
+// FM3 (meta docs/plans/MMO-FAILURE-MODES-PLAN.md): the case manifest of the failure proof. Every one of the catalogue's 46 modes has a
+// stable scenario name, its runtime owner row, the phase it happens in, how failmode-proof.mjs injects it, the screen a player must see
+// (`data-failmode`, which may carry several ids: `drop reset`) and how it recovers. A `b` hold card and too-old's banner/page variant sit
+// under their parent; they are not new numeric modes. `run` names the proof's runner; a case with no runner records why (`blocked`:
+// its runtime row or contract isn't built; `unsupported`: this engine or harness can't produce the fault honestly). Neither is a pass.
+
+/** @typedef {'boot' | 'load' | 'play' | 'title' | 'doctor'} Phase */
+/** @typedef {'pass' | 'ui-fail' | 'blocked-dependency' | 'unsupported' | 'harness-fail'} Outcome */
+/** @typedef {{ mode: string, id: string, owner: string, phase: Phase, screen: string, inject: string, recover: string, run?: string,
+ *   blocked?: string, chromiumOnly?: boolean, parent?: string }} Case */
+
+/** @type {readonly Case[]} */
+export const CASES = Object.freeze([
+  // J298 amends mode 1: a world build holding a cached world loads it from cache and shows mode 2's card; mode 1's page is only for a page
+  // with nothing cached, which can't render its own screen (the browser's offline page). So a warmed world must show `offline-play`.
+  { mode: '1', id: 'offline-launch', owner: 'FM5', phase: 'boot', screen: 'offline-play', inject: 'warm the service worker in the world, then setOffline and reload', recover: 'online: a frame, no card', run: 'offlineLaunch' },
+  { mode: '2', id: 'offline-play', owner: 'FM4b', phase: 'play', screen: 'offline-play', inject: 'context.setOffline(true) in the world', recover: 'online: a frame, no card', run: 'offlinePlay' },
+  { mode: '3', id: 'background-short', owner: 'FM4', phase: 'play', screen: 'background-short', inject: 'CDP freeze 4 s (server stalls the socket at 3 s)', recover: 'first frame: reconnected', run: 'freeze', chromiumOnly: true },
+  { mode: '3b', id: 'background-short/blocked', parent: 'background-short', owner: 'FM4', phase: 'play', screen: 'background-short-blocked', inject: 'Interact while 3 shows', recover: 'closes on the first frame', blocked: 'the harness drives no in-world tap under a banner yet (test/net-strip-browser.test.ts covers the tap on a real room)' },
+  { mode: '4', id: 'background-long', owner: 'FM4b', phase: 'play', screen: 'background-long', inject: 'CDP hidden 35 s (visibility changes)', recover: 'seated again: no card', run: 'freeze', chromiumOnly: true },
+  { mode: '5', id: 'unreachable', owner: 'FM4b', phase: 'play', screen: 'unreachable', inject: 'refuse-upgrade 503 from the first dial', recover: 'heal: seated', blocked: 'mode 5 waits on a design call (FM4b: no readable /health; limit to a link that never heard a frame, or a public /health)' },
+  { mode: '6', id: 'dns', owner: 'FM4b', phase: 'play', screen: 'unreachable', inject: '.invalid socket', recover: 'as 5', blocked: 'shares mode 5\'s screen (design call)' },
+  { mode: '7', id: 'tls', owner: 'FM4b', phase: 'play', screen: 'unreachable', inject: 'self-signed 18793 listener', recover: 'as 5', blocked: 'shares mode 5\'s screen (design call)' },
+  { mode: '8', id: 'upgrade-refused', owner: 'FM4b', phase: 'play', screen: 'unreachable', inject: 'refuse-upgrade 502', recover: 'as 5', blocked: 'shares mode 5\'s screen (design call)' },
+  { mode: '9', id: 'restart', owner: 'FM4', phase: 'play', screen: 'restart', inject: 'socket close 4005 on every connection for 4 s', recover: 'heal: reconnected', run: 'socketDown' },
+  { mode: '9b', id: 'restart/blocked', parent: 'restart', owner: 'FM4', phase: 'title', screen: 'restart-blocked', inject: 'Play on the title while 9 shows', recover: 'joins by itself', blocked: 'FM4 left: no link exists on the title yet' },
+  { mode: '10', id: 'deploy', owner: 'FM4', phase: 'play', screen: 'deploy', inject: 'a newer signed release (needs a second build)', recover: 'the move lands', blocked: 'needs a second build of the same stamp; online-proof.mjs --next proves the countdown' },
+  { mode: '10b', id: 'deploy/blocked', parent: 'deploy', owner: 'FM4', phase: 'title', screen: 'deploy-blocked', inject: 'Enter world in the last 15 s', recover: 'joins after the move', blocked: 'FM4 left: no link exists on the title yet' },
+  { mode: '11', id: 'release-5xx', owner: 'FM5', phase: 'boot', screen: 'release-5xx', inject: 'release status 503 before navigation', recover: 'heal: the world loads by itself', run: 'releaseFault' },
+  { mode: '12', id: 'release-429', owner: 'FM5', phase: 'boot', screen: 'release-429', inject: 'release status 429, Retry-After 3', recover: 'heal: the world loads after Retry-After', run: 'releaseFault' },
+  { mode: '13', id: 'version-http', owner: 'FM5', phase: 'play', screen: 'version-http', inject: 'version.json status 503 (Developer on)', recover: 'heal: the next poll clears it', blocked: 'the next poll comes at the next foreground, at most every 5 min: the harness has no honest trigger yet' },
+  { mode: '14', id: 'doctor-http', owner: 'FM8', phase: 'doctor', screen: 'doctor-http', inject: 'doctor status 503', recover: 'heal: the doctor opens', blocked: 'FM8 not built' },
+  { mode: '15', id: 'drop', owner: 'FM4', phase: 'play', screen: 'drop', inject: 'socket drop-after 0 (terminated: 1006), then refuse-upgrade for 2 s', recover: 'heal: reconnected chip', run: 'socketDown' },
+  { mode: '15b', id: 'drop/blocked', parent: 'drop', owner: 'FM4', phase: 'play', screen: 'drop-blocked', inject: 'Talk while 15 shows', recover: 'closes on the first frame', blocked: 'the harness drives no in-world tap under a banner yet (test/net-strip-browser.test.ts covers the tap on a real room)' },
+  { mode: '16', id: 'reset', owner: 'FM4', phase: 'play', screen: 'drop', inject: 'socket drop-after 0 (a reset is a 1006 to the page)', recover: 'heal: reconnected chip', run: 'socketDown' },
+  { mode: '16b', id: 'reset/blocked', parent: 'reset', owner: 'FM4', phase: 'play', screen: 'reset-blocked', inject: 'Send in chat while 16 shows', recover: 'the held line sends once', run: 'heldChat' },
+  { mode: '17', id: 'half-open', owner: 'FM4', phase: 'play', screen: 'half-open', inject: 'socket half-open (no downstream frames or pongs)', recover: 'heal: reconnected chip', run: 'socketDown' },
+  { mode: '17b', id: 'half-open/blocked', parent: 'half-open', owner: 'FM4', phase: 'play', screen: 'half-open-blocked', inject: 'Pick up while 17 shows', recover: 'closes on the first frame', blocked: 'the harness drives no in-world tap under a banner yet' },
+  { mode: '18', id: 'reconnected', owner: 'FM4', phase: 'play', screen: 'reconnected', inject: 'a 2 s drop', recover: 'the chip goes by itself', run: 'socketDown' },
+  { mode: '19', id: 'resuming', owner: 'FM4', phase: 'play', screen: 'resuming', inject: 'drop, then refuse-upgrade 503 for 37 s', recover: 'heal: reconnected', run: 'socketDown' },
+  { mode: '19b', id: 'resuming/blocked', parent: 'resuming', owner: 'FM4', phase: 'play', screen: 'resuming-blocked', inject: 'an action after 35 s down', recover: 'closes on the first frame', blocked: 'the harness drives no in-world tap under a banner yet' },
+  { mode: '20', id: 'lost', owner: 'FM4', phase: 'play', screen: 'lost', inject: 'drop, then refuse-upgrade 503 for 122 s', recover: 'heal, Try again: seated', run: 'socketDown' },
+  { mode: '21', id: 'slow', owner: 'FM4b', phase: 'play', screen: 'slow', inject: 'delay-frames 160 ms both ways (RTT over 250 ms)', recover: 'heal: clears after 10 good seconds', run: 'linkQuality' },
+  { mode: '22', id: 'lossy', owner: 'FM4b', phase: 'play', screen: 'lossy', inject: 'delay-frames 20 ms ± 200 ms jitter downstream', recover: 'heal: clears after 10 good seconds', run: 'linkQuality' },
+  { mode: '23', id: 'version-skew', owner: 'FM5', phase: 'play', screen: 'version-skew', inject: 'socket close 4000 (reload) on every connection', recover: 'one reload, then the page', run: 'socketDown' },
+  { mode: '24', id: 'too-old', owner: 'FM5b', phase: 'play', screen: 'too-old-warning', inject: 'verified retention metadata excluding this build', recover: 'next load: too-old page', blocked: 'FM7 retention metadata not built' },
+  { mode: '25', id: 'full', owner: 'FM4', phase: 'play', screen: 'full', inject: 'socket close 4002 on every connection for 3 s (FM7b queue numbers not built)', recover: 'heal: seated on the next 30 s retry', run: 'socketDown' },
+  { mode: '26', id: 'replaced', owner: 'FM4', phase: 'play', screen: 'replaced', inject: 'a second tab of the same device takes the seat', recover: 'Play here: seated', run: 'replaced' },
+  { mode: '27', id: 'auth-expired', owner: 'FM8b', phase: 'play', screen: 'auth-expired', inject: 'local provider expiry', recover: 'sign in: rejoins', blocked: 'FM8b / MP2.2 login contract not built' },
+  { mode: '28', id: 'auth-failed', owner: 'FM8b', phase: 'title', screen: 'auth-failed', inject: 'provider callback error', recover: 'other ways to sign in', blocked: 'FM8b / MP2.2 login contract not built' },
+  { mode: '29', id: 'api-5xx', owner: 'FM8b', phase: 'title', screen: 'api-5xx', inject: 'api status 503', recover: 'retry', blocked: 'FM8b / MP2.2 login contract not built' },
+  { mode: '30', id: 'save-slow', owner: 'FM8s', phase: 'play', screen: 'save-slow', inject: 'owned persistence delay', recover: 'durable ack', blocked: 'FM7b live save status not built' },
+  { mode: '30b', id: 'save-slow/blocked', parent: 'save-slow', owner: 'FM8s', phase: 'play', screen: 'save-slow-blocked', inject: 'Leave while 30 shows', recover: 'leave on the ack', blocked: 'FM7b live save status not built' },
+  { mode: '31', id: 'save-failed', owner: 'FM8s', phase: 'play', screen: 'save-failed', inject: 'owned persistence failure', recover: 'durable ack', blocked: 'FM7b live save status not built' },
+  { mode: '32', id: 'voice-failed', owner: 'FM8', phase: 'play', screen: 'voice-failed', inject: 'two peers, exhausted ICE', recover: 'linked or voice off', blocked: 'FM8 not built' },
+  { mode: '32b', id: 'voice-failed/blocked', parent: 'voice-failed', owner: 'FM8', phase: 'play', screen: 'voice-failed-blocked', inject: 'talk while 32 shows', recover: 'Try again', blocked: 'FM8 not built' },
+  { mode: '33', id: 'packs-5xx', owner: 'FM6', phase: 'load', screen: 'packs-5xx', inject: 'packs status 503 before navigation, healed after 6 s', recover: 'the world loads', run: 'packsFault' },
+  { mode: '34', id: 'packs-429', owner: 'FM6', phase: 'load', screen: 'packs-429', inject: 'packs status 429, Retry-After 3, healed after 6 s', recover: 'the world loads', run: 'packsFault' },
+  { mode: '35', id: 'book-5xx', owner: 'FM6', phase: 'load', screen: 'book-5xx', inject: 'book status 503 before navigation, healed after 6 s', recover: 'the world loads', run: 'packsFault' },
+  { mode: '36', id: 'download-failed', owner: 'FM6', phase: 'load', screen: 'download-failed', inject: 'packs status 503 until the operation refuses', recover: 'heal, Retry: the world loads', run: 'packsFault' },
+  { mode: '37', id: 'release-404', owner: 'FM5', phase: 'boot', screen: 'release-404', inject: 'release status 404', recover: 'heal, Try again: the world loads', run: 'releaseFault' },
+  { mode: '38', id: 'captive-portal', owner: 'FM5', phase: 'boot', screen: 'captive-portal', inject: 'release body: an HTML sign-in page', recover: 'heal, Try again: the world loads', run: 'releaseFault' },
+  { mode: '39', id: 'release-unsigned', owner: 'FM5', phase: 'boot', screen: 'release-unsigned', inject: 'release body: a file with a bad signature', recover: 'heal, Try again: the world loads; no dial while bad', run: 'releaseFault' },
+  { mode: '40', id: 'refused', owner: 'FM4', phase: 'play', screen: 'refused', inject: 'socket close 4001 on every connection', recover: 'heal, Play again: seated', run: 'socketDown' },
+  { mode: '41', id: 'banned', owner: 'FM8m', phase: 'play', screen: 'banned', inject: 'coded terminal close', recover: 'none: no redial', blocked: 'FM7b terminal-reason contract not built' },
+  { mode: '42', id: 'clock-skew', owner: 'FM4b', phase: 'doctor', screen: 'clock-skew', inject: 'the page clock 2 min ahead, socket refused', recover: 'Run again with the clock right', run: 'clockSkew' },
+  { mode: '43', id: 'storage-full', owner: 'FM6', phase: 'load', screen: 'storage-full', inject: 'Cache API put throws QuotaExceededError (labelled injection)', recover: 'plays on from memory', run: 'storageFull' },
+  { mode: '44', id: 'pack-broken', owner: 'FM6', phase: 'load', screen: 'packs-5xx', inject: 'packs truncate 64 bytes, healed after 6 s', recover: 'the world loads with verified bytes', run: 'packsFault' },
+  { mode: '45', id: 'sleep-wake', owner: 'FM4b', phase: 'play', screen: 'background-long', inject: 'CDP freeze 35 s with no visibility change', recover: 'seated again: no card', run: 'freeze', chromiumOnly: true },
+  { mode: '46', id: 'staging', owner: 'FM5', phase: 'boot', screen: 'staging', inject: 'the fixture release signed with channel staging (loopback only)', recover: 'stays for the session', run: 'staging' },
+]);
+
+/** The cases a `--scenario=` asks for: `all`, or a comma list of ids (a parent id brings its `b` case too). Unknown ids throw. @param {string} asked */
+export function selectCases(asked) {
+  if (asked === 'all') return [...CASES];
+  const ids = asked.split(',').map(word => word.trim()).filter(word => word !== '');
+  const unknown = ids.filter(id => !CASES.some(item => item.id === id));
+  if (ids.length === 0 || unknown.length > 0) throw new Error(`--scenario names no case: ${unknown.join(', ') || '(empty)'}`);
+  return CASES.filter(item => ids.includes(item.id) || (item.parent !== undefined && ids.includes(item.parent)));
+}
+
+/** The proof's exit: 0 when every selected case passed; 2 when the harness itself failed (an injection with no match, setup, cleanup or a
+ *  guard), whatever else happened; else 1 (a screen missing, a dependency blocked, an engine that can't produce the fault). `--baseline`
+ *  collects every case either way; it never changes this verdict. @param {readonly { outcome: Outcome }[]} rows */
+export function verdict(rows) {
+  if (rows.some(row => row.outcome === 'harness-fail')) return 2;
+  return rows.length > 0 && rows.every(row => row.outcome === 'pass') ? 0 : 1;
+}
+
+/** Whether a `data-failmode` attribute (space-separated ids) names `id`. @param {string | null} attribute @param {string} id */
+export const names = (attribute, id) => attribute !== null && attribute.split(/\s+/u).includes(id);
+
+/** Primary copy a player reads may not carry a raw exception, a status line or an address: those belong in Details. @param {string} text */
+export function rawLeak(text) {
+  const found = /\b(?:TypeError|Error:|Failed to fetch|NetworkError|undefined|null)\b|https?:\/\/|\bws:\/\/|\b[45]\d\d\b(?!\s*ms)/u.exec(text);
+  return found === null ? null : found[0];
+}

@@ -955,6 +955,28 @@ await test('shared pressure heals both native sending directions', async () => {
     await fixture.close()
   }
 })
+await test('a grid cell query reaches the world door, and nothing else does', async () => {
+  const fixture = await nativeFixture()
+  /** @type {string[]} */ const seen = []
+  fixture.wss.on('connection', (_peer, request) => {
+    seen.push(request.url ?? '')
+  })
+  try {
+    const world = fixture.proxy.ready.worldOrigin
+    const cell = new WebSocket(`${world.replace('http:', 'ws:')}/?chunk=driftwood-isle`)
+    await once(cell, 'open')
+    cell.close()
+    await once(cell, 'close')
+    assert.deepEqual(seen, ['/?chunk=driftwood-isle'])
+    const state = await (await fixture.proxy.control()).json()
+    assert.equal(state.counters.upgrades, 1)
+    for (const path of ['/?chunk=a&other=1', '/?chunk=a&chunk=b', '/?chunk=..%2F', '/x?chunk=a', '/?other=1'])
+      assert.equal((/** @type {{status:number}} */ (await rawRequest(world, path, { connection: 'Upgrade', upgrade: 'websocket', 'sec-websocket-key': 'YWJjZGVmZ2hpamtsbW5vcA==', 'sec-websocket-version': '13' }))).status, 404, path)
+    assert.equal(seen.length, 1)
+  } finally {
+    await fixture.close()
+  }
+})
 await test('zero-length delayed messages have a count bound', async () => {
   const fixture = await nativeFixture(),
     client = await socket(fixture.proxy.ready.worldOrigin)

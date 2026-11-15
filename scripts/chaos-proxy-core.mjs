@@ -195,6 +195,8 @@ export async function openChaosProxy(options) {
     droppedBytes: 0,
     forwardedMessages: 0,
     droppedMessages: 0,
+    /** FM3: socket upgrades the proxy carried on to the world (a refused one is a `socket` match instead) */
+    upgrades: 0,
     metadataOverflow: 0,
     queueOverflow: 0,
   }
@@ -749,7 +751,16 @@ export async function openChaosProxy(options) {
       socket.destroy()
       return
     }
-    if (request.url !== '/') {
+    // FM3: the world door is `/`; a page Shard select sent to a grid cell names it (`/?chunk=<cell>`, shell.ts gotoSocket), and
+    // only that one bounded query passes on to the upstream
+    const asked = new URL(request.url ?? '', 'http://127.0.0.1'),
+      cell = asked.searchParams.get('chunk')
+    if (
+      asked.pathname !== '/' ||
+      [...asked.searchParams.keys()].some(name => name !== 'chunk') ||
+      asked.searchParams.getAll('chunk').length > 1 ||
+      (cell !== null && !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(cell))
+    ) {
       socket.end(
         'HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n',
       )
@@ -778,8 +789,10 @@ export async function openChaosProxy(options) {
       )
       return
     }
+    counters.upgrades++
     const address = new URL(worldTarget)
     address.protocol = 'ws:'
+    if (cell !== null) address.searchParams.set('chunk', cell)
     const offered = request.headers['sec-websocket-protocol']
     /** @type {WebSocket} */
     let remote
