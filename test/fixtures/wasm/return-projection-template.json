@@ -1,0 +1,5 @@
+{
+  "source": "import * as core from './core';\nexport function ws_abi():i32{return 2;}export function ws_io():i32{return 0;}\nexport function ws_init(lo:i32,hi:i32,fuel:i32):i32{return fuel;}\nexport function ws_project(fuel:i32):i32{\n  core.beginState();assert(core.beginBinding(0));\n  core.pageOutput(2,core.field(0));core.pageOutput(1,core.parameter(0));\n  core.endBinding();return fuel;\n}",
+  "fixture": "return-projection-template.wasm",
+  "ioBytes": 3296
+}

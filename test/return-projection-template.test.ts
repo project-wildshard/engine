@@ -1,32 +1,20 @@
-import {beforeAll,expect,test,vi} from 'vitest';
+import {expect,test,vi} from 'vitest';
 import * as observations from '../src/shared/engine/script/observationsV2';
 import {ScriptModuleV2} from '../src/shared/engine/script/moduleV2';
 import {ReturnProjectionV2} from '../src/shared/game/population/returnProjectionV2';
 import {returnProjectionV2Layout,parseReturnProjectionV2,type ReturnProjectionV2Rows} from '@wildshard/format/returnProjectionV2';
-import {compileScriptV2} from '../src/sharddev/bake/compileScriptV2';
-import {v2CoreSource} from '../src/sharddev/as/wsV2';
 import {SCRIPT_V2_REVISIONS} from '@wildshard/format/scriptAdmissionV2';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
 import {writeV2Frame} from '@wildshard/format/scriptWireV2';
 import {prepareV2Rng} from '@wildshard/format/scriptRngV2';
 import {Rng} from '../src/shared/engine/core/rng';
 import {Scope} from '../src/shared/engine/app/scope';
+import {fixtureBytes} from '@wildshard/engine/test/nativeBytes';
 
-let row:ReturnProjectionV2Rows;
-beforeAll(async()=>{
-  const layout=returnProjectionV2Layout(2);
-  const bytes=await compileScriptV2(`import * as core from './core';
-    export function ws_abi():i32{return 2;}export function ws_io():i32{return 0;}
-    export function ws_init(lo:i32,hi:i32,fuel:i32):i32{return fuel;}
-    export function ws_project(fuel:i32):i32{
-      core.beginState();assert(core.beginBinding(0));
-      core.pageOutput(2,core.field(0));core.pageOutput(1,core.parameter(0));
-      core.endBinding();return fuel;
-    }`,{lane:'project',ioBytes:layout.bytes,sources:{'core.ts':v2CoreSource(0)}});
-  row=parseReturnProjectionV2({artifact:{abi:2,minor:0,compilerRevision:SCRIPT_V2_REVISIONS.compiler,admissionRevision:SCRIPT_V2_REVISIONS.admission,
-    hash:hashImmutableBytes(bytes),lane:'project',pages:1,ioBytes:layout.bytes},fields:['a','z'],signals:['first','second'],channels:['signal','value'],
-    bytes:btoa(Array.from(bytes,byte=>String.fromCodePoint(byte)).join(''))});
-},30000);
+const layout=returnProjectionV2Layout(2), bytes=fixtureBytes(new URL('./fixtures/wasm/return-projection-template.wasm',import.meta.url));
+const row:ReturnProjectionV2Rows=parseReturnProjectionV2({artifact:{abi:2,minor:0,compilerRevision:SCRIPT_V2_REVISIONS.compiler,admissionRevision:SCRIPT_V2_REVISIONS.admission,
+  hash:hashImmutableBytes(bytes),lane:'project',pages:1,ioBytes:layout.bytes},fields:['a','z'],signals:['first','second'],channels:['signal','value'],
+  bytes:btoa(Array.from(bytes,byte=>String.fromCodePoint(byte)).join(''))});
 
 function genericFrame(signal:number,frames:readonly Readonly<Record<string,number>>[],random:Rng|undefined,count=frames.length):Uint8Array {
   const layout=returnProjectionV2Layout(row.fields.length),view=new DataView(new ArrayBuffer(layout.pages*65536));
