@@ -14,7 +14,7 @@ afterEach(() => { for (const root of roots.splice(0)) rmSync(root, {recursive: t
 
 /** No hook paths, no herdr, no inherited Git or Vitest state: a plain lane shell. */
 const ENV = {
-  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_') && !key.startsWith('HERDR') && !key.startsWith('VITEST'))),
+  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_') && !key.startsWith('CLAUDE_') && !key.startsWith('HERDR') && !key.startsWith('VITEST'))),
   GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@example.com',
   GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@example.com',
   WS_LANE_RECEIPTS: resolve('tmp/codex-netlag/worktree-fixture-receipts.log'),
@@ -71,13 +71,14 @@ describe('worktree new', () => {
     const {canonical, base} = repos();
     put(canonical, 'dist-content/assets/content.bin', 'regenerable content');
     const receipts = join(base, 'receipts.log');
-    const made = worktree(canonical, ['new', 'foo', '--no-install'], {WS_LANE_NAME: 'lane-x', WS_LANE_RECEIPTS: receipts});
+    const made = worktree(canonical, ['new', 'foo', '--no-install'], {WS_LANE_NAME: 'lane-x', WS_LANE_RECEIPTS: receipts, CODEX_THREAD_ID: 'thread-worktree-fixture'});
     expect(made.status, made.stderr).toBe(0);
     const tree = join(canonical, '.worktrees/foo');
     expect(git(tree, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('plan/foo');
     expect(git(tree, ['rev-parse', 'HEAD'])).toBe(git(canonical, ['rev-parse', 'origin/main']));
     expect(git(tree, ['status', '--porcelain', '--untracked-files=no'])).toBe('');
     expect(existsSync(join(tree, '.owner'))).toBe(true);
+    expect(JSON.parse(readFileSync(join(tree, '.owner'), 'utf8'))).toMatchObject({session: 'thread-worktree-fixture', agent: 'codex'});
     // Never the canonical checkout's local commit, uncommitted edit or ignored files.
     expect(readFileSync(join(tree, 'src/ahead.ts'), 'utf8')).toBe('export const ahead = 1;\n');
     expect(readFileSync(join(tree, 'src/dirty.ts'), 'utf8')).toBe('export const dirty = 1;\n');
