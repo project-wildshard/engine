@@ -23,3 +23,7 @@
   signed follow state, which overrides legacy `cook.env` values. The service
   reads all three in that order and its restart hash covers them. Focused
   `test/vps-rebuild.test.ts` passes after the composition.
+
+- The first queued land's full pre-push found the release lint's strict
+  missing-index spelling. The parser now uses `index === -1`; both game and
+  kit lint are rerun before re-queuing.

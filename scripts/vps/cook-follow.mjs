@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const BUILD = /^[0-9a-f]{40}$/u, TAG = /^server-staging-([0-9a-f]{40})$/u;
 const value = (text, name) => [...text.matchAll(new RegExp(`^${name}=(.*)$`, 'gmu'))].pop()?.[1]?.trim().replaceAll(/^["']|["']$/gu, '') ?? '';
-const argument = name => { const index = process.argv.indexOf(name), next = process.argv[index + 1]; if (index < 0 || next === undefined) throw new Error(`Missing ${name}`); return next; };
+const argument = name => { const index = process.argv.indexOf(name), next = process.argv[index + 1]; if (index === -1 || next === undefined) throw new Error(`Missing ${name}`); return next; };
 
 /** @param {string} text @param {string} key */
 export function signedCookRelease(text, key) {
