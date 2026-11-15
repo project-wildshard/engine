@@ -26,13 +26,14 @@ import type { RegionalRuntimePage } from './regionalRuntime';
 
 function isItemModel(value: unknown): value is Object3D { return value instanceof Object3D; }
 
-/** Whether a data cell has anything to hold: a declared weapon or a loadout tool. */
+/** Whether a data cell has anything to hold: a declared weapon (a kit is built around one). */
 export function holdsItems(source: Pick<Shardfile, 'items'>): boolean {
-  return source.items.rows.some(row => row.kind === 'weapon') || source.items.loadout.tools.length > 0;
+  return source.items.rows.some(row => row.kind === 'weapon');
 }
 
 /** Build the cell's declared kit under `entry` and bind it as the page's held equipment until `entry` is disposed. */
-export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, page: RegionalRuntimePage, entry: Scope): Promise<EquipmentService | null> {
+/** `here`: whether the wire's frames are this cell's (a crossing's frames are another's, and their lines are not this kit's). */
+export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, page: RegionalRuntimePage, entry: Scope, here: () => boolean = () => true): Promise<EquipmentService | null> {
   const controls = page.equipment;
   if (controls === undefined || !holdsItems(source)) return null;
   const models = await loadItemModels(source.items, assets, entry);
@@ -68,17 +69,16 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
     const model: unknown = Reflect.get(item, 'model');
     if (isItemModel(model)) { host.viewmodel.add(model); entry.onDispose(() => { model.removeFromParent(); }); }
   }
-  // the road's wire and switches, read before the kit takes the controls: the page's reveal, menu and safe zone set them on the
-  // controls, which set both while a kit is bound, so the kit starts where the road stands
-  const road = controls.service, wire = road.boundWire, enabled = road.enabled, visible = road.visible;
-  controls.bind(kit, entry);
+  // the road's switches, read before the kit takes the controls: the page's reveal, menu and safe zone set them on the controls,
+  // which set both while a kit is bound, so the kit starts where the road stands; it takes the road's wire with it
+  const road = controls.service, enabled = road.enabled, visible = road.visible;
+  controls.bind(kit, entry, { wire: true });
   kit.enabled = enabled; kit.visible = visible; kit.stowed = false;
-  if (wire !== null) { kit.bindWire(wire); entry.onDispose(() => { kit.bindWire(null); }); }
   // TE-ENG2: a lever follows the server's owned lines; taken, it unlocks and comes to hand
   const levers = weapons.flatMap(weapon => { const lever = declaredLever(weapon); return lever === null ? [] : [lever]; });
   app.addContentSystem({ id: 'grid.data-cell-kit', phase: 'update', run: (dt, t) => {
     for (const lever of levers) {
-      if (wirePage.client !== null) {
+      if (wirePage.client !== null && here()) {
         const lines = leverLines(lever.row.id);
         lever.mirror(wirePage.line(lines.rounds), wirePage.line(lines.reserve), wirePage.line(lines.reloading) > 0, wirePage.line(lines.taken) > 0);
       }

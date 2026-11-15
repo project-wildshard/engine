@@ -23,21 +23,23 @@ const source = { identity: { slug: 'blender-template', seed: 1 }, runtime: null,
   items: { version: 1, contexts: [fixture.context], rows: [fixture.row], loadout: { primary: fixture.row.id, secondary: null, tools: [] } },
   targets: { interactions: [fixture.interaction], itemActions: fixture.itemActions } } as unknown as Shardfile;
 
-function page(scope: Scope): { page: RegionalRuntimePage; controls: EnteredEquipment; viewmodel: Group; systems: { id: string; run: (dt: number, t: number) => void }[] } {
+function page(scope: Scope): { page: RegionalRuntimePage; controls: EnteredEquipment; viewmodel: Group; equips: string[]; systems: { id: string; run: (dt: number, t: number) => void }[] } {
   const binds = new Map<string, number>(), systems: { id: string; run: (dt: number, t: number) => void }[] = [];
   const input = { bind: (action: string) => { binds.set(action, (binds.get(action) ?? 0) + 1); }, held: () => false, register: () => undefined, has: () => true, bindings: { describe: () => undefined } };
-  const road = new EquipmentService(new EmptyEquipment(), { scope });
+  const road = new EquipmentService(new EmptyEquipment(), { scope }), equips: string[] = [];
+  // the server's wire, as the worker client binds it on the page's controls
+  road.bindWire({ equip: (row: string) => { equips.push(row); } } as unknown as Parameters<EquipmentService['bindWire']>[0]);
   const controls = new EnteredEquipment(road);
   const viewmodel = new Group();
   const app = { input, events: undefined, equipmentHost: { viewmodel }, combat: { targets: () => [] }, effects: null, player: null, state: 'play', get equipment() { return controls.service; },
     addContentSystem: (spec: { id: string; run: (dt: number, t: number) => void }, owner: Scope) => { systems.push(spec); owner.onDispose(() => { systems.splice(systems.indexOf(spec), 1); }); } };
   const camera = new PerspectiveCamera();
-  return { controls, systems, viewmodel, page: { equipment: controls, world: { game: { camera }, player: { position: new Vector3() } }, play: {}, context: { app } } as unknown as RegionalRuntimePage };
+  return { controls, systems, viewmodel, equips, page: { equipment: controls, world: { game: { camera }, player: { position: new Vector3() } }, play: {}, context: { app } } as unknown as RegionalRuntimePage };
 }
 
 test('a data copy with declared items holds them while entered, and the road\'s bare hands come back on leaving', async () => {
   expect(holdsItems(source)).toBe(true);
-  const scope = new Scope('data-cell-kit'), { page: lent, controls, systems, viewmodel } = page(scope), entry = scope.child('entry');
+  const scope = new Scope('data-cell-kit'), { page: lent, controls, systems, viewmodel, equips } = page(scope), entry = scope.child('entry');
   const kit = await enterDataCellKit(source, new Map(), lent, entry);
   expect(kit).not.toBeNull();
   // the page's controls now read the copy's kit: its declared lever, its one weapon
@@ -45,8 +47,10 @@ test('a data copy with declared items holds them while entered, and the road\'s 
   expect(controls.service.available.map((weapon) => weapon.row.id)).toEqual([fixture.row.id]);
   expect(systems.map((system) => system.id)).toEqual(['grid.data-cell-kit']);
   expect(viewmodel.children).toHaveLength(1); // the lever's model, in hand
+  expect(equips.at(-1)).toBe(fixture.row.id); // the server hears the lever is held
   entry.dispose();
   expect(viewmodel.children).toHaveLength(0);
+  expect(equips.at(-1)).toBe('weapon.empty'); // and bare hands again on leaving
   expect(controls.service.current.row.id).toBe('weapon.empty');
   expect(systems).toHaveLength(0);
   scope.dispose();

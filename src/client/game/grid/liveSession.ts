@@ -717,6 +717,8 @@ export class LiveGridSession {
           // AU20: the cell's declared audio scene, bound only while the feet stand in it (no entered hooks run here)
           audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(shardProductFromAdmission(retained.admitted, shell.scope))) : null });
         this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: source.entryways });
+        // TC-E1b: feet that entered before this admission finished get the cell's kit now
+        if (gridCells.cell?.instance === cell.instance && this.dataKit === null) this.enterDataKit(cell.instance);
         // G321: its own sky inside its cell (its data look's dome and light), laid while it is resident
         {
           const request = { instance: cell.instance, slug: cell.slug, look: copySource.look, assets, page: this.page.runtimePage?.() ?? null, allocator: this.ports.allocator, scope: shell.scope };
@@ -866,7 +868,7 @@ export class LiveGridSession {
     const entry = this.ports.scope.child(`grid.data-kit.${instance}`);
     this.dataKit = { instance, scope: entry };
     const enter = async (): Promise<void> => {
-      try { await enterDataCellKit(kit.source, kit.assets, page, entry); } catch (error: unknown) {
+      try { await enterDataCellKit(kit.source, kit.assets, page, entry, () => this.wire === null || this.wire.site() === instance); } catch (error: unknown) {
         if (this.dataKit?.scope === entry) this.leaveDataKit();
         console.error(`[grid] ${instance}'s declared kit refused`, error);
       }

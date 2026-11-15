@@ -23,3 +23,8 @@ were on the wire and none on screen.
   entered kit starts as the road's controls stand. Local preview proof: Shard select and the road from Signal Dunes both
   hold the lever with 6 in the tube; one shot each downs `target.1` and `target.2` and the quest moves to camp 1; the rack
   raises the reserve 30 to 60.
+- Review (one `claude -p` pass) found the kit copied the road's wire once, so a session that booted inside the cell left
+  the road unwired after leaving. `EnteredEquipment.bind(kit, entry, { wire: true })` now hands the road's wire to the
+  kit and back, and tells the server the road's held row on leaving; a later `bindWire` reaches both. Also: feet that
+  entered before the cell's admission finished get the kit then; the lever ignores another cell's wire frames; a cell
+  needs a weapon row for a kit.

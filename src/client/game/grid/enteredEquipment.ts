@@ -7,6 +7,7 @@ const callbacks = new Set<PropertyKey>(['onFire', 'onHit', 'onImpact', 'onReload
 export class EnteredEquipment {
   readonly service: EquipmentService;
   private active: EquipmentService;
+  private wired = false;
   constructor(private readonly road: EquipmentService) {
     this.active = road;
     this.service = new Proxy(road, {
@@ -26,6 +27,8 @@ export class EnteredEquipment {
           owner.unlock(id); return undefined;
         };
         if (key === 'setEnabled') return (on: boolean) => { this.service.enabled = on; };
+        // TC-E1b: a wired kit (a data cell's) takes the road's wire with it; the road keeps it for when the kit goes
+        if (key === 'bindWire') return (wire: Parameters<EquipmentService['bindWire']>[0]) => { road.bindWire(wire); if (this.wired && this.active !== road) this.active.bindWire(wire); };
         const value: unknown = Reflect.get(active, key, active);
         const bound: unknown = typeof value === 'function' ? value.bind(active) : value;
         return bound;
@@ -39,7 +42,9 @@ export class EnteredEquipment {
   }
 
   /** Install only after trusted play and continuation succeed; leaving restores every prior callback descriptor. */
-  bind(equipment: EquipmentService, entry: Scope): void {
+  /** `wire`: the kit plays on the server's wire as the road does (a data cell's declared kit, TC-E1b); leaving gives the server
+   *  the road's held row again. A regional runtime's kit keeps its own contacts. */
+  bind(equipment: EquipmentService, entry: Scope, options: { readonly wire?: boolean } = {}): void {
     if (entry.disposed || this.active !== this.road || equipment === this.road) throw new Error('Equipment entry is not available');
     const prior = [...callbacks].map(key => [key, Object.getOwnPropertyDescriptor(equipment, key)] as const);
     if (prior.some(([, descriptor]) => descriptor?.configurable === false)) throw new Error('Equipment callbacks are not configurable');
@@ -54,8 +59,12 @@ export class EnteredEquipment {
         } });
     }
     this.active = equipment;
+    const wire = options.wire === true ? this.road.boundWire : null;
+    this.wired = options.wire === true;
+    if (wire !== null) equipment.bindWire(wire);
     entry.onDispose(() => {
-      this.active = this.road;
+      this.active = this.road; this.wired = false;
+      if (options.wire === true) { equipment.bindWire(null); const now = this.road.boundWire; if (now !== null) this.road.bindWire(now); }
       for (const [key, descriptor] of prior) {
         if (descriptor === undefined) Reflect.deleteProperty(equipment, key); else Object.defineProperty(equipment, key, descriptor);
       }
