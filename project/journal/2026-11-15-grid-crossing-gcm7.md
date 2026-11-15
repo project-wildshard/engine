@@ -111,3 +111,9 @@
   Driftwood's remaining lap-1 link (`driftwood-creature-glowing`, 149 to 198 ms) and Pine's three `pine-wildlife` links were
   the region's creatures: the page's DL24 warm rigs sit outside the region (no `|look:driftwood-isle`, the page factory's
   hulls without normals), so the region now stages its own warm rigs after its creatures build (`regionalWorld.ts` afterKit).
+- 19:05 (opus-gcm11, land review) The one-shot review's MUST: ZE11 left the in-page server's road with no wall round the home,
+  and that server keeps one world, so after a reload on the road a walker could reach the home before it loaded and walk on
+  under its hills. The home keeps its 2 m hold (the 6 m crossing takes a walker past it). Its first SHOULD too: a save on the
+  road takes every capture a step out left owed (`GridSimulation.flushOwed`), so a reload there keeps the home's state.
+  Left for their rows: the dedicated worker's road walls (ZE6), the page's and the server's home after a zone entry (ZE10),
+  and GC13's loading envelope, not yet wired (ZE12).

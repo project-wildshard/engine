@@ -282,10 +282,12 @@ export class StandaloneGrid {
   }
   /** Save where the session stands. The document for that place first, then the site that names it. */
   async save(): Promise<{ readonly tick: number; readonly durable: boolean }> {
+    // a world left for the road owes its capture until evicted: a save takes it, so a reload on the road keeps it
+    const owed = this.grid.flushOwed();
     const site = this.grid.current(), { host } = this, { tick } = host.state, wire = capture(host), ledger = this.options.book.snapshot();
     const cell = site === null ? undefined : this.slots(site);
     const wrote = (cell?.write({ tick, snapshot: wire, ledger }) ?? true) && this.sites.write({ tick: ++this.saved, site, ...(site === null ? { road: wire, ledger } : {}) });
-    return { tick, durable: await this.settle(cell === undefined ? [this.sites] : [cell, this.sites]) && wrote };
+    return { tick, durable: await this.settle(cell === undefined ? [this.sites] : [cell, this.sites]) && wrote && owed };
   }
   dispose(): void { this.rooms.dispose(); this.room.dispose(); this.grid.dispose(); }
 }

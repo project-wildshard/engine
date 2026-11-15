@@ -31,7 +31,7 @@ test('the in-page server crosses a walker only into its home; another cell withi
   } finally { grid.dispose(); }
 });
 
-test('the server road walls every cell but the home: its edge stands, its buffer is floored and its gate shut', () => {
+test('the server road walls every cell but the home: its edge stands, its buffer is floored and its gate shut; the home keeps its 2 m hold', () => {
   const assembly = new GridAssembly({ developer: false, devserver: false }), [home, other] = assembly.cells;
   if (home === undefined || other === undefined) throw new Error('Missing cells');
   const road = createSimHost(ROAD, { rapier });
@@ -49,6 +49,10 @@ test('the server road walls every cell but the home: its edge stands, its buffer
     expect(hits(outsideOf(other, 0), east(other, 0, BUFFER_DEPTH - 2))).toBe(false); // into the buffer
     expect(hits(outsideOf(other, 0), east(other, 0, BUFFER_DEPTH + 2))).toBe(true); // the gate
     expect(castRay(road.physics, east(other, 0, 5), { x: 0, y: -1, z: 0 }, 3, ['WORLD'])).not.toBeNull(); // the buffer's floor
-    expect(hits(outsideOf(home, 40), east(home, 40, 20))).toBe(false); // the home stands open
+    // the home has no zone wall, only the 2 m hold its crossing (6 m out) takes a walker past: after a reload on the road the
+    // in-page server keeps one world, so a walker reaching the home before it loads stops there, never walks under its hills
+    expect(hits(outsideOf(home, 40), east(home, 40, -3))).toBe(false);
+    expect(hits(outsideOf(home, 40), east(home, 40, 20))).toBe(true);
+    expect(hits(outsideOf(home, 0), east(home, 0, 20))).toBe(true);
   } finally { road.dispose(); }
 });

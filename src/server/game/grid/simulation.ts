@@ -253,6 +253,13 @@ export class GridSimulation {
     if (this.ports.save?.(instance, snapshot) !== true) return false;
     this.snapshots.store(instance, packed); return true;
   }
+  /** Take every capture a step out left owed whose world nobody stands in now (a save on the road: a reload there must not lose
+   *  the world left behind). False when one fails; the rest are still tried, and a failed one stays owed. */
+  flushOwed(): boolean {
+    let ok = true;
+    for (const instance of this.owed) if (!this.occupied(instance) && !this.checkpoint(instance)) ok = false;
+    return ok;
+  }
   /** Readiness keeps a frozen destination resident; unneeded neighbours may be evicted by the shared allocator. */
   retain(instance: string, needed: boolean, distance: number): void {
     if (!Number.isFinite(distance) || distance < 0) throw new RangeError('Invalid sim residency distance');

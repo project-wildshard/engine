@@ -48,7 +48,7 @@ export function addCellWalls(road: SimHost, cells: readonly (Pick<GridCell, 'ori
 /**
  * ZONE-ENTRY ZE11 (J352): the in-page server's road walls every cell but the session's home on the page's own lines (`zoneWallEdges`:
  * the edge line, open only at each entryway's buffer, the gate 10 m in) and floors each buffer with its entry socket, so the feet
- * reach a gate on the server's road as they do on the page, and no further. The home stands open. A restored road first loses the
+ * reach a gate on the server's road as they do on the page, and no further. The home has only its 2 m hold. A restored road first loses the
  * walls an older build saved (`dropCellWalls`); its platform-tagged pieces are renewed with its void floor (`renewVoidFloor`).
  */
 export function addZoneWalls(road: SimHost, cells: readonly GridCell[], home: string): void {
@@ -57,6 +57,9 @@ export function addZoneWalls(road: SimHost, cells: readonly GridCell[], home: st
     installEntrySockets(road.physics, road.scope, walled.map(cell => cell.origin));
     new ReadinessWalls(road.physics, walled.flatMap(cell => zoneWallEdges(cell, { origin: { x: 0, z: 0 } })), road.scope);
   });
+  // the home keeps the 2 m hold (`addCellWalls`): its crossing, 6 m out, takes a walker past it; but this server keeps one world, so
+  // after a reload on the road a walker who reaches the home before it loads stops there, never walking on under its hills
+  addCellWalls(road, cells.filter(cell => cell.instance === home));
 }
 /** ZE11: take out the 2 m plain walls (`addCellWalls`) a road saved by an older build holds: the only cuboids of that size. */
 export function dropCellWalls(road: SimHost): number {

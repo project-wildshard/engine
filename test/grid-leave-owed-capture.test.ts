@@ -52,3 +52,32 @@ test('leaving a cell for the road captures nothing; its eviction takes the captu
     await until(walking(-1), () => grid.current() === home.instance); // the restored world takes its owner back
   } finally { room.dispose(); grid.dispose(); }
 });
+
+// review of plan/gcm7: a save on the road wrote only the road, so a reload there (every zone entry reloads the page) lost the home's
+// state since its last in-cell save. A save first takes every capture still owed.
+test('a save on the road takes the capture the step out left owed', async () => {
+  const assembly = new GridAssembly({ developer: false, devserver: false }), [home] = assembly.cells;
+  if (home === undefined) throw new Error('Missing cells');
+  const captures: string[] = [], hosts = new Map<string, SimHost>();
+  const highway = createSimHost(level, { rapier });
+  const grid = new GridSimulation(assembly, { highway: resident(highway), maxResidents: 1, read: () => undefined,
+    durable: (id) => { captures.push(id); return true; },
+    load: row => { const host = createSimHost(level, { rapier }); hosts.set(row.instance, host); return Promise.resolve(resident(host)); } });
+  const room = new GridRoom(grid, assembly, { loadout: () => ({ checkpoint: () => true, stow: () => undefined, interior: () => undefined }) });
+  const until = async (command: SimCommand, done: () => boolean): Promise<void> => {
+    for (let tick = 0; tick < 2400 && !done(); tick++) { room.step(new Map([[leadPlayer(grid.host()).id, command]])); await settle(); }
+    expect(done()).toBe(true);
+  };
+  try {
+    const seat = grid.host().players.get(leadPlayer(grid.host()).id);
+    seat?.position.set(outside(home, 8).x, 0, outside(home, 8).z); seat?.motor.resetAt(seat.position);
+    await until(walking(-1), () => grid.current() === home.instance);
+    await until(walking(1), () => grid.current() === null);
+    expect(captures).toEqual([]);
+    expect(grid.flushOwed()).toBe(true);
+    expect(captures).toEqual([home.instance]);
+    expect(grid.flushOwed()).toBe(true);
+    expect(captures).toEqual([home.instance]); // taken once
+    expect(grid.ready(home.instance)).toBe(true); // and still resident
+  } finally { room.dispose(); grid.dispose(); }
+});
