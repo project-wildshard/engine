@@ -9239,7 +9239,7 @@
     "file": "test/sim-lane.test.ts",
     "outcome": "restored",
     "target": "test/sim-lane.test.ts",
-    "decision": "Restored in place (CI21 E-TOOL): its isolated simctl fixture tracks the current bootstatus lifecycle and runs the real simulator-lane Bash handover without a device. SimulatorReadinessTests and ParallelResultTests pass 68 cases in 20 seconds.",
+    "decision": "Restored in place (CI21 E-TOOL): its isolated simctl fixture tracks the current bootstatus lifecycle and runs the real simulator-lane Bash handover without a device. The fast boundary selects independent successful-handover, bootstatus-failure and result-propagation witnesses, completing in 3.25 seconds; the broader simulator class remains its own longer proof.",
     "originalTests": [],
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "a199c0a985ba6d16f29f29b4d22366b99af6933b",
