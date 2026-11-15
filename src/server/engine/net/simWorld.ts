@@ -1,7 +1,6 @@
 import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { AnimalPoseSample } from '../../../shared/engine/entities/AnimalSim';
 import type { SimHost } from '../sim';
-import { leadPlayer } from '../../../shared/engine/sim/leadPlayer';
 import type { AnimalNetView } from '../../../shared/engine/net/animalNet';
 import { actRoutes } from '../../../shared/engine/sim/actRoutes';
 import { CombatWire, type CombatEvent } from './combatWire';
@@ -39,10 +38,10 @@ export class SimNetWorld implements NetWorld {
   private readonly frame: number;
   private readonly filings: (() => readonly LedgerFiling[]) | undefined;
   private readonly turn = { still: new Set<string>(), extra: new Map<string, NetCommand>() };
-  /** `frame` names the cell this host's positions are local to; 0 is the highway, and any world that is not on a grid. `filings` reads the tick's grants, which the host's owner holds: the sim keeps none. */
-  constructor(host: SimHost, frame = 0, filings?: () => readonly LedgerFiling[]) {
+  /** `frame` names the cell this host's positions are local to; 0 is the highway, and any world that is not on a grid. `filings` reads the tick's grants, which the host's owner holds: the sim keeps none. `owner` selects the default network seat explicitly; legacy standalone callers use actor.player. */
+  constructor(host: SimHost, frame = 0, filings?: () => readonly LedgerFiling[], owner = 'actor.player') {
     this.host = host; this.frame = frame; this.filings = filings; this.wire = new CombatWire(host); keepHitHistory(host);
-    this.player = this.playerOf(leadPlayer(host).id);
+    this.player = this.playerOf(owner);
   }
   /** A player, as the client that owns it reads it. */
   playerOf(id: string): NetPlayer {

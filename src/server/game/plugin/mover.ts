@@ -24,7 +24,6 @@ import { MoverMechanic, type NativeMoverMotion } from '@wildshard/engine/sim/mov
 import { parseMovers, type MoverData } from "@wildshard/format/movers";
 import { carryPrompt } from "../../../shared/game/shardfile/wirePrompts";
 import { actRoutes } from "@wildshard/engine/sim/actRoutes";
-import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { publishScriptBody } from '@wildshard/engine/sim/shardRows';
 
@@ -208,6 +207,8 @@ export class MoverRuntime {
   private readonly carryPoses = new Map<string, CarryPose>();
   /** Who rides each carry mover, when it is not the lead (P1-E3.10). A lone player's save never holds one. */
   private readonly riders = new Map<string, string>();
+  /** Owner of legacy unnamed carry commands, selected when the native host installs. */
+  private nativeOwner = 'actor.player';
   private readonly previousRides = new Map<string, boolean>();
   private readonly flags: Pick<Flags, 'has' | 'set'> | undefined;
   private readonly riderFlags: MoverPorts['riderFlags'];
@@ -324,7 +325,7 @@ export class MoverRuntime {
   }
   private carryNative(host: SimHost): void {
     for (const [id, carry] of this.carryPoses) {
-      const named = this.riders.get(id), rider = named === undefined ? leadPlayer(host) : host.players.get(named);
+      const named = this.riders.get(id), rider = host.players.get(named ?? this.nativeOwner);
       if (!carry.riding) this.riders.delete(id);
       if (rider === undefined) continue; // left the world mid-ride: the boat goes on without them
       rider.position.set(...carry.at); rider.motor.resetAt(rider.position); rider.velocity.y = 0; rider.fall.grounded = false; if (!carry.riding) rider.yaw = carry.yaw;
@@ -332,23 +333,24 @@ export class MoverRuntime {
     this.carryPoses.clear();
   }
   /** Protect ordinary walking while the existing fixed mover lane publishes carry. */
-  bindNativeCarry(host: SimHost): void {
+  bindNativeCarry(host: SimHost, owner = 'actor.player'): void {
     if (!this.data.some(row => row.carry !== undefined)) return;
+    if (!host.players.has(owner)) throw new RangeError('Unknown native carry owner');
+    this.nativeOwner = owner;
     host.events.answer('player.carrying', carried => carried || this.carrying(), host.scope);
-    const lead = leadPlayer(host);
-    host.leading.push(body => this.carrying(body === lead ? undefined : body.id)); // a client's capsule stays out of a boat's way
+    host.leading.push(body => this.carrying(body.id === owner ? undefined : body.id)); // a client's capsule stays out of a boat's way
     const routes = actRoutes(host);
     for (const row of this.data) row.carry?.prompts.forEach(({ at: [x, y, z], radius }, end) => {
       routes.claims.set(carryPrompt(row.id, end), player => {
         const body = host.players.get(player)?.position;
-        if (body !== undefined && Math.hypot(body.x - x, body.y - y, body.z - z) <= radius + CARRY_REACH) this.command(row.id, end === 0 ? 1 : 2, player === lead.id ? undefined : player);
+        if (body !== undefined && Math.hypot(body.x - x, body.y - y, body.z - z) <= radius + CARRY_REACH) this.command(row.id, end === 0 ? 1 : 2, player === owner ? undefined : player);
         else routes.refused++;
       });
     });
     host.events.answer('player.traversal', dt => {
       const player = host.traversing;
       if (typeof dt !== 'number') return dt;
-      if (player === null || player === lead) return this.carrying();
+      if (player === null || player.id === owner) return this.carrying();
       return this.carrying(player.id) ? true : dt;
     }, host.scope);
     host.onStep('movers.carry', () => { this.carryNative(host); }, undefined, 'afterBodies');
@@ -537,7 +539,7 @@ export class MoverScriptDriver {
       schedules: [this.schedule(() => { if (this.runtime === undefined) throw new Error('Missing mover runtime'); return this.runtime; }, permissions), ...(extra?.schedules ?? [])] });
   }
   /** Attach native handles to the same host; an explicit drive owns one fixed tick, never another script host. */
-  install(sim: SimHost, input: ReturnType<typeof createShardfileComposedLane> | DeclaredMoverComposition, options: { id: string; restoring?: boolean; restoreFlags?: ReadonlySet<string>; activation?: MoverActivationPorts; drive?: boolean; permissions?: () => ReadonlyMap<string, number>; joined?: boolean }): MoverRuntime {
+  install(sim: SimHost, input: ReturnType<typeof createShardfileComposedLane> | DeclaredMoverComposition, options: { id: string; owner?: string; restoring?: boolean; restoreFlags?: ReadonlySet<string>; activation?: MoverActivationPorts; drive?: boolean; permissions?: () => ReadonlyMap<string, number>; joined?: boolean }): MoverRuntime {
     if (this.runtime !== undefined) throw new Error('Mover driver is already installed');
     const lane = 'host' in input ? input : this.compose({ ...input.content, sim: { ...input.content.sim, scripts: [...input.assets.keys()] } }, input.assets,
       { rules: input.rules, entities: [], actors: new Map(), query: () => [] }, undefined, options.permissions,
@@ -548,13 +550,14 @@ export class MoverScriptDriver {
     const riderFlags = arrivals.length === 0 ? undefined : (rider: string | undefined): Flags | undefined => {
       if (sim.players.size === 0) return sim.flags;
       const books = questBooks(sim); books.claim(arrivals);
-      return rider === undefined ? books.lead.flags : sim.players.has(rider) ? books.of(rider).flags : undefined;
+      const player = rider ?? options.owner ?? 'actor.player';
+      return sim.players.has(player) ? books.of(player).flags : undefined;
     };
     const runtime = new MoverRuntime(this.data, { lane, flags: sim.flags, ...(riderFlags === undefined ? {} : { riderFlags }), host: lane.host, physics: () => sim.physics, scope: sim.scope,
       ...(options.restoring === undefined ? {} : { restoring: options.restoring }),
       ...(options.restoreFlags === undefined ? {} : { restoreFlags: options.restoreFlags }),
       activation: { ground: () => playerGrounds(sim), ...options.activation } });
-    this.runtime = runtime; runtime.bindNativeCarry(sim);
+    this.runtime = runtime; runtime.bindNativeCarry(sim, options.owner);
     for (const row of this.data) publishScriptBody(sim, row.id, () => runtime.pose(row.id));
     // `joined`: a save from before these movers had their step holds none of it, so its world has no bodies to reconnect: build them
     let continued = false;

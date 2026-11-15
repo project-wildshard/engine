@@ -10,6 +10,7 @@ import { decodeSimSnapshot, serializeSimSnapshot, SIM_SNAPSHOT_VERSION, snapshot
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { canonicalSimDigest } from './fake/simState';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
+import { SimNetWorld } from '../src/server/engine/net/simWorld';
 
 // P1-E5.2a: one SimHost, many players. Health, strike runner, motor and every clock of the movement law are per player.
 let rapier: Rapier;
@@ -32,6 +33,14 @@ test('a host starts with its lead player, and joining adds one with its own body
   expect(bot.motor).not.toBe(other.motor); expect(bot.strike).not.toBe(other.strike);
   expect(() => host.addPlayer('bot:1')).toThrow(); expect(() => host.addPlayer(target)).toThrow(); expect(() => host.addPlayer('bad id')).toThrow();
   host.dispose();
+});
+
+test('the network adapter uses its explicitly selected seat and refuses a missing owner', () => {
+  const host = hostWithPlayers(2);
+  try {
+    expect(new SimNetWorld(host, 0, undefined, 'bot:1').player.id).toBe('bot:1');
+    expect(() => new SimNetWorld(host, 0, undefined, 'missing')).toThrow('Unknown net player');
+  } finally { host.dispose(); }
 });
 
 test('one tick moves each player on its own command and leaves the idle one alone', () => {

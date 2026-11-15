@@ -24,13 +24,26 @@ import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 // P1-E3.10: a carry mover carries whoever called it, not the host's first player.
 const row = structuredClone(canoeRow), level = { ...SIM_LEVEL, entities: [] }, BOT = 'bot:1';
-function install(host: SimHost): MoverRuntime {
+function install(host: SimHost, owner?: string): MoverRuntime {
   const source = emptyShardfile({ slug: 'carry-test', name: 'Carry', author: 'Test', revision: 1, seed: 3 });
   return new MoverScriptDriver([row], host).install(host, { content: source, assets: new Map(),
-    rules: { fields: {}, archetypes: [], events: [], maxEntities: 32 } }, { id: 'carry-test', drive: true });
+    rules: { fields: {}, archetypes: [], events: [], maxEntities: 32 } }, { id: 'carry-test', drive: true, ...(owner === undefined ? {} : { owner }) });
 }
 const landing = (end: 0 | 1): Vector3 => { const at = row.carry?.landings[end]; if (at === undefined) throw new Error('Missing landing'); return new Vector3(...at); };
 function rapierNow(): ReturnType<typeof loadRapier> { return loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))); }
+
+test('an explicit mover owner can be another seat while the first player stays ashore', async () => {
+  const host = createSimHost(level, { rapier: await rapierNow() });
+  try {
+    const rider = host.addPlayer(BOT, { x: 3, y: 1, z: 3 }), first = leadPlayer(host), stood = first.position.clone(), motion = install(host, BOT);
+    motion.command(row.id, 1);
+    for (let tick = 0; tick < 550 && motion.riding(row.id); tick++) host.step();
+    expect(rider.position.distanceTo(landing(1))).toBeLessThan(1e-6);
+    expect(first.position.distanceTo(stood)).toBeLessThan(1);
+    expect(questBooks(host).of(BOT).flags.has('secret:islet')).toBe(true);
+    expect(questBooks(host).of(first.id).flags.has('secret:islet')).toBe(false);
+  } finally { host.dispose(); }
+});
 
 test('the bot that calls a canoe rides it, and the lead stays on foot and free', async () => {
   const host = createSimHost(level, { rapier: await rapierNow() }), motion = install(host);

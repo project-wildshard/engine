@@ -10,7 +10,6 @@ import type { GridAssembly, GridCell, GridPoint } from '../../../shared/game/gri
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { GridContinuationCache, GRID_CONTINUATION_CACHE_BYTES } from '../../../shared/game/grid/continuations';
 import { gridBoardLimitAt } from '../../../shared/game/grid/rules';
-import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 /** Admission returns one owned, renderer-free regional host; its world is always in authored local coordinates. */
 export interface GridResident { readonly host: SimHost; readonly dispose: () => void }
@@ -18,6 +17,8 @@ export interface GridResident { readonly host: SimHost; readonly dispose: () => 
 export interface GridSimLease { release: () => void; update?: (state: { needed?: boolean; distance?: number }) => void }
 /** Durable snapshots and native/browser admission are injected; no network operation runs during a fixed tick. */
 export interface GridSimulationPorts {
+  /** The session's owning seat; older standalone callers use actor.player. */
+  readonly owner?: string;
   readonly highway: GridResident;
   load: (cell: GridCell, saved: SimSnapshot | undefined) => Promise<GridResident>;
   save?: (instance: string, snapshot: SimSnapshot) => boolean;
@@ -83,7 +84,7 @@ export function carryMotion(from: PlayerSim, to: PlayerSim): void {
 
 /**
  * Independent local physics worlds; only a world with a player in it advances, while visible neighbours remain frozen.
- * Each player crosses on their own (P1-E3.9). `owner` is the player this session was built around, the lead of every host:
+ * Each player crosses on their own (P1-E3.9). `owner` is the explicit seat this session was built around:
  * its systems bind to that seat, so when it leaves others behind the seat stays, parked, and a lone player never parks.
  */
 export class GridSimulation {
@@ -105,8 +106,8 @@ export class GridSimulation {
   constructor(assembly: GridAssembly, ports: GridSimulationPorts) {
     this.assembly = assembly; this.ports = ports;
     this.limit = ports.maxResidents ?? 4;
-    const owner = leadPlayer(ports.highway.host);
-    if (!Number.isInteger(this.limit) || this.limit < 1 || this.limit > 9 || ports.highway.host.embedded || !owner.hasMotor) throw new RangeError('Invalid grid simulation owner');
+    const owner = ports.highway.host.players.get(ports.owner ?? 'actor.player');
+    if (!Number.isInteger(this.limit) || this.limit < 1 || this.limit > 9 || ports.highway.host.embedded || owner === undefined || !owner.hasMotor) throw new RangeError('Invalid grid simulation owner');
     this.owner = owner.id; this.sites.set(owner.id, null);
     if (ports.reserve !== undefined && ports.residentBytes === undefined) throw new Error('Sim reservation needs admitted resident bytes');
     if (ports.allocator !== undefined && (ports.residentBytes === undefined || ports.reserve !== undefined)) throw new Error('Use one sim reservation owner with admitted bytes');

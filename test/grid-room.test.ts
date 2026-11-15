@@ -32,6 +32,18 @@ function stage(): Stage {
   const loadout = (player: string): GridLoadout => ({ checkpoint: () => true, stow: () => { stows.push(player); }, interior: () => undefined });
   return { grid, room: new GridRoom(grid, assembly, { loadout: player => loadout(player) }), cell, hosts, saved, loads, stows };
 }
+
+test('an explicitly owned grid tracks the requested seat rather than the first body', () => {
+  const assembly = new GridAssembly({ developer: false, devserver: false }), host = createSimHost(level, { rapier });
+  host.addPlayer(BOT, { x: 281.25, y: 0, z: 0 });
+  const grid = new GridSimulation(assembly, { owner: BOT, highway: resident(host), load: () => { throw new Error('No cell requested'); } });
+  try {
+    expect(grid.players()).toEqual([BOT]); expect(grid.current()).toBeNull();
+    grid.stepSite(null, new Map([[BOT, walking(1)]]));
+    expect(grid.host().players.get(BOT)?.position.x).toBeGreaterThan(281.25);
+    expect(() => grid.current('actor.player')).toThrow('Not on the grid');
+  } finally { grid.dispose(); }
+});
 /** The road east of a cell. Cells sit 562.5 m apart, so 6 m of band either side leaves 6 to 56 m past its edge clear. */
 const outside = (cell: GridCell, past: number): GridPoint => ({ x: cell.origin.x + CHUNK_HALF + past, y: 0, z: cell.origin.z });
 const walking = (direction: number): SimCommand => ({ moveX: direction, moveZ: 0, yaw: 0 });
