@@ -13,3 +13,9 @@ It checks the physical panel as well as the earned flag. The fixture now
 uses the original HUD entry operation and waits for 30 worker frames;
 its play cap is reapplied after grid navigation clears query options.
 Only a shown, non-inert pause menu is a Resume target.
+
+Fault proof: a separately built worker checkpoint zeros shared field 101.
+Its marker was verified in the emitted worker JavaScript, then the source
+was restored before the browser ran. The earned flag returned after the
+reload, but the physical door stayed shut: the final panel assertion went
+red. The clean build then passed all five harness checks in 43.8 seconds.
