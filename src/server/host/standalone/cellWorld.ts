@@ -7,7 +7,6 @@ import { removeChunkEdgeWalls } from '@wildshard/engine/physics/terrain';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
-import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { decodeSimSnapshot, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
@@ -24,7 +23,8 @@ import { installPlayerOwned, type OwnedBook, type OwnedStores, type CreatureRewa
 import { QUEST_OWNED } from '@wildshard/engine/game/quest/nativeComposition';
 import { shardRows } from '@wildshard/engine/sim/shardRows';
 import { createQuestLedger } from '@wildshard/engine/game/quest/ledger';
-import { serverDiscoveries } from '@wildshard/engine/game/quest/serverPlaces';
+import { serverDiscoveries, serverPlaces } from '@wildshard/engine/game/quest/serverPlaces';
+import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
 import { RESPAWN_NOW_ACT, STORY_ACT, UNSTUCK_ACT } from '@wildshard/engine/net/acts';
 import { installServerChapters } from '@wildshard/engine/game/quest/serverChapters';
 import { installServerDoors } from '@wildshard/engine/game/quest/serverDoors';
@@ -135,6 +135,16 @@ function ownedOf(host: SimHost, input: HeadlessRuntimeInput, stores: OwnedStores
   return installPlayerOwned(host, input.shard.identity.slug, sold ?? null, !shardRows(host).owned.has(QUEST_OWNED), stores, input.shard, profiles);
 }
 
+/** The radius a data cell's place takes when its manifest POI names none. */
+const PLACE_RADIUS = 8;
+/** Where a fallen player in a data cell comes back (TEMPLATE-E2E TC-E3, J361: "the last camp or the depot"): the product's
+ *  published places, else the shard's own map POIs. A cell with neither respawns at the shard's spawn, as before. */
+export async function dataCellPlaces(input: Pick<HeadlessRuntimeInput, 'shard' | 'product'>): Promise<readonly PlaceArea[]> {
+  const published = input.product === undefined ? [] : await serverPlaces(input.product);
+  if (published.length > 0) return published;
+  return (input.shard.manifest?.pois ?? []).map(poi => ({ id: poi.id, label: poi.name, x: poi.x, z: poi.z, r: poi.r ?? PLACE_RADIUS }));
+}
+
 /** Whether this output runs on the trusted headless owner. */
 export const nativeCell = (input: HeadlessRuntimeInput): boolean => input.product !== undefined && (hasNativeAssembly(input.product) || input.product.has('sim/runtime-plan'));
 
@@ -165,7 +175,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
   }
   const effects: HeadlessEffect[] = [], { host, dispose, sim, kit } = await bootTask(snapshot === undefined ? 'server:data-simulation-and-collision' : 'server:data-continuation-restore', () => openDataCell(input, snapshot, effects));
   if (snapshot !== undefined) removeChunkEdgeWalls(host.physics); // GC36: a world saved while lone cells had walls
-  installRoomRespawn(host, []);
+  installRoomRespawn(host, await dataCellPlaces(input));
   installDeclaredClimate(host, input.shard.rows);
   bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product));
   host.respawn.served = true; actRoutes(host).introLocks = true;
