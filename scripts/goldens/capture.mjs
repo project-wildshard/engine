@@ -53,6 +53,9 @@ const LEVEL_DOWNLOAD=arg('level-download','');if(!['','packs','shardfile'].inclu
 // out at the URLs they stand in for) are judged on a served build. Pair it with --level-download=shardfile: a pack part is not a request.
 const SERVE_OVER=arg('serve-over',''),overHits=new Set();
 const DIRECT=process.argv.includes('--direct');
+// A repeated stationary view can pause the solo room before posing: creatures remain where boot put them while the
+// real local motor and the renderer stream the camera. This never removes a creature or changes authored geometry.
+const STILL_ROOM=process.argv.includes('--still-room');if(STILL_ROOM&&!DIRECT)throw Error('--still-room requires --direct solo entry');
 mkdirSync(root,{recursive:true});
 
 // --engine=webkit: Playwright's WebKit (muted by the game's volume 0; its Escape is a plain key press)
@@ -88,7 +91,7 @@ async function settle(page,inflight){
 
 try{for(const slug of slugs){
  const dir=`${root}/${slug}`;mkdirSync(dir,{recursive:true});
- const row={slug,head,engine,device:'iPhone 16 Pro',tier:'phone',dpr:2,seed:357,levelDownload:LEVEL_DOWNLOAD===''?'default':LEVEL_DOWNLOAD,errors:[],warnings:{},poses:[]};
+ const row={slug,head,engine,device:'iPhone 16 Pro',tier:'phone',dpr:2,seed:357,stillRoom:STILL_ROOM,levelDownload:LEVEL_DOWNLOAD===''?'default':LEVEL_DOWNLOAD,errors:[],warnings:{},poses:[]};
  const context=await browser.newContext({...devices['iPhone 16 Pro']});let page;
  try{
   await developerSettings(context,{tier:'phone',volume:0,time:'midday',weather:'clear'});
@@ -166,9 +169,11 @@ try{for(const slug of slugs){
    const free=c.eye!==undefined&&Math.hypot(c.eye[0]-probe.x,c.eye[2]-probe.z,probe.y===undefined?0:c.eye[1]-EYE-probe.y)>FREE;
    const at=free?{...probe,x:c.eye[0],y:c.eye[1]-EYE,z:c.eye[2]}:probe;
    await page.evaluate(()=>{const w=window.__wildshard.world;w.game.hold=false;window.__wsEye=null;
+    if(window.__wsGoldenPractice){document.dispatchEvent(new CustomEvent('ws:practice-active',{detail:false}));window.__wsGoldenPractice=false;}
     // what hangs off the camera before any hover (the held weapon, the hands): the shot keeps only these visible. Taken
     // once per entry: a board stepped off a moment ago still shows while it fades
     window.__wsCamOff??=new Set(w.game.camera.children.filter(o=>o.visible));});
+   if(STILL_ROOM)await page.evaluate(()=>{document.dispatchEvent(new CustomEvent('ws:practice-active',{detail:true}));window.__wsGoldenPractice=true;});
    await board(page,false);await page.evaluate(p=>window.__wildshard.pose(p),at);if(free)await board(page,true);
    await frames(page,FRAMES);const idle=await settle(page,inflight);await frames(page,30);
    // a player on a slope slides off its pose while streaming settles (Pine's bear den slid into the lake and respawned at
@@ -207,6 +212,7 @@ try{for(const slug of slugs){
     g.shardFrame();g.composer.render(0);g.shardFrame();g.composer.render(0);
     return{eye:cam.position.toArray(),rotation:cam.rotation.toArray(),fov:cam.fov,frame:g.frameCount,player,hover:w.player.hover===true,settledEye:e.settled};
    });
+   if(drifted&&Math.hypot(observed.player[0]-at.x,observed.player[2]-at.z)>FREE)row.errors.push(`camera ${c.n}: residency player left the probe; repeat solo with --still-room`);
    const shot=set?`${dir}/${String(c.n).padStart(2,'0')}-${c.name}-${mode}.png`:`${dir}/${i+1}-${c.name}-shardfile.png`;
    // the 24-camera set hides the HUD (every element but the canvases; a canvas read-back misses Nine's layered composite)
    // and the minimap: a canvas smaller than half the viewport stays hidden

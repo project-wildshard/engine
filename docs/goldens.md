@@ -84,6 +84,15 @@ pixel-identical.
 
 ## The WebKit pass
 
+A worker can recover a slope pose back to spawn while a fixed camera
+stays behind. The capture refuses that mismatch instead of accepting
+empty near dressing as settled. Repeat the affected solo camera with
+`--direct --still-room --cams=<n>`: the existing practice pause holds
+the room before the pose; the real local motor and renderer keep
+streaming the unchanged world. The receipt names `stillRoom`. This also
+keeps a chasing creature from covering the repeated view. Read the
+replacement triptych and retain that camera's recapture provenance.
+
 The iPhone is WebKit on Apple's GPU. Add a WebKit pass when the change
 touches **shaders or node graphs, blending or transparency, render
 targets, the composer or post, background / clear colour or alpha,
