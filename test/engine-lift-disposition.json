@@ -9532,5 +9532,18 @@
     "sourceRevision": "4c5cea15d61e5d35c02befaa3ce18c98ceeb2c1c",
     "sourceBlob": "3ff39d5a513453549f00d5fbe9e16414b077f5f6",
     "retirementProof": "Restored public product-file boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/world-weather-stage.test.ts",
+    "outcome": "restored",
+    "target": "test/world-weather-stage.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): literal admitted client-channel rows replace the moved sharddev DAG builder while preserving each weather channel's public format boundary.",
+    "originalTests": [
+      "real clocked weather runs through play rank40 with the same rig, clock and object loan"
+    ],
+    "sourceRevision": "d3ed088555a695916d7c03e284dbc3408b09594e",
+    "sourceBlob": "59e8197afa6d20cbfb6f5f255dec9733d213b106",
+    "retirementProof": "Restored public weather entry boundary; no J186 retirement or successor equivalence claimed."
   }
 ]

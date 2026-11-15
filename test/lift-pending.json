@@ -266,6 +266,5 @@
   "test/world-scene-geometry-cache.test.ts",
   "test/world-scene-graph-pages.test.ts",
   "test/world-scene-placement-pages.test.ts",
-  "test/world-scene-slabs.test.ts",
-  "test/world-weather-stage.test.ts"
+  "test/world-scene-slabs.test.ts"
 ]

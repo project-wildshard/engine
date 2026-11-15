@@ -14,7 +14,6 @@ import { WorldAssemblySchema } from '@wildshard/format/worldAssembly';
 import { publishEntryOwner, entryOwner, lendEntryOwner } from '../src/shared/game/shardfile/entryOwners';
 import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { emptyShardfile } from '../src/shared/host/author';
-import { ClientChannels } from '../src/sharddev/clientChannels';
 import { parseClientChannels } from '@wildshard/format/clientChannels';
 import { DayCycle } from '../src/shared/engine/world/dayCycle';
 import { lendLooks } from '../src/client/game/shardfile/lentLooks';
@@ -142,10 +141,10 @@ function clockedFixture(hold?: 'sky' | 'program', parent?: Scope, nativeOwner?: 
   const program = { states: ['clear'], next: { clear: 'clear' }, length: { clear: [1, 1] }, soak: 1, dry: 1, salt: 1,
     initial: { overcast: 0, rain: 0, wet: 0, wind: 0, fog: 0 }, modes: { live: 'none' }, values: [], outputs: { overcast: 0, rain: 0, wet: 0, wind: 0, fog: 0 },
     page: { id: 'weather.clock', after: [], before: [], tick: 'weather.clock' } };
-  const channels = parseClientChannels(['key', 'sample', 'dome', 'weather', 'tint'].map(group => {
-    const dag = new ClientChannels(`weather.${group}`); dag.output('value', dag.constant(1));
-    return Object.assign(dag.build(), { numeric: { group, outputs: [{ property: 'value', target: 'look', path: ['keyIntensity'] }] } });
-  }));
+  const channels = parseClientChannels(['key', 'sample', 'dome', 'weather', 'tint'].map(group => ({
+    id: `weather.${group}`, reads: [], nodes: [{ op: 'constant', value: 1 }], channels: [{ property: 'value', value: 0 }],
+    numeric: { group, outputs: [{ property: 'value', target: 'look', path: ['keyIntensity'] }] },
+  })));
   const source = emptyShardfile({ slug: 'clocked-weather', name: 'Weather', author: 'Fixture', revision: 1, seed: 1 }); source.clientChannels = channels;
   const rows = { ...policy, sky: skyRows }, values = new Map<string, unknown>([[row.file, rows], [skyRows.file, skyFile], [policy.files.program, program]]);
   let release: () => void = () => { throw new Error('No held weather file'); };
