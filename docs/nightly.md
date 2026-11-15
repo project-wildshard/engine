@@ -101,7 +101,10 @@ or claim to prevent a human from bypassing the documented release rule.
 
 After the report job passes, nightly calls `ring-3.yml` with its exact
 engine SHA. That workflow can also be dispatched alone on a plan branch
-to prove sender configuration without waiting for a full night. It calls
+to prove sender configuration without waiting for a full night. Before
+the new workflow is on main, dispatch the existing `nightly.yml` on the
+plan branch with `ring3_only=true`. That diagnostic skips Ring 2, produces
+no nightly verdict and cannot qualify a release. The sender calls
 all seven shard `ci.yml` receivers with `workflow_dispatch` and the full
 `engine` input. Their existing `engine-candidate` repository-dispatch
 entry remains available and reaches the same candidate selection code.

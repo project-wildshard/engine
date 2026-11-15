@@ -1,4 +1,4 @@
-# Ring 2 / J167: one exact main SHA, all pinned heads, no deployment or app token.
+# Ring 2 / J167: one exact SHA, all pinned heads. Ring 3 follows a green report.
 # Promotion owns tags (J184); a red or incomplete verdict holds the tag.
 name: nightly
 on:
@@ -6,6 +6,10 @@ on:
     - cron: '17 7 * * *'
   workflow_dispatch:
     inputs:
+      ring3_only:
+        description: Diagnose the Ring 3 sender only (does not qualify Ring 2 or a release)
+        type: boolean
+        default: false
       pins_channel:
         description: Reviewed pin snapshot to test (staging release hash awaits AP-26)
         type: choice
@@ -21,6 +25,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   ring3:
+    if: always() && (needs.report.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.ring3_only))
     needs: report
     uses: ./.github/workflows/ring-3.yml
     with:
@@ -29,6 +34,7 @@ jobs:
       NIGHTLY_APP_CLIENT_ID: ${{ secrets.NIGHTLY_APP_CLIENT_ID }}
       NIGHTLY_APP_PRIVATE_KEY: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
   plan:
+    if: ${{ !inputs.ring3_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -132,7 +138,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   report:
-    if: always()
+    if: always() && !inputs.ring3_only
     needs: [plan, tests, heads]
     runs-on: ubuntu-24.04
     timeout-minutes: 5

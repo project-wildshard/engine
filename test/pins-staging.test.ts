@@ -58,12 +58,16 @@ test('refresh pins staging-only revisions, leaves production alone, and both rin
 test('an incomplete refresh and a tampered snapshot refuse before replacing existing inputs', async () => fixture(async (root, api, _requests, document) => {
   await execute(script, root, api, 'refresh', '--channel', 'staging');
   const path = join(root, 'test/pins/staging.json'), before = readFileSync(path, 'utf8');
-  document.shards[0].hash = 'b'.repeat(64); // Listing has no bytes for this head.
+  const head = document.shards[0];
+  if (head === undefined) throw new Error('Missing fixture head');
+  head.hash = 'b'.repeat(64); // Listing has no bytes for this head.
   const refused = await execute(script, root, api, 'refresh', '--channel', 'staging');
   expect(refused.code).not.toBe(0);
   expect(readFileSync(path, 'utf8')).toBe(before);
   const changed = JSON.parse(before) as StagingPins;
-  changed.catalogue.shards[0].revision++;
+  const changedHead = changed.catalogue.shards[0];
+  if (changedHead === undefined) throw new Error('Missing exported head');
+  changedHead.revision++;
   writeFileSync(path, JSON.stringify(changed));
   expect((await execute(selector, root, api, 'select')).code).not.toBe(0);
   expect(readFileSync(join(root, 'test/pins/shardfiles.json'), 'utf8')).toBe(prod);
