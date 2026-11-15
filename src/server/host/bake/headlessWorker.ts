@@ -24,7 +24,6 @@ import { headlessSections } from '../../../shared/host/headlessSections';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
-import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 await runTickWorker(async raw => {
   const payload = v.parse(v.strictObject({ shard: v.unknown(), assets: v.map(v.string(), v.instance(Uint8Array)), binary: v.string(), snapshot: v.optional(v.string()), sections: v.exactOptional(v.map(v.string(), v.unknown())), product: v.exactOptional(v.string()) }), raw);
@@ -85,8 +84,9 @@ await runTickWorker(async raw => {
           if (!sim.actors.has(command.actorId)) throw new Error('Unknown command actor'); numeric.set(command.actorId, command.value);
         } else { if (sim.lane === undefined) throw new Error('Event requires a script lane'); sim.lane.enqueue({ type: command.type, target: command.target, value: command.value }); }
       }
-      commands = numeric; sim.host.step(leadCommands(sim.host, player));
-      if (![leadPlayer(sim.host).position, ...[...sim.host.entities.values()].map(entity => entity.position)].every(point => [point.x, point.y, point.z].every(Number.isFinite))) throw new Error('Nonfinite headless simulation state');
+      commands = numeric; sim.host.step(player === undefined ? undefined : new Map([['actor.player', player]]));
+      for (const body of sim.host.players.values()) if (!Number.isFinite(body.position.x) || !Number.isFinite(body.position.y) || !Number.isFinite(body.position.z)) throw new Error('Nonfinite headless simulation state');
+      for (const body of sim.host.entities.values()) if (!Number.isFinite(body.position.x) || !Number.isFinite(body.position.y) || !Number.isFinite(body.position.z)) throw new Error('Nonfinite headless simulation state');
       const script=sim.lane?.host.checkpoint();
       if(script?.modules.some(module=>module.failures>0||module.disabled))throw new Error('Headless script call failed');
       if(sim.decisions?.host.metrics().some(row=>row.refusals>0||row.disabled))throw new Error('Headless decision call failed');

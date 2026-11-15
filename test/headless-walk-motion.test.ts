@@ -8,6 +8,22 @@ import {emptyShardfile} from '../src/shared/host/author';
 import {walkVelocity,walkingSpeed} from '../src/shared/engine/player/walk';
 import {runHeadlessJourney} from '../src/shared/host/headlessJourney';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { simPlayerCommand } from '../src/shared/host/tickProtocol';
+
+test('a journey follows the selected seat and leaves the first player alone',async()=>{
+  const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const sim=createShardfileSim(emptyShardfile({slug:'walk-owner',name:'Walk owner',author:'Test',revision:1,seed:1}),new Map(),{rapier});
+  try{
+    const {host}=sim,owner=host.addPlayer('bot:1',{x:10,y:0,z:0});
+    const report=runHeadlessJourney(host,commands=>{
+      const command=commands.find(row=>row.kind==='player');
+      host.step(command===undefined?undefined:new Map([[owner.id,simPlayerCommand(command)]]));
+    },{ticks:300,once:true,points:[{x:10,z:0},{x:12,z:0}]},undefined,owner.id);
+    expect(report.complete).toBe(true);expect(report.final.position[0]).toBeGreaterThan(11);
+    expect(host.players.get('actor.player')?.position.x).toBeCloseTo(0);
+    expect(()=>runHeadlessJourney(host,()=>host.step(),{ticks:1,points:[{x:0,z:0},{x:1,z:0}]},undefined,'missing')).toThrow('Unknown journey player');
+  }finally{sim.dispose();}
+});
 
 test('the shared page acceleration preserves its arithmetic through turns and stopping',()=>{
   let original=0,shared=0;

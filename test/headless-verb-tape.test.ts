@@ -57,6 +57,21 @@ test('compact tape executes every native tick and reads actual owners at each se
   }finally{host.dispose();}
 });
 
+test('a tape observes its selected player instead of the first seat',()=>{
+  const host=createSimHost({...SIM_LEVEL,entities:[]},{rapier}),selected=host.addPlayer('bot:1',{x:10,y:0,z:0});
+  try{
+    const tape=createTrustedHeadlessTape(host,commands=>{
+      const command=commands.find(row=>row.kind==='player');
+      host.step(command===undefined?undefined:new Map([[selected.id,simPlayerCommand(command)]]));
+    },()=>[],selected.id);
+    const report=tape({...plan,observe:[]});
+    expect(report.observations[0]?.position[0]).toBeGreaterThan(10);
+    expect(report.observations[1]?.position[0]).toBeCloseTo(selected.position.x);
+    expect(host.players.get('actor.player')?.position.x).toBeCloseTo(0);
+    expect(()=>runTrustedHeadlessTape(host,()=>host.step(),()=>[],{...plan,observe:[]},'missing')).toThrow('Unknown tape player');
+  }finally{host.dispose();}
+});
+
 test('missing, replaced and nonfinite owners cannot publish a successful tape observation',()=>{
   const host=createSimHost({...SIM_LEVEL,entities:[]},{rapier});
   try {

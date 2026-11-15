@@ -16,7 +16,6 @@ import { HEADLESS_ARENA } from '@wildshard/engine/game/boss/headlessArenaViews';
 import type { NativeSweptMeleeInput } from '@wildshard/engine/game/plugin/nativeSwept';
 import { installPortableMath } from '@wildshard/engine/core/portableMath';
 import { createSimHost, type SimHost, type SimHostPorts, type SimLevel, type SimTickCommand } from '@wildshard/engine/sim';
-import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import { shardRows } from '@wildshard/engine/sim/shardRows';
 import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { NetTickAct } from '@wildshard/engine/net/acts';
@@ -258,7 +257,8 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
     if (saved !== undefined && world?.near !== undefined) { host.physics.near = world.near; world.near.attach(host.physics); }
   } catch (error) { installing?.dispose(); throw error; }
   if (plan.economy !== undefined) installRoomLoot(host, plan.economy, context);
-  const lead = leadPlayer(host);
+  const lead = host.players.get('actor.player');
+  if (lead === undefined) throw new RangeError('Unknown trusted runtime owner');
   // ENG-18: a room catches its seats' falls itself (cellWorld's FallFloor); a resident alone catches its own, or nobody does.
   const caught = world?.room === true ? null : residentFallNet(host, shardPlayArea(preparation.shard.manifest?.bounds, preparation.product), host.level.player.at);
   if (caught !== null && preparation.product !== undefined) registerInstalled(host, 'fallFloor'); // SS3: the page's play area, read off its rows

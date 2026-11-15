@@ -6,7 +6,6 @@ import { floorBelow } from '@wildshard/engine/physics/query';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { walkingSpeed } from '@wildshard/engine/player/walk';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
-import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 export interface WalkPoint { readonly x:number;readonly z:number;readonly jump?:boolean|number;readonly jumpAt?:number }
 export interface WalkStall { readonly tick:number;readonly waypoint:number;readonly x:number;readonly y:number;readonly z:number }
@@ -97,8 +96,9 @@ export interface HeadlessJourneySample {readonly commands:readonly HeadlessComma
  * its script/decision/finite-state refusals. The parent request watchdog still
  * preempts a blocked worker. This proof does not encode a resumable checkpoint.
  * `capture` sees the placed start with no commands, then every committed tick. */
-export function runHeadlessJourney(host:SimHost,step:(commands:readonly HeadlessCommand[])=>void,input:HeadlessJourneyPlan,capture?:(sample:HeadlessJourneySample)=>void):HeadlessJourneyReport {
-  const player=leadPlayer(host),plan=v.parse(HeadlessJourneyPlanSchema,input),cursor=new PhysicsRouteCursor(plan.points,{once:plan.once===true,edge:plan.inside!==undefined}),initial=host.state.tick;
+export function runHeadlessJourney(host:SimHost,step:(commands:readonly HeadlessCommand[])=>void,input:HeadlessJourneyPlan,capture?:(sample:HeadlessJourneySample)=>void,playerId='actor.player'):HeadlessJourneyReport {
+  const player=host.players.get(playerId);if(player===undefined)throw new RangeError(`Unknown journey player ${playerId}`);
+  const plan=v.parse(HeadlessJourneyPlanSchema,input),cursor=new PhysicsRouteCursor(plan.points,{once:plan.once===true,edge:plan.inside!==undefined}),initial=host.state.tick;
   let distance=0,maxTickMicros=0,out=0,ticks=0;
   const observe=(commands:readonly HeadlessCommand[]):void=>{const p=player.position;capture?.({commands,x:p.x,y:p.y,z:p.z,grounded:player.fall.grounded});};
   const held=new Map<AnimalSim,boolean>();

@@ -2,7 +2,6 @@ import * as v from 'valibot';
 import type {SimHost} from '@wildshard/engine/sim';
 import {PhysicsRouteCursor,type WalkPoint} from './headlessJourney';
 import type {HeadlessCommand,HeadlessEffect} from './tickProtocol';
-import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 export interface HeadlessTapeSegment {id:string;ticks:number;commands:HeadlessCommand[];route?:WalkPoint[];frames?:HeadlessCommand[][]}
 export interface HeadlessTapePlan {version:1;observe:string[];segments:HeadlessTapeSegment[]}
@@ -38,12 +37,14 @@ export function headlessTapeReportSchema(effect:v.GenericSchema<HeadlessEffect>)
 }
 /** Private worker-side execution of an already admitted offline tape. Every
  * repeated command still enters the existing native owner and fixed tick.
- * The worker keeps its request watchdog; the reply is terminal observations. */
+ * The worker keeps its request watchdog; the reply is terminal observations.
+ * playerId names the seat driven by step and observed throughout the tape. */
 export function runTrustedHeadlessTape(host:SimHost,step:(commands:readonly HeadlessCommand[])=>void,
-  effects:()=>readonly HeadlessEffect[],plan:HeadlessTapePlan):HeadlessTapeReport {
+  effects:()=>readonly HeadlessEffect[],plan:HeadlessTapePlan,playerId='actor.player'):HeadlessTapeReport {
   if(host.scope.disposed||host.scope.disposing)throw new Error('Tape owner retired');
   const owners=plan.observe.map(id=>{const owner=host.adapters.get(id);if(owner===undefined)throw new Error(`Missing tape observation owner ${id}`);return {id,owner};});
-  const player=leadPlayer(host),initial=host.state.tick,observations:HeadlessTapeObservation[]=[],encoder=new TextEncoder();let bytes=0;
+  const player=host.players.get(playerId);if(player===undefined)throw new RangeError(`Unknown tape player ${playerId}`);
+  const initial=host.state.tick,observations:HeadlessTapeObservation[]=[],encoder=new TextEncoder();let bytes=0;
   for(const segment of plan.segments){
     let peakY=player.position.y;const emitted:HeadlessEffect[]=[];
     const cursor=segment.route===undefined?null:new PhysicsRouteCursor(segment.route,{once:true});
@@ -88,12 +89,12 @@ export function runTrustedHeadlessTape(host:SimHost,step:(commands:readonly Head
 /** A resident tape owner stays pinned across streamed parts as well as inside
  * each ordinary terminal plan. No part may silently rebind an observation. */
 export function createTrustedHeadlessTape(host:SimHost,step:(commands:readonly HeadlessCommand[])=>void,
-  effects:()=>readonly HeadlessEffect[]):(plan:HeadlessTapePlan)=>HeadlessTapeReport {
+  effects:()=>readonly HeadlessEffect[],playerId='actor.player'):(plan:HeadlessTapePlan)=>HeadlessTapeReport {
   let pinned:{id:string;owner:unknown}[]|undefined;
   return plan=>{
     const owners=plan.observe.map(id=>({id,owner:host.adapters.get(id)}));
     if(pinned===undefined)pinned=owners;
     else if(owners.length!==pinned.length||owners.some((row,index)=>row.id!==pinned?.[index]?.id||row.owner!==pinned[index]?.owner))throw new Error('Tape observation owner changed between parts');
-    return runTrustedHeadlessTape(host,step,effects,plan);
+    return runTrustedHeadlessTape(host,step,effects,plan,playerId);
   };
 }
