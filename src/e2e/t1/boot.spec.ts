@@ -1,8 +1,10 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
+import { inPlay, state } from './probe.ts'
 
-test('Template 1 is selectable from its title', async ({
+test('Template 1 reaches control through its title', async ({
   page,
 }): Promise<void> => {
-  await page.goto('/?mute=1&nolock=1&sw=0')
-  await expect(page.locator('.ws-main-select')).toBeVisible()
+  await inPlay(page)
+  const seated = await state(page)
+  expect(seated.slug).toBe('_template')
 })

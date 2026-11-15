@@ -7,6 +7,7 @@ import type { Browser, BrowserContext, Page } from '@playwright/test'
 interface SeatedWorld {
   readonly context: BrowserContext
   readonly page: Page
+  readonly errors: readonly string[]
 }
 
 interface Fixtures {
@@ -79,8 +80,18 @@ async function openWorld(
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true })
     await harnessPins(context, { seed: 357 })
     const page = await context.newPage()
+    const errors: string[] = []
+    page.on('pageerror', (error: Readonly<Error>): void => {
+      errors.push(error.message)
+    })
+    page.on('console', (message): void => {
+      if (message.type() === 'error') {
+        errors.push(message.text())
+      }
+    })
     await seat(page)
-    return { context, page }
+    expect(errors).toEqual([])
+    return { context, page, errors }
   } catch (error) {
     await context.close()
     throw error
@@ -106,22 +117,24 @@ const test = base.extend<Fixtures, Workers>({
   ],
   page: async ({ world }, provide): Promise<void> => {
     await provide(world.page)
+    expect(world.errors).toEqual([])
   },
   freshPage: async ({ browser, baseURL }, provide): Promise<void> => {
     if (baseURL === undefined) {
       throw new Error('Missing T1 origin')
     }
-    const contexts: BrowserContext[] = []
+    const worlds: SeatedWorld[] = []
     try {
       await provide(async (): Promise<Page> => {
         const world = await openWorld(browser, baseURL)
-        contexts.push(world.context)
+        worlds.push(world)
         return world.page
       })
     } finally {
       await Promise.all(
-        contexts.map(async (context): Promise<void> => {
-          await context.close()
+        worlds.map(async (world): Promise<void> => {
+          await world.context.close()
+          expect(world.errors).toEqual([])
         }),
       )
     }
