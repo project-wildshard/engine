@@ -50,7 +50,7 @@ import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { HomeResidencyClaim } from './pageResidency';
 import { LiveGridHost, type LiveGridAdmission, type LiveGridFrame, type LiveGridRegion, type LiveGridState } from './live';
 import { installGridCrossing, type GridCheckpointResult, type GridCrossingSession, type GridCrossingState } from '../../../shared/game/grid/crossing';
-import { GridWallet, stowGridMount } from '../../../shared/game/grid/wallet';
+import { GridWallet, stowGridMount, type GridLoadout } from '../../../shared/game/grid/wallet';
 import type { LedgerCatalogueItem } from '../../../shared/game/ledger';
 import { installGridHoverSpeed } from '../../../shared/game/grid/rules';
 import { installGridTravellerCombat } from '../../../shared/game/grid/travellerCombat';
@@ -407,12 +407,17 @@ export class LiveGridSession {
       }, target: (feet) => this.wire === null ? this.live.target(feet) : this.wireTarget() },
     this.ports.assembly, (instance) => {
       const runtime = this.runtimeRegions.get(instance), flush = (): boolean => true;
-      if (runtime === undefined) return { checkpoint: flush, stow: () => { stowGridMount(this.page.traveller); }, interior: () => undefined };
-      if (this.wire !== null) return { ...runtime.loadout, checkpoint: flush };
+      if (runtime === undefined) return { checkpoint: flush, stow: () => { this.keepPrograms('home-edge:cell'); stowGridMount(this.page.traveller); }, interior: () => { this.keepPrograms('home-edge:road'); } };
+      // ZE2: the home edge swaps the lights, shadows and kit drawn, so three moves every material to another program key
+      // and releases the old one; walking back linked it again on the edge frame (Pine 133 to 650 ms, every lap). Each side's
+      // programs are pinned as the feet leave it, so the way back finds them compiled.
+      const edge = (loadout: GridLoadout): GridLoadout => ({ ...loadout, stow: () => { this.keepPrograms('home-edge:cell'); loadout.stow(); },
+        interior: () => { this.keepPrograms('home-edge:road'); loadout.interior(); } });
+      if (this.wire !== null) return edge({ ...runtime.loadout, checkpoint: flush });
       // rt3-crossing2: a committed runtime the traveller never entered never ran its hooks and never played: it saves as
       // the stored resident. Its own checkpoint refuses until its hooks restore, so turning back on the strip after the
       // commit held the crossing in save-failed for good.
-      return this.startedRuntimes.has(instance) ? runtime.loadout : { ...runtime.loadout, checkpoint: flush };
+      return edge(this.startedRuntimes.has(instance) ? runtime.loadout : { ...runtime.loadout, checkpoint: flush });
     }, this.ports.scope, (from, to) => {
       if (to !== null || from === null) return;
       const leaveStart = diagnosticNow();
