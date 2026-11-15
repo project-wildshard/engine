@@ -36,6 +36,7 @@
     }
   ],
   "include": [
+    "../.agents/hooks/active-hours.mjs",
     "**/*.mjs",
     "**/*.ts",
     "**/*.mts",

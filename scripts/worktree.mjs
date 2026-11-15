@@ -10,6 +10,9 @@
 //   3. `pnpm install --frozen-lockfile --offline`: pnpm's store, cloned, not downloaded;
 //   4. `pnpm pins` when the repo has that script (shard products from ~/.cache/wildshard/pins);
 //   5. names the herdr pane (inside herdr only) and prints the land steps.
+// Before step 1 adds anything, meta REPO-DISK DK9 (Q41): it refuses when the repo's volume has under MIN_FREE_GIB
+// free or the repo already has MAX_WORKTREES live worktrees under .worktrees/, and names the oldest parked one.
+// WS_WORKTREE_FREE_GIB stands in for the measured free GiB (tests); setting it is a deliberate override.
 //
 // Never copied: .env*, tmp/, .review/, .cache/, browser profiles, leases, ports, push proofs; the worktree gets
 // only tracked files and its own install. Each step's seconds go to <worktree>/tmp/worktree-setup.json and, with
@@ -19,12 +22,12 @@
 // (scripts/worktree-reap.mjs) removes landed, clean, idle worktrees with their branches, local and on origin.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
-import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,rmSync,statSync,unlinkSync,writeFileSync} from 'node:fs';
+import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,realpathSync,rmSync,statSync,statfsSync,unlinkSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {WORKTREES} from './worktree-ignore.mjs';
-import {freeBytes,parseReapArgs,reap} from './worktree-reap.mjs';
+import {freeBytes,lastActivity,linkedWorktrees,onMain,parseReapArgs,reap} from './worktree-reap.mjs';
 
 export const SLUG=/^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const REGULAR=/^100(?:644|755)$/u;
@@ -50,7 +53,7 @@ for source, target in zip(parts[0::2], parts[1::2]):
             sys.exit(f'{target.decode()}: {os.strerror(ctypes.get_errno())}')
     finally:
         os.close(fd)`;
-const USAGE='usage: node scripts/worktree.mjs new <slug> [--no-install] [--no-pins] [--no-herdr] [--no-clone]\n       node scripts/worktree.mjs reap [--dry-run] [--grace=HOURS] [--no-remote]';
+const USAGE='usage: node scripts/worktree.mjs new <slug> [--row=PLAN-ROW] [--no-install] [--no-pins] [--no-herdr] [--no-clone]\n       node scripts/worktree.mjs reap [--dry-run] [--grace=HOURS] [--no-remote]';
 
 class StopError extends Error{name='StopError';}
 
@@ -82,15 +85,67 @@ export function withStoreUse(env,what,fn){
  }finally{rmSync(mine,{force:true});}
 }
 
+/** Meta REPO-DISK DK9 (DEV-SPEED Q41): at most this many live plan worktrees per repo. */
+export const MAX_WORKTREES=6;
+/** Meta REPO-DISK DK9: refuse a new worktree when the repo's volume has less free than this, in GiB. */
+export const MIN_FREE_GIB=60;
+
+/** Free GiB on the volume holding `path`; WS_WORKTREE_FREE_GIB fakes it (tests). @param {string} path @param {NodeJS.ProcessEnv} env */
+export function freeGib(path,env){
+ const faked=env.WS_WORKTREE_FREE_GIB;
+ if(faked!==undefined&&faked!==''){
+  const value=Number(faked);
+  if(!Number.isFinite(value)||value<0)throw new StopError(`WS_WORKTREE_FREE_GIB=${faked} is not a number of GiB`);
+  return value;
+ }
+ const volume=statfsSync(path);
+ return volume.bavail*volume.bsize/2**30;
+}
+
+/**
+ * DK9: why `worktree new` must not add another worktree here, or '' when it may. Live means a registered worktree
+ * whose folder exists under <canonical>/.worktrees/. A refusal names the oldest parked one (on plan/<slug>, landed:
+ * its tip on origin/main, and clean), by its last Git activity, and the reap command that frees it.
+ * @param {string} canonical @param {NodeJS.ProcessEnv} env @returns {string}
+ */
+export function capRefusal(canonical,env){
+ const roots=new Set([join(canonical,WORKTREES),join(realpathSync(canonical),WORKTREES)]);
+ const live=linkedWorktrees(canonical).filter(tree=>roots.has(dirname(resolve(tree.path)))&&existsSync(tree.path));
+ const free=freeGib(canonical,env);
+ const full=live.length>=MAX_WORKTREES,low=free<MIN_FREE_GIB;
+ if(!full&&!low)return '';
+ const why=[
+  ...(full?[`${basename(canonical)} already has ${String(live.length)} live worktrees under ${WORKTREES}/ (cap ${String(MAX_WORKTREES)})`]:[]),
+  ...(low?[`only ${free.toFixed(1)} GiB free on the volume of ${canonical} (floor ${String(MIN_FREE_GIB)} GiB)`]:[]),
+ ].join(', and ');
+ const parked=live.flatMap(tree=>{
+  const slug=basename(tree.path);
+  if(tree.branch!==`refs/heads/plan/${slug}`||!onMain(canonical,tree.head))return [];
+  // Activity first, and a status that takes no optional lock: a plain `git status` may rewrite the index and so
+  // make every worktree look active now.
+  const at=lastActivity(tree.path,git(tree.path,['rev-parse','--absolute-git-dir']).trim());
+  const dirty=spawnSync('git',['--no-optional-locks','status','--porcelain','--untracked-files=all'],{cwd:tree.path,encoding:'utf8',maxBuffer:64<<20});
+  if(dirty.status!==0||dirty.stdout.trim()!=='')return [];
+  return [{slug,at}];
+ }).sort((a,b)=>a.at-b.at);
+ const oldest=parked[0];
+ const hint=oldest===undefined
+  ?`none of them is parked (landed on origin/main and clean): land one, or remove one by hand`
+  :`the oldest parked worktree is ${WORKTREES}/${oldest.slug} (landed, clean, idle ${((Date.now()-oldest.at)/3_600_000).toFixed(1)} h); \`node scripts/worktree.mjs reap\` frees it once idle 24 h with no process inside, or land and remove one by hand`;
+ return `${why}; ${hint}`;
+}
+
 /** @param {string[]} argv */
 export function parseArgs(argv){
  const [command,slug,...rest]=argv;
  if(command!=='new'||slug===undefined)throw new StopError(USAGE);
  if(!SLUG.test(slug))throw new StopError(`slug "${slug}" must match ${SLUG.source}`);
  const flags=new Set(['--no-install','--no-pins','--no-herdr','--no-clone']);
- const unknown=rest.filter(arg=>!flags.has(arg));
+ const row=rest.find(arg=>arg.startsWith('--row='));
+ const unknown=rest.filter(arg=>!flags.has(arg)&&arg!==row);
  if(unknown.length>0)throw new StopError(`unknown option ${unknown.join(' ')}\n${USAGE}`);
- return {slug,install:!rest.includes('--no-install'),pins:!rest.includes('--no-pins'),herdr:!rest.includes('--no-herdr'),clone:!rest.includes('--no-clone')};
+ if(row!==undefined&&!/^--row=[A-Z][A-Z0-9-]*\d+[a-z]?$/u.test(row))throw new StopError(`invalid plan row ${row}\n${USAGE}`);
+ return {slug,row:row?.slice('--row='.length)??null,install:!rest.includes('--no-install'),pins:!rest.includes('--no-pins'),herdr:!rest.includes('--no-herdr'),clone:!rest.includes('--no-clone')};
 }
 
 /** The canonical checkout of the repo `cwd` is in: the main worktree, never a linked one. @param {string} cwd */
@@ -277,6 +332,9 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
   if(existsSync(tree))throw new StopError(`${relative} already exists; work there, or pick another slug`);
   if(tryGit(canonical,['rev-parse','--verify','--quiet',`refs/heads/${branch}`]).status===0)throw new StopError(`branch ${branch} already exists; delete it or pick another slug`);
   timed('fetch',()=>{git(canonical,['fetch','--quiet','origin','main']);base=git(canonical,['rev-parse','origin/main']).trim();return `origin/main ${base.slice(0,10)}; ${followMain(canonical,base)}`;});
+  // DK9: after the fetch, so "landed" reads the current origin/main; before anything is added.
+  const refused=capRefusal(canonical,env);
+  if(refused!=='')throw new StopError(refused);
   // Git refuses `-b` for a branch that appeared since the check, before anything here owns one.
   timed('add',()=>{git(canonical,['worktree','add','--quiet','--no-checkout','-b',branch,relative,base]);});
   try{
@@ -304,9 +362,10 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
    throw error;
   }
  }finally{unlock();}
- const scripts=/** @type {{scripts?:Record<string,string>}} */(JSON.parse(readFileSync(join(tree,'package.json'),'utf8'))).scripts??{};
+ const manifest=join(tree,'package.json');
+ const scripts=existsSync(manifest)?/** @type {{scripts?:Record<string,string>}} */(JSON.parse(readFileSync(manifest,'utf8'))).scripts??{}:{};
  const childEnv=Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_')));
- if(options.install)timed('install',()=>withStoreUse(env,'worktree install',()=>run(tree,'pnpm',['install','--frozen-lockfile','--offline'],childEnv)));
+ if(options.install&&existsSync(manifest))timed('install',()=>withStoreUse(env,'worktree install',()=>run(tree,'pnpm',['install','--frozen-lockfile','--offline'],childEnv)));
  if(options.pins&&scripts.pins!==undefined)timed('pins',()=>run(tree,'pnpm',['--silent','pins'],childEnv));
  if(options.herdr&&env.HERDR_ENV==='1'&&env.HERDR_PANE_ID!==undefined&&env.HERDR_PANE_ID!==''){
   const named=spawnSync('herdr',['pane','rename',env.HERDR_PANE_ID,`${basename(canonical)} ${branch}`],{encoding:'utf8'});
@@ -321,17 +380,20 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
  const total=Number(((performance.now()-began)/1000).toFixed(2));
  const disk=diskCost(tree,freeBefore);
  process.stdout.write(`worktree disk     ${disk.text}\n`);
- const record={slug:options.slug,branch,base,tree,total,steps,disk,finished:new Date().toISOString()};
+ const created=new Date().toISOString();
+ const lane=/^[a-z][a-z0-9_-]*$/u.test(env.WS_LANE_NAME??'')?String(env.WS_LANE_NAME):null;
+ const record={slug:options.slug,branch,base,tree,total,steps,disk,finished:created};
+ const owner={lane,session:env.CLAUDE_SESSION_ID??env.CLAUDE_CODE_SESSION_ID??lane,agent:env.CLAUDE_SESSION_ID||env.CLAUDE_CODE_SESSION_ID?'claude':lane===null?'unknown':'codex',row:options.row??env.WS_PLAN_ROW??null,created,activeHours:null};
+ writeFileSync(join(tree,'.owner'),`${JSON.stringify(owner,null,2)}\n`,{flag:'wx'});
  mkdirSync(join(tree,'tmp'),{recursive:true});
  writeFileSync(join(tree,'tmp/worktree-setup.json'),`${JSON.stringify(record,null,2)}\n`);
- const lane=/^[a-z][a-z0-9_-]*$/u.test(env.WS_LANE_NAME??'')?String(env.WS_LANE_NAME):'';
- if(lane!==''){
+ if(lane!==null){
   const file=resolve(env.WS_LANE_RECEIPTS??join(homedir(),'.cache/wildshard/lane-receipts.log'));
   try{mkdirSync(dirname(file),{recursive:true});appendFileSync(file,`${new Date().toISOString().slice(11,16)} UTC ${lane} worktree new ${basename(canonical)}/${relative} on ${branch} from ${base.slice(0,10)} in ${total.toFixed(1)} s (${steps.map(row=>`${row.step} ${row.seconds.toFixed(1)}`).join(', ')}); ${disk.text}\n`);}
   catch(error){process.stderr.write(`worktree receipt unavailable: ${String(error)}\n`);}
  }
- const name=lane===''?'<lane>':lane;
- process.stdout.write(`\nworktree ready in ${total.toFixed(1)} s: ${tree} on ${branch}\n\nLand (J240):\n  cd ${tree}\n  # commit by pathspec as usual; the hooks allow commits here on ${branch}\n  WS_LANE_NAME=${name} node scripts/land.mjs\n  # it pushes ${branch}, waits for its ci and ring-1, rebases and fast-forwards main;\n  # check its receipt in ~/.cache/wildshard/lane-receipts.log. Force only your own plan/* branch\n  # after a rebase (--force-with-lease), never main.\n`);
+ const name=lane??'<lane>';
+ process.stdout.write(`\nworktree ready in ${total.toFixed(1)} s: ${tree} on ${branch}\n\nLand (J240):\n  cd ${tree}\n  # commit by pathspec as usual; the hooks allow commits here on ${branch}\n  WS_LANE_NAME=${name} node scripts/land.mjs\n  # it pushes ${branch}, waits for its hosted CI (land.config.json workflows), rebases and fast-forwards main;\n  # check its receipt in ~/.cache/wildshard/lane-receipts.log. Force only your own plan/* branch\n  # after a rebase (--force-with-lease), never main.\n`);
  return 0;
 }
 

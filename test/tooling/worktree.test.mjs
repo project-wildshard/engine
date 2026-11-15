@@ -60,7 +60,7 @@ const worktree = (cwd, args, env = {}) => spawnSync(process.execPath, [SCRIPT, .
 
 describe('worktree new', () => {
   test('parses its slug and options and refuses anything else', () => {
-    expect(parseArgs(['new', 'foo'])).toEqual({slug: 'foo', install: true, pins: true, herdr: true, clone: true});
+    expect(parseArgs(['new', 'foo'])).toEqual({slug: 'foo', row: null, install: true, pins: true, herdr: true, clone: true});
     expect(parseArgs(['new', 'foo', '--no-install', '--no-pins'])).toMatchObject({install: false, pins: false});
     for (const bad of [[], ['old', 'foo'], ['new'], ['new', 'Foo'], ['new', '../x'], ['new', 'foo', '--force']]) expect(() => parseArgs(bad)).toThrow();
     expect(SLUG.test('dev-speed.2')).toBe(true);
@@ -74,7 +74,8 @@ describe('worktree new', () => {
     const tree = join(canonical, '.worktrees/foo');
     expect(git(tree, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('plan/foo');
     expect(git(tree, ['rev-parse', 'HEAD'])).toBe(git(canonical, ['rev-parse', 'origin/main']));
-    expect(git(tree, ['status', '--porcelain'])).toBe('');
+    expect(git(tree, ['status', '--porcelain', '--untracked-files=no'])).toBe('');
+    expect(existsSync(join(tree, '.owner'))).toBe(true);
     // Never the canonical checkout's local commit, uncommitted edit or ignored files.
     expect(readFileSync(join(tree, 'src/ahead.ts'), 'utf8')).toBe('export const ahead = 1;\n');
     expect(readFileSync(join(tree, 'src/dirty.ts'), 'utf8')).toBe('export const dirty = 1;\n');
@@ -207,7 +208,8 @@ describe('worktree new', () => {
     expect(readFileSync(join(tree, 'src/same.ts'), 'utf8')).toBe('export const same = 1;\n');
     expect(spawnSync('test', ['-x', join(tree, 'bin/run.sh')]).status).toBe(0);
     expect(readFileSync(join(tree, 'package.json'), 'utf8')).toContain('"name":"fixture"');
-    expect(git(tree, ['status', '--porcelain'])).toBe('');
+    expect(git(tree, ['status', '--porcelain', '--untracked-files=no'])).toBe('');
+    expect(existsSync(join(tree, '.owner'))).toBe(true);
   });
 
   test('writes an ident-expanded file through git, not as a raw clone', () => {
