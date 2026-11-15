@@ -17,7 +17,7 @@ import { EquipmentService } from '@wildshard/engine/combat/EquipmentService';
 import type { Weapon } from '@wildshard/engine/combat/Weapon';
 import { playerModes } from '@wildshard/engine/player/modes';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import { installDeclaredItems, leverLines } from '../../../shared/game/shardfile/items';
+import { installDeclaredItems, leverLines, rackMeleeRows, takenLine } from '../../../shared/game/shardfile/items';
 import { declaredItemIcon, declaredKitItemFamilies, declaredLever } from '../plugin/weaponFamily';
 import { itemScene } from '../shardfile/clientItems';
 import { loadItemModels } from '../shardfile/itemModels';
@@ -76,6 +76,8 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   kit.enabled = enabled; kit.visible = visible; kit.stowed = false;
   // TE-ENG2: a lever follows the server's owned lines; taken, it unlocks and comes to hand
   const levers = weapons.flatMap(weapon => { const lever = declaredLever(weapon); return lever === null ? [] : [lever]; });
+  // TEMPLATE-E2E TC-E4: a melee weapon on a rack follows its owned taken line the same way
+  const onRacks = rackMeleeRows(source), racked = new Set(weapons.filter(weapon => weapon !== first && onRacks.has(weapon.id)));
   app.addContentSystem({ id: 'grid.data-cell-kit', phase: 'update', run: (dt, t) => {
     for (const lever of levers) {
       if (wirePage.client !== null && here()) {
@@ -83,6 +85,10 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
         lever.mirror(wirePage.line(lines.rounds), wirePage.line(lines.reserve), wirePage.line(lines.reloading) > 0, wirePage.line(lines.taken) > 0);
       }
       if (lever.taken && !kit.has(lever.id)) { kit.unlock(lever.id); kit.select(lever.id); }
+    }
+    if (wirePage.client !== null && here()) for (const weapon of racked) {
+      if (wirePage.line(takenLine(weapon.id)) <= 0) continue;
+      racked.delete(weapon); if (!kit.has(weapon.id)) { kit.unlock(weapon.id); kit.select(weapon.id); }
     }
     kit.update(dt, t);
   } }, entry);

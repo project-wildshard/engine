@@ -95,7 +95,15 @@ export function leverProfile(row: { readonly id: string; readonly profile?: unkn
 /** The owned lines a lever's server seat publishes to its holder: rounds in the gun (tube and chamber), the reserve, a reload under
  *  way (0 or 1) and whether the player has taken it (0 or 1). A line at zero is dropped from `owned`, so absent reads as zero. */
 export function leverLines(id: string): { readonly rounds: string; readonly reserve: string; readonly reloading: string; readonly taken: string } {
-  return { rounds: `${id}.rounds`, reserve: `${id}.reserve`, reloading: `${id}.reloading`, taken: `${id}.taken` };
+  return { rounds: `${id}.rounds`, reserve: `${id}.reserve`, reloading: `${id}.reloading`, taken: takenLine(id) };
+}
+/** The owned line that says a player has taken a declared weapon off its rack (a lever's, TC-E1; a melee weapon's, TC-E4). */
+export function takenLine(id: string): string { return `${id}.taken`; }
+/** TEMPLATE-E2E TC-E4: the declared melee weapons a rack hands over (an item scene's take, action 3), other than the loadout's
+ *  primary. Each starts on its rack for every player and comes to hand when that player takes it. */
+export function rackMeleeRows(shard: { readonly items: { readonly rows: readonly { readonly id: string; readonly kind?: string; readonly family?: string }[]; readonly loadout: { readonly primary: string | null } }; readonly targets: { readonly itemActions?: readonly { readonly item: string; readonly action: number }[] | undefined } }): ReadonlySet<string> {
+  const melee = new Set(shard.items.rows.filter(row => row.kind === 'weapon' && row.family === 'kit.melee').map(row => row.id));
+  return new Set((shard.targets.itemActions ?? []).flatMap(row => row.action === 3 && melee.has(row.item) && row.item !== shard.items.loadout.primary ? [row.item] : []));
 }
 /** Normal equipment factory result plus authoritative fixed-step runtimes, scoped to the one session. */
 export interface DeclaredItems {

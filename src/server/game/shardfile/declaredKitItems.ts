@@ -19,7 +19,7 @@ import type { AimCommand } from '@wildshard/engine/input/commands';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
-import { declaredKitSlots, LEVER_FAMILY, leverLines, leverProfile, SERVER_KIT_FAMILIES, type LeverProfile } from '../../../shared/game/shardfile/items';
+import { declaredKitSlots, LEVER_FAMILY, leverLines, leverProfile, rackMeleeRows, SERVER_KIT_FAMILIES, takenLine, type LeverProfile } from '../../../shared/game/shardfile/items';
 import { playerSeats, type PlayerSeat } from '../plugin/playerSeats';
 import { nativeRangedHit } from '../plugin/nativeItems';
 import { installStatusEffects } from './statusEffects';
@@ -45,7 +45,9 @@ export interface DeclaredKitItems {
 type Cycle = InstanceType<typeof RangedAction.Cycle>;
 /** One player's lever: the cycle and its reserve, whether they have taken it, and the time since a dry pull (its auto-reload window). */
 interface LeverSeat { readonly act: Cycle; readonly store: { reserve: number }; taken: boolean; sinceEmpty: number }
-interface KitSeat extends PlayerSeat { readonly runtimes: ReadonlyMap<string, ItemRuntime>; readonly levers: ReadonlyMap<string, LeverSeat> }
+interface KitSeat extends PlayerSeat { readonly runtimes: ReadonlyMap<string, ItemRuntime>; readonly levers: ReadonlyMap<string, LeverSeat>; readonly racked: Set<string> }
+/** The continuation key of a player's rack weapons still on their racks (TC-E4): no item id starts with '#'. */
+const RACKED = '#racked';
 type LeverRow = Extract<Shardfile['items']['rows'][number], { kind: 'weapon' }>;
 const finiteNumber = v.pipe(v.number(), v.finite()), count = v.pipe(finiteNumber, v.integer(), v.minValue(0));
 const LeverSaved = v.strictObject({ tube: count, chambered: v.boolean(), caseInChamber: v.boolean(), hammerCocked: v.boolean(),
@@ -86,6 +88,8 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
   // TEMPLATE-E2E TC-E1c: the loadout's primary lever is in hand from the start; any other waits for its rack
   const primary = shard.items.loadout.primary;
   const scenes = new Map((shard.targets.itemActions ?? []).filter(row => rows.some(item => item.id === row.item)).map(row => [row.scene, row] as const));
+  // TEMPLATE-E2E TC-E4 (J361: Mossgate's sword is found on a rack): a melee weapon a rack takes starts on that rack, per player
+  const rackMelee = rackMeleeRows(shard);
   const fields = (shard.targets.itemFields ?? []).flatMap(row => {
     const field = shard.state.player.find(entry => entry.id === row.fieldId);
     return field === undefined || field.privacy === 'host' ? [] : [{ item: row.item, name: field.name, property: row.property }];
@@ -112,7 +116,8 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
       const seat: LeverSeat = { act: new RangedAction.Cycle(store, { magazine: profile.magazine, reload: profile.reload, ...profile.lever }), store, taken: id === primary, sinceEmpty: 99 };
       return [id, seat] as const;
     }));
-    return { runtimes, levers: seated,
+    const racked = new Set(rackMelee);
+    return { runtimes, levers: seated, racked,
       step: dt => {
         for (const runtime of runtimes.values()) runtime.step(host.state.tick, dt);
         const holding = weapons[player.held];
@@ -124,7 +129,8 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
           for (const _event of seat.act.events(dt, due)) { /* The seat has no presentation: the page plays its own cycle. */ }
         }
       },
-      snapshot: (): SimValue => ({ ...Object.fromEntries([...runtimes].map(([id, runtime]) => [id, runtime.snapshot()])), ...Object.fromEntries([...seated].map(([id, seat]) => [id, leverSnapshot(seat)])) }) as unknown as SimValue,
+      snapshot: (): SimValue => ({ ...Object.fromEntries([...runtimes].map(([id, runtime]) => [id, runtime.snapshot()])), ...Object.fromEntries([...seated].map(([id, seat]) => [id, leverSnapshot(seat)])),
+        ...(rackMelee.size === 0 ? {} : { [RACKED]: [...racked].sort() }) }),
       restore: value => {
         if (!isStates(value)) throw new Error('Invalid declared kit item continuation');
         // A player's document can come from an older room (E7.4): its tick is that room's. The runtime's tick only orders steps,
@@ -132,6 +138,9 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         for (const [id, runtime] of runtimes) { const saved = value[id]; if (saved !== undefined) runtime.restore({ ...saved, tick: Math.max(-1, Math.min(saved.tick, host.state.tick - 1)) }); }
         // A save made before a lever existed leaves it fresh.
         for (const [id, seat] of seated) { const saved: unknown = value[id]; if (saved !== undefined) restoreLever(seat, saved); if (id === primary) seat.taken = true; }
+        // A save from before TC-E4 has no rack list: its weapons stay on their racks, as a fresh player's do.
+        const saved: unknown = value[RACKED];
+        if (Array.isArray(saved)) { racked.clear(); for (const id of saved) if (typeof id === 'string' && rackMelee.has(id)) racked.add(id); }
       } };
   });
   // Joined: a save made before this owner existed restores, and its items start fresh.
@@ -146,6 +155,11 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
       out.set(field.name, field.property === 'fuel' ? Math.round(runtime.remainingFuel * FUEL_STEPS) / FUEL_STEPS : Number(runtime.lightOn));
     }
   });
+  if (rackMelee.size > 0) publishOwned(host, 'items.declared-rack', (id, out) => {
+    const player = host.players.get(id); if (player === undefined) return;
+    const { racked } = seats.of(player);
+    for (const item of rackMelee) out.set(takenLine(item), Number(!racked.has(item)));
+  });
   if (levers.size > 0) publishOwned(host, 'items.declared-lever', (id, out) => {
     const player = host.players.get(id); if (player === undefined) return;
     for (const [item, seat] of seats.of(player).levers) {
@@ -154,7 +168,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
       out.set(lines.reloading, Number(seat.act.phase === 'reload')); out.set(lines.taken, Number(seat.taken));
     }
   });
-  const held = (player: PlayerSim): ItemRuntime | undefined => { const id = weapons[player.held]; return id === undefined ? undefined : seats.of(player).runtimes.get(id); };
+  const held = (player: PlayerSim): ItemRuntime | undefined => { const id = weapons[player.held], seat = seats.of(player); return id === undefined || seat.racked.has(id) ? undefined : seat.runtimes.get(id); };
   const heldLever = (player: PlayerSim): { readonly seat: LeverSeat; readonly row: LeverRow; readonly profile: LeverProfile } | undefined => {
     const id = weapons[player.held], lever = id === undefined ? undefined : levers.get(id), seat = id === undefined ? undefined : seats.of(player).levers.get(id);
     return lever === undefined || seat === undefined ? undefined : { seat, row: lever.row, profile: lever.profile };
@@ -215,7 +229,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
       const player = host.players.get(id), want = weapons[slot];
       if (player === undefined || want === undefined) return false;
       // A lever still on its rack is no swap: the act is spent, and the hand stays where it is.
-      if (seats.of(player).levers.get(want)?.taken === false) return true;
+      if (seats.of(player).levers.get(want)?.taken === false || seats.of(player).racked.has(want)) return true;
       const before = held(player), aim = eye(player, 0);
       if (before !== undefined) safely(() => { before.hold(false, aim, false); }); // a swap lets go of a charge without striking
       player.held = slot; return true;
@@ -233,6 +247,15 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
           if (before !== undefined) safely(() => { before.hold(false, eye(taker, 0), false); });
           lever.taken = true; if (slot !== -1) taker.held = slot;
         } else if (lever.taken) lever.act.beginReload();
+        return true;
+      }
+      // TC-E4: 3 takes a racked melee weapon into hand; once taken, its rack is spent
+      if (taker !== undefined && row.action === 3 && rackMelee.has(row.item)) {
+        const own = seats.of(taker).racked;
+        if (!own.has(row.item) || !near(taker, scene)) return true;
+        const slot = weapons.indexOf(row.item), before = held(taker);
+        if (before !== undefined) safely(() => { before.hold(false, eye(taker, 0), false); });
+        own.delete(row.item); if (slot !== -1) taker.held = slot;
         return true;
       }
       const player = taker, runtime = player === undefined ? undefined : seats.of(player).runtimes.get(row.item);
