@@ -227,6 +227,7 @@ jobs:
             tmp/engine-ci
             tmp/ci-pack/*.json
             tmp/ring-cook/step.json
+            tmp/template-e2e-ci/t1/results/
           retention-days: 7
           if-no-files-found: ignore
       - name: Keep the recorded Ring 1 baseline
@@ -257,7 +258,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: playwright-traces-${{ matrix.job }}
-          path: src/e2e/test-results/
+          path: |
+            src/e2e/test-results/
+            tmp/template-e2e-ci/t1/results/
           retention-days: 7
           if-no-files-found: ignore
       - name: Record every shard's wall-budget verdict, artifact upload included (J193)

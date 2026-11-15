@@ -17,6 +17,8 @@ export default defineConfig({
     't1/results',
   ),
   workers: 1,
+  forbidOnly: process.env['CI'] !== undefined,
+  timeout: 120_000,
   use: {
     baseURL: BASE_URL,
     trace: 'retain-on-failure',
