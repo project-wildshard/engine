@@ -234,6 +234,23 @@ export class World {
     await this.bootWorker(slugs, false, index);
     this.openRoads();
   }
+  /** MP1.3: drain one worker's seats through their normal save-and-redial path, then replace only that worker. */
+  async restartDrainedWorker(index: number): Promise<void> {
+    const old = this.workers[index], slugs = old === undefined ? undefined : this.workerSlugs.get(old);
+    if (old === undefined || slugs === undefined) throw new Error(`No worker ${String(index)}`);
+    this.options.log({ at: 'worker.draining', index, slugs });
+    const drained = new Promise<void>(resolve => {
+      const timer = this.scope.timeout(DRAIN_MS, resolve);
+      this.drains.set(index, () => { this.scope.cancelTimer(timer); resolve(); });
+      old.send({ kind: 'drain', leave: true });
+    });
+    await drained;
+    if (!await this.options.saves.drain(DRAIN_MS)) throw new Error('Worker save drain timed out');
+    if ([...this.seated.values()].some(slug => this.linkOf(slug) === old)) throw new Error('Worker drain left seated players');
+    this.replacing.add(old); this.up.delete(old); this.resident.delete(old); this.stands.delete(old); old.stop();
+    await this.bootWorker(slugs, false, index);
+    this.openRoads();
+  }
   /**
    * SA33: open cells on a running world (a placement the API made, J314) on a worker of their own. No other worker is told anything, so every
    * player in another cell stays where they are, and the door seats a player in a new cell only once its worker has booted. A cell this world
