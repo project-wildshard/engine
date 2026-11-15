@@ -69,3 +69,25 @@ test.each([Number.NaN, Infinity, -1, Number.MAX_SAFE_INTEGER + 1])('G723: invali
   expect(allocator.canPrepareAlongside('kept', 'incoming', bytes, limits)).toBe(false);
   expect(allocator.entries()).toEqual([]);
 });
+
+test('GC13: a phone page builds no world beside the one it keeps (its loading envelope is its 1.0 GB playing envelope)', () => {
+  const phone = new ResidencyAllocator({ playing: 1_000_000_000, loading: 1_000_000_000 }), desktop = new ResidencyAllocator();
+  // the phone tour's road: Driftwood's sim kept (284 MB, with the page's 59 MB of commons) while Nalati's (197 MB) would build beside it
+  const commons = { id: 'commons', owner: 'platform', category: 'commons' as const, bytes: 59_000_000, distance: 0, needed: true };
+  const leases = [phone.reserve(world('driftwood', 284_000_000)), desktop.reserve(world('driftwood', 284_000_000)), phone.reserve(commons), desktop.reserve(commons)];
+  try {
+    expect(phone.loadingEnvelope()).toBe(1_000_000_000);
+    expect(desktop.loadingEnvelope()).toBe(CONTENT_CAPS.loading);
+    const projected = (allocator: ResidencyAllocator) => contentCost({ ...allocator.cost().input, sims: allocator.cost().input.sims + 197_000_000 }).loading;
+    expect(projected(phone)).toBeGreaterThan(1_000_000_000);
+    expect(projected(desktop)).toBeLessThanOrEqual(CONTENT_CAPS.loading);
+    const alongside = (allocator: ResidencyAllocator) => allocator.canPrepareAlongside('driftwood', 'nalati', 197_000_000, { playing: allocator.envelope(), loading: allocator.loadingEnvelope() });
+    expect(alongside(phone)).toBe(false);
+    expect(alongside(desktop)).toBe(true);
+  } finally { for (const lease of leases) lease?.release(); }
+});
+
+test('GC13: a loading envelope under the playing one is refused; a larger playing envelope raises the default', () => {
+  expect(() => new ResidencyAllocator({ playing: 1_000_000_000, loading: 999_999_999 })).toThrow('Invalid residency loading envelope');
+  expect(new ResidencyAllocator({ playing: 10e9 }).loadingEnvelope()).toBe(10e9);
+});

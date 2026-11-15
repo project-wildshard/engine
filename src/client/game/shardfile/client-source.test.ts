@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { expect, test, vi } from 'vitest';
-import { configuredShardfile, pagePlayingBytes, preparePageResidency } from './clientSource';
+import { configuredShardfile, pageLoadingBytes, pagePlayingBytes, preparePageResidency } from './clientSource';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { parseShardSlug } from '../../../shared/game/shard/slug';
 import type { ProductOptions } from './product';
@@ -40,4 +40,9 @@ test('a phone page admits against G65\'s 1.0 GB playing envelope, a desktop page
   expect(pagePlayingBytes('phone')).toBe(1_000_000_000);
   expect(pagePlayingBytes('desktop')).toBe(CONTENT_CAPS.playing);
   expect(pagePlayingBytes('phone')).toBeLessThan(CONTENT_CAPS.playing);
+});
+
+test('a phone page keeps no loading headroom past its 1.0 GB, a desktop page keeps the shared loading cap (GC13)', () => {
+  expect(pageLoadingBytes('phone')).toBe(pagePlayingBytes('phone'));
+  expect(pageLoadingBytes('desktop')).toBe(CONTENT_CAPS.loading);
 });

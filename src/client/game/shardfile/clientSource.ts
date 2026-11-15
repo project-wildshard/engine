@@ -54,6 +54,9 @@ export interface PageResidencyBoot {
  */
 /** GC13: the page's playing envelope: the phone tier's 1.0 GB (G65), else the shared caps' */
 export function pagePlayingBytes(tier: Tier = TIER): number { return tier === 'phone' ? PHONE_PLAYING_BYTES : CONTENT_CAPS.playing; }
+/** GC13: the page's loading envelope. A phone has no headroom past G65's 1.0 GB (two worlds on the road peaked at 1.28 GB), so a
+ *  world is never built beside the one being left: that one goes first. Else the shared caps' loading figure. */
+export function pageLoadingBytes(tier: Tier = TIER): number { return tier === 'phone' ? PHONE_PLAYING_BYTES : CONTENT_CAPS.loading; }
 
 export function preparePageResidency(manifest: Pick<ShardManifest, 'slug' | 'shardfile' | 'runtimeCost'>, configuredSlug?: string, memory: MemoryAdmission = new MemoryAdmission(() => MEMORY_GATES.reportOnly || isDev())): PageResidencyBoot {
   const mode = bootPageMode(configuredSlug ?? manifest.slug);
@@ -61,7 +64,7 @@ export function preparePageResidency(manifest: Pick<ShardManifest, 'slug' | 'sha
   if (mode !== 'grid' && (!measuredHome || manifest.runtimeCost === undefined)) return { mode, instance: null, memory };
   const instance = mode === 'grid' ? pageGridInstance() : manifest.slug;
   if (instance === null) throw new Error('Grid residency requires the consumed home instance');
-  const residency = new PageResidency(new ResidencyAllocator({ memory, playing: pagePlayingBytes() }));
+  const residency = new PageResidency(new ResidencyAllocator({ memory, playing: pagePlayingBytes(), loading: pageLoadingBytes() }));
   try {
     if (measuredHome) {
       if (manifest.runtimeCost === undefined) throw new Error('Grid runtime home requires reviewed memory measurements before bootstrap');
@@ -104,7 +107,7 @@ function clientSource(admitted: AdmittedProduct, options: ProductOptions, bindin
   const sections = outputDescriptor(source)?.sections;
   if (sections !== undefined) prepareClientModuleGroups(source, sections);
   const ownedBindings = { ...bindings,
-    ...(bindings.allocator === undefined && bindings.residency === undefined && options.memory !== undefined ? { allocator: new ResidencyAllocator({ memory: options.memory, playing: pagePlayingBytes() }) } : {}),
+    ...(bindings.allocator === undefined && bindings.residency === undefined && options.memory !== undefined ? { allocator: new ResidencyAllocator({ memory: options.memory, playing: pagePlayingBytes(), loading: pageLoadingBytes() }) } : {}),
     ...(options.firstParty ? {} : { instance: admitted.instance ?? '' }) };
   const residency = clientResidency(source, ownedBindings);
   const assets = new ClientAssets(source, admitted.assets, options);

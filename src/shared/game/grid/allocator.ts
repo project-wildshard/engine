@@ -100,16 +100,23 @@ export class ResidencyAllocator {
   private evictableCredit = 0;
 
   private readonly playing: number;
+  /** GC13: the most two worlds may hold at once while one is built beside another (`canPrepareAlongside`'s caller) */
+  private readonly loading: number;
   private generation = 0;
   private evicting = false;
-  constructor(options: { playing?: number; memory?: MemoryAdmission } = {}) {
+  constructor(options: { playing?: number; loading?: number; memory?: MemoryAdmission } = {}) {
     this.memory = options.memory ?? new MemoryAdmission();
     this.playing = options.playing ?? CONTENT_CAPS.playing;
+    this.loading = options.loading ?? Math.max(CONTENT_CAPS.loading, this.playing);
     if (!Number.isFinite(this.playing) || this.playing <= 0) throw new RangeError('Invalid residency envelope');
+    if (!Number.isFinite(this.loading) || this.loading < this.playing) throw new RangeError('Invalid residency loading envelope');
   }
 
   /** The playing envelope this allocator admits against (the tier's, else §3.2's). */
   envelope(): number { return this.playing; }
+  /** GC13: the transient envelope a world built beside the kept one may reach (§3.2's loading cap; a phone's is its playing
+   *  envelope, so the world left is released before the next is built). */
+  loadingEnvelope(): number { return this.loading; }
 
   /** Admit a claim, or share one already held under the same id; null when it cannot fit even after eviction. */
   reserve(claim: ResidencyClaim): ResidencyLease | null { return this.reserveClaim(claim, 0); }
