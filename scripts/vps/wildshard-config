@@ -5,6 +5,9 @@
 #                                                                   write the settings, restart the channel once, roll back if
 #                                                                   it does not come up healthy
 #   wildshard-config split <channel>                                setup.sh's: move the settings out of <channel>.env, once
+#   wildshard-config cook <tag>                                     AUTO-RELEASE AR4 (J355): move the cook worker to vX.Y.Z and
+#                                                                   the build a signed release names for it; roll back on failure
+#   wildshard-config show cook                                      print the cook worker's tag and build
 # Settings live in /etc/wildshard/<channel>.settings (640 root:wildshard-<channel>), which the units read after <channel>.env.
 # Secrets stay in the root-only .env, and this never prints one or writes one (it reads only the placement rows there, for
 # the pair check below): only the keys in SETTINGS below, each
@@ -167,11 +170,106 @@ def restart(channel):
     return healthy(channel)
 
 
+# AUTO-RELEASE AR4 (J355): the cook worker's two non-secret keys. They go to /etc/wildshard/cook.settings (640
+# root:wildshard-cook), which its unit and rebuild.sh read after the root-only cook.env (the notify token and R2 writer keys,
+# never read here), so they win. The build is never the caller's: wildshard-apply's verify reads it from a signed channel
+# release that names the tag, after checking GitHub's tag points at it. rebuild.sh --cook then moves the checkout, installs,
+# restarts the worker and waits for its /health.
+COOK_KEYS = ('COOK_ENGINE_REF', 'WILDSHARD_BUILD')
+COOK_TAG = r'v[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}'
+COOK_HEADER = ['# AUTO-RELEASE AR4 (J355): the cook worker\'s engine tag and build, read after cook.env. Change them with',
+               '# `sudo wildshard-config cook <tag>`; the secrets stay in cook.env.']
+CLEAN = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root', 'LANG': 'C.UTF-8'}
+
+
+def helper(name):
+    """A root-owned helper, or the test's stand-in (never as root)."""
+    if TEST:
+        return os.environ.get(f'WILDSHARD_CONFIG_TEST_{name.upper()}', '/nonexistent')
+    return {'apply': '/usr/local/sbin/wildshard-apply', 'rebuild': '/opt/wildshard-vps/rebuild.sh'}[name]
+
+
+def helper_env():
+    if not TEST:
+        return dict(CLEAN)
+    return {**CLEAN, 'PATH': os.environ.get('PATH', CLEAN['PATH']),
+            **{key: value for key, value in os.environ.items() if key.startswith(('WILDSHARD_APPLY_TEST', 'WILDSHARD_CONFIG_TEST'))}}
+
+
+def cook_rebuild():
+    """rebuild.sh's cook step alone, as root, from the root-owned copy. It exits non-zero unless the worker answers /health."""
+    return subprocess.run(['bash' if TEST else '/usr/bin/bash', helper('rebuild'), '--cook'], cwd='/', env=helper_env()).returncode == 0
+
+
+def show_cook():
+    rows = [row for row in read_rows(f'{ETC}/cook.settings') if key_of(row) in COOK_KEYS]
+    for row in rows:
+        print(row)
+    if not rows:
+        print('note    no cook.settings: the cook worker runs what cook.env names')
+    return 0
+
+
+def cook(args):
+    if len(args) != 2 or re.fullmatch(COOK_TAG, args[1]) is None:
+        stop('usage: wildshard-config cook vX.Y.Z')
+    tag, rebuild = args[1], helper('rebuild')
+    try:
+        with open(rebuild, encoding='utf-8') as handle:
+            knows = '--cook' in handle.read()
+    except OSError:
+        knows = False
+    if not knows:
+        stop(f'{rebuild} has no --cook yet: apply a signed tag that carries it first (wildshard-apply <tag> harden)')
+    checked = subprocess.run([helper('apply'), tag, 'verify'], cwd='/', env=helper_env(), capture_output=True, text=True)
+    found = re.search(r'^commit\s+([0-9a-f]{40})$', checked.stdout, re.M)
+    if checked.returncode != 0 or found is None:
+        reason = ((checked.stderr or checked.stdout).strip().splitlines() or ['no commit'])[-1]
+        stop(f'{tag} is not a tag a signed release names: {reason}')
+    commit = found.group(1)
+    # One move at a time, held through the rebuild and any rollback, as `set` holds its channel.
+    import fcntl
+    lock = os.fdopen(os.open(f'{ETC}/.cook.settings.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    path = f'{ETC}/cook.settings'
+    before = read_rows(path)
+    rows = [row for row in (list(before) or list(COOK_HEADER)) if key_of(row) not in COOK_KEYS]
+    rows += [f'COOK_ENGINE_REF={tag}', f'WILDSHARD_BUILD={commit}']
+    if rows == before:
+        print(f'ok      cook.settings already names {tag}')
+    else:
+        write_rows(path, rows, 'cook')
+        print(f'doing   cook {tag} at {commit}')
+    if cook_rebuild():
+        print(f'ok      the cook worker runs {tag} ({commit[:8]})')
+        return 0
+    if rows == before:
+        print(f'stop    the cook worker is not healthy on {tag}: look at journalctl -u wildshard-cook', file=sys.stderr)
+        return 2
+    # It did not come back: the old tag goes back and is rebuilt, so a bad move never leaves the cook down.
+    if before:
+        write_rows(path, before, 'cook')
+    else:
+        os.unlink(path)
+    print(f'undo    the cook worker did not come up on {tag}; the old tag is back', file=sys.stderr)
+    if not cook_rebuild():
+        print('stop    the cook worker is not healthy on its old tag either: look at journalctl -u wildshard-cook', file=sys.stderr)
+        return 2
+    return 1
+
+
 def main(argv):
     production = '--production' in argv
     args = [arg for arg in argv if arg != '--production']
+    if args and args[0] == 'cook':
+        return cook(args)
+    if args[:2] == ['show', 'cook'] and len(args) == 2:
+        return show_cook()
+    if args[:2] == ['set', 'cook']:
+        stop('the cook worker moves with: wildshard-config cook vX.Y.Z')
     if not args or args[0] not in ('show', 'set', 'split'):
-        stop('usage: wildshard-config show <channel> | set <channel> <KEY> <value> [<KEY> <value>]... [--production] | split <channel>')
+        stop('usage: wildshard-config show <channel> | set <channel> <KEY> <value> [<KEY> <value>]... [--production] | split <channel> '
+             '| cook vX.Y.Z | show cook')
     verb = args[0]
     if len(args) < 2 or args[1] not in CHANNELS:
         stop('the channel is production or staging')

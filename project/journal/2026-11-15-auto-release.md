@@ -7,3 +7,7 @@ Jake, 2026-11-15 ~12:05 Cancún: ship patch versions with no Jake commands.
 - The cook was the one real gap: `cook.env` is root-only and holds the secrets. AR3: `rebuild.sh --cook` runs step 4
   alone, and the unit reads `/etc/wildshard/cook.settings` after `cook.env`, so the tag and build can move without the
   secrets. The restart hash is cook.env's own while no settings file exists, so the upgrade restarts once, for the unit.
+- AR2 + AR4: `wildshard-apply <tag> verify` prints the commit a signed channel release names (after GitHub's tag check);
+  `wildshard-config cook vX.Y.Z` takes the build only from that, writes `cook.settings` (640 root:wildshard-cook), runs
+  `rebuild.sh --cook` and puts the old file back if the worker does not come up. It refuses while the box's
+  `/opt/wildshard-vps/rebuild.sh` has no `--cook`. No sudoers change: `wildshard-config` is already allowed with any args.

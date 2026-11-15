@@ -251,6 +251,72 @@ test('wildshard-apply runs only a tag a signed release names, and refuses a bad 
   expect(apply(other.dir, key, tag, 'harden').out).toContain(`no signed release names ${tag}`);
 });
 
+test('AUTO-RELEASE AR2: wildshard-apply verify prints the signed commit and runs nothing', () => {
+  const good = 'd'.repeat(40);
+  const { dir, key } = releases([{ tag: 'v0.1.20', commit: good }]);
+  const ok = apply(dir, key, 'v0.1.20', 'verify');
+  expect(ok.status, ok.out).toBe(0);
+  expect(ok.out).toMatch(new RegExp(`^commit {2}${good}$`, 'mu'));
+  expect(ok.out).not.toContain('would');
+  expect(apply(dir, key, 'v0.1.21', 'verify').status).toBe(1);
+  expect(apply(dir, key, 'v0.1.20', 'verify', 'x').out).toContain('usage');
+});
+
+/** A made-up box for the cook verb: a signed v0.1.20 and v0.1.21, the real wildshard-apply behind a wrapper, a fake rebuild. */
+function cookBox(rebuildText = '#!/bin/bash\n# takes --cook\nset -eu\ngrep -q v0.1.21 "$WILDSHARD_CONFIG_TEST_ROOT/etc/wildshard/cook.settings" 2>/dev/null && exit "${WILDSHARD_CONFIG_TEST_REBUILD_EXIT:-0}"\necho "rebuild $1"\n') {
+  const root = etc(), one = 'e'.repeat(40), two = 'f'.repeat(40);
+  writeFileSync(join(root, 'etc/wildshard/cook.env'), 'COOK_ENGINE_REF=v0.1.18\nWILDSHARD_BUILD=0000000000000000000000000000000000000000\nCOOK_NOTIFY_TOKEN=planted-cook-secret\n');
+  const { dir, key } = releases([{ tag: 'v0.1.20', commit: one }, { tag: 'v0.1.21', commit: two }]);
+  const wrapper = join(root, 'apply'), rebuild = join(root, 'rebuild.sh');
+  writeFileSync(wrapper, `#!/bin/bash\nexec node ${JSON.stringify(APPLY)} "$@"\n`, { mode: 0o755 });
+  writeFileSync(rebuild, rebuildText, { mode: 0o755 });
+  const env = { WILDSHARD_CONFIG_TEST_APPLY: wrapper, WILDSHARD_CONFIG_TEST_REBUILD: rebuild, WILDSHARD_APPLY_TEST: dir, WILDSHARD_APPLY_TEST_KEY: key };
+  return { root, one, two, run: (extra: Readonly<Record<string, string>>, ...args: string[]) => configWith(root, { ...env, ...extra }, ...args) };
+}
+
+test('AUTO-RELEASE AR4: wildshard-config cook moves the cook to a signed tag and its build, and never touches cook.env', () => {
+  const { root, one, run } = cookBox();
+  const env = read(root, 'cook.env');
+  expect(run({}, 'show', 'cook').out).toContain('no cook.settings');
+  const moved = run({}, 'cook', 'v0.1.20');
+  expect(moved.status, moved.out).toBe(0);
+  expect(moved.out).toContain('rebuild --cook');
+  expect(moved.out).toContain(`ok      the cook worker runs v0.1.20 (${one.slice(0, 8)})`);
+  expect(read(root, 'cook.settings')).toContain(`COOK_ENGINE_REF=v0.1.20\nWILDSHARD_BUILD=${one}\n`);
+  expect(read(root, 'cook.env')).toBe(env);
+  expect(run({}, 'show', 'cook').out).toBe(`COOK_ENGINE_REF=v0.1.20\nWILDSHARD_BUILD=${one}\n`);
+  expect(run({}, 'cook', 'v0.1.20').out).toContain('already names v0.1.20');
+  for (const [args, why] of [
+    [['cook', 'v0.1.19'], 'v0.1.19 is not a tag a signed release names'],
+    [['cook', 'main'], 'usage: wildshard-config cook vX.Y.Z'],
+    [['cook', 'v0.1.20;id'], 'usage: wildshard-config cook vX.Y.Z'],
+    [['cook', 'v0.1.20', 'x'], 'usage: wildshard-config cook vX.Y.Z'],
+    [['set', 'cook', 'COOK_NOTIFY_TOKEN', 'x'], 'moves with: wildshard-config cook'],
+    [['set', 'cook', 'COOK_ENGINE_REF', 'v0.1.20'], 'moves with: wildshard-config cook'],
+  ] as const) {
+    const refused = run({}, ...args);
+    expect(refused.status, args.join(' ')).toBe(1);
+    expect(refused.out, args.join(' ')).toContain(why);
+  }
+  expect(read(root, 'cook.settings')).toContain('COOK_ENGINE_REF=v0.1.20\n');
+  expect(read(root, 'cook.env')).toBe(env);
+});
+
+test('AUTO-RELEASE AR4: a cook move that does not come up is undone, and an old rebuild.sh is refused before any write', () => {
+  const { root, run } = cookBox();
+  expect(run({}, 'cook', 'v0.1.20').status).toBe(0);
+  const before = read(root, 'cook.settings');
+  const bad = run({ WILDSHARD_CONFIG_TEST_REBUILD_EXIT: '1' }, 'cook', 'v0.1.21');
+  expect(bad.status, bad.out).toBe(1);
+  expect(bad.out).toContain('the old tag is back');
+  expect(read(root, 'cook.settings')).toBe(before);
+  const old = cookBox('#!/bin/bash\necho old\n');
+  const refused = old.run({}, 'cook', 'v0.1.20');
+  expect(refused.status).toBe(1);
+  expect(refused.out).toContain('has no --cook yet');
+  expect(existsSync(join(old.root, 'etc/wildshard/cook.settings'))).toBe(false);
+});
+
 test('wildshard-apply never reads a file a channel user owns', () => {
   expect(readFileSync(APPLY, 'utf8')).not.toMatch(/\/var\/lib\/wildshard\/\$\{channel\}|bundles/u);
 });

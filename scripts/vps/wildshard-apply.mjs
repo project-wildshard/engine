@@ -1,6 +1,7 @@
 #!/usr/bin/node
 // MMO-SERVER-PLAN MS3.5 (J266): the agents' way to rerun harden.sh or setup.sh as root, from a signed, landed release only.
 //   wildshard-apply <tag> harden|setup|rebuild
+//   wildshard-apply <tag> verify    AUTO-RELEASE AR2 (J355): print `commit  <sha>` for a signed tag GitHub agrees on; runs nothing
 // <tag> is a release tag a signed channel file names: `vX.Y.Z` (production) or `server-staging-<sha>` (staging). The file is
 // checked exactly as pull.mjs checks it (Ed25519 over `body`, the release public key embedded below and in setup.sh), and its
 // `bundle.name` must sit under that tag. Its `engineBuild` commit is fetched from GitHub by hash, the tag must point at the
@@ -89,7 +90,7 @@ async function main() {
       { stdio: 'inherit', env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', LANG: 'C.UTF-8', WILDSHARD_APPLY_LOCKED: '1' } });
     process.exit(locked.status ?? 1);
   }
-  if (tag === undefined || which === undefined || rest.length > 0 || !(which in SCRIPTS)) stop('usage: wildshard-apply <tag> harden|setup|rebuild');
+  if (tag === undefined || which === undefined || rest.length > 0 || !(which in SCRIPTS || which === 'verify')) stop('usage: wildshard-apply <tag> harden|setup|rebuild|verify');
   if (!TAG.test(tag)) stop(`${tag} is not a release tag (vX.Y.Z or server-staging-<sha>)`);
   const key = test !== undefined ? process.env.WILDSHARD_APPLY_TEST_KEY ?? '' : RELEASE_PUBLIC_KEY;
   const commits = new Set((await signedFiles()).map(text => signedCommit(text, tag, key)).filter(commit => commit !== null));
@@ -97,12 +98,15 @@ async function main() {
   if (commits.size > 1) stop(`signed releases name ${tag} with different commits`);
   const [commit] = commits;
   say('ok', `${tag} is signed: engine ${commit}`);
+  if (test !== undefined && which === 'verify') { say('commit', commit); return; }
   if (test !== undefined) { say('would', `fetch ${commit} and run scripts/vps/${SCRIPTS[/** @type {'harden' | 'setup' | 'rebuild'} */ (which)]}`); return; }
 
   // The tag on GitHub must point at the signed commit (a peeled annotated tag, or a lightweight one).
   const refs = git(['ls-remote', ENGINE_GIT, `refs/tags/${tag}`, `refs/tags/${tag}^{}`]).trim().split('\n').filter(Boolean).map(row => row.split('\t'));
   const pointed = (refs.find(([, ref]) => ref === `refs/tags/${tag}^{}`) ?? refs.find(([, ref]) => ref === `refs/tags/${tag}`))?.[0];
   if (pointed !== commit) stop(`GitHub's ${tag} points at ${pointed ?? 'nothing'}, not the signed ${commit}`);
+  // verify: wildshard-config's cook verb reads this line and moves the cook to exactly this commit (AUTO-RELEASE AR4).
+  if (which === 'verify') { say('commit', commit); return; }
 
   // A fresh root-only folder for this commit: fetched by hash, unpacked from git's own objects, never a working copy.
   mkdirSync(WORK, { recursive: true, mode: 0o700 });
