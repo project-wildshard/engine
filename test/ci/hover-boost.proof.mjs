@@ -67,7 +67,7 @@ check('real standalone Player movement follows the HOVER double tap, its amber l
   const f=fixture();try{
    installShardHoverSpeed(f.player,f.scope,road?'road':'shard');
    setDev(false);tap(f);assert.equal(f.player.hover,true,'A Developer-off double tap is two plain taps: off and on again');assert.equal(f.player.hoverBoost,false);assert.equal(amber(f),false);speed(f,road?30:14);
-   setDev(true);tap(f);assert.equal(f.player.hover,true);assert.equal(f.player.hoverBoost,true);assert.equal(amber(f),true);speed(f,road?60:56);
+   setDev(true);tap(f);assert.equal(f.player.hover,true);assert.equal(f.player.hoverBoost,true);assert.equal(amber(f),true);speed(f,road?120:56);
    setDev(false);assert.equal(amber(f),false);tap(f);assert.equal(f.player.hoverBoost,true);speed(f,road?30:14);
    setDev(true);tap(f);assert.equal(f.player.hoverBoost,false);assert.equal(amber(f),false);speed(f,road?30:14);
    tap(f);assert.equal(amber(f),true);single(f);assert.equal(f.player.hover,false,'A single tap still steps off at once');assert.equal(amber(f),false);
@@ -84,8 +84,8 @@ check('real grid movement reads class and eased caps live and restores the previ
   installGridHoverSpeed(f.player,owner,()=>({local:point,shardCap:cap,speedClass,onHighwayDeck:true}));
   setDev(false);speed(f,30);speedClass='shard';speed(f,14);
   setDev(true);tap(f);speed(f,56);
-  cap=10;speed(f,40);cap=14;point={x:(CHUNK_HALF+(CONTENT_CAPS.pitch-ROAD_WIDTH)/2)/2,y:0,z:0};assert.equal(gridHoverSpeed(point,cap),22);speed(f,58);
-  speedClass='road';speed(f,60);
+  cap=10;speed(f,40);cap=14;point={x:(CHUNK_HALF+(CONTENT_CAPS.pitch-ROAD_WIDTH)/2)/2,y:0,z:0};assert.equal(gridHoverSpeed(point,cap),22);speed(f,88);
+  speedClass='road';speed(f,120);
   owner.dispose();assert.equal(f.player.hoverSpeedLimit,previous);speed(f,48);
   const replacement=()=>10,other=f.scope.child('superseded-policy');installGridHoverSpeed(f.player,other,()=>({local:point,shardCap:14,onHighwayDeck:true}));f.player.hoverSpeedLimit=replacement;other.dispose();assert.equal(f.player.hoverSpeedLimit,replacement);speed(f,40);
   assert.throws(()=>hoverSpeed(60,true),RangeError);assert.equal(hoverSpeed(),14);
@@ -110,7 +110,7 @@ check('real sustained command bytes keep boost gated through the native server m
   assert.ok((f.player.sampleCommand().buttons&NET_BUTTONS.boost)!==0);
   assert.ok((f.player.sampleHeldCommand().buttons&NET_BUTTONS.boost)!==0,'Sustained command lost the real boost latch');
   wireSpeed(30); // ordinary server refuses the Developer capability by default
-  allowDeveloperBoost();wireSpeed(60); // standalone host explicitly grants it at boot
+  allowDeveloperBoost();wireSpeed(120); // standalone host explicitly grants it at boot
   setDev(false);assert.equal(f.player.sampleCommand().buttons&NET_BUTTONS.boost,0);assert.equal(f.player.sampleHeldCommand().buttons&NET_BUTTONS.boost,0);wireSpeed(30);
  }finally{try{client.dispose();}finally{try{room.dispose();}finally{try{host.dispose();}finally{f.dispose();}}}}
 });

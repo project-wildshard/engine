@@ -361,7 +361,7 @@ export class GridSimulation {
   /**
    * Every seat's board takes the page's grid cap (`boardLimit`) before its world steps, by whichever path steps it. QA 11-15 row 8:
    * only `stepAll` installed it, so the in-page server's rooms (`stepSite`, and a cell world stepping itself) ran 14 m/s on the road
-   * and 56 boosted against the page's 30 and 60. `site` limits it to that world's seats.
+   * and 56 boosted against the page's 30 and 60 (now 120). `site` limits it to that world's seats.
    */
   capBoards(site?: string | null): void {
     for (const [player, at] of this.sites) if (site === undefined || at === site) this.seat(this.hostAt(at), player).hoverSpeedLimit ??= () => this.boardLimit(player);

@@ -82,7 +82,7 @@ test('QA 11-15 row 8: one world-feet read for every host, off the origin and in 
   expect(gridBoardLimitAt(grid, { x: 2 * pitch + 10, y: 1, z: pitch - 40 })).toBe(30); // a road-class cell's interior
   const strip = gridBoardLimitAt(grid, { x: -pitch + CHUNK_HALF + STRIP / 2, y: 1, z: 0 }); // [-1, 0]'s east strip
   expect(strip).toBeGreaterThan(14); expect(strip).toBeLessThan(30);
-  expect(hoverSpeed(14, true)).toBe(56); expect(hoverSpeed(30, true)).toBe(60); // G540
+  expect(hoverSpeed(14, true)).toBe(56); expect(hoverSpeed(30, true)).toBe(120); // G540, road 4x (Jake 11-15)
 });
 
 test('QA 11-15 row 8: a room stepping its own world (the in-page server\'s road) caps the board as stepAll does', async () => {

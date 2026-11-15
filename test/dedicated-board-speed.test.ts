@@ -8,8 +8,9 @@ import { RoomBot, type BotThumb } from './fixtures/dedicated/roomBot';
 
 // QA 11-15 row 8 (Jake: "We had agreed upon speeds. I feel like the speeds have changed now that we have an MMO server"): the
 // dedicated server's board, by input over real sockets, runs the agreed speeds the page predicts. G39: 14 m/s inside a shard;
-// G60: 30 m/s on the road; G540: Developer boost 4x in a shard (56) and 2x on the road (60). Before, a worker's cell and road
-// rooms installed no grid cap and refused boost, so every case ran 14 while the page predicted 30, 56 and 60.
+// G60: 30 m/s on the road; Developer boost 4x everywhere (G540's 56 in a shard; Jake 11-15 12:10 "Road push should be a 4x as
+// well. So this should go to 120"). Before, a worker's cell and road rooms installed no grid cap and refused boost, so every
+// case ran 14 while the page predicted 30, 56 and 60.
 const HOME = 'driftwood-isle', CELLS = [HOME, 'sunscar-dunes', 'far-reach', 'nalati-grasslands'];
 /** The middle of the road's deck west of Driftwood, in the world's frame (the road room's). */
 const DECK_X = -(CHUNK_HALF + (CONTENT_CAPS.pitch - CHUNK_HALF * 2 - ROAD_WIDTH) / 2 + ROAD_WIDTH / 2);
@@ -48,12 +49,14 @@ test('a worker\'s cell and road run the agreed board speeds, boost off and on', 
   roadBot.thumb = drive(0, () => boosted); cellBot.thumb = drive(Math.PI, () => boosted);
   const [cellCruise, roadCruise] = await Promise.all([topSpeed(inCell, 3000), topSpeed(onRoad, 3000)]);
   boosted = true;
-  const [cellBoost, roadBoost] = await Promise.all([topSpeed(inCell, 5500), topSpeed(onRoad, 5500)]);
+  // 12 m/s² takes 30 to 120 in 7.5 s; the cell bot stops once its own 56 is read, before it runs out of Driftwood.
+  const idle: BotThumb = () => ({ viewTick: 0, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw: Math.PI, pitch: 0, buttons: 0 });
+  const [cellBoost, roadBoost] = await Promise.all([topSpeed(inCell, 5500).then(top => { cellBot.thumb = idle; return top; }), topSpeed(onRoad, 9000)]);
   const speeds = { cellCruise, roadCruise, cellBoost, roadBoost }, label = JSON.stringify(speeds);
   expect(road.holds('device:road'), `the road bot stays on the road: ${label}`).toBe(true);
   expect(onRoad()?.board.on, label).toBe(true); expect(inCell()?.board.on, label).toBe(true);
   expect(cellCruise, `G39: 14 m/s inside a shard ${label}`).toBeCloseTo(14, 0);
   expect(roadCruise, `G60: 30 m/s on the road ${label}`).toBeCloseTo(30, 0);
   expect(cellBoost, `G540: boost is 4x in a shard ${label}`).toBeCloseTo(56, 0);
-  expect(roadBoost, `G540: boost is 2x on the road ${label}`).toBeCloseTo(60, 0);
+  expect(roadBoost, `boost is 4x on the road ${label}`).toBeCloseTo(120, 0);
 });

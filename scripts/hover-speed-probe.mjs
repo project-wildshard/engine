@@ -123,7 +123,7 @@ try {
   if (!await driveTo(DECK_X, 0, 40_000)) result.notes.push('the deck (-281, 0) was not reached');
   await drive('road, boost off', DECK_X, 8000);
   await boost(true);
-  await drive('road, boost on', DECK_X, 6000);
+  await drive('road, boost on', DECK_X, 10_500); // 12 m/s² takes 30 to 120 in 7.5 s
   code = 0;
 } catch (error) {
   result.errors.push(String(error).slice(0, 400)); console.error(error);

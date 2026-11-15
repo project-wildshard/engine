@@ -31,3 +31,17 @@ Meta QA 11-15 rows 8 and 9.
   (`--base`), a local build (loopback) or engine's local world (`--rig`).
   Staging (38d11aca): 14 / 13.8 / 14.3 / 13.9 m/s with 63-102 corrections a
   case; local world after the fix: 14 / 56 / 29.4 / 59.5.
+
+## Road boost 4x (Jake, 12:10 Cancún)
+
+- Jake: "Road push should be a 4x as well. So this should go to 120".
+  `hoverSpeed` is now `base * 4` when boosted: 56 in a shard, 120 on the
+  road, and the strip eases 56 to 120 on its own (4x of an eased cap).
+- 120 m/s is 2 m a 60 Hz tick. Board moves go through Rapier's swept
+  character controller, so walls still stop it; the server is
+  input-authoritative (the command queue spends what an empty client
+  earns), so there is no position clamp to trip. The road's build-ahead
+  is not speed-scaled on the road itself (it starts within one pitch,
+  562.5 m), and the 62.5 m gap between cells passes in about 0.5 s, so a
+  boosted rider meets an unbuilt neighbour's wall as they did at 60.
+- Acceleration stays 12 m/s²: 30 to 120 takes 7.5 s (about 560 m).

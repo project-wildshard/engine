@@ -1,9 +1,9 @@
-/** Base cruise is 14 m/s standalone or a grid cap ≤ 30. Developer boost gives 4× interiors and 2× roads, easing over strips. */
+/** Base cruise is 14 m/s standalone or a grid cap ≤ 30. Developer boost is 4× everywhere: 56 in a shard, 120 on the road (J-road-4x). */
 export function hoverSpeed(limit?: number, boost = false): number {
   const base = limit ?? 14;
   if (!Number.isFinite(base) || base <= 0 || base > 30) throw new RangeError('Invalid hover speed cap');
-  // Keep the strip smooth between 4× interior (56) and 2× road (60).
-  return boost ? base <= 14 ? base * 4 : 56 + (base - 14) / 4 : base;
+  // Jake 11-15 12:10: "Road push should be a 4x as well. So this should go to 120". 4× of the cap stays smooth over the strip.
+  return boost ? base * 4 : base;
 }
 
 /** m/s² the board loses gliding with no input, at or below the 14 m/s standalone cruise (25 % of its acceleration). */

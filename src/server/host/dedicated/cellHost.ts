@@ -86,7 +86,7 @@ function installCellIdentity(): void {
 /** Run one worker's cells until it is told to close. Anything that ends it says `failed`, and the process ends (Q77). */
 export function runCells(port: CellPort, options: CellHostOptions): { dispose: () => void } {
   // QA 11-15 row 8 (G540: Developer boost "everywhere"): a Developer page's boost bit moves its board here too, to the shared speed
-  // law's 56 m/s in a shard and 60 on the road, so the page's prediction and this authority agree. Replaces E7.7's "never installed";
+  // law's 56 m/s in a shard and 120 on the road (4x, Jake 11-15), so the page's prediction and this authority agree. Replaces E7.7's "never installed";
   // `WORLD_BOOST=off` on a box turns it back off. The server can't tell a Developer page from another, so this trusts the bit.
   allowDeveloperBoost(options.developerBoost !== false);
   const scope = new Scope('dedicated.worker'), started = diagnosticNow(), cells = new Map<string, Cell>();
