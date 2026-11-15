@@ -9506,5 +9506,18 @@
     "sourceRevision": "c130747fc07fb5ab38a007aaf419fe3df671c56e",
     "sourceBlob": "9cb4411fd738904df9d212504dac5a4857541259",
     "retirementProof": "Restored public cook-cache boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/patrol-contact.test.ts",
+    "outcome": "restored",
+    "target": "test/patrol-contact.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): patrol contact reads the pinned engine-owned arrow strike profile rather than a moved Nalati fixture.",
+    "originalTests": [
+      "a rider's arrow lands by its strike's range and origin, and never through cover"
+    ],
+    "sourceRevision": "1ec941e2ee409ee2474fa11442c3fa20a6a6e34d",
+    "sourceBlob": "b0a8aa82555d67621c150710106fd9c9d3b3568e",
+    "retirementProof": "Restored current patrol contact boundary; no J186 retirement or successor equivalence claimed."
   }
 ]

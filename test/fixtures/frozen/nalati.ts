@@ -18,7 +18,7 @@ const entries = new Map(manifest.files.map(file => [file.name, file]));
 /** Reads an immutable CI21-H2 fixture without reaching into a shard checkout. */
 export function frozenNalatiBytes(name: string): Uint8Array {
   const entry = entries.get(name);
-  if (entry === undefined || !/^[a-z0-9][a-z0-9-]*\.(?:bin|json|wasm)$/u.test(name)
+  if (entry === undefined || !/^[A-Za-z0-9][A-Za-z0-9-]*\.(?:bin|json|wasm)$/u.test(name)
     || !Number.isSafeInteger(entry.bytes) || !/^[a-f0-9]{64}$/u.test(entry.sha256)) {
     throw new Error(`Unknown CI21 Nalati frozen fixture: ${name}`);
   }

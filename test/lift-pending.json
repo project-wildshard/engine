@@ -149,7 +149,6 @@
   "test/output-runtime.test.ts",
   "test/packed-specimen-files.test.ts",
   "test/page-wildlife-view.test.ts",
-  "test/patrol-contact.test.ts",
   "test/patrol-encounter-view.test.ts",
   "test/patrol-law.test.ts",
   "test/phased-arena-continuation.test.ts",
