@@ -203,7 +203,8 @@ export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAM
       for (const row of following) {
         const follow = row.lamp.follow, target = follow === undefined || resolve === undefined ? null : resolve(follow.actor, follow.bone);
         row.live = target !== null;
-        if (target !== null) group.worldToLocal(target.localToWorld(row.place.copy(row.at)));
+        // the bone's world matrix is renewed only inside render: renew it here, or the lamp trails a frame behind (review)
+        if (target !== null) { target.updateWorldMatrix(true, false); group.updateWorldMatrix(true, false); group.worldToLocal(target.localToWorld(row.place.copy(row.at))); }
       }
     }
     chosen.length = 0;

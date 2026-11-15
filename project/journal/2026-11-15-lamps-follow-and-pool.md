@@ -8,3 +8,4 @@
   `setLampFollow(scene, ...)` over `wirePage.namedBody`; the lamp is dark while the actor is not in the world. Its
   halo is left out for now (it would stay at the offset).
 - The phone tier keeps every lamp and lights the nearest 4 (it took the first 4).
+- Review (claude -p, no MUSTs): a following lamp renews its bone's world matrix before reading it (it trailed a frame). Noted: a phone now draws every lamp's halo (one instanced draw, as before, but more instances than the first 4); the 16th and 17th nearest swap with no hysteresis; the dev hook picks by the player's position and lights 16 on any tier.
