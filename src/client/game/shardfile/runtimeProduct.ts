@@ -12,6 +12,7 @@ import { ClientAssets } from './clientAssets';
 import { buildYield, pacedResolve, workSlice, type WorkSlice } from '@wildshard/engine/core/workSlice';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { waitFor } from '@wildshard/engine/boot/waits';
+import { bootTask } from '@wildshard/engine/boot/timing';
 import { currentOwner } from '@wildshard/engine/app/ownership';
 import { shardProductData } from '../../../shared/game/shardfile/productData';
 import { absentShardProduct, type ShardProduct } from '../../../shared/game/shardfile/shardProduct';
@@ -374,12 +375,15 @@ export async function runtimeLookMaterials(ctx: Pick<ShardContext, 'scope' | 'ga
     }));
     shard = { ...shard, look: { ...look, families: [], materials }, terrain: null, props: null };
   }
-  const assets = new Map(product.assets.retained);
-  const files = Object.values(shard.look.materials).flatMap(entry => entry.family === 'graph' && 'file' in entry ? [entry.file] : []);
-  for (const ref of files) assets.set(ref, await product.assets.read(ref));
-  for (const ref of new Set([...materialTextureRefs(shard.look.materials), ...keptGraphFileTextureRefs(shard.look.materials, hash => assets.get(hash))])) assets.set(ref, await product.assets.read(ref));
+  const assets = await bootTask(`look:material-inputs ${source.identity.slug}`, async () => {
+    const files = new Map(product.assets.retained);
+    const graphFiles = Object.values(shard.look.materials).flatMap(entry => entry.family === 'graph' && 'file' in entry ? [entry.file] : []);
+    for (const ref of graphFiles) files.set(ref, await product.assets.read(ref));
+    for (const ref of new Set([...materialTextureRefs(shard.look.materials), ...keptGraphFileTextureRefs(shard.look.materials, hash => files.get(hash))])) files.set(ref, await product.assets.read(ref));
+    return files;
+  });
   if (ctx.scope.disposed) throw new Error('Runtime look scope unloaded while reading materials');
-  return clientMaterials(shard, assets, renderer, ctx.scope, { trustedGraphs: true, ...(graphs === undefined ? {} : { graphs }), ...(units === undefined ? {} : { units }) });
+  return bootTask(`look:material-compile ${source.identity.slug}`, () => clientMaterials(shard, assets, renderer, ctx.scope, { trustedGraphs: true, ...(graphs === undefined ? {} : { graphs }), ...(units === undefined ? {} : { units }) }));
 }
 
 /** Prepare the requested original graph materials for resident effects and boss storms. */

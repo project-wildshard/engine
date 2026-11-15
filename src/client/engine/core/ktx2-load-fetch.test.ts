@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { CompressedTexture, LoadingManager } from 'three';
 import { loadKtx2 } from './ktx2';
+import { bootWaits } from '../../../shared/engine/boot/waits';
 
 
 // T10: KTX2 files are read with fetch, not three's FileLoader (whose progress re-stream cost ~200 ms of a Pine cold entry):
@@ -39,4 +40,44 @@ test('a KTX2 read refuses a failed status and is read again after', async () => 
   await expect(loadKtx2(f.target, 'gone.ktx2')).rejects.toThrow('responded with 404: Not Found');
   status = 200;
   await expect(loadKtx2(f.target, 'gone.ktx2')).resolves.toBeInstanceOf(CompressedTexture);
+});
+
+test('NB13: parallel KTX2 bodies and decoder replies each name their original file while pending', async () => {
+  const f = fixture(), replies = new Map<string, ReadableStreamDefaultController<Uint8Array>>();
+  const spans: {operation: string; result: string}[] = [];
+  vi.stubGlobal('__bootTiming', {version: 1,
+    begin(operation: string): number { spans.push({operation, result: 'pending'}); return spans.length; },
+    end(id: number, result: string): void { const row = spans[id - 1]; if (row !== undefined) row.result = result; },
+    mark: (): void => undefined,
+  });
+  try {
+  const decoded: ((texture: CompressedTexture) => void)[] = [], refused: ((error: Error) => void)[] = [];
+  const target = {...f.target, parse(_buffer: ArrayBuffer, done?: (texture: CompressedTexture) => void, fail?: (error: Error) => void): void {
+    if (done !== undefined) decoded.push(done);
+    if (fail !== undefined) refused.push(fail);
+  }};
+  vi.spyOn(globalThis, 'fetch').mockImplementation(input => {
+    const path = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    return Promise.resolve(new Response(new ReadableStream<Uint8Array>({start(controller) { replies.set(path, controller); }})));
+  });
+  const jobs = Array.from({length: 7}, (_, index) => loadKtx2(target, `map-${index}.ktx2`));
+  const paths = Array.from({length: 7}, (_, index) => `/assets/map-${index}.ktx2?v=7`);
+  expect(spans.filter(row => row.operation.startsWith('texture:read '))).toEqual(paths.map(path => ({operation: `texture:read ${path}`, result: 'pending'})));
+  expect(bootWaits().filter(row => row.label === 'Reading texture').map(row => row.resource ?? '').sort((a, b) => a < b ? -1 : a > b ? 1 : 0)).toEqual(paths);
+  expect(bootWaits().filter(row => row.label === 'Reading texture').every(row => row.kind === 'file')).toBe(true);
+  for (const reply of replies.values()) { reply.enqueue(Uint8Array.of(1, 2, 3)); reply.close(); }
+  await vi.waitFor(() => { expect(decoded).toHaveLength(7); });
+  expect(spans.filter(row => row.operation.startsWith('texture:read ')).every(row => row.result === 'complete')).toBe(true);
+  expect(spans.filter(row => row.operation.startsWith('texture:decode '))).toEqual(paths.map(path => ({operation: `texture:decode ${path}`, result: 'pending'})));
+  expect(bootWaits().filter(row => row.label === 'Reading texture')).toEqual([]);
+  expect(bootWaits().filter(row => row.label === 'Preparing texture').map(row => row.resource ?? '').sort((a, b) => a < b ? -1 : a > b ? 1 : 0)).toEqual(paths);
+  const results = Promise.allSettled(jobs);
+  decoded.slice(0, 6).forEach(done => { done(new CompressedTexture([], 4, 4)); });
+  refused[6]?.(new Error('Broken map'));
+  const settled = await results;
+  expect(settled.map(row => row.status)).toEqual(['fulfilled', 'fulfilled', 'fulfilled', 'fulfilled', 'fulfilled', 'fulfilled', 'rejected']);
+  for (const row of settled) if (row.status === 'fulfilled') row.value.dispose();
+  expect(bootWaits().filter(row => row.label === 'Reading texture' || row.label === 'Preparing texture')).toEqual([]);
+  expect(spans.filter(row => row.operation.startsWith('texture:decode ')).map(row => row.result)).toEqual(['complete', 'complete', 'complete', 'complete', 'complete', 'complete', 'failed']);
+  } finally { vi.unstubAllGlobals(); vi.restoreAllMocks(); }
 });

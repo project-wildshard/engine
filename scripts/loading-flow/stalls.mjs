@@ -73,6 +73,19 @@ export function stageStalls(entries, idle, stages = STALL_STAGES) {
   });
 }
 
+/** Wall-clock gaps between named operations inside one completed stage.
+ * Stage/app envelopes cannot explain their own contents; parallel operations
+ * cover their union, clipped to the stage. This reports CPU work as well as IO.
+ * @param {readonly StallEntry[]} entries @param {string} stage @returns {Span[]} */
+export function stageGaps(entries, stage) {
+  const own = entries.find(row => row.realm === 'page' && row.operation === `stage:${stage}` && row.end !== null);
+  if (own === undefined || own.end === null) return [];
+  const named = entries.filter(row => row.realm === 'page' && row.end !== null
+    && !/^(?:stage:|game-stage:|app:|sw:)/u.test(row.operation))
+    .map(row => ({start: row.start, end: row.end ?? row.start}));
+  return idleWithin([{start: own.start, end: own.end}], named, own.start, own.end);
+}
+
 /** Stage stalls as fault lines: a window whose unexplained idle reaches STALL_IDLE_SHARE of it.
  * @param {readonly StallEntry[]} entries @param {readonly Span[]} idle @returns {string[]} */
 export function stallFaults(entries, idle) {

@@ -20,3 +20,19 @@ to control). The repeat observes 195 neighbour runtime requests after
 control, starting 1.35 s later, so they resume normally. Discovery cards
 remain boot metadata. Local home is noisy (5.33-6.04 s); this makes no
 phone speed claim. Nine grid/background/control tests pass (9 cases).
+
+NB13: the old texture wait started when a Basis job reached its worker.
+File-body reads, decoder initialization, zstd queues and lent paint layers
+could precede that wait with no file span. Reads and complete decodes now
+have separate file-named diagnostics; the card keeps short progress labels.
+Material input/compile phases have their own spans too. No concurrency,
+texture format, bytes or upload policy changed.
+
+NB1 --assert-home-spans, capped Chromium, x4, 402x874 @2: Home 5.44 s,
+control 15.70 s, largest unnamed interval 0.899 s. The current pin names
+13 texture files: three sign textures, two organic textures and eight rig
+maps. Each prints its read/decode split. The old phone's 4.6 s cannot be
+reproduced on this GPU; a shipped phone paste must confirm that reading.
+Twenty-nine focused cases pass, including seven simultaneously pending
+body/decode jobs, failure cleanup and an independent gap-coverage oracle.
+Main b52607cf CI is the coordinator's explicit prerequisite for landing.

@@ -8,6 +8,7 @@
  */
 import { pageScope } from '../../../shared/engine/app/resources';
 import type { Scope } from '../../../shared/engine/app/scope';
+import { waitFor } from '../../../shared/engine/boot/waits';
 
 const HEADER = 80, LEVEL = 24, SCHEME_ZSTD = 2;
 /** level data starts at a multiple of this in the rewritten file (the spec's lcm(texel block size, 4) for every format) */
@@ -143,7 +144,7 @@ export async function unsupercompressKtx2(buffer: ArrayBuffer): Promise<ArrayBuf
   const bytes = new Uint8Array(buffer), levels = zstdLevels(bytes);
   if (levels === null) return buffer;
   try {
-    const decoded = await decodeLevels(levels.map(level => ({ data: bytes.slice(level.offset, level.offset + level.length), size: level.size })));
+    const decoded = await waitFor('Preparing texture data', decodeLevels(levels.map(level => ({ data: bytes.slice(level.offset, level.offset + level.length), size: level.size }))), 'worker');
     if (decoded.length !== levels.length || decoded.some((data, i) => data.byteLength !== levels[i]?.size)) return buffer;
     const plain = plainKtx2(bytes, levels, decoded);
     return plain.buffer instanceof ArrayBuffer ? plain.buffer : buffer;

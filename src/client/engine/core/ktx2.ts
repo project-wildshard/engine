@@ -40,6 +40,8 @@ import { workSlice } from '../../../shared/engine/core/workSlice';
 import { TIER } from './tier';
 import { prepareKtx2Zstd, unsupercompressKtx2 } from './ktx2Zstd';
 import { parseKtx2 } from '@wildshard/format/ktx2Cost';
+import { waitFor } from '../../../shared/engine/boot/waits';
+import { bootTask } from '../../../shared/engine/boot/timing';
 
 /** where scripts/app-build/basis.ts copies three's transcoder: versioned by three's revision, so the SW / HTTP caches never mix two */
 /** Before transcoding `files`: start what their parses will need (the raw-texel zstd decoder) from the caller's stack. */
@@ -307,16 +309,16 @@ export function loadKtx2(target: Pick<KTX2Loader, 'manager' | 'path' | 'requestH
   const resolved = target.manager.resolveURL(target.path + url);
   let bytes = reading.get(resolved);
   if (bytes === undefined) {
-    bytes = fetch(resolved, { headers: target.requestHeader, credentials: target.withCredentials ? 'include' : 'same-origin' }).then(response => {
+    bytes = bootTask(`texture:read ${resolved}`, () => waitFor('Reading texture', fetch(resolved, { headers: target.requestHeader, credentials: target.withCredentials ? 'include' : 'same-origin' }).then(response => {
       if (response.status !== 200 && response.status !== 0) throw new Error(`fetch for "${response.url}" responded with ${String(response.status)}: ${response.statusText}`);
       return response.arrayBuffer();
-    });
+    }), 'file', resolved));
     reading.set(resolved, bytes);
     const read = bytes;
     const clear = (): void => { if (reading.get(resolved) === read) reading.delete(resolved); };
     read.finally(clear).catch(() => undefined);
   }
-  return bytes.then(buffer => new Promise<THREE.CompressedTexture>((resolve, reject) => { target.parse(buffer, resolve, reject); }));
+  return bytes.then(buffer => bootTask(`texture:decode ${resolved}`, () => waitFor('Preparing texture', new Promise<THREE.CompressedTexture>((resolve, reject) => { target.parse(buffer, resolve, reject); }), 'worker', resolved)));
 }
 function load(url: string, keep: boolean): Promise<THREE.CompressedTexture> {
   let p = transcoded.get(url);

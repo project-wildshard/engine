@@ -16,6 +16,8 @@ import { prepareLentLooks, setLentParam, setLentTexture } from './lentLooks';
 import { applyTextureSampler } from './clientMaterials';
 import type { SceneHandles } from './sceneHandles';
 import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { waitFor } from '@wildshard/engine/boot/waits';
+import { bootTask } from '@wildshard/engine/boot/timing';
 
 /** Client-only: load each declared texture under `owner`, lend it to its compiled looks (they are lent first) and
  * publish a product texture that names a handle, and a volume with its numbers for the world's variant (`cube`). */
@@ -55,7 +57,8 @@ export async function lendWorldSceneTextures(rows: readonly WorldSceneLentTextur
 /** A baked volume: its deflated RGBA8 voxels as a linear 3D texture (GPU-only once uploaded), lent with its box to its looks. */
 async function lendVolume(row: Extract<WorldSceneLentTexture, { kind: 'volume' }>, volume: Extract<WorldSceneLentTexture, { kind: 'volume' }>['files']['cell']['phone'],
   owner: Scope, product: Pick<ShardProduct, 'url'>, handles: SceneHandles): Promise<void> {
-  const bytes = await fetchDeflatedBytes(product.url(volume.file)), [x, y, z] = volume.size;
+  const url = product.url(volume.file);
+  const bytes = await bootTask(`texture:volume-inflate ${volume.file}`, () => waitFor('Preparing volume texture', fetchDeflatedBytes(url), 'work', url)), [x, y, z] = volume.size;
   if (owner.disposed) throw new Error('World scene textures unloaded while loading');
   if (bytes.length !== x * y * z * 4) throw new Error(`Lent volume ${row.label} size differs`);
   const texture = owner.own(new Data3DTexture(bytes, x, y, z));
@@ -70,8 +73,8 @@ async function lendVolume(row: Extract<WorldSceneLentTexture, { kind: 'volume' }
 }
 
 /** A product's raw r8 texels as a data texture (its wrap and magnification; trilinear with mipmaps, else linear). */
-async function loadRaster(row: Extract<WorldSceneLentTexture, { kind: 'raster' }>, product: Pick<ShardProduct, 'file'>): Promise<Texture> {
-  const bytes = Uint8Array.from(await product.file(row.file)), [width, height] = row.size;
+async function loadRaster(row: Extract<WorldSceneLentTexture, { kind: 'raster' }>, product: Pick<ShardProduct, 'file' | 'url'>): Promise<Texture> {
+  const bytes = Uint8Array.from(await bootTask(`texture:raster-read ${row.file}`, () => waitFor('Reading texture', product.file(row.file), 'file', product.url(row.file)))), [width, height] = row.size;
   if (bytes.length !== width * height) throw new Error(`Lent raster ${row.label} size differs`);
   const texture = new DataTexture(bytes, width, height, RedFormat, UnsignedByteType);
   texture.wrapS = texture.wrapT = row.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
@@ -81,10 +84,11 @@ async function loadRaster(row: Extract<WorldSceneLentTexture, { kind: 'raster' }
 }
 
 /** A product's own KTX2 blob for the tier (its encoded orientation, flipY false), sampled by its row; GPU-only once uploaded. */
-async function loadProduct(row: Extract<WorldSceneLentTexture, { kind: 'product' }>, product: Pick<ShardProduct, 'file'>, loader: KTX2Loader | null): Promise<Texture> {
+async function loadProduct(row: Extract<WorldSceneLentTexture, { kind: 'product' }>, product: Pick<ShardProduct, 'file' | 'url'>, loader: KTX2Loader | null): Promise<Texture> {
   if (loader === null) throw new Error('Product textures need a KTX2 reader');
-  const bytes = Uint8Array.from(await product.file(row.file[TIER]));
-  const texture = await new Promise<Texture>((resolve, reject) => { loader.parse(bytes.buffer, resolve, reject); });
+  const file = row.file[TIER], url = product.url(file);
+  const bytes = Uint8Array.from(await bootTask(`texture:read ${file}`, () => waitFor('Reading texture', product.file(file), 'file', url)));
+  const texture = await bootTask(`texture:decode ${file}`, () => waitFor('Preparing texture', new Promise<Texture>((resolve, reject) => { loader.parse(bytes.buffer, resolve, reject); }), 'worker', url));
   texture.flipY = false; texture.name = row.label;
   if (row.colour !== undefined) texture.colorSpace = row.colour === 'srgb' ? SRGBColorSpace : LinearSRGBColorSpace;
   applyTextureSampler(texture, row.sampler);
@@ -95,8 +99,9 @@ async function loadProduct(row: Extract<WorldSceneLentTexture, { kind: 'product'
 
 async function blob(url: string): Promise<Blob> {
   let type = '';
-  const bytes = await readContent(phoneUrl(url), 25_000_000, {fetch: (address, init) => fetch(address, init),
-    response: response => {type = response.headers.get('content-type') ?? '';}});
+  const path = phoneUrl(url);
+  const bytes = await bootTask(`texture:layer-read ${path}`, () => waitFor('Reading texture layer', readContent(path, 25_000_000, {fetch: (address, init) => fetch(address, init),
+    response: response => {type = response.headers.get('content-type') ?? '';}}), 'file', path));
   return new Blob([bytes], {type});
 }
 
@@ -116,7 +121,8 @@ async function loadLayers(row: Extract<WorldSceneLentTexture, { kind: 'layers' }
   const files = await Promise.all(row.layers.map(layer => Promise.all([blob(`${row.base}/${layer.name}.jpg`), layer.alpha ? blob(`${row.base}/${layer.name}-a.jpg`) : null])));
   for (const [i, [rgb, alpha]] of files.entries()) {
     if (slice.due()) await slice.yield();
-    const texels = await decodeLayerTexels(rgb, alpha, size);
+    const path = `${row.base}/${row.layers[i]?.name ?? i}`;
+    const texels = await bootTask(`texture:layer-decode ${path}`, () => waitFor('Preparing texture layer', decodeLayerTexels(rgb, alpha, size), 'worker', path));
     if (texels !== null) { data.set(texels, i * size * size * 4); continue; }
     const colour = await createImageBitmap(rgb), cover = alpha === null ? null : await createImageBitmap(alpha), at = i * size * size * 4;
     try {

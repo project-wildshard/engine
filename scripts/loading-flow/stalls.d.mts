@@ -25,6 +25,8 @@ export function idleWithin(spans: readonly Span[], holes: readonly Span[], from:
 export function busiestWindow(spans: readonly Span[], width: number): { at: number; ms: number };
 /** Each listed stage's worst window of idle main thread with no page `wait:` entry open. */
 export function stageStalls(entries: readonly StallEntry[], idle: readonly Span[], stages?: readonly string[]): StageStall[];
+/** Uncovered wall-clock intervals inside a completed stage, ignoring broad parent envelopes. */
+export function stageGaps(entries: readonly StallEntry[], stage: string): Span[];
 /** Stage stalls at or over the share, as fault lines. */
 export function stallFaults(entries: readonly StallEntry[], idle: readonly Span[]): string[];
 /** Where the profile's clock meets the page's, from the clock mark's first sample. */

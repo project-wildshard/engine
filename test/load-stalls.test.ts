@@ -1,5 +1,19 @@
 import { expect, test } from 'vitest';
-import { busiestLeaves, busiestWindow, CLOCK_MARK, idleWithin, PLAY_BUSY_SHARE, playStall, playStallFaults, profileAnchor, profileBusy, profileIdle, stageStalls, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from '../scripts/loading-flow/stalls.mjs';
+import { busiestLeaves, busiestWindow, CLOCK_MARK, idleWithin, PLAY_BUSY_SHARE, playStall, playStallFaults, profileAnchor, profileBusy, profileIdle, stageStalls, stageGaps, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from '../scripts/loading-flow/stalls.mjs';
+
+test('NB13: home gaps ignore broad parents and union actual waits at the stage edges', () => {
+  const row = (operation: string, start: number, end: number | null, realm = 'page') => ({operation, start, end, realm});
+  const entries = [row('stage:home', 1000, 8000), row('app:entry', 0, 9000), row('game-stage:home', 1000, 8000),
+    row('wait:read', 900, 1400), row('wait:decode', 2000, 3000), row('wait:parallel', 2100, 2600),
+    row('wait:unrelated worker', 1000, 8000, 'worker:1'), row('wait:unresolved', 3000, null)];
+  expect(stageGaps(entries, 'home')).toEqual([{start: 1400, end: 2000}, {start: 3000, end: 8000}]);
+  // The 4.6 s decode can explain its actual interval, without hiding either end.
+  entries.push(row('wait:KTX2 decode /map.ktx2', 3000, 7600));
+  expect(stageGaps(entries, 'home')).toEqual([{start: 1400, end: 2000}, {start: 7600, end: 8000}]);
+  entries.push(row('wait:tail', 7600, 9000));
+  expect(stageGaps(entries, 'home')).toEqual([{start: 1400, end: 2000}]);
+  expect(stageGaps(entries, 'missing')).toEqual([]);
+});
 
 // NINE-DRAGON-BENCHMAX NB6: the ring-1 boot smoke's props stall ratchet (scripts/loading-flow/stalls.mjs)
 const props = (start: number, ms: number) => ({ operation: 'stage:props', realm: 'page', start, end: start + ms });

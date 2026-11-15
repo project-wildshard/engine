@@ -14,16 +14,17 @@
 //   --dpr: the render scale the game draws at (Graphics' saved pick; the viewport stays a 2x phone); NB5 reads 1 and 2.
 //   --seconds 600: NINE-DRAGON-BENCHMAX NB5's sustained run, printed per minute.
 //   --warm-base <url>: revisit on the same origin with another build, retaining the native caches.
+//   --assert-home-spans: NB13 refuses an unnamed home interval longer than one second.
 import { writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { chromium, devices } from 'playwright';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { NAME_ASKED, developerSettings, saveFixture, levelDownloadFixtures, hideDeveloperOverlays } from '../debug-settings.mjs';
-import { bootTimelineEntries, clockMarkExpression, profileAnchor, profileIdle, stageStalls, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';
+import { bootTimelineEntries, clockMarkExpression, profileAnchor, profileIdle, stageStalls, stageGaps, STALL_IDLE_SHARE, STALL_WINDOW_MS } from './stalls.mjs';
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shard: { type: 'string', default: 'Nine' }, throttle: { type: 'string', default: '4' },
   seconds: { type: 'string', default: '60' }, json: { type: 'string' }, profile: { type: 'string' },
-  dpr: { type: 'string', default: '2' }, window: { type: 'string' }, 'warm-base': {type: 'string'} } });
+  dpr: { type: 'string', default: '2' }, window: { type: 'string' }, 'warm-base': {type: 'string'}, 'assert-home-spans': {type: 'boolean', default: false} } });
 if (values.base === undefined) { console.error('usage: benchmax.mjs --base <url> [--shard <card title regex>] [--throttle 4] [--seconds 60] [--dpr 2] [--json <file>] [--profile <file>]'); process.exit(2); }
 // --window <css W>x<css H>@<scale>: a desktop browser window instead of the phone (NB5, Jake's Mac: 1496x717@2 is 2992x1434), desktop tier
 const desktop = /^(\d+)x(\d+)@([\d.]+)$/u.exec(values.window ?? '');
@@ -118,7 +119,7 @@ try {
       if (ready.start + ready.ms - at >= 100) gaps.push({ from: at - ready.start, ms: ready.start + ready.ms - at });
     }
     const control = entries.find(e => e.operation === 'app:control-ready')?.start ?? Number.NaN, first = Math.min(...stage.map(e => e.start));
-    const timeline = entries.map(e => ({ op: e.operation, realm: e.realm, start: Math.round(e.start), ms: e.end === null ? null : Math.round(e.end - e.start), result: e.result }));
+    const timeline = entries.map(e => ({ op: e.operation, realm: e.realm, start: Math.round(e.start), ms: e.end === null ? null : Math.round(e.end - e.start), result: e.result, detail: e.detail }));
     // NB3: readyFrame's named parts of 100 ms or more (spans and waits), in start order
     const readyParts = ready === undefined ? [] : done.filter(e => !e.op.startsWith('stage:') && !e.op.startsWith('game-stage:') && e.ms >= 100
       && e.start >= ready.start && e.start < ready.start + ready.ms).map(e => ({ op: e.op, from: e.start - ready.start, ms: e.ms }));
@@ -138,7 +139,7 @@ try {
     const tileAttach = { raw, warm, tiles: attaches.length, span: attachSpan, contents: [...byContent.values()].sort((a, b) => b.ms - a.ms),
       slowest: [...attaches].sort((a, b) => b.duration - a.duration).slice(0, 5).map(a => ({ key: a.detail?.key, layer: a.detail?.layer, ms: Math.round(a.duration), contents: a.detail?.contents })) };
     const resources = performance.getEntriesByType('resource').map(r => ({url: r.name, start: r.startTime, transfer: r.transferSize, bytes: r.decodedBodySize}));
-    return { resources, phases: { control, firstStage: first }, stage, waits, readyGaps: gaps, readyParts, scriptMemory, tileAttach, timeline };
+    return { resources, workerResources: timing?.resources?.filter(r => r.realm !== 'page') ?? [], phases: { control, firstStage: first }, stage, waits, readyGaps: gaps, readyParts, scriptMemory, tileAttach, timeline };
   })()`);
 
   // the play: walk 10 s, then the hoverboard at boost; the game's own frame ring, read every 250 ms
@@ -213,6 +214,28 @@ try {
   console.log(`  geometry warms: prepare ${ta.warm.prepare.n} · ${s(ta.warm.prepare.ms)} · parked draws ${ta.warm.draws.n} · ${s(ta.warm.draws.ms)}`);
   for (const row of ta.slowest.slice(0, 2)) console.log(`  slowest tile ${row.key} ${row.layer} ${s(row.ms)}: ${Object.entries(row.contents ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id, ms]) => `${id.slice(0, 28)} ${ms} ms`).join(', ')}`);
   const bank = (/** @type {{ hits: number, misses: number, retained: number } | null} */ m) => m === null ? 'n/a' : `hits ${m.hits} · misses ${m.misses} · retained ${m.retained}`;
+  const home = /** @type {{op: string, start: number, ms: number}[]} */ (load.stage).find(row => row.op === 'stage:home');
+  /** @type {{op: string, realm: string, start: number, ms: number | null}[]} */
+  const timeline = load.timeline;
+  const homeGaps = stageGaps(timeline.map(row => ({operation: row.op, realm: row.realm, start: row.start, end: row.ms === null ? null : row.start + row.ms})), 'home');
+  load.homeGaps = homeGaps;
+  /** @type {Map<string, {url: string, read: number, decode: number}>} */
+  const homeTextures = new Map();
+  for (const part of timeline) {
+    if (home === undefined || part.start >= home.start + home.ms || part.start + (part.ms ?? 0) <= home.start) continue;
+    const match = /^texture:(read|decode) (.+)$/u.exec(part.op), url = match?.[2];
+    if (url === undefined) continue;
+    const record = homeTextures.get(url) ?? {url, read: 0, decode: 0};
+    if (match?.[1] === 'read') record.read += part.ms ?? 0; else record.decode += part.ms ?? 0;
+    homeTextures.set(url, record);
+  }
+  load.homeTextures = [...homeTextures.values()];
+  console.log(`home texture files (${homeTextures.size}), read / decode:`);
+  for (const file of homeTextures.values()) console.log(`  ${file.url} · ${s(file.read)} / ${s(file.decode)}`);
+  console.log('home operations >= 100 ms:');
+  for (const part of timeline.filter(row => home !== undefined && (row.ms ?? 0) >= 100 && row.start >= home.start && row.start < home.start + home.ms && !/^(?:stage:|game-stage:|app:|sw:)/u.test(row.op)).sort((a, b) => (b.ms ?? 0) - (a.ms ?? 0)).slice(0, 16)) console.log(`  ${part.op} · ${s(part.ms ?? 0)}`);
+  console.log(`home unlogged >= 100 ms: ${homeGaps.filter(row => row.end - row.start >= 100).map(row => `${s(row.end - row.start)} at +${s(row.start - (home?.start ?? 0))}`).join(', ') || 'none'}`);
+  if (values['assert-home-spans'] && (home === undefined || homeGaps.some(row => row.end - row.start > 1000))) { console.error('NB13: home has an unnamed stretch over 1 s (or no completed home stage)'); process.exitCode = 1; }
   console.log(`script memory bank: at control ${bank(load.scriptMemory)} · after play ${bank(play.scriptMemory)}`);
   console.log(`readyFrame unlogged >= 100 ms: ${load.readyGaps.length === 0 ? 'none' : load.readyGaps.map((/** @type {{ ms: number, from: number }} */ g) => `${s(g.ms)} at +${s(g.from)}`).join(', ')}`);
   console.log(`play ${seconds} s: ${f(play.all.fps)} fps · frame p50 ${f(play.all.p50)} / p95 ${f(play.all.p95)} ms · gpu~ p50 ${f(play.all.gpu50)} / p95 ${f(play.all.gpu95)} ms · ${play.draws} draws · ${(play.triangles / 1e6).toFixed(2)} M tris · pixel ratio ${play.pixelRatio}`);
