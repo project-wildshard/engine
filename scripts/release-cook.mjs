@@ -5,7 +5,9 @@
 // 1. Production's signed release must name vX.Y.Z (read from packs.wildshard.io, public; the box checks the signature).
 // 2. If the box's wildshard-config has no `cook` verb yet, it is installed from a signed tag that carries it, by the
 //    allowlisted `wildshard-apply <tag> harden` (which refreshes /usr/local/sbin and /opt/wildshard-vps). Only after
-//    `wildshard-harden --check` shows no `fail` row, so the apply changes no sshd, ufw or Tailscale setting.
+//    `wildshard-harden --check` shows no `fail` row outside OFF_SSH_ROWS, so the apply changes no sshd, ufw or Tailscale
+//    setting. An OFF_SSH_ROWS fail is one the apply fixes away from them (v0.1.21: SC2, Prometheus down on a root-only
+//    /etc/prometheus, fixed by the tag's harden).
 // 3. `sudo -n wildshard-config cook vX.Y.Z`: the box verifies the tag, writes cook.settings, rebuilds the cook step alone,
 //    waits for its /health and rolls back if it does not come up. Then `show cook` and the worker's /health.
 // --dry-run reads the box and says what it would do; it writes nothing. Output never carries an address or a secret.
@@ -16,6 +18,8 @@ const RELEASES = 'https://packs.wildshard.io/releases';
 const TAG = /^v\d{1,4}\.\d{1,4}\.\d{1,4}$/u;
 const SIGNED_TAG = /^(?:v\d{1,4}\.\d{1,4}\.\d{1,4}|server-(?:staging|production)-[0-9a-f]{40})$/u, COMMIT = /^[0-9a-f]{40}$/u;
 const MARK = 'cook <tag>';
+// harden --check rows whose fix never touches sshd, ufw or Tailscale: SC2 is the box-local Prometheus on loopback.
+const OFF_SSH_ROWS = new Set(['SC2']);
 
 /** @param {string} what @param {string} message */
 function say(what, message) { console.info(`${what.padEnd(7)} ${redact(message)}`); }
@@ -69,7 +73,7 @@ async function main() {
     const source = carries(production.build) ? production : carries(staging.build) ? staging : null;
     if (source === null) stop('no signed release carries `wildshard-config cook` yet: it rides the next staging serial (AUTO-RELEASE AR8)');
     const check = box('sudo -n /usr/local/sbin/wildshard-harden --check');
-    const fails = check.out.split('\n').filter(line => line.startsWith('fail'));
+    const fails = check.out.split('\n').filter(line => line.startsWith('fail') && !OFF_SSH_ROWS.has(line.split(/\s+/u)[1] ?? ''));
     if (fails.length > 0) stop(`harden --check has ${String(fails.length)} fail row(s) (${fails.map(line => line.split(/\s+/u)[1]).join(', ')}): applying would change the box, so no auto-install`);
     if (dry) { say('would', `install the cook verb by: sudo -n wildshard-apply ${source.tag} harden`); }
     else {
