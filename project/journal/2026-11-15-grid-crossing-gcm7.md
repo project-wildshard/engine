@@ -71,3 +71,7 @@
   (the last-cell window expired it; the road bar says the home is never retired on the road, so the owned home now has no
   expiry and stays pressure-evictable), and stops of 400 to 750 ms, every one the board's ramp back to cruise out of a
   90° corner: the proof now counts a stop only after the segment first reaches cruise, and a ramp over 1.5 s fails it.
+- 16:10 (opus-gcm9) The kept home, rerun on the whole road: Driftwood stayed resident, but the page sat at its 1.2 GB
+  desktop envelope (playing 1187 to 1200 MB, against 850 to 900 with the home retired) and the road's far views churned
+  against it: 30 frames over 50 ms, to 1.1 s, and 2 s walking back in. The home now stays only within 300 m of its edge
+  (its own ring of road and half a cell past it) and retires past that; the plan's "never retired" is recorded as unaffordable.

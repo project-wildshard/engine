@@ -194,6 +194,8 @@ const HIGHWAY_QUERIES: PlayerFrameQueries = { heightAt: () => 0, waterSurfaceAt:
 export interface LiveGridSpawn { readonly x: number; readonly y: number | undefined; readonly z: number; readonly yaw: number }
 
 /** The platform travel envelope at the deck's 30 m/s; a shardfile's critical bundle is its declared compressed sim. */
+/** ZE3: how far onto the road the owned home stays resident (its own ring of road and half a cell past it); see `keepHome`. */
+const HOME_KEEP_METRES = 300;
 const LINK: ReadinessLink = { speed: 30, linkBitsPerSecond: 5_000_000, requestLatencySeconds: 0.25, maxStallSeconds: 10 };
 
 /** G598: a preparation that fails (or a road approach abandoned for another crossing, T7) frees its half-built region as a
@@ -297,7 +299,7 @@ export class LiveGridSession {
     const highwayBytes = (ports.initialStripBytes ?? ports.strips.reduce((sum, strip) => sum + strip.mesh.positions.byteLength + strip.mesh.indices.byteLength, 0))
       + assembly.cells.length * TRANSFER_WALL_BYTES;
     try { this.live = new LiveGridHost(assembly, {
-      lastCell: { windowMs: 30_000, playingBytes: ports.allocator.envelope(), keepHome: true, schedule: (expire, ms) => {
+      lastCell: { windowMs: 30_000, playingBytes: ports.allocator.envelope(), keepHome: HOME_KEEP_METRES, schedule: (expire, ms) => {
         const timer = scope.child('grid.last-cell-expiry');
         timer.timeout(ms, () => { timer.dispose(); scope.run(expire); });
         return () => { timer.dispose(); };

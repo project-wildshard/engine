@@ -72,9 +72,11 @@ export interface LiveGridPorts {
   /** Keep only the last departed isolated world on the road. Its original
    * full claim stays unneeded/evictable; no new world may overlap it. */
   lastCell?: { readonly windowMs: number; readonly playingBytes: number;
-    /** ZE3 (J352): the owned home, once departed onto the road, has no expiry: it stays resident while the traveller is on
-     *  the road (still pressure-evictable, and retired before any other cell's allocation). Absent: every cell expires. */
-    readonly keepHome?: boolean;
+    /** ZE3 (J352): the owned home, once departed onto the road, has no time expiry: it stays resident while the traveller is
+     *  within this many metres of it (still pressure-evictable, and retired before any other cell's allocation), and retires
+     *  past it. Kept for the whole road, the home held the desktop page at its 1.2 GB envelope and the road's far views
+     *  churned against it (frames to 1.1 s on the laptop's whole-road drive, 2026-11-15). Absent: every cell expires. */
+    readonly keepHome?: number;
     readonly schedule: (expire: () => void, delayMs: number) => () => void };
   /** G580 T2: told once before a resident's retirement or unload disposes its world, so its compiled programs can be kept
    *  for the next world; never refuses a retirement. Absent keeps nothing. */
@@ -391,7 +393,7 @@ export class LiveGridHost {
       } catch { return false; }
     }
     this.forgetLastCell();
-    const kept = policy.keepHome === true && instance === this.ports.home.instance;
+    const kept = policy.keepHome !== undefined && instance === this.ports.home.instance && this.distance(this.assembly.cell(instance)) <= policy.keepHome;
     const last = { instance, until: kept ? Number.POSITIVE_INFINITY : diagnosticNow() + policy.windowMs, cancel: (): void => undefined };
     this.lastCell = last;
     if (kept) {
@@ -414,7 +416,9 @@ export class LiveGridHost {
    * A different actual entry retires the departure before any new allocation. */
   private retireInactiveRegions(destination?: string): boolean {
     const last = this.lastCell;
+    const keep = this.ports.lastCell?.keepHome;
     if (last !== null && (diagnosticNow() >= last.until || !this.retainedFits(last.instance)
+      || keep !== undefined && last.instance === this.ports.home.instance && this.distance(this.assembly.cell(last.instance)) > keep
       || this.active !== null || destination !== undefined && destination !== last.instance)) this.forgetLastCell();
     let released = true;
     for (const [instance, resident] of this.residents) {
