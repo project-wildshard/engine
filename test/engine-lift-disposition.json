@@ -9342,5 +9342,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "be3209090eee14962d4cb48d3e6f05f4909f7cbb",
     "retirementProof": "Individual body-reviewed J186 disposition: retired source freshness, not the retained engine lint pin or a flaky test."
+  },
+  {
+    "repo": "engine",
+    "file": "test/native-fixture-bundle.test.ts",
+    "outcome": "restored",
+    "target": "test/native-fixture-bundle.test.ts",
+    "decision": "Restored in place (CI21 E-TOOL): its seven generic archive/cache proofs remain engine-owned. The two former Nalati/Pine-specific cache selection assertions now use two synthetic dedicated specs; the shard owners prove their real selection contracts.",
+    "originalTests": [],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "2f67c52218f183c8d38314c7417ca80009d0aba5",
+    "retirementProof": "Restored public native-fixture boundary; no J186 retirement or successor equivalence claimed."
   }
 ]

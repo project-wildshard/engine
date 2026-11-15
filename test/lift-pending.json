@@ -134,7 +134,6 @@
   "test/named-json-admission.test.ts",
   "test/native-assembly.test.ts",
   "test/native-elite-projected.test.ts",
-  "test/native-fixture-bundle.test.ts",
   "test/native-ground-assembly.test.ts",
   "test/native-group-rows.test.ts",
   "test/native-oracle.test.ts",
