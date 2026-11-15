@@ -51,7 +51,7 @@ export const PUBLIC_BYTES = {
   "/assets/baked/ink-cel-valley/far.json": 949,
   "/assets/baked/ink-cel-valley/near.glb": 907100,
   "/assets/baked/ink-cel-valley/near.json": 461,
-  "/assets/baked/nalati-grasslands/far-impostor.png": 40666,
+  "/assets/baked/nalati-grasslands/far-impostor.png": 40285,
   "/assets/baked/nalati-grasslands/far.glb": 239660,
   "/assets/baked/nalati-grasslands/far.json": 957,
   "/assets/baked/nalati-grasslands/near.glb": 3863736,
