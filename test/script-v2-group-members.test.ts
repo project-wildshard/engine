@@ -5,7 +5,7 @@ import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import { Rng } from '../src/shared/engine/core/rng';
 import { GroupStepV2 } from '../src/shared/engine/script/groupStepV2';
 import { ObservationColumnsV2, type V2ColumnOwners } from '../src/shared/engine/script/observationColumnsV2';
-import { parseGroupStepV2, GroupStepV2Schema, groupStepLayoutV2 } from '@wildshard/format/scriptGroupStepV2';
+import { parseGroupStepV2, GroupStepV2Schema } from '@wildshard/format/scriptGroupStepV2';
 import { ObservationColumnsV2Schema } from '@wildshard/format/scriptObservationColumnsV2';
 import { fixtureBytes } from '@wildshard/engine/test/nativeBytes';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';

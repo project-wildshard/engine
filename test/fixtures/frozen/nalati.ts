@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { ReturnProgram } from '../../../src/shared/game/population/returnProgram';
 import { ReturnProgramSchema } from '@wildshard/format/namedJsonContracts';
 import type { Scope } from '../../../src/shared/engine/app/scope';
@@ -8,8 +9,8 @@ import { looseObject, parse, string } from 'valibot';
 type FrozenFile = { name: string; bytes: number; sha256: string };
 type FrozenManifest = { sourceCommit: string; exporter: string; files: FrozenFile[] };
 
-const directory = new URL('./nalati/', import.meta.url);
-const manifest = JSON.parse(readFileSync(new URL('./nalati/manifest.json', import.meta.url), 'utf8')) as FrozenManifest;
+const directory = resolve('test/fixtures/frozen/nalati');
+const manifest = JSON.parse(readFileSync(resolve(directory, 'manifest.json'), 'utf8')) as FrozenManifest;
 if (!/^[a-f0-9]{40}$/u.test(manifest.sourceCommit) || manifest.exporter !== 'scripts/export-ci21-frozen.mjs') {
   throw new Error('Invalid CI21 Nalati frozen-fixture manifest');
 }
@@ -22,7 +23,7 @@ export function frozenNalatiBytes(name: string): Uint8Array {
     || !Number.isSafeInteger(entry.bytes) || !/^[a-f0-9]{64}$/u.test(entry.sha256)) {
     throw new Error(`Unknown CI21 Nalati frozen fixture: ${name}`);
   }
-  const bytes = new Uint8Array(readFileSync(new URL(name, directory)));
+  const bytes = new Uint8Array(readFileSync(resolve(directory, name)));
   if (bytes.byteLength !== entry.bytes || createHash('sha256').update(bytes).digest('hex') !== entry.sha256) {
     throw new Error(`CI21 Nalati frozen fixture differs: ${name}`);
   }

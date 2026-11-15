@@ -1,0 +1,82 @@
+[
+  {
+    "path": "src/shards/nalati-grasslands/boot/poiPaint.json",
+    "bytes": 376938,
+    "sha256": "ad66e963c8117875db1cb0e106bc24290cf2835395a16e34ca1bcd6667c4fd8a"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poiPaint.json",
+    "bytes": 376938,
+    "sha256": "ad66e963c8117875db1cb0e106bc24290cf2835395a16e34ca1bcd6667c4fd8a"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-0.bin",
+    "bytes": 50976,
+    "sha256": "9560941086752a170a60fa47556a45128744a1e800ba75106ecd1d6c8b4a7b4a"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-1.bin",
+    "bytes": 53448,
+    "sha256": "ccb1c9cdd22401ed2512d4700544b11bfff283cd6cf355e0d4037004b085adfb"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-2.bin",
+    "bytes": 90432,
+    "sha256": "b970b7ae38e1889a6be8318635c716b00bb831558a22c8d34b5085e7e4a73976"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-3.bin",
+    "bytes": 9636,
+    "sha256": "4871e6318c3e34feda0dc65eef983244b71cb8e783f3128c4067d58304157f82"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-4.bin",
+    "bytes": 6400,
+    "sha256": "729ed1ab92483f05fc4471f3a8c66e5bebf00961b658a7c4b3490a01512d7b64"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-5.bin",
+    "bytes": 1200,
+    "sha256": "d87f78e16b298db787e12aa2a9e0bebf63a289090209c136b3c915ffbae61dee"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-6.bin",
+    "bytes": 5148,
+    "sha256": "eacec6ef3b6fb468753cde44bd82aa084aa8a0cb0ef16d4e46e93d6bd498540f"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-7.bin",
+    "bytes": 5148,
+    "sha256": "c612871bebe9bfb61ae952318c3ff97cf00e14aca43720a75ce205261cd9cb2c"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-8.bin",
+    "bytes": 15896,
+    "sha256": "0b0553454fbd153506da4bc3b12f2aabba235ba456802d6a312bbb2d9e0bdcdc"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-9.bin",
+    "bytes": 15500,
+    "sha256": "2098cdeda510664077a732c7a947ce1686538b1fde5373a57751b07dc2ed70a6"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-10.bin",
+    "bytes": 17876,
+    "sha256": "73f960dda72e7cfcc6392405d261747065f8a03b6024538aa05fef9d4f893828"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-11.bin",
+    "bytes": 34020,
+    "sha256": "d15467a0a3e7b181b2f98ed37469960abd1c625962ec2d0ffd30b57856a409b9"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-12.bin",
+    "bytes": 33932,
+    "sha256": "1036e13c60a3e9bb6f21bd9fb4280238a3a63eeb93b5c2979129bd613ec212ae"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/poi-shape-13.bin",
+    "bytes": 38288,
+    "sha256": "6052aa4d70602f4a940de323327421d6ff8af5270ac0e197d124b6612548e1a2"
+  }
+]

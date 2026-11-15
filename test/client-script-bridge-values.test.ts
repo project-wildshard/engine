@@ -1,5 +1,5 @@
 import { beforeAll, expect, test } from 'vitest';
-import { compileScript } from '@wildshard/sharddev/compileScript';
+import { frozenLegacyGuest } from './fixtures/frozen/scriptGuests';
 import { createShardfileClientScripts as current, captureClientScriptPosition, type ShardfileClientScriptPorts } from '../src/client/game/shardfile/clientScripts';
 import { createShardfileClientScripts as before } from './fixtures/client-script-bridge-before';
 import { DeclaredScriptWorld } from '../src/shared/engine/script/state';
@@ -8,7 +8,7 @@ import type { ClientScriptContent } from '@wildshard/format/clientScripts';
 let bytes: Uint8Array = new Uint8Array();
 const moduleId = 'a'.repeat(64);
 beforeAll(async () => {
-  bytes = await compileScript(`
+  bytes = await frozenLegacyGuest(`
 export function abi_version():i32{return 0;}
 export function init(lo:i32,hi:i32):void{}
 export function in_ptr():i32{return 16384;}

@@ -116,7 +116,7 @@ test('page actors are real native rigs, excluded from target lists and retired e
 });
 
 test.each([true, false])('compiled AS body queries require granted floor capability: %s', async allowedFloor => {
-  const { compileDecisionScripts } = await import('../src/sharddev/buildDecisionScripts');
+  const { frozenDecisionGuest } = await import('./fixtures/frozen/scriptGuests');
   const { decisionBindingMap } = await import('@wildshard/format/decisionBindings');
   const { DecisionHost } = await import('../src/server/engine/script/decision');
   const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
@@ -127,10 +127,11 @@ test.each([true, false])('compiled AS body queries require granted floor capabil
     const input = { id: 'test.native-body', abi: '1.0', side: 'sim', module: `blobs/wasm/${'0'.repeat(64)}.wasm`, source: 'behaviour/body.as',
       binding: { shard: true }, onFail: 'hold', on: ['start'], reads: ['bodyAlive', 'playerIntent', 'declaredFloor'], commands: ['body.spawn', 'body.teleport'],
       bodies: { crate: 'crate' }, params: {}, state: [], stateVersion: 1 };
-    const built = await compileDecisionScripts([input], ops.registries, new Map([['behaviour/body.as',
+    const built = await frozenDecisionGuest([input], ops.registries, new Map([['behaviour/body.as',
       "import {Body,Read,List,Do} from './generated/testNativeBody';\nexport function onStart():void{if(!Read.bodyAlive(Body.crate))Do.bodySpawn(Body.crate);Read.declaredFloor(2,3);const y=List.at(0);Do.bodyTeleport(Body.crate,Read.playerIntent(0),y,Read.playerIntent(1));}"]]), { asLineCeiling: 10 });
     const script = built.rows[0], blob = built.blobs[0]; if (script === undefined || blob === undefined) throw new Error('Missing compiled body program');
-    const decision = new DecisionHost({ scripts: [{ ...script, reads: ['bodyAlive', 'playerIntent'], lists: allowedFloor ? ['declaredFloor'] : [], ids: decisionBindingMap(script, ops.registries).ids }],
+    if (script.side !== 'sim') throw new Error('Frozen body guest must be a sim script');
+    const decision = new DecisionHost({ scripts: [{ ...script, side: script.side, reads: ['bodyAlive', 'playerIntent'], lists: allowedFloor ? ['declaredFloor'] : [], ids: decisionBindingMap(script, ops.registries).ids }],
       bindings: [{ id: 1, script: script.id, self: 0, actors: [], instance: 0 }], modules: new Map([[script.module, blob.bytes]]), seed: [1, 2],
       world: { read: (op, a, b) => ops.read(op, a, b), list: (op, a, b, out) => ops.list(op, a, b, out), prepare: commands => ops.prepare(commands), failed: () => undefined } });
     decision.enqueue(1, [1, 0, 0, 0, 0, 0]);

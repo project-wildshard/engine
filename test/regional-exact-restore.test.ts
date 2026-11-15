@@ -2,7 +2,7 @@
 import {readFileSync} from 'node:fs';
 import {beforeAll,expect,test,vi} from 'vitest';
 import {emptyShardfile} from '../src/shared/host/author';
-import {compileScript} from '@wildshard/sharddev/compileScript';
+import {frozenLegacyGuest} from './fixtures/frozen/scriptGuests';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
 import {createShardfileSim,bindShardfileSim,prepareShardfileSimRestore} from '../src/server/game/plugin/simulation';
 import { snapshotSimHost, onSimHostRestored, isSimHostRestoring, serializeSimSnapshot } from '../src/shared/engine/sim/snapshot';
@@ -33,8 +33,8 @@ export function in_ptr():i32{return 16384;}export function in_cap():i32{return 4
 export function out_ptr():i32{return 24576;}export function out_cap():i32{return 32;}
 export function out_count():i32{return 0;}
 export function on_tick():void{${grow?'if(memory.size()==1)memory.grow(1);':''}counter++;store<i32>(32768,counter);}`;
-  fixed=await compileScript(source(false),{maximumPages:1});
-  grown=await compileScript(source(true),{maximumPages:2});
+  fixed=await frozenLegacyGuest(source(false),{maximumPages:1});
+  grown=await frozenLegacyGuest(source(true),{maximumPages:2});
 },30000);
 function fixture(bytes=fixed,mesh=false){
   const source=emptyShardfile({slug:'restore-contract',name:'Restore',author:'Test',seed:37,revision:1}),hash=hashImmutableBytes(bytes);

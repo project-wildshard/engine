@@ -3,12 +3,10 @@ import * as v from 'valibot';
 import {zlibSync} from 'fflate';
 import {MountedSpecimenSeatSchema} from '@wildshard/format/mountedSpecimenRows';
 import {prepareSeatedFigure,seatedFigureView} from '../src/client/game/riding/seatedFigure';
-import {MOUNTED_FIGURE} from './fixtures/nalati-poi-paint-original';
-import {SHAPE_BYTES} from './fixtures/nalatiShapes';
+import {MOUNTED_FIGURE} from './fixtures/frozen/renderRows';
+import {SHAPE_BYTES} from './fixtures/frozen/renderRows';
 import * as geometry from '../src/client/game/plugin/geometry';
-import { installWorldFixture } from './fixtures/worldSetup';
 
-await installWorldFixture();
 
 function inlineRows(mixed:boolean){
   return v.parse(MountedSpecimenSeatSchema,{...MOUNTED_FIGURE,shapes:MOUNTED_FIGURE.shapes.map((shape,index)=>{

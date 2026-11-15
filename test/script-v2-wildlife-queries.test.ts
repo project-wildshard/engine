@@ -6,7 +6,7 @@ import { groups } from '../src/shared/engine/physics/groups';
 import { resolvePhysicsQueriesV2,type V2QueryWorld } from '../src/shared/engine/physics/queryBatchV2';
 import { QueryRingV2,answerV2QueryBatch } from '../src/server/engine/script/queriesV2';
 import { SimBatchV2 } from '../src/server/engine/script/simBatchV2';
-import { compileSimV2 } from '../src/sharddev/test/compileSimV2';
+import { frozenSimGuest } from './fixtures/frozen/scriptGuests';
 import { layoutV2 } from '@wildshard/format/scriptWireV2';
 import { prepareV2QueryReplies,validateV2QueryRequest,type V2QueryBinding,type V2QueryOperation,type V2QueryRequest } from '@wildshard/format/scriptQueriesV2';
 import { fixtureBytes } from '@wildshard/engine/test/nativeBytes';
@@ -82,7 +82,7 @@ test('real AS requests answer only after bodies; saved stable results remap and 
   const w = await nativeWorld();
   try {
     const state = [0,-1], ring = new QueryRingV2(layout,rights), region = layout.regions[2];if (region === undefined) throw new Error('Missing state region');
-    const lane = new SimBatchV2(await compileSimV2(program,{ io: 1024,ioBytes: layout.bytes }),{ layout,ordinal: 0,handle: 1,divisor: 6,bindings: [{ identity: 'wildlife',handle: 1 }],fuel: 100000,initFuel: 10000,seed: [1,2],output: [{ offset: layout.io+region.offset,count: 2,width: 8 }] });
+    const lane = new SimBatchV2(await frozenSimGuest(program,{ io: 1024,ioBytes: layout.bytes }),{ layout,ordinal: 0,handle: 1,divisor: 6,bindings: [{ identity: 'wildlife',handle: 1 }],fuel: 100000,initFuel: 10000,seed: [1,2],output: [{ offset: layout.io+region.offset,count: 2,width: 8 }] });
     const byHandle = new Map([[1,binding]]), byName = new Map([['wildlife',binding]]), due = new Set(['wildlife']);let queries = ring,calls = 0;
     for (let tick = 0; tick <= 7; tick++) {
       let delivery: ReturnType<QueryRingV2['delivery']> | undefined;

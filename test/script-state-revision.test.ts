@@ -1,7 +1,7 @@
 import { beforeAll, expect, test } from 'vitest';
 import { ScriptHost } from '../src/shared/engine/script/host';
 import { ScriptWorld } from '../src/shared/engine/script/effects';
-import { compileScript } from '@wildshard/sharddev/compileScript';
+import { frozenLegacyGuest } from './fixtures/frozen/scriptGuests';
 
 // The same ABI regions as the Template's scene hooks; `witness` keeps door.as's tick counter outside them.
 const module = (witness: boolean): string => `
@@ -21,7 +21,7 @@ export function on_tick(): void {
 }`;
 let atRest: Uint8Array = new Uint8Array(), counting: Uint8Array = new Uint8Array();
 beforeAll(async () => {
-  [atRest, counting] = await Promise.all([compileScript(module(false), { maximumPages: 1 }), compileScript(module(true), { maximumPages: 1 })]);
+  [atRest, counting] = await Promise.all([frozenLegacyGuest(module(false), { maximumPages: 1 }), frozenLegacyGuest(module(true), { maximumPages: 1 })]);
 });
 function lane(bytes: Uint8Array): { host: ScriptHost; tick: (tick: number, action?: number) => void } {
   const host = new ScriptHost({ world: new ScriptWorld({ fields: {}, archetypes: [], events: [], maxEntities: 1 }, [{ id: 1, name: 'door', position: [0, 0, 0], fields: {}, frozen: false, interactive: true }]), query: () => [] });

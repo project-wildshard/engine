@@ -9949,5 +9949,413 @@
     "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
     "sourceBlob": "a1df7be0fb0ff46d794d7acd9d5e4a3ba6eb999c",
     "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/actor-projection-v2.test.ts",
+    "outcome": "restored",
+    "target": "test/actor-projection-v2.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "independent rows run actual AS on ordered original native members without another continuation or clock",
+      "admission refuses executables, accessors, unknown selectors and missing declared outputs before native writes",
+      "foreign identity, non-finite memory and sliced retirement refuse without changing native state"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "1fbbac048aec97696d0bcc35356579b14f4b4f71",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/client-return-modules.test.ts",
+    "outcome": "restored",
+    "target": "test/client-return-modules.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "page preparation lends the same verified book to sibling construction and actual level scopes",
+      "preparation reads ABI1 named modules into the original map"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "1af7adda6836281bdb17f3ee47a9c1b9f76e9daf",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/client-script-bridge-values.test.ts",
+    "outcome": "restored",
+    "target": "test/client-script-bridge-values.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "the real guest retains every observation, restore byte and getter order from zero through 24 fields",
+      "later observers and custom position iterators cannot overwrite completed rows",
+      "nested ticks and a throwing observer keep outer observations and subsequent ticks independent",
+      "late missing/private fields refuse before guest publication and scratch is safe to reuse",
+      "the real point-capture producer preserves original guest bytes across nested field reads",
+      "an iterable returned by the capture port retains its live alias and exact copy order",
+      "a malformed legacy observation cannot select the numeric capture path or publish"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "7e115543ac28fbee163056e45dc00583f035b280",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/client-script-transactions-regression.test.ts",
+    "outcome": "restored",
+    "target": "test/client-script-transactions-regression.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "ordered observation/input copies retain zero through maximum field counts",
+      "an invalid final observation refuses before any host or visual tick",
+      "later observation getters cannot retarget an already admitted input copy",
+      "invalid effect suffixes preserve the last visual pose and native refusal",
+      "prepared visual transactions keep stale and non-finite refusals",
+      "detached outputs and saved continuation retain exact replay bytes",
+      "frame-only steps retain complete guest state through failure, resume, restore and skipped ticks"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "f09a620c0c1fb4b13ad25a65590984576de53c14",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/declared-body-ops.test.ts",
+    "outcome": "restored",
+    "target": "test/declared-body-ops.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "declared transactions allocate only at commit, retain exact physics and refuse atomically",
+      "caller-owned old save handles rebind without allocating or replaying scripts",
+      "rows are plain data and absent targets refuse before publishing any body",
+      "page actors are real native rigs, excluded from target lists and retired exactly once",
+      "intent samples remain requested motion and floors preserve captured null/bounds/max rules"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "e82dd9d506571105932e65b72f19b02c733c173c",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/regional-exact-restore.test.ts",
+    "outcome": "restored",
+    "target": "test/regional-exact-restore.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "bodyless regional target restores saved native walls and motor before detaching the temporary player",
+      "stepped, disposed and already-kept targets cannot restore; borrowed worlds refuse before allocation",
+      "retained terrain scope cannot touch the freed constructor world after replacement",
+      "the existing installer-based restore retains staged mesh validation and exact bytes"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "c5b5df8ac8c77780e18c54bd0067bc17b2154193",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/return-program-raw-modules.test.ts",
+    "outcome": "restored",
+    "target": "test/return-program-raw-modules.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "the original map lends raw projections to the real owner and its children only",
+      "raw admission refuses foreign bytes, incomplete contracts and executable rows",
+      "raw lookup uses the original concrete map without invoking an overridden getter",
+      "inline descriptors keep their original admission and owner cache",
+      "raw ABI1 weather keeps its module loan, outputs, stream and owner",
+      "ABI1 retirement during a request refuses results and restores its original RNG"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "a35ac9c745cc67eca49100597c05824bddac4f10",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/return-projection-template.test.ts",
+    "outcome": "restored",
+    "target": "test/return-projection-template.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "reused shapes write the exact generic ABI bytes with fresh values, absent fields and signed zero",
+      "later calls cannot alter detached captures or leak values through a refused or retired call",
+      "declared candidate slots retain absent bytes when the candidate iterator yields fewer frames",
+      "alternating RNG presence and shapes keeps every retained input writer detached and exact",
+      "candidate iteration completes before ordered descriptor capture and nested preparation stays independent"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "4b60ebf3a1f67dff1ccbf4453a31bd38d068a8a8",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-call-results.test.ts",
+    "outcome": "restored",
+    "target": "test/script-call-results.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "discarding only results preserves complete native execution, events, failure history and snapshots"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "7b65ce6b09cd5f3f1f046dca4045ddedae6a6fd1",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-checkpoint-regression.test.ts",
+    "outcome": "restored",
+    "target": "test/script-checkpoint-regression.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "checkpoint JSON preserves every byte, globals and insertion order",
+      "retained checkpoint arrays never alias another checkpoint or the guest",
+      "saved replay and invalid suffix restores retain exact continuation",
+      "reused private rollback buffers never alias retained public checkpoints"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "25b84026b2679688d3ec5576bbea6ca8974bb18c",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-fixed-memory.test.ts",
+    "outcome": "restored",
+    "target": "test/script-fixed-memory.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "boot reserves the entire observed 33-instance fixed demand without depending on any retirement",
+      "retirement clears every byte; exact page counts and escaped storage remain independent",
+      "a held closed module releases its instance and forbids use; busy disposal cannot lend its memory to a nested owner",
+      "public memory access and arbitrary initialization permanently exclude recycling",
+      "sliced teardown cannot lend retired storage until all original owner cleanups finish",
+      "abandoned reservations return only on their original owner and reject stale tokens",
+      "a retired return wrapper and detached candidate cannot read or affect its next owner",
+      "the census separates reusable bank bytes from scope-fenced storage without mutating either",
+      "the idle bank is bounded and invalid warmup does not allocate",
+      "legacy consumers never reuse returned V2 storage and growables cannot consume fixed stock"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "dff97bff020c17bd4ab493d284da1999c2a5cbb5",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-lane-results.test.ts",
+    "outcome": "restored",
+    "target": "test/script-lane-results.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "authoritative no-result ticks preserve complete events, command inputs, failure, restore and state revisions"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "df1ffb4a59e5271617a5574096b8f694e5d8d6b1",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-state-revision.test.ts",
+    "outcome": "restored",
+    "target": "test/script-state-revision.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "an at-rest lane keeps its state revision while only the clock and the ABI rows move",
+      "a guest that counts ticks (the Template door witness) changes state every tick"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "ab09efbb292e70020ccba4969d0cb37a9358a800",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-v2-group-bank.test.ts",
+    "outcome": "restored",
+    "target": "test/script-v2-group-bank.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "finite columns preserve ordered sixteen-member and cross-group references without changing wire values",
+      "real GroupBrain JSON continuation round-trips through the bank and original restore owner",
+      "malformed suffixes, forged references and accessors refuse before publication",
+      "publication fences original bank, reference slot identity and ancestor sliced retirement",
+      "real AS claims observe earlier writes in the same group call and match the original director",
+      "metadata admission is strict and emits the same finite named schema",
+      "incremental updates keep one bank and validate the whole changed suffix before any write",
+      "validation checks every original wire kind without building a decoded record",
+      "equivalent fresh rosters preserve metadata but keep each publication tied to its original row objects",
+      "repeated publication guards retain signed-zero and final-row metadata fences",
+      "numeric read plans retain finite and bounded checks around variable-width reference columns",
+      "reused update staging clears shorter reference tails and never publishes a refused prefix",
+      "a descriptor trap reentering update borrows independent staging and preserves both original banks",
+      "snapshot pairs stay exclusive until accept or discard while public values stay detached",
+      "a refused pooled candidate returns its lease without publishing or retaining a stale numeric suffix",
+      "custom slice and iterable snapshots preserve their original copy semantics",
+      "an overridden setter may retain a candidate even after throwing without later pool reuse changing it",
+      "discard during a setter getter cannot lend the in-progress acceptance pair to a nested preparation",
+      "repeated scalar validation checks changed words and current reference authority",
+      "failed scalar reads cannot prime a later invalid bank",
+      "ArrayLike getters retain order and nested validation after native reads",
+      "native validation does not trust detached or shared mutable views"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "11c5900adab33d5370232293c8d1f5e5fde3b3af",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-v2-group-members.test.ts",
+    "outcome": "restored",
+    "target": "test/script-v2-group-members.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "mixed finite member effects and native result run in original order after complete preflight",
+      "memory value/valid columns preserve the original negative-infinity sentinel and signed zero",
+      "invalid state or sentinel suffix prevents every native effect and group/RNG commit",
+      "member memory/pose/motion owner replacement and ancestor retirement refuse before effects",
+      "member operation and sentinel rows emit strict named admission without executable selectors",
+      "native prefix retirement fences later member operations without retargeting the emitted actor"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "bd79ba859d2a0a43cfa65263a49b1a978011b1ad",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-v2-group-rng.test.ts",
+    "outcome": "restored",
+    "target": "test/script-v2-group-rng.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "real group AS borrows both original streams and atomically commits exact interleaved draws",
+      "rejected suffix, second-stream replacement and stale draws publish neither bank nor other stream",
+      "two-stream capability is explicit and aliased original owners refuse before any draw",
+      "ancestor retirement and callable replacement refuse both prepared stream commits"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "165181a67851badeb1c0899c6fd8dd8eb020d5a2",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-v2-wildlife-queries.test.ts",
+    "outcome": "restored",
+    "target": "test/script-v2-wildlife-queries.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "nearest borrows actual live actors, horizontal strict radius and original roster ties, without self exclusion or body/RNG changes",
+      "deferred point sight uses the actual WORLD/sensor/slack law and does not replace native reach/contact",
+      "real AS requests answer only after bodies; saved stable results remap and commit at the next eligible entry",
+      "new query arguments and stale result identities refuse before any reply publication"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "c7a43c7df812822dedae64efe7745a1a75c56ab9",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-v2-world-actions.test.ts",
+    "outcome": "restored",
+    "target": "test/script-v2-world-actions.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "empty actions retain full binding validation and distinct frozen results",
+      "real v2 AS emits the fixed dismount/ignite/impulse bank, preserving order, f64 and signed zero",
+      "a real guest overflowing the action bank traps without publishing a prefix, and a retry is clean",
+      "every malformed suffix refuses the whole bank before an earlier valid effect",
+      "binding declarations, per-binding quotas, missing capabilities and view-lane commands refuse",
+      "all owner loans preflight before effects, then dismount/ignite/impulse apply in emitted order",
+      "ancestor retirement refuses all effects, and retirement during an earlier effect fences later effects",
+      "native impulse uses the same owned SimHost without stepping clocks/RNG or borrowing a page player",
+      "the module accepts exactly 128 commands with at most 32 for each declared binding",
+      "prepared world effects copy operands and can interleave only after every family validates",
+      "retired or replaced authority after preparation refuses before the first world effect"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "1d0168fd2338a210e72aa3fc5010a4d037c793c9",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-virgin-memory.test.ts",
+    "outcome": "restored",
+    "target": "test/script-virgin-memory.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "initial install, repeated install and saved restore each consume a distinct virgin growable memory",
+      "virgin growable reservations match both page limits and never accept returned fixed storage",
+      "unused prepared growables leave with their owner and are never returned to stock",
+      "all virgin descriptors and combined bounds refuse before the first allocation",
+      "the full-route reserve fits the approved 45-memory and unchanged 10 MiB bounds"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "2a3757d34e00bc1870e45006192e332ec5331179",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/titan-world-commands.test.ts",
+    "outcome": "restored",
+    "target": "test/titan-world-commands.test.ts",
+    "decision": "Restored in place (CI21 E-SCRIPT): Retain every runtime protocol case using hash-checked frozen guests and source-keyed snapshots; no SDK compiler or shard source is loaded by the test.",
+    "originalTests": [
+      "selected-only command names append without renumbering any original binding",
+      "the actual selected Titan emits only its declared same-call field and mount effects",
+      "command operands are detached and retired owners refuse before native application",
+      "mismatched or inferred additional name tables refuse before instantiating a module",
+      "the selected intro clock preserves the original irregular cadence and reset",
+      "projection preflight resolves its default event through the declared aliases"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "1f66221f912cca2f6600454b6a72c44ab0706bc2",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/grass-profile-file-only.test.ts",
+    "outcome": "restored",
+    "target": "test/grass-profile-file-only.test.ts",
+    "decision": "Restored in place (CI21 E-RENDER): Frozen named shapes, mounted rows and grass blocks preserve every public intake and ownership assertion without global shard-world setup.",
+    "originalTests": [
+      "prepared profiles cannot decode later inline payload arguments"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "62b3a853b7372d58bc3bf6b0b4c8c7b123f3acff",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/mounted-specimen-factory.test.ts",
+    "outcome": "restored",
+    "target": "test/mounted-specimen-factory.test.ts",
+    "decision": "Restored in place (CI21 E-RENDER): Frozen named shapes, mounted rows and grass blocks preserve every public intake and ownership assertion without global shard-world setup.",
+    "originalTests": [
+      "a mounted specimen admits only plain rows, and refuses before any read",
+      "a mounted specimen admits its seat file again and seats the figure on the declared joint of its rig"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "109dc32aedf1ef64f90c5e503192c1db488cd72d",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/seated-figure-file-only.test.ts",
+    "outcome": "restored",
+    "target": "test/seated-figure-file-only.test.ts",
+    "decision": "Restored in place (CI21 E-RENDER): Frozen named shapes, mounted rows and grass blocks preserve every public intake and ownership assertion without global shard-world setup.",
+    "originalTests": [
+      "the complete shipped rider prepares every named shape once through its verified owner"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "a41e5525ba4b45b52949a0b58a5bac4b323c21ca",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/nalati-actor-paint.test.ts",
+    "outcome": "restored",
+    "target": "test/fixed-draw-shape-copy.test.ts",
+    "decision": "Restore fixed-draw copy ownership under a generic name, using a pinned named painted mesh instead of the removed monorepo place lane. Both independent-transform and absent-handle assertions remain.",
+    "originalTests": [
+      "returns independent geometry for dungeon transforms and refuses missing shapes"
+    ],
+    "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
+    "sourceBlob": "e2ec624a44d1716e7518d1ee31a4f18ff3978d2d",
+    "retirementProof": "No cases retired; the donor mesh is not claimed as a byte-equivalent Balbal."
   }
 ]

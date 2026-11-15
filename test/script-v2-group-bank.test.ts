@@ -8,9 +8,9 @@ import { GroupBankV2Schema, parseGroupBankV2 } from '@wildshard/format/scriptGro
 import { layoutV2, writeV2Frame, validateV2Frame } from '@wildshard/format/scriptWireV2';
 import { prepareV2Observations } from '../src/shared/engine/script/observationsV2';
 import { ScriptModuleV2 } from '../src/shared/engine/script/moduleV2';
-import { compileScriptV2 } from '../src/sharddev/bake/compileScriptV2';
-import { v2CoreSource } from '../src/sharddev/as/wsV2';
-import { groupBankSourceV2 } from '../src/sharddev/as/groupBankV2';
+import { frozenV2Guest } from './fixtures/frozen/scriptGuests';
+import { frozenV2CoreSource } from './fixtures/frozen/scriptGuests';
+import { frozenGroupBankSource } from './fixtures/frozen/scriptGuests';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
 
@@ -118,8 +118,8 @@ test('real AS claims observe earlier writes in the same group call and match the
     export function ws_project(fuel:i32):i32{core.beginState();assert(core.beginBinding(0));
       group.write(1,group.claim(0,2,1)?1:0);group.write(2,group.claim(0,3,1)?1:0);
       group.write(3,group.claim(0,2,1)?1:0);core.endBinding();return fuel;}`;
-  const bytes = await compileScriptV2(source, { lane: 'project', ioBytes: layout.bytes,
-    sources: { 'sdk/as/wsV2.ts': v2CoreSource(0), 'sdk/as/groupBankV2.ts': groupBankSourceV2(0, codec.width) } });
+  const bytes = await frozenV2Guest(source, { lane: 'project', ioBytes: layout.bytes,
+    sources: { 'sdk/as/wsV2.ts': frozenV2CoreSource(0), 'sdk/as/groupBankV2.ts': frozenGroupBankSource(0, codec.width) } });
   const module = new ScriptModuleV2(bytes, { seed: [0, 0], initFuel: 400000, output: [], ioBytes: layout.bytes });
   const input = prepareV2Observations(layout, 0, { bindings: [{ identity: 'original-group', handle: 1,
     self: 0, player: 0, observed: new Set(), enabled: true, due: true, divisor: 6, fuel: 400000,

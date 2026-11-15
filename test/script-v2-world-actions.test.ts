@@ -5,7 +5,7 @@ import { ScriptModuleV2 } from '../src/shared/engine/script/moduleV2';
 import { prepareV2Observations } from '../src/shared/engine/script/observationsV2';
 import { createSimHost } from '../src/server/engine/sim';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { compileSimV2 } from '../src/sharddev/test/compileSimV2';
+import { frozenSimGuest } from './fixtures/frozen/scriptGuests';
 import { readV2WorldActions,V2_ACTION_OPS,type V2ActionBinding,type V2WorldAction } from '@wildshard/format/scriptActionsV2';
 import { layoutV2,writeV2Frame,validateV2Frame,type V2FrameAuthority } from '@wildshard/format/scriptWireV2';
 import { prepareV2WorldActions, type V2WorldActionLoan } from '../src/shared/game/shardfile/worldActionsV2';
@@ -51,7 +51,7 @@ test('empty actions retain full binding validation and distinct frozen results',
 });
 let compiled: Promise<Uint8Array> | undefined;
 function bytes(): Promise<Uint8Array> {
-  compiled ??= compileSimV2(`import * as ws from './sdk/as/wsV2';
+  compiled ??= frozenSimGuest(`import * as ws from './sdk/as/wsV2';
 export function onBinding():void{for(let i=0;i<i32(ws.parameter(0));i++){ws.dismount(12,true);ws.ignite(13,-0,1099511627776.125);ws.impulse(11,3,4,-0);}}`,{ io: layout.io,ioBytes: layout.bytes });return compiled;
 }
 async function guest(): Promise<ScriptModuleV2> { return new ScriptModuleV2(await bytes(),{ seed: [1,2],initFuel: 10000,ioBytes: layout.bytes,output: [] }); }

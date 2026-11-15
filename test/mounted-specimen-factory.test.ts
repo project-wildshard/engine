@@ -1,15 +1,13 @@
-import {SHAPE_BYTES} from './fixtures/nalatiShapes';
+import {SHAPE_BYTES} from './fixtures/frozen/renderRows';
 import { expect, test } from 'vitest';
 import { Bone, BufferGeometry, Group, Object3D } from 'three';
 import { mountedSpecimens, type MountedSpecimenPorts } from '../src/client/game/models/mountedSpecimen';
 import { Scope } from '../src/shared/engine/app/scope';
-import { MOUNTED_FIGURE } from './fixtures/nalati-poi-paint-original';
+import { MOUNTED_FIGURE } from './fixtures/frozen/renderRows';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import type { ModelContext } from '../src/client/engine/models/model';
 import type { Rng } from '../src/shared/engine/core/rng';
-import { installWorldFixture } from './fixtures/worldSetup';
 
-await installWorldFixture();
 
 const row = { model: { id: 'fixture/rider', name: 'A rider', category: 'people', pipeline: ['code'], file: 'test/mounted-specimen-factory.test.ts', defaults: {} },
   slug: 'fixture', json: 'riding/seat.json', species: 'pony', variant: 'grey', tint: 0.25 };

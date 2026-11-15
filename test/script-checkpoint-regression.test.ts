@@ -1,11 +1,11 @@
 import { beforeAll, expect, test } from 'vitest';
 import { ScriptHost, type ScriptHostState } from '../src/shared/engine/script/host';
 import { ScriptWorld } from '../src/shared/engine/script/effects';
-import { compileScript } from '@wildshard/sharddev/compileScript';
+import { frozenLegacyGuest } from './fixtures/frozen/scriptGuests';
 
 let bytes: Uint8Array = new Uint8Array();
 beforeAll(async () => {
-  bytes = await compileScript(`
+  bytes = await frozenLegacyGuest(`
 let counter:i32=0;
 let wide:i64=0;
 export function abi_version():i32{return 0;}

@@ -1,0 +1,7 @@
+{
+  "sourceRepository": "project-wildshard/sharddev",
+  "sourceCommit": "23d05fd147700fe5e9c929749f7d8cb63cdf7761",
+  "key": "SHA256(JSON.stringify([method,arguments], Maps -> {map:[...entries]}))",
+  "compiler": "assemblyscript 0.28.20; its pinned binaryen 131; instrumentation binaryen 132; resolve package symlinks before compiling",
+  "captureRecipe": "import {deserialize,serialize} from 'node:v8';\nimport {readFileSync} from 'node:fs';\nimport {compileScript} from '@wildshard/sharddev/compileScript';\nimport {compileScriptV2} from '@wildshard/sharddev/compileScriptV2';\nimport {compileDecisionScripts} from '@wildshard/sharddev/buildDecisionScripts';\nimport {compileSimV2} from '<checkouts>/sharddev/src/sharddev/test/compileSimV2.ts';\nimport {v2CoreSource} from '<checkouts>/sharddev/src/sharddev/as/wsV2.ts';\nimport {groupBankSourceV2} from '<checkouts>/sharddev/src/sharddev/as/groupBankV2.ts';\nconst {method,args}=deserialize(readFileSync(0));\nconst methods={compileScript,compileScriptV2,compileDecisionScripts,compileSimV2,v2CoreSource,groupBankSourceV2};\nprocess.stdout.write(serialize(await methods[method](...args)));\n"
+}

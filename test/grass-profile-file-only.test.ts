@@ -1,9 +1,9 @@
 import {expect,test,vi} from 'vitest';
 import {DataTexture} from 'three';
 import {GrassPresentationProfile} from '../src/client/game/looks/grassPresentation';
-import {GRASS_FILES,originalGrassProfile} from './fixtures/nalatiGrass';
+import { GRASS_FILES, GRASS_ROWS } from './fixtures/frozen/renderRows';
 
-const original=originalGrassProfile().rows;
+const original=GRASS_ROWS;
 const inline='eJxjYGBgAAAABAAB';
 const payloads=['height','mask','field','ground']as const;
 for(const key of payloads)test(`grass refuses inline ${key} before file access`,()=>{

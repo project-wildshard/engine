@@ -1,11 +1,11 @@
 import { beforeAll, expect, test } from 'vitest';
 import { ClientScriptLane, type ClientScriptObservation } from '../src/client/engine/script/client';
 import { ScriptWorld } from '../src/shared/engine/script/effects';
-import { compileScript } from '@wildshard/sharddev/compileScript';
+import { frozenLegacyGuest } from './fixtures/frozen/scriptGuests';
 
 let bytes: Uint8Array = new Uint8Array();
 beforeAll(async () => {
-  bytes = await compileScript(`
+  bytes = await frozenLegacyGuest(`
 let calls:i32=0;
 export function abi_version():i32{return 0;}
 export function init(lo:i32,hi:i32):void{calls=lo;}
