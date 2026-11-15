@@ -115,14 +115,21 @@ jobs:
           key: ${{ steps.pins.outputs.cache-primary-key }}
       - run: bash scripts/ci-playwright-install.sh ${{ matrix.browser }}
       # Pure input-addressed encodes are reusable; each head's cook store remains cold.
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: encodes
         with:
           path: ~/.cache/wildshard/gen/spawn-parts-br
-          key: nightly-encodes-${{ runner.os }}-${{ github.sha }}
+          key: nightly-encodes-${{ github.sha }}
           restore-keys: |
-            nightly-encodes-${{ runner.os }}-
+            nightly-encodes-
             ring1-spawn-parts-br-
       - run: pnpm build:game
+      # Save after a good build even when a later cold-head proof goes red.
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: steps.encodes.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ${{ steps.encodes.outputs.cache-primary-key }}
       # PAGE-SIZE PZ4: build:game splits dist/ from dist-content/; this job serves the whole game from dist.
       - run: node scripts/app-build/splitOutput.mjs dist --join
       - name: Cold cook and real phone UI on each pinned head
