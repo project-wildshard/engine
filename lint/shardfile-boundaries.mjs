@@ -18,9 +18,11 @@ const packages = new Map();
 
 function publicPackage(root, source) {
   if (source === 'three' || source.startsWith('three/') || source === 'valibot') return true;
-  const pkg = /^@wildshard\/(engine|game|sdk|sharddev|format)(?:\/(.+))?$/u.exec(source);
+  const pkg = /^@wildshard\/(engine|game|sdk|format)(?:\/(.+))?$/u.exec(source);
   if (pkg === null) return false;
-  const file = resolve(root, 'src', pkg[1], 'package.json');
+  const file = pkg[1] === 'engine'
+    ? resolve(root, 'package.json')
+    : resolve(root, 'node_modules', '@wildshard', pkg[1], 'package.json');
   if (!packages.has(file)) packages.set(file, existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')).exports ?? {} : {});
   const sub = pkg.at(2);
   return Object.hasOwn(packages.get(file), sub === undefined ? '.' : `./${sub}`);

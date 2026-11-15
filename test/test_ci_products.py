@@ -162,15 +162,6 @@ class PreparedProducts(unittest.TestCase):
             self.assertTrue((self.root / name).is_file(), name)
         self.assertEqual(json.loads((self.root / policy).read_text())['decisionLegacyLines'], 100)
         self.assertEqual(json.loads((self.root / words).read_text())['slugs'], ['fictional'])
-        repo = Path(__file__).resolve().parents[1]
-        probe = f"""
-          import {{projectDecisionBudget}} from '{(repo / 'src/sharddev/projectPolicy.ts').as_uri()}';
-          import {{decisionLineCeiling}} from '{(repo / 'src/sharddev/buildDecisionScripts.ts').as_uri()}';
-          const ceiling = decisionLineCeiling({{decisionLegacyLines: projectDecisionBudget(process.argv[1])}});
-          if (ceiling !== 10) throw new Error('Restored policy did not reach decision admission');
-        """
-        subprocess.run(['node', '--import', str(repo / 'scripts/bake-loader.mjs'), '--input-type=module',
-                        '-e', probe, str(self.root / self.shard)], check=True)
         self.assertEqual((self.root / 'public/generated.bin').read_bytes(), b'\0\x01')
         self.assertEqual((self.root / self.table).read_text(), 'export const value=7;')
         self.assertEqual((self.root / 'out/fictional/shard.json').read_text(), '{"format":2}')

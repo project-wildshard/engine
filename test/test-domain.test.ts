@@ -31,10 +31,10 @@ test('colocated fixtures keep product guards in production and architecture guar
   const rejected: { file: string; rules: readonly string[] }[] = [];
   const refuses = (path: string, source: string, rules: readonly string[]): void => { rejected.push({ file: put(path, source), rules }); };
   try {
-    const allowed = run([put('src/engine/core/fixture.test.ts', code), put('src/test/engine/helper.ts', code), put('src/test/game/helper.ts', code), put('src/sharddev/test/helper.ts', code),
+    const allowed = run([put('src/engine/core/fixture.test.ts', code), put('src/test/engine/helper.test.ts', code), put('src/test/game/helper.test.ts', code), put('src/sharddev/test/helper.ts', code),
       put('src/shards/probe/generators/unit.test.ts', 'import {test} from "vitest"; import {readFile} from "node:fs"; export const fixture = {test,readFile};')]);
     expect(allowed.status, String(allowed.error ?? '') + String(allowed.stdout) + String(allowed.stderr)).toBe(0);
-    refuses('src/engine/core/fixture.ts', code, ['engine-words', 'no-inline-ui-string', 'no-authored-html', 'no-global-listener-patch', 'no-raw-hud']);
+    refuses('src/client/engine/view/fixture.ts', code, ['engine-words', 'no-inline-ui-string', 'no-authored-html', 'no-global-listener-patch', 'no-raw-hud']);
     refuses('src/sharddev/runtime/fixture.ts', code, ['no-authored-html', 'no-global-listener-patch', 'no-raw-hud']);
     refuses('src/game/runtime/fixture.ts', code, ['no-authored-html', 'no-global-listener-patch', 'no-raw-hud']);
     refuses('src/engine/core/boundary.test.ts', 'import {value} from "../../game/value"; import {vi} from "vitest"; vi.mock("./value"); export {value};', ['layer', 'no-module-mock']);
@@ -53,9 +53,10 @@ test('colocated fixtures keep product guards in production and architecture guar
     statements.forEach((source, index) => { refuses(`src/sharddev/runtime/importer-${index}.ts`, source, ['no-production-test-import']); });
     statements.forEach((source, index) => { refuses(`src/game/runtime/importer-${index}.ts`, source, ['no-production-test-import']); });
     for (const layer of ['engine', 'game', 'sdk']) {
-      refuses(`src/${layer}/fixture-consumer.ts`, 'import {FakeGame} from "@wildshard/engine/test/FakeGame"; export const value = FakeGame;', ['no-production-test-import']);
-      refuses(`src/${layer}/sdk-fixture-consumer.ts`, 'import {helper} from "@wildshard/sharddev/test/helper"; export const value = helper;', ['no-production-test-import']);
-      refuses(`src/${layer}/game-fixture-consumer.ts`, 'import {helper} from "@wildshard/engine/game/test/helper"; export const value = helper;', ['no-production-test-import']);
+      const root = `src/shared/${layer}`;
+      refuses(`${root}/fixture-consumer.ts`, 'import {FakeGame} from "@wildshard/engine/test/FakeGame"; export const value = FakeGame;', ['no-production-test-import']);
+      refuses(`${root}/sdk-fixture-consumer.ts`, 'import {helper} from "@wildshard/sharddev/test/helper"; export const value = helper;', ['no-production-test-import']);
+      refuses(`${root}/game-fixture-consumer.ts`, 'import {helper} from "@wildshard/engine/game/test/helper"; export const value = helper;', ['no-production-test-import']);
     }
     const production = rejected.slice(0, 3), architecture = rejected.slice(3);
     for (const [rows, selected] of [[production, surfaces], [architecture, boundaries]] as const) {

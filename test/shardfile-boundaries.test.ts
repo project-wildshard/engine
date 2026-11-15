@@ -13,9 +13,9 @@ const root = cwd(), runtime = 'src/shards/sample/runtime/index.ts';
 const violations = (file: string, source: string, rule: string) => shardfileBoundaryViolations(root, file, source).filter(row => row.rule === rule);
 const closed = (source: string) => violations(runtime, source, 'runtime-standalone');
 
-test('runtime accepts its own TS and published packages, never private or author packages', () => {
-  expect(closed("import './nested/helper'; import './const.ts'; import 'three'; import 'valibot'; import '@wildshard/engine/physics/query'; import '@wildshard/engine/game/plugin/simulation'; import '@wildshard/sharddev/movers';")).toEqual([]);
-  expect(closed("import '@wildshard/engine/not-public'; import '@wildshard/commons/props'; import 'node:fs'; import '../../../engine/physics/query';")).toHaveLength(4);
+test('runtime accepts its own TS and installed published packages, never private or author packages', () => {
+  expect(closed("import './nested/helper'; import './const.ts'; import 'three'; import 'valibot'; import '@wildshard/engine/physics/query'; import '@wildshard/engine/game/plugin/simulation'; import '@wildshard/format/clientPlan';")).toEqual([]);
+  expect(closed("import '@wildshard/engine/not-public'; import '@wildshard/sharddev/movers'; import '@wildshard/commons/props'; import 'node:fs'; import '../../../engine/physics/query';")).toHaveLength(5);
 });
 
 test('runtime closes type imports, re-exports, dynamic imports and other-shard escapes', () => {
@@ -39,7 +39,7 @@ test('play code cannot reach any build-time folder through static, lazy or resou
   const file = 'src/shards/sample/world/build.ts';
   const source = "import '../data/facts'; export * from '../generators/a'; import('../behaviour/a'); new URL('../assets/a.glb', import.meta.url); import.meta.glob('../blender/*.ts'); import '../shard.config';";
   expect(violations(file, source, 'no-build-time-import')).toHaveLength(6);
-  expect(violations('src/client/app/main.ts', "import './shards/sample/data/a';", 'no-build-time-import')).toHaveLength(1);
+  expect(violations('src/client/app/main.ts', "import '../../shards/sample/data/a';", 'no-build-time-import')).toHaveLength(1);
   expect(violations('src/engine/a.ts', "import('/src/shards/' + slug + '/data/a');", 'no-build-time-import')).toHaveLength(1);
 });
 

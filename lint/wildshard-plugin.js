@@ -1140,7 +1140,7 @@ export const TEST_DOMAIN_RUNTIME_RULES = [
   'runtime-performance', 'no-raw-random-time', 'no-runtime-generator',
 ];
 /** @param {string} path */
-const testFixtures = path => /^src\/(?:engine|game|sdk|sharddev)\/test\//u.test(path);
+const testFixtures = path => /^(?:src\/(?:test\/(?:engine|game|sdk)|(?:engine|game|sdk|sharddev)\/test)|@wildshard\/(?:engine|game|sdk|sharddev)\/test)\//u.test(path);
 /** @param {string} path */
 const testModule = path => path.endsWith('.test.ts') || testFixtures(path);
 const testDomain = context => testModule(pathOf(context));
