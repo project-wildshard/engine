@@ -21,11 +21,7 @@ interface Workers {
   readonly peers: Peers
 }
 
-async function enter(
-  browser: Browser,
-  rig: T1OnlineRig,
-  name: string,
-): Promise<Entered> {
+async function device(browser: Browser, rig: T1OnlineRig): Promise<Entered> {
   const context = await browser.newContext({
     ...devices['Desktop Chrome'],
     baseURL: rig.base,
@@ -51,11 +47,25 @@ async function enter(
         errors.push(`console: ${message.text()}`)
       }
     })
-    await page.goto('/?mute=1&nolock=1&sw=0&fps=30')
-    await enterTemplate(page, name)
     return { context, page, errors }
   } catch (error) {
     await context.close()
+    throw error
+  }
+}
+
+async function enter(
+  browser: Browser,
+  rig: T1OnlineRig,
+  name: string,
+): Promise<Entered> {
+  const opened = await device(browser, rig)
+  try {
+    await opened.page.goto('/?mute=1&nolock=1&sw=0&fps=30')
+    await enterTemplate(opened.page, name)
+    return opened
+  } catch (error) {
+    await opened.context.close()
     throw error
   }
 }
@@ -213,5 +223,55 @@ test('browser offline shows its card and recovers online', async ({
     expectInjectedSocketErrors(errors)
   } finally {
     await first.context.setOffline(false)
+  }
+})
+
+async function seatedResult(page: Page, name: string): Promise<unknown> {
+  try {
+    await enterTemplate(page, name)
+    return undefined
+  } catch (error) {
+    return error
+  }
+}
+
+test('a matched release 503 shows its page and heals to Template control', async ({
+  browser,
+  rig,
+}): Promise<void> => {
+  const opened = await device(browser, rig)
+  let result: Promise<unknown> | undefined = undefined
+  try {
+    const before = await rig.matches('release')
+    await rig.arm('release-5xx', [
+      { route: 'release', kind: 'status', code: 503 },
+    ])
+    await opened.page.goto('/?mute=1&nolock=1&sw=0&fps=30')
+    // Observe the load while it is blocked; keep rejection owned if its UI check fails.
+    result = seatedResult(opened.page, 'T1 Release')
+    await expect
+      .poll(async (): Promise<number> => await rig.matches('release'))
+      .toBeGreaterThan(before)
+    const screen = opened.page.locator('[data-failmode~="release-5xx"]')
+    await expect(screen).toBeVisible({ timeout: 10_000 })
+    await rig.arm('healthy', [])
+    const retry = screen.getByRole('button', { name: /Try/u })
+    if (await retry.isVisible()) {
+      await retry.click()
+    }
+    expect(await result).toBeUndefined()
+    await expect(screen).toBeHidden()
+    expect(
+      opened.errors.filter(
+        (line): boolean =>
+          !line.startsWith(
+            'console: Failed to load resource: the server responded with a status of 503',
+          ),
+      ),
+    ).toEqual([])
+  } finally {
+    await rig.arm('healthy', [])
+    await opened.context.close()
+    await result
   }
 })
