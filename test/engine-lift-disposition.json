@@ -8976,5 +8976,20 @@
     "sourceRevision": "81917783f4083c09fa6d2036108168baa453ffce",
     "sourceBlob": "57f8e48495927acf5051cfaf0d90c24c8ab1646f",
     "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/build-validation-receipts.test.ts",
+    "outcome": "restored",
+    "target": "test/build-validation-receipts.test.ts",
+    "decision": "Restored in place (CI21 E-PRODUCT): engine's app build (scripts/app-build/validationReceipts.mjs) keeps every runtime trust field, refuses stale or missing receipts, residency and post cost; 14 of 14 pass. Dropped one test, 'the SDK publisher emits the complete original client source/wire claim': it imported sharddev's writeOutputProduct (src/sharddev/ left engine); that half is sharddev's.",
+    "originalTests": [
+      "client receipts preserve every runtime trust field and omit build-only discovery",
+      "a missing index retains its build refusal",
+      "the SDK publisher emits the complete original client source/wire claim"
+    ],
+    "sourceRevision": "6c77e7b58a6520be3b37076a68a5199c103a4c0a",
+    "sourceBlob": "462ee3684513482829db1f9e8d60c0ed9df4668e",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
   }
 ]

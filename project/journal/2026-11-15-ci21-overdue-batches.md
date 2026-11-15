@@ -22,3 +22,7 @@ reason recorded in `test/engine-lift-disposition.json`.
 - DUNES-TOOL: `sunscar-generation-inputs` drove engine's retired
   monorepo generation pipeline against a Sunscar source engine no longer
   has. Retired (J186); no port claimed.
+- E-PRODUCT: `build-validation-receipts` is engine's app-build check and
+  runs again in place, 14 of 14 green and typechecked again. Its one
+  "SDK publisher" test imported sharddev's `writeOutputProduct` (that
+  folder left engine) and is dropped; that half is sharddev's.

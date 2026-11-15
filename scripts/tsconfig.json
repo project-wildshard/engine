@@ -72,7 +72,6 @@
     "../test/boot-extras.test.ts",
     "../test/boot-settings-interaction.test.ts",
     "../test/build-cache-report.test.ts",
-    "../test/build-validation-receipts.test.ts",
     "../test/carried-quest-host.test.ts",
     "../test/channel-programs-gather.test.ts",
     "../test/ci12-ghost-owners.test.ts",

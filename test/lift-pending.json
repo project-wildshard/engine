@@ -24,7 +24,6 @@
   "test/boot-settings-interaction.test.ts",
   "test/boot-smoke-dispatch.test.ts",
   "test/build-cache-report.test.ts",
-  "test/build-validation-receipts.test.ts",
   "test/carried-quest-host.test.ts",
   "test/channel-programs-gather.test.ts",
   "test/ci-fail-fast.test.ts",

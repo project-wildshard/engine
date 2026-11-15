@@ -86,7 +86,6 @@
     "boot-extras.test.ts",
     "boot-settings-interaction.test.ts",
     "build-cache-report.test.ts",
-    "build-validation-receipts.test.ts",
     "carried-quest-host.test.ts",
     "channel-programs-gather.test.ts",
     "ci12-ghost-owners.test.ts",
