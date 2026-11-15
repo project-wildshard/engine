@@ -97,6 +97,8 @@ function ownerTable(columns: readonly NetColumn<never>[]): OwnerTable {
 export class Predictor {
   /** Corrections taken, and steps replayed for them: what a proof page reports. */
   corrections = 0; replays = 0;
+  /** Server-owned transitions, kept separate from a failed local prediction in proof output. */
+  readonly authoritative = { leadEnds: 0, resets: 0 };
   /** What each correction disagreed on, and the widest gap at the acknowledged step. */
   readonly missed = { position: 0, grounded: 0, board: 0, swim: 0, ride: 0, gap: 0 };
   readonly misses: number[][] = [];
@@ -160,7 +162,8 @@ export class Predictor {
     if ((acked !== null && seqAfter(acked, lastSeq)) || (this.body.ride === null) !== (ridden === null)) return false;
     const led = this.flag(table.led, owner) === 1, resets = this.value(table.resets, owner);
     const boarded = (ridden !== null) !== this.aboard; // getting on or off is the server's word, not a wrong guess
-    const forced = led || this.led || boarded || (this.resets !== null && this.resets !== resets);
+    const leadEnded = this.led && !led, reset = this.resets !== null && this.resets !== resets;
+    const forced = led || this.led || boarded || reset;
     this.led = led; this.resets = resets; this.aboard = ridden !== null;
     if (!forced && acked === lastSeq) return false;
     const { body, seqs, states, count, head } = this, offset = count === 0 ? -1 : (lastSeq - (seqs[head] ?? 0)) & 0xffff;
@@ -182,12 +185,17 @@ export class Predictor {
       this.save(run);
     }
     s.yaw = yaw; // the view is this client's own: the server sends it back later than the thumb has moved
-    if (!led && !boarded) this.corrections++;
+    // The end of a server-led move and a server teleport must take the authoritative pose, but neither says the
+    // page predicted a command incorrectly. Counting them as corrections made Far Reach's boost report a false B2 miss.
+    if (leadEnded) this.authoritative.leadEnds++;
+    if (reset) this.authoritative.resets++;
+    const corrected = !forced && !led && !boarded;
+    if (corrected) this.corrections++;
     const offsetX = x - feet.x, offsetY = y - feet.y, offsetZ = z - feet.z, far = offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ > PREDICTION_SNAP * PREDICTION_SNAP;
     body.renderOffset.set(far ? 0 : offsetX, far ? 0 : offsetY, far ? 0 : offsetZ);
     this.glide = glidePace(body.renderOffset.length());
-    if(!led&&!boarded)this.corrected?.({tick:tick??s.tick,mode:ride!==null?'ride':s.board.on?'board':s.swim.on?'swim':'foot',offset:Math.hypot(offsetX,offsetY,offsetZ),snapped:far});
-    return !led && !boarded;
+    if(corrected)this.corrected?.({tick:tick??s.tick,mode:ride!==null?'ride':s.board.on?'board':s.swim.on?'swim':'foot',offset:Math.hypot(offsetX,offsetY,offsetZ),snapped:far});
+    return corrected;
   }
 
   /** A session's first frame: this body stands where the server says, with nothing to compare it to. */

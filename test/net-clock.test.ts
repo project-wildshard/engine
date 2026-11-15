@@ -31,6 +31,19 @@ test('a clean link rests on the floor', () => {
   expect(clock.delayMs).toBeLessThan(INTERP_FLOOR_MS + 1);
 });
 
+test('a fixed 90 ms transport offset is not jitter', () => {
+  const loopback = new NetClock(), delayed = new NetClock();
+  for (let frame = 0; frame < 15 * 30; frame++) {
+    const tick = frame * 2, due = 5000 + tick * TICK_MS;
+    loopback.arrival(tick, due);
+    delayed.arrival(tick, due + 90);
+  }
+  expect(delayed.jitterMs).toBeCloseTo(0, 8);
+  expect(delayed.targetMs).toBeGreaterThanOrEqual(INTERP_FLOOR_MS);
+  expect(delayed.targetMs).toBeLessThan(INTERP_FLOOR_MS + 1);
+  expect(delayed.delayMs).toBeCloseTo(loopback.delayMs, 5);
+});
+
 test('the clock tracks the server and never runs more than 1 % off', () => {
   const clock = new NetClock();
   clock.arrival(0, 0); clock.arrival(2, 2 * TICK_MS + 40); // a late frame: 40 ms of error

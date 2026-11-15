@@ -162,8 +162,8 @@ export interface WorkerClientReport {
   retired: Readonly<Record<string, number>>;
   /** The longest a row of each kind took to spawn, in ms: a model built late shows here. */
   spawnMs: Readonly<Record<string, number>>;
-  /** What the corrections disagreed on. */
-  missed: Readonly<NetPlayer['predictor']['missed']>; misses: readonly (readonly number[])[];
+  /** What corrections disagreed on, and server-owned transitions that were deliberately not corrections. */
+  missed: Readonly<NetPlayer['predictor']['missed']>; misses: readonly (readonly number[])[]; authoritative: Readonly<NetPlayer['predictor']['authoritative']>;
 }
 /** A fight as a proof reads it: its row, where its body stands and the server's name for it. */
 export type WorkerClientFight = EncounterRow & { readonly at: { readonly x: number; readonly y: number; readonly z: number } | null; readonly name: string | null };
@@ -465,7 +465,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   if (shell.redials === true) others = new (await import('@wildshard/engine/net/otherPlayers')).OtherPlayers(client, ports.scene, scope, player.position);
   if (new URLSearchParams(location.search).has('bossGod')) shell.bossGod();
   bootMark('server:ready-send'); shell.ready();
-  const started = diagnosticNow(), report: WorkerClientReport = { drawn: wirePage.drawn, frames: 0, framesPerSecond: 0, ticksPerSecond: 0, correctionsPerMinute: 0, corrections: 0, retired: {}, spawnMs: {}, missed: net.predictor.missed, misses: net.predictor.misses, worstOffset: 0, queue: 0, replaysPerFrame: 0, delayMs: 0, jitterMs: 0, interpHeld: 0, interpStarved: 0, mainMsP95: 0, workerTickMs: 0, rows: 0, attacks: 0, hits: 0, kills: 0, refused: 0, held: 0, dropped: 0, hp: 0, falls: 0, closed: null, x: 0, z: 0, cell: 0, serverX: 0, serverZ: 0, restored, savedTick: -1, savedOk: false, receipts: [], quests: {}, flags: [], paid: 0, fights: [], owned: {}, sky: null, day: null, clawed: false, own: null, movers: 0, posed: 0, sand: 0 };
+  const started = diagnosticNow(), report: WorkerClientReport = { drawn: wirePage.drawn, frames: 0, framesPerSecond: 0, ticksPerSecond: 0, correctionsPerMinute: 0, corrections: 0, retired: {}, spawnMs: {}, missed: net.predictor.missed, misses: net.predictor.misses, authoritative: net.predictor.authoritative, worstOffset: 0, queue: 0, replaysPerFrame: 0, delayMs: 0, jitterMs: 0, interpHeld: 0, interpStarved: 0, mainMsP95: 0, workerTickMs: 0, rows: 0, attacks: 0, hits: 0, kills: 0, refused: 0, held: 0, dropped: 0, hp: 0, falls: 0, closed: null, x: 0, z: 0, cell: 0, serverX: 0, serverZ: 0, restored, savedTick: -1, savedOk: false, receipts: [], quests: {}, flags: [], paid: 0, fights: [], owned: {}, sky: null, day: null, clawed: false, own: null, movers: 0, posed: 0, sand: 0 };
   if (unseated) void shell.booted.then(answer => { report.restored = answer.restored; bootMark('server:seated-late'); return undefined; }, () => undefined);
   scope.onDispose(client.onLedger(receipt => { report.receipts.push(`${receipt.grant}:${receipt.name}`); }));
   const contacts: NetCombatEvent[] = [];
@@ -556,7 +556,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     report.frames++;
     if (firstTick === -1 && tick > 0) firstTick = tick;
     report.ticksPerSecond = firstTick === -1 ? 0 : (tick - firstTick) / ((now - ticksFrom) / 1000); // each world keeps its own clock
-    report.missed = predictor.missed; report.corrections = predictor.corrections; report.correctionsPerMinute = predictor.corrections / seconds * 60; report.worstOffset = net.worstOffset; report.queue = predictor.pending;
+    report.missed = predictor.missed; report.authoritative = predictor.authoritative; report.corrections = predictor.corrections; report.correctionsPerMinute = predictor.corrections / seconds * 60; report.worstOffset = net.worstOffset; report.queue = predictor.pending;
     report.replaysPerFrame = predictor.replays / report.frames; report.delayMs = client.clock.delayMs; report.jitterMs = client.clock.jitterMs; report.interpHeld = client.interpolator.held; report.interpStarved = client.interpolator.starved;
     report.refused = net.attacks.refused; report.attacks = net.attacks.pending; report.held = net.heldSlot;
     if (report.closed === null && client.closed !== null && !ended && client.closed !== 'reload' && shell.redials !== true) showError(`The game's server stopped (${client.closed})`);

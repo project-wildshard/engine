@@ -38,3 +38,24 @@ test('a gap in XZ, in the air, or past the slack still corrects', () => {
   expect(frame({ y: .03 }, false).corrected).toBe(true);
   expect(frame({ y: .2 }, true).corrected).toBe(true);
 });
+
+test('a lead ending or a server reset is authoritative, not a failed prediction', () => {
+  const state = createMotionState();
+  state.position.set(5, 1, 5); state.fall.grounded = true;
+  const body: PredictedBody = { motionState: state, motor: legacyDouble<CharacterMotor>({ result: { grounded: true, groundNormalY: 1, downhillX: 0, downhillZ: 0, horizontalFreedom: 1, groundCollider: null }, captureState: () => undefined, restoreState: () => undefined }),
+    ride: null, renderOffset: new Vector3(), step: () => true };
+  const predictor = new Predictor(body, PLAYER_CLASS.owner), owner = new Float64Array(PLAYER_CLASS.owner.length);
+  const put = (name: string, value: number): void => { owner[column(name)] = value; };
+  put('px', 5); put('py', 1); put('pz', 5); put('grounded', 1);
+  predictor.step({ seq: 1, viewTick: 0, steer: standing, yaw: 0, pitch: 0, buttons: 0 });
+  put('led', 1);
+  expect(predictor.reconcile(1, owner)).toBe(false);
+  predictor.step({ seq: 2, viewTick: 0, steer: standing, yaw: 0, pitch: 0, buttons: 0 });
+  put('led', 0); put('px', 6);
+  expect(predictor.reconcile(2, owner)).toBe(false);
+  put('resets', 1);
+  predictor.step({ seq: 3, viewTick: 0, steer: standing, yaw: 0, pitch: 0, buttons: 0 });
+  expect(predictor.reconcile(3, owner)).toBe(false);
+  expect(predictor.corrections).toBe(0);
+  expect(predictor.authoritative).toEqual({ leadEnds: 1, resets: 1 });
+});

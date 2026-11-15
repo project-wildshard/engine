@@ -107,7 +107,7 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
     if (await page.evaluate(() => /** @type {any} */ (window).__wildshard?.world?.game.app.clock.paused === true)) await page.getByRole('button', { name: /^resume$/iu }).click().catch(() => undefined);
     row.enterMs = Date.now() - t0;
     const entered = Date.now(), delays = /** @type {{ t: number, delay: number }[]} */ ([]), heldFrom = await page.evaluate(() => window.__workerClient?.().interpHeld ?? 0);
-    const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed } }; });
+    const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed }, authoritative: { ...w.authoritative } }; });
     sampler = setInterval(() => { void report().then(r => { if (r !== null) delays.push({ t: Date.now() - entered, delay: r.delay }); return undefined; }).catch(() => undefined); }, 250);
     await sleep(2000);
     // the budget: the drawn rate standing still, against the display's 60 Hz (headless)
@@ -131,7 +131,8 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
       const drawn = await page.evaluate(() => /** @type {any} */ (window).__netLag.drawn.slice()), to = await report();
       // what this phase's corrections disagreed on (position, grounded, board, swim, ride), for the row a miss becomes
       const missed = Object.fromEntries(Object.entries(to?.missed ?? {}).filter(([key]) => key !== 'gap').map(([key, value]) => [key, value - (/** @type {Record<string, number> | undefined} */ (from?.missed)?.[key] ?? 0)]).filter(([, value]) => value !== 0));
-      return { name, corrections: (to?.corrections ?? 0) - (from?.corrections ?? 0), missed, frames: drawn.length, p50: at(drawn, 0.5), p99: at(drawn, 0.99), max: at(drawn, 1), over2x: drawn.filter((/** @type {number} */ ms) => ms > 2 * row.budgetMs).length, over50: drawn.filter((/** @type {number} */ ms) => ms > 50).length };
+      const authoritative = Object.fromEntries(Object.entries(to?.authoritative ?? {}).map(([key, value]) => [key, value - (/** @type {Record<string, number> | undefined} */ (from?.authoritative)?.[key] ?? 0)]).filter(([, value]) => value !== 0));
+      return { name, corrections: (to?.corrections ?? 0) - (from?.corrections ?? 0), missed, authoritative, frames: drawn.length, p50: at(drawn, 0.5), p99: at(drawn, 0.99), max: at(drawn, 1), over2x: drawn.filter((/** @type {number} */ ms) => ms > 2 * row.budgetMs).length, over50: drawn.filter((/** @type {number} */ ms) => ms > 50).length };
     };
     row.walk = await phase('walk', ['KeyW']);
     row.sprint = await phase('sprint', ['KeyW', 'ShiftLeft']);
