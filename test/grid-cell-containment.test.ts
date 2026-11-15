@@ -55,6 +55,38 @@ test('aggregate instance bounds cross the edge even when the source geometry fit
   } finally { scope.dispose(); material.dispose(); geometry.dispose(); }
 });
 
+test('a forest whose copies brush the edge is decided copy by copy, never by a walk of every copy (ZE2)', () => {
+  // a long thin trunk: its bounding sphere (radius ~5) reaches past the edge where its box (0.5 m wide) does not
+  const scope = new Scope('forest-edge'), root = new Group(), material = new MeshStandardMaterial(), geometry = new BoxGeometry(0.5, 10, 0.5);
+  try {
+    const count = 4000, mesh = new InstancedMesh(geometry, material, count), at = new Matrix4();
+    for (let i = 0; i < count; i++) mesh.setMatrixAt(i, at.makeTranslation(-240 + (i % 80) * 6, 0, i === 0 ? 248 : -200 + Math.floor(i / 80) * 8));
+    root.add(mesh);
+    const walk = vi.spyOn(mesh, 'computeBoundingBox');
+    const guard = cellClip(root, 250, scope); guard.sweep();
+    expect(walk).not.toHaveBeenCalled(); expect(mesh.material).toBe(material);
+    // the edge copy's box itself crosses now: clipped, still with no whole walk
+    mesh.setMatrixAt(0, at.makeTranslation(0, 0, 249.9)); mesh.instanceMatrix.needsUpdate = true; guard.update();
+    expect(walk).not.toHaveBeenCalled(); expect(mesh.material).not.toBe(material);
+    mesh.setMatrixAt(0, at.makeTranslation(0, 0, 248)); mesh.instanceMatrix.needsUpdate = true; guard.update();
+    expect(mesh.material).toBe(material);
+  } finally { scope.dispose(); material.dispose(); geometry.dispose(); }
+});
+
+test('a batched forest brushing the edge is decided copy by copy too (ZE2)', () => {
+  const scope = new Scope('batched-edge'), root = new Group(), material = new MeshStandardMaterial(), geometry = new BoxGeometry(0.5, 10, 0.5);
+  try {
+    const count = 2000, mesh = new BatchedMesh(count, 24 * count, 36 * count, material), id = mesh.addGeometry(geometry), at = new Matrix4();
+    for (let i = 0; i < count; i++) mesh.setMatrixAt(mesh.addInstance(id), at.makeTranslation(-240 + (i % 80) * 6, 0, i === 0 ? 248 : -200 + Math.floor(i / 80) * 8));
+    root.add(mesh);
+    const walk = vi.spyOn(mesh, 'computeBoundingBox');
+    const guard = cellClip(root, 250, scope); guard.sweep();
+    expect(walk).not.toHaveBeenCalled(); expect(mesh.material).toBe(material);
+    mesh.setMatrixAt(0, at.makeTranslation(0, 0, 249.9)); guard.update();
+    expect(walk).not.toHaveBeenCalled(); expect(mesh.material).not.toBe(material);
+  } finally { scope.dispose(); material.dispose(); geometry.dispose(); }
+});
+
 test('an empty culled level is clipped by its declared envelope at admission, whichever copies it draws later', () => {
   const scope = new Scope('envelope'), root = new Group(), material = new MeshStandardMaterial(), geometry = new BoxGeometry(2, 2, 2);
   try {

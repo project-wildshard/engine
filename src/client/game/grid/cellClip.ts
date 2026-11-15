@@ -100,6 +100,60 @@ function copySpheres(sphere: Sphere, m: ArrayLike<number>, count: number, target
   return target;
 }
 
+/** ZE2: an instanced or batched draw's XZ bounds for the cell test, exact only where it matters. Each copy's bounding sphere,
+ *  moved by its instance matrix and the draw's world matrix, settles a copy well inside the cell; only a copy whose sphere
+ *  crosses takes its exact box (its geometry's box through both matrices). The union is inside exactly when every copy's exact
+ *  box is, as three's whole walk (`computeBoundingBox`, eight corners of every copy) would say, without the walk: a forest
+ *  re-choosing its copies as the feet came back in from the road re-walked thousands (46 to 75 ms of Pine's edge frame). */
+interface CopyScratch { readonly box: Box3; readonly copy: Matrix4; readonly composed: Matrix4; readonly sphere: Sphere; readonly local: Box3 }
+function worldScale(world: Matrix4): number {
+  const w = world.elements;
+  return Math.sqrt(Math.max(w[0] * w[0] + w[1] * w[1] + w[2] * w[2], w[4] * w[4] + w[5] * w[5] + w[6] * w[6], w[8] * w[8] + w[9] * w[9] + w[10] * w[10]));
+}
+/** One copy (its matrix at `o` in `m`) into `target`: its sphere's XZ box when inside, else its exact box. */
+function addCopy(local: Box3, sphere: Sphere, m: ArrayLike<number>, o: number, world: Matrix4, scale: number, inside: (bounds: Box3) => boolean,
+  target: Box3, scratch: CopyScratch): void {
+  const w = world.elements, cx = sphere.center.x, cy = sphere.center.y, cz = sphere.center.z;
+  const a0 = m[o] ?? 0, a1 = m[o + 1] ?? 0, a2 = m[o + 2] ?? 0, a4 = m[o + 4] ?? 0, a5 = m[o + 5] ?? 0, a6 = m[o + 6] ?? 0;
+  const a8 = m[o + 8] ?? 0, a9 = m[o + 9] ?? 0, a10 = m[o + 10] ?? 0;
+  const k = sphere.radius * scale * Math.sqrt(Math.max(a0 * a0 + a1 * a1 + a2 * a2, a4 * a4 + a5 * a5 + a6 * a6, a8 * a8 + a9 * a9 + a10 * a10));
+  const x = a0 * cx + a4 * cy + a8 * cz + (m[o + 12] ?? 0), y = a1 * cx + a5 * cy + a9 * cz + (m[o + 13] ?? 0), z = a2 * cx + a6 * cy + a10 * cz + (m[o + 14] ?? 0);
+  const wx = w[0] * x + w[4] * y + w[8] * z + w[12], wz = w[2] * x + w[6] * y + w[10] * z + w[14], box = scratch.box;
+  box.min.set(wx - k, 0, wz - k); box.max.set(wx + k, 0, wz + k);
+  if (!inside(box)) projectBounds(local, scratch.composed.multiplyMatrices(world, scratch.copy.fromArray(m, o)), box);
+  target.union(box);
+}
+function copyBounds(local: Box3, sphere: Sphere, m: ArrayLike<number>, count: number, world: Matrix4, inside: (bounds: Box3) => boolean,
+  target: Box3, scratch: CopyScratch): Box3 {
+  target.makeEmpty();
+  if (sphere.radius < 0 || local.isEmpty()) return target;
+  const scale = worldScale(world);
+  for (let i = 0; i < count; i++) addCopy(local, sphere, m, i * 16, world, scale, inside, target, scratch);
+  return target;
+}
+/** A batched draw's copies the same way (three's `BatchedMesh.computeBoundingBox` walks every active one); null when its
+ *  instance table is not the shape this reads, for the whole walk to decide. */
+function batchedBounds(node: BatchedMesh, inside: (bounds: Box3) => boolean, target: Box3, scratch: CopyScratch): Box3 | null {
+  const info: unknown = Reflect.get(node, '_instanceInfo'), texture: unknown = Reflect.get(node, '_matricesTexture');
+  const data: unknown = typeof texture === 'object' && texture !== null ? Reflect.get(Reflect.get(texture, 'image') ?? {}, 'data') : undefined;
+  if (!Array.isArray(info) || !(data instanceof Float32Array)) return null;
+  target.makeEmpty();
+  const world = node.matrixWorld, scale = worldScale(world), shapes = new Map<number, { sphere: Sphere; local: Box3 } | null>();
+  for (let i = 0; i < info.length; i++) {
+    const row: unknown = info[i];
+    if (typeof row !== 'object' || row === null || Reflect.get(row, 'active') === false) continue;
+    const id: unknown = Reflect.get(row, 'geometryIndex');
+    if (typeof id !== 'number') return null;
+    let shape = shapes.get(id);
+    if (shape === undefined) {
+      const sphere = node.getBoundingSphereAt(id, new Sphere()), local = node.getBoundingBoxAt(id, new Box3());
+      shape = sphere === null || local === null || local.isEmpty() ? null : { sphere, local }; shapes.set(id, shape);
+    }
+    if (shape !== null) addCopy(shape.local, shape.sphere, data, i * 16, world, scale, inside, target, scratch);
+  }
+  return target;
+}
+
 /** Exact affine XZ projection of an AABB. Height contributes through rotated
  * axes but has no clipping plane. Unusual projective object matrices keep the
  * general eight-corner path. */
@@ -130,6 +184,7 @@ const _joint = new Vector3();
 /** Clip edge-crossing draws at the exact inclusive cell edge. No road-band or dome exemption. */
 export function cellClip(root: Object3D, half: number, scope: Scope, options: CellClipOptions = {}): CellClip {
   const cell = { value: new Vector4(-half, -half, half, half) }, origin = new Vector3(), box = new Box3(), camera = { value: new Matrix4() }, submittedWorld = new Matrix4(), alternate = new Box3();
+  const copies: CopyScratch = { box: new Box3(), copy: new Matrix4(), composed: new Matrix4(), sphere: new Sphere(), local: new Box3() };
   root.updateWorldMatrix(true, false); origin.setFromMatrixPosition(root.matrixWorld);
   if (!Number.isFinite(origin.x) || !Number.isFinite(origin.z)) throw new Error('Cell origin is not finite');
   cell.value.set(origin.x - half, origin.z - half, origin.x + half, origin.z + half);
@@ -281,13 +336,22 @@ export function cellClip(root: Object3D, half: number, scope: Scope, options: Ce
       if (!(node instanceof InstancedMesh) || !(sphere instanceof Sphere)
         || !within(projectBounds(copySpheres(sphere, node.instanceMatrix.array, node.count, alternate), node.matrixWorld, box))) {
         const walked = node instanceof InstancedMesh ? instanceWalks.get(node) : undefined;
-        if (node.boundingBox === null || !(node instanceof InstancedMesh) || walked === undefined || walked.geometry !== node.geometry
-          || walked.version !== node.instanceMatrix.version || walked.count !== node.count) {
-          node.computeBoundingBox();
-          if (node instanceof InstancedMesh) instanceWalks.set(node, { geometry: node.geometry, version: node.instanceMatrix.version, count: node.count });
+        const affine = node.matrixWorld.elements[3] === 0 && node.matrixWorld.elements[7] === 0 && node.matrixWorld.elements[11] === 0 && node.matrixWorld.elements[15] === 1;
+        if (shape instanceof BufferGeometry && shape.boundingBox === null) shape.computeBoundingBox();
+        const local: unknown = shape instanceof BufferGeometry ? shape.boundingBox : null;
+        if (node instanceof InstancedMesh && sphere instanceof Sphere && local instanceof Box3 && affine) {
+          copyBounds(local, sphere, node.instanceMatrix.array, node.count, node.matrixWorld, within, box, copies);
+        } else if (node instanceof BatchedMesh && affine && batchedBounds(node, within, box, copies) !== null) {
+          // decided copy by copy (batchedBounds), as an instanced draw is
+        } else {
+          if (node.boundingBox === null || !(node instanceof InstancedMesh) || walked === undefined || walked.geometry !== node.geometry
+            || walked.version !== node.instanceMatrix.version || walked.count !== node.count) {
+            node.computeBoundingBox();
+            if (node instanceof InstancedMesh) instanceWalks.set(node, { geometry: node.geometry, version: node.instanceMatrix.version, count: node.count });
+          }
+          if (node.boundingBox === null) throw new Error('Cell draw has no instance bounds');
+          projectBounds(node.boundingBox, node.matrixWorld, box);
         }
-        if (node.boundingBox === null) throw new Error('Cell draw has no instance bounds');
-        projectBounds(node.boundingBox, node.matrixWorld, box);
       }
     } else {
       if (node.geometry.boundingBox === null) for (const _step of geometryBoundsSteps(node.geometry, 'box')) { /* exact admission scan */ }

@@ -61,3 +61,8 @@
   2 m wall turns it red. zone-gate-proof shoots on the count, not on sleeps: a slow walk had let 0 fire mid-proof. On a
   loopback build, desktop, phone Chromium and phone WebKit all pass 5, out and reset, 5, 2, and at 0 the loading screen and
   Nalati as the new home. The mini is off limits now (J356), so these ran on the laptop at 60 fps.
+- 14:40 (opus-gcm9) Rebased onto ZE1 (main `3c7ff774`). Road-lag on the laptop at 60 fps: Driftwood and Nalati hold the bar
+  after the first lap; Pine's walk back in cost 100 to 650 ms frames every lap. Two causes, both on the edge frame: three
+  released and relinked material programs (the edge swaps lights and kit, so each side's programs are now pinned by the
+  G580 keeper as the feet leave it), and the cell clip walked every forest copy's exact box when the forest re-chose its
+  copies (`computeBoundingBox`, 46 to 75 ms): each copy's sphere now settles it, and only a crossing copy is boxed exactly.
