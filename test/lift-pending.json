@@ -11,7 +11,6 @@
   "test/author-errors.test.ts",
   "test/author-lut-sampling.test.ts",
   "test/author-placement-parity.test.ts",
-  "test/authored-transition.test.ts",
   "test/bake-collider-kernels.test.ts",
   "test/balbal-program.test.ts",
   "test/balbal-v2.test.ts",

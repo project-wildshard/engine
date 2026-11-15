@@ -1,15 +1,16 @@
 import { expect, test } from 'vitest';
-// oxlint-disable-next-line import/no-nodejs-modules -- Read committed authored metadata for the compiler fixture.
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Own the compiler fixture's isolated files.
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the source fixture within its own clean tree.
 import { resolve } from 'node:path';
 import { parseManifestMetadata } from '@wildshard/format/minimap';
 import { defineAuthoredShard, declaredForestQueries, declaredGround } from '../src/client/game/shard/manifest';
 import { toLevelSpec } from '../src/client/game/shard/spec';
 import { authoredManifestSource } from '../scripts/authored-manifest.mjs';
+import { fixtureManifest } from './fixtures/manifest-metadata';
 
 const root = resolve(import.meta.dirname, '..');
-const fixture = parseManifestMetadata(JSON.parse(readFileSync(resolve(root, 'src/shards/_template/manifest.json'), 'utf8')));
+const fixture = fixtureManifest;
 const { load: _load, entry: _entry, ...bindings } = fixture.bindings;
 const entry = { platform: 'client-plan', retainHomeRuntime: true, stagesOwner: 'declared' };
 const metadata = (patch: object): unknown => ({ ...fixture, ...patch });
@@ -45,12 +46,12 @@ test('authored bindings admit only canonical JSON or generated modules', () => {
 
 test('fixed boot and art bindings stay independent of page mode and lazy graph loading', () => {
   const scratch = mkdtempSync(resolve(root, 'tmp/manifest-fixed-boot-'));
-  const folder = resolve(scratch, 'src/shards/_template');
+  const folder = resolve(scratch, 'src/shards/fixture');
   mkdirSync(resolve(folder, 'boot'), { recursive: true });
   mkdirSync(resolve(folder, 'explore'), { recursive: true });
   mkdirSync(resolve(folder, 'data'), { recursive: true });
-  writeFileSync(resolve(folder, 'data/budgets.json'), readFileSync(resolve(root, 'src/shards/_template/data/budgets.json')));
-  const art = '/src/shards/_template/explore/fixed-binding.svg';
+  writeFileSync(resolve(folder, 'data/budgets.json'), '{}');
+  const art = '/src/shards/fixture/explore/fixed-binding.svg';
   writeFileSync(resolve(folder, 'boot/explore.generated.json'), JSON.stringify({ art: [art] }));
   writeFileSync(resolve(folder, 'explore/fixed-binding.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>');
   try {
@@ -65,7 +66,7 @@ test('fixed boot and art bindings stay independent of page mode and lazy graph l
     expect(source).toContain('"./boot/explore.generated.json"');
     expect(source).toContain('from "./explore/fixed-binding.svg"');
     expect(source).toContain(JSON.stringify(art));
-    expect(source).toContain('HeldView.fromProduct("_template", "weapons/jian-row.json")).sword()');
+    expect(source).toContain('HeldView.fromProduct("fixture", "weapons/jian-row.json")).sword()');
     expect(source).toContain('declaredForestQueries({"platform":"fixed","density":0})');
     expect(source).not.toContain('pageModeBoot');
     const queries = declaredForestQueries({ platform: 'fixed', density: 0 });
@@ -87,12 +88,12 @@ test('declared forest rows join the manifest intake instead of decoding during d
 
 test('the default JSON art binding contributes extra source image imports and refuses invalid paths', () => {
   const scratch = mkdtempSync(resolve(root, 'tmp/manifest-extra-art-'));
-  const folder = resolve(scratch, 'src/shards/_template/boot');
+  const folder = resolve(scratch, 'src/shards/fixture/boot');
   mkdirSync(folder, { recursive: true });
   mkdirSync(resolve(folder, '../data'), { recursive: true });
-  writeFileSync(resolve(folder, '../data/budgets.json'), readFileSync(resolve(root, 'src/shards/_template/data/budgets.json')));
+  writeFileSync(resolve(folder, '../data/budgets.json'), '{}');
   const file = resolve(folder, 'explore.generated.json');
-  const extra = '/src/shards/_template/explore/additional.webp';
+  const extra = '/src/shards/fixture/explore/additional.webp';
   const data = parseManifestMetadata({ ...fixture, bindings: { ...bindings,
     boot: { files: { module: './boot/files.generated.json', export: 'default' },
       sources: { module: './boot/sources.generated.json', export: 'default' },
@@ -103,7 +104,7 @@ test('the default JSON art binding contributes extra source image imports and re
     const source = compile();
     expect(source).toContain('from "./explore/additional.webp"');
     expect(source).toContain(JSON.stringify(extra));
-    for (const art of [['/src/shards/other-shard/extra.webp'], ['/src/shards/_template/../escape.webp'], ['https://example.com/image.webp']]) {
+    for (const art of [['/src/shards/other-shard/extra.webp'], ['/src/shards/fixture/../escape.webp'], ['https://example.com/image.webp']]) {
       writeFileSync(file, JSON.stringify({ art }));
       expect(compile).toThrow();
     }
@@ -126,7 +127,7 @@ test('only the attackers sentinel becomes infinity and complete art order surviv
   const chunk = { sky: [], baked: [], terrain: [], trees: [], cabins: [], physics: ['/assets/physics/rapier.wasm'], props: files, art: [], music: [], sfx: [] };
   const sources = { modes: { phone: { img: chunk, ktx2: chunk }, desktop: { img: chunk, ktx2: chunk } } };
   const ground = { ...declaredGround({ terrain: { flat: 0, seed: 40234 }, trails: [], cabinSites: [], water: -1000, bodies: [] }), structures: true as const, paths: 'plugin' as const };
-  const manifest = defineAuthoredShard(data, '_template', { accent: 'pink', bootBindings: { files, sources, explore: { art } } },
+  const manifest = defineAuthoredShard(data, 'fixture', { accent: 'pink', bootBindings: { files, sources, explore: { art } } },
     { ground }, images);
   expect(manifest.fight?.attackers).toBe(Infinity);
   expect(manifest.boot?.explore?.art).toEqual(art);

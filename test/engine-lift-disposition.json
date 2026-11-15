@@ -9353,5 +9353,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "2f67c52218f183c8d38314c7417ca80009d0aba5",
     "retirementProof": "Restored public native-fixture boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/authored-transition.test.ts",
+    "outcome": "restored",
+    "target": "test/authored-transition.test.ts",
+    "decision": "Restored in place (CI21 E-TOOL): its complete engine-owned metadata fixture replaces Template source reads while preserving manifest schema, transition, declared rows and art-path rejection coverage.",
+    "originalTests": [],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "21c9d26893d94909d86ea93f9c0f9686020b9ec6",
+    "retirementProof": "Restored current manifest compiler boundary; no J186 retirement or successor equivalence claimed."
   }
 ]
