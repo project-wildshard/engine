@@ -20,7 +20,7 @@ export function readSmokeHistory(text) {
   const history = [];
   for (const line of text.split('\n')) {
     const offset = line.indexOf(MARKER);
-    if (offset < 0) continue;
+    if (offset === -1) continue;
     try {
       const value = JSON.parse(line.slice(offset + MARKER.length));
       if (isReceipt(value)) history.push(value);
