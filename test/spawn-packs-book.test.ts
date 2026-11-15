@@ -82,3 +82,20 @@ test('a packs book whose body stalls past the limit is the same named refusal (D
   const {download} = run('book-slow-body', () => new Response(new ReadableStream({pull: controller => { controller.error(new DOMException('aborted', 'AbortError')); }})));
   await expect(download.ready).rejects.toThrow('Packs book did not arrive in 20 s');
 });
+
+// FM6 mode 35 (meta MMO-FAILURE-MODES-PLAN): FM3's proof found one 503 on the book refusing the whole start ("Something broke").
+// A server error or busy answer is read again on content's ladder, the card saying book-5xx meanwhile; a 404 still refuses at once.
+test('a packs book that answers 503 is read again, says book-5xx while it waits, and the download completes', async () => {
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+  try {
+    const {loadingWaitState} = await import('../src/shared/engine/boot/loadingWaits');
+    let answers = 0;
+    const {download, reads} = run('book-busy', whole => ++answers === 1 ? new Response(null, {status: 503}) : Response.json({book: 'packs', build: 'build-book-busy', ...entry('book-busy', whole)}));
+    await vi.waitFor(() => { expect([...loadingWaitState().pending.values()].some(row => row.failmode === 'book-5xx')).toBe(true); });
+    expect(reads).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(2000);
+    await download.ready;
+    expect(download.snapshot()).toMatchObject({complete: true, error: null});
+    expect([...loadingWaitState().pending.values()].some(row => row.failmode === 'book-5xx')).toBe(false);
+  } finally { vi.useRealTimers(); }
+});

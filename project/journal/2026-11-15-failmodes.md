@@ -56,3 +56,10 @@ Toggle mode's press is voice off, mode 32's own recovery, so it is not held.
   "Read failed: /assets/boot-tables-….json · HTTP 503". It now shows the FM6 line with its `data-failmode`.
 - The proof opens the play address for its warm and offline visits: the page drops its query once it starts, so a reload
   landed on the title (offline-launch now passes).
+
+## FM6 mode 35: one 503 on the packs book no longer refuses the start
+
+FM3's book-5xx case showed "Something broke: … Packs book unavailable (503)". The book read now retries a 5xx or 429
+on content's ladder (Retry-After as told, at least 2 s) for up to six reads, each with its own 20 s limit (DL21), the
+card saying `book-5xx` meanwhile; a 404 still refuses at once. The packs cases press the card's Retry after the heal:
+the budgeted retries were spent before the line showed, so Retry is the player's way on.

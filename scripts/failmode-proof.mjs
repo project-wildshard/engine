@@ -438,9 +438,10 @@ try {
         if (injection.matches === 0) return { outcome: 'harness-fail', reason: `the ${route} fault matched nothing (the proxy learns pack URLs from the manifests it forwards)`, injection, notes: await onScreen(page) };
         const result = await judged(seen, item, page);
         if (result.outcome !== 'pass') return { ...result, injection, shot };
-        if (item.id === 'download-failed') await press(page, item.screen, 'Retry').catch(() => undefined);
+        // the budgeted retries were spent before the line showed: healed, the card's Retry is the player's way on
+        const retry = page.locator('.ws-load-retry:visible').first(), pressed = await retry.click({ timeout: 5000 }).then(() => true, () => false);
         await intoWorld(entered, 90_000).catch(() => undefined);
-        return await recovered(page, 30_000) ? { ...result, injection, shot, recovery: 'the world loads' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen, injection, shot, notes: await onScreen(page) };
+        return await recovered(page, 30_000) ? { ...result, injection, shot, recovery: pressed ? 'heal, Retry: the world loads' : 'heal: the world loads' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen, injection, shot, notes: await onScreen(page) };
       } finally { await heal(); await entered.context.close(); }
     },
     // FM6: the Cache API refuses with QuotaExceededError (an injection at the public boundary, labelled; never a full disk)

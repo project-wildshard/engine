@@ -3,6 +3,8 @@ import {assetCacheName} from '@wildshard/engine/pwa/cacheNames';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
 import { bootMark,bootProgress,bootTiming,downloadShown } from '@wildshard/engine/boot/timing';
 import { beginLoadingWait, finishLoadingWait } from '@wildshard/engine/boot/loadingWaits';
+import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { Scope } from '@wildshard/engine/app/scope';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
 import {placedLoose, placedSpawn} from './placedSpawn';
@@ -853,6 +855,29 @@ function spawnSelection(slug: string, flow: 'client' | 'grid', tier: 'phone' | '
 declare const __BUILD_ID__: string;
 let packsBook: {readonly url: string; readonly book: Promise<unknown>} | undefined;
 const PACKS_BOOK_MS = 20_000;
+/** FM6 mode 35 (meta MMO-FAILURE-MODES-PLAN): a server error or busy answer on the book is read again on content's ladder (a
+ *  429's Retry-After as told, at least 2 s) for up to BOOK_TRIES reads, the loading card saying `book-5xx` meanwhile, before the
+ *  named refusal. FM3's proof found a single 503 refusing the whole start ("Something broke"). A 404 still refuses at once. */
+const BOOK_TRIES = 6, BOOK_LADDER_MS: readonly number[] = [2000, 4000, 8000, 16_000, 30_000];
+async function bookResponse(url: string, fresh: () => AbortSignal, stalled: (error: unknown) => never): Promise<Response> {
+  let wait: number | undefined;
+  try {
+    for (let attempt = 0; ; attempt++) {
+      // each read has its own 20 s limit (DL21), body included; the waits between reads are the ladder's, not a stall
+      const response = await fetch(url, {signal: fresh()}).catch(stalled);
+      if (response.ok) return response;
+      const busy = response.status === 429 || response.status >= 500;
+      if (!busy || attempt + 1 >= BOOK_TRIES) throw new Error(`Packs book unavailable (${response.status})`);
+      void response.body?.cancel().catch(() => undefined);
+      const told = Number(response.headers.get('retry-after'));
+      const ms = Math.max(2000, response.status === 429 && Number.isFinite(told) && told > 0 ? Math.min(told, 60) * 1000 : BOOK_LADDER_MS[attempt] ?? 30_000);
+      if (wait === undefined) wait = beginLoadingWait('Packs book', {kind: 'file', resource: url, failmode: 'book-5xx', line: 'The world\'s book didn\'t arrive', dueAt: diagnosticNow() + ms});
+      else { finishLoadingWait(wait); wait = beginLoadingWait('Packs book', {kind: 'file', resource: url, failmode: 'book-5xx', line: 'The world\'s book didn\'t arrive', dueAt: diagnosticNow() + ms}); }
+      const pause = new Scope('packs-book-retry');
+      try { await new Promise<void>(resolve => { pause.timeout(ms, resolve); }); } finally { pause.dispose(); }
+    }
+  } finally { if (wait !== undefined) finishLoadingWait(wait); }
+}
 function readPacksBook(): Promise<unknown> {
   const url = contentURL(new URL(`/${packsBookPath(__BUILD_ID__)}`, document.baseURI).href);
   if (packsBook?.url === url) return packsBook.book;
@@ -860,11 +885,11 @@ function readPacksBook(): Promise<unknown> {
     try {
       // DL21 (E526): a stalled book is a named refusal with the loading card's retry, never an endless wait.
       // The limit covers the body too (sp-x9): a stalled body is the same named refusal.
-      const signal = AbortSignal.timeout(PACKS_BOOK_MS), stalled = (error: unknown): never => {
+      let signal = AbortSignal.timeout(PACKS_BOOK_MS);
+      const stalled = (error: unknown): never => {
         throw signal.aborted ? new Error(`Packs book did not arrive in ${PACKS_BOOK_MS / 1000} s`) : error;
       };
-      const response = await fetch(url, {signal}).catch(stalled);
-      if (!response.ok) throw new Error(`Packs book unavailable (${response.status})`);
+      const response = await bookResponse(url, () => (signal = AbortSignal.timeout(PACKS_BOOK_MS)), stalled);
       const value: unknown = await response.json().catch(stalled);
       // Bound to its purpose and this build: a valid default book or another build's book is refused (sp-x9).
       if (get(value, 'book') !== 'packs' || get(value, 'build') !== __BUILD_ID__) throw new Error('Packs book is not this build\'s whole-level book');
