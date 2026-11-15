@@ -49,3 +49,18 @@ test('replacement working bytes are explicitly budgeted and incompatible layouts
   expect(() => finishRoadSteps(mergeRoadTileSteps([a, b]))).toThrow('Incompatible resident');
   a.geometry.dispose(); b.geometry.dispose();
 });
+
+// ZE2d: three links a program in `setProgram` before it reads the draw count, so an empty pool (none of its tiles resident:
+// at boot, or once the camera leaves every tile of it on the road) linked a position-less, flat-shaded variant of its
+// material, once per lighting state, 133 to 167 ms each walking back into Nalati
+test('a pool with no resident tile draws nothing', () => {
+  const owner = new Scope('road pool'), material = new MeshBasicMaterial(), culler: RoadCuller = { pitch: 562.5, tileSize: 62.5, plans: new Map() };
+  const pool = new RoadTilePool(owner, material, culler, 'road'), a = fixture(0), one = owner.child('one'); one.own(a.geometry);
+  expect(pool.mesh().visible).toBe(false);
+  const view = pool.publish(descriptor('a'), a, one);
+  expect(pool.mesh().visible).toBe(true);
+  view.dispose();
+  expect(pool.mesh().geometry.getAttribute('position')).toBeUndefined();
+  expect(pool.mesh().visible).toBe(false);
+  owner.dispose(); material.dispose();
+});

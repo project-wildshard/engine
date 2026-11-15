@@ -135,6 +135,10 @@ export class RoadTilePool {
   }
   private makeMesh(geometry: BufferGeometry): Mesh<BufferGeometry, Material> {
     const mesh = new Mesh(geometry, this.material); mesh.name = this.name;
+    // ZE2d: an empty pool (no resident tile) draws nothing. three links a program in `setProgram` before it reads the
+    // draw count, so a drawn empty geometry linked a position-less, flat-shaded variant of the material per lighting state
+    // (RP4's retired whole-road mesh, again): 133 to 167 ms a link walking back into Nalati
+    mesh.visible = geometry.getAttribute('position') !== undefined;
     mesh.receiveShadow = this.receiveShadow; mesh.renderOrder = this.renderOrder; mesh.castShadow = false;
     mesh.matrixAutoUpdate = false; mesh.updateMatrix(); return mesh;
   }
