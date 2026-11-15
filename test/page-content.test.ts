@@ -130,6 +130,15 @@ test('a failed bulk put is retried with only the keys still missing', async () =
   expect(batches[1]).toEqual(batches[0]?.slice(4));
 });
 
+test('persistent rate limits back off and leave the completion index absent', async () => {
+  const dir = page(), bucket = fakeBucket(), waits: number[] = [];
+  bucket.store.put = () => Promise.reject(new Error('HTTP 429'));
+  await expect(publishContent({dir, store: bucket.store, scratch: join(scratchRoot, 'scratch'), origin: ORIGIN,
+    log: () => undefined, sleep: ms => { waits.push(ms); return Promise.resolve(); }})).rejects.toThrow('HTTP 429');
+  expect(waits).toEqual([30_000, 60_000, 90_000, 120_000, 150_000, 180_000]);
+  expect(bucket.objects.has(contentKey(contentSet(scanContent(dir)), 'content.json'))).toBe(false);
+});
+
 test('a read-back with other bytes, or without the game CORS, fails the publish and writes no index', async () => {
   const dir = page(), set = contentSet(scanContent(dir));
   const bad = fakeBucket();
@@ -160,7 +169,7 @@ test('the real store reads through packs.wildshard.io cache-busted with the Orig
   ]);
   expect(runs).toHaveLength(2);
   expect(runs.map(call => call.list)).toEqual([[{key: 'content/s/a.json', file: '/d/a.json'}], [{key: 'content/s/p.pack.br', file: '/d/p.pack.br'}]]);
-  expect(runs[1]?.args).toEqual(expect.arrayContaining(['bulk', 'put', 'wildshard-packs', '--remote', '--content-encoding', 'br']));
+  expect(runs[1]?.args).toEqual(expect.arrayContaining(['bulk', 'put', 'wildshard-packs', '--remote', '--content-encoding', 'br', '--concurrency', '2']));
   for (const call of runs) { expect(call.args.join(' ')).not.toContain(token); expect(call.secrets).toEqual([token]); }
 });
 

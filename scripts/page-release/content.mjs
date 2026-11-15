@@ -170,7 +170,7 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
   let wrong = 0;
   // A present key is held only when it reads back with this file's bytes and the game's CORS; anything else (a wrong or
   // short object left by an earlier run, say) is uploaded again over it. Set keys are content-named, so that is safe.
-  await pool(files, 32, async file => {
+  await pool(files, 8, async file => {
     const key = contentKey(set, file.path);
     if (!await store.exists(key)) { missing.push(file); return; }
     const read = await store.read(key, origin);
@@ -196,7 +196,7 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
       } catch (error) {
         if (round >= 6) throw error;
         /** @type {ContentFile[]} */ const still = [];
-        await pool(left, 32, async file => { if (!await store.exists(contentKey(set, file.path))) still.push(file); });
+        await pool(left, 8, async file => { if (!await store.exists(contentKey(set, file.path))) still.push(file); });
         log(`content ${set}: put failed (${error instanceof Error ? error.message : String(error)}); ${still.length} still missing, retrying`);
         left = still.sort((a, b) => (a.path < b.path ? -1 : 1));
         // The API answers 429 under load (seen on the first real run): back off longer each round.
@@ -204,7 +204,7 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
       }
     }
     let read = 0;
-    await pool(missing, 16, async file => {
+    await pool(missing, 4, async file => {
       await readBack(store, contentKey(set, file.path), file.decoded, origin, sleep);
       if (++read % 1000 === 0) log(`content ${set}: ${read}/${missing.length} read back`);
     });
@@ -244,7 +244,7 @@ export async function copyFromSets({set, missing, store, origin, log, sleep}) {
   }
   /** @type {ContentFile[]} */ const copied = [];
   let failed = 0;
-  await pool(missing.filter(file => held.has(`${file.sha256}:${file.bytes}`)), 32, async file => {
+  await pool(missing.filter(file => held.has(`${file.sha256}:${file.bytes}`)), 4, async file => {
     const from = held.get(`${file.sha256}:${file.bytes}`) ?? '';
     try { await copy(from, contentKey(set, file.path), contentHeaders(file.path), file.bytes); copied.push(file); }
     catch (error) { failed++; log(`content ${set}: copy ${from} failed (${error instanceof Error ? error.message : String(error)}); uploading it`); }
@@ -262,14 +262,14 @@ export async function copyFromSets({set, missing, store, origin, log, sleep}) {
  * PZ6: R2's S3 API on the packs bucket, for the store's `sets` and `copy`. Credentials from the environment
  * (R2_ACCOUNT_ID, R2_PACKS_ACCESS_KEY_ID, R2_PACKS_SECRET_ACCESS_KEY: server-release's bucket-scoped keys), else none.
  * @param {NodeJS.ProcessEnv} env
- * With them the store also puts through S3 (16 at a time), not `wrangler r2 bulk put`, so a CI token needs no R2 write.
+ * With them the store also puts through S3 (4 at a time), not `wrangler r2 bulk put`, so a CI token needs no R2 write.
  * @returns {{sets: () => Promise<string[]>, copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>, put: (puts: readonly Put[]) => Promise<void>, secrets: string[], close: () => void} | undefined}
  */
 export function r2Copies(env) {
   const account = env.R2_ACCOUNT_ID?.trim(), accessKeyId = env.R2_PACKS_ACCESS_KEY_ID?.trim(), secretAccessKey = env.R2_PACKS_SECRET_ACCESS_KEY?.trim();
   if (account === undefined || accessKeyId === undefined || secretAccessKey === undefined || account === '' || accessKeyId === '' || secretAccessKey === '') return undefined;
   if (!/^[0-9a-f]{32}$/u.test(account)) throw new Error('Invalid R2_ACCOUNT_ID');
-  const client = new S3Client({region: 'auto', endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials: {accessKeyId, secretAccessKey}});
+  const client = new S3Client({region: 'auto', maxAttempts: 6, endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials: {accessKeyId, secretAccessKey}});
   return {
     secrets: [accessKeyId, secretAccessKey],
     close: () => client.destroy(),
@@ -293,7 +293,7 @@ export function r2Copies(env) {
       return complete.sort((a, b) => b.at - a.at).map(row => row.set);
     },
     async put(puts) {
-      await pool(puts, 16, async item => {
+      await pool(puts, 4, async item => {
         await client.send(new PutObjectCommand({Bucket: BUCKET, Key: item.key, Body: readFileSync(item.file),
           ContentType: item.headers.type, CacheControl: item.headers.cache, ...(item.headers.encoding === undefined ? {} : {ContentEncoding: item.headers.encoding})}));
       });
@@ -366,7 +366,7 @@ export function r2Content({root, scratch, token, fetch: get = fetch, exec = runR
         /** @type {Headers} */ const headers = JSON.parse(id);
         const list = join(scratch, `bulk-${createHash('sha256').update(id).digest('hex').slice(0, 8)}.json`);
         writeFileSync(list, JSON.stringify(items.map(item => ({key: item.key, file: item.file}))));
-        const args = ['r2', 'bulk', 'put', BUCKET, '--remote', '--filename', list, '--content-type', headers.type, '--cache-control', headers.cache, '--concurrency', '6', '--force'];
+        const args = ['r2', 'bulk', 'put', BUCKET, '--remote', '--filename', list, '--content-type', headers.type, '--cache-control', headers.cache, '--concurrency', '2', '--force'];
         if (headers.encoding !== undefined) args.push('--content-encoding', headers.encoding);
         try {
           exec(join(root, 'node_modules/.bin/wrangler'), args, {cwd: root, env: {...process.env, CLOUDFLARE_ACCOUNT_ID: CLOUDFLARE_ACCOUNT}, timeout: 3 * 60 * 60_000}, secrets);
