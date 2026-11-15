@@ -54,7 +54,7 @@ export const boostShown = (player: Pick<HoverPort, 'hover' | 'hoverBoost'>): boo
 /** The word BOOST, hidden until `follow` shows it. */
 function boostWord(scope: Scope): HTMLElement {
   const word = document.createElement('b');
-  word.className = 'ws-hover-boost'; word.textContent = engineString('s_hover_boost'); word.hidden = true;
+  word.className = 'ws-touch-boost-word'; word.textContent = engineString('s_hover_boost'); word.hidden = true;
   scope.onDispose(() => { word.remove(); });
   return word;
 }
@@ -82,7 +82,7 @@ export function mountBoostLook(button: HTMLElement, player: Pick<HoverPort, 'hov
  *  boost is on. */
 export function mountBoostTag(hud: HTMLElement, player: Pick<HoverPort, 'hover' | 'hoverBoost'>, events: Events, scope: Scope): void {
   const tag = boostWord(scope);
-  tag.classList.add('ws-boost-tag');
+  tag.classList.add('ws-touch-boost-tag');
   hud.append(tag);
   follow(player, events, scope, on => { tag.hidden = !on; });
 }

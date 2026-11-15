@@ -88,7 +88,7 @@ test('QA 11-15 row 9: the HOVER tab says BOOST only while boost is on, and the w
   const button = document.createElement('button'), p = rider(true);
   button.innerHTML = '<svg></svg><span>Hover</span>';
   mountBoostLook(button, p, app.events, scope);
-  const word = (): HTMLElement | null => button.querySelector<HTMLElement>('.ws-hover-boost');
+  const word = (): HTMLElement | null => button.querySelector<HTMLElement>('.ws-touch-boost-word');
   const shown = (): boolean => word()?.hidden === false;
   setDev(true);
   expect(shown()).toBe(false);
@@ -106,7 +106,7 @@ test('QA 11-15 row 9: a keyboard page with no HOVER tab shows BOOST on the left 
   const scope = new Scope('boost-tag'); owners.push(scope);
   const hud = document.createElement('div'), p = rider(true);
   mountBoostTag(hud, p, app.events, scope);
-  const tag = (): HTMLElement | null => hud.querySelector<HTMLElement>('.ws-boost-tag');
+  const tag = (): HTMLElement | null => hud.querySelector<HTMLElement>('.ws-touch-boost-tag');
   setDev(true);
   expect(tag()?.hidden).toBe(true);
   p.setBoost(true); app.events.emit('player.boost', true); app.events.flush('input');
