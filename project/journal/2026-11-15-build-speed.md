@@ -22,3 +22,9 @@ shared: 3.819/3.765 CPU-s / 3.464/3.373 s wall. Each suite owns its
 input objects and leaves no mock, environment, installer or clock change.
 The aggregate TS6 census remains open.
 The existing reviewed list keeps its original order.
+
+TS6c shares nine audited graph/material suites. Each compiles owned graph
+and material inputs without changing the live wind/cascade state; the
+wind-mutating suite stays isolated. Isolated and shared seeds 7/73 pass.
+Isolated: 3.501 CPU-s / 3.115 s wall; shared: 1.842/1.834 CPU-s /
+1.765/1.710 s wall. Full-gate census is still owed.

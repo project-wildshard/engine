@@ -621,5 +621,14 @@
  "src/client/game/grid/road-page-textures.test.ts",
  "src/shared/engine/sim/edge-profile-boundaries.test.ts",
  "src/client/game/grid/cell-clip-lights.test.ts",
- "src/client/game/grid/near-pose-bake.test.ts"
+ "src/client/game/grid/near-pose-bake.test.ts",
+ "test/graph-flat-varying.test.ts",
+ "test/graph-foliage-normal.test.ts",
+ "test/graph-instance-transform.test.ts",
+ "test/graph-optional-attribute.test.ts",
+ "test/graph-shadow-offset.test.ts",
+ "test/graph-toon-caustics.test.ts",
+ "test/graph-wave-normal.test.ts",
+ "test/pbr-emissive.test.ts",
+ "src/client/engine/render/data-look-sky.test.ts"
 ]
