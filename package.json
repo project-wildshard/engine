@@ -825,6 +825,7 @@
     "./game/population/productCreatures": "./src/client/game/population/productCreatures.ts",
     "./game/quest/ledger": "./src/shared/game/quest/ledger.ts",
     "./game/ledger": "./src/shared/game/ledger.ts",
+    "./game/grid/cellHome": "./src/server/game/grid/cellHome.ts",
     "./game/loot/platformCatalogue": "./src/shared/game/loot/platformCatalogue.ts",
     "./game/quest/legacyRecords": "./src/shared/game/quest/legacyRecords.ts",
     "./game/shardfile/pageWater": "./src/client/game/shardfile/pageWater.ts",

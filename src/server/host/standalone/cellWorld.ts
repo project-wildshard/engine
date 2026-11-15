@@ -24,6 +24,7 @@ import { QUEST_OWNED } from '@wildshard/engine/game/quest/nativeComposition';
 import { shardRows } from '@wildshard/engine/sim/shardRows';
 import { createQuestLedger } from '@wildshard/engine/game/quest/ledger';
 import { admitLedgerRewards } from '@wildshard/engine/game/ledger';
+import { installCellHome } from '@wildshard/engine/game/grid/cellHome';
 import { serverDiscoveries, serverPlaces } from '@wildshard/engine/game/quest/serverPlaces';
 import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
 import { RESPAWN_NOW_ACT, STORY_ACT, UNSTUCK_ACT } from '@wildshard/engine/net/acts';
@@ -106,13 +107,14 @@ async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimS
   const kitOf = (sim: ShardfileSimulation): DeclaredKitItems | null => installDeclaredKitItems(sim.host, shard, sim.itemHooks);
   if (snapshot === undefined) {
     const fresh = createShardfileSim(shard, assets, ports), kit = kitOf(fresh);
+    installCellHome(fresh.host);
     // SS3: a data shard's simulation builds its declared prop solids; a shard with none built has no server half to claim
     if (fresh.colliders.size > 0) registerInstalled(fresh.host, 'collision');
     return { host: fresh.host, sim: () => fresh, kit: () => kit, dispose: () => { fresh.dispose(); } };
   }
   const probe = createShardfileSim(shard, assets, ports), { level } = probe.host; probe.dispose();
   const installed: { value?: ReturnType<typeof bindShardfileSim>; kit?: DeclaredKitItems | null } = {};
-  const host = restoreSimHost(level, { rapier }, typeof snapshot === 'string' ? decodeSimSnapshot(snapshot) : snapshot, restored => { installed.value = bindShardfileSim(restored, shard, assets, { ...ports, restoring: true }); installed.kit = kitOf(installed.value); if (installed.value.colliders.size > 0) registerInstalled(restored, 'collision'); });
+  const host = restoreSimHost(level, { rapier }, typeof snapshot === 'string' ? decodeSimSnapshot(snapshot) : snapshot, restored => { installed.value = bindShardfileSim(restored, shard, assets, { ...ports, restoring: true }); installed.kit = kitOf(installed.value); installCellHome(restored); if (installed.value.colliders.size > 0) registerInstalled(restored, 'collision'); });
   return { host, sim: () => installed.value, kit: () => installed.kit ?? null, dispose: () => { (installed.value ?? { dispose: () => { host.dispose(); } }).dispose(); } };
 }
 
@@ -158,7 +160,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
   if (nativeCell(input)) {
     // J68: a native assembly keeps its ground whole and its solids as data. A saved world holds none of them, so a throwaway fresh one lists them.
     const near = options.wholeSolids !== true && input.product !== undefined && hasNativeAssembly(input.product) ? new NearColliders() : undefined;
-    const around = { room: true, ...(near === undefined ? {} : { near }) };
+    const around = { room: true, grid: true, ...(near === undefined ? {} : { near }) };
     if (near !== undefined && snapshot !== undefined) (await bootTask('server:restore-collision-inventory', () => createTrustedHeadlessResident(input, undefined, around))).dispose();
     // A world with no save of its own takes the page's: the flags and records its fights read as they install.
     const seeded = snapshot === undefined && options.pageless !== true;

@@ -1219,6 +1219,7 @@
     "src/server/game/boss/slotsNative.ts": "server",
     "src/server/game/boss/windEliteNative.ts": "server",
     "src/server/game/grapple/native.ts": "server",
+    "src/server/game/grid/cellHome.ts": "server",
     "src/server/game/grid/durability.ts": "server",
     "src/server/game/grid/room.ts": "server",
     "src/server/game/grid/roomNet.ts": "server",

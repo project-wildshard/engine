@@ -38,6 +38,7 @@ import { prepareProductRuntimePlan } from '@wildshard/engine/game/shardfile/nati
 import { holdPageState, type RuntimeStateValue } from '@wildshard/engine/game/shardfile/runtimeState';
 import type { NativeAssemblyPorts } from '@wildshard/engine/game/shardfile/nativeAssemblyInput';
 import type { LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
+import { installCellHome } from '@wildshard/engine/game/grid/cellHome';
 
 /** The same admitted bytes and native physics implementation used by the ordinary headless worker. */
 export interface HeadlessRuntimePreparation { shard: Shardfile; assets: ReadonlyMap<string, Uint8Array>; rapier: Rapier; readonly product: ShardProduct }
@@ -236,7 +237,7 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
 }
 /** Install the selected plan into one fresh or strictly restored native host.
  * A failed install disposes its world; installation may emit no gameplay effects. */
-export async function createTrustedHeadlessResident(preparation: HeadlessRuntimeInput, snapshot?: string | Readonly<SimSnapshot | SimSnapshotBytes>, world?: { readonly room?: boolean; readonly near?: NearColliders; readonly page?: PageProgress }): Promise<TrustedHeadlessResident> {
+export async function createTrustedHeadlessResident(preparation: HeadlessRuntimeInput, snapshot?: string | Readonly<SimSnapshot | SimSnapshotBytes>, world?: { readonly room?: boolean; readonly grid?: boolean; readonly near?: NearColliders; readonly page?: PageProgress }): Promise<TrustedHeadlessResident> {
   // The roster rolls its herds while this installs, so a room opened afterwards is too late: a save from a native-Math boot
   // would hold recipes its restore on the portable table can't reproduce.
   installPortableMath();
@@ -249,12 +250,13 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
   const otherCommands = new Map<string, readonly HeadlessCommand[]>();
   const context: HeadlessRuntimeInstallation = { combat, ...(world?.room === true ? { room: true } : {}), restoring: saved !== undefined, ...(saved === undefined ? {} : { snapshot: saved }), commands: () => commands, playerCommands: id => otherCommands.get(id) ?? [], emit: effect => { effects.push(effect); } };
   const ports = { ...plan.ports, rapier: preparation.rapier };
+  const install = (target: SimHost): void => { plan.install(target, context); if (world?.grid === true) installCellHome(target); };
   let installing: SimHost | undefined;
   let host: SimHost;
   try {
-    if (saved === undefined) { installing = createSimHost(plan.level, ports); if (world?.near !== undefined) { installing.physics.near = world.near; world.near.attach(installing.physics); } if (world?.page !== undefined) { for (const flag of world.page.flags) installing.flags.set(flag); holdPageState(installing, world.page.state); } plan.install(installing, context); host = installing; }
+    if (saved === undefined) { installing = createSimHost(plan.level, ports); if (world?.near !== undefined) { installing.physics.near = world.near; world.near.attach(installing.physics); } if (world?.page !== undefined) { for (const flag of world.page.flags) installing.flags.set(flag); holdPageState(installing, world.page.state); } install(installing); host = installing; }
     else host = restoreSimHost(plan.level, ports, saved, fresh => {
-      installing = fresh; if (ports.heightAt !== undefined) fresh.setHeightQuery(ports.heightAt); plan.install(fresh, context);
+      installing = fresh; if (ports.heightAt !== undefined) fresh.setHeightQuery(ports.heightAt); install(fresh);
     });
     if (effects.length > 0) throw new Error('Trusted runtime emitted gameplay effects during installation');
     if (saved !== undefined && world?.near !== undefined) { host.physics.near = world.near; world.near.attach(host.physics); }
