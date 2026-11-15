@@ -313,21 +313,33 @@ const reading = new Map<string, Promise<ArrayBuffer>>();
  *  ReadableStream nobody here listens to (T10: its enqueue / close were ~200 ms of a Pine cold entry at phone 4x). Same
  *  URL resolution (the page's modifier on the default manager), credentials, headers and status rule, then the loader's
  *  own parse. */
-export function loadKtx2(target: Pick<KTX2Loader, 'manager' | 'path' | 'requestHeader' | 'withCredentials' | 'parse'>, url: string): Promise<THREE.CompressedTexture> {
+export function loadKtx2(target: Pick<KTX2Loader, 'manager' | 'path' | 'requestHeader' | 'withCredentials' | 'parse'>, url: string, signal?: AbortSignal): Promise<THREE.CompressedTexture> {
+  signal?.throwIfAborted();
   const resolved = target.manager.resolveURL(target.path + url);
-  let bytes = reading.get(resolved);
+  let bytes = signal === undefined ? reading.get(resolved) : undefined;
   if (bytes === undefined) {
-    bytes = bootTask(`texture:read ${resolved}`, () => waitFor('Reading texture', fetch(resolved, { headers: target.requestHeader, credentials: target.withCredentials ? 'include' : 'same-origin' }).then(response => {
+    bytes = bootTask(`texture:read ${resolved}`, () => waitFor('Reading texture', fetch(resolved, {
+      headers: target.requestHeader, credentials: target.withCredentials ? 'include' : 'same-origin',
+      ...(signal === undefined ? {} : {signal}),
+    }).then(response => {
       if (response.status !== 200 && response.status !== 0) throw new Error(`fetch for "${response.url}" responded with ${String(response.status)}: ${response.statusText}`);
       return response.arrayBuffer();
     }), 'file', resolved));
-    reading.set(resolved, bytes);
+    if (signal === undefined) reading.set(resolved, bytes);
     const read = bytes;
     const clear = (): void => { if (reading.get(resolved) === read) reading.delete(resolved); };
     read.finally(clear).catch(() => undefined);
   }
-  return bytes.then(buffer => bootTask(`texture:decode ${resolved}`, () => waitFor('Preparing texture', new Promise<THREE.CompressedTexture>((resolve, reject) => { target.parse(buffer, resolve, reject); }), 'worker', resolved)));
+  return bytes.then(buffer => {
+    signal?.throwIfAborted();
+    return bootTask(`texture:decode ${resolved}`, () => waitFor('Preparing texture', new Promise<THREE.CompressedTexture>((resolve, reject) => {
+      target.parse(buffer, texture => {
+        if (signal?.aborted === true) { texture.dispose(); reject(new Error('KTX2 read aborted', {cause: signal.reason})); } else resolve(texture);
+      }, reject);
+    }), 'worker', resolved));
+  });
 }
+
 function load(url: string, keep: boolean): Promise<THREE.CompressedTexture> {
   let p = transcoded.get(url);
   if (p === undefined) {
@@ -344,11 +356,12 @@ function load(url: string, keep: boolean): Promise<THREE.CompressedTexture> {
  * A KTX2 file at its own URL (a shardfile product's named blob, not the stand-in of another file) as a CompressedTexture
  * on the page's loader, in any texture mode: one transcode per file per wave, flipY = false (the file keeps its encoded
  * orientation), its mips dropped from JS once uploaded. The caller sets its sampler and colour space, then fences it with
- * `prepareCompressedTexture`.
+ * `prepareCompressedTexture`. An optional signal owns an isolated, cancellable read.
  */
-export async function ktx2File(url: string): Promise<THREE.CompressedTexture> {
+export async function ktx2File(url: string, signal?: AbortSignal): Promise<THREE.CompressedTexture> {
   if (texMode() !== 'ktx2') markGpuOnly('KTX2 product files on the image path (their mips are dropped from JS once uploaded)');
-  const t = (await load(url, true)).clone();
+  // Cancellable callers own their read and parsed texture; abort cannot cancel a shared wave.
+  const t = signal === undefined ? (await load(url, true)).clone() : await loadKtx2(ktx2Loader(), url, signal);
   t.flipY = false;
   t.generateMipmaps = false;
   sources.share(t, url, 0);

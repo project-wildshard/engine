@@ -45,11 +45,12 @@ test('a KTX2 read refuses a failed status and is read again after', async () => 
 test('NB13: parallel KTX2 bodies and decoder replies each name their original file while pending', async () => {
   const f = fixture(), replies = new Map<string, ReadableStreamDefaultController<Uint8Array>>();
   const spans: {operation: string; result: string}[] = [];
-  vi.stubGlobal('__bootTiming', {version: 1,
+  const previousTiming = Object.getOwnPropertyDescriptor(globalThis, '__bootTiming');
+  Object.defineProperty(globalThis, '__bootTiming', {configurable: true, writable: true, value: {version: 1,
     begin(operation: string): number { spans.push({operation, result: 'pending'}); return spans.length; },
     end(id: number, result: string): void { const row = spans[id - 1]; if (row !== undefined) row.result = result; },
     mark: (): void => undefined,
-  });
+  }});
   try {
   const decoded: ((texture: CompressedTexture) => void)[] = [], refused: ((error: Error) => void)[] = [];
   const target = {...f.target, parse(_buffer: ArrayBuffer, done?: (texture: CompressedTexture) => void, fail?: (error: Error) => void): void {
@@ -79,5 +80,43 @@ test('NB13: parallel KTX2 bodies and decoder replies each name their original fi
   for (const row of settled) if (row.status === 'fulfilled') row.value.dispose();
   expect(bootWaits().filter(row => row.label === 'Reading texture' || row.label === 'Preparing texture')).toEqual([]);
   expect(spans.filter(row => row.operation.startsWith('texture:decode ')).map(row => row.result)).toEqual(['complete', 'complete', 'complete', 'complete', 'complete', 'complete', 'failed']);
-  } finally { vi.unstubAllGlobals(); vi.restoreAllMocks(); }
+  } finally {
+    if (previousTiming === undefined) Reflect.deleteProperty(globalThis, '__bootTiming');
+    else Object.defineProperty(globalThis, '__bootTiming', previousTiming);
+    vi.restoreAllMocks();
+  }
+});
+
+test('an owned cancellable read never joins or aborts the shared wave', async () => {
+  const f = fixture(), controller = new AbortController(), signals: (AbortSignal | null | undefined)[] = [];
+  vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+    signals.push(init?.signal);
+    if (init?.signal) return new Promise((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => { reject(new Error('owned read aborted')); }, {once: true});
+    });
+    return Promise.resolve(new Response(new Uint8Array([1]), {status: 200}));
+  });
+  const owned = loadKtx2(f.target, 'owned.ktx2', controller.signal);
+  const rejected = expect(owned).rejects.toThrow('owned read aborted');
+  const shared = loadKtx2(f.target, 'owned.ktx2');
+  controller.abort(); await rejected;
+  await expect(shared).resolves.toBeInstanceOf(CompressedTexture);
+  expect(signals).toEqual([controller.signal, undefined]);
+  expect(bootWaits().filter(row => row.label === 'Reading texture' || row.label === 'Preparing texture')).toEqual([]);
+});
+
+test('a cancelled decode disposes the texture when parsing finishes late', async () => {
+  const f = fixture(), controller = new AbortController();
+  let finish: ((texture: CompressedTexture) => void) | undefined, disposed = 0;
+  let entered = (): void => { /* Set by the promise executor. */ };
+  const parsed = new Promise<void>(resolve => { entered = resolve; });
+  f.target.parse = (_buffer, onLoad) => { finish = onLoad; controller.abort(); entered(); };
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array([1]), {status: 200}));
+  const read = loadKtx2(f.target, 'late.ktx2', controller.signal);
+  const rejected = expect(read).rejects.toThrow('KTX2 read aborted');
+  await parsed;
+  const texture = new CompressedTexture([], 4, 4); texture.addEventListener('dispose', () => { disposed++; });
+  expect(finish).toBeTypeOf('function'); finish?.(texture);
+  await rejected; expect(disposed).toBe(1);
+  expect(bootWaits().filter(row => row.label === 'Reading texture' || row.label === 'Preparing texture')).toEqual([]);
 });

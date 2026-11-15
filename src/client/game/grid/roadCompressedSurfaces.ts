@@ -22,7 +22,7 @@ export function roadSurfaceBytes(width: number, height: number): number {
 }
 interface SurfaceLoader {
   readonly supported?: boolean;
-  readonly read?: (url: string) => Promise<CompressedTexture>;
+  readonly read?: (url: string, signal: AbortSignal) => Promise<CompressedTexture>;
   readonly upload?: (texture: CompressedTexture, current: () => boolean) => Promise<void>;
 }
 
@@ -34,15 +34,18 @@ export async function prepareRoadSurfaceMaps(admission: PlatformRenderAdmission,
   try { owner = admission.allocate({id: 'road.surface-maps', jsBytes: gpuBytes, gpuBytes}, scope => scope); }
   catch (error) { if (error instanceof PlatformRenderAdmissionError) return false; throw error; }
   const textures = new Map<string, CompressedTexture>();
+  const controller = new AbortController(), loading = owner.child('surface-loading');
+  const retired = new Promise<false>(resolve => { owner.onDispose(() => { controller.abort(); resolve(false); }); });
+  loading.timeout(5000, () => { owner.dispose(); });
   let shared = false;
   owner.onDispose(() => { for (const [id, texture] of textures) { if (shared) maps.release(id, texture); else texture.dispose(); } });
-  const read = loader.read ?? (async (url: string) => (await import('@wildshard/engine/core/ktx2')).ktx2File(url));
+  const read = loader.read ?? (async (url: string, signal: AbortSignal) => (await import('@wildshard/engine/core/ktx2')).ktx2File(url, signal));
   const upload = loader.upload ?? (async (texture: CompressedTexture, current: () => boolean): Promise<void> => {
     await (await import('@wildshard/engine/core/ktx2')).prepareCompressedTexture(texture, undefined, current);
   });
   try {
-    const results = await Promise.allSettled(KINDS.map(async kind => {
-      const texture = await read(contentURL(`/assets/grid-road/road-${kind}-phone.ktx2`));
+    const results = await Promise.race([retired, Promise.allSettled(KINDS.map(async kind => {
+      const texture = await read(contentURL(`/assets/grid-road/road-${kind}-phone.ktx2`), controller.signal);
       if (owner.disposed || owner.disposing) { texture.dispose(); throw new Error('Road surface owner retired'); }
       textures.set(IDS[kind], texture);
       const image: unknown = texture.image, expected = ROAD_GRAIN_PLANES[kind];
@@ -55,11 +58,12 @@ export async function prepareRoadSurfaceMaps(admission: PlatformRenderAdmission,
       texture.anisotropy = 8; texture.minFilter = LinearMipmapLinearFilter; texture.magFilter = LinearFilter;
       texture.needsUpdate = true;
       await upload(texture, () => !owner.disposed && !owner.disposing);
-    }));
-    if (results.some(result => result.status === 'rejected') || owner.disposed || owner.disposing) { owner.dispose(); return false; }
+    }))]);
+    if (results === false || results.some(result => result.status === 'rejected') || owner.disposed || owner.disposing) { owner.dispose(); return false; }
     for (const [id, texture] of textures) maps.hold(id, texture);
     shared = true;
     admission.shrink?.('road.surface-maps', gpuBytes);
     return true;
   } catch (error) { owner.dispose(); throw error; }
+  finally { loading.dispose(); }
 }

@@ -1,4 +1,4 @@
-import {expect, test} from 'vitest';
+import {expect, test, vi} from 'vitest';
 import {CompressedTexture, RGBA_ASTC_6x6_Format, SRGBColorSpace} from 'three';
 import {Scope} from '@wildshard/engine/app/scope';
 import {ResidencyAllocator} from '../../../shared/game/grid/allocator';
@@ -55,4 +55,28 @@ test('unsupported, partially failed and retired preparations leave the procedura
       read: url => { retired.scope.dispose(); return Promise.resolve(native(url)); }, upload: () => Promise.resolve()})).toBe(false);
     expect(retired.maps.has('road.asphalt')).toBe(false);
   } finally { retired.scope.dispose(); }
+});
+
+test('stalled optional maps time out, abort their reads and dispose a late texture', async () => {
+  vi.useFakeTimers();
+  const r = rig(); let finish: ((texture: CompressedTexture) => void) | undefined, disposed = 0;
+  const signals: AbortSignal[] = [];
+  try {
+    const result = prepareRoadSurfaceMaps(r.admission, r.maps, {supported: true,
+      read: (_url, signal) => { signals.push(signal); return new Promise(resolve => { finish = resolve; }); }});
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(await result).toBe(false); expect(signals).toHaveLength(2);
+    expect(signals.every(signal => signal.aborted)).toBe(true);
+    expect(r.allocator.has('platform:render:road.surface-maps')).toBe(false);
+    const late = native('junction'); late.addEventListener('dispose', () => { disposed++; });
+    finish?.(late); await Promise.resolve();
+    expect(disposed).toBe(1); expect(r.maps.has('road.junctions')).toBe(false);
+  } finally { r.scope.dispose(); vi.useRealTimers(); }
+});
+test('session disposal immediately cancels a stalled optional preparation', async () => {
+  const r = rig(), signals: AbortSignal[] = [];
+  const result = prepareRoadSurfaceMaps(r.admission, r.maps, {supported: true,
+    read: (_url, signal) => { signals.push(signal); return new Promise(() => { /* Deliberately stalled reader. */ }); }});
+  r.scope.dispose(); expect(await result).toBe(false);
+  expect(signals.every(signal => signal.aborted)).toBe(true);
 });
