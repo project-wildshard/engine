@@ -49,6 +49,10 @@ export const TIER_TABLE = {
     // every PMREM environment's cube size (pmremSize.ts; 0 = each source's own): one size, so no lit program compiles twice
     // for two shards' environments (the HDR backdrops' 128 cube, a 512-wide equirect, drawn at Driftwood's 64)
     pmremCube: 64,
+    // NINE-DRAGON-BENCHMAX NB5 (mini-ninefps, 2026-11-15): a placed model's LOD start distances times this. The phone's
+    // portrait camera (vertical FOV ~100°, 874 px at 1×) draws a copy at 0.36× the desktop window's pixels per metre
+    // (1496x717 @2, ~70°), 0.72× at 2×: at 0.6 every level still switches at about the projected size the desktop switches at
+    placedLodScale: 0.6,
   },
   desktop: {
     maxTexture: 4096, layerSize: 1024, dpr: 1.5, ao: true,
@@ -74,6 +78,7 @@ export const TIER_TABLE = {
     pickupItemDist: 90, pickupOrbDist: 200,
     godRaysSamples: 60, godRaysScale: 0.5, volumetricSteps: 14, volumetricScale: 1, smaa: 'high' as 'off' | 'low' | 'high', bloomLevels: 8,
     pmremCube: 0,
+    placedLodScale: 1,
   },
 };
 
