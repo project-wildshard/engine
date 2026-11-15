@@ -147,7 +147,6 @@
   "test/nine-walk-verbs.test.ts",
   "test/original-script-order.test.ts",
   "test/output-runtime.test.ts",
-  "test/packed-specimen-files.test.ts",
   "test/page-wildlife-view.test.ts",
   "test/patrol-encounter-view.test.ts",
   "test/patrol-law.test.ts",

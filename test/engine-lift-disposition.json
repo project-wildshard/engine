@@ -9519,5 +9519,18 @@
     "sourceRevision": "1ec941e2ee409ee2474fa11442c3fa20a6a6e34d",
     "sourceBlob": "b0a8aa82555d67621c150710106fd9c9d3b3568e",
     "retirementProof": "Restored current patrol contact boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/packed-specimen-files.test.ts",
+    "outcome": "restored",
+    "target": "test/packed-specimen-files.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Explorer and dressing use literal engine product rows with immutable hashes, preserving the admitted bank and JSON schema boundary without sharddev blob builders.",
+    "originalTests": [
+      "the existing Explorer and dressing adapters prepare admitted banks without URL fallback"
+    ],
+    "sourceRevision": "4c5cea15d61e5d35c02befaa3ce18c98ceeb2c1c",
+    "sourceBlob": "3ff39d5a513453549f00d5fbe9e16414b077f5f6",
+    "retirementProof": "Restored public product-file boundary; no J186 retirement or successor equivalence claimed."
   }
 ]

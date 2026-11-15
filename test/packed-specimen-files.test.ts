@@ -1,4 +1,3 @@
-import { registeredJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { fixtureProductFile, fixtureJsonCheck } from './fixtures/productFile';
 import {zlibSync} from 'fflate';
 import * as THREE from 'three';
@@ -15,7 +14,7 @@ import {SkyRig} from '../src/client/engine/world/skyRig';
 import {WorldRegistry} from '../src/client/engine/world/registry';
 import {parseExplorerCatalogue} from '@wildshard/format/explorerCatalogue';
 import {emptyShardfile} from '../src/shared/host/author';
-import {emitNamedBlobs,nameBlob} from '../src/sharddev/blobs';
+import { hashImmutableBytes } from '../src/shared/host/immutable';
 import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
 import {SceneDressing} from '../src/client/game/shardfile/sceneDressing';
 import type {ShardContext} from '../src/client/game/plugin/context';
@@ -196,13 +195,13 @@ test('the original URL form keeps its native decoder and strict asset-path admis
 });
 
 test('the existing Explorer and dressing adapters prepare admitted banks without URL fallback',async()=>{
-  const book='models/cover-phone.json',declared=emitNamedBlobs([nameBlob(forge.file,'bin',forge.wire,{decoded:forge.raw.length}),
-    nameBlob(book,'json',new TextEncoder().encode(JSON.stringify({rows:forge.rows,packed:forge.packed,materials})),{jsonSchema:registeredJsonSchema(book)})]);
+  const book='models/cover-phone.json',bookBytes=new TextEncoder().encode(JSON.stringify({rows:forge.rows,packed:forge.packed,materials})),
+    bankHash=hashImmutableBytes(forge.wire),bookHash=hashImmutableBytes(bookBytes),assets=new Map([[bankHash,forge.wire],[bookHash,bookBytes]]);
   const product=createShardProduct({slug:'packed-file-fixture',revision:1,
     shardfile:emptyShardfile({slug:'packed-file-fixture',name:'Packed fixture',author:'Fixture',revision:1,seed:1}),
     sections:new Map([['explore/catalogue',parseExplorerCatalogue({version:1,entries:[{kind:'specimen',id:'packed-card',books:{phone:book,desktop:book},model:'anvil'}]})]]),
-    files:new Map(declared.files.flatMap(row=>row.name===undefined?[]:[[row.name,fixtureProductFile(row.name,{hash:row.hash,url:row.hash})]])),
-    jsonCheck:fixtureJsonCheck, read:hash=>{const bytes=declared.assets.get(hash);if(bytes===undefined)throw new Error('Missing product bytes');return Promise.resolve(bytes);},check:true});
+    files:new Map([[forge.file,fixtureProductFile(forge.file,{hash:bankHash,url:bankHash})],[book,fixtureProductFile(book,{hash:bookHash,url:bookHash})]]),
+    jsonCheck:fixtureJsonCheck, read:hash=>{const bytes=assets.get(hash);if(bytes===undefined)throw new Error('Missing product bytes');return Promise.resolve(bytes);},check:true});
   const fetch=vi.spyOn(globalThis,'fetch').mockRejectedValue(new Error('No specimen URL fallback'));
   const sky=skyFixture(),registry=new WorldRegistry(),scope=new Scope('packed-adapters'),root=new THREE.Group();
   try{
