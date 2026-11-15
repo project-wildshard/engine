@@ -24,7 +24,7 @@ const online = base.includes('staging');
 const HOMES = /** @type {Record<string, { slug: string, card: string, axis: 'x' | 'z', sign: number, approach: [number, number][] }>} */ ({
   driftwood: { slug: 'driftwood-isle', card: 'Driftwood Isle', axis: 'x', sign: 1, approach: [[235, -194], [235, 0]] },
   nalati: { slug: 'nalati-grasslands', card: 'Nalati Grasslands', axis: 'x', sign: -1, approach: [] },
-  sunscar: { slug: 'sunscar-dunes', card: 'Sunscar Dunes', axis: 'x', sign: 1, approach: [] },
+  sunscar: { slug: 'sunscar-dunes', card: 'Signal Dunes', axis: 'x', sign: 1, approach: [] },
   pine: { slug: 'pine-hollow', card: 'Pine Hollow', axis: 'x', sign: 1, approach: [] } });
 const homeName = flag('home', 'driftwood'), home = HOMES[homeName];
 if (home === undefined) throw new Error(`No home ${homeName}: ${Object.keys(HOMES).join(', ')}`);
@@ -62,6 +62,9 @@ try {
     const W = /** @type {any} */ (window), q = W.__road = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), programs: /** @type {any[]} */ ([]), slowLinks: /** @type {any[]} */ ([]) };
     // every shader program the renderer links, with when it was first seen: a crossing that compiles one stalls its frame
     const known = new Set(W.__wildshard?.world?.game?.renderer?.info?.programs);
+    // a key linked once before and released since links again: `again` tells a re-link from a first link
+    const seenKeys = new Set([...known].map((/** @type {any} */ program) => String(program.cacheKey)));
+    let held = new Set(known);
     // and every program whose first use blocked the page (a link the driver finished only when asked): which, and how long
 
     const renderer = W.__wildshard?.world?.game?.renderer, gl = renderer?.getContext?.();
@@ -69,7 +72,7 @@ try {
       const ask = gl.getProgramParameter.bind(gl);
       gl.getProgramParameter = (/** @type {WebGLProgram} */ handle, /** @type {number} */ name) => {
         const t0 = performance.now(), value = ask(handle, name), ms = performance.now() - t0;
-        if (ms > 8) { const found = (renderer.info.programs ?? []).find((/** @type {any} */ row) => row.program === handle); q.slowLinks.push({ t: Math.round(t0), ms: Math.round(ms), name: String(found?.name ?? ''), key: String(found?.cacheKey ?? '').slice(0, 160) }); }
+        if (ms > 8) { const found = (renderer.info.programs ?? []).find((/** @type {any} */ row) => row.program === handle); q.slowLinks.push({ t: Math.round(t0), ms: Math.round(ms), name: String(found?.name ?? ''), key: String(found?.cacheKey ?? '').slice(0, 700) }); }
         return value;
       };
     }
@@ -79,9 +82,13 @@ try {
     setInterval(() => { try {
       const st = W.__wildshard.shard.grid.state(), p = W.__wildshard.world.player;
       const wf = st.live?.live?.worldFeet ?? p.position;
-      for (const program of W.__wildshard.world.game?.renderer?.info?.programs ?? []) if (!known.has(program)) { known.add(program); q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: String(program.cacheKey ?? '').slice(0, 160) }); }
+      const now = W.__wildshard.world.game?.renderer?.info?.programs ?? [];
+      for (const program of now) if (!known.has(program)) { known.add(program); const key = String(program.cacheKey ?? ''); q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: key.slice(0, 700), again: seenKeys.has(key) }); seenKeys.add(key); }
+      const live = new Set(now);
+      for (const program of held) if (!live.has(program)) q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: String(program.cacheKey ?? '').slice(0, 700), released: true });
+      held = live;
       q.samples.push({ t: Math.round(performance.now()), x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), inside: st.inside, phase: st.live?.crossing?.phase ?? null, card: st.cellLoading ?? null, stage: st.cellStage ?? null, ready: st.live?.live?.gameplayReady, res: st.live?.live?.residents ?? null, cx: st.live?.live?.crossings ?? null, cur: st.live?.live?.current ?? null, hy: st.hybrid?.instance ?? null, hook: st.hybrid?.hook ?? null });
-    } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 50);
+    } catch (error) { q.samples.push({ err: String(error).slice(0, 700) }); } }, 50);
   });
   const sample = () => page.evaluate(() => { const rows = /** @type {any[]} */ (/** @type {any} */ (window).__road.samples); for (let at = rows.length - 1; at >= 0; at--) if (rows[at].err === undefined) return rows[at]; return undefined; });
   const face = (/** @type {number} */ yaw) => page.evaluate(wanted => { /** @type {any} */ (window).__wildshard.world.player.yaw = wanted; }, yaw);
@@ -132,7 +139,8 @@ try {
     return { name, crossed: true, lineAt: line.t, frames: span.length, worstFrameMs: sorted.at(-1) ?? 0, p95Ms: sorted[Math.floor(sorted.length * 0.95)] ?? 0, medianMs: sorted[Math.floor(sorted.length / 2)] ?? 0,
       over33: span.filter(ms => ms > 33.4).length, over50: span.filter(ms => ms > 50).length, over100: span.filter(ms => ms > 100).length,
       trace: near.filter((_, i) => i % 2 === 0).map(s => [s.t - line.t, s.x, s.z, s.inside, s.cur, s.cx, s.phase, s.card, s.stage, s.res, s.hy, s.hook]), cardMs: cards.length * 50, cards: [...new Set(cards.map(s => `${String(s.card)}:${String(s.stage)}`))], worstStopMs: worstStop, stopAt, cruiseMps: Number((cruise * 1000).toFixed(2)), phases: [...new Set(near.map(s => s.phase))],
-      programs: programs.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ t: r.t - line.t, name: r.name, key: r.key })),
+      programs: programs.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ t: r.t - line.t, name: r.name, key: r.key, ...(r.again === true ? { again: true } : {}), ...(r.released === true ? { released: true } : {}) })),
+      releasedBefore: programs.filter(r => r.released === true && r.t < line.t - 1000).map(r => ({ t: r.t - line.t, name: r.name, key: r.key })),
       slowLinks: slowLinks.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ t: r.t - line.t, ms: r.ms, name: r.name, key: r.key })) };
   };
   const cdp = profile && engineName === 'chromium' ? await context.newCDPSession(page) : undefined;

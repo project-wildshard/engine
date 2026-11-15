@@ -378,6 +378,10 @@ export class GridSession {
   private readonly life: NeighbourLife;
   /** Late frames the page loop has run; `stepRingsUntil` steps the rings only while it has not. */
   private lateFrames = 0;
+  /** A ring prelink asked before the page drew its first frame: the page's warm-up skips it then (`warmSceneRoots`), so it
+   *  runs again once the loop has drawn (ZE2d: the home's boot prelink was lost, and the road linked its home-lit variants
+   *  on the first walk back in). */
+  private prelinkOwed = false;
   private readonly admitNeighbour: ((cell: GridCell, required?: boolean) => Promise<void>) | undefined;
   private readonly admitNeighbourRender: ((cell: GridCell) => Promise<boolean>) | undefined;
   /** G222 playtest #7: each neighbour's declared doors and gates, shown exactly when its region has them standing */
@@ -848,7 +852,7 @@ export class GridSession {
     };
     // the one late system (play.ts binds every onLate to game.grid.frame): the ring tiles' static-matrix checks run in it too
     let ringStep: (() => void) | undefined;
-    host.frame?.onLate((dt) => { this.lateFrames++; this.viewStep(); this.life.late(dt); this.panels.late(); bands(); frame?.frame(); ringStep?.(); });
+    host.frame?.onLate((dt) => { this.lateFrames++; if (this.prelinkOwed && this.lateFrames > 2) { this.prelinkOwed = false; this.prelinkViews(); } this.viewStep(); this.life.late(dt); this.panels.late(); bands(); frame?.frame(); ringStep?.(); });
     const tiles = neighbourTiles(host.scope, async (tile) => { await host.prepareTile?.(tile); },
       (tile, retiredRoots) => { this.tileGhosts.retired(tile.key, retiredRoots); }, host.frame === undefined ? undefined : step => { ringStep = step; }),
       tileCost = clientRingCatalogue(tiles.instances);
@@ -1053,6 +1057,7 @@ export class GridSession {
   private prelinkViews(): void {
     const prepare = this.host.prepareView, scope = this.host.scope;
     if ((prepare === undefined && this.host.prepareViews === undefined) || scope.disposed || scope.disposing) return;
+    if (this.lateFrames <= 2) this.prelinkOwed = true;
     prelinkGridViews(scope, [...this.viewRoots.values(), ...this.roadRoots], prepare, this.host.prepareViews);
     // the resident cells' sky domes too, under these lights (each layer was prepared under the lights it was built in)
     const skies = this.host.prepareSkyLayers;
