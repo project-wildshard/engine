@@ -134,8 +134,8 @@ try {
       }
       if (await page.evaluate(() => typeof window.__workerClient === 'function' && window.__wildshard?.world?.player !== undefined).catch(() => false)) break;
       if (Date.now() > until) {
-        const marks = await page.evaluate(() => ({ ...document.documentElement.dataset, sw: navigator.serviceWorker?.controller?.state ?? 'none', url: location.href })).catch(() => null);
-        throw new Error(`the page never reached the world (${JSON.stringify({ marks, seen: await visibleIds(page), errors: entered.errors.slice(-4) }).slice(0, 900)})`);
+        const marks = await page.evaluate(() => ({ marks: Object.entries(document.documentElement.dataset).map(([key, value]) => `${key}=${value ?? ''}`).join(' '), sw: navigator.serviceWorker?.controller?.state ?? 'none', url: location.href, seen: [...document.querySelectorAll('[data-failmode]')].map(node => node instanceof HTMLElement ? node.dataset.failmode : '') })).catch(() => null);
+        throw new Error(`the page never reached the world (${JSON.stringify({ marks, errors: entered.errors.slice(-4) }).slice(0, 900)})`);
       }
       await sleep(250);
     }
