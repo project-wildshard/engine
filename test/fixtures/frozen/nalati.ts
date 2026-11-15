@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { ReturnProgram } from '../../../src/shared/game/population/returnProgram';
 import { ReturnProgramSchema } from '@wildshard/format/namedJsonContracts';
 import type { Scope } from '../../../src/shared/engine/app/scope';
-import { parse } from 'valibot';
+import { looseObject, parse, string } from 'valibot';
 
 type FrozenFile = { name: string; bytes: number; sha256: string };
 type FrozenManifest = { sourceCommit: string; exporter: string; files: FrozenFile[] };
@@ -41,7 +41,8 @@ const admission = parse(ReturnProgramSchema, Object.fromEntries(Object.entries(f
 const admissionV2 = admission.v2;
 if (admissionV2 === undefined) throw new Error('CI21 frozen admission must declare ABI2');
 const admissionArtifact = admissionV2.artifact.hash;
-const admissionWitness = admission.script.module.slice('blobs/wasm/'.length, -'.wasm'.length);
+const admissionScript = parse(looseObject({ module: string() }), admission.script);
+const admissionWitness = admissionScript.module.slice('blobs/wasm/'.length, -'.wasm'.length);
 const admissionAssets = new Map([
   [admissionArtifact, frozenNalatiBytes('nalati-admission-original.wasm')],
   [admissionWitness, frozenNalatiBytes('nalati-admission-witness-original.bin')],
