@@ -36,3 +36,9 @@ retain preparation. All eight real native controls pass with parent
 preparation (13.38 s locally); no native timeout or assertion changes.
 Latest ten hosted samples span 11.04–34.43 s before this change, so the
 12-second/ten-run bar stays open pending hosted evidence.
+
+TS6d shares eight read-only catalogue/reporting and owned-store suites.
+Their CLI modules guard execution, stores belong to each case, and the
+compiler case owns its materials. Isolated: 5.015 CPU-s / 5.687 s wall;
+shared seeds 7/73: 2.581/2.611 CPU-s / 2.990/3.057 s wall. All cases
+pass without changing assertions or test clocks.

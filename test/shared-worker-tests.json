@@ -630,5 +630,13 @@
  "test/graph-toon-caustics.test.ts",
  "test/graph-wave-normal.test.ts",
  "test/pbr-emissive.test.ts",
- "src/client/engine/render/data-look-sky.test.ts"
+ "src/client/engine/render/data-look-sky.test.ts",
+ "test/boot-extras.test.ts",
+ "test/devices-script.test.ts",
+ "test/fail-screens-catalogue.test.ts",
+ "test/failmode-cases.test.ts",
+ "test/grid-crossing-ratchet.test.ts",
+ "test/title-chunk-budget.test.ts",
+ "test/title-prefetch.test.ts",
+ "test/graph-budget.test.ts"
 ]
