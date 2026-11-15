@@ -2,7 +2,6 @@
 // clone of it with local edits and a local commit, so the tests can tell a cloned file from the origin/main blob.
 import {spawn, spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
-import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
 import {SLUG, parseArgs, withStoreUse} from '../../scripts/worktree.mjs';
@@ -10,6 +9,7 @@ import {SLUG, parseArgs, withStoreUse} from '../../scripts/worktree.mjs';
 const SCRIPT = resolve(import.meta.dirname, '../../scripts/worktree.mjs');
 /** @type {string[]} */
 const roots = [];
+mkdirSync('tmp/codex-netlag', {recursive: true});
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, {recursive: true, force: true}); });
 
 /** No hook paths, no herdr, no inherited Git or Vitest state: a plain lane shell. */
@@ -29,7 +29,7 @@ const put = (root, path, body) => { mkdirSync(dirname(join(root, path)), {recurs
 
 /** origin with two commits; `canonical` cloned from it, then edited. */
 function repos() {
-  const base = mkdtempSync(join(tmpdir(), 'worktree-new-'));
+  const base = mkdtempSync(resolve('tmp/codex-netlag/worktree-new-'));
   roots.push(base);
   const origin = join(base, 'origin.git'), seed = join(base, 'seed'), canonical = join(base, 'engine');
   git(base, ['init', '-q', '--bare', '-b', 'main', origin]);
@@ -275,7 +275,7 @@ describe('worktree new', () => {
 describe('worktree install and the store prune reservation (GVS G10)', () => {
   /** @returns {{users: string, reservation: string, env: NodeJS.ProcessEnv}} */
   const box = () => {
-    const base = mkdtempSync(join(tmpdir(), 'store-use-'));
+    const base = mkdtempSync(resolve('tmp/codex-netlag/store-use-'));
     roots.push(base);
     const users = join(base, 'store-users'), reservation = join(base, 'store-maintenance.lock');
     return {users, reservation, env: {WS_STORE_USERS: users, WS_STORE_RESERVATION: reservation}};
