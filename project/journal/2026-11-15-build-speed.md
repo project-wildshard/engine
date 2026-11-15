@@ -28,3 +28,11 @@ and material inputs without changing the live wind/cascade state; the
 wind-mutating suite stays isolated. Isolated and shared seeds 7/73 pass.
 Isolated: 3.501 CPU-s / 3.115 s wall; shared: 1.842/1.834 CPU-s /
 1.765/1.710 s wall. Full-gate census is still owed.
+
+TS8 moves the browser executable/resource read to the one CI shard that
+owns Escape. It remains inside the charged shard clock, while the file
+receives the exact prepared executable. Local or changed-browser runs
+retain preparation. All eight real native controls pass with parent
+preparation (13.38 s locally); no native timeout or assertion changes.
+Latest ten hosted samples span 11.04–34.43 s before this change, so the
+12-second/ten-run bar stays open pending hosted evidence.

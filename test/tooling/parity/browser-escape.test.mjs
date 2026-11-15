@@ -62,7 +62,12 @@ beforeAll(() => {
   // Handled at once, so a supervisor failure is never an unhandled rejection; the owning case still awaits the original.
   endpointRun.child.catch(() => undefined); deliveryRun.runs.catch(() => undefined);
 });
-beforeAll(async () => { await warmNativeChrome(nativeChromeExecutable()); }, 60_000);
+beforeAll(async () => {
+  const executable=nativeChromeExecutable();
+  // Packed CI already read this exact browser once before the native phase;
+  // local runs and a different browser selection still prepare their own files.
+  if(process.env.WS_CI_NATIVE_CHROME_WARM!==executable)await warmNativeChrome(executable);
+}, 60_000);
 // A filtered run that skips either case still waits for every child it started and removes what that case would have.
 afterAll(async () => {
   await Promise.allSettled([endpointRun?.child, deliveryRun?.runs]);
