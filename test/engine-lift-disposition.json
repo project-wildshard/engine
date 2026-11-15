@@ -9491,5 +9491,20 @@
     "sourceRevision": "df5e67c6520c12e5ab44eef0a4e2d79253870583",
     "sourceBlob": "a9b2b77bbe53466e380b546cec1e41f3026efdcb",
     "retirementProof": "Parity migrated to sharddev test/portable-math-parity.test.ts; engine keeps all engine-bound checks."
+  },
+  {
+    "repo": "engine",
+    "file": "test/portable-bytes-cache.test.ts",
+    "outcome": "restored",
+    "target": "test/portable-bytes-cache.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): the cache now compares against its own public cook encoder. The prior sharddev-only decode round trip was not cache behavior and is covered by sharddev's codec tests.",
+    "originalTests": [
+      "cold and fresh-reader hits retain every current encoded byte and detached ownership",
+      "corrupt or absent bodies, transplanted metadata and unwritable storage recompute the real transform",
+      "a cached ordinary buffer never authorizes shared input"
+    ],
+    "sourceRevision": "c130747fc07fb5ab38a007aaf419fe3df671c56e",
+    "sourceBlob": "9cb4411fd738904df9d212504dac5a4857541259",
+    "retirementProof": "Restored public cook-cache boundary; no J186 retirement or successor equivalence claimed."
   }
 ]
