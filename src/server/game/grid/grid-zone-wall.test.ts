@@ -15,7 +15,7 @@ import { GridAssembly } from '../../../shared/game/grid/assembly';
 import { BUFFER_DEPTH, walledCells, zoneWallEdges } from '../../../shared/game/grid/zoneWalls';
 
 // ZONE-ENTRY ZE5 (J352): the page's wall round a cell that is not the home, as GC7's cases met the old readiness wall: a walk,
-// an 18 m/s boost, a jump, a 40 m fall and a slide along it, from the road on all four sides. Off the entryway every case stays
+// an 18 m/s boost, the road board's 120 m/s boost (J354), a jump, a 40 m fall and a slide along it, from the road on all four sides. Off the entryway every case stays
 // on the road side of the cell's edge; into the entryway every case reaches the buffer and none passes the gate, 10 m in.
 const assembly = new GridAssembly({ developer: false, devserver: false }), cell = assembly.cell('driftwood-isle');
 const empty = assembly.emptyNeighbour.edge;
@@ -26,8 +26,10 @@ const GRAVITY = 30, DT = 1 / 60;
 const CASES = [
   { name: 'walk into it', y: 0.02, inward: 4.3, along: 0, jump: 0 },
   { name: 'boost into it at 18 m/s', y: 0.02, inward: 18, along: 0, jump: 0 },
+  { name: 'board boost into it at 120 m/s (J354)', y: 0.02, inward: 120, along: 0, jump: 0 },
   { name: 'jump into it', y: 0.02, inward: 8, along: 0, jump: 9 },
-  { name: 'fall into it from 40 m', y: 40, inward: 8, along: 0, jump: 0 },
+  { name: 'fall into it from 40 m, at the wall still 19 m up', y: 40, inward: 12, along: 0, jump: 0 },
+  { name: 'high jump into it, 2.4 m apex', y: 0.02, inward: 8, along: 0, jump: 12 },
   { name: 'slide along it, jumping', y: 0.02, inward: 4, along: 8, jump: 9 },
 ] as const;
 
