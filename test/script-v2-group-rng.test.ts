@@ -1,27 +1,16 @@
-import { beforeAll, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { Scope } from '../src/shared/engine/app/scope';
 import { Rng } from '../src/shared/engine/core/rng';
 import { GroupStepV2 } from '../src/shared/engine/script/groupStepV2';
 import { parseGroupStepV2, groupStepLayoutV2, GroupStepV2Schema } from '@wildshard/format/scriptGroupStepV2';
-import { compileScriptV2 } from '../src/sharddev/bake/compileScriptV2';
-import { v2CoreSource } from '../src/sharddev/as/wsV2';
+import { fixtureBytes } from '@wildshard/engine/test/nativeBytes';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
 
 const rows = parseGroupStepV2({ bank: ['firstA','secondA','firstB','secondB'].map(name => ({name,kind:'number'})),
   columns: [], members: 16, signals: ['step','bad'], actions: [], outputs: 1, pages: 1, fuel: 400000, randomStreams: 2 });
-let bytes: Uint8Array;
-beforeAll(async () => {
-  bytes = await compileScriptV2(`import * as core from './sdk/as/wsV2';
-    export function ws_abi():i32{return 2;}export function ws_io():i32{return 0;}
-    export function ws_init(lo:i32,hi:i32,fuel:i32):i32{return fuel;}
-    export function ws_project(fuel:i32):i32{core.beginState();assert(core.beginBinding(0));
-      core.setState(0,core.random(1));core.setState(1,core.random(2));
-      core.setState(2,core.random(1));core.setState(3,core.random(2));
-      if(core.parameter(0)==2)core.pageOutput(99);
-      core.endBinding();return fuel;}`, {lane:'project',ioBytes:groupStepLayoutV2(rows).bytes,sources:{'sdk/as/wsV2.ts':v2CoreSource(0)}});
-});
+const bytes=fixtureBytes(new URL('./fixtures/wasm/script-v2-group-rng.wasm',import.meta.url));
 function fixture() {
   const parent = new Scope('rng-parent'),scope = parent.child('group'), random = new Rng(10), contextRandom = new Rng(45);
   const runner = new GroupStepV2(bytes,rows,scope), state = new Float64Array(4);

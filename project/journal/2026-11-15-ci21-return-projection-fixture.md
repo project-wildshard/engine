@@ -6,3 +6,6 @@ time. The fixture manifest preserves the source for an intentional re-emit.
 
 The same bank now holds the legacy guests used by call-results, lane-results and
 virgin-memory tests; each was formerly compiled from the SDK during setup.
+
+It also carries the two-stream group-RNG projection guest, retaining the exact
+declared IO layout in its manifest rather than compiling SDK source in engine.

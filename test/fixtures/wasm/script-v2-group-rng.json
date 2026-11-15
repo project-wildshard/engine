@@ -1,0 +1,5 @@
+{
+  "source": "import * as core from './sdk/as/wsV2';\nexport function ws_abi():i32{return 2;}export function ws_io():i32{return 0;}\nexport function ws_init(lo:i32,hi:i32,fuel:i32):i32{return fuel;}\nexport function ws_project(fuel:i32):i32{core.beginState();assert(core.beginBinding(0));\n  core.setState(0,core.random(1));core.setState(1,core.random(2));\n  core.setState(2,core.random(1));core.setState(3,core.random(2));\n  if(core.parameter(0)==2)core.pageOutput(99);\n  core.endBinding();return fuel;}",
+  "fixture": "script-v2-group-rng.wasm",
+  "ioBytes": 1216
+}
