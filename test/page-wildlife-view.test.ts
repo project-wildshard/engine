@@ -9,8 +9,9 @@ import { pageAir } from '../src/client/game/population/pageAir';
 import { CrowdTargets } from '../src/shared/game/shardfile/crowdRuntime';
 import { FlockBrain } from '../src/shared/engine/ai/flock';
 import { parseFlock } from '@wildshard/format/crowds';
-import { NALATI_HEADLESS_ASSEMBLY as headlessAssembly } from './fixtures/nalati-headless-assembly';
-import { lendNalatiPasture } from './fixtures/nalati-return-modules';
+import { frozenWildlife } from './fixtures/frozen/runtimePrograms';
+const headlessAssembly = { constants: { pageWildlife: frozenWildlife } };
+import { lendFrozenPasture as lendNalatiPasture } from './fixtures/frozen/runtimePrograms';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
 

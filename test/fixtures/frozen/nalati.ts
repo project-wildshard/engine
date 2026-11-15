@@ -43,11 +43,11 @@ if (admissionV2 === undefined) throw new Error('CI21 frozen admission must decla
 const admissionArtifact = admissionV2.artifact.hash;
 const admissionScript = parse(looseObject({ module: string() }), admission.script);
 const admissionWitness = admissionScript.module.slice('blobs/wasm/'.length, -'.wasm'.length);
-const admissionAssets = new Map([
+export const frozenAdmissionAssets = new Map([
   [admissionArtifact, frozenNalatiBytes('nalati-admission-original.wasm')],
   [admissionWitness, frozenNalatiBytes('nalati-admission-witness-original.bin')],
 ]);
-const admissionModules = [{
+export const frozenAdmissionModules = [{
   id: 'ci21.frozen.admission', module: `blobs/wasm/${admissionArtifact}.wasm`, side: 'sim' as const, abi: 2 as const,
   lane: admissionV2.artifact.lane, pages: admissionV2.artifact.pages, ioBytes: admissionV2.artifact.ioBytes,
   compilerRevision: admissionV2.artifact.compilerRevision, admissionRevision: admissionV2.artifact.admissionRevision,
@@ -55,7 +55,7 @@ const admissionModules = [{
 
 /** Lends the pinned ABI2 admission guest to a test's actual owning scope. */
 export function lendFrozenNalatiAdmission(owner: Scope): void {
-  ReturnProgram.lendModules(owner, admissionAssets, admissionModules);
+  ReturnProgram.lendModules(owner, frozenAdmissionAssets, frozenAdmissionModules);
 }
 
 /** Reuses the pinned admission guest where a compact public stealth envelope is enough. */

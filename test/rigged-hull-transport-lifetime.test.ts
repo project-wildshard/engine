@@ -1,11 +1,11 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { Bone, BoxGeometry, BufferGeometry, BufferAttribute, Mesh, MeshStandardMaterial, Skeleton, SkinnedMesh, Uint16BufferAttribute, Float32BufferAttribute } from 'three';
+import { Bone, BufferGeometry, BufferAttribute, Mesh, Skeleton, SkinnedMesh, Uint16BufferAttribute, Float32BufferAttribute } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { realGc } from '@wildshard/engine/test/realGc';
 import { createRigLoader } from '@wildshard/engine/anim/rigParser';
 import { rebindGeometry } from '@wildshard/engine/app/cachedAssets';
 import { riggedHulls } from '@wildshard/engine/game/looks/riggedHulls';
-import { staticGlb } from '../src/sharddev/bake/glb';
+import { frozenAsset } from './fixtures/frozen/assets';
 
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -16,9 +16,7 @@ test(name, async () => {
     let reads = 0;
     const mock = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(async url => {
       expect(url).toBe('/hull.glb'); reads++;
-      const geometry = new BoxGeometry(1, 2, 3), material = new MeshStandardMaterial({ color: 0x345678 });
-      const bytes = staticGlb([{ name: 'source', geometry, material, nativeAttributes: true }]);
-      geometry.dispose(); material.dispose();
+      const bytes = frozenAsset('hull.glb');
       const file = await createRigLoader().parseBytesAsync(bytes, '');
       const source = file.scene.getObjectByName('source');
       if (!(source instanceof Mesh)) throw new Error('Missing parsed source mesh');

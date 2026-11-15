@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { BufferAttribute, BufferGeometry, Matrix4, MeshBasicMaterial } from 'three';
+import { BufferAttribute, BufferGeometry, Matrix4 } from 'three';
 import { AssetService } from '../src/client/engine/app/assets';
 import { Scope } from '../src/shared/engine/app/scope';
 import { CONTENT_CAPS } from '../src/shared/engine/core/config';
@@ -8,7 +8,7 @@ import { AssetResidencyBridge } from '../src/client/game/grid/assetResidency';
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
 import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { emptyShardfile } from '../src/shared/host/author';
-import { staticGlb } from '../src/sharddev/bake/glb';
+import { frozenAsset } from './fixtures/frozen/assets';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
 import { provideRuntimeProduct, runtimeProduct } from '../src/client/game/shardfile/runtimeProduct';
 import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
@@ -19,12 +19,9 @@ import * as geometryModule from '../src/client/game/plugin/geometry';
 const originalTier = TIER;
 afterEach(() => { initializeTier(originalTier); vi.restoreAllMocks(); });
 function fixture(limit = 10000, transform = new Matrix4(), part = 'draw', readCold?: () => Promise<Uint8Array | null>) {
-  const owner = new Scope('whole-source'), shape = new BufferGeometry();
-  shape.setAttribute('position', new BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3));
-  shape.setAttribute('normal', new BufferAttribute(new Float32Array([0, 0, 2, 0, 0, 2, 0, 0, 2]), 3));
-  const paint = new MeshBasicMaterial(), bytes = staticGlb([{ geometry: shape, material: paint, nativeAttributes: true, transform,
-    extras: { wholePartition: { id: part, vertices: { runs: [0, 3] }, triangles: { runs: [0, 1] }, vertexCount: 3, indexCount: 0, index: 'none' } } }]);
-  shape.dispose(); paint.dispose();
+  const owner = new Scope('whole-source');
+  const posed = !transform.equals(new Matrix4());
+  const bytes = frozenAsset(`whole-${part}-${posed ? 'posed' : 'plain'}.glb`);
   const hash = hashImmutableBytes(bytes), source = emptyShardfile({ slug: 'whole-cache', name: 'Whole cache', author: 'Fixture', revision: 1, seed: 1 });
   source.files.push({ hash, kind: 'glb', compressed: bytes.length, decoded: bytes.length, gpu: 72, triangles: 1, draws: 1, dependencies: [], critical: false });
   source.library.push(hash);

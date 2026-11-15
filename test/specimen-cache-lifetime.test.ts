@@ -1,7 +1,6 @@
 import { expect, test, vi } from 'vitest';
-import { BoxGeometry, MeshStandardMaterial } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { staticGlb } from '../src/sharddev/bake/glb';
+import { frozenAsset } from './fixtures/frozen/assets';
 import { loadSpecimenAsset, loadBoundSpecimen } from '../src/client/game/models/specimenCatalogue';
 import { SkyRig } from '../src/client/engine/world/skyRig';
 import { realGc } from '@wildshard/engine/test/realGc';
@@ -9,8 +8,7 @@ import { realGc } from '@wildshard/engine/test/realGc';
 const name = 'a live cached specimen does not retain the consumed loader row';
 test(name, async () => {
   await realGc('test/specimen-cache-lifetime.test.ts', name, async collect => {
-    const geometry = new BoxGeometry(), material = new MeshStandardMaterial();
-    const bytes = staticGlb([{ name: 'specimen', geometry, material }]);
+    const bytes = frozenAsset('specimen.glb');
     const parsed = await new GLTFLoader().parseAsync(Uint8Array.from(bytes).buffer, '');
     const load = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockResolvedValue(parsed);
     const prepare = async () => {
@@ -33,7 +31,7 @@ test(name, async () => {
       expect(await loadSpecimenAsset({ url: '/assets/specimen-cache-lifetime.glb' })).toBe(replacement);
       replacement.geometry.dispose();
     } finally {
-      result.asset.geometry.dispose(); geometry.dispose(); material.dispose(); vi.restoreAllMocks();
+      result.asset.geometry.dispose();  vi.restoreAllMocks();
     }
   });
 });
@@ -41,8 +39,7 @@ test(name, async () => {
 const boundName = 'a live bound specimen does not retain its consumed asset declaration';
 test(boundName, async () => {
   await realGc('test/specimen-cache-lifetime.test.ts', boundName, async collect => {
-    const geometry = new BoxGeometry(), material = new MeshStandardMaterial();
-    const bytes = staticGlb([{ name: 'bound-specimen', geometry, material }]);
+    const bytes = frozenAsset('bound-specimen.glb');
     const parsed = await new GLTFLoader().parseAsync(Uint8Array.from(bytes).buffer, '');
     const load = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockResolvedValue(parsed);
     const sky: unknown = Object.create(SkyRig.prototype);
@@ -62,14 +59,13 @@ test(boundName, async () => {
       expect(load).toHaveBeenCalledOnce();
     } finally {
       result.asset.geometry.dispose(); result.asset.material.dispose();
-      geometry.dispose(); material.dispose(); vi.restoreAllMocks();
+       vi.restoreAllMocks();
     }
   });
 });
 
 test('failed specimen acquisition keeps its error and a later request can retry', async () => {
-  const geometry = new BoxGeometry(), material = new MeshStandardMaterial();
-  const bytes = staticGlb([{ name: 'retry-specimen', geometry, material }]);
+  const bytes = frozenAsset('retry-specimen.glb');
   const parsed = await new GLTFLoader().parseAsync(Uint8Array.from(bytes).buffer, '');
   const error = new Error('Specimen transport refused');
   const load = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockRejectedValueOnce(error).mockResolvedValue(parsed);
@@ -78,5 +74,5 @@ test('failed specimen acquisition keeps its error and a later request can retry'
     const asset = await loadSpecimenAsset({ url: '/assets/retry-specimen-cache-lifetime.glb' });
     expect(asset.geometry.getAttribute('position').count).toBe(24);
     expect(load).toHaveBeenCalledTimes(2); asset.geometry.dispose();
-  } finally { geometry.dispose(); material.dispose(); vi.restoreAllMocks(); }
+  } finally {  vi.restoreAllMocks(); }
 });

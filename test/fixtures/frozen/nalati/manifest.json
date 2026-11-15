@@ -86,12 +86,70 @@
       "name": "nalati-weather-original.wasm",
       "bytes": 29379,
       "sha256": "c8bc0a34e42bd416a8dd8d6d76b08a4d80cb3d548579b4d2cd651b02eab3fced"
+    },
+    {
+      "name": "nalati-titan-programs.json",
+      "bytes": 91064,
+      "sha256": "b536504c4c17af9a7c50110dc9ecc61985ded456681650b2d69e1afdc549a320"
+    },
+    {
+      "name": "nalati-wildlife.json",
+      "bytes": 114111,
+      "sha256": "b8ed7049282d906632ed266b80d235ec8f7083934c11b85bbfc533e4d7468e2a"
+    },
+    {
+      "name": "nalati-titan-wasm.wasm",
+      "bytes": 33384,
+      "sha256": "459dfc9d9f511f4722e23e97079a5f44722a5cdf5734985c535ec8383b396054"
+    },
+    {
+      "name": "nalati-titan-witness.bin",
+      "bytes": 47060,
+      "sha256": "ba56b0de486d84b2dcf05695844f5ad61579d1eb4f3530d5211b85b2568f1e3b"
+    },
+    {
+      "name": "nalati-pasture-wasm.wasm",
+      "bytes": 93118,
+      "sha256": "aeebb64806452eeaea55931aa2e10066ddba8736bb92b32dd062f49d4de3eb96"
+    },
+    {
+      "name": "nalati-pasture-witness.bin",
+      "bytes": 19763,
+      "sha256": "17a68c74224d7e331d3d53dbb217d44b433254df0897e2b2a064651870d94327"
+    },
+    {
+      "name": "nalati-species-view.json",
+      "bytes": 488309,
+      "sha256": "49b8e546e6c3b845f935272c4f666c776141eed267b5252dd2a2a661df06fd27"
+    },
+    {
+      "name": "nalati-sheep-body.json",
+      "bytes": 374,
+      "sha256": "dc6c07b50215dd2730e6c5ad20bfbf62e0c622d780b8e68f13d84303a37207cc"
+    },
+    {
+      "name": "nalati-sheep-body.bin",
+      "bytes": 101520,
+      "sha256": "dabc1feca4eaa375485410aa1b9bd4adeb25fb6aef07bc4a0ecdac1299d75fd9"
+    },
+    {
+      "name": "nalati-crowd-view.json",
+      "bytes": 1561,
+      "sha256": "df983bd9c45d53a166735caa2e7ace95839e02fd10d8e5fa315a9420b2eab6b7"
     }
   ],
   "supplement": {
     "sourceRepository": "project-wildshard/shard-nalati",
     "sourceCommit": "ea62309fa4fae8f9bfdc22a7c639f2a4a14dc5d2",
     "night": "src/generators/nightRows.ts; ecology.modes read verbatim from src/data/ecology.json (ecologyRows forwards this field unchanged)",
-    "weather": "engine test/fixtures/nalati-weather-original.wasm; hash pinned by weather script.module"
+    "weather": "engine test/fixtures/nalati-weather-original.wasm; hash pinned by weather script.module",
+    "runtime": "stormTitanRows.mjs compiled via sharddev compileReturnProjectionV2; nativeGroups.ts nalatiHeadlessAssembly with frozen admission",
+    "sdkCommit": "23d05fd147700fe5e9c929749f7d8cb63cdf7761",
+    "species": "speciesProgram.ts nalatiSpeciesProgram; view-only sections; sheepBody.ts bakeSheepBody, src/data/crowdView.json"
+  },
+  "exportRecipes": {
+    "export-night.mjs": "import { createServer } from 'vite';\nimport { writeFileSync, readFileSync } from 'node:fs';\nconst shard='<checkouts>/shard-nalati';\nwriteFileSync('tmp/codex-tc48/ecology.mjs',`export const NALATI_ECOLOGY=${JSON.stringify({modes:JSON.parse(readFileSync(shard+'/src/data/ecology.json','utf8')).modes})};`);\nconst server=await createServer({configFile:false,optimizeDeps:{noDiscovery:true,include:[]},resolve:{alias:{'./ecology.mjs':'<engine>/tmp/codex-tc48/ecology.mjs',three:process.cwd()+'/node_modules/three'}},server:{middlewareMode:true},appType:'custom'});\ntry {\nconst {nalatiNightRows}=await server.ssrLoadModule(`${shard}/src/generators/nightRows.ts`);\nconst weather=JSON.parse(readFileSync('test/fixtures/frozen/nalati/nalati-weather-original.json','utf8'));\nwriteFileSync('test/fixtures/frozen/nalati/nalati-night.json',JSON.stringify(nalatiNightRows({script:weather.script,bytes:''}))+'\\n');\n} finally {await server.close();}\n",
+    "export-runtime.mjs": "import {readFileSync,writeFileSync} from 'node:fs';\nimport {readDecisionSources} from '@wildshard/sharddev/buildDecisionScripts';\nimport {compileReturnProjectionV2} from '@wildshard/sharddev/returnProjectionV2';\nimport {nalatiTitanRows} from '<checkouts>/shard-nalati/src/generators/stormTitanRows.mjs';\nconst source='<checkouts>/shard-nalati';\nconst built=await nalatiTitanRows((input,registries,authored,options)=>compileReturnProjectionV2(input,registries,authored,options),readDecisionSources(source+'/src'));\nwriteFileSync('tmp/codex-tc48/titan.json',JSON.stringify({programs:built.programs,titan:{wasm:Buffer.from(built.titan.wasm).toString('base64'),witness:Buffer.from(built.titan.witness).toString('base64')},pasture:{wasm:Buffer.from(built.pasture.wasm).toString('base64'),witness:Buffer.from(built.pasture.witness).toString('base64')}}));\nconst {nalatiHeadlessAssembly}=await import(source+'/src/generators/nativeGroups.ts');\nconst admission=JSON.parse(readFileSync('test/fixtures/frozen/nalati/nalati-admission-original.json','utf8'));\nconst assembly=nalatiHeadlessAssembly(built.programs.wind,admission);\nwriteFileSync('tmp/codex-tc48/assembly.json',JSON.stringify(assembly));\n",
+    "export-species.mjs": "import {readFileSync,writeFileSync} from 'node:fs';\nimport {compileDecisionScripts} from '@wildshard/sharddev/buildDecisionScripts';\nimport {compileReturnProjectionV2} from '@wildshard/sharddev/returnProjectionV2';\nimport {nalatiSpeciesProgram} from '<checkouts>/shard-nalati/src/generators/speciesProgram.ts';\nimport {CreatureGuestSchema} from '@wildshard/format/speciesBookRows';\nimport {parse} from 'valibot';\nconst source='<checkouts>/shard-nalati';\nconst files=await nalatiSpeciesProgram({compileDecisionRows:compileDecisionScripts,compileReturnProjection:compileReturnProjectionV2,cached:(step,make)=>Promise.resolve(make(new Map(step.inputs.map(name=>[name,new Uint8Array(readFileSync(source+(name.startsWith('/')?'/public'+name:'/src/'+name)))]))))},input=>input,input=>parse(CreatureGuestSchema,input),hash=>`/assets/nalati/baked/bodies-${hash}.bin`);\nfor(const [name,bytes] of files) writeFileSync('tmp/codex-tc48/species-'+name,bytes);\nconst {bakeSheepBody}=await import(source+'/src/generators/sheepBody.ts');\nconst {bytes,...metadata}=bakeSheepBody();\nwriteFileSync('tmp/codex-tc48/sheep.bin',bytes);writeFileSync('tmp/codex-tc48/sheep.json',JSON.stringify(metadata));\n"
   }
 }

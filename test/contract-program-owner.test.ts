@@ -3,7 +3,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { realGc } from '@wildshard/engine/test/realGc';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { CONTRACTS } from './fixtures/pine-contracts';
+import { frozenContracts as CONTRACTS } from './fixtures/frozen/contracts';
 import { contractKill, draw, loadBoard, ownContractCatalogue, saveBoard } from '../src/shared/game/quest/contracts';
 
 const original = CONTRACTS;

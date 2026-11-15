@@ -9560,5 +9560,213 @@
     "sourceRevision": "7ad578358b81ceaf380fd56a2faa72e9da6cdf0f",
     "sourceBlob": "456426255e9f8e64fbd49096000eaacb5a742983",
     "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/client-wildlife.test.ts",
+    "outcome": "restored",
+    "target": "test/client-wildlife.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen pasture and admission modules plus wildlife rows retain all wildlife ordering, hook disposal and fixed-draw refusal cases.",
+    "originalTests": [
+      "declared wildlife waits for animals, owns one frame and retires its hook",
+      "wildlife rows refuse callbacks and reflected ordering knobs",
+      "wildlife retains joint/bound guards and refuses retired fixed-draw intake"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "73d7d1d4db8b09a1f2827aa06fde56d5c09cbe7a",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/page-wildlife-view.test.ts",
+    "outcome": "restored",
+    "target": "test/page-wildlife-view.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen pasture rows retain wildlife view and crowd interaction behavior.",
+    "originalTests": [
+      "a page keeps the crowds it draws and reads its wild off rows, spawning nobody"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "78ec76f99cfdb2a4d03919e2e224fd398c5fbd0c",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/wet-product-loans.test.ts",
+    "outcome": "restored",
+    "target": "test/wet-product-loans.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen wildlife and independently pinned geography blocks retain wet-product ownership checks.",
+    "originalTests": [
+      "wildlife lends its named wet block once before binding or publishing the animal stage",
+      "native preparation lends one verified wet block to both existing native owners",
+      "a failed named wet read publishes no group, frame or animal stage"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "fc45db70082b4fc8f0fb2cfd957bd29e2399b58f",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/population-raster.test.ts",
+    "outcome": "restored",
+    "target": "test/population-raster.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen geography and population rows retain independent raster comparisons without shard-source readers.",
+    "originalTests": [
+      "population raster observations retain the predecessor edges and strict thresholds",
+      "population raster admission still refuses short, oversized and nonfinite channels",
+      "raw population pond admission refuses missing, malformed and wrongly shaped blocks",
+      "native preparation lends both original named rasters to the existing owners",
+      "named wet raster retains every native threshold and detaches the compressed loan",
+      "named wet rasters refuse missing, malformed, nonfinite and duplicate loans",
+      "the wet field names its supplied scalar block and native grid size"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "a0599cd83d2caddd2eb8c81a5efa163dff66a104",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/contract-program-owner.test.ts",
+    "outcome": "restored",
+    "target": "test/contract-program-owner.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Pinned contract guest and catalogue retain live-scope, corrupt-module, independent-owner and GC behavior.",
+    "originalTests": [
+      "owned raw catalogues retain every offer, predicate and board save",
+      "raw catalogues require the exact live scope loan and never rescue corrupt bytes",
+      "independent owners can borrow the same catalogue without sharing retirement",
+      "a retained catalogue releases its retired Scope and refuses later projection"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "6932913e6c73777abcb64d1e0bf84f21d0952669",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/contracts-platform.test.ts",
+    "outcome": "restored",
+    "target": "test/contracts-platform.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Pinned contract guest retains the synthetic island catalogue and all generic board transaction cases.",
+    "originalTests": [
+      "death rows classify overlapping variants and legacy labels before board exclusions",
+      "another shard accepts, counts, completes, rewards and tears through rows alone",
+      "generic predicates overlap, exclude tags and elites, and respect authored rarity bounds",
+      "saved serials resume silently, reward content is rebuilt, and malformed restore is atomic",
+      "admission refuses dangling targets and callback-shaped policy"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "ec9ecf92e292a532ff7f867f6644f6bb49f37aba",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/species-catalogue-entry.test.ts",
+    "outcome": "restored",
+    "target": "test/species-catalogue-entry.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen species view catalogue retains two-file owner preparation and publication ordering without shard producer imports.",
+    "originalTests": [
+      "the catalogue source prepares once before world and installs the same rows at kit",
+      "catalogue publication refuses changed original owners after either file read",
+      "species source grammar preserves the old source and refuses mixed or absent sources"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "de2497f70f0c0926db091a576f6f06b501c44a0c",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/ktx2-owned-bytes.test.ts",
+    "outcome": "restored",
+    "target": "test/ktx2-owned-bytes.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Pinned raw KTX2 files replace SDK baking; actual decoder, pixel, buffer ownership and refusal assertions remain.",
+    "originalTests": [
+      "invalid and shared KTX2 input refuses before invoking the decoder",
+      "decoder failure propagates and the next call can parse the same source"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "f585fe84ef1140d3497f4dadd535165a3f4f0915",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/model-library-transport-lifetime.test.ts",
+    "outcome": "restored",
+    "target": "test/model-library-transport-lifetime.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Fresh pinned GLB transport replaces SDK baking while retaining real GC and independent geometry proofs.",
+    "originalTests": [],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "357b7a727f63c306467448d4bc4e7107498d818d",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/rigged-hull-transport-lifetime.test.ts",
+    "outcome": "restored",
+    "target": "test/rigged-hull-transport-lifetime.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Pinned GLB transport retains rigged-hull GC ownership checks.",
+    "originalTests": [],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "2ce7b7993a6dfe6252bb6a40665f8a85eea78cdd",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/specimen-cache-lifetime.test.ts",
+    "outcome": "restored",
+    "target": "test/specimen-cache-lifetime.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Pinned GLB fixtures retain consumed-row GC, shader binding and retry lifetime proofs.",
+    "originalTests": [
+      "failed specimen acquisition keeps its error and a later request can retry"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "67a996449a8573fe8baaaab953e12a1c9225bfe7",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/whole-library-cache.test.ts",
+    "outcome": "restored",
+    "target": "test/whole-library-cache.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Pinned GLB variants preserve whole-part names and original transform branches through actual cache and residency readers.",
+    "originalTests": [
+      "a cold non-play reader awaits its exact whole source instead of requiring eager play transport",
+      "idle re-entry skips reconstruction; pressure protects live references and invalidates completed maps",
+      "concurrent readers publish once and cancellation cannot strand live claims",
+      "tier changes miss and refused registration leaves no partially owned template",
+      "ordered content hashes identify reconstructions and partial registration unwinds every original",
+      "a sliced retiring ancestor refuses before creating a child, registering or acquiring",
+      "cache hits retain transport release authority and cancellation releases the construction lease",
+      "cold whole transport refills six shared slots before the first ordered decode is ready"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "d000883421725ce48a0a5a94e9362f3e944167cf",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/world-scene-geometry-cache.test.ts",
+    "outcome": "restored",
+    "target": "test/world-scene-geometry-cache.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Pinned triangle GLB retains all cache identity, concurrent read, cancellation and residency proofs.",
+    "originalTests": [
+      "six transport reads refill independently of four decoded leases and close drains both",
+      "an ordered model failure drains later reads and preserves the cursor failure",
+      "a retired model window drains its six reads without starting a suffix",
+      "a warm model window reads no bytes and closing preserves only its taken lease",
+      "segmented geometry starts every read with its primary and restores the original segment order",
+      "a primary read refusal drains started segments without decoding or publishing a template",
+      "runtime retirement evicts its idle template and re-entry decodes fresh equal geometry",
+      "re-entry skips decoding but every consumer gets a private deep copy and its own lease",
+      "content, tier, segment order and sorted channel mappings identify completed templates",
+      "overlapping and overwritten aliases preserve the original decoder order instead of sharing a sorted key",
+      "cancelled readers neither publish nor strand a live claim, and concurrent readers share only completed geometry",
+      "concurrent cold readers do not retain duplicate templates",
+      "retiring ancestors refuse reads and acquisitions; malformed decode and refused claims leave no retained build",
+      "resident revisit templates stay charged after retirement and reuse only independent copies under a recycled sim id",
+      "resident revisit keys remain separate from ordinary templates and policy is captured before awaited input",
+      "pressure may evict a warm suffix before its decode cursor without stranding its verified reread",
+      "closing an evicted warm suffix cancels its queued reread without waiting for another phase"
+    ],
+    "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
+    "sourceBlob": "c8e6fedca09657b060f598e95ef40bf9151bfae0",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
   }
 ]

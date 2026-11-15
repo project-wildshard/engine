@@ -11,11 +11,11 @@ import { NativePopulationField } from '../src/server/game/population/environment
 import { bakedSamplers } from '@wildshard/format/bakedTerrainSampling';
 import type { BakedGrid } from '@wildshard/format/bakedTerrainBytes';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the native f32 field fixture without a JSON type edge.
-import { readFileSync } from 'node:fs';
+import { frozenNalatiJson } from './fixtures/frozen/nalati';
 import * as v from 'valibot';
 import { PopulationFieldSchema } from '@wildshard/format/populationEnvironment';
 
-const shipped=v.parse(PopulationFieldSchema,JSON.parse(readFileSync('test/fixtures/nalati-population-field-original.json','utf8')));
+const shipped=v.parse(PopulationFieldSchema,frozenNalatiJson('nalati-population-field-original.json'));
 const shippedWet=originalNalatiWet;
 const pondBlock={file:'data/geography-pond.bin',bytes:scalarBlockBytes({file:'data/geography-pond.bin'})};
 const wetBlock=nalatiWetBlock;

@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { BufferAttribute, BufferGeometry, MeshStandardMaterial } from 'three';
+import { BufferAttribute, BufferGeometry } from 'three';
 import { AssetService } from '../src/client/engine/app/assets';
 import { Scope } from '../src/shared/engine/app/scope';
 import { initializeTier, TIER } from '../src/client/engine/core/tier';
@@ -7,7 +7,7 @@ import { CONTENT_CAPS } from '../src/shared/engine/core/config';
 import { AssetResidencyBridge } from '../src/client/game/grid/assetResidency';
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
 import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
-import { staticGlb } from '../src/sharddev/bake/glb';
+import { frozenAsset } from './fixtures/frozen/assets';
 import { cachedWorldSceneGeometry, readWorldSceneGeometries, readWorldSceneGeometry } from '../src/client/game/shardfile/worldSceneGeometry';
 import { createOwnedGeometry } from '../src/client/engine/models/ownedGeometry';
 import { PreparationReads } from '../src/client/game/shardfile/preparationReads';
@@ -15,12 +15,7 @@ import { PreparationReads } from '../src/client/game/shardfile/preparationReads'
 const originalTier = TIER;
 afterEach(() => { initializeTier(originalTier); vi.restoreAllMocks(); });
 function fixture(limit = 10000) {
-  const source = new BufferGeometry().setAttribute('position', new BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3));
-  source.setAttribute('normal', new BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]), 3));
-  source.setAttribute('uv', new BufferAttribute(new Float32Array(6), 2));
-  const material = new MeshStandardMaterial();
-  const bytes = staticGlb([{ geometry: source, material, nativeAttributes: true }]);
-  source.dispose(); material.dispose();
+  const bytes = frozenAsset('scene.glb');
   const file = vi.fn((_name: string) => Promise.resolve(bytes));
   const product = { url: (name: string) => `/blobs/fixture/${name}`, file };
   const assets = new AssetService<BufferGeometry>();

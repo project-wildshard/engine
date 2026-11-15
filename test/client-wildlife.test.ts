@@ -1,6 +1,6 @@
 import {fixtureProductFile,fixtureJsonCheck} from './fixtures/productFile';
 import {nalatiWetBlock} from './fixtures/nalati-wet';
-import {lendNalatiPasture} from './fixtures/nalati-return-modules';
+import { lendFrozenPasture as lendNalatiPasture } from './fixtures/frozen/runtimePrograms';
 import { createShardProduct, type ShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { emptyShardfile } from '../src/shared/host/author';
 import { expect, test, vi } from 'vitest';
@@ -18,7 +18,8 @@ import type { ShardRuntime } from '../src/shared/game/shard/runtime';
 import { PageWildlifeView, installClientWildlife } from '../src/client/game/population/wildlifeFeature';
 import { clientWildlife } from '../src/shared/game/population/wildlifeOwner';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
-import { NALATI_HEADLESS_ASSEMBLY as headlessAssembly } from './fixtures/nalati-headless-assembly';
+import { frozenWildlife } from './fixtures/frozen/runtimePrograms';
+const headlessAssembly = { constants: { pageWildlife: frozenWildlife } };
 import { admittedSheepProduct } from './fake/admittedSheep';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 

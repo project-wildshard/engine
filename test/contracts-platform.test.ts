@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { CONTRACTS } from './fixtures/pine-contracts';
+import { frozenContracts as CONTRACTS } from './fixtures/frozen/contracts';
 import { parseContractCatalogue } from '@wildshard/format/contracts';
 import { ContractBoard, CONTRACT_ACTION } from '../src/shared/game/quest/contractBoard';
 import { contractKill, counts, draw, loadBoard, newBoard, recordKill, saveBoard } from '../src/shared/game/quest/contracts';

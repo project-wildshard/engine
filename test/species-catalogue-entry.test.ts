@@ -1,4 +1,4 @@
-import { originalSpeciesJson } from './fixtures/nalati-original-species';
+import { frozenNalatiJson } from './fixtures/frozen/nalati';
 import { expect, test, vi } from 'vitest';
 import { object, parse } from 'valibot';
 import { ClientSpeciesProgramSchema } from '@wildshard/format/clientNative';
@@ -16,7 +16,7 @@ import type { ShardWorld } from '../src/server/game/shard/world';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
 const source = parse(object({hullBook: HullLookBookSchema, looks: PackedCreatureLooksSchema, presentation: SpeciesPresentationSchema}),
-  originalSpeciesJson('species.json'));
+  frozenNalatiJson('nalati-species-view.json'));
 const row = {kind: 'species.program', catalogue: {owner: 'orchard.species', actors: 'actors/catalogue.json', looks: 'actors/looks.json'}} as const;
 
 function fixture() {
