@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "ddd7d2c70cacb879b3b080360e0d0a0f5fdf3ce3",
+  "sourceCommit": "b40cd2a7bf1584b1b842937da47cdc0d910a78dd",
   "exporter": "scripts/export-ci21-frozen.mjs",
   "files": [
     {
@@ -41,6 +41,11 @@
       "name": "nalati-held-files.json",
       "bytes": 371,
       "sha256": "c04bda777c060d0d13e4d04d560603015046e3bf42de0764f0d0b488407290fc"
+    },
+    {
+      "name": "nalati-poi-paint-original.d.json.ts",
+      "bytes": 1267,
+      "sha256": "ca577266dcf6a4534cffaccaee8bd46635cbae20d0c564ad2bed92c69da075cc"
     },
     {
       "name": "nalati-poi-paint-original.json",
