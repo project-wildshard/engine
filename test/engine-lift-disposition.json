@@ -9375,5 +9375,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "5eabfb06765c16194cb1d9478c5bf77eaafd0e3c",
     "retirementProof": "Restored current entry-style boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/host-callbacks.test.ts",
+    "outcome": "restored",
+    "target": "test/host-callbacks.test.ts",
+    "decision": "Restored the engine-owned lint and syntax boundary in place (CI21 E-TOOL); the two sharddev catalogue cases now belong with the catalogue generator.",
+    "originalTests": [],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "92f18f3058a6957ecfa2fc1a053e6f89e3fe8b63",
+    "retirementProof": "Engine keeps its public host-callback guard; catalogue and audit credit proof moved to sharddev's successor test."
   }
 ]

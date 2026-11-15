@@ -64,7 +64,6 @@
   "test/held-bow-product.test.ts",
   "test/held-slot-entered.test.ts",
   "test/herd-elite-projection.test.ts",
-  "test/host-callbacks.test.ts",
   "test/import-bundle.test.ts",
   "test/json-output-guard.test.ts",
   "test/ktx2-owned-bytes.test.ts",
