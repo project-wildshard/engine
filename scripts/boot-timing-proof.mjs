@@ -4,6 +4,7 @@
 /** @typedef {import('./types/worker-page').WorkerWindow} WorkerWindow */
 /** @typedef {import('../src/client/engine/debug/probe').EngineProbe} EngineProbe */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { chromium, webkit, devices } from 'playwright';
@@ -31,7 +32,7 @@ assert.ok(Number.isFinite(delayMs)&&delayMs>0&&delayMs<=60000,'delay-ms must be 
 const handoff=process.argv.includes('--handoff');
 const grid=process.argv.includes('--grid');
 const serverNetwork=process.argv.includes('--server-network');
-const shard=option('shard')??(delayKind==='server'||handoff||serverNetwork?'sunscar-dunes':'template');
+const shard=option('shard')??(delayKind==='server'||handoff||serverNetwork?'sunscar-dunes':'_template');
 const swDelay=delayKind==='sw-open'||delayKind==='sw-put';
 const controlled = option('sw') === 'warm' || swDelay;
 const remote=option('base');
@@ -42,6 +43,11 @@ if(remote!==undefined){
   assert.ok(response.ok);assert.equal(version.build,option('expect-build-id'));assert.equal(version.saveEpoch,1);
   console.log('Exact production timing proof',JSON.stringify(version));
 }
+const html = remote === undefined ? readFileSync(resolvePath(root, 'dist/index.html'), 'utf8') : await (await fetch(remote)).text();
+const rowsText = /id="ws-title-rows"[^>]*>(.*?)<\/script>/su.exec(html)?.[1];
+assert.ok(rowsText, 'Built title catalogue is absent');
+const titleRows = /** @type {{slug:string,name:string}[]} */ (JSON.parse(rowsText));
+assert.ok(titleRows.some(row => row.slug === shard), `Built catalogue lacks ${shard}; use its exact engine slug`);
 const preview = remote===undefined?await serve(root, '', true):{url:remote,close:()=>undefined};
 const expectedBuild=option('expect-build');
 const proxy=delayKind!==undefined && (swDelay||delayKind==='server')?await bootTimingDelay(preview.url,delayKind,delayMs):undefined;
@@ -125,6 +131,14 @@ if(expectedBuild!==undefined) {
         const title=new URL(address);title.searchParams.delete('chunk');
         await page.goto(title.href,{waitUntil:'domcontentloaded',timeout:30000});
         await page.locator('.ws-main-select').click();
+        const skip = page.locator('#ws-name-box [data-name=skip]');
+        await page.locator('#ws-name-box, .ws-title-stack[data-screen="select"]').first().waitFor();
+        if (await skip.count() > 0) await skip.click();
+        const cards = await page.locator('.ws-menu-card b').allTextContents();
+        const selected = cards.indexOf(titleRows.find(row => row.slug === shard)?.name ?? '');
+        assert.ok(selected !== -1, 'Requested handoff shard is absent');
+        await page.locator(`.ws-menu-dots i[data-i="${selected}"]`).click();
+        await page.locator(`.ws-menu-card.selected[data-i="${selected}"]`).waitFor();
         await Promise.all([
           page.waitForURL(url=>url.searchParams.get('chunk')===shard,{waitUntil:'domcontentloaded',timeout:30000}),
           page.locator('.ws-menu-play').click(),
