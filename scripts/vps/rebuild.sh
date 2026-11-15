@@ -7,20 +7,24 @@
 #   4. The cook worker (C4): an engine checkout at a tag, its user, its AppArmor allowance and its unit. It needs cook.env.
 #      sudo bash rebuild.sh        do what is missing. Exit 0 is done; exit 2 is waiting for one of Jake's inputs
 #      bash rebuild.sh --check     change nothing and say what it would do; protected state says `cannot verify`
+#      sudo bash rebuild.sh --cook step 4 alone (AUTO-RELEASE AR3): `wildshard-config cook <tag>` runs it as root after
+#                                  writing cook.settings, whose COOK_ENGINE_REF and WILDSHARD_BUILD win over cook.env's
 # Keep this beside the other scripts/vps files. docs/vps-setup.md, "Rebuild from nothing", has the steps around it.
 # HARD STOP (Jake, 2026-11-09): this never runs on the old VPS. Nothing there is rebuilt until OPENCLAW-EXTRACT's OX10
 # is signed, so a host that still holds OpenClaw, Coolify, clawdbot or Ollama state is refused in both modes.
 # Port 443 and `rooms.wildshard.io` are Jake's, after VPS-HARDENING VH16 (J179): Caddy is installed and left off.
 set -euo pipefail
-CHECK=0
-if [ "${1:-}" = --check ]; then CHECK=1
-elif [ "$#" != 0 ]; then printf 'stop   Expected no arguments or --check\n'; exit 1; fi
+CHECK=0 COOK_ONLY=0
+if [ "$#" = 1 ] && [ "$1" = --check ]; then CHECK=1
+elif [ "$#" = 1 ] && [ "$1" = --cook ]; then COOK_ONLY=1
+elif [ "$#" != 0 ]; then printf 'stop   Expected no arguments, --check or --cook\n'; exit 1; fi
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ETC=/etc/wildshard HOME_DIR=/var/lib/wildshard SYSTEMD=/etc/systemd/system
 PG_VERSION=16 NODE=/usr/bin/node NODE_MAJOR=24 PNPM=pnpm@10.34.9
 KEY_DIR=/home/raynos/wildshard-e7 KEY_FILE=/home/raynos/wildshard-e7/release-public-key.hex
 COOK_ENV=/etc/wildshard/cook.env COOK_HOME=/var/lib/wildshard-cook COOK_SRC=/opt/wildshard/engine COOK_LIB=/usr/local/lib/wildshard-cook
 COOK_GROUP=wildshard-cook
+COOK_SETTINGS=/etc/wildshard/cook.settings
 # 8790 and 8791 are the game's loopback ports; the cook worker's own default was 8791 too.
 COOK_PORT=8792
 ENGINE_GIT=https://github.com/project-wildshard/engine.git
@@ -80,9 +84,15 @@ env_value() { sed -n "s/^$2=//p" "$1" 2>/dev/null | tail -n 1; }
 # The cook worker starts only once its env file names a build, an API, a token and one store (R2's four rows or a folder).
 cook_env_complete() {
   local file=$1 name
-  for name in COOK_ENGINE_REF WILDSHARD_BUILD WILDSHARD_API_URL COOK_NOTIFY_TOKEN; do [ -n "$(env_value "$file" "$name")" ] || return 1; done
-  if [ -n "$(env_value "$file" COOK_STORE_DIR)" ]; then return 0; fi
-  for name in R2_ACCOUNT_ID R2_BUCKET_PACKS R2_PACKS_ACCESS_KEY_ID R2_PACKS_SECRET_ACCESS_KEY; do [ -n "$(env_value "$file" "$name")" ] || return 1; done
+  for name in COOK_ENGINE_REF WILDSHARD_BUILD WILDSHARD_API_URL COOK_NOTIFY_TOKEN; do [ -n "$(cook_value "$file" "$name")" ] || return 1; done
+  if [ -n "$(cook_value "$file" COOK_STORE_DIR)" ]; then return 0; fi
+  for name in R2_ACCOUNT_ID R2_BUCKET_PACKS R2_PACKS_ACCESS_KEY_ID R2_PACKS_SECRET_ACCESS_KEY; do [ -n "$(cook_value "$file" "$name")" ] || return 1; done
+}
+# AUTO-RELEASE AR3 (J355): `wildshard-config cook <tag>` writes COOK_ENGINE_REF and WILDSHARD_BUILD to cook.settings, which
+# the unit reads after cook.env. A key there wins, blank too, exactly as systemd reads the two files; otherwise cook.env's.
+cook_value() {
+  if [ -n "${COOK_SETTINGS:-}" ] && [ -r "$COOK_SETTINGS" ] && grep -q "^$2=" "$COOK_SETTINGS"; then env_value "$COOK_SETTINGS" "$2"
+  else env_value "$1" "$2"; fi
 }
 # Caddy's package ships a page on port 80. Only that file, byte for byte as dpkg recorded it, or this script's own
 # placeholder is replaced; any other file is VH9's and is never touched.
@@ -121,6 +131,9 @@ if [ "$(uname -m)" != x86_64 ]; then say warn "The VPS is x86_64, and this is $(
 CPUS=$(nproc) SHARED_CPUS='AllowedCPUs=13-15'
 if [ "$CPUS" -lt 16 ]; then say warn "The units' AllowedCPUs assume 16 cores, and this has $CPUS"; SHARED_CPUS="# AllowedCPUs=13-15 needs 16 cores; this box has $CPUS"; fi
 
+# AUTO-RELEASE AR3: --cook is step 4 alone; the box already has what steps 1 to 3 make.
+PHASE2=0
+if [ "$COOK_ONLY" = 0 ]; then
 # --- 1. Packages
 APT_UPDATED=0
 apt_update() { if [ "$APT_UPDATED" = 0 ]; then apt-get update -qq; APT_UPDATED=1; fi; }
@@ -375,6 +388,7 @@ else
   bash "$HERE/setup.sh"
   PHASE2=1
 fi
+fi # COOK_ONLY: --cook skips steps 1 to 3
 
 # --- 4. The cook worker (C4, J28): its own user, an engine checkout it can read and not write, and its unit.
 have_cook_user() { id wildshard-cook >/dev/null 2>&1 && getent group wildshard-cook >/dev/null; }
@@ -426,7 +440,7 @@ EOF
 else say ok 'unprivileged user namespaces are not restricted here; no AppArmor profile needed'; fi
 
 COOK_REF='' COOK_READY=0
-if [ -r "$COOK_ENV" ] && cook_env_complete "$COOK_ENV"; then COOK_READY=1; COOK_REF=$(env_value "$COOK_ENV" COOK_ENGINE_REF); fi
+if [ -r "$COOK_ENV" ] && cook_env_complete "$COOK_ENV"; then COOK_READY=1; COOK_REF=$(cook_value "$COOK_ENV" COOK_ENGINE_REF); fi
 if [ "$COOK_READY" = 0 ]; then
   if [ -r "$COOK_ENV" ] || [ "$CHECK" = 0 ]; then wait_for "Fill $COOK_ENV (engine tag, build, notify token, and R2 or a folder), then run rebuild.sh again"
   elif [ "$(id -u)" = 0 ]; then say would "wait for $COOK_ENV to be filled"
@@ -474,8 +488,11 @@ if [ "$COOK_READY" = 1 ]; then
   if [ "$CHECK" = 0 ] && ! have_cook_read; then COOK_SOURCE_CHANGED=1; fi
   step "cook source readable by $COOK_GROUP" have_cook_read make_cook_read
 fi
-# What the running worker last read of cook.env, as a hash in its root-owned checkout: a changed file restarts it.
-cook_env_hash() { sha256sum < "$COOK_ENV" | cut -d' ' -f1; }
+# What the running worker last read of cook.env and cook.settings, as a hash in its root-owned checkout: a changed file
+# restarts it. With no cook.settings the hash is cook.env's alone, as it was before AR3.
+cook_env_hash() {
+  { cat "$COOK_ENV"; cat "$COOK_SETTINGS" 2>/dev/null || true; } | sha256sum | cut -d' ' -f1
+}
 
 if put "$SYSTEMD/wildshard-cook.service" 644 root:root <<EOF
 [Unit]
@@ -490,6 +507,8 @@ User=wildshard-cook
 Group=wildshard-cook
 WorkingDirectory=$COOK_SRC
 EnvironmentFile=$COOK_ENV
+# AUTO-RELEASE AR3: the engine tag and build wildshard-config cook sets, read after the secrets so they win. Optional.
+EnvironmentFile=-$COOK_SETTINGS
 # MS2.4b: the checkout is root's and the worker runs git in it as wildshard-cook, which git refuses ("dubious ownership")
 # unless the path is a safe.directory. Set here, not in a gitconfig the worker's home would have to hold.
 Environment=GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=$COOK_SRC

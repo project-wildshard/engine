@@ -52,7 +52,7 @@ test('the cook worker waits for a build, an API, a token and exactly one kind of
   const root = scratch(), file = join(root, 'cook.env');
   const complete = (text: string): number | null => {
     writeFileSync(file, text);
-    return spawnSync('bash', ['-c', `${definition('env_value')}\n${definition('cook_env_complete')}\ncook_env_complete "$1"`, 'cook', file]).status;
+    return spawnSync('bash', ['-c', `${definition('env_value')}\n${definition('cook_value')}\n${definition('cook_env_complete')}\ncook_env_complete "$1"`, 'cook', file]).status;
   };
   const base = 'COOK_ENGINE_REF=v0.1.6\nWILDSHARD_BUILD=b1\nWILDSHARD_API_URL=https://api.wildshard.io\nCOOK_NOTIFY_TOKEN=0123456789abcdef0123\n';
   const r2 = 'R2_ACCOUNT_ID=a\nR2_BUCKET_PACKS=wildshard-packs\nR2_PACKS_ACCESS_KEY_ID=k\nR2_PACKS_SECRET_ACCESS_KEY=s\nCOOK_STORE_DIR=\n';
@@ -65,6 +65,40 @@ test('the cook worker waits for a build, an API, a token and exactly one kind of
   // The template rebuild.sh writes is incomplete as written, so a fresh box waits rather than starting a worker.
   const template = source.slice(source.indexOf('# C4: the cook worker.'), source.indexOf('EOF', source.indexOf('# C4: the cook worker.')));
   expect(complete(template)).not.toBe(0);
+});
+
+test('AUTO-RELEASE AR3: cook.settings wins over cook.env as systemd reads them, and --cook runs step 4 alone', () => {
+  const root = scratch(), env = join(root, 'cook.env'), settings = join(root, 'cook.settings');
+  writeFileSync(env, 'COOK_ENGINE_REF=v0.1.18\nWILDSHARD_BUILD=aaaa\nCOOK_NOTIFY_TOKEN=t\n');
+  const value = (name: string) => spawnSync('bash', ['-c', `COOK_SETTINGS="$2"\n${definition('env_value')}\n${definition('cook_value')}\ncook_value "$1" "$3"`, 'cook', env, settings, name], { encoding: 'utf8' }).stdout.trim();
+  // No settings file: cook.env's, as before AR3.
+  expect(value('COOK_ENGINE_REF')).toBe('v0.1.18');
+  writeFileSync(settings, '# header\nCOOK_ENGINE_REF=v0.1.20\nWILDSHARD_BUILD=38d11acac5103afcdf9df877dc6be9671d666b75\n');
+  expect(value('COOK_ENGINE_REF')).toBe('v0.1.20');
+  expect(value('WILDSHARD_BUILD')).toBe('38d11acac5103afcdf9df877dc6be9671d666b75');
+  // Keys it does not hold, the secrets among them, stay cook.env's.
+  expect(value('COOK_NOTIFY_TOKEN')).toBe('t');
+  // A blank key in the later file is blank to systemd too, so the cook waits rather than run a ref no one named.
+  writeFileSync(settings, 'COOK_ENGINE_REF=\n');
+  expect(value('COOK_ENGINE_REF')).toBe('');
+  // The unit reads the settings after the secrets, and a missing settings file is fine.
+  const unit = source.slice(source.indexOf('wildshard-cook.service" 644'), source.indexOf('WantedBy=multi-user.target', source.indexOf('wildshard-cook.service" 644')));
+  expect(unit.indexOf('EnvironmentFile=$COOK_ENV')).toBeGreaterThan(-1);
+  expect(unit.indexOf('EnvironmentFile=-$COOK_SETTINGS')).toBeGreaterThan(unit.indexOf('EnvironmentFile=$COOK_ENV'));
+  expect(source).toContain('COOK_REF=$(cook_value "$COOK_ENV" COOK_ENGINE_REF)');
+  // The restart hash covers both files, and is cook.env's own hash while no settings file exists (no restart on upgrade).
+  const hash = (path: string) => spawnSync('bash', ['-c', `set -euo pipefail\nCOOK_ENV="$1" COOK_SETTINGS="$2"\n${definition('cook_env_hash')}\ncook_env_hash`, 'cook', env, path], { encoding: 'utf8' }).stdout.trim();
+  expect(hash(join(root, 'missing'))).toBe(createHash('sha256').update(readFileSync(env)).digest('hex'));
+  expect(hash(settings)).not.toBe(hash(join(root, 'missing')));
+  // --cook skips steps 1 to 3: the packages, harden.sh and setup.sh sit inside its guard, the cook step outside it.
+  const guard = source.indexOf('if [ "$COOK_ONLY" = 0 ]; then'), end = source.indexOf('fi # COOK_ONLY: --cook skips steps 1 to 3');
+  expect(guard).toBeGreaterThan(-1);
+  for (const inside of ['# --- 1. Packages', 'bash "$HERE/harden.sh"', 'bash "$HERE/setup.sh"']) {
+    expect(source.indexOf(inside), inside).toBeGreaterThan(guard);
+    expect(source.indexOf(inside), inside).toBeLessThan(end);
+  }
+  expect(source.indexOf('# --- 4. The cook worker')).toBeGreaterThan(end);
+  expect(spawnSync('bash', ['scripts/vps/rebuild.sh', '--cook', '--check'], { encoding: 'utf8' }).stdout).toContain('Expected no arguments, --check or --cook');
 });
 
 test('the staged key is the one setup.sh embeds, read by the same pattern', () => {
