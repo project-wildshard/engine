@@ -8950,5 +8950,15 @@
     "sourceRevision": "8a01811e90b6e802242a50f05a554b1aacfacb87",
     "sourceBlob": "5d1509154a08e0c725ab7195482a473b9cad5fc9",
     "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-author-tools.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: it hashes the two Nalati bake scripts' command program against the bytes recorded when they were relocated inside the monorepo, and reads them at src/shards/nalati-grasslands/bake/. That one-time relocation check pins source bytes, not behaviour; the scripts now live in shard-nalati (src/bake/), which owns them. No successor equivalence is claimed.",
+    "originalTests": [],
+    "sourceRevision": "35da409c0123703956d3a0b670dde6f0964bd67d",
+    "sourceBlob": "c602f194ce12f6ad7e3bf534c59be26547f0c080",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
   }
 ]

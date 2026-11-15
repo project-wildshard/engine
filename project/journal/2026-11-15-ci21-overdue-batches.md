@@ -16,3 +16,6 @@ reason recorded in `test/engine-lift-disposition.json`.
 - PLOTS-TOOL: `open-plots-capture` and `open-plots-config` were ported to
   shard-open-plots (same names); engine's copies imported modules that
   left engine and are deleted.
+- NAL-TOOL: `nalati-author-tools` hashed the bake scripts against their
+  bytes at a monorepo relocation; the scripts left for shard-nalati.
+  Retired (J186) with its two fixtures; no port claimed.
