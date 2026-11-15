@@ -14,7 +14,7 @@ import type { RoadSignSource } from './roadSignPaint';
  * before the deck's and the boulevard's claims and dropped after; the curtain's split arrays become its geometry without a
  * copy (they are counted in `road.curtain`).
  */
-import { Mesh, type Camera, type Object3D } from 'three';
+import { DataArrayTexture, Mesh, type Camera, type Object3D } from 'three';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { ownRoadMesh, type RoadMapShare } from './roadResources';
 import type { RoadTileBacking } from './roadTileBacking';
@@ -57,7 +57,7 @@ export interface PlatformRoadInput {
   readonly within?: (x: number, z: number) => boolean;
   /** build the void floor and its rail (default true; one build of a split road draws it) */
   readonly voidFloor?: boolean;
-  /** PZ24: one asphalt and one junction map for every build of this road (a split road's halves pass the same share) */
+  /** PZ24: one asphalt, junction and deck-grain upload for every build of this road (a split road's halves pass the same share) */
   readonly maps?: RoadMapShare;
 }
 /** The readouts and the roots the road budget measures. */
@@ -162,18 +162,23 @@ function* platformRoadSteps(input: PlatformRoadInput): Generator<void, PlatformR
   const meshes: Mesh[] = [];
   yield;
   const deckBytes = yield* meshBytesSteps(parts.map(solidSource), SOLID_FLOATS, { pitch, ...(tileSize === undefined ? {} : { tileSize }), lod: ROAD_LOD }, true);
-  const grainBytes = gpuOnlyTextureBytes(GRAIN_SIZE, GRAIN_SIZE, GRAIN_LAYERS.length, 'data');
+  const maps = input.maps, grainId = 'road.deck-grain';
+  const grainBytes = maps?.has(grainId) === true ? { jsBytes: 0, gpuBytes: 0 } : gpuOnlyTextureBytes(GRAIN_SIZE, GRAIN_SIZE, GRAIN_LAYERS.length, 'data');
   const deckAdmission = bytePlan('road.deck', deckBytes, grainBytes);
   const builtDeck = yield* allocateRenderSteps(admission, deckAdmission, function* buildDeck(owner) {
     yield;
-    const grain = grainArray({ gravel, stone, strata, riprap }), material = solidMaterial(grain);
+    const held = maps?.take(grainId);
+    if (held !== undefined && !(held instanceof DataArrayTexture)) throw new Error('Road deck grain must be an array texture');
+    const grain = held ?? grainArray({ gravel, stone, strata, riprap }), material = solidMaterial(grain);
+    if (maps !== undefined && held === undefined) maps.hold(grainId, grain);
     yield;
     const deck = new Mesh(yield* solidGeometrySteps(parts), material);
-    ownRoadMesh(owner, deck, [grain]);
+    ownRoadMesh(owner, deck, maps === undefined ? [grain] : []);
+    if (maps !== undefined) owner.onDispose(() => { maps.release(grainId, grain); });
     deck.name = 'grid-deck'; deck.receiveShadow = true;
     deck.castShadow = false; deck.matrixAutoUpdate = false; deck.updateMatrix();
     yield* cullIntoSteps(culler, deck, ROAD_LOD); scene.add(deck); meshes.push(deck);
-    gpuOnlyRoad(deck, [grain]); // G144: admitted, its JS copies go on upload (the plan counts them gone)
+    gpuOnlyRoad(deck, held === undefined ? [grain] : []); // G144: admitted, its JS copies go on upload (the plan counts them gone)
     return deck;
   });
   if (builtDeck === undefined) throw new Error('Road construction cancelled');
