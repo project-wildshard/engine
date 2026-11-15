@@ -27,3 +27,9 @@
 - The first queued land's full pre-push found the release lint's strict
   missing-index spelling. The parser now uses `index === -1`; both game and
   kit lint are rerun before re-queuing.
+
+- AUTO-RELEASE's `wildshard-config cook` is intentionally retained: it is the
+  explicit signed-release move and now overrides the follow state. There is no
+  `release-cook.mjs`; `cook-follow.mjs` remains the distinct verifier for the
+  staging signed catalogue. Its parameters and exported test contract are now
+  declared for the VPS typecheck.

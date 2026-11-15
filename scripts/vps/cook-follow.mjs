@@ -7,7 +7,9 @@ import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const BUILD = /^[0-9a-f]{40}$/u, TAG = /^server-staging-([0-9a-f]{40})$/u;
+/** @param {string} text @param {string} name */
 const value = (text, name) => [...text.matchAll(new RegExp(`^${name}=(.*)$`, 'gmu'))].pop()?.[1]?.trim().replaceAll(/^["']|["']$/gu, '') ?? '';
+/** @param {string} name */
 const argument = name => { const index = process.argv.indexOf(name), next = process.argv[index + 1]; if (index === -1 || next === undefined) throw new Error(`Missing ${name}`); return next; };
 
 /** @param {string} text @param {string} key */
@@ -20,6 +22,7 @@ export function signedCookRelease(text, key) {
   if (release?.channel !== 'staging' || typeof release.engineBuild !== 'string' || !BUILD.test(release.engineBuild) || !TAG.test(tag) || tag.slice('server-staging-'.length) !== release.engineBuild) throw new Error('The signed staging release has no matching server tag and build');
   return { tag, build: release.engineBuild };
 }
+/** @param {string} path @param {string} text */
 function atomic(path, text) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o750 });
   const temporary = `${path}.${process.pid}.tmp`;
