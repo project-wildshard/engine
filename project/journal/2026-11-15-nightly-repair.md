@@ -11,3 +11,7 @@ encode cache for slow hosted builds; head cook stores remain fresh.
 Checkpoint those encodes immediately after a successful build, before a
 red head can discard the job's post-cache save. The pure input-addressed
 cache is shared between Linux and macOS; per-OS keys kept WebKit cold.
+
+Nightly now reads DEFAULT_LIMITS.seconds from the production worker
+(600 s), instead of its obsolete private 300 s cutoff. The worker's
+independent store and phone encodes stay cold, with a bounded parent.

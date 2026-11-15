@@ -17,7 +17,7 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 await import('./bake-loader.mjs');
 const {folderStore} = await import('../src/cook/game/packStore.ts');
-const {objectHeaders} = await import('../src/cook/game/cookWorker.ts');
+const {objectHeaders, DEFAULT_LIMITS} = await import('../src/cook/game/cookWorker.ts');
 const {addStoredShards} = await import('./app-build/catalogue.ts');
 const {bareSlug} = await import('../src/shared/game/grid/catalogueSlot.ts');
 const [browserName, groupText, directory = 'tmp/nightly/reports', only] = process.argv.slice(2);
@@ -64,8 +64,11 @@ try {
     };
     try {
       if (!await phase('cook', () => {
-        execFileSync(process.execPath, ['scripts/ring-cook.mjs', '--ring2', `--only=${head.slug}`, `--out=${cooked}`, `--build=${build}`, '--timeout-ms=300000'],
-          {stdio: 'inherit', timeout: 330000});
+        // Exercise the production worker's time allowance, including cold phone
+        // ASTC encodes. The old private 300 s cap was half its current limit.
+        const timeout = DEFAULT_LIMITS.seconds * 1000;
+        execFileSync(process.execPath, ['scripts/ring-cook.mjs', '--ring2', `--only=${head.slug}`, `--out=${cooked}`, `--build=${build}`, `--timeout-ms=${timeout}`],
+          {stdio: 'inherit', timeout: timeout + 30_000});
         const cookedReceipt = (read(join(cooked, 'receipt.json')) as {indexes: CookIndex[]});
         const index = cookedReceipt.indexes[0];
         if (index?.hash !== head.hash || index.slug !== head.slug || index.build !== build || index.keys.length === 0) throw new Error('Wrong or empty cooked product');

@@ -136,7 +136,9 @@ keeps its own existing candidate-job limits.
 Estimate, pending the first hosted measurement: **45–60 minutes elapsed,
 180–220 aggregate runner-minutes per night**. The eight product jobs have
 a 75-minute hard limit, tests 35, plan/report five each. Cold cooks have a
-300-second worker limit and a 330-second parent limit per head. Missing
+production `DEFAULT_LIMITS.seconds` allowance (currently 600 seconds),
+with another 30 seconds for parent cleanup per head. The earlier private
+300-second cap predated the cold phone ASTC work. Missing
 work after a job timeout remains red in the final report.
 
 This is a public repository. Standard hosted Linux and macOS minutes are
@@ -146,6 +148,10 @@ Only immutable pin tarballs use the Actions cache, approximately 1.1 GB
 per OS (about 2.2 GB total), within the
 [10 GB cache allowance per repository](https://docs.github.com/en/actions/reference/limits).
 Cold cook results are never reused while cook cache safety P5/P6 is open.
+Successful client-build encodes are input-addressed and checkpointed
+before head proofs, so a red head does not leave the next WebKit build
+cold. They are shared across Linux and macOS; the independent cold
+worker stores and worker phone encodes remain fresh.
 
 Artifacts retain compact JSON and Markdown for seven days. No builds,
 tarballs, packs, browser profiles or screenshots are uploaded. Budget
