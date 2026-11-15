@@ -12,9 +12,12 @@ const listen = page => page.evaluate(() => {
   for (const name of ['combat', 'sting']) record(world.music, name);
 });
 const heardOf = page => page.evaluate(() => (window.__said ?? []).slice(-14));
+/** EG-15: when the census sets `sink`, it sees every page these journeys open (`opened`) and reads each one last as its context closes. */
+export const pageCensus = { sink: null };
 /** Open one shard with the row on, entered and on the wire. */
 async function open(browser, phone, base, slug, query = '') {
-  const context = await browser.newContext(phone), page = await context.newPage(), errors = [];
+  const context = await browser.newContext(phone), page = await context.newPage(), errors = [], { sink } = pageCensus;
+  if (sink !== null) { const close = context.close.bind(context); context.close = async () => { await sink.closing(slug, page); return close(); }; }
   page.on('pageerror', error => { errors.push(error.message.slice(0, 300)); });
   page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 300)); });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
@@ -23,8 +26,11 @@ async function open(browser, phone, base, slug, query = '') {
   await page.waitForFunction(() => typeof window.__workerClient === 'function', undefined, { timeout: 150_000 });
   await page.evaluate(FLOOR_GRID_ENTER);
   await page.waitForFunction(() => window.__workerClient().frames > 30, undefined, { timeout: 60_000 });
+  if (sink !== null) sink.opened(slug, page);
   return { context, page, errors };
 }
+/** A fresh boot of the same shard by its own URL, as a player reopens it. A reload can't: a started page drops its query, so it lands on the title. */
+const reboot = (page, base, slug, query = '') => page.goto(new URL(`/?chunk=${slug}&mute=1&nolock=1${query}`, base).href, { waitUntil: 'load' });
 const report = page => page.evaluate(() => window.__workerClient());
 const fight = (page, id) => page.evaluate(want => window.__workerClientFights().find(row => row.id === want) ?? null, id);
 const place = (page, x, y, z) => page.evaluate(([px, py, pz]) => { window.__wildshard.world.player.link.place(px, py, pz, 0); }, [x, y, z]);
@@ -721,7 +727,7 @@ async function qaraJourney(browser, phone, base, step) {
   await step('qara: a save keeps him fallen and a page\'s fresh boot reads it back', async () => {
     await page.evaluate(() => Promise.race([window.__workerClientSave(), new Promise(resolve => { setTimeout(resolve, 20_000); })]));
     const before = await fight(page, id);
-    await page.reload({ waitUntil: 'load' });
+    await reboot(page, base, 'nalati-grasslands', '&bossGod');
     await page.waitForFunction(() => window.__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
     await page.waitForFunction(() => typeof window.__workerClient === 'function', undefined, { timeout: 150_000 });
     await page.evaluate(FLOOR_GRID_ENTER);
@@ -810,7 +816,7 @@ async function qyranJourney(browser, phone, base, step) {
   await step('qyran: a save keeps him fallen and a page\'s fresh boot reads it back', async () => {
     await page.evaluate(() => Promise.race([window.__workerClientSave(), new Promise(resolve => { setTimeout(resolve, 20_000); })]));
     const before = await fight(page, id);
-    await page.reload({ waitUntil: 'load' });
+    await reboot(page, base, 'nalati-grasslands');
     await page.waitForFunction(() => window.__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
     await page.waitForFunction(() => typeof window.__workerClient === 'function', undefined, { timeout: 150_000 });
     await page.evaluate(FLOOR_GRID_ENTER);

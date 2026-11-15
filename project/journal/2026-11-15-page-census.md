@@ -17,3 +17,6 @@ Meta TEST-COVERAGE row 32, lane mini-pages on the Mac mini.
 - EG-20: `catalogue-all-heads` never ran on a schedule since at least 11-12: the step before it died at Vitest startup on a
   shallow clone (lift-pending ownership needs history), and the job's `continue-on-error` called that green. The catalogue
   census is its own blocking job now, and the report job checks out full history.
+
+- Census commit: Qara and Qyran save steps reboot by URL (a reload lost `?chunk=` and sat on the title 150 s); qara is out of
+  the census set (its captain comes only after a thinned patrol, and one run in three it never came).

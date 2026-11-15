@@ -552,6 +552,7 @@
     "webkit-mem-reading.mjs",
     "webkit-render-smoke.mjs",
     "worker-client-fights.mjs",
+    "fight-page-census.mjs",
     "worker-client-moments.mjs",
     "worker-client-play.mjs",
     "worker-client-proof.mjs",
