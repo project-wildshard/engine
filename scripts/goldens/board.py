@@ -10,6 +10,9 @@ A shard (24 cameras). <goldens> is a shard repo's art/goldens/: cameras24.json, 
 An open plot (8 views). <goldens> holds <plot>/cameras.json and <plot>/<n>-<view>.jpg:
   python3 scripts/goldens/board.py --goldens <goldens> --plot <plot> --now <dir> --out <dir> [...]
   NOW frames: <now>/<plot>/<n>-<view>.png|.jpg. Columns: GOLDEN | NOW.
+  Plot mask: when <n>-<view>-iso.png (other cells hidden) and <n>-<view>-bare.png (every cell hidden) sit beside a NOW
+  frame, the pixels where they differ are the plot's own. SSIM and the colour guard count only those, so a neighbour
+  the grid layout moved never scores, and a SCORED column shows NOW with everything else dimmed.
 
 Writes <out>/<id>.jpg (one big labelled row per camera: read every one) and <out>/board-<slug>.jpg (every camera on one
 labelled board, <= 500 KB; --red burns a red frame and RED onto those cameras). Prints SSIM per camera: a guide only,
@@ -45,15 +48,32 @@ def blur(a):
     return sum(k[i] * rows[:, i:i + a.shape[1]] for i in range(11))
 
 
-def ssim(a_img, b_img):
-    """Luma SSIM at 402 x 681, the G859 page's measure."""
+def fitted_mask(mask, size):
+    """A boolean mask resized to size (w, h)."""
+    return np.asarray(Image.fromarray(mask.astype(np.uint8) * 255).resize(size, Image.NEAREST)) > 127
+
+
+def ssim(a_img, b_img, mask=None):
+    """Luma SSIM at 402 x 681, the G859 page's measure; with a mask, the mean over its pixels."""
     size = (402, 681)
     a, b = luma(a_img.resize(size, Image.BILINEAR)), luma(b_img.resize(size, Image.BILINEAR))
+    if mask is not None:  # the same flat fill outside the plot in both, so edge windows never see a neighbour
+        inside = fitted_mask(mask, size); fill = b[inside].mean()
+        a, b = np.where(inside, a, fill), np.where(inside, b, fill)
     c1, c2 = (0.01 * 255) ** 2, (0.03 * 255) ** 2
     ma, mb = blur(a), blur(b)
     va, vb, cov = blur(a * a) - ma * ma, blur(b * b) - mb * mb, blur(a * b) - ma * mb
     m = ((2 * ma * mb + c1) * (2 * cov + c2)) / ((ma * ma + mb * mb + c1) * (va + vb + c2))
-    return float(m.mean())
+    return float(m[fitted_mask(mask, size)].mean() if mask is not None else m.mean())
+
+
+def plot_mask(iso, bare):
+    """Where the plot draws: other-cells-hidden against every-cell-hidden, a per-channel step over 24 (sky drift
+    and dithering stay under it), smoothed so single noisy pixels drop out. None when the two frames don't pair."""
+    if iso is None or bare is None or iso.size != bare.size: return None
+    a, b = (np.asarray(x.convert('RGB'), dtype=np.int16) for x in (iso, bare))
+    differs = (np.abs(a - b).max(axis=2) > 24).astype(np.float64)
+    return blur(differs) > 0.5
 
 
 def font(size):
@@ -98,19 +118,21 @@ def cameras(a):
             golden = Image.open(os.path.join(g, 'shardfile', f'{cid}.jpg')).convert('RGB')
             cols.append(('SHARDFILE golden', golden.crop((0, STRIP, golden.width, golden.height))))
             now = find(os.path.join(a.now, a.shard), (f'{cid}-shardfile.png', f'{cid}.png', f'{cid}.jpg'))
-            out.append((c['n'], cid, cols, now))
+            out.append((c['n'], cid, cols, now, None))
     else:
         for v in json.load(open(os.path.join(g, a.plot, 'cameras.json')))['views']:
             vid = f'{v["n"]}-{v["name"]}'
             golden = Image.open(os.path.join(g, a.plot, f'{vid}.jpg')).convert('RGB')
-            now = find(os.path.join(a.now, a.plot), (f'{vid}.png', f'{vid}.jpg'))
-            out.append((v['n'], vid, [('GOLDEN', golden)], now))
+            base = os.path.join(a.now, a.plot)
+            now = find(base, (f'{vid}.png', f'{vid}.jpg'))
+            mask = plot_mask(find(base, (f'{vid}-iso.png',)), find(base, (f'{vid}-bare.png',)))
+            out.append((v['n'], vid, [('GOLDEN', golden)], now, mask))
     return out
 
 
 def promote(a, cams):
     if not a.shard or not a.source: raise SystemExit('--promote needs --shard and --source "<sha10> <ruling>"')
-    for n, cid, _, now in cams:
+    for n, cid, _, now, _mask in cams:
         if n not in a.promote: continue
         if now is None: raise SystemExit(f'no NOW frame for {cid}')
         img, f = fit(now, 540), font(12)
@@ -136,20 +158,31 @@ def main():
     if not a.out: raise SystemExit('--out is required')
     os.makedirs(a.out, exist_ok=True)
     big, small, missing = [], [], []
-    for n, cid, goldens, now in cams:
+    for n, cid, goldens, now, mask in cams:
         if now is None: missing.append(cid); continue
-        s = ssim(goldens[-1][1], now)
-        pixels = lambda image: image.convert('RGB').resize((128, 217), Image.BILINEAR).getdata()
+        if mask is not None and not mask.any(): mask = None  # nothing of the plot in view: score the frame
+        s = ssim(goldens[-1][1], now, mask)
+        small_px = lambda image: np.asarray(image.convert('RGB').resize((128, 217), Image.BILINEAR)).reshape(-1, 3)
+        keep = fitted_mask(mask, (128, 217)).reshape(-1) if mask is not None else slice(None)
+        pixels = lambda image: [tuple(p) for p in small_px(image)[keep].tolist()]
         colour = colour_shift(pixels(goldens[-1][1]), pixels(now))
         if colour['red']: red.add(n)
         is_red = n in red
         shift = f'dY {colour["luma_delta"]:+.3f} dS {colour["saturation_delta"]:+.3f}'
+        if mask is not None: shift += f'  plot {mask.mean():.0%}'
         flag = ' RED COLOUR' if colour['red'] else ' RED' if is_red else ''
         print(f'{cid:28s} {s:.3f}  {shift}{flag}')
         for w, size, sink, title in ((360, 13, big, f'{slug} {cid}  SSIM {s:.2f}  {shift}'), (120, 9, small, f'{cid} {s:.2f}')):
             f = font(size)
             cells = [labelled(fit(img, w), label, INK, w, f) for label, img in goldens]
             cells.append(labelled(fit(now, w), a.label, RED if is_red else INK, w, f))
+            if any(c[4] is not None for c in cams):
+                scored = fit(now, w)
+                if mask is not None:
+                    keep_w = fitted_mask(mask, scored.size)[..., None]
+                    arr = np.asarray(scored, dtype=np.float64)
+                    scored = Image.fromarray(np.where(keep_w, arr, arr * 0.2 + 8).astype(np.uint8))
+                cells.append(labelled(scored, 'SCORED (plot mask)' if mask is not None else 'SCORED (whole frame)', INK, w, f))
             sink.append(row(cells, title + flag, w, is_red, f))
         big[-1].save(os.path.join(a.out, f'{cid}.jpg'), quality=82)
     if missing: print('MISSING NOW frames:', ', '.join(missing))
@@ -157,7 +190,7 @@ def main():
     cols = 4; tw, th = small[0].width, max(t.height for t in small)
     f = font(16); head = 2 * f.size + 24
     board = Image.new('RGB', (cols * (tw + 4) + 4, head + -(-len(small) // cols) * (th + 4) + 4), BG)
-    columns = ' . '.join([label for label, _ in cams[0][2]] + [a.label])
+    columns = ' . '.join([label for label, _ in cams[0][2]] + [a.label] + (['SCORED'] if any(c[4] is not None for c in cams) else []))
     draw = ImageDraw.Draw(board)
     draw.text((6, 6), f'GOLDEN RERUN {slug} | {columns}', fill=INK, font=f)
     status = f'RED: {",".join(map(str, sorted(red)))}' if red else 'No mean colour-shift flags; VISUAL REVIEW REQUIRED'

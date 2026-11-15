@@ -53,6 +53,12 @@ pixel-identical.
   shard. An engine change in render, shaders, post, the grid, shared
   kits or the format layer re-captures **all six** (two browser lanes,
   three shards each). An open-plot change re-shoots that plot's 8 views.
+- **A plot scores only itself:** its NOW frame is the grid as played,
+  but neighbours are a layout choice (J305 moved them), so the plot
+  capture also shoots each view with other cells hidden and with every
+  cell hidden. `board.py` scores SSIM and the colour guard only where
+  those two differ (the plot's own pixels) and shows that mask in a
+  SCORED column. A neighbour, the sky or the road never turns a plot red.
 - **The candidate build** is a working-tree build of your change:
   engine's `scripts/serve-build.sh --shard <slug>`. After landing, a
   `--head` rerun is a QA check, not a substitute.

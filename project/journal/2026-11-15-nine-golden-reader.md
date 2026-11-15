@@ -11,3 +11,9 @@
   listed only as a devDependency, so a shard repo running them from the pnpm store could not resolve it (mini-shardgfx
   needed a node `--import` resolve hook for Open Plots). Now an optional peer at 1.65.0, like `sharp`: a shard repo's
   own `playwright` devDependency satisfies it; nothing installs it for players.
+
+- Open-plot boards score the plot alone. Views 3 and 4 (and Night Market 1) went low or RED on whole-frame SSIM because
+  J305 moved the neighbours (Nine Dragon's towers now stand behind Night Market). Hiding the other cells to match was
+  wrong: the void under a hidden cell shows sky, not the old grid floor. Instead the capture shoots two extra frames per
+  view (other cells hidden, every cell hidden); `board.py` scores only where they differ, filling outside the mask with
+  one flat value in both images so SSIM's window never sees a neighbour, and adds a SCORED column.
