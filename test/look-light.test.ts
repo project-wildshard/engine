@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
-import { bounceLight, environmentScene, lampLights, lookLightManifest, lightPools, rimPatch, LOOK_RIM_PATCH, PHONE_LAMPS } from '../src/client/engine/render/lookLight';
+import { bounceLight, environmentScene, lampLights, lookLightManifest, lightPools, rimPatch, LOOK_RIM_PATCH, DESKTOP_LAMPS, PHONE_LAMPS } from '../src/client/engine/render/lookLight';
 import { lookLightOn } from '../src/client/engine/ui/lookLightOption';
 import { jsonSlot } from '../src/client/engine/saves/slots';
 
@@ -14,7 +14,7 @@ const LIGHT = {
   heightFog: { density: 0.08, height: -1, falloff: 0.6 },
   pools: { colour: [1, 0.6, 0.2] as [number, number, number], intensity: 1, radius: 3, at: [[0, 0, -9], [3, 0, -6]] as [number, number, number][] },
 };
-const OFF = { atmosphere: { fogHeight: -20, fogHeightFalloff: 0, fogHeightDensity: 0 }, bloom: { intensity: 0, threshold: 1, radius: null }, ao: null, rim: null, pools: null, lamps: null, bounce: null, environment: null, shadow: null, motes: null };
+const OFF = { atmosphere: { fogHeight: -20, fogHeightFalloff: 0, fogHeightDensity: 0 }, bloom: { intensity: 0, threshold: 1, radius: null }, ao: null, rim: null, pools: null, lamps: null, lampsLit: DESKTOP_LAMPS, bounce: null, environment: null, shadow: null, motes: null };
 const B2 = {
   lamps: [{ at: [1, 2, -3] as [number, number, number], colour: [1, 0.4, 0.06] as [number, number, number], intensity: 4, distance: 7 }],
   bounce: { colour: [1, 0.28, 0.16] as [number, number, number], intensity: 0.35, lift: 0.25 },
@@ -121,7 +121,7 @@ test('pools: one additive instanced decal draw for every lamp, no light objects'
   expect(lights).toBe(0);
 });
 
-test('M4.9: the phone tier keeps the cheap settings: no bloom or AO, at most PHONE_LAMPS lamps, half the motes', () => {
+test('M4.9: the phone tier keeps the cheap settings: no bloom or AO, PHONE_LAMPS lamps lit (the nearest, AP28), half the motes', () => {
   const slot = jsonSlot('debug.lookLight', 'device');
   slot.write('on');
   try {
@@ -134,7 +134,7 @@ test('M4.9: the phone tier keeps the cheap settings: no bloom or AO, at most PHO
   const look = { light: { ...LIGHT, ...B2, lamps, motes, shadow: { intensity: 0.6, radius: 3, normalBias: 0.03 } }, grade: { bloom: { intensity: 0.8, threshold: 0.6 } } };
   const phone = lookLightManifest(look, true, 'phone'), desktop = lookLightManifest(look, true, 'desktop');
   expect(phone.bloom.intensity).toBe(0); expect(phone.ao).toBeNull();
-  expect(phone.lamps).toHaveLength(PHONE_LAMPS); expect(desktop.lamps).toHaveLength(PHONE_LAMPS + 2);
+  expect(phone.lamps).toHaveLength(PHONE_LAMPS + 2); expect(phone.lampsLit).toBe(PHONE_LAMPS); expect(desktop.lamps).toHaveLength(PHONE_LAMPS + 2); expect(desktop.lampsLit).toBe(DESKTOP_LAMPS);
   expect(phone.motes?.count).toBe(80); expect(desktop.motes?.count).toBe(160);
   expect(phone.environment).toEqual(B2.environment); expect(phone.shadow).toEqual(desktop.shadow);
 });

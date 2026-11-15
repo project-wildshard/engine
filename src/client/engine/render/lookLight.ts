@@ -21,7 +21,7 @@
  * All of it waits behind Settings ▸ Debug ▸ Look ▸ "Look light" (read at load; default on): with the row off, a look that
  * declares every setting draws as one that declares none. TEMPLATES-CLEANROOM M4.9 gates it per field on the phone tier
  * instead of all or nothing: a phone keeps the environment, bounce, pools, rim, height fog and shadow look, at most
- * `PHONE_LAMPS` lamps, half the motes, and no bloom or AO.
+ * `PHONE_LAMPS` lamps lit, the nearest (AP28), half the motes, and no bloom or AO.
  */
 import * as THREE from 'three';
 import type { LookBounce, LookEnvironment, LookLamp, LookLight, LookPools, LookRim } from '@wildshard/format/look-light';
@@ -42,6 +42,8 @@ export interface LookLightResolved {
   readonly rim: LookRim | null;
   readonly pools: LookPools | null;
   readonly lamps: readonly LookLamp[] | null;
+  /** AP28: how many of `lamps` light a frame, the nearest the eye (`PHONE_LAMPS` on a phone, `DESKTOP_LAMPS` else) */
+  readonly lampsLit: number;
   readonly bounce: LookBounce | null;
   readonly environment: LookEnvironment | null;
   /** M4.2: the sun's shadow look; null: the engine's */
@@ -61,10 +63,12 @@ const NO_HEIGHT_FOG = { fogHeight: -20, fogHeightFalloff: 0, fogHeightDensity: 0
 
 /** M4.9: at most this many of a look's lamps light on the phone tier (each costs every lit draw a light-loop step) */
 export const PHONE_LAMPS = 4;
+/** SHARD-SOURCE AP28: at most this many of a look's lamps light a desktop frame (shard-format `LOOK_LIGHT_LIT_MAX`) */
+export const DESKTOP_LAMPS = 16;
 
 /**
  * Resolve a look's light settings; `on` is the Debug row ("Look light"), `tier` the page's. Off, or nothing declared: as
- * before. The phone tier keeps the cheap fields (M4.9): no bloom or AO, the first `PHONE_LAMPS` lamps, half the motes.
+ * before. The phone tier keeps the cheap fields (M4.9): no bloom or AO, the nearest `PHONE_LAMPS` lamps lit (AP28), half the motes.
  */
 export function lookLightManifest(look: LookLightSource, on: boolean, tier = 'desktop'): LookLightResolved {
   const phone = tier === 'phone';
@@ -76,7 +80,8 @@ export function lookLightManifest(look: LookLightSource, on: boolean, tier = 'de
     ao: light?.ao === undefined || phone ? null : { intensity: light.ao.intensity, radius: light.ao.radius },
     rim: light?.rim ?? null,
     pools: light?.pools ?? null,
-    lamps: light?.lamps === undefined ? null : phone ? light.lamps.slice(0, PHONE_LAMPS) : light.lamps,
+    lamps: light?.lamps ?? null,
+    lampsLit: phone ? PHONE_LAMPS : DESKTOP_LAMPS,
     bounce: light?.bounce ?? null,
     environment: light?.environment ?? null,
     shadow: light?.shadow ?? null,
@@ -156,29 +161,67 @@ export function bounceLight(bounce: LookBounce): { light: THREE.DirectionalLight
   return { light, aim };
 }
 
+/** SHARD-SOURCE AP24b: what a following lamp rides (`lamps[].follow`), or null while that actor is not in the world. */
+export type LampFollowResolve = (actor: string, bone: string | undefined) => THREE.Object3D | null;
+const lampFollows = new WeakMap<THREE.Object3D, LampFollowResolve>();
+/** The page's actor lookup for the following lamps drawn under `root` (its scene); returns the undo. */
+export function setLampFollow(root: THREE.Object3D, resolve: LampFollowResolve): () => void {
+  lampFollows.set(root, resolve);
+  return () => { if (lampFollows.get(root) === resolve) lampFollows.delete(root); };
+}
+const rootOf = (object: THREE.Object3D): THREE.Object3D => { let at = object; while (at.parent !== null) at = at.parent; return at; };
+
+/** a lamp group's frame step: `time` drives the flicker, `eye` (world) picks the nearest lamps when more than `lit` exist */
+export type LampUpdate = (time: number, eye?: THREE.Vector3Like) => void;
+
 /**
- * The look's lamps (B2): one shadowless point light each, physical decay unless the lamp sets its own (M4.3). `update`
- * flickers the lamps that declare a flicker (two incommensurate sines per lamp, so no two lamps pulse together); it is
- * null when none does.
+ * The look's lamps (B2): a pool of at most `lit` shadowless point lights (AP28: 16 on a desktop, `PHONE_LAMPS` on a phone),
+ * physical decay unless a lamp sets its own (M4.3). The pool's size never changes, so no shader recompiles as lamps come and
+ * go: `update` gives its lights to the lamps nearest `eye`, places each following lamp (AP24b) at its offset in its actor's
+ * or bone's frame (dark while that actor is absent), and flickers the lamps that declare a flicker (two incommensurate sines
+ * per lamp, so no two pulse together). It is null when nothing moves: at most `lit` fixed lamps and no flicker, drawn
+ * exactly as before.
  */
-export function lampLights(lamps: readonly LookLamp[]): THREE.Group & { update: ((time: number) => void) | null } {
-  const group = Object.assign(new THREE.Group(), { update: null as ((time: number) => void) | null });
+export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAMPS): THREE.Group & { update: LampUpdate | null } {
+  const group = Object.assign(new THREE.Group(), { update: null as LampUpdate | null });
   group.name = 'look-light-lamps';
-  const flickering: { light: THREE.PointLight; base: number; rate: number; amount: number; phase: number }[] = [];
-  lamps.forEach((lamp, i) => {
-    const light = new THREE.PointLight(new THREE.Color().setRGB(lamp.colour[0], lamp.colour[1], lamp.colour[2], THREE.LinearSRGBColorSpace), lamp.intensity, lamp.distance, lamp.decay ?? 2);
-    light.position.set(lamp.at[0], lamp.at[1], lamp.at[2]); light.castShadow = false;
+  const rows = lamps.map((lamp, i) => ({ lamp, phase: i * 2.399, at: new THREE.Vector3(...lamp.at), place: new THREE.Vector3(...lamp.at), live: lamp.follow === undefined,
+    colour: new THREE.Color().setRGB(lamp.colour[0], lamp.colour[1], lamp.colour[2], THREE.LinearSRGBColorSpace) }));
+  const pool = rows.slice(0, Math.max(0, Math.min(rows.length, lit))).map((row) => {
+    const light = new THREE.PointLight(row.colour, row.live ? row.lamp.intensity : 0, row.lamp.distance, row.lamp.decay ?? 2);
+    light.position.copy(row.place); light.castShadow = false;
     group.add(light);
-    if (lamp.flicker !== undefined && lamp.flicker.amount > 0) flickering.push({ light, base: lamp.intensity, rate: lamp.flicker.rate, amount: lamp.flicker.amount, phase: i * 2.399 });
+    return light;
   });
-  if (flickering.length > 0) {
-    group.update = (time) => {
-      for (const f of flickering) {
-        const w = Math.sin(time * f.rate * 2.1 + f.phase) * 0.6 + Math.sin(time * f.rate * 5.3 + f.phase * 1.7) * 0.4;
-        f.light.intensity = f.base * (1 - f.amount * 0.5 + f.amount * 0.5 * w);
+  const following = rows.filter((row) => row.lamp.follow !== undefined), crowded = rows.length > pool.length;
+  const flickers = rows.some((row) => (row.lamp.flicker?.amount ?? 0) > 0);
+  if (following.length === 0 && !crowded && !flickers) return group;
+  const eyeLocal = new THREE.Vector3(), chosen: typeof rows = [];
+  group.update = (time, eye) => {
+    if (following.length > 0) {
+      const resolve = lampFollows.get(rootOf(group));
+      for (const row of following) {
+        const follow = row.lamp.follow, target = follow === undefined || resolve === undefined ? null : resolve(follow.actor, follow.bone);
+        row.live = target !== null;
+        if (target !== null) group.worldToLocal(target.localToWorld(row.place.copy(row.at)));
       }
-    };
-  }
+    }
+    chosen.length = 0;
+    for (const row of rows) if (row.live) chosen.push(row);
+    if (crowded && eye !== undefined) {
+      group.worldToLocal(eyeLocal.copy(eye));
+      chosen.sort((a, b) => a.place.distanceToSquared(eyeLocal) - b.place.distanceToSquared(eyeLocal));
+    }
+    pool.forEach((light, i) => {
+      const row = chosen[i];
+      if (row === undefined) { light.intensity = 0; return; }
+      const flicker = row.lamp.flicker;
+      light.color.copy(row.colour); light.distance = row.lamp.distance; light.decay = row.lamp.decay ?? 2; light.position.copy(row.place);
+      if (flicker === undefined || flicker.amount <= 0) { light.intensity = row.lamp.intensity; return; }
+      const w = Math.sin(time * flicker.rate * 2.1 + row.phase) * 0.6 + Math.sin(time * flicker.rate * 5.3 + row.phase * 1.7) * 0.4;
+      light.intensity = row.lamp.intensity * (1 - flicker.amount * 0.5 + flicker.amount * 0.5 * w);
+    });
+  };
   return group;
 }
 

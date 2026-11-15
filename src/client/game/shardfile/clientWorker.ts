@@ -58,6 +58,7 @@ import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
 import { earlyStandalone, serverRoute } from './serverRoute';
 import { worldHosted } from '../grid/oneWayIn';
+import { setLampFollow } from '@wildshard/engine/render/lookLight';
 
 type Creatures = Pick<RowBodiesView, 'animals' | 'spawn' | 'retire' | 'onWindup' | 'presentHit' | 'presentDeath' | 'presentReward'>;
 /** What a grid page lends: its crossing follows the server, and its creatures are the entered cell's. */
@@ -439,6 +440,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   wirePage.led = () => net.predictor.leading; wirePage.rowBody = handle => bodies.get(handle)?.body ?? null;
   wirePage.namedBody = id => { for (const [handle, { body }] of bodies) if (client.entities.get(handle)?.id === id) return body; return null; };
   scope.onDispose(() => { wirePage.unbind(); wirePage.led = () => false; wirePage.rowBody = () => null; wirePage.namedBody = () => null; });
+  // SHARD-SOURCE AP24b: a look lamp that follows an actor rides its body, or one of its bones, by the server's name for it
+  scope.onDispose(setLampFollow(ports.scene, (actor, bone) => { const body = wirePage.namedBody(actor); return body === null ? null : bone === undefined ? body.mesh : body.mesh.skeleton.getBoneByName(bone) ?? null; }));
   // J116: the lock's body by the server's name for it
   net.lockTarget = () => {
     if (lockOn.state !== 'locked' || lockOn.target === null) return undefined;

@@ -16,6 +16,6 @@ export function shardfileLiveLook(look: Shardfile['look'], light: boolean = look
   return { day: look.day ?? DATA_LOOK_DAY, dayOverride: look.dayOverride, keys: look.keys, lut: look.grade.lut === null ? null : shardfileFileUrl(look.grade.lut),
     neutral: look.grade.tone === 'neutral', aces: look.grade.tone === 'aces', exposure: look.grade.exposure, vignette: look.grade.vignette ?? null, bloomRadius: resolved.bloom.radius,
     bloom: resolved.bloom,
-    light: { rim: resolved.rim, pools: resolved.pools, heightFogDensity: resolved.atmosphere.fogHeightDensity, lamps: resolved.lamps, bounce: resolved.bounce, environment: resolved.environment,
+    light: { rim: resolved.rim, pools: resolved.pools, heightFogDensity: resolved.atmosphere.fogHeightDensity, lamps: resolved.lamps, lampsLit: resolved.lampsLit, bounce: resolved.bounce, environment: resolved.environment,
       shadow: resolved.shadow, motes: resolved.motes } };
 }

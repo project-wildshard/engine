@@ -66,7 +66,9 @@ export interface DataLookSpec {
   readonly light?: {
     readonly rim: LookRim | null; readonly pools: LookPools | null; readonly heightFogDensity: number;
     /** B2: real lamps, a warm bounce and a sky-derived environment; absent or null: none */
-    readonly lamps?: readonly LookLamp[] | null; readonly bounce?: LookBounce | null; readonly environment?: LookEnvironment | null;
+    readonly lamps?: readonly LookLamp[] | null;
+    /** AP28: how many lamps light a frame, the nearest the camera; absent: `DESKTOP_LAMPS` */
+    readonly lampsLit?: number; readonly bounce?: LookBounce | null; readonly environment?: LookEnvironment | null;
     /** TEMPLATES-CLEANROOM M4: the sun's shadow look and glow motes; absent or null: the engine's shadows, no motes */
     readonly shadow?: LookShadow | null; readonly motes?: LookMotes | null;
   };
@@ -237,6 +239,8 @@ function cellTone(spec: { readonly neutral?: boolean; readonly aces?: boolean; r
  * A level look from data: the engine's clean chain, the gradient dome, the engine fog, key light and ambient turned by
  * the keys on the engine clock, and the LUT last in the grade. Nothing is patched into another material.
  */
+const lampEye = new THREE.Vector3();
+
 export function dataLook(spec: DataLookSpec): LookStrategy {
   if (spec.keys.length === 0) throw new Error('[look] a data look needs at least one key');
   const linear = spec.keys[0]?.fog.near !== undefined;
@@ -270,9 +274,9 @@ ${mist ? `
     shader.fragmentShader = `#ifdef USE_FOG\nuniform float wsLookFogNear; uniform float wsLookFogFar; uniform float wsLookFogEnabled;\n#endif\n${patched}`;
   };
   const owned: { dome: THREE.Mesh<THREE.SphereGeometry, THREE.Material> | null; lut: LookupTexture | null; pools: THREE.Object3D | null; rim: boolean;
-    lamps: ReturnType<typeof lampLights> | null; bounce: ReturnType<typeof bounceLight> | null; environment: THREE.WebGLRenderTarget | null;
+    lamps: ReturnType<typeof lampLights> | null; eye: THREE.Camera | null; bounce: ReturnType<typeof bounceLight> | null; environment: THREE.WebGLRenderTarget | null;
     glow: THREE.Object3D[] | null; fx: EngineEffects | null; exposure: ExposureEffect | null; clock: DayCycle | null;
-    chain: { vignette: { offset: number; darkness: number }; radius: number } | null } = { dome: null, lut: null, pools: null, rim: false, lamps: null, bounce: null, environment: null, glow: null,
+    chain: { vignette: { offset: number; darkness: number }; radius: number } | null } = { dome: null, lut: null, pools: null, rim: false, lamps: null, eye: null, bounce: null, environment: null, glow: null,
     fx: null, exposure: null, clock: null, chain: null };
   // AP17: what `liveLook` last set (the light rows and the LUT are compared with the build's, never set)
   let day = spec.day, dayOverride = spec.dayOverride;
@@ -312,7 +316,9 @@ ${mist ? `
       return true;
     },
     // the sky builds before the composer: the level scope takes the dome and the LUT here
-    mode: 'extend', chain: 'clean', compose: ({ engineChain, scene, scope, fx, renderer }) => {
+    mode: 'extend', chain: 'clean', compose: ({ engineChain, scene, scope, fx, renderer, camera }) => {
+      // AP28: the lamps nearest this camera light
+      owned.eye = camera; scope.onDispose(() => { if (owned.eye === camera) owned.eye = null; });
       const rim = spec.light?.rim ?? null, pools = spec.light?.pools ?? null, lamps = spec.light?.lamps ?? null;
       if (rim !== null && !owned.rim) {
         owned.rim = true; scope.onDispose(() => { owned.rim = false; });
@@ -335,7 +341,7 @@ ${mist ? `
       }
       if (lamps !== null && owned.lamps === null) {
         // B2: real lamps, once per look like the pools
-        const group = lampLights(lamps);
+        const group = lampLights(lamps, spec.light?.lampsLit);
         owned.lamps = group;
         scene.add(group); scope.onDispose(() => { group.removeFromParent(); for (const light of group.children) if (light instanceof THREE.Light) light.dispose(); if (owned.lamps === group) owned.lamps = null; });
       }
@@ -343,7 +349,8 @@ ${mist ? `
       if (owned.glow === null && ((lamps?.some((lamp) => lamp.halo !== undefined) ?? false) || motes !== null)) {
         // M4.8: the lamps' halos (one instanced draw) and the motes (one points draw), once per look like the lamps
         const glow: (THREE.Mesh | THREE.Points)[] = [];
-        const halos = lamps === null ? null : lampHalos(lamps);
+        // a following lamp's halo would stay at its offset: AP24b lights it, its halo waits
+        const halos = lamps === null ? null : lampHalos(lamps.filter((lamp) => lamp.follow === undefined));
         if (halos !== null) glow.push(halos);
         if (motes !== null) glow.push(lookMotes(motes));
         owned.glow = glow;
@@ -436,7 +443,7 @@ ${mist ? `
       owned.lut = await lutTexture(spec.lut);
       return { clock, horizon: now.fog.clone(), lut: owned.lut, clouds: dome,
         bind: (t) => { targets = t; apply(); },
-        update: (dt) => { clock.update(dt); apply(); flicker += dt; owned.lamps?.update?.(flicker); if (owned.glow !== null) tickGlow(owned.glow, flicker); },
+        update: (dt) => { clock.update(dt); apply(); flicker += dt; owned.lamps?.update?.(flicker, owned.eye?.getWorldPosition(lampEye)); if (owned.glow !== null) tickGlow(owned.glow, flicker); },
         rebuild: () => undefined, attachPost: () => undefined };
     },
   };

@@ -19,7 +19,7 @@ export function lookLightSaved(): boolean {
 }
 /**
  * Whether the settings draw on this page: the row on. TEMPLATES-CLEANROOM M4.9: the phone tier draws them too, gated per
- * field (`lookLightManifest`: no bloom or AO, at most 4 lamps, half the motes), not all or nothing; `tier` stays for callers.
+ * field (`lookLightManifest`: no bloom or AO, the nearest 4 lamps lit, half the motes), not all or nothing; `tier` stays for callers.
  */
 export function lookLightOn(_tier: string = TIER): boolean { return lookLightSaved(); }
 /** Save the row's value (the page reloads to apply it). */

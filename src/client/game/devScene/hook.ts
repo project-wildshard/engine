@@ -241,7 +241,7 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
         group.add(lamps);
         owned.push({ dispose: () => { for (const light of lamps.children) if (light instanceof THREE.Light) light.dispose(); } });
         const { update } = lamps;
-        if (update !== null) { let time = 0; partScope.onDispose(ports.watchFrames(dt => { time += dt; update(time); })); }
+        if (update !== null) { let time = 0; partScope.onDispose(ports.watchFrames(dt => { time += dt; update(time, ports.player?.()?.position); })); }
       }
       // the client's own water surfaces, under this part's scope
       installClientWater(part.water, { root: group, scope: partScope, frame: run => { partScope.onDispose(ports.watchFrames(run)); } });

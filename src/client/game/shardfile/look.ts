@@ -23,6 +23,6 @@ export function shardfileLook(look: Shardfile['look'], assets?: ReadonlyMap<stri
   // exposure and vignette); the bloom radius rides the bloom, which the row and the tier gate
   return dataLook({ day: look.day ?? DATA_LOOK_DAY, dayOverride: look.dayOverride, keys: look.keys, lut, neutral: look.grade.tone === 'neutral', aces: look.grade.tone === 'aces',
     exposure: look.grade.exposure, vignette: look.grade.vignette ?? null, bloomRadius: resolved.bloom.radius, sky: look.sky?.graph ?? null,
-    light: { rim: resolved.rim, pools: resolved.pools, heightFogDensity: resolved.atmosphere.fogHeightDensity, lamps: resolved.lamps, bounce: resolved.bounce, environment: resolved.environment,
+    light: { rim: resolved.rim, pools: resolved.pools, heightFogDensity: resolved.atmosphere.fogHeightDensity, lamps: resolved.lamps, lampsLit: resolved.lampsLit, bounce: resolved.bounce, environment: resolved.environment,
       shadow: resolved.shadow, motes: resolved.motes } });
 }
