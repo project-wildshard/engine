@@ -85,17 +85,17 @@ Exit 0 is done. Exit 2 means it did everything it could and waits for
 one of Jake's inputs; it names each one, and a rerun picks up from there:
 
 - `sudo tailscale up --ssh`: Phase 2 needs the node's tailnet name.
-- `/etc/wildshard/cook.env`: the engine tag and build the worker cooks
-  for, the notify token api-server sends, and the four R2 packs rows
-  (or `COOK_STORE_DIR` on a scratch box). Until then the cook worker
-  stays off; the game servers do not need it. After the first fill,
-  agents move the tag and build themselves (AUTO-RELEASE, J355):
-  `sudo wildshard-config cook vX.Y.Z` takes the build from the signed
-  release that names the tag, writes `/etc/wildshard/cook.settings`
-  (`640 root:wildshard-cook`, read after `cook.env`, so its two keys
-  win), runs `rebuild.sh --cook` (step 4 alone) and rolls back if the
-  worker does not answer `/health`. `wildshard-config show cook` says
-  what it names; the secrets stay in `cook.env`.
+- `/etc/wildshard/cook.env`: the notify token api-server sends and the
+  four R2 packs rows (or `COOK_STORE_DIR` on a scratch box). Until then
+  the cook worker stays off; the game servers do not need it. The signed
+  staging release supplies its tag and build into root-only
+  `/etc/wildshard/cook-release.env`; `wildshard-cook-follow.timer` checks
+  it every five minutes, so a promotion needs no cook.env edit. An
+  explicit `sudo wildshard-config cook vX.Y.Z` writes root-owned
+  `/etc/wildshard/cook.settings` whose tag/build override that state,
+  runs `rebuild.sh --cook` (step 4 alone) and rolls back if `/health`
+  does not answer. `wildshard-config show cook` says what it names; the
+  secrets remain in `cook.env`.
 - `passwd raynos`, printed as `next`, for sudo and the console.
 
 Caddy's package would serve a page on port 80, so it is installed with
@@ -103,9 +103,10 @@ its start refused, its default file is replaced by a comment, and it is
 disabled. VH9 writes the real file, which reruns leave alone; port 443
 opens by Jake's hand after VH16 (J179).
 
-The cook worker runs from `/opt/wildshard/engine` at `COOK_ENGINE_REF`
-(CI's sparse set, `pnpm install --frozen-lockfile --ignore-scripts` once
-per commit, so no package script runs as root) as
+The cook worker runs from `/opt/wildshard/engine` at the tag and build a
+signed staging release names (CI's sparse set, `pnpm install
+--frozen-lockfile --ignore-scripts` once per commit, so no package script
+runs as root) as
 `wildshard-cook`, on `127.0.0.1:8792`, with CPUs 13-15. Each cook job
 runs in a user and network namespace of its own. Ubuntu 24.04 refuses
 those to unconfined programs (`kernel.apparmor_restrict_unprivileged_userns=1`,

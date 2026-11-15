@@ -14,7 +14,7 @@
 # is signed, so a host that still holds OpenClaw, Coolify, clawdbot or Ollama state is refused in both modes.
 # Port 443 and `rooms.wildshard.io` are Jake's, after VPS-HARDENING VH16 (J179): Caddy is installed and left off.
 set -euo pipefail
-CHECK=0 COOK_ONLY=0
+CHECK=0 COOK_ONLY=0 PHASE2=0
 if [ "$#" = 1 ] && [ "$1" = --check ]; then CHECK=1
 elif [ "$#" = 1 ] && [ "$1" = --cook ]; then COOK_ONLY=1
 elif [ "$#" != 0 ]; then printf 'stop   Expected no arguments, --check or --cook\n'; exit 1; fi
@@ -22,7 +22,7 @@ HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ETC=/etc/wildshard HOME_DIR=/var/lib/wildshard SYSTEMD=/etc/systemd/system
 PG_VERSION=16 NODE=/usr/bin/node NODE_MAJOR=24 PNPM=pnpm@10.34.9
 KEY_DIR=/home/raynos/wildshard-e7 KEY_FILE=/home/raynos/wildshard-e7/release-public-key.hex
-COOK_ENV=/etc/wildshard/cook.env COOK_HOME=/var/lib/wildshard-cook COOK_SRC=/opt/wildshard/engine COOK_LIB=/usr/local/lib/wildshard-cook
+COOK_ENV=/etc/wildshard/cook.env COOK_STATE=/etc/wildshard/cook-release.env COOK_HOME=/var/lib/wildshard-cook COOK_SRC=/opt/wildshard/engine COOK_LIB=/usr/local/lib/wildshard-cook
 COOK_GROUP=wildshard-cook
 COOK_SETTINGS=/etc/wildshard/cook.settings
 # 8790 and 8791 are the game's loopback ports; the cook worker's own default was 8791 too.
@@ -84,14 +84,16 @@ env_value() { sed -n "s/^$2=//p" "$1" 2>/dev/null | tail -n 1; }
 # The cook worker starts only once its env file names a build, an API, a token and one store (R2's four rows or a folder).
 cook_env_complete() {
   local file=$1 name
-  for name in COOK_ENGINE_REF WILDSHARD_BUILD WILDSHARD_API_URL COOK_NOTIFY_TOKEN; do [ -n "$(cook_value "$file" "$name")" ] || return 1; done
-  if [ -n "$(cook_value "$file" COOK_STORE_DIR)" ]; then return 0; fi
-  for name in R2_ACCOUNT_ID R2_BUCKET_PACKS R2_PACKS_ACCESS_KEY_ID R2_PACKS_SECRET_ACCESS_KEY; do [ -n "$(cook_value "$file" "$name")" ] || return 1; done
+  # The signed staging release supplies the ref and build. cook.env has credentials only.
+  for name in COOK_NOTIFY_TOKEN; do [ -n "$(env_value "$file" "$name")" ] || return 1; done
+  if [ -n "$(env_value "$file" COOK_STORE_DIR)" ]; then return 0; fi
+  for name in R2_ACCOUNT_ID R2_BUCKET_PACKS R2_PACKS_ACCESS_KEY_ID R2_PACKS_SECRET_ACCESS_KEY; do [ -n "$(env_value "$file" "$name")" ] || return 1; done
 }
-# AUTO-RELEASE AR3 (J355): `wildshard-config cook <tag>` writes COOK_ENGINE_REF and WILDSHARD_BUILD to cook.settings, which
-# the unit reads after cook.env. A key there wins, blank too, exactly as systemd reads the two files; otherwise cook.env's.
+# AUTO-RELEASE AR3 (J355) writes an explicit tag and build to cook.settings. It wins over staging's signed follow state,
+# which wins over legacy cook.env values, exactly as the service's EnvironmentFile order does.
 cook_value() {
-  if [ -n "${COOK_SETTINGS:-}" ] && [ -r "$COOK_SETTINGS" ] && grep -q "^$2=" "$COOK_SETTINGS"; then env_value "$COOK_SETTINGS" "$2"
+  if [ -r "$COOK_SETTINGS" ] && grep -q "^$2=" "$COOK_SETTINGS"; then env_value "$COOK_SETTINGS" "$2"
+  elif [ -r "$COOK_STATE" ] && grep -q "^$2=" "$COOK_STATE"; then env_value "$COOK_STATE" "$2"
   else env_value "$1" "$2"; fi
 }
 # Caddy's package ships a page on port 80. Only that file, byte for byte as dpkg recorded it, or this script's own
@@ -119,12 +121,17 @@ if [ "$CHECK" = 0 ] && [ "$(id -u)" != 0 ]; then say stop 'Run with sudo, or pas
 # AUTO-RELEASE AR3: one rebuild at a time, whichever way it was started (a full run, --cook from wildshard-config cook,
 # wildshard-apply <tag> rebuild), so two never move the cook's checkout or install into it at once.
 if [ "$CHECK" = 0 ]; then exec 9>/run/wildshard-rebuild.lock; flock 9; fi
-for name in setup.sh setup-state.mjs pull.mjs dump.sh restore-check.sh uptime.sh health-stub.mjs wildshard-config wildshard-apply.mjs wildshard-agent.pub; do
+REQUIRED=(setup.sh setup-state.mjs pull.mjs dump.sh restore-check.sh uptime.sh health-stub.mjs wildshard-config wildshard-apply.mjs wildshard-agent.pub)
+if [ "$COOK_ONLY" = 1 ]; then REQUIRED=(cook-follow.mjs); fi
+for name in "${REQUIRED[@]}"; do
   if [ ! -f "$HERE/$name" ]; then say stop "$name must sit beside rebuild.sh"; exit 1; fi
 done
 # The one trusted public key lives in setup.sh; this stages a copy of it, never another.
-EXPECTED_KEY=$(sed -n 's/^EXPECTED_RELEASE_PUBLIC_KEY=\([0-9a-f]*\)$/\1/p' "$HERE/setup.sh")
-if ! [[ "$EXPECTED_KEY" =~ ^302a300506032b6570032100[0-9a-f]{64}$ ]]; then say stop 'Cannot read the release public key from setup.sh'; exit 1; fi
+EXPECTED_KEY=''
+if [ "$COOK_ONLY" = 0 ]; then
+  EXPECTED_KEY=$(sed -n 's/^EXPECTED_RELEASE_PUBLIC_KEY=\([0-9a-f]*\)$/\1/p' "$HERE/setup.sh")
+  if ! [[ "$EXPECTED_KEY" =~ ^302a300506032b6570032100[0-9a-f]{64}$ ]]; then say stop 'Cannot read the release public key from setup.sh'; exit 1; fi
+fi
 # shellcheck source=/dev/null
 . /etc/os-release
 if [ "${VERSION_CODENAME:-}" != noble ]; then say stop "Written for Ubuntu 24.04 (noble), and this is ${PRETTY_NAME:-unknown}"; exit 1; fi
@@ -135,7 +142,6 @@ CPUS=$(nproc) SHARED_CPUS='AllowedCPUs=13-15'
 if [ "$CPUS" -lt 16 ]; then say warn "The units' AllowedCPUs assume 16 cores, and this has $CPUS"; SHARED_CPUS="# AllowedCPUs=13-15 needs 16 cores; this box has $CPUS"; fi
 
 # AUTO-RELEASE AR3: --cook is step 4 alone; the box already has what steps 1 to 3 make.
-PHASE2=0
 if [ "$COOK_ONLY" = 0 ]; then
 # --- 1. Packages
 APT_UPDATED=0
@@ -379,7 +385,6 @@ if [ -f "$HERE/harden.sh" ]; then
 else say skip 'harden.sh is not written yet (VPS-HARDENING-PLAN); it must pass VH16 before port 443'; fi
 
 # --- 3. Phase 2, once the box is on the tailnet
-PHASE2=0
 if ! tailnet_up; then
   if [ "$CHECK" = 1 ] && [ ! -x "$NODE" ]; then say would 'run setup.sh once Tailscale is installed and up'
   else wait_for 'Tailscale is not logged in: run `sudo tailscale up --ssh`, then run rebuild.sh again (Phase 2 needs the node name)'; fi
@@ -391,7 +396,7 @@ else
   bash "$HERE/setup.sh"
   PHASE2=1
 fi
-fi # COOK_ONLY: --cook skips steps 1 to 3
+fi # COOK_ONLY: the follow timer only refreshes the cook source and service.
 
 # --- 4. The cook worker (C4, J28): its own user, an engine checkout it can read and not write, and its unit.
 have_cook_user() { id wildshard-cook >/dev/null 2>&1 && getent group wildshard-cook >/dev/null; }
@@ -403,12 +408,8 @@ make_cook_folders() { install -d -m 750 -o wildshard-cook -g wildshard-cook "${C
 step 'cook folders' have_cook_folders make_cook_folders
 if [ "$(id -u)" != 0 ] && [ -d "$ETC" ] && [ ! -x "$ETC" ]; then say 'cannot verify' "$COOK_ENV (needs sudo)"
 elif put_once "$COOK_ENV" 600 root:root <<'EOF'
-# C4: the cook worker. It starts once the rows below are filled; then run rebuild.sh again.
-# The engine tag it runs, and that build's id: the same build production serves (its version.json `build`).
-COOK_ENGINE_REF=
-WILDSHARD_BUILD=
-# Where it lists the catalogue and downloads shardfiles
-WILDSHARD_API_URL=https://api.wildshard.io
+# C4: the cook worker. Its signed staging release chooses its engine tag and build.
+# Only credentials belong here; run rebuild.sh again after filling them.
 # The bearer token api-server's notify call sends (J30). The same value goes in api-server's settings.
 COOK_NOTIFY_TOKEN=
 # Where packs go: the four R2 rows, or, on a scratch box only, COOK_STORE_DIR (a folder under /var/lib/wildshard-cook).
@@ -442,10 +443,19 @@ EOF
   then if [ "$CHECK" = 0 ]; then apparmor_parser -r /etc/apparmor.d/wildshard-cook-unshare; fi; fi
 else say ok 'unprivileged user namespaces are not restricted here; no AppArmor profile needed'; fi
 
-COOK_REF='' COOK_READY=0
-if [ -r "$COOK_ENV" ] && cook_env_complete "$COOK_ENV"; then COOK_READY=1; COOK_REF=$(cook_value "$COOK_ENV" COOK_ENGINE_REF); fi
+COOK_REF='' COOK_BUILD='' COOK_READY=0
+cook_follow() { "$NODE" "$HERE/cook-follow.mjs" --env "$ETC/staging.env" --state "$COOK_STATE"; }
+if [ -r "$COOK_ENV" ] && cook_env_complete "$COOK_ENV"; then
+  if cook_follow; then
+    COOK_REF=$(cook_value "$COOK_ENV" COOK_ENGINE_REF)
+    COOK_BUILD=$(cook_value "$COOK_ENV" WILDSHARD_BUILD)
+    [ -n "$COOK_REF" ] && [ -n "$COOK_BUILD" ] && COOK_READY=1
+  else
+    wait_for 'The signed staging release did not supply a usable cook ref and build; the cook stays off'
+  fi
+fi
 if [ "$COOK_READY" = 0 ]; then
-  if [ -r "$COOK_ENV" ] || [ "$CHECK" = 0 ]; then wait_for "Fill $COOK_ENV (engine tag, build, notify token, and R2 or a folder), then run rebuild.sh again"
+  if [ -r "$COOK_ENV" ] || [ "$CHECK" = 0 ]; then wait_for "Fill $COOK_ENV (notify token and R2 or a folder), then run rebuild.sh again"
   elif [ "$(id -u)" = 0 ]; then say would "wait for $COOK_ENV to be filled"
   else say 'cannot verify' "$COOK_ENV (needs sudo)"; fi
 fi
@@ -456,8 +466,9 @@ org_git() { env GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=url.https://github.com/proje
   GIT_CONFIG_KEY_1=url.https://github.com/project-wildshard/.insteadof GIT_CONFIG_VALUE_1=ssh://git@github.com/project-wildshard/ "$@"; }
 cook_commit() { git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" rev-parse HEAD 2>/dev/null; }
 have_cook_source() {
-  [ -f "$COOK_SRC/.wildshard-installed" ] && [ "$(cat "$COOK_SRC/.wildshard-installed")" = "$COOK_REF $(cook_commit)" ] \
-    && [ "$(git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" rev-parse "$COOK_REF^{commit}" 2>/dev/null)" = "$(cook_commit)" ]
+  [ -f "$COOK_SRC/.wildshard-installed" ] && [ "$(cat "$COOK_SRC/.wildshard-installed")" = "$COOK_REF $COOK_BUILD" ] \
+    && [ "$(cook_commit)" = "$COOK_BUILD" ] \
+    && [ "$(git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" rev-parse "$COOK_REF^{commit}" 2>/dev/null)" = "$COOK_BUILD" ]
 }
 make_cook_source() {
   install -d -m 755 -o root -g root "$(dirname "$COOK_SRC")"
@@ -467,13 +478,10 @@ make_cook_source() {
   fi
   git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" fetch --quiet --tags origin
   git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" checkout --quiet --force --detach "$COOK_REF^{commit}"
-  # --cook (AR3): the tag must still be the build wildshard-config verified, or the worker would run other code than it reports.
-  if [ "$COOK_ONLY" = 1 ] && [ "$(cook_commit)" != "$(cook_value "$COOK_ENV" WILDSHARD_BUILD)" ]; then
-    say stop "$COOK_REF is $(cook_commit) on GitHub now, not the verified WILDSHARD_BUILD"; exit 1
-  fi
+  if [ "$(cook_commit)" != "$COOK_BUILD" ]; then say stop "The signed release's $COOK_REF does not resolve to $COOK_BUILD"; exit 1; fi
   rm -f "$COOK_SRC/.wildshard-installed"
   (cd "$COOK_SRC" && org_git env CI=1 HOME=/root COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack "$PNPM" install --frozen-lockfile --ignore-scripts --config.confirmModulesPurge=false)
-  printf '%s %s\n' "$COOK_REF" "$(cook_commit)" > "$COOK_SRC/.wildshard-installed"
+  printf '%s %s\n' "$COOK_REF" "$COOK_BUILD" > "$COOK_SRC/.wildshard-installed"
   chmod -R go-w "$COOK_SRC"
 }
 # MMO-SERVER MS2.4b: root clones under the box's umask 027, so the checkout came out 750 root:root and the cook, its own user,
@@ -495,10 +503,10 @@ if [ "$COOK_READY" = 1 ]; then
   if [ "$CHECK" = 0 ] && ! have_cook_read; then COOK_SOURCE_CHANGED=1; fi
   step "cook source readable by $COOK_GROUP" have_cook_read make_cook_read
 fi
-# What the running worker last read of cook.env and cook.settings, as a hash in its root-owned checkout: a changed file
-# restarts it. With no cook.settings the hash is cook.env's alone, as it was before AR3.
+# What the running worker last read of cook.env, signed follow state and cook.settings, as a hash in its root-owned checkout.
+# A changed value restarts it; absent optional files preserve the legacy cook.env-only hash.
 cook_env_hash() {
-  { cat "$COOK_ENV"; cat "$COOK_SETTINGS" 2>/dev/null || true; } | sha256sum | cut -d' ' -f1
+  { cat "$COOK_ENV"; cat "$COOK_STATE" 2>/dev/null || true; cat "$COOK_SETTINGS" 2>/dev/null || true; } | sha256sum | cut -d' ' -f1
 }
 
 if put "$SYSTEMD/wildshard-cook.service" 644 root:root <<EOF
@@ -514,8 +522,11 @@ User=wildshard-cook
 Group=wildshard-cook
 WorkingDirectory=$COOK_SRC
 EnvironmentFile=$COOK_ENV
-# AUTO-RELEASE AR3: the engine tag and build wildshard-config cook sets, read after the secrets so they win. Optional.
+EnvironmentFile=$COOK_STATE
+# AUTO-RELEASE AR3: explicit engine ref/build read after signed state and credentials, so they win. Optional.
 EnvironmentFile=-$COOK_SETTINGS
+# The catalogue is public configuration, not cook.env state.
+Environment=WILDSHARD_API_URL=https://api.wildshard.io
 # MS2.4b: the checkout is root's and the worker runs git in it as wildshard-cook, which git refuses ("dubious ownership")
 # unless the path is a safe.directory. Set here, not in a gitconfig the worker's home would have to hold.
 Environment=GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=$COOK_SRC
@@ -548,8 +559,39 @@ WantedBy=multi-user.target
 EOF
 then COOK_UNIT_CHANGED=1; else COOK_UNIT_CHANGED=0; fi
 
+if put "$SYSTEMD/wildshard-cook-follow.service" 644 root:root <<EOF
+[Unit]
+Description=Follow staging's signed release for the Wildshard cook
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=$COOK_ENV
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/bash $COOK_LIB/rebuild.sh --cook
+EOF
+then COOK_FOLLOW_UNIT_CHANGED=1; else COOK_FOLLOW_UNIT_CHANGED=0; fi
+if put "$SYSTEMD/wildshard-cook-follow.timer" 644 root:root <<'EOF'
+[Unit]
+Description=Check staging's signed release for the Wildshard cook every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+then COOK_TIMER_CHANGED=1; else COOK_TIMER_CHANGED=0; fi
+
 if [ "$CHECK" = 0 ]; then
+  install -d -m 755 -o root -g root "$COOK_LIB"
+  install -m 750 -o root -g root "$HERE/rebuild.sh" "$COOK_LIB/rebuild.sh"
+  install -m 750 -o root -g root "$HERE/cook-follow.mjs" "$COOK_LIB/cook-follow.mjs"
   systemctl daemon-reload
+  systemctl enable --quiet wildshard-cook-follow.timer
   if [ "$COOK_READY" = 1 ]; then
     if systemctl is-active --quiet wildshard-cook.service && [ "$COOK_UNIT_CHANGED" = 0 ] && [ "$COOK_SOURCE_CHANGED" = 0 ] \
       && [ "$(cat "$COOK_SRC/.wildshard-env" 2>/dev/null)" = "$(cook_env_hash)" ]; then say ok 'cook worker running'
@@ -572,4 +614,4 @@ if [ "$PHASE2" = 1 ] && [ "$CHECK" = 0 ]; then
 fi
 if [ "${#WAITING[@]}" != 0 ]; then say waiting "${#WAITING[@]} input(s) above; everything else is done"; exit 2; fi
 if [ "$CHECK" = 1 ]; then say check 'Read-only pass complete'; exit 0; fi
-say 'done' 'Rebuild complete: Phase 1, Phase 2 and the cook worker'
+if [ "$COOK_ONLY" = 1 ]; then say done 'Cook follow complete'; else say done 'Rebuild complete: Phase 1, Phase 2 and the cook worker'; fi
