@@ -8900,5 +8900,19 @@
     "sourceRevision": "1149fb495a819c73f6df758fad559166fe298ee8",
     "sourceBlob": "b3acf33685479a6bdc856ee69c82ca95be874f52",
     "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "shard-driftwood",
+    "file": "test/graph-scene-author-ports.test.ts",
+    "outcome": "migrated",
+    "target": "test/driftwood-graph-scene-declarations.test.ts",
+    "decision": "Ported (CI21 DRIFT-NAMED): Driftwood's graph, model-choice, spawn and exchange declarations are Driftwood's source; shard-driftwood's test/driftwood-graph-scene-declarations.test.ts holds them. Engine's copy imported src/shards/driftwood-isle/generators, which left engine.",
+    "originalTests": [
+      "all graph, scene-model, spawn and exchange ports retain exact complete native types",
+      "every original graph, model-choice, spawn and exchange declaration byte remains unchanged"
+    ],
+    "sourceRevision": "b2138ab34b3d12319c1b788fa9ac3375ac42b73a",
+    "sourceBlob": "f341646879d2400c41136f9853a45e97dd47baad",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
   }
 ]

@@ -10,3 +10,6 @@ reason recorded in `test/engine-lift-disposition.json`.
 - SF-BAKE: `glb-normalized-positions` was already ported to shard-format
   (`src/format/glb-normalized-positions.test.ts`); engine's copy, which
   read a Driftwood GLB engine no longer has, is deleted (`migrated`).
+- DRIFT-NAMED: `graph-scene-author-ports` was ported to shard-driftwood
+  (`test/driftwood-graph-scene-declarations.test.ts`); engine's copy and
+  its fixture `graph-scene-author-observation.ts` are deleted.
