@@ -30,6 +30,8 @@ const root = resolvePath(option('root') ?? '.'), expectedAbsent = process.argv.i
 const delayKind = option('delay'), delayMs = Number(option('delay-ms')??1250);
 assert.ok(Number.isFinite(delayMs)&&delayMs>0&&delayMs<=60000,'delay-ms must be 1..60000');
 const handoff=process.argv.includes('--handoff');
+const dynamicPreloads=option('dynamic-preloads')??'on';
+assert.ok(['on','off'].includes(dynamicPreloads),'dynamic-preloads must be on or off');
 const grid=process.argv.includes('--grid');
 const serverNetwork=process.argv.includes('--server-network');
 const shard=option('shard')??(delayKind==='server'||handoff||serverNetwork?'sunscar-dunes':'_template');
@@ -69,6 +71,19 @@ if(expectedBuild!==undefined) {
     try {
       const context = await browser.newContext({...devices['iPhone 16 Pro'], deviceScaleFactor:2});
       await saveFixture(context, {scope:'device',key:'devMode',data:true});
+      if(dynamicPreloads==='off'||process.argv.includes('--inspect'))await context.addInitScript(disabled=>{
+        const originalAppend=Reflect.get(Element.prototype,'append');
+        /** @type {{file:string,at:number,blocked:boolean}[]} */const attempts=[];
+        Reflect.set(window,'__modulePreloadAttempts',attempts);
+        Element.prototype.append=function append(...nodes){
+          Reflect.apply(originalAppend,this,nodes.filter(node=>{
+            if(node instanceof HTMLLinkElement&&node.rel==='modulepreload') {
+              attempts.push({file:node.href.split('/').at(-1)??node.href,at:Math.round(performance.now()),blocked:disabled});return !disabled;
+            }
+            return true;
+          }));
+        };
+      },dynamicPreloads==='off');
       if(process.argv.includes('--worker-bootstrap')) await context.addInitScript(()=>{
         /** @type {{label:string,steps:number,files:number,bytes:number}[]} */ const samples=[];
         Reflect.set(window,'__workerBootProof',samples);
@@ -196,6 +211,15 @@ if(expectedBuild!==undefined) {
         console.log(`${name}: renderer=${renderer}`);
       }
       if(process.argv.includes('--inspect')) console.log(JSON.stringify({stretches:timing.entries.filter(row=>row.end!==null&&row.end-row.start>500).map(row=>({operation:row.operation,ms:Math.round((row.end??row.start)-row.start)}))}));
+      if(process.argv.includes('--inspect'))console.log(JSON.stringify({moduleGraph:await page.evaluate(()=>{
+        const bank=/** @type {{optional:{files:[string,number][],groups:Record<string,number[]>}}} */(JSON.parse(document.getElementById('boot-module-files')?.textContent??'{}'));
+        const graph=new Set((bank.optional.groups['models.gltf']??[]).map(index=>new URL(bank.optional.files[index]?.[0]??'',location.href).href));
+        return {attempts:Reflect.get(window,'__modulePreloadAttempts')??[],resources:performance.getEntriesByType('resource')
+          .filter(row=>graph.has(row.name)).map(row=>{
+            const resource=/** @type {PerformanceResourceTiming} */(row);
+            return {file:resource.name.split('/').at(-1),start:Math.round(resource.startTime),end:Math.round(resource.responseEnd),initiator:resource.initiatorType};
+          })};
+      })}));
       assert.equal(Object.keys(timing.overflow??{}).length,0,'bounded collector overflowed');
       if(process.argv.includes('--inspect')) console.log(JSON.stringify({server:timing.entries.filter(row=>row.operation.startsWith('server:')).map(row=>({operation:row.operation,realm:row.realm,start:row.start,end:row.end})),clientPreloads:timing.entries.filter(row=>row.operation==='app:client-module-preload').map(row=>row.detail),workerResources:timing.resources.filter(row=>row.realm!=='page').map(row=>row.url)}));
       const operations=new Set(timing.entries.map(row=>row.operation));
