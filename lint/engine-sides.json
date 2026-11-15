@@ -711,6 +711,7 @@
     "src/client/game/grid/roadSignScale.ts": "client",
     "src/client/game/grid/roadSky.ts": "client",
     "src/client/game/grid/roadSolid.ts": "client",
+    "src/client/game/grid/roadSurfaceMaps.ts": "client",
     "src/client/game/grid/roadTileArchive.ts": "client",
     "src/client/game/grid/roadTileBacking.ts": "client",
     "src/client/game/grid/roadTileCapture.worker.ts": "client",

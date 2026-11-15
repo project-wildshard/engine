@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "vkFormat": 166,
+  "painterSHA256": "6b5cd03e04d8f3b65fdee5c9fe93709245e3f748da5166ac98b71888cacdad99",
+  "bakeSHA256": "c1322e15ce4842afc788aae880195535c3e4350e175fdae53a83accb7a64fad9",
+  "assets": [
+    {
+      "kind": "asphalt",
+      "file": "road-asphalt-phone.ktx2",
+      "width": 1024,
+      "height": 512,
+      "levels": 11,
+      "bytes": 211919,
+      "gpuBytes": 314992,
+      "sha256": "1f9a805a204f22d305c674ad15b3b9336de131025f7a02922b2a9fabc3ce01c3"
+    },
+    {
+      "kind": "junction",
+      "file": "road-junction-phone.ktx2",
+      "width": 1024,
+      "height": 1024,
+      "levels": 11,
+      "bytes": 385931,
+      "gpuBytes": 626288,
+      "sha256": "a94834d648d67da6e3170dd0ce6f32d3e448a0560535b3747cf5c6d84f10e546"
+    }
+  ]
+}
