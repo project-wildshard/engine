@@ -6,6 +6,7 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { scratchDir } from './scratch-dir.mjs';
+import { activeT1Gate, t1ContentReady, t1Scope } from './t1-qualification.mjs';
 import { T1_SHARDS } from './t1-shards.mjs';
 
 export const T1_BUDGET_MS = 120_000;
@@ -30,18 +31,27 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   const env = { ...process.env, WS_LANE_NAME: lane };
   const scratch = scratchDir(lane, 'Template suite shard receipts', { env });
   mkdirSync(resolve(scratch, 't1'), { recursive: true });
+  const scope = t1Scope();
+  let reportOnly = true;
+  try {
+    const qualification = JSON.parse(readFileSync(resolve(scratch, 'qualification.json'), 'utf8'));
+    reportOnly = !(process.env.CI && activeT1Gate(qualification, scope, Date.now()));
+  } catch { /* Absent history cannot establish a qualification. */ }
   const started = Date.now();
   const command = ['scripts/t1-e2e.mjs', `--project=${suite}`, '--global-timeout=120000'];
   const result = spawnSync(process.execPath, command, { stdio: 'inherit', env });
   const wallMs = Date.now() - started;
   const verdict = t1Verdict(result, wallMs);
-  const receipt = { version: 1, suite, sha: process.env.GITHUB_SHA ?? null, run: process.env.GITHUB_RUN_ID ?? null,
+  const receipt = { version: 1, suite, scope, complete: t1ContentReady(), sha: process.env.GITHUB_SHA ?? null, run: process.env.GITHUB_RUN_ID ?? null,
     event: process.env.GITHUB_EVENT_NAME ?? null, ref: process.env.GITHUB_REF ?? null,
     started, build, platform: process.platform, wallMs, budgetMs: T1_BUDGET_MS,
-    status: result.status, signal: result.signal, error: result.error?.message ?? null, verdict, reportOnly: true };
+    status: result.status, signal: result.signal, error: result.error?.message ?? null, verdict, reportOnly };
   writeFileSync(resolve(scratch, `t1/receipt-${suite}.json`), `${JSON.stringify(receipt)}\n`);
-  const line = `T1 ${suite}: ${verdict.toUpperCase()}, ${(wallMs / 1000).toFixed(1)}s / 120s, exit ${String(result.status)}, shared build ${build} (report-only)`;
+  const line = `T1 ${suite}: ${verdict.toUpperCase()}, ${(wallMs / 1000).toFixed(1)}s / 120s, exit ${String(result.status)}, shared build ${build} (${reportOnly ? 'report-only' : 'blocking'})`;
   console.log(line);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${line}\n`);
-  if (verdict !== 'pass') console.log(`::warning title=Template suite ${suite}::${line}`);
+  if (verdict !== 'pass') {
+    console.log(`::${reportOnly ? 'warning' : 'error'} title=Template suite ${suite}::${line}`);
+    if (!reportOnly) process.exitCode = 1;
+  }
 }

@@ -237,7 +237,14 @@ jobs:
         if: steps.pack.outputs.products == 'true'
         run: |
           WS_LANE_NAME=template-e2e-ci node scripts/scratch-dir.mjs template-e2e-ci "Shared Ring-1 client and Template pin"
-          tar -cf tmp/template-e2e-ci/products.tar dist out/_template test/pins/saves
+      - name: Read the actual Template qualification receipts
+        if: steps.pack.outputs.products == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/t1-qualification.mjs
+      - name: Archive the shared Template build and qualification
+        if: steps.pack.outputs.products == 'true'
+        run: tar -cf tmp/template-e2e-ci/products.tar dist out/_template test/pins/saves tmp/template-e2e-ci/qualification.json
       - name: Publish the shared Template suite build
         if: steps.pack.outputs.products == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -356,9 +363,16 @@ jobs:
           name: template-e2e-${{ matrix.suite }}
           path: |
             tmp/template-e2e-ci/t1/receipt-*.json
-            tmp/template-e2e-ci/t1/results/
           retention-days: 7
           if-no-files-found: error
+      - name: Keep failing Template traces separately from receipt history
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: template-e2e-traces-${{ matrix.suite }}
+          path: tmp/template-e2e-ci/t1/results/**/trace.zip
+          retention-days: 7
+          if-no-files-found: ignore
 
   timings:
     # LAND-SIMPLIFY LS2 (J250, J258): main's run measures every planned file; merge its shard reports into the
