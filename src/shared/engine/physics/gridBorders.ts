@@ -12,9 +12,20 @@ export function installGridBorders(physics: Physics, scope: Scope, origin: Reado
   if (scope.disposed) return;
   const { R, world } = physics;
   const halfHeight = (CELL_ABOVE + CELL_BELOW) / 2, y = origin.y + (CELL_ABOVE - CELL_BELOW) / 2;
+  const border = groups('BORDER'), near = (a: number, b: number): boolean => Math.abs(a - b) < .001;
   withOwner(scope, () => {
     for (const [dx, dz, hx, hz] of [[CHUNK_HALF + 0.5, 0, 0.5, CHUNK_HALF + 1], [-CHUNK_HALF - 0.5, 0, 0.5, CHUNK_HALF + 1], [0, CHUNK_HALF + 0.5, CHUNK_HALF + 1, 0.5], [0, -CHUNK_HALF - 0.5, CHUNK_HALF + 1, 0.5]] as const) {
-      world.createCollider(R.ColliderDesc.cuboid(hx, halfHeight, hz).setTranslation(origin.x + dx, y, origin.z + dz).setCollisionGroups(groups('BORDER')));
+      // A restored world already carries its walls. Match their actual shape,
+      // rather than an in-memory handle from the physics world it replaced.
+      let installed = false;
+      world.forEachCollider(collider => {
+        if (collider.collisionGroups() !== border || collider.shapeType() !== R.ShapeType.Cuboid || collider.isSensor() || collider.parent() !== null) return;
+        const at = collider.translation(), half = collider.halfExtents(), rotation = collider.rotation();
+        if (half !== null && near(at.x, origin.x + dx) && near(at.y, y) && near(at.z, origin.z + dz)
+          && near(half.x, hx) && near(half.y, halfHeight) && near(half.z, hz)
+          && near(Math.abs(rotation.w), 1) && near(rotation.x, 0) && near(rotation.y, 0) && near(rotation.z, 0)) installed = true;
+      });
+      if (!installed) world.createCollider(R.ColliderDesc.cuboid(hx, halfHeight, hz).setTranslation(origin.x + dx, y, origin.z + dz).setCollisionGroups(border));
     }
   });
 }
