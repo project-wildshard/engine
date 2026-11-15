@@ -69,7 +69,9 @@ test('plain launch paints only the approved hero and WILDSHARD, the launch image
   if (hero === null) throw new Error('Missing title art');
   expect([...panel.children].map(child => child.className)).toEqual(['ws-launch-hero', 'ws-launch-brand', 'ws-launch-pill', 'ws-launch-load']);
   expect(window.getComputedStyle(hero).backgroundImage).toMatch(/main-crossroads-square-first-[a-f0-9]{16}\.jpg/u); // PZ19: the ~30 kB first cut
-  expect(window.document.querySelector('link[as="image"]')?.getAttribute('href')).toMatch(/^\/assets\/title\/main-crossroads-square-first-[a-f0-9]{16}\.jpg$/u);
+  const preload = window.document.querySelector('link[as="image"]');
+  expect(preload?.getAttribute('href')).toMatch(/^\/assets\/title\/main-crossroads-square-first-[a-f0-9]{16}\.jpg$/u);
+  expect(preload?.getAttribute('fetchpriority')).toBe('low');
   expect(window.document.querySelector('#hud')?.childElementCount).toBe(0);
 });
 

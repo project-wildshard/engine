@@ -223,7 +223,7 @@
       if (homeParams.size === 0) document.documentElement.classList.add('title-first');
       if (document.documentElement.classList.contains('title-first')) {
         const hero = document.createElement('link');
-        hero.rel = 'preload'; hero.as = 'image'; hero.fetchPriority = 'high';
+        hero.rel = 'preload'; hero.as = 'image'; hero.setAttribute('fetchpriority', 'low');
         // PZ19: the shell's hero is the ~30 kB first cut, so it no longer outruns the entry's code on a slow line; the title's
         // own hero (mainMenu.ts) brings the full image in over it once the title is up
         hero.href = titleAssetURLs['/assets/title/main-crossroads-' + (matchMedia('(orientation: portrait)').matches ? 'square' : 'landscape') + '-first.jpg'];
