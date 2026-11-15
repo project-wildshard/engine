@@ -8,6 +8,8 @@
 //   scripts/browser-lane.sh node scripts/road-drive-proof.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood]
 //     [--engine=chromium|webkit] [--device='iPhone 15 Pro'] [--viewport=2992x1434@2] [--segments=n] (the first n only, a short check)
 //     [--ride=board|boost|run] (default board: the hoverboard, 30 m/s on the road, J354; boost 120 m/s; run: on foot with the run key)
+//     [--from=k] (start measuring at segment k: the board drives the shortest junction path there first, unmeasured; a repro of one
+//     segment's frame, not the proof)
 // The steering runs in the page (a 50 ms yaw toward the next waypoint); the keys are real. The walker is placed 20 m inside the
 // home's east entryway by the in-page harness pose, so it runs on preview or a loopback page only. Never production (J205).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -19,7 +21,7 @@ import { saveFixture } from './debug-settings.mjs';
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', '');
-const limit = Number(flag('segments', '0')) || Infinity, ride = flag('ride', 'board');
+const limit = Number(flag('segments', '0')) || Infinity, ride = flag('ride', 'board'), from = Number(flag('from', '0'));
 if (!['board', 'boost', 'run'].includes(ride)) throw new Error(`No ride ${ride}: board, boost or run`);
 if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: road-drive-proof.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood] [--segments=n]');
 const HOMES = /** @type {Record<string, { slug: string, card: string }>} */ ({ driftwood: { slug: 'driftwood-isle', card: 'Driftwood Isle' }, sunscar: { slug: 'sunscar-dunes', card: 'Signal Dunes' }, pine: { slug: 'pine-hollow', card: 'Pine Hollow' } });
@@ -29,6 +31,9 @@ const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '2992x1434@2')) ??
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 /** The cell's half size, the gap's half (road and both strips) and the junction offsets a drive keeps off the roundabout's island (6 m). */
 const HALF = 250, GAP_HALF = 31.25, LANE = 4, AROUND = 10, CLEAR = 20, MEASURE_CLEAR = 30;
+/** ZE3a: the page keeps its home resident while the feet are within this many metres of its edge (`liveSession.ts`
+ *  HOME_KEEP_METRES 300), less a 20 m margin for the 50 ms sample's stride. */
+const KEEP_M = 280;
 /** The longest ramp back to cruise out of a corner the bar accepts: the board's own 90° turn takes about 0.8 s, a longer one is a stop. */
 const RAMP_MS = 1500;
 mkdirSync(out, { recursive: true });
@@ -94,14 +99,23 @@ try {
   // m off its centre toward the way out (or toward the lane on a straight pass), clear of the island
   /** @type {{ x: number, z: number, seg: number }[]} */
   const waypoints = [];
-  const legs = Math.min(path.length - 1, limit);
-  for (let k = 0; k < legs; k++) {
-    const [ai, aj] = path[k], [bi, bj] = path[k + 1];
+  const legs = Math.min(path.length - 1, from + limit);
+  // --from: a lead-in, the junction path from the home's south-east junction to segment `from`'s start, driven unmeasured (seg -5)
+  /** @type {[number, number][]} */
+  const lead = [];
+  if (from > 0) {
+    let [ci, cj] = [si, sj];
+    const [ti, tj] = path[from];
+    while (ci !== ti || cj !== tj) { lead.push([ci, cj]); if (ci !== ti) ci += Math.sign(ti - ci); else cj += Math.sign(tj - cj); }
+  }
+  const run = [...lead, ...path.slice(from, legs + 1)], segOf = (/** @type {number} */ r) => r < lead.length ? -5 : from + r - lead.length;
+  for (let r = 0; r < run.length - 1; r++) {
+    const [ai, aj] = run[r], [bi, bj] = run[r + 1];
     const a = { x: lines[ai] ?? 0, z: lines[aj] ?? 0 }, b = { x: lines[bi] ?? 0, z: lines[bj] ?? 0 }, d = { x: Math.sign(b.x - a.x), z: Math.sign(b.z - a.z) };
     const n = d.x !== 0 ? { x: 0, z: Math.sign(centre - a.z) || 1 } : { x: Math.sign(centre - a.x) || 1, z: 0 };
-    waypoints.push({ x: a.x + d.x * CLEAR + n.x * LANE, z: a.z + d.z * CLEAR + n.z * LANE, seg: k }, { x: b.x - d.x * CLEAR + n.x * LANE, z: b.z - d.z * CLEAR + n.z * LANE, seg: k });
-    const next = path[k + 2];
-    if (next !== undefined && k + 1 < legs) {
+    waypoints.push({ x: a.x + d.x * CLEAR + n.x * LANE, z: a.z + d.z * CLEAR + n.z * LANE, seg: segOf(r) }, { x: b.x - d.x * CLEAR + n.x * LANE, z: b.z - d.z * CLEAR + n.z * LANE, seg: segOf(r) });
+    const next = run[r + 2];
+    if (next !== undefined) {
       const e = { x: Math.sign((lines[next[0]] ?? 0) - b.x), z: Math.sign((lines[next[1]] ?? 0) - b.z) }, straight = e.x === d.x && e.z === d.z;
       waypoints.push({ x: b.x + (straight ? n.x : e.x) * AROUND, z: b.z + (straight ? n.z : e.z) * AROUND, seg: -1 });
     }
@@ -118,7 +132,37 @@ try {
     if (!(await page.evaluate(() => /** @type {any} */ (window).__wildshard.world.player.hover === true))) throw new Error('The board did not take');
   }
   await page.evaluate(({ wps, homeSlug }) => {
-    const W = /** @type {any} */ (window), q = W.__drive = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), at: 0, done: false, wps };
+    const W = /** @type {any} */ (window), q = W.__drive = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), at: 0, done: false, wps,
+      programs: /** @type {any[]} */ ([]), slowLinks: /** @type {any[]} */ ([]), loafs: /** @type {any[]} */ ([]) };
+    // what a long frame did: the programs it linked, a link the driver finished only when asked, and (Chromium) the long
+    // animation frame's own scripts
+    const renderer = W.__wildshard?.world?.game?.renderer, gl = renderer?.getContext?.(), known = new Set(renderer?.info?.programs);
+    if (gl !== undefined) {
+      const ask = gl.getProgramParameter.bind(gl);
+      gl.getProgramParameter = (/** @type {WebGLProgram} */ handle, /** @type {number} */ name) => {
+        const t0 = performance.now(), value = ask(handle, name), ms = performance.now() - t0;
+        if (ms > 8) {
+          const found = (renderer.info.programs ?? []).find((/** @type {any} */ row) => row.program === handle), row = { t: Math.round(t0), ms: Math.round(ms), name: String(found?.name ?? ''), key: String(found?.cacheKey ?? '').slice(-40), owners: /** @type {string[]} */ ([]) };
+          q.slowLinks.push(row);
+          // who drew it: the first few objects whose material now holds this program, by their ancestors' names
+          setTimeout(() => { try {
+            const seen = new Set();
+            W.__wildshard.world.game.scene.traverse((/** @type {any} */ o) => {
+              if (row.owners.length >= 4 || o.material === undefined) return;
+              for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+                if (renderer.properties.get(m)?.currentProgram?.program !== handle) continue;
+                const names = []; for (let at = o; at != null && names.length < 6; at = at.parent) names.push(String(at.name || at.type));
+                const label = `${names.join('<')} [${String(m.name || m.type)}]`;
+                if (!seen.has(label)) { seen.add(label); row.owners.push(label.slice(0, 220)); }
+              }
+            });
+          } catch (error) { row.owners.push(String(error).slice(0, 120)); } }, 0);
+        }
+        return value;
+      };
+    }
+    try { new PerformanceObserver(list => { for (const e of /** @type {any[]} */ (list.getEntries())) if (e.duration > 50) q.loafs.push({ t: Math.round(e.startTime), ms: Math.round(e.duration), block: Math.round(e.blockingDuration ?? 0), render: Math.round((e.startTime + e.duration) - (e.renderStart || e.startTime + e.duration)),
+      scripts: (e.scripts ?? []).filter((/** @type {any} */ x) => x.duration > 5).map((/** @type {any} */ x) => ({ ms: Math.round(x.duration), fn: String(x.sourceFunctionName ?? ''), src: String(x.sourceURL ?? '').split('/').at(-1) + ':' + String(x.sourceCharPosition ?? ''), inv: String(x.invoker ?? '').slice(0, 80) })) }); }).observe({ type: 'long-animation-frame', buffered: false }); } catch { /* WebKit has none */ }
     let last = performance.now();
     const raf = (/** @type {number} */ now) => { q.frames.push([Math.round(now), Number((now - last).toFixed(1))]); last = now; requestAnimationFrame(raf); };
     requestAnimationFrame(raf);
@@ -134,6 +178,7 @@ try {
       }
       q.samples.push({ t: Math.round(performance.now()), x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), seg: q.wps[q.at]?.seg ?? -3, inside: st.inside, card: st.cellLoading ?? null, stage: st.cellStage ?? null,
         res: st.live?.live?.residents ?? null, home: (st.live?.live?.residents ?? []).includes(homeSlug), mb: st.playingMB ?? null });
+      for (const program of renderer?.info?.programs ?? []) if (!known.has(program)) { known.add(program); q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: String(program.cacheKey ?? '').slice(0, 300) }); }
     } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 50);
   }, { wps: route, homeSlug: home.slug });
   const t0 = Date.now();
@@ -150,9 +195,18 @@ try {
   await page.keyboard.up('KeyW'); if (ride === 'run') await page.keyboard.up('ShiftLeft');
   const driveMs = Date.now() - t0;
   // per segment: its straight, MEASURE_CLEAR m off each end, read from the samples and the frames between its first and last sample
-  const { frames, samples } = await page.evaluate(() => { const q = /** @type {any} */ (window).__drive; return { frames: q.frames, samples: q.samples.filter((/** @type {any} */ r) => r.err === undefined) }; });
-  const allCards = samples.filter((/** @type {any} */ r) => r.card !== null), allHome = samples.every((/** @type {any} */ r) => r.home === true);
-  for (let k = 0; k < legs; k++) {
+  const { frames, samples, programs, slowLinks, loafs } = await page.evaluate(() => { const q = /** @type {any} */ (window).__drive; return { frames: q.frames, programs: q.programs, slowLinks: q.slowLinks, loafs: q.loafs, samples: q.samples.filter((/** @type {any} */ r) => r.err === undefined) }; });
+  const edgeM = (/** @type {any} */ r) => Math.hypot(Math.max(0, Math.abs(r.x - grid.origin.x) - HALF), Math.max(0, Math.abs(r.z - grid.origin.z) - HALF));
+  const firstOut = samples.findIndex((/** @type {any} */ r) => edgeM(r) > KEEP_M);
+  // ZE3a: the home stays resident until the feet first pass KEEP_M from its edge (the page's 300 m keep), then may retire
+  const allCards = samples.filter((/** @type {any} */ r) => r.card !== null), allHome = samples.slice(0, firstOut < 0 ? samples.length : firstOut).every((/** @type {any} */ r) => r.home === true);
+  /** every frame over 50 ms, with what the page did around it (a ±400 ms window) */
+  const longFrames = frames.filter((/** @type {number[]} */ r) => (r[1] ?? 0) > 50).map((/** @type {number[]} */ [t, ms]) => {
+    const near = (/** @type {any} */ r) => r.t >= t - (ms ?? 0) - 400 && r.t <= t + 400, at = samples.filter(near)[0];
+    return { t, ms, seg: at?.seg ?? null, at: at === undefined ? null : { x: at.x, z: at.z }, res: at?.res ?? null, mb: at?.mb ?? null,
+      programs: programs.filter(near).map((/** @type {any} */ r) => r.name), slowLinks: slowLinks.filter(near), loafs: loafs.filter(near) };
+  });
+  for (let k = from; k < legs; k++) {
     const rows = samples.filter((/** @type {any} */ r) => r.seg === k);
     if (rows.length < 3) { result.segments.push({ seg: k, driven: false }); continue; }
     const [ai, aj] = path[k], [bi, bj] = path[k + 1];
@@ -172,10 +226,11 @@ try {
     result.segments.push({ seg: k, driven: true, from: [ai, aj], to: [bi, bj], ms: rows.at(-1).t - rows[0].t, cruiseMps: Number((cruise * 1000).toFixed(2)), worstFrameMs: Math.max(0, ...span),
       over50: span.filter((/** @type {number} */ ms) => ms > 50).length, over100: span.filter((/** @type {number} */ ms) => ms > 100).length, worstStopMs: worstStop, stopAt, rampMs,
       cardMs: cards.length * 50, cards: [...new Set(cards.map((/** @type {any} */ r) => `${String(r.card)}:${String(r.stage)}`))], homeResident: rows.every((/** @type {any} */ r) => r.home === true),
-      residents: [...new Set(rows.flatMap((/** @type {any} */ r) => r.res ?? []))], mb: mbs.length === 0 ? null : { min: Math.min(...mbs), max: Math.max(...mbs) } });
+      residents: [...new Set(rows.flatMap((/** @type {any} */ r) => r.res ?? []))], mb: mbs.length === 0 ? null : { min: Math.min(...mbs), max: Math.max(...mbs) },
+      programs: programs.filter((/** @type {any} */ r) => r.t >= rows[0].t && r.t <= rows.at(-1).t).length });
   }
   // back to the home's east entryway and in, by input: control with no card (a short --segments check ends away from home)
-  const whole = legs === path.length - 1;
+  const whole = from === 0 && legs === path.length - 1;
   const backFrom = await page.evaluate(() => Math.round(performance.now()));
   await page.evaluate(([wps]) => { const q = /** @type {any} */ (window).__drive; q.wps = wps; q.at = 0; q.done = false; }, [[{ x: grid.origin.x + HALF + GAP_HALF - LANE, z: grid.origin.z, seg: -4 }, { x: grid.origin.x + HALF - 12, z: grid.origin.z, seg: -4 }]]);
   if (whole) {
@@ -193,10 +248,10 @@ try {
   await page.screenshot({ path: join(out, `${tag}-road-drive.png`) });
   const driven = result.segments.filter(row => row.driven === true), mbAll = driven.flatMap(row => { const mb = /** @type {any} */ (row.mb); return mb === null ? [] : [mb.min, mb.max]; });
   const phoneBar = device !== '' ? 1 : 0, over50 = driven.reduce((sum, row) => sum + Number(row.over50), 0);
-  result.summary = { driveMs, segments: legs, driven: driven.length, over50, worstFrameMs: Math.max(0, ...driven.map(row => Number(row.worstFrameMs))), worstStopMs: Math.max(0, ...driven.map(row => Number(row.worstStopMs))),
+  result.summary = { driveMs, from, segments: legs - from, driven: driven.length, over50, worstFrameMs: Math.max(0, ...driven.map(row => Number(row.worstFrameMs))), worstStopMs: Math.max(0, ...driven.map(row => Number(row.worstStopMs))),
     worstRampMs: Math.max(0, ...driven.map(row => Number(row.rampMs ?? 0))),
-    cardMs: allCards.length * 50, cards: [...new Set(allCards.map((/** @type {any} */ r) => `${String(r.card)}:${String(r.stage)}`))], homeResident: allHome, mbGrowth: mbAll.length === 0 ? null : Math.max(...mbAll) - (/** @type {any} */ (driven[0]?.mb)?.min ?? 0),
-    bar: driven.length === legs && over50 <= phoneBar && driven.every(row => Number(row.worstStopMs) <= 250 && Number(row.rampMs ?? 0) <= RAMP_MS) && allCards.length === 0 && allHome && result.errors.length === 0 };
+    cardMs: allCards.length * 50, cards: [...new Set(allCards.map((/** @type {any} */ r) => `${String(r.card)}:${String(r.stage)}`))], homeResident: allHome, homeKeptToM: KEEP_M, longFrames, mbGrowth: mbAll.length === 0 ? null : Math.max(...mbAll) - (/** @type {any} */ (driven[0]?.mb)?.min ?? 0),
+    bar: driven.length === legs - from && over50 <= phoneBar && driven.every(row => Number(row.worstStopMs) <= 250 && Number(row.rampMs ?? 0) <= RAMP_MS) && allCards.length === 0 && allHome && result.errors.length === 0 };
   console.log(`${result.summary.bar === true ? 'ok  ' : 'FAIL'} ${homeName} drive ${JSON.stringify(result.summary)}`);
   console.log(`${result.back.inside === true && result.back.cardMs === 0 ? 'ok  ' : 'FAIL'} ${homeName} back in ${JSON.stringify(result.back)}`);
   await context.close();

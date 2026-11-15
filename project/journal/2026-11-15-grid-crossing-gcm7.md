@@ -84,3 +84,6 @@
   1140 MB, under the envelope, and the neighbours' tiles still stream. Also: a neighbour's creatures were drawn once when
   their admission resolved between the late phase and the draw, linking the barrow warden's program on the frame (114 ms,
   ZE3a's corner frame); they are now hidden from birth.
+- 17:10 (opus-gcm10, ZE3a) `road-drive-proof.mjs --from=k` drives the junction path to segment k unmeasured and measures
+  from there (the corner frame reproduced in 2 minutes, not 26), and every frame over 50 ms now carries its program links,
+  the objects that own them and Chromium's long-animation-frame scripts.

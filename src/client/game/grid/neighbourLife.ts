@@ -93,6 +93,10 @@ export class NeighbourLife {
       const { mesh, bones } = skinMesh(skin), driver = new SkinDriver(skin, bones);
       const view: CreatureView = { id, mesh, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale: spawn.scale }, bodyY: species.dims.bodyY * spawn.scale, t: (spawn.seed % 97) / 13, phase: 0 };
       mesh.position.set(spawn.at[0], spawn.at[1], spawn.at[2]); mesh.rotation.set(0, spawn.yaw, 0, 'YXZ'); mesh.scale.setScalar(spawn.scale);
+      // ZE3a: hidden from birth unless its cell is the active one: an admission that resolves between the late phase (which
+      // hides a frozen cell's creatures) and the draw drew them once, and that draw linked their programs on the frame (a
+      // neighbour's barrow warden, 114 ms, on the laptop's whole-road drive past an open plot, 2026-11-15)
+      mesh.visible = this.ports.active(cell.instance);
       root.add(mesh); creatures.set(id, view);
     }
     const instance = cell.instance;
