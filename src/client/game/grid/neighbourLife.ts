@@ -1,8 +1,11 @@
 /**
- * A cell's client life (SHARD-PLATFORM SF25 render side): each shardfile cell that declares `clientScripts` gets its
- * creatures drawn in its cell root (the SF9c skins, following its regional host's authoritative entities) and its own
+ * A cell's client life (SHARD-PLATFORM SF25 render side): a shardfile cell gets its creatures drawn in its cell root (the
+ * SF9c skins, following its regional host's authoritative entities): the ones its `clientScripts` bind, and in a data cell
+ * (no runtime, no declared client page: the templates) every spawn with a skin look, bound or not (TEMPLATE-E2E TC-E1a:
+ * Brasscap binds only particles, so its bandits were never drawn). A cell that declares `clientScripts` also gets its own
  * isolated client lane (`createShardfileClientScripts`, sp-x5) stepped on the page's fixed tick; `ClientScriptViews`
- * composes its frames on top of the views and draws its particles. Nothing here writes a simulation.
+ * composes its frames on top of the views and draws its particles. A lane that fails to build leaves the creatures drawn.
+ * Nothing here writes a simulation.
  *
  * Only while the traveller is inside the cell (G663, tile streaming T7: a neighbour is scene-graph level of detail, with
  * no logic or runtime; it replaced G66's "frozen, but alive-looking" neighbours): a frozen cell's lane never steps and its
@@ -15,6 +18,7 @@ import type { ClientScriptTarget } from '@wildshard/format/clientScripts';
 import { loadClientSkins, SkinDriver, type ClientSkin, type SkinDriveState } from '../shardfile/clientSkins';
 import { ClientScriptViews, type ClientScriptViewTarget, type ClientScriptViewState } from "../plugin/ui";
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 
 /** One creature as a view draws it (E6): a page reads the region's sim entity, a client reads its row. */
@@ -37,7 +41,8 @@ export interface NeighbourLifeCell { readonly instance: string; readonly creatur
 interface CreatureView { readonly id: string; readonly mesh: SkinnedMesh; readonly driver: SkinDriver; readonly spawn: { at: readonly [number, number, number]; yaw: number; scale: number }; readonly bodyY: number; t: number; phase: number }
 interface CellLife {
   readonly cell: GridCell; readonly root: Group; readonly creatures: ReadonlyMap<string, CreatureView>;
-  readonly scripts: ReturnType<typeof createShardfileClientScripts>; readonly views: ClientScriptViews; failed: string | null;
+  /** null: the cell binds no script (or its lane failed to build, `failed` says why); its creatures still draw */
+  lane: { readonly scripts: ReturnType<typeof createShardfileClientScripts>; readonly views: ClientScriptViews } | null; failed: string | null;
 }
 
 /** A static view of one skin: the factory's bone layout (positions relative to the parent), bound once. */
@@ -68,17 +73,19 @@ export class NeighbourLife {
 
   /** Admit one neighbour's life once its product and materials are ready (the session's shared per-slug load). */
   async admit(cell: GridCell, root: Group, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, compile: Parameters<typeof loadClientSkins>[2], skinsBySlug: Map<string, Promise<ReadonlyMap<string, ClientSkin>>>): Promise<void> {
-    const declared = source.clientScripts;
-    if (declared.bindings.length === 0 || this.cells.has(cell.instance)) return;
+    const declared = source.clientScripts, data = source.runtime === null && !hasDeclaredClientPage(source);
+    // the creatures this page draws: the script-bound ones, and in a data cell every spawn (its runtime draws a native cell's)
+    const drawn = [...new Set([...declared.bindings.flatMap((binding) => binding.target.kind === 'creature' ? [binding.target.id] : []),
+      ...(data ? source.creatures.spawns.map((row) => row.id) : [])])];
+    if ((declared.bindings.length === 0 && drawn.length === 0) || this.cells.has(cell.instance)) return;
     const scope = this.ports.scope;
     let loading = skinsBySlug.get(cell.slug);
     if (loading === undefined) { loading = loadClientSkins(source, assets, compile, scope); skinsBySlug.set(cell.slug, loading); }
     const skins = await loading;
     if (scope.disposed) return;
     const creatures = new Map<string, CreatureView>();
-    for (const binding of declared.bindings) {
-      if (binding.target.kind !== 'creature' || creatures.has(binding.target.id)) continue;
-      const id = binding.target.id, spawn = source.creatures.spawns.find((row) => row.id === id);
+    for (const id of drawn) {
+      const spawn = source.creatures.spawns.find((row) => row.id === id);
       const species = spawn === undefined ? undefined : source.rows.species.find((row) => row.id === spawn.species);
       const look = species === undefined ? undefined : source.rows.looks.find((row) => row.species === species.id);
       const skin = look === undefined ? undefined : skins.get(look.id);
@@ -89,6 +96,20 @@ export class NeighbourLife {
       root.add(mesh); creatures.set(id, view);
     }
     const instance = cell.instance;
+    const life: CellLife = { cell, root, creatures, lane: null, failed: null };
+    if (declared.bindings.length > 0) {
+      try { life.lane = this.lane(instance, source, assets, root, creatures); } catch (error) { life.failed = error instanceof Error ? error.message : String(error); }
+    }
+    this.cells.set(instance, life);
+    scope.onDispose(() => {
+      life.lane?.scripts.dispose();
+      for (const view of creatures.values()) { view.mesh.removeFromParent(); view.mesh.skeleton.dispose(); const m = view.mesh.material; if (!Array.isArray(m)) m.dispose(); }
+    });
+  }
+
+  /** The cell's own client lane and the views its frames compose on (throws when its scripts are refused). */
+  private lane(instance: string, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, root: Group, creatures: ReadonlyMap<string, CreatureView>): NonNullable<CellLife['lane']> {
+    const declared = source.clientScripts;
     const observe = (target: ClientScriptTarget): { position: readonly [number, number, number]; frozen: boolean } => {
       const frozen = !this.ports.active(instance);
       if (target.kind === 'particles') return { position: target.at, frozen };
@@ -97,39 +118,36 @@ export class NeighbourLife {
       const p = view.mesh.position; return { position: [p.x, p.y, p.z], frozen };
     };
     const scripts = createShardfileClientScripts(source, assets, { actorId: 'actor.neighbour', observe });
-    const targets = scripts.targets.map(({ entity, target }): ClientScriptViewTarget => {
-      const view = target.kind === 'creature' ? creatures.get(target.id) : undefined;
-      const emitters = declared.bindings.find((b) => b.entity === entity)?.emitters.map((e) => ({ id: e.id, live: e.live, colour: e.colour, size: e.size, velocity: e.velocity, gravity: e.gravity })) ?? [];
-      const anchor = (out: Vector3): Vector3 => {
-        if (target.kind === 'particles') return out.fromArray(target.at);
-        if (view === undefined) return out.set(0, 0, 0);
-        return out.copy(view.mesh.position).setY(view.mesh.position.y + view.bodyY * 1.6);
-      };
-      const object: Object3D | null = view?.mesh ?? null;
-      return { entity, object, anchor, emitters };
-    });
-    const views = new ClientScriptViews(scripts.lane, targets, { root, scope });
-    const life: CellLife = { cell, root, creatures, scripts, views, failed: null };
-    this.cells.set(instance, life);
-    scope.onDispose(() => {
-      scripts.dispose();
-      for (const view of creatures.values()) { view.mesh.removeFromParent(); view.mesh.skeleton.dispose(); const m = view.mesh.material; if (!Array.isArray(m)) m.dispose(); }
-    });
+    try {
+      const targets = scripts.targets.map(({ entity, target }): ClientScriptViewTarget => {
+        const view = target.kind === 'creature' ? creatures.get(target.id) : undefined;
+        const emitters = declared.bindings.find((b) => b.entity === entity)?.emitters.map((e) => ({ id: e.id, live: e.live, colour: e.colour, size: e.size, velocity: e.velocity, gravity: e.gravity })) ?? [];
+        const anchor = (out: Vector3): Vector3 => {
+          if (target.kind === 'particles') return out.fromArray(target.at);
+          if (view === undefined) return out.set(0, 0, 0);
+          return out.copy(view.mesh.position).setY(view.mesh.position.y + view.bodyY * 1.6);
+        };
+        const object: Object3D | null = view?.mesh ?? null;
+        return { entity, object, anchor, emitters };
+      });
+      return { scripts, views: new ClientScriptViews(scripts.lane, targets, { root, scope: this.ports.scope }) };
+    } catch (error) { scripts.dispose(); throw error; }
   }
 
   /** The page's fixed step: the entered cell's lane advances on the page tick. */
   fixed(): void {
     const tick = this.tick++;
     for (const life of this.cells.values()) {
-      if (life.failed !== null || !this.ports.active(life.cell.instance)) continue; // G663: no neighbour logic
-      try { life.scripts.step(tick); } catch (error) { life.failed = error instanceof Error ? error.message : String(error); life.views.restore(); }
+      const { lane } = life;
+      if (lane === null || life.failed !== null || !this.ports.active(life.cell.instance)) continue; // G663: no neighbour logic
+      try { lane.scripts.step(tick); } catch (error) { life.failed = error instanceof Error ? error.message : String(error); lane.views.restore(); }
     }
   }
 
   /** The page's late phase: views back to base, follow the region (if admitted), then compose the scripts on top. */
   late(dt: number): void {
     for (const life of this.cells.values()) {
-      life.views.restore();
+      life.lane?.views.restore();
       const region = this.ports.simulation(life.cell.instance), live = this.ports.active(life.cell.instance);
       // G663: a frozen cell draws none of its creatures and composes no lane
       if (!live) { for (const view of life.creatures.values()) view.mesh.visible = false; continue; }
@@ -141,11 +159,11 @@ export class NeighbourLife {
         view.phase = (view.phase + dt * Math.hypot(speed, strafe) * 0.6) % 1;
         view.driver.step({ dt, t: view.t, alive: sim?.alive ?? true, flinch: 0, attack: sim?.attackPhase ?? -1, speed, strafe, scale: sim?.scale ?? view.spawn.scale, phase: view.phase, state: sim?.state ?? 'idle' });
       }
-      if (life.failed === null) life.views.apply(dt);
+      if (life.failed === null) life.lane?.views.apply(dt);
     }
   }
 
   state(): readonly NeighbourLifeCell[] {
-    return [...this.cells.values()].map((life) => ({ instance: life.cell.instance, creatures: life.creatures.size, frozen: !this.ports.active(life.cell.instance), views: life.views.state(), failed: life.failed }));
+    return [...this.cells.values()].map((life) => ({ instance: life.cell.instance, creatures: life.creatures.size, frozen: !this.ports.active(life.cell.instance), views: life.lane?.views.state() ?? { targets: 0, posed: 0, particles: 0, capacity: 0, tick: 0 }, failed: life.failed }));
   }
 }
