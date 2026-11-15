@@ -4,7 +4,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture is the author's rows on disk.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { PerspectiveCamera, Vector3 } from 'three';
+import { Group, PerspectiveCamera, Vector3 } from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
 import { EquipmentService } from '@wildshard/engine/combat/EquipmentService';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -23,27 +23,30 @@ const source = { identity: { slug: 'blender-template', seed: 1 }, runtime: null,
   items: { version: 1, contexts: [fixture.context], rows: [fixture.row], loadout: { primary: fixture.row.id, secondary: null, tools: [] } },
   targets: { interactions: [fixture.interaction], itemActions: fixture.itemActions } } as unknown as Shardfile;
 
-function page(scope: Scope): { page: RegionalRuntimePage; controls: EnteredEquipment; systems: { id: string; run: (dt: number, t: number) => void }[] } {
+function page(scope: Scope): { page: RegionalRuntimePage; controls: EnteredEquipment; viewmodel: Group; systems: { id: string; run: (dt: number, t: number) => void }[] } {
   const binds = new Map<string, number>(), systems: { id: string; run: (dt: number, t: number) => void }[] = [];
   const input = { bind: (action: string) => { binds.set(action, (binds.get(action) ?? 0) + 1); }, held: () => false, register: () => undefined, has: () => true, bindings: { describe: () => undefined } };
   const road = new EquipmentService(new EmptyEquipment(), { scope });
   const controls = new EnteredEquipment(road);
-  const app = { input, events: undefined, combat: { targets: () => [] }, effects: null, player: null, state: 'play', get equipment() { return controls.service; },
+  const viewmodel = new Group();
+  const app = { input, events: undefined, equipmentHost: { viewmodel }, combat: { targets: () => [] }, effects: null, player: null, state: 'play', get equipment() { return controls.service; },
     addContentSystem: (spec: { id: string; run: (dt: number, t: number) => void }, owner: Scope) => { systems.push(spec); owner.onDispose(() => { systems.splice(systems.indexOf(spec), 1); }); } };
   const camera = new PerspectiveCamera();
-  return { controls, systems, page: { equipment: controls, world: { game: { camera }, player: { position: new Vector3() } }, play: {}, context: { app } } as unknown as RegionalRuntimePage };
+  return { controls, systems, viewmodel, page: { equipment: controls, world: { game: { camera }, player: { position: new Vector3() } }, play: {}, context: { app } } as unknown as RegionalRuntimePage };
 }
 
 test('a data copy with declared items holds them while entered, and the road\'s bare hands come back on leaving', async () => {
   expect(holdsItems(source)).toBe(true);
-  const scope = new Scope('data-cell-kit'), { page: lent, controls, systems } = page(scope), entry = scope.child('entry');
+  const scope = new Scope('data-cell-kit'), { page: lent, controls, systems, viewmodel } = page(scope), entry = scope.child('entry');
   const kit = await enterDataCellKit(source, new Map(), lent, entry);
   expect(kit).not.toBeNull();
   // the page's controls now read the copy's kit: its declared lever, its one weapon
   expect(controls.service.current.row.id).toBe(fixture.row.id);
   expect(controls.service.available.map((weapon) => weapon.row.id)).toEqual([fixture.row.id]);
   expect(systems.map((system) => system.id)).toEqual(['grid.data-cell-kit']);
+  expect(viewmodel.children).toHaveLength(1); // the lever's model, in hand
   entry.dispose();
+  expect(viewmodel.children).toHaveLength(0);
   expect(controls.service.current.row.id).toBe('weapon.empty');
   expect(systems).toHaveLength(0);
   scope.dispose();

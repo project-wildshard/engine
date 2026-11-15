@@ -120,3 +120,23 @@ test('the three-second path hands over control without waiting for the rings or 
   run.released();
   expect(window.__wsReveal).toMatchObject({ ceiling: false, skipped: false, ringsReadyMs: null, homeSimMs: null, endedMs: 3000 });
 });
+
+test('the end gives the weapons back as ENTER left them, not as the install found them (TEMPLATE-E2E TC-E1b)', () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+  const scope = new Scope('reveal.enter.test'); scopes.push(scope);
+  const hudRoot = document.createElement('div'); document.body.append(hudRoot);
+  const canvas = document.createElement('canvas'); document.body.append(canvas);
+  // installed under the title: the weapons are still off until ENTER turns them on, after `entered` has started the reveal
+  const weapons = { enabled: false, visible: false, setEnabled(on: boolean): void { this.enabled = on; } };
+  let late: () => void = () => { throw new Error('Missing late callback'); };
+  const active = installGridReveal({ scope, camera: new PerspectiveCamera(), hudRoot, canvas, home: 'Brasscap Mesa',
+    onLate: fn => { late = () => { fn(1 / 30); }; }, ringsReady: () => true, homeSimReady: () => true,
+    weapons, viewmodel: { visible: true }, entered: () => true });
+  late();
+  expect(weapons).toMatchObject({ enabled: false, visible: false });
+  weapons.setEnabled(true); weapons.visible = true; // ENTER, mid-reveal
+  late();
+  for (let i = 0; i < 400 && active(); i++) { vi.advanceTimersByTime(50); late(); }
+  expect(active()).toBe(false);
+  expect(weapons).toMatchObject({ enabled: true, visible: true });
+});

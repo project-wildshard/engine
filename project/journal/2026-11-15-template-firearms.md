@@ -17,3 +17,9 @@ were on the wire and none on screen.
   Pine Hollow's forest page, so a gun there needs new engine and format work anyway; this route is engine only.
 - TC-E1c: the loadout's primary lever starts taken on the server (and after a restore), so it fires with no rack.
 - TC-E1d: a rack's take of a lever already in hand adds its row's reserve again, capped at 999 (`RESTOCK_CAP`).
+- The lever still never fired on the grid: the sky-down reveal (`grid/reveal.ts`) read the weapons' state when it was
+  installed, under the title, while they were still off, and its end turned them off again after ENTER had turned them on.
+  Bare hands hid it. It now reads them as it begins and gives them back only if nothing turned them on meanwhile. The
+  entered kit starts as the road's controls stand. Local preview proof: Shard select and the road from Signal Dunes both
+  hold the lever with 6 in the tube; one shot each downs `target.1` and `target.2` and the quest moves to camp 1; the rack
+  raises the reserve 30 to 60.

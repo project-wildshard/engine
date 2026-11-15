@@ -9,7 +9,7 @@
  * server's seat for this cell (its slots are the cell's `enteredItems`), and a declared lever follows the server's owned lines
  * (rounds, reserve, taken) as the standalone client's does. An item request (a rack's take) is the scene the server runs it by.
  */
-import { Vector3 } from 'three';
+import { Object3D, Vector3 } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { Actor, CombatTarget } from '@wildshard/engine/combat/pipeline';
 import type { ItemTarget } from '@wildshard/engine/combat/items';
@@ -23,6 +23,8 @@ import { itemScene } from '../shardfile/clientItems';
 import { loadItemModels } from '../shardfile/itemModels';
 import { wirePage } from '../shardfile/wirePage';
 import type { RegionalRuntimePage } from './regionalRuntime';
+
+function isItemModel(value: unknown): value is Object3D { return value instanceof Object3D; }
 
 /** Whether a data cell has anything to hold: a declared weapon or a loadout tool. */
 export function holdsItems(source: Pick<Shardfile, 'items'>): boolean {
@@ -60,9 +62,17 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   const kit = new EquipmentService(first, { scope: entry, events: app.events, input: { bind: (action, run, _scope, allowed) => { app.input.bind(action, run, entry, allowed ?? (() => kit.enabled)); } }, order: [...items.order] });
   for (const weapon of weapons) if (weapon !== first) kit.add(weapon, { locked: true });
   items.install(kit);
-  const wire = controls.service.boundWire; // the road's, read before the kit takes the controls
+  // the held models hang off the page's viewmodel, as a standalone page's do (client.ts)
+  const host = app.equipmentHost;
+  if (host !== null) for (const item of [...weapons, ...items.tools]) {
+    const model: unknown = Reflect.get(item, 'model');
+    if (isItemModel(model)) { host.viewmodel.add(model); entry.onDispose(() => { model.removeFromParent(); }); }
+  }
+  // the road's wire and switches, read before the kit takes the controls: the page's reveal, menu and safe zone set them on the
+  // controls, which set both while a kit is bound, so the kit starts where the road stands
+  const road = controls.service, wire = road.boundWire, enabled = road.enabled, visible = road.visible;
   controls.bind(kit, entry);
-  kit.enabled = true; kit.visible = true; kit.stowed = false;
+  kit.enabled = enabled; kit.visible = visible; kit.stowed = false;
   if (wire !== null) { kit.bindWire(wire); entry.onDispose(() => { kit.bindWire(null); }); }
   // TE-ENG2: a lever follows the server's owned lines; taken, it unlocks and comes to hand
   const levers = weapons.flatMap(weapon => { const lever = declaredLever(weapon); return lever === null ? [] : [lever]; });

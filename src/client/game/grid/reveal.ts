@@ -70,7 +70,10 @@ export function installGridReveal(host: GridRevealHost): () => boolean {
   let pathEnd: number | null = null, ringsAt: number | null = null, homeAt: number | null = null, endedAt: number | null = null;
   let layer: HTMLElement | null = null;
   let viewmodelWas = true;
-  const wasEnabled = host.weapons.enabled, wasVisible = host.weapons.visible;
+  // read when the reveal begins; the end gives them back only if nothing turned them on meanwhile: the title's ENTER turns the
+  // weapons on after `entered` starts the reveal, and an end that restored the earlier "off" left them off for good (TEMPLATE-E2E
+  // TC-E1b: Brasscap's lever never fired on the grid; bare hands never showed it)
+  let wasEnabled = host.weapons.enabled, wasVisible = host.weapons.visible;
   const land = new Vector3(), landQ = new Quaternion(), sky = new Vector3(), skyQ = new Quaternion(), look = new Vector3(), fwd = new Vector3(), m = new Matrix4();
   const now = (): number => app.clock.mode === 'capture' ? app.clock.real * 1000 : diagnosticNow();
   const publish = (): void => {
@@ -82,7 +85,8 @@ export function installGridReveal(host: GridRevealHost): () => boolean {
     host.hudRoot.classList.remove('ws-grid-revealing', 'ws-grid-live');
     if (layer !== null) hudSlots.discard(layer);
     layer = null;
-    host.weapons.setEnabled(wasEnabled); host.weapons.visible = wasVisible;
+    if (!host.weapons.enabled) host.weapons.setEnabled(wasEnabled);
+    if (!host.weapons.visible) host.weapons.visible = wasVisible;
     host.viewmodel.visible = viewmodelWas;
     publish();
     scope.dispose();
@@ -90,6 +94,7 @@ export function installGridReveal(host: GridRevealHost): () => boolean {
   const begin = (at: number): void => {
     started = at;
     host.canvas.style.visibility = ''; // this frame draws the sky pose (the late phase runs before the render)
+    wasEnabled = host.weapons.enabled; wasVisible = host.weapons.visible;
     host.weapons.setEnabled(false); host.weapons.visible = false;
     viewmodelWas = host.viewmodel.visible;
     host.hudRoot.classList.add('ws-grid-revealing');
