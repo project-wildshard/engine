@@ -20,6 +20,9 @@ export interface GridSimulationPorts {
   /** The session's owning seat; older standalone callers use actor.player. */
   readonly owner?: string;
   readonly highway: GridResident;
+  /** ZE11 (J352): the cells a walker crosses into from the road (the session's home); absent, every cell. Any other cell is entered
+   *  only by its gate's zone entry. */
+  readonly enterable?: (instance: string) => boolean;
   load: (cell: GridCell, saved: SimSnapshot | undefined) => Promise<GridResident>;
   save?: (instance: string, snapshot: SimSnapshot) => boolean;
   /**
@@ -168,7 +171,7 @@ export class GridSimulation {
     const distance = (cell: GridCell): number => Math.max(Math.abs(feet.x - cell.origin.x), Math.abs(feet.z - cell.origin.z)) - CHUNK_HALF;
     const active = this.current(player);
     if (active !== null && distance(this.assembly.cell(active)) <= 10) return active;
-    return [...this.assembly.cells].sort((a, b) => a.instance.localeCompare(b.instance)).find((cell) => distance(cell) <= 6)?.instance ?? null;
+    return [...this.assembly.cells].sort((a, b) => a.instance.localeCompare(b.instance)).find((cell) => distance(cell) <= 6 && (this.ports.enterable?.(cell.instance) ?? true))?.instance ?? null;
   }
   /** Physics construction is not enough when the runtime/admitted closure has an additional readiness fence. */
   ready(instance: string | null): boolean { return !this.disposed && (instance === null || (this.residents.has(instance) && !this.resident(instance).evicting && (this.ports.admitted?.(instance) ?? true))); }

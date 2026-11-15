@@ -181,6 +181,10 @@ try {
       for (const program of renderer?.info?.programs ?? []) if (!known.has(program)) { known.add(program); q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: String(program.cacheKey ?? '').slice(0, 300) }); }
     } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 50);
   }, { wps: route, homeSlug: home.slug });
+  // --profile (Chromium): the page thread's CPU profile over the measured drive, for a long frame's cause
+  const cdp = process.argv.includes('--profile') && engineName === 'chromium' ? await context.newCDPSession(page) : undefined;
+  if (cdp !== undefined) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
+  const profileAt = await page.evaluate(() => performance.now());
   const t0 = Date.now();
   if (ride === 'run') await page.keyboard.down('ShiftLeft');
   await page.keyboard.down('KeyW');
@@ -193,6 +197,7 @@ try {
     await sleep(1000);
   }
   await page.keyboard.up('KeyW'); if (ride === 'run') await page.keyboard.up('ShiftLeft');
+  if (cdp !== undefined) { const { profile } = await cdp.send('Profiler.stop'); writeFileSync(join(out, `${tag}-drive.cpuprofile.json`), JSON.stringify({ at: profileAt, profile })); }
   const driveMs = Date.now() - t0;
   // per segment: its straight, MEASURE_CLEAR m off each end, read from the samples and the frames between its first and last sample
   const { frames, samples, programs, slowLinks, loafs } = await page.evaluate(() => { const q = /** @type {any} */ (window).__drive; return { frames: q.frames, programs: q.programs, slowLinks: q.slowLinks, loafs: q.loafs, samples: q.samples.filter((/** @type {any} */ r) => r.err === undefined) }; });

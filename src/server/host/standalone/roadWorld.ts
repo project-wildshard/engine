@@ -14,6 +14,9 @@ import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollisi
 import { HOST_PROBE } from '@wildshard/engine/game/plugin/simulation';
 import { installVoidFloor, voidFloorBoxes } from '@wildshard/engine/game/grid/voidFloor';
 import { FALL_FLOOR } from './fallFloor';
+import { installEntrySockets } from '@wildshard/engine/physics/entrySockets';
+import { ReadinessWalls } from '@wildshard/engine/physics/readinessWalls';
+import { walledCells, zoneWallEdges } from '@wildshard/engine/game/grid/zoneWalls';
 
 /** Ground under the whole grid, far below the road's strips, and a player's pace on them. */
 const ROAD_HALF_SIZE = 2000, ROAD_SPEED = 8;
@@ -41,6 +44,30 @@ export function addCellWalls(road: SimHost, cells: readonly (Pick<GridCell, 'ori
       if (instance !== undefined) kept.set(instance, [...kept.get(instance) ?? [], collider]);
     }
   });
+}
+/**
+ * ZONE-ENTRY ZE11 (J352): the in-page server's road walls every cell but the session's home on the page's own lines (`zoneWallEdges`:
+ * the edge line, open only at each entryway's buffer, the gate 10 m in) and floors each buffer with its entry socket, so the feet
+ * reach a gate on the server's road as they do on the page, and no further. The home stands open. A restored road first loses the
+ * walls an older build saved (`dropCellWalls`); its platform-tagged pieces are renewed with its void floor (`renewVoidFloor`).
+ */
+export function addZoneWalls(road: SimHost, cells: readonly GridCell[], home: string): void {
+  const walled = walledCells({ cells }, { instance: home });
+  withOwner(road.scope, () => {
+    installEntrySockets(road.physics, road.scope, walled.map(cell => cell.origin));
+    new ReadinessWalls(road.physics, walled.flatMap(cell => zoneWallEdges(cell, { origin: { x: 0, z: 0 } })), road.scope);
+  });
+}
+/** ZE11: take out the 2 m plain walls (`addCellWalls`) a road saved by an older build holds: the only cuboids of that size. */
+export function dropCellWalls(road: SimHost): number {
+  const { world } = road.physics, found: Collider[] = [];
+  world.forEachCollider(collider => {
+    if (tagOf(collider) !== undefined) return;
+    const half = collider.halfExtents?.();
+    if (half !== undefined && half !== null && Math.abs(half.y - WALL_HEIGHT) < 1e-3 && Math.abs(Math.min(half.x, half.z) - WALL / 2) < 1e-3) found.push(collider);
+  });
+  for (const collider of found) world.removeCollider(collider, false);
+  return found.length;
 }
 /** GC15 (3): take down the walls round these cells (on another worker, their entryways standing): the road crosses into them now. */
 export function openCellWalls(road: SimHost, instances: readonly string[]): void {

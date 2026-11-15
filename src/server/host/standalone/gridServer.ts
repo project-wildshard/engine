@@ -33,7 +33,7 @@ import { landedBy } from '@wildshard/engine/combat/damageBook';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { openCellWorld, type CellWorld, type CellWorldOptions } from './cellWorld';
-import { addCellWalls, addVoidFloor, installRoadCombat, renewVoidFloor, ROAD } from './roadWorld';
+import { addVoidFloor, addZoneWalls, dropCellWalls, installRoadCombat, renewVoidFloor, ROAD } from './roadWorld';
 import { netBuys, netWorldInput } from '../../../shared/host/standalone/netInput';
 import { cellDocuments, CONTINUATION, ContinuationSlots, SITE, siteDocuments, type SavedContinuation, type SavedSite } from './continuation';
 import { ledgerFilings } from './ledgerFilings';
@@ -171,8 +171,11 @@ export class StandaloneGrid {
       return world;
     };
     const strips = options.lone === true ? [] : await bootTask('server:road-collision-inputs', options.strips);
-    const road = bootWork('server:road-physics-and-collision', () => StandaloneGrid.road(rapier, assembly.cells, strips, site === null ? candidate?.saved.road : undefined, arrival, options.refused));
+    // ZE11 (J352): the session's home is the cell it opens in (a Shard select pick, a gate's zone entry or its save), else its slug's
+    const homeCell = site ?? home.instance;
+    const road = bootWork('server:road-physics-and-collision', () => StandaloneGrid.road(rapier, assembly.cells, strips, site === null ? candidate?.saved.road : undefined, arrival, options.refused, homeCell));
     const grid: GridSimulation = new GridSimulation(assembly, { highway: { host: road, dispose: () => { road.dispose(); } }, maxResidents: options.residents ?? STANDALONE_RESIDENTS,
+      enterable: instance => options.lone === true || instance === homeCell,
       load: async (cell, cached) => {
         const world = await open(cell, cached);
         holdStrips(world.host, strips.flatMap(strip => strip.duplicates.filter(row => row.instance === cell.instance).map(row => row.mesh)));
@@ -193,19 +196,20 @@ export class StandaloneGrid {
     return server;
   }
 
-  private static road(rapier: Rapier, cells: readonly GridCell[], strips: readonly GridCollisionStrip[], saved: string | undefined, arrival: Readonly<GridPoint> | undefined, refused: GridServerOptions['refused']): SimHost {
+  private static road(rapier: Rapier, cells: readonly GridCell[], strips: readonly GridCollisionStrip[], saved: string | undefined, arrival: Readonly<GridPoint> | undefined, refused: GridServerOptions['refused'], home: string): SimHost {
     if (saved !== undefined) {
       try {
         const restored = restoreSimHost(ROAD, { rapier }, decodeSimSnapshot(saved)), player = sessionPlayer(restored);
         if (renewVoidFloor(restored, cells, player.position, ROAD_SKIN)) player.motor.resetAt(player.position);
         installRoadCombat(restored);
+        dropCellWalls(restored); addZoneWalls(restored, cells, home);
         holdStrips(restored, strips.map(strip => strip.mesh));
         return restored;
       } catch (error) { refused?.(error); } // a road holds no progress but where the player stood
     }
     const road = createSimHost(ROAD, { rapier }), [x, y, z] = readableSnapshot(saved ?? '')?.players[0]?.position ?? [], stood = arrival ?? (x === undefined || y === undefined || z === undefined ? undefined : { x, y, z });
     installRoadCombat(road);
-    addCellWalls(road, cells);
+    addZoneWalls(road, cells, home);
     addVoidFloor(road, cells);
     holdStrips(road, strips.map(strip => strip.mesh));
     const player = sessionPlayer(road);

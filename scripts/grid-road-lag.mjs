@@ -72,7 +72,16 @@ try {
       const ask = gl.getProgramParameter.bind(gl);
       gl.getProgramParameter = (/** @type {WebGLProgram} */ handle, /** @type {number} */ name) => {
         const t0 = performance.now(), value = ask(handle, name), ms = performance.now() - t0;
-        if (ms > 8) { const found = (renderer.info.programs ?? []).find((/** @type {any} */ row) => row.program === handle); q.slowLinks.push({ t: Math.round(t0), ms: Math.round(ms), name: String(found?.name ?? ''), key: String(found?.cacheKey ?? '').slice(0, 700) }); }
+        if (ms > 8) {
+          const all = renderer.info.programs ?? [], found = all.find((/** @type {any} */ row) => row.program === handle), key = String(found?.cacheKey ?? '');
+          // ZE2d: what this link differs in from the same material's programs already linked: the key's comma fields that differ
+          const fields = key.split(','), siblings = all.filter((/** @type {any} */ row) => row !== found && row.name === found?.name).map((/** @type {any} */ row) => String(row.cacheKey).split(','));
+          const diffs = siblings.slice(0, 4).map((/** @type {string[]} */ other) => other.length !== fields.length ? `len ${String(other.length)}/${String(fields.length)}` : fields.map((f, i) => f === other[i] ? null : `${String(i)}:${String(other[i])}->${f}`).filter(x => x !== null).join(' '));
+          // who drew it
+          const owners = /** @type {string[]} */ ([]);
+          try { W.__wildshard.world.game.scene.traverse((/** @type {any} */ o) => { if (owners.length >= 3 || o.material === undefined) return; for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (renderer.properties.get(m)?.currentProgram?.program === handle) { const n = []; for (let at = o; at != null && n.length < 5; at = at.parent) n.push(String(at.name || at.type)); owners.push(n.join('<')); } }); } catch { /* best effort */ }
+          q.slowLinks.push({ t: Math.round(t0), ms: Math.round(ms), name: String(found?.name ?? ''), fields: fields.length, tail: fields.slice(-24).join(','), diffs, owners, env: String(W.__wildshard.world.game.scene.environment?.image?.height ?? null) });
+        }
         return value;
       };
     }
@@ -83,9 +92,9 @@ try {
       const st = W.__wildshard.shard.grid.state(), p = W.__wildshard.world.player;
       const wf = st.live?.live?.worldFeet ?? p.position;
       const now = W.__wildshard.world.game?.renderer?.info?.programs ?? [];
-      for (const program of now) if (!known.has(program)) { known.add(program); const key = String(program.cacheKey ?? ''); q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: key.slice(0, 700), again: seenKeys.has(key) }); seenKeys.add(key); }
+      for (const program of now) if (!known.has(program)) { known.add(program); const key = String(program.cacheKey ?? ''); q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: key.length > 700 ? key.slice(0, 300) + " … " + key.slice(-300) : key, again: seenKeys.has(key) }); seenKeys.add(key); }
       const live = new Set(now);
-      for (const program of held) if (!live.has(program)) q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: String(program.cacheKey ?? '').slice(0, 700), released: true });
+      for (const program of held) if (!live.has(program)) q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: ((k) => k.length > 700 ? k.slice(0, 300) + " … " + k.slice(-300) : k)(String(program.cacheKey ?? '')), released: true });
       held = live;
       q.samples.push({ t: Math.round(performance.now()), x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), inside: st.inside, phase: st.live?.crossing?.phase ?? null, card: st.cellLoading ?? null, stage: st.cellStage ?? null, ready: st.live?.live?.gameplayReady, res: st.live?.live?.residents ?? null, cx: st.live?.live?.crossings ?? null, cur: st.live?.live?.current ?? null, hy: st.hybrid?.instance ?? null, hook: st.hybrid?.hook ?? null });
     } catch (error) { q.samples.push({ err: String(error).slice(0, 700) }); } }, 50);

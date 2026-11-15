@@ -87,3 +87,8 @@
 - 17:10 (opus-gcm10, ZE3a) `road-drive-proof.mjs --from=k` drives the junction path to segment k unmeasured and measures
   from there (the corner frame reproduced in 2 minutes, not 26), and every frame over 50 ms now carries its program links,
   the objects that own them and Chromium's long-animation-frame scripts.
+- 17:28 (opus-gcm10, ZE11) The road-memory probe's board slid from Driftwood's road into Pine Hollow and an open plot: the
+  in-page server's road still crossed a walker into any cell within 6 m (its 2 m plain walls stood behind that band), and the
+  page followed. The in-page server now enters only the session's home from the road (`GridSimulation` `enterable`) and its
+  road lays the page's zone walls and buffer floors (`addZoneWalls`; a restored road drops an older build's plain walls), so
+  every other cell is reached only at its gate. `grid-zone-server-road.test.ts`.

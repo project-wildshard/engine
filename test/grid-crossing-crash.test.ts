@@ -16,8 +16,9 @@ import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
 import { bakedGridCollision } from './fixtures/gridCollision';
 
 const PLAYER = 'actor.player', SLUG = 'sunscar-dunes';
-/** On the road east of a cell: walking west (yaw -90°) crosses its seam, as `net-fuzz`'s crossing does. */
-const ARRIVAL = { x: -259, y: 0, z: 0 };
+/** On the road 9 m west of the home's (Sunscar's) west edge: the walk (yaw -90°, toward +x) crosses its seam. ZONE-ENTRY ZE11
+ *  (J352): the road enters only the session's home; any other cell only by its gate. */
+const ARRIVAL = { x: -562.5 - 259, y: 0, z: 0 };
 /** A page's storage. `dieAfter(n)` lets n more writes land and drops every one after: the tab died with a save half written. */
 class PageStorage implements SaveStorage {
   readonly items = new Map<string, string>();
