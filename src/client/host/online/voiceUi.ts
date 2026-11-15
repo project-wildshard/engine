@@ -22,7 +22,7 @@ import { voiceTalkKey, voiceTalkKeys } from '@wildshard/engine/ui/voiceSettings'
 
 const CYAN = '#8fe3ff', NAVY = 'rgba(9,22,36,.86)', RED = '#ff7a7a', AMBER = '#ffc56b';
 /** The first-time tip, the "you're on, alone" tip and the "voice off" tip go after this long. */
-const FIRST_TIP_MS = 15_000, ALONE_TIP_MS = 5000, OFF_TIP_MS = 3000;
+const FIRST_TIP_MS = 15_000, ALONE_TIP_MS = 5000, OFF_TIP_MS = 3000, BLOCKED_TIP_MS = 6000;
 const CSS = `
 #ws-voice{flex:none;position:relative;width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(143,227,255,.5);background:${NAVY};color:#9fb3c8;display:grid;place-items:center;padding:0;pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:box-shadow .12s,background .2s,border-color .2s}
 #ws-voice svg{width:20px;height:20px}
@@ -98,13 +98,19 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
   chat.form.append(button); chat.box.append(tip, peers);
   const touch = touchFirst(), act = (): string => touch ? 'Tap the mic' : `${voice.mode === 'hold' ? 'Hold' : 'Press'} ${voiceTalkKey()}`;
   // the first-time tip's clock starts when the corner first shows (NaN: not yet)
-  let dismissed = '', firstUntil = voicePrefs.read().seen ? 0 : Number.NaN, aloneUntil = 0, offUntil = 0, was: VoiceState = voice.state;
+  let blockedUntil = 0, dismissed = '', firstUntil = voicePrefs.read().seen ? 0 : Number.NaN, aloneUntil = 0, offUntil = 0, was: VoiceState = voice.state;
   const seen = (): void => { voicePrefs.write({ seen: true }); firstUntil = 0; };
   // A press is a fresh question: whatever it leads to shows, even a tip the player closed before (a second "blocked").
   const pressed = (): void => { seen(); dismissed = ''; voice.toggle(); };
   scope.listen(button, 'click', event => { event.preventDefault(); pressed(); button.blur(); });
   // V11: the key presses (toggle mode: on or off; hold mode: open while held), and its release closes a held mic wherever focus is
-  const press = (): void => { seen(); dismissed = ''; voice.press(); };
+  // FM8 32b: holding talk while voice reaches no one on voice says so (the voice-failed-blocked card); the mic still opens, so
+  // a link that comes up mid-hold carries the voice. Toggle mode's press turns voice off, which is 32's own recovery.
+  const press = (): void => {
+    seen(); dismissed = '';
+    if (voice.mode === 'hold' && voice.state === 'on' && voice.roster.size > 0 && voice.unreachable.length === voice.roster.size) blockedUntil = diagnosticNow() + BLOCKED_TIP_MS;
+    voice.press();
+  };
   listenPage(scope, 'keydown', event => { if (voiceKey(event)) press(); }, { capture: true });
   listenPage(scope, 'keyup', event => { if (isTalkKey(event.code)) voice.release(); }, { capture: true });
   listenPage(scope, 'pointerdown', event => { if (event instanceof PointerEvent && event.pointerType === 'mouse' && isTalkKey(`Mouse${String(event.button)}`) && cornerShown(document.documentElement.dataset)) press(); }, { capture: true });
@@ -123,6 +129,7 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
     if (state === 'full') return { key: 'full', text: 'Voice is full here: 8 players are on it already.', tone: 'bad' };
     // FM8 mode 32: a peer voice couldn't reach after every retry; text chat goes on, and Try again asks afresh
     const stuck = voice.unreachable;
+    if (state === 'on' && stuck.length > 0 && now < blockedUntil) return { key: 'voice-failed-blocked', text: 'Voice can\'t connect here, so no one hears you. Text chat still works.', tone: 'bad' };
     if (state === 'on' && stuck.length > 0) return { key: `voice-failed:${stuck.map(peer => peer.id).join(',')}`, text: `Voice couldn't connect${stuck.length === 1 ? ` to ${stuck[0]?.name ?? 'a player'}` : ` to ${String(stuck.length)} players`} on this network. Text chat still works.`, tone: 'bad' };
     if (state === 'on') return others.length === 0 && now < aloneUntil ? { key: 'alone', text: voice.mode === 'hold' && !touch ? `You're on voice. Hold ${voiceTalkKey()} to talk.` : 'You\'re on voice. Players here hear you once they join.', tone: 'ok' } : null;
     if (state !== 'off') return null;
@@ -176,13 +183,14 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
         text.textContent = shown.text; close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Dismiss');
         scope.listen(close, 'click', () => { dismissed = shown.key; if (shown.key === 'first') seen(); render(); });
         tip.replaceChildren(text, close);
-        if (tip.dataset['key'] === 'voice-failed') {
+        if (tip.dataset['key'] === 'voice-failed' || tip.dataset['key'] === 'voice-failed-blocked') {
           const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Try again'; again.dataset['action'] = 'retry';
           scope.listen(again, 'click', () => { again.disabled = true; again.textContent = 'Trying…'; void voice.retryUnreachable(); });
           close.before(again);
         }
       }
-      if (shown?.key.startsWith('voice-failed:') === true) tip.dataset['failmode'] = 'voice-failed'; else delete tip.dataset['failmode'];
+      const failmode = shown?.key.split(':')[0];
+      if (failmode === 'voice-failed' || failmode === 'voice-failed-blocked') tip.dataset['failmode'] = failmode; else delete tip.dataset['failmode'];
     }
     for (const id of chips.keys()) if (!voice.roster.has(id)) { chips.get(id)?.chip.remove(); chips.delete(id); }
     peers.hidden = voice.state !== 'on' || voice.roster.size === 0;

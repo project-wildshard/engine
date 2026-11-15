@@ -414,10 +414,18 @@ test('FM8 mode 32: voice that cannot reach a peer says voice-failed, and Try aga
     expect(tip()).toBe('Voice couldn\'t connect to Ann#4821 on this network. Text chat still works.');
     expect(el()?.dataset['failmode']).toBe('voice-failed');
     expect(voice.state).toBe('on'); // voice stays on for everyone it can reach; text chat never waited on it
+    // 32b: holding talk then reaches no one, and says so; the mic still opens for a link that comes up mid-hold
+    voiceSettings.write({ mode: 'hold' });
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b', bubbles: true }));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(el()?.dataset['failmode']).toBe('voice-failed-blocked');
+    expect(tip()).toBe('Voice can\'t connect here, so no one hears you. Text chat still works.');
+    expect(voice.state).toBe('on');
+    document.body.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyB', key: 'b', bubbles: true }));
     el()?.querySelector<HTMLButtonElement>('button[data-action="retry"]')?.click();
     await vi.waitFor(() => { expect(offers).toBe(2); });
     expect(voice.unreachable).toEqual([]);
     await vi.advanceTimersByTimeAsync(500);
     expect(el()?.dataset['failmode']).toBeUndefined();
-  } finally { vi.unstubAllGlobals(); Reflect.deleteProperty(navigator, 'mediaDevices'); }
+  } finally { voiceSettings.write({ mode: 'toggle' }); vi.unstubAllGlobals(); Reflect.deleteProperty(navigator, 'mediaDevices'); }
 });

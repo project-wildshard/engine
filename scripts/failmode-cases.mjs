@@ -53,7 +53,7 @@ export const CASES = Object.freeze([
   { mode: '30b', id: 'save-slow/blocked', parent: 'save-slow', owner: 'FM8s', phase: 'play', screen: 'save-slow-blocked', inject: 'Leave while 30 shows', recover: 'leave on the ack', blocked: 'FM7b live save status not built' },
   { mode: '31', id: 'save-failed', owner: 'FM8s', phase: 'play', screen: 'save-failed', inject: 'owned persistence failure', recover: 'durable ack', blocked: 'FM7b live save status not built' },
   { mode: '32', id: 'voice-failed', owner: 'FM8', phase: 'play', screen: 'voice-failed', inject: 'two peers, exhausted ICE', recover: 'linked or voice off', blocked: 'screen built (chat-corner.test.ts); the rig has no two-peer voice harness' },
-  { mode: '32b', id: 'voice-failed/blocked', parent: 'voice-failed', owner: 'FM8', phase: 'play', screen: 'voice-failed-blocked', inject: 'talk while 32 shows', recover: 'Try again', blocked: 'FM8 not built' },
+  { mode: '32b', id: 'voice-failed/blocked', parent: 'voice-failed', owner: 'FM8', phase: 'play', screen: 'voice-failed-blocked', inject: 'talk while 32 shows', recover: 'Try again', blocked: 'screen built (chat-corner.test.ts); the rig has no two-peer voice harness' },
   { mode: '33', id: 'packs-5xx', owner: 'FM6', phase: 'load', screen: 'packs-5xx', inject: 'packs status 503 before navigation, healed after 6 s', recover: 'the world loads', run: 'packsFault' },
   { mode: '34', id: 'packs-429', owner: 'FM6', phase: 'load', screen: 'packs-429', inject: 'packs status 429, Retry-After 3, healed after 6 s', recover: 'the world loads', run: 'packsFault' },
   { mode: '35', id: 'book-5xx', owner: 'FM6', phase: 'load', screen: 'book-5xx', inject: 'book status 503 before navigation, healed after 6 s', recover: 'the world loads', run: 'packsFault' },

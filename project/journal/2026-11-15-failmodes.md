@@ -27,3 +27,9 @@ A peer on voice still unlinked after every offer retry (four offers, 15 s each, 
 `data-failmode="voice-failed"` and a Try again that asks for the TURN list afresh and offers again. Voice stays on for
 everyone else. Proved in `chat-corner.test.ts` over a stub peer connection whose offers always fail; the rig has no
 two-peer voice harness, so the manifest case stays blocked, and 32b (talking while it shows) is left.
+
+## FM8 32b: holding talk when voice reaches no one
+
+In hold mode, holding talk while every peer on voice is unreachable shows `voice-failed-blocked` ("Voice can't connect here,
+so no one hears you") for 6 s with Try again. The mic still opens, so a link that comes up mid-hold carries the voice.
+Toggle mode's press is voice off, mode 32's own recovery, so it is not held.
