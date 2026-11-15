@@ -75,7 +75,8 @@ try {
         if (ms > 8) {
           const all = renderer.info.programs ?? [], found = all.find((/** @type {any} */ row) => row.program === handle), key = String(found?.cacheKey ?? '');
           // ZE2d: what this link differs in from the same material's programs already linked: the key's comma fields that differ
-          const fields = key.split(','), siblings = all.filter((/** @type {any} */ row) => row !== found && row.name === found?.name).map((/** @type {any} */ row) => String(row.cacheKey).split(','));
+          const custom = (/** @type {string} */ k) => k.slice(Math.max(0, k.lastIndexOf(',srgb,'))), head = (/** @type {string} */ k) => k.slice(0, Math.max(0, k.lastIndexOf(',srgb,')));
+          const fields = head(key).split(','), siblings = all.filter((/** @type {any} */ row) => row !== found && row.name === found?.name && custom(String(row.cacheKey)) === custom(key)).map((/** @type {any} */ row) => head(String(row.cacheKey)).split(','));
           const diffs = siblings.slice(0, 4).map((/** @type {string[]} */ other) => other.length !== fields.length ? `len ${String(other.length)}/${String(fields.length)}` : fields.map((f, i) => f === other[i] ? null : `${String(i)}:${String(other[i])}->${f}`).filter(x => x !== null).join(' '));
           // who drew it
           const owners = /** @type {string[]} */ ([]);
@@ -117,6 +118,18 @@ try {
     await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [x, z]);
   }
   await sleep(4000);
+  // ZE2d: what the boot prelinked for the road before the first walk out: each road program's environment height and light
+  // fields (the key's 3, 4, 51, 52), and the environments the page and the root scene hold now
+  /** @type {any} */ (result).bootRoad = await page.evaluate(() => {
+    const W = /** @type {any} */ (window), game = W.__wildshard.world.game, height = (/** @type {any} */ t) => t?.image?.height ?? null;
+    const programs = (game.renderer.info.programs ?? []).filter((/** @type {any} */ p) => String(p.name).startsWith('grid-')).map((/** @type {any} */ p) => { const f = String(p.cacheKey).split(','); return `${String(p.name)} ${f[3] ?? ''} ${f[4] ?? ''} ${f[51] ?? ''} ${f[52] ?? ''}`; });
+    return { programs, scene: height(game.scene.environment), root: height(game.rootScene?.environment), exterior: W.__wildshard.shard.grid.exterior?.() ?? 'none', sameScene: game.scene === game.rootScene };
+  });
+  if (process.argv.includes('--reprelink')) {
+    await page.evaluate(() => { /** @type {any} */ (window).__wildshard.shard.grid.prelink(); });
+    await sleep(5000);
+    /** @type {any} */ (result).bootRoadAgain = await page.evaluate(() => (/** @type {any} */ (window).__wildshard.world.game.renderer.info.programs ?? []).filter((/** @type {any} */ p) => String(p.name).startsWith('grid-')).map((/** @type {any} */ p) => { const f = String(p.cacheKey).split(','); return `${String(p.name)} ${f[3] ?? ''} ${f[4] ?? ''} ${f[51] ?? ''} ${f[52] ?? ''}`; }));
+  }
   // the walk's lines are in the home's own coordinates: world feet less the home cell's origin
   const originAt = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
   const local = (/** @type {any} */ s) => s[along] - originAt[along];
@@ -150,7 +163,7 @@ try {
       trace: near.filter((_, i) => i % 2 === 0).map(s => [s.t - line.t, s.x, s.z, s.inside, s.cur, s.cx, s.phase, s.card, s.stage, s.res, s.hy, s.hook]), cardMs: cards.length * 50, cards: [...new Set(cards.map(s => `${String(s.card)}:${String(s.stage)}`))], worstStopMs: worstStop, stopAt, cruiseMps: Number((cruise * 1000).toFixed(2)), phases: [...new Set(near.map(s => s.phase))],
       programs: programs.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ t: r.t - line.t, name: r.name, key: r.key, ...(r.again === true ? { again: true } : {}), ...(r.released === true ? { released: true } : {}) })),
       releasedBefore: programs.filter(r => r.released === true && r.t < line.t - 1000).map(r => ({ t: r.t - line.t, name: r.name, key: r.key })),
-      slowLinks: slowLinks.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ t: r.t - line.t, ms: r.ms, name: r.name, key: r.key })) };
+      slowLinks: slowLinks.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ ...r, t: r.t - line.t })) };
   };
   const cdp = profile && engineName === 'chromium' ? await context.newCDPSession(page) : undefined;
   let profileAt = 0;
@@ -174,6 +187,8 @@ try {
     for (const row of result.crossings.slice(-2)) console.log(`${row.crossed === true ? 'ok  ' : 'FAIL'} ${homeName} rep ${String(rep)} ${String(row.name)} ${JSON.stringify({ worst: row.worstFrameMs, p95: row.p95Ms, over50: row.over50, over100: row.over100, card: row.cardMs, stop: row.worstStopMs })}`);
   }
   await page.screenshot({ path: join(out, `${engineName}${device === '' ? '' : '-phone'}${run ? '-run' : ''}-${homeName}-road-lag.png`) });
+  // ZE2d: every road program the run linked or released, by page time (the crossings' `lineAt` place them)
+  /** @type {any} */ (result).roadPrograms = await page.evaluate(() => /** @type {any[]} */ (/** @type {any} */ (window).__road.programs).filter(p => String(p.name).startsWith('grid-') || p.name === '').map(p => { const f = String(p.key).split(','); return `${String(p.t)} ${String(p.name)} ${f[3] ?? ''} ${f[4] ?? ''} ${f[51] ?? ''} ${f[52] ?? ''}${p.released === undefined ? '' : ' released'}`; }));
   result.crossingTiming = await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().live?.crossingTiming ?? null);
   await context.close();
   code = result.crossings.every(row => row.crossed === true) && result.errors.length === 0 ? 0 : 1;

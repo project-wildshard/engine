@@ -96,3 +96,10 @@
   (worst 83 ms) where the CPU profile shows the page thread idle for most of each (another lane's browser held slot 1 from
   17:45); short reruns of those stretches are clean, but one at segment 37 linked ink-cel-valley's client-script particle
   pool (65 ms): a frozen neighbour's pool is now hidden like its creatures (`ClientScriptViews.show`).
+- 18:50 (opus-gcm10, ZE2d) Nalati's lap-1 back-in link, measured: at boot the road's roots hold only cell-lit programs
+  (`grid-road-solid` key fields 51/52 `8389648,8520707` with the 512 PMREM, `8389632,8520707` without), and a second prelink
+  asked through the new grid probe (`prelink`) adds none, though the root scene declares its exterior lighting (`exterior`:
+  1 root, no environment). The road draws `1024,132103` (no PMREM, linked ~3 s past the out line in the background) and
+  `1040,132103` with the home's 512 PMREM on the approach, linked at the back line (433 to 616 ms). So the exterior compile
+  keys the road roots with the in-cell lighting state; the next step is to find which state (field 51 bit 0x800000, field 52
+  0x820303 against 0x020407) the compile scene copies from inside the cell and match the road's.

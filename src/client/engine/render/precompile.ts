@@ -121,6 +121,12 @@ export function registerExteriorLighting(scene: THREE.Scene, owner: Scope, root:
   owner.onDispose(() => { held.roots.delete(root); if (held.roots.size === 0) exteriorLighting.delete(scene); });
 }
 
+/** The exterior lighting a scene declares (`registerExteriorLighting`): its root count and environment height, for proofs. */
+export function exteriorLightingState(scene: THREE.Object3D): { readonly roots: number; readonly environment: unknown } | null {
+  const state = exteriorLighting.get(scene as THREE.Scene);
+  return state === undefined ? null : { roots: state.roots.size, environment: state.environment === null ? null : Reflect.get(state.environment.image ?? {}, 'height') };
+}
+
 /** Hidden registered siblings cannot draw on this entered frame. Keep its entire hierarchy and any visible roots;
  * ordinary boot has no exclusion. Borrowed roots and their visibility are never changed. */
 export function entryFrameExclusions(scene: THREE.Scene, future?: THREE.Object3D): ReadonlySet<THREE.Object3D> | undefined {

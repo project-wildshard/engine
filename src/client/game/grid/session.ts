@@ -98,7 +98,7 @@ import type { ClientAssets } from '../shardfile/clientAssets';
 import { admittedGraphAuthority, clientMaterials } from '../shardfile/clientMaterials';
 import { clientTileViews, type ClientTileViews } from '../shardfile/clientViews';
 import type { ClientSkin } from '../shardfile/clientSkins';
-import { setParkedMatricesFrozen, setWarmUpHeld } from '@wildshard/engine/render/precompile';
+import { exteriorLightingState, setParkedMatricesFrozen, setWarmUpHeld } from '@wildshard/engine/render/precompile';
 import { setBuildHeldTimed } from '@wildshard/engine/core/heldTiming';
 import { setBuildUrgent } from '@wildshard/engine/core/framePacing';
 import { NeighbourLife, type NeighbourLifeCell } from './neighbourLife';
@@ -912,6 +912,9 @@ export class GridSession {
       }),
       // the live cell alone, for a sampler that must not build the whole readout four times a second (state() allocates it)
       current: () => (this.live === null ? null : this.live.live.current()),
+      // ZE2d: the road's prelink on demand, and the exterior lighting the page scene declares, for the road-lag proof
+      prelink: () => { this.prelinkViews(); },
+      exterior: () => exteriorLightingState(host.scene),
     }));
     this.constructorTiming?.('streaming');
   }
