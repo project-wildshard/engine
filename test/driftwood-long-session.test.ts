@@ -9,8 +9,8 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { mixedPopulation } from '../src/server/game/population/mixedRoster';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
-import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { canonicalSimDigest } from '../src/test/engine/simState';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { jumpOwnerClock } from './fixtures/ownerClock';
 
 // A long session on Driftwood's shipped rows, solo. The roster held 34 bodies and room for 221 returns, and the 222nd

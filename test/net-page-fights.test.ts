@@ -8,7 +8,7 @@ import { memoryElitePersistence } from '../src/shared/game/eliteSystem';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type PageProgress } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 async function nalati(page?: PageProgress, snapshot?: string) {
   const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);

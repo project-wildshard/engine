@@ -17,7 +17,7 @@ import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands, type HeadlessCommand } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // P1-E5.3-I4 (J50, J127, E5-REPLICATION §6.2, §9): a real room on the shipped Pine product, a real client over conditioned
 // links, Pine's lever rifle, and a boar crossing the crosshair at 6 m/s. The client fires at the boar it has been shown and

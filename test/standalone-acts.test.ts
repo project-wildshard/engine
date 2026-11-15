@@ -12,7 +12,7 @@ import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // P1-E5.2c: the acts and receipts through the real worker code over real MessagePorts. The page has no way to teleport, so
 // each run starts from a save whose player already stands where the act needs them.

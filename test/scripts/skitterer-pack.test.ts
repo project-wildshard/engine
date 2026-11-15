@@ -1,6 +1,6 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The scenario reads the admitted product and native physics.
 import { readFileSync } from 'node:fs';
-import { builtProduct } from '../fixtures/builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 import { beforeAll, expect, test, vi } from 'vitest';
 import * as v from 'valibot';
 import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';

@@ -10,7 +10,7 @@ import type { SimHost } from '../../src/server/engine/sim';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
-import { builtProduct } from './builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 
 // Qyran in a room: the page's wind law on a body the world raises, on the shipped product. His own save joins a world's, and an older one loads.
 

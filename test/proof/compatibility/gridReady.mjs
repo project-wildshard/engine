@@ -18,7 +18,7 @@ import { GridAssembly } from '../../../src/shared/game/grid/assembly.ts';
 import { GridSimulation } from '../../../src/server/game/grid/simulation.ts';
 import { ResidencyAllocator } from '../../../src/shared/game/grid/allocator.ts';
 import { createTrustedHeadlessResident } from '../../../src/server/host/headlessRuntime.ts';
-import { createNativeProofResident } from '../../fixtures/headless-native.ts';
+import { createNativeProofResident } from '../../../src/test/game/headlessNative.ts';
 import { leadPlayer } from '../../../src/shared/engine/sim/leadPlayer.ts';
 
 /** The same catalogue grid is used in public and Developer modes (G972). */

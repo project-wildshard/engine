@@ -14,8 +14,8 @@ import { RespawnQueue } from '../src/shared/game/population/respawn';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { canonicalSimDigest } from '../src/test/engine/simState';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { installBoarWorldFixture } from './fixtures/boar-world';
 
 // J109: a spawn point refills on a timer, faster with more players near it, up to the shard's budget. J108: taming owes

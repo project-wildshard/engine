@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read only the admitted product and actual physics bytes.
 import {readFileSync} from 'node:fs';
-import {builtProduct} from '../builtProduct';
+import {builtProduct} from '../../../src/test/game/builtProduct';
 import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
@@ -10,7 +10,7 @@ import {snapshotSimHost,serializeSimSnapshot} from '../../../src/shared/engine/s
 import {nativePopulationOf,type NativePopulation} from '../../../src/server/game/riding/nativePopulation';
 import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
 import type {WalkPoint} from '../../../src/shared/host/headlessJourney';
-import {createNativeProofResident} from '../headless-native';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {prepareHeadlessRuntime} from '../nalati-predators-native';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 

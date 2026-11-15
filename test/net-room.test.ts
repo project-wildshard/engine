@@ -21,7 +21,7 @@ import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 // P1-E5.2 (E5-REPLICATION §3.3, §9): a real room over the shipped Sunscar Dunes product, on the real codec. Only the carrier

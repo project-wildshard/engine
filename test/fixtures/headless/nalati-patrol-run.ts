@@ -4,13 +4,13 @@ import '../../../src/shared/engine/core/portableMathFirst';
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Load only the admitted product and unchanged native physics bytes.
 import {readFileSync} from 'node:fs';
-import {builtProduct} from '../builtProduct';
+import {builtProduct} from '../../../src/test/game/builtProduct';
 import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHostBytes,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
-import {canonicalSimDigest} from '../../fake/simState';
-import {createNativeProofResident} from '../headless-native';
+import {canonicalSimDigest} from '../../../src/test/engine/simState';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {prepareHeadlessRuntime,nalatiPatrolOf} from '../nalati-patrol-native';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';

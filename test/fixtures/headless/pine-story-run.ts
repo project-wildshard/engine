@@ -11,10 +11,10 @@ import {productHeadlessSections} from '../../../src/shared/host/headlessSections
 import type {HeadlessRuntimePlan} from '../../../src/server/host/headlessRuntime';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import type {HeadlessTapeObservation,HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
-import {createNativeProofResident} from '../headless-native';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
-import {installWalkRopeBodies} from './ropeBodies';
-import {installNativeWalkBounds} from './nativeBounds';
+import {installWalkRopeBodies} from '../../../src/test/game/headless/ropeBodies';
+import {installNativeWalkBounds} from '../../../src/test/game/headless/nativeBounds';
 import {installAppIdentity} from '../../../src/shared/engine/app/identity';
 import {WILDSHARD_IDENTITY} from '../../../src/client/game/identity';
 import {ForestPageSchema} from '@wildshard/format/forestPage';

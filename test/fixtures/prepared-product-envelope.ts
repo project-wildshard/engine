@@ -1,6 +1,6 @@
 import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
-import { builtProduct } from './builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 
 /** Read the normal prepare output through strict native admission. Never build
  * an author project or fall back to stale bytes during test collection. */

@@ -9,7 +9,7 @@ import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
 import type { RoomNews } from '../src/server/host/dedicated/cellProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });

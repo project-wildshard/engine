@@ -1,5 +1,5 @@
 import { beforeAll, expect, test } from 'vitest';
-import { builtProduct } from '../fixtures/builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 import { scenario as diskScenario,type DiskScriptScenario } from '../../src/sharddev/test/scriptScenario';
 
 let prepared:readonly [DiskScriptScenario,DiskScriptScenario]|undefined;

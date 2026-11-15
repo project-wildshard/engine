@@ -6,7 +6,7 @@ import {HeightPatch} from '../src/shared/engine/physics/heightPatch';
 import {ArenaRoomGround,sandWireName} from '../src/shared/game/boss/arenaGround';
 import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import {physicsState} from './fake/simState';
+import {physicsState} from '../src/test/engine/simState';
 import {NativeArenaSand} from '../src/server/game/boss/nativeArenaSand';
 import {SIM_LEVEL} from './fixtures/sim-level/level';
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';

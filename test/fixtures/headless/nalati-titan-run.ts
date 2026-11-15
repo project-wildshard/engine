@@ -5,14 +5,14 @@ import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the admitted named product and shipped physics binary.
 import {readFileSync,writeFileSync,statSync} from 'node:fs';
 import * as v from 'valibot';
-import {builtProduct} from '../builtProduct';
+import {builtProduct} from '../../../src/test/game/builtProduct';
 import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
 import {productHeadlessSections} from '../../../src/shared/host/headlessSections';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHostBytes,serializeSimSnapshot,decodeSimSnapshotBytes} from '../../../src/shared/engine/sim/snapshot';
-import {canonicalSimDigest} from '../../fake/simState';
-import {createNativeProofResident} from '../headless-native';
+import {canonicalSimDigest} from '../../../src/test/engine/simState';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {createNativeProofWorker} from '../headless-worker';
 import {prepareHeadlessRuntime,nalatiTitanOf} from '../nalati-titan-native';
 import {readArenaScriptData} from '../../../src/shared/game/boss/openArenaFight';
@@ -20,7 +20,7 @@ import {questObservation} from '../../../src/shared/game/quest/questObservation'
 import {parseChapterStoryPresentation} from '@wildshard/format/questStory';
 import {reachTitanCairn} from '../../proof/nalati-grasslands/titanTravel';
 import {titanBowPilot,titanRidersPilot} from '../../proof/nalati-grasslands/titanCombat';
-import {checkedReplayPipeline} from './checkedReplayPipeline';
+import {checkedReplayPipeline} from '../../../src/test/game/headless/checkedReplayPipeline';
 import type {HeadlessTapeObservation} from '../../../src/shared/host/headlessTape';
 import {TitanHandoffSchema,checkTitanLedger,titanWireHash,titanInputDigest,titanObservationDigest,type TitanHandoff,type TitanPart} from './titanHandoff';
 import type {HeadlessCommand,HeadlessEffect} from '../../../src/shared/host/tickProtocol';

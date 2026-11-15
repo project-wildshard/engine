@@ -16,7 +16,7 @@ import { netInteractCommands } from '../src/shared/host/standalone/netInput';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 // J107: a fallen player returns to their own last place, alone, while the room carries on.

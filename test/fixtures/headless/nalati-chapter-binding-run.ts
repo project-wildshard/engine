@@ -5,11 +5,11 @@ import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- The original shipped Rapier module is part of the native product proof.
 import {readFileSync} from 'node:fs';
 import {beginProductSession} from './productSession';
-import {createNativeProofResident} from '../headless-native';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {prepareHeadlessRuntime} from '../nalati-chapter-native';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {decodeSimSnapshot,snapshotSimHost} from '../../../src/shared/engine/sim/snapshot';
-import {physicsState,sameBytes} from '../../fake/simState';
+import {physicsState,sameBytes} from '../../../src/test/engine/simState';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import { leadSnapshot } from '@wildshard/engine/sim/snapshot';

@@ -12,8 +12,8 @@ import { openWorldAdapter, type WorldAdapter } from '../src/server/host/openWorl
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { populationCensus } from '../src/shared/game/population/census';
-import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { canonicalSimDigest } from '../src/test/engine/simState';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // P1-E3.1b: Driftwood's population on the shipped headless host, from its built product and nothing else: the plan and
 // rows under server/, no fixture and no overlay.

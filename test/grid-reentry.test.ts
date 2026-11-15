@@ -5,14 +5,14 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost, serializeSimSnapshot, decodeSimSnapshot } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { createShardfileSim, bindShardfileSim, prepareShardfileSimRestore } from '../src/server/game/plugin/simulation';
 import { createTrustedHeadlessResident, type PrepareHeadlessRuntime } from '../src/server/host/headlessRuntime';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { ScriptHost } from '../src/shared/engine/script/host';
 import { productHeadlessSections } from '../src/shared/host/headlessSections';
-import { createNativeProofResident, prepareProductPlan } from './fixtures/headless-native';
+import { createNativeProofResident, prepareProductPlan } from '../src/test/game/headlessNative';
 import { prepareHeadlessRuntime as ninePlan } from './fixtures/nine-headless';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 

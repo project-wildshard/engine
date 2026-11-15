@@ -3,7 +3,7 @@ import { beforeAll, expect, test } from 'vitest';
 import { writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Optional scenario receipts use the caller environment.
 import { env } from 'node:process';
-import { builtProduct } from '../fixtures/builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 import { scenario as diskScenario } from '../../src/sharddev/test/scriptScenario';
 import { scenarioHostHash, scriptScenarioReceipt } from '../../scripts/script-scenario-metrics.mjs';
 

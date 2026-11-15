@@ -18,7 +18,7 @@ import {HeadlessSimulation} from '../../src/server/host/headless';
 import {loadHeadlessProduct} from '../../src/server/host/headlessProduct';
 import {productHeadlessSections} from '../../src/shared/host/headlessSections';
 import {outputDescriptor} from '../../src/shared/game/shardfile/outputDescriptor';
-import {builtProduct} from '../fixtures/builtProduct';
+import {builtProduct} from '../../src/test/game/builtProduct';
 import {compileProductWorker} from '../fixtures/headless/compileProductWorker';
 import {physicsRoutes} from '../fixtures/headless/physicsRoutes';
 

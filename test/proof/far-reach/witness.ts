@@ -9,7 +9,7 @@ import { createSimHost, type SimHost } from '../../../src/server/engine/sim';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost } from '../../../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../../../src/server/engine/sim/restore';
 import { loadRapier, type Rapier } from '../../../src/shared/engine/physics/rapier';
-import { canonicalSimDigest, simWireV1 } from '../../fake/simState';
+import { canonicalSimDigest, simWireV1 } from '../../../src/test/engine/simState';
 import { SaveStore, type SaveStorage } from '../../../src/shared/engine/saves/store';
 import { Ledger, LedgerEmitter, type LedgerReceipt } from '../../../src/shared/game/ledger';
 import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';

@@ -8,7 +8,7 @@ import type { MoverPose } from '../src/shared/engine/physics/mover';
 import { installFollowedMovers } from '../src/client/game/plugin/followedMovers';
 import { wirePage } from '../src/client/game/shardfile/wirePage';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // GRID-CROSSING GC30b (preview 1b2f1ac8, Driftwood to Far Reach): "proof.worker.present: null pointer passed to rust". A cell's
 // movers lend the wire their views (`wirePage.movers`), and the cell's scope frees their bodies when it goes, but the views

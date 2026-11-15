@@ -9,10 +9,10 @@ import { snapshotSimHostBytes, serializeSimSnapshot, decodeSimSnapshot } from '.
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
-import { prepareProductPlan as prepareHeadlessRuntime } from './fixtures/headless-native';
+import { builtProduct } from '../src/test/game/builtProduct';
+import { prepareProductPlan as prepareHeadlessRuntime } from '../src/test/game/headlessNative';
 import { nalatiNativeAssets } from './proof/nalati-grasslands/nativeAssets';
-import { canonicalSimDigest } from './fake/simState';
+import { canonicalSimDigest } from '../src/test/engine/simState';
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 
 test('Nalati declared assembly retains its native 100 + 30 tick continuation', async () => {

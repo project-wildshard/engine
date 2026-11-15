@@ -12,7 +12,7 @@ import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '
 import { installDeclaredKitItems, type DeclaredKitItems } from '../src/server/game/shardfile/declaredKitItems';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // TEMPLATE-E2E TC-E4 (J361, Jake 2026-11-15: "Mossgate's sword is found on a rack"): Template's sword leaves the loadout's
 // hand for a rack. It starts on that rack for each player; the rack's take (an item scene, action 3) puts it in that player's

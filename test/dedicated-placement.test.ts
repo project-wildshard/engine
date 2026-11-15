@@ -15,7 +15,7 @@ import type { PlacementFile } from '../src/shared/game/grid/placementRows';
 import { cookIndexPath, serverPackBookPath, type ServerPack } from '../src/shared/game/shardfile/serverPack';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { roomBench, serverInput, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
 

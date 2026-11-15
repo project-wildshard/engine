@@ -6,7 +6,7 @@ import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
 import {openProductSession} from './productSession';
-import {builtProduct} from '../builtProduct';
+import {builtProduct} from '../../../src/test/game/builtProduct';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {productHeadlessSections} from '../../../src/shared/host/headlessSections';
 import {createTrustedHeadlessResident} from '../../../src/server/host/headlessRuntime';

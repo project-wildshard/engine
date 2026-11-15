@@ -10,7 +10,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { HeadlessCommand } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { titanBowPilot } from './proof/nalati-grasslands/titanCombat';
 
 test('a rider at a gallop takes the Titan\'s heart to his next phase with real arrows', { timeout: 300_000 }, async () => {

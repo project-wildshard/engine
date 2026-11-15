@@ -8,13 +8,13 @@ import assert from 'node:assert/strict';
 import type { SimHost } from '../../../src/server/engine/sim';
 import { snapshotSimHostBytes, serializeSimSnapshot } from '../../../src/shared/engine/sim/snapshot';
 import type { Rapier } from '../../../src/shared/engine/physics/rapier';
-import { createNativeProofResident, prepareProductPlan as prepareHeadlessRuntime } from '../../fixtures/headless-native';
+import { createNativeProofResident, prepareProductPlan as prepareHeadlessRuntime } from '../../../src/test/game/headlessNative';
 import {createNalatiTamingPilot} from './tamingPilot';
 import source from '../../fixtures/nalati-product-source';
 import { createNativeBakeReader } from '@wildshard/engine/game/population/nativeBake';
 import { nativeTamingOf } from '@wildshard/engine/game/riding/nativeTaming';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
-import { canonicalSimDigest } from '../../fake/simState';
+import { canonicalSimDigest } from '../../../src/test/engine/simState';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const physics=(()=>{

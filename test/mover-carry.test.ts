@@ -14,7 +14,7 @@ import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { emptyShardfile } from '../src/shared/host/author';
 import { builtProduct } from './fixtures/engine-lift/product';
-import { createNativeProofResident,prepareProductPlan } from './fixtures/headless-native';
+import { createNativeProofResident,prepareProductPlan } from '../src/test/game/headlessNative';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 const row = structuredClone(canoeRow), level = { ...SIM_LEVEL, entities: [] };

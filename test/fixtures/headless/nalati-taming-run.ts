@@ -5,15 +5,15 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Assert actual native ownership and checkpoint continuation.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {builtProduct} from '../builtProduct';
+import {builtProduct} from '../../../src/test/game/builtProduct';
 import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHostBytes,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
 import {nativeTamingOf} from '../../../src/server/game/riding/nativeTaming';
 import {mountedPlayerOf} from '../../../src/server/game/riding/native';
-import {createNativeProofResident,prepareProductPlan as prepareHeadlessRuntime} from '../headless-native';
-import {canonicalSimDigest} from '../../fake/simState';
+import {createNativeProofResident,prepareProductPlan as prepareHeadlessRuntime} from '../../../src/test/game/headlessNative';
+import {canonicalSimDigest} from '../../../src/test/engine/simState';
 import {walkNalatiHorsePlains} from '../../proof/nalati-grasslands/horsePlainsWalk';
 import {createNalatiTamingPilot} from '../../proof/nalati-grasslands/tamingPilot';
 import {TickCommandSchema,type HeadlessCommand} from '../../../src/shared/host/tickProtocol';

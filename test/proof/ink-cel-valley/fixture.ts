@@ -4,7 +4,7 @@ import { Vector3 } from 'three';
 import { inkProofProduct } from './product';
 import { createShardfileSim, bindShardfileSim, type ShardfileSimulation, type ShardfileSimPorts } from '../../../src/server/game/plugin/simulation';
 import { loadRapier, type Rapier } from '../../../src/shared/engine/physics/rapier';
-import { canonicalSimDigest } from '../../fake/simState';
+import { canonicalSimDigest } from '../../../src/test/engine/simState';
 import { SaveStore, type SaveStorage } from '../../../src/shared/engine/saves/store';
 import { Ledger, installLedgerEmitter, type LedgerEmitter } from '../../../src/shared/game/ledger';
 import { snapshotSimHost } from '../../../src/shared/engine/sim/snapshot';

@@ -8,7 +8,7 @@ import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // P1-E5.2c (J102): a corrupt save falls back without losing the last good one, through the real worker code and a real restore.
 const SLUG = 'sunscar-dunes', FIRST = `wildshard.standalone-${SLUG}`, SECOND = `wildshard.standalonealt-${SLUG}`;

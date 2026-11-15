@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { afterAll, expect, test } from 'vitest';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { clientPageGround } from '../src/shared/game/shardfile/clientGround';
 import { admittedTerrain } from '../src/server/game/plugin/simulation';

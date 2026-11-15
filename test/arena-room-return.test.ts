@@ -11,7 +11,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { Flags } from '../src/shared/engine/world/interact/flags';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // SERVER-CELLS SC10 item 3 (J328): a grid cell's world is never rebuilt, so when a served world's room boss stands again (SC5) its
 // record's world flags (`boss.<id>.defeated`, `.paid`) must clear with it, as a fresh world's would. Before, they only ever set.

@@ -6,7 +6,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // A resident rolls its herds as it installs, on the Math a save will restore them on. This file takes no Math first, on purpose.
 test('a resident is on the sim Math before it rolls anything', async () => {

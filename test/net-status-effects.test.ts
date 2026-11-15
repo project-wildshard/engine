@@ -20,7 +20,7 @@ import { installStatusEffects } from '../src/server/game/shardfile/statusEffects
 import { statusLine } from '../src/shared/game/systems/effects/starterEffects';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import STARTER from '../src/shared/game/systems/effects/starterRows.json' with { type: 'json' };
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 const POISON = STARTER.find(row => row.id === 'effect.poison');
 const BLOB = 'grey-blob:1', HEAVY = 30;

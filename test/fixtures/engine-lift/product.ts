@@ -1,6 +1,6 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Ring 1 must actually use the server-only pin.
 import { existsSync, readFileSync } from 'node:fs';
-import { builtProduct as fullProduct } from '../builtProduct';
+import { builtProduct as fullProduct } from '../../../src/test/game/builtProduct';
 import { outputDescriptor, serverReadsFile } from '../../../src/shared/game/shardfile/outputDescriptor';
 import type { ShardProduct } from '../../../src/shared/game/shardfile/shardProduct';
 

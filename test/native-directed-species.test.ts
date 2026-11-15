@@ -18,11 +18,11 @@ import type { Animal } from '../src/client/engine/entities/AnimalView';
 import type { ThinkCtx } from '../src/shared/engine/entities/species/registry';
 import type { DamageRequest } from '../src/shared/engine/combat/pipeline';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
-import { builtProduct } from './fixtures/builtProduct';
-import { createNativeProofResident } from './fixtures/headless-native';
+import { builtProduct } from '../src/test/game/builtProduct';
+import { createNativeProofResident } from '../src/test/game/headlessNative';
 import { prepareNalatiWorld } from './fixtures/nalati-world';
 import { readPatrolIntake } from '../src/server/game/boss/patrolNative';
-import { canonicalSimDigest } from './fake/simState';
+import { canonicalSimDigest } from '../src/test/engine/simState';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 test('a bound ghost rider decides and scales hits through its law natively, and binding alone changes nothing', async () => {

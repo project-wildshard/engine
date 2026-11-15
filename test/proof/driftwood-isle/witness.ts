@@ -21,11 +21,11 @@ import { serializeSimSnapshot, snapshotSimHost } from '../../../src/shared/engin
 import { SaveStore, type SaveStorage } from '../../../src/shared/engine/saves/store';
 import { Ledger, LedgerEmitter, type LedgerReceipt } from '../../../src/shared/game/ledger';
 import type { TrustedHeadlessResident } from '../../../src/server/host/headlessRuntime';
-import { createNativeProofResident, prepareProductPlan } from '../../fixtures/headless-native';
+import { createNativeProofResident, prepareProductPlan } from '../../../src/test/game/headlessNative';
 import type { TickWorkerHost } from '../../../src/server/host/tickWorkerHost';
 import { createNativeProofWorker } from '../../fixtures/headless-worker';
 import { TickCommandSchema, TickEffectSchema, type HeadlessCommand, type HeadlessEffect } from '../../../src/shared/host/tickProtocol';
-import { canonicalSimDigest, simWireV1 } from '../../fake/simState';
+import { canonicalSimDigest, simWireV1 } from '../../../src/test/engine/simState';
 import { simMismatchError } from '../../fake/simMismatch';
 import { playDriftwood } from './tape';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';

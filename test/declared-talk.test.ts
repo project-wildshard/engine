@@ -12,7 +12,7 @@ import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // TE-ENG3: a quest-giver from rows alone (`test/fixtures/declared-talk/rows.json`), on Template's product. Its talk offers a quest;
 // the accept starts it, a region lights the lamp, the report finishes it, and it pays its coins and files its fact.

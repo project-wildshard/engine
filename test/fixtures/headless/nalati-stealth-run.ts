@@ -10,7 +10,7 @@ import {snapshotSimHost,serializeSimSnapshot} from '../../../src/shared/engine/s
 import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
 import {StealthRowsSchema} from '@wildshard/format/stealth';
 import type {HeadlessCommand,HeadlessEffect} from '../../../src/shared/host/tickProtocol';
-import {createNativeProofResident} from '../headless-native';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {prepareHeadlessRuntime} from '../nalati-stealth-native';
 import {beginProductSession} from './productSession';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';

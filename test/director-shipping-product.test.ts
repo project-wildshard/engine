@@ -2,7 +2,7 @@ import {expect,test} from 'vitest';
 import {Scope} from '../src/shared/engine/app/scope';
 import {readDirectorProduct} from '../src/shared/game/plugin/director';
 import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
-import {builtProduct} from './fixtures/builtProduct';
+import {builtProduct} from '../src/test/game/builtProduct';
 import {pineDirector,driftwoodDirector} from './fixtures/director-modules';
 
 for(const [slug,module] of [['pine-hollow',pineDirector],['driftwood-isle',driftwoodDirector]] as const){

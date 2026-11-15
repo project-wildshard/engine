@@ -13,7 +13,7 @@ import { exportSeats, importSeats } from '../src/server/game/plugin/playerSeats'
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // SR11 (C8, C9): Template's whip and lantern run on the server, fed by a player's wire, as the page's runtime did before the flip.
 async function template(): Promise<HeadlessRuntimeInput> {

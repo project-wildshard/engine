@@ -17,7 +17,7 @@ import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
 import { stepResident } from '../src/shared/host/standalone/netInput';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { nineNativeConstants } from './fixtures/nine-native-constants';
 import { nineNativeOracle } from './fixtures/nine-native-oracle';
 

@@ -1,5 +1,5 @@
 import { beforeAll, expect, test } from 'vitest';
-import { builtProduct } from '../fixtures/builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 import { scenario, type DiskScriptScenario } from '../../src/sharddev/test/scriptScenario';
 import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
 

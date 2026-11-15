@@ -1,4 +1,4 @@
-import {retainRestoredWalkBodies} from './headless/ropeBodies';
+import {retainRestoredWalkBodies} from '../../src/test/game/headless/ropeBodies';
 import { prepareNativeCoinRecipe } from './native-coin-recipe';
 import { driftwoodNativeInputs } from '../../src/shards/driftwood-isle/generators/nativeServer';
 import * as v from 'valibot';

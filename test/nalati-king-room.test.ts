@@ -8,7 +8,7 @@ import { arenaEntryOf } from '../src/server/game/boss/arenaRoomEntry';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // The Golden King from Nalati's product, for a room. A tape's resident has no such fight, so its saves keep their adapters.
 const KING_ORIGIN = { x: -40, y: 140, z: -95 }, ROOM_REWARD = [-40, 0, -103.3];

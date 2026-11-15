@@ -4,7 +4,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, it } from 'vitest';
 import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
-import { builtProduct } from './builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
 import { productHeadlessSections } from '../../src/shared/host/headlessSections';
 import { HeadlessSimulation } from '../../src/server/host/headless';

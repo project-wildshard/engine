@@ -4,7 +4,7 @@ import { ReturnProgram } from '../../src/shared/game/population/returnProgram';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read only admitted product and native physics bytes.
 import { readFileSync } from 'node:fs';
 import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
-import { createNativeProofResident, prepareProductPlan } from './headless-native';
+import { createNativeProofResident, prepareProductPlan } from '../../src/test/game/headlessNative';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier } from '../../src/shared/engine/physics/rapier';
 import legacy from './quest-step-legacy-saves.json' with { type: 'json' };

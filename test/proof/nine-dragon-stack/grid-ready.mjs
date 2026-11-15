@@ -4,7 +4,7 @@ import { prepareHeadlessRuntime } from '../../fixtures/nine-headless.ts';
 // Read the ordinary checked runtime product; authoring generators need build-only raw imports.
 // oxlint-disable-next-line import/no-nodejs-modules -- Native proof reads the admitted local payload inventory.
 import { readFileSync } from 'node:fs';
-import { builtProduct } from '../../fixtures/builtProduct.ts';
+import { builtProduct } from '../../../src/test/game/builtProduct.ts';
 import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct.ts';
 import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor.ts';
 import { proveTrustedGridReady } from '../compatibility/gridReady.mjs';

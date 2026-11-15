@@ -1,7 +1,7 @@
-import {installBounds} from '../../../src/client/engine/world/bounds';
-import {floorBelow} from '../../../src/shared/engine/physics/query';
-import type {Bounds} from '../../../src/shared/engine/level/spec';
-import type {SimHost} from '../../../src/server/engine/sim';
+import {installBounds} from '../../../client/engine/world/bounds';
+import {floorBelow} from '../../../shared/engine/physics/query';
+import type {Bounds} from '../../../shared/engine/level/spec';
+import type {SimHost} from '../../../server/engine/sim';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const declared=new WeakMap<SimHost,Bounds>();

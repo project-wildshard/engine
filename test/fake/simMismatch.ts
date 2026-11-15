@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import process from 'node:process';
 import { capturedNumberPathProbe } from '../../scripts/number-path-probe.mjs';
 import { decodeSimSnapshot, type SimSnapshot } from '../../src/shared/engine/sim/snapshot';
-import { canonicalSimDigest, physicsState } from './simState';
+import { canonicalSimDigest, physicsState } from '../../src/test/engine/simState';
 
 interface FieldDifference { path: string; expected: unknown; actual: unknown; record?: string }
 function preview(value: unknown, limit = 512): string {

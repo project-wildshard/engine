@@ -2,8 +2,8 @@ import * as v from 'valibot';
 import { NATIVE_ASSEMBLY_FILE, parseNativeAssembly } from '@wildshard/format/nativeAssembly';
 import type { ShardProduct } from '../../src/shared/game/shardfile/shardProduct';
 import type { PrepareHeadlessRuntime } from '../../src/server/host/headlessRuntime';
-import { prepareProductPlan } from './headless-native';
-import { registerNativeWalkBounds } from './headless/nativeBounds';
+import { prepareProductPlan } from '../../src/test/game/headlessNative';
+import { registerNativeWalkBounds } from '../../src/test/game/headless/nativeBounds';
 
 // CI21 (J232): engine's copy reads Nine's walk bounds from the pinned product's own `ui/level` manifest section, not from
 // shard source (J65). Same plan, same claw, same bounds as shard-nine-dragon's test/fixtures/nine-headless.ts.

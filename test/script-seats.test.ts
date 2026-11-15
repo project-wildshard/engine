@@ -5,7 +5,7 @@ import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 

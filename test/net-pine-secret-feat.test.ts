@@ -10,7 +10,7 @@ import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 const FEAT = 'pine.feat.secrets', SECRETS = ['secret:vista', 'secret:log', 'secret:islet'] as const;
 

@@ -5,7 +5,7 @@ import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {floorBelow} from '../src/shared/engine/physics/query';
 import {createShardfileSim} from '../src/server/game/plugin/simulation';
 import {emptyShardfile} from '../src/shared/host/author';
-import {installNativeWalkBounds,registerNativeWalkBounds} from './fixtures/headless/nativeBounds';
+import {installNativeWalkBounds,registerNativeWalkBounds} from '../src/test/game/headless/nativeBounds';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 test('walk bounds activation is explicit and installs one owner per resident',async()=>{

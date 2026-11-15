@@ -1,8 +1,8 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- A witness's continuation hash is a sha256 of the canonical state.
 import { createHash } from 'node:crypto';
 import RAPIER, { RigidBodyType, type Collider, type World } from '@dimforge/rapier3d-simd';
-import { Physics } from '../../src/shared/engine/physics/Physics';
-import { decodeSimSnapshot, type SimSnapshot, type SimSnapshotBytes } from '../../src/shared/engine/sim/snapshot';
+import { Physics } from '../../shared/engine/physics/Physics';
+import { decodeSimSnapshot, type SimSnapshot, type SimSnapshotBytes } from '../../shared/engine/sim/snapshot';
 
 /**
  * A sim snapshot's native physics as restored world state, the one canonical form of "the same world" (SF72, E435).

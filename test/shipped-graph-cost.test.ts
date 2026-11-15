@@ -1,7 +1,7 @@
 import {afterAll,expect,test} from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the committed pin list and the products `pnpm pins` installed from it.
 import {existsSync,readFileSync,readdirSync} from 'node:fs';
-import {builtProduct} from './fixtures/builtProduct';
+import {builtProduct} from '../src/test/game/builtProduct';
 import {shippedGraphCosts,type ShippedGraphCost} from './fixtures/shipped-graph-costs';
 
 // CI21 (J232): engine holds no shard source now; every shipped product it reads is a pinned one (`pnpm pins`).

@@ -28,7 +28,7 @@ import { QUEST_STEP } from '../../../src/shards/pine-hollow/generators/questProm
 import { nativeInventorySchema } from '../../../src/shared/game/inventoryLaw';
 import wardens from '../../../src/shards/pine-hollow/data/wardensHollow.json' with { type: 'json' };
 import bossRows from '../../../src/shards/pine-hollow/data/bossEncounter.json' with { type: 'json' };
-import { canonicalSimDigest, simWireV1 } from '../../fake/simState';
+import { canonicalSimDigest, simWireV1 } from '../../../src/test/engine/simState';
 import { SaveStore, type SaveStorage } from '../../../src/shared/engine/saves/store';
 import { Ledger, LedgerEmitter, type LedgerReceipt } from '../../../src/shared/game/ledger';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';

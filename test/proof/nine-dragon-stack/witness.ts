@@ -10,9 +10,9 @@ import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescr
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify native blobs against the admitted output inventory.
 import { createHash } from 'node:crypto';
 import { loadRapier, type Rapier } from '../../../src/shared/engine/physics/rapier';
-import { canonicalSimDigest, simWireV1 } from '../../fake/simState';
+import { canonicalSimDigest, simWireV1 } from '../../../src/test/engine/simState';
 import { decodeSimSnapshot } from '../../../src/shared/engine/sim/snapshot';
-import { createNativeProofAdapter } from '../../fixtures/headless-native';
+import { createNativeProofAdapter } from '../../../src/test/game/headlessNative';
 import { prepareHeadlessRuntime } from '../../fixtures/nine-headless';
 import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
 import type { TickWorkerHost } from '../../../src/server/host/tickWorkerHost';

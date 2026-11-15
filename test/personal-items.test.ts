@@ -11,7 +11,7 @@ import * as v from 'valibot';
 import { installPersonalLoot, personalItemTable, type PersonalLootPorts } from '../src/server/game/loot/personal';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { ledgerFilings } from '../src/server/host/standalone/ledgerFilings';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 // J105: an item is a personal roll too, through the ledger, for each player who earned it.

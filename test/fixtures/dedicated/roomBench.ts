@@ -15,7 +15,7 @@ import { memoryPlayerSaves } from '../../../src/server/host/dedicated/playerSave
 import { World, type WorkerLink, type WorldOptions } from '../../../src/server/host/dedicated/world';
 import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
 import type { HeadlessRuntimeInput } from '../../../src/server/host/headlessRuntime';
-import { builtProduct } from '../builtProduct';
+import { builtProduct } from '../../../src/test/game/builtProduct';
 
 export async function serverInput(slug: string): Promise<HeadlessRuntimeInput> {
   const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);

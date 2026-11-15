@@ -8,7 +8,7 @@ import { contentHash } from '../src/shared/game/shardfile/contentHash';
 import { isBuildValidatedOutput } from '../src/shared/game/shardfile/outputDescriptor';
 import { answerHeldReads, askHeldReads } from '../src/shared/host/standalone/heldReads';
 import { fetchServerProduct } from '../src/server/host/standalone/serverProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 test('a held read crosses the port, and a miss or a failed read is a null', async () => {
   const { port1, port2 } = new MessageChannel();

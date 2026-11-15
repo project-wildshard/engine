@@ -188,7 +188,7 @@ test('J217 (LD6): a newer deploy shares unchanged code and still serves an old b
   const output = (name: string, shared: Readonly<Record<string, string>>): string => {
     const dir = join(root, name); mkdirSync(join(dir, `b/${name}`), {recursive: true}); mkdirSync(join(dir, 'b/c'), {recursive: true});
     writeFileSync(join(dir, 'version.json'), JSON.stringify({build: name}));
-    writeFileSync(join(dir, `b/${name}/main-${name.repeat(8)}.js`), `import "../c/${Object.keys(shared).join('";import "../c/')}";`);
+    writeFileSync(join(dir, `b/${name}/main-${name.repeat(8)}.js`), `import "../c/${Object.keys(shared).join('";import "../c')}";`);
     for (const [file, body] of Object.entries(shared)) writeFileSync(join(dir, `b/c/${file}`), body);
     return dir;
   };

@@ -35,8 +35,8 @@ import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands, type HeadlessCommand } from '../src/shared/host/tickProtocol';
-import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { canonicalSimDigest } from '../src/test/engine/simState';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 // P1-E3.2: hits and damage settled by the shipped headless host (`createTrustedHeadlessResident`, what the standalone

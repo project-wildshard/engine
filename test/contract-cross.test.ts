@@ -42,7 +42,7 @@ import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // WIRE-STABILITY WR6, engine's half of the cross-version harness (plan section 7). `@wildshard/wire-released` is the wire
 // at the last release (shardfile 669d1fc, WR4's last codec commit, until `wire-v1.0.0` exists) installed beside the wire

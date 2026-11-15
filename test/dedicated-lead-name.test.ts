@@ -13,7 +13,7 @@ import type { NetClass } from '../src/shared/engine/net/schema';
 import { LEAD_SEAT } from '../src/server/host/standalone/cellWorld';
 import { LEFT } from '../src/server/host/dedicated/socketPump';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // A room's first seat stands in its lead body (`actor.player`), and the next player to take it is someone else. A body's
 // Name travels once, in its spawn, so the lead's Name must go out again (a new spawn) when its holder changes: to a page

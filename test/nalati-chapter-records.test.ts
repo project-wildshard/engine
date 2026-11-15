@@ -11,10 +11,10 @@ import {AdventurePersistenceSchema} from '@wildshard/format/namedJsonContracts';
 import {parseChapterStoryPresentation} from '@wildshard/format/questStory';
 import type {PrepareHeadlessRuntime} from '../src/server/host/headlessRuntime';
 import type {SimHost} from '../src/server/engine/sim';
-import {builtProduct} from './fixtures/builtProduct';
-import {createNativeProofResident,prepareProductPlan as prepareNalati} from './fixtures/headless-native';
+import {builtProduct} from '../src/test/game/builtProduct';
+import {createNativeProofResident,prepareProductPlan as prepareNalati} from '../src/test/game/headlessNative';
 import {prepareChapterRecords,type ChapterRecords} from '../src/server/game/quest/chapterRecords';
-import {canonicalSimDigest} from './fake/simState';
+import {canonicalSimDigest} from '../src/test/engine/simState';
 
 test('chapter saved reads borrow actual native records and restore without granting outcomes',async()=>{
   const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory),shard=product.shardfile;

@@ -1,5 +1,5 @@
 import {expect,test} from 'vitest';
-import {checkedReplayPipeline} from './fixtures/headless/checkedReplayPipeline';
+import {checkedReplayPipeline} from '../src/test/game/headless/checkedReplayPipeline';
 
 function gate():{promise:Promise<void>;release:()=>void}{
   let release=():void=>{throw new Error('Gate is not installed');};

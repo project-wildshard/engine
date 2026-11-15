@@ -17,7 +17,7 @@ import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
 import { bakedGridCollision } from './fixtures/gridCollision';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // An exact save is one build's: a later build that changes a level, a creature or an adapter refuses the whole world. The player's progress still
 // goes on, through the real worker code, or every such deploy takes it from them.

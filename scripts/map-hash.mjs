@@ -10,12 +10,12 @@ import { shardSourceDir, shardSourceFolders } from './shard-outputs.mjs';
 
 // Sharp resolves from this file: engine's own devDependency here, the consumer's through the optional
 // `sharp` peer when a shard repo or sharddev runs this script from its install of engine.
-const sharp = createRequire(import.meta.url)('sharp');
 
 /** Hash decoded sRGB RGBA8 pixels and their dimensions, independent of image encoding and metadata.
  * This binds a stamp to its raster; world freshness still requires the official map bake.
  * @param {string} image @returns {Promise<string>} */
 export async function mapPixelHash(image) {
+  const sharp = createRequire(import.meta.url)('sharp');
   // Decode these exact bytes: libvips' filename cache can retain a previous
   // raster when an official bake replaces the same path within one clock tick.
   const { data, info } = await sharp(readFileSync(image), { limitInputPixels: 4096 * 4096, animated: false, failOn: 'warning' })

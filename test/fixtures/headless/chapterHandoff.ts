@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import * as v from 'valibot';
 import {HeadlessTapePlanSchema,HeadlessTapeReportSchema} from '../../../src/shared/host/tickProtocol';
 import {decodeSimSnapshotBytes,type SimSnapshot,type SimSnapshotBytes} from '../../../src/shared/engine/sim/snapshot';
-import {physicsState} from '../../fake/simState';
+import {physicsState} from '../../../src/test/engine/simState';
 import {PACKED_CHAPTER_TAMING,unpackChapterTaming} from './chapterObservation';
 import {chapterReportUsesCodec,unpackChapterReport} from './chapterReportCodec';
 import type {HeadlessTapeReport} from '../../../src/shared/host/headlessTape';

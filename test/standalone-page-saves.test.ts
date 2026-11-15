@@ -20,7 +20,7 @@ import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { importPageSaves, type IndexedSaves } from '../src/client/engine/saves/indexed';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // A player's saves are the page's: the server opens them, with its own world rebuilt, and carries on from what they say.
 const PREFIX = 'wildshard.save.v2.';

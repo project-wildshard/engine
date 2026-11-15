@@ -3,13 +3,12 @@ import {writeSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- A process-wide CPU sample belongs to the recorder, not each worker thread.
 import {isMainThread} from 'node:worker_threads';
 
-const recorders=new Set(['nalati-awareness-run.ts','nalati-discovery-run.ts']);
 let registered=false;
 
 /** Observe complete real recorder processes without changing their verdict or simulation. */
 export function recordNativeProcessUsage():void {
   const entry=process.argv[1]?.replaceAll('\\','/').split('/').at(-1);
-  if(!isMainThread||registered||!recorders.has(entry??''))return;
+  if(!isMainThread||registered)return;
   registered=true;
   process.once('exit',exitCode=>{
     try{

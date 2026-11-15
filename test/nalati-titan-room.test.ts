@@ -13,7 +13,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netInteractCommands } from '../src/shared/host/standalone/netInput';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // The Storm Titan from Nalati's product, for a room. A tape's resident has no such fight, so its saves keep their adapters.
 let rapier: Rapier;

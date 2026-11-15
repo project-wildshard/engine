@@ -5,12 +5,12 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native behavior assertions run in this bounded child.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {builtProduct} from '../builtProduct';
+import {builtProduct} from '../../../src/test/game/builtProduct';
 import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {mountedPlayerOf} from '../../../src/server/game/riding/native';
-import {createNativeProofResident} from '../headless-native';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {createNativeProofWorker} from '../headless-worker';
 import {productHeadlessSections} from '../../../src/shared/host/headlessSections';
 import {runTrustedHeadlessTape,type HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';

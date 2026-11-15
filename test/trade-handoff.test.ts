@@ -2,7 +2,7 @@
 import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
 import {TradeHandoffSchema,tradeWire,tradeRead,tradeHash,checkTradeLedger,checkTradeHandoff,type TradePart,type TradeHandoff} from './fixtures/headless/tradeHandoff';
-import {retainRestoredWalkBodies} from './fixtures/headless/ropeBodies';
+import {retainRestoredWalkBodies} from '../src/test/game/headless/ropeBodies';
 import {createSimHost} from '../src/server/engine/sim';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';

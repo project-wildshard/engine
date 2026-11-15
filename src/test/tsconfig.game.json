@@ -16,6 +16,9 @@
   "references": [
     {
       "path": "../../tsconfig.game.json"
+    },
+    {
+      "path": "../../tsconfig.host.json"
     }
   ],
   "include": [

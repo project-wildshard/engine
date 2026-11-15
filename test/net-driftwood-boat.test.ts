@@ -12,7 +12,7 @@ import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { SimHost } from '../src/server/engine/sim';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // SERVER-PARITY HS2. Driftwood's moored boat is a `platform` mover on the swell. The page stands its player on the boat's planks,
 // posed from the room's `script:driftwood.boat` row (`FollowedMovers.follow`). Before HS2 the room (`createTrustedHeadlessResident`,

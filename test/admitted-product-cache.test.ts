@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare bank bytes without relying on assertion-library typed-array formatting.
 import { createHash } from 'node:crypto';
 import { expect, test, vi } from 'vitest';
-import { createAdmittedProductCache } from './fixtures/headless/admittedProductCache';
+import { createAdmittedProductCache } from '../src/test/game/headless/admittedProductCache';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
 import { productClosureFile } from '../src/shared/game/shardfile/shardProduct';

@@ -17,7 +17,7 @@ import { installQuestTrader, installQuestShop } from '../src/client/game/quest/t
 import { wirePage } from '../src/client/game/shardfile/wirePage';
 import { NetClient } from '../src/client/engine/net/client';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { declaredLootEconomy } from '../src/shared/game/shard/declaredRows';
 import type { Transport } from '../src/shared/engine/net/transport';
 

@@ -1,4 +1,4 @@
-import { builtProduct } from '../fixtures/builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 import { beforeAll, expect, test } from 'vitest';
 import { scenario } from '../../src/sharddev/test/scriptScenario';
 

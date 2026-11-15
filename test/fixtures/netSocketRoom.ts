@@ -17,7 +17,7 @@ import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../
 import { ledgerFilings } from '../../src/server/host/standalone/ledgerFilings';
 import { netTickCommands } from '../../src/shared/host/standalone/netInput';
 import { tickCommands } from '../../src/shared/host/tickProtocol';
-import { builtProduct } from './builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 
 // E7.1a: `net-bots`' room on real localhost sockets. Both ends are the shipped ones, and Node 24's global `WebSocket` stands in
 // for the browser's. Set WS_SOCKET_REPORT=<file> to keep the run's numbers.

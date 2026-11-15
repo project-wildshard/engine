@@ -22,8 +22,8 @@ import { legacyDouble } from '../src/test/engine/FakeGame';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import type { ShardPlayHost, ShardRuntime } from '../src/shared/game/shard/runtime';
 import { RowBodies } from '../src/client/engine/entities/RowBodies';
-import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { canonicalSimDigest } from '../src/test/engine/simState';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // P1-E3.1: population and creature spawning on the shipped headless host (`createTrustedHeadlessResident`, the tick
 // worker's own composition) for a real shard. Sunscar Dunes' homes keeper spawns, thinks, moves, kills and refills

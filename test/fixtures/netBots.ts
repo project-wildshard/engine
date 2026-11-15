@@ -16,7 +16,7 @@ import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
 import { netTickCommands } from '../../src/shared/host/standalone/netInput';
 import { tickCommands } from '../../src/shared/host/tickProtocol';
-import { builtProduct } from './builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 
 // P1-E5.2a (MMO-REQUIREMENTS B4, M9): a full room. 32 players on a real shard, each a NetClient over its own DirectLoopback
 // on the real codec, in one SimHost. Only the bots' fingers are fake. Tick p95 is the measured number; set

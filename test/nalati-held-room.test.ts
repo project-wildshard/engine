@@ -8,7 +8,7 @@ import { heldArmsOf } from '../src/server/game/weapons/nativeHeld';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // A bot's own sabre and polearm in Nalati's product: their seats, their commands, their kills in the damage book.
 let rapier: Rapier;

@@ -6,7 +6,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { playLibrarySource, scopedSpecimenLibrarySource, tierLibrarySource, urlImageLibrarySource } from '../src/client/game/shardfile/productCost';
 import { textureLibrarySource } from '@wildshard/format/deviceMemoryCost';
 import { nearbyContentCost } from '@wildshard/format/budget';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 /** D122: Nine Dragon's spawn, phone tier, read on HEAD preview a423f4d305 (Chromium, 2026-10-27): labelled GPU 245.6 MB +
  *  labelled RAM 287.1 MB. The admission's estimate there may shed what is never resident, never fall below this. */

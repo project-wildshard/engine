@@ -6,7 +6,7 @@ import '../../../src/shared/engine/core/portableMathFirst.ts';
 import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the native physics module.
 import { readFileSync } from 'node:fs';
-import { createNativeProofAdapter, createNativeProofResident } from '../headless-native.ts';
+import { createNativeProofAdapter, createNativeProofResident } from '../../../src/test/game/headlessNative.ts';
 import { prepareHeadlessRuntime } from './trustedRuntime.ts';
 import { createShardProduct } from '../../../src/shared/game/shardfile/shardProduct.ts';
 import { emptyShardfile } from '../../../src/shared/host/author.ts';

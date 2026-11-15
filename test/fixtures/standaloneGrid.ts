@@ -10,7 +10,7 @@ import type { HeadlessRuntimeInput } from '../../src/server/host/headlessRuntime
 import type { StandaloneGrid } from '../../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../../src/server/host/standalone/serverHost';
 import { connectStandalone, type StandaloneShell } from '../../src/client/host/standalone/shell';
-import { builtProduct } from './builtProduct';
+import { builtProduct } from '../../src/test/game/builtProduct';
 import { bakedGridCollision } from './gridCollision';
 
 // P1-E3.9, E5.2b: the grid in the server's half, over real MessagePorts on the server's own clock. Shared by

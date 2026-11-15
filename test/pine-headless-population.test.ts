@@ -14,8 +14,8 @@ import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost, snapshotSimHo
 import { hasNativeAssembly } from '../src/server/game/shardfile/nativeAssembly';
 import { populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
-import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { canonicalSimDigest } from '../src/test/engine/simState';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { fencedNativeOracle } from './fixtures/native-oracle';
 import { pineNativeOracleInputs } from './fixtures/pine-native-oracle-inputs';
 import { pineNativeOracleSpec } from './fixtures/pine-native-oracle-spec';

@@ -7,10 +7,10 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { HeadlessJourneyPlanSchema } from '../src/shared/host/headlessJourney';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import type { TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
-import { createNativeProofResident, prepareProductPlan } from './fixtures/headless-native';
-import { installNativeWalkBounds } from './fixtures/headless/nativeBounds';
-import { installWalkRopeBodies } from './fixtures/headless/ropeBodies';
+import { builtProduct } from '../src/test/game/builtProduct';
+import { createNativeProofResident, prepareProductPlan } from '../src/test/game/headlessNative';
+import { installNativeWalkBounds } from '../src/test/game/headless/nativeBounds';
+import { installWalkRopeBodies } from '../src/test/game/headless/ropeBodies';
 import { physicsRoutes } from './fixtures/headless/physicsRoutes';
 import { captureJourney, replayOnClient, type MotionCapture } from './fixtures/headless/motion-replay';
 

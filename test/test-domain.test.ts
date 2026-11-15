@@ -48,7 +48,7 @@ test('colocated fixtures keep product guards in production and architecture guar
     refuses('src/shards/probe/generators/game.test.ts', 'import {value} from "@wildshard/engine/game/world"; export {value};', ['generator-imports']);
     refuses('src/shards/probe/generators/absolute.test.ts', 'import {value} from "/src/engine/value"; export {value};', ['generator-imports']);
     const statements = ['import "./fixture.test";', 'export * from "./fixture.test.ts";', 'void import("./fixture.test.js");', 'export type Value = typeof import("./fixture.test");',
-      'import "../test/helper";', 'export * from "../test/helper";', 'void import("../test/helper");', 'export type Helper = typeof import("../test/helper");'];
+      'import "./helper";', 'export * from "./helper";', 'void import("./helper");', 'export type Helper = typeof import("./helper");'];
     statements.forEach((source, index) => { refuses(`src/engine/core/importer-${index}.ts`, source, ['no-production-test-import']); });
     statements.forEach((source, index) => { refuses(`src/sharddev/runtime/importer-${index}.ts`, source, ['no-production-test-import']); });
     statements.forEach((source, index) => { refuses(`src/game/runtime/importer-${index}.ts`, source, ['no-production-test-import']); });

@@ -15,7 +15,7 @@ import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { nativeStealthOf } from '../src/server/game/stealth/nativeStealth';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { HeadlessCommand } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // The long grass the native stealth proof walks into (test/fixtures/headless/nalati-stealth-run.ts).
 const GRASS = { x: 34, z: 198 }, RANGE = 3;

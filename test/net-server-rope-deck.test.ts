@@ -10,7 +10,7 @@ import { snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import type { RigidBody } from '@dimforge/rapier3d-simd';
 import type { SimHost } from '../src/server/engine/sim';
 import { tagOf } from '../src/shared/engine/physics/surface';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // NET-LAG NL5 (Jake, 2026-11-12: "i fucking clipped through the rope bridge because of the lag lol"). The room's own resident
 // (`createTrustedHeadlessResident`, what `cellWorld` runs) walks Driftwood's rope bridge. Before NL5 it built no rope chain:

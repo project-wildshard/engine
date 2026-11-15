@@ -1,6 +1,6 @@
 import { beforeAll, expect, test } from 'vitest';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { claim, contractKill, loadBoard, ownContractCatalogue, recordKill, saveBoard } from '../src/shared/game/quest/contracts';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';

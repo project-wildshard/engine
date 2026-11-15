@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as v from 'valibot';
 import {beginProductSession} from './productSession';
-import {createNativeProofResident} from '../headless-native';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {prepareHeadlessRuntime} from '../nalati-weapons-native';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {mountedPlayerOf} from '../../../src/server/game/riding/native';

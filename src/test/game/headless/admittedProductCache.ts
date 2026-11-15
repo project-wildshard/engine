@@ -6,11 +6,11 @@ import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 // oxlint-disable-next-line import/no-nodejs-modules -- Check the loaded descriptor against the cache identity.
 import { createHash } from 'node:crypto';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
-import { carryOutputDescriptor, outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
-import { productClosureFile, type ShardProduct } from '../../../src/shared/game/shardfile/shardProduct';
-import { shardProductData } from '../../../src/shared/game/shardfile/productData';
-import { nodeNamedJsonCheck } from '../../../src/shared/game/shardfile/outputChecksNode';
+import { loadHeadlessProduct } from '../../../server/host/headlessProduct';
+import { carryOutputDescriptor, outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
+import { productClosureFile, type ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { shardProductData } from '../../../shared/game/shardfile/productData';
+import { nodeNamedJsonCheck } from '../../../shared/game/shardfile/outputChecksNode';
 
 export type ProductMode = 'full' | 'slice' | 'server';
 

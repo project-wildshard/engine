@@ -1,22 +1,22 @@
 // oxlint-disable-next-line import/no-unassigned-import -- The sim's Math goes in before any module body runs.
-import '../../src/shared/engine/core/portableMathFirst';
-import {createTrustedHeadlessTape} from '../../src/shared/host/headlessTape';
+import '../../shared/engine/core/portableMathFirst';
+import {createTrustedHeadlessTape} from '../../shared/host/headlessTape';
 import { installNativeWalkBounds } from './headless/nativeBounds';
 import { installWalkRopeBodies } from './headless/ropeBodies';
-import { runHeadlessJourney } from '../../src/shared/host/headlessJourney';
-import { fillNativeCombatFrame, headlessAssemblyPorts, validateHeadlessCommandOwners, type HeadlessRuntimeInput, type HeadlessRuntimeInstallation, type HeadlessRuntimePreparation, type HeadlessRuntimePlan, type PrepareHeadlessRuntime, type TrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
+import { runHeadlessJourney } from '../../shared/host/headlessJourney';
+import { fillNativeCombatFrame, headlessAssemblyPorts, validateHeadlessCommandOwners, type HeadlessRuntimeInput, type HeadlessRuntimeInstallation, type HeadlessRuntimePreparation, type HeadlessRuntimePlan, type PrepareHeadlessRuntime, type TrustedHeadlessResident } from '../../server/host/headlessRuntime';
 import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
+import { loadHeadlessProduct } from '../../server/host/headlessProduct';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
-import { prepareProductRuntimePlan } from '../../src/server/game/shardfile/nativePlan';
-import { MoverScriptDriver, type MoverRuntime } from '../../src/server/game/plugin/mover';
-import { installCableModes } from '../../src/shared/engine/player/modes';
-import { createNativeCombatFrame } from '../../src/server/game/plugin/nativeItems';
-import { createSimHost, type SimHost , type SimCommand } from '../../src/server/engine/sim';
-import { createSimSnapshotSerializer, admitSimSnapshotBytes, decodeSimSnapshotBytes, snapshotSimHostBytes, type SimSnapshot, type SimSnapshotBytes } from '../../src/shared/engine/sim/snapshot';
-import { restoreSimHost } from '../../src/server/engine/sim/restore';
-import { simPlayerCommand, type HeadlessCommand, type HeadlessEffect } from '../../src/shared/host/tickProtocol';
-import type { TickWorkerAdapter } from '../../src/server/host/tickWorkerLoop';
+import { prepareProductRuntimePlan } from '../../server/game/shardfile/nativePlan';
+import { MoverScriptDriver, type MoverRuntime } from '../../server/game/plugin/mover';
+import { installCableModes } from '../../shared/engine/player/modes';
+import { createNativeCombatFrame } from '../../server/game/plugin/nativeItems';
+import { createSimHost, type SimHost , type SimCommand } from '../../server/engine/sim';
+import { createSimSnapshotSerializer, admitSimSnapshotBytes, decodeSimSnapshotBytes, snapshotSimHostBytes, type SimSnapshot, type SimSnapshotBytes } from '../../shared/engine/sim/snapshot';
+import { restoreSimHost } from '../../server/engine/sim/restore';
+import { simPlayerCommand, type HeadlessCommand, type HeadlessEffect } from '../../shared/host/tickProtocol';
+import type { TickWorkerAdapter } from '../../server/host/tickWorkerLoop';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 /** The world a product's own native plan builds: what the tick worker runs, for proofs that wrap or drive it. */

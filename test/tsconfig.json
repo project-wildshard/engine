@@ -48,7 +48,8 @@
     "../src/**/*.d.ts",
     "../src/**/*.d.mts",
     "../src/**/*.d.*.ts",
-    "loading-diagnostics-grid.test.ts"
+    "loading-diagnostics-grid.test.ts",
+    "exported-proof-harness.test.ts"
   ],
   "exclude": [
     "../node_modules",

@@ -15,7 +15,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netWorldInput, stepResident } from '../src/shared/host/standalone/netInput';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // `mem` holds a body's pose inputs and its brain's memory side by side, and a server pack has no pose program to tell them apart,
 // so a page names what it reads. Whether a page poses a body by them is the row's browser proof, not this.

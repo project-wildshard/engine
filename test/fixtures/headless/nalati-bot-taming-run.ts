@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native behavior assertions run in this bounded child.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {builtProduct} from '../builtProduct';
+import {builtProduct} from '../../../src/test/game/builtProduct';
 import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
@@ -13,7 +13,7 @@ import {NET_BUTTONS} from '../../../src/shared/engine/input/netButtons';
 import {serializeSimSnapshot,snapshotSimHostBytes} from '../../../src/shared/engine/sim/snapshot';
 import {mountedPlayerOf} from '../../../src/server/game/riding/native';
 import {nativeTamingControls,nativeTamingOf} from '../../../src/server/game/riding/nativeTaming';
-import {createNativeProofResident} from '../headless-native';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {prepareHeadlessRuntime} from '../nalati-verbs';
 
 // J108, on the real Nalati stallion: a bot offers beside it, is put to the break (the approach is the first player's own

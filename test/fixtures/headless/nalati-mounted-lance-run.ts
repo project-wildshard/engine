@@ -5,12 +5,12 @@ import assert from 'node:assert/strict';
 import {Vector3} from 'three';
 import * as v from 'valibot';
 import {decodeSimSnapshot,snapshotSimHost,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
-import {canonicalSimDigest} from '../../fake/simState';
+import {canonicalSimDigest} from '../../../src/test/engine/simState';
 import {parseHeldSlots} from '@wildshard/format/heldArms';
 import {PolearmRowsSchema} from '@wildshard/format/heldMelee';
 import type {HeadlessCommand,HeadlessEffect,HeadlessTapePartReport} from '../../../src/shared/host/tickProtocol';
 import {beginProductSession} from './productSession';
-import {checkedReplayPipeline} from './checkedReplayPipeline';
+import {checkedReplayPipeline} from '../../../src/test/game/headless/checkedReplayPipeline';
 import {earnNalatiMountedRaid} from './nalati-mounted-raid';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 

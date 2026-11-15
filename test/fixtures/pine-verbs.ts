@@ -6,7 +6,7 @@ import {ForestPageSchema} from '@wildshard/format/forestPage';
 import {buildingDoor,toggleBuildingDoor,stepBuildingDoor,buildingDoorYaw,buildingDoorCollides} from '../../src/shared/game/shardfile/buildingDoor';
 import {eyeReaches} from '../../src/shared/game/quest/interactionRows';
 import type {PrepareHeadlessRuntime} from '../../src/server/host/headlessRuntime';
-import {prepareProductPlan} from './headless-native';
+import {prepareProductPlan} from '../../src/test/game/headlessNative';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const finite=v.pipe(v.number(),v.finite());

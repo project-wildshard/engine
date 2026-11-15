@@ -7,12 +7,12 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { installCableModes } from '../src/shared/engine/player/modes';
 import { createNativeCombatFrame } from '../src/server/game/plugin/nativeItems';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { prepareProductPlan } from './fixtures/headless-native';
-import { canonicalSimDigest } from './fake/simState';
+import { prepareProductPlan } from '../src/test/game/headlessNative';
+import { canonicalSimDigest } from '../src/test/engine/simState';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const Value: v.GenericSchema<SimValue> = v.lazy(() => v.union([v.null(), v.boolean(), v.number(), v.string(), v.array(Value), v.record(v.string(), Value)]));

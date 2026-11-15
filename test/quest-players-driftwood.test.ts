@@ -13,7 +13,7 @@ import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // P1-E3.3: Driftwood's real quest, in a room of two. A bot takes the same steps as the verb tape's and the quest is the
 // bot's: the headless host runs it from the built product, on script commands that name the bot.

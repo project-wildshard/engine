@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The proof uses official product and physics bytes.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { Vector3 } from 'three';
 import * as v from 'valibot';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
@@ -10,7 +10,7 @@ import { snapshotSimHost } from '@wildshard/engine/sim/snapshot';
 import { borrowedDecisionControl } from '@wildshard/engine/game/shardfile/borrowedDecisions';
 import { outputDescriptor } from '@wildshard/engine/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
-import { createNativeProofResident, prepareProductPlan } from './fixtures/headless-native';
+import { createNativeProofResident, prepareProductPlan } from '../src/test/game/headlessNative';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const savedControl = v.object({ version:v.literal(1),actor:v.string(),phase:v.number(),fighting:v.boolean(),decision:v.string(),strike:v.unknown() });

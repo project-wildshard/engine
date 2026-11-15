@@ -21,7 +21,7 @@ import { Object3D } from 'three';
 import { QuestState } from '../src/shared/engine/quest/core';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // E6, QUEST: a view reads one port. The page feeds it with its own QuestState; here a NetClient feeds it over a loopback
 // from Driftwood's real quest, and what a view would draw is the same, step by step, and the player's own.

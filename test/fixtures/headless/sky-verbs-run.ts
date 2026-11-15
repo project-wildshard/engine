@@ -5,12 +5,12 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Assertions describe actual current input execution, never golden output.
 import assert from 'node:assert/strict';
 import {openProductSession} from './productSession';
-import {builtProduct} from '../builtProduct';
+import {builtProduct} from '../../../src/test/game/builtProduct';
 import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
-import {createNativeProofResident} from '../headless-native';
-import {installWalkRopeBodies} from './ropeBodies';
-import {installNativeWalkBounds} from './nativeBounds';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
+import {installWalkRopeBodies} from '../../../src/test/game/headless/ropeBodies';
+import {installNativeWalkBounds} from '../../../src/test/game/headless/nativeBounds';
 import {prepareHeadlessRuntime} from '../sky-verbs';
 import {SkyTape} from '../../proof/far-reach/tape';
 import type {HeadlessCommand,HeadlessEffect} from '../../../src/shared/host/tickProtocol';

@@ -5,7 +5,7 @@ import { createSimHost, type SimHost } from '../../../src/server/engine/sim';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost } from '../../../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../../../src/server/engine/sim/restore';
 import { loadRapier, type Rapier } from '../../../src/shared/engine/physics/rapier';
-import { canonicalSimDigest } from '../../fake/simState';
+import { canonicalSimDigest } from '../../../src/test/engine/simState';
 import { SaveStore, type SaveStorage } from '../../../src/shared/engine/saves/store';
 import type { AnimalSim } from '../../../src/shared/engine/entities/AnimalSim';
 import { Ledger, LedgerEmitter, type LedgerReceipt } from '../../../src/shared/game/ledger';

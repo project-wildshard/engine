@@ -9,8 +9,8 @@ import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { compileProductWorker } from './fixtures/headless/compileProductWorker';
 import { productHeadlessSections } from '../src/shared/host/headlessSections';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
-import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { canonicalSimDigest } from '../src/test/engine/simState';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // P1-E3.1b: Nalati Grasslands' worker runs the same world as a resident, from its built product alone. FAST-SLOW-TESTS
 // FS1: this case moved here unchanged from nalati-headless-population.test.ts as it stood before FAST-SLOW-TESTS (the

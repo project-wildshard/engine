@@ -11,9 +11,9 @@ import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes, type Sim
 import { restoreSimHost } from '../../../src/server/engine/sim/restore';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier';
 import { createNativeBakeReader } from '@wildshard/engine/game/population/nativeBake';
-import { prepareProductPlan as prepareHeadlessRuntime } from '../../fixtures/headless-native';
+import { prepareProductPlan as prepareHeadlessRuntime } from '../../../src/test/game/headlessNative';
 import { nalatiTamingWitness } from './taming';
-import { canonicalSimDigest, sameBytes } from '../../fake/simState';
+import { canonicalSimDigest, sameBytes } from '../../../src/test/engine/simState';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const physics:unknown=originalNalatiPhysics();

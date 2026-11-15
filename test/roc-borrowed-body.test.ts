@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import * as v from 'valibot';
 import { expect, test } from 'vitest';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';

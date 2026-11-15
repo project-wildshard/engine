@@ -6,7 +6,7 @@ import { createSimHost, type SimCommand, type SimHost } from '../src/server/engi
 import { leadCommands, leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { decodeSimSnapshot, leadSnapshot, serializeSimSnapshot, snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { simWireV1 } from './fake/simState';
+import { simWireV1 } from '../src/test/engine/simState';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
 // P1-E5.3: the motion state a step reads is state, so it survives a save.

@@ -11,8 +11,8 @@ import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
 import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
-import { canonicalSimDigest } from './fake/simState';
-import { builtProduct } from './fixtures/builtProduct';
+import { canonicalSimDigest } from '../src/test/engine/simState';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { jumpOwnerClock } from './fixtures/ownerClock';
 
 // P1-E3.1b: Nalati Grasslands' population on the shipped headless host, from its built product alone. The world's every

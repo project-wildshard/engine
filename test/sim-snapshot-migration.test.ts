@@ -5,7 +5,7 @@ import type { SimCommand } from '../src/server/engine/sim';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { decodeSimSnapshot, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { canonicalSimDigest } from './fake/simState';
+import { canonicalSimDigest } from '../src/test/engine/simState';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import recorded from './fixtures/sim-snapshot-v1.json';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';

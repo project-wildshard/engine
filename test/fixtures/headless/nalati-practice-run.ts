@@ -9,7 +9,7 @@ import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHost,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import type {HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
-import {createNativeProofResident} from '../headless-native';
+import {createNativeProofResident} from '../../../src/test/game/headlessNative';
 import {prepareHeadlessRuntime} from '../nalati-practice-native';
 import {beginProductSession} from './productSession';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';

@@ -1,16 +1,16 @@
-import { prepareProductPlan as prepareHeadlessRuntime } from './fixtures/headless-native';
+import { prepareProductPlan as prepareHeadlessRuntime } from '../src/test/game/headlessNative';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native checkpoint regression uses the shipped physics module.
 import { readFileSync } from 'node:fs';
 import { expect,test } from 'vitest';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 import { decodeTerrainTile } from '@wildshard/format/terrainTileBytes';
 import type { BakedGrid } from '@wildshard/format/bakedTerrainBytes';
 import { createSimHost,type SimHost } from '../src/server/engine/sim';
 import { snapshotSimHost, serializeSimSnapshot, decodeSimSnapshot } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { canonicalSimDigest } from './fake/simState';
+import { canonicalSimDigest } from '../src/test/engine/simState';
 import { nalatiNativeAssets } from './proof/nalati-grasslands/nativeAssets';
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 

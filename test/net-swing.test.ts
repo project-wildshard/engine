@@ -19,7 +19,7 @@ import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { tickCommands } from '../src/shared/host/tickProtocol';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // P1-E5.3-E1, E4 (J47): what the client predicts of an attack against what the server ran, in a real room on a real shard.
 const DT = 1 / 60;

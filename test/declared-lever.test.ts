@@ -13,7 +13,7 @@ import { installDeclaredKitItems, type DeclaredKitItems } from '../src/server/ga
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // TE-ENG2: a lever-action rifle from rows alone (`test/fixtures/declared-lever/rows.json`), on Template's product. It starts on its
 // rack; the rack's scene takes it; six rounds leave the tube, each a hitscan that lands on a declared body; R feeds one round at a time.

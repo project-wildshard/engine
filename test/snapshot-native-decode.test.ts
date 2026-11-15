@@ -6,7 +6,7 @@ import { createSimHost } from '../src/server/engine/sim';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createSimSnapshotSerializer, decodeSimSnapshot, decodeSimSnapshotBytes, snapshotSimHostBytes, serializeSimSnapshot, SnapshotBasisMismatchError } from '../src/shared/engine/sim/snapshot';
 import { prepareSimHostRestore, restoreSimHost } from '../src/server/engine/sim/restore';
-import { canonicalSimDigest } from './fake/simState';
+import { canonicalSimDigest } from '../src/test/engine/simState';
 import { SIM_LEVEL, fightCommand } from './fixtures/sim-level/level';
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 

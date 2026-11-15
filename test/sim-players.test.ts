@@ -8,7 +8,7 @@ import { SIM_API_VERSION } from '../src/shared/engine/sim/apiVersion';
 import { leadCommands, leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { decodeSimSnapshot, serializeSimSnapshot, SIM_SNAPSHOT_VERSION, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { canonicalSimDigest } from './fake/simState';
+import { canonicalSimDigest } from '../src/test/engine/simState';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import { SimNetWorld } from '../src/server/engine/net/simWorld';
 

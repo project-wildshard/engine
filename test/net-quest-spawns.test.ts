@@ -13,7 +13,7 @@ import { spawnCueWord } from '../src/shared/game/shardfile/wirePrompts';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 const RACE = { x: -181, z: -144 }, WAKE = 2;
 

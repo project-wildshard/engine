@@ -12,7 +12,7 @@ import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // opus-slotsync (J293, REMOTE-PLAYERS RP5's gap): on a native kit with no slot map (Driftwood's swords, Nalati's bow, sabre and
 // spear) a page had no slot to send for the item it switched to, and Driftwood's server had no route for one, so another player
