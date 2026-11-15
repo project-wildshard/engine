@@ -246,7 +246,7 @@ try {
           for(let index=0;index<Number(match[4]??1);index++)gaps.push([Number(match[1])+index*Number(match[3]??0),Number(match[2])]);
         }
         const gapsMatch=gaps.length===expected.gaps.length&&gaps.every(([start,ms],index)=>{
-          const held=expected.gaps[index];return held!==undefined&&Math.abs(start-held[0])<=0.00051&&Math.abs(ms-held[1])<=0.00051;
+          const held=expected.gaps[index];return held!==undefined&&start.toFixed(3)===held[0].toFixed(3)&&ms.toFixed(3)===held[1].toFixed(3);
         });
         const complete=native.includes(`counts: ${expected.entries} spans (`)&&native.includes(`${expected.resources} resources;`)
           &&native.includes('longest spans (start s + duration s):')&&native.includes('slowest resources (bytes, duration s, source):')

@@ -39,3 +39,8 @@ interval at the report's displayed precision. A 1,200.4 ms / 706-gap control pin
 its final interval and still fits below 6 KB. The native clipboard proof also
 expands every reported gap and compares it to an independent event-sweep census
 of collector request coverage, including navigation and aligned workers.
+
+J206's narrow precision review clears every MUST. Apply its SHOULD too: compare
+expanded clipboard gaps and the independent census at the displayed precision,
+so sub-millisecond raw differences cannot make the manual proof falsely fail.
+Normal split push on 2a7f3f2c passed 22 files / 62 cases and all static gates.
