@@ -48,10 +48,11 @@ function copyPair(source,target){
  * Clone each `[source, target]` pair. Returns `clone` when every pair is an APFS clone, `copy` when some were copied.
  * Throws when a source is a link, missing or neither a file nor a directory, or a target exists; a pair cloned before
  * the failure stays.
- * @param {readonly (readonly [string,string])[]} pairs @param {{platform?:string}} [options]
+ * `copy:false` refuses unsupported cloning instead of allocating a full copy.
+ * @param {readonly (readonly [string,string])[]} pairs @param {{platform?:string,copy?:boolean}} [options]
  * @returns {'clone'|'copy'|'none'}
  */
-export function clonePaths(pairs,{platform=process.platform}={}){
+export function clonePaths(pairs,{platform=process.platform,copy=true}={}){
  if(pairs.length===0)return 'none';
  let rest=pairs;
  if(platform==='darwin'){
@@ -62,6 +63,8 @@ export function clonePaths(pairs,{platform=process.platform}={}){
   if(!/Operation not supported|Cross-device link/u.test(reason))throw new Error(`clonefile: ${reason}`);
   rest=pairs.filter(([,target])=>{try{lstatSync(target);return false;}catch{return true;}});
  }
+ if(!copy&&rest.length>0)throw new Error('clonefile unavailable; copy disabled');
+ if(!copy)return 'clone';
  for(const [source,target] of rest)copyPair(source,target);
  return 'copy';
 }

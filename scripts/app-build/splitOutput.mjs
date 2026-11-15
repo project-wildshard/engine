@@ -82,18 +82,23 @@ export function splitOutput(dist, content = contentDirOf(dist)) {
   if (!existsSync(join(root, 'index.html'))) throw new Error(`splitOutput: ${root} holds no index.html; give a built page`);
   // a kept build's content (MF2 carry, PZ5: an unmarked build reads it from the page) stays on the page until it ages out
   const carried = carriedPaths(root)?.paths ?? new Set();
-  const shards = shardNames(root), rows = files(root).filter(row => row.path !== SPLITTING && !carried.has(row.path) && isContent(row.path, shards));
+  const shards = shardNames(root), rows = files(root).filter(row => row.path !== SPLITTING && row.path !== `${SPLITTING}.tmp` && !carried.has(row.path) && isContent(row.path, shards));
   // The full desired path list makes pruning resumable too. An empty mark
   // from the previous implementation already had its old target removed.
-  if (rows.length > 0 && !existsSync(mark)) writeFileSync(mark, JSON.stringify(rows.map(row => row.path)));
+  if (rows.length > 0 && !existsSync(mark)) {
+    writeFileSync(`${mark}.tmp`, JSON.stringify(rows.map(row => row.path)));
+    renameSync(`${mark}.tmp`, mark);
+  }
   if (existsSync(mark) && readFileSync(mark, 'utf8') !== '') {
-    const paths = JSON.parse(readFileSync(mark, 'utf8'));
-    if (!Array.isArray(paths) || !paths.every(path => typeof path === 'string')) throw new Error('splitOutput: invalid interrupted path list');
+    let paths;
+    try { paths = JSON.parse(readFileSync(mark, 'utf8')); } catch { throw new Error('splitOutput: invalid interrupted path list; inspect output and remove .splitting to restart'); }
+    if (!Array.isArray(paths) || !paths.every(path => typeof path === 'string')) throw new Error('splitOutput: invalid interrupted path list; inspect output and remove .splitting to restart');
     const desired = new Set(paths);
     for (const {path} of files(target)) if (!desired.has(path)) rmSync(join(target, path));
   }
   const moved = move(root, target, rows, true);
   rmSync(mark, {force: true});
+  rmSync(`${mark}.tmp`, {force: true});
   return moved;
 }
 

@@ -366,9 +366,16 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
  // DK10: keep unchanged split content on shared APFS blocks. This is an
  // ignored, regenerable output; the next split compares its actual bytes.
  const content=join(canonical,'dist-content');
- if(options.clone&&process.platform==='darwin'&&existsSync(content)&&lstatSync(content).isDirectory()&&!lstatSync(content).isSymbolicLink()
-  &&tryGit(tree,['check-ignore','--quiet','dist-content/']).status===0){
-  timed('content',()=>{clonePaths([[content,join(tree,'dist-content')]]);return 'APFS clone of regenerable dist-content';});
+ if(options.clone&&process.platform==='darwin'){
+  try{
+   if(existsSync(content)&&lstatSync(content).isDirectory()&&!lstatSync(content).isSymbolicLink()
+    &&tryGit(tree,['check-ignore','--quiet','dist-content/']).status===0){
+    timed('content',()=>{const method=clonePaths([[content,join(tree,'dist-content')]],{copy:false});return `${method} (APFS content, no copy fallback)`;});
+   }
+  }catch(error){
+   rmSync(join(tree,'dist-content'),{recursive:true,force:true});
+   process.stderr.write(`worktree: content clone skipped (${error instanceof Error?error.message:String(error)})\n`);
+  }
  }
  const manifest=join(tree,'package.json');
  const scripts=existsSync(manifest)?/** @type {{scripts?:Record<string,string>}} */(JSON.parse(readFileSync(manifest,'utf8'))).scripts??{}:{};

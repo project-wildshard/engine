@@ -104,6 +104,24 @@ test('DK10: pruning refuses a linked content root and preserves its destination'
   expect(statSync(join(foreign, 'keep.bin')).size).toBe(4);
 });
 
+test('DK10: an interrupted temporary marker restarts atomically and still prunes stale content', () => {
+  const dist = fixture(), content = contentDirOf(dist);
+  mkdirSync(content); writeFileSync(join(content, 'stale.bin'), 'stale');
+  writeFileSync(join(dist, `${SPLITTING}.tmp`), '["incomplete');
+  splitOutput(dist);
+  expect(tree(content)).toEqual([...CONTENT].sort());
+  expect(tree(dist)).toEqual([...PAGE].sort());
+});
+
+test('DK10: a corrupt committed marker reports recovery before moving or pruning anything', () => {
+  const dist = fixture(), content = contentDirOf(dist);
+  mkdirSync(content); writeFileSync(join(content, 'stale.bin'), 'stale');
+  writeFileSync(join(dist, SPLITTING), '["incomplete');
+  expect(() => splitOutput(dist)).toThrow('invalid interrupted path list; inspect output and remove .splitting');
+  expect(tree(content)).toEqual(['stale.bin']);
+  expect(tree(dist)).toEqual([...PAGE, ...CONTENT, SPLITTING].sort());
+});
+
 test('a retry after an interrupted split keeps what already moved; overlapping roots are refused', () => {
   const dist = fixture(), content = contentDirOf(dist), first = CONTENT[0] ?? '';
   // the split was interrupted after its first move

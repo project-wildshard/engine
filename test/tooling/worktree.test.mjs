@@ -87,6 +87,7 @@ describe('worktree new', () => {
     const record = JSON.parse(readFileSync(join(tree, 'tmp/worktree-setup.json'), 'utf8'));
     expect(record.steps.map((/** @type {{step: string}} */ row) => row.step)).toEqual(['fetch', 'add', 'checkout', ...(process.platform === 'darwin' ? ['content'] : [])]);
     if (process.platform === 'darwin') {
+      expect(record.steps.find((/** @type {{step: string}} */ row) => row.step === 'content').detail).toMatch(/^clone /u);
       expect(readFileSync(join(tree, 'dist-content/assets/content.bin'), 'utf8')).toBe('regenerable content');
       put(tree, 'dist-content/assets/content.bin', 'changed clone');
       expect(readFileSync(join(canonical, 'dist-content/assets/content.bin'), 'utf8')).toBe('regenerable content');
@@ -97,6 +98,21 @@ describe('worktree new', () => {
     // REPO-DISK DK10: the record keeps df before and after and the worktree's du.
     expect(record.disk.dfCostBytes).toBe(record.disk.freeBefore - record.disk.freeAfter);
     expect(record.disk.duKib).toBeGreaterThan(0);
+  });
+
+  test.skipIf(process.platform !== 'darwin')('DK10: a refused optional content clone keeps setup usable and removes its partial output', () => {
+    const {canonical, base} = repos(), bin = join(base, 'bin'), partial = join(canonical, '.worktrees/foo/dist-content');
+    put(canonical, 'dist-content/assets/content.bin', 'regenerable content');
+    put(base, 'bin/python3', `#!/bin/sh\nmkdir -p '${partial}'\nprintf partial > '${partial}/partial.bin'\necho 'fixture clone failure' >&2\nexit 1\n`);
+    spawnSync('chmod', ['+x', join(bin, 'python3')]);
+    const made = worktree(canonical, ['new', 'foo', '--no-install'], {PATH: `${bin}:${ENV.PATH ?? ''}`});
+    expect(made.status, made.stderr).toBe(0);
+    expect(made.stderr).toContain('content clone skipped');
+    const tree = join(canonical, '.worktrees/foo');
+    expect(existsSync(partial)).toBe(false);
+    expect(existsSync(join(tree, '.owner'))).toBe(true);
+    expect(existsSync(join(tree, 'tmp/worktree-setup.json'))).toBe(true);
+    expect(readFileSync(join(tree, 'src/same.ts'), 'utf8')).toBe('export const same = 1;\n');
   });
 
   test('keeps the canonical checkout on origin/main: fast-forwards a clean one, never moves a diverged or edited one', () => {
