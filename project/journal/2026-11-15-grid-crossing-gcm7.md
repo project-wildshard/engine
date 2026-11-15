@@ -103,3 +103,11 @@
   `1040,132103` with the home's 512 PMREM on the approach, linked at the back line (433 to 616 ms). So the exterior compile
   keys the road roots with the in-cell lighting state; the next step is to find which state (field 51 bit 0x800000, field 52
   0x820303 against 0x020407) the compile scene copies from inside the cell and match the road's.
+- 18:40 (opus-gcm11, ZE2d) Not a lighting state: decoded with three r186's `getProgramCacheKeyBooleans`, field 51 bit 23 is
+  `vertexNormals` and field 52's bits 2 and 23 are `flatShading` and `hasPositionAttribute`. The road's late variants are a
+  geometry with no position and no normal: an empty `RoadTilePool` (no resident tile; its rebuild publishes a cull plan, so
+  `frustumCulled` is off) drew, and three links in `setProgram` before it reads the draw count (RP4's retired whole-road
+  mesh, again). An empty pool now draws nothing (`road-tile-pool.test.ts`, red first): Nalati lap 1 back 16.8 ms (was 433).
+  Driftwood's remaining lap-1 link (`driftwood-creature-glowing`, 149 to 198 ms) and Pine's three `pine-wildlife` links were
+  the region's creatures: the page's DL24 warm rigs sit outside the region (no `|look:driftwood-isle`, the page factory's
+  hulls without normals), so the region now stages its own warm rigs after its creatures build (`regionalWorld.ts` afterKit).

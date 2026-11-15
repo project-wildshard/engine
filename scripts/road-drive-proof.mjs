@@ -151,8 +151,8 @@ try {
               if (row.owners.length >= 4 || o.material === undefined) return;
               for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
                 if (renderer.properties.get(m)?.currentProgram?.program !== handle) continue;
-                const names = []; for (let at = o; at != null && names.length < 6; at = at.parent) names.push(String(at.name || at.type));
-                const label = `${names.join('<')} [${String(m.name || m.type)}]`;
+                const names = []; for (let node = o; node !== null && node !== undefined && names.length < 6; node = node.parent) names.push(String(node.name === '' ? node.type : node.name));
+                const label = `${names.join('<')} [${String(m.name === '' ? m.type : m.name)}]`;
                 if (!seen.has(label)) { seen.add(label); row.owners.push(label.slice(0, 220)); }
               }
             });
@@ -161,8 +161,8 @@ try {
         return value;
       };
     }
-    try { new PerformanceObserver(list => { for (const e of /** @type {any[]} */ (list.getEntries())) if (e.duration > 50) q.loafs.push({ t: Math.round(e.startTime), ms: Math.round(e.duration), block: Math.round(e.blockingDuration ?? 0), render: Math.round((e.startTime + e.duration) - (e.renderStart || e.startTime + e.duration)),
-      scripts: (e.scripts ?? []).filter((/** @type {any} */ x) => x.duration > 5).map((/** @type {any} */ x) => ({ ms: Math.round(x.duration), fn: String(x.sourceFunctionName ?? ''), src: String(x.sourceURL ?? '').split('/').at(-1) + ':' + String(x.sourceCharPosition ?? ''), inv: String(x.invoker ?? '').slice(0, 80) })) }); }).observe({ type: 'long-animation-frame', buffered: false }); } catch { /* WebKit has none */ }
+    try { new PerformanceObserver(list => { for (const e of /** @type {any[]} */ (list.getEntries())) if (e.duration > 50) q.loafs.push({ t: Math.round(e.startTime), ms: Math.round(e.duration), block: Math.round(e.blockingDuration ?? 0), render: Math.round((e.startTime + e.duration) - (e.renderStart > 0 ? e.renderStart : e.startTime + e.duration)),
+      scripts: (e.scripts ?? []).filter((/** @type {any} */ x) => x.duration > 5).map((/** @type {any} */ x) => ({ ms: Math.round(x.duration), fn: String(x.sourceFunctionName ?? ''), src: `${String(x.sourceURL ?? '').split('/').at(-1) ?? ''}:${String(x.sourceCharPosition ?? '')}`, inv: String(x.invoker ?? '').slice(0, 80) })) }); }).observe({ type: 'long-animation-frame', buffered: false }); } catch { /* WebKit has none */ }
     let last = performance.now();
     const raf = (/** @type {number} */ now) => { q.frames.push([Math.round(now), Number((now - last).toFixed(1))]); last = now; requestAnimationFrame(raf); };
     requestAnimationFrame(raf);
@@ -204,11 +204,11 @@ try {
   const edgeM = (/** @type {any} */ r) => Math.hypot(Math.max(0, Math.abs(r.x - grid.origin.x) - HALF), Math.max(0, Math.abs(r.z - grid.origin.z) - HALF));
   const firstOut = samples.findIndex((/** @type {any} */ r) => edgeM(r) > KEEP_M);
   // ZE3a: the home stays resident until the feet first pass KEEP_M from its edge (the page's 300 m keep), then may retire
-  const allCards = samples.filter((/** @type {any} */ r) => r.card !== null), allHome = samples.slice(0, firstOut < 0 ? samples.length : firstOut).every((/** @type {any} */ r) => r.home === true);
+  const allCards = samples.filter((/** @type {any} */ r) => r.card !== null), allHome = samples.slice(0, firstOut === -1 ? samples.length : firstOut).every((/** @type {any} */ r) => r.home === true);
   /** every frame over 50 ms, with what the page did around it (a ±400 ms window) */
   const longFrames = frames.filter((/** @type {number[]} */ r) => (r[1] ?? 0) > 50).map((/** @type {number[]} */ [t, ms]) => {
-    const near = (/** @type {any} */ r) => r.t >= t - (ms ?? 0) - 400 && r.t <= t + 400, at = samples.filter(near)[0];
-    return { t, ms, seg: at?.seg ?? null, at: at === undefined ? null : { x: at.x, z: at.z }, res: at?.res ?? null, mb: at?.mb ?? null,
+    const near = (/** @type {any} */ r) => r.t >= t - (ms ?? 0) - 400 && r.t <= t + 400, hit = samples.find(near);
+    return { t, ms, seg: hit?.seg ?? null, at: hit === undefined ? null : { x: hit.x, z: hit.z }, res: hit?.res ?? null, mb: hit?.mb ?? null,
       programs: programs.filter(near).map((/** @type {any} */ r) => r.name), slowLinks: slowLinks.filter(near), loafs: loafs.filter(near) };
   });
   for (let k = from; k < legs; k++) {

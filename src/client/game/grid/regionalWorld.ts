@@ -533,6 +533,11 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
           const animals = frame.run(app, () => new RowBodies(new AnimalHerdView(scene, sky, { physics: host.physics }), app, host.physics));
           await animals.build(ports.pause, frame);
           if (left()) throw new Error('Regional world left while building creatures');
+          // ZE2d (DL24 on the grid): one hidden rig of every model a row can bring, parked in this region's scene, so its
+          // warm-up builds the programs its creatures draw with: the region's look patch and its own factory's bodies. The
+          // page's warm rigs sit outside the region (no `|look:`, another factory's hulls): Driftwood's glowing creature
+          // linked 149 to 198 ms on the first walk back in from the road, Pine's wildlife three programs
+          frame.run(app, () => { animals.stageWarmRigs(); });
           return { animals, wearSkin: (equipment: EquipmentService, skin: SkinDef): void => {
             const model = equipment.get(skin.weapon).model;
             if (model instanceof Group) applySkin(model, skin, sky);

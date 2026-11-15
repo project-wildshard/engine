@@ -16,6 +16,10 @@ import { saveFixture } from './debug-settings.mjs';
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
+/** A program row on a crossing's clock (`at`, its line), its `again` and `released` marks only when set. @param {any} r @param {number} at */
+const programRow = (r, at) => ({ t: r.t - at, name: r.name, key: r.key, ...(r.again === true ? { again: true } : {}), ...(r.released === true ? { released: true } : {}) });
+/** A row on a crossing's clock. @param {any} r @param {number} at */
+const shifted = (r, at) => ({ ...r, t: r.t - at });
 const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), run = process.argv.includes('--run'), profile = process.argv.includes('--profile'), reps = Number(flag('reps', '3'));
 if (!/^https:\/\/(preview|staging)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: grid-road-lag.mjs --base=<staging, preview or loopback url> --out=<dir> [--home=driftwood|nalati] [--viewport=WxH@dpr] [--reps=n]');
 const online = base.includes('staging');
@@ -77,10 +81,10 @@ try {
           // ZE2d: what this link differs in from the same material's programs already linked: the key's comma fields that differ
           const custom = (/** @type {string} */ k) => k.slice(Math.max(0, k.lastIndexOf(',srgb,'))), head = (/** @type {string} */ k) => k.slice(0, Math.max(0, k.lastIndexOf(',srgb,')));
           const fields = head(key).split(','), siblings = all.filter((/** @type {any} */ row) => row !== found && row.name === found?.name && custom(String(row.cacheKey)) === custom(key)).map((/** @type {any} */ row) => head(String(row.cacheKey)).split(','));
-          const diffs = siblings.slice(0, 4).map((/** @type {string[]} */ other) => other.length !== fields.length ? `len ${String(other.length)}/${String(fields.length)}` : fields.map((f, i) => f === other[i] ? null : `${String(i)}:${String(other[i])}->${f}`).filter(x => x !== null).join(' '));
+          const diffs = siblings.slice(0, 4).map((/** @type {string[]} */ other) => other.length !== fields.length ? `len ${String(other.length)}/${String(fields.length)}` : fields.map((f, i) => f === other[i] ? null : `${String(i)}:${other[i] ?? ''}->${f}`).filter(x => x !== null).join(' '));
           // who drew it
           const owners = /** @type {string[]} */ ([]);
-          try { W.__wildshard.world.game.scene.traverse((/** @type {any} */ o) => { if (owners.length >= 3 || o.material === undefined) return; for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (renderer.properties.get(m)?.currentProgram?.program === handle) { const n = []; for (let at = o; at != null && n.length < 5; at = at.parent) n.push(String(at.name || at.type)); owners.push(n.join('<')); } }); } catch { /* best effort */ }
+          try { W.__wildshard.world.game.scene.traverse((/** @type {any} */ o) => { if (owners.length >= 3 || o.material === undefined) return; for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (renderer.properties.get(m)?.currentProgram?.program === handle) { const n = []; for (let at = o; at !== null && at !== undefined && n.length < 5; at = at.parent) n.push(String(at.name === '' ? at.type : at.name)); owners.push(n.join('<')); } }); } catch { /* best effort */ }
           q.slowLinks.push({ t: Math.round(t0), ms: Math.round(ms), name: String(found?.name ?? ''), fields: fields.length, tail: fields.slice(-24).join(','), diffs, owners, env: String(W.__wildshard.world.game.scene.environment?.image?.height ?? null) });
         }
         return value;
@@ -93,9 +97,9 @@ try {
       const st = W.__wildshard.shard.grid.state(), p = W.__wildshard.world.player;
       const wf = st.live?.live?.worldFeet ?? p.position;
       const now = W.__wildshard.world.game?.renderer?.info?.programs ?? [];
-      for (const program of now) if (!known.has(program)) { known.add(program); const key = String(program.cacheKey ?? ''); q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: key.length > 700 ? key.slice(0, 300) + " … " + key.slice(-300) : key, again: seenKeys.has(key) }); seenKeys.add(key); }
+      for (const program of now) if (!known.has(program)) { known.add(program); const key = String(program.cacheKey ?? ''); q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: key.length > 700 && !/creature|wildlife/u.test(String(program.name)) ? `${key.slice(0, 300)} … ${key.slice(-300)}` : key, again: seenKeys.has(key) }); seenKeys.add(key); }
       const live = new Set(now);
-      for (const program of held) if (!live.has(program)) q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: ((k) => k.length > 700 ? k.slice(0, 300) + " … " + k.slice(-300) : k)(String(program.cacheKey ?? '')), released: true });
+      for (const program of held) if (!live.has(program)) q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: ((k) => k.length > 700 ? `${k.slice(0, 300)} … ${k.slice(-300)}` : k)(String(program.cacheKey ?? '')), released: true });
       held = live;
       q.samples.push({ t: Math.round(performance.now()), x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), inside: st.inside, phase: st.live?.crossing?.phase ?? null, card: st.cellLoading ?? null, stage: st.cellStage ?? null, ready: st.live?.live?.gameplayReady, res: st.live?.live?.residents ?? null, cx: st.live?.live?.crossings ?? null, cur: st.live?.live?.current ?? null, hy: st.hybrid?.instance ?? null, hook: st.hybrid?.hook ?? null });
     } catch (error) { q.samples.push({ err: String(error).slice(0, 700) }); } }, 50);
@@ -123,7 +127,12 @@ try {
   /** @type {any} */ (result).bootRoad = await page.evaluate(() => {
     const W = /** @type {any} */ (window), game = W.__wildshard.world.game, height = (/** @type {any} */ t) => t?.image?.height ?? null;
     const programs = (game.renderer.info.programs ?? []).filter((/** @type {any} */ p) => String(p.name).startsWith('grid-')).map((/** @type {any} */ p) => { const f = String(p.cacheKey).split(','); return `${String(p.name)} ${f[3] ?? ''} ${f[4] ?? ''} ${f[51] ?? ''} ${f[52] ?? ''}`; });
-    return { programs, scene: height(game.scene.environment), root: height(game.rootScene?.environment), exterior: W.__wildshard.shard.grid.exterior?.() ?? 'none', sameScene: game.scene === game.rootScene };
+    // and the home's creatures: each graph body's linked programs (key fields 3, 4, 51, 52) and the hidden warm rigs (DL24)
+    // parked anywhere in the page, by material
+    const creatures = (game.renderer.info.programs ?? []).filter((/** @type {any} */ p) => /creature|wildlife/u.test(String(p.name))).map((/** @type {any} */ p) => `${String(p.name)} ${String(p.cacheKey)}`);
+    const warm = /** @type {string[]} */ ([]);
+    for (const root of [game.scene, game.rootScene]) root?.traverse((/** @type {any} */ o) => { if (o.name !== 'creature-warm') return; o.traverse((/** @type {any} */ m) => { for (const mat of m.material === undefined ? [] : Array.isArray(m.material) ? m.material : [m.material]) warm.push(`${String(mat.name === '' ? mat.type : mat.name)}${(o.parent?.name ?? '') === '' ? '' : ` in ${String(o.parent.name)}`}`); }); });
+    return { programs, creatures, warm: [...new Set(warm)], scene: height(game.scene.environment), root: height(game.rootScene?.environment), exterior: W.__wildshard.shard.grid.exterior?.() ?? 'none', sameScene: game.scene === game.rootScene };
   });
   if (process.argv.includes('--reprelink')) {
     await page.evaluate(() => { /** @type {any} */ (window).__wildshard.shard.grid.prelink(); });
@@ -161,9 +170,9 @@ try {
     return { name, crossed: true, lineAt: line.t, frames: span.length, worstFrameMs: sorted.at(-1) ?? 0, p95Ms: sorted[Math.floor(sorted.length * 0.95)] ?? 0, medianMs: sorted[Math.floor(sorted.length / 2)] ?? 0,
       over33: span.filter(ms => ms > 33.4).length, over50: span.filter(ms => ms > 50).length, over100: span.filter(ms => ms > 100).length,
       trace: near.filter((_, i) => i % 2 === 0).map(s => [s.t - line.t, s.x, s.z, s.inside, s.cur, s.cx, s.phase, s.card, s.stage, s.res, s.hy, s.hook]), cardMs: cards.length * 50, cards: [...new Set(cards.map(s => `${String(s.card)}:${String(s.stage)}`))], worstStopMs: worstStop, stopAt, cruiseMps: Number((cruise * 1000).toFixed(2)), phases: [...new Set(near.map(s => s.phase))],
-      programs: programs.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ t: r.t - line.t, name: r.name, key: r.key, ...(r.again === true ? { again: true } : {}), ...(r.released === true ? { released: true } : {}) })),
+      programs: programs.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => programRow(r, line.t)),
       releasedBefore: programs.filter(r => r.released === true && r.t < line.t - 1000).map(r => ({ t: r.t - line.t, name: r.name, key: r.key })),
-      slowLinks: slowLinks.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ ...r, t: r.t - line.t })) };
+      slowLinks: slowLinks.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => shifted(r, line.t)) };
   };
   const cdp = profile && engineName === 'chromium' ? await context.newCDPSession(page) : undefined;
   let profileAt = 0;
