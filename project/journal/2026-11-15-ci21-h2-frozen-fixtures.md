@@ -8,3 +8,6 @@ the fixture bank to shard-nalati `b40cd2a`.
 
 The export keeps the paint fixture's generated JSON declaration beside it,
 which preserves the engine-wide declaration contract for copied JSON.
+
+The frozen-fixture source landed on engine main at `2cce5f9e`; the following
+CI21-H2 policy receipt records its J237 schedule from that committed source.
