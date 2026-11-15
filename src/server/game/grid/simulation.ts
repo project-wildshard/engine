@@ -9,7 +9,7 @@ import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 import type { GridAssembly, GridCell, GridPoint } from '../../../shared/game/grid/assembly';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { GridContinuationCache, GRID_CONTINUATION_CACHE_BYTES } from '../../../shared/game/grid/continuations';
-import { gridBoardLimit } from '../../../shared/game/grid/rules';
+import { gridBoardLimitAt } from '../../../shared/game/grid/rules';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 /** Admission returns one owned, renderer-free regional host; its world is always in authored local coordinates. */
@@ -327,10 +327,7 @@ export class GridSimulation {
   /** A seat's board cap, read in world space from wherever it stands: a resident host's feet are its cell's (P1-E5.3-A10). */
   private boardLimit(player: string): number {
     const site = this.current(player), seat = this.seat(this.hostAt(site), player), { assembly } = this;
-    const feet = site === null ? seat.position : assembly.world(seat.position, assembly.cell(site));
-    const p = assembly.pitch, cx = Math.round(feet.x / p), cz = Math.round(feet.z / p), cell = assembly.cells.find(row => row.cell[0] === cx && row.cell[1] === cz);
-    return gridBoardLimit({ local: { x: feet.x - cx * p, y: feet.y, z: feet.z - cz * p }, shardCap: 14, onHighwayDeck: feet.y < 4,
-      speedClass: cell?.speedClass ?? 'shard' });
+    return gridBoardLimitAt(assembly, site === null ? seat.position : assembly.world(seat.position, assembly.cell(site)));
   }
   /** The empty seat a player takes on arrival. The lead's is always there; anyone else's is made for them. */
   private arrivalSeat(host: SimHost, player: string, traveller: PlayerSim): PlayerSim {

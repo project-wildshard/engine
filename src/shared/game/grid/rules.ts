@@ -25,6 +25,17 @@ export function gridBoardLimit(state: GridHoverState): number {
   const cap = gridHoverSpeed(state.local, state.shardCap, state.speedClass);
   return gridZone(state.local) === 'highway' && !state.onHighwayDeck ? state.shardCap : cap;
 }
+/** What `gridBoardLimitAt` reads of a grid: its pitch and each placed cell's spot and speed class (`GridAssembly`). */
+export interface GridHoverCells { readonly pitch: number; readonly cells: readonly { readonly cell: readonly [number, number]; readonly speedClass?: 'road' }[] }
+/**
+ * The board's cap at world-frame feet on this grid: the page's, the in-page server's and a dedicated worker's road and cell rooms'
+ * one read of it, so prediction and authority agree (QA 11-15 row 8: G60's 30 m/s road, G39's 14 m/s shard, G540's road class).
+ */
+export function gridBoardLimitAt(grid: GridHoverCells, feet: Readonly<GridPoint>, shardCap = 14): number {
+  finite(feet);
+  const p = grid.pitch, cx = Math.round(feet.x / p), cz = Math.round(feet.z / p), cell = grid.cells.find(row => row.cell[0] === cx && row.cell[1] === cz);
+  return gridBoardLimit({ local: { x: feet.x - cx * p, y: feet.y, z: feet.z - cz * p }, shardCap, onHighwayDeck: feet.y < 4, speedClass: cell?.speedClass ?? 'shard' });
+}
 /** Minimal board port for standalone and residency policy; no Player or browser dependency enters here. */
 export interface GridHoverPort { hoverSpeedLimit: (() => number) | null }
 /** A directly opened padding shard uses its same authored road class; ordinary shards retain their existing port. */

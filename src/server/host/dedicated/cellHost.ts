@@ -17,6 +17,7 @@ import { openRoad } from '../standalone/roadWorld';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { CellOrder, WorkerNews, WorkerReading, WorkerResident } from './cellProtocol';
 import { SeatTransport } from './socketPump';
+import { allowDeveloperBoost } from '@wildshard/engine/sim/playerSim';
 
 /** How often a worker reads itself (E7.8). */
 export const READING_MS = 10_000;
@@ -82,6 +83,9 @@ function installCellIdentity(): void {
 
 /** Run one worker's cells until it is told to close. Anything that ends it says `failed`, and the process ends (Q77). */
 export function runCells(port: CellPort, options: CellHostOptions): { dispose: () => void } {
+  // QA 11-15 row 8 (G540: Developer boost "everywhere"): a Developer page's boost bit moves its board here too, to the shared speed
+  // law's 56 m/s in a shard and 60 on the road, so the page's prediction and this authority agree. Replaces E7.7's "never installed".
+  allowDeveloperBoost();
   const scope = new Scope('dedicated.worker'), started = diagnosticNow(), cells = new Map<string, Cell>();
   let clock: ServerClock | undefined, disposed = false, ready = false, ticks: number[] = [], ticked = 0, readAt = started, dropsAt = 0;
   /** SC8: each awake cell's own tick time since the last reading (ms summed, ticks counted), so a bench can weigh cells by awake cost. */

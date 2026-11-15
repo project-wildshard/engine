@@ -86,10 +86,9 @@ test('`climate` changes nothing, and a buy needs the seller', { timeout: 60_000 
   phone.client.act({ kind: 'buy', seq: 0, good: whetstone });
   await vi.waitFor(() => { expect(owned.purse.coins).toBeLessThan(coins); }, { timeout: 2000 });
   expect(refused()).toBe(2);
-  // the Developer boost is never installed here, so the button does nothing
+  // QA 11-15 row 8 (G540): a Developer page's boost is honoured here as on its own server (it was E7.7's "never installed")
   phone.thumb = () => ({ viewTick: 0, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw: 0, pitch: 0, buttons: NET_BUTTONS.boost });
-  await new Promise(resolve => { setTimeout(resolve, 100); });
-  expect(Reflect.get(body, 'boosted')).toBe(false);
+  await vi.waitFor(() => { expect(Reflect.get(body, 'boosted')).toBe(true); }, { timeout: 2000 });
   phone.thumb = stillThumb;
   // and walking off shuts it
   const paid = owned.purse.coins;

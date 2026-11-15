@@ -8,6 +8,7 @@ import type { Transport } from '@wildshard/engine/net/transport';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { carryMotion, motionOf } from '@wildshard/engine/game/grid/simulation';
+import { gridBoardLimitAt } from '@wildshard/engine/game/grid/rules';
 import type { GridAssembly, GridCell } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
@@ -87,6 +88,8 @@ export class RoadRoom implements CrossTarget {
     if (this.seats.has(entry.device)) return 'held';
     const player = this.host.addPlayer(entry.body, at, at.yaw);
     player.netName = entry.name;
+    // QA 11-15 row 8: the road's board cap is the page's (G60: 30 m/s on the deck, easing to 14 over a cell's strip); its frame is the world's
+    player.hoverSpeedLimit = () => gridBoardLimitAt(this.assembly, player.position);
     player.resetPose(at, at.yaw);
     if (motion !== undefined) carryMotion(motion, player);
     const seat: RoadSeat = { device: entry.device, name: entry.name, body: entry.body, transport, client: null, closeOff: null, holdEnds: null, asked: null, askedAt: 0, fall: new FallFloor(ROAD_FLOOR, true, at) };

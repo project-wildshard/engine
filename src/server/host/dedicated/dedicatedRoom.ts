@@ -25,7 +25,8 @@ import { ShopGate } from './shopGate';
 import { HOLD_MS, type ResumeAt, type RoomNews, type SeatEntry } from './cellProtocol';
 import { LEFT } from './socketPump';
 import type {PlaytestHit} from './playtest';
-import { cellFrame, cellName } from './gridCells';
+import { cellFrame, cellName, gridAssembly } from './gridCells';
+import { gridBoardLimitAt } from '@wildshard/engine/game/grid/rules';
 import {hitHistoryOf} from '@wildshard/engine/combat/rewind';
 import { entrywaysStand, floorBelow } from '@wildshard/engine/physics/query';
 import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
@@ -228,6 +229,7 @@ export class DedicatedRoom implements CrossTarget {
     const aside = SPAWN_ASIDE[(this.joined++) % SPAWN_ASIDE.length] ?? 0, stand = { ...spawn, x: spawn.x + aside };
     const player = lead ? this.lead : host.addPlayer(body, at ?? doc?.at ?? stand, at?.yaw ?? doc?.at.yaw ?? spawn.yaw);
     player.netName = entry.name;
+    this.capBoard(player);
     if (lead) player.resetPose(stand, spawn.yaw);
     book.seat(body, doc?.ledger ?? { serial: 0, rows: [] });
     // Bind owned modifiers to the fresh body baseline before restoring its already modified health.
@@ -240,6 +242,15 @@ export class DedicatedRoom implements CrossTarget {
       return `doc: ${String(error)}`;
     }
     return seat;
+  }
+  /**
+   * QA 11-15 row 8: a grid cell's board cap is the page's (`installGridHoverSpeed`): 14 m/s inside (G39), easing to the road's 30 over
+   * the strip (G60), 30 throughout a road-class padding cell (G540). Read from world feet, this cell's frame lifted by its placement.
+   * A cell the grid doesn't place keeps the standalone 14.
+   */
+  private capBoard(player: PlayerSim): void {
+    const assembly = gridAssembly(), cell = assembly.cells.find(row => row.instance === this.name);
+    player.hoverSpeedLimit = cell === undefined ? null : () => gridBoardLimitAt(assembly, assembly.world(player.position, cell));
   }
   /** GC30: whether a walker off the road stands at this cell's entryways (`entrywaysStand`); else its worker's road walls it. */
   entrywaysStand(): boolean { return entrywaysStand(this.host.physics, ARRIVAL_LIFT); }
