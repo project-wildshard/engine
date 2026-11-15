@@ -8956,9 +8956,25 @@
     "file": "test/nalati-author-tools.test.ts",
     "outcome": "deleted-j186",
     "decision": "J186: it hashes the two Nalati bake scripts' command program against the bytes recorded when they were relocated inside the monorepo, and reads them at src/shards/nalati-grasslands/bake/. That one-time relocation check pins source bytes, not behaviour; the scripts now live in shard-nalati (src/bake/), which owns them. No successor equivalence is claimed.",
-    "originalTests": [],
+    "originalTests": [
+      "src/shards/nalati-grasslands/bake/bake-nalati-sign-atlases.mjs retains the complete original author command",
+      "src/shards/nalati-grasslands/bake/bake-nalati-poi-contacts.mjs retains the complete original author command"
+    ],
     "sourceRevision": "35da409c0123703956d3a0b670dde6f0964bd67d",
     "sourceBlob": "c602f194ce12f6ad7e3bf534c59be26547f0c080",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "shard-dunes",
+    "file": "test/sunscar-generation-inputs.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "J186: it drives engine's retired monorepo generation pipeline (scripts/gen-programs.mjs, build-shardfiles.mjs, authoring-inputs.mjs) against src/shards/sunscar-dunes, which left engine; shard-dunes builds with sharddev's wildshard build. It pins that pipeline's plan shape, not a built product. No successor equivalence is claimed.",
+    "originalTests": [
+      "zero remaining jobs selects the defining source program without generated inputs",
+      "fresh source preparation refuses any attempt to load the legacy scheduler"
+    ],
+    "sourceRevision": "81917783f4083c09fa6d2036108168baa453ffce",
+    "sourceBlob": "57f8e48495927acf5051cfaf0d90c24c8ab1646f",
     "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
   }
 ]

@@ -488,7 +488,6 @@
     "splat-family-props.test.ts",
     "stealth-crouch-kernel.test.ts",
     "stealth-detection.test.ts",
-    "sunscar-generation-inputs.test.ts",
     "taming-binding-order.test.ts",
     "taming-guest-legacy.test.ts",
     "taming-world-actions.test.ts",

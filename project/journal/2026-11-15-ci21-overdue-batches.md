@@ -19,3 +19,6 @@ reason recorded in `test/engine-lift-disposition.json`.
 - NAL-TOOL: `nalati-author-tools` hashed the bake scripts against their
   bytes at a monorepo relocation; the scripts left for shard-nalati.
   Retired (J186) with its two fixtures; no port claimed.
+- DUNES-TOOL: `sunscar-generation-inputs` drove engine's retired
+  monorepo generation pipeline against a Sunscar source engine no longer
+  has. Retired (J186); no port claimed.
