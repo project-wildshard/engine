@@ -1109,6 +1109,7 @@ export class GridSession {
     this.gateState = this.gate.step(buffer?.instance ?? null, diagnosticNow());
     if (this.gateState.fire !== null) this.host.enterZone?.(this.gateState.fire);
   }
+  private shardName(instance: string): string { const slug = this.assembly.cell(instance).slug; return this.names.get(slug) ?? slug; }
   private drawGate(at: { x: number; z: number }): void {
     const card = this.gateCard, { cell } = this.gateState;
     if (card === null) return;

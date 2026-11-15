@@ -94,7 +94,7 @@ try {
   const waypoints = [];
   const legs = Math.min(path.length - 1, limit);
   for (let k = 0; k < legs; k++) {
-    const [ai, aj] = /** @type {[number, number]} */ (path[k]), [bi, bj] = /** @type {[number, number]} */ (path[k + 1]);
+    const [ai, aj] = path[k], [bi, bj] = path[k + 1];
     const a = { x: lines[ai] ?? 0, z: lines[aj] ?? 0 }, b = { x: lines[bi] ?? 0, z: lines[bj] ?? 0 }, d = { x: Math.sign(b.x - a.x), z: Math.sign(b.z - a.z) };
     const n = d.x !== 0 ? { x: 0, z: Math.sign(centre - a.z) || 1 } : { x: Math.sign(centre - a.x) || 1, z: 0 };
     waypoints.push({ x: a.x + d.x * CLEAR + n.x * LANE, z: a.z + d.z * CLEAR + n.z * LANE, seg: k }, { x: b.x - d.x * CLEAR + n.x * LANE, z: b.z - d.z * CLEAR + n.z * LANE, seg: k });
@@ -125,7 +125,7 @@ try {
       const wp = q.wps[q.at];
       if (wp !== undefined) {
         // a waypoint counts within a stride of a 50 ms look at the speed held (3 m on foot, more on a board)
-        const last = q.samples.at(-1), reach = last === undefined || last.err !== undefined ? 3 : Math.max(3, Math.hypot(wf.x - last.x, wf.z - last.z) * 2.5);
+        const prev = q.samples.at(-1), reach = prev === undefined || prev.err !== undefined ? 3 : Math.max(3, Math.hypot(wf.x - prev.x, wf.z - prev.z) * 2.5);
         if (Math.hypot(wf.x - wp.x, wf.z - wp.z) < reach) q.at++;
         const to = q.wps[q.at];
         if (to === undefined) q.done = true; else p.yaw = Math.atan2(wf.x - to.x, wf.z - to.z);
@@ -138,11 +138,11 @@ try {
   if (ride === 'run') await page.keyboard.down('ShiftLeft');
   await page.keyboard.down('KeyW');
   for (let seen = -1, since = Date.now(); ;) {
-    const { at, done, last } = await page.evaluate(() => { const q = /** @type {any} */ (window).__drive; return { at: q.at, done: q.done, last: q.samples.at(-1) }; });
+    const { reached, done, last } = await page.evaluate(() => { const q = /** @type {any} */ (window).__drive; return { reached: q.at, done: q.done, last: q.samples.at(-1) }; });
     if (done) break;
-    if (at !== seen) { seen = at; since = Date.now(); if (at % 12 === 0) console.log(`waypoint ${String(at)}/${String(route.length)} after ${String(Math.round((Date.now() - t0) / 1000))} s`); }
+    if (reached !== seen) { seen = reached; since = Date.now(); if (reached % 12 === 0) console.log(`waypoint ${String(reached)}/${String(route.length)} after ${String(Math.round((Date.now() - t0) / 1000))} s`); }
     // a waypoint not reached in 90 s is a drive stuck on something: say where, and stop
-    if (Date.now() - since > 90_000) throw new Error(`stuck before waypoint ${String(at)} ${JSON.stringify(route[at])}: last sample ${JSON.stringify(last)}`);
+    if (Date.now() - since > 90_000) throw new Error(`stuck before waypoint ${String(reached)} ${JSON.stringify(route[reached])}: last sample ${JSON.stringify(last)}`);
     await sleep(1000);
   }
   await page.keyboard.up('KeyW'); if (ride === 'run') await page.keyboard.up('ShiftLeft');
@@ -153,7 +153,7 @@ try {
   for (let k = 0; k < legs; k++) {
     const rows = samples.filter((/** @type {any} */ r) => r.seg === k);
     if (rows.length < 3) { result.segments.push({ seg: k, driven: false }); continue; }
-    const [ai, aj] = /** @type {[number, number]} */ (path[k]), [bi, bj] = /** @type {[number, number]} */ (path[k + 1]);
+    const [ai, aj] = path[k], [bi, bj] = path[k + 1];
     const a = { x: lines[ai] ?? 0, z: lines[aj] ?? 0 }, b = { x: lines[bi] ?? 0, z: lines[bj] ?? 0 }, len = Math.hypot(b.x - a.x, b.z - a.z);
     const along = (/** @type {any} */ r) => ((r.x - a.x) * (b.x - a.x) + (r.z - a.z) * (b.z - a.z)) / len;
     const mid = rows.filter((/** @type {any} */ r) => along(r) >= MEASURE_CLEAR && along(r) <= len - MEASURE_CLEAR);

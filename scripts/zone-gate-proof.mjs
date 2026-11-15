@@ -50,7 +50,7 @@ try {
   const face = (/** @type {number} */ yaw) => page.evaluate(wanted => { /** @type {any} */ (window).__wildshard.world.player.yaw = wanted; }, yaw);
   /** Walk with W held toward x (along z = origin.z) until within 0.4 m. */
   const walkTo = async (/** @type {number} */ x) => {
-    for (let ends = Date.now() + 60_000; Date.now() < ends;) {
+    for (const ends = Date.now() + 60_000; Date.now() < ends;) {
       const at = await state(); if (Math.abs(at.x - x) < 0.4) break;
       await face(Math.atan2(at.x - x, at.z - origin.z)); await page.keyboard.down('KeyW'); await sleep(Math.min(400, Math.abs(at.x - x) * 200)); await page.keyboard.up('KeyW');
     }
@@ -61,7 +61,7 @@ try {
   await walkTo(origin.x + HALF + 31.25); await face(-Math.PI / 2); await sleep(1500);
   await shoot('road-wall');
   /** Poll the gate until `test` holds (or 8 s). */
-  const until = async (/** @type {(gate: any) => boolean} */ test) => { for (let ends = Date.now() + 8000; Date.now() < ends; await sleep(50)) if (test((await state()).gate)) return true; return false; };
+  const until = async (/** @type {(gate: any) => boolean} */ test) => { for (const ends = Date.now() + 8000; Date.now() < ends; await sleep(50)) if (test((await state()).gate)) return true; return false; };
   // in, 2 m past the edge line: the card at 5; back out of the buffer at 3 (so the count can't reach 0 on the way out)
   await walkTo(nalatiEdge + 2); await until(gate => gate?.count === 5); await shoot('gate-5');
   await until(gate => gate?.count === 3);
