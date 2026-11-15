@@ -156,6 +156,7 @@ function wiredQuestSpawns(ctx: ShardContext, rows: QuestSpawnPageRows, flags: Fl
     const [id, x = 0, y = 0, z = 0] = args, cue = rows.cues.find(row => row.id === id);
     if (cue?.kind === 'sound') bank.shot(cue.name, { at: { x, y, z } });
     else if (cue?.kind === 'puff' && puffs.length < 64) puffs.push({ x, y, z });
+    if (cue !== undefined) wirePage.drew(name);
   }));
   ctx.scope.onDispose(flags.onChange((flag, on) => {
     const effects = complete.get(flag);

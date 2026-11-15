@@ -6,11 +6,14 @@
  *
  *   audioLog('sfx', 'leverShot', true)            // kind, name, ok (false = not decoded / not shipped), detail
  */
-export interface AudioLogEntry { t: number; kind: 'music' | 'sfx' | 'bark' | 'bed' | 'zone' | 'wire'; name: string; ok?: boolean; detail?: string }
+export interface AudioLogEntry { t: number; kind: 'music' | 'sfx' | 'bark' | 'bed' | 'zone' | 'wire' | 'cue'; name: string; ok?: boolean; detail?: string }
+/** EG-15: every trigger since boot, by `kind name`: how many sounded (`ok` not false) and how many found no sound. The ring forgets; this doesn't. */
+export type AudioTally = Record<string, { played: number; silent: number }>;
 
 const MAX = 400;
 const log: AudioLogEntry[] = [];
-if (typeof window !== 'undefined') (window as unknown as { __audioLog: AudioLogEntry[] }).__audioLog = log;
+const tally: AudioTally = {};
+if (typeof window !== 'undefined') Object.assign(window as unknown as { __audioLog: AudioLogEntry[]; __audioTally: AudioTally }, { __audioLog: log, __audioTally: tally });
 
 /** record one audio trigger (music, sfx, bark, bed …) in the `window.__audioLog` ring a headless check reads */
 export function audioLog(kind: AudioLogEntry['kind'], name: string, ok?: boolean, detail?: string): void {
@@ -19,4 +22,6 @@ export function audioLog(kind: AudioLogEntry['kind'], name: string, ok?: boolean
   if (detail !== undefined) e.detail = detail;
   log.push(e);
   if (log.length > MAX) log.shift();
+  const row = tally[`${kind} ${name}`] ??= { played: 0, silent: 0 };
+  if (ok === false) row.silent++; else row.played++;
 }

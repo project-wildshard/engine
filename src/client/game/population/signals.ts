@@ -14,7 +14,7 @@ export function installPopulationSignals(ctx: ShardContext, scope: Scope, effect
     if(typeof x!=='number'||typeof zOrY!=='number')return;
     if(view.name.startsWith('creature.signal:')) {
       const name=view.name.slice('creature.signal:'.length);
-      ctx.app.events.emit('creature.signal',{name,x,z:zOrY});notice(notices?.signal(name,view.tick/60)??null);
+      ctx.app.events.emit('creature.signal',{name,x,z:zOrY});wirePage.drew(view.name);notice(notices?.signal(name,view.tick/60)??null);
     } else if(view.name.startsWith('creature.sound:')&&typeof third==='number') {
       ctx.app.events.emit('creature.sound',{cue:view.name.slice('creature.sound:'.length),x,y:zOrY,z:third});
     } else if(view.name==='creature.knockdown'&&typeof third==='number') {

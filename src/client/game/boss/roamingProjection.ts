@@ -101,7 +101,7 @@ function followRoamingFight(context: ShardContext, { rows, ring, hazard, cues, l
       hazardFrom.set(fromX, fromY, fromZ); hazard(index, { x, y, z, fallT }, t, beat);
     },
   };
-  wirePage.whenLive(context.scope, client => client.onView(({ name, args }) => { actions[name]?.(args); }));
+  wirePage.whenLive(context.scope, client => client.onView(({ name, args }) => { const act = actions[name]; if (act !== undefined) { act(args); wirePage.drew(name); } }));
   context.system({ id: 'roaming.followed', phase: 'update', run: (dt, t) => {
     room(dt, t);
     for (const [slot, row] of lanes.entries()) {

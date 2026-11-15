@@ -6,7 +6,7 @@ import type { LiveGridWire } from '../grid/liveSession';
 import { chosenCell, gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
-import { Vector3, type Object3D } from 'three';
+import { Scene, Vector3, type Object3D } from 'three';
 import { appIdentity } from '@wildshard/engine/app/identity';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { SEAT_GRACE_MS, seatedInTime } from './seatGrace';
@@ -166,6 +166,10 @@ export interface WorkerClientReport {
   owned: Readonly<Record<string, number>>; sky: number | null; day: number | null;
   /** What this page drew of what it only hears, by name. */
   drawn: Readonly<Record<string, number>>;
+  /** EG-15: every view word the server said to this page, by name: what `drawn` is held against (scripts/fight-page-census.mjs). */
+  heard: Readonly<Record<string, number>>;
+  /** Of those, the words for a view this page hasn't built (`wirePage.unbuilt`): not drawn, and not dark. */
+  offstage: Readonly<Record<string, number>>;
   /** Movers this page holds, the poses rows have given them, and the highest drift rows have laid. */
   movers: number; posed: number; sand: number;
   /** Bodies this page made and the rows put away, by kind: what its own sim still builds. */
@@ -175,8 +179,14 @@ export interface WorkerClientReport {
   /** What corrections disagreed on, and server-owned transitions that were deliberately not corrections. */
   missed: Readonly<NetPlayer['predictor']['missed']>; misses: readonly (readonly number[])[]; authoritative: Readonly<NetPlayer['predictor']['authoritative']>;
 }
-/** A fight as a proof reads it: its row, where its body stands and the server's name for it. */
-export type WorkerClientFight = EncounterRow & { readonly at: { readonly x: number; readonly y: number; readonly z: number } | null; readonly name: string | null };
+/** A fight as a proof reads it: its row, where its body stands and the server's name for it. `shown` (EG-15): the page's body for that row
+ *  is in the scene and visible; null when the page holds no row body for it (an open arena draws its own, off its view words). */
+export type WorkerClientFight = EncounterRow & { readonly at: { readonly x: number; readonly y: number; readonly z: number } | null; readonly name: string | null; readonly shown: boolean | null };
+/** Whether an object is drawn: visible, and so is every parent up to a scene. */
+function inScene(object: Object3D): boolean {
+  for (let at: Object3D | null = object; at !== null; at = at.parent) { if (!at.visible) return false; if (at instanceof Scene) return true; }
+  return false;
+}
 declare global { interface Window { __onlinePlayers?: () => OtherPlayers['shown']; __workerClientFights?: () => readonly WorkerClientFight[]; __workerClientHits?: (by: number) => void; __workerClientTravel?: (to: ShardSlug) => void;__workerClientSky?: (name: string) => void; __workerClientTime?: (pick: OptionValue<'time'>) => void; __workerClientRow?: (name: string) => number | undefined; __workerClientFlag?: (flag: string) => void; __workerClientDevColliders?: (name: string, boxes: readonly DevBox[]) => void; __workerClientRows?: (kind: string) => readonly { readonly x: number; readonly y: number; readonly z: number }[]; __workerClientGate?: (flag: string) => boolean; __workerClientBot?: (id: string, x: number, y: number, z: number) => { readonly move: (x: number, y: number, z: number) => void; readonly press: (id: string) => void; readonly end: () => void }; __workerClient?: () => WorkerClientReport; __workerClientSave?: () => Promise<void> } }
 
 /** The page's pose inputs, as acts short enough to go. */
@@ -475,9 +485,11 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   if (shell.redials === true) others = new (await import('@wildshard/engine/net/otherPlayers')).OtherPlayers(client, ports.scene, scope, player.position);
   if (new URLSearchParams(location.search).has('bossGod')) shell.bossGod();
   bootMark('server:ready-send'); shell.ready();
-  const started = diagnosticNow(), report: WorkerClientReport = { drawn: wirePage.drawn, frames: 0, framesPerSecond: 0, ticksPerSecond: 0, correctionsPerMinute: 0, corrections: 0, retired: {}, spawnMs: {}, missed: net.predictor.missed, misses: net.predictor.misses, authoritative: net.predictor.authoritative, worstOffset: 0, queue: 0, replaysPerFrame: 0, delayMs: 0, jitterMs: 0, interpHeld: 0, interpStarved: 0, mainMsP95: 0, workerTickMs: 0, rows: 0, attacks: 0, hits: 0, kills: 0, refused: 0, held: 0, dropped: 0, hp: 0, falls: 0, closed: null, x: 0, z: 0, cell: 0, serverX: 0, serverZ: 0, restored, savedTick: -1, savedOk: false, receipts: [], quests: {}, flags: [], paid: 0, fights: [], owned: {}, sky: null, day: null, clawed: false, own: null, movers: 0, posed: 0, sand: 0 };
+  const heard: Record<string, number> = {};
+  const started = diagnosticNow(), report: WorkerClientReport = { drawn: wirePage.drawn, heard, offstage: wirePage.offstage, frames: 0, framesPerSecond: 0, ticksPerSecond: 0, correctionsPerMinute: 0, corrections: 0, retired: {}, spawnMs: {}, missed: net.predictor.missed, misses: net.predictor.misses, authoritative: net.predictor.authoritative, worstOffset: 0, queue: 0, replaysPerFrame: 0, delayMs: 0, jitterMs: 0, interpHeld: 0, interpStarved: 0, mainMsP95: 0, workerTickMs: 0, rows: 0, attacks: 0, hits: 0, kills: 0, refused: 0, held: 0, dropped: 0, hp: 0, falls: 0, closed: null, x: 0, z: 0, cell: 0, serverX: 0, serverZ: 0, restored, savedTick: -1, savedOk: false, receipts: [], quests: {}, flags: [], paid: 0, fights: [], owned: {}, sky: null, day: null, clawed: false, own: null, movers: 0, posed: 0, sand: 0 };
   if (unseated) void shell.booted.then(answer => { report.restored = answer.restored; bootMark('server:seated-late'); return undefined; }, () => undefined);
   scope.onDispose(client.onLedger(receipt => { report.receipts.push(`${receipt.grant}:${receipt.name}`); }));
+  scope.onDispose(client.onView(({ name }) => { heard[name] = (heard[name] ?? 0) + 1; }));
   const contacts: NetCombatEvent[] = [];
   scope.onDispose(client.onTravel(() => { contacts.length = 0; }));
   scope.onDispose(client.onCombat(event => {
@@ -531,7 +543,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     let inputs = poses.get(id);
     if (inputs === undefined) { inputs = {}; poses.set(id, inputs); }
     inputs[field] = value;
-    for (const [handle, { body }] of bodies) if (client.entities.get(handle)?.id === id) { body.mem[field] = value; break; }
+    for (const [handle, { body }] of bodies) if (client.entities.get(handle)?.id === id) { body.mem[field] = value; wirePage.drew(name); break; }
   }));
   const decks = new NetMovers(client, wirePage.movers, player.position);
   scope.onDispose(net.world.addMover(decks));
@@ -616,7 +628,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const out: WorkerClientFight[] = [];
     for (const fight of wirePage.encounters()) {
       const body = client.latest === null ? null : client.fields(client.latest, fight.body);
-      out.push({ ...fight, at: body === null ? null : { x: Number(body['x']), y: Number(body['y']), z: Number(body['z']) }, name: client.entities.get(fight.body)?.id ?? null });
+      const held = bodies.get(fight.body)?.body.mesh ?? null;
+      out.push({ ...fight, at: body === null ? null : { x: Number(body['x']), y: Number(body['y']), z: Number(body['z']) }, name: client.entities.get(fight.body)?.id ?? null, shown: held === null ? null : inScene(held) });
     }
     return out;
   };

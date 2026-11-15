@@ -87,9 +87,10 @@ export function pageArenaRoomFight(ctx: ShardContext, dungeon: BossArenaRoom, in
   const { animals } = play, owner = bindRuntimeBoss(ctx, ctx.product.shardfile, rows.body, undefined, { identity: rows.identity }), binding = views(rows.presentation);
   // The server's fight runs, and its looks reach this room as it told them. A room nobody has entered has nothing built to draw on.
   wirePage.whenLive(ctx.scope, client => client.onView(({ name, args }) => {
-    if (!dungeon.built) return;
+    if (!dungeon.built) { if (binding[name] !== undefined) wirePage.unbuilt(name); return; }
     if (name === 'boss.glow') dungeon.actor = animals.animals.find(actor => actor.rowDriven && actor.kind === owner.row.kind) ?? null; // the server's body is the row's
-    binding[name]?.(...args);
+    const draw = binding[name];
+    if (draw !== undefined) { draw(...args); wirePage.drew(name); }
   }));
   return rowFightScript({ rewardPoint: () => new Vector3().fromArray(rows.reward), respawnPoint: () => ({ pos: new Vector3().fromArray(rows.respawn), yaw: rows.yaw }) });
 }
@@ -204,7 +205,7 @@ export class ArenaRoomEncounter {
       if(encounter.boss.rewardTaken)kit.upgradeBow('bow-reward',play.weapons);
     }else{
       if(this.prompt===null||this.projection===null)throw new Error('Missing open arena projection');runtime.interactables.push(this.prompt);
-      {const word=arenaTieWord(this.data.definition.id),lines=this.data.tieLines,heard=this.projection;wirePage.whenLive(ctx.scope,client=>client.onView(({name,args})=>{const line=name===word?lines[args[0]??-1]:undefined;if(line!==undefined)play.hud.toast(line);if(name.startsWith('open-arena.')){heard.hear(name,args);wirePage.drew(name);}}));}
+      {const word=arenaTieWord(this.data.definition.id),lines=this.data.tieLines,heard=this.projection;wirePage.whenLive(ctx.scope,client=>client.onView(({name,args})=>{const line=name===word?lines[args[0]??-1]:undefined;if(line!==undefined){play.hud.toast(line);wirePage.drew(name);}if(name.startsWith('open-arena.')){heard.hear(name,args);wirePage.drew(name);}}));}
       if(encounter.boss.rewardTaken){if(blade===null)throw new Error('Missing open arena power');kit.upgradeBlade('blade-reward',play.weapons,blade);}
       page.boundary(ctx.scope,this.projection.boundary);page.lendOpenView(this.projection,ctx.scope);
     }

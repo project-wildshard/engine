@@ -23,14 +23,15 @@ export function installClientBossTelegraph(ctx: ShardContext, input: unknown): v
     new MeshBasicMaterial({ color: view.color, transparent: true, opacity: 0, depthWrite: false, side: DoubleSide, fog: false }));
   wall.name = view.system; wall.visible = false; ctx.root.add(wall); ctx.scope.own(wall.geometry); ctx.scope.own(wall.material); ctx.scope.onDispose(() => { wall.removeFromParent(); });
   /** A page on a server holds no body to read a strike off: the server says it, until it stops saying so. */
-  const heard = { through: 0, aim: 0, x: 0, z: 0, fresh: false, at: Number.NEGATIVE_INFINITY }, name = `${BOSS_STRIKE}${strike.id}`;
+  const heard = { through: 0, aim: 0, x: 0, z: 0, fresh: 0, at: Number.NEGATIVE_INFINITY }, name = `${BOSS_STRIKE}${strike.id}`;
   wirePage.whenLive(ctx.scope, client => client.onView(call => {
     if (call.name !== name) return;
     const [through = 0, aim = 0, x = 0, z = 0] = call.args;
-    Object.assign(heard, { through, aim, x, z, fresh: true });
+    Object.assign(heard, { through, aim, x, z, fresh: heard.fresh + 1 });
   }));
   ctx.system({ id: view.system, phase: 'update', run: (_dt, t) => {
-    if (heard.fresh) { heard.fresh = false; heard.at = t; } // the clock's the frame's: a slow frame still shows what it heard
+    // the clock's the frame's: a slow frame still shows what it heard, and counts every word it draws (EG-15's census)
+    if (heard.fresh > 0) { wirePage.drew(name, heard.fresh); heard.fresh = 0; heard.at = t; }
     const live = t - heard.at < HEARD_FOR;
     wall.visible = live;
     if (!live) return;

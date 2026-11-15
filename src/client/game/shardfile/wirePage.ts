@@ -111,8 +111,11 @@ export class WirePage {
   }
   /** The kind a row spawns as here: its declared species' page kind, else the wire's `kind` (a native body, an older server). */
   rowKind(species: unknown, kind: string): string { return typeof species === 'string' && species !== '' ? this.speciesKinds.get(species) ?? kind : kind; }
-  /** Count one thing drawn. */
-  drew(what: string): void { this.drawn[what] = (this.drawn[what] ?? 0) + 1; }
+  /** Count a thing drawn, or `times` of them (a frame that draws every word heard since the last). */
+  drew(what: string, times = 1): void { this.drawn[what] = (this.drawn[what] ?? 0) + times; }
+  /** Words for a view this page hasn't built (a room nobody entered), by name: heard, and rightly not drawn (EG-15). */
+  readonly offstage: Record<string, number> = {};
+  unbuilt(what: string): void { this.offstage[what] = (this.offstage[what] ?? 0) + 1; }
 
   /** One of this player's lines as the server last said it: 0 for none. */
   line(name: string): number { return this.client?.owned.get(name) ?? 0; }

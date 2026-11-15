@@ -4,6 +4,7 @@ import { parse } from 'valibot';
 import type { Game } from '@wildshard/engine/core/Game';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { CombatCues } from '@wildshard/engine/combat/cues';
+import { audioLog } from '@wildshard/engine/audio/audioLog';
 import { Impacts } from '@wildshard/engine/fx/Impacts';
 import { effectField, type EffectField } from '@wildshard/engine/fx/effectField';
 import { ParticlePool, pointScale } from '@wildshard/engine/fx/ParticlePool';
@@ -151,7 +152,7 @@ export class CueDirector {
     }
     if (row.sound !== undefined) {
       if (this.sounds === undefined) throw new Error('Cue sound owner is absent');
-      this.sounds.cue(row.sound as `cue.${string}`, row.soundPhase === undefined ? {} : { phase: row.soundPhase });
+      audioLog('cue', row.id, this.sounds.cue(row.sound as `cue.${string}`, row.soundPhase === undefined ? {} : { phase: row.soundPhase }), row.sound);
     }
   }
 }
