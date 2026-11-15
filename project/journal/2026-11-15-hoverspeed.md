@@ -27,3 +27,7 @@ Meta QA 11-15 rows 8 and 9.
   cap only in `stepAll`, and the standalone grid server steps rooms through
   `stepSite` (and a cell world steps itself), so the road ran 14 / 56.
   `capBoards(site)` now runs on every step path.
+- `scripts/hover-speed-probe.mjs`: the four cases by real driving, on staging
+  (`--base`), a local build (loopback) or engine's local world (`--rig`).
+  Staging (38d11aca): 14 / 13.8 / 14.3 / 13.9 m/s with 63-102 corrections a
+  case; local world after the fix: 14 / 56 / 29.4 / 59.5.
