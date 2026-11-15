@@ -1,0 +1,9 @@
+/* ZE8: the gate card, in Shard Select's card language (glass, cyan line, mono), standing on the gate's face */
+.ws-gate-card { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none; width: 220px; padding: 14px 16px 16px; text-align: center; transform-origin: 50% 100%;
+  background: var(--ws-glass-deep, rgba(9, 22, 36, 0.88)); border: 1px solid var(--ws-cyan-line, rgba(143, 227, 255, 0.4)); color: var(--ws-text, #e8f6ff);
+  font-family: var(--ws-mono, ui-monospace, monospace); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 12px 40px rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); }
+.ws-gate-card[hidden] { display: none; }
+.ws-gate-card .ws-gate-name { font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ws-gate-card .ws-gate-line { margin-top: 6px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.75; }
+.ws-gate-card .ws-gate-count { margin-top: 8px; font-size: 44px; line-height: 1; color: var(--ws-cyan, #38e6ff); }

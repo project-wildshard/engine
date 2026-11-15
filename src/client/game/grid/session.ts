@@ -51,7 +51,9 @@ import { WATER_UNBOUNDED, waterExtent } from '@wildshard/engine/world/waves';
 import type { Renderer } from '@wildshard/engine/render/renderer';
 import { generatePlatform, generatePlatformSliced, type GeneratedStrip, type PlatformCell, type StripProfile } from '@wildshard/engine/sim/strips';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
-import { walledCells, zoneWallEdges } from '../../../shared/game/grid/zoneWalls';
+import { bufferAt, walledCells, zoneWallEdges } from '../../../shared/game/grid/zoneWalls';
+import { GateCount, type GateCountState } from '../../../shared/game/grid/gateCount';
+import { GateCard } from './gateCard';
 import { DEVSERVER, gridMode } from './menu';
 import { gridCells, pageGridInstance } from '../plugin/context';
 import { prepareHomeMetadata, withInitialHomeMetadata } from './homeMetadata';
@@ -163,6 +165,8 @@ export interface GridSessionHost {
   /** Presentation-only short range while an actual crossing waits at its
    * in-world screen. Disabled in the same frame the crossing settles. */
   readonly heldFrame?: { enabled: boolean };
+  /** ZE8: a gate's count reached 0 for this walled cell (ZE10 opens the loading screen and makes it the home) */
+  readonly enterZone?: (instance: string) => void;
   /** Register once per fixed step (the page's one fixed step; never a second loop). */
   readonly onFixed: (fn: (dt: number) => void) => void;
   /** SF19a's one frame: the camera, composer and grade effects, and the page's late phase (absent: never built) */
@@ -206,6 +210,8 @@ export interface GridSessionState {
   readonly seams: SeamLookState;
   /** G85's soft walls: how many edges are closed */
   readonly softWalls: SoftWallState;
+  /** ZE8: the buffer the feet stand in and its count (null: none), and the card's text while it shows */
+  readonly gate: { readonly cell: string | null; readonly count: number; readonly card: string | null };
   /** G78's border shimmer and G119's save panel (status null: no panel up) */
   readonly shimmer: BorderShimmerState;
   /** G555: the cell whose step-by-step loading screen is open (its entry or re-entry waits), or null */
@@ -377,6 +383,10 @@ export class GridSession {
   /** G222 playtest #7: each neighbour's declared doors and gates, shown exactly when its region has them standing */
   private readonly panels: NeighbourPanels;
   private readonly softWalls: { readonly step: () => void; readonly state: () => SoftWallState };
+  /** ZE8: the gate count and its card */
+  private readonly gate = new GateCount();
+  private gateState: GateCountState = { cell: null, count: 5, fire: null };
+  private readonly gateCard: GateCard | null;
   /** G342 / G385: the near-placeholder tier, shipped for everyone: the four nearest cells draw their near view */
   private readonly near: NearPlaceholders;
   private readonly shimmer: { readonly step: () => void; readonly state: () => BorderShimmerState };
@@ -703,6 +713,7 @@ export class GridSession {
           return status;
         },
         text: (shown) => (shown === 'saving' ? GAME_STRINGS.grid.saving : GAME_STRINGS.grid.saveFailed) } });
+    this.gateCard = typeof document === 'undefined' ? null : new GateCard(host.scope);
     this.constructorTiming?.('presentation');
     const nativeOrigin = { origin: { x: 0, z: 0 } };
     if (preparedRoad?.collidersInstalled !== true) for (const { mesh } of this.strips) installStripCollider(host.physics, mesh, host.scope);
@@ -1081,6 +1092,7 @@ export class GridSession {
       if (this.assembly.approaching(distance, 400 + Math.min(speed, 60) * 4)) void this.admitNeighbour?.(cell).catch(() => undefined);
     }
     this.softWalls.step();
+    this.stepGate(at);
     if (view) this.viewStep();
     const inside = this.assembly.at(at.x, at.z), active = this.live === null ? this.home.instance : this.live.live.current();
     // GC2: online, prediction on the rim of a cell the server still walls (C5) is not a departure
@@ -1089,6 +1101,21 @@ export class GridSession {
     const presence = cellPresence(inside, active, held, past);
     if (presence.kind === 'leave') gridCells.leave();
     else if (presence.kind === 'enter') gridCells.enter({ instance: presence.instance, slug: presence.slug });
+  }
+
+  /** ZE8: the count while the feet stand in a walled cell's buffer; at 0 that cell's zone entry, once. */
+  private stepGate(at: { x: number; z: number }): void {
+    const buffer = bufferAt(this.assembly.cells, this.home, at);
+    this.gateState = this.gate.step(buffer?.instance ?? null, diagnosticNow());
+    if (this.gateState.fire !== null) this.host.enterZone?.(this.gateState.fire);
+  }
+  private drawGate(at: { x: number; z: number }): void {
+    const card = this.gateCard, { cell } = this.gateState;
+    if (card === null) return;
+    if (cell === null) { card.hide(); return; }
+    const origin = this.assembly.cell(cell).origin, home = this.home.origin;
+    card.show({ centre: { x: origin.x - home.x, z: origin.z - home.z }, feet: { x: at.x - home.x, z: at.z - home.z }, name: this.shardName(cell), count: this.gateState.count },
+      this.host.frame?.camera, innerWidth, innerHeight);
   }
 
   /** Tile streaming T5.3 (G775): the entered cell's resident L0 tiles (key j * 8 + i) and its origin from the home cell,
@@ -1130,6 +1157,7 @@ export class GridSession {
     for (const cell of this.neighbours) if (this.placeholderBlocksTiles(cell.instance)) this.rings.retireRefinement(cell.instance);
     if (this.host.heldFrame !== undefined) this.host.heldFrame.enabled = false;
     this.shimmer.step();
+    this.drawGate(at);
     const active = this.live === null ? this.home.instance : this.live.live.current();
     const eye = this.host.eye?.();
     if (this.host.backgroundReady?.() !== false) this.near.update(eye === undefined || !Number.isFinite(eye.x) || !Number.isFinite(eye.z) ? at : { x: at.x + eye.x, z: at.z + eye.z }, active);
@@ -1197,7 +1225,7 @@ export class GridSession {
       pitch: this.assembly.pitch,
       home: this.home.instance, inside: gridCells.cell?.instance ?? null, feet: { x: Math.round(at.x * 100) / 100, z: Math.round(at.z * 100) / 100 },
       cells: this.assembly.cells.map((cell) => { const d = drawn(cell.instance); return { instance: cell.instance, slug: cell.slug, cell: cell.cell, shows: shows(cell.instance, d), drawn: d }; }),
-      strips: this.strips.length, road: this.road, seams: this.seams, softWalls: this.softWalls.state(), shimmer: this.shimmer.state(), cellLoading: null, cellStage: null, cellStep: null, hybrid: this.live?.hybridState() ?? null, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
+      strips: this.strips.length, road: this.road, seams: this.seams, softWalls: this.softWalls.state(), gate: { cell: this.gateState.cell, count: this.gateState.count, card: this.gateCard?.text ?? null }, shimmer: this.shimmer.state(), cellLoading: null, cellStage: null, cellStep: null, hybrid: this.live?.hybridState() ?? null, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
       residentMB: Math.round(cost.accounted / 1e4) / 100, playingMB: Math.round(cost.playing / 1e4) / 100, envelopeMB: Math.round(this.allocator.envelope() / 1e4) / 100,
       accountedBytes: cost.accounted,
       rings: { frame: stats.frame, far: stats.resident.far, l1: stats.resident.l1, l0: stats.resident.l0, refused: stats.refused, inFlight: stats.inFlight, queued: stats.queued,

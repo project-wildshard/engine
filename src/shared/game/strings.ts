@@ -92,6 +92,8 @@ export const GAME_STRINGS = {
     /** G119: on the border shimmer while a crossing waits for its durable save, and when that save fails (the crossing retries) */
     saving: 'SAVING…',
     saveFailed: 'SAVE FAILED, RETRY',
+    /** ZE8: the gate card's line under a walled cell's name, over its count */
+    gatePreparing: 'Preparing to enter',
     off: 'Off',
     on: 'On',
   },

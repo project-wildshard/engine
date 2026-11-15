@@ -43,3 +43,6 @@
   10 m buffer with its two sides and the gate. They replace the 5 m-out neighbour readiness edges in the session's road
   physics and the look; the hex look now shows at any distance (faint past 70 m). `readinessEdges.ts` is left only for the
   continuous-crossing tests ZE1 retires. The server's road (ZE6) is Codex's.
+- ZE8 (opus-gcm8): `bufferAt` (zoneWalls.ts) finds the walled cell whose 8 x 10 m buffer the feet stand in, `GateCount`
+  counts 5 to 0 once a second and fires once, and `GateCard` pins a Shard Select-style DOM card to the gate's face through
+  the camera. The session fires `host.enterZone` at 0; ZE10 wires it to the loading screen.

@@ -49,3 +49,16 @@ export function zoneWallEdges(cell: GridCell, home: Readonly<{ origin: Readonly<
 export function walledCells<Cell extends Readonly<{ instance: string }>>(assembly: Readonly<{ cells: readonly Cell[] }>, home: Readonly<{ instance: string }>): Cell[] {
   return assembly.cells.filter(cell => cell.instance !== home.instance);
 }
+
+/** ZE8: the walled cell whose buffer the feet (grid metres) stand in, or null. The buffer is the 8 m wide pocket from an entryway's
+ *  edge line to its gate, in the cell's own frame; the home has none. */
+export function bufferAt<Cell extends Readonly<{ instance: string; origin: Readonly<{ x: number; z: number }> }>>(cells: readonly Cell[], home: Readonly<{ instance: string }>, feet: Readonly<{ x: number; z: number }>): Cell | null {
+  const open = ENTRY_WIDTH / 2;
+  for (const cell of cells) {
+    if (cell.instance === home.instance) continue;
+    const x = feet.x - cell.origin.x, z = feet.z - cell.origin.z;
+    const across = Math.max(Math.abs(x), Math.abs(z)), along = Math.abs(x) >= Math.abs(z) ? z : x;
+    if (across <= CHUNK_HALF && across >= CHUNK_HALF - BUFFER_DEPTH && Math.abs(along) <= open) return cell;
+  }
+  return null;
+}
