@@ -9473,5 +9473,23 @@
     "sourceRevision": "11bf212eea8b39e31c042dbbd13dfbc57dd0fc82",
     "sourceBlob": "d9879af3d1ff997bad827659cc75a688994605af",
     "retirementProof": "Restored current client-stealth public boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/portable-math.test.ts",
+    "outcome": "restored",
+    "target": "test/portable-math.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): engine retains its platform-stable sim table, install, source scan, and current sim-entry checks. The bake-table parity assertion moved to sharddev's public engine import.",
+    "originalTests": [
+      "the functions hold their bits on every platform",
+      "hypot is V8's, so V8 keeps its bits and JavaScriptCore takes them",
+      "the sim's table and the authors' are one table",
+      "installing is the whole of it, and idempotent",
+      "the exponents a sim file may keep round as multiplication does",
+      "no sim source goes round the table"
+    ],
+    "sourceRevision": "df5e67c6520c12e5ab44eef0a4e2d79253870583",
+    "sourceBlob": "a9b2b77bbe53466e380b546cec1e41f3026efdcb",
+    "retirementProof": "Parity migrated to sharddev test/portable-math-parity.test.ts; engine keeps all engine-bound checks."
   }
 ]

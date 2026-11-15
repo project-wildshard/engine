@@ -167,7 +167,6 @@
   "test/polearm-decision.test.ts",
   "test/population-raster.test.ts",
   "test/portable-bytes-cache.test.ts",
-  "test/portable-math.test.ts",
   "test/product-build-times.test.ts",
   "test/product-map-publish.test.ts",
   "test/program-discovery-bootstrap.test.ts",
