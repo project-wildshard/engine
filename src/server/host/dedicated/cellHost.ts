@@ -296,7 +296,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
       return;
     }
     if (!ready) { fail(new Error('A worker was told something before it booted')); return; }
-    if (order.kind === 'drain') { drained = true; clock?.pause(); for (const { room } of cells.values()) room.drain(); road?.drain(); post({ kind: 'drained' }); return; }
+    if (order.kind === 'drain') { drained = true; clock?.pause(); for (const { room } of cells.values()) room.drain(order.leave); road?.drain(); post({ kind: 'drained' }); return; }
     if (order.kind === 'cross') { cross(order).catch(fail); return; }
     // GC15 (3): crossings between workers, and which cells on the others a walker can stand in
     if (order.kind === 'open') { road?.open(order.cells); return; }

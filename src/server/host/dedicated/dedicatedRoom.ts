@@ -465,8 +465,13 @@ export class DedicatedRoom implements CrossTarget {
     for (const [body, left] of this.departed) if (now - left >= FORGET_PAID_MS) { this.departed.delete(body); this.forgetPaid(body); }
   }
   /** Everyone goes, as at SIGTERM: their last checkpoint now, and a close that says a restart is why. */
-  drain(): void {
-    for (const seat of this.seats.values()) { this.write(seat, 'restart'); seat.holdEnds = null; const { transport } = seat; seat.transport = null; transport?.close('restart'); }
+  drain(leave = false): void {
+    for (const seat of this.seats.values()) {
+      this.write(seat, 'restart'); seat.holdEnds = null;
+      const { transport } = seat; seat.transport = null;
+      if (leave) this.release(seat);
+      transport?.close('restart');
+    }
   }
   dispose(): void { this.net.dispose(); this.cell.dispose(); }
 }

@@ -27,7 +27,7 @@ export interface SeatEntry {
 export type CellOrder =
   | { readonly kind: 'find'; readonly id: number; readonly slug: string; readonly device: string }
   | ({ readonly kind: 'seat'; readonly slug: string; readonly port: MessagePort; readonly hello: ArrayBuffer } & SeatEntry)
-  | { readonly kind: 'drain' }
+  | { readonly kind: 'drain'; readonly leave?: boolean }
   /** MP4.1: a `room` line said in cell `from`, for every other awake cell on this worker. */
   | { readonly kind: 'chat'; readonly from: string; readonly line: WorldLine }
   /** GC15: a seat in cell `from` walks into `to` on the same worker. The entry is the door's read of their save on `to`'s shard. */
