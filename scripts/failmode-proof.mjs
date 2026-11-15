@@ -238,7 +238,7 @@ try {
           if (reloading !== null) { await reloading; await intoWorld(entered, 90_000).catch(() => undefined); }
         }
         const back = await recovered(page, item.id === 'full' ? 45_000 : 30_000);
-        return back ? { ...result, injection, shot, recovery: 'a real frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen: seenWhileDown, injection, shot, notes: await onScreen(page) };
+        return back ? { ...result, injection, shot, recovery: 'a real frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen: seenWhileDown, injection, shot, after: await shoot(page, item.id, 'after'), url: page.url(), notes: await onScreen(page) };
       } finally { await heal(); await entered.context.close(); }
     },
     // FM4: Send while the link is down holds one visible line, sent once on the way back

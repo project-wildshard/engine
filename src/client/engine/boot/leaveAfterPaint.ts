@@ -1,4 +1,5 @@
 import { pageScope } from '../../../shared/engine/app/resources';
+import { framesAvailable } from '../../../shared/engine/app/scopeEnvironment';
 
 /** iOS Simulator, 2026-11-09: WebKit stops painting a page as soon as a navigation starts in the same turn, so the load
  * failure screen's RELOAD showed no cover at all. Every reload the player asked for navigates one painted frame after the
@@ -11,6 +12,8 @@ export function leaveAfterPaint(go: () => void): void {
   if (pageScope.disposed || pageScope.disposing) { go(); return; }
   let gone = false;
   const once = (): void => { if (gone) return; gone = true; go(); };
-  pageScope.raf(() => { pageScope.timeout(0, once); });
+  // FM3's proof (version-skew Reload, 2026-11-15): the online shell's graph runs this with no browser frame environment
+  // installed, and the bare frame throws, so Reload sat at RELOADING under 'Something broke'. No frames: the timer alone goes.
+  if (framesAvailable()) pageScope.raf(() => { pageScope.timeout(0, once); });
   pageScope.timeout(LEAVE_FRAME_MS, once);
 }

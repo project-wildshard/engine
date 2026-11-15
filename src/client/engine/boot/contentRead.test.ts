@@ -162,15 +162,19 @@ test('time alone never retries pending transport and confirmed failure adds no t
   } finally { vi.useRealTimers(); }
 });
 
-test('QA 11-12 row 36: at START, before Loading owns the card, an unreachable read shows the shell\'s RETRY and names the file', async () => {
+test('QA 11-12 row 36: at START, before Loading owns the card, an unreachable read shows the shell\'s RETRY and says what failed', async () => {
   document.body.innerHTML = '<div class="ws-load"><div class="ws-load-foot"><span data-el="foot"></span><button type="button" class="ws-load-retry" data-el="retry" hidden>Retry</button></div></div>';
   let offline = true;
   const pending = readContent(url, 3, { fetch: () => offline ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(new Response(new Uint8Array([1, 2, 3]))) });
   const button = document.querySelector<HTMLButtonElement>('.ws-load-retry');
   await vi.waitFor(() => { expect(button?.hidden).toBe(false); });
-  expect(document.querySelector('[data-el="foot"]')?.textContent).toContain('/shardfiles/island/shape.bin');
+  // FM6: in a player's words with the catalogue's id; the file's address stays in the error for Copy diagnostics
+  const foot = document.querySelector<HTMLElement>('[data-el="foot"]');
+  expect(foot?.textContent).toBe('Download paused · the connection dropped');
+  expect(foot?.dataset['failmode']).toBe('packs-5xx');
   offline = false; button?.click();
   expect(await pending).toEqual(new Uint8Array([1, 2, 3]));
+  expect(foot?.dataset['failmode']).toBeUndefined();
   document.body.innerHTML = '';
 });
 

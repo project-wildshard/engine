@@ -121,7 +121,13 @@ function shellRetry(scope: Scope, error: ContentReadError, retry: () => void): v
   const button = document.querySelector<HTMLButtonElement>('.ws-load .ws-load-retry');
   if (button === null) return;
   const foot = document.querySelector<HTMLElement>('.ws-load [data-el="foot"]');
-  if (foot !== null) foot.textContent = error.message;
+  // FM6: the shell's foot says what failed in a player's words with the catalogue's id, as Loading's does (the FM3 proof caught
+  // START's boot tables showing their address and HTTP status here); the address stays in the error for Copy diagnostics
+  if (foot !== null) {
+    const failure = contentFailure(error);
+    foot.textContent = failure.line; foot.dataset['failmode'] = failure.failmode;
+    scope.onDispose(() => { if (foot.dataset['failmode'] === failure.failmode) delete foot.dataset['failmode']; });
+  }
   button.hidden = false;
   scope.listen(button, 'click', retry);
 }

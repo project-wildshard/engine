@@ -45,3 +45,14 @@ Toggle mode's press is voice off, mode 32's own recovery, so it is not held.
 - The doctor-http card: one at a time (the old one's scope goes too), Try again stays on the card while it checks, focus
   on it. The release page stops its countdown once it reads ("Trying…"). Voice tip buttons listen in a per-tip scope.
 - Left for a row: `Retry-After` is not CORS-safelisted, so a cross-origin content or release server must expose it.
+
+## FM3 proof reds fixed: Reload stuck at RELOADING, START's foot showing an address
+
+- version-skew: the panel showed, but Reload sat at RELOADING under "Something broke: Frame scheduling is unavailable in
+  this host". `leaveAfterPaint` asked the page scope for a frame before setting its fallback timer, and the online shell's
+  graph has no browser frame environment, so it threw and never navigated. It now asks for a frame only when frames exist
+  (`test/leave-after-paint.test.ts`, red first).
+- packs-5xx, packs-429, book-5xx: at START, before Loading owns the card, the shell's foot showed
+  "Read failed: /assets/boot-tables-….json · HTTP 503". It now shows the FM6 line with its `data-failmode`.
+- The proof opens the play address for its warm and offline visits: the page drops its query once it starts, so a reload
+  landed on the title (offline-launch now passes).
