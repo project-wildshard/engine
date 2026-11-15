@@ -300,4 +300,10 @@ html[data-ws-keyboard] .ws-touch { visibility: hidden; pointer-events: none; }
 
 /* QA row 42: no BOOST button. A double tap of HOVER latches Developer boost; the tab burns amber while it moves the board
    (ui/hoverBoost.ts `.boost`), as do the board's repulsors. */
+/* QA 11-15 row 9: the word BOOST under HOVER while boost is on, gone while it is off (ui/hoverBoost.ts `.ws-hover-boost`). A keyboard
+   page has no tab: the word stands alone on the left edge, at the tab's height, in the tab's amber. */
+.ws-hover-boost { display: block; font: inherit; font-weight: 700; letter-spacing: inherit; line-height: 1; }
+.ws-hover-boost[hidden] { display: none; }
+#hud .ws-boost-tag { position: absolute; z-index: calc(var(--ws-layer-hud) + 2); left: env(safe-area-inset-left, 0px); top: 46%; transform: translateY(-50%); padding: 8px 10px 8px 8px; border: 1px solid var(--ws-amber); border-left: 0; border-radius: 0 10px 10px 0; background: var(--ws-amber); color: #2a1600; box-shadow: 0 0 0 2px rgba(255, 181, 71, 0.35), 0 0 18px rgba(255, 181, 71, 0.75); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; pointer-events: none; }
+#hud .ws-boost-tag[hidden] { display: none; }
 #hud .ws-touch .ws-touch-hover.on.boost { color: #2a1600; border-color: var(--ws-amber); background: var(--ws-amber); box-shadow: 0 0 0 2px rgba(255, 181, 71, 0.35), 0 0 18px rgba(255, 181, 71, 0.75); text-shadow: none; font-weight: 700; }

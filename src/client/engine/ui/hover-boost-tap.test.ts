@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { app } from '../app/runtime';
 import { setDev } from '../core/devMode';
-import { BOOST_TAP_MS, hoverTap, hoverTaps, mountBoostLook, pressHover, type HoverPort } from './hoverBoost';
+import { BOOST_TAP_MS, hoverTap, hoverTaps, mountBoostLook, mountBoostTag, pressHover, type HoverPort } from './hoverBoost';
 
 const owners: Scope[] = [];
 afterEach(() => { for (const owner of owners.splice(0)) owner.dispose(); setDev(false); });
@@ -81,4 +81,39 @@ test('QA row 42: the HOVER tab turns amber only while boost moves the board', ()
   expect(button.classList.contains('boost')).toBe(true);
   scope.dispose();
   expect(button.classList.contains('boost')).toBe(false);
+});
+
+test('QA 11-15 row 9: the HOVER tab says BOOST only while boost is on, and the word is gone while it is off', () => {
+  const scope = new Scope('boost-word'); owners.push(scope);
+  const button = document.createElement('button'), p = rider(true);
+  button.innerHTML = '<svg></svg><span>Hover</span>';
+  mountBoostLook(button, p, app.events, scope);
+  const word = (): HTMLElement | null => button.querySelector<HTMLElement>('.ws-hover-boost');
+  const shown = (): boolean => word()?.hidden === false;
+  setDev(true);
+  expect(shown()).toBe(false);
+  p.setBoost(true); app.events.emit('player.boost', true); app.events.flush('input');
+  expect(shown()).toBe(true);
+  expect(word()?.textContent).toBe('Boost');
+  expect(button.textContent).toBe('HoverBoost');
+  p.setBoost(false); app.events.emit('player.boost', false); app.events.flush('input');
+  expect(shown()).toBe(false);
+  scope.dispose();
+  expect(word()).toBeNull();
+});
+
+test('QA 11-15 row 9: a keyboard page with no HOVER tab shows BOOST on the left edge only while boost is on', () => {
+  const scope = new Scope('boost-tag'); owners.push(scope);
+  const hud = document.createElement('div'), p = rider(true);
+  mountBoostTag(hud, p, app.events, scope);
+  const tag = (): HTMLElement | null => hud.querySelector<HTMLElement>('.ws-boost-tag');
+  setDev(true);
+  expect(tag()?.hidden).toBe(true);
+  p.setBoost(true); app.events.emit('player.boost', true); app.events.flush('input');
+  expect(tag()?.hidden).toBe(false);
+  expect(tag()?.textContent).toBe('Boost');
+  p.setHover(false); app.events.emit('player.hover', false); app.events.flush('input');
+  expect(tag()?.hidden, 'off the board, boost moves nothing').toBe(true);
+  scope.dispose();
+  expect(tag()).toBeNull();
 });

@@ -748,7 +748,8 @@ export const ENGINE_STRINGS = {
   "s_e94f3b418bf5": "Deletes the downloaded game files (every cache and the service worker) so the next load is a first visit. Keeps saves, settings and the review login.",
   "s_9c6373f9a730": "Sound effects: MOSS-SoundEffect v2 · Stable Audio 3 Medium — Powered by Stability AI",
   "s_ef691a454428": "Powered by Stability AI",
-  "s_7fc7e56bbd7f": "Music: MiniMax-Music3"
+  "s_7fc7e56bbd7f": "Music: MiniMax-Music3",
+  "s_hover_boost": "Boost"
 } as const;
 export type EngineStringKey = keyof typeof ENGINE_STRINGS;
 const overrides: Partial<Record<EngineStringKey, string>> = {};

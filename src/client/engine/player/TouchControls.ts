@@ -1,5 +1,5 @@
 import { mountUi } from '../ui/ownership';
-import { mountBoostLook } from '../ui/hoverBoost';
+import { mountBoostLook, mountBoostTag } from '../ui/hoverBoost';
 import { app } from '../app/runtime';
 import { capturePointer, listenDom, listenPage } from '../input/dom';
 import type { Action, TouchStack, TouchVerbSpec } from '../input/InputService';
@@ -155,7 +155,8 @@ export class TouchControls {
     this.weapons = weapons;
     this.lock = lock;
     this.active = force || IS_TOUCH;
-    if (!this.active) return;
+    // QA 11-15 row 9: a keyboard page has no HOVER tab, so BOOST stands on the left edge by itself while boost is on
+    if (!this.active) { mountBoostTag(document.getElementById('hud') ?? document.body, player, app.events, this.scope); return; }
     const hud = document.getElementById('hud') ?? document.body;
     hud.classList.add('touch');
     const root = document.createElement('div');

@@ -12,3 +12,8 @@ Meta QA 11-15 rows 8 and 9.
   is now the one world-feet read for all three; `runCells` grants the boost.
   `test/dedicated-board-speed.test.ts` drives bots over real sockets: 14/14/14/14
   before, 14/30/56/60 after.
+- Row 9: Jake wants the left-edge HOVER tab to say BOOST while boost is on
+  and the word gone while it is off. `mountBoostLook` adds the word under
+  HOVER (`.ws-hover-boost`, shown only while boost is shown); a keyboard page
+  has no tab, so `mountBoostTag` stands the same word alone on the left edge
+  (`.ws-boost-tag`) while boost is on (my pick, so desktop says it too).

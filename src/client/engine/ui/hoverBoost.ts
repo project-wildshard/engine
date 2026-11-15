@@ -1,5 +1,6 @@
 import type { Scope } from '../../../shared/engine/app/scope';
 import type { Events } from '../../../shared/engine/events/events';
+import { engineString } from '../../../shared/engine/strings';
 import { isDev, onDev } from '../core/devMode';
 
 // QA row 42 (Jake, 2026-11-10): "Let's get rid of the boost button. Let's make boost be like an undocumented double tap on the
@@ -50,12 +51,38 @@ export function pressHover(player: HoverPort, taps: HoverTaps, now: number): voi
 /** Boost shows while it moves the board: Developer mode, riding, latched. */
 export const boostShown = (player: Pick<HoverPort, 'hover' | 'hoverBoost'>): boolean => isDev() && player.hover && player.hoverBoost;
 
-/** The HOVER tab turns amber (`.boost`) while boost is shown. */
-export function mountBoostLook(button: HTMLElement, player: Pick<HoverPort, 'hover' | 'hoverBoost'>, events: Events, scope: Scope): void {
-  const sync = (): void => { button.classList.toggle('boost', boostShown(player)); };
+/** The word BOOST, hidden until `follow` shows it. */
+function boostWord(scope: Scope): HTMLElement {
+  const word = document.createElement('b');
+  word.className = 'ws-hover-boost'; word.textContent = engineString('s_hover_boost'); word.hidden = true;
+  scope.onDispose(() => { word.remove(); });
+  return word;
+}
+/** Run `show` with whether boost is shown now and on every change that can move it, until `scope` ends. */
+function follow(player: Pick<HoverPort, 'hover' | 'hoverBoost'>, events: Events, scope: Scope, show: (on: boolean) => void): void {
+  const sync = (): void => { show(boostShown(player)); };
   events.on('player.hover', sync, scope);
   events.on('player.boost', sync, scope);
   scope.onDispose(onDev(sync));
-  scope.onDispose(() => { button.classList.remove('boost'); });
   sync();
+}
+
+/**
+ * The HOVER tab turns amber (`.boost`) while boost is shown, and says BOOST under its HOVER. QA 11-15 row 9 (Jake: "I want that little
+ * icon on the left edge of the screen to say hover boost. I just want the word boost there, boost is on. I want the word boost gone [when]
+ * boost is off."): the word is there only while boost is on.
+ */
+export function mountBoostLook(button: HTMLElement, player: Pick<HoverPort, 'hover' | 'hoverBoost'>, events: Events, scope: Scope): void {
+  const word = boostWord(scope);
+  button.append(word);
+  scope.onDispose(() => { button.classList.remove('boost'); });
+  follow(player, events, scope, on => { button.classList.toggle('boost', on); word.hidden = !on; });
+}
+/** QA 11-15 row 9 on a keyboard page, which has no HOVER tab: the same word on the left edge, where the phone's tab stands, only while
+ *  boost is on. */
+export function mountBoostTag(hud: HTMLElement, player: Pick<HoverPort, 'hover' | 'hoverBoost'>, events: Events, scope: Scope): void {
+  const tag = boostWord(scope);
+  tag.classList.add('ws-boost-tag');
+  hud.append(tag);
+  follow(player, events, scope, on => { tag.hidden = !on; });
 }
