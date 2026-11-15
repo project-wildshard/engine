@@ -29,7 +29,12 @@
     "landings": {
       "CI21-H1": null,
       "CI21-H2": null,
-      "CI21-H3": null,
+      "CI21-H3": {
+        "repository": "project-wildshard/engine",
+        "commit": "d2287a1ad45e010f496380cc4263cec16d7f54ce",
+        "landedAt": "2026-11-15T16:07:14.000Z",
+        "evidence": "First CI21-H3 engine integration https://github.com/project-wildshard/engine/commit/d2287a1ad45e010f496380cc4263cec16d7f54ce; integration journal and normal gate bind the published prerequisite and public consumer proof."
+      },
       "CI21-H4": null,
       "CI21-H5": null
     },
