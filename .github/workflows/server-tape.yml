@@ -1,0 +1,96 @@
+# MMO-SERVER E7.2a: compare the real dedicated room's fixed tape across OSes.
+# Manual and independent of push CI; neither job joins a live server.
+name: server-tape
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: server-tape
+  cancel-in-progress: false
+jobs:
+  witness:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: node scripts/pins.ts install driftwood-isle
+      - name: Build the dedicated tape and its pinned product
+        shell: bash
+        run: |
+          node scripts/build-server.mjs --build "$GITHUB_SHA" --out tmp/server-tape/server --entry tapeWitness=test/fixtures/dedicated/tapeWitnessEntry.ts
+          node scripts/server-origin.mjs tmp/server-tape/origin "$GITHUB_SHA" "driftwood-isle=$PWD/out/driftwood-isle"
+      - name: Run 3600 deterministic ticks with two moving seats
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {spawnSync} from 'node:child_process';
+          import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+          import {resolve} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const build=process.env.GITHUB_SHA;
+          const run=spawnSync(process.execPath,[
+            'tmp/server-tape/server/tapeWitness.mjs',
+            pathToFileURL(`${resolve('tmp/server-tape/origin')}/`).href,
+            resolve('tmp/server-tape/cache'),'driftwood-isle',build,'3600',
+            'tmp/server-tape/server/rapier.wasm',
+          ],{encoding:'utf8',timeout:300000});
+          process.stdout.write(run.stdout??'');process.stderr.write(run.stderr??'');
+          if(run.error)throw run.error;
+          assert.equal(run.status,0);
+          const row=JSON.parse(run.stdout.trim().split('\n').at(-1));
+          assert.equal(row.portableMath,true);assert.equal(row.ticks,3600);
+          assert.equal(row.moved.length,2);assert.ok(row.moved.every(n=>n>0));
+          for(const key of ['sim','snapshot'])assert.match(row[key],/^[0-9a-f]{64}$/u);
+          const pin=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')).shards.find(p=>p.slug==='driftwood-isle');
+          assert.ok(pin);
+          mkdirSync('tmp/server-tape/result',{recursive:true});
+          writeFileSync(`tmp/server-tape/result/${process.platform}.json`,JSON.stringify({build,pin:pin.hash,...row},null,2));
+          NODE
+      - name: Retain each platform's measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: server-tape-${{ matrix.os }}
+          path: tmp/server-tape/result
+          if-no-files-found: error
+          retention-days: 7
+  compare:
+    needs: witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: server-tape-*
+          path: reports
+          merge-multiple: true
+      - name: Require identical simulation and snapshot hashes
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {appendFileSync,readFileSync} from 'node:fs';
+          const read=os=>JSON.parse(readFileSync(`reports/${os}.json`,'utf8'));
+          const linux=read('linux'),darwin=read('darwin');
+          assert.equal(linux.platform,'linux');assert.equal(darwin.platform,'darwin');
+          for(const row of [linux,darwin]){
+            assert.equal(row.build,process.env.GITHUB_SHA);
+            assert.equal(row.portableMath,true);assert.equal(row.ticks,3600);
+            assert.equal(row.moved.length,2);assert.ok(row.moved.every(n=>n>0));
+            for(const key of ['pin','sim','snapshot'])assert.match(row[key],/^[0-9a-f]{64}$/u);
+          }
+          for(const key of ['build','pin','slug','ticks','moved','sim','snapshot','entities','sin1','portableMath']){
+            assert.deepEqual(linux[key],darwin[key],`platform mismatch: ${key}`);
+          }
+          const result=`E7.2a PASS ${linux.build}: 3600 ticks, two moving seats, Linux/Darwin sim ${linux.sim}, snapshot ${linux.snapshot}`;
+          console.log(result);appendFileSync(process.env.GITHUB_STEP_SUMMARY,`${result}\n`);
+          NODE
