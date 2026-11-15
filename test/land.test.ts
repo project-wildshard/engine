@@ -1060,7 +1060,6 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     // TS15/EV3b: boundaries is blocking on its own runner from t=0, never behind products.
     expect(jobs.get('tests')).not.toContain('boundaries');
     expect(jobs.get('boundaries')).not.toMatch(/^ {4}continue-on-error:/mu);
-    expect(readFileSync('.github/workflows/engine-boundaries.yml', 'utf8')).not.toMatch(/^ {4}continue-on-error:/mu);
     expect(jobs.get('boundaries')).toContain('scripts/ci-pack.mjs --jobs=1 --job=1 --units=boundaries');
     // EV3: six shares, the last of them Ring 1's products alone.
     expect(jobs.get('tests')).toContain('job: [1, 2, 3, 4, 5, 6]');

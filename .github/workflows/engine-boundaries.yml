@@ -1,4 +1,4 @@
-# TS15: blocking after the green main soak in run 43768938893, 2026-11-15.
+# J186: daily Ring 2 report remains outside TS15's validated push-half gate.
 # Cold q11 cooking plus a clean build exceeds ten seconds: Ring 2.
 # CI-JOB-PACKING (J244): a push no longer starts this workflow. Its push half, cook-to-play on Ring 1's products,
 # is ci's blocking `boundaries` unit (scripts/ci-pack.mjs); its six Vitest files already run in ci's shards.
@@ -15,6 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   report:
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
