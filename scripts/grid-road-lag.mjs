@@ -5,6 +5,7 @@
 // longest stretch under 90 % of the approach speed with the key held (the road bar's stop). One JSON per run, plus a printed line per crossing.
 //   scripts/browser-lane.sh node scripts/grid-road-lag.mjs --base=<staging, preview or loopback> --out=<dir> [--home=driftwood|nalati]
 //     [--viewport=2992x1434@2] [--reps=3] [--engine=chromium|webkit] [--run] (sprint) [--device='iPhone 15 Pro'] (a phone: its viewport, touch and agent)
+//     [--profile] (Chromium: the page thread's CPU profile over the first lap, with `at`, its start on the page's clock)
 // On preview or a loopback page the walker is set 20 m inside the home cell's road-facing entryway by the in-page harness pose; on
 // staging (an online seat can't be placed) only Driftwood is walked to its east entryway from the spawn. Never production (J205).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -15,7 +16,7 @@ import { saveFixture } from './debug-settings.mjs';
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), run = process.argv.includes('--run'), reps = Number(flag('reps', '3'));
+const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), run = process.argv.includes('--run'), profile = process.argv.includes('--profile'), reps = Number(flag('reps', '3'));
 if (!/^https:\/\/(preview|staging)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: grid-road-lag.mjs --base=<staging, preview or loopback url> --out=<dir> [--home=driftwood|nalati] [--viewport=WxH@dpr] [--reps=n]');
 const online = base.includes('staging');
 /** Each home's road-facing entryway (the middle of an edge, in the cell's own metres) and the yaw that walks out through it (the
@@ -112,11 +113,15 @@ try {
     const speed = (/** @type {number} */ i) => Math.hypot(held[i].x - held[i - 1].x, held[i].z - held[i - 1].z) / Math.max(1, held[i].t - held[i - 1].t);
     const approach = held.map((_, i) => i > 0 && held[i].t < line.t - 200 ? speed(i) : Number.NaN).filter(v => Number.isFinite(v)).sort((a, b) => a - b), cruise = approach[Math.floor(approach.length / 2)] ?? 0;
     let stopAt = null;
-    for (let i = 1; i < held.length; i++) { stop = speed(i) < cruise * 0.9 ? stop + (held[i].t - held[i - 1].t) : 0; if (stop > worstStop) { worstStop = stop; stopAt = { endsMs: held[i].t - line.t, x: held[i].x, z: held[i].z }; } }
+    // a walk that starts within the window starts from rest: count only once the feet first reach the approach's speed
+    for (let i = 1, moving = false; i < held.length; i++) { const slow = speed(i) < cruise * 0.9; moving ||= !slow; if (!moving) continue; stop = slow ? stop + (held[i].t - held[i - 1].t) : 0; if (stop > worstStop) { worstStop = stop; stopAt = { endsMs: held[i].t - line.t, x: held[i].x, z: held[i].z }; } }
     return { name, crossed: true, lineAt: line.t, frames: span.length, worstFrameMs: sorted.at(-1) ?? 0, p95Ms: sorted[Math.floor(sorted.length * 0.95)] ?? 0, medianMs: sorted[Math.floor(sorted.length / 2)] ?? 0,
       over33: span.filter(ms => ms > 33.4).length, over50: span.filter(ms => ms > 50).length, over100: span.filter(ms => ms > 100).length,
       trace: near.filter((_, i) => i % 2 === 0).map(s => [s.t - line.t, s.x, s.z, s.inside, s.cur, s.cx, s.phase, s.card, s.stage, s.res, s.hy, s.hook]), cardMs: cards.length * 50, cards: [...new Set(cards.map(s => `${String(s.card)}:${String(s.stage)}`))], worstStopMs: worstStop, stopAt, cruiseMps: Number((cruise * 1000).toFixed(2)), phases: [...new Set(near.map(s => s.phase))] };
   };
+  const cdp = profile && engineName === 'chromium' ? await context.newCDPSession(page) : undefined;
+  let profileAt = 0;
+  if (cdp !== undefined) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 250 }); await cdp.send('Profiler.start'); profileAt = await t(); }
   for (let rep = 1; rep <= reps; rep++) {
     let from = await t();
     await walk(outward, s => s.inside === null && Math.abs(local(s)) >= edge + 12);
@@ -126,6 +131,10 @@ try {
     await walk(outward + Math.PI, s => s.inside === home.slug && Math.abs(local(s)) <= edge - 12);
     await sleep(2500);
     result.crossings.push({ rep, ...await measure('back (road to cell)', from) });
+    if (cdp !== undefined && rep === 1) {
+      const { profile: taken } = await cdp.send('Profiler.stop');
+      writeFileSync(join(out, `${engineName}${device === '' ? '' : '-phone'}${run ? '-run' : ''}-${homeName}-lap1.cpuprofile.json`), JSON.stringify({ at: profileAt, base, profile: taken }));
+    }
     for (const row of result.crossings.slice(-2)) console.log(`${row.crossed === true ? 'ok  ' : 'FAIL'} ${homeName} rep ${String(rep)} ${String(row.name)} ${JSON.stringify({ worst: row.worstFrameMs, p95: row.p95Ms, over50: row.over50, over100: row.over100, card: row.cardMs, stop: row.worstStopMs })}`);
   }
   await page.screenshot({ path: join(out, `${engineName}${device === '' ? '' : '-phone'}${run ? '-run' : ''}-${homeName}-road-lag.png`) });
