@@ -462,8 +462,13 @@ function status(): void {
 
 const [command = 'status', ...rest] = process.argv.slice(2);
 if (command === 'refresh') {
+  if (rest.length === 2 && rest[0] === '--channel' && rest[1] === 'staging') {
+    const {refreshStaging} = await import('./pins-staging.ts');
+    await refreshStaging(API);
+  } else {
   if (rest.some((arg, at) => arg.startsWith('-') ? arg !== '--drop' : rest[at - 1] !== '--drop')) throw new Error('usage: pins.ts refresh [--drop slug[,slug]]...');
   await refresh(rest.flatMap((arg, at) => rest[at - 1] === '--drop' ? arg.split(',') : []));
+  }
 }
 else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1');
 else if (command === 'install' && rest[0] === '--from-format') await install(rest.slice(1), 'format');

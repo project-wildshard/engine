@@ -1,0 +1,1087 @@
+{
+  "version": 1,
+  "channel": "staging",
+  "api": "https://api.wildshard.io",
+  "catalogueHash": "55b78bedc4b452fe30d3a536b1f802de77abb38337a879df92f22b0830e067d3",
+  "releaseHash": null,
+  "catalogue": {
+    "version": 0,
+    "stage": "live",
+    "placements": [
+      {
+        "instance": "template-solo",
+        "slug": "_template",
+        "cell": [
+          0,
+          0
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 1000,
+        "status": "live"
+      },
+      {
+        "instance": "driftwood-isle",
+        "slug": "driftwood-isle",
+        "cell": [
+          -1,
+          6
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 1,
+        "status": "live"
+      },
+      {
+        "instance": "far-reach",
+        "slug": "far-reach",
+        "cell": [
+          1,
+          4
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 60,
+        "status": "experimental"
+      },
+      {
+        "instance": "nalati-grasslands",
+        "slug": "nalati-grasslands",
+        "cell": [
+          4,
+          -2
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 3,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "nine-dragon-stack",
+        "slug": "nine-dragon-stack",
+        "cell": [
+          -2,
+          1
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 4,
+        "status": "partial"
+      },
+      {
+        "instance": "pine-hollow",
+        "slug": "pine-hollow",
+        "cell": [
+          3,
+          -2
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 2,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "sunscar-dunes",
+        "slug": "sunscar-dunes",
+        "cell": [
+          2,
+          -1
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 50,
+        "status": "experimental"
+      },
+      {
+        "instance": "blender-template-solo",
+        "slug": "blender-template",
+        "cell": [
+          -1,
+          -1
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 8,
+        "status": "hidden"
+      },
+      {
+        "instance": "pastel-plain-solo",
+        "slug": "pastel-plain",
+        "cell": [
+          -1,
+          1
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 9,
+        "status": "hidden"
+      },
+      {
+        "instance": "ink-cel-valley-solo",
+        "slug": "ink-cel-valley",
+        "cell": [
+          1,
+          -1
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 10,
+        "status": "hidden"
+      },
+      {
+        "instance": "open-plot-thin-ice-solo",
+        "slug": "open-plot-thin-ice",
+        "cell": [
+          -6,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-frostline-peaks-solo",
+        "slug": "open-plot-frostline-peaks",
+        "cell": [
+          -5,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-ember-forge-solo",
+        "slug": "open-plot-ember-forge",
+        "cell": [
+          -4,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-lantern-bayou-solo",
+        "slug": "open-plot-lantern-bayou",
+        "cell": [
+          -3,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-sky-harbor-solo",
+        "slug": "open-plot-sky-harbor",
+        "cell": [
+          -2,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-coral-drift-solo",
+        "slug": "open-plot-coral-drift",
+        "cell": [
+          -1,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-clockwork-canyon-solo",
+        "slug": "open-plot-clockwork-canyon",
+        "cell": [
+          0,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-starfall-observatory-solo",
+        "slug": "open-plot-starfall-observatory",
+        "cell": [
+          1,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-mosslight-ruins-solo",
+        "slug": "open-plot-mosslight-ruins",
+        "cell": [
+          2,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-alien-plain-solo",
+        "slug": "open-plot-alien-plain",
+        "cell": [
+          3,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-desert-ruin-solo",
+        "slug": "open-plot-desert-ruin",
+        "cell": [
+          4,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "hidden"
+      },
+      {
+        "instance": "open-plot-night-market-solo",
+        "slug": "open-plot-night-market",
+        "cell": [
+          5,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "experimental"
+      },
+      {
+        "instance": "open-plot-sky-race-solo",
+        "slug": "open-plot-sky-race",
+        "cell": [
+          6,
+          8
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-fossil-badlands-solo",
+        "slug": "open-plot-fossil-badlands",
+        "cell": [
+          -2,
+          9
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-patchwork-fairground-solo",
+        "slug": "open-plot-patchwork-fairground",
+        "cell": [
+          -1,
+          9
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-saltwind-lighthouse-solo",
+        "slug": "open-plot-saltwind-lighthouse",
+        "cell": [
+          0,
+          9
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      },
+      {
+        "instance": "open-plot-jungle-ziggurat-solo",
+        "slug": "open-plot-jungle-ziggurat",
+        "cell": [
+          1,
+          9
+        ],
+        "size": [
+          500,
+          500,
+          500
+        ],
+        "order": 11,
+        "status": "earlyAccess"
+      }
+    ],
+    "grid": {
+      "version": 0,
+      "pitch": 562.5,
+      "cells": [
+        {
+          "instance": "pine-hollow",
+          "slug": "pine-hollow",
+          "cell": [
+            0,
+            1
+          ]
+        },
+        {
+          "instance": "template-2",
+          "slug": "_template",
+          "cell": [
+            1,
+            1
+          ],
+          "identity": {
+            "accent": "lime",
+            "marks": [
+              {
+                "x": -88,
+                "y": 28.3,
+                "z": -85,
+                "yaw": 0,
+                "size": 4
+              },
+              {
+                "x": -88,
+                "y": 28.3,
+                "z": -91,
+                "yaw": 3.14159265,
+                "size": 4
+              },
+              {
+                "x": -85,
+                "y": 28.3,
+                "z": -88,
+                "yaw": 1.570796325,
+                "size": 4
+              },
+              {
+                "x": -91,
+                "y": 28.3,
+                "z": -88,
+                "yaw": -1.570796325,
+                "size": 4
+              },
+              {
+                "x": 0,
+                "y": 13.25,
+                "z": 229.8,
+                "yaw": 0,
+                "size": 1.5
+              },
+              {
+                "x": 0,
+                "y": 10.75,
+                "z": -219.55,
+                "yaw": 3.14159265,
+                "size": 2.2
+              },
+              {
+                "x": 221.05,
+                "y": 2.5,
+                "z": 14,
+                "yaw": 1.570796325,
+                "size": 3
+              },
+              {
+                "x": -234.2,
+                "y": 5.6,
+                "z": 0,
+                "yaw": -1.570796325,
+                "size": 1.8
+              }
+            ],
+            "layout": {
+              "seed": 7,
+              "plots": [
+                {
+                  "x": 66,
+                  "z": 162,
+                  "half": 20
+                },
+                {
+                  "x": -162,
+                  "z": 66,
+                  "half": 20
+                },
+                {
+                  "x": -66,
+                  "z": -162,
+                  "half": 20
+                },
+                {
+                  "x": 162,
+                  "z": -66,
+                  "half": 20
+                }
+              ]
+            }
+          },
+          "speedClass": "road"
+        },
+        {
+          "instance": "sunscar-dunes",
+          "slug": "sunscar-dunes",
+          "cell": [
+            -1,
+            0
+          ]
+        },
+        {
+          "instance": "driftwood-isle",
+          "slug": "driftwood-isle",
+          "cell": [
+            0,
+            0
+          ]
+        },
+        {
+          "instance": "nalati-grasslands",
+          "slug": "nalati-grasslands",
+          "cell": [
+            1,
+            0
+          ]
+        },
+        {
+          "instance": "far-reach",
+          "slug": "far-reach",
+          "cell": [
+            0,
+            -1
+          ]
+        },
+        {
+          "instance": "pastel-plain",
+          "slug": "pastel-plain",
+          "cell": [
+            -1,
+            1
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "blender-template",
+          "slug": "blender-template",
+          "cell": [
+            -1,
+            -1
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "nine-dragon-stack",
+          "slug": "nine-dragon-stack",
+          "cell": [
+            1,
+            -1
+          ]
+        },
+        {
+          "instance": "open-plot-0-0",
+          "slug": "open-plot-patchwork-fairground",
+          "cell": [
+            -2,
+            -2
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-1-0",
+          "slug": "open-plot-fossil-badlands",
+          "cell": [
+            -1,
+            -2
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-2-0",
+          "slug": "open-plot-sky-race",
+          "cell": [
+            0,
+            -2
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-3-0",
+          "slug": "open-plot-night-market",
+          "cell": [
+            1,
+            -2
+          ],
+          "edgeLook": {
+            "height": 1.2
+          },
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-4-0",
+          "slug": "open-plot-alien-plain",
+          "cell": [
+            2,
+            -2
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-0-1",
+          "slug": "open-plot-lantern-bayou",
+          "cell": [
+            -2,
+            -1
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-4-1",
+          "slug": "open-plot-ember-forge",
+          "cell": [
+            2,
+            -1
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-0-2",
+          "slug": "open-plot-coral-drift",
+          "cell": [
+            -2,
+            0
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-4-2",
+          "slug": "open-plot-mosslight-ruins",
+          "cell": [
+            2,
+            0
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-0-3",
+          "slug": "open-plot-frostline-peaks",
+          "cell": [
+            -2,
+            1
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-4-3",
+          "slug": "open-plot-clockwork-canyon",
+          "cell": [
+            2,
+            1
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-0-4",
+          "slug": "open-plot-jungle-ziggurat",
+          "cell": [
+            -2,
+            2
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "ink-cel-valley",
+          "slug": "ink-cel-valley",
+          "cell": [
+            -1,
+            2
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-2-4",
+          "slug": "open-plot-saltwind-lighthouse",
+          "cell": [
+            0,
+            2
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-3-4",
+          "slug": "open-plot-starfall-observatory",
+          "cell": [
+            1,
+            2
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-4-4",
+          "slug": "open-plot-sky-harbor",
+          "cell": [
+            2,
+            2
+          ],
+          "speedClass": "road"
+        },
+        {
+          "instance": "open-plot-thin-ice",
+          "slug": "open-plot-thin-ice",
+          "cell": [
+            0,
+            3
+          ]
+        }
+      ],
+      "emptyNeighbour": {
+        "kind": "sea",
+        "level": 0,
+        "edgeColour": [
+          0.25,
+          0.25,
+          0.25
+        ],
+        "fog": {
+          "colour": [
+            0.6,
+            0.65,
+            0.7
+          ],
+          "near": 60,
+          "far": 180
+        }
+      }
+    },
+    "shards": [
+      {
+        "slug": "blender-template",
+        "name": "Brasscap Mesa",
+        "revision": 3,
+        "hash": "5400ea84de953f98d690fe93abd6ac46ee3e2a42fe4ed194a255638013295d37"
+      },
+      {
+        "slug": "driftwood-isle",
+        "name": "Driftwood Isle",
+        "revision": 4,
+        "hash": "c10405befd5abe86e35e5dade8dcada9ee8a8cddf40b0a328eaa10b0f765a7d6"
+      },
+      {
+        "slug": "far-reach",
+        "name": "Sky Reach",
+        "revision": 3,
+        "hash": "cdbb400ca5d0908399f0e9c43b2304a49fa3881b0846bc562c0f6fe6444051fc"
+      },
+      {
+        "slug": "ink-cel-valley",
+        "name": "Ink & Cel Valley",
+        "revision": 1,
+        "hash": "5764c86a258ac664ced0ba46860089738cca44d2f27a3f84abdd9ad80f79b0c3"
+      },
+      {
+        "slug": "nalati-grasslands",
+        "name": "Nalati Grasslands",
+        "revision": 2,
+        "hash": "77b77fcc2174d6485c11db79f0327a219d2a450cd5b7af3b7bb7649823912e69"
+      },
+      {
+        "slug": "nine-dragon-stack",
+        "name": "Nine Dragon Stack",
+        "revision": 1,
+        "hash": "ea45516a999bd33b7bea1cfca79c018503d6b51163fbeaeee6760709fc2c551b"
+      },
+      {
+        "slug": "open-plot-alien-plain",
+        "name": "Open Plot · Pastel Alien Plain",
+        "revision": 1,
+        "hash": "c32cd9fb9229b56be36fbf1d9834b963f547b962cb2e53d37afb71cfe198704e"
+      },
+      {
+        "slug": "open-plot-clockwork-canyon",
+        "name": "Open Plot · Clockwork Canyon",
+        "revision": 1,
+        "hash": "3b322eccd99e209f98bbe59e16f79de77375b6075bc91f379d67cefff7bcf740"
+      },
+      {
+        "slug": "open-plot-coral-drift",
+        "name": "Open Plot · Coral Drift",
+        "revision": 1,
+        "hash": "87841749dc3f7310559514f44986b5e5aa9b59d44584123584da3143eca75037"
+      },
+      {
+        "slug": "open-plot-desert-ruin",
+        "name": "Open Plot · Desert Ruin",
+        "revision": 1,
+        "hash": "3b65bfef7275d5baf721b334c5ef68b3dc057f9fcd30699f89a314c46967b76d"
+      },
+      {
+        "slug": "open-plot-ember-forge",
+        "name": "Open Plot · Ember Forge",
+        "revision": 1,
+        "hash": "e1a3a9325e8e98543b19f7c7b1017a2a1761af3954b017ff732ccf20ac89b4c0"
+      },
+      {
+        "slug": "open-plot-fossil-badlands",
+        "name": "Open Plot · Fossil Badlands",
+        "revision": 1,
+        "hash": "5bbdd51b8db97dc1ec8244e79638e45143e5532ba57d3447cb90d77e48a3d5b1"
+      },
+      {
+        "slug": "open-plot-frostline-peaks",
+        "name": "Open Plot · Frostline Peaks",
+        "revision": 1,
+        "hash": "ec7b8879a343eadcb5ca51313097d2c91883b47dba63c753d8516a698c6c0985"
+      },
+      {
+        "slug": "open-plot-jungle-ziggurat",
+        "name": "Open Plot · Jungle Ziggurat",
+        "revision": 1,
+        "hash": "62fdb3cc7e4153ffc738fff5196666d180504bc0d625fd46446a5f1c85d3292d"
+      },
+      {
+        "slug": "open-plot-lantern-bayou",
+        "name": "Open Plot · Lantern Bayou",
+        "revision": 1,
+        "hash": "1f9fb1cba098c85bfc5a7175258f3f273d336a67c36001edce295e02ef7c752f"
+      },
+      {
+        "slug": "open-plot-mosslight-ruins",
+        "name": "Open Plot · Mosslight Ruins",
+        "revision": 1,
+        "hash": "19840339238bab41994463ca485a47f5ffe766bc4cf6ec33c5499151eddf74fc"
+      },
+      {
+        "slug": "open-plot-night-market",
+        "name": "Open Plot · Night Market",
+        "revision": 1,
+        "hash": "d8fe11c2db67b199111e25e5ecbb86e59e3063c46a913317ba9e71dc9cc98210"
+      },
+      {
+        "slug": "open-plot-patchwork-fairground",
+        "name": "Open Plot · Patchwork Fairground",
+        "revision": 1,
+        "hash": "e517f4814ef624fa6122ac3611d39cf59a56c54e4ecb126d2de983064ae2caa8"
+      },
+      {
+        "slug": "open-plot-saltwind-lighthouse",
+        "name": "Open Plot · Saltwind Lighthouse",
+        "revision": 1,
+        "hash": "2e37a04b0c9e7f6c0463f12b5cfce96d7e7c2f83868bc6341948d779dcbe5207"
+      },
+      {
+        "slug": "open-plot-sky-harbor",
+        "name": "Open Plot · Sky Harbor",
+        "revision": 1,
+        "hash": "9aa4a98390153c9e63ec79d1a9ca7c3c221b03a5017664206a34001b242df112"
+      },
+      {
+        "slug": "open-plot-sky-race",
+        "name": "Open Plot · Floating Island Race",
+        "revision": 1,
+        "hash": "a5633d8eee7f7e453b459fa3d4c3db3d60bddd07ad39036ba437ccd44655058a"
+      },
+      {
+        "slug": "open-plot-starfall-observatory",
+        "name": "Open Plot · Starfall Observatory",
+        "revision": 1,
+        "hash": "25331b613be193d8a1e67e72da521a56e431c19fa0de2fa3431df42a13941802"
+      },
+      {
+        "slug": "open-plot-thin-ice",
+        "name": "Open Plot · Thin Ice",
+        "revision": 1,
+        "hash": "4546f70ddac2dd08771fb315cb8a9156a0e21503ea72c120af73e31f90e64ead"
+      },
+      {
+        "slug": "pastel-plain",
+        "name": "Pastel Plain",
+        "revision": 1,
+        "hash": "e42e2f5f57937695bae0eb0e17fdfbd5f238897d05b167cd38aa2b7ecebb0481"
+      },
+      {
+        "slug": "pine-hollow",
+        "name": "Pine Hollow",
+        "revision": 5,
+        "hash": "2afc6270c9534acc9d6578686bf87479c63872ac58799cef416d13b3b8b0281b"
+      },
+      {
+        "slug": "sunscar-dunes",
+        "name": "Signal Dunes",
+        "revision": 1,
+        "hash": "2e78b39ea7b91902829cb08ee7466b4d7127cda7bc4bb98664a42c3e1a89151d"
+      },
+      {
+        "slug": "template",
+        "name": "Template shard",
+        "revision": 6,
+        "hash": "d9d5cb68310cb1e573bd68c2827eb32be9e8f0aeeffe0ca3adb0c47cdc58f599"
+      }
+    ],
+    "missing": []
+  },
+  "shards": [
+    {
+      "slug": "blender-template",
+      "revision": 3,
+      "hash": "5400ea84de953f98d690fe93abd6ac46ee3e2a42fe4ed194a255638013295d37",
+      "bytes": 5660672
+    },
+    {
+      "slug": "driftwood-isle",
+      "revision": 4,
+      "hash": "c10405befd5abe86e35e5dade8dcada9ee8a8cddf40b0a328eaa10b0f765a7d6",
+      "bytes": 94885888
+    },
+    {
+      "slug": "far-reach",
+      "revision": 3,
+      "hash": "cdbb400ca5d0908399f0e9c43b2304a49fa3881b0846bc562c0f6fe6444051fc",
+      "bytes": 47129088
+    },
+    {
+      "slug": "ink-cel-valley",
+      "revision": 1,
+      "hash": "5764c86a258ac664ced0ba46860089738cca44d2f27a3f84abdd9ad80f79b0c3",
+      "bytes": 7011840
+    },
+    {
+      "slug": "nalati-grasslands",
+      "revision": 2,
+      "hash": "77b77fcc2174d6485c11db79f0327a219d2a450cd5b7af3b7bb7649823912e69",
+      "bytes": 144178176
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "revision": 1,
+      "hash": "ea45516a999bd33b7bea1cfca79c018503d6b51163fbeaeee6760709fc2c551b",
+      "bytes": 115897344
+    },
+    {
+      "slug": "open-plot-alien-plain",
+      "revision": 1,
+      "hash": "c32cd9fb9229b56be36fbf1d9834b963f547b962cb2e53d37afb71cfe198704e",
+      "bytes": 8756224
+    },
+    {
+      "slug": "open-plot-clockwork-canyon",
+      "revision": 1,
+      "hash": "3b322eccd99e209f98bbe59e16f79de77375b6075bc91f379d67cefff7bcf740",
+      "bytes": 12332032
+    },
+    {
+      "slug": "open-plot-coral-drift",
+      "revision": 1,
+      "hash": "87841749dc3f7310559514f44986b5e5aa9b59d44584123584da3143eca75037",
+      "bytes": 14862336
+    },
+    {
+      "slug": "open-plot-desert-ruin",
+      "revision": 1,
+      "hash": "3b65bfef7275d5baf721b334c5ef68b3dc057f9fcd30699f89a314c46967b76d",
+      "bytes": 14441984
+    },
+    {
+      "slug": "open-plot-ember-forge",
+      "revision": 1,
+      "hash": "e1a3a9325e8e98543b19f7c7b1017a2a1761af3954b017ff732ccf20ac89b4c0",
+      "bytes": 11407360
+    },
+    {
+      "slug": "open-plot-fossil-badlands",
+      "revision": 1,
+      "hash": "5bbdd51b8db97dc1ec8244e79638e45143e5532ba57d3447cb90d77e48a3d5b1",
+      "bytes": 10731008
+    },
+    {
+      "slug": "open-plot-frostline-peaks",
+      "revision": 1,
+      "hash": "ec7b8879a343eadcb5ca51313097d2c91883b47dba63c753d8516a698c6c0985",
+      "bytes": 13398016
+    },
+    {
+      "slug": "open-plot-jungle-ziggurat",
+      "revision": 1,
+      "hash": "62fdb3cc7e4153ffc738fff5196666d180504bc0d625fd46446a5f1c85d3292d",
+      "bytes": 13255680
+    },
+    {
+      "slug": "open-plot-lantern-bayou",
+      "revision": 1,
+      "hash": "1f9fb1cba098c85bfc5a7175258f3f273d336a67c36001edce295e02ef7c752f",
+      "bytes": 14660096
+    },
+    {
+      "slug": "open-plot-mosslight-ruins",
+      "revision": 1,
+      "hash": "19840339238bab41994463ca485a47f5ffe766bc4cf6ec33c5499151eddf74fc",
+      "bytes": 16719872
+    },
+    {
+      "slug": "open-plot-night-market",
+      "revision": 1,
+      "hash": "d8fe11c2db67b199111e25e5ecbb86e59e3063c46a913317ba9e71dc9cc98210",
+      "bytes": 18138112
+    },
+    {
+      "slug": "open-plot-patchwork-fairground",
+      "revision": 1,
+      "hash": "e517f4814ef624fa6122ac3611d39cf59a56c54e4ecb126d2de983064ae2caa8",
+      "bytes": 9830400
+    },
+    {
+      "slug": "open-plot-saltwind-lighthouse",
+      "revision": 1,
+      "hash": "2e37a04b0c9e7f6c0463f12b5cfce96d7e7c2f83868bc6341948d779dcbe5207",
+      "bytes": 5573632
+    },
+    {
+      "slug": "open-plot-sky-harbor",
+      "revision": 1,
+      "hash": "9aa4a98390153c9e63ec79d1a9ca7c3c221b03a5017664206a34001b242df112",
+      "bytes": 10700800
+    },
+    {
+      "slug": "open-plot-sky-race",
+      "revision": 1,
+      "hash": "a5633d8eee7f7e453b459fa3d4c3db3d60bddd07ad39036ba437ccd44655058a",
+      "bytes": 11087872
+    },
+    {
+      "slug": "open-plot-starfall-observatory",
+      "revision": 1,
+      "hash": "25331b613be193d8a1e67e72da521a56e431c19fa0de2fa3431df42a13941802",
+      "bytes": 11625984
+    },
+    {
+      "slug": "open-plot-thin-ice",
+      "revision": 1,
+      "hash": "4546f70ddac2dd08771fb315cb8a9156a0e21503ea72c120af73e31f90e64ead",
+      "bytes": 6465536
+    },
+    {
+      "slug": "pastel-plain",
+      "revision": 1,
+      "hash": "e42e2f5f57937695bae0eb0e17fdfbd5f238897d05b167cd38aa2b7ecebb0481",
+      "bytes": 6994432
+    },
+    {
+      "slug": "pine-hollow",
+      "revision": 5,
+      "hash": "2afc6270c9534acc9d6578686bf87479c63872ac58799cef416d13b3b8b0281b",
+      "bytes": 337219584
+    },
+    {
+      "slug": "sunscar-dunes",
+      "revision": 1,
+      "hash": "2e78b39ea7b91902829cb08ee7466b4d7127cda7bc4bb98664a42c3e1a89151d",
+      "bytes": 11275264
+    },
+    {
+      "slug": "template",
+      "revision": 6,
+      "hash": "d9d5cb68310cb1e573bd68c2827eb32be9e8f0aeeffe0ca3adb0c47cdc58f599",
+      "bytes": 16335872
+    }
+  ]
+}

@@ -48,6 +48,7 @@ export const KEY_EXEMPT=Object.freeze({
  'scripts/renderer-revision.mjs':'names a printed preparation label only (J262); no byte under out/',
  'src/shared/game/shardfile/ktx2Targets.ts':'hashed already: the validation revision in the key covers src/shared/game/shardfile (S11)',
  'scripts/pins-catalogue.ts':'refresh check only (DEL9): refuses before the pins are written; no byte under out/',
+ 'scripts/pins-staging.ts':'refresh/export only; selection materializes shardfiles.json already hashed in the key',
  'scripts/server-release/served-slug.mjs':'refresh check only (DEL9): names a slug\'s served folder for the catalogue compare',
 });
 

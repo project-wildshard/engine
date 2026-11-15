@@ -22,6 +22,11 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      pins_channel:
+        description: Reviewed pin snapshot to test (staging release hash awaits AP-26)
+        type: choice
+        options: [production, staging]
+        default: production
       record:
         description: Record Ring 1's platform digest baseline and upload it, instead of comparing
         type: boolean
@@ -31,6 +36,9 @@ on:
 permissions:
   contents: read
   actions: read
+
+env:
+  WILDSHARD_PIN_CHANNEL: ${{ inputs.pins_channel || 'production' }}
 
 concurrency:
   # Qualification dispatches must execute, rather than replacing a pending

@@ -23,6 +23,10 @@ runs:
           pnpm-lock.yaml
           pnpm-workspace.yaml
     - uses: ./.github/actions/org-deps
+    - name: Select the reviewed staging snapshot for this test checkout
+      if: env.WILDSHARD_PIN_CHANNEL == 'staging'
+      run: node scripts/pins-staging.ts select
+      shell: bash
     - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: ~/.cache/wildshard/pins
@@ -39,4 +43,8 @@ runs:
         path: ~/.cache/npm-bin-deps
         key: bin-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bin-deps/pnpm-lock.yaml', '.bin-deps/pnpm-workspace.yaml') }}
     - run: pnpm exec npr install --frozen
+      shell: bash
+    - name: Cut Ring 1 slices from the selected staging heads
+      if: env.WILDSHARD_PIN_CHANNEL == 'staging'
+      run: node scripts/pins.ts slice
       shell: bash

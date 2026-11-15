@@ -1,10 +1,24 @@
 # Ring 2 nightly
 
-`.github/workflows/nightly.yml` runs at 07:17 UTC daily and by manual
+`.github/workflows/nightly.yml` runs at 02:17 Cancún daily and by manual
 dispatch. It checks the event's exact commit, never a later moving main.
-It reads the committed 28 heads in `test/pins/shardfiles.json` and the
+It reads every committed head in `test/pins/shardfiles.json` and the
 existing `test/pins/ring-2-tests.json`. Updating pins is a separate reviewed
 change: a nightly does not silently substitute live catalogue heads.
+
+Refresh staging independently with `node scripts/pins.ts refresh --channel
+staging`. Review and commit `test/pins/staging.json`; its catalogue and pins
+come from `GET /api/catalogue.json?channel=staging`. Dispatch `ci.yml`
+(Ring 1) or `nightly.yml` (Ring 2) with `pins_channel=staging` to select
+that committed snapshot in each disposable test checkout. Ring 1 re-cuts
+its slices from those heads. Ordinary pushes and the schedule keep their
+production pins. Local selection is `node scripts/pins-staging.ts select`;
+it replaces `shardfiles.json` and `catalogue.json`, so use a disposable tree.
+
+The snapshot's `catalogueHash` detects mismatched inputs; `releaseHash`
+is explicitly null. api-server AP-26 exposes no public release-row hash
+yet. These runs prove the selected staging inputs and do not qualify a
+release against J171's signed identity. Row 23 remains open for that check.
 
 No secret needs setting. All dependencies and immutable tarballs are
 public. The built-in read-only `GITHUB_TOKEN` reads prior Actions reports;
@@ -17,7 +31,7 @@ nightly branch update or automatic tag. Promotion owns releases (J184).
   and the full admitted Vitest suite, including the slow Ring 2 list.
   Every listed file must actually execute at least one passing assertion.
   Missing files, skipped assertions and a nonzero suite exit are red.
-- Eight jobs split the 28 heads into four groups of seven for Chromium
+- Eight jobs split the heads into four balanced groups for Chromium
   on `ubuntu-24.04` and WebKit on `macos-15`. At most four jobs run at once.
   Each builds the full catalogue, then cold-cooks its heads through the
   production bounded cook worker. Failed heads do not stop later heads.
