@@ -160,7 +160,7 @@ function encode(value: unknown, host: SimHost, parents = new Set<object>()): Eve
   if (value === null || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') return { kind: 'value', value };
   if (typeof value !== 'object') throw new TypeError('Snapshot payload contains a callback or unsupported value');
   for (const player of host.players.values()) {
-    if (value === player || player.isExternalObject(value)) return player === leadPlayer(host) ? { kind: 'player' } : { kind: 'player', id: player.id };
+    if (value === player || player.isExternalObject(value)) return { kind: 'player', id: player.id };
     if (value === player.position) return { kind: 'position', id: player.id };
     if (value === player.health) return { kind: 'actor', id: player.id };
   }

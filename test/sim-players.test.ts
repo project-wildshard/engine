@@ -114,6 +114,28 @@ test('a room of players saves and restores exactly', () => {
   host.dispose(); restored.dispose();
 });
 
+test('queued player references name both seats and still restore legacy default references', () => {
+  const host = hostWithPlayers(2);
+  let restored: SimHost | undefined, legacy: SimHost | undefined;
+  try {
+    const owner = player(host, 'actor.player'), other = player(host, 'bot:1');
+    host.events.restore({ version: 1, frameCount: 0, frameBound: false, queue: [{ name: 'fault', payload: [owner, other] }] }, value => value);
+    const saved = snapshotSimHost(host);
+    expect(saved.events.queue[0]?.payload).toEqual({ kind: 'array', items: [{ kind: 'player', id: owner.id }, { kind: 'player', id: other.id }] });
+    restored = restoreSimHost(SIM_LEVEL, { rapier }, saved);
+    const read = restored.events.snapshot(value => value).queue[0]?.payload;
+    if (!Array.isArray(read)) throw new Error('Missing restored player references');
+    expect(read[0]).toBe(player(restored, owner.id)); expect(read[1]).toBe(player(restored, other.id));
+    const old = structuredClone(saved), event = old.events.queue[0];
+    if (event === undefined) throw new Error('Missing saved event');
+    event.payload = { kind: 'array', items: [{ kind: 'player' }, { kind: 'player', id: other.id }] };
+    legacy = restoreSimHost(SIM_LEVEL, { rapier }, old);
+    const prior = legacy.events.snapshot(value => value).queue[0]?.payload;
+    if (!Array.isArray(prior)) throw new Error('Missing legacy player references');
+    expect(prior[0]).toBe(player(legacy, owner.id)); expect(prior[1]).toBe(player(legacy, other.id));
+  } finally { restored?.dispose(); legacy?.dispose(); host.dispose(); }
+});
+
 test('a player leaves: body, health and strike go, the lead cannot, and a save no longer holds them', () => {
   const host = hostWithPlayers(2), bot = player(host, 'bot:1'), colliders = host.physics.world.colliders.len();
   expect(host.removePlayer(leadPlayer(host).id)).toBe(false);
