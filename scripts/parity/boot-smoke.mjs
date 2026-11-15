@@ -273,7 +273,7 @@ export function bootRoadCompletionState() {
   return {at, timeOrigin: performance.timeOrigin, stop: stop ?? null,
     compact: compact === null ? null : {inside: field(compact, 'inside'), current: field(live, 'current'), ready: field(live, 'gameplayReady'),
       pendingCount: Array.isArray(pending) ? pending.length : null, phase: field(crossing, 'phase')},
-    observer: ids === null ? null : {present: ids.includes('harness.walk'), systems: ids.length},
+    observer: ids === null ? null : {present: ids.some((id) => id.startsWith('harness.walk')), systems: ids.length},
     owner: scope === undefined ? null : {name: scope.name, disposed: scope.disposed, disposing: scope.disposing},
     view: {coverage: ui?.presentation, still: ui?.still, blocking: ui?.blocking, top: ui?.top,
       visibility: typeof document === 'undefined' ? null : document.visibilityState,

@@ -360,6 +360,7 @@ export class Game {
    *  they hold) go with their row; a re-registered id starts a fresh record. */
   private readonly faultSystems = new WeakMap<object, GameSystem<(dt: number, t: number) => void>>();
   private anonymous = 0;
+  private observers = 0;
   /** E357 F2: list order is the execution order; observation never registers a system. */
   systemLabels(): Record<'input' | 'fixed.pre' | 'fixed.step' | 'fixed.post' | 'update' | 'late', string[]> {
     const phases = this.app.systemsByPhase();
@@ -904,10 +905,13 @@ export class Game {
   onUpdate(fn: (dt: number, t: number) => void, label?: string, core = false): void { this.register('update', fn, label, core); }
   /** One player-owned callback survives world-frame changes and ends with the original player scope. */
   onPlayerUpdate(fn: (dt: number, t: number) => void, label: string): void { this.register('update', fn, label, false, this.playerScope, false); }
-  /** E357 F2: a temporary harness observer of simulation frames, removed when its walk finishes. */
+  /**
+   * E357 F2: a temporary harness observer of simulation frames, removed when its walk finishes. Each has its own system id:
+   * the dev hook holds several at once (its ground sweep, each part's lamps and water), and one shared id threw on the second.
+   */
   watchFrames(fn: (dt: number) => void): () => void {
     const scope = this.levelScope.child('observer');
-    this.register('update', fn, 'harness.walk', false, scope, false);
+    this.register('update', fn, `harness.walk.${String(this.observers++)}`, false, scope, false);
     return () => { scope.dispose(); };
   }
   /** First in the frame: read controls into intents the fixed steps consume (the player's move, a queued jump). */
