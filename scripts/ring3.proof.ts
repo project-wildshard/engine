@@ -7,7 +7,7 @@ const candidate = 'a'.repeat(40), shard = 'b'.repeat(40);
 interface Call {method: string; path: string; body?: unknown}
 function fixture(options: {red?: string; malformed?: boolean; pending?: boolean; wrongRun?: boolean; denied?: string; existing?: boolean} = {}): {api: Api; calls: Call[]} {
   const calls: Call[] = [];
-  const api: Api = async (method, path, body) => {
+  const api: Api = (method, path, body) => Promise.resolve().then(() => {
     calls.push({method, path, body});
     const repo = path.split('/')[2];
     if (repo === undefined || !shardRepos.includes(repo as typeof shardRepos[number])) throw new Error(`Unexpected repository: ${path}`);
@@ -22,7 +22,7 @@ function fixture(options: {red?: string; malformed?: boolean; pending?: boolean;
     if (method === 'GET' && path.includes('/issues?')) return options.existing ? [{title: `[Ring 3] engine ${candidate}`, html_url: 'existing-issue'}] : [];
     if (method === 'POST' && path.endsWith('/issues')) return {html_url: `https://github.com/project-wildshard/${repo}/issues/1`};
     throw new Error(`Unexpected API call: ${method} ${path}`);
-  };
+  });
   return {api, calls};
 }
 
@@ -61,7 +61,7 @@ await test('missing IDs and unrelated green runs can never qualify the candidate
 });
 await test('queued receivers hit a bounded deadline and remain red with their run links', async () => {
   let now = 0;
-  const {api} = fixture({pending: true}), report = await runRing3(prepare(candidate, 'sender'), {api, now: () => now, sleep: async ms => {now += ms;}, deadlineMs: 100, pollMs: 20});
+  const {api} = fixture({pending: true}), report = await runRing3(prepare(candidate, 'sender'), {api, now: () => now, sleep: ms => {now += ms; return Promise.resolve();}, deadlineMs: 100, pollMs: 20});
   assert.equal(now, 100);
   assert.equal(report.ok, false);
   assert.equal(report.rows.every(row => row.status === 'timeout' && row.runUrl !== undefined), true);

@@ -14,7 +14,7 @@ const hash = (value: unknown): string => createHash('sha256').update(JSON.string
 export function checkStaging(value: StagingPins): void {
   if (value.version !== 1 || value.channel !== 'staging' || value.releaseHash !== null || value.catalogueHash !== hash(value.catalogue)) throw new Error('Invalid staging snapshot identity');
   const {catalogue, shards} = value;
-  if (!Array.isArray(catalogue.missing) || catalogue.missing.length !== 0 || !Array.isArray(shards) || shards.length === 0 || new Set(shards.map(row => row.slug)).size !== shards.length) throw new Error('Incomplete staging catalogue');
+  if (!Array.isArray(catalogue.missing) || catalogue.missing.length > 0 || !Array.isArray(shards) || shards.length === 0 || new Set(shards.map(row => row.slug)).size !== shards.length) throw new Error('Incomplete staging catalogue');
   if (shards.some(row => !/^[a-z0-9-]+$/u.test(row.slug) || !/^[a-f0-9]{64}$/u.test(row.hash) || !Number.isSafeInteger(row.revision) || row.revision < 1 || !Number.isSafeInteger(row.bytes) || row.bytes <= 0)) throw new Error('Invalid staging pin');
   if (catalogue.shards.length !== shards.length || catalogue.shards.some(row => !shards.some(pin => pin.slug === row.slug && pin.hash === row.hash && pin.revision === row.revision))) throw new Error('Staging pins disagree with catalogue');
   const unlisted = unlistedSlugs(catalogueSlugs(catalogue), {staging: documentSlugs(catalogue)});

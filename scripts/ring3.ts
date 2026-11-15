@@ -18,7 +18,7 @@ export function prepare(engine: string, originRun: string): Aggregate {
 }
 
 export async function runRing3(report: Aggregate, options: Options): Promise<Aggregate> {
-  const {api, now = Date.now, sleep = ms => new Promise(resolve => {setTimeout(resolve, ms);}), deadlineMs = 20 * 60_000, pollMs = 15_000, checkpoint = () => {}} = options;
+  const {api, now = Date.now, sleep = (ms: number): Promise<void> => new Promise(resolve => {setTimeout(resolve, ms);}), deadlineMs = 20 * 60_000, pollMs = 15_000, checkpoint = () => { /* Embedded callers may omit persisted receipts. */ }} = options;
   const until = now() + deadlineMs;
   // All seven requests are independent; a refused shard must not hide the others.
   await Promise.all(report.rows.map(async row => {
