@@ -8887,5 +8887,18 @@
     ],
     "restorationProof": "Actual complete full-product run: 19 files, 100 cases, zero errors; actual thin Ring1 subset: 11 files, 81 cases, zero errors. Module clocks retain complete collection/setup and unchanged file/case budgets. No assertion removed or retirement claimed.",
     "ringReason": "Requires unchanged full pinned asset table (including GLBs), absent from normal Ring 1 server slices. Real thin install failed before product admission; preserve full input validation and every original assertion in blocking full CI/full pre-push. Ring2 is product scope, not quarantine."
+  },
+  {
+    "repo": "shard-format",
+    "file": "test/glb-normalized-positions.test.ts",
+    "outcome": "migrated",
+    "target": "src/format/glb-normalized-positions.test.ts",
+    "decision": "Ported (CI21 SF-BAKE): the GLB cost reader is shard-format's, and its KHR_mesh_quantization test lives there. Engine's copy read public/assets/models/driftwood-blender/island.glb, which left engine with Driftwood.",
+    "originalTests": [
+      "normalized Int16 positions are admitted and placed by their node scale"
+    ],
+    "sourceRevision": "1149fb495a819c73f6df758fad559166fe298ee8",
+    "sourceBlob": "b3acf33685479a6bdc856ee69c82ca95be874f52",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
   }
 ]
