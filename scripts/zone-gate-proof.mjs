@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // ZONE-ENTRY ZE5 and ZE8 (J352): the walls and the gate card, by real input. From Driftwood (Shard Select), step out of its east
 // entryway onto the road and shoot Nalati's wall across it; walk into Nalati's west buffer and shoot the gate card at 5 and at 2;
-// back out and shoot it gone; walk in again and read 5 (the reset). Each shot's page state (the gate's cell, count and card text)
-// goes in one JSON. `--fire` stands on to 0 and records the zone entry's firing.
+// at 3 back out and shoot it gone; walk in again, read 5 (the reset) and shoot it at 2. Each shot's page state (the gate's cell, count and card text)
+// goes in one JSON. `--fire` stands on to 0 and records the zone entry: the navigation, the loading screen and the cell as the new home (ZE10).
 //   scripts/browser-lane.sh node scripts/zone-gate-proof.mjs --base=<preview or loopback url> --out=<dir> [--device='iPhone 15 Pro'] [--viewport=2992x1434@2]
 // The walker is set 20 m inside Driftwood's east entryway by the in-page harness pose, so preview or a loopback page only (J205).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -60,19 +60,31 @@ try {
   await sleep(4000);
   await walkTo(origin.x + HALF + 31.25); await face(-Math.PI / 2); await sleep(1500);
   await shoot('road-wall');
-  await walkTo(nalatiEdge + 5); await sleep(300);
-  await shoot('gate-5');
-  await sleep(3000);
-  await shoot('gate-2');
+  /** Poll the gate until `test` holds (or 8 s). */
+  const until = async (/** @type {(gate: any) => boolean} */ test) => { for (let ends = Date.now() + 8000; Date.now() < ends; await sleep(50)) if (test((await state()).gate)) return true; return false; };
+  // in, 2 m past the edge line: the card at 5; back out of the buffer at 3 (so the count can't reach 0 on the way out)
+  await walkTo(nalatiEdge + 2); await until(gate => gate?.count === 5); await shoot('gate-5');
+  await until(gate => gate?.count === 3);
   await walkTo(nalatiEdge - 6); await face(-Math.PI / 2); await sleep(600);
   await shoot('backed-away');
-  await walkTo(nalatiEdge + 5); await sleep(300);
-  await shoot('gate-again');
-  if (fire) { await sleep(5600); await shoot('gate-0'); result.fired = /** @type {any} */ (result.shots.at(-1)).gate; }
-  const [at5, at2, gone, again] = result.shots.slice(1).map(row => /** @type {any} */ (row).gate);
+  // in again: 5 (the reset), then 2
+  await walkTo(nalatiEdge + 2); await until(gate => gate?.count === 5); await shoot('gate-again');
+  await until(gate => gate?.count === 2); await shoot('gate-2');
+  if (fire) {
+    // stand on: 0 opens the loading screen and the page enters the cell as its home
+    const before = page.url();
+    const left = await page.waitForEvent('framenavigated', { timeout: 6000 }).then(() => true).catch(() => false);
+    await page.screenshot({ path: join(out, `${tag}-gate-0-loading.png`) }).catch(() => undefined);
+    const ready = await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 180_000, polling: 250 }).then(() => true).catch(() => false);
+    const home = await page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard?.shard?.grid?.state?.(); return { home: st?.live?.live?.home ?? st?.home ?? null, current: st?.live?.live?.current ?? null, slug: W.__wildshard?.shard?.slug ?? null }; }).catch(() => null);
+    if (ready) await page.screenshot({ path: join(out, `${tag}-entered.png`) });
+    result.fired = { navigated: left, before, after: page.url(), ready, home };
+  }
+  const named = (/** @type {string} */ name) => /** @type {any} */ (result.shots.find(row => row.name === name))?.gate;
+  const [at5, gone, again, at2] = ['gate-5', 'backed-away', 'gate-again', 'gate-2'].map(named);
   console.log(JSON.stringify({ at5, at2, gone, again, fired: result.fired }));
   await context.close();
-  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 ? 0 : 1;
+  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || /** @type {any} */ (result.fired)?.ready === true) ? 0 : 1;
 } catch (error) { result.note = String(error).slice(0, 400); console.log(`FAIL ${result.note}`); }
 finally {
   writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);

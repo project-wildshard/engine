@@ -57,3 +57,7 @@
   asks the world, or preview's in-page server (J311), to seat it there. This is the plan's marked-reload fallback, taken first:
   one world in memory by construction. It arrives at the cell's spawn, not 14 m past the gate (ZE9 and ZE11 bring the pose).
   `zone-gate-proof.mjs` shoots the wall, the card at 5 and 2, gone after backing away, and 5 again.
+- 12:57 (opus-gcm8) ZE5's wall test drives in at the board's 120 m/s too, and the 40 m fall now meets the wall 19 m up, so a
+  2 m wall turns it red. zone-gate-proof shoots on the count, not on sleeps: a slow walk had let 0 fire mid-proof. On a
+  loopback build, desktop, phone Chromium and phone WebKit all pass 5, out and reset, 5, 2, and at 0 the loading screen and
+  Nalati as the new home. The mini is off limits now (J356), so these ran on the laptop at 60 fps.
