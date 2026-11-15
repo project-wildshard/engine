@@ -69,18 +69,25 @@ const CSS = `
 .ws-link details p{margin:8px 0 0;font-size:10.5px;color:rgba(230,242,248,.55);overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
 @keyframes ws-link-fade{from{opacity:0}}@keyframes ws-link-rise{from{opacity:0;transform:translateY(8px)}}
 .ws-link-notice{animation-name:ws-link-fade}
+.ws-link-page{background:#05101a;animation:ws-link-fade .2s ease-out}.ws-link-page .ws-link-box{animation:none}
+.ws-link-mark{position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147482200;padding:3px 10px;pointer-events:none;background:rgba(13,27,38,.78);border:1px solid rgba(255,181,71,.5);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--a)}
 @media (max-width:420px){.ws-link-banner{max-width:calc(100% - 220px);padding-left:12px;padding-right:12px}.ws-link-banner b{letter-spacing:.08em}}
 @media (min-width:700px){.ws-link-banner{max-width:min(620px,calc(100% - 440px))}.ws-link-box{padding:28px 26px 20px}.ws-link h1{font-size:28px}}
 @media (prefers-reduced-motion:reduce){.ws-link,.ws-link *{animation:none!important;transition:none!important}}
 `;
 
-const make = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] => {
+export const make = <K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] => {
   const node = document.createElement(tag);
   if (className !== '') node.className = className;
   if (text !== '') node.textContent = text;
   return node;
 };
-const ring = (): HTMLElement => { const node = make('span', 'ring'); node.setAttribute('aria-hidden', 'true'); return node; };
+export const ring = (): HTMLElement => { const node = make('span', 'ring'); node.setAttribute('aria-hidden', 'true'); return node; };
+
+/** The screens' stylesheet. It lives as long as the document: a second shell (a reload in place) shares it. */
+export function linkStyle(): void {
+  if (document.getElementById('ws-link-style') === null) { const style = make('style'); style.id = 'ws-link-style'; style.textContent = CSS; document.head.append(style); }
+}
 
 /** What the screens ask of the link and the page. */
 export interface LinkScreenHooks {
@@ -130,7 +137,7 @@ const awayFor = (ms: number): string => ms < 90_000 ? `${String(Math.round(ms / 
 const blockedIds = (ids: string): string => ids.split(' ').map(id => `${id}-blocked`).join(' ');
 
 /** A card's frame: the scrim, the box, a tag and a title. The caller fills the rest. */
-function card(scope: Scope, ids: string, tone: 'info' | 'warn' | 'bad', tag: string, title: string): { root: HTMLElement; box: HTMLElement } {
+export function card(scope: Scope, ids: string, tone: 'info' | 'warn' | 'bad', tag: string, title: string): { root: HTMLElement; box: HTMLElement } {
   const root = scope.ownNode(make('div', 'ws-link ws-link-scrim')), box = make('div', 'ws-link-box');
   root.dataset['failmode'] = ids; root.dataset['tone'] = tone; root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', title);
   box.append(make('p', 'ws-link-tag', tag), make('h1', '', title)); root.append(box);
@@ -147,7 +154,7 @@ function card(scope: Scope, ids: string, tone: 'info' | 'warn' | 'bad', tag: str
   });
   return { root, box };
 }
-function buttons(scope: Scope, actions: readonly { readonly label: string; readonly primary?: true; readonly busy?: string; readonly act: () => void }[]): HTMLElement {
+export function buttons(scope: Scope, actions: readonly { readonly label: string; readonly primary?: true; readonly busy?: string; readonly act: () => void }[]): HTMLElement {
   const column = make('div', 'ws-link-col');
   for (const action of actions) {
     const button = make('button', action.primary === true ? 'go' : '', action.label);
@@ -169,8 +176,7 @@ function buttons(scope: Scope, actions: readonly { readonly label: string; reado
  */
 export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLElement = document.body): LinkScreens {
   const report = hooks.report ?? captureBrowserError;
-  // the stylesheet lives as long as the document: a second shell (a reload in place) shares it
-  if (document.getElementById('ws-link-style') === null) { const style = make('style'); style.id = 'ws-link-style'; style.textContent = CSS; document.head.append(style); }
+  linkStyle();
   // the banner keeps the old strip's id, so the online proofs still find it
   const banner = scope.ownNode(make('div', 'ws-link ws-link-banner')), head = make('b'), line = make('span');
   banner.id = 'ws-reconnect-strip'; banner.setAttribute('role', 'status'); banner.hidden = true; banner.append(head, line);

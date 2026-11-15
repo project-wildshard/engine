@@ -5,3 +5,9 @@
   Driftwood build stamped with the proxy's release address. The door lets 10 connects a minute per address, so play cases wait
   out the minute (`--cooldown`) instead of lifting the cap. The proxy now forwards one bounded `?chunk=` (grid pages dial
   `/?chunk=<cell>`; it 404ed them) and counts upgrades. First run: drop passes; release-5xx sits at LOAD with no word.
+- FM5: a failed release read with no kept copy no longer hangs the load at LOAD. `release.ts` types each failure
+  (`ReleaseReadError.fault`: offline, network, timeout, status + Retry-After, portal, unsigned) and `releaseToDial` takes a
+  `wait` port that shows `releaseScreens.ts`'s page and reads again by the stated policy (2/4/8/16 then 30 s; 429 as told or
+  20 s; 404 each minute; offline, portal and bad signature wait for the network, the page in view or a tap). Title screen
+  stops the load. Staging pages carry the session's staging mark (46); the new-build panel carries `version-skew` (23).
+  `release-unsigned` joins ERROR_SCREENS (reported once a page).

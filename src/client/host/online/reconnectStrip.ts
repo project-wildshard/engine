@@ -11,8 +11,9 @@ const NEW_BUILD_BUTTON = 'min-height:44px;padding:8px 32px;border:1px solid #8fe
 export function newBuildPanel(scope: Scope, again: () => Promise<boolean>, reload: () => void, parent: HTMLElement = document.body): void {
   if (document.getElementById('ws-new-build') !== null) return;
   const panel = scope.ownNode(document.createElement('div')), words = document.createElement('p'), go = document.createElement('button');
-  panel.id = 'ws-new-build'; panel.setAttribute('role', 'alertdialog'); panel.style.cssText = NEW_BUILD;
-  words.textContent = 'A new build is out. Reload to play on.'; words.style.margin = '0';
+  // FM5 mode 23 (`version-skew`): the page's build and the world's differ, and the one automatic reload didn't land
+  panel.id = 'ws-new-build'; panel.dataset['failmode'] = 'version-skew'; panel.setAttribute('role', 'alertdialog'); panel.style.cssText = NEW_BUILD;
+  words.textContent = 'A new version is out. Reload to play on.'; words.style.margin = '0';
   go.type = 'button'; go.textContent = 'Reload'; go.style.cssText = NEW_BUILD_BUTTON;
   // RL3: the panel is already full-page; the tap's own turn turns it and its button into RELOADING
   scope.listen(go, 'click', () => { go.disabled = true; go.setAttribute('aria-busy', 'true'); go.textContent = 'Reloading…'; words.textContent = 'Reloading'; reload(); });

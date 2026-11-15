@@ -248,6 +248,20 @@ test('the player\'s own outcomes open no reporting screen: "Playing somewhere el
   scope.dispose();
 });
 
+walk('release-unsigned', 'a release file that fails its signature puts up its page and reports once, however many tries (FM5 mode 39)', async () => {
+  const { Scope } = await import('../src/shared/engine/app/scope');
+  const { releaseScreens } = await import('../src/client/host/online/releaseScreens');
+  const scope = new Scope('test'), wait = releaseScreens(scope, { title: () => undefined });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const read = wait.after({ kind: 'unsigned' }, attempt, null, 'A release file has a bad signature');
+    expect(document.querySelector('[data-failmode="release-unsigned"]')?.textContent).toContain('can\'t verify');
+    document.querySelector<HTMLButtonElement>('[data-failmode="release-unsigned"] button.go')?.click();
+    await read;
+  }
+  wait.done(); scope.dispose();
+  expect(opened()).toEqual(['release-unsigned']);
+});
+
 test('the walk covers every screen in ERROR_SCREENS', async () => {
   const { ERROR_SCREENS } = await import('../src/client/engine/telemetry/browserErrors');
   expect([...covered].sort()).toEqual([...ERROR_SCREENS].sort());

@@ -108,7 +108,7 @@ try {
   launched = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist'] });
   const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
   const URL_PLAY = `${PAGE_ORIGIN}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
-  /** A fresh device: its own context, Developer on, its errors and visibility changes kept. @param {string} [init] */
+  /** A fresh device: its own context, Developer on, its errors and visibility changes kept. @param {() => void} [init] */
   const fresh = async init => {
     const context = await /** @type {import('playwright').Browser} */ (launched).newContext(phone), errors = /** @type {string[]} */ ([]);
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true });

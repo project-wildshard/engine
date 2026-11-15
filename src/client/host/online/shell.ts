@@ -18,6 +18,7 @@ import { chatLines } from './chatLines';
 import { VoiceChat, type VoiceHeard, type VoiceLink } from './voice';
 import { voiceUi } from './voiceUi';
 import { fetchSignedRelease, releaseToDial, type ReleaseKeep } from './release';
+import { releaseScreens, stagingMark } from './releaseScreens';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
@@ -293,7 +294,14 @@ async function askWorld(config: { readonly release: string; readonly key: string
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
 export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   // OF4: a verified kept release file dials at once (offline too), and the fresh read follows; with none, the page waits for the read
-  const { release: at, key, keep, identity, recordTag, grid, ...link } = config, { file: release, fresh } = await releaseToDial(at, key, { keep: keep ?? NO_KEEP }), { socket } = release;
+  const { release: at, key, keep, identity, recordTag, grid, ...link } = config;
+  // FM5: with no kept copy and no file, the page says why (offline, the file's server down or busy, a portal, a bad signature) and
+  // reads again by release.ts's policy until a verified file answers; Title screen stops the load
+  const waiting = new Scope('online.release-wait');
+  const toTitle = (): void => { markUnload('release page: title screen'); location.replace(new URL('/', location.origin).toString()); };
+  let dial: Awaited<ReturnType<typeof releaseToDial>>;
+  try { dial = await releaseToDial(at, key, { keep: keep ?? NO_KEEP, wait: releaseScreens(waiting, { doctor, title: toTitle }) }); } finally { waiting.dispose(); }
+  const { file: release, fresh } = dial, { socket } = release;
   // QA row 16: a level page enters only from a tap. A reload this page makes itself carries the tap that brought it here.
   const entering = (slug: string): void => { setTitleArrival({ slug, mode: 'enter' }, { tab: true }); };
   const stale = async (): Promise<boolean> => { entering(link.loaded); const going = await reloadStale(); if (!going) dropTabArrival(); return going; };
@@ -301,6 +309,8 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   if (fresh === null && release.engineBuild !== link.build) await stale();
   if (socket === undefined) throw new Error('The release file names no address');
   const scope = new Scope('online.page');
+  // FM5 mode 46: the staging world says so for the session (the release file's own verified channel)
+  if (release.channel === 'staging') stagingMark(scope);
   const goto = grid?.goto === true ? grid.cell : undefined;
   let dialing = socket;
   // MP2.4: the page asked for the Name before it got here (namePrompt.ts, once per device); Skip keeps the device's own (Guest)
