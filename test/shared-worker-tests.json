@@ -431,7 +431,6 @@
  "test/grid-quarantine.test.ts",
  "test/grid-refusal-words.test.ts",
  "test/grid-room.test.ts",
- "test/grid-warm-neighbour.test.ts",
  "test/group-notices.test.ts",
  "test/headless-journey.test.ts",
  "test/headless-local-walk.test.ts",
