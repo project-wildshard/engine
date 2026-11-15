@@ -9440,5 +9440,20 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "1d52ed33d918fcaab70272e8609cda653140264b",
     "retirementProof": "Restored current arena schema boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/balbal-program.test.ts",
+    "outcome": "restored",
+    "target": "test/balbal-program.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): the public engine-owned frozen Balbal rows preserve strike-before-program admission without Nalati fixture, held-loan, or generator imports.",
+    "originalTests": [
+      "a strike refusal cannot publish a program or start a later encounter",
+      "native strike binding precedes program allocation and is reused",
+      "the defining admission refuses malformed native strike rows"
+    ],
+    "sourceRevision": "2a4bc1615538b62cc651918e7df26cf9cd8ffb1e",
+    "sourceBlob": "647eebcb7b0c4d1e5839f2432c4c86c7ba8dd50d",
+    "retirementProof": "Restored current return-program and strike public boundaries; no J186 retirement or successor equivalence claimed."
   }
 ]
