@@ -647,5 +647,13 @@
  "test/frame-floor-inventory.test.ts",
  "test/engine-sides.test.ts",
  "test/standalone-sides.test.ts",
- "test/control-chunks.test.ts"
+ "test/control-chunks.test.ts",
+ "test/ci-fail-fast.test.ts",
+ "test/vitest-worker-limit.test.ts",
+ "test/cook-api-source.test.ts",
+ "test/title-music-precache.test.ts",
+ "test/title-preloads.test.ts",
+ "test/wire-lockfile.test.ts",
+ "test/grid-seam-plans.test.ts",
+ "test/preflight-source-bytes.test.ts"
 ]
