@@ -27,6 +27,7 @@ import {homedir} from 'node:os';
 import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {WORKTREES} from './worktree-ignore.mjs';
+import {clonePaths} from './apfs-clone.mjs';
 import {freeBytes,lastActivity,linkedWorktrees,onMain,parseReapArgs,reap} from './worktree-reap.mjs';
 
 export const SLUG=/^[a-z0-9][a-z0-9._-]{0,63}$/u;
@@ -362,6 +363,13 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
    throw error;
   }
  }finally{unlock();}
+ // DK10: keep unchanged split content on shared APFS blocks. This is an
+ // ignored, regenerable output; the next split compares its actual bytes.
+ const content=join(canonical,'dist-content');
+ if(options.clone&&process.platform==='darwin'&&existsSync(content)&&lstatSync(content).isDirectory()&&!lstatSync(content).isSymbolicLink()
+  &&tryGit(tree,['check-ignore','--quiet','dist-content/']).status===0){
+  timed('content',()=>{clonePaths([[content,join(tree,'dist-content')]]);return 'APFS clone of regenerable dist-content';});
+ }
  const manifest=join(tree,'package.json');
  const scripts=existsSync(manifest)?/** @type {{scripts?:Record<string,string>}} */(JSON.parse(readFileSync(manifest,'utf8'))).scripts??{}:{};
  const childEnv=Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_')));

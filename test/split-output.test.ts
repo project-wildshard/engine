@@ -1,6 +1,6 @@
 // @vitest-environment node
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture is a built page tree under the repository's tmp.
-import {existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay under tmp.
 import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the CLI as build:game does.
@@ -35,8 +35,8 @@ function tree(root: string): string[] {
 }
 
 function fixture(): string {
-  mkdirSync('tmp', {recursive: true});
-  const parent = mkdtempSync(resolve('tmp/split-output-')); roots.push(parent);
+  mkdirSync('tmp/codex-netlag', {recursive: true});
+  const parent = mkdtempSync(resolve('tmp/codex-netlag/split-output-')); roots.push(parent);
   const dist = join(parent, 'dist');
   for (const path of [...PAGE, ...CONTENT]) { mkdirSync(dirname(join(dist, path)), {recursive: true}); writeFileSync(join(dist, path), path); }
   writeFileSync(join(dist, 'catalogue.json'), JSON.stringify({placements: [{slug: 'pine-hollow'}]}));
@@ -69,6 +69,39 @@ test('a fresh build replaces a stale dist-content; --join puts the one tree back
   expect(existsSync(contentDirOf(dist))).toBe(false);
   // join with nothing to join is a no-op
   expect(joinOutput(dist).files).toBe(0);
+});
+
+test('DK10: an unchanged rebuilt file keeps its inode while changed and stale content is replaced', () => {
+  const dist = fixture(), content = contentDirOf(dist), same = CONTENT[0] ?? '', changed = CONTENT[1] ?? '';
+  splitOutput(dist);
+  const inode = statSync(join(content, same)).ino;
+  for (const path of CONTENT) { mkdirSync(dirname(join(dist, path)), {recursive: true}); writeFileSync(join(dist, path), path); }
+  writeFileSync(join(dist, changed), 'changed content');
+  writeFileSync(join(content, 'stale.bin'), 'stale');
+  splitOutput(dist);
+  expect(statSync(join(content, same)).ino).toBe(inode);
+  expect(statSync(join(content, changed)).size).toBe('changed content'.length);
+  expect(tree(content)).toEqual([...CONTENT].sort());
+  expect(tree(dist)).toEqual([...PAGE].sort());
+});
+
+test('DK10: a saved full path list resumes pruning without losing already-moved files', () => {
+  const dist = fixture(), content = contentDirOf(dist), first = CONTENT[0] ?? '';
+  mkdirSync(dirname(join(content, first)), {recursive: true});
+  renameSync(join(dist, first), join(content, first));
+  writeFileSync(join(content, 'stale.bin'), 'stale');
+  writeFileSync(join(dist, SPLITTING), JSON.stringify(CONTENT));
+  splitOutput(dist);
+  expect(tree(content)).toEqual([...CONTENT].sort());
+  expect(tree(dist)).toEqual([...PAGE].sort());
+});
+
+test('DK10: pruning refuses a linked content root and preserves its destination', () => {
+  const dist = fixture(), foreign = join(dirname(dist), 'foreign');
+  mkdirSync(foreign); writeFileSync(join(foreign, 'keep.bin'), 'keep');
+  symlinkSync(foreign, contentDirOf(dist));
+  expect(() => splitOutput(dist)).toThrow('content root must be a real directory');
+  expect(statSync(join(foreign, 'keep.bin')).size).toBe(4);
 });
 
 test('a retry after an interrupted split keeps what already moved; overlapping roots are refused', () => {

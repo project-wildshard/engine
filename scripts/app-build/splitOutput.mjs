@@ -6,7 +6,7 @@
 // joins before it packages, and the jobs that serve the whole game from dist (nightly, hover contract) join too.
 //
 //   node scripts/app-build/splitOutput.mjs [dist] [--join]
-import {existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, rmdirSync, writeFileSync} from 'node:fs';
+import {existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, renameSync, rmSync, rmdirSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {carriedPaths, classify, shardNames} from '../page-size.mjs';
@@ -38,12 +38,21 @@ function files(root) {
 
 /** Move each path from one root to the other, then drop the folders the moves emptied.
  * @param {string} from @param {string} to @param {readonly {path: string, bytes: number}[]} rows */
-function move(from, to, rows) {
+function move(from, to, rows, reuse = false) {
   for (const {path} of rows) {
-    const target = join(to, path);
-    if (existsSync(target)) throw new Error(`splitOutput: ${target} already exists`);
+    const source = join(from, path), target = join(to, path);
+    let old;
+    try { old = lstatSync(target); } catch { /* A new generated path. */ }
+    if (old) {
+      if (!reuse) throw new Error(`splitOutput: ${target} already exists`);
+      const next = lstatSync(source);
+      const same = old.isFile() && next.isFile() && old.size === next.size && readFileSync(target).equals(readFileSync(source))
+        || old.isSymbolicLink() && next.isSymbolicLink() && readlinkSync(target) === readlinkSync(source);
+      if (same) { rmSync(source); continue; }
+      rmSync(target, {recursive: true, force: true});
+    }
     mkdirSync(dirname(target), {recursive: true});
-    renameSync(join(from, path), target);
+    renameSync(source, target);
   }
   const folders = new Set(rows.flatMap(({path}) => path.split('/').slice(0, -1).map((_, at, parts) => parts.slice(0, at + 1).join('/'))));
   for (const folder of [...folders].sort((a, b) => b.length - a.length)) {
@@ -61,21 +70,29 @@ function disjoint(root, content) {
   if (root === content || content.startsWith(`${root}/`) || root.startsWith(`${content}/`)) throw new Error(`splitOutput: ${content} and ${root} overlap`);
 }
 
-/** Split a freshly built page. A dist-content left by an earlier build is replaced; one an interrupted split of this page
+/** Split a freshly built page. Unchanged content retains its inode/APFS blocks; stale paths are replaced. An interrupted split
  * left (the page still holds SPLITTING) is kept and finished. A page that holds no content is already split.
  * @param {string} dist @param {string} [content] @returns {{files: number, bytes: number}} */
 export function splitOutput(dist, content = contentDirOf(dist)) {
   const root = resolve(dist), target = resolve(content), mark = join(root, SPLITTING);
   disjoint(root, target);
+  try {
+    if (!lstatSync(target).isDirectory() || lstatSync(target).isSymbolicLink()) throw new Error('splitOutput: content root must be a real directory');
+  } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
   if (!existsSync(join(root, 'index.html'))) throw new Error(`splitOutput: ${root} holds no index.html; give a built page`);
   // a kept build's content (MF2 carry, PZ5: an unmarked build reads it from the page) stays on the page until it ages out
   const carried = carriedPaths(root)?.paths ?? new Set();
   const shards = shardNames(root), rows = files(root).filter(row => row.path !== SPLITTING && !carried.has(row.path) && isContent(row.path, shards));
-  if (rows.length > 0) {
-    if (!existsSync(mark)) rmSync(target, {recursive: true, force: true});
-    writeFileSync(mark, '');
+  // The full desired path list makes pruning resumable too. An empty mark
+  // from the previous implementation already had its old target removed.
+  if (rows.length > 0 && !existsSync(mark)) writeFileSync(mark, JSON.stringify(rows.map(row => row.path)));
+  if (existsSync(mark) && readFileSync(mark, 'utf8') !== '') {
+    const paths = JSON.parse(readFileSync(mark, 'utf8'));
+    if (!Array.isArray(paths) || !paths.every(path => typeof path === 'string')) throw new Error('splitOutput: invalid interrupted path list');
+    const desired = new Set(paths);
+    for (const {path} of files(target)) if (!desired.has(path)) rmSync(join(target, path));
   }
-  const moved = move(root, target, rows);
+  const moved = move(root, target, rows, true);
   rmSync(mark, {force: true});
   return moved;
 }

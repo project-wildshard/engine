@@ -36,7 +36,7 @@ function repos() {
   git(base, ['init', '-q', '--bare', '-b', 'main', origin]);
   git(base, ['init', '-q', '-b', 'main', seed]);
   put(seed, 'package.json', '{"name":"fixture","private":true,"scripts":{}}\n');
-  put(seed, '.gitignore', '/.worktrees/\n/tmp/\n');
+  put(seed, '.gitignore', '/.worktrees/\n/tmp/\n/dist-content/\n');
   put(seed, 'src/same.ts', 'export const same = 1;\n');
   put(seed, 'src/dirty.ts', 'export const dirty = 1;\n');
   put(seed, 'src/ahead.ts', 'export const ahead = 1;\n');
@@ -69,6 +69,7 @@ describe('worktree new', () => {
 
   test('makes .worktrees/<slug> on plan/<slug> at origin/main, clean, with origin/main bytes, a record and land steps', () => {
     const {canonical, base} = repos();
+    put(canonical, 'dist-content/assets/content.bin', 'regenerable content');
     const receipts = join(base, 'receipts.log');
     const made = worktree(canonical, ['new', 'foo', '--no-install'], {WS_LANE_NAME: 'lane-x', WS_LANE_RECEIPTS: receipts});
     expect(made.status, made.stderr).toBe(0);
@@ -84,7 +85,12 @@ describe('worktree new', () => {
     expect(spawnSync('test', ['-x', join(tree, 'bin/run.sh')]).status).toBe(0);
     expect(spawnSync('readlink', [join(tree, 'src/link.ts')], {encoding: 'utf8'}).stdout.trim()).toBe('same.ts');
     const record = JSON.parse(readFileSync(join(tree, 'tmp/worktree-setup.json'), 'utf8'));
-    expect(record.steps.map((/** @type {{step: string}} */ row) => row.step)).toEqual(['fetch', 'add', 'checkout']);
+    expect(record.steps.map((/** @type {{step: string}} */ row) => row.step)).toEqual(['fetch', 'add', 'checkout', ...(process.platform === 'darwin' ? ['content'] : [])]);
+    if (process.platform === 'darwin') {
+      expect(readFileSync(join(tree, 'dist-content/assets/content.bin'), 'utf8')).toBe('regenerable content');
+      put(tree, 'dist-content/assets/content.bin', 'changed clone');
+      expect(readFileSync(join(canonical, 'dist-content/assets/content.bin'), 'utf8')).toBe('regenerable content');
+    }
     if (process.platform === 'darwin') expect(record.steps[2].detail).toMatch(/^4 of 7 tracked files cloned/u);
     expect(made.stdout).toContain('WS_LANE_NAME=lane-x node scripts/land.mjs');
     expect(readFileSync(receipts, 'utf8')).toMatch(/^\d\d:\d\d UTC lane-x worktree new engine\/\.worktrees\/foo on plan\/foo from [0-9a-f]{10} in .*; df (?:cost|gained) [\d,]+ MiB, du \d+\.\d\d GiB, free [\d.]+ GiB$/mu);
