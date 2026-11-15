@@ -72,10 +72,9 @@ export interface LiveGridPorts {
   /** Keep only the last departed isolated world on the road. Its original
    * full claim stays unneeded/evictable; no new world may overlap it. */
   lastCell?: { readonly windowMs: number; readonly playingBytes: number;
-    /** ZE3 (J352): the owned home, once departed onto the road, has no time expiry: it stays resident while the traveller is
-     *  within this many metres of it (still pressure-evictable, and retired before any other cell's allocation), and retires
-     *  past it. Kept for the whole road, the home held the desktop page at its 1.2 GB envelope and the road's far views
-     *  churned against it (frames to 1.1 s on the laptop's whole-road drive, 2026-11-15). Absent: every cell expires. */
+    /** ZE3 / ZE21 (J352): the owned home, once departed onto the road, has no time expiry: it stays resident, and needed (never
+     *  a pressure eviction), while the traveller is within this many metres of it (the page passes Infinity: the whole road),
+     *  and is retired before any other cell's allocation. Absent: every cell expires. */
     readonly keepHome?: number;
     readonly schedule: (expire: () => void, delayMs: number) => () => void };
   /** G580 T2: told once before a resident's retirement or unload disposes its world, so its compiled programs can be kept
@@ -147,7 +146,9 @@ export class LiveGridHost {
   private readonly highway: LiveGridHighway;
   private sequence: Promise<void> = Promise.resolve();
   private active: string | null;
-  private lastCell: { readonly instance: string; readonly until: number; cancel: () => void } | null = null;
+  /** `pinned`: the owned home kept on the road (ZE21): needed while kept, so allocator pressure (a neighbour's tiles or
+   *  products) is refused rather than evicting it. */
+  private lastCell: { readonly instance: string; readonly until: number; readonly pinned: boolean; cancel: () => void } | null = null;
   private disposed = false;
   /** Each checkpoint of an instance takes a generation; a staged one still waiting is superseded by any later one. */
   private highwayDisposed = false;
@@ -394,10 +395,10 @@ export class LiveGridHost {
     }
     this.forgetLastCell();
     const kept = policy.keepHome !== undefined && instance === this.ports.home.instance && this.distance(this.assembly.cell(instance)) <= policy.keepHome;
-    const last = { instance, until: kept ? Number.POSITIVE_INFINITY : diagnosticNow() + policy.windowMs, cancel: (): void => undefined };
+    const last = { instance, until: kept ? Number.POSITIVE_INFINITY : diagnosticNow() + policy.windowMs, pinned: kept, cancel: (): void => undefined };
     this.lastCell = last;
     if (kept) {
-      resident.lease.update({ needed: false, distance: this.distance(this.assembly.cell(instance)) });
+      resident.lease.update({ needed: true, distance: this.distance(this.assembly.cell(instance)) });
       return true;
     }
     try {
@@ -422,7 +423,8 @@ export class LiveGridHost {
       || this.active !== null || destination !== undefined && destination !== last.instance)) this.forgetLastCell();
     let released = true;
     for (const [instance, resident] of this.residents) {
-      const needed = instance === this.active || instance === destination || instance === this.ahead || this.requests.has(instance) || resident.reservations > 0;
+      const needed = instance === this.active || instance === destination || instance === this.ahead || this.requests.has(instance) || resident.reservations > 0
+        || this.lastCell?.instance === instance && this.lastCell.pinned;
       resident.lease.update({ distance: this.distance(this.assembly.cell(instance)), needed: needed || resident.disposalFailed === true });
       if (needed || this.lastCell?.instance === instance) continue;
       if (resident.disposalFailed === true || resident.evicting || this.coldUnloadRefused.has(instance)) { released = false; continue; }

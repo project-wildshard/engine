@@ -278,19 +278,25 @@ test('an optional near view cannot evict the real retained world needed for retu
   } finally { near?.dispose(); f.close(); }
 });
 
-test('ZE3: the owned home stays resident on the road near it, and retires past the keep radius', async () => {
-  const f = await fixture({ keepHome: 300 });
+test('ZE21: the owned home stays resident for the whole road, and allocator pressure never evicts it', async () => {
+  const f = await fixture({ keepHome: Number.POSITIVE_INFINITY });
   try {
     await f.enter(f.home.instance); const object = f.objects.get(f.home.instance);
     expect(await f.leave()).toBe(true); await f.settle();
-    // no time expiry beside the home (ZONE-ENTRY: the home stays resident while on the road)
+    // no time expiry (ZONE-ENTRY: the home stays resident while on the road)
     expect(f.expiries).toEqual([]);
+    // far down the road (Jake: "1000m away shouldnt matter")
+    f.player.position.x += 250 + 1500;
     for (let tick = 0; tick < 5; tick++) await f.settle();
     expect(f.live.state().retainedCell?.instance).toBe(f.home.instance); expect(f.disposed).toEqual([]);
+    // a claim that only fits by evicting the home is refused: the neighbours' tiles yield to the home, never the reverse
+    const baseline = f.residency.allocator.ownerCost('pressure').playing;
+    const bytes = Math.floor((CONTENT_CAPS.playing - baseline) / CONTENT_CAPS.residentFactor) - 1000;
+    const lease = f.residency.allocator.reserve({ id: 'pressure', owner: 'pressure', category: 'library', bytes, needed: false, distance: 0 });
+    try { expect(f.disposed).toEqual([]); expect(f.live.state().retainedCell?.instance).toBe(f.home.instance); } finally { lease?.release(); }
+    await f.settle();
+    f.player.position.x -= 250 + 1500;
     await f.enter(f.home.instance);
     expect(f.created).toEqual([f.home.instance]); expect(f.objects.get(f.home.instance)).toBe(object);
-    // past the radius the road's far views need the bytes: it retires
-    await f.leave(); f.player.position.x += 250 + 301; await f.settle();
-    expect(f.disposed).toEqual([f.home.instance]); expect(f.live.state().retainedCell ?? null).toBeNull();
   } finally { f.close(); }
 });

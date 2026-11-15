@@ -75,3 +75,12 @@
   desktop envelope (playing 1187 to 1200 MB, against 850 to 900 with the home retired) and the road's far views churned
   against it: 30 frames over 50 ms, to 1.1 s, and 2 s walking back in. The home now stays only within 300 m of its edge
   (its own ring of road and half a cell past it) and retires past that; the plan's "never retired" is recorded as unaffordable.
+- 17:05 (opus-gcm10, ZE21) Jake called the 300 m unload a bug ("1000m away shouldnt matter"). `road-memory-probe.mjs`
+  measured it on the laptop, desktop 2992x1434@2: real GPU+RAM (the owner ledger) is 619 MB in Driftwood, 647 MB on the
+  road with the home, 431 MB with it retired, so the home is ~216 MB; render targets 210 MB, near placeholders ~45 MB, road
+  signs, junctions and strips ~40 MB. The 1.2 GB envelope is the cost model (engine base 237, page 140, overlap 76 MB fixed,
+  plus the home's 271 MB sim claim and neighbours' tile products 64 to 226 MB), and the products pressure-evicted the home
+  185 m out. The kept home is now needed while on the road, at any distance; at 850 m it is resident, ledger 652 MB, cost
+  1140 MB, under the envelope, and the neighbours' tiles still stream. Also: a neighbour's creatures were drawn once when
+  their admission resolved between the late phase and the draw, linking the barrow warden's program on the frame (114 ms,
+  ZE3a's corner frame); they are now hidden from birth.

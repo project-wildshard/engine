@@ -194,8 +194,11 @@ const HIGHWAY_QUERIES: PlayerFrameQueries = { heightAt: () => 0, waterSurfaceAt:
 export interface LiveGridSpawn { readonly x: number; readonly y: number | undefined; readonly z: number; readonly yaw: number }
 
 /** The platform travel envelope at the deck's 30 m/s; a shardfile's critical bundle is its declared compressed sim. */
-/** ZE3: how far onto the road the owned home stays resident (its own ring of road and half a cell past it); see `keepHome`. */
-const HOME_KEEP_METRES = 300;
+/** ZE21 (Jake, 2026-11-15 ~16:50 Cancún: "Having the home cell in memory when your 10m away 100m or 300m away shouldnt
+ *  matter, 1000m away shouldnt matter"): the owned home stays resident for the whole road. Measured on the laptop (desktop,
+ *  2992x1434@2), the home is ~216 MB of real GPU and RAM; the envelope was filled by neighbours' tile products and the cost
+ *  model's fixed shares, which now yield to it (`keepHome`). */
+const HOME_KEEP_METRES = Number.POSITIVE_INFINITY;
 const LINK: ReadinessLink = { speed: 30, linkBitsPerSecond: 5_000_000, requestLatencySeconds: 0.25, maxStallSeconds: 10 };
 
 /** G598: a preparation that fails (or a road approach abandoned for another crossing, T7) frees its half-built region as a
