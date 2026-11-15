@@ -6,3 +6,7 @@
   the shell's `setTitleArrival` and `markUnload` were written nowhere and the next page read a "player reload". The page now
   lends `startOnline` a `leaving` port (clientWorker.ts `onlineLeaving`) for arrival, unload, the stale reloads and settle.
   The same loss hit Play here / Play again, `regrid`, `elsewhere` and the release page's Title screen.
+- Mode 22: the chaos proxy keeps a socket's frames in order, so ±200 ms jitter on a 60 Hz stream queues every frame behind
+  the slowest and the pong RTT sits flat; no chip could show. The proof now swings the downstream delay 20/420 ms every 2.5 s.
+- Mode 1 (and 2) on WebKit: Playwright's WebKit `setOffline` leaves loopback sockets up; the proof also cuts the world door
+  at the proxy there (`loopbackCut` in the receipt). Both pass in WebKit now.

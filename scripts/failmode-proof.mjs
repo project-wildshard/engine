@@ -121,7 +121,8 @@ try {
     if (init !== undefined) await context.addInitScript(init);
     const page = await context.newPage();
     page.on('pageerror', error => { errors.push(error.message.slice(0, 240)); });
-    page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 240)); });
+    page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 240)); if (process.env.FM_TRACE === '1') console.log(`  [page ${line.type()}] ${line.text().slice(0, 300)}`); });
+    page.on('framenavigated', frame => { if (frame === page.mainFrame() && process.env.FM_TRACE === '1') console.log(`  [nav] ${frame.url()}`); });
     return { page, context, errors };
   };
   /** Through the Name box (if it asks) into the world, to 30 frames. @param {Entered} entered @param {number} [timeout] */
@@ -189,6 +190,18 @@ try {
   };
   /** Clicks a button on the case's screen. @param {import('playwright').Page} page @param {string} id @param {string} label */
   const press = (page, id, label) => page.locator(`[data-failmode~="${id}"] button`, { hasText: label }).first().click({ timeout: 5000 });
+  /** WebKit's setOffline (Playwright) leaves loopback sockets up, so a WebKit page "offline" kept playing on the rig (opus-fm1's mode 1).
+   *  There the proxy cuts the world door too while the browser is offline: a live link drops and new upgrades are refused. Labelled in
+   *  the receipt as `loopbackCut`; Chromium needs none (its offline mode closes the socket itself). @param {boolean} live */
+  const cutLoopback = async live => {
+    if (engine !== 'webkit') return false;
+    if (live) {
+      const before = await control(); await arm('webkit-offline', [{ route: 'socket', kind: 'drop-after', afterMs: 0 }]);
+      for (let tries = 0; tries < 40 && await matchedSince(before, 'socket') === 0; tries++) await sleep(100);
+    }
+    await arm('webkit-offline-held', [{ route: 'socket', kind: 'refuse-upgrade', code: 503 }]);
+    return true;
+  };
 
   /** @type {Record<string, (item: Case) => Promise<Result>>} */
   const runners = {
@@ -317,12 +330,13 @@ try {
       try {
         await page.goto(URL_PLAY); await intoWorld(entered);
         const started = Date.now(); await context.setOffline(true);
+        const loopbackCut = await cutLoopback(true), injection = { setOffline: true, ...loopbackCut ? { loopbackCut } : {} };
         const seen = await screen(page, item.screen, 8000, started), shot = seen === null ? undefined : await shoot(page, item.id, 'card');
-        await sleep(2000); await context.setOffline(false);
+        await sleep(2000); await context.setOffline(false); if (loopbackCut) await heal();
         const result = await judged(seen, item, page);
         const back = result.outcome === 'pass' && await recovered(page, 30_000);
-        return result.outcome !== 'pass' ? { ...result, injection: { setOffline: true } } : back ? { ...result, ...shot === undefined ? {} : { shot }, injection: { setOffline: true }, recovery: 'online: a frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery online', seen, notes: await onScreen(page) };
-      } finally { await context.setOffline(false).catch(() => undefined); await entered.context.close(); }
+        return result.outcome !== 'pass' ? { ...result, injection } : back ? { ...result, ...shot === undefined ? {} : { shot }, injection, recovery: 'online: a frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery online', seen, notes: await onScreen(page) };
+      } finally { await context.setOffline(false).catch(() => undefined); await heal(); await entered.context.close(); }
     },
     // J298: a world the device holds loads offline and says so
     offlineLaunch: async item => {
@@ -337,14 +351,15 @@ try {
         if (!controlled) return { outcome: 'unsupported', reason: `${engine}: no controlling service worker after the warm visit, so nothing can launch offline` };
         await sleep(3000);
         await context.setOffline(true);
+        const loopbackCut = await cutLoopback(false), injection = { warmed: true, setOffline: true, ...loopbackCut ? { loopbackCut } : {} };
         const started = Date.now(); await page.goto(URL_PLAY).catch(() => undefined);
         await intoWorld(entered, 60_000).catch(() => undefined);
         const seen = await screen(page, item.screen, 15_000, started), shot = seen === null ? await shoot(page, item.id, 'missing') : await shoot(page, item.id, 'card');
-        await context.setOffline(false);
+        await context.setOffline(false); if (loopbackCut) await heal();
         const result = await judged(seen, item, page);
-        if (result.outcome !== 'pass') return { ...result, shot };
-        return await recovered(page, 45_000) ? { ...result, shot, injection: { warmed: true, setOffline: true }, recovery: 'online: a frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery online', seen, shot, notes: await onScreen(page) };
-      } finally { await context.setOffline(false).catch(() => undefined); await entered.context.close(); }
+        if (result.outcome !== 'pass') return { ...result, shot, injection };
+        return await recovered(page, 45_000) ? { ...result, shot, injection, recovery: 'online: a frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery online', seen, shot, notes: await onScreen(page) };
+      } finally { await context.setOffline(false).catch(() => undefined); await heal(); await entered.context.close(); }
     },
     // the page frozen (CDP), with or without a visibility change
     freeze: async item => {
@@ -372,8 +387,14 @@ try {
       try {
         await page.goto(URL_PLAY); await intoWorld(entered);
         const before = await control(), started = Date.now();
-        await arm(item.id, [item.id === 'slow' ? { route: 'socket', kind: 'delay-frames', direction: 'both', ms: 160, jitterMs: 0, seed: 7 } : { route: 'socket', kind: 'delay-frames', direction: 'down', ms: 20, jitterMs: 200, seed: 7 }]);
+        // Mode 22 (opus-of18): the proxy keeps a socket's frames in order, so per-frame jitter on a 60 Hz stream queues every frame behind
+        // the slowest and the pong RTT sits flat near the jitter's top (seen: no screen under ±200 ms). An unstable link is one whose
+        // delay swings: the driver moves the downstream delay between 20 ms and 420 ms every 2.5 s, so the last five pongs span over 250 ms.
+        const waving = { on: item.id === 'lossy' };
+        const wave = (async () => { for (let high = true; waving.on; high = !high) { await arm(item.id, [{ route: 'socket', kind: 'delay-frames', direction: 'down', ms: high ? 420 : 20, jitterMs: 0, seed: 7 }]); await sleep(2500); } })();
+        if (item.id === 'slow') await arm(item.id, [{ route: 'socket', kind: 'delay-frames', direction: 'both', ms: 160, jitterMs: 0, seed: 7 }]);
         const seen = await screen(page, item.screen, 15_000, started), shot = seen === null ? undefined : await shoot(page, item.id, 'chip');
+        waving.on = false; await wave;
         const injection = { socketMatches: await matchedSince(before, 'socket') };
         await heal();
         if (injection.socketMatches === 0) return { outcome: 'harness-fail', reason: 'the delay matched no frame', injection };
