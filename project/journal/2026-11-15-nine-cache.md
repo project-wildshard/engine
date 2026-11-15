@@ -36,3 +36,8 @@ reproduced on this GPU; a shipped phone paste must confirm that reading.
 Twenty-nine focused cases pass, including seven simultaneously pending
 body/decode jobs, failure cleanup and an independent gap-coverage oracle.
 Main b52607cf CI is the coordinator's explicit prerequisite for landing.
+
+Hosted CI 43775349911 found the title-music cache test parsing the exact
+pre-NB11 worker destructuring. Read the same encoded payload without
+assuming which fields the worker destructures; keep both page/CDN music
+inventory assertions. The first land was stopped before main moved.

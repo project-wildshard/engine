@@ -24,7 +24,9 @@ test("a fresh install's shell precache lists the piano title music and no other 
 test('with a content base the title music is precached from it, never from the page', async () => {
   const html = readFileSync('index.html', 'utf8').replace('</head>', '<script type="application/json" id="boot-module-files">{"contentBase":"https://cdn.example/content/au3/"}</script></head>');
   const { core } = await bake(html);
-  const shell = list(core, 'SHELL_FILES'), literal = /^\s*(?:const|var) \{ base: CONTENT_BASE, files: CONTENT_FILES \} = JSON\.parse\((.+)\);$/mu.exec(core)?.[1];
+  const shell = list(core, 'SHELL_FILES');
+  // NB11 adds per-file versions to this declaration; the payload owns the inventory.
+  const literal = /JSON\.parse\(("(?:[^"\\]|\\.)*")\);/u.exec(core.slice(core.indexOf('CONTENT_BASE')))?.[1];
   if (literal === undefined) throw new Error('Missing the content list');
   const content = JSON.parse(JSON.parse(literal) as string) as { files: string[] };
   expect(shell).not.toContain(title);
