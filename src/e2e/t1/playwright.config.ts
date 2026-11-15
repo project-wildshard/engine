@@ -3,6 +3,7 @@ import path from 'node:path'
 import { defineConfig, devices } from '@playwright/test'
 
 import { KEYCHAIN_ARGS } from '../../../scripts/chromium-keychain.mjs'
+import { T1_SHARDS } from '../../../scripts/t1-shards.mjs'
 
 const E2E_PORT = Number(process.env['WS_T1_PORT'])
 if (!Number.isInteger(E2E_PORT) || E2E_PORT < 1) {
@@ -16,6 +17,12 @@ export default defineConfig({
     process.env['WS_LANE_NAME'] ?? 't1-e2e',
     't1/results',
   ),
+  projects: [
+    { name: 'A', testMatch: T1_SHARDS.A },
+    { name: 'B', testMatch: T1_SHARDS.B },
+    { name: 'C', testMatch: T1_SHARDS.C },
+    { name: 'D', testMatch: T1_SHARDS.D },
+  ],
   workers: 1,
   forbidOnly: process.env['CI'] !== undefined,
   timeout: 120_000,

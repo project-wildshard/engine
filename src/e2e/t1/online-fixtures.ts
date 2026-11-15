@@ -17,6 +17,7 @@ interface Peers {
   readonly second: Entered
 }
 interface Workers {
+  readonly rigGroup: 'session' | 'entry'
   readonly rig: T1OnlineRig
   readonly peers: Peers
 }
@@ -71,15 +72,16 @@ async function enter(
 }
 
 const test = base.extend<object, Workers>({
+  rigGroup: ['session', { scope: 'worker', option: true }],
   rig: [
-    async ({ browserName }, provide): Promise<void> => {
+    async ({ browserName, rigGroup }, provide): Promise<void> => {
       expect(browserName).toBe('chromium')
       const dist = process.env['WS_T1_BUILD_DIR']
       if (dist === undefined) {
         throw new Error('Missing shared client build')
       }
       const lane = process.env['WS_LANE_NAME'] ?? 't1-e2e'
-      const rig = await openT1OnlineRig(dist, `tmp/${lane}`)
+      const rig = await openT1OnlineRig(dist, `tmp/${lane}/${rigGroup}`)
       try {
         await provide(rig)
       } finally {

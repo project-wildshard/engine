@@ -65,6 +65,7 @@ jobs:
     # The plan-branch run a main push reused (J240): its reports are this SHA's measurements (LS2's timings job).
     outputs:
       reused-run: ${{ steps.reuse.outputs.run }}
+      code-run: ${{ steps.code.outputs.run }}
     strategy:
       fail-fast: false
       matrix:
@@ -306,6 +307,58 @@ jobs:
           if test "$RESULT" = failure; then
             echo "::error title=Red run covers $range::$(printf '%s\n' "$commits" | sed '/^$/d' | wc -l | tr -d ' ') commits after the last finished run; see this job's summary"
           fi
+
+  t1-e2e:
+    # J244 folded Ring 1 into this workflow. Every shard consumes the one
+    # products build; exact-reuse and docs-only runs create no second suite.
+    needs: tests
+    if: needs.tests.outputs.code-run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [A, B, C, D]
+    env:
+      WS_LANE_NAME: template-e2e-ci
+      WS_T1_BUILD_DIR: dist
+      WS_T1_SHARD: ${{ matrix.suite }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - name: Select the installed Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-pack-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+          restore-keys: ms-playwright-chromium-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Own the suite scratch folder
+        run: node scripts/scratch-dir.mjs template-e2e-ci "Template suite shard"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: template-e2e-products
+          path: tmp/template-e2e-ci
+      - name: Restore the shared client and Template pin
+        run: |
+          tar -xf tmp/template-e2e-ci/products.tar
+          rm tmp/template-e2e-ci/products.tar
+          bash scripts/ci-playwright-install.sh --only-shell chromium
+      - name: Run this Template suite shard (report-only until qualified)
+        run: node scripts/t1-ci-proof.mjs
+      - name: Keep the actual exit, wall and traces
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: template-e2e-${{ matrix.suite }}
+          path: |
+            tmp/template-e2e-ci/t1/receipt-*.json
+            tmp/template-e2e-ci/t1/results/
+          retention-days: 7
+          if-no-files-found: error
 
   timings:
     # LAND-SIMPLIFY LS2 (J250, J258): main's run measures every planned file; merge its shard reports into the
