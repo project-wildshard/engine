@@ -9255,5 +9255,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "d35079e9cf99696a81dca4ed5c82f6a22c3d2037",
     "retirementProof": "Restored current lint boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/no-shard-runtime.test.ts",
+    "outcome": "restored",
+    "target": "test/no-shard-runtime.test.ts",
+    "decision": "Restored in place (CI21 E-TOOL): the fixture no longer claims exemptions from a registry that moved to the shard repos. Its two old blender examples now refuse like every other executable shard path, and the explicit trusted-runtime import remains covered.",
+    "originalTests": [],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "f44f9ebb26ecd6ef0c133445820760c0e6c057ef",
+    "retirementProof": "Restored current engine lint boundary; no J186 retirement or successor equivalence claimed."
   }
 ]

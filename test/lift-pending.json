@@ -157,7 +157,6 @@
   "test/nine-source-rows.test.ts",
   "test/nine-verb-tape.test.ts",
   "test/nine-walk-verbs.test.ts",
-  "test/no-shard-runtime.test.ts",
   "test/original-script-order.test.ts",
   "test/output-runtime.test.ts",
   "test/packed-specimen-files.test.ts",
