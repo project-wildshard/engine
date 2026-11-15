@@ -1,0 +1,12 @@
+[
+  {
+    "path": "src/shards/nalati-grasslands/data/heldWeapons.generated.json",
+    "bytes": 47462,
+    "sha256": "5b4a155038bac33a614e35c3146eabbdc41c7c49683172cff9d9b7314723a29d"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/stealth.generated.json",
+    "bytes": 18415,
+    "sha256": "a4d687954bc350bc9248b38e1f06b00fbb2ba8450a248e8b3412117723fbd301"
+  }
+]

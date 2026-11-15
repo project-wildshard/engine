@@ -1,0 +1,76 @@
+{
+  "sourceCommit": "ddd7d2c70cacb879b3b080360e0d0a0f5fdf3ce3",
+  "exporter": "scripts/export-ci21-frozen.mjs",
+  "files": [
+    {
+      "name": "nalati-admission-original.json",
+      "bytes": 7540,
+      "sha256": "04884b225dda9a0d0a4a0510b95ecbd0c508f67d6cff8f75327a74ea929ae900"
+    },
+    {
+      "name": "nalati-admission-original.wasm",
+      "bytes": 15747,
+      "sha256": "b05ee4ff6fe77d8e269a40f23ac3d53bec85ec197a3d7af87beba1c17a65faaf"
+    },
+    {
+      "name": "nalati-admission-witness-original.bin",
+      "bytes": 21529,
+      "sha256": "60c94c58be1c785e9fbaed7692fa8b849b924c9cb48cbe83696ec31d7ad00bc8"
+    },
+    {
+      "name": "nalati-geography-files.json",
+      "bytes": 2711,
+      "sha256": "4a23b3b55a97b8fb830502d5390807abe60747c77713851d218bbf955121e1db"
+    },
+    {
+      "name": "nalati-geography-original.bin",
+      "bytes": 995619,
+      "sha256": "871fbf81ca5de7d34172af7962bd14182086089a1348836241efee12f31a93b8"
+    },
+    {
+      "name": "nalati-geography-original.json",
+      "bytes": 62876,
+      "sha256": "8d54903f9051f16dba04cb154315bb24f2a277e3d26f7ae4650f9b0d071bcdec"
+    },
+    {
+      "name": "nalati-goldenKing-original.json",
+      "bytes": 35065,
+      "sha256": "575e9b2f3d3516dbac4cb988f27b407515f21ff73b3fa906f979d234a9aa4a70"
+    },
+    {
+      "name": "nalati-held-files.json",
+      "bytes": 371,
+      "sha256": "c04bda777c060d0d13e4d04d560603015046e3bf42de0764f0d0b488407290fc"
+    },
+    {
+      "name": "nalati-poi-paint-original.json",
+      "bytes": 376938,
+      "sha256": "ad66e963c8117875db1cb0e106bc24290cf2835395a16e34ca1bcd6667c4fd8a"
+    },
+    {
+      "name": "nalati-poi-shapes-original.bin",
+      "bytes": 377900,
+      "sha256": "e67e42940efa9b80bff7d41e1dfc3038b6166bde4c6d9beaaf039ec82f9021fe"
+    },
+    {
+      "name": "nalati-population-field-original.json",
+      "bytes": 21630,
+      "sha256": "2379d0bd0db07bd20f2e63878639a59606b4df2a9621092f03d2ac8e8001a5f9"
+    },
+    {
+      "name": "nalati-shape-book-original.json",
+      "bytes": 33591,
+      "sha256": "623745bcdad1020c991d0c9293d0f0acd5b78509d3f98fa3acf847e25c38ad7a"
+    },
+    {
+      "name": "nalati-strikeProfiles-original.json",
+      "bytes": 7498,
+      "sha256": "941b63a9bedffb46d651ed07fa34012f8006625e197e23f9991d6626aefb7150"
+    },
+    {
+      "name": "nalati-weather-original.json",
+      "bytes": 6943,
+      "sha256": "8a48b3361c08bee51e08348dcbe1a3b6f0698b888d6e16a3182787a6bbec0233"
+    }
+  ]
+}

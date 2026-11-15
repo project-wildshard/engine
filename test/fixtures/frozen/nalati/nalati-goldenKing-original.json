@@ -1,0 +1,1697 @@
+{
+  "client": {
+    "light": {
+      "colour": 16762976,
+      "drop": 30
+    },
+    "prewarm": {
+      "kind": "balbal",
+      "variant": "warrior"
+    },
+    "system": "shard.nalati-grasslands.bind",
+    "debugZ": 13.2
+  },
+  "portal": {
+    "signal": "kingDoor",
+    "spawn": {
+      "x": 0,
+      "z": 20.3,
+      "yaw": 0
+    },
+    "end": 22.5,
+    "exitOffset": 2.4,
+    "slow": 0.5,
+    "fade": {
+      "out": 220,
+      "hold": 0.24,
+      "in": 420
+    },
+    "keep": "sky|planet|cloud|kurgan|projectile|arrow|arc|pickup|streak|csm|light",
+    "near": 40,
+    "floor": {
+      "tolerance": 0.02,
+      "depth": 4
+    }
+  },
+  "profile": {
+    "kind": "boss",
+    "pattern": "arena",
+    "fight": {
+      "origin": {
+        "x": -40,
+        "y": 140,
+        "z": -95
+      },
+      "bounds": 9.1,
+      "rest": {
+        "x": 0,
+        "z": -0.6,
+        "plinth": 0.45,
+        "lift": 0.12,
+        "halfW": 0.65,
+        "halfL": 1.6,
+        "inset": 0.05,
+        "focusY": 1.5
+      },
+      "shieldSpot": {
+        "x": 0,
+        "z": 1.7
+      },
+      "enragedFrom": 2,
+      "phases": [
+        {
+          "at": 1,
+          "mem": {
+            "cape": 1
+          }
+        },
+        {
+          "at": 0.6,
+          "mem": {
+            "cape": 1
+          },
+          "resume": {
+            "shieldSpot": true,
+            "mode": "shield"
+          },
+          "enter": {
+            "roar": {
+              "act": 3,
+              "seconds": 1.3
+            },
+            "line": "The kurgan wakes — the King falls back to his coffin",
+            "mode": "toCoffin",
+            "modeT": -1.3,
+            "pourDelay": 2.5,
+            "lineFirst": true
+          }
+        },
+        {
+          "at": 0.3,
+          "mem": {
+            "cape": 0
+          },
+          "resume": {
+            "mem": {
+              "cape": 0
+            },
+            "sweep": true
+          },
+          "enter": {
+            "roar": {
+              "act": 4,
+              "seconds": 1.4,
+              "shed": {
+                "field": "cape",
+                "from": 0.45,
+                "rate": 4
+              }
+            },
+            "line": "The King tears off his cloak — the gold burns",
+            "mode": "fight",
+            "modeT": 0,
+            "views": [
+              [
+                "arena.shield",
+                0
+              ]
+            ],
+            "pourStop": true,
+            "sweep": true,
+            "crownReset": true,
+            "cooldowns": {
+              "combo": 1.6,
+              "burst": 3.5
+            }
+          }
+        }
+      ],
+      "modes": {
+        "coffin": {
+          "damage": 0,
+          "shielded": false,
+          "look": 0,
+          "glows": false,
+          "motion": {
+            "kind": "hold"
+          }
+        },
+        "rising": {
+          "damage": 0,
+          "shielded": false,
+          "look": 1,
+          "glows": false,
+          "motion": {
+            "kind": "hold"
+          }
+        },
+        "fight": {
+          "damage": 1,
+          "shielded": false,
+          "look": 1,
+          "glows": true,
+          "motion": {
+            "kind": "fight"
+          },
+          "timeouts": [
+            {
+              "seconds": 16,
+              "to": "toCoffin",
+              "phase": 1
+            }
+          ]
+        },
+        "toCoffin": {
+          "damage": 0,
+          "shielded": true,
+          "look": 1,
+          "glows": true,
+          "motion": {
+            "kind": "goto",
+            "spot": "shield",
+            "speed": 2.4,
+            "turn": 4,
+            "arrive": 0.5,
+            "roarTurn": 2,
+            "next": "shield"
+          }
+        },
+        "shield": {
+          "damage": 0,
+          "shielded": true,
+          "look": 1,
+          "glows": true,
+          "motion": {
+            "kind": "face",
+            "yaw": 0,
+            "turn": 1.5
+          },
+          "enter": {
+            "cancel": true,
+            "mem": {
+              "act": 0,
+              "kneel": 1,
+              "raise": 1
+            },
+            "yaw": 0,
+            "motion": [
+              0,
+              0,
+              3
+            ],
+            "lockHp": true,
+            "views": [
+              [
+                "arena.shield",
+                1
+              ]
+            ],
+            "wave": true
+          }
+        },
+        "stun": {
+          "damage": 1.25,
+          "shielded": false,
+          "look": 1,
+          "glows": true,
+          "motion": {
+            "kind": "face",
+            "turn": 1.5
+          },
+          "timeouts": [
+            {
+              "seconds": 4,
+              "to": "fight",
+              "effect": {
+                "mem": {
+                  "kneel": 0,
+                  "raise": 0
+                },
+                "cooldowns": {
+                  "combo": 0.8
+                }
+              }
+            }
+          ]
+        },
+        "kneel": {
+          "damage": 1.25,
+          "shielded": false,
+          "look": 1,
+          "glows": true,
+          "motion": {
+            "kind": "face",
+            "turn": 1.5
+          },
+          "timeouts": [
+            {
+              "seconds": 3,
+              "to": "fight",
+              "effect": {
+                "mem": {
+                  "kneel": 0
+                },
+                "cooldowns": {
+                  "combo": 0.6
+                }
+              }
+            }
+          ]
+        },
+        "dead": {
+          "damage": 1,
+          "shielded": false,
+          "look": 1,
+          "glows": true,
+          "motion": {
+            "kind": "hold"
+          }
+        }
+      },
+      "modeNames": {
+        "rest": "coffin",
+        "rising": "rising",
+        "fight": "fight",
+        "dead": "dead"
+      },
+      "attacks": {
+        "burst": {
+          "act": 2,
+          "min": 2.2,
+          "max": 13,
+          "seconds": [
+            2.4,
+            2
+          ],
+          "fireAt": 0.72,
+          "rings": [
+            1,
+            2
+          ],
+          "after": [
+            [
+              9,
+              3
+            ],
+            [
+              6.5,
+              2
+            ]
+          ],
+          "comboFloor": 0.6,
+          "lines": [
+            "SUNBURST — jump it",
+            "SUNBURST ×2 — jump, land, jump"
+          ]
+        },
+        "combo": {
+          "act": 1,
+          "reach": 3,
+          "engage": 0.2,
+          "count": [
+            3,
+            4
+          ],
+          "seconds": [
+            0.95,
+            0.78
+          ],
+          "hitAt": 0.62,
+          "chain": 2.5,
+          "rest": [
+            1.8,
+            1.1
+          ],
+          "cuts": [
+            {
+              "damage": 14,
+              "reachMul": 1,
+              "arc": 0.95,
+              "shove": 3,
+              "painted": false
+            },
+            {
+              "damage": 14,
+              "reachMul": 1,
+              "arc": 0.95,
+              "shove": 3,
+              "painted": false
+            },
+            {
+              "damage": 22,
+              "reachMul": 1.1,
+              "arc": 1.35,
+              "shove": 5,
+              "painted": true
+            },
+            {
+              "damage": 22,
+              "reachMul": 1.1,
+              "arc": 1.35,
+              "shove": 5,
+              "painted": true
+            }
+          ],
+          "above": 2.6
+        },
+        "commit": {
+          "windup": 0.45,
+          "turn": [
+            1.8,
+            0.2
+          ]
+        },
+        "chase": {
+          "stop": 2.3,
+          "speed": [
+            1.75,
+            2.6
+          ],
+          "turn": 2.8
+        }
+      },
+      "fields": {
+        "act": "act",
+        "strike": "strike",
+        "hitDone": "hitDone",
+        "floorY": "floorY",
+        "floorS": "floorS",
+        "rise": "rise",
+        "pose": "pose"
+      },
+      "reset": {
+        "mem": {
+          "pose": 0,
+          "rise": 0,
+          "lift": 0,
+          "kneel": 0,
+          "raise": 0,
+          "act": 0,
+          "strike": 0,
+          "crown": 1,
+          "deadT": 0,
+          "init": 1,
+          "noHeadBar": 1
+        },
+        "combo": 1.2,
+        "burst": [
+          5,
+          2
+        ],
+        "pourDelay": 2,
+        "drifts": {
+          "fromPhase": 2,
+          "height": 0.6,
+          "cap": 0.8,
+          "at": [
+            [
+              -5.2,
+              3.4,
+              2.6
+            ],
+            [
+              4.8,
+              4.6,
+              2.4
+            ],
+            [
+              -3.6,
+              -5,
+              2.2
+            ],
+            [
+              5.6,
+              -3.2,
+              2.5
+            ],
+            [
+              1.8,
+              6.6,
+              2
+            ]
+          ]
+        },
+        "views": [
+          [
+            "arena.lid.open",
+            0
+          ],
+          [
+            "arena.shaft",
+            0,
+            0.38
+          ],
+          [
+            "arena.shaft",
+            1,
+            0
+          ],
+          [
+            "victory.heap",
+            0
+          ]
+        ],
+        "glow": 0.01
+      },
+      "intro": {
+        "long": {
+          "lid": [
+            0.25,
+            1.35
+          ],
+          "rise": [
+            1.25,
+            3.55
+          ],
+          "pulse": 3.8
+        },
+        "short": {
+          "lid": [
+            0,
+            0.3
+          ],
+          "rise": [
+            0.15,
+            1.15
+          ],
+          "pulse": 1.2
+        },
+        "shaft": {
+          "index": 0,
+          "base": 0.38,
+          "amp": 0.45
+        },
+        "glow": {
+          "base": 0.01,
+          "peak": 0.2,
+          "lead": 0.8,
+          "fade": 0.6
+        }
+      },
+      "begin": {
+        "mem": {
+          "pose": 1,
+          "rise": 1
+        },
+        "combo": 0.8,
+        "burst": [
+          4,
+          3
+        ],
+        "views": [
+          [
+            "arena.lid.open",
+            1
+          ]
+        ]
+      },
+      "glow": {
+        "base": 0.035,
+        "glint": 0.22,
+        "charge": 0.45,
+        "glintFade": 3,
+        "chargeFade": 2,
+        "burn": [
+          0.07,
+          0.04,
+          6
+        ]
+      },
+      "hits": {
+        "head": [
+          0.16,
+          0.14
+        ],
+        "armour": {
+          "melee": 3.8,
+          "breaks": 6,
+          "ranged": 0.5,
+          "line": "Gold plaques torn loose — his chest is bare"
+        }
+      },
+      "crown": {
+        "hp": 200,
+        "fromPhase": 2,
+        "field": "crown",
+        "to": "kneel",
+        "effect": {
+          "cancel": true,
+          "mem": {
+            "act": 0,
+            "kneel": 1
+          },
+          "line": "The headdress falls — the King kneels"
+        }
+      },
+      "rings": {
+        "count": 2,
+        "start": 0.8,
+        "gap": 0.95,
+        "speed": 8.5,
+        "max": 17,
+        "band": 0.5,
+        "jump": 0.4,
+        "damage": 25,
+        "push": 9,
+        "pushTime": 0.18,
+        "strike": "sunburst"
+      },
+      "pour": {
+        "spots": [
+          {
+            "x": -5.2,
+            "z": 3.4
+          },
+          {
+            "x": 4.8,
+            "z": 4.6
+          },
+          {
+            "x": -3.6,
+            "z": -5
+          },
+          {
+            "x": 5.6,
+            "z": -3.2
+          },
+          {
+            "x": -7,
+            "z": -0.6
+          },
+          {
+            "x": 1.8,
+            "z": 6.6
+          },
+          {
+            "x": 7.2,
+            "z": 1.2
+          },
+          {
+            "x": -1.6,
+            "z": -6.8
+          }
+        ],
+        "phase": 1,
+        "every": [
+          3.2,
+          1.6
+        ],
+        "tell": 1,
+        "pour": 6,
+        "fadeIn": 3,
+        "fadeOut": [
+          5.2,
+          6
+        ],
+        "pile": {
+          "r": 2.4,
+          "rate": 0.2,
+          "cap": 0.95
+        },
+        "hitRadius": 0.55,
+        "hitRate": 2,
+        "damage": 4,
+        "strike": "sand",
+        "reset": 2
+      },
+      "sweep": {
+        "radius": 6.2,
+        "squash": 0.85,
+        "offset": -0.5,
+        "speed": 0.24,
+        "limit": 2.4,
+        "start": -2.2,
+        "ease": 1.2,
+        "hitRadius": 1.15,
+        "damage": 15,
+        "every": 1,
+        "strike": "beam",
+        "boss": {
+          "damage": 50,
+          "every": 3,
+          "extra": 0.3,
+          "line": "The sun beam sears the King"
+        }
+      },
+      "adds": {
+        "spots": [
+          {
+            "x": -9.8,
+            "z": 4.6,
+            "yaw": 1.5707963267948966
+          },
+          {
+            "x": 9.8,
+            "z": 4.6,
+            "yaw": -1.5707963267948966
+          },
+          {
+            "x": -9.8,
+            "z": -4.2,
+            "yaw": 1.5707963267948966
+          },
+          {
+            "x": 9.8,
+            "z": -4.2,
+            "yaw": -1.5707963267948966
+          }
+        ],
+        "push": 0.55,
+        "pairs": [
+          [
+            0,
+            1
+          ],
+          [
+            2,
+            3
+          ]
+        ],
+        "mode": "shield",
+        "reinforce": 25,
+        "retireAfter": 2.4,
+        "cleared": {
+          "to": "stun",
+          "effect": {
+            "mem": {
+              "raise": 0,
+              "kneel": 1
+            },
+            "views": [
+              [
+                "arena.shield",
+                0
+              ]
+            ],
+            "line": "The dome breaks — the King is stunned"
+          }
+        }
+      },
+      "victory": {
+        "views": [
+          [
+            "arena.shield",
+            0
+          ],
+          [
+            "strike.arc.off"
+          ],
+          [
+            "arena.shaft",
+            0,
+            0.35
+          ],
+          [
+            "arena.shaft",
+            1,
+            1.4
+          ]
+        ],
+        "crumble": 1.6,
+        "drain": 0.3
+      },
+      "views": [
+        "arena.lid.open",
+        "arena.shaft",
+        "arena.fx.hide",
+        "arena.shield",
+        "arena.shield.at",
+        "adds.spot",
+        "boss.glow",
+        "strike.arc",
+        "strike.arc.off",
+        "hazard.ring",
+        "hazard.ring.off",
+        "hazard.ring.tell",
+        "hazard.pour.off",
+        "hazard.pour.tell",
+        "hazard.pour.fall",
+        "hazard.sweep",
+        "hazard.sweep.off",
+        "victory.heap"
+      ]
+    }
+  },
+  "encounter": {
+    "id": "golden-king",
+    "name": "THE GOLDEN KING",
+    "title": "LORD OF THE GREAT KURGAN",
+    "retryTitle": "THE KING ENDURES",
+    "phases": [
+      {
+        "at": 1,
+        "caption": "",
+        "name": "The King's Court"
+      },
+      {
+        "at": 0.6,
+        "caption": "PHASE II",
+        "name": "The Kurgan Wakes"
+      },
+      {
+        "at": 0.3,
+        "caption": "PHASE III",
+        "name": "The Gold Burns"
+      }
+    ],
+    "intro": 4.2,
+    "introShort": 1.4
+  },
+  "reward": {
+    "tier": "LEGENDARY",
+    "name": "THE GOLDEN BOW",
+    "flavour": "Bow of the Saka King",
+    "prompt": "TAKE THE GOLDEN BOW"
+  },
+  "tuning": {
+    "strikeDamage": [
+      14,
+      14,
+      22,
+      22
+    ],
+    "reach": 3,
+    "sunburstDamage": 25,
+    "ringSpeed": 8.5,
+    "ringMax": 17,
+    "beamRadius": 6.2,
+    "beamHitRadius": 1.15,
+    "beamDamage": 15,
+    "beamToKing": 50,
+    "headdressHp": 200,
+    "shieldOffset": 0.7,
+    "drifts": [
+      [
+        -5.2,
+        3.4,
+        2.6
+      ],
+      [
+        4.8,
+        4.6,
+        2.4
+      ],
+      [
+        -3.6,
+        -5,
+        2.2
+      ],
+      [
+        5.6,
+        -3.2,
+        2.5
+      ],
+      [
+        1.8,
+        6.6,
+        2
+      ]
+    ]
+  },
+  "page": {
+    "profile": {
+      "kind": "boss",
+      "pattern": "arena",
+      "fight": {
+        "origin": {
+          "x": -40,
+          "y": 140,
+          "z": -95
+        },
+        "bounds": 9.1,
+        "rest": {
+          "x": 0,
+          "z": -0.6,
+          "plinth": 0.45,
+          "lift": 0.12,
+          "halfW": 0.65,
+          "halfL": 1.6,
+          "inset": 0.05,
+          "focusY": 1.5
+        },
+        "shieldSpot": {
+          "x": 0,
+          "z": 1.7
+        },
+        "enragedFrom": 2,
+        "phases": [
+          {
+            "at": 1,
+            "mem": {
+              "cape": 1
+            }
+          },
+          {
+            "at": 0.6,
+            "mem": {
+              "cape": 1
+            },
+            "resume": {
+              "shieldSpot": true,
+              "mode": "shield"
+            },
+            "enter": {
+              "roar": {
+                "act": 3,
+                "seconds": 1.3
+              },
+              "line": "The kurgan wakes — the King falls back to his coffin",
+              "lineFirst": true,
+              "mode": "toCoffin",
+              "modeT": -1.3,
+              "pourDelay": 2.5
+            }
+          },
+          {
+            "at": 0.3,
+            "mem": {
+              "cape": 0
+            },
+            "resume": {
+              "mem": {
+                "cape": 0
+              },
+              "sweep": true
+            },
+            "enter": {
+              "roar": {
+                "act": 4,
+                "seconds": 1.4,
+                "shed": {
+                  "field": "cape",
+                  "from": 0.45,
+                  "rate": 4
+                }
+              },
+              "mode": "fight",
+              "modeT": 0,
+              "views": [
+                [
+                  "arena.shield",
+                  0
+                ]
+              ],
+              "pourStop": true,
+              "sweep": true,
+              "crownReset": true,
+              "line": "The King tears off his cloak — the gold burns",
+              "cooldowns": {
+                "combo": 1.6,
+                "burst": 3.5
+              }
+            }
+          }
+        ],
+        "modes": {
+          "coffin": {
+            "damage": 0,
+            "shielded": false,
+            "look": 0,
+            "glows": false,
+            "motion": {
+              "kind": "hold"
+            }
+          },
+          "rising": {
+            "damage": 0,
+            "shielded": false,
+            "look": 1,
+            "glows": false,
+            "motion": {
+              "kind": "hold"
+            }
+          },
+          "fight": {
+            "damage": 1,
+            "shielded": false,
+            "look": 1,
+            "glows": true,
+            "motion": {
+              "kind": "fight"
+            },
+            "timeouts": [
+              {
+                "seconds": 16,
+                "phase": 1,
+                "to": "toCoffin"
+              }
+            ]
+          },
+          "toCoffin": {
+            "damage": 0,
+            "shielded": true,
+            "look": 1,
+            "glows": true,
+            "motion": {
+              "kind": "goto",
+              "spot": "shield",
+              "speed": 2.4,
+              "turn": 4,
+              "arrive": 0.5,
+              "roarTurn": 2,
+              "next": "shield"
+            }
+          },
+          "shield": {
+            "damage": 0,
+            "shielded": true,
+            "look": 1,
+            "glows": true,
+            "motion": {
+              "kind": "face",
+              "yaw": 0,
+              "turn": 1.5
+            },
+            "enter": {
+              "cancel": true,
+              "mem": {
+                "act": 0,
+                "kneel": 1,
+                "raise": 1
+              },
+              "yaw": 0,
+              "motion": [
+                0,
+                0,
+                3
+              ],
+              "lockHp": true,
+              "views": [
+                [
+                  "arena.shield",
+                  1
+                ]
+              ],
+              "wave": true
+            }
+          },
+          "stun": {
+            "damage": 1.25,
+            "shielded": false,
+            "look": 1,
+            "glows": true,
+            "motion": {
+              "kind": "face",
+              "turn": 1.5
+            },
+            "timeouts": [
+              {
+                "seconds": 4,
+                "to": "fight",
+                "effect": {
+                  "mem": {
+                    "kneel": 0,
+                    "raise": 0
+                  },
+                  "cooldowns": {
+                    "combo": 0.8
+                  }
+                }
+              }
+            ]
+          },
+          "kneel": {
+            "damage": 1.25,
+            "shielded": false,
+            "look": 1,
+            "glows": true,
+            "motion": {
+              "kind": "face",
+              "turn": 1.5
+            },
+            "timeouts": [
+              {
+                "seconds": 3,
+                "to": "fight",
+                "effect": {
+                  "mem": {
+                    "kneel": 0
+                  },
+                  "cooldowns": {
+                    "combo": 0.6
+                  }
+                }
+              }
+            ]
+          },
+          "dead": {
+            "damage": 1,
+            "shielded": false,
+            "look": 1,
+            "glows": true,
+            "motion": {
+              "kind": "hold"
+            }
+          }
+        },
+        "modeNames": {
+          "rest": "coffin",
+          "rising": "rising",
+          "fight": "fight",
+          "dead": "dead"
+        },
+        "attacks": {
+          "burst": {
+            "act": 2,
+            "min": 2.2,
+            "max": 13,
+            "seconds": [
+              2.4,
+              2
+            ],
+            "fireAt": 0.72,
+            "rings": [
+              1,
+              2
+            ],
+            "after": [
+              [
+                9,
+                3
+              ],
+              [
+                6.5,
+                2
+              ]
+            ],
+            "comboFloor": 0.6,
+            "lines": [
+              "SUNBURST — jump it",
+              "SUNBURST ×2 — jump, land, jump"
+            ]
+          },
+          "combo": {
+            "act": 1,
+            "reach": 3,
+            "engage": 0.2,
+            "count": [
+              3,
+              4
+            ],
+            "seconds": [
+              0.95,
+              0.78
+            ],
+            "hitAt": 0.62,
+            "chain": 2.5,
+            "rest": [
+              1.8,
+              1.1
+            ],
+            "above": 2.6,
+            "cuts": [
+              {
+                "damage": 14,
+                "reachMul": 1,
+                "arc": 0.95,
+                "shove": 3,
+                "painted": false
+              },
+              {
+                "damage": 14,
+                "reachMul": 1,
+                "arc": 0.95,
+                "shove": 3,
+                "painted": false
+              },
+              {
+                "damage": 22,
+                "reachMul": 1.1,
+                "arc": 1.35,
+                "shove": 5,
+                "painted": true
+              },
+              {
+                "damage": 22,
+                "reachMul": 1.1,
+                "arc": 1.35,
+                "shove": 5,
+                "painted": true
+              }
+            ]
+          },
+          "commit": {
+            "windup": 0.45,
+            "turn": [
+              1.8,
+              0.2
+            ]
+          },
+          "chase": {
+            "stop": 2.3,
+            "speed": [
+              1.75,
+              2.6
+            ],
+            "turn": 2.8
+          }
+        },
+        "fields": {
+          "act": "act",
+          "strike": "strike",
+          "hitDone": "hitDone",
+          "floorY": "floorY",
+          "floorS": "floorS",
+          "rise": "rise",
+          "pose": "pose"
+        },
+        "reset": {
+          "mem": {
+            "pose": 0,
+            "rise": 0,
+            "lift": 0,
+            "kneel": 0,
+            "raise": 0,
+            "act": 0,
+            "strike": 0,
+            "crown": 1,
+            "deadT": 0,
+            "init": 1,
+            "noHeadBar": 1
+          },
+          "combo": 1.2,
+          "burst": [
+            5,
+            2
+          ],
+          "pourDelay": 2,
+          "drifts": {
+            "fromPhase": 2,
+            "height": 0.6,
+            "cap": 0.8,
+            "at": [
+              [
+                -5.2,
+                3.4,
+                2.6
+              ],
+              [
+                4.8,
+                4.6,
+                2.4
+              ],
+              [
+                -3.6,
+                -5,
+                2.2
+              ],
+              [
+                5.6,
+                -3.2,
+                2.5
+              ],
+              [
+                1.8,
+                6.6,
+                2
+              ]
+            ]
+          },
+          "views": [
+            [
+              "arena.lid.open",
+              0
+            ],
+            [
+              "arena.shaft",
+              0,
+              0.38
+            ],
+            [
+              "arena.shaft",
+              1,
+              0
+            ],
+            [
+              "victory.heap",
+              0
+            ]
+          ],
+          "glow": 0.01
+        },
+        "intro": {
+          "long": {
+            "lid": [
+              0.25,
+              1.35
+            ],
+            "rise": [
+              1.25,
+              3.55
+            ],
+            "pulse": 3.8
+          },
+          "short": {
+            "lid": [
+              0,
+              0.3
+            ],
+            "rise": [
+              0.15,
+              1.15
+            ],
+            "pulse": 1.2
+          },
+          "shaft": {
+            "index": 0,
+            "base": 0.38,
+            "amp": 0.45
+          },
+          "glow": {
+            "base": 0.01,
+            "peak": 0.2,
+            "lead": 0.8,
+            "fade": 0.6
+          }
+        },
+        "begin": {
+          "mem": {
+            "pose": 1,
+            "rise": 1
+          },
+          "combo": 0.8,
+          "burst": [
+            4,
+            3
+          ],
+          "views": [
+            [
+              "arena.lid.open",
+              1
+            ]
+          ]
+        },
+        "glow": {
+          "base": 0.035,
+          "glint": 0.22,
+          "charge": 0.45,
+          "glintFade": 3,
+          "chargeFade": 2,
+          "burn": [
+            0.07,
+            0.04,
+            6
+          ]
+        },
+        "hits": {
+          "head": [
+            0.16,
+            0.14
+          ],
+          "armour": {
+            "melee": 3.8,
+            "breaks": 6,
+            "ranged": 0.5,
+            "line": "Gold plaques torn loose — his chest is bare"
+          }
+        },
+        "crown": {
+          "hp": 200,
+          "fromPhase": 2,
+          "field": "crown",
+          "to": "kneel",
+          "effect": {
+            "cancel": true,
+            "mem": {
+              "act": 0,
+              "kneel": 1
+            },
+            "line": "The headdress falls — the King kneels"
+          }
+        },
+        "rings": {
+          "count": 2,
+          "start": 0.8,
+          "gap": 0.95,
+          "speed": 8.5,
+          "max": 17,
+          "band": 0.5,
+          "jump": 0.4,
+          "damage": 25,
+          "push": 9,
+          "pushTime": 0.18,
+          "strike": "sunburst"
+        },
+        "pour": {
+          "spots": [
+            {
+              "x": -5.2,
+              "z": 3.4
+            },
+            {
+              "x": 4.8,
+              "z": 4.6
+            },
+            {
+              "x": -3.6,
+              "z": -5
+            },
+            {
+              "x": 5.6,
+              "z": -3.2
+            },
+            {
+              "x": -7,
+              "z": -0.6
+            },
+            {
+              "x": 1.8,
+              "z": 6.6
+            },
+            {
+              "x": 7.2,
+              "z": 1.2
+            },
+            {
+              "x": -1.6,
+              "z": -6.8
+            }
+          ],
+          "phase": 1,
+          "every": [
+            3.2,
+            1.6
+          ],
+          "tell": 1,
+          "pour": 6,
+          "fadeIn": 3,
+          "fadeOut": [
+            5.2,
+            6
+          ],
+          "pile": {
+            "r": 2.4,
+            "rate": 0.2,
+            "cap": 0.95
+          },
+          "hitRadius": 0.55,
+          "hitRate": 2,
+          "damage": 4,
+          "strike": "sand",
+          "reset": 2
+        },
+        "sweep": {
+          "radius": 6.2,
+          "squash": 0.85,
+          "offset": -0.5,
+          "speed": 0.24,
+          "limit": 2.4,
+          "start": -2.2,
+          "ease": 1.2,
+          "hitRadius": 1.15,
+          "damage": 15,
+          "every": 1,
+          "strike": "beam",
+          "boss": {
+            "damage": 50,
+            "every": 3,
+            "extra": 0.3,
+            "line": "The sun beam sears the King"
+          }
+        },
+        "adds": {
+          "spots": [
+            {
+              "x": -9.8,
+              "z": 4.6,
+              "yaw": 1.5707963267948966
+            },
+            {
+              "x": 9.8,
+              "z": 4.6,
+              "yaw": -1.5707963267948966
+            },
+            {
+              "x": -9.8,
+              "z": -4.2,
+              "yaw": 1.5707963267948966
+            },
+            {
+              "x": 9.8,
+              "z": -4.2,
+              "yaw": -1.5707963267948966
+            }
+          ],
+          "push": 0.55,
+          "pairs": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "mode": "shield",
+          "reinforce": 25,
+          "retireAfter": 2.4,
+          "cleared": {
+            "to": "stun",
+            "effect": {
+              "views": [
+                [
+                  "arena.shield",
+                  0
+                ]
+              ],
+              "mem": {
+                "raise": 0,
+                "kneel": 1
+              },
+              "line": "The dome breaks — the King is stunned"
+            }
+          }
+        },
+        "victory": {
+          "views": [
+            [
+              "arena.shield",
+              0
+            ],
+            [
+              "strike.arc.off"
+            ],
+            [
+              "arena.shaft",
+              0,
+              0.35
+            ],
+            [
+              "arena.shaft",
+              1,
+              1.4
+            ]
+          ],
+          "crumble": 1.6,
+          "drain": 0.3
+        },
+        "views": [
+          "arena.lid.open",
+          "arena.shaft",
+          "arena.fx.hide",
+          "arena.shield",
+          "arena.shield.at",
+          "adds.spot",
+          "boss.glow",
+          "strike.arc",
+          "strike.arc.off",
+          "hazard.ring",
+          "hazard.ring.off",
+          "hazard.ring.tell",
+          "hazard.pour.off",
+          "hazard.pour.tell",
+          "hazard.pour.fall",
+          "hazard.sweep",
+          "hazard.sweep.off",
+          "victory.heap"
+        ]
+      }
+    },
+    "body": "nalati.golden-king",
+    "identity": "runtime",
+    "add": {
+      "kind": "balbal",
+      "variant": "warrior",
+      "memory": {
+        "floorY": 140,
+        "emergeT": 1.9,
+        "minX": -49.1,
+        "maxX": -30.9,
+        "minZ": -104.1,
+        "maxZ": -85.9
+      }
+    },
+    "damageTag": "boss.golden-king",
+    "maxZ": -86.1,
+    "reward": [
+      -40,
+      140.97,
+      -103.3
+    ],
+    "respawn": [
+      -40,
+      140,
+      -79.5
+    ],
+    "yaw": 0,
+    "presentation": {
+      "reach": 3,
+      "ringMax": 17,
+      "beamRadius": 6.2
+    },
+    "cuts": [
+      {
+        "id": "strike.golden-king.cut0",
+        "shape": {
+          "kind": "arc",
+          "radius": 3,
+          "halfAngle": 0.95
+        },
+        "windup": 0.589,
+        "active": 0,
+        "recover": 0,
+        "cooldown": 0,
+        "range": null,
+        "damage": 14,
+        "tags": [],
+        "weight": {
+          "kind": "constant",
+          "value": 1
+        },
+        "units": "world"
+      },
+      {
+        "id": "strike.golden-king.cut1",
+        "shape": {
+          "kind": "arc",
+          "radius": 3,
+          "halfAngle": 0.95
+        },
+        "windup": 0.589,
+        "active": 0,
+        "recover": 0,
+        "cooldown": 0,
+        "range": null,
+        "damage": 14,
+        "tags": [],
+        "weight": {
+          "kind": "constant",
+          "value": 1
+        },
+        "units": "world"
+      },
+      {
+        "id": "strike.golden-king.cut2",
+        "shape": {
+          "kind": "arc",
+          "radius": 3.3,
+          "halfAngle": 1.35
+        },
+        "windup": 0.589,
+        "active": 0,
+        "recover": 0,
+        "cooldown": 0,
+        "range": null,
+        "damage": 22,
+        "tags": [],
+        "weight": {
+          "kind": "constant",
+          "value": 1
+        },
+        "units": "world"
+      },
+      {
+        "id": "strike.golden-king.cut3",
+        "shape": {
+          "kind": "arc",
+          "radius": 3.3,
+          "halfAngle": 1.35
+        },
+        "windup": 0.589,
+        "active": 0,
+        "recover": 0,
+        "cooldown": 0,
+        "range": null,
+        "damage": 22,
+        "tags": [],
+        "weight": {
+          "kind": "constant",
+          "value": 1
+        },
+        "units": "world"
+      }
+    ],
+    "hazards": {
+      "sunburst": {
+        "id": "strike.golden-king.sunburst",
+        "shape": {
+          "kind": "ring",
+          "inner": -0.5,
+          "outer": 0.5
+        },
+        "windup": 0,
+        "active": 0,
+        "recover": 0,
+        "cooldown": 0,
+        "range": null,
+        "damage": 25,
+        "tags": [
+          "cover.exempt"
+        ],
+        "weight": {
+          "kind": "constant",
+          "value": 1
+        },
+        "units": "world",
+        "motion": {
+          "speed": 8.5
+        }
+      },
+      "sand": {
+        "id": "strike.golden-king.sand",
+        "shape": {
+          "kind": "point",
+          "radius": 0.55,
+          "exclusive": true
+        },
+        "windup": 1,
+        "active": 0,
+        "recover": 6,
+        "cooldown": 0,
+        "range": null,
+        "damage": 4,
+        "tags": [
+          "cover.exempt"
+        ],
+        "weight": {
+          "kind": "constant",
+          "value": 1
+        },
+        "units": "world"
+      },
+      "beam": {
+        "id": "strike.golden-king.beam",
+        "shape": {
+          "kind": "point",
+          "radius": 1.15,
+          "exclusive": true
+        },
+        "windup": 0,
+        "active": 0,
+        "recover": 0,
+        "cooldown": 1,
+        "range": null,
+        "damage": 15,
+        "tags": [
+          "cover.exempt"
+        ],
+        "weight": {
+          "kind": "constant",
+          "value": 1
+        },
+        "units": "world"
+      }
+    }
+  }
+}

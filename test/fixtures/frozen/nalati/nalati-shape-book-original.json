@@ -1,0 +1,1832 @@
+{
+  "draws": [
+    {
+      "slot": "balbal:0:2977",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 18043980
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 3570,
+        "index": "u32",
+        "indexCount": 10776,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "balbal:1:2977",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 18215604
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 3685,
+        "index": "u32",
+        "indexCount": 11028,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "balbal:0:3112",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 18392376
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 3561,
+        "index": "u32",
+        "indexCount": 10776,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "balbal:0:3114",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 18563676
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 3561,
+        "index": "u32",
+        "indexCount": 10776,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "balbal:1:3160",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 18734976
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 3661,
+        "index": "u32",
+        "indexCount": 11028,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "balbal:1:3162",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 18910884
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 3677,
+        "index": "u32",
+        "indexCount": 11028,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "balbal:0:2983",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 19087368
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 3553,
+        "index": "u32",
+        "indexCount": 10776,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "balbal:1:2986",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 19258380
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 3679,
+        "index": "u32",
+        "indexCount": 11028,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "balbal:0:2989",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 19434936
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 3555,
+        "index": "u32",
+        "indexCount": 10776,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "balbal:1:2992",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 19606020
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 3641,
+        "index": "u32",
+        "indexCount": 11028,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "dungeon:interior",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 19781208
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 112276,
+        "index": "u32",
+        "indexCount": 333948,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "dungeon:lid",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 25158936
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 448,
+        "index": "u32",
+        "indexCount": 1464,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "dungeon:statue:0",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 25180920
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 9288,
+        "index": "u32",
+        "indexCount": 10776,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "dungeon:statue:1",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 25558392
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 9326,
+        "index": "u32",
+        "indexCount": 11028,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "dungeon:statue:2",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 25938240
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 9288,
+        "index": "u32",
+        "indexCount": 10776,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "dungeon:statue:3",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26315712
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 9324,
+        "index": "u32",
+        "indexCount": 11028,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "dungeon:heap",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26695488
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 1772,
+        "index": "u32",
+        "indexCount": 3060,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "dungeon:sand",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26771520
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "light",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 1681,
+        "index": "u16",
+        "indexCount": 9600,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:shaft:0",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26904056
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 50,
+        "index": "u16",
+        "indexCount": 144,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:shaft:1",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26906232
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 50,
+        "index": "u16",
+        "indexCount": 144,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:flames",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26908408
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 120,
+        "index": "u16",
+        "indexCount": 288,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:ring",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26913400
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 258,
+        "index": "u16",
+        "indexCount": 768,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:stream",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26924728
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 26,
+        "index": "u16",
+        "indexCount": 72,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:tell",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26925848
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 4,
+        "index": "u16",
+        "indexCount": 6,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:beam",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26926000
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 38,
+        "index": "u16",
+        "indexCount": 108,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:line",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26927648
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 130,
+        "index": "u16",
+        "indexCount": 384,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:dome",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26933344
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 561,
+        "index": "u16",
+        "indexCount": 2976,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:arc",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26963200
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 34,
+        "index": "u16",
+        "indexCount": 96,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dungeon:seal",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26964672
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ]
+        ],
+        "count": 4,
+        "index": "u16",
+        "indexCount": 6,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "goat",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26964824
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 282,
+        "index": "u32",
+        "indexCount": 1188,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "rider",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 26979728
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 485,
+        "index": "u32",
+        "indexCount": 1584,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "trophy:aqbars",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 27003524
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 201,
+        "index": "u32",
+        "indexCount": 636,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "trophy:kokbori",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 27013304
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 126,
+        "index": "u32",
+        "indexCount": 636,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "trophy:qyran",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 27020384
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 114,
+        "index": "u32",
+        "indexCount": 600,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "trophy:qara-batyr",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 27026888
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 188,
+        "index": "u32",
+        "indexCount": 504,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "trophy:argymaq",
+      "channels": [],
+      "lane": {
+        "url": "/assets/nalati/baked/places.bin",
+        "offset": 27035672
+      },
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 78,
+        "index": "u32",
+        "indexCount": 216,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "ghost-rider",
+      "channels": [],
+      "file": "models/shapes/paint-0.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 1114,
+        "index": "u32",
+        "indexCount": 6060,
+        "box": false,
+        "expand": true
+      }
+    },
+    {
+      "slot": "ghost-captain",
+      "channels": [],
+      "file": "models/shapes/paint-1.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 1192,
+        "index": "u32",
+        "indexCount": 6210,
+        "box": false,
+        "expand": true
+      }
+    },
+    {
+      "slot": "shepherd-body",
+      "channels": [],
+      "file": "models/shapes/paint-2.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 1640,
+        "index": "u32",
+        "indexCount": 7848,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "shepherd-arm",
+      "channels": [],
+      "file": "models/shapes/paint-3.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 181,
+        "index": "u32",
+        "indexCount": 780,
+        "box": true,
+        "expand": true
+      }
+    },
+    {
+      "slot": "sign-labels:roads",
+      "channels": [],
+      "file": "models/shapes/paint-4.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 128,
+        "index": "u16",
+        "indexCount": 192,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "sign-labels:specimen",
+      "channels": [],
+      "file": "models/shapes/paint-5.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 24,
+        "index": "u16",
+        "indexCount": 36,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "glacier-snout:world",
+      "channels": [],
+      "file": "models/shapes/paint-6.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 95,
+        "index": "u16",
+        "indexCount": 432,
+        "box": false,
+        "expand": false
+      }
+    },
+    {
+      "slot": "glacier-snout:specimen",
+      "channels": [],
+      "file": "models/shapes/paint-7.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 95,
+        "index": "u16",
+        "indexCount": 432,
+        "box": true,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dressing:phone:boulder",
+      "channels": [],
+      "file": "models/shapes/paint-8.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 274,
+        "index": "u16",
+        "indexCount": 960,
+        "box": true,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dressing:phone:boulder-tall",
+      "channels": [],
+      "file": "models/shapes/paint-9.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 265,
+        "index": "u16",
+        "indexCount": 960,
+        "box": true,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dressing:phone:slab",
+      "channels": [],
+      "file": "models/shapes/paint-10.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 319,
+        "index": "u16",
+        "indexCount": 960,
+        "box": true,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dressing:desktop:boulder",
+      "channels": [],
+      "file": "models/shapes/paint-11.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 555,
+        "index": "u16",
+        "indexCount": 2400,
+        "box": true,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dressing:desktop:boulder-tall",
+      "channels": [],
+      "file": "models/shapes/paint-12.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 553,
+        "index": "u16",
+        "indexCount": 2400,
+        "box": true,
+        "expand": false
+      }
+    },
+    {
+      "slot": "dressing:desktop:slab",
+      "channels": [],
+      "file": "models/shapes/paint-13.bin",
+      "baked": {
+        "attrs": [
+          [
+            "position",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "normal",
+            "f32",
+            3,
+            false
+          ],
+          [
+            "uv",
+            "f32",
+            2,
+            false
+          ],
+          [
+            "color",
+            "f32",
+            3,
+            false
+          ]
+        ],
+        "count": 652,
+        "index": "u16",
+        "indexCount": 2400,
+        "box": true,
+        "expand": false
+      }
+    }
+  ],
+  "sources": [
+    {
+      "name": "models/shapes/paint-0.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-0.bin"
+    },
+    {
+      "name": "models/shapes/paint-1.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-1.bin"
+    },
+    {
+      "name": "models/shapes/paint-2.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-2.bin"
+    },
+    {
+      "name": "models/shapes/paint-3.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-3.bin"
+    },
+    {
+      "name": "models/shapes/paint-4.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-4.bin"
+    },
+    {
+      "name": "models/shapes/paint-5.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-5.bin"
+    },
+    {
+      "name": "models/shapes/paint-6.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-6.bin"
+    },
+    {
+      "name": "models/shapes/paint-7.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-7.bin"
+    },
+    {
+      "name": "models/shapes/paint-8.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-8.bin"
+    },
+    {
+      "name": "models/shapes/paint-9.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-9.bin"
+    },
+    {
+      "name": "models/shapes/paint-10.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-10.bin"
+    },
+    {
+      "name": "models/shapes/paint-11.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-11.bin"
+    },
+    {
+      "name": "models/shapes/paint-12.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-12.bin"
+    },
+    {
+      "name": "models/shapes/paint-13.bin",
+      "kind": "bin",
+      "source": "data/poi-shape-13.bin"
+    }
+  ]
+}

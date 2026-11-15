@@ -1,0 +1,77 @@
+[
+  {
+    "path": "src/shards/nalati-grasslands/boot/geography.generated.json",
+    "bytes": 62876,
+    "sha256": "8d54903f9051f16dba04cb154315bb24f2a277e3d26f7ae4650f9b0d071bcdec"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/boot/geography.generated.d.json.ts",
+    "bytes": 117,
+    "sha256": "a9e5650097097c587bc67d02a23d570147419e22332a7dba02313ffeee699b4d"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/populationField.generated.json",
+    "bytes": 21630,
+    "sha256": "2379d0bd0db07bd20f2e63878639a59606b4df2a9621092f03d2ac8e8001a5f9"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-pond.bin",
+    "bytes": 5476,
+    "sha256": "57919bb109a7fbe95afce2f9f49f576d4cc3d0c16af690937cac6f7a4d892f04"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-wet.bin",
+    "bytes": 622,
+    "sha256": "262d9218a0f70b8dc314063ac367944083d8e7f57543c19759193b321e2302d7"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-forest.bin",
+    "bytes": 14715,
+    "sha256": "827334eb0dc4171f3f2d81f3a4268568b52f0a7ea2b71f16de929bae3e80d0fe"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-red.bin",
+    "bytes": 194475,
+    "sha256": "65a79815c367e6f7a4bc1c5c51ea413b0e4d1158aae825535a98cdf6646a8fc1"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-green.bin",
+    "bytes": 192024,
+    "sha256": "d3b0dd4556e327e81d46f16a11b074c637474d1cb67917a8884ec36c23303b83"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-blue.bin",
+    "bytes": 194971,
+    "sha256": "51a765e699e9030ff6234a9096c003a369ce1f43c99eac499945a6af040c43ad"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-gravel.bin",
+    "bytes": 42570,
+    "sha256": "73b9d2ab9a3679093d7349442d764e40b3f9b47f31eea581e49aafe02a61d45c"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-rock.bin",
+    "bytes": 41754,
+    "sha256": "3b85722fa57e338466b84443e57100559e2de14bc9d55b8868af0a234d3bcb1c"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-ice.bin",
+    "bytes": 38966,
+    "sha256": "0aea784f254f0166ca74f310e3667ac00d7a1ab13444cf9c9086709582c61c96"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-mapRed.bin",
+    "bytes": 90442,
+    "sha256": "301b887756dbdcd81dec3b3aab1f709e295e034cfaee01440603a8e0df850fe5"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-mapGreen.bin",
+    "bytes": 88352,
+    "sha256": "1641afc53f05e073f782ed32f6a1c4f0c1fb49cec34e01b745538e3713949352"
+  },
+  {
+    "path": "src/shards/nalati-grasslands/data/geography-mapBlue.bin",
+    "bytes": 91252,
+    "sha256": "ad6844f8ccad8bb9c673f4c82646b91d0ba26fbbfcdd82ddbdbef208c1937196"
+  }
+]
