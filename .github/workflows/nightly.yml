@@ -6,6 +6,10 @@ on:
     - cron: '17 7 * * *'
   workflow_dispatch:
     inputs:
+      suite_only:
+        description: Diagnose both suite partitions only (no head or release qualification)
+        type: boolean
+        default: false
       ring3_only:
         description: Diagnose the Ring 3 sender only (does not qualify Ring 2 or a release)
         type: boolean
@@ -21,7 +25,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: nightly-${{ github.ref }}
+  group: nightly-${{ github.ref }}${{ inputs.suite_only && '-suite-diagnostic' || '' }}
   cancel-in-progress: false
 jobs:
   ring3:
@@ -54,6 +58,10 @@ jobs:
         run: echo "matrix=$(node scripts/nightly.ts plan)" >> "$GITHUB_OUTPUT"
   tests:
     needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [0, 1]
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -77,16 +85,18 @@ jobs:
       - run: pnpm gen:inputs
       - run: node scripts/nightly.ts tests
         env:
+          NIGHTLY_TEST_GROUP: ${{ matrix.group }}
           WS_FULL_SUITE: '1'
           NET_FUZZ_SEEDS: ${{ github.run_id }}
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: nightly-tests
-          path: tmp/nightly/reports/tests.json
+          name: nightly-tests-${{ matrix.group }}
+          path: tmp/nightly/reports/tests-*.json
           if-no-files-found: error
           retention-days: 7
   heads:
+    if: ${{ !inputs.suite_only }}
     needs: plan
     strategy:
       fail-fast: false
@@ -145,7 +155,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   report:
-    if: always() && !inputs.ring3_only
+    if: always() && !inputs.ring3_only && !inputs.suite_only
     needs: [plan, tests, heads]
     runs-on: ubuntu-24.04
     timeout-minutes: 5

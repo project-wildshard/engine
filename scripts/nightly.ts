@@ -2,7 +2,7 @@
 import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readdirSync, writeFileSync} from 'node:fs';
 import {join, relative, resolve} from 'node:path';
-import {browsers, groups, markdown, partition, plan, read, requirePublishedGreen, verdict, type Receipt, type TestsReport, type Verdict} from './nightly-model.ts';
+import {browsers, groups, markdown, partition, plan, read, requirePublishedGreen, testGroups, verdict, type Receipt, type TestsReport, type Verdict} from './nightly-model.ts';
 
 interface VitestResult {numTotalTests?: number; testResults?: {name: string; status: string; assertionResults?: {status: string}[]}[]}
 
@@ -13,24 +13,29 @@ if (command === 'plan') {
   console.log(JSON.stringify({include: browsers.flatMap(browser => Array.from({length: groups}, (_, group) => ({browser, group,
     os: browser === 'webkit' ? 'macos-15' : 'ubuntu-24.04', heads: partition(expected.heads, group).map(row => row.slug).join(',')})))}));
 } else if (command === 'tests') {
+  const group = Number(process.env.NIGHTLY_TEST_GROUP ?? '-1');
+  if (!Number.isInteger(group) || group < 0 || group >= testGroups) throw new Error('Set NIGHTLY_TEST_GROUP to 0 or 1; the verdict requires both suite partitions');
   mkdirSync(out, {recursive: true});
-  const json = join(out, 'vitest.json');
+  const json = join(out, `vitest-${group}.json`);
   const kit = spawnSync('pnpm', ['test:kit'], {stdio: 'inherit', timeout: 120000});
-  // Run the entire admitted suite once, including every slow Ring 2 entry.
+  // The two jobs cover the entire admitted suite once, including every slow
+  // Ring 2 entry. Keep each job's existing 25-minute process limit.
   const child = spawnSync('python3', ['scripts/heavy-lane.py', 'full-test', '--', process.execPath, 'scripts/vitest-tmp.ts', 'run',
-    '--maxWorkers=2', '--reporter=default', '--reporter=json', `--outputFile.json=${json}`],
+    '--maxWorkers=2', `--shard=${group + 1}/${testGroups}`, '--reporter=default', '--reporter=json', `--outputFile.json=${json}`],
   {stdio: 'inherit', timeout: 1500000, env: {...process.env, WS_FULL_SUITE: '1', WILDSHARD_RING: '2'}});
   const raw: VitestResult = existsSync(json) ? (read(json) as VitestResult) : {};
   const files = (raw.testResults ?? []).map(file => ({path: relative(process.cwd(), file.name).replaceAll('\\', '/'),
     ok: file.status !== 'failed' && file.assertionResults?.every(row => row.status !== 'failed') === true,
     assertions: file.assertionResults?.filter(row => row.status === 'passed').length ?? 0,
     skipped: file.assertionResults?.filter(row => row.status !== 'passed' && row.status !== 'failed').length ?? 0}));
-  const report: TestsReport = {...expected, kind: 'tests', exitCode: child.status ?? 1, kitExitCode: kit.status ?? 1, totalTests: raw.numTotalTests ?? 0, files};
-  write('tests.json', report);
-  if (report.exitCode !== 0 || report.kitExitCode !== 0 || expected.tests.some(path => !files.some(row => row.path === path && row.ok && row.assertions > 0 && row.skipped === 0))) process.exitCode = 1;
+  const report: TestsReport = {...expected, kind: 'tests', group, groups: testGroups, exitCode: child.status ?? 1, kitExitCode: kit.status ?? 1, totalTests: raw.numTotalTests ?? 0, files};
+  write(`tests-${group}.json`, report);
+  // Listed journeys in either partition are checked together by report;
+  // a partition must still fail for any ordinary or listed test failure.
+  if (report.exitCode !== 0 || report.kitExitCode !== 0 || report.totalTests < 1 || files.some(file => !file.ok)) process.exitCode = 1;
 } else if (command === 'report') {
   mkdirSync(out, {recursive: true});
-  const receipts = readdirSync(out).filter(name => /^(heads-|tests\.)/u.test(name) && name.endsWith('.json')).map(name => (read(join(out, name)) as Receipt));
+  const receipts = readdirSync(out).filter(name => /^(heads-|tests[-.])/u.test(name) && name.endsWith('.json')).map(name => (read(join(out, name)) as Receipt));
   const jobs = {plan: process.env.NIGHTLY_PLAN_RESULT, tests: process.env.NIGHTLY_TESTS_RESULT, heads: process.env.NIGHTLY_HEADS_RESULT};
   const report = {...verdict(expected, receipts, baseline !== undefined && existsSync(baseline) ? (read(baseline) as Verdict) : undefined, jobs), run: process.env.GITHUB_RUN_ID ?? null};
   write('verdict.json', report);

@@ -7,7 +7,7 @@ import {join, resolve} from 'node:path';
 import {browsers, partition, phases, plan, read, requireBuild, requireGreen, requireLatest, type HeadsReport, type Plan, type TestsReport, type Verdict} from './nightly-model.ts';
 
 interface Execution {status: number | null; report: Verdict; summary: string}
-interface Fixture {root: string; heads: HeadsReport[]; suite: TestsReport; expected: Plan;
+interface Fixture {root: string; heads: HeadsReport[]; suite: TestsReport; suites: TestsReport[]; expected: Plan;
   execute: (baseline?: string, env?: NodeJS.ProcessEnv) => Execution; write: (path: string, value: unknown) => void}
 
 const cli = resolve('scripts/nightly.ts'), tagger = resolve('scripts/nightly-tag.mjs');
@@ -23,19 +23,23 @@ function fixture(run: (context: Fixture) => void): void {
     const expected = plan(root);
     const heads: HeadsReport[] = browsers.flatMap(browser => Array.from({length: 4}, (_, group) => ({...expected, kind: 'heads' as const, browser, group,
       results: partition(expected.heads, group).map(head => ({slug: head.slug, hash: head.hash, phases: phases.map(name => ({name, ok: true}))}))})));
-    const suite: TestsReport = {...expected, kind: 'tests', exitCode: 0, kitExitCode: 0, totalTests: 1, files: [{path: 'test/journey.test.ts', ok: true, assertions: 1, skipped: 0}]};
+    const suite: TestsReport = {...expected, kind: 'tests', group: 0, groups: 2, exitCode: 0, kitExitCode: 0, totalTests: 1, files: [{path: 'test/journey.test.ts', ok: true, assertions: 1, skipped: 0}]};
+    const suites: TestsReport[] = [suite, {...suite, group: 1, files: [{path: 'test/ordinary.test.ts', ok: true, assertions: 1, skipped: 0}]}];
     const execute = (baseline?: string, env: NodeJS.ProcessEnv = {}): Execution => {
+      rmSync(join(root, 'reports'), {recursive: true, force: true});
       for (const report of heads) write(`reports/heads-${report.browser}-${report.group}.json`, report);
-      write('reports/tests.json', suite);
+      for (const [index, report] of suites.entries()) write(`reports/tests-${index}.json`, report);
       const child = spawnSync(process.execPath, [cli, 'report', join(root, 'reports'), ...(baseline === undefined ? [] : [baseline])], {cwd: root, encoding: 'utf8', env: {...process.env, ...env}});
       return {status: child.status, report: read(join(root, 'reports/verdict.json')) as Verdict, summary: readFileSync(join(root, 'reports/summary.md'), 'utf8')};
     };
-    run({root, heads, suite, expected, execute, write});
+    run({root, heads, suite, suites, expected, execute, write});
   } finally {rmSync(root, {recursive: true, force: true});}
 }
 
 await test('complete real report files admit the exact commit, but never another commit or repeated row', () => fixture(({expected, execute}) => {
   const result = execute(); assert.equal(result.status, 0); requireGreen(result.report, expected);
+  assert.throws(() => requireGreen({...result.report, version: 1}, expected), /J167/u);
+  assert.throws(() => requireGreen({...result.report, tests: result.report.tests.slice(0, 1)}, expected), /J167/u);
   requireBuild(`${expected.sha.slice(0, 7)}-proof`, expected);
   assert.throws(() => requireBuild('0000000-stale', expected), /stale/u);
   assert.throws(() => requireGreen(result.report, {...expected, sha: 'wrong'}), /J167/u);
@@ -64,6 +68,15 @@ await test('ordinary suite skips retain existing policy while listed journeys mu
   suite.files.push({path: 'test/ordinary-platform.test.ts', ok: true, assertions: 0, skipped: 1});
   assert.equal(execute().status, 0);
 }));
+await test('missing, duplicate, malformed or overlapping suite partitions hold an otherwise green night', () => {
+  const mutations: ((suites: TestsReport[]) => void)[] = [suites => {suites.pop();}, suites => {suites[1].group = 0;}, suites => {suites[1].groups = 1;}, suites => {suites[1].files = [...suites[0].files];}, suites => {suites[1].files = [];}];
+  for (const mutate of mutations) fixture(({suites, execute, expected}) => {
+    mutate(suites);
+    const result = execute();
+    assert.equal(result.status, 1);
+    assert.throws(() => requireGreen(result.report, expected), /J167/u);
+  });
+});
 await test('an empty artifact directory never produces green', () => fixture(({root}) => {
   mkdirSync(join(root, 'empty'));
   const result = spawnSync(process.execPath, [cli, 'report', join(root, 'empty')], {cwd: root, encoding: 'utf8'});
@@ -77,7 +90,7 @@ await test('a failed Actions job holds the tag even if every uploaded phase pass
 }));
 await test('prior nightly failures are compared by head hash, browser and phase', () => fixture(({heads, execute, root, write}) => {
   heads[0].results[0].phases[0].ok = false;
-  const first = execute(); write('previous.json', first.report);
+  const first = execute(); write('previous.json', {...first.report, version: 1});
   heads[0].results[0].phases[0].ok = true; heads[1].results[0].phases[1].ok = false;
   const next = execute(join(root, 'previous.json'));
   assert.equal(next.report.resolved.length, 1); assert.equal(next.report.newFailures.length, 1);

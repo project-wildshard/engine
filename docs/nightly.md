@@ -28,10 +28,17 @@ releases (J184).
 
 ## Work and evidence
 
-- One Linux job installs all pins, generates inputs, runs the kit checks
-  and the full admitted Vitest suite, including the slow Ring 2 list.
+- Two Linux jobs install all pins, generate inputs, run the kit checks
+  and partition the full admitted Vitest suite with `--shard=1/2` and
+  `--shard=2/2`, including the slow Ring 2 list.
   Every listed file must actually execute at least one passing assertion.
-  Missing files, skipped assertions and a nonzero suite exit are red.
+  Both partition receipts are required; a missing or duplicate partition,
+  overlapping test files, skipped listed assertions or a nonzero exit is
+  red. Verdict version 2 includes each partition's file/assertion counts;
+  old verdicts remain usable only as failure-diff baselines. Each process
+  keeps its existing 25-minute limit (jobs: 35 minutes including setup).
+  A manual `suite_only=true` dispatch diagnoses just these jobs, produces
+  no qualification verdict and uses its own concurrency group.
 - Eight jobs split the heads into four balanced groups for Chromium
   on `ubuntu-24.04` and WebKit on `macos-15`. At most four jobs run at once.
   Each builds the full catalogue, then cold-cooks its heads through the

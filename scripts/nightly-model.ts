@@ -9,15 +9,17 @@ export interface Phase {name: string; ok: boolean; error?: string; ms?: number; 
 export interface HeadResult extends Head {phases: Phase[]}
 export interface HeadsReport extends Plan {kind: 'heads'; browser: string; group: number; results: HeadResult[]}
 export interface TestFile {path: string; ok: boolean; assertions: number; skipped: number}
-export interface TestsReport extends Plan {kind: 'tests'; exitCode: number; kitExitCode: number; totalTests: number; files: TestFile[]}
+export interface TestsReport extends Plan {kind: 'tests'; group: number; groups: number; exitCode: number; kitExitCode: number; totalTests: number; files: TestFile[]}
 export type Receipt = HeadsReport | TestsReport;
 export interface Failure {key: string; error: string}
 export interface Row extends Head {browser: string; phase: string; ok: boolean; error?: string}
 export interface Verdict {version: number; sha: string; pins: string; testList: string; ok: boolean; tag: string; rows: Row[]; failures: Failure[];
+  tests: {group: number; ok: boolean; files: number; assertions: number}[];
   run?: string | null; baseline: {sha: string; run: string | null} | null; newFailures: string[]; resolved: string[]}
 export const browsers = ['chromium', 'webkit'];
 export const phases = ['cook', 'boot', 'hover', 'draw', 'explorer'];
 export const groups = 4;
+export const testGroups = 2;
 export const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
 
@@ -30,7 +32,7 @@ export function plan(root = process.cwd()): Plan {
   if (shards.some(row => !/^[a-z0-9-]+$/u.test(row.slug) || !/^[a-f0-9]{64}$/u.test(row.hash))) throw new Error('Unsafe pinned head');
   if (tests.length === 0 || new Set(tests).size !== tests.length) throw new Error('Empty or duplicate Ring 2 list');
   const heads = [...shards].sort((a, b) => a.slug.localeCompare(b.slug));
-  return {version: 1, sha: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
+  return {version: 2, sha: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
     pins: digest(shards), testList: digest(tests), heads, tests};
 }
 
@@ -61,23 +63,31 @@ export function verdict(expected: Plan, reports: Receipt[], previous?: Verdict, 
     }
   }
   const suites = reports.filter((row): row is TestsReport => row.version === expected.version && row.kind === 'tests' && row.sha === expected.sha && row.pins === expected.pins && row.testList === expected.testList);
-  const [suite] = suites;
-  if (suites.length !== 1 || suite === undefined) failures.push({key: 'shared/tests', error: `Expected one suite, got ${suites.length}`});
-  else {
-    if (suite.exitCode !== 0 || suite.kitExitCode !== 0 || suite.totalTests < 1) failures.push({key: 'shared/tests', error: `Vitest exit ${suite.exitCode}, kit exit ${suite.kitExitCode}, ${suite.totalTests} tests`});
+  if (suites.length !== testGroups || suites.some(suite => suite.groups !== testGroups || !Number.isInteger(suite.group) || suite.group < 0 || suite.group >= testGroups)) failures.push({key: 'shared/tests', error: `Expected exactly ${testGroups} suite partitions, got ${suites.length}`});
+  const tests: Verdict['tests'] = [];
+  for (let group = 0; group < testGroups; group++) {
+    const matching = suites.filter(suite => suite.group === group), suite = matching[0];
+    const assertions = suite?.files.reduce((sum, file) => sum + file.assertions, 0) ?? 0;
+    tests.push({group, ok: matching.length === 1 && suite?.groups === testGroups && suite.exitCode === 0 && suite.kitExitCode === 0 && suite.totalTests > 0 && assertions > 0 && suite.files.length > 0 && suite.files.every(file => file.ok), files: suite?.files.length ?? 0, assertions});
+    if (matching.length !== 1 || suite === undefined) failures.push({key: `shared/tests/${group}`, error: `Expected one partition receipt, got ${matching.length}`});
+    else if (suite.exitCode !== 0 || suite.kitExitCode !== 0 || suite.totalTests < 1 || suite.files.length === 0 || assertions < 1) failures.push({key: `shared/tests/${group}`, error: `Vitest exit ${suite.exitCode}, kit exit ${suite.kitExitCode}, ${suite.totalTests} tests, ${assertions} passing assertions`});
+  }
+  const files = suites.flatMap(suite => suite.files);
+  if (new Set(files.map(file => file.path)).size !== files.length) failures.push({key: 'shared/tests/duplicates', error: 'A test file appeared in more than one suite partition'});
+  if (suites.length > 0) {
     for (const path of expected.tests) {
-      const executions = suite.files.filter(row => row.path === path);
+      const executions = files.filter(row => row.path === path);
       const [run] = executions;
       if (executions.length !== 1 || run === undefined || !run.ok || run.assertions < 1 || run.skipped !== 0) failures.push({key: `shared/${path}`, error: 'Listed test missing, skipped or failed'});
     }
-    for (const file of suite.files.filter(row => !row.ok)) {
+    for (const file of files.filter(row => !row.ok)) {
       if (!failures.some(row => row.key === `shared/${file.path}`)) failures.push({key: `shared/${file.path}`, error: 'Suite failure outside the slow-test list'});
     }
   }
-  const baseline = previous?.version === 1 && Array.isArray(previous.failures) ? previous : undefined;
+  const baseline = (previous?.version === 1 || previous?.version === 2) && Array.isArray(previous.failures) ? previous : undefined;
   const old = new Set(baseline?.failures.map(row => row.key)), current = new Set(failures.map(row => row.key));
-  return {version: 1, sha: expected.sha, pins: expected.pins, testList: expected.testList,
-    ok: failures.length === 0, tag: failures.length === 0 ? 'eligible' : 'HOLD', rows, failures,
+  return {version: expected.version, sha: expected.sha, pins: expected.pins, testList: expected.testList,
+    ok: failures.length === 0, tag: failures.length === 0 ? 'eligible' : 'HOLD', rows, tests, failures,
     baseline: baseline === undefined ? null : {sha: baseline.sha, run: baseline.run ?? null},
     newFailures: failures.filter(row => !old.has(row.key)).map(row => row.key),
     resolved: [...old].filter(key => !current.has(key))};
@@ -93,6 +103,8 @@ export function markdown(report: Verdict): string {
     const rows = report.rows.filter(row => row.browser === browser && row.slug === slug);
     lines.push(`| ${slug} @ ${rows[0]?.hash.slice(0, 12)} | ${browser} | ${phases.map(phase => rows.find(row => row.phase === phase)?.ok ? 'pass' : '**RED**').join(' | ')} |`);
   }
+  lines.push('', '## Shared suite', '', '| Partition | Files | Passing assertions | Verdict |', '| --- | --- | --- | --- |',
+    ...report.tests.map(suite => `| ${suite.group + 1}/${testGroups} | ${suite.files} | ${suite.assertions} | ${suite.ok ? 'pass' : '**RED**'} |`));
   lines.push('', '## Failures', '');
   if (report.failures.length === 0) lines.push('None.');
   for (const failure of report.failures) lines.push(`- ${report.newFailures.includes(failure.key) ? 'NEW' : 'existing'} \`${failure.key}\`: ${failure.error.replaceAll(/[\r\n|<>]/gu, ' ').slice(0, 1500)}`);
@@ -103,9 +115,11 @@ export function markdown(report: Verdict): string {
 export function requireGreen(report: Verdict, expected: Plan): void {
   const keys = expected.heads.flatMap(head => browsers.flatMap(browser => phases.map(phase => `${browser}/${head.slug}@${head.hash}/${phase}`)));
   const actual = report.rows?.map(row => `${row.browser}/${row.slug}@${row.hash}/${row.phase}`) ?? [];
+  const suites = report.tests ?? [];
   if (report.version !== expected.version || !report.ok || report.tag !== 'eligible' || report.sha !== expected.sha || report.pins !== expected.pins || report.testList !== expected.testList ||
     !Array.isArray(report.failures) || report.failures.length > 0 || actual.length !== keys.length || new Set(actual).size !== keys.length ||
-    keys.some(key => !actual.includes(key)) || report.rows.some(row => !row.ok)) {
+    keys.some(key => !actual.includes(key)) || report.rows.some(row => !row.ok) || suites.length !== testGroups ||
+    new Set(suites.map(suite => suite.group)).size !== testGroups || suites.some(suite => !Number.isInteger(suite.group) || suite.group < 0 || suite.group >= testGroups || !suite.ok || suite.files < 1 || suite.assertions < 1)) {
     throw new Error('J167: complete green nightly for this exact commit and pins required; tag held');
   }
 }
