@@ -13,3 +13,6 @@ reason recorded in `test/engine-lift-disposition.json`.
 - DRIFT-NAMED: `graph-scene-author-ports` was ported to shard-driftwood
   (`test/driftwood-graph-scene-declarations.test.ts`); engine's copy and
   its fixture `graph-scene-author-observation.ts` are deleted.
+- PLOTS-TOOL: `open-plots-capture` and `open-plots-config` were ported to
+  shard-open-plots (same names); engine's copies imported modules that
+  left engine and are deleted.

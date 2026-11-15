@@ -173,8 +173,6 @@
   "test/no-binary-json.test.ts",
   "test/no-generated-import.test.ts",
   "test/no-shard-runtime.test.ts",
-  "test/open-plots-capture.test.ts",
-  "test/open-plots-config.test.ts",
   "test/original-script-order.test.ts",
   "test/output-runtime.test.ts",
   "test/packed-specimen-files.test.ts",

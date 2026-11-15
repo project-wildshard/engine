@@ -8914,5 +8914,41 @@
     "sourceRevision": "b2138ab34b3d12319c1b788fa9ac3375ac42b73a",
     "sourceBlob": "f341646879d2400c41136f9853a45e97dd47baad",
     "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "shard-open-plots",
+    "file": "test/open-plots-capture.test.ts",
+    "outcome": "migrated",
+    "target": "test/open-plots-capture.test.ts",
+    "decision": "Ported (CI21 PLOTS-TOOL): the dome capture CLI (scripts/open-plots/) is shard-open-plots' author tool; its test lives there (8c42365). The modules this copy imported left engine.",
+    "originalTests": [
+      "plot selection preserves caller order and refuses ambiguous, missing and unsafe identities",
+      "defect view selection preserves original cameras and cannot pass a partial board",
+      "late neighbour admission must drain before an image, with crossing and ring guards intact",
+      "the accepted capture snapshot is the same grid that passed the pending gate",
+      "board admission cannot turn a partial, duplicate, failed or reordered capture into a sheet",
+      "plot and view labels remain literal text on the board",
+      "ring junction selection binds all four real neighbours and the served pitch",
+      "all eight manifests are admitted in requested order with exact source hashes",
+      "the independent board maker binds real image bytes and refuses changed captures"
+    ],
+    "sourceRevision": "8a01811e90b6e802242a50f05a554b1aacfacb87",
+    "sourceBlob": "2b376b39ac13b65a4606ac13a76ddd2ba88a3632",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "shard-open-plots",
+    "file": "test/open-plots-config.test.ts",
+    "outcome": "migrated",
+    "target": "test/open-plots-config.test.ts",
+    "decision": "Ported (CI21 PLOTS-TOOL): the open-plots entry config is shard-open-plots' source; its test lives there. Engine's copy imported src/shards/open-plots, which left engine.",
+    "originalTests": [
+      "the open-plots entry declares one product per idea",
+      "Night Market road B lowers only its layout curtain and keeps road A posters",
+      "all plot poster faces use the unlit map or baked mean without fog"
+    ],
+    "sourceRevision": "8a01811e90b6e802242a50f05a554b1aacfacb87",
+    "sourceBlob": "5d1509154a08e0c725ab7195482a473b9cad5fc9",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
   }
 ]

@@ -342,8 +342,6 @@
     "no-base64.test.ts",
     "no-generated-import.test.ts",
     "no-shard-runtime.test.ts",
-    "open-plots-capture.test.ts",
-    "open-plots-config.test.ts",
     "original-script-order.test.ts",
     "output-runtime.test.ts",
     "packed-specimen-files.test.ts",
