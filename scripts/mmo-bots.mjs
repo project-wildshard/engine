@@ -2,6 +2,7 @@
 // MMO-PLAN MP0.4: real-socket bots from this Mac (J202), against an isolated production-shaped replica or the staging socket.
 // Never production (J205): there is no flag for it, and the bots refuse any socket but loopback and staging.
 //   node scripts/mmo-bots.mjs replica [--bots 32] [--seconds 120] [--seats 32] [--workers 4] [--cells driftwood-isle] [--database <url>]
+//   node scripts/mmo-bots.mjs replica --spread --cells driftwood-isle,nalati-grasslands   (MP1.7: local cell distribution)
 //   node scripts/mmo-bots.mjs replica --remote wildshard [--cpus 9-13] ...   (MP1.2: the replica on the box's cores, bots on this Mac)
 //   node scripts/mmo-bots.mjs replica [--remote wildshard] --server-from <main commit> ...   (MP1.2: that commit's server code)
 //   node scripts/mmo-bots.mjs replica --remote wildshard-agent --bots-on-host [--bot-cpus 14-15] ...   (MP1.2: bots on the box too)
@@ -49,7 +50,8 @@ const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, 
   cells: { type: 'string', default: 'driftwood-isle' }, database: { type: 'string', default: 'memory:' }, keep: { type: 'boolean', default: false },
   remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' },
   'bots-on-host': { type: 'boolean', default: false }, 'bot-cpus': { type: 'string', default: '14-15' }, tailnet: { type: 'boolean', default: false },
-  'work-dir': { type: 'string' } } });
+  'work-dir': { type: 'string' }, spread: { type: 'boolean', default: false } } });
+if (values.spread && (mode !== 'replica' || values.remote !== undefined)) throw new Error('--spread is for a local replica');
 const serverFrom = values['server-from'];
 if (serverFrom !== undefined && (mode !== 'replica' || !/^[0-9a-f]{40}$/u.test(serverFrom))) throw new Error('--server-from is a full commit, for a replica');
 // These reach the host's shell inside the replica's env line: only slugs and whole numbers.
@@ -227,7 +229,7 @@ if (botsOnHost && hostSsh !== null) {
 const code = await new Promise(resolve => {
   const child = botsOnHost && remote !== undefined
     ? spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, `cd ${away}/bots && exec taskset -c ${values['bot-cpus']} node "$HOME/${away}/bots/mmoBots.mjs" ${botArgs.join(' ')} "$HOME/${away}/bots.json" forwarded`], { stdio: ['ignore', 'pipe', 'inherit'] })
-    : spawn(process.execPath, [join(out, 'mmoBots.mjs'), ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own'], { stdio: ['ignore', 'pipe', 'inherit'] });
+    : spawn(process.execPath, [join(out, 'mmoBots.mjs'), ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own', values.spread ? values.cells : ''], { stdio: ['ignore', 'pipe', 'inherit'] });
   botsChild = child;
   child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
   child.on('exit', resolve);
@@ -235,7 +237,7 @@ const code = await new Promise(resolve => {
 if (botsOnHost && hostSsh !== null) writeFileSync(result, hostSsh(`cat ${away}/bots.json`));
 const after = mode === 'staging' ? await health() : null;
 await stopRoom();
-const full = readings.slice(playing).filter(row => row.players === bots);
+const full = readings.slice(playing).filter(row => values.spread ? row.players > 0 : row.players === bots);
 const report = { ...JSON.parse(readFileSync(result, 'utf8')), mode, exit: code, ...(serverFrom === undefined ? {} : { serverFrom }), ...(remote === undefined ? {} : { remote, cpus: values.cpus }),
   ...(botsOnHost ? { botsOnHost, botCpus: values['bot-cpus'] } : {}),
   ...(mode === 'staging' ? { stagingAfter: after } : {}),

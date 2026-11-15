@@ -12,6 +12,20 @@ export const SOCKETS_PER_ADDRESS = 4;
 
 export interface BotTarget { readonly url: URL; readonly loopback: boolean }
 
+/** MP1.7: spread replica seats evenly and count only their own cell's peers. */
+export function botCells(url: string, bots: number, cells: string): readonly { url: string; cell: string | null; peers: number }[] {
+  if (cells === '') return Array.from({ length: bots }, () => ({ url, cell: null, peers: bots - 1 }));
+  botTarget(url, 'forwarded', bots);
+  const names = cells.split(',');
+  if (names.length < 2 || names.length > bots || new Set(names).size !== names.length || names.some(name => !/^[a-z0-9-]+$/u.test(name))) throw new Error('Spread needs distinct cell slugs, at least two and at most the bot count');
+  const targets = Array.from({ length: bots }, (_, index) => names[index % names.length]);
+  return targets.map(cell => {
+    if (cell === undefined) throw new Error('Missing spread cell');
+    const at = new URL(url); at.searchParams.set('chunk', cell);
+    return { url: at.href, cell, peers: targets.filter(target => target === cell).length - 1 };
+  });
+}
+
 /** Throws unless bots may dial `url` with these addresses, this many of them. */
 export function botTarget(url: string, addresses: string, bots: number): BotTarget {
   const parsed = new URL(url);

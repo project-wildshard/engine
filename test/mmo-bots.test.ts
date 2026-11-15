@@ -5,10 +5,19 @@ import { readFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the driver's argument check only.
 import { spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
-import { botTarget, SOCKETS_PER_ADDRESS, STAGING_SOCKET, STAGING_SOCKETS } from './fixtures/dedicated/mmoBotsGuard';
+import { botCells, botTarget, SOCKETS_PER_ADDRESS, STAGING_SOCKET, STAGING_SOCKETS } from './fixtures/dedicated/mmoBotsGuard';
 import { interArrival } from './fixtures/dedicated/mmoBotsStats';
 
 const entry = readFileSync('test/fixtures/dedicated/mmoBotsEntry.ts', 'utf8'), driver = readFileSync('scripts/mmo-bots.mjs', 'utf8');
+
+test('replica cells distribute uneven counts with cell-local peers and refuse unsafe targets', () => {
+  const targets = botCells('ws://127.0.0.1:18796/', 5, 'driftwood-isle,nalati-grasslands');
+  expect(targets.map(row => [row.cell, row.peers])).toEqual([['driftwood-isle',2],['nalati-grasslands',1],['driftwood-isle',2],['nalati-grasslands',1],['driftwood-isle',2]]);
+  expect(targets.map(row => new URL(row.url).searchParams.get('chunk'))).toEqual(targets.map(row => row.cell));
+  expect(botCells('ws://127.0.0.1:18796/', 2, '').map(row => row.peers)).toEqual([1,1]);
+  for (const cells of ['only-one','a,a','a,b,c,d,e,f','a,b;run','a,']) expect(() => botCells('ws://127.0.0.1:18796/',5,cells)).toThrow(/Spread needs/u);
+  expect(() => botCells(STAGING_SOCKET,2,'a,b')).toThrow(/loopback replica only/u);
+});
 
 test('the bots accept loopback and the staging socket only', () => {
   expect(STAGING_SOCKET).toBe('wss://rooms-staging.wildshard.io');
