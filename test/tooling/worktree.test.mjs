@@ -17,6 +17,7 @@ const ENV = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_') && !key.startsWith('HERDR') && !key.startsWith('VITEST'))),
   GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@example.com',
   GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@example.com',
+  WS_LANE_RECEIPTS: resolve('tmp/codex-netlag/worktree-fixture-receipts.log'),
 };
 /** @param {string} cwd @param {string[]} args */
 const git = (cwd, args) => {
