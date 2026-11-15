@@ -641,5 +641,11 @@
  "test/graph-budget.test.ts",
  "test/grid-layout-j305.test.ts",
  "test/grid-format-v047.test.ts",
- "test/nightly-plan.test.ts"
+ "test/nightly-plan.test.ts",
+ "test/cook-follow.test.ts",
+ "test/asset-limits.test.ts",
+ "test/frame-floor-inventory.test.ts",
+ "test/engine-sides.test.ts",
+ "test/standalone-sides.test.ts",
+ "test/control-chunks.test.ts"
 ]

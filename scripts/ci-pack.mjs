@@ -18,7 +18,7 @@
 //   boundaries  engine-boundaries' push half, cook-to-play on Ring 1's products; blocking after TS15's green soak.
 //               It needs the full pins (its Ring 1 cook reads raw tarballs only `pnpm pins` fetches, run 43303094170),
 //               then installs Ring 1's and Chromium itself and builds its own tree, so it needs no other unit: ci.yml
-//               runs it as its own non-blocking job from t=0 (EV3b; after products in job 6 it took that job to 13.7
+//               runs it as its own blocking job from t=0 (TS15/EV3b; after products in job 6 it took that job to 13.7
 //               min). Packed with products, it still follows products into products' job
 // Phases run in order: before pins (up to C units at once), `pnpm pins && pnpm gen:inputs`, the shards ONE AT A TIME,
 // then products and boundaries. A shard has the runner to itself, as its plan assumes: two at once on the 4-vCPU runner
