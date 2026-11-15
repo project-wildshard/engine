@@ -201,7 +201,14 @@ try {
         Reflect.set(window,'__nativeCopy',original);
         navigator.clipboard.writeText=text=>{
           const raw=/** @type {import('../src/shared/engine/boot/timing').BootTiming} */(Reflect.get(window,'__bootTiming')).read();
-          const expected={entries:raw.entries.length,resources:raw.resources.length};
+          const spans=raw.entries.filter(row=>row.end!==null&&row.end>row.start).sort((a,b)=>(b.end??0)-b.start-((a.end??0)-a.start)).slice(0,15);
+          const duration=(/** @type {Readonly<Record<string,unknown>>} */row)=>Number(row.duration??Number(row.responseEnd??0)-Number(row.startTime??0));
+          const resources=[...raw.resources].sort((a,b)=>duration(b)-duration(a)).slice(0,10);
+          const network=raw.resources.filter(row=>Number(row.transferSize)>0),cache=raw.resources.filter(row=>row.transferSize===0&&Number(row.encodedBodySize)>0);
+          const expected={entries:raw.entries.length,resources:raw.resources.length,
+            spans:spans.map(row=>`[${row.realm}] ${(row.start/1000).toFixed(2)} + ${(((row.end??0)-row.start)/1000).toFixed(2)}`),
+            slow:resources.map(row=>`${Number(row.transferSize)>0?row.transferSize:row.encodedBodySize??0} B ${(duration(row)/1000).toFixed(2)} s ${Number(row.transferSize)>0?'network':row.transferSize===0&&Number(row.encodedBodySize)>0?'cache':'unknown'}`),
+            totals:`network ${network.length} / ${network.reduce((sum,row)=>sum+Number(row.transferSize),0)} B; cache ${cache.length} / ${cache.reduce((sum,row)=>sum+Number(row.encodedBodySize),0)} B`};
           const receipt={text,expected,settled:false,success:false};Reflect.set(window,'__copyReceipt',receipt);
           return original(text).then(()=>{receipt.settled=true;receipt.success=true;return undefined;},(/** @type {unknown} */error)=>{receipt.settled=true;throw error;});
         };
@@ -218,7 +225,9 @@ try {
         const expected=receipt.expected,bytes=new TextEncoder().encode(native).byteLength;
         const complete=native.includes(`counts: ${expected.entries} spans (`)&&native.includes(`${expected.resources} resources;`)
           &&native.includes('longest spans (start s + duration s):')&&native.includes('slowest resources (bytes, duration s, source):')
-          &&native.includes('page request-free gaps >0.5 s')&&!native.includes('"entries":');
+          &&native.includes('request-free gaps >0.5 s')&&!native.includes('"entries":')
+          &&expected.spans.every((/** @type {string} */fact)=>native.includes(fact))
+          &&expected.slow.every((/** @type {string} */fact)=>native.includes(fact))&&native.includes(expected.totals);
         return {ok:complete&&bytes<6000&&document.querySelector('.ws-load-copy')?.textContent==='Copied',
           reason:complete?`compact safe report: ${bytes} bytes, ${expected.entries} spans, ${expected.resources} resources`:'missing compact timeline facts'};
       });

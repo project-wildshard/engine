@@ -19,7 +19,12 @@ it('lists every request-free gap over 500 ms after merging overlapping page requ
     {realm:'worker:1',startTime:0,responseEnd:12000},
   ]} as unknown as BootTiming;
   const line=compactBootDiagnostics(timing).timeline.at(-1);
-  expect(line).toBe('page request-free gaps >0.5 s (start+duration s): 0.00+1.00, 8.00+2.00, 11.50+0.50');
+  expect(line).toBe('request-free gaps >0.5 s (page clock, start+duration s): 0+1, 8+2, 11.499+0.501');
+  // The worker's local clock is unrelated; only its measured translation can
+  // fill the 8-to-10 second page-clock gap. Navigation fills the opening gap.
+  const aligned={...timing,navigation:{requestStart:0,responseEnd:1000},resources:[...timing.resources,
+    {realm:'worker:2',startTime:50000,responseEnd:52000,pageStart:8000,pageEnd:10000}]};
+  expect(compactBootDiagnostics(aligned).timeline.at(-1)).toBe('request-free gaps >0.5 s (page clock, start+duration s): 11.499+0.501');
   expect(compactBootDiagnostics(undefined).timeline).toEqual(['timeline (LS1): unavailable']);
 });
 

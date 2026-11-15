@@ -20,3 +20,15 @@ Four regression files pass 52 cases, including 221 spans and 706 resources in a
 complete loading-card report below 6,000 UTF-8 bytes. The test pins the slowest
 work, build ID, byte totals, ranked row counts, gap coverage and privacy. Layer
 TypeScript and proof-script syntax pass. Normal push and J206 review follow.
+
+J206 asked for navigation coverage before requestStart and a populated grid card
+in the size control. Cover navigation from its start, merge worker requests using
+the collector's measured pageStart/pageEnd, and test the real production grid
+path with all its rows populated. Keep all request-free gaps; repeated equal
+intervals use an exact start/duration/period/count run instead of hundreds of
+repeated strings. Even a 706-request separated-request control fits below 6 KB.
+Both controls pass with the populated grid card. The native clipboard proof now
+compares ranked durations and byte totals with independent collector facts too.
+Five files still pass 52 cases and layer TypeScript. The 6 KB size requirement
+is the full Nine boot report; no claim is made for arbitrarily long sessions
+with unbounded distinct required facts.

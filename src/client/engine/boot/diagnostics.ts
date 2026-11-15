@@ -225,23 +225,39 @@ export function compactBootDiagnostics(timing:BootTiming|undefined):{summary:rea
       return `  ${label(row['url'],100)} ${transfer!==null&&transfer>0?transfer:encoded} B ${seconds(duration(row))} s ${source}`;
     }),
   ];
-  // Only page-clock intervals can describe a page request-free gap. Merge all
-  // outstanding requests: a long download is never reported as idle time.
+  // Worker resource receipts carry their measured page-clock translation.
+  // Merge those with page requests; unaligned worker clocks cannot fill a gap.
   const end=Math.max(0,...entries.filter(row=>row['realm']==='page').map(row=>number(row['end'])??number(row['start'])??0));
   const intervals=resources.flatMap(row=>{
-    const start=number(row['startTime']),finish=number(row['responseEnd'])??(start===null?null:start+duration(row));
-    return row['realm']==='page'&&start!==null&&finish!==null&&finish>start&&start<end?[{start:Math.max(0,start),end:Math.min(end,finish)}]:[];
+    const page=row['realm']==='page';
+    const start=number(row['pageStart'])??(page?number(row['startTime']):null);
+    const finish=number(row['pageEnd'])??(page?number(row['responseEnd'])??(start===null?null:start+duration(row)):null);
+    return start!==null&&finish!==null&&finish>start&&start<end?[{start:Math.max(0,start),end:Math.min(end,finish)}]:[];
   });
   const navigation=record(safe['navigation']),responseEnd=number(navigation['responseEnd']);
-  if(responseEnd!==null&&responseEnd>0)intervals.push({start:Math.max(0,number(navigation['requestStart'])??0),end:Math.min(end,responseEnd)});
+  const requestStart=Math.max(0,number(navigation['startTime'])??0);
+  if(responseEnd!==null&&responseEnd>requestStart&&requestStart<end)intervals.push({start:requestStart,end:Math.min(end,responseEnd)});
   intervals.sort((a,b)=>a.start-b.start);
-  const gaps:string[]=[];
+  const gaps:{start:number;ms:number}[]=[];
   let cursor=0;
   for(const interval of intervals){
-    if(interval.start-cursor>500)gaps.push(`${seconds(cursor)}+${seconds(interval.start-cursor)}`);
+    if(interval.start-cursor>500)gaps.push({start:cursor,ms:interval.start-cursor});
     cursor=Math.max(cursor,interval.end);
   }
-  if(end-cursor>500)gaps.push(`${seconds(cursor)}+${seconds(end-cursor)}`);
-  timeline.push(`page request-free gaps >0.5 s (start+duration s): ${gaps.join(', ')||'none'}`);
+  if(end-cursor>500)gaps.push({start:cursor,ms:end-cursor});
+  // Keep every interval. Repeated polling gaps need one readable run rather
+  // than hundreds of identical durations; no gap is sampled or discarded.
+  const gapLines:string[]=[],stamp=(ms:number):string=>String(Number((ms/1000).toFixed(3)));
+  for(let index=0;index<gaps.length;){
+    const gap=gaps[index];if(gap===undefined)break;
+    const next=gaps[index+1],stride=next===undefined?0:next.start-gap.start;
+    let count=1;
+    if(stride>0)while(gaps[index+count]!==undefined&&Math.abs((gaps[index+count]?.ms??0)-gap.ms)<0.001
+      &&Math.abs((gaps[index+count]?.start??0)-(gap.start+count*stride))<0.001)count++;
+    const repeated=count>=3;
+    gapLines.push(`${stamp(gap.start)}+${stamp(gap.ms)}${repeated?` every ${stamp(stride)} x${count}`:''}`);
+    index+=repeated?count:1;
+  }
+  timeline.push(`request-free gaps >0.5 s (page clock, start+duration s): ${gapLines.join(', ')||'none'}`);
   return {summary:list(safe['summary']).filter((value):value is string=>typeof value==='string'),timeline};
 }
