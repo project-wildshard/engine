@@ -12,3 +12,7 @@ declared IO layout in its manifest rather than compiling SDK source in engine.
 
 The group-members guest completes the same move for ordered native member
 effects, including its fixed 1408-byte ABI2 layout.
+
+The six engine-owned guests landed as CI21-H3's public fixture source. Its
+separate integration receipt records the J237 batch clocks after this source
+is available on engine main.
