@@ -309,3 +309,4 @@ public/assets/driftwood-isle/map/top.webp
 # LS1 (J250): the renderer and validation revisions are computed live, never stamped; an old checkout's copies stay out.
 /scripts/renderer-revision.json
 /scripts/validation-revision.json
+/.owner

@@ -2,8 +2,8 @@
 // REPO-DISK DK18a/J358: preserve a worktree before a human removes it. This
 // helper only writes a copy; it has no delete operation.
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -31,6 +31,25 @@ function destination(path, root, now) {
 /** @param {string} path @param {string[]} files */
 function bytes(path, files) {
   return files.reduce((total, file) => total + lstatSync(join(path, file)).size, 0);
+}
+
+/** Snapshot every recoverable byte before copying and again after stopping
+ * writers. Status alone misses edits within an existing untracked folder.
+ * @param {string} root */
+export function worktreeState(root) {
+  const hash = createHash('sha256');
+  for (const file of text(root, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean)) {
+    const path = join(root, file), info = lstatSync(path);
+    if (!info.isFile() && !info.isSymbolicLink()) throw new Error(`cannot snapshot ${file}`);
+    hash.update(JSON.stringify([file, info.mode, info.size]));
+    hash.update(info.isSymbolicLink() ? readlinkSync(path) : readFileSync(path));
+  }
+  return JSON.stringify([
+    text(root, ['rev-parse', 'HEAD']), text(root, ['symbolic-ref', '--quiet', 'HEAD']),
+    text(root, ['status', '--porcelain', '--untracked-files=all']),
+    text(root, ['diff', '--binary', 'HEAD']), text(root, ['diff', '--cached', '--binary', 'HEAD']),
+    hash.digest('hex'),
+  ]);
 }
 
 /** Copy recoverable Git worktree state. It never deletes or mutates `path`.

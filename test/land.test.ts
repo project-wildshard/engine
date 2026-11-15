@@ -108,8 +108,8 @@ exit 0
 type Fixture = ReturnType<typeof fixture>;
 
 function fixture() {
-  mkdirSync('tmp', { recursive: true });
-  const root = mkdtempSync(resolve('tmp', 'land-'));
+  mkdirSync('tmp/codex-netlag', { recursive: true });
+  const root = mkdtempSync(resolve('tmp/codex-netlag', 'land-'));
   roots.push(root);
   const remote = join(root, 'remote.git'), repo = join(root, 'engine'), peer = join(root, 'peer'), bin = join(root, 'bin'), hooks = join(root, 'hooks');
   const files = { pushed: join(root, 'pushed.log'), gh: join(root, 'gh.log'), prepush: join(root, 'prepush.log'), receipts: join(root, 'receipts.log'), state: join(root, 'gh-state.json'), fail: join(root, 'prepush-fail'), race: join(root, 'prepush-race'), raceScript: join(root, 'race.sh') };
@@ -252,6 +252,44 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(g.land(kept, ['--keep']).stdout).not.toContain('cleaned');
     expect(existsSync(kept)).toBe(true);
     expect(parseArgs([])).toEqual({ pollSeconds: 30, timeoutMinutes: 60, appearMinutes: 5, rounds: 5, keep: false });
+  }, 60_000);
+
+  test('J358: a failed copy keeps the landed worktree and local branch', () => {
+    const f = fixture(), wt = f.worktree('copy-failure');
+    const tip = f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feature');
+    writeFileSync(join(f.root, 'session-keep'), 'not a directory');
+    const result = f.land(wt, []);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toContain('worktree kept: copy failed');
+    expect(existsSync(wt)).toBe(true);
+    expect(f.git(f.repo, ['rev-parse', 'plan/copy-failure'])).toBe(tip);
+  }, 60_000);
+
+  test('J358: generated changes are copied as a recoverable patch before removal', () => {
+    const f = fixture(), wt = f.worktree('generated');
+    f.commit(wt, 'src/bytes.generated.ts', 'export const bytes = 1;\n', 'generated');
+    f.state({ once: { marker: join(f.root, 'once'), command: [process.execPath, '-e', `require('fs').writeFileSync(${JSON.stringify(join(wt, 'src/bytes.generated.ts'))}, 'export const bytes = 2;\\n')`] } });
+    const result = f.land(wt, []);
+    expect(result.status, result.stdout).toBe(0);
+    expect(existsSync(wt)).toBe(false);
+    const day = join(f.root, 'session-keep', readdirSync(join(f.root, 'session-keep'))[0]!);
+    const copy = join(day, readdirSync(day)[0]!);
+    expect(readFileSync(join(copy, 'tracked.patch'), 'utf8')).toContain('+export const bytes = 2;');
+  }, 60_000);
+
+  test('J358: a shutdown write after copying keeps the worktree', async () => {
+    const f = fixture(), wt = f.worktree('shutdown');
+    f.commit(wt, 'src/bytes.generated.ts', 'export const bytes = 1;\n', 'generated');
+    const marker = join(f.root, 'ready');
+    const child = spawn(process.execPath, ['-e', `const fs=require('fs');process.on('SIGTERM',()=>{fs.writeFileSync('src/bytes.generated.ts','export const bytes = 3;\\n');process.exit(0)});fs.writeFileSync(${JSON.stringify(marker)},'ready');setInterval(()=>{},1000)`], { cwd: wt, stdio: 'ignore' });
+    try {
+      for (let tries = 0; tries < 100 && !existsSync(marker); tries++) await new Promise(done => setTimeout(done, 20));
+      expect(existsSync(marker)).toBe(true);
+      const result = f.land(wt, []);
+      expect(result.status, result.stdout).toBe(0);
+      expect(result.stdout).toContain('worktree kept: changed during process cleanup');
+      expect(readFileSync(join(wt, 'src/bytes.generated.ts'), 'utf8')).toContain('bytes = 3');
+    } finally { if (child.exitCode === null) child.kill('SIGKILL'); }
   }, 60_000);
 
   test('after the main push, the canonical checkout fast-forwards to it (Jake: land into the main checkout)', () => {

@@ -36,12 +36,17 @@ export function processCwds() {
   return found.stdout.split('\n').filter(line => line.startsWith('n')).map(line => line.slice(1));
 }
 
-/** @param {unknown} lane @param {string} path */
-function receipt(lane, path) {
+/** @param {unknown} lane @param {string} path @param {unknown} offset */
+function receipt(lane, path, offset) {
   if (typeof lane !== 'string' || !/^[\w.-]+$/u.test(lane)) return undefined;
+  // Undated receipts cannot end a folder created later. Legacy owners have
+  // no cursor, so they must use process/session evidence and active hours.
+  if (typeof offset !== 'number' || !Number.isSafeInteger(offset) || offset < 0) return undefined;
   try {
+    const log = readFileSync(path);
+    if (offset > log.length) return undefined;
     let last;
-    for (const line of readFileSync(path, 'utf8').split('\n'))
+    for (const line of log.subarray(offset).toString('utf8').split('\n').slice(0, -1))
       if (line.includes(` ${lane} `) && /\s(?:DONE|ENDED|PAUSED):/u.test(line)) last = line;
     return last;
   } catch { return undefined; }
@@ -109,10 +114,10 @@ export function laneLive(path, { receipts = RECEIPTS, activeHours, cwdLive, cwds
     const hours = activeHours ?? activeHoursSince(lstatSync(root).mtime, { log: activeLog });
     return { state: 'unknown', reason: hours >= 72 ? 'no readable .owner; at least 72 active hours, investigate' : 'no readable .owner' };
   }
-  const line = receipt(record.lane, receipts);
-  if (line && /\s(?:DONE|ENDED):/u.test(line)) return { state: 'ended', reason: 'ending receipt' };
   const evidence = sessionLive === undefined ? sessionEvidence(record.session, activeLog) : { live: sessionLive, latest: 0 };
   if (evidence.live) return { state: 'live', reason: 'owner session is present' };
+  const line = receipt(record.lane, receipts, record.receiptOffset);
+  if (line && /\s(?:DONE|ENDED):/u.test(line)) return { state: 'ended', reason: 'ending receipt' };
   const since = evidence.latest !== undefined && evidence.latest > 0 ? evidence.latest : Date.parse(record.started ?? record.created ?? '');
   const elapsed = activeHours ?? (Number.isFinite(since) ? activeHoursSince(new Date(since), { log: activeLog }) : 0);
   if (elapsed >= 24) return { state: 'ended', reason: 'owner gone and silent for 24 active hours' };

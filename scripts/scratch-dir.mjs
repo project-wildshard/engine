@@ -12,7 +12,8 @@
 // <task> is one plain folder name: letters, digits, '.', '_' and '-', not starting with '.', never containing '/' or
 // '..'. The helper deletes nothing. It refuses a folder that already exists unless that folder's .owner names this
 // same session (then it prints the path again), so it never takes over another lane's or an ownerless folder.
-import { mkdirSync, readFileSync, rmdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmdirSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -35,6 +36,9 @@ export function refuseTask(task) {
  * @param {string | null} row */
 export function ownerRecord(task, purpose, env, now, row = null) {
   const lane = env.WS_LANE_NAME || null;
+  let receiptOffset = null;
+  try { receiptOffset = statSync(env.WS_LANE_RECEIPTS ?? join(homedir(), '.cache/wildshard/lane-receipts.log')).size; }
+  catch (error) { if (error instanceof Error && 'code' in error && error.code === 'ENOENT') receiptOffset = 0; }
   return {
     task,
     session: env.CLAUDE_SESSION_ID || env.CLAUDE_CODE_SESSION_ID || lane,
@@ -42,6 +46,7 @@ export function ownerRecord(task, purpose, env, now, row = null) {
     pane: env.HERDR_PANE_ID || null,
     agent: env.CLAUDE_SESSION_ID || env.CLAUDE_CODE_SESSION_ID ? 'claude' : lane ? 'codex' : 'unknown',
     row,
+    receiptOffset,
     started: now.toISOString(),
     purpose,
   };
