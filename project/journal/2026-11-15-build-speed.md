@@ -51,3 +51,5 @@ bank, mode and retry assertions remain. A shared-byte mutant fails the
 old and bounded fixtures on the same ownership assertion, without a
 clock failure. Shipped-product integration stays in the Pine journey.
 Bounded positives: 44.48/30.03 ms; real Pine continuation 10.70 s.
+The bounded fixture declares no shipped product inputs in test-products;
+keeping its old Template dependency would schedule unrelated product work.
