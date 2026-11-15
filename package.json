@@ -730,6 +730,7 @@
     "./boot/prefetchQuota": "./src/client/engine/boot/prefetchQuota.ts",
     "./boot/readContentResponse": "./src/client/engine/boot/readContentResponse.ts",
     "./boot/contentRead": "./src/client/engine/boot/contentRead.ts",
+    "./boot/downloadGiveUp": "./src/client/engine/boot/downloadGiveUp.ts",
     "./sim/readiness": "./src/shared/engine/sim/readiness.ts",
     "./sim/shore": "./src/shared/engine/sim/shore.ts",
     "./physics/readinessWalls": "./src/shared/engine/physics/readinessWalls.ts",

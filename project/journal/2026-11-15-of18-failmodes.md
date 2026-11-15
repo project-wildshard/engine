@@ -10,3 +10,8 @@
   the slowest and the pong RTT sits flat; no chip could show. The proof now swings the downstream delay 20/420 ms every 2.5 s.
 - Mode 1 (and 2) on WebKit: Playwright's WebKit `setOffline` leaves loopback sockets up; the proof also cuts the world door
   at the proxy there (`loopbackCut` in the receipt). Both pass in WebKit now.
+- Mode 36: nothing ever gave up, since a failed content read waits on RETRY forever (pinned on purpose: time never retries).
+  Now a read on RETRY becomes the `download-failed` page when the spawn download's job refused (a part out of its three
+  reads) or after `DOWNLOAD_GIVE_UP_MS` (30 s) on RETRY with nothing reading again by itself. The count is every read of that
+  file so far; Try again is the same RETRY (no new counter), Check connection opens the doctor, Copy diagnostics copies the
+  measured failure. The FM3 proof's packs 503 sits on the spawn manifest's own read, so the time bound is what fires there.

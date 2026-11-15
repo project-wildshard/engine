@@ -122,6 +122,7 @@ try {
     const page = await context.newPage();
     page.on('pageerror', error => { errors.push(error.message.slice(0, 240)); });
     page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 240)); if (process.env.FM_TRACE === '1') console.log(`  [page ${line.type()}] ${line.text().slice(0, 300)}`); });
+    page.on('response', response => { if (process.env.FM_TRACE === '1' && response.status() >= 400) console.log(`  [http ${String(response.status())}] ${response.url().slice(0, 200)}`); });
     page.on('framenavigated', frame => { if (frame === page.mainFrame() && process.env.FM_TRACE === '1') console.log(`  [nav] ${frame.url()}`); });
     return { page, context, errors };
   };
@@ -460,7 +461,9 @@ try {
         const result = await judged(seen, item, page);
         if (result.outcome !== 'pass') return { ...result, injection, shot };
         // the budgeted retries were spent before the line showed: healed, the card's Retry is the player's way on
-        const retry = page.locator('.ws-load-retry:visible').first(), pressed = await retry.click({ timeout: 5000 }).then(() => true, () => false);
+        // mode 36's page covers the card: its Try again is the same RETRY
+        const retry = item.id === 'download-failed' ? page.locator('[data-failmode~="download-failed"] button', { hasText: 'Try again' }).first() : page.locator('.ws-load-retry:visible').first();
+        const pressed = await retry.click({ timeout: 5000 }).then(() => true, () => false);
         await intoWorld(entered, 90_000).catch(() => undefined);
         return await recovered(page, 30_000) ? { ...result, injection, shot, recovery: pressed ? 'heal, Retry: the world loads' : 'heal: the world loads' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen, injection, shot, notes: await onScreen(page) };
       } finally { await heal(); await entered.context.close(); }

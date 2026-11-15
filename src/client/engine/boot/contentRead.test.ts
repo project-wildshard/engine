@@ -208,3 +208,44 @@ test('Retry-After is seconds or an HTTP date, bounded; anything else is no answe
   expect(contentRetryAfterMs('later', now)).toBeNull();
   expect(contentRetryAfterMs('9999', now)).toBeNull();
 });
+
+test('FM6 mode 36: once the download gives up, a read waiting on RETRY shows the download-failed page; Try again is that RETRY', async () => {
+  const { noteDownloadGiveUp, clearDownloadGiveUp } = await import('./downloadGiveUp');
+  clearDownloadGiveUp();
+  let calls = 0;
+  const pending = readContent(url, 3, { fetch: () => { calls++; return Promise.resolve(calls <= 2 ? new Response(null, { status: 503 }) : new Response(new Uint8Array([1, 2, 3]))); } });
+  await vi.waitFor(() => { expect([...loadingWaitState().pending.values()].some(row => row.resource === url)).toBe(true); });
+  // the card's line alone while the download still runs
+  expect(document.querySelector('[data-failmode~="download-failed"]')).toBeNull();
+  noteDownloadGiveUp({ attempts: 3, status: 503, detail: 'Spawn part unavailable: https://example.test/packs/p.bin' });
+  const page = await vi.waitFor(() => { const found = document.querySelector<HTMLElement>('[data-failmode~="download-failed"]'); expect(found).not.toBeNull(); return found as HTMLElement; });
+  const primary = [...page.querySelectorAll('h1, p')].filter(node => node.closest('details') === null).map(node => node.textContent).join(' ');
+  expect(primary).toContain('3 times'); expect(primary).not.toMatch(/503|https?:/u);
+  const again = [...page.querySelectorAll('button')].find(button => button.textContent === 'Try again');
+  again?.click();
+  expect(await pending).toEqual(new Uint8Array([1, 2, 3])); expect(calls).toBe(3);
+  expect(document.querySelector('[data-failmode~="download-failed"]')).toBeNull();
+  clearDownloadGiveUp();
+});
+
+test('FM6 mode 36: a read on RETRY for DOWNLOAD_GIVE_UP_MS shows the page, counting every read so far; no read starts by itself', async () => {
+  const { clearDownloadGiveUp } = await import('./downloadGiveUp');
+  const { DOWNLOAD_GIVE_UP_MS } = await import('./contentRead');
+  clearDownloadGiveUp();
+  vi.useFakeTimers();
+  try {
+    let calls = 0;
+    const pending = readContent(url, 3, { fetch: () => { calls++; return Promise.resolve(calls <= 4 ? new Response(null, { status: 503 }) : new Response(new Uint8Array([1, 2, 3]))); } });
+    await vi.advanceTimersByTimeAsync(DOWNLOAD_GIVE_UP_MS - 1000);
+    expect(document.querySelector('[data-failmode~="download-failed"]')).toBeNull();
+    // RETRY from the card: two more reads, and the count goes on (no new counter)
+    [...loadingWaitState().pending.values()].find(row => row.resource === url)?.retry?.();
+    await vi.advanceTimersByTimeAsync(DOWNLOAD_GIVE_UP_MS + 1000);
+    const page = document.querySelector<HTMLElement>('[data-failmode~="download-failed"]');
+    expect(page?.textContent).toContain('4 times'); expect(calls).toBe(4);
+    [...(page?.querySelectorAll('button') ?? [])].find(button => button.textContent === 'Try again')?.click();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(await pending).toEqual(new Uint8Array([1, 2, 3]));
+    expect(document.querySelector('[data-failmode~="download-failed"]')).toBeNull();
+  } finally { vi.useRealTimers(); clearDownloadGiveUp(); }
+});

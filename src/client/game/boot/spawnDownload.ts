@@ -6,6 +6,7 @@ import { beginLoadingWait, finishLoadingWait } from '@wildshard/engine/boot/load
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { Scope } from '@wildshard/engine/app/scope';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
+import { clearDownloadGiveUp, noteDownloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
 import {placedLoose, placedSpawn} from './placedSpawn';
 
@@ -389,6 +390,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
   let markListed = (): void => undefined, markStopped = (_reason: unknown): void => undefined;
   const listedOnly = new Promise<void>(resolve => { markListed = resolve; });
   const stopped = new Promise<never>((_resolve, reject) => { markStopped = reject; });
+  // FM6 mode 36: a part that ran out of reads, and the last status a part answered (no HTTP response: null)
+  let exhausted = false, partStatus: number | null = null;
+  clearDownloadGiveUp();
   const work = (async () => {
     try {
       // OVERNIGHT 6e: the manifest and its code list, read together. The list is the build's own, read from the content base
@@ -608,7 +612,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
           }
           // One read of the part. A read after a failure starts over and skips what landed, so no member counts twice.
           const read = async (init: RequestInit | undefined): Promise<void> => {
+            partStatus = null;
             const response = await ports.fetch(onPacks(part.url, packs), controller.signal, init);
+            partStatus = response.status;
             if (!response.ok || response.body === null) throw new Error(`Spawn part unavailable: ${part.url}`);
             const body = new Uint8Array(part.bytes), reader = response.body.getReader();
             let at = 0, next = 0;
@@ -650,7 +656,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
               const last = attempt >= PART_READS || controller.signal.aborted;
               if (last) for (const [index] of order) { const file = files[index]; if (file !== undefined) landed(file.url); }
               controller.signal.throwIfAborted();
-              if (attempt >= PART_READS) throw failure; // the job's failure answers every read still waiting
+              if (attempt >= PART_READS) { exhausted = true; throw failure; } // the job's failure answers every read still waiting
               if (attempt > 1) { await partPause(); controller.signal.throwIfAborted(); }
             }
           }
@@ -689,6 +695,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
     } catch (failure) {
       // A read waiting on a file this download will not store falls through to the network.
       releaseWaits();
+      // FM6 mode 36: a part out of reads refused the job (a cancel is no refusal); a read that falls through and fails too shows
+      // the download-failed page, not RETRY's line alone (contentRead.ts)
+      if (!controller.signal.aborted && exhausted) noteDownloadGiveUp({ attempts: PART_READS, status: partStatus, detail: failure instanceof Error ? failure.message : String(failure) });
       error = failure instanceof Error ? failure.message : String(failure); publish(); controller.abort(); nudge(); throw failure;
     }
   })();

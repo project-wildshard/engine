@@ -4,6 +4,7 @@ import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot
 import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
 import { bootProgress } from '../../../shared/engine/boot/timing';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
+import { downloadGiveUp, onDownloadGiveUp, type DownloadGiveUp } from './downloadGiveUp';
 
 /** A missing or interrupted transport, never a parsed-content or admission refusal. */
 export class ContentReadError extends Error {
@@ -140,7 +141,10 @@ function reportStall(target: Document, error: ContentReadError, step: string | n
   try { captureBrowserError(error, engineScreenTags('loading-stall', 'content-read', step ?? 'loading', { url: error.url })); }
   catch { /* a report never holds the retry */ }
 }
-async function retryFromCard(error: ContentReadError, signal?: AbortSignal): Promise<void> {
+/** FM6 mode 36: how long a read may wait on RETRY, with nothing left that reads again by itself, before its line becomes the
+ *  download-failed page. The line (modes 33 to 35) is the pause; the page says the download stopped, with what to do. */
+export const DOWNLOAD_GIVE_UP_MS = 30_000;
+async function retryFromCard(error: ContentReadError, signal?: AbortSignal, reads = 2): Promise<void> {
   if (typeof document === 'undefined') throw error;
   const target = document, timeline = currentLoadingTimeline(), scope = new Scope('content-read-button');
   let group = retryGroups.get(target);
@@ -157,6 +161,18 @@ async function retryFromCard(error: ContentReadError, signal?: AbortSignal): Pro
         owner: timeline?.waitOwner ?? null, step: timeline?.snapshot().current ?? null,
         retry: () => {for (const retry of pending) retry();}, retryNavigation: false, ...contentFailure(error) });
       shellRetry(scope, error, () => {for (const retry of pending) retry();});
+      // FM6 mode 36: the download gave up (before or while this read waits), so nothing more arrives by itself: the page says so
+      const page = (given: DownloadGiveUp): void => { void (async () => {
+        const { downloadFailedPage } = await import('../ui/downloadFailed');
+        if (!scope.disposed) downloadFailedPage(scope, given, `${error.url} · ${error.message}`, () => {for (const retry of pending) retry();});
+      })(); };
+      // or this read itself has waited DOWNLOAD_GIVE_UP_MS with every read it makes by itself spent (RETRY adds no new counter)
+      const given = downloadGiveUp();
+      if (given !== null) page(given);
+      else {
+        scope.onDispose(onDownloadGiveUp(page));
+        scope.timeout(DOWNLOAD_GIVE_UP_MS, () => { page({ attempts: reads, status: error.status, detail: error.url }); });
+      }
     });
   } finally {
     if (id !== undefined) finishLoadingWait(id);
@@ -186,9 +202,10 @@ async function busyWait(error: ContentReadError, ms: number, signal?: AbortSigna
 export async function readContent(url: string, maximum: number, options: ContentReadOptions): Promise<Uint8Array<ArrayBuffer>> {
   if (!Number.isSafeInteger(maximum) || maximum < 0 || maximum > 25_000_000) throw new Error('Invalid content wire cap');
   if (options.expectedBytes !== undefined && (!Number.isSafeInteger(options.expectedBytes) || options.expectedBytes < 0 || options.expectedBytes > maximum)) throw new Error('Invalid expected content length');
-  let retried = false;
+  let retried = false, reads = 0;
   for (;;) {
     options.signal?.throwIfAborted();
+    reads++;
     try {
       let response: Response;
       try { response = await options.fetch(url, { ...(retried ? { cache: 'reload' } : {}), ...(options.signal === undefined ? {} : { signal: options.signal }) }); }
@@ -208,7 +225,7 @@ export async function readContent(url: string, maximum: number, options: Content
         // Instead of RETRY forever, the page reloads past its worker into the live build (once per build and tab).
         if (options.retry === undefined && error.missing && typeof document !== 'undefined'
           && await (await import('./browserChunkRecovery')).reloadIfStaleBuild()) await new Promise<void>(() => { /* never settles: the page is navigating */ });
-        await (options.retry === undefined ? retryFromCard(error, options.signal) : options.retry(error)); retried = false;
+        await (options.retry === undefined ? retryFromCard(error, options.signal, reads) : options.retry(error)); retried = false;
       }
     }
   }
