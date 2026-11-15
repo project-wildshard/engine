@@ -3,15 +3,21 @@ import {existsSync} from 'node:fs';
 import {open, readdir, realpath} from 'node:fs/promises';
 import {dirname, join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {chromium} from 'playwright';
+import {createRequire} from 'node:module';
 
 /** The native control and its untimed disk preparation must select the same
  * installed browser. Explicit selection wins, with no fallback after failure.
  * @returns {string} */
 export function nativeChromeExecutable() {
   const candidates=[process.env.CHROME_PATH,process.env.CHROME_BIN,
-    ...(process.platform==='linux'?['/usr/bin/google-chrome','/usr/bin/chromium']:[]),chromium.executablePath()];
-  const executable=candidates.find(file=>file!==undefined&&existsSync(file));
+    ...(process.platform==='linux'?['/usr/bin/google-chrome','/usr/bin/chromium']:[])];
+  const selected=candidates.find(file=>file!==undefined&&existsSync(file));
+  if(selected!==undefined)return selected;
+  // Native controls with an explicit executable need no automation graph.
+  // Keep the ordinary installed-Playwright fallback for unprepared local runs.
+  const {chromium}=createRequire(import.meta.url)('playwright');
+  const fallback=chromium.executablePath();
+  const executable=existsSync(fallback)?fallback:undefined;
   if(executable===undefined)throw new Error('No installed Chromium for the original trusted-input control');
   return executable;
 }

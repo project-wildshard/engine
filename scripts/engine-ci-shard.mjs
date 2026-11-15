@@ -20,7 +20,10 @@ for(const phase of /** @type {const} */ (['native','ordinary'])){
   if(shard[phase].length===0)continue;
   const report=resolve(`tmp/engine-ci/shard-${index}-${phase}.json`);
   /** @type {NodeJS.ProcessEnv} */ const env={...process.env,WS_CI_PHASE:phase,WS_CI_TIMINGS:report};
-  if(chrome!==null)env.WS_CI_NATIVE_CHROME_WARM=chrome.executable;
+  if(chrome!==null){
+    env.WS_CI_NATIVE_CHROME_WARM=chrome.executable;
+    if(phase==='native')env.CHROME_PATH=chrome.executable;
+  }
   else Reflect.deleteProperty(env,'WS_CI_NATIVE_CHROME_WARM');
   if(plan.ring==='1')env.WILDSHARD_RING='1';else Reflect.deleteProperty(env,'WILDSHARD_RING');
   const result=spawnSync('python3',['scripts/heavy-lane.py','full-test','--',process.execPath,'scripts/vitest-tmp.ts','run','--config','scripts/engine-ci.config.ts','--reporter=default','--reporter=./scripts/engine-ci-budget.ts'],{env,stdio:'inherit',timeout:300000});

@@ -4,6 +4,21 @@ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,symlinkSync,rmSync,exis
 // oxlint-disable-next-line import/no-nodejs-modules -- All fake installation and resource paths stay in repository scratch.
 import {resolve,join} from 'node:path';
 import {warmNativeChrome} from '../../../scripts/warm-native-chrome.mjs';
+// oxlint-disable-next-line import/no-nodejs-modules -- A fresh process proves explicit selection never evaluates Playwright.
+import {spawnSync} from 'node:child_process';
+
+test('an explicit executable is selected in a fresh process without loading the automation graph',()=>{
+  const script=`import {createRequire} from 'node:module';
+    const {nativeChromeExecutable}=await import('./scripts/warm-native-chrome.mjs');
+    const executable=nativeChromeExecutable(),cache=Object.keys(createRequire(import.meta.url).cache);
+    console.log(JSON.stringify({executable,playwright:cache.filter(file=>/[/\\\\]playwright(?:-core)?[/\\\\]/u.test(file))}));`;
+  for(const key of ['CHROME_PATH','CHROME_BIN']){
+    const env={...process.env,CHROME_PATH:'',CHROME_BIN:'',[key]:process.execPath};
+    const result=spawnSync(process.execPath,['--input-type=module','-e',script],{env,encoding:'utf8',timeout:5000});
+    expect(result.status,result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({executable:process.execPath,playwright:[]});
+  }
+});
 
 test('warm-up reads the complete selected native binary and resource packs through its launcher without executing it',async()=>{
   const root=mkdtempSync(resolve('tmp/native-chrome-files-'));
