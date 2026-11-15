@@ -2,21 +2,38 @@
 import {execFileSync, spawnSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {parseArgs} from 'node:util';
+import {resolve} from 'node:path';
+import * as v from 'valibot';
 import {HeadObjectCommand, S3Client} from '@aws-sdk/client-s3';
 import {publishChannel} from '../server-release/publish.mjs';
 import {COMMIT, releaseShards} from '../server-release/sign.mjs';
 import {RELEASE_PUBLIC_KEY} from './flow.mjs';
 
+const UploadState = v.object({
+  build: v.object({build: v.string(), contentBase: v.optional(v.string())}),
+  upload: v.object({build: v.string(), channel: v.literal('preview'),
+    deployment: v.object({id: v.pipe(v.string(), v.minLength(1))}), content: v.optional(v.object({base: v.string()}))}),
+});
+
+/** Validate the completed page upload before granting the signer any work.
+ * @param {unknown} state @param {string} build @param {boolean} onMain @returns {string|undefined} */
+export function previewUpload(state, build, onMain) {
+  if (!COMMIT.test(build) || !onMain) throw new Error('Preview build must be a full commit on origin/main');
+  const row = v.parse(UploadState, state);
+  if (row.build.build !== build || row.upload.build !== build) throw new Error('Preview must upload this page before signing');
+  const base = row.build.contentBase;
+  if (base !== undefined && (!/^https:\/\/packs\.wildshard\.io\/content\/[0-9a-f]{16}\/$/u.test(base)
+    || row.upload.content?.base !== base)) throw new Error('Preview content upload does not match the built page');
+  return base;
+}
+
+async function main() {
 const {values} = parseArgs({options: {build: {type: 'string'}}});
 const build = values.build;
 if (build === undefined || !COMMIT.test(build)) throw new Error('Preview needs --build=<full SHA>');
 if (execFileSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).trim() !== build) throw new Error('Preview build must be HEAD');
-const state = JSON.parse(readFileSync(`tmp/page-release/preview-${build}.json`, 'utf8'));
-if (state.build?.build !== build || state.upload?.build !== build || state.upload?.channel !== 'preview'
-  || typeof state.upload?.deployment?.id !== 'string') throw new Error('Preview must upload this page before signing');
-const base = state.build.contentBase;
-if (base !== undefined && (typeof base !== 'string' || !/^https:\/\/packs\.wildshard\.io\/content\/[0-9a-f]{16}\/$/u.test(base)
-  || state.upload.content?.base !== base)) throw new Error('Preview content upload does not match the built page');
+const onMain = spawnSync('git', ['merge-base', '--is-ancestor', build, 'origin/main'], {stdio: 'ignore'}).status === 0;
+const base = previewUpload(JSON.parse(readFileSync(`tmp/page-release/preview-${build}.json`, 'utf8')), build, onMain);
 const need = (/** @type {string} */ name) => {
   const value = process.env[name]?.trim();
   if (value === undefined || value === '') throw new Error(`Missing ${name}`);
@@ -45,6 +62,13 @@ try {
       return null;
     },
   });
-  if (result.release.engineBuild !== build) throw new Error('Preview publication is stale; alias stays unchanged');
+  if (!['published', 'unchanged'].includes(result.status) || result.release.engineBuild !== build) throw new Error('Preview publication is stale; alias stays unchanged');
   console.log(`preview ${result.status}: ${build} signed at serial ${result.release.serial}, no socket`);
 } finally { client.destroy(); }
+
+}
+
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
+  try { await main(); }
+  catch (error) { console.error(error instanceof Error ? error.message : 'Preview publication failed'); process.exitCode = 1; }
+}

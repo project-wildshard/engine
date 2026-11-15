@@ -27,11 +27,15 @@ import {execFileSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {CHANNELS, RefusedError, buildEnv, runPhase} from './page-release/flow.mjs';
+import {CHANNELS, RELEASE_PUBLIC_KEY, RefusedError, buildEnv, runPhase} from './page-release/flow.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
 
+// The world-signing key reaches only the deployment publisher, never build tools or the host.
+const signingKey = process.env.E7_RELEASE_SIGNING_KEY;
+delete process.env.E7_RELEASE_SIGNING_KEY;
+const releaseKey = process.env.E7_RELEASE_PUBLIC_KEY?.trim() || RELEASE_PUBLIC_KEY;
 const args = process.argv.slice(2);
 const flag = (/** @type {string} */ name) => args.find(arg => arg === `--${name}` || arg.startsWith(`--${name}=`));
 const value = (/** @type {string} */ name) => flag(name)?.split('=').slice(1).join('=');
@@ -47,7 +51,7 @@ if (flag('print-env') !== undefined) {
   }
   const cwd = resolve(value('root') ?? '.');
   const head = execFileSync('git', ['rev-parse', 'HEAD'], {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
-  const env = buildEnv(config, /** @type {any} */ ({build: head, ...(catalogue === undefined ? {} : {catalogue: resolve(catalogue)})}));
+  const env = buildEnv(config, /** @type {any} */ ({build: head, releaseKey, ...(catalogue === undefined ? {} : {catalogue: resolve(catalogue)})}));
   for (const name of Object.keys(env).sort()) console.log(`${name}=${env[name]}`);
   process.exit(0);
 }
@@ -59,7 +63,7 @@ const git = (/** @type {string[]} */ argv, /** @type {string} */ cwd) => execFil
 const root = resolve(value('root') ?? git(['rev-parse', '--show-toplevel'], process.cwd()));
 const build = git(['rev-parse', 'HEAD'], root);
 /** @type {string[]} */
-const secrets = [];
+const secrets = signingKey === undefined || signingKey === '' ? [] : [signingKey];
 /** Cloudflare's token comes only from CLOUDFLARE_API_TOKEN (else wrangler's login). */
 const cloudflareToken = process.env.CLOUDFLARE_API_TOKEN;
 if (cloudflareToken !== undefined && cloudflareToken !== '') secrets.push(cloudflareToken);
@@ -83,13 +87,17 @@ let phase = '';
 try {
   for (phase of phaseList.split(',')) {
     const {refusals} = await runPhase(/** @type {any} */ (phase), {
-      root, channel: /** @type {any} */ (channel), build, host,
+      root, channel: /** @type {any} */ (channel), build, host, releaseKey,
       packs: r2Packs({log}),
       ...(flag('content') === undefined ? {} : {content: {
         publish: ({dir, cors, dryRun}) => publishContent({dir, origin: cors, dryRun, log,
           scratch: join(root, 'tmp/page-release/content'), store: r2Content({root, scratch: join(root, 'tmp/page-release/content'), token: cloudflareToken, copies: contentCopies})}),
       }}),
-      run: (file, argv, env) => { execFileSync(file, argv, {cwd: root, env: {...process.env, ...env}, stdio: 'inherit'}); },
+      run: (file, argv, env) => {
+        const signing = file === 'node' && argv[2] === 'scripts/page-release/preview.mjs' && signingKey !== undefined
+          ? {E7_RELEASE_SIGNING_KEY: signingKey} : {};
+        execFileSync(file, argv, {cwd: root, env: {...process.env, ...env, ...signing}, stdio: 'inherit'});
+      },
       fetchJSON: async url => (await fetch200(url)).json(),
       fetchText: async url => (await fetch200(url)).text(),
       readFile: path => readFileSync(path),

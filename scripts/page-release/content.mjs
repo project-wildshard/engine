@@ -123,8 +123,17 @@ const mb = bytes => (bytes / 1e6).toFixed(1);
 
 /** @template T @param {readonly T[]} items @param {number} width @param {(item: T) => Promise<void>} each */
 async function pool(items, width, each) {
-  let next = 0;
-  await Promise.all(Array.from({length: Math.min(width, items.length)}, async () => { while (next < items.length) { const item = items[next++]; if (item !== undefined) await each(item); } }));
+  let next = 0, failed = false;
+  /** @type {unknown} */ let failure;
+  await Promise.all(Array.from({length: Math.min(width, items.length)}, async () => {
+    while (!failed && next < items.length) {
+      const item = items[next++];
+      try { if (item !== undefined) await each(item); }
+      catch (error) { failed = true; failure = error; }
+    }
+  }));
+  // Drain every already-started request before a retry can create another pool.
+  if (failed) throw failure;
 }
 
 /** A key read back: 200, the game's CORS, the decoded bytes. A 404 right after upload is retried (the CDN caches 404s

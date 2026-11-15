@@ -130,6 +130,27 @@ test('a failed bulk put is retried with only the keys still missing', async () =
   expect(batches[1]).toEqual(batches[0]?.slice(4));
 });
 
+test('a failed validation pool drains outstanding requests before rejecting', async () => {
+  const dir = page(), bucket = fakeBucket();
+  let release = (): void => {}, started = 0, settled = false;
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  bucket.store.exists = async key => {
+    if (key.endsWith('/content.json')) return false;
+    if (++started === 1) throw new Error('HTTP 429');
+    await blocked;
+    return false;
+  };
+  const pending = run(dir, bucket.store);
+  void pending.catch(() => { settled = true; });
+  await new Promise<void>(resolve => { setTimeout(resolve, 0); });
+  expect(started).toBe(8);
+  expect(settled).toBe(false);
+  release();
+  await expect(pending).rejects.toThrow('HTTP 429');
+  expect(started).toBe(8);
+  expect(bucket.puts).toEqual([]);
+});
+
 test('persistent rate limits back off and leave the completion index absent', async () => {
   const dir = page(), bucket = fakeBucket(), waits: number[] = [];
   bucket.store.put = () => Promise.reject(new Error('HTTP 429'));

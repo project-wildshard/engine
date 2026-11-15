@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       sha:
-        description: A main commit whose ci run is green (default the newest green main); a dispatch skips the hourly gate
+        description: A full main SHA with green ci, fix-forward only (default newest green main); dispatch skips the hourly gate
         type: string
         required: false
         default: ''
@@ -71,6 +71,9 @@ jobs:
           sha="$ASKED"
           [ -n "$sha" ] || sha=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --status success --limit 1 --json headSha --jq '.[0].headSha')
           [ -n "$sha" ] || { echo "::error::no green main ci run"; exit 1; }
+          # PZ6 D2: never sign a branch commit or an unverified dispatch as preview's channel head.
+          green=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --commit "$sha" --status success --limit 1 --json headSha --jq '.[0].headSha')
+          [ "$green" = "$sha" ] || { echo "::error::the requested full main SHA has no green ci run"; exit 1; }
           echo "sha=$sha" >> "$GITHUB_OUTPUT"; echo "newest green main: $sha"
       # the whole history and every tag: the client inputs' diff against the live commit, and `git describe` for the label
       - if: steps.due.outputs.deploy != 'false'
