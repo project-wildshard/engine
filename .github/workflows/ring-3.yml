@@ -1,0 +1,78 @@
+name: ring-3
+on:
+  workflow_call:
+    inputs:
+      engine:
+        description: Exact engine candidate commit
+        required: true
+        type: string
+    secrets:
+      NIGHTLY_APP_CLIENT_ID:
+        required: false
+      NIGHTLY_APP_PRIVATE_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      engine:
+        description: Exact engine commit (empty uses this workflow ref)
+        type: string
+        default: ''
+permissions:
+  contents: read
+concurrency:
+  group: ring-3-${{ inputs.engine || github.sha }}
+  cancel-in-progress: false
+jobs:
+  candidates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      RING3_ENGINE: ${{ inputs.engine || github.sha }}
+      RING3_ORIGIN_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.engine || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+      - run: node --test scripts/ring3.proof.ts
+      - run: node scripts/ring3.ts prepare
+      - name: Mint the dedicated nightly App token for the seven receivers
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.NIGHTLY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
+          owner: project-wildshard
+          repositories: |
+            shard-dunes
+            shard-sky-reach
+            shard-nalati
+            shard-nine-dragon
+            shard-driftwood
+            shard-pine-hollow
+            shard-open-plots
+          permission-actions: write
+          permission-issues: write
+      - name: Dispatch exact candidates, wait, and file red-shard issues
+        run: node scripts/ring3.ts run
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+      - name: Publish the release qualification aggregate
+        if: always()
+        run: |
+          if [ -f tmp/ring3/summary.md ]; then
+            cat tmp/ring3/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          node scripts/ring3.ts report
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ring-3-verdict
+          path: |
+            tmp/ring3/verdict.json
+            tmp/ring3/summary.md
+          if-no-files-found: error
+          retention-days: 7

@@ -20,6 +20,14 @@ concurrency:
   group: nightly-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  ring3:
+    needs: report
+    uses: ./.github/workflows/ring-3.yml
+    with:
+      engine: ${{ github.sha }}
+    secrets:
+      NIGHTLY_APP_CLIENT_ID: ${{ secrets.NIGHTLY_APP_CLIENT_ID }}
+      NIGHTLY_APP_PRIVATE_KEY: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
   plan:
     runs-on: ubuntu-24.04
     timeout-minutes: 5

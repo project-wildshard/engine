@@ -20,10 +20,11 @@ is explicitly null. api-server AP-26 exposes no public release-row hash
 yet. These runs prove the selected staging inputs and do not qualify a
 release against J171's signed identity. Row 23 remains open for that check.
 
-No secret needs setting. All dependencies and immutable tarballs are
-public. The built-in read-only `GITHUB_TOKEN` reads prior Actions reports;
-there is no app credential, shard repository checkout, deployment,
-nightly branch update or automatic tag. Promotion owns releases (J184).
+Ring 2's dependencies and immutable tarballs are public. Its built-in
+read-only `GITHUB_TOKEN` reads prior Actions reports. After Ring 2 is
+green, Ring 3 uses the dedicated nightly App described below. There is
+no deployment, nightly branch update or automatic tag. Promotion owns
+releases (J184).
 
 ## Work and evidence
 
@@ -91,10 +92,41 @@ that successful run and its exact commit. A later red night on the same
 commit cannot be cleared with an older green artifact. No new credential
 is created; unavailable history refuses promotion.
 
-The scheduled workflow has no write permission and never calls that
-helper. This preserves J184's promotion ownership while making J167's
+The scheduled workflow's built-in token has no write permission and never
+calls that helper. This preserves J184's promotion ownership while making J167's
 refusal explicit. This workflow does not configure repository rulesets
 or claim to prevent a human from bypassing the documented release rule.
+
+## Ring 3 sender
+
+After the report job passes, nightly calls `ring-3.yml` with its exact
+engine SHA. That workflow can also be dispatched alone on a plan branch
+to prove sender configuration without waiting for a full night. It calls
+all seven shard `ci.yml` receivers with `workflow_dispatch` and the full
+`engine` input. Their existing `engine-candidate` repository-dispatch
+entry remains available and reaches the same candidate selection code.
+
+The dispatch requests `return_run_details`, then follows those exact run
+IDs; it never substitutes the latest run of a shard's moving main. This
+is the documented [workflow dispatch response](https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event).
+The aggregate records each receiver's actual shard commit, run link and
+conclusion. All seven must succeed; a timeout, cancelled run, changed run
+identity or dispatch refusal holds qualification. Each red receiver gets
+one issue per engine candidate in that shard; repeated reds reuse it.
+
+`NIGHTLY_APP_CLIENT_ID` and `NIGHTLY_APP_PRIVATE_KEY` already exist on
+engine. The App must be installed on the seven shard repos with Actions
+write (dispatch and read runs) and Issues write. The workflow requests a
+token scoped to exactly those seven repos. It never changes installation
+permissions, org variables or secrets. If the second App is still scoped
+to engine only (Q25), its installation needs Jake's decision; the token
+step stays red with a pending aggregate until then.
+
+`ring-3-verdict` is a compact release qualification artifact, not a
+published release. Its JSON and Markdown are retained for seven days.
+No tag, release, shard upload, cook or deployment is run by this sender.
+The twenty-minute sender deadline includes queued receivers; each shard
+keeps its own existing candidate-job limits.
 
 ## Cost and bounds
 
@@ -126,6 +158,7 @@ outside hooks and Vitest discovery (J186):
 
 ```sh
 node --test scripts/nightly.proof.ts
+node --test scripts/ring3.proof.ts
 actionlint .github/workflows/nightly.yml
 ```
 

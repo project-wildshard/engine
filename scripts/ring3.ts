@@ -1,0 +1,100 @@
+// Ring 3: dispatch the exact candidate, then follow the returned run ID.
+// workflow_dispatch reaches the same receiver as engine-candidate, and its
+// return_run_details response avoids guessing which concurrent run is ours.
+import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+
+export const shardRepos = ['shard-dunes', 'shard-sky-reach', 'shard-nalati', 'shard-nine-dragon', 'shard-driftwood', 'shard-pine-hollow', 'shard-open-plots'] as const;
+interface Row {repo: string; status: 'pending' | 'success' | 'failure' | 'error' | 'timeout'; runId?: number; runUrl?: string; shardSha?: string; conclusion?: string | null; issue?: string; error?: string}
+export interface Aggregate {version: 1; engine: string; originRun: string; ok: boolean; rows: Row[]}
+export type Api = (method: 'GET' | 'POST', path: string, body?: unknown) => Promise<unknown>;
+interface Options {api: Api; now?: () => number; sleep?: (ms: number) => Promise<void>; deadlineMs?: number; pollMs?: number; checkpoint?: (report: Aggregate) => void}
+const errorText = (error: unknown): string => String(error).replaceAll(/[\r\n]/gu, ' ').slice(0, 1000);
+
+export function prepare(engine: string, originRun: string): Aggregate {
+  if (!/^[a-f0-9]{40}$/u.test(engine)) throw new Error('Ring 3 requires the full engine commit hash');
+  return {version: 1, engine, originRun, ok: false, rows: shardRepos.map(repo => ({repo, status: 'pending'}))};
+}
+
+export async function runRing3(report: Aggregate, options: Options): Promise<Aggregate> {
+  const {api, now = Date.now, sleep = ms => new Promise(resolve => {setTimeout(resolve, ms);}), deadlineMs = 20 * 60_000, pollMs = 15_000, checkpoint = () => {}} = options;
+  const until = now() + deadlineMs;
+  // All seven requests are independent; a refused shard must not hide the others.
+  await Promise.all(report.rows.map(async row => {
+    try {
+      const response = await api('POST', `repos/project-wildshard/${row.repo}/actions/workflows/ci.yml/dispatches`,
+        {ref: 'main', inputs: {engine: report.engine}, return_run_details: true}) as {workflow_run_id?: number; html_url?: string};
+      if (!Number.isSafeInteger(response.workflow_run_id) || (response.workflow_run_id ?? 0) <= 0) throw new Error('Dispatch returned no exact run ID; refusing to guess a run');
+      row.runId = response.workflow_run_id;
+      row.runUrl = `https://github.com/project-wildshard/${row.repo}/actions/runs/${row.runId}`;
+    } catch (error) {row.status = 'error'; row.error = errorText(error);}
+    checkpoint(report);
+  }));
+  while (report.rows.some(row => row.status === 'pending') && now() < until) {
+    await Promise.all(report.rows.filter(row => row.status === 'pending').map(async row => {
+      try {
+        const run = await api('GET', `repos/project-wildshard/${row.repo}/actions/runs/${row.runId}`) as {id: number; event: string; path: string; head_sha: string; status: string; conclusion: string | null; run_attempt: number};
+        if (run.id !== row.runId || run.event !== 'workflow_dispatch' || run.path.split('@')[0] !== '.github/workflows/ci.yml' || !/^[a-f0-9]{40}$/u.test(run.head_sha) || run.run_attempt !== 1) throw new Error('Receiver run identity changed; new qualification required');
+        row.shardSha = run.head_sha;
+        if (run.status === 'completed') {row.conclusion = run.conclusion; row.status = run.conclusion === 'success' ? 'success' : 'failure';}
+      } catch (error) {row.status = 'error'; row.error = errorText(error);}
+      checkpoint(report);
+    }));
+    if (report.rows.some(row => row.status === 'pending')) await sleep(Math.max(0, Math.min(pollMs, until - now())));
+  }
+  for (const row of report.rows) if (row.status === 'pending') {row.status = 'timeout'; row.error = 'Receiver did not complete within the Ring 3 deadline';}
+  // Deduplicate per candidate in each shard; cancelled/skipped/incomplete is never green.
+  await Promise.all(report.rows.filter(row => row.status !== 'success' && row.runId !== undefined).map(async row => {
+    try {
+      const title = `[Ring 3] engine ${report.engine}`;
+      const existing = await api('GET', `repos/project-wildshard/${row.repo}/issues?state=all&per_page=100&sort=created&direction=desc`) as {title: string; html_url: string; pull_request?: unknown}[];
+      const prior = existing.find(issue => issue.pull_request === undefined && issue.title === title);
+      if (prior !== undefined) row.issue = prior.html_url;
+      else {
+        const issue = await api('POST', `repos/project-wildshard/${row.repo}/issues`, {title,
+          body: `Engine candidate: \`${report.engine}\`\n\nReceiver: ${row.runUrl}\n\nShard commit: \`${row.shardSha ?? 'unavailable'}\`\n\nVerdict: ${row.status} (${row.conclusion ?? row.error ?? 'incomplete'}).\n\nSender: ${report.originRun}\n\nFix forward (J165); this candidate is not release-qualified.`}) as {html_url: string};
+        row.issue = issue.html_url;
+      }
+    } catch (error) {row.error = `${row.error ?? ''} Issue creation failed: ${errorText(error)}`.trim();}
+    checkpoint(report);
+  }));
+  report.ok = report.rows.length === shardRepos.length && report.rows.every(row => row.status === 'success');
+  checkpoint(report);
+  return report;
+}
+
+export function markdown(report: Aggregate): string {
+  return [`# Ring 3: ${report.ok ? 'GREEN' : 'RED — RELEASE HELD'}`, '', `Engine: \`${report.engine}\``, '',
+    '| Shard | Candidate run | Shard commit | Verdict | Issue |', '| --- | --- | --- | --- | --- |',
+    ...report.rows.map(row => `| ${row.repo} | ${row.runUrl === undefined ? 'not dispatched' : `[${row.runId}](${row.runUrl})`} | ${row.shardSha?.slice(0, 12) ?? 'unknown'} | ${row.status} | ${row.issue === undefined ? '' : `[issue](${row.issue})`} |`),
+    '', ...report.rows.filter(row => row.error !== undefined).map(row => `- ${row.repo}: ${row.error?.replaceAll(/[|<>]/gu, ' ')}`),
+    '', 'This artifact aggregates candidate checks. It does not create a tag, release, upload or deployment.', ''].join('\n');
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const [command, directory = 'tmp/ring3'] = process.argv.slice(2);
+  const save = (report: Aggregate): void => {mkdirSync(directory, {recursive: true}); writeFileSync(join(directory, 'verdict.json'), `${JSON.stringify(report, null, 2)}\n`); writeFileSync(join(directory, 'summary.md'), markdown(report));};
+  if (command === 'prepare') save(prepare(process.env.RING3_ENGINE ?? '', process.env.RING3_ORIGIN_RUN ?? 'local'));
+  else if (command === 'run') {
+    const report = JSON.parse(readFileSync(join(directory, 'verdict.json'), 'utf8')) as Aggregate;
+    // Revalidate the persisted candidate before any write request.
+    if (JSON.stringify(report) !== JSON.stringify(prepare(report.engine, report.originRun))) throw new Error('Ring 3 must start from a fresh prepared aggregate');
+    const token = process.env.GH_TOKEN;
+    if (token === undefined || token === '') throw new Error('Ring 3 needs the dedicated nightly App token');
+    const api: Api = async (method, path, body) => {
+      const response = await fetch(`https://api.github.com/${path}`, {method, signal: AbortSignal.timeout(20_000),
+        headers: {accept: 'application/vnd.github+json', authorization: `Bearer ${token}`, 'x-github-api-version': '2022-11-28', ...(body === undefined ? {} : {'content-type': 'application/json'})},
+        ...(body === undefined ? {} : {body: JSON.stringify(body)})});
+      if (!response.ok) throw new Error(`GitHub ${method} ${path}: HTTP ${response.status}; check nightly App installation and Actions/Issues permissions`);
+      return response.json();
+    };
+    await runRing3(report, {api, checkpoint: save});
+    console.log(markdown(report));
+    if (!report.ok) process.exitCode = 1;
+  } else if (command === 'report') {
+    const report = JSON.parse(readFileSync(join(directory, 'verdict.json'), 'utf8')) as Aggregate;
+    console.log(markdown(report));
+    if (!report.ok) process.exitCode = 1;
+  } else throw new Error('Use ring3.ts prepare|run|report [directory]');
+}
