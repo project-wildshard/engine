@@ -1,4 +1,9 @@
 [
+ "src/client/app/slug-path.test.ts",
+ "src/client/engine/pwa/cache-names.test.ts",
+ "src/client/game/error-report-origins.test.ts",
+ "src/client/game/grid/cell-presence.test.ts",
+ "src/server/game/plugin/quest-capture-stages.test.ts",
  "src/client/app/app-isolated-declarations.test.ts",
  "src/client/app/boot-preparation.test.ts",
  "src/client/engine/app/cachedAssets-memo.test.ts",

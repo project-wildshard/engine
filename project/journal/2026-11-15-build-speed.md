@@ -7,3 +7,9 @@ worlds, RNG and the complete worker admission remain independent.
 TS15's apparent green soak concealed a red cook-to-play unit. The stored
 shard attachment parsed the build-label assignment as part of its verdict
 JSON. Scan the array boundary, retaining the rest of the stamped script.
+
+TS6a admits five audited pure suites to shared workers: slug paths, cache
+names, error origins, cell presence and borrowed methods. Isolated 21/21:
+4.03 CPU-s / 3.93 s wall; shared shuffled seeds 7 and 73: 21/21 each,
+2.86 and 2.87 CPU-s / 2.67 and 2.72 s wall. No mocks, global writes,
+installers or fresh-import contracts occur in those suites.
