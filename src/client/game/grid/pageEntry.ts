@@ -140,6 +140,27 @@ export function enterGrid(): void {
 
 
 
+/** ZONE-ENTRY ZE10 (J352, Jake 2026-11-15: "you pop up the full loading screen, the same loading screen that you get in shard select
+ *  [...] you've evicted the previous zone from memory, you've loaded a new zone into memory"): a gate's count reached 0. The page
+ *  enters that cell as Shard select enters it: the full loading screen at once, then a fresh page whose home is the target (so its
+ *  walls move), with a goto asking the world (or the in-page server, J311) to seat it there. The plan's marked-reload form: one world
+ *  in memory by construction, the old home released with its document. */
+export function enterZone(instance: string): void {
+  if (navigating !== null && !navigating.disposed) return;
+  const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
+  if (cell === undefined || target === undefined) return; // a cell this build can't open stays behind its gate
+  const shown = gridDestination({ slug: target.slug }, target);
+  document.documentElement.style.setProperty('--ws-load-portrait', shown.art === '' ? 'none' : `url("${shown.art}")`);
+  startEntryDownload(target.slug, 'grid');
+  startGridStripDownload(gridMode(DEVSERVER), cell.instance, 'metadata');
+  navigating = beginNavigationShell(shown.name, pageScope, () => {
+    if (!gridRecovery(saves).clearLoop()) throw new Error('Grid recovery guard could not be cleared');
+    clearGridRecovery();
+    pageGridIntents().set({ instance: cell.instance, slug: target.slug, goto: true });
+    travel({ to: target.slug, mode: 'enter', shown });
+  }, null);
+}
+
 /** The grid page's address: its path, and only the harness flags skipintro, mute and nolock, none of which selects a level, and `skipintro` dropped here sent a
  *  `?chunk=<slug>&skipintro` link on a world build back under the title (OFFLINE OF18: every Open Plot in the offline proof). */
 export function gridPageUrl(href: string): URL {

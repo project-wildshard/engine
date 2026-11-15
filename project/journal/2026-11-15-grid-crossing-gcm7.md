@@ -52,3 +52,8 @@
   7.2 m/s, 0 frames over 50 ms, stops 54-101 ms, no card, but the page held Nalati and then nothing: the home is retired
   on the road (`playingMB` touched the 1200 MB desktop envelope beside Nalati). ZE1's one-home path is what fixes that;
   the whole drive (about 45 km, ~105 min at 7.2 m/s) runs on the mini once ZE1 lands.
+- ZE10 (opus-gcm8), first form: the gate's 0 calls `enterZone` (pageEntry.ts), which paints the full loading screen at once
+  and enters the target as Shard select does: a fresh page whose home is the target (its walls move with it) and a goto that
+  asks the world, or preview's in-page server (J311), to seat it there. This is the plan's marked-reload fallback, taken first:
+  one world in memory by construction. It arrives at the cell's spawn, not 14 m past the gate (ZE9 and ZE11 bring the pose).
+  `zone-gate-proof.mjs` shoots the wall, the card at 5 and 2, gone after backing away, and 5 again.

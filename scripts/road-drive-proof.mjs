@@ -7,6 +7,7 @@
 // the key held, any loading card on screen, `playingMB`, and whether the home stayed resident; then the walk back in.
 //   scripts/browser-lane.sh node scripts/road-drive-proof.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood]
 //     [--engine=chromium|webkit] [--device='iPhone 15 Pro'] [--viewport=2992x1434@2] [--segments=n] (the first n only, a short check)
+//     [--ride=board|boost|run] (default board: the hoverboard, 30 m/s on the road, J354; boost 120 m/s; run: on foot with the run key)
 // The steering runs in the page (a 50 ms yaw toward the next waypoint); the keys are real. The walker is placed 20 m inside the
 // home's east entryway by the in-page harness pose, so it runs on preview or a loopback page only. Never production (J205).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -18,7 +19,8 @@ import { saveFixture } from './debug-settings.mjs';
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', '');
-const limit = Number(flag('segments', '0')) || Infinity;
+const limit = Number(flag('segments', '0')) || Infinity, ride = flag('ride', 'board');
+if (!['board', 'boost', 'run'].includes(ride)) throw new Error(`No ride ${ride}: board, boost or run`);
 if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: road-drive-proof.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood] [--segments=n]');
 const HOMES = /** @type {Record<string, { slug: string, card: string }>} */ ({ driftwood: { slug: 'driftwood-isle', card: 'Driftwood Isle' }, sunscar: { slug: 'sunscar-dunes', card: 'Sunscar Dunes' }, pine: { slug: 'pine-hollow', card: 'Pine Hollow' } });
 const homeName = flag('home', 'driftwood'), home = HOMES[homeName];
@@ -47,7 +49,7 @@ function junctionPath(n, si, sj) {
   return path;
 }
 
-const result = { base, home: home.slug, engine: engineName, viewport: `${String(desk[0])}x${String(desk[1])}@${String(desk[2])}`, at: new Date().toISOString(), build: '',
+const result = { base, home: home.slug, engine: engineName, ride, viewport: `${String(desk[0])}x${String(desk[1])}@${String(desk[2])}`, at: new Date().toISOString(), build: '',
   segments: /** @type {Record<string, unknown>[]} */ ([]), back: /** @type {Record<string, unknown> | null} */ (null), summary: /** @type {Record<string, unknown> | null} */ (null), errors: /** @type {string[]} */ ([]), note: '' };
 const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
 const tag = `${engineName}${device === '' ? '' : '-phone'}-${homeName}`;
@@ -107,7 +109,13 @@ try {
   await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [HALF - 20, 0]);
   await sleep(4000);
   const route = [{ ...exitAt, seg: -2 }, ...waypoints];
-  await page.evaluate(([wps, homeSlug]) => {
+  // the board and its boost through the player's own toggles (what H and a double tap of H call)
+  if (ride !== 'run') {
+    await page.evaluate(boost => { const p = /** @type {any} */ (window).__wildshard.world.player; if (!p.hover) p.setHover(true); p.setBoost?.(boost); }, ride === 'boost');
+    await sleep(800);
+    if (!(await page.evaluate(() => /** @type {any} */ (window).__wildshard.world.player.hover === true))) throw new Error('The board did not take');
+  }
+  await page.evaluate(({ wps, homeSlug }) => {
     const W = /** @type {any} */ (window), q = W.__drive = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), at: 0, done: false, wps };
     let last = performance.now();
     const raf = (/** @type {number} */ now) => { q.frames.push([Math.round(now), Number((now - last).toFixed(1))]); last = now; requestAnimationFrame(raf); };
@@ -116,16 +124,19 @@ try {
       const st = W.__wildshard.shard.grid.state(), p = W.__wildshard.world.player, wf = st.live?.live?.worldFeet ?? p.position;
       const wp = q.wps[q.at];
       if (wp !== undefined) {
-        if (Math.hypot(wf.x - wp.x, wf.z - wp.z) < 3) q.at++;
+        // a waypoint counts within a stride of a 50 ms look at the speed held (3 m on foot, more on a board)
+        const last = q.samples.at(-1), reach = last === undefined || last.err !== undefined ? 3 : Math.max(3, Math.hypot(wf.x - last.x, wf.z - last.z) * 2.5);
+        if (Math.hypot(wf.x - wp.x, wf.z - wp.z) < reach) q.at++;
         const to = q.wps[q.at];
         if (to === undefined) q.done = true; else p.yaw = Math.atan2(wf.x - to.x, wf.z - to.z);
       }
       q.samples.push({ t: Math.round(performance.now()), x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), seg: q.wps[q.at]?.seg ?? -3, inside: st.inside, card: st.cellLoading ?? null, stage: st.cellStage ?? null,
         res: st.live?.live?.residents ?? null, home: (st.live?.live?.residents ?? []).includes(homeSlug), mb: st.playingMB ?? null });
     } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 50);
-  }, [route, home.slug]);
+  }, { wps: route, homeSlug: home.slug });
   const t0 = Date.now();
-  await page.keyboard.down('ShiftLeft'); await page.keyboard.down('KeyW');
+  if (ride === 'run') await page.keyboard.down('ShiftLeft');
+  await page.keyboard.down('KeyW');
   for (let seen = -1, since = Date.now(); ;) {
     const { at, done, last } = await page.evaluate(() => { const q = /** @type {any} */ (window).__drive; return { at: q.at, done: q.done, last: q.samples.at(-1) }; });
     if (done) break;
@@ -134,7 +145,7 @@ try {
     if (Date.now() - since > 90_000) throw new Error(`stuck before waypoint ${String(at)} ${JSON.stringify(route[at])}: last sample ${JSON.stringify(last)}`);
     await sleep(1000);
   }
-  await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft');
+  await page.keyboard.up('KeyW'); if (ride === 'run') await page.keyboard.up('ShiftLeft');
   const driveMs = Date.now() - t0;
   // per segment: its straight, MEASURE_CLEAR m off each end, read from the samples and the frames between its first and last sample
   const { frames, samples } = await page.evaluate(() => { const q = /** @type {any} */ (window).__drive; return { frames: q.frames, samples: q.samples.filter((/** @type {any} */ r) => r.err === undefined) }; });
@@ -148,7 +159,7 @@ try {
     const mid = rows.filter((/** @type {any} */ r) => along(r) >= MEASURE_CLEAR && along(r) <= len - MEASURE_CLEAR);
     const span = mid.length < 2 ? [] : frames.filter((/** @type {number[]} */ r) => (r[0] ?? 0) >= mid[0].t && (r[0] ?? 0) <= mid.at(-1).t).map((/** @type {number[]} */ r) => r[1] ?? 0);
     const speed = (/** @type {number} */ i) => Math.hypot(mid[i].x - mid[i - 1].x, mid[i].z - mid[i - 1].z) / Math.max(1, mid[i].t - mid[i - 1].t);
-    const speeds = mid.map((_, i) => i > 0 ? speed(i) : Number.NaN).filter(v => Number.isFinite(v)).sort((x, y) => x - y), cruise = speeds[Math.floor(speeds.length / 2)] ?? 0;
+    const speeds = mid.map((/** @type {unknown} */ _, /** @type {number} */ i) => i > 0 ? speed(i) : Number.NaN).filter((/** @type {number} */ v) => Number.isFinite(v)).sort((/** @type {number} */ x, /** @type {number} */ y) => x - y), cruise = speeds[Math.floor(speeds.length / 2)] ?? 0;
     let stop = 0, worstStop = 0, stopAt = null;
     for (let i = 1; i < mid.length; i++) { stop = speed(i) < cruise * 0.9 ? stop + (mid[i].t - mid[i - 1].t) : 0; if (stop > worstStop) { worstStop = stop; stopAt = { x: mid[i].x, z: mid[i].z }; } }
     const cards = rows.filter((/** @type {any} */ r) => r.card !== null), mbs = rows.map((/** @type {any} */ r) => r.mb).filter((/** @type {unknown} */ v) => typeof v === 'number');
@@ -167,12 +178,12 @@ try {
     await page.keyboard.up('KeyW');
     await sleep(2500);
   }
-  result.back = await page.evaluate(([after, slug]) => {
+  result.back = await page.evaluate(({ after, slug }) => {
     const W = /** @type {any} */ (window), q = W.__drive, rows = q.samples.filter((/** @type {any} */ r) => r.err === undefined && r.t >= after), st = W.__wildshard.shard.grid.state();
     const span = q.frames.filter((/** @type {number[]} */ r) => (r[0] ?? 0) >= after).map((/** @type {number[]} */ r) => r[1] ?? 0);
     return { reached: q.done === true, inside: st.inside === slug, control: st.live?.live?.gameplayReady === true, cardMs: rows.filter((/** @type {any} */ r) => r.card !== null).length * 50,
       cards: [...new Set(rows.filter((/** @type {any} */ r) => r.card !== null).map((/** @type {any} */ r) => `${String(r.card)}:${String(r.stage)}`))], worstFrameMs: Math.max(0, ...span), over50: span.filter((/** @type {number} */ ms) => ms > 50).length };
-  }, [backFrom, home.slug]);
+  }, { after: backFrom, slug: home.slug });
   await page.screenshot({ path: join(out, `${tag}-road-drive.png`) });
   const driven = result.segments.filter(row => row.driven === true), mbAll = driven.flatMap(row => { const mb = /** @type {any} */ (row.mb); return mb === null ? [] : [mb.min, mb.max]; });
   const phoneBar = device !== '' ? 1 : 0, over50 = driven.reduce((sum, row) => sum + Number(row.over50), 0);

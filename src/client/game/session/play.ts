@@ -4,6 +4,7 @@ import { ownedSave } from '../../../shared/game/saves';
 import type { GridSession as DeclarationGridSession } from '../grid/session';
 import { exitSessionToTitle } from './exitToTitle';
 import { initialHomeMetadataRequired } from '../grid/homeMetadata';
+import { enterZone } from '../grid/pageEntry';
 import { timeClientPreparation } from '../shardfile/preparationTiming';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { Audio } from '@wildshard/engine/audio/Audio';
@@ -176,6 +177,8 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     },
     prepareSkyLayers: () => game.warmSkyLayers(),
     ...(ctx.session.residency === undefined ? {} : { residency: ctx.session.residency }),
+    // ZE10 (J352): a gate's count reached 0: the full loading screen, and that cell becomes the home
+    enterZone: (instance) => { enterZone(instance); },
     onFixed: (fn) => { game.onFixed('post', fn, 'game.grid.session'); },
     frame: { prepareDisplay: pass => game.preparePostPass(pass), scene: game.rootScene, camera: game.camera, composer: () => game.composer, post: () => game.post, sunDir: () => game.sky.sunDir, cinematic: () => game.regionCinematic(), slices: () => game.depthSlices,
       // G321: the frame blends the camera's field of view by owner; the shadow cascades follow it
