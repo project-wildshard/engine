@@ -179,6 +179,7 @@
       "rules": {
         "eslint/max-statements": "off",
         "eslint/max-lines-per-function": "off",
+        "eslint/id-length": ["error", { "exceptions": ["x", "y", "z"] }],
         "eslint/no-underscore-dangle": [
           "error",
           { "allow": ["__wildshard", "__workerClientRow", "__workerClient"] }

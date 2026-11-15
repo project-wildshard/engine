@@ -20,6 +20,10 @@ interface SmokeProbe {
   readonly state: () => {
     readonly player: { readonly pos: SmokeVec3; readonly health: number }
   }
+  readonly pose: (pose: {
+    readonly x: number
+    readonly z: number
+  }) => Promise<void>
 }
 
 declare global {

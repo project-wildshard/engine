@@ -1,6 +1,6 @@
 import { devices, expect, test as base } from '@playwright/test'
 
-import { saveFixture } from '../../../scripts/debug-settings.mjs'
+import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 
 import type { Browser, BrowserContext, Page } from '@playwright/test'
 
@@ -77,6 +77,7 @@ async function openWorld(
   })
   try {
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true })
+    await harnessPins(context, { seed: 357 })
     const page = await context.newPage()
     await seat(page)
     return { context, page }
