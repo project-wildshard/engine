@@ -9,6 +9,8 @@ import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { GridSimulation } from '../src/server/game/grid/simulation';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import { findShard } from '../src/client/game/shard/registry';
+import { gridBoardLimitAt } from '../src/shared/game/grid/rules';
+import { hoverSpeed } from '../src/shared/engine/player/hoverSpeed';
 
 // P1-E5.3-A10: the server's board reads the grid's cap as the page does, from world feet, wherever the seat's host keeps them.
 const level: SimLevel = { ...SIM_LEVEL, entities: [], ground: { size: 3000, height: 0 } };
@@ -69,4 +71,16 @@ test('a placement says road exactly where its shard does: the server reads no ma
     if (manifest === undefined) throw new Error(`No manifest for ${cell.slug}`);
     expect([cell.slug, cell.speedClass]).toEqual([cell.slug, manifest.hoverSpeedClass === 'road' ? 'road' : undefined]);
   }
+});
+
+test('QA 11-15 row 8: one world-feet read for every host, off the origin and in a road-class cell', () => {
+  const pitch = CONTENT_CAPS.pitch, deck = CHUNK_HALF + STRIP + ROAD_WIDTH / 2;
+  const grid = { pitch, cells: [{ cell: [0, 0] as const }, { cell: [-1, 0] as const }, { cell: [2, 1] as const, speedClass: 'road' as const }] };
+  expect(gridBoardLimitAt(grid, { x: -pitch + 100, y: 1, z: 30 })).toBe(14); // inside [-1, 0]
+  expect(gridBoardLimitAt(grid, { x: -deck, y: 0.5, z: 120 })).toBe(30); // the deck between [0, 0] and [-1, 0]
+  expect(gridBoardLimitAt(grid, { x: -deck, y: 6, z: 120 })).toBe(14); // over the deck, off it
+  expect(gridBoardLimitAt(grid, { x: 2 * pitch + 10, y: 1, z: pitch - 40 })).toBe(30); // a road-class cell's interior
+  const strip = gridBoardLimitAt(grid, { x: -pitch + CHUNK_HALF + STRIP / 2, y: 1, z: 0 }); // [-1, 0]'s east strip
+  expect(strip).toBeGreaterThan(14); expect(strip).toBeLessThan(30);
+  expect(hoverSpeed(14, true)).toBe(56); expect(hoverSpeed(30, true)).toBe(60); // G540
 });

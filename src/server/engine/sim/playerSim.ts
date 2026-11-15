@@ -25,7 +25,7 @@ import type { SimCommand, SimExternalPlayer, SimHost, SimPlayerBody, SimPlayerDr
 /** The world-space command a tick's input means. */
 /** Developer boost is a Developer page's, on its own server: a standalone worker says so at boot, and any other host ignores the button. */
 let developerBoost = false;
-export function allowDeveloperBoost(): void { developerBoost = true; }
+export function allowDeveloperBoost(on = true): void { developerBoost = on; }
 export function simCommandOf(input: SimTickCommand): SimCommand { return 'seq' in input ? netSimCommand(input) : input; }
 /** A board whose "riding near the ride height" is the fall's ground. */
 function boardOn(fall: { grounded: boolean }): BoardState & { on: boolean } {

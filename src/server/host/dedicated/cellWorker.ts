@@ -29,7 +29,7 @@ if (port === null) throw new Error('A cell runs in a worker');
 for (const row of placed ?? []) placeCell(row);
 const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 };
 const rapier = await loadRapier(await readFile(new URL('rapier.wasm', import.meta.url)));
-runCells(port as unknown as CellPort, { slugs, build, bootId: () => randomBytes(4).toString('hex'), memory: () => process.memoryUsage(), ...(metrics === true ? { lag: loopLag() } : {}), closed: () => { process.exit(0); }, ...(holdMs === undefined ? {} : { holdMs }), ...(emptyMs === undefined ? {} : { emptyMs }),...(playtest===undefined?{}:{playtest}),...(crossing === true ? { road: async () => {
+runCells(port as unknown as CellPort, { slugs, build, developerBoost: process.env['WORLD_BOOST'] !== 'off', bootId: () => randomBytes(4).toString('hex'), memory: () => process.memoryUsage(), ...(metrics === true ? { lag: loopLag() } : {}), closed: () => { process.exit(0); }, ...(holdMs === undefined ? {} : { holdMs }), ...(emptyMs === undefined ? {} : { emptyMs }),...(playtest===undefined?{}:{playtest}),...(crossing === true ? { road: async () => {
     // A build whose server book has no grid pack gives a road with no strips: this line says so before anyone falls through it.
     const strips = await readPackGrid(build, { origin, cache }, reads);
     console.info(JSON.stringify({ at: 'road.pack', strips: strips.length, ...reads }));

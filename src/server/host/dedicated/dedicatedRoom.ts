@@ -245,12 +245,14 @@ export class DedicatedRoom implements CrossTarget {
   }
   /**
    * QA 11-15 row 8: a grid cell's board cap is the page's (`installGridHoverSpeed`): 14 m/s inside (G39), easing to the road's 30 over
-   * the strip (G60), 30 throughout a road-class padding cell (G540). Read from world feet, this cell's frame lifted by its placement.
+   * the strip (G60), 30 throughout a road-class padding cell (G540). Read from world feet: this cell's x and z moved by its placement.
    * A cell the grid doesn't place keeps the standalone 14.
    */
   private capBoard(player: PlayerSim): void {
-    const assembly = gridAssembly(), cell = assembly.cells.find(row => row.instance === this.name);
-    player.hoverSpeedLimit = cell === undefined ? null : () => gridBoardLimitAt(assembly, assembly.world(player.position, cell));
+    player.hoverSpeedLimit = () => {
+      const assembly = this.options.road?.assembly ?? gridAssembly(), cell = assembly.cells.find(row => row.instance === this.name);
+      return cell === undefined ? 14 : gridBoardLimitAt(assembly, assembly.world(player.position, cell));
+    };
   }
   /** GC30: whether a walker off the road stands at this cell's entryways (`entrywaysStand`); else its worker's road walls it. */
   entrywaysStand(): boolean { return entrywaysStand(this.host.physics, ARRIVAL_LIFT); }

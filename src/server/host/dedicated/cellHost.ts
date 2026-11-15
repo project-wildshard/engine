@@ -63,6 +63,8 @@ export interface CellHostOptions {
   readonly booted?: (slug: string, room: DedicatedRoom) => void;
   readonly roaded?: (road: RoadRoom) => void;
   readonly playtest?:boolean;
+  /** QA 11-15 row 8 (G540): honour a Developer page's boost bit (on unless `WORLD_BOOST=off`, `cellWorker.ts`). */
+  readonly developerBoost?: boolean;
   /**
    * GC15 (`WORLD_CROSSING=worker`): the grid pack's road strips. Given, this worker hosts the road between its cells, each of its grid
    * cells opens onto it instead of standing in lone walls, and a seat walks cell, road, cell on one socket. Left out, or no strips, every cell is lone.
@@ -84,8 +86,9 @@ function installCellIdentity(): void {
 /** Run one worker's cells until it is told to close. Anything that ends it says `failed`, and the process ends (Q77). */
 export function runCells(port: CellPort, options: CellHostOptions): { dispose: () => void } {
   // QA 11-15 row 8 (G540: Developer boost "everywhere"): a Developer page's boost bit moves its board here too, to the shared speed
-  // law's 56 m/s in a shard and 60 on the road, so the page's prediction and this authority agree. Replaces E7.7's "never installed".
-  allowDeveloperBoost();
+  // law's 56 m/s in a shard and 60 on the road, so the page's prediction and this authority agree. Replaces E7.7's "never installed";
+  // `WORLD_BOOST=off` on a box turns it back off. The server can't tell a Developer page from another, so this trusts the bit.
+  allowDeveloperBoost(options.developerBoost !== false);
   const scope = new Scope('dedicated.worker'), started = diagnosticNow(), cells = new Map<string, Cell>();
   let clock: ServerClock | undefined, disposed = false, ready = false, ticks: number[] = [], ticked = 0, readAt = started, dropsAt = 0;
   /** SC8: each awake cell's own tick time since the last reading (ms summed, ticks counted), so a bench can weigh cells by awake cost. */

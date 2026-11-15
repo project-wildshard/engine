@@ -65,7 +65,7 @@ test('a full world closes `full`, a freed seat lets the next in, and a second so
 });
 
 test('`climate` changes nothing, and a buy needs the seller', { timeout: 60_000 }, async () => {
-  bench = await roomBench();
+  bench = await roomBench({ developerBoost: false });
   const phone = bot('device:shopper');
   expect(await phone.arrived()).toBe(true);
   const room = roomOf(), body = room.bodyOf('device:shopper'), owned = room.cell.owned.of(body?.id ?? ''), whetstone = 0;
@@ -86,9 +86,10 @@ test('`climate` changes nothing, and a buy needs the seller', { timeout: 60_000 
   phone.client.act({ kind: 'buy', seq: 0, good: whetstone });
   await vi.waitFor(() => { expect(owned.purse.coins).toBeLessThan(coins); }, { timeout: 2000 });
   expect(refused()).toBe(2);
-  // QA 11-15 row 8 (G540): a Developer page's boost is honoured here as on its own server (it was E7.7's "never installed")
+  // a box with `WORLD_BOOST=off` (QA 11-15 row 8: the boost is honoured by default, G540) ignores the button
   phone.thumb = () => ({ viewTick: 0, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw: 0, pitch: 0, buttons: NET_BUTTONS.boost });
-  await vi.waitFor(() => { expect(Reflect.get(body, 'boosted')).toBe(true); }, { timeout: 2000 });
+  await new Promise(resolve => { setTimeout(resolve, 100); });
+  expect(Reflect.get(body, 'boosted')).toBe(false);
   phone.thumb = stillThumb;
   // and walking off shuts it
   const paid = owned.purse.coins;

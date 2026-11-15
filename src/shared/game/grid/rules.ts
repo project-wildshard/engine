@@ -28,8 +28,9 @@ export function gridBoardLimit(state: GridHoverState): number {
 /** What `gridBoardLimitAt` reads of a grid: its pitch and each placed cell's spot and speed class (`GridAssembly`). */
 export interface GridHoverCells { readonly pitch: number; readonly cells: readonly { readonly cell: readonly [number, number]; readonly speedClass?: 'road' }[] }
 /**
- * The board's cap at world-frame feet on this grid: the page's, the in-page server's and a dedicated worker's road and cell rooms'
- * one read of it, so prediction and authority agree (QA 11-15 row 8: G60's 30 m/s road, G39's 14 m/s shard, G540's road class).
+ * The board's cap at world-frame feet on this grid: the in-page server's and a dedicated worker's road and cell rooms' one read of
+ * it, the same `gridBoardLimit` the page's `installGridHoverSpeed` reads, so prediction and authority agree (QA 11-15 row 8: G60's
+ * 30 m/s road, G39's 14 m/s shard, G540's road class).
  */
 export function gridBoardLimitAt(grid: GridHoverCells, feet: Readonly<GridPoint>, shardCap = 14): number {
   finite(feet);

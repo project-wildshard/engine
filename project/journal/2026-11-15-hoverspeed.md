@@ -9,7 +9,12 @@ Meta QA 11-15 rows 8 and 9.
   them; a dedicated worker's cell and road rooms installed no board cap and
   refused boost (E7.7's "never installed"), so online every case ran 14 while
   the page predicted 30/56/60. `gridBoardLimitAt` (shared/game/grid/rules.ts)
-  is now the one world-feet read for all three; `runCells` grants the boost.
+  is now the servers' one world-feet read (the page computes the same through
+  `gridBoardLimit`); `runCells` grants the boost unless `WORLD_BOOST=off`.
+  Review: the server can't tell a Developer page from another, so it trusts the
+  bit; the kill switch is the reversible half. Placed cells (SA33) still drop
+  `speedClass` in `gridAssembly()` (pre-existing): such a road-class cell runs 14
+  on the server and 30 on the page.
   `test/dedicated-board-speed.test.ts` drives bots over real sockets: 14/14/14/14
   before, 14/30/56/60 after.
 - Row 9: Jake wants the left-edge HOVER tab to say BOOST while boost is on
