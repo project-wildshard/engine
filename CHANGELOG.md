@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.22 (2026-11-15)
+
+- Brasscap Mesa: you walk in with the lever-action in hand, its rack restocks your rounds, and every bandit and beast in the cell is drawn.
+- A shard placed on the grid after a release keeps its road speed limit on the server too.
+- When the world's files fail to download, the game says so and offers Try again instead of waiting forever.
+- Reloading for a new version brings you back into the game rather than to the title.
+- Behind the scenes: the server swaps out a stuck or drained worker without dropping players, and the cook follows staging by itself.
+
 ## v0.1.21 (2026-11-15)
 
 - The hoverboard is faster online too: 14 m/s in a shard and 30 on the road, and boost is four times that (56 and 120).
