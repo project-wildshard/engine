@@ -22,7 +22,6 @@
   "test/client-runtime-declaration.test.ts",
   "test/client-script-bridge-values.test.ts",
   "test/client-script-transactions-regression.test.ts",
-  "test/client-stealth-entry.test.ts",
   "test/client-timed-encounters.test.ts",
   "test/client-wildlife.test.ts",
   "test/contract-page-admission.test.ts",

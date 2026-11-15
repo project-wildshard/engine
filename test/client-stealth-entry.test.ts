@@ -1,4 +1,3 @@
-import { originalHeldMetadata } from './fixtures/nalati-held-original';
 import { expect, test, vi } from 'vitest';
 import { Vector3 } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
@@ -19,8 +18,9 @@ import { CLIENT_FEATURES } from '../src/client/game/shardfile/clientPlan';
 import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { emptyShardfile } from '../src/shared/host/author';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { lendNalatiAdmission } from './fixtures/nalati-return-modules';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
+import { lendFrozenNalatiAdmission } from './fixtures/frozen/nalati';
+import { frozenStealthRows } from './fixtures/frozen/stealthRows';
 
 const row: Extract<ClientFeatureRow, {kind: 'stealth.entry'}> = {
   kind: 'stealth.entry', owner: 'orchard.stealth', claims: 'orchard.claims', riding: 'orchard.mount', night: 'orchard.night',
@@ -99,12 +99,12 @@ test('a missing world refuses before construction or publication', () => {
 
 
 test('world admission reserves only stealth memory; controller guest initialization remains at prepare-play', async () => {
-  const scope = new Scope('early-stealth'), rows: unknown = originalHeldMetadata().stealth;
+  const scope = new Scope('early-stealth'), rows: unknown = frozenStealthRows;
   const product = createShardProduct({slug: 'orchard', revision: 1,
     shardfile: emptyShardfile({slug: 'orchard', name: 'Orchard', author: 'Test', revision: 1, seed: 1}),
     sections: new Map([['player/stealth', rows]]), files: new Map(), read: () => Promise.reject(new Error('Stealth needs no file read'))});
   const ctx = legacyDouble<ShardContext>({scope, product}), feature = CLIENT_FEATURES['stealth.entry'];
-  lendNalatiAdmission(scope);
+  lendFrozenNalatiAdmission(scope);
   const memory = vi.spyOn(WebAssembly, 'Memory'), instance = vi.spyOn(WebAssembly, 'Instance');
   try {
     expect(feature.phase).toBe('prepare-play'); expect(feature.world?.rank).toBe(0);

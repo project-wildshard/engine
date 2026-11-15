@@ -9455,5 +9455,23 @@
     "sourceRevision": "2a4bc1615538b62cc651918e7df26cf9cd8ffb1e",
     "sourceBlob": "647eebcb7b0c4d1e5839f2432c4c86c7ba8dd50d",
     "retirementProof": "Restored current return-program and strike public boundaries; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/client-stealth-entry.test.ts",
+    "outcome": "restored",
+    "target": "test/client-stealth-entry.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): the early world-admission proof uses a compact engine stealth row and the pinned ABI2 admission loan, not moved Nalati metadata or return-module helpers.",
+    "originalTests": [
+      "strict entry rows refuse executable settings, unknown fields and negative exclusion radii",
+      "fired and impact callbacks preserve the original order and exact exclusion boundary",
+      "original population replacement and sliced owner retirement refuse before weapon or frame effects",
+      "disposal restores only its own bow wrapper and unregisters original event listeners",
+      "a missing world refuses before construction or publication",
+      "world admission reserves only stealth memory; controller guest initialization remains at prepare-play"
+    ],
+    "sourceRevision": "11bf212eea8b39e31c042dbbd13dfbc57dd0fc82",
+    "sourceBlob": "d9879af3d1ff997bad827659cc75a688994605af",
+    "retirementProof": "Restored current client-stealth public boundary; no J186 retirement or successor equivalence claimed."
   }
 ]
