@@ -9,3 +9,4 @@ export function observeRefinement<T extends readonly unknown[]>(proto:{add:(...a
   jobs:{id:T[0];at:T[1];state:string;error?:string}[];
 };
 export function heldGoldenResidency():Promise<unknown>;
+export function goldenScriptPaths(graph: unknown, build: string): string[];

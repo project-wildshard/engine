@@ -20,6 +20,14 @@ test('the Nine reader scans the build folder and the shared chunks its import ma
     mkdirSync(join(root, 'assets'));
     writeFileSync(join(root, 'assets/old-a.js'), '');
     expect(buildCodeChunks(root, 'missing')).toEqual(['/assets/old-a.js']);
+    // Current builds use the exact owner graph, even when an old import map remains.
+    writeFileSync(join(root, 'deploy-chunks.json'), JSON.stringify({builds: [
+      {build: 'abc-1', files: [{path: 'b/abc-1/main-x.js'}, {path: 'b/c/owned-new.js'}]},
+      {build: 'previous', files: [{path: 'b/c/other-build-z.js'}]},
+    ]}));
+    expect(buildCodeChunks(root, 'abc-1')).toEqual(['/b/abc-1/main-x.js', '/b/c/owned-new.js']);
+    expect(() => buildCodeChunks(root, 'missing')).toThrow('ambiguous');
+
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

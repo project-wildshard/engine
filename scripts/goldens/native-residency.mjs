@@ -48,12 +48,14 @@ export async function goldenRefinementBinding(base,source) {
     nineIndexSHA256:createHash('sha256').update(index).digest('hex'),chunk,chunkSHA256:createHash('sha256').update(served).digest('hex')};
 }
 
-/** This build's code chunks, as served paths: its own folder `b/<build>`, plus the
+/** Prefer the current build's chunk ownership graph (PZ5). Legacy builds use their own folder `b/<build>`, plus the
  * content-named chunks in the shared `b/c` that its `importmap.json` names (J217
  * LD6). The shared folder can also hold other builds' chunks, so it is never
  * listed. A build without `b/<build>` keeps everything in `assets/`.
  * @param {string} root the preview's dist @param {string} build */
 export function buildCodeChunks(root,build) {
+  const graph=join(root,'deploy-chunks.json');
+  if (existsSync(graph)) return goldenScriptPaths(JSON.parse(readFileSync(graph,'utf8')),build).map(file=>`/${file}`);
   const own=`b/${build}`;
   if (!existsSync(join(root,own))) return readdirSync(join(root,'assets')).filter(file=>file.endsWith('.js')).map(file=>`/assets/${file}`);
   const chunks=readdirSync(join(root,own)).filter(file=>file.endsWith('.js')).map(file=>`/${own}/${file}`);
@@ -61,6 +63,17 @@ export function buildCodeChunks(root,build) {
   if (existsSync(map)) for (const target of Object.values(JSON.parse(readFileSync(map,'utf8')).imports??{}))
     if (typeof target==='string'&&target.startsWith('/b/c/')&&target.endsWith('.js')&&!chunks.includes(target)) chunks.push(target);
   return chunks;
+}
+
+/** The current build's owned JavaScript, including shared chunks, excluding carry-only files.
+ * @param {unknown} graph @param {string} build @returns {string[]} */
+export function goldenScriptPaths(graph,build) {
+  const rows=typeof graph==='object'&&graph!==null?Reflect.get(graph,'builds'):undefined;
+  if (!Array.isArray(rows)) throw new Error('Golden chunk graph is missing');
+  const owners=rows.filter(row=>row?.build===build);
+  if (owners.length!==1||!Array.isArray(owners[0].files)) throw new Error('Golden build chunk ownership is ambiguous');
+  return owners[0].files.map(row=>row.path).filter(path=>typeof path==='string'&&path.endsWith('.js')
+    &&path.startsWith('b/')&&!path.split('/').some(part=>part==='..'||part===''||part.includes('\\')));
 }
 
 /** Fail closed when the compiler shape changes; no guessed export or copied release binding.
