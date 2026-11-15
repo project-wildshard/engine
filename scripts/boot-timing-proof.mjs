@@ -168,7 +168,7 @@ if(expectedBuild!==undefined) {
       const timing=await page.evaluate(snapshot);
       assert.ok(timing);
       assert.equal(Object.keys(timing.overflow??{}).length,0,'bounded collector overflowed');
-      if(process.argv.includes('--inspect')) console.log(JSON.stringify({server:timing.entries.filter(row=>row.operation.startsWith('server:')).map(row=>({operation:row.operation,realm:row.realm,start:row.start,end:row.end})),workerResources:timing.resources.filter(row=>row.realm!=='page').map(row=>row.url)}));
+      if(process.argv.includes('--inspect')) console.log(JSON.stringify({server:timing.entries.filter(row=>row.operation.startsWith('server:')).map(row=>({operation:row.operation,realm:row.realm,start:row.start,end:row.end})),clientPreloads:timing.entries.filter(row=>row.operation==='app:client-module-preload').map(row=>row.detail),workerResources:timing.resources.filter(row=>row.realm!=='page').map(row=>row.url)}));
       const operations=new Set(timing.entries.map(row=>row.operation));
       if(process.argv.includes('--worker-bootstrap')) {
         assert.ok(operations.has('server:worker-bootstrap-ready'),'actual bootstrap receipt absent');

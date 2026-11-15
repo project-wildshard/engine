@@ -1,4 +1,5 @@
 import { beginLoadingWait, loadingWaitState } from '../../../shared/engine/boot/loadingWaits';
+import { bootMark } from '../../../shared/engine/boot/timing';
 
 /** Adopt the same inline fallback and bind early promises to the real attempt.
  * Neither adoption nor a new renderer resets any pending operation's clock. */
@@ -92,21 +93,25 @@ export function preloadModuleFiles(input: unknown): void {
   const files = readModuleFiles(input);
   preloadAdmittedModuleFiles(files);
 }
-function preloadAdmittedModuleFiles(files: readonly (readonly [string, number])[]): void {
-  if (typeof document === 'undefined') return;
+function preloadAdmittedModuleFiles(files: readonly (readonly [string, number])[]): { readonly inserted: number; readonly existing: number } {
+  if (typeof document === 'undefined') return { inserted: 0, existing: 0 };
   const present = new Set([...document.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]')].map(link => link.href));
+  let inserted = 0, existing = 0;
   for (const [url] of files) {
     if (!url.endsWith('.js')) continue;
     const href = new URL(url, document.baseURI).href;
-    if (present.has(href)) continue;
+    if (present.has(href)) { existing++; continue; }
     present.add(href);
     const link = document.createElement('link'); link.rel = 'modulepreload'; link.crossOrigin = 'anonymous'; link.href = href;
-    document.head.append(link);
+    document.head.append(link); inserted++;
   }
+  return { inserted, existing };
 }
 /** Admission of every selected row precedes every preload and declaration. */
 export function preloadModuleGroups(kinds: readonly string[]): void {
   const selection = selectedModuleFiles(kinds);
   if (selection === undefined) return;
-  preloadAdmittedModuleFiles(selection.files);
+  const result = preloadAdmittedModuleFiles(selection.files);
+  bootMark('app:client-module-preload', { groups: [...new Set(kinds)].join(','), files: selection.files.length,
+    bytes: selection.files.reduce((total, [, bytes]) => total + bytes, 0), ...result });
 }

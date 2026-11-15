@@ -4,8 +4,9 @@ import { readModuleFiles, readModuleGroups, preloadModuleFiles, preloadModuleGro
 import { checkClientPlanModules, checkProductClientModules, prepareClientModuleGroups } from '../src/client/game/shardfile/clientModules';
 import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { emptyShardfile } from '../src/shared/host/author';
+import { bootTiming } from '../src/shared/engine/boot/timing';
 
-afterEach(() => { document.body.replaceChildren(); for (const link of document.querySelectorAll('link[rel="modulepreload"]')) link.remove(); });
+afterEach(() => { document.body.replaceChildren(); Reflect.deleteProperty(globalThis, '__bootTiming'); for (const link of document.querySelectorAll('link[rel="modulepreload"]')) link.remove(); });
 function bank(input: unknown): void {
   const element = document.createElement('script'); element.id = 'boot-module-files';
   element.textContent = JSON.stringify({optional:input}); document.body.append(element);
@@ -108,6 +109,21 @@ test('selected preloads start together without importing code', () => {
   expect(document.querySelectorAll('script[src]')).toHaveLength(0);
   preloadModuleFiles([['/assets/direct.js',5]]);
   expect(document.querySelector('link[href$="/assets/direct.js"]')?.getAttribute('crossorigin')).toBe('anonymous');
+});
+
+test('selected graph preloads leave a bounded named boot receipt', () => {
+  bank({files:[['/assets/shared.js',4],['/assets/scenes.js',6]],groups:{'world.scenes':[0,1]}});
+  const entries: { operation: string; detail: unknown }[] = [];
+  Reflect.set(globalThis, '__bootTiming', { version: 1, begin: () => 0, mark: (operation: string, detail: unknown) => entries.push({ operation, detail }) });
+  const timing = bootTiming();
+  if (timing === undefined) throw new Error('Missing boot timing collector');
+  const before = entries.length;
+  preloadModuleGroups(['world.scenes']);
+  expect(entries.slice(before)).toContainEqual(expect.objectContaining({ operation: 'app:client-module-preload',
+    detail: { groups: 'world.scenes', files: 2, bytes: 10, inserted: 2, existing: 0 } }));
+  preloadModuleGroups(['world.scenes']);
+  expect(entries.at(-1)).toEqual(expect.objectContaining({ operation: 'app:client-module-preload',
+    detail: { groups: 'world.scenes', files: 2, bytes: 10, inserted: 0, existing: 2 } }));
 });
 
 test('invalid selected suffixes create no preload prefix', () => {
