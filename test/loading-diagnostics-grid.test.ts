@@ -47,5 +47,12 @@ it('NB15/NB14: copies a full grid boot below 6 KB with its real build and slowes
     const sparse=loading.diagnosticsText();
     expect(new TextEncoder().encode(sparse).byteLength).toBeLessThan(6000);
     expect(sparse).toContain('0.2+1 every 1.2 x706');
+    timing.resources=timing.resources.map((row,index)=>({...row,startTime:index*1200.4,responseEnd:index*1200.4+200}));
+    const last=timing.entries.at(-1);if(last===undefined)throw new Error('Missing end mark');
+    last.start=706*1200.4;last.end=last.start;
+    const fractional=loading.diagnosticsText();
+    expect(new TextEncoder().encode(fractional).byteLength).toBeLessThan(6000);
+    expect(fractional).toContain('0.2+1 every 1.2004 x706');
+    expect(0.2+705*1.2004).toBeCloseTo((705*1200.4+200)/1000,6);
   }finally{loading.scope.dispose();}
 });

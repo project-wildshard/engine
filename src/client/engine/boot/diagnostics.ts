@@ -250,12 +250,12 @@ export function compactBootDiagnostics(timing:BootTiming|undefined):{summary:rea
   const gapLines:string[]=[],stamp=(ms:number):string=>String(Number((ms/1000).toFixed(3)));
   for(let index=0;index<gaps.length;){
     const gap=gaps[index];if(gap===undefined)break;
-    const next=gaps[index+1],stride=next===undefined?0:next.start-gap.start;
+    const next=gaps[index+1],stride=next===undefined?0:Number(((next.start-gap.start)/1000).toFixed(9));
     let count=1;
-    if(stride>0)while(gaps[index+count]!==undefined&&Math.abs((gaps[index+count]?.ms??0)-gap.ms)<0.001
-      &&Math.abs((gaps[index+count]?.start??0)-(gap.start+count*stride))<0.001)count++;
+    if(stride>0)while(gaps[index+count]!==undefined&&stamp(gaps[index+count]?.ms??0)===stamp(gap.ms)
+      &&stamp(gaps[index+count]?.start??0)===stamp((Number(stamp(gap.start))+count*stride)*1000))count++;
     const repeated=count>=3;
-    gapLines.push(`${stamp(gap.start)}+${stamp(gap.ms)}${repeated?` every ${stamp(stride)} x${count}`:''}`);
+    gapLines.push(`${stamp(gap.start)}+${stamp(gap.ms)}${repeated?` every ${stride} x${count}`:''}`);
     index+=repeated?count:1;
   }
   timeline.push(`request-free gaps >0.5 s (page clock, start+duration s): ${gapLines.join(', ')||'none'}`);

@@ -205,10 +205,25 @@ try {
           const duration=(/** @type {Readonly<Record<string,unknown>>} */row)=>Number(row.duration??Number(row.responseEnd??0)-Number(row.startTime??0));
           const resources=[...raw.resources].sort((a,b)=>duration(b)-duration(a)).slice(0,10);
           const network=raw.resources.filter(row=>Number(row.transferSize)>0),cache=raw.resources.filter(row=>row.transferSize===0&&Number(row.encodedBodySize)>0);
+          const end=Math.max(0,...raw.entries.filter(row=>row.realm==='page').map(row=>row.end??row.start));
+          const edges=[{at:0,change:0},{at:end,change:0}];
+          const cover=(/** @type {unknown} */start,/** @type {unknown} */finish)=>{
+            if(typeof start!=='number'||typeof finish!=='number'||!Number.isFinite(start)||!Number.isFinite(finish))return;
+            const left=Math.max(0,start),right=Math.min(end,finish);
+            if(right>left)edges.push({at:left,change:1},{at:right,change:-1});
+          };
+          for(const row of raw.resources)cover(row.pageStart??(row.realm==='page'?row.startTime:undefined),row.pageEnd??(row.realm==='page'?row.responseEnd:undefined));
+          if(raw.navigation!==undefined)cover(raw.navigation.startTime??0,raw.navigation.responseEnd);
+          const gaps=/** @type {Array<[number,number]>} */([]);
+          let active=0,previous=0;
+          for(const edge of edges.sort((a,b)=>a.at-b.at)){
+            if(active===0&&edge.at-previous>500)gaps.push([previous/1000,(edge.at-previous)/1000]);
+            active+=edge.change;previous=edge.at;
+          }
           const expected={entries:raw.entries.length,resources:raw.resources.length,
             spans:spans.map(row=>`[${row.realm}] ${(row.start/1000).toFixed(2)} + ${(((row.end??0)-row.start)/1000).toFixed(2)}`),
             slow:resources.map(row=>`${Number(row.transferSize)>0?row.transferSize:row.encodedBodySize??0} B ${(duration(row)/1000).toFixed(2)} s ${Number(row.transferSize)>0?'network':row.transferSize===0&&Number(row.encodedBodySize)>0?'cache':'unknown'}`),
-            totals:`network ${network.length} / ${network.reduce((sum,row)=>sum+Number(row.transferSize),0)} B; cache ${cache.length} / ${cache.reduce((sum,row)=>sum+Number(row.encodedBodySize),0)} B`};
+            gaps,totals:`network ${network.length} / ${network.reduce((sum,row)=>sum+Number(row.transferSize),0)} B; cache ${cache.length} / ${cache.reduce((sum,row)=>sum+Number(row.encodedBodySize),0)} B`};
           const receipt={text,expected,settled:false,success:false};Reflect.set(window,'__copyReceipt',receipt);
           return original(text).then(()=>{receipt.settled=true;receipt.success=true;return undefined;},(/** @type {unknown} */error)=>{receipt.settled=true;throw error;});
         };
@@ -223,11 +238,21 @@ try {
         const marker='timeline (LS1):\n',at=native.indexOf(marker);
         if(at===-1)return {ok:false,reason:'no timeline digest'};
         const expected=receipt.expected,bytes=new TextEncoder().encode(native).byteLength;
+        const gapText=native.split('\n').find(line=>line.startsWith('request-free gaps >0.5 s'))?.split(': ')[1];
+        const gaps=/** @type {Array<[number,number]>} */([]);
+        for(const item of gapText===undefined||gapText==='none'?[]:gapText.split(', ')){
+          const match=/^(\d+(?:\.\d+)?)\+(\d+(?:\.\d+)?)(?: every (\d+(?:\.\d+)?) x(\d+))?$/u.exec(item);
+          if(match===null)return {ok:false,reason:'unreadable gap interval'};
+          for(let index=0;index<Number(match[4]??1);index++)gaps.push([Number(match[1])+index*Number(match[3]??0),Number(match[2])]);
+        }
+        const gapsMatch=gaps.length===expected.gaps.length&&gaps.every(([start,ms],index)=>{
+          const held=expected.gaps[index];return held!==undefined&&Math.abs(start-held[0])<=0.00051&&Math.abs(ms-held[1])<=0.00051;
+        });
         const complete=native.includes(`counts: ${expected.entries} spans (`)&&native.includes(`${expected.resources} resources;`)
           &&native.includes('longest spans (start s + duration s):')&&native.includes('slowest resources (bytes, duration s, source):')
           &&native.includes('request-free gaps >0.5 s')&&!native.includes('"entries":')
           &&expected.spans.every((/** @type {string} */fact)=>native.includes(fact))
-          &&expected.slow.every((/** @type {string} */fact)=>native.includes(fact))&&native.includes(expected.totals);
+          &&expected.slow.every((/** @type {string} */fact)=>native.includes(fact))&&native.includes(expected.totals)&&gapsMatch;
         return {ok:complete&&bytes<6000&&document.querySelector('.ws-load-copy')?.textContent==='Copied',
           reason:complete?`compact safe report: ${bytes} bytes, ${expected.entries} spans, ${expected.resources} resources`:'missing compact timeline facts'};
       });

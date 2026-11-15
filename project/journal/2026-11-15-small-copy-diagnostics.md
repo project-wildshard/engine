@@ -32,3 +32,10 @@ compares ranked durations and byte totals with independent collector facts too.
 Five files still pass 52 cases and layer TypeScript. The 6 KB size requirement
 is the full Nine boot report; no claim is made for arbitrarily long sessions
 with unbounded distinct required facts.
+
+The correction review caught cumulative rounding in fractional gap periods.
+Keep period precision and compress only when expanding the run reproduces every
+interval at the report's displayed precision. A 1,200.4 ms / 706-gap control pins
+its final interval and still fits below 6 KB. The native clipboard proof also
+expands every reported gap and compares it to an independent event-sweep census
+of collector request coverage, including navigation and aligned workers.
