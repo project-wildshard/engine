@@ -180,3 +180,38 @@ test('a real dropped Template socket shows its strip and recovers', async ({
     await rig.arm('healthy', [])
   }
 })
+
+test('browser offline shows its card and recovers online', async ({
+  peers,
+}): Promise<void> => {
+  const { first, second } = peers
+  const before = first.errors.length
+  try {
+    await first.context.setOffline(true)
+    const online: unknown = await first.page.evaluate('navigator.onLine')
+    expect(online).toBe(false)
+    await expect(
+      first.page.locator('[data-failmode~="offline-play"]'),
+    ).toBeVisible({ timeout: 8000 })
+    await first.context.setOffline(false)
+    await expect(
+      first.page.locator('[data-failmode~="offline-play"]'),
+    ).toBeHidden({ timeout: 30_000 })
+    await first.page.locator('#ws-chat input').fill('recovered after offline')
+    await first.page.locator('#ws-chat input').press('Enter')
+    await expect(second.page.locator('#ws-chat')).toContainText(
+      'T1 Alice: recovered after offline',
+    )
+    const errors = first.errors
+      .slice(before)
+      .filter(
+        (line): boolean =>
+          !line.startsWith(
+            'console: Failed to load resource: net::ERR_INTERNET_DISCONNECTED',
+          ),
+      )
+    expectInjectedSocketErrors(errors)
+  } finally {
+    await first.context.setOffline(false)
+  }
+})
