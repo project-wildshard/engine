@@ -3,7 +3,7 @@ import { prepareFrameMotors, type FrameMember } from '@wildshard/engine/physics/
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import { TraversalReadiness, readinessModel, type ReadinessBundle, type ReadinessLink, type ReadinessTicket } from '@wildshard/engine/sim/readiness';
 import type { ReadinessWalls } from '@wildshard/engine/physics/readinessWalls';
-import { CHUNK_HALF, CONTENT_CAPS } from '@wildshard/engine/core/config';
+import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { GhostWorlds, type GhostRegion } from '../../../shared/game/grid/ghosts';
 import { WORK_SLICE_MS, workSlice } from '@wildshard/engine/core/workSlice';

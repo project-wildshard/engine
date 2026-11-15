@@ -8,7 +8,7 @@
 // QA 11-15 row 9: `--shots` also shoots the left edge riding with boost off and on (the HOVER tab on a phone, the tag on desktop).
 //   scripts/browser-lane.sh node scripts/hover-speed-probe.mjs --base=<staging, preview or loopback url> --out=<dir> [--layout=phone] [--shots]
 //   scripts/browser-lane.sh node scripts/hover-speed-probe.mjs --rig=<app dist>,<work dir>,<key.json> --out=<dir>   (engine's loopback
-//     world, online-rig.mjs: the built dedicated server, 2 workers, crossing on; the dist stamped for its release file)
+//     world, online-rig.mjs: the built dedicated server and 2 workers; the dist stamped for its release file)
 // J205: staging, preview or a loopback page only, never production. Chromium runs headless and muted; the page is closed at the end.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
@@ -31,7 +31,7 @@ let rig = /** @type {{ base: string, close: () => Promise<unknown> } | null} */ 
 if (rigArg !== '') {
   const [dist = '', work = '', keyFile = ''] = rigArg.split(',');
   const { openRig, WORLD_PORT } = await import('./online-rig.mjs');
-  rig = await openRig({ dist, work: absolute(work), keyFile, pgBin: 'memory:', pgData: '', shard: 'driftwood-isle', more: ['pine-hollow', 'far-reach', 'sunscar-dunes', 'nalati-grasslands'], cells: 'grid', crossing: true, workers: 2 });
+  rig = await openRig({ dist, work: absolute(work), keyFile, pgBin: 'memory:', pgData: '', shard: 'driftwood-isle', more: ['pine-hollow', 'far-reach', 'sunscar-dunes', 'nalati-grasslands'], cells: 'grid', workers: 2 });
   for (let tries = 0; tries < 300 && !(await fetch(`http://127.0.0.1:${String(WORLD_PORT)}/health`).then(found => found.ok).catch(() => false)); tries++) await sleep(200);
   base = rig.base;
 }
