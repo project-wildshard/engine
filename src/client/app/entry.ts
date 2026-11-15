@@ -437,7 +437,7 @@ async function startSelected(): Promise<void> {
   const imports = prepareBootImports(bootAwait('app:common-service-imports', Promise.all([speciesModule, iconsModule, pickupsModule, pickupRowsModule, propsModule,
     starterModule, hoverboardModule, voicesModule, boarModule, familiesModule, sourceModule, runtimeModule,
     gridEntryModule, pathsModule, prefetchModule])));
-  const [{ sharedWeaponVoices, declaredWeaponVoices }, { BOAR_LOOK }, { declaredKitItemFamilies },
+  const [{ sharedWeaponVoices, declaredWeaponVoices }, { BOAR_LOOK }, { declaredKitItemFamilies, declaredItemIcon },
     { configuredShardfile, installShardfileProduct, installManifestShardfile, preparePageResidency }, { browserShardfileOptions },
     { pageGridRecovery }, { loadingPath }, { gridPrefetchStatus }] = await Promise.all([
     voicesModule, boarModule, familiesModule, sourceModule, runtimeModule, gridEntryModule, pathsModule,
@@ -475,12 +475,11 @@ async function startSelected(): Promise<void> {
     if (path === 'grid') modules('grid');
     // Hybrid shardfile entries retain real TypeScript stages until their page is data-only.
     loading.setPath(loadingPath(path, game.shard.boot?.steps, path === 'shardfile' && source === null && game.shard.shardfile === undefined));
-    const declaredIcons = ['lock', 'check', 'poi', 'you', 'map', 'pack', 'star', 'book', 'heart', 'pin', 'laurel', 'sword', 'glyph', 'coin', 'purse', 'crossbow', 'rifle', 'lever', 'longbow', 'grapple', 'horse'] as const;
     const bindings: Parameters<typeof installShardfileProduct>[2] = {
       imageOwner,
       instance: page.instance ?? (source === null ? 'template-solo' : `standalone-${source.identity.slug}`), catalogue: [], items: declaredKitItemFamilies(), voices: declaredWeaponVoices,
       ...(page.residency === undefined ? {} : { residency: page.residency }),
-      icon: (name) => { const id = declaredIcons.find((entry) => entry === name); if (id === undefined) throw new Error(`Unknown catalogue item icon ${name}`); return id; },
+      icon: declaredItemIcon,
       recipes: new Map([['kit.look.boar', (row, species) => { if (row.animation.recipe !== 'kit.pose.quadruped') throw new Error('Unknown boar pose recipe'); return { ...BOAR_LOOK, id: row.id, species: species.id, kind: species.kind }; }]]),
     };
     imports.check();

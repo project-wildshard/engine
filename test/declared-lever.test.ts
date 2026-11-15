@@ -141,3 +141,28 @@ test('a rows-only lever projects its take to a player field', async () => {
   expect(line(sim, TAKEN)).toBe(1);
   sim.dispose();
 });
+
+// TEMPLATE-E2E TC-E1c and TC-E1d: the loadout's primary lever is in hand from the start, and its rack is then a restock.
+test('a primary lever starts taken and fires with no take; its rack restocks the reserve', async () => {
+  const input = await withLever(), ports = { rapier: input.rapier, quest: { fact: () => undefined, coins: () => undefined } };
+  const shard: Shardfile = { ...input.shard, items: { ...input.shard.items, loadout: { ...input.shard.items.loadout, primary: LEVER } } };
+  const sim = createShardfileSim(shard, input.assets, ports), kit = installDeclaredKitItems(sim.host, shard, sim.itemHooks);
+  const player = sim.host.players.get(PLAYER), slot = declaredKitSlots(shard.items.rows).get(LEVER);
+  if (kit === null || player === undefined || slot === undefined) throw new Error('Missing fixture bodies');
+  expect(kit.equip(PLAYER, slot)).toBe(true);
+  tick(sim, kit);
+  expect(player.held).toBe(slot); // a swap to it is a swap: it is no longer on its rack
+  expect(line(sim, LINES.taken)).toBe(1);
+  expect(line(sim, LINES.rounds)).toBe(6);
+  tick(sim, kit, command({ attack: { aim: { origin: { x: 500, y: 0, z: 500 }, direction: { x: 0, y: 0, z: -1 } } } }));
+  for (let i = 0; i < 60; i++) tick(sim, kit);
+  expect(line(sim, LINES.rounds)).toBe(5); // fired at tick 0 of the fight, no take first
+  expect(line(sim, LINES.reserve)).toBe(12);
+  const [rx, , rz] = fixture.interaction.at;
+  player.position.set(rx + 1, player.position.y, rz); player.motor.resetAt(player.position);
+  expect(kit.scene(PLAYER, fixture.interaction.id)).toBe(true);
+  tick(sim, kit);
+  expect(line(sim, LINES.reserve)).toBe(24); // the row's reserve again
+  expect(line(sim, LINES.rounds)).toBe(5);
+  sim.dispose();
+});

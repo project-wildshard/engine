@@ -64,6 +64,8 @@ function restoreLever(seat: LeverSeat, value: unknown): void {
   seat.store.reserve = s.reserve; seat.sinceEmpty = s.sinceEmpty; seat.taken = s.taken;
 }
 
+/** The most rounds a lever's reserve holds from its rack's restocks (TC-E1d). */
+export const RESTOCK_CAP = 999;
 const finite = (aim: AimCommand): boolean => [aim.origin.x, aim.origin.y, aim.origin.z, aim.direction.x, aim.direction.y, aim.direction.z].every(Number.isFinite);
 function isStates(value: unknown): value is Record<string, ItemState> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
 
@@ -81,6 +83,8 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
   // A rack's prompt names its lever's scene: the page sends the prompt's own id, and this kit runs it, not a script (a shard may have none).
   const leverPrompts = new Map(shard.targets.interactions.flatMap(row => (shard.targets.itemActions ?? []).some(action => action.scene === row.scene && levers.has(action.item)) ? [[row.id, row.scene] as const] : []));
   const slots = declaredKitSlots(shard.items.rows), weapons = [...slots.keys()];
+  // TEMPLATE-E2E TC-E1c: the loadout's primary lever is in hand from the start; any other waits for its rack
+  const primary = shard.items.loadout.primary;
   const scenes = new Map((shard.targets.itemActions ?? []).filter(row => rows.some(item => item.id === row.item)).map(row => [row.scene, row] as const));
   const fields = (shard.targets.itemFields ?? []).flatMap(row => {
     const field = shard.state.player.find(entry => entry.id === row.fieldId);
@@ -105,7 +109,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
     })] as const));
     const seated = new Map([...levers].map(([id, { profile }]) => {
       const store = { reserve: profile.reserve };
-      const seat: LeverSeat = { act: new RangedAction.Cycle(store, { magazine: profile.magazine, reload: profile.reload, ...profile.lever }), store, taken: false, sinceEmpty: 99 };
+      const seat: LeverSeat = { act: new RangedAction.Cycle(store, { magazine: profile.magazine, reload: profile.reload, ...profile.lever }), store, taken: id === primary, sinceEmpty: 99 };
       return [id, seat] as const;
     }));
     return { runtimes, levers: seated,
@@ -127,7 +131,7 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         // so it never stands ahead of this host's.
         for (const [id, runtime] of runtimes) { const saved = value[id]; if (saved !== undefined) runtime.restore({ ...saved, tick: Math.max(-1, Math.min(saved.tick, host.state.tick - 1)) }); }
         // A save made before a lever existed leaves it fresh.
-        for (const [id, seat] of seated) { const saved: unknown = value[id]; if (saved !== undefined) restoreLever(seat, saved); }
+        for (const [id, seat] of seated) { const saved: unknown = value[id]; if (saved !== undefined) restoreLever(seat, saved); if (id === primary) seat.taken = true; }
       } };
   });
   // Joined: a save made before this owner existed restores, and its items start fresh.
@@ -223,6 +227,8 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         if (!near(taker, scene)) return true;
         // 3 takes the lever off its rack and into hand; 4 reloads it.
         if (row.action === 3) {
+          // TC-E1d: a rack is a restock once its lever is in hand: its row's reserve again, up to the cap
+          if (lever.taken) { const profile = levers.get(row.item)?.profile; if (profile !== undefined) lever.store.reserve = Math.min(RESTOCK_CAP, lever.store.reserve + profile.reserve); return true; }
           const slot = weapons.indexOf(row.item), before = held(taker);
           if (before !== undefined) safely(() => { before.hold(false, eye(taker, 0), false); });
           lever.taken = true; if (slot !== -1) taker.held = slot;

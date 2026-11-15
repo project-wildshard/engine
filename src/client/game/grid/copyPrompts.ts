@@ -6,8 +6,8 @@
  * which runs the scene. The page offers them only while the feet stand in the entered copy (`enteredCopy`), and they go
  * with the region (built at admission, dropped at its disposal).
  *
- * Not here: an item scene (`targets.itemActions`, the template's lantern toggle / refill) is the held item's own action;
- * a template cell holds its empty equipment (bare hands, G68), so no prompt can reach an item runtime there.
+ * An item scene's prompt (`targets.itemActions`: Brasscap's rack) is offered too (TEMPLATE-E2E TC-E1b): an entered copy holds
+ * its declared kit (`dataCellKit.ts`), and the server runs the scene on the held item, as it does a standalone page's.
  */
 import { Vector3 } from 'three';
 import type { ShardRuntime } from '../../../shared/game/shard/runtime';
@@ -17,8 +17,7 @@ type Interactable = ShardRuntime['interactables'][number];
 
 /** The copy's declared interactions as frame-local prompts the server answers. */
 export function copyPrompts(source: Pick<Shardfile, 'targets'>): Interactable[] {
-  const items = new Set((source.targets.itemActions ?? []).map((row) => row.scene));
-  return source.targets.interactions.filter((row) => !items.has(row.scene)).map((row) => ({
+  return source.targets.interactions.map((row) => ({
     position: new Vector3(...row.at), radius: row.radius, label: row.label, wireId: row.id, onInteract: () => undefined,
   }));
 }

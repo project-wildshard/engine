@@ -355,6 +355,8 @@ export class EquipmentService implements WeaponHooks {
   get reach(): number | undefined { return this.current.reach; }
 
   /** Give every weapon its line to the server (P1-E5.3-E1). */
+  /** The server's weapon wire this page's kit is bound to (TC-E1b: an entered data cell's kit takes the road's). */
+  get boundWire(): WeaponWire | null { return this.serverWire; }
   bindWire(wire: WeaponWire | null): void { this.serverWire = wire; for (const w of this.list) w.wire = wire; wire?.equip(this.current.row.id); }
   /** A named interaction the server must judge: nothing, where no server owns the player. */
   interact(id: string): void { this.serverWire?.interact(id); }

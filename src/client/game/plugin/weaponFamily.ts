@@ -403,6 +403,12 @@ export function registerWeaponFamily(registry: Map<string, ItemFamily>, id: stri
   registry.set(id, family);
 }
 
+/** The icons a declared item row may name (`ui.icon`), as the page's catalogue draws them. */
+export const DECLARED_ITEM_ICONS = ['lock', 'check', 'poi', 'you', 'map', 'pack', 'star', 'book', 'heart', 'pin', 'laurel', 'sword', 'glyph', 'coin', 'purse', 'crossbow', 'rifle', 'lever', 'longbow', 'grapple', 'horse'] as const;
+/** A declared item row's icon, refused when the catalogue draws no such icon. */
+export function declaredItemIcon(name: string): (typeof DECLARED_ITEM_ICONS)[number] {
+  const id = DECLARED_ITEM_ICONS.find((entry) => entry === name); if (id === undefined) throw new Error(`Unknown catalogue item icon ${name}`); return id;
+}
 /** Explicit built-in item family registry, injected into the full loader; importing does not install content. */
 export function declaredKitItemFamilies(): ReadonlyMap<string, ItemFamily> {
   return new Map<string, ItemFamily>([

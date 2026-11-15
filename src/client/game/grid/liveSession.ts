@@ -77,6 +77,7 @@ import { copyPrompts, enteredCopy } from './copyPrompts';
 import { yieldGridAdmission, yieldGridConstruction } from './admissionYield';
 import { HybridRuntimeSession, type HybridResident } from '../shardfile/hybrid';
 
+import { enterDataCellKit, holdsItems } from './dataCellKit';
 import { enterPlotAudio, pagePlotAudioPorts, plotAudioScene, type PlotAudioPorts, type PlotAudioScene } from './plotAudio';
 import { shardProductFromAdmission } from '../shardfile/runtimeProduct';
 import { createRegionalRuntimeFactory, regionalRuntimeAccountedBytes, type PreparedRegionalRuntime, type RegionalRuntimePage, type RegionalRuntimeTextures } from './regionalRuntime';
@@ -234,9 +235,13 @@ export class LiveGridSession {
   private readonly applied = new Vector3();
   private readonly roadWallet: GridWallet;
   /** each admitted region's authored spawn (its level's player start) and its ground / water queries, local */
-  private readonly regions = new Map<string, { readonly spawn: LiveGridSpawn; readonly items: Shardfile['items']['rows']; readonly queries: PlayerFrameQueries; readonly colliders: PanelRegion['colliders']; readonly prompts: ReturnType<typeof copyPrompts>; readonly audio: PlotAudioScene | null }>();
+  private readonly regions = new Map<string, { readonly spawn: LiveGridSpawn; readonly items: Shardfile['items']['rows']; readonly queries: PlayerFrameQueries; readonly colliders: PanelRegion['colliders']; readonly prompts: ReturnType<typeof copyPrompts>; readonly audio: PlotAudioScene | null;
+    /** TC-E1b: the copy's admitted source and assets, its declared kit built from them on entry */
+    readonly kit: { readonly source: Shardfile; readonly assets: ReadonlyMap<string, Uint8Array> } | null }>();
   /** AU20: the entered data cell's own audio scene (an Open Plot's score, bed and loops), live while the feet are in it. */
   private plotAudio: { readonly instance: string; readonly scope: Scope } | null = null;
+  /** TC-E1b: the entered data cell's held kit, disposed when the feet leave it */
+  private dataKit: { readonly instance: string; readonly scope: Scope } | null = null;
   private readonly plotBanks = new Map<string, ReturnType<PlotAudioPorts['bank']>>();
   private readonly runtimeScope: Scope;
   private readonly runtimeRegions = new Map<string, PreparedRegionalRuntime>();
@@ -272,9 +277,9 @@ export class LiveGridSession {
     this.runtimeScope = scope.child('grid.runtime.residents');
     this.hybrid = new HybridRuntimeSession(this.runtimeResidents, scope, { pause: yieldGridConstruction });
     scope.onDispose(gridCells.onLeave(() => { this.hybrid.leave(); this.prepareDeferredEntries(); }));
-    scope.onDispose(gridCells.onLeave(() => { this.leavePlotAudio(); }));
+    scope.onDispose(gridCells.onLeave(() => { this.leavePlotAudio(); this.leaveDataKit(); }));
     scope.onDispose(gridCells.onEnter(cell => {
-      if (!this.runtimeResidents.has(cell.instance)) { this.enterPlotAudio(cell.instance); ports.lightingSettled?.(); return; }
+      if (!this.runtimeResidents.has(cell.instance)) { this.enterPlotAudio(cell.instance); this.enterDataKit(cell.instance); ports.lightingSettled?.(); return; }
       this.startedRuntimes.add(cell.instance);
       const activation = this.hybrid.enter(cell);
       this.activation = activation;
@@ -708,7 +713,7 @@ export class LiveGridSession {
         transfer.sync(); this.transferWalls.set(cell.instance, transfer);
         this.regions.set(cell.instance, { spawn: { x: start.at.x, y: undefined, z: start.at.z, yaw: start.yaw },
           // the admitted terrain inside the cell (one source of truth); its strips are road level (the terrain tile ends at the cell edge)
-          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: copyPrompts(copySource),
+          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: copyPrompts(copySource), kit: holdsItems(copySource) ? { source: copySource, assets } : null,
           // AU20: the cell's declared audio scene, bound only while the feet stand in it (no entered hooks run here)
           audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(shardProductFromAdmission(retained.admitted, shell.scope))) : null });
         this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: source.entryways });
@@ -719,7 +724,7 @@ export class LiveGridSession {
             try { await hangCellDataSky(request); } catch (error) { console.warn(`[region sky] ${cell.instance}`, error); }
           })();
         }
-        const unlist = (): void => { if (this.plotAudio?.instance === cell.instance) this.leavePlotAudio(); this.plotBanks.delete(cell.instance); this.regions.delete(cell.instance); this.transferWalls.delete(cell.instance); };
+        const unlist = (): void => { if (this.plotAudio?.instance === cell.instance) this.leavePlotAudio(); if (this.dataKit?.instance === cell.instance) this.leaveDataKit(); this.plotBanks.delete(cell.instance); this.regions.delete(cell.instance); this.transferWalls.delete(cell.instance); };
         return { host: shell, shell, dispose: () => {
           unlist();
           try { shell.dispose(); } finally { retained.release(); }
@@ -852,6 +857,25 @@ export class LiveGridSession {
     this.plotAudio = { instance, scope: owner };
     try { enterPlotAudio(scene, owner, ports); }
     catch (error) { this.leavePlotAudio(); ports.fault(error); }
+  }
+  /** TC-E1b: the feet entered a data cell; its declared items are the page's held kit until they leave. */
+  private enterDataKit(instance: string): void {
+    this.leaveDataKit();
+    const kit = this.regions.get(instance)?.kit ?? null, page = this.page.runtimePage?.() ?? null;
+    if (kit === null || page === null) return;
+    const entry = this.ports.scope.child(`grid.data-kit.${instance}`);
+    this.dataKit = { instance, scope: entry };
+    const enter = async (): Promise<void> => {
+      try { await enterDataCellKit(kit.source, kit.assets, page, entry); } catch (error: unknown) {
+        if (this.dataKit?.scope === entry) this.leaveDataKit();
+        console.error(`[grid] ${instance}'s declared kit refused`, error);
+      }
+    };
+    void enter();
+  }
+  private leaveDataKit(): void {
+    const entered = this.dataKit; this.dataKit = null;
+    entered?.scope.dispose();
   }
   private leavePlotAudio(): void {
     const entered = this.plotAudio; this.plotAudio = null;

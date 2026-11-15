@@ -9,3 +9,11 @@ were on the wire and none on screen.
 
 - TC-E1a: `NeighbourLife.admit` now draws every spawn with a skin look in a data cell, and a refused lane leaves the
   bodies drawn. A native cell still leaves its creatures to its runtime.
+- TC-E1b: a grid data cell's declared items are in hand while the feet stand in it (`grid/dataCellKit.ts`). Entering the
+  cell builds its `items` rows (kit families, item models) into one equipment service bound under the page's controls
+  (`EnteredEquipment.bind`), wired to the server by the road's weapon wire; a lever follows the server's owned lines.
+  Leaving gives the road's bare hands back. A rack's prompt (an item scene) is offered in the copy now (`copyPrompts`).
+  Why not a declared client page (Signal Dunes' way): `held.melee` holds only a melee weapon and `held.ranged-page` is
+  Pine Hollow's forest page, so a gun there needs new engine and format work anyway; this route is engine only.
+- TC-E1c: the loadout's primary lever starts taken on the server (and after a restore), so it fires with no rack.
+- TC-E1d: a rack's take of a lever already in hand adds its row's reserve again, capped at 999 (`RESTOCK_CAP`).
