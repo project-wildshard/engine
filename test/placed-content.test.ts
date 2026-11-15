@@ -5,8 +5,6 @@
 // header admitted by the cook's verdict under this page's own validator. Anything else leaves the slug out, as SA46 does.
 // oxlint-disable-next-line import/no-nodejs-modules -- It signs as the API does, and hashes as the cook does.
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
-// oxlint-disable-next-line import/no-nodejs-modules -- the catalogue pin.
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { installCatalogue, installedCatalogue } from '../src/shared/game/grid/catalogueSlot';
 import { learnPlacedCells } from '../src/client/game/grid/placedCells';
@@ -15,6 +13,7 @@ import { clearPlacedSpawns, placedLoose, placedSpawn } from '../src/client/game/
 import { entryProgramsURL, setSpawnPacks, startSpawnDownload } from '../src/client/game/boot/spawnDownload';
 import { installTitleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
 import { cookReceipt } from '../src/cook/game/cookJob';
+import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
 const SLUG = 'new-author-shard', HASH = 'a'.repeat(64), BUILD = 'b1', VALIDATOR = 'f'.repeat(64);
 const PACKS = 'https://packs.example/', URL_AT = `${PACKS}releases/staging-placements.json`, API = 'https://api.example';
@@ -54,7 +53,7 @@ function store(index: (asked: string) => Response = () => json(INDEX), body: (ro
   };
   return Object.assign(answer, { asked }) as typeof fetch & { readonly asked: string[] };
 }
-const PIN = JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as Parameters<typeof installCatalogue>[0];
+const PIN = catalogueBeforePlacements;
 const TITLE: readonly TitleManifest[] = [{ slug: 'driftwood-isle', name: 'Driftwood Isle', biome: '', status: 'live', card: { thumb: '/t.jpg', portrait: '/p.jpg', landscape: '/l.jpg' } }];
 const verdicts = (): unknown[] => Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__') as unknown[];
 const gridSlugs = (): readonly string[] => (installedCatalogue()?.grid.cells ?? []).map(cell => cell.slug);

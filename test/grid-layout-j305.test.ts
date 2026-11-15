@@ -16,7 +16,10 @@ const grids: readonly (readonly [string, readonly Cell[]])[] = [
 ];
 const centre = (row: Cell): boolean => Math.max(Math.abs(row.cell[0] ?? 9), Math.abs(row.cell[1] ?? 9)) <= 1;
 
-for (const [name, cells] of grids) {
+for (const [name, selected] of grids) {
+  // SA34 permits later channel placements in ring 3. J305 still owns the
+  // complete 5x5 core; test that core without discarding any of its rules.
+  const cells = selected.filter(row => row.cell.every(axis => Math.abs(axis) <= 2));
   test(`J305 ${name}: every slot of the 5x5 is filled once`, () => {
     expect(cells).toHaveLength(25);
     expect(new Set(cells.map(row => row.cell.join(','))).size).toBe(25);
@@ -42,6 +45,6 @@ for (const [name, cells] of grids) {
     if (unplaced.length > 0) expect(ring.filter(slug => TEMPLATES.includes(slug))).toEqual([]);
   });
   test(`J305 ${name}: no legacy grey template on the grid`, () => {
-    for (const slug of LEGACY) expect(cells.map(row => row.slug)).not.toContain(slug);
+    for (const slug of LEGACY) expect(selected.map(row => row.slug)).not.toContain(slug);
   });
 }

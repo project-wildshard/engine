@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { installCatalogue } from '../src/shared/game/grid/catalogueSlot';
 import { installTitleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
 import { buildTitleDeck, titleCards, type TitleDeck } from '../src/client/game/titleDeck';
 import type { MenuMode } from '../src/client/game/grid/menu';
+import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
 /** J313 (Jake, 2026-11-12 ~23:05 Cancún, after GC21): Sky Reach and Signal Dunes enter for every player labelled EXPERIMENTAL,
  *  Nine Dragon labelled PARTIAL; Mossgate (`_template`) has a card for everyone; open plots have no card (players reach them by
@@ -26,7 +26,7 @@ const ROWS: readonly TitleManifest[] = [
 const PLAYER: MenuMode = { developer: false, devserver: false };
 
 const decks: TitleDeck[] = [];
-beforeEach(() => { installCatalogue(JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8'))); });
+beforeEach(() => { installCatalogue(catalogueBeforePlacements); });
 afterEach(() => { for (const deck of decks.splice(0)) deck.dispose(); document.body.replaceChildren(); Reflect.deleteProperty(globalThis, Symbol.for('game.catalogue')); });
 const deckOf = (showHidden: boolean, mode: MenuMode): TitleDeck => {
   installTitleManifests(ROWS);

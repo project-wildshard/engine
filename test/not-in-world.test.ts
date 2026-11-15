@@ -9,6 +9,7 @@ import { enterByShard, inThisWorld, worldHosted, worldOpens, type RouteMemory } 
 import { pageGridIntents } from '../src/client/game/grid/intent';
 import { GAME_STRINGS } from '../src/shared/game/strings';
 import type { MenuMode } from '../src/client/game/grid/menu';
+import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
 // OFFLINE OF3 (J298, J300): on a world build, a shard the world doesn't open is never entered. A card whose shard the kept world word
 // leaves out, or that the catalogue doesn't place, reads "Not in this world yet" with ENTER WORLD off; a `?chunk=` link to it lands on
@@ -31,7 +32,7 @@ const ROWS: readonly TitleManifest[] = [
 ];
 const DEVELOPER: MenuMode = { developer: true, devserver: false };
 const decks: TitleDeck[] = [];
-beforeEach(() => { installCatalogue(JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8'))); installTitleManifests(ROWS); });
+beforeEach(() => { installCatalogue(catalogueBeforePlacements); installTitleManifests(ROWS); });
 afterEach(() => {
   for (const deck of decks.splice(0)) deck.dispose();
   document.body.replaceChildren(); Reflect.deleteProperty(globalThis, Symbol.for('game.catalogue')); pageGridIntents().consume('');

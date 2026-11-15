@@ -20,10 +20,11 @@ test('a name means a grid instance, and each cell runs its shard', () => {
   expect([cellShard(PLOT), cellShard(HOME), cellShard('template-2'), cellShard('not-on-the-grid')]).toEqual([PLOT_SHARD, HOME, '_template', 'not-on-the-grid']);
 });
 
-test('the catalogue a page build installs places the grid as the server\'s baked one does, so frame numbers agree', () => {
+test('the selected channel keeps the baked grid\'s frame numbers when later placements extend it', () => {
   const baked = new GridAssembly({ developer: false, devserver: false }).cells.map(cell => [cell.instance, cell.slug]);
   const pinned = new GridAssembly({ developer: false, devserver: false }, (JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as { grid: unknown }).grid).cells.map(cell => [cell.instance, cell.slug]);
-  expect(pinned).toEqual(baked);
+  expect(pinned.slice(0, baked.length)).toEqual(baked);
+  expect(new Set(pinned.map(([instance]) => instance)).size).toBe(pinned.length);
 });
 
 test('a cell\'s frames carry the number a grid page gives that cell', () => {

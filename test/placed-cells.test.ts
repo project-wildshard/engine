@@ -5,7 +5,6 @@
 // unreadable file keep the build's 25 cells.
 // oxlint-disable-next-line import/no-nodejs-modules -- It signs as the API does.
 import { generateKeyPairSync, sign, type KeyObject } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { installCatalogue, installedCatalogue } from '../src/shared/game/grid/catalogueSlot';
 import { PLACEMENT_PUBLIC_KEY, placementsURL } from '../src/shared/game/grid/placementRows';
@@ -17,6 +16,7 @@ import { titleCards } from '../src/client/game/titleDeck';
 import { oneWayIn, shardCell } from '../src/client/game/grid/oneWayIn';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import type { PlacedContent } from '../src/client/game/grid/placedContent';
+import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
 const URL_AT = 'https://packs.example/releases/staging-placements.json';
 const pair = (): { readonly privateKey: KeyObject; readonly hex: string } => {
@@ -54,7 +54,7 @@ const routes = (table: Record<string, (init?: RequestInit) => Response | Promise
 /** SA48: a carded slug enters only with the cook's content; these SA46 tests are about its card, so its content is a stand-in. */
 const STAND_IN: PlacedContent = { spawn: { slug: 'new-author-shard', entry: {}, whole: {}, base: 'https://packs.example/', loose: 'https://packs.example/loose/x/', programs: false }, verdict: null };
 const cooked = (): Promise<PlacedContent> => Promise.resolve(STAND_IN);
-const PIN = JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as { grid: { cells: Cells } };
+const PIN = catalogueBeforePlacements;
 const ART = { thumb: '/t.jpg', portrait: '/p.jpg', landscape: '/l.jpg' };
 // the live title rows' Thin Ice: an open plot, `shardSelect: false`, its art in the build
 const ROWS: readonly TitleManifest[] = [
