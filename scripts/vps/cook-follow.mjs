@@ -28,11 +28,13 @@ function atomic(path, text) {
 }
 async function main() {
   const env = argument('--env'), state = argument('--state'), envText = readFileSync(env, 'utf8');
+  const check = process.argv.includes('--check');
   const url = value(envText, 'RELEASE_URL'), key = value(envText, 'RELEASE_PUBLIC_KEY');
   if (!url.startsWith('https://') || key === '') throw new Error('staging.env has no HTTPS signed release configuration');
   const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(20_000), redirect: 'error' });
   if (!response.ok) throw new Error(`The signed staging release answered ${response.status}`);
   const next = signedCookRelease(await response.text(), key), text = `COOK_ENGINE_REF=${next.tag}\nWILDSHARD_BUILD=${next.build}\n`;
+  if (check) { console.info('would'); return; }
   let held = ''; try { held = readFileSync(state, 'utf8'); } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
   if (held === text) { console.info('unchanged'); return; }
   atomic(state, text); console.info('changed');

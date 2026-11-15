@@ -14,3 +14,7 @@
   root-owned group-readable global virtual store. Its install enables pnpm's
   global store explicitly and proves the resulting layout before the sandboxed
   worker can start.
+
+- Review fixes: the timer no longer installs its own script onto itself; a tag
+  is proved to resolve to the signed build before the checkout or marker can
+  change; and `--check` verifies the release without writing its state file.

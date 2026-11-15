@@ -458,7 +458,10 @@ EOF
 else say ok 'unprivileged user namespaces are not restricted here; no AppArmor profile needed'; fi
 
 COOK_REF='' COOK_BUILD='' COOK_READY=0
-cook_follow() { "$NODE" "$HERE/cook-follow.mjs" --env "$ETC/staging.env" --state "$COOK_STATE"; }
+cook_follow() {
+  if [ "$CHECK" = 1 ]; then "$NODE" "$HERE/cook-follow.mjs" --check --env "$ETC/staging.env" --state "$COOK_STATE"
+  else "$NODE" "$HERE/cook-follow.mjs" --env "$ETC/staging.env" --state "$COOK_STATE"; fi
+}
 if [ -r "$COOK_ENV" ] && cook_env_complete "$COOK_ENV"; then
   if cook_follow; then
     COOK_REF=$(cook_value "$COOK_ENV" COOK_ENGINE_REF)
@@ -491,9 +494,9 @@ make_cook_source() {
     git -C "$COOK_SRC" sparse-checkout set --no-cone '/*' '!/progress/' '!/art/' '!/sources/'
   fi
   git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" fetch --quiet --tags origin
-  git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" checkout --quiet --force --detach "$COOK_REF^{commit}"
-  if [ "$(cook_commit)" != "$COOK_BUILD" ]; then say stop "The signed release's $COOK_REF does not resolve to $COOK_BUILD"; exit 1; fi
+  if [ "$(git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" rev-parse "$COOK_REF^{commit}" 2>/dev/null)" != "$COOK_BUILD" ]; then say stop "The signed release's $COOK_REF does not resolve to $COOK_BUILD"; exit 1; fi
   rm -f "$COOK_SRC/.wildshard-installed"
+  git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" checkout --quiet --force --detach "$COOK_BUILD"
   (cd "$COOK_SRC" && org_git env CI=1 HOME=/root COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack "$PNPM" install --frozen-lockfile --ignore-scripts --config.confirmModulesPurge=false --config.ci=false --store-dir "$COOK_PNPM_STORE" --virtual-store-dir "$COOK_PNPM_STORE/links")
   (cd "$COOK_SRC" && "$NODE" scripts/assert-store-layout.mjs)
   printf '%s %s\n' "$COOK_REF" "$COOK_BUILD" > "$COOK_SRC/.wildshard-installed"
@@ -604,8 +607,10 @@ then COOK_TIMER_CHANGED=1; else COOK_TIMER_CHANGED=0; fi
 
 if [ "$CHECK" = 0 ]; then
   install -d -m 755 -o root -g root "$COOK_LIB"
-  install -m 750 -o root -g root "$HERE/rebuild.sh" "$COOK_LIB/rebuild.sh"
-  install -m 750 -o root -g root "$HERE/cook-follow.mjs" "$COOK_LIB/cook-follow.mjs"
+  if [ "$HERE" != "$COOK_LIB" ]; then
+    install -m 750 -o root -g root "$HERE/rebuild.sh" "$COOK_LIB/rebuild.sh"
+    install -m 750 -o root -g root "$HERE/cook-follow.mjs" "$COOK_LIB/cook-follow.mjs"
+  fi
   systemctl daemon-reload
   systemctl enable --quiet wildshard-cook-follow.timer
   if [ "$COOK_READY" = 1 ]; then
