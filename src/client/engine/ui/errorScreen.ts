@@ -7,7 +7,7 @@ import { app } from '../app/runtime';
 import { uiScope, mountUi } from './ownership';
 import { listenTap } from '../input/dom';
 import { copyText, diagnosticsSource, DOCTOR_EARLIER_KEY } from './diagnosticsCopy';
-import type { Scope } from '../../../shared/engine/app/scope';
+import { Scope } from '../../../shared/engine/app/scope';
 
 const scope = uiScope('loadFailure', app.engineScope);
 
@@ -28,19 +28,56 @@ export function doctorUrl(from: string, at: Location = location): string {
   return url.href;
 }
 
-/** Leave for the doctor: a held session saves first, and the page's report and the way back go with it. */
-export function openDoctorPage(from: string): void {
-  const read = diagnosticsSource();
+/** FM8 mode 14: how long the doctor's preflight may take before it counts as failed. */
+const DOCTOR_PREFLIGHT_MS = 8000;
+/** FM8 mode 14 (meta MMO-FAILURE-MODES-PLAN): a same-origin preflight of the doctor's own page. It says only that this one
+ *  request answered now; it can't promise the document's later reads will, so a pass never claims more. Null when it answered. */
+export async function doctorPreflight(url: string, read: typeof fetch = fetch, deadlineMs: number = DOCTOR_PREFLIGHT_MS): Promise<string | null> {
+  const abort = new AbortController(), timer = setTimeout(() => { abort.abort(); }, deadlineMs);
+  try {
+    const response = await read(url, { method: 'HEAD', cache: 'no-store', signal: abort.signal });
+    return response.ok ? null : engineString('s_doctor_http_status', [response.status]);
+  } catch { return abort.signal.aborted ? engineString('s_doctor_http_slow', [Math.round(deadlineMs / 1000)]) : engineString('s_doctor_http_none'); }
+  finally { clearTimeout(timer); }
+}
+/** FM8 mode 14's card: the doctor didn't open, and this page stays as it was. Try again re-checks; Back closes the card. */
+function doctorHttpCard(measured: string, again: () => void): void {
+  document.querySelector('[data-failmode="doctor-http"]')?.remove();
+  const card = document.createElement('div'), box = document.createElement('div'), title = document.createElement('h1'), body = document.createElement('p');
+  const retry = document.createElement('button'), back = document.createElement('button'), details = document.createElement('details'), summary = document.createElement('summary'), fact = document.createElement('p');
+  card.dataset['failmode'] = 'doctor-http'; card.dataset['tone'] = 'warn'; card.setAttribute('role', 'alertdialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', engineString('s_doctor_http_title'));
+  card.style.cssText = 'position:fixed;inset:0;z-index:2147482600;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(4,9,14,.62);color:#e6f2f8;font:12px/1.5 "JetBrains Mono",Menlo,monospace';
+  box.style.cssText = 'width:min(440px,100%);padding:22px 18px 16px;background:rgba(13,27,38,.92);border:1px solid rgba(143,227,255,.35);display:flex;flex-direction:column;gap:10px';
+  title.textContent = engineString('s_doctor_http_title'); title.style.cssText = 'margin:0;font:700 24px/1.1 Rajdhani,Bahnschrift,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#fff';
+  body.textContent = engineString('s_doctor_http_body'); body.style.margin = '0';
+  const button = 'min-height:48px;padding:13px 16px;cursor:pointer;font:700 12px/1 "JetBrains Mono",Menlo,monospace;letter-spacing:.22em;text-transform:uppercase;border:1px solid rgba(143,227,255,.35);background:rgba(13,27,38,.6);color:#e6f2f8';
+  retry.type = 'button'; retry.className = 'go'; retry.textContent = engineString('s_doctor_http_retry'); retry.style.cssText = `${button};border-color:#8fe3ff;background:rgba(143,227,255,.18)`;
+  back.type = 'button'; back.textContent = engineString('s_doctor_http_back'); back.style.cssText = button;
+  summary.textContent = engineString('s_doctor_http_details'); fact.textContent = engineString('s_doctor_http_fact', [measured]); fact.style.cssText = 'margin:8px 0 0;opacity:.6';
+  details.append(summary, fact);
+  const owner = new Scope('doctor-http', scope), close = (): void => { owner.dispose(); card.remove(); };
+  owner.listen(retry, 'click', () => { retry.disabled = true; retry.textContent = engineString('s_doctor_http_checking'); close(); again(); });
+  owner.listen(back, 'click', close);
+  box.append(title, body, retry, back, details); card.append(box);
+  mountUi(card, owner, document.body);
+}
+
+/** Leave for the doctor: a held session saves first, and the page's report and the way back go with it. FM8 mode 14: a doctor page
+ *  that doesn't answer its preflight leaves this page as it was, with a card saying so. Resolves true when the page leaves. */
+export async function openDoctorPage(from: string, read: typeof fetch = fetch): Promise<boolean> {
+  const url = doctorUrl(from), failed = await doctorPreflight(url, read);
+  if (failed !== null) { doctorHttpCard(failed, () => { void openDoctorPage(from, read); }); return false; }
+  const report = diagnosticsSource();
   try {
     // oxlint-disable-next-line wildshard/no-raw-save -- one tab-scoped handoff key the doctor's page reads; that page loads no save service
-    sessionStorage.setItem(DOCTOR_EARLIER_KEY, JSON.stringify({ earlier: read === null ? null : read(), back: `${location.pathname}${location.search}` }));
+    sessionStorage.setItem(DOCTOR_EARLIER_KEY, JSON.stringify({ earlier: report === null ? null : report(), back: `${location.pathname}${location.search}` }));
   } catch { /* storage refused: the doctor still runs, its report is just shorter */ }
-  const url = doctorUrl(from);
   leaveSaved(() => { markUnload('doctor'); location.assign(url); });
+  return true;
 }
 
 // The online page's own module graph (src/client/host/online/shell.ts) asks by event: it can't share this bundle's save hold.
-scope.listen(document, 'ws:doctor', event => { openDoctorPage(event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : 'online'); });
+scope.listen(document, 'ws:doctor', event => { void openDoctorPage(event instanceof CustomEvent && typeof event.detail === 'string' ? event.detail : 'online'); });
 
 /** Settings ▸ Connection: the doctor for everyone, beside Offline play (the title's Settings and the pause menu's saves). */
 export function buildConnectionRow(owner: Scope): HTMLElement {
@@ -48,7 +85,7 @@ export function buildConnectionRow(owner: Scope): HTMLElement {
   const label = document.createElement('div'); label.className = 'ws-gmenu-label'; label.textContent = engineString('s_doctor_title');
   const note = document.createElement('div'); note.className = 'ws-gmenu-note'; note.textContent = engineString('s_doctor_note');
   const go = document.createElement('button'); go.type = 'button'; go.className = 'ws-gmenu-btn ws-gmenu-doctor'; go.textContent = engineString('s_doctor_open');
-  listenTap(owner, go, () => { go.disabled = true; openDoctorPage('settings'); });
+  listenTap(owner, go, () => { go.disabled = true; void openDoctorPage('settings').then(left => { go.disabled = left; return left; }); });
   box.append(label, note, go);
   return box;
 }
@@ -98,7 +135,7 @@ export function showLoadFailure(failure: LoadFailure): HTMLElement {
     const doctor = document.createElement('button');
     doctor.type = 'button'; doctor.className = 'ws-load-doctor'; doctor.textContent = engineString('s_doctor_failed');
     doctor.style.cssText = button;
-    listenTap(scope, doctor, () => { doctor.disabled = true; openDoctorPage('ls4'); });
+    listenTap(scope, doctor, () => { doctor.disabled = true; void openDoctorPage('ls4').then(left => { doctor.disabled = left; return left; }); });
     actions.append(doctor);
     root.append(heading, context, message, stack, actions);
     mountUi(root, scope, document.body);

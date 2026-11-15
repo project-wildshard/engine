@@ -159,7 +159,7 @@ function build(): HTMLElement {
     const doctor = document.createElement('button');
     doctor.type = 'button'; doctor.className = 'doctor'; doctor.textContent = engineString('s_doctor_failed');
     q(el, '.title').after(doctor);
-    scope.listen(doctor, 'click', () => { doctor.disabled = true; openDoctorPage('failed-join'); });
+    scope.listen(doctor, 'click', () => { doctor.disabled = true; void openDoctorPage('failed-join').then(left => { doctor.disabled = left; return left; }); });
   }
   // a dead loop can't be played on: KEEP PLAYING only acts while the loop still runs (it is hidden otherwise)
   scope.listen(q(el, '.keep'), 'click', () => { if (loopState() !== 'running') return; closeFatal(); document.dispatchEvent(new Event('ws:error-keep')); });

@@ -16,3 +16,6 @@
   line (still in the wait's label for diagnostics). `ContentReadError` keeps the measured status, Retry-After and a broken
   length; a 429 that says when waits that long (cancellable, counted down on the line) before the retry the budget already
   allowed. A spawn download that can't keep bytes (quota) shows Storage is full until it ends. Mode 36's page is left.
+- FM8 (doctor half, mode 14): `openDoctorPage` HEADs the doctor's own page first (8 s); one that doesn't answer leaves
+  the player's page as it was, with the `doctor-http` card (Try again, Back to the game; the measured status in Details,
+  and no claim that a passing HEAD proves the later reads). The callers re-enable their buttons when the page stays.

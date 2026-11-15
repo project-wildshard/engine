@@ -289,6 +289,25 @@ try {
         return matches === 0 ? { outcome: 'harness-fail', reason: 'the doctor fault matched nothing in 5 s', injection: { matches } } : { outcome: 'pass', injection: { matches } };
       } finally { await heal(); await entered.context.close(); }
     },
+    // FM8 mode 14: the doctor's page doesn't answer its preflight; the world page stays, with a card
+    doctorHttp: async item => {
+      const entered = await fresh(); const { page } = entered;
+      try {
+        await page.goto(URL_PLAY); await intoWorld(entered);
+        const before = await control(), here = page.url(), started = Date.now();
+        await arm(item.id, [{ route: 'doctor', kind: 'status', code: 503 }]);
+        await page.evaluate(() => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: 'link' })); });
+        const seen = await screen(page, item.screen, 15_000, started), shot = await shoot(page, item.id, seen === null ? 'missing' : 'card');
+        const injection = { doctorMatches: await matchedSince(before, 'doctor'), stayed: page.url() === here };
+        await heal();
+        if (injection.doctorMatches === 0) return { outcome: 'harness-fail', reason: 'the doctor fault matched nothing', injection, notes: await onScreen(page) };
+        const result = await judged(seen, item, page);
+        if (result.outcome !== 'pass') return { ...result, injection, shot };
+        if (!injection.stayed) return { outcome: 'ui-fail', reason: 'the page left for a doctor that did not answer', seen, injection, shot };
+        await Promise.all([page.waitForURL(/\/doctor\//u, { timeout: 20_000 }), press(page, item.screen, 'Try again')]).catch(() => undefined);
+        return /\/doctor\//u.test(page.url()) ? { ...result, injection, shot, recovery: 'healed, Try again: the doctor opened' } : { outcome: 'ui-fail', reason: 'Try again never opened the doctor', seen, injection, shot };
+      } finally { await heal(); await entered.context.close(); }
+    },
     // FM4b: the browser goes offline in the world
     offlinePlay: async item => {
       const entered = await fresh(); const { page, context } = entered;
