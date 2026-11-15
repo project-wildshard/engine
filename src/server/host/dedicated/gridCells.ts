@@ -16,7 +16,9 @@ interface GridNames { readonly instances: readonly string[]; readonly frames: Re
   readonly spots: ReadonlyMap<string, string> }
 /** SA33: one cell a signed placement file names: the API's placement of a new slug (SA30), on a spot the catalogue leaves empty. SA47:
  *  `hash` is its shardfile, for a pack the build's book lacks. */
-export interface PlacedCell { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number]; readonly hash?: string }
+export interface PlacedCell { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number]; readonly hash?: string;
+  /** The grid row's speed class, so the board's cap in a placed road-class cell matches the page's (QA 11-15 row 8). */
+  readonly speedClass?: 'road' }
 /** SA33: the cells placed on this running server, in the placement file's order, after the catalogue's. A restart forgets them; the
  *  placement watch's first look places them again. */
 const placed: PlacedCell[] = [];
@@ -51,7 +53,7 @@ export function placeCell(row: PlacedCell): boolean {
   if (cells.has(row.instance)) throw new Error(`${row.instance} is a placed shard's name`);
   const taken = spots.get(spot);
   if (taken !== undefined) throw new Error(`${spot} is ${taken}'s`);
-  placed.push({ instance: row.instance, slug: row.slug, cell: [x, z], ...(row.hash === undefined ? {} : { hash: row.hash }) });
+  placed.push({ instance: row.instance, slug: row.slug, cell: [x, z], ...(row.hash === undefined ? {} : { hash: row.hash }), ...(row.speedClass === undefined ? {} : { speedClass: row.speedClass }) });
   if (row.hash !== undefined) hashes.set(row.slug, row.hash);
   return true;
 }
@@ -65,7 +67,7 @@ let assembled: { readonly from: unknown; readonly placed: number; readonly assem
 export function gridAssembly(placedToo = true): GridAssembly {
   const { grid } = catalogueDocument(), count = placedToo ? placed.length : 0;
   if (assembled?.from === grid && assembled.placed === count) return assembled.assembly;
-  const assembly = new GridAssembly({ developer: false, devserver: false }, count === 0 ? grid : { ...grid, cells: [...grid.cells, ...placed.map(({ instance, slug, cell }) => ({ instance, slug, cell: [...cell] }))] });
+  const assembly = new GridAssembly({ developer: false, devserver: false }, count === 0 ? grid : { ...grid, cells: [...grid.cells, ...placed.map(({ instance, slug, cell, speedClass }) => ({ instance, slug, cell: [...cell], ...(speedClass === undefined ? {} : { speedClass }) }))] });
   assembled = { from: grid, placed: count, assembly };
   return assembly;
 }
