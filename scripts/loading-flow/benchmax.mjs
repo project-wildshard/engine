@@ -13,6 +13,7 @@
 //   --window 1496x717@2: a desktop window (Jake's Mac, 2992x1434 device pixels) on the desktop tier instead of the phone (NB5).
 //   --dpr: the render scale the game draws at (Graphics' saved pick; the viewport stays a 2x phone); NB5 reads 1 and 2.
 //   --seconds 600: NINE-DRAGON-BENCHMAX NB5's sustained run, printed per minute.
+//   --warm-base <url>: revisit on the same origin with another build, retaining the native caches.
 import { writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { chromium, devices } from 'playwright';
@@ -22,7 +23,7 @@ import { bootTimelineEntries, clockMarkExpression, profileAnchor, profileIdle, s
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shard: { type: 'string', default: 'Nine' }, throttle: { type: 'string', default: '4' },
   seconds: { type: 'string', default: '60' }, json: { type: 'string' }, profile: { type: 'string' },
-  dpr: { type: 'string', default: '2' }, window: { type: 'string' } } });
+  dpr: { type: 'string', default: '2' }, window: { type: 'string' }, 'warm-base': {type: 'string'} } });
 if (values.base === undefined) { console.error('usage: benchmax.mjs --base <url> [--shard <card title regex>] [--throttle 4] [--seconds 60] [--dpr 2] [--json <file>] [--profile <file>]'); process.exit(2); }
 // --window <css W>x<css H>@<scale>: a desktop browser window instead of the phone (NB5, Jake's Mac: 1496x717@2 is 2992x1434), desktop tier
 const desktop = /^(\d+)x(\d+)@([\d.]+)$/u.exec(values.window ?? '');
@@ -52,8 +53,24 @@ try {
   /** @param {string} selector */
   const tap = selector => page.evaluate(`document.querySelector(${JSON.stringify(selector)})?.click()`);
 
+  const visits = values['warm-base'] === undefined ? [base] : [base, values['warm-base']];
+  for (const [visit, visitBase] of visits.entries()) {
+  if (visit > 0) {
+    // Adopt the next build's document while keeping Cache Storage and disk state.
+    await page.evaluate(async () => { for (const registration of await navigator.serviceWorker.getRegistrations()) await registration.unregister(); });
+    await page.goto('about:blank');
+  }
+  await cdp.send('Network.enable');
+  /** @type {{url: string, fromServiceWorker: boolean, fromDiskCache: boolean}[]} */
+  const transfers = [];
+  /** @param {import('playwright').Request} request */
+  const workerRequest = request => { if (request.serviceWorker() !== null) transfers.push({url: request.url(), fromServiceWorker: false, fromDiskCache: false}); };
+  context.on('request', workerRequest);
+  /** @param {{type: string, response: {url: string, fromServiceWorker?: boolean, fromDiskCache?: boolean}}} event */
+  const resource = event => { if (event.type !== 'Preflight') transfers.push({url: event.response.url, fromServiceWorker: event.response.fromServiceWorker === true, fromDiskCache: event.response.fromDiskCache === true}); };
+  cdp.on('Network.responseReceived', resource);
   // the title, as Jake enters a shard: SHARD SELECT, the card, ENTER WORLD (scripts/loading-flow/drive.mjs's route)
-  await page.goto(`${base}/`);
+  await page.goto(visitBase === base ? `${base}/` : visitBase);
   if (!await until(`!!document.querySelector('.ws-main-select')?.getClientRects().length`, 120_000)) throw new Error('title never ready');
   await sleep(1500);
   await tap('.ws-main-select');
@@ -62,6 +79,8 @@ try {
   const titles = await page.evaluate(`[...document.querySelectorAll('.ws-menu-card')].map(c => (c.querySelector('b')?.textContent ?? c.textContent ?? '').trim().slice(0, 40))`);
   const target = titles.findIndex((/** @type {string} */ title) => shard.test(title));
   if (target === -1) throw new Error(`no card matches ${shard} in ${JSON.stringify(titles)}`);
+  // Only the requested shard: opening the deck may prefetch the default card.
+  transfers.length = 0;
   await tap(`.ws-menu-dots i[data-i="${target}"]`);
   if (!await until(`document.querySelector('.ws-menu-card.selected')?.dataset.i === '${target}' && !document.querySelector('.ws-menu-play')?.disabled`, 15_000)) throw new Error(`${titles[target]} never selectable`);
   await sleep(800);
@@ -118,7 +137,8 @@ try {
       .map(e => ({ n: n.split('.').pop(), start: Math.round(e.startTime), ms: Math.round(e.duration), key: e.detail?.key, layer: e.detail?.layer })));
     const tileAttach = { raw, warm, tiles: attaches.length, span: attachSpan, contents: [...byContent.values()].sort((a, b) => b.ms - a.ms),
       slowest: [...attaches].sort((a, b) => b.duration - a.duration).slice(0, 5).map(a => ({ key: a.detail?.key, layer: a.detail?.layer, ms: Math.round(a.duration), contents: a.detail?.contents })) };
-    return { phases: { control, firstStage: first }, stage, waits, readyGaps: gaps, readyParts, scriptMemory, tileAttach, timeline };
+    const resources = performance.getEntriesByType('resource').map(r => ({url: r.name, start: r.startTime, transfer: r.transferSize}));
+    return { resources, phases: { control, firstStage: first }, stage, waits, readyGaps: gaps, readyParts, scriptMemory, tileAttach, timeline };
   })()`);
 
   // the play: walk 10 s, then the hoverboard at boost; the game's own frame ring, read every 250 ms
@@ -182,7 +202,7 @@ try {
   const s = ms => `${(ms / 1000).toFixed(1)} s`;
   /** @param {number} n */
   const f = n => n.toFixed(1);
-  console.log(`benchmax: ${titles[target]} at ${base}, Chromium headless, CPU x${throttle}, ${desktop === null ? '402x874 @2 (phone)' : `${desktop[1]}x${desktop[2]} @${desktop[3]} (desktop)`}, packs, cold`);
+  console.log(`benchmax: ${titles[target]} at ${visitBase}, Chromium headless, CPU x${throttle}, ${desktop === null ? '402x874 @2 (phone)' : `${desktop[1]}x${desktop[2]} @${desktop[3]} (desktop)`}, packs, ${visit === 0 ? 'cold' : 'warm next build'}`);
   console.log(`control ${s(load.phases.control)} after the world page's navigation · its first boot stage at ${s(load.phases.firstStage)}`);
   console.log('stages, longest first:'); for (const e of load.stage.slice(0, 10)) console.log(`  ${e.op.slice(6).padEnd(16)} ${s(e.ms)}`);
   console.log('named waits >= 200 ms:'); for (const e of load.waits.slice(0, 10)) console.log(`  ${e.op.slice(5, 90).padEnd(60)} ${s(e.ms)}`);
@@ -200,5 +220,11 @@ try {
   console.log(`shadow pass: ${shadow.draws} of ${shadow.allDraws} draws · ${(shadow.triangles / 1e6).toFixed(2)} of ${(shadow.allTriangles / 1e6).toFixed(2)} M tris`);
   play.minutes.forEach((/** @type {{ fps: number, p95: number, gpu95: number, draws95: number, tris95: number }} */ m, /** @type {number} */ i) => { console.log(`  minute ${String(i + 1).padStart(2)}: ${f(m.fps)} fps · p95 ${f(m.p95)} ms · gpu~ p95 ${f(m.gpu95)} ms · draws p95 ${m.draws95} · tris p95 ${(m.tris95 / 1e6).toFixed(2)} M`); });
   if (seconds <= 120) play.tens.forEach((/** @type {{ fps: number, p95: number, gpu95: number }} */ t, /** @type {number} */ i) => { console.log(`  ${String(i * 10).padStart(3)}-${String(i * 10 + 10).padEnd(3)} s: ${f(t.fps)} fps · p95 ${f(t.p95)} ms · gpu~ p95 ${f(t.gpu95)} ms`); });
-  if (values.json !== undefined) writeFileSync(values.json, `${JSON.stringify({ shard: titles[target], base, throttle, dpr: values.dpr, load, play, shadow, where }, null, 1)}\n`);
+  cdp.off('Network.responseReceived', resource);
+  context.off('request', workerRequest);
+  const network = transfers.filter(row => !row.fromServiceWorker && !row.fromDiskCache);
+  const cacheCheck = {spawnParts: network.filter(row => /\/assets\/spawn\/parts\/.*\.pack\.br/u.test(row.url)).length, paint: network.filter(row => /\/assets\/nine-dragon\/paint\/.*\.phone\.webp/u.test(row.url)).length};
+  console.log(`network: ${cacheCheck.spawnParts} spawn parts, ${cacheCheck.paint} phone paint files`);
+  if (values.json !== undefined) writeFileSync(visit === 0 ? values.json : values.json.replace(/(\.json)?$/u, '-warm.json'), `${JSON.stringify({ shard: titles[target], base: visitBase, throttle, dpr: values.dpr, load, play, shadow, where, cacheCheck, transfers }, null, 1)}\n`);
+  }
 } finally { await browser.close(); }

@@ -52,11 +52,11 @@ const immutable = url => NAMED.has(url.pathname) || url.pathname.startsWith('/b/
   || /^[a-f0-9]{8,64}$/.test(url.searchParams.get('v') ?? '');
 const isHtml = response => /\btext\/html\b/i.test(response.headers.get('content-type') ?? '');
 /* PAGE-SIZE PZ10 (J276): content on the content base (`https://packs.wildshard.io/content/<set>/`, baked from the boot
- * bank by serviceWorker.ts; '' when content is on the page) lives in one cross-build cache, keyed by exact URL: every key
- * there is content-named, so a copy is good for every build that names it, and no activate touches it. Only a CORS 200 is
+ * bank by serviceWorker.ts; '' when content is on the page) lives in one cross-build cache. NB11 removes the set folder
+ * only from content-named or per-file-versioned keys; mutable files retain their release URL. No activate touches it. Only a CORS 200 is
  * kept: an opaque body cannot be checked and is padded against quota, and a range never stands for the whole file. */
-/** @type {{ base: string, files: string[] }} one parsed value: the bundler would fold a literal base into its origin */
-const { base: CONTENT_BASE, files: CONTENT_FILES } = JSON.parse('__CONTENT__');
+/** @type {{ base: string, files: string[], versions?: Record<string, string> }} one parsed value: the bundler would fold a literal base into its origin */
+const { base: CONTENT_BASE, files: CONTENT_FILES, versions: CONTENT_VERSIONS = {} } = JSON.parse('__CONTENT__');
 /** OF5: the server book on the content base is solo-only too (a URL there, its path under the base's folder). */
 const CONTENT_PRECACHE = CONTENT_FILES.filter(href => !WORLD || !SOLO_ONLY.test(new URL(href).pathname));
 const CONTENT_CACHE = cacheName('ws-content-v1', CHANNEL);
@@ -77,6 +77,23 @@ const keepContent = response => (response.type === 'cors' || SAME_ORIGIN_BASE &&
  * single Range); its headers, redirect mode, cache mode and signal are kept.
  * @param {Request | string} input @param {RequestInit} init */
 const corsRequest = (input, init = {}) => new Request(input, { ...init, mode: 'cors', credentials: 'omit' });
+
+/** NB11: a release's set folder changes when any content changes. Only a
+ * content-named file or a build-declared content hash can leave that folder.
+ * Mutable metadata keeps its exact release URL; channel stores remain separate. */
+function contentKey(href) {
+  if (CONTENT_URL === undefined) return href;
+  const address = new URL(href);
+  if (address.origin !== CONTENT_URL.origin || !address.pathname.startsWith(CONTENT_URL.pathname)) return href;
+  const path = address.pathname.slice(CONTENT_URL.pathname.length - 1);
+  const version = CONTENT_VERSIONS[path];
+  if (!CONTENT.test(path) && !PAGE_PART.test(path) && !OWN_NAMED.test(path)
+    && !/^[a-f0-9]{8,64}$/.test(address.searchParams.get('v') ?? '') && version === undefined) return href;
+  const key = new URL(`/__ws_content__/v1${path}`, CONTENT_URL.origin);
+  key.search = address.search;
+  if (!key.searchParams.has('v') && version !== undefined) key.searchParams.set('v', version);
+  return key.href;
+}
 
 // Keep the current worker's hot handles. WebKit can take a second to reopen
 // a cache during navigation; a rejected open must remain retryable.
@@ -217,14 +234,14 @@ async function precacheQueue(cache, urls, content = false) {
       await whilePaused();
       const path = pending.shift();
       if (path === undefined) return;
-      const key = abs(path), control = new AbortController();
+      const address = abs(path), key = content ? contentKey(address) : address, control = new AbortController();
       inflight.add(control);
       try {
         const held = await cache.match(key, MATCH);
         if (held !== undefined && !isHtml(held)) continue;
         if (held !== undefined) await cache.delete(key);
         if (content) {
-          const response = await fetch(corsRequest(key, { cache: 'force-cache', signal: control.signal }));
+          const response = await fetch(corsRequest(address, { cache: 'force-cache', signal: control.signal }));
           if (!keepContent(response)) throw new Error(`Precache failed: ${path} (${response.type} ${response.status})`);
           await cache.put(key, response);
           continue;
@@ -397,10 +414,11 @@ async function networkFirst(request, name, event) {
  * @param {Request} request */
 async function contentRead(request) {
   const reload = request.cache === 'reload' || request.cache === 'no-store';
+  const key = contentKey(request.url);
   let cache;
   try {
     cache = await store(CONTENT_CACHE);
-    const held = reload ? undefined : await cache.match(request.url, MATCH);
+    const held = reload ? undefined : await cache.match(key, MATCH) ?? (key === request.url ? undefined : await cache.match(request.url, MATCH));
     if (held !== undefined && !isHtml(held)) return held;
   } catch { stores.delete(CONTENT_CACHE); /* Storage denial keeps online fetch working. */ }
   let response;
@@ -409,7 +427,7 @@ async function contentRead(request) {
     try { response = await fetch(corsRequest(request)); }
     catch { return fetch(request); }
   }
-  if (cache !== undefined && keepContent(response)) await cache.put(request.url, response.clone()).catch(() => undefined);
+  if (cache !== undefined && keepContent(response)) await cache.put(key, response.clone()).catch(() => undefined);
   return response;
 }
 

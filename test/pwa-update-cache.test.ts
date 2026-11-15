@@ -1,5 +1,5 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The preview fixture writes and removes only its owned ./tmp directory.
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths for the owned static HTTP fixture.
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
@@ -106,13 +106,33 @@ test('worker updates revalidate unchanged bytes and fetch a changed script in fu
 }, 20_000);
 
 /** The worker's baked content value: `{ base, files }` (PAGE-SIZE PZ10). */
-const bakedContent = (core: string): { base: string; files: string[] } => {
+const bakedContent = (core: string): { base: string; files: string[]; versions?: Record<string, string> } => {
   const literal = /JSON\.parse\(("(?:[^"\\]|\\.)*")\);/u.exec(core.slice(core.indexOf('CONTENT_BASE')))?.[1];
   if (literal === undefined) throw new Error('Missing baked content');
   return JSON.parse(JSON.parse(literal) as string) as { base: string; files: string[] };
 };
 const page = (bank: Record<string, unknown>): { type: 'asset'; source: Uint8Array } => ({ type: 'asset', source: new TextEncoder().encode(
   `<html><head><script type="application/json" id="boot-module-files">${JSON.stringify(bank)}</script></head></html>`) });
+
+test('NB11: bare art keys name its bytes rather than its release set', async () => {
+  mkdirSync(resolve('tmp'), {recursive: true});
+  const root = mkdtempSync(resolve('tmp/content-hashes-'));
+  const path = '/assets/paint/stone.phone.webp';
+  mkdirSync(join(root, 'public/assets/title'), {recursive: true});
+  mkdirSync(join(root, 'public/assets/paint'), {recursive: true});
+  symlinkSync(resolve('src'), join(root, 'src'), 'dir');
+  writeFileSync(join(root, 'public/manifest.webmanifest'), '{}');
+  try {
+    writeFileSync(join(root, 'public', path), 'test');
+    const first = await serviceWorkerCore({'index.html': page({contentBase: 'https://packs.test/content/a/'})}, root, 'A');
+    const next = await serviceWorkerCore({'index.html': page({contentBase: 'https://packs.test/content/b/'})}, root, 'B');
+    expect(bakedContent(first.core).versions?.[path]).toBe('9f86d081');
+    expect(bakedContent(next.core).versions?.[path]).toBe('9f86d081');
+    writeFileSync(join(root, 'public', path), 'different bytes');
+    const changed = await serviceWorkerCore({'index.html': page({contentBase: 'https://packs.test/content/c/'})}, root, 'C');
+    expect(bakedContent(changed.core).versions?.[path]).not.toBe('9f86d081');
+  } finally { rmSync(root, {recursive: true, force: true}); }
+});
 
 test('PZ10: a page with no content base bakes no content origin and precaches as before', async () => {
   const url = '/assets/spawn/server-fixture.json', bytes = new TextEncoder().encode('{"book":"server"}');

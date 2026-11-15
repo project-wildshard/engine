@@ -8,6 +8,7 @@ import { ASSET_CACHE_NAME } from '../../src/client/engine/pwa/cacheNames';
 import { serverPackBookPath } from '../../src/shared/game/shardfile/serverPack';
 import { packsBookPath } from '../../src/shared/game/shardfile/spawnManifest';
 import { titleAssetURLs } from '../title-assets.mjs';
+import { staticAssetHashes, contentNamed } from './assetHashes';
 import { documentIsolation } from './isolation.mjs';
 import { writtenBundle, type EmittedFile } from './writtenBundle';
 
@@ -101,11 +102,13 @@ export async function serviceWorkerCore(bundle: Readonly<Record<string, EmittedF
     content = [...new Set(moved)].map(path => new URL(`.${path}`, base).href);
     files = files.filter(path => !isContentPath(path)); shellList = shellList.filter(path => !isContentPath(path));
   }
+  const versions = base === '' ? {} : Object.fromEntries(Object.entries(staticAssetHashes(root)).filter(([path]) => isContentPath(path) && !contentNamed(path)));
+  digest.update(JSON.stringify(versions));
   const build = `${buildId}-${digest.digest('hex').slice(0, 10)}`;
   const core = source.replaceAll('__BUILD_ID__', build).replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME)
     .replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
     .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shellList)))
-    .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base, files: content })))
+    .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base, files: content, ...base === '' ? {} : {versions} })))
     .replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(html))
     // PZ12: the page origin's COOP and COEP on the baked document, so a load the worker serves is isolated like the network's
     .replace(/['"]__DOCUMENT_HEADERS__['"]/u, () => JSON.stringify(JSON.stringify(documentHeaders)));

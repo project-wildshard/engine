@@ -59,7 +59,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
   const caches = { open, keys: () => Promise.resolve([...books.keys()]), has: (name: string) => Promise.resolve(books.has(name)), delete: (name: string) => Promise.resolve(books.delete(name)) };
   const fetch = vi.fn((input: Request | string) => read?.(typeof input === 'string' ? new Request(input) : input)
     ?? Promise.resolve(new Response(`body:${typeof input === 'string' ? input : input.url}`)));
-  const load = (build: string, files: string[], shellFiles = shell, content: { base?: string; files?: string[] } = {}, page = document, documentHeaders: Record<string, string> = {}) => {
+  const load = (build: string, files: string[], shellFiles = shell, content: { base?: string; files?: string[]; versions?: Record<string, string> } = {}, page = document, documentHeaders: Record<string, string> = {}) => {
     const listeners = new Map<string, ((event: WorkerEvent) => void)[]>();
     const claim = vi.fn(() => Promise.resolve()), skipWaiting = vi.fn(() => Promise.resolve());
     const routes = vi.fn<(rules: NativeRoute[]) => Promise<void>>(() => Promise.resolve());
@@ -70,7 +70,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
     const source = bundled.replaceAll('__BUILD_ID__', build)
       .replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME).replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(page)).replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
       .replace(/['"]__SHELL_FILES__['"]/u, () => JSON.stringify(JSON.stringify(shellFiles)))
-      .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base: content.base ?? '', files: content.files ?? [] })))
+      .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base: content.base ?? '', files: content.files ?? [], versions: content.versions ?? {} })))
       .replace(/['"]__DOCUMENT_HEADERS__['"]/u, () => JSON.stringify(JSON.stringify(documentHeaders)));
     // Deliberately no crypto, scheduler or accounting ports; timers only for the precache's bounded pause.
     runInNewContext(source, { self, caches, fetch, URL, Request, Response, Headers, Set, JSON, encodeURIComponent, AbortController, setTimeout, clearTimeout, performance });
@@ -550,8 +550,8 @@ test('PZ10: a content-base read is cache-first from ws-content-v1, fetched in CO
   const sent = f.fetch.mock.calls[0]?.[0];
   if (!(sent instanceof Request)) throw new Error('Missing CORS request');
   expect(sent.url).toBe(cdnPart); expect(sent.mode).toBe('cors'); expect(sent.credentials).toBe('omit'); expect(sent.redirect).toBe('manual');
-  expect(await (await (await f.open(CONTENT_CACHE)).match(cdnPart))?.text()).toBe(`cdn:${cdnPart}`);
-  expect(await (await f.open(ASSET_CACHE_NAME)).match(cdnPart)).toBeUndefined();
+  expect(await (await (await f.open(CONTENT_CACHE)).match(`${cdn}/__ws_content__/v1/assets/spawn/parts/0123456789abcdef.pack.br`))?.text()).toBe(`cdn:${cdnPart}`);
+  expect(await (await f.open(ASSET_CACHE_NAME)).match(`${cdn}/__ws_content__/v1/assets/spawn/parts/0123456789abcdef.pack.br`)).toBeUndefined();
   f.fetch.mockRejectedValue(new Error('offline'));
   expect(await (await worker.dispatch('fetch', { request: new Request(cdnPart, { mode: 'no-cors' }) }))?.text()).toBe(`cdn:${cdnPart}`);
   expect(f.fetch).toHaveBeenCalledOnce();
@@ -582,7 +582,7 @@ test('PZ10: no activate deletes ws-content-v1', async () => {
     await next.dispatch('install'); await next.dispatch('message', precached); await next.dispatch('activate');
   }
   expect(await f.caches.keys()).toContain(CONTENT_CACHE);
-  expect(await (await f.open(CONTENT_CACHE)).match(cdnPart)).toBeDefined();
+  expect(await (await f.open(CONTENT_CACHE)).match(`${cdn}/__ws_content__/v1/assets/spawn/parts/0123456789abcdef.pack.br`)).toBeDefined();
 });
 
 test('PZ10: the books precache at their CDN URLs, in CORS mode, and adoption waits for them', async () => {
@@ -812,4 +812,42 @@ test('OF12: production keeps its names and marks the origin; another channel dro
   const first = old.load('S1', files, shell, {}, stagingDocument);
   await first.dispatch('install'); await first.dispatch('activate');
   expect((await old.caches.keys()).sort()).toEqual(['ws-staging-assets-v1', 'ws-staging-builds-v1', 'ws-staging-shell-v3-S1']);
+});
+
+
+test('NB11: a new release set reuses hashed parts and paint, but changed paint and metadata stay separate', async () => {
+  const f = fixture(request => Promise.resolve(typed(`cdn:${request.url}`, 'cors')));
+  const paint = '/assets/nine-dragon/paint/concrete.phone.webp', part = '/assets/spawn/parts/0123456789abcdef.pack.br';
+  const first = f.load('A', [], [], {base, versions: {[paint]: 'aaaaaaaa'}});
+  for (const path of [part, paint, '/shardfiles/nine/shard.json']) await first.dispatch('fetch', {request: new Request(`${base}${path.slice(1)}`)});
+  const nextBase = `${cdn}/content/fedcba9876543210/`;
+  const next = f.load('B', [], [], {base: nextBase, versions: {[paint]: 'aaaaaaaa'}});
+  await next.dispatch('install'); await next.dispatch('activate');
+  f.fetch.mockClear();
+  for (const path of [part, paint]) {
+    expect(await (await next.dispatch('fetch', {request: new Request(`${nextBase}${path.slice(1)}`)}))?.text()).toBe(`cdn:${base}${path.slice(1)}`);
+  }
+  expect(f.fetch).not.toHaveBeenCalled();
+  await next.dispatch('fetch', {request: new Request(`${nextBase}shardfiles/nine/shard.json`)});
+  expect(f.fetch).toHaveBeenCalledOnce();
+  const changed = f.load('C', [], [], {base: nextBase, versions: {[paint]: 'bbbbbbbb'}});
+  await changed.dispatch('fetch', {request: new Request(`${nextBase}${paint.slice(1)}`)});
+  expect(f.fetch).toHaveBeenCalledTimes(2);
+  await next.dispatch('fetch', {request: new Request(`${nextBase}${part.slice(1)}`, {cache: 'reload'})});
+  expect(f.fetch).toHaveBeenCalledTimes(3);
+  const staging = f.load('D', [], [], {base: nextBase, versions: {[paint]: 'aaaaaaaa'}}, document.replace('production.json', 'staging.json'));
+  await staging.dispatch('fetch', {request: new Request(`${nextBase}${paint.slice(1)}`)});
+  expect(f.fetch).toHaveBeenCalledTimes(4);
+  expect((await (await f.open(CONTENT_CACHE)).keys()).map(key => key.url)).toContain(`${cdn}/__ws_content__/v1${paint}?v=aaaaaaaa`);
+});
+
+test('NB11: versioned CDN content and precache share a content key across sets', async () => {
+  const f = fixture(request => Promise.resolve(typed(request.url, 'cors'))), path = 'assets/paint.webp?v=aaaaaaaa';
+  const old = f.load('A', [], [], {base, files: [`${base}${path}`]});
+  await old.dispatch('message', precached);
+  const nextBase = `${cdn}/content/another-set/`, next = f.load('B', [], [], {base: nextBase, files: [`${nextBase}${path}`]});
+  f.fetch.mockClear();
+  await next.dispatch('message', precached);
+  expect(await (await next.dispatch('fetch', {request: new Request(`${nextBase}${path}`)}))?.text()).toBe(`${base}${path}`);
+  expect(f.fetch).not.toHaveBeenCalled();
 });
