@@ -3,11 +3,11 @@ import { resolve } from 'node:path';
 
 /**
  * PZ18 (meta PAGE-SIZE, QA 11-13 row 29): the title's code comes in the first wave. The entry imports the grid's page
- * entry (`src/client/game/grid/pageEntry.ts`) dynamically, so its static closure (the title-0 chunks) was only requested
- * once the entry had run: two serial round trips after the module graph (preview, throttled: 1.07 to 1.29 s of a 1.53 s
- * title). The built document now names every chunk of that closure as a `modulepreload` beside the entry's own, so the
- * browser fetches them with the first wave. Splicing the links into preview's document moved the throttled title from
- * 1.54-1.56 s to 1.26-1.39 s.
+ * entry (`src/client/game/grid/pageEntry.ts`) dynamically, so its title chunks were only requested once the entry had
+ * run: two serial round trips after the module graph (preview, throttled: 1.07 to 1.29 s of a 1.53 s title). The built
+ * document now names the root's static closure and every `title-0-` sibling chunk as `modulepreload` beside the entry's
+ * own. The siblings are dynamic imports from the title slice, so the static closure alone leaves a later title request
+ * on the wire after the first wave.
  */
 export const TITLE_PRELOAD_ROOT = 'src/client/game/grid/pageEntry.ts';
 
@@ -38,6 +38,9 @@ export function titlePreloadFiles(report, html, root = TITLE_PRELOAD_ROOT) {
     for (const next of row.imports) visit(next);
   };
   for (const [file, row] of Object.entries(report)) if (row.moduleIds.some(id => clean(id) === root)) visit(file);
+  // Rolldown places title-only dynamic imports in the same `title-0-` slice but not in the root's static import graph.
+  // They still have to join the document's first wave: the title cannot paint until all of them are available.
+  for (const chunk of Object.keys(report).filter(path => path.includes('/title-0-')).sort()) visit(chunk);
   return order.filter(file => !loaded.has(file) && file.endsWith('.js'));
 }
 
