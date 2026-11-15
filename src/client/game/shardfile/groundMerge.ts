@@ -20,7 +20,7 @@
  */
 import { Box3, BufferAttribute, BufferGeometry, InterleavedBufferAttribute, Matrix3, Matrix4, Mesh, Sphere, Vector3, type Material, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
-import { SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
+import { MERGED_VIEW, SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
 
 const HALF = 250, COARSE = 125, BLOCK = 250;
 /** an attribute's change count (an interleaved one counts on its buffer) */
@@ -280,5 +280,6 @@ export function propMerge(parent: Object3D, material: Material, draw: PropDraw):
 export function mergeView(parent: Object3D, mesh: Mesh, material: Material, scope: Scope): void {
   if (mesh.material !== material) throw new Error('Prop merge member draws another material');
   propMerge(parent, material, { receive: mesh.receiveShadow, order: mesh.renderOrder }).add(mesh, scope);
-  mesh.visible = true; mesh.layers.set(SHADOW_LAYER);
+  // SHARD-SOURCE ss4d: still the World Explorer's to pick (explore/pick.ts reads this mark), though it draws on SHADOW_LAYER
+  mesh.visible = true; mesh.layers.set(SHADOW_LAYER); mesh.userData[MERGED_VIEW] = true;
 }

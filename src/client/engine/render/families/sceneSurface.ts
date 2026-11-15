@@ -41,7 +41,9 @@ const SWAY_VERTEX = /* glsl */`
 	vec3 wsSwayAt = ( wsSwayM * vec4( transformed, 1.0 ) ).xyz;
 	float wsSwayPh = wsSceneTime * wsSwayWind.z * 6.2831853 + wsSwayAt.x * 0.37 + wsSwayAt.z * 0.29;
 	float wsSwayAmt = wsSway * ( 0.7 * sin( wsSwayPh ) + 0.3 * sin( wsSwayPh * 2.3 + 1.7 ) );
-	vec3 wsSwayDir = transpose( mat3( wsSwayM ) ) * vec3( wsSwayWind.x, 0.0, wsSwayWind.y );
+	// the wind is a world direction and wsSway world metres: back into the mesh's own frame by the inverse, which (unlike
+	// the transpose) also undoes the mesh's scale, so a scaled frond still moves its declared metres
+	vec3 wsSwayDir = inverse( mat3( wsSwayM ) ) * vec3( wsSwayWind.x, 0.0, wsSwayWind.y );
 	transformed += wsSwayDir * wsSwayAmt;
 }
 `;

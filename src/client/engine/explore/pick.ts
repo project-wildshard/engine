@@ -21,6 +21,7 @@
  * pickups do) is a few pixels wide, and the finger lands on the roof beside it.
  */
 import * as THREE from 'three';
+import { drawnSurface, SHADOW_LAYER } from '../core/shadowLayer';
 
 /** something a tap can hit: an object (or a batch mesh) and how it maps to a catalog entry + a box */
 export interface SelectTarget {
@@ -55,6 +56,17 @@ const volume = (b: THREE.Box3): number => { b.getSize(_size); return _size.x * _
 export const MIN_PICK = 0.75;
 const tiny = (b: THREE.Box3): boolean => { b.getSize(_size); return Math.max(_size.x, _size.y, _size.z) <= MIN_PICK; };
 
+/**
+ * The nearest drawn surface of `object` under the ray. SHARD-SOURCE ss4d: a merged prop (AP8) draws through its merge and
+ * keeps its own mesh on SHADOW_LAYER, which a raycaster on the view layer skips: the ray tests that layer too for the
+ * one call, and keeps only the hits on drawn surfaces (a shadow-only depth proxy is not one).
+ */
+function drawnHit(ray: THREE.Raycaster, object: THREE.Object3D): THREE.Intersection | undefined {
+  const view = new THREE.Layers(); view.mask = ray.layers.mask;
+  ray.layers.enable(SHADOW_LAYER);
+  try { return ray.intersectObject(object, true).find((hit) => drawnSurface(hit.object, view)); } finally { ray.layers.mask = view.mask; }
+}
+
 /** the target under the ray, or null (nothing hit, or a surface no target claims) */
 export function pickTarget(ray: THREE.Raycaster, targets: readonly SelectTarget[]): Picked | null {
   const byObject = new Map<THREE.Object3D, SelectTarget[]>();
@@ -65,7 +77,7 @@ export function pickTarget(ray: THREE.Raycaster, targets: readonly SelectTarget[
   let near: { mesh: THREE.Object3D; point: THREE.Vector3; d: number } | null = null;
   for (const object of byObject.keys()) {
     if (!shown(object)) continue;
-    const hit = ray.intersectObject(object, true)[0];
+    const hit = drawnHit(ray, object);
     if (hit && (!near || hit.distance < near.d)) near = { mesh: hit.object, point: hit.point.clone(), d: hit.distance };
   }
   // a small copy the ray passes through before the surface it hits (E345: the minimum pick size)
