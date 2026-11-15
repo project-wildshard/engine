@@ -303,6 +303,20 @@ test('MS2.4b: the cook reads and enters its root-owned checkout, and git trusts 
   expect(mode(join(src, '.wildshard-env'))).toBe(`600 ${start}`)
 })
 
+test('MS2.4b: pnpm uses a root-owned store outside protected homes', () => {
+  expect(source).toMatch(/^COOK_PNPM_STORE=\/var\/lib\/wildshard-pnpm-store$/mu)
+  expect(source).toContain(
+    'step "cook pnpm store $COOK_PNPM_STORE" have_cook_store make_cook_store',
+  )
+  expect(source).toContain('! -user root -o ! -group "$COOK_GROUP"')
+  expect(source).toContain('chown root:"$COOK_GROUP"')
+  expect(source).toContain(
+    '--config.ci=false --store-dir "$COOK_PNPM_STORE" --virtual-store-dir "$COOK_PNPM_STORE/links"',
+  )
+  expect(source).toContain('"$NODE" scripts/assert-store-layout.mjs')
+  expect(source).toContain('ProtectHome=yes')
+})
+
 test('MS2.4a: staging chooses the cook ref and build, and a root timer follows it', () => {
   const unit = source.slice(
     source.indexOf('wildshard-cook.service" 644'),

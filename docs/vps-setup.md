@@ -114,6 +114,11 @@ true on the VPS), so the worker gets its own copy of `unshare` in
 `/usr/local/lib/wildshard-cook` and one AppArmor profile allowing that
 copy only. The unit checks the wrap once before it starts.
 
+Its pnpm store is `/var/lib/wildshard-pnpm-store`, root-owned and readable
+but never writable by `wildshard-cook`. The install explicitly keeps pnpm's
+global store on, outside `/root` and `/home`, then runs
+`scripts/assert-store-layout.mjs`; this remains usable with `ProtectHome=yes`.
+
 **Proof without the VPS.** `bash scripts/vps-rebuild-proof.sh` runs the
 whole sequence in a throwaway container that boots systemd (Docker on
 the Mac, its own arm64; Rosetta's amd64 cannot run systemd's services): `--check`, a run that waits for Tailscale, a stub

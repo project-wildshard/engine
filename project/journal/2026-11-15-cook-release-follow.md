@@ -9,3 +9,8 @@
   engine commit. The existing MS2.4b read-only checkout rules remain in force.
 - Focused Vitest startup is currently stopped by CI21's known deadline gate;
   shell/Node syntax and direct positive/forged/mismatched-release checks pass.
+
+- MS2.4b: the cook now installs through `/var/lib/wildshard-pnpm-store`, a
+  root-owned group-readable global virtual store. Its install enables pnpm's
+  global store explicitly and proves the resulting layout before the sandboxed
+  worker can start.

@@ -22,7 +22,7 @@ HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ETC=/etc/wildshard HOME_DIR=/var/lib/wildshard SYSTEMD=/etc/systemd/system
 PG_VERSION=16 NODE=/usr/bin/node NODE_MAJOR=24 PNPM=pnpm@10.34.9
 KEY_DIR=/home/raynos/wildshard-e7 KEY_FILE=/home/raynos/wildshard-e7/release-public-key.hex
-COOK_ENV=/etc/wildshard/cook.env COOK_STATE=/etc/wildshard/cook-release.env COOK_HOME=/var/lib/wildshard-cook COOK_SRC=/opt/wildshard/engine COOK_LIB=/usr/local/lib/wildshard-cook
+COOK_ENV=/etc/wildshard/cook.env COOK_STATE=/etc/wildshard/cook-release.env COOK_HOME=/var/lib/wildshard-cook COOK_SRC=/opt/wildshard/engine COOK_LIB=/usr/local/lib/wildshard-cook COOK_PNPM_STORE=/var/lib/wildshard-pnpm-store
 COOK_GROUP=wildshard-cook
 COOK_SETTINGS=/etc/wildshard/cook.settings
 # 8790 and 8791 are the game's loopback ports; the cook worker's own default was 8791 too.
@@ -406,6 +406,20 @@ COOK_FOLDERS=("$COOK_HOME" "$COOK_HOME/scratch" "$COOK_HOME/server" "$COOK_HOME/
 have_cook_folders() { local path; for path in "${COOK_FOLDERS[@]}"; do [ -d "$path" ] && metadata_ok "$path" 750 wildshard-cook:wildshard-cook || return 1; done; }
 make_cook_folders() { install -d -m 750 -o wildshard-cook -g wildshard-cook "${COOK_FOLDERS[@]}"; }
 step 'cook folders' have_cook_folders make_cook_folders
+# GVS G9: pnpm must not choose /root's store (hidden by ProtectHome), and the
+# cook account must only read the packages root installed. Keep the whole tree
+# below a root-owned parent so the worker cannot replace a path the installer uses.
+cook_store_unreadable() {
+  find "$COOK_PNPM_STORE" ! -type l \( ! -user root -o ! -group "$COOK_GROUP" -o ! -perm -g+r -o -perm -g+w -o -perm -o+w \
+    -o \( -type d ! -perm -g+x \) \) -print -quit
+}
+have_cook_store() { [ -d "$COOK_PNPM_STORE" ] && [ -z "$(cook_store_unreadable)" ]; }
+make_cook_store() {
+  install -d -m 750 -o root -g "$COOK_GROUP" "$COOK_PNPM_STORE"
+  find "$COOK_PNPM_STORE" ! -type l -exec chown root:"$COOK_GROUP" {} +
+  find "$COOK_PNPM_STORE" ! -type l -exec chmod g+rX,g-w,o-w {} +
+}
+step "cook pnpm store $COOK_PNPM_STORE" have_cook_store make_cook_store
 if [ "$(id -u)" != 0 ] && [ -d "$ETC" ] && [ ! -x "$ETC" ]; then say 'cannot verify' "$COOK_ENV (needs sudo)"
 elif put_once "$COOK_ENV" 600 root:root <<'EOF'
 # C4: the cook worker. Its signed staging release chooses its engine tag and build.
@@ -480,7 +494,8 @@ make_cook_source() {
   git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" checkout --quiet --force --detach "$COOK_REF^{commit}"
   if [ "$(cook_commit)" != "$COOK_BUILD" ]; then say stop "The signed release's $COOK_REF does not resolve to $COOK_BUILD"; exit 1; fi
   rm -f "$COOK_SRC/.wildshard-installed"
-  (cd "$COOK_SRC" && org_git env CI=1 HOME=/root COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack "$PNPM" install --frozen-lockfile --ignore-scripts --config.confirmModulesPurge=false)
+  (cd "$COOK_SRC" && org_git env CI=1 HOME=/root COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack "$PNPM" install --frozen-lockfile --ignore-scripts --config.confirmModulesPurge=false --config.ci=false --store-dir "$COOK_PNPM_STORE" --virtual-store-dir "$COOK_PNPM_STORE/links")
+  (cd "$COOK_SRC" && "$NODE" scripts/assert-store-layout.mjs)
   printf '%s %s\n' "$COOK_REF" "$COOK_BUILD" > "$COOK_SRC/.wildshard-installed"
   chmod -R go-w "$COOK_SRC"
 }
@@ -502,6 +517,7 @@ if [ "$COOK_READY" = 1 ]; then
   step "cook source $COOK_SRC at $COOK_REF" have_cook_source make_cook_source
   if [ "$CHECK" = 0 ] && ! have_cook_read; then COOK_SOURCE_CHANGED=1; fi
   step "cook source readable by $COOK_GROUP" have_cook_read make_cook_read
+  step "cook pnpm store readable by $COOK_GROUP" have_cook_store make_cook_store
 fi
 # What the running worker last read of cook.env, signed follow state and cook.settings, as a hash in its root-owned checkout.
 # A changed value restarts it; absent optional files preserve the legacy cook.env-only hash.
