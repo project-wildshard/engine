@@ -14,7 +14,7 @@ import { Worker } from 'node:worker_threads';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
 import type { WorkerNews } from './cellProtocol';
 import type { CellWorkerData } from './cellWorker';
-import { readPackProduct, type PackReads } from './packReader';
+import { readPackProduct, readReleaseItems, type PackReads } from './packReader';
 import { openPlayerSaves, memoryPlayerSaves } from './playerSaves';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { fetchReleaseFile, servingRelease, ReleaseWatch } from './releaseFile';
@@ -56,6 +56,8 @@ async function installedRelease(): Promise<ReleaseFile> {
   return selected;
 }
 const release = await installedRelease();
+const itemReads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 };
+const catalogue = await readReleaseItems(release.items, { origin, cache }, itemReads);
 // C5, C11, GO3: the cells, by grid instance, fixed at startup; a player with no save lands in the first. `grid` opens every grid cell
 // the release names, home first. A cell runs its shard's pack, and the release must name that shard.
 const listed = process.env['WORLD_CELLS'] ?? 'driftwood-isle', cells = worldCells(listed, release.shards.map(shard => shard.slug)), shards = [...new Set(cells.map(cellShard))];
@@ -80,7 +82,7 @@ const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting
 
 /** One row of the table is one worker thread, started once (J182). */
 function bootWorker(slugs: readonly string[]): WorkerLink {
-  const data: CellWorkerData = { slugs, build, origin, cache, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), crossing: true, ...(metrics === undefined ? {} : { metrics: true }),...(playtest===undefined?{}:{playtest:true}) };
+  const data: CellWorkerData = { slugs, build, origin, cache, catalogue, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), crossing: true, ...(metrics === undefined ? {} : { metrics: true }),...(playtest===undefined?{}:{playtest:true}) };
   const worker = new Worker(new URL('cellWorker.mjs', import.meta.url), { workerData: data });
   let stopped = false;
   return { send: (order, transfer = []) => { worker.postMessage(order, transfer as never); },
@@ -141,7 +143,8 @@ async function pullBundle(script: string): Promise<void> {
 const watch = new ReleaseWatch({ read: readRelease, serving: release, cells: shards, ...(poll === undefined ? {} : { everyMs: Number(poll) }), failed: error => { log({ at: 'release.failed', error: String(error) }); },
   changed: async next => {
     if (pullScript !== undefined) await pullBundle(pullScript);
-    for (const slug of shards) await readPackProduct(slug, next.engineBuild, await rapier(), { origin, cache }, reads);
+    const nextCatalogue = await readReleaseItems(next.items, { origin, cache }, reads);
+    for (const slug of shards) await readPackProduct(slug, next.engineBuild, await rapier(), { origin, cache }, reads, undefined, nextCatalogue);
     world.beginGrace(next.engineBuild);
   } });
 // SA33: a cell the API placed opens on this running server within a look, on a worker of its own, with no grace and no restart. Its shard's
@@ -154,7 +157,7 @@ placements = placementAt === undefined || placementKey === undefined || listed.t
     const ready: string[] = [];
     for (const row of rows) {
       // SA34a: the pack first, so the door's placed list (and so every worker's frame numbers) holds only cells it opens.
-      try { await readPackProduct(row.slug, build, await rapier(), { origin, cache }, reads, row.hash); placeCell(row); ready.push(row.instance); }
+      try { await readPackProduct(row.slug, build, await rapier(), { origin, cache }, reads, row.hash, catalogue); placeCell(row); ready.push(row.instance); }
       catch (error) { log({ at: 'placement.refused', instance: row.instance, slug: row.slug, error: String(error) }); }
     }
     return ready.length === 0 ? [] : world.openCells(ready);

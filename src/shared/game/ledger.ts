@@ -17,6 +17,17 @@ export interface LedgerInstance { id: string; shard: string; cell?: readonly [nu
 export interface LedgerRewardPolicy { id: string; quantity: number; repeat?: { everyTicks: number; maxGrants: number } }
 /** Catalogue grants default to one item, once per stable instance and shard, independent of author facts or revisions. */
 export interface LedgerCatalogueItem { id: string; maxTier: number; reward?: LedgerRewardPolicy }
+/** Refuse every inadmissible mapping at world load, before a player or save exists. */
+export function admitLedgerRewards(input: unknown, catalogue: readonly LedgerCatalogueItem[]): readonly LedgerRule[] {
+  const items = new Map(catalogue.map(item => [item.id, item]));
+  if (items.size !== catalogue.length || catalogue.some(item => !Number.isSafeInteger(item.maxTier) || item.maxTier < 0)) throw new Error('Invalid platform catalogue');
+  const rules = parseLedgerRules(input);
+  for (const rule of rules) for (const reward of rule.rewards) if (reward.kind === 'catalogue') {
+    const item = items.get(reward.item);
+    if (item === undefined || reward.tier > item.maxTier || reward.quantity !== (item.reward?.quantity ?? 1)) throw new Error('Reward is outside the platform catalogue policy');
+  }
+  return rules;
+}
 /** A grant is confirmed only by a durable save write; a pending receipt may be retried. */
 export interface LedgerReceipt {
   id: string; status: 'granted' | 'duplicate' | 'pending';
@@ -37,8 +48,7 @@ export class Ledger {
   constructor(store: SaveStore, instances: readonly LedgerInstance[], mappings: readonly { shard: string; revision: number; rules: readonly LedgerRule[] }[], catalogue: readonly LedgerCatalogueItem[]) {
     this.instances = new Map(instances.map((instance) => [instance.id, instance.shard]));
     if (this.instances.size !== instances.length) throw new Error('Duplicate ledger instance');
-    const items = new Map(catalogue.map((item) => [item.id, item.maxTier]));
-    if (items.size !== catalogue.length || catalogue.some((item) => !Number.isSafeInteger(item.maxTier) || item.maxTier < 0)) throw new Error('Invalid platform catalogue');
+    admitLedgerRewards([], catalogue);
     this.catalogue = new Map(catalogue.map((item) => [item.id, structuredClone(item.reward ?? { id: item.id, quantity: 1 })]));
     const policies = [...this.catalogue.values()];
     if (new Set(policies.map((policy) => policy.id)).size !== policies.length || policies.some((policy) => policy.id.length === 0 || policy.id.length > 128
@@ -47,10 +57,9 @@ export class Ledger {
     this.rules = new Map();
     for (const mapping of mappings) {
       if (!Number.isSafeInteger(mapping.revision) || mapping.revision < 1) throw new Error('Invalid ledger revision');
-      for (const rule of parseLedgerRules(mapping.rules)) {
+      for (const rule of admitLedgerRewards(mapping.rules, catalogue)) {
         const key = JSON.stringify([mapping.shard, mapping.revision, rule.fact]);
         if (this.rules.has(key)) throw new Error('Duplicate ledger mapping');
-        for (const reward of rule.rewards) if (reward.kind === 'catalogue' && (items.get(reward.item) === undefined || reward.tier > (items.get(reward.item) ?? -1) || reward.quantity !== this.catalogue.get(reward.item)?.quantity)) throw new Error('Reward is outside the platform catalogue policy');
         this.rules.set(key, { revision: mapping.revision, rule });
       }
     }

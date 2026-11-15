@@ -23,6 +23,7 @@ import { installPlayerOwned, type OwnedBook, type OwnedStores, type CreatureRewa
 import { QUEST_OWNED } from '@wildshard/engine/game/quest/nativeComposition';
 import { shardRows } from '@wildshard/engine/sim/shardRows';
 import { createQuestLedger } from '@wildshard/engine/game/quest/ledger';
+import { admitLedgerRewards } from '@wildshard/engine/game/ledger';
 import { serverDiscoveries, serverPlaces } from '@wildshard/engine/game/quest/serverPlaces';
 import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
 import { RESPAWN_NOW_ACT, STORY_ACT, UNSTUCK_ACT } from '@wildshard/engine/net/acts';
@@ -150,8 +151,9 @@ export const nativeCell = (input: HeadlessRuntimeInput): boolean => input.produc
 
 /** Open `cell`'s world from `input`, at `snapshot` if there is one. */
 export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, options: CellWorldOptions, refused?: SimSnapshot): Promise<CellWorld> {
+  admitLedgerRewards(input.shard.ledger, input.catalogue ?? []);
   const declared = new Set(input.shard.ledger.map(row => row.fact)), placed = { id: cell.instance, shard: input.shard.identity.slug }, { facts, lone } = options;
-  const ledger = facts === undefined ? createQuestLedger(options.saves, input.shard, cell.instance) : null;
+  const ledger = facts === undefined ? createQuestLedger(options.saves, input.shard, cell.instance, input.catalogue) : null;
   const fact: CellWorld['fact'] = (name, entity, player) => !declared.has(name) ? null : ledger === null ? facts?.(name, entity, player, input) ?? null : ledger(name, entity);
   if (nativeCell(input)) {
     // J68: a native assembly keeps its ground whole and its solids as data. A saved world holds none of them, so a throwaway fresh one lists them.

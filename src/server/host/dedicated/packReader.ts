@@ -10,6 +10,9 @@ import type { Rapier } from '@wildshard/engine/physics/rapier';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { readGridCollisionPack, readServerProduct, type ServerRead } from '../standalone/serverProduct';
+import type { ReleaseFile } from '../../../shared/host/releaseRows';
+import { readPlatformItemCatalogue, type PlatformItemCatalogue } from '@wildshard/engine/game/loot/platformCatalogue';
+import { admitLedgerRewards, type LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
 
 /** What a reader counts, so a boot can say where its bytes came from. */
 export interface PackReads { fetched: number; fetchedBytes: number; cached: number; refused: number }
@@ -63,6 +66,16 @@ export function readPackGrid(build: string, options: PackReaderOptions, reads: P
   return readGridCollisionPack(new URL('shards/', options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, build, packRead(options, reads));
 }
 /** One shard's server inputs, through its build's book, or for a placed slug the book lacks, the cook's index of `hash` (SA47). */
-export function readPackProduct(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads, hash?: string): Promise<HeadlessRuntimeInput> {
-  return readServerProduct(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, () => build, packRead(options, reads), rapier, undefined, hash);
+export async function readPackProduct(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads, hash?: string, catalogue: readonly LedgerCatalogueItem[] = []): Promise<HeadlessRuntimeInput> {
+  const input = await readServerProduct(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, () => build, packRead(options, reads), rapier, undefined, hash);
+  admitLedgerRewards(input.shard.ledger, catalogue);
+  return { ...input, catalogue };
+}
+/** Q37: the signed release selects these bytes; an old release has no catalogue grants. */
+export async function readReleaseItems(reference: ReleaseFile['items'], options: PackReaderOptions, reads: PackReads): Promise<PlatformItemCatalogue['items']> {
+  if (reference === undefined) return [];
+  const root = options.origin.endsWith('/') ? options.origin : `${options.origin}/`;
+  const body = await packRead(options, reads)(new URL(reference.path, root), reference.path, reference.sha256);
+  if (body.byteLength !== reference.bytes) throw new Error('Item catalogue byte count mismatch');
+  return readPlatformItemCatalogue(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body))).items;
 }

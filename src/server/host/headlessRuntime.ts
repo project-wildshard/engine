@@ -37,12 +37,15 @@ import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct
 import { prepareProductRuntimePlan } from '@wildshard/engine/game/shardfile/nativePlan';
 import { holdPageState, type RuntimeStateValue } from '@wildshard/engine/game/shardfile/runtimeState';
 import type { NativeAssemblyPorts } from '@wildshard/engine/game/shardfile/nativeAssemblyInput';
+import type { LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
 
 /** The same admitted bytes and native physics implementation used by the ordinary headless worker. */
 export interface HeadlessRuntimePreparation { shard: Shardfile; assets: ReadonlyMap<string, Uint8Array>; rapier: Rapier; readonly product: ShardProduct }
 /** Build workers carry verified native sections before any output exists.
  * Existing native callers may instead supply or explicitly load their built product. */
-export type HeadlessRuntimeInput = Omit<HeadlessRuntimePreparation, 'product'> & { readonly product?: ShardProduct; readonly sections?: ReadonlyMap<string, unknown> };
+export type HeadlessRuntimeInput = Omit<HeadlessRuntimePreparation, 'product'> & { readonly product?: ShardProduct; readonly sections?: ReadonlyMap<string, unknown>;
+  /** Q37: the installed release's immutable trusted catalogue, never the shard's own data. */
+  readonly catalogue?: readonly LedgerCatalogueItem[] };
 /** Current tick inputs and buffered effects; only a completed tick publishes them to the parent. */
 /** What a page's save held, for a world's first boot: its quest flags and its declared fields, up before its fights install. */
 export interface PageProgress { readonly flags: readonly string[]; readonly state: ReadonlyMap<string, RuntimeStateValue> }

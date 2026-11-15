@@ -11,7 +11,8 @@ import { brotliCompressSync } from 'node:zlib';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify the actual published part digest.
 import { createHash } from 'node:crypto';
 import { afterEach, expect, test } from 'vitest';
-import { packRead, type PackReads } from '../src/server/host/dedicated/packReader';
+import { packRead, readReleaseItems, type PackReads } from '../src/server/host/dedicated/packReader';
+import { platformItemCatalogueBytes } from '../src/shared/game/loot/platformCatalogue';
 
 // E7.3d: the Node reader against a real HTTP origin that stores `.br` parts and says nothing of it, as a bucket does.
 const BODY = new TextEncoder().encode('a part of a pack, and then some more of the same part of a pack'), HASH = createHash('sha256').update(BODY).digest('hex'), WIRE = brotliCompressSync(BODY);
@@ -25,6 +26,20 @@ async function origin(bytes: () => Uint8Array): Promise<string> {
   return `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/`;
 }
 function scratch(): string { const root = absolute('tmp/packs'); mkdirSync(root, { recursive: true }); const folder = mkdtempSync(join(root, 'packs-')); closers.push(() => { rmSync(folder, { recursive: true, force: true }); }); return folder; }
+
+test('release item bytes are pinned by digest and size, cached locally, and absent in legacy releases', async () => {
+  const body = platformItemCatalogueBytes({ version: 1, items: [{ id: 'sword', maxTier: 2 }] }), hash = createHash('sha256').update(body).digest('hex');
+  let wire = body;
+  const base = await origin(() => wire), options = { origin: base, cache: scratch() }, reads = fresh();
+  const reference = { path: `assets/catalogue/items-${hash}.json`, sha256: hash, bytes: body.byteLength };
+  expect(await readReleaseItems(undefined, options, reads)).toEqual([]); expect(reads.fetched).toBe(0);
+  expect(await readReleaseItems(reference, options, reads)).toEqual([{ id: 'sword', maxTier: 2 }]);
+  wire = new TextEncoder().encode('the API and origin may be down after boot');
+  expect(await readReleaseItems(reference, options, reads)).toEqual([{ id: 'sword', maxTier: 2 }]);
+  expect(reads).toMatchObject({ fetched: 1, cached: 1 });
+  await expect(readReleaseItems({ ...reference, bytes: body.byteLength + 1 }, options, reads)).rejects.toThrow('byte count mismatch');
+  await expect(readReleaseItems({ ...reference, sha256: 'a'.repeat(64) }, options, reads)).rejects.toThrow('hash mismatch');
+});
 
 test('a cold cache reads the network and undoes `br`, a warm one reads the disk, and a bad byte is refused for the network\'s', async () => {
   const cache = scratch(), url = await origin(() => WIRE), reads = fresh(), read = packRead({ origin: url, cache }, reads), part = new URL('/assets/spawn/server/a.pack.br', url);

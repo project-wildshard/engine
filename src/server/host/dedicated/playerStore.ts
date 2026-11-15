@@ -50,7 +50,7 @@ export class PlayerStore {
   }
   /** This player's fact ledger on this shard. */
   facts(input: HeadlessRuntimeInput, instance: string): RuntimeFacts {
-    this.ledger ??= createQuestLedger(this.saves, input.shard, instance);
+    this.ledger ??= createQuestLedger(this.saves, input.shard, instance, input.catalogue);
     return this.ledger;
   }
   /** Every document held, as its text. */

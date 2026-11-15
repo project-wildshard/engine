@@ -12,9 +12,11 @@ import { readPackGrid, readPackProduct, type PackReads } from './packReader';
 import { runCells, type CellPort } from './cellHost';
 import { placeCell, placedHash, type PlacedCell } from './gridCells';
 import { loopLag } from './loopLag';
+import type { LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
 
 /** What the door boots a worker with. */
 export interface CellWorkerData { readonly slugs: readonly string[]; readonly build: string; readonly origin: string; readonly cache: string; readonly holdMs?: number;readonly playtest?:boolean;
+  readonly catalogue?: readonly LedgerCatalogueItem[];
   /** J107's start-over wait, a proof's override (`EMPTY_MS`): 5 minutes when absent. */
   readonly emptyMs?: number;
   /** Every worker hosts its road; J353 removed the mode switch. */
@@ -24,7 +26,7 @@ export interface CellWorkerData { readonly slugs: readonly string[]; readonly bu
   /** SERVER-CELLS SC1: `METRICS_PORT` is set, so this worker measures its event-loop lag for `/metrics`. */
   readonly metrics?: boolean }
 
-const { slugs, build, origin, cache, holdMs, emptyMs, playtest, crossing, placed, metrics } = workerData as CellWorkerData, port = parentPort;
+const { slugs, build, origin, cache, holdMs, emptyMs, playtest, crossing, placed, metrics, catalogue } = workerData as CellWorkerData, port = parentPort;
 if (port === null) throw new Error('A cell runs in a worker');
 for (const row of placed ?? []) placeCell(row);
 const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 };
@@ -36,7 +38,7 @@ runCells(port as unknown as CellPort, { slugs, build, developerBoost: process.en
     return strips;
   } } : {}),
   load: async slug => {
-    const input = await readPackProduct(slug, build, rapier, { origin, cache }, reads, placedHash(slug));
+    const input = await readPackProduct(slug, build, rapier, { origin, cache }, reads, placedHash(slug), catalogue);
     console.info(JSON.stringify({ at: 'cell.pack', slug, ...reads }));
     return input;
   } });

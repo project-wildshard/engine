@@ -824,6 +824,8 @@
     "./game/population/perchBody": "./src/server/game/population/perchBody.ts",
     "./game/population/productCreatures": "./src/client/game/population/productCreatures.ts",
     "./game/quest/ledger": "./src/shared/game/quest/ledger.ts",
+    "./game/ledger": "./src/shared/game/ledger.ts",
+    "./game/loot/platformCatalogue": "./src/shared/game/loot/platformCatalogue.ts",
     "./game/quest/legacyRecords": "./src/shared/game/quest/legacyRecords.ts",
     "./game/shardfile/pageWater": "./src/client/game/shardfile/pageWater.ts",
     "./game/shardfile/pagePreparation": "./src/client/game/shardfile/pagePreparation.ts",
