@@ -18,8 +18,8 @@ const {publicKey, privateKey} = generateKeyPairSync('ed25519');
 const key = publicKey.export({format: 'der', type: 'spki'}).toString('hex');
 const token = ['host', 'credential', 'marker'].join('-');
 
-function signed(channel: 'staging' | 'production', serial: number, engineBuild = build) {
-  const body = JSON.stringify({channel, serial, engineBuild, saveEpoch: 1, socket: CHANNELS[channel].socket});
+function signed(channel: Channel, serial: number, engineBuild = build) {
+  const body = JSON.stringify({channel, serial, engineBuild, saveEpoch: 1, ...(channel === 'preview' ? {} : {socket: CHANNELS[channel].socket})});
   return {body, signature: sign(null, Buffer.from(body), privateKey).toString('hex')};
 }
 
@@ -41,7 +41,7 @@ function rig(channel: Channel = 'staging') {
   ]);
   const deployedFiles = new Map(files);
   const live = {
-    release: (channel === 'preview' ? undefined : signed(channel, 7)) as unknown,
+    release: signed(channel, 7) as unknown,
     health: {build, serial: 7} as unknown,
     stagingVersion: {build, saveEpoch: 1},
     domain: {build: 'old', saveEpoch: 1},
@@ -71,7 +71,7 @@ function rig(channel: Channel = 'staging') {
     fetchJSON: url => {
       calls.push(`fetch ${url}`);
       const config = CHANNELS[channel];
-      if (!config.solo && url === config.release) return Promise.resolve(live.release);
+      if (url === config.release) return Promise.resolve(live.release);
       if (!config.solo && url === config.health) return Promise.resolve(live.health);
       if (url === `${CHANNELS.staging.origin}/version.json` && channel === 'production') return Promise.resolve(live.stagingVersion);
       if (url === `${CHANNELS[channel].origin}/version.json`) return Promise.resolve(live.domain);
@@ -294,8 +294,8 @@ test('--print-env: the three channels build alike but for named keys (PAGE-SIZE 
   const names = new Set(Object.values(envs).flatMap(env => [...env.keys()]));
   const differing = [...names].filter(name => new Set(Object.values(envs).map(env => env.get(name))).size > 1).sort();
   // PZ6's done-when allows release URL, previous origin, Sentry env, icon channel and Worker env (WS_CHANNEL carries the
-  // last three). WILDSHARD_RELEASE_KEY differs only because preview signs nothing yet (PZ6 D2): it leaves this list then.
-  expect(differing).toEqual(['WILDSHARD_RELEASE_KEY', 'WILDSHARD_RELEASE_URL', 'WS_CHANNEL', 'WS_PREVIOUS_DEPLOY_ORIGIN']);
+  // last three). Preview uses the same key for its deployment-only signed gate (PZ6 D2).
+  expect(differing).toEqual(['WILDSHARD_RELEASE_URL', 'WS_CHANNEL', 'WS_PREVIOUS_DEPLOY_ORIGIN']);
   expect(envs['preview']?.get('WS_PREVIOUS_DEPLOY_ORIGIN')).toBe(CHANNELS.preview.origin);
   for (const bad of [['nowhere'], ['toString'], ['staging', '--catalogue=x.json']]) {
     const run = spawnSync(process.execPath, ['scripts/page-release.mjs', '--print-env', ...bad], {encoding: 'utf8', timeout: 20_000});
@@ -305,7 +305,7 @@ test('--print-env: the three channels build alike but for named keys (PAGE-SIZE 
   expect(borrowed.stdout).toContain(`WILDSHARD_CATALOGUE=${resolve('x.json')}`);
 });
 
-test('preview is the solo game: no release file, no packs, no gate, and the alias still moves last', async () => {
+test('preview signs a deployment gate while its page stays solo and the alias moves last', async () => {
   const {deps, calls, lines} = rig('preview');
   const seen: Record<string, string>[] = [];
   const run = deps.run;
@@ -314,16 +314,32 @@ test('preview is the solo game: no release file, no packs, no gate, and the alia
   expect(fetched(calls)).toEqual([
     'prepare', 'run pnpm build:game', 'run node scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
     'upload', 'state upload',
-    'deployedDigests', 'state check',
+    'deployedDigests', `run node --import ./scripts/bake-loader.mjs scripts/page-release/preview.mjs --build=${build}`, 'state check',
     'deployedDigests', 'goLive', 'state go-live',
   ]);
-  // Only the domain is read: never a release file or /health.
-  expect(calls.filter(call => call.startsWith('fetch ')).every(call => call.startsWith(`fetch ${CHANNELS.preview.origin}/`))).toBe(true);
+  // The deploy reads the signed file; no rooms or health reads.
+  expect(calls.filter(call => call.startsWith('fetch ')).every(call => call.startsWith(`fetch ${CHANNELS.preview.origin}/`) || call === `fetch ${CHANNELS.preview.release}`)).toBe(true);
   expect(seen[0]?.['WILDSHARD_RELEASE_URL']).toBeUndefined();
   expect(seen[0]?.['WS_CHANNEL']).toBe('preview');
   expect(seen[0]?.['WS_PREVIOUS_DEPLOY_ORIGIN']).toBe('https://preview.wildshard.io');
   expect(seen[0]?.['VITE_API_ORIGIN']).toBe('https://api.wildshard.io');
-  expect(lines.some(line => line.includes('solo, no gate'))).toBe(true);
+  expect(lines.some(line => line.includes('solo deployment gate'))).toBe(true);
+});
+
+test('preview refuses a missing, forged, stale or online release before its alias moves', async () => {
+  for (const release of [undefined, {body: '{}', signature: '00'}, signed('preview', 8, 'b'.repeat(40)), signed('staging', 8)]) {
+    const {deps, live, calls} = rig('preview');
+    await through(deps, 'upload');
+    live.release = release;
+    await expect(runPhase('check', deps)).rejects.toThrow(RefusedError);
+    expect(calls).not.toContain('goLive');
+  }
+  const {deps, live, calls} = rig('preview');
+  await through(deps, 'check');
+  const body = JSON.stringify({channel: 'preview', serial: 9, engineBuild: build, saveEpoch: 1, socket: 'wss://rooms.example'});
+  live.release = {body, signature: sign(null, Buffer.from(body), privateKey).toString('hex')};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/must be solo/);
+  expect(calls).not.toContain('goLive');
 });
 
 test('SA35: preview bakes the grid it borrowed from staging; staging and production refuse a borrowed catalogue', async () => {

@@ -8,8 +8,8 @@
 //            the producer's signed serial to name this build and the channel's /health to show that build and serial.
 //   go-live  the alias move, LAST: refused without a fresh signed-release and /health match.
 //
-// Preview (the solo build of green main, J274: hourly) has no world: no release file, no packs and no gate. Its check
-// and go-live compare bytes and move the alias.
+// Preview (the solo build of green main, J274) signs releases/preview.json as a deployment gate (PZ6 D2).
+// Its document has no world stamp or release URL: the offline page still runs its server in a worker.
 //
 // The flow owns order and gates; the host (hosts/workers.mjs, page-release.mjs --host) owns how a
 // page is packaged, uploaded, read back and aliased. Every dependency comes in through `deps`, so the tests drive a fake host.
@@ -30,13 +30,13 @@ export const CHECKED_DOCUMENTS = /** @type {const} */ (['version.json', 'index.h
 /** @typedef {WorldChannel|'preview'} Channel */
 /** @typedef {typeof PHASES[number]} Phase */
 /** @typedef {{channel: WorldChannel, solo: false, other: WorldChannel, origin: string, release: string, socket: string, health: string}} WorldChannelConfig */
-/** @typedef {{channel: 'preview', solo: true, origin: string}} SoloChannelConfig */
+/** @typedef {{channel: 'preview', solo: true, origin: string, release: string}} SoloChannelConfig */
 /** @typedef {WorldChannelConfig|SoloChannelConfig} ChannelConfig */
 
 /** @type {{staging: WorldChannelConfig, production: WorldChannelConfig, preview: SoloChannelConfig}} */
 export const CHANNELS = {
   // SHELL-CUTOVER SC1: the solo build of the newest green main, no world stamp, so the in-page server runs.
-  preview: {channel: 'preview', solo: true, origin: 'https://preview.wildshard.io'},
+  preview: {channel: 'preview', solo: true, origin: 'https://preview.wildshard.io', release: `${PACKS_ORIGIN}/releases/preview.json`},
   staging: {
     channel: 'staging', solo: false, other: 'production', origin: 'https://staging.wildshard.io',
     release: `${PACKS_ORIGIN}/releases/staging.json`, socket: 'wss://rooms-staging.wildshard.io',
@@ -221,19 +221,17 @@ export async function runPhase(phase, deps) {
     for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
     if (!dry) await checkDeployed(deps, deployed, refuse);
     if (channel.solo) {
-      // Preview has no gate (J274): no release file, no packs, no rooms.
-      if (dry) return {refusals};
-      deps.state.write('check', {build: deps.build, channel: channel.channel, deployment});
-      deps.log(`PASS ${channel.channel} check ${deployment.id}: deployed bytes equal; solo, no gate; alias not moved`);
-      return {refusals};
+      plan(`sign ${channel.release} after the page and its content are uploaded (no socket or server bundle)`);
+      if (!dry) deps.run('node', ['--import', './scripts/bake-loader.mjs', 'scripts/page-release/preview.mjs', `--build=${deps.build}`], {});
+    } else {
+      plan(`verify the server book and parts on ${PACKS_ORIGIN} answer with CORS ${channel.origin}`);
+      if (!dry) await deps.packs.verify({root: deps.root, build: deps.build, cors: channel.origin});
     }
-    plan(`verify the server book and parts on ${PACKS_ORIGIN} answer with CORS ${channel.origin}`);
-    if (!dry) await deps.packs.verify({root: deps.root, build: deps.build, cors: channel.origin});
-    plan(`wait for ${channel.release} to sign ${deps.build} and ${channel.health} to match its serial`);
+    plan(`wait for ${channel.release} to sign ${deps.build}${channel.solo ? ' (solo deployment gate)' : ` and ${channel.health} to match its serial`}`);
     const gate = await waitForGate(channel, deps, refuse);
     if (dry) return {refusals};
     deps.state.write('check', {build: deps.build, channel: channel.channel, deployment, serial: gate.serial});
-    deps.log(`PASS ${channel.channel} check ${deployment.id}: deployed bytes equal, packs public, serial ${gate.serial} signed and healthy; alias not moved`);
+    deps.log(`PASS ${channel.channel} check ${deployment.id}: deployed bytes equal, serial ${gate.serial} signed${channel.solo ? ', solo deployment gate' : ', packs public and healthy'}; alias not moved`);
     return {refusals};
   }
 
@@ -244,8 +242,8 @@ export async function runPhase(phase, deps) {
   if (!dry) await checkDeployed(deps, deployed, refuse);
   /** @type {{serial?: number, problem?: string}} */
   let gate = {};
-  if (!channel.solo) {
-    plan(`re-read ${channel.release} and ${channel.health}: both must name ${deps.build} and one serial`);
+  {
+    plan(`re-read ${channel.release}${channel.solo ? '' : ` and ${channel.health}`}: must name ${deps.build} and one serial`);
     gate = await readGate(channel, deps);
     if (gate.problem !== undefined) refuse(gate.problem);
     else if (checked !== undefined && gate.serial !== checked.serial) deps.log(`note: serial moved ${checked.serial} -> ${gate.serial} since check, still ${deps.build}`);
@@ -256,7 +254,7 @@ export async function runPhase(phase, deps) {
   deps.log(`ALIAS MOVED ${channel.origin} -> ${deployment.id}; checking the domain`);
   await waitForDomain(channel, deps, refuse);
   deps.state.write('go-live', {build: deps.build, channel: channel.channel, deployment, ...(gate.serial === undefined ? {} : {serial: gate.serial})});
-  deps.log(`PASS ${channel.origin} -> ${deps.build} ${deployment.id} ${channel.solo ? 'solo, no gate' : `after matching serial ${gate.serial}`} (alias last)`);
+  deps.log(`PASS ${channel.origin} -> ${deps.build} ${deployment.id} after matching serial ${gate.serial}${channel.solo ? ' (solo)' : ''} (alias last)`);
   deps.log(channel.solo ? `next: node scripts/e7-doctor-proof.mjs ${channel.origin} ${deps.build} --human-static`
     : channel.channel === 'staging'
     ? `next: strict staging proofs, then production. node scripts/e7-doctor-proof.mjs ${channel.origin} ${deps.build} ${RELEASE_PUBLIC_KEY}; node scripts/e7-live-staging-proof.mjs ${channel.origin} ${deps.build} ${RELEASE_PUBLIC_KEY} chromium|webkit`
@@ -271,7 +269,7 @@ export function buildEnv(channel, deps) {
     WS_BUILD_ID: deps.build, WILDSHARD_CATALOGUE: (channel.solo ? deps.catalogue : undefined) ?? 'test/pins/catalogue.json',
     WS_PREVIOUS_DEPLOY_ORIGIN: channel.origin, WS_RELEASE: '1', WS_CHANNEL: channel.channel,
     // API-CLOUDFLARE AC11: errors, telemetry and the inbox go to the api-server Worker on every channel.
-    VITE_API_ORIGIN: API_ORIGIN,
+    VITE_API_ORIGIN: API_ORIGIN, WILDSHARD_RELEASE_KEY: deps.releaseKey ?? RELEASE_PUBLIC_KEY,
   };
   // Preview is the solo game: no release file, so the build stamps no world (app-build-pipeline.mjs E7.2d).
   return channel.solo ? common
@@ -340,8 +338,8 @@ async function productionGates(phase, deps, refuse) {
 }
 
 /**
- * The signed release file names this build, and the channel's /health shows this build at that serial.
- * @param {WorldChannelConfig} channel @param {Deps} deps
+ * The signed file names this build. Online channels also require matching /health; preview forbids a socket.
+ * @param {ChannelConfig} channel @param {Deps} deps
  * @returns {Promise<{serial?: number, problem?: string}>}
  */
 export async function readGate(channel, deps) {
@@ -354,10 +352,14 @@ export async function readGate(channel, deps) {
       createPublicKey({key: Buffer.from(deps.releaseKey ?? RELEASE_PUBLIC_KEY, 'hex'), format: 'der', type: 'spki'}), Buffer.from(signed.signature, 'hex'));
   } catch { valid = false; }
   if (!valid) return {problem: `${channel.release} signature does not verify`};
-  const release = JSON.parse(signed.body);
+  let release;
+  try { release = JSON.parse(signed.body); } catch { return {problem: `${channel.release} body is not JSON`}; }
+  if (release === null || typeof release !== 'object' || !Number.isSafeInteger(release.serial) || release.serial < 1) return {problem: `${channel.release} has an invalid serial`};
   if (release.channel !== channel.channel) return {problem: `${channel.release} is channel ${release.channel}`};
   if (release.engineBuild !== deps.build) return {problem: `${channel.release} serial ${release.serial} signs ${release.engineBuild}, not ${deps.build}`};
   if (release.saveEpoch !== deps.manifest.saveEpoch) return {problem: `${channel.release} save epoch ${release.saveEpoch} is not ${deps.manifest.saveEpoch}`};
+  if (channel.solo) return release.socket === undefined && release.bundle === undefined
+    ? {serial: release.serial} : {problem: `${channel.release} must be solo (no socket or server bundle)`};
   if (String(release.socket).replace(/\/$/u, '') !== channel.socket) return {problem: `${channel.release} socket ${release.socket} is not ${channel.socket}`};
   /** @type {any} */
   let health;
@@ -366,7 +368,7 @@ export async function readGate(channel, deps) {
   return {serial: release.serial};
 }
 
-/** @param {WorldChannelConfig} channel @param {Deps} deps @param {(message: string) => void} refuse */
+/** @param {ChannelConfig} channel @param {Deps} deps @param {(message: string) => void} refuse */
 async function waitForGate(channel, deps, refuse) {
   const deadline = deps.now() + (deps.dryRun ? 0 : deps.waitMs ?? 45 * 60_000);
   for (let last = '';;) {

@@ -129,6 +129,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          # PZ6 D2: deployment-only signature; the solo page carries no release URL.
+          E7_RELEASE_SIGNING_KEY: ${{ secrets.E7_RELEASE_SIGNING_KEY }}
+          E7_RELEASE_PUBLIC_KEY: ${{ vars.E7_RELEASE_PUBLIC_KEY }}
           # PAGE-SIZE PZ6: preview reads its content from packs.wildshard.io. --content stamps the content set's base into the
           # page, keeps the split (the Worker serves only dist/) and publishes dist-content/ first; a new set copies unchanged
           # files from the last one on R2 (server side) and puts the rest through S3 with these bucket-scoped keys.

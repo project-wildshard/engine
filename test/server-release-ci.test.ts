@@ -55,6 +55,13 @@ test('CI signer agrees with the server and WebCrypto for both complete channels'
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+test('preview signs the same envelope without a socket or server bundle', async () => {
+  const preview = {channel: 'preview' as const, serial: 1, engineBuild: sha, saveEpoch: 1, shards: release().shards};
+  expect(await readSignedRelease(signRelease(preview, pem), publicKey)).toEqual(preview);
+  expect(() => signRelease({...preview, socket: release().socket}, pem)).toThrow(/must be solo/);
+  expect(() => signRelease({...preview, bundle: release().bundle}, pem)).toThrow(/must be solo/);
+});
+
 test('real S3 HTTP conditional writes advance once, retry a race, and reject an older green build', async () => {
   let held: { body: string; etag: string } | null = null, writes = 0, conflicts = 0;
   const waiting: (() => void)[] = [];

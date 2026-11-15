@@ -11,15 +11,19 @@ export { DEFAULT_SERVER_SHARDS, servedSlug } from './served-slug.mjs';
 /** @typedef {import('../../src/shared/host/releaseRows.ts').ReleaseFile} ReleaseFile */
 export const COMMIT = /^[0-9a-f]{40}$/u;
 
-/** CI publications always name their immutable bundle and public socket.
+/** Online publications name their immutable bundle and socket; preview is a signed solo deployment.
  * @param {unknown} value @returns {ReleaseFile} */
 export function publication(value) {
   const row = v.parse(ReleaseSchema, value);
-  if (row.channel === 'preview' || !Number.isSafeInteger(row.serial) || row.serial < 1 || !COMMIT.test(row.engineBuild)
+  if (!Number.isSafeInteger(row.serial) || row.serial < 1 || !COMMIT.test(row.engineBuild)
     || !Number.isSafeInteger(row.saveEpoch) || row.saveEpoch < 1 || row.shards.length === 0
     || row.shards.some(shard => !/^[a-z0-9_-]+$/u.test(shard.slug) || !Number.isSafeInteger(shard.revision))
-    || new Set(row.shards.map(shard => shard.slug)).size !== row.shards.length
-    || row.bundle === undefined || !/^[\w][\w.+-]*\/[\w][\w.+-]*\.tar\.gz$/u.test(row.bundle.name)
+    || new Set(row.shards.map(shard => shard.slug)).size !== row.shards.length) throw new Error('Invalid release publication');
+  if (row.channel === 'preview') {
+    if (row.socket !== undefined || row.bundle !== undefined) throw new Error('Preview publication must be solo');
+    return row;
+  }
+  if (row.bundle === undefined || !/^[\w][\w.+-]*\/[\w][\w.+-]*\.tar\.gz$/u.test(row.bundle.name)
     || row.socket === undefined) throw new Error('Invalid server publication');
   const socket = new URL(row.socket);
   if (socket.protocol !== 'wss:' || socket.username !== '' || socket.password !== '' || socket.hash !== '') throw new Error('A public wss socket is required');
