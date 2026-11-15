@@ -146,6 +146,10 @@ export class World {
   /** The static table: which worker each cell is on (J182). */
   private readonly links = new Map<string, WorkerLink>();
   private readonly workers: WorkerLink[] = [];
+  /** The row each worker owns, retained for a planned replacement. */
+  private readonly workerSlugs = new Map<WorkerLink, readonly string[]>();
+  /** A replacement's old worker may exit without taking the whole server down. */
+  private readonly replacing = new Set<WorkerLink>();
   private readonly sockets = new Map<string, number>();
   private readonly connects = new Map<string, ConnectAttempt[]>();
   private readonly ends = new Set<SocketTransport>();
@@ -201,13 +205,16 @@ export class World {
   }
   /** A worker on its row. At startup its cells are in the table at once, and any failure ends the process (Q77). SA33: a `late` worker's cells
    *  join the table only once it has booted, and one that fails to boot is let go with nobody seated on it; after its boot it is like any. */
-  private bootWorker(slugs: readonly string[], late = false): Promise<void> {
-    const link = this.options.boot(slugs), index = this.workers.push(link) - 1;
+  private bootWorker(slugs: readonly string[], late = false, slot?: number): Promise<void> {
+    const link = this.options.boot(slugs), index = slot ?? this.workers.push(link) - 1;
+    if (slot !== undefined) this.workers[slot] = link;
+    this.workerSlugs.set(link, slugs);
     if (!late) for (const slug of slugs) this.links.set(slug, link);
     let up = false;
     return new Promise((resolve, reject) => {
       const ended = (reason: string): void => {
-        this.options.log({ at: 'worker.ended', index, slugs, reason }); reject(new Error(reason)); this.up.delete(link); this.resident.delete(link);
+        this.options.log({ at: 'worker.ended', index, slugs, reason }); reject(new Error(reason)); this.up.delete(link); this.resident.delete(link); this.stands.delete(link); this.workerSlugs.delete(link);
+        if (this.replacing.delete(link)) return;
         if (late && !up) { link.stop(); if (this.workers.at(-1) === link) this.workers.pop(); return; }
         this.options.crashed(new Error(reason));
       };
@@ -216,6 +223,16 @@ export class World {
         else if (news.kind === 'failed') ended(news.reason); else this.heard(index, news);
       }, ended);
     });
+  }
+  /** MP1.3: replace an idle worker without exposing a process or host control surface. Seats need the drain/reconnect half first. */
+  async restartWorker(index: number): Promise<void> {
+    const old = this.workers[index], slugs = old === undefined ? undefined : this.workerSlugs.get(old);
+    if (old === undefined || slugs === undefined) throw new Error(`No worker ${String(index)}`);
+    if ([...this.seated.values()].some(slug => this.linkOf(slug) === old)) throw new Error('A worker with seated players needs drain and reconnect');
+    this.options.log({ at: 'worker.restarting', index, slugs });
+    this.replacing.add(old); this.up.delete(old); this.resident.delete(old); this.stands.delete(old); old.stop();
+    await this.bootWorker(slugs, false, index);
+    this.openRoads();
   }
   /**
    * SA33: open cells on a running world (a placement the API made, J314) on a worker of their own. No other worker is told anything, so every
