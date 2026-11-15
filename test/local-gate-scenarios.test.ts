@@ -5,12 +5,10 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 test.each([
-  'ground-borrowed-body', 'matriarch-borrowed-body', 'roc-borrowed-body', 'pine-npc-figure-product',
+  'ground-borrowed-body', 'matriarch-borrowed-body', 'roc-borrowed-body',
   'scripts/_template-boss', 'scripts/ground-encounters', 'scripts/sunscar-matriarch',
   'scripts/far-reach-roc', 'scripts/skitterer-pack',
-  'chapter-director-product', 'pine-quest-actions-product', 'pine-prop-product',
-  'native-runtime-plan', 'mover-carry',
-  'template-map-generation',
+  'mover-carry',
 ])('%s consumes an existing product without building an app or starting a server', name => {
   const source = readFileSync(`test/${name}.test.ts`, 'utf8');
   expect(source).toContain('builtProduct(');
@@ -28,9 +26,9 @@ cases = [
  ['src/sharddev/bake/script-scenario.test.ts', 'test/shard-headless.test.ts'],
  [], ['test/scripts-not-a-scenario.test.ts'],
  ['test/scripts/readme.md'], ['other/test/scripts/example.test.ts'],
- ['test/pine-npc-figure-product.test.ts', 'test/scripts/ground-encounters.test.ts'],
+ ['test/mover-carry.test.ts', 'test/scripts/ground-encounters.test.ts'],
  ['test/scripts/nine-sign-atlas.test.ts'],
- ['test/template-map-generation.test.ts'],
+ ['test/mover-carry.test.ts'],
 ]
 print(json.dumps([select(case, registry) for case in cases], separators=(',', ':')))
 try:
@@ -44,7 +42,7 @@ assert all(str(path) in registry for path in Path('test/scripts').glob('*.test.t
   expect(JSON.parse(result)).toEqual([
     ['_template'], ['far-reach'],
     ['_template', 'driftwood-isle', 'far-reach', 'nalati-grasslands', 'nine-dragon-stack', 'pastel-plain', 'pine-hollow', 'sunscar-dunes'],
-    [], [], [], [], ['driftwood-isle', 'pine-hollow'], [], ['_template'],
+    [], [], [], [], ['driftwood-isle', 'pine-hollow'], [], ['pine-hollow'],
   ]);
 });
 

@@ -9266,5 +9266,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "f44f9ebb26ecd6ef0c133445820760c0e6c057ef",
     "retirementProof": "Restored current engine lint boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/local-gate-scenarios.test.ts",
+    "outcome": "restored",
+    "target": "test/local-gate-scenarios.test.ts",
+    "decision": "Restored in place (CI21 E-TOOL): the selector now names only current product-reader scenarios. Six removed monorepo scenario entries are retired under J186 because their files and private product contracts no longer exist; current ground-encounter and mover-carry readers retain the selection boundary.",
+    "originalTests": ["pine-npc-figure-product", "chapter-director-product", "pine-quest-actions-product", "pine-prop-product", "native-runtime-plan", "template-map-generation"],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "0eb821d1d5f8bcfaa27dfedf7ab570720e3de6a8",
+    "retirementProof": "Individual body-reviewed J186 disposition for six missing scenario files; the restored test reads only existing public products."
   }
 ]

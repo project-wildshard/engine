@@ -73,7 +73,6 @@
   "test/import-bundle.test.ts",
   "test/json-output-guard.test.ts",
   "test/ktx2-owned-bytes.test.ts",
-  "test/local-gate-scenarios.test.ts",
   "test/loot-continuation-ports.test.ts",
   "test/map-binding.test.ts",
   "test/map-source-inputs.test.ts",

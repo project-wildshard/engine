@@ -139,10 +139,6 @@
   "test/sdk-rigged-hull-files.test.ts": [],
   "test/frame-floor-output-entry.test.ts": [],
   "test/texture-scope-lifetime.test.ts": [],
-  "test/chapter-director-product.test.ts": [
-    "pine-hollow",
-    "driftwood-isle"
-  ],
   "test/director-shipping-product.test.ts": [
     "pine-hollow",
     "driftwood-isle"
@@ -221,9 +217,6 @@
     "sunscar-dunes",
     "far-reach"
   ],
-  "test/pine-npc-figure-product.test.ts": [
-    "pine-hollow"
-  ],
   "test/scripts/_template-boss.test.ts": [
     "_template"
   ],
@@ -272,10 +265,6 @@
   "test/keyed-sky-platform.test.ts": [],
   "test/streamed-cover-platform.test.ts": [],
   "test/toon-look-platform.test.ts": [],
-  "test/pine-quest-actions-product.test.ts": [
-    "pine-hollow",
-    "driftwood-isle"
-  ],
   "test/world-scene-batch.test.ts": [],
   "test/pine-crag-scenes.test.ts": [
     "pine-hollow"
@@ -285,9 +274,6 @@
     "driftwood-isle"
   ],
   "test/world-scene-baked-model.test.ts": [],
-  "test/pine-prop-product.test.ts": [
-    "pine-hollow"
-  ],
   "test/driftwood-foliage-scenes.test.ts": [],
   "test/quest-catalogue-sites.test.ts": [
     "pine-hollow",
@@ -332,10 +318,6 @@
   "test/quest-page-refs.test.ts": [],
   "test/scene-motion-refs.test.ts": [],
   "test/scene-buffers.test.ts": [],
-  "test/native-runtime-plan.test.ts": [
-    "far-reach",
-    "sunscar-dunes"
-  ],
   "test/native-runtime-observation.test.ts": [
     "far-reach"
   ],
@@ -356,9 +338,6 @@
   "test/boss-arena-room.test.ts": [],
   "test/grapple-platform.test.ts": [],
   "test/nalati-layout-bake.test.ts": [],
-  "test/template-map-generation.test.ts": [
-    "_template"
-  ],
   "test/stealth-detection.test.ts": [],
   "test/held-weapon-laws.test.ts": [],
   "test/nalati-riding-rules.test.ts": ["pine-hollow", "nalati-grasslands"],
