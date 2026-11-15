@@ -38,15 +38,29 @@ export async function goldenRefinementBinding(base,source) {
     throw new Error('Native reader requires the served Nine product');
   const servedIndex=Buffer.from(await(await fetch(new URL('/shardfiles/nine-dragon-stack/shard.json',base))).arrayBuffer());
   if(!servedIndex.equals(index))throw new Error('Served Nine index differs from exact preview');
-  const code=`b/${source.build}`,codeFolder=existsSync(join(root,code))?code:'assets',dist=join(root,codeFolder);
-  const chunks=readdirSync(dist).filter(file=>file.endsWith('.js')).map(file=>({file,bytes:readFileSync(join(dist,file))}))
+  const chunks=buildCodeChunks(root,source.build).map(chunk=>({chunk,bytes:readFileSync(join(root,chunk))}))
     .filter(row=>row.bytes.includes('Invalid or duplicate refinement job'));
   if (chunks.length!==1) throw new Error('Native refinement chunk is missing or ambiguous');
-  const {file,bytes}=chunks[0],binding=refinementExports(bytes.toString('utf8'));
-  const chunk=`/${codeFolder}/${file}`,served=Buffer.from(await(await fetch(new URL(chunk,base))).arrayBuffer());
+  const {chunk,bytes}=chunks[0],binding=refinementExports(bytes.toString('utf8'));
+  const served=Buffer.from(await(await fetch(new URL(chunk,base))).arrayBuffer());
   if (!served.equals(bytes)) throw new Error('Served native refinement differs from exact preview');
   return {...binding,sha:pinned?.sha??source.sha,build:source.build,preview:pinned===undefined?'working-tree':'pinned',
     nineIndexSHA256:createHash('sha256').update(index).digest('hex'),chunk,chunkSHA256:createHash('sha256').update(served).digest('hex')};
+}
+
+/** This build's code chunks, as served paths: its own folder `b/<build>`, plus the
+ * content-named chunks in the shared `b/c` that its `importmap.json` names (J217
+ * LD6). The shared folder can also hold other builds' chunks, so it is never
+ * listed. A build without `b/<build>` keeps everything in `assets/`.
+ * @param {string} root the preview's dist @param {string} build */
+export function buildCodeChunks(root,build) {
+  const own=`b/${build}`;
+  if (!existsSync(join(root,own))) return readdirSync(join(root,'assets')).filter(file=>file.endsWith('.js')).map(file=>`/assets/${file}`);
+  const chunks=readdirSync(join(root,own)).filter(file=>file.endsWith('.js')).map(file=>`/${own}/${file}`);
+  const map=join(root,'importmap.json');
+  if (existsSync(map)) for (const target of Object.values(JSON.parse(readFileSync(map,'utf8')).imports??{}))
+    if (typeof target==='string'&&target.startsWith('/b/c/')&&target.endsWith('.js')&&!chunks.includes(target)) chunks.push(target);
+  return chunks;
 }
 
 /** Fail closed when the compiler shape changes; no guessed export or copied release binding.
