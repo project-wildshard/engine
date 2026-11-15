@@ -164,7 +164,7 @@ export async function committedFastChecks(root,base,tip,phase,paths) {
       const policy=json(view,'lint/ratchet.json');
       if(view.files.has('scripts/check-spelled-paths.mjs')) {
         const {spelledPathFailures}=/** @type {typeof import('./check-spelled-paths.mjs')} */(await module('scripts/check-spelled-paths.mjs'));
-        view.prime([...view.files.keys()].filter(path=>/^src\/(?:engine|game)\/isolated-[^/]+\.test\.ts$|^scripts\/.*\.[cm]?[jt]s$|^src\/shards\/[^/]+\/(?:data|look)\/map\.json$/u.test(path)));
+        view.prime([...view.files.keys()].filter(path=>/^src\/(?:client|cook|server|shared)\/(?:engine|game)\/isolated-[^/]+\.test\.ts$|^scripts\/.*\.[cm]?[jt]s$|^src\/shards\/[^/]+\/(?:data|look)\/map\.json$/u.test(path)));
         failures.push(...spelledPathFailures(view.files,path=>view.read(path).toString('utf8')));
       }
       // The folder rule of check-paths, over committed paths: a new file in a shard's root needs the layout's word.
@@ -237,7 +237,7 @@ export async function committedFastChecks(root,base,tip,phase,paths) {
     } else if(phase==='census') {
       // The census ratchets of CI's prepare job, over the tip's blobs, last so they spend only what the budget leaves.
       // One that runs out of time is CI's, not a verdict.
-      if(view.files.has('scripts/sort-sides.mjs')&&view.files.has('scripts/check-sim-players.mjs')&&paths.some(path=>/^(?:src\/(?:engine|game|sdk|sharddev)|lint)\//u.test(path))) {
+      if(view.files.has('scripts/sort-sides.mjs')&&view.files.has('scripts/check-sim-players.mjs')&&paths.some(path=>/^(?:src\/(?:client|cook|server|shared)\/(?:engine|game|host)|lint)\//u.test(path))) {
         const census=async(/** @type {string} */ script)=>{
           const child=spawn(process.execPath,[resolve(root,'scripts/sort-sides.mjs'),'--view',tip,script],{cwd:root,timeout:25_000,stdio:['ignore','pipe','pipe']});
           const closed=once(child,'close'),[stdout,stderr]=await Promise.all([text(child.stdout),text(child.stderr)]);

@@ -9386,5 +9386,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "92f18f3058a6957ecfa2fc1a053e6f89e3fe8b63",
     "retirementProof": "Engine keeps its public host-callback guard; catalogue and audit credit proof moved to sharddev's successor test."
+  },
+  {
+    "repo": "engine",
+    "file": "test/committed-fast-checks.test.ts",
+    "outcome": "restored",
+    "target": "test/committed-fast-checks.test.ts",
+    "decision": "Restored the exact-commit and sorted-layout gate proof in place (CI21 E-TOOL). The old native shard-discovery provider case has J186 disposition: engine no longer builds shard source, so its producer proof belongs to sharddev.",
+    "originalTests": [],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "4076ae1d89611ecd4471b1377d7189cf2b8e9fcc",
+    "retirementProof": "J186: dynamic shard-source generation is not an engine public boundary after the split; keep engine's generic committed-input proof and test the producer in sharddev."
   }
 ]

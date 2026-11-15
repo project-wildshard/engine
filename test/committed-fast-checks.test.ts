@@ -95,7 +95,7 @@ test('a format bump the lock left behind is refused, naming the lock, and an unt
     f.put('scripts/check-platform-ratchets.mjs','export const PLATFORM_LISTS=[];export function comparePlatformList(){return [];}');
     f.put('scripts/ratchet-approval.mjs','export function ratchetApprovalFailures(){return [];}');
     f.put('scripts/format-lock.mjs',readFileSync(resolve('scripts/format-lock.mjs'),'utf8'));
-    f.put('package.json',JSON.stringify({dependencies:{'@wildshard/format':'github:project-wildshard/shardfile#v0.3.4'}}));
+    f.put('package.json',JSON.stringify({dependencies:{'@wildshard/format':'github:project-wildshard/shard-format#v0.3.4'}}));
     const sha='a'.repeat(40),row=`git+ssh://git@github.com/project-wildshard/shardfile.git#${sha}`;
     const lock=(version:string)=>`lockfileVersion: '9.0'
 
@@ -104,12 +104,12 @@ importers:
   .:
     dependencies:
       '@wildshard/format':
-        specifier: github:project-wildshard/shardfile#v0.3.4
+        specifier: github:project-wildshard/shard-format#v0.3.4
         version: ${row}(typescript@7.0.2)
 
 packages:
 
-  '@wildshard/format@${row}':
+  '@wildshard/shard-format@${row}':
     resolution: {commit: ${sha}, repo: ${f.root}/absent.git, type: git}
     version: ${version}
 `;
@@ -130,7 +130,7 @@ packages:
 test('native-output handoff keeps ordinary source errors blocking',()=>{
   const f=fixture();try{
     f.put('.gitignore','tmp/\nnode_modules/\n*.generated.ts\n');
-    f.put('scripts/source-generation-outputs.json',JSON.stringify({producers:{'scripts/gen-shards.mjs':['src/value.generated.ts']}}));
+    f.put('scripts/source-generation-outputs.json',JSON.stringify({producers:{'scripts/gen-shards.mjs':['src/client/app/value.generated.ts']}}));
     f.put('src/client/app/main.ts',"import './value.generated';export const value=1;");
     const good=f.commit();f.put('src/value.generated.ts','eval("poison");');
     const handed=f.run('fast-lint',good,undefined,undefined,false,true,true);
@@ -138,7 +138,7 @@ test('native-output handoff keeps ordinary source errors blocking',()=>{
     expect(handed.stdout).toContain('Fast lint passed on 1 exact changed files');
     expect(handed.stdout).toContain('Gate-deferred: native-outputs');
     expect(handed.stdout).not.toContain('DEFERRED TO CI');
-    expect(()=>readFileSync(resolve(f.root,'src/value.generated.ts'))).toThrow();
+    expect(()=>readFileSync(resolve(f.root,'src/client/app/value.generated.ts'))).toThrow();
     f.put('src/client/app/main.ts',"import './value.generated';eval('1');");
     const refused=f.run('fast-lint',f.commit(),undefined,undefined,false,true,true);
     expect(refused.status,refused.stderr).toBe(1);expect(refused.stderr).toContain('no-eval');
@@ -151,7 +151,7 @@ test('native-output handoff keeps ordinary source errors blocking',()=>{
 
 test('native closure admits tracked declaration modules without a generation handoff',()=>{
   const f=fixture();try{
-    f.put('src/shape.d.ts','export interface Shape {value:number}\n');
+    f.put('src/client/app/shape.d.ts','export interface Shape {value:number}\n');
     f.put('src/client/app/main.ts',"import type {Shape} from './shape';export const value:Shape={value:1};");
     const result=f.run('fast-lint',f.commit(),undefined,undefined,false,true,true);
     expect(result.status,result.stderr).toBe(0);
@@ -214,17 +214,17 @@ test('plugin executable and policy reads stay on Git even when both are dirty',(
 test('native lint detects exact cycles and defers a changed dependency',()=>{
   const f=fixture();try {
     f.put('src/client/app/main.ts',"import {other} from './other';export const value=other+1;");
-    f.put('src/other.ts',"import {value} from './main';export const other=value+1;");const bad=f.commit();
+    f.put('src/client/app/other.ts',"import {value} from './main';export const other=value+1;");const bad=f.commit();
     const exact=f.run('fast-lint',bad);expect(exact.status,exact.stderr).toBe(1);expect(exact.stderr).toContain('no-cycle');
-    f.put('src/other.ts','export const other=1;');
+    f.put('src/client/app/other.ts','export const other=1;');
     const result=f.run('fast-lint',bad);expect(result.status,result.stderr).toBe(0);expect(result.stdout).toContain('DEFERRED TO CI fast-lint src/client/app/main.ts');expect(result.stdout).not.toContain('Fast lint passed');
   }finally{f.close();}
 });
 
 test('native closure resolves query and fragment imports to their tracked file',()=>{
   const f=fixture();try {
-    f.put('src/worker.ts','export const value=1;');
-    f.put('src/client/app/main.ts',"import first from '../lint/ratchet.json?raw';import second from '../lint/ratchet.json#text';import worker from './worker?worker&inline';export const value=[first,second,worker];");
+    f.put('src/client/app/worker.ts','export const value=1;');
+    f.put('src/client/app/main.ts',"import first from '../../../lint/ratchet.json?raw';import second from '../../../lint/ratchet.json#text';import worker from './worker?worker&inline';export const value=[first,second,worker];");
     const tip=f.commit(),index=f.git('write-tree');
     const result=f.run('fast-lint',tip);
     expect(result.status,result.stdout+result.stderr).toBe(0);
@@ -232,13 +232,13 @@ test('native closure resolves query and fragment imports to their tracked file',
     expect(result.stdout).not.toContain('DEFERRED TO CI');
     expect(f.git('write-tree')).toBe(index);
     expect(readFileSync(resolve(f.root,'src/client/app/main.ts'),'utf8')).toContain('ratchet.json?raw');
-    f.put('src/worker.ts','export const value=2;');
+    f.put('src/client/app/worker.ts','export const value=2;');
     const dirty=f.run('fast-lint',tip);
-    expect(dirty.stdout).toContain('unverified inputs src/worker.ts');
+    expect(dirty.stdout).toContain('unverified inputs src/client/app/worker.ts');
     expect(dirty.stdout).not.toContain('Fast lint passed');
     f.put('src/client/app/main.ts',"import worker from './missing?worker&inline';export const value=worker;");
     const missing=f.run('fast-lint',f.commit());
-    expect(missing.stdout).toContain('unverified inputs src/missing');
+    expect(missing.stdout).toContain('unverified inputs src/client/app/missing');
     expect(missing.stdout).not.toContain('Fast lint passed');
   }finally{f.close();}
 });
@@ -257,7 +257,7 @@ test('native generated inputs match canonical committed producer bytes',()=>{
   const f=fixture();try {
     f.put('scripts/gen-starter-weapons.mjs',readFileSync(resolve('scripts/gen-starter-weapons.mjs'),'utf8'));
     f.put('src/shared/game/weapons/starterBow.json','{"damage":1}');
-    f.put('src/client/app/main.ts',"import {STARTER_BOW} from './game/shared/weapons/starter.generated';export const value=STARTER_BOW;");
+    f.put('src/client/app/main.ts',"import {STARTER_BOW} from '../../shared/game/weapons/starter.generated';export const value=STARTER_BOW;");
     f.put('.gitignore','.gitignore\ntmp/\nnode_modules/\n*.generated.ts\n');
     const tip=f.commit();
     const generate=()=>execFileSync('node',['--input-type=module','--eval',"import {genStarterWeapons} from './scripts/gen-starter-weapons.mjs';genStarterWeapons();"],{cwd:f.root});
@@ -280,63 +280,31 @@ test('native generated inputs match canonical committed producer bytes',()=>{
 
 test('loose data without a current provider cannot supply committed inputs',()=>{
   const f=fixture();try {
-    const file='src/layout.generated.json';
+    const file='src/client/app/layout.generated.json';
     f.put('.gitignore','tmp/\nnode_modules/\n*.generated.json\n');
     f.put('src/client/app/main.ts',"import layout from './layout.generated.json';export const value=layout;");
     const tip=f.commit();
     for(const bytes of [undefined,'{"layout":1}','{"layout":2}']) {
       if(bytes!==undefined)f.put(file,bytes);
       const result=f.run('fast-lint',tip);
-      expect(result.stdout).toContain('unverified inputs src/layout.generated.json');
+      expect(result.stdout).toContain('unverified inputs src/client/app/layout.generated.json');
       expect(result.stdout).not.toContain('Fast lint passed');
     }
   }finally{f.close();}
 });
 
-test('literal discovery providers require native context and exact tracked correspondence',()=>{
-  const f=fixture();try {
-    const file='src/derived.generated.ts',retained='src/owned.json';
-    f.put('.gitignore','tmp/\nnode_modules/\n*.generated.ts\n');
-    f.put('src/client/app/main.ts',"import {value} from './derived.generated';export const result=value;");
-    const registry=(outputs:string[]):void=>f.put('scripts/source-generation-outputs.json',JSON.stringify({producers:{'scripts/gen-shards.mjs':outputs}}));
-    registry([file,retained]);f.put(retained,'{"id":1}');
-    f.put('scripts/node-format.mjs','// Fixture has no format imports.');
-    const provider=`import{mkdirSync,writeFileSync}from'node:fs';export function genShards(){mkdirSync('src',{recursive:true});writeFileSync('${file}','export const value=1;');writeFileSync('${retained}','{"id":1}');}`;
-    f.put('scripts/gen-shards.mjs',provider);const tip=f.commit();
-    expect(f.run('fast-lint',tip).stdout).toContain('unverified inputs src/derived.generated');
-    const native=f.run('fast-lint',tip,['src/client/app/main.ts'],f.base,false,true);
-    expect(native.status,native.stdout+native.stderr).toBe(0);
-    expect(native.stdout).toContain('Fast lint passed on 1 exact changed files');
-    expect(native.stdout).not.toContain('DEFERRED TO CI');
-    expect(readFileSync(resolve(f.root,file),'utf8')).toBe('export const value=1;');
-    expect(readFileSync(resolve(f.root,retained),'utf8')).toBe('{"id":1}');
-    f.put('scripts/gen-shards.mjs',provider.replace('{"id":1}','{"id":2}'));
-    const moved=f.run('fast-lint',f.commit(),['src/client/app/main.ts'],f.base,false,true);
-    expect(moved.status).toBe(1);expect(moved.stderr).toContain('Generated output differs from committed source');
-    // This native root represents a disposable mirror; mismatched bytes never
-    // gain admission even though the rejected writer emitted them there.
-    expect(readFileSync(resolve(f.root,retained),'utf8')).toBe('{"id":2}');
-    f.put('scripts/gen-shards.mjs',provider);registry([file,'src/missing.generated.ts']);
-    const incomplete=f.run('fast-lint',f.commit(),['src/client/app/main.ts'],f.base,false,true);
-    expect(incomplete.status).toBe(1);expect(incomplete.stderr).toContain('ENOENT');
-    registry([file,'src/../escape']);
-    const escaped=f.run('fast-lint',f.commit(),['src/client/app/main.ts'],f.base,false,true);
-    expect(escaped.status).toBe(1);expect(escaped.stderr).toContain('Invalid native source output');
-  }finally{f.close();}
-});
-
 test('deleted-path guard ignores loose rescues and keeps frozen legacy references historical',()=>{
   const f=fixture();try {
-    f.put('src/other.ts','export const other=1;');f.commit();f.git('rm','src/other.ts');
-    f.put('src/client/app/main.ts',"export{other}from'./other';");const bad=f.commit();f.put('src/other.ts','export const other=1;');
+    f.put('src/client/app/other.ts','export const other=1;');f.commit();f.git('rm','src/client/app/other.ts');
+    f.put('src/client/app/main.ts',"export{other}from'./other';");const bad=f.commit();f.put('src/client/app/other.ts','export const other=1;');
     const index=readFileSync(resolve(f.root,'.git/index'));
-    const result=f.run('deleted-paths',bad,['src/other.ts']);expect(result.status,result.stderr).toBe(1);expect(result.stderr).toContain('deleted path src/other.ts');
+    const result=f.run('deleted-paths',bad,['src/client/app/other.ts']);expect(result.status,result.stderr).toBe(1);expect(result.stderr).toContain('deleted path src/client/app/other.ts');
     expect(readFileSync(resolve(f.root,'.git/index'))).toEqual(index);
-    expect(readFileSync(resolve(f.root,'src/other.ts'),'utf8')).toBe('export const other=1;');
-    f.put('src/client/app/main.ts','export const value=1;');f.put('src/shards/example-legacy/runtime/index.ts',"export{other}from'../../../other';");const fixed=f.commit();
+    expect(readFileSync(resolve(f.root,'src/client/app/other.ts'),'utf8')).toBe('export const other=1;');
+    f.put('src/client/app/main.ts','export const value=1;');f.put('src/shards/example-legacy/runtime/index.ts',"export{other}from'../../../client/app/other';");const fixed=f.commit();
     f.put('src/client/app/main.ts',"export{other}from'./other';");
     const fixedIndex=readFileSync(resolve(f.root,'.git/index'));
-    expect(f.run('deleted-paths',fixed,['src/other.ts']).status).toBe(0);
+    expect(f.run('deleted-paths',fixed,['src/client/app/other.ts']).status).toBe(0);
     expect(readFileSync(resolve(f.root,'.git/index'))).toEqual(fixedIndex);
     expect(readFileSync(resolve(f.root,'src/client/app/main.ts'),'utf8')).toBe("export{other}from'./other';");
   }finally{f.close();}
@@ -375,15 +343,15 @@ test('guards refuse paths written as data and a file outside a shard\'s layout',
     for(const file of ['check-spelled-paths.mjs','check-shards.mjs','shard-outputs.mjs'])f.put(`scripts/${file}`,readFileSync(resolve('scripts',file),'utf8'));
     f.put('lint/shard-layout.json',JSON.stringify({sourceLayout:{requiredFiles:['shard.config.ts'],allowedFiles:[],folders:['data']}}));
     f.put('src/shards/one/shard.config.ts','export default {};\n');f.put('src/shards/one/data/map.json','{"inputs":["data"]}\n');
-    f.put('src/client/engine/view.ts','export const view=1;\n');f.put('src/engine/isolated-x.test.ts','const names=["client/view"];\n');
+    f.put('src/client/engine/view.ts','export const view=1;\n');f.put('src/client/engine/isolated-x.test.ts','const names=["client/view"];\n');
     const base=f.commit();
     expect(f.run('guards',base,['src/shards/one/data/map.json'],base).status).toBe(0);
     f.put('src/shards/one/mounts.json','{}\n');const stray=f.commit();
     const layout=f.run('guards',stray,['src/shards/one/mounts.json'],base);
     expect(layout.status).toBe(1);expect(layout.stderr).toContain('src/shards/one/mounts.json: outside the standalone source layout');
-    f.git('rm','-q','src/shards/one/mounts.json');f.git('mv','src/client/engine/view.ts','src/server/engine-view.ts');
+    f.git('rm','-q','src/shards/one/mounts.json');rmSync(resolve(f.root,'src/client/engine/view.ts'));f.put('src/server/engine-view.ts','export const view=1;\n');
     const moved=f.commit(),spelled=f.run('guards',moved,['src/server/engine-view.ts'],stray);
-    expect(spelled.status).toBe(1);expect(spelled.stderr).toContain('src/engine/isolated-x.test.ts: no module at src/client/engine/view');
+    expect(spelled.status).toBe(1);expect(spelled.stderr).toContain('src/client/engine/isolated-x.test.ts: no module at src/client/engine/view');
   }finally{f.close();}
 });
 
@@ -396,10 +364,10 @@ test('the census phase runs the ratchets over the tip, and only for source',()=>
     expect(f.run('census',base,['src/client/app/main.ts'],base).status).toBe(0);
     f.put('src/client/app/main.ts','export const rose=1;\n');const risen=f.commit();
     expect(f.run('census',risen,['docs/note.md'],base).status).toBe(0);
-    const bad=f.run('census',risen,['src/engine/x.ts'],base);
+    const bad=f.run('census',risen,['src/client/engine/x.ts'],base);
     expect(bad.status).toBe(1);expect(bad.stderr).toContain('src/client/app/main.ts: 2 → 4');
     f.put('src/client/app/main.ts','export const value=1;\n');
-    expect(f.run('census',risen,['src/engine/x.ts'],base).stderr).toContain('src/client/app/main.ts: 2 → 4');
+    expect(f.run('census',risen,['src/client/engine/x.ts'],base).stderr).toContain('src/client/app/main.ts: 2 → 4');
   }finally{f.close();}
 });
 

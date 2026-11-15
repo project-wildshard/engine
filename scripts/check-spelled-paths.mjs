@@ -20,9 +20,12 @@ export function spelledPathFailures(files, read) {
   const failures = [], paths = [...files.keys()], folders = new Set(['src']);
   for (const path of paths) for (let at = path.indexOf('/'); at !== -1; at = path.indexOf('/', at + 1)) folders.add(path.slice(0, at));
   for (const file of paths) {
-    const isolated = /^src\/(engine|game)\/isolated-[^/]+\.test\.ts$/u.exec(file)?.[1];
-    if (isolated !== undefined) for (const [, rel] of read(file).matchAll(ROOTED))
-      if (!exists(files, folders, `src/${isolated}/${rel}`)) failures.push(`${file}: no module at src/${isolated}/${rel}: the isolated test spells a side the file left`);
+    const isolated = /^src\/(client|cook|server|shared)\/(engine|game)\/isolated-[^/]+\.test\.ts$/u.exec(file);
+    if (isolated !== null) for (const [, rel] of read(file).matchAll(ROOTED)) {
+      const [side, ...rest] = rel.split('/');
+      const target = side === undefined || rest.length === 0 ? `src/${isolated[1]}/${isolated[2]}/${rel}` : `src/${side}/${isolated[2]}/${rest.join('/')}`;
+      if (!exists(files, folders, target)) failures.push(`${file}: no module at ${target}: the isolated test spells a side the file left`);
+    }
     if (/^scripts\/.*\.[cm]?[jt]s$/u.test(file) && !file.includes('.test.')) for (const match of read(file).matchAll(EMITTED))
       if (!exists(files, folders, `src/${match[2]}/${match[3]}`.replace(/[./]+$/u, ''))) failures.push(`${file}: no module at src/${match[2]}/${match[3]}: an emitted import spells a side the file left`);
     if (MAP_FILE.test(file)) for (const input of JSON.parse(read(file)).inputs ?? []) {
