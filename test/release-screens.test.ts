@@ -20,6 +20,7 @@ test('a 5xx page counts down the real scheduled read, reads again by itself, and
   expect(primary()).not.toMatch(/503|https?:/u);
   expect(document.querySelector('[data-failmode] details')?.textContent).toContain('HTTP 503');
   expect(labels()).toEqual(['Try now', 'Check connection', 'Title screen']);
+  expect(document.activeElement?.textContent).toBe('Try now'); // the page takes focus, so Enter or Space acts at once
   await vi.advanceTimersByTimeAsync(1999);
   expect(read).toBe(false);
   await vi.advanceTimersByTimeAsync(1);

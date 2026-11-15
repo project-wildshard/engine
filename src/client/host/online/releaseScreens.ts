@@ -88,6 +88,7 @@ export function releaseScreens(scope: Scope, hooks: ReleaseScreenHooks, parent: 
       details.append(summary, make('p', '', `${measured(fault)} ${detail}`));
       box.append(details);
       parent.append(root);
+      root.querySelector<HTMLButtonElement>('button')?.focus(); // the first action takes focus; card() keeps Tab inside
       // mode 39 goes to the error report queue, once a page
       if (id === 'release-unsigned' && !reported) { reported = true; try { report(new Error(`Release file failed its signature: ${detail}`), { system: 'link', build: '', shard: '', bootStage: 'loading', fatal: false, screen: 'release-unsigned', diagnostic: { detail } }); } catch { /* telemetry never stops the page */ } }
     }),
