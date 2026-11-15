@@ -197,8 +197,19 @@ def helper_env():
 
 
 def cook_rebuild():
-    """rebuild.sh's cook step alone, as root, from the root-owned copy. It exits non-zero unless the worker answers /health."""
-    return subprocess.run(['bash' if TEST else '/usr/bin/bash', helper('rebuild'), '--cook'], cwd='/', env=helper_env()).returncode == 0
+    """rebuild.sh's cook step alone, as root, from the root-owned copy. It exits non-zero unless the worker answers /health.
+    It runs in its own session with SIGPIPE and SIGHUP ignored (restore_signals=False keeps them so), so a dropped ssh
+    caller can't kill it halfway through a checkout or an install."""
+    return subprocess.run(['bash' if TEST else '/usr/bin/bash', helper('rebuild'), '--cook'], cwd='/', env=helper_env(),
+                          restore_signals=False, start_new_session=True).returncode == 0
+
+
+def say(line, error=False):
+    """Print, but never let a caller that went away stop a move or its rollback."""
+    try:
+        print(line, file=sys.stderr if error else sys.stdout, flush=True)
+    except OSError:
+        pass
 
 
 def show_cook():
@@ -216,7 +227,7 @@ def cook(args):
     tag, rebuild = args[1], helper('rebuild')
     try:
         with open(rebuild, encoding='utf-8') as handle:
-            knows = '--cook' in handle.read()
+            knows = '[ "$1" = --cook ]' in handle.read()
     except OSError:
         knows = False
     if not knows:
@@ -231,29 +242,36 @@ def cook(args):
     import fcntl
     lock = os.fdopen(os.open(f'{ETC}/.cook.settings.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
     fcntl.flock(lock, fcntl.LOCK_EX)
+    # From here on a dropped caller changes nothing: no hangup, no broken pipe, and any failure rolls back.
+    import signal
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
     path = f'{ETC}/cook.settings'
     before = read_rows(path)
     rows = [row for row in (list(before) or list(COOK_HEADER)) if key_of(row) not in COOK_KEYS]
     rows += [f'COOK_ENGINE_REF={tag}', f'WILDSHARD_BUILD={commit}']
+    try:
+        if rows == before:
+            say(f'ok      cook.settings already names {tag}')
+        else:
+            write_rows(path, rows, 'cook')
+            say(f'doing   cook {tag} at {commit}')
+        if cook_rebuild():
+            say(f'ok      the cook worker runs {tag} ({commit[:8]})')
+            return 0
+    except BaseException:
+        pass
     if rows == before:
-        print(f'ok      cook.settings already names {tag}')
-    else:
-        write_rows(path, rows, 'cook')
-        print(f'doing   cook {tag} at {commit}')
-    if cook_rebuild():
-        print(f'ok      the cook worker runs {tag} ({commit[:8]})')
-        return 0
-    if rows == before:
-        print(f'stop    the cook worker is not healthy on {tag}: look at journalctl -u wildshard-cook', file=sys.stderr)
+        say(f'stop    the cook worker is not healthy on {tag}: look at journalctl -u wildshard-cook', error=True)
         return 2
     # It did not come back: the old tag goes back and is rebuilt, so a bad move never leaves the cook down.
     if before:
         write_rows(path, before, 'cook')
-    else:
+    elif os.path.exists(path):
         os.unlink(path)
-    print(f'undo    the cook worker did not come up on {tag}; the old tag is back', file=sys.stderr)
+    say(f'undo    the cook worker did not come up on {tag}; the old tag is back', error=True)
     if not cook_rebuild():
-        print('stop    the cook worker is not healthy on its old tag either: look at journalctl -u wildshard-cook', file=sys.stderr)
+        say('stop    the cook worker is not healthy on its old tag either: look at journalctl -u wildshard-cook', error=True)
         return 2
     return 1
 

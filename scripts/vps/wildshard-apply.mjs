@@ -90,7 +90,7 @@ async function main() {
       { stdio: 'inherit', env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', LANG: 'C.UTF-8', WILDSHARD_APPLY_LOCKED: '1' } });
     process.exit(locked.status ?? 1);
   }
-  if (tag === undefined || which === undefined || rest.length > 0 || !(which in SCRIPTS || which === 'verify')) stop('usage: wildshard-apply <tag> harden|setup|rebuild|verify');
+  if (tag === undefined || which === undefined || rest.length > 0 || !(Object.hasOwn(SCRIPTS, which) || which === 'verify')) stop('usage: wildshard-apply <tag> harden|setup|rebuild|verify');
   if (!TAG.test(tag)) stop(`${tag} is not a release tag (vX.Y.Z or server-staging-<sha>)`);
   const key = test !== undefined ? process.env.WILDSHARD_APPLY_TEST_KEY ?? '' : RELEASE_PUBLIC_KEY;
   const commits = new Set((await signedFiles()).map(text => signedCommit(text, tag, key)).filter(commit => commit !== null));

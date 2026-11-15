@@ -116,6 +116,9 @@ wait_http() {
 
 # --- Before anything
 if [ "$CHECK" = 0 ] && [ "$(id -u)" != 0 ]; then say stop 'Run with sudo, or pass --check'; exit 1; fi
+# AUTO-RELEASE AR3: one rebuild at a time, whichever way it was started (a full run, --cook from wildshard-config cook,
+# wildshard-apply <tag> rebuild), so two never move the cook's checkout or install into it at once.
+if [ "$CHECK" = 0 ]; then exec 9>/run/wildshard-rebuild.lock; flock 9; fi
 for name in setup.sh setup-state.mjs pull.mjs dump.sh restore-check.sh uptime.sh health-stub.mjs wildshard-config wildshard-apply.mjs wildshard-agent.pub; do
   if [ ! -f "$HERE/$name" ]; then say stop "$name must sit beside rebuild.sh"; exit 1; fi
 done
@@ -464,6 +467,10 @@ make_cook_source() {
   fi
   git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" fetch --quiet --tags origin
   git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" checkout --quiet --force --detach "$COOK_REF^{commit}"
+  # --cook (AR3): the tag must still be the build wildshard-config verified, or the worker would run other code than it reports.
+  if [ "$COOK_ONLY" = 1 ] && [ "$(cook_commit)" != "$(cook_value "$COOK_ENV" WILDSHARD_BUILD)" ]; then
+    say stop "$COOK_REF is $(cook_commit) on GitHub now, not the verified WILDSHARD_BUILD"; exit 1
+  fi
   rm -f "$COOK_SRC/.wildshard-installed"
   (cd "$COOK_SRC" && org_git env CI=1 HOME=/root COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack "$PNPM" install --frozen-lockfile --ignore-scripts --config.confirmModulesPurge=false)
   printf '%s %s\n' "$COOK_REF" "$(cook_commit)" > "$COOK_SRC/.wildshard-installed"

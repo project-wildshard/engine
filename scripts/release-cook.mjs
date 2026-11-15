@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 const HOST = 'wildshard-agent';
 const RELEASES = 'https://packs.wildshard.io/releases';
 const TAG = /^v\d{1,4}\.\d{1,4}\.\d{1,4}$/u;
+const SIGNED_TAG = /^(?:v\d{1,4}\.\d{1,4}\.\d{1,4}|server-(?:staging|production)-[0-9a-f]{40})$/u, COMMIT = /^[0-9a-f]{40}$/u;
 const MARK = 'cook <tag>';
 
 /** @param {string} what @param {string} message */
@@ -34,7 +35,10 @@ async function served(channel) {
   const answer = await fetch(`${RELEASES}/${channel}.json`, { signal: AbortSignal.timeout(20_000), cache: 'no-store' });
   if (!answer.ok) stop(`${channel}'s release file answered ${String(answer.status)}`);
   const body = JSON.parse(/** @type {{ body: string }} */ (await answer.json()).body);
-  return { tag: String(body.bundle?.name ?? '').split('/')[0] ?? '', build: String(body.engineBuild ?? '') };
+  const tag = String(body.bundle?.name ?? '').split('/')[0] ?? '', build = String(body.engineBuild ?? '');
+  // The file is unverified here and both values reach a shell on the box: only a release tag and a full commit pass.
+  if (!SIGNED_TAG.test(tag) || !COMMIT.test(build)) stop(`${channel}'s release file names an unexpected tag or build`);
+  return { tag, build };
 }
 
 /** True when engine `commit` ships the cook verb. @param {string} commit */
@@ -73,15 +77,21 @@ async function main() {
       box(`nohup sudo -n /usr/local/sbin/wildshard-apply ${source.tag} harden > ~/release-cook-harden.log 2>&1 < /dev/null &`);
       // [w]: pgrep must not match the remote shell that runs it.
       const deadline = Date.now() + 20 * 60_000, running = `pgrep -f '[w]ildshard-apply ${source.tag}' >/dev/null`;
+      // pgrep's 1 is "finished"; ssh's 255 (harden restarting sshd) is "ask again".
+      let status;
       do {
         await new Promise(resolve => { setTimeout(resolve, 15_000); });
         if (Date.now() > deadline) stop('wildshard-apply harden did not finish in 20 minutes; see ~/release-cook-harden.log on the box');
-      } while (box(running).status === 0);
+        status = box(running).status;
+      } while (status !== 1);
       if (box(`grep -qF '${MARK}' /usr/local/sbin/wildshard-config`).status !== 0) stop('harden ran but the cook verb is not installed; see ~/release-cook-harden.log on the box');
       // A step that could cut SSH arms a 10-minute dead-man; this new session proves the way in, so stop it as harden asks.
       if (box('systemctl is-active --quiet wildshard-harden-deadman.timer').status === 0) {
         say('note', 'harden armed its dead-man, so it changed an SSH-side setting; this session got in, stopping the timer');
-        box('sudo -n /usr/bin/systemctl stop wildshard-harden-deadman.timer');
+        const stopped = box('sudo -n /usr/bin/systemctl stop wildshard-harden-deadman.timer');
+        if (stopped.status !== 0 || box('systemctl is-active --quiet wildshard-harden-deadman.timer').status === 0) {
+          stop('the harden dead-man timer is still armed: run `sudo -n systemctl stop wildshard-harden-deadman.timer` as wildshard-agent within 10 minutes');
+        }
       }
       say('ok', `the cook verb is installed from ${source.tag}`);
     }
@@ -92,7 +102,7 @@ async function main() {
   for (const line of moved.out.trim().split('\n').filter(row => /^(ok|doing|undo|stop|note|wait|warn|done)\s/u.test(row))) console.info(redact(line));
   if (moved.status !== 0) stop(`wildshard-config cook ${tag} exited ${String(moved.status)}`);
   const after = box('sudo -n /usr/local/sbin/wildshard-config show cook; curl -fsS --max-time 5 http://127.0.0.1:8792/health >/dev/null && echo health-up');
-  if (!after.out.includes(`COOK_ENGINE_REF=${tag}`) || !after.out.includes('health-up')) stop('the cook did not settle on the new tag; see journalctl -u wildshard-cook');
+  if (!after.out.includes(`COOK_ENGINE_REF=${tag}\n`) || !after.out.includes(`WILDSHARD_BUILD=${production.build}`) || !after.out.includes('health-up')) stop('the cook did not settle on the new tag; see journalctl -u wildshard-cook');
   say('done', `the cook worker runs ${tag} (${production.build.slice(0, 8)}) and answers /health`);
 }
 

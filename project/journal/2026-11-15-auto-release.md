@@ -15,3 +15,8 @@ Jake, 2026-11-15 ~12:05 Cancún: ship patch versions with no Jake commands.
   cook verb from a signed tag that carries it (only after `wildshard-harden --check` has no fail row), stops a dead-man
   harden armed from the new session, then runs `wildshard-config cook`. `--dry-run` today: no signed release carries
   the verb yet, so it waits for the next staging serial.
+- Review fixes (one `claude -p`, 2 MUST): release-cook checks the unverified release file's tag and build shapes before
+  they reach a box shell; `wildshard-config cook` ignores SIGHUP/SIGPIPE, runs the rebuild in its own session and rolls
+  back on any exception, so a dropped ssh caller can't leave the cook down. SHOULDs: rebuild.sh takes one flock for every
+  path, `--cook` refuses a tag that no longer peels to the verified build, the harden wait retries ssh 255, the dead-man
+  stop is checked, `show cook` matching is exact, `Object.hasOwn` for the apply verb, the `--cook` probe looks for the flag.

@@ -263,7 +263,7 @@ test('AUTO-RELEASE AR2: wildshard-apply verify prints the signed commit and runs
 });
 
 /** A made-up box for the cook verb: a signed v0.1.20 and v0.1.21, the real wildshard-apply behind a wrapper, a fake rebuild. */
-function cookBox(rebuildText = '#!/bin/bash\n# takes --cook\nset -eu\ngrep -q v0.1.21 "$WILDSHARD_CONFIG_TEST_ROOT/etc/wildshard/cook.settings" 2>/dev/null && exit "${WILDSHARD_CONFIG_TEST_REBUILD_EXIT:-0}"\necho "rebuild $1"\n') {
+function cookBox(rebuildText = '#!/bin/bash\n[ "$1" = --cook ] || exit 9\nset -eu\ngrep -q v0.1.21 "$WILDSHARD_CONFIG_TEST_ROOT/etc/wildshard/cook.settings" 2>/dev/null && exit "${WILDSHARD_CONFIG_TEST_REBUILD_EXIT:-0}"\necho "rebuild $1"\n') {
   const root = etc(), one = 'e'.repeat(40), two = 'f'.repeat(40);
   writeFileSync(join(root, 'etc/wildshard/cook.env'), 'COOK_ENGINE_REF=v0.1.18\nWILDSHARD_BUILD=0000000000000000000000000000000000000000\nCOOK_NOTIFY_TOKEN=planted-cook-secret\n');
   const { dir, key } = releases([{ tag: 'v0.1.20', commit: one }, { tag: 'v0.1.21', commit: two }]);
@@ -310,7 +310,8 @@ test('AUTO-RELEASE AR4: a cook move that does not come up is undone, and an old 
   expect(bad.status, bad.out).toBe(1);
   expect(bad.out).toContain('the old tag is back');
   expect(read(root, 'cook.settings')).toBe(before);
-  const old = cookBox('#!/bin/bash\necho old\n');
+  // A comment that only mentions --cook is not the flag.
+  const old = cookBox('#!/bin/bash\n# one day: --cook\necho old\n');
   const refused = old.run({}, 'cook', 'v0.1.20');
   expect(refused.status).toBe(1);
   expect(refused.out).toContain('has no --cook yet');
