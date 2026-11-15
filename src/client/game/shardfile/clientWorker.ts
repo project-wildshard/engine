@@ -15,7 +15,8 @@ import { saveEnvironment } from '@wildshard/engine/saves/environment';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { syncPageRewards } from '../../../shared/game/saves';
 import type { SaveStorage } from '@wildshard/engine/saves/store';
-import { atMostLeaveWait, holdLeaving } from '@wildshard/engine/boot/lastEnd';
+import { atMostLeaveWait, holdLeaving, markUnload } from '@wildshard/engine/boot/lastEnd';
+import { dropTabArrival, setTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import { countedWait } from '@wildshard/engine/boot/waits';
 import { contentURL } from '@wildshard/engine/boot/contentBase';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
@@ -128,7 +129,16 @@ function releaseKeep(): ReleaseKeep {
   };
 }
 /** E7.2d: the page's seat in the one world, in a shell of the same shape. */
-interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean } }) => Promise<Shell> }
+/** FM3 mode 23: how the online shell leaves this document on purpose, through the page's own saves (shell.ts `OnlineLeaving`). */
+interface OnlineLeaving { readonly arrive: (slug: string) => void; readonly unarrive: () => void; readonly unload: (reason: string) => void;
+  readonly reloadStale: () => Promise<boolean>; readonly reloadByHand: () => Promise<void>; readonly settle: () => void }
+const onlineLeaving: OnlineLeaving = {
+  arrive: slug => { setTitleArrival({ slug, mode: 'enter' }, { tab: true }); }, unarrive: dropTabArrival, unload: reason => { markUnload(reason); },
+  reloadStale: async () => (await import('@wildshard/engine/boot/browserChunkRecovery')).reloadRefusedBuild(true),
+  reloadByHand: async () => { await (await import('@wildshard/engine/boot/browserChunkRecovery')).reloadPastWorker(); },
+  settle: () => { void (async () => { (await import('@wildshard/engine/boot/browserChunkRecovery')).settleRefusedBuild(); })(); },
+};
+interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean } }) => Promise<Shell> }
 interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: readonly DevBox[]) => void; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
 
 const SAVE_EVERY_MS = 30_000;
@@ -351,7 +361,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     // a page that left while it asked never joins (Codex review): a cancelled load must not take the device's seat
     if (!answered || scope.disposed) throw new Error('The page left before it joined the world');
     const { grid } = ports, booted = grid?.booted;
-    return startOnline({ ...world, keep: releaseKeep(), loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name),
+    return startOnline({ ...world, keep: releaseKeep(), leaving: onlineLeaving, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name),
       ...(grid === null || booted === undefined ? {} : { grid: { cell: booted, cells: grid.cells.map(cell => cell.instance), placed: (cell, at) => { grid.serverPlace?.(cell, at); }, reenter: cell => { grid.reenter?.(cell); },
         ...(pageGoto() === booted ? { goto: true } : {}) } }) });
   };

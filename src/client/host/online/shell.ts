@@ -179,10 +179,32 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     dispose: () => { records?.dispose(); redial.dispose(); client.dispose(); link?.close('disposed'); } };
 }
 
-const reloadStale = async (): Promise<boolean> => (await import('@wildshard/engine/boot/browserChunkRecovery')).reloadRefusedBuild(true);
-const reloadByHand = async (): Promise<void> => { await (await import('@wildshard/engine/boot/browserChunkRecovery')).reloadPastWorker(); };
+/** FM3's proof (mode 23, 2026-11-15): how the page leaves this document on purpose. This bundle's saves have no storage (OF4's
+ *  `keep`), so the tap it hands the next document (`setTitleArrival`), the unload it marks (`lastEnd`) and the reload claims it
+ *  settles were written nowhere: the new-build Reload came back as a "player reload" and landed on the title. The page lends its own
+ *  (clientWorker.ts `onlineLeaving`); this module's copies are the fallback for a page that lends none (tests). */
+export interface OnlineLeaving {
+  /** QA row 16: the tap that brought the player here, for this tab's next document only */
+  readonly arrive: (slug: string) => void;
+  /** that tap, when the reload it was for didn't happen */
+  readonly unarrive: () => void;
+  /** the game is about to navigate on purpose (lastEnd) */
+  readonly unload: (reason: string) => void;
+  /** J54/J174: reload into the server's build, once per tab; false when there is none to reload into, or this tab already did */
+  readonly reloadStale: () => Promise<boolean>;
+  /** a player's tap on a stale tab: the next document comes from the network */
+  readonly reloadByHand: () => Promise<void>;
+  /** a seat on this build settles the reload that brought this tab here */
+  readonly settle: () => void;
+}
+const OWN_LEAVING: OnlineLeaving = {
+  arrive: slug => { setTitleArrival({ slug, mode: 'enter' }, { tab: true }); }, unarrive: dropTabArrival, unload: reason => { markUnload(reason); },
+  reloadStale: async () => (await import('@wildshard/engine/boot/browserChunkRecovery')).reloadRefusedBuild(true),
+  reloadByHand: async () => { await (await import('@wildshard/engine/boot/browserChunkRecovery')).reloadPastWorker(); },
+  settle: () => { void (async () => { (await import('@wildshard/engine/boot/browserChunkRecovery')).settleRefusedBuild(); })(); },
+};
 /** A seat on this build settles any reload that brought this tab here, so a sitting can ride more than one deploy. */
-async function settled(booted: OnlineShell['booted']): Promise<void> { await booted; (await import('@wildshard/engine/boot/browserChunkRecovery')).settleRefusedBuild(); }
+async function settled(booted: OnlineShell['booted'], leaving: OnlineLeaving): Promise<void> { await booted; leaving.settle(); }
 /** J174: the next build's files, while play goes on. The worker that installs is what the reload lands on. */
 function preload(): void {
   if ('serviceWorker' in navigator) void navigator.serviceWorker.getRegistration().then(found => found?.update()).catch(() => undefined);
@@ -210,6 +232,8 @@ export interface StartOnline {
    *  a second store writing the page's device save would drop the keys it doesn't define. */
   readonly keep?: ReleaseKeep;
   readonly recordTag?:string;
+  /** mode 23: how the page leaves on purpose, in its own saves (see OnlineLeaving) */
+  readonly leaving?: OnlineLeaving;
 }
 /** E7.5 prep: ask the page to leave for the Connection doctor, saying which screen asked. The page's own bundle answers
  *  (src/client/engine/ui/errorScreen.ts): it holds the save hold and the loading card's report, which this module can't see. */
@@ -294,17 +318,17 @@ async function askWorld(config: { readonly release: string; readonly key: string
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
 export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   // OF4: a verified kept release file dials at once (offline too), and the fresh read follows; with none, the page waits for the read
-  const { release: at, key, keep, identity, recordTag, grid, ...link } = config;
+  const { release: at, key, keep, identity, recordTag, grid, leaving = OWN_LEAVING, ...link } = config;
   // FM5: with no kept copy and no file, the page says why (offline, the file's server down or busy, a portal, a bad signature) and
   // reads again by release.ts's policy until a verified file answers; Title screen stops the load
   const waiting = new Scope('online.release-wait');
-  const toTitle = (): void => { markUnload('release page: title screen'); location.replace(new URL('/', location.origin).toString()); };
+  const toTitle = (): void => { leaving.unload('release page: title screen'); location.replace(new URL('/', location.origin).toString()); };
   let dial: Awaited<ReturnType<typeof releaseToDial>>;
   try { dial = await releaseToDial(at, key, { keep: keep ?? NO_KEEP, wait: releaseScreens(waiting, { doctor, title: toTitle }) }); } finally { waiting.dispose(); }
   const { file: release, fresh } = dial, { socket } = release;
   // QA row 16: a level page enters only from a tap. A reload this page makes itself carries the tap that brought it here.
-  const entering = (slug: string): void => { setTitleArrival({ slug, mode: 'enter' }, { tab: true }); };
-  const stale = async (): Promise<boolean> => { entering(link.loaded); const going = await reloadStale(); if (!going) dropTabArrival(); return going; };
+  const entering = (slug: string): void => { leaving.arrive(slug); };
+  const stale = async (): Promise<boolean> => { entering(link.loaded); const going = await leaving.reloadStale(); if (!going) leaving.unarrive(); return going; };
   // only a fresh read says the world moved on: a kept copy's build is the past, and an offline page can't reload anyway
   if (fresh === null && release.engineBuild !== link.build) await stale();
   if (socket === undefined) throw new Error('The release file names no address');
@@ -321,23 +345,23 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   const screens = linkScreens(scope, {
     retry: () => { shellNow?.retry(); }, dialNow: () => { shellNow?.dialNow(); }, doctor,
     // Play here / Play again reload into the world: the tap that brought the player here comes along (QA row 16)
-    reload: () => { entering(link.loaded); void reloadByHand(); },
+    reload: () => { entering(link.loaded); void leaving.reloadByHand(); },
     progress: () => shellNow?.progress() ?? { dials: 0, nextDialMs: null, downMs: 0 }, why: () => shellNow?.why() ?? 'closed',
     // FM4b modes 21 and 22: the Slow and Unstable chips read the link's own measurements
     stats: () => shellNow?.client.stats,
   });
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
-  const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void reloadByHand(); }); };
+  const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void leaving.reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
   const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto), address: () => gotoSocket(dialing, goto), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); if (state === 'ended' && reason === 'reload') void ended(); },
     // The cut (5.5): an old server refused a v1 hello. Reload only into another build; on this one, the server is updating.
-    cut: () => { void reloadStale(); },
+    cut: () => { void leaving.reloadStale(); },
     countdown: said => { screens.countdown(said); preload(); },
     placed: (cell, stand) => { if (stand !== undefined) grid?.placed(cell, stand); },
     // A grid page re-enters the grid in the seat's cell: the tap that brought it here comes along (QA row 16), and the URL stays bare.
-    regrid: cell => { entering(link.loaded); markUnload(`online seat in another grid cell (${cell})`); grid?.reenter(cell); },
-    elsewhere: seat => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); markUnload(`online seat elsewhere (${seat})`); location.replace(url); },
+    regrid: cell => { entering(link.loaded); leaving.unload(`online seat in another grid cell (${cell})`); grid?.reenter(cell); },
+    elsewhere: seat => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); leaving.unload(`online seat elsewhere (${seat})`); location.replace(url); },
   });
   shellNow = shell;
   // the fresh read behind a kept copy: another build reloads into it, as a fresh read before the dial would (two reloads share one
@@ -351,7 +375,7 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   });
   // a tap the world must hear waits for the link: the hold card says so, and the tap is never sent late
   shell.client.gateActions(what => screens.allow(what));
-  void settled(shell.booted);
+  void settled(shell.booted, leaving);
   const chat = chatLines(scope, shell.client, document.body, screens.holdChat);
   voiceUi(scope, new VoiceChat(scope, shell.voice), chat);
   scope.listen(window,'pagehide',()=>{shell.flushRecords();});
