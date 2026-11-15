@@ -137,7 +137,7 @@ try {
       .map(e => ({ n: n.split('.').pop(), start: Math.round(e.startTime), ms: Math.round(e.duration), key: e.detail?.key, layer: e.detail?.layer })));
     const tileAttach = { raw, warm, tiles: attaches.length, span: attachSpan, contents: [...byContent.values()].sort((a, b) => b.ms - a.ms),
       slowest: [...attaches].sort((a, b) => b.duration - a.duration).slice(0, 5).map(a => ({ key: a.detail?.key, layer: a.detail?.layer, ms: Math.round(a.duration), contents: a.detail?.contents })) };
-    const resources = performance.getEntriesByType('resource').map(r => ({url: r.name, start: r.startTime, transfer: r.transferSize}));
+    const resources = performance.getEntriesByType('resource').map(r => ({url: r.name, start: r.startTime, transfer: r.transferSize, bytes: r.decodedBodySize}));
     return { resources, phases: { control, firstStage: first }, stage, waits, readyGaps: gaps, readyParts, scriptMemory, tileAttach, timeline };
   })()`);
 
@@ -222,9 +222,10 @@ try {
   if (seconds <= 120) play.tens.forEach((/** @type {{ fps: number, p95: number, gpu95: number }} */ t, /** @type {number} */ i) => { console.log(`  ${String(i * 10).padStart(3)}-${String(i * 10 + 10).padEnd(3)} s: ${f(t.fps)} fps · p95 ${f(t.p95)} ms · gpu~ p95 ${f(t.gpu95)} ms`); });
   cdp.off('Network.responseReceived', resource);
   context.off('request', workerRequest);
+  const resources = await page.evaluate(() => performance.getEntriesByType('resource').map(r => ({url: r.name, start: r.startTime, bytes: /** @type {PerformanceResourceTiming} */ (r).decodedBodySize})));
   const network = transfers.filter(row => !row.fromServiceWorker && !row.fromDiskCache);
   const cacheCheck = {spawnParts: network.filter(row => /\/assets\/spawn\/parts\/.*\.pack\.br/u.test(row.url)).length, paint: network.filter(row => /\/assets\/nine-dragon\/paint\/.*\.phone\.webp/u.test(row.url)).length};
   console.log(`network: ${cacheCheck.spawnParts} spawn parts, ${cacheCheck.paint} phone paint files`);
-  if (values.json !== undefined) writeFileSync(visit === 0 ? values.json : values.json.replace(/(\.json)?$/u, '-warm.json'), `${JSON.stringify({ shard: titles[target], base: visitBase, throttle, dpr: values.dpr, load, play, shadow, where, cacheCheck, transfers }, null, 1)}\n`);
+  if (values.json !== undefined) writeFileSync(visit === 0 ? values.json : values.json.replace(/(\.json)?$/u, '-warm.json'), `${JSON.stringify({ shard: titles[target], base: visitBase, throttle, dpr: values.dpr, load, play, shadow, where, cacheCheck, transfers, resources }, null, 1)}\n`);
   }
 } finally { await browser.close(); }

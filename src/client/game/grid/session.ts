@@ -157,7 +157,7 @@ export interface GridSessionHost {
   readonly physics: Physics;
   readonly scope: Scope;
   readonly feet: () => { readonly x: number; readonly y: number; readonly z: number };
-  /** Home/far coverage can load before controls; neighbour products and near views start after this boundary. */
+  /** Only home coverage can load before controls; every neighbour read waits for this boundary. */
   readonly backgroundReady?: () => boolean;
   /** Presentation-only short range while an actual crossing waits at its
    * in-world screen. Disabled in the same frame the crossing settles. */
@@ -597,8 +597,9 @@ export class GridSession {
     const home = this.home;
     // the root world is neutral highway physics and the home an owned region like every cell, so every cell is a neighbour
     this.neighbours = [...this.assembly.cells];
-    const initialRing = new Set(this.neighbours.filter(cell => Math.abs(cell.cell[0] - home.cell[0]) <= 1
-      && Math.abs(cell.cell[1] - home.cell[1]) <= 1).map(cell => cell.instance));
+    // NB12: the eight adjacent cells used to compete with home for downloads
+    // and GLTF decodes. The home's own coverage is the only boot exception.
+    const initialRing = new Set([home.instance]);
     const backgroundReady = (): boolean => host.backgroundReady?.() !== false;
     // ringsReady: the far ring charges each proxy its declared bytes before it loads, not the 1.6 MB cap, so placeholder
     // charges never leave a visible cell out of the ring (12 visible proxies of 0.4-1.6 MB fit its 14.4 MB)
