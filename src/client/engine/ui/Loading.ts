@@ -579,7 +579,7 @@ export class Loading {
 
   private paintWaiting(timeline: TimelineSnapshot): void {
     if (this.view?.error || this.failedReason !== null) return;
-    if (this.finished) { set(this.els.foot, ''); this.els.retry.hidden = true; setData(this.root, 'stalled', 'false'); return; }
+    if (this.finished) { set(this.els.foot, ''); delete this.els.foot.dataset['failmode']; this.els.retry.hidden = true; setData(this.root, 'stalled', 'false'); return; }
     const pending = this.scoped ? [] : loadingStepWaits(bootWaits(), timeline.display, timeline.current, this.timeline.waitOwner).filter(wait => wait.id !== this.waitId);
     const files = pending.filter(wait => wait.kind === 'file');
     // The outer admission promise has no file identity. Let the current
@@ -615,6 +615,17 @@ export class Loading {
     // A quiet phase still reports its actual age, without advancing a byte,
     // file or setup credit. Only an explicit failed-read retry capability offers
     // an action; a long pending operation remains pending.
+    // FM6 (meta MMO-FAILURE-MODES-PLAN modes 33 to 35, 43, 44): a failed read says what failed in a player's words, how long it has
+    // waited, and the retry actually scheduled; the catalogue's ids ride on the line. A RETRY wait wins over a note (storage full).
+    const faults = [...loadingWaitState().pending.values()].filter(row => row.failmode !== undefined && row.line !== undefined);
+    const fault = faults.find(row => row.retry !== null) ?? faults.find(row => row.dueAt !== undefined) ?? faults[0];
+    if (fault?.failmode !== undefined && fault.line !== undefined) {
+      const due = fault.dueAt === undefined ? '' : ` · next try in ${String(Math.max(0, Math.ceil((fault.dueAt - now) / 1000)))} s`;
+      this.els.foot.dataset['failmode'] = fault.failmode;
+      set(this.els.foot, `${fault.line} · ${String(Math.floor(Math.max(0, now - fault.startedAt) / 1000))} s${due}`);
+      return;
+    }
+    delete this.els.foot.dataset['failmode'];
     set(this.els.foot, stalled ? `Waiting for ${label} · ${(quietMs / 1000).toFixed(1)} s` : !this.finished && quietMs >= 500
       ? `No reported progress for ${(quietMs / 1000).toFixed(1)} s · ${detail}` : detail);
   }

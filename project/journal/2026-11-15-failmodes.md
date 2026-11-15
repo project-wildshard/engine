@@ -11,3 +11,8 @@
   20 s; 404 each minute; offline, portal and bad signature wait for the network, the page in view or a tap). Title screen
   stops the load. Staging pages carry the session's staging mark (46); the new-build panel carries `version-skew` (23).
   `release-unsigned` joins ERROR_SCREENS (reported once a page).
+- FM6: a failed content read now says what failed on the loading card's line, with the catalogue's id on it
+  (`packs-5xx`, `packs-429`, `book-5xx`, `packs-5xx pack-broken`, `storage-full`) and its age; the address moves off the
+  line (still in the wait's label for diagnostics). `ContentReadError` keeps the measured status, Retry-After and a broken
+  length; a 429 that says when waits that long (cancellable, counted down on the line) before the retry the budget already
+  allowed. A spawn download that can't keep bytes (quota) shows Storage is full until it ends. Mode 36's page is left.

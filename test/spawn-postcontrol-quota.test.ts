@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {expect, test, vi} from 'vitest';
 import {currentSpawnDownload, prefetchSpawnDownload, releaseSpawnMembers, setSpawnPacks, spawnHeldBytes} from '../src/client/game/boot/spawnDownload';
+import {loadingWaitState, type LoadingWaitEntry} from '../src/shared/engine/boot/loadingWaits';
 
 test('verified packed files stay readable after control when native publication exhausts quota', async () => {
   const base = 'https://example.test/', slug = 'post-quota', reads: string[] = [], stored = new Map<string, Response>();
@@ -27,6 +28,14 @@ test('verified packed files stay readable after control when native publication 
     return Promise.resolve(path === address.url ? new Response(text) : path === part.url ? new Response(bytes) : new Response('', {status: 404}));
   });
   try {
+    // FM6 mode 43: while a download can't keep its bytes, the card says Storage is full; the wait ends with the download
+    const seen: string[] = [], state = loadingWaitState(), pending = state.pending;
+    state.pending = new (class extends Map<number, LoadingWaitEntry> { override set(key: number, row: LoadingWaitEntry): this { if (row.failmode !== undefined) seen.push(`${row.failmode}: ${row.line ?? ''}`); return super.set(key, row); } })(pending);
+    full = true;
+    setSpawnPacks(true); prefetchSpawnDownload(slug, 'phone'); await currentSpawnDownload()?.ready;
+    expect(seen).toEqual(['storage-full: Storage is full · the world will load more slowly']);
+    expect([...state.pending.values()].some(row => row.failmode === 'storage-full'), 'gone once the download is done').toBe(false);
+    state.pending = pending; full = false;
     setSpawnPacks(true); prefetchSpawnDownload(slug, 'phone'); await currentSpawnDownload()?.ready;
     releaseSpawnMembers(); stored.clear(); full = true; reads.length = 0;
     const first = await fetch(new URL(glb.url, base));

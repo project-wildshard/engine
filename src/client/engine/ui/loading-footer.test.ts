@@ -619,7 +619,10 @@ it('retries missing content in the same loading card without a fatal or planned 
     loading.waiting('Reading scene');
     await vi.advanceTimersByTimeAsync(1100); now = 1200; await vi.advanceTimersByTimeAsync(200);
     const retry = root.querySelector<HTMLButtonElement>('[data-el="retry"]');
-    expect(retry?.hidden).toBe(false); expect(root.querySelector('[data-el="foot"]')?.textContent).toContain('/shardfiles/island/scene.json');
+    // FM6 mode 33: the line says what failed in a player's words and carries the catalogue's id; the address stays in diagnostics
+    const foot = root.querySelector<HTMLElement>('[data-el="foot"]');
+    expect(retry?.hidden).toBe(false); expect(foot?.dataset['failmode']).toBe('packs-5xx');
+    expect(foot?.textContent).toMatch(/^Download paused · the server had an error · \d+ s$/u);
     expect(calls).toBe(2);
     retry?.click(); await expect(pending).resolves.toEqual(new Uint8Array([1, 2, 3]));
     expect(loading.root).toBe(root); expect(root.isConnected).toBe(true);
@@ -747,4 +750,27 @@ it('QA row 31: an idle stretch or a pause never reads as a fall; fps and gpu~ fa
   expect(long.minutes()).toHaveLength(120);
   expect(long.minutes()[0]?.minute).toBe(1);
   expect(long.minutes().at(-1)?.minute).toBe(125);
+});
+
+it('FM6 mode 34: a 429 that says when waits that long on the card, counting down, then reads again with no new budget', async () => {
+  const loading = new Loading({id: 'content-busy', name: 'Content busy'}), root = loading.root;
+  const controller = new AbortController(), url = 'https://example.test/shardfiles/island/scene.json', at: number[] = [];
+  const pending = readContent(url, 3, {signal: controller.signal, fetch: () => {
+    at.push(now); return Promise.resolve(at.length === 1 ? new Response(null, {status: 429, headers: {'retry-after': '5'}}) : new Response(new Uint8Array([1, 2, 3])));
+  }});
+  try {
+    loading.waiting('Reading scene');
+    now = 300; await vi.advanceTimersByTimeAsync(200);
+    const foot = root.querySelector<HTMLElement>('[data-el="foot"]');
+    expect(foot?.dataset['failmode']).toBe('packs-429');
+    expect(foot?.textContent).toContain('Download paused · the server is busy');
+    expect(foot?.textContent).toMatch(/next try in 5 s$/u);
+    now = 2300; await vi.advanceTimersByTimeAsync(2000);
+    expect(foot?.textContent).toMatch(/next try in 3 s$/u);
+    expect(at).toHaveLength(1);
+    now = 5400; await vi.advanceTimersByTimeAsync(3100);
+    await expect(pending).resolves.toEqual(new Uint8Array([1, 2, 3]));
+    expect(at).toHaveLength(2);
+    expect(root.querySelector<HTMLElement>('[data-el="retry"]')?.hidden, 'the server\'s own wait offers no RETRY').toBe(true);
+  } finally {controller.abort(); loading.scope.dispose();}
 });

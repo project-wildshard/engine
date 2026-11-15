@@ -2,6 +2,7 @@ import {joinSpawnManifest, packsBookPath, readSpawnCodeList, readSpawnManifest, 
 import {assetCacheName} from '@wildshard/engine/pwa/cacheNames';
 import {jsonSlot} from '@wildshard/engine/saves/slots';
 import { bootMark,bootProgress,bootTiming,downloadShown } from '@wildshard/engine/boot/timing';
+import { beginLoadingWait, finishLoadingWait } from '@wildshard/engine/boot/loadingWaits';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
 import {placedLoose, placedSpawn} from './placedSpawn';
@@ -315,7 +316,8 @@ function isQuota(failure: unknown): boolean { return typeof failure === 'object'
  * worker-cache response credits immediately without reading/checksumming it. */
 export function downloadSpawnManifest(address: SpawnManifestAddress, ports: SpawnDownloadPorts, base: string, packs: string = base): SpawnDownload {
   const controller = new AbortController(), listeners = new Set<(snapshot: SpawnDownloadSnapshot) => void>(), aliases = new Map<string, string>();
-  let cacheWriteDenied = false;
+  let cacheWriteDenied = false, storageFull: number | null = null;
+  const endStorageFull = (): void => { if (storageFull !== null) finishLoadingWait(storageFull); storageFull = null; };
   // Verified bytes remain usable when optional disk publication exhausts quota.
   // Do not retry the part, claim cached credit, or publish an index for unkept bytes.
   const keepCopy = async (write: SpawnDownloadPorts['store'], url: string, response: Response): Promise<boolean> => {
@@ -326,7 +328,10 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
       await write(url, response); retained = true; return true;
     } catch (failure) {
       if (!isQuota(failure)) throw failure;
-      cacheWriteDenied = true; bootMark('download:cache-write-quota'); return false;
+      cacheWriteDenied = true; bootMark('download:cache-write-quota');
+      // FM6 mode 43: the card says so while this download runs; the world plays on from the bytes in memory
+      storageFull ??= beginLoadingWait('Storage is full', { kind: 'work', failmode: 'storage-full', line: 'Storage is full · the world will load more slowly' });
+      return false;
     } finally { if (!retained) void response.body?.cancel().catch(() => undefined); }
   };
   let completedBytes = 0, cachedBytes = 0, filesDone = 0, complete = false, progressKnown = false, error: string | null = null;
@@ -690,11 +695,12 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
   // The tap starts work before its composition root reaches the await. Keep
   // its original rejection for that await without a premature global report.
   void work.catch(() => undefined); void ready.catch(() => undefined);
+  void ready.finally(endStorageFull).catch(() => undefined);
   const listed = Promise.race([listedOnly, ready]);
   void listed.catch(() => undefined);
   return {ready, listed, snapshot, subscribe: listener => {listeners.add(listener); listener(snapshot()); return () => {listeners.delete(listener);};},
     resolve: input => {const url = new URL(input, base); return url.origin === new URL(base).origin ? aliases.get(url.pathname) ?? url.href : url.href;},
-    cancel: () => {controller.abort(); releaseWaits(); nudge(); markStopped(controller.signal.reason); listeners.clear();}};
+    cancel: () => {controller.abort(); endStorageFull(); releaseWaits(); nudge(); markStopped(controller.signal.reason); listeners.clear();}};
 }
 
 let current: {key: string; download: SpawnDownload; foreground: boolean} | undefined;

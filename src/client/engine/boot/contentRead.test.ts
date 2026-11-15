@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { expect, test, vi } from 'vitest';
-import { ContentReadError, readContent } from './contentRead';
+import { ContentReadError, contentFailure, contentRetryAfterMs, readContent } from './contentRead';
 import { loadingWaitState } from '../../../shared/engine/boot/loadingWaits';
 
 const url = 'https://example.test/shardfiles/island/shape.bin';
@@ -172,4 +172,35 @@ test('QA 11-12 row 36: at START, before Loading owns the card, an unreachable re
   offline = false; button?.click();
   expect(await pending).toEqual(new Uint8Array([1, 2, 3]));
   document.body.innerHTML = '';
+});
+
+// FM6 (meta MMO-FAILURE-MODES-PLAN modes 33 to 35, 44): what failed, measured, and the line a player reads
+test('a failed read keeps its measured status and Retry-After, and names its catalogue screen', async () => {
+  const failed = async (response: Response, at = url): Promise<ContentReadError> => {
+    const error: unknown = await readContent(at, 3, { fetch: () => Promise.resolve(response.clone()), retry: () => Promise.reject(new Error('stop')), expectedBytes: 3 }).catch((caught: unknown) => caught);
+    if (error instanceof Error && error.message === 'stop') {
+      const seen: unknown = await readContent(at, 3, { fetch: () => Promise.resolve(response.clone()), retry: (read) => Promise.reject(read), expectedBytes: 3 }).catch((caught: unknown) => caught);
+      if (seen instanceof ContentReadError) return seen;
+    }
+    throw new Error(`no typed failure: ${String(error)}`);
+  };
+  const down = await failed(new Response(null, { status: 503 }));
+  expect([down.status, down.retryAfterMs, down.broken]).toEqual([503, null, false]);
+  expect(contentFailure(down)).toEqual({ failmode: 'packs-5xx', line: 'Download paused · the server had an error' });
+  const book = await failed(new Response(null, { status: 502 }), 'https://example.test/b/x/assets/spawn/packs-abc123.json');
+  expect(contentFailure(book).failmode).toBe('book-5xx');
+  const short = await failed(new Response(new Uint8Array([1, 2])));
+  expect(short.broken).toBe(true);
+  expect(contentFailure(short).failmode).toBe('packs-5xx pack-broken');
+  expect(contentFailure(new ContentReadError(url, 'connection unavailable')).line).toBe('Download paused · the connection dropped');
+  expect(contentFailure(new ContentReadError(url, 'HTTP 429', undefined, false, { status: 429, retryAfterMs: 2000 })).failmode).toBe('packs-429');
+  for (const { line } of [contentFailure(down), contentFailure(book), contentFailure(short)]) expect(line).not.toMatch(/https?:|\/shardfiles|\b\d{3}\b/u);
+});
+
+test('Retry-After is seconds or an HTTP date, bounded; anything else is no answer', () => {
+  const now = Date.UTC(2026, 10, 15, 12);
+  expect(contentRetryAfterMs('4', now)).toBe(4000);
+  expect(contentRetryAfterMs(new Date(now + 6000).toUTCString(), now)).toBe(6000);
+  expect(contentRetryAfterMs('later', now)).toBeNull();
+  expect(contentRetryAfterMs('9999', now)).toBeNull();
 });

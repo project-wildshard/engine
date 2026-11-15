@@ -73,7 +73,12 @@ const [dist = '', work = '', keyFile = '', pgBin = '', pgData = ''] = positional
 if (pgData === '' && pgBin !== 'memory:') throw new Error('failmode-proof <dist> <work> <key.json> <pg bin|memory:> <pg data>');
 const engine = flag('engine', 'chromium'), baseline = args.includes('--baseline'), cooldownMs = Number(flag('cooldown', '60')) * 1000;
 if (engine !== 'chromium' && engine !== 'webkit') throw new Error('--engine=chromium|webkit');
-const cases = selectCases(flag('scenario', 'all')), out = join(absolute(work), 'failmodes'), shots = join(out, 'shots');
+// `--refusal=screen|injection` proves strict mode refuses: a drop that must show a screen no build has (exit 1), and a fault armed on
+// a route the page never reads, so it matches nothing (exit 2). Neither is a catalogue case.
+const refusal = flag('refusal', '');
+if (!['', 'screen', 'injection'].includes(refusal)) throw new Error('--refusal=screen|injection');
+const drop = selectCases('drop')[0];
+const cases = refusal === '' ? selectCases(flag('scenario', 'all')) : drop === undefined ? [] : [refusal === 'screen' ? { ...drop, id: 'drop', screen: 'no-such-screen', mode: 'R1' } : { ...drop, id: 'unmatched', run: 'unmatched', mode: 'R2' }], out = join(absolute(work), 'failmodes'), shots = join(out, 'shots');
 if (!readFileSync(join(dist, 'index.html'), 'utf8').includes(RELEASE_URL)) throw new Error(`${dist} is not stamped with ${RELEASE_URL}: build it with --prepare`);
 rmSync(out, { recursive: true, force: true }); mkdirSync(shots, { recursive: true });
 const sha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim();
@@ -273,6 +278,17 @@ try {
         return back ? { ...result, ...shot === undefined ? {} : { shot }, injection: { secondTab: true }, recovery: 'Play here: seated' } : { outcome: 'ui-fail', reason: 'Play here never seated', seen, notes: await onScreen(page) };
       } finally { await entered.context.close(); }
     },
+    // --refusal=injection: a fault on a route this page never reads matches nothing, and that is a harness failure, never a pass
+    unmatched: async () => {
+      const entered = await fresh(); const { page } = entered;
+      try {
+        await page.goto(URL_PLAY); await intoWorld(entered);
+        const before = await control(); await arm('unmatched', [{ route: 'doctor', kind: 'status', code: 503 }]);
+        await sleep(5000);
+        const matches = await matchedSince(before, 'doctor');
+        return matches === 0 ? { outcome: 'harness-fail', reason: 'the doctor fault matched nothing in 5 s', injection: { matches } } : { outcome: 'pass', injection: { matches } };
+      } finally { await heal(); await entered.context.close(); }
+    },
     // FM4b: the browser goes offline in the world
     offlinePlay: async item => {
       const entered = await fresh(); const { page, context } = entered;
@@ -291,7 +307,10 @@ try {
       const entered = await fresh(); const { page, context } = entered;
       try {
         await page.goto(URL_PLAY); await intoWorld(entered);
-        const controlled = await page.waitForFunction(() => navigator.serviceWorker?.controller !== null && navigator.serviceWorker?.controller !== undefined, undefined, { timeout: 30_000 }).then(() => true, () => false);
+        // a first visit's worker takes control from the next load (no clients.claim on a world page): a second online visit is the warm one
+        const controlling = () => page.waitForFunction(() => navigator.serviceWorker?.controller !== null && navigator.serviceWorker?.controller !== undefined, undefined, { timeout: 20_000 }).then(() => true, () => false);
+        if (!await controlling()) { await page.waitForFunction(async () => (await navigator.serviceWorker?.getRegistration())?.active !== undefined, undefined, { timeout: 60_000 }).catch(() => undefined); await page.reload(); await intoWorld(entered); }
+        const controlled = await controlling();
         if (!controlled) return { outcome: 'unsupported', reason: `${engine}: no controlling service worker after the warm visit, so nothing can launch offline` };
         await sleep(3000);
         await context.setOffline(true);

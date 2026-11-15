@@ -3,16 +3,42 @@ import { captureBrowserError, engineScreenTags } from '../telemetry/browserError
 import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot/loadingWaits';
 import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
 import { bootProgress } from '../../../shared/engine/boot/timing';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
 
 /** A missing or interrupted transport, never a parsed-content or admission refusal. */
 export class ContentReadError extends Error {
   readonly url: string;
   /** RL8: the server answered that the file is not there (404, or the HTML fallback): a retry of the same URL can't help */
   readonly missing: boolean;
-  constructor(url: string, detail: string, cause?: unknown, missing = false) {
+  /** FM6: the HTTP status the server answered, its `Retry-After` in ms (seconds or a date, at most 10 min), and whether the bytes
+   *  arrived but failed their length check (mode 44). Null and false when not measured. */
+  readonly status: number | null;
+  readonly retryAfterMs: number | null;
+  readonly broken: boolean;
+  constructor(url: string, detail: string, cause?: unknown, missing = false, measured: { status?: number; retryAfterMs?: number | null; broken?: boolean } = {}) {
     super(`Read failed: ${new URL(url, 'https://content.invalid').pathname} · ${detail}`, { cause });
     this.name = 'ContentReadError'; this.url = url; this.missing = missing;
+    this.status = measured.status ?? null; this.retryAfterMs = measured.retryAfterMs ?? null; this.broken = measured.broken ?? false;
   }
+}
+/** FM6 mode 34: a `Retry-After` of seconds or an HTTP date, in ms from `now`; anything else (or past 10 min) is no answer. */
+export function contentRetryAfterMs(header: string | null, now: number = Date.now()): number | null {
+  if (header === null) return null;
+  const text = header.trim(), ms = /^\d{1,6}$/u.test(text) ? Number(text) * 1000 : /[a-z]/iu.test(text) ? Date.parse(text) - now : Number.NaN;
+  return Number.isFinite(ms) && ms >= 0 && ms <= 600_000 ? Math.round(ms) : null;
+}
+/** The spawn book (`assets/spawn/packs-<build>.json`): mode 35 names it apart from the packs it lists. */
+const BOOK = /(?:^|\/)assets\/spawn\/packs-[^/]+\.json$/u;
+/** FM6: the catalogue's ids for a failed read, and the line a player reads (meta MMO-FAILURE-MODES-PLAN modes 33 to 35, 44). The
+ *  address and raw detail stay in the error for Copy diagnostics. */
+export function contentFailure(error: ContentReadError): { readonly failmode: string; readonly line: string } {
+  const book = BOOK.test(new URL(error.url, 'https://content.invalid').pathname);
+  if (book) return { failmode: 'book-5xx', line: 'The world\'s book didn\'t arrive' };
+  if (error.status === 429) return { failmode: 'packs-429', line: 'Download paused · the server is busy' };
+  if (error.broken) return { failmode: 'packs-5xx pack-broken', line: 'Download paused · a file didn\'t verify' };
+  if (error.missing) return { failmode: 'packs-5xx', line: 'Download paused · a file isn\'t there' };
+  if (error.status !== null) return { failmode: 'packs-5xx', line: 'Download paused · the server had an error' };
+  return { failmode: 'packs-5xx', line: 'Download paused · the connection dropped' };
 }
 export interface ContentReadOptions {
   fetch: (url: string, init: RequestInit) => Promise<Response>;
@@ -38,10 +64,11 @@ function html(bytes: Uint8Array): boolean {
 async function body(response: Response, url: string, maximum: number, read?: (bytes: number) => void, expected?: number,
   received?: (response: Response) => void): Promise<Uint8Array<ArrayBuffer>> {
   const sizeError = (): Error => expected === undefined ? new Error('Content wire size exceeds cap')
-    : new ContentReadError(url, 'byte length differs from manifest');
+    : new ContentReadError(url, 'byte length differs from manifest', undefined, false, { broken: true });
   if (!response.ok || /\btext\/html\b/iu.test(response.headers.get('content-type') ?? '')) {
     await response.body?.cancel().catch(() => undefined);
-    throw new ContentReadError(url, response.ok ? 'missing content (HTML response)' : `HTTP ${response.status}`, undefined, response.ok || response.status === 404);
+    throw new ContentReadError(url, response.ok ? 'missing content (HTML response)' : `HTTP ${response.status}`, undefined, response.ok || response.status === 404,
+      response.ok ? {} : { status: response.status, retryAfterMs: contentRetryAfterMs(response.headers.get('retry-after')) });
   }
   const length = response.headers.get('content-length');
   if (length !== null && (!/^\d+$/u.test(length) || Number(length) > maximum)) {
@@ -122,7 +149,7 @@ async function retryFromCard(error: ContentReadError, signal?: AbortSignal): Pro
       reportStall(target, error, timeline?.snapshot().current ?? null);
       id = beginLoadingWait(error.message, { kind: 'file', resource: error.url,
         owner: timeline?.waitOwner ?? null, step: timeline?.snapshot().current ?? null,
-        retry: () => {for (const retry of pending) retry();}, retryNavigation: false });
+        retry: () => {for (const retry of pending) retry();}, retryNavigation: false, ...contentFailure(error) });
       shellRetry(scope, error, () => {for (const retry of pending) retry();});
     });
   } finally {
@@ -131,6 +158,20 @@ async function retryFromCard(error: ContentReadError, signal?: AbortSignal): Pro
     if (pending.size === 0) retryGroups.delete(target);
     scope.dispose();
   }
+}
+
+/** FM6 mode 34: the server's own wait, on the card as `packs-429` with its countdown; the read's signal cancels it. */
+async function busyWait(error: ContentReadError, ms: number, signal?: AbortSignal): Promise<void> {
+  const scope = new Scope('content-read-busy'), timeline = currentLoadingTimeline();
+  const id = typeof document === 'undefined' ? undefined : beginLoadingWait(error.message, { kind: 'file', resource: error.url, owner: timeline?.waitOwner ?? null,
+    step: timeline?.snapshot().current ?? null, ...contentFailure(error), dueAt: diagnosticNow() + ms });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      if (signal?.aborted === true) { reject(abortReason(signal)); return; }
+      if (signal !== undefined) scope.listen(signal, 'abort', () => { reject(abortReason(signal)); }, { once: true });
+      scope.timeout(ms, resolve);
+    });
+  } finally { if (id !== undefined) finishLoadingWait(id); scope.dispose(); }
 }
 
 /** Read a complete bounded file. Retry one confirmed lost/missing transport immediately,
@@ -151,6 +192,8 @@ export async function readContent(url: string, maximum: number, options: Content
       options.signal?.throwIfAborted();
       if (!(error instanceof ContentReadError)) throw error;
       if (error.missing && options.missingThrows === true) throw error;
+      // FM6 mode 34: a 429 that says when waits that long before the retry the budget already allows; the count is unchanged
+      if (error.retryAfterMs !== null && error.retryAfterMs > 0) await busyWait(error, error.retryAfterMs, options.signal);
       if (!retried) { retried = true; }
       else {
         if (options.instead !== undefined && await options.instead(error)) throw error;

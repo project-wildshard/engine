@@ -16,6 +16,12 @@ export interface LoadingWaitEntry {
   retryNavigation?: boolean;
   /** Exact transport identity for diagnostics; never the human work caption. */
   resource?: string;
+  /** FM6 (meta MMO-FAILURE-MODES-PLAN modes 33 to 35, 43, 44): the failure catalogue's ids for this wait (`packs-5xx`, `packs-429`,
+   *  `book-5xx`, `storage-full`, `packs-5xx pack-broken`) and the line a player reads for it, with no address or raw error. */
+  failmode?: string;
+  line?: string;
+  /** A retry actually scheduled for this time (`diagnosticNow`): the card counts down to it. None scheduled, no countdown. */
+  dueAt?: number;
 }
 export interface LoadingWaitState { version: 1; sequence: number; pending: Map<number, LoadingWaitEntry> }
 const loadingWaitKey = Symbol.for('engine.loading.waits.v1');
@@ -40,7 +46,7 @@ export function loadingWaitState(target: object = waitCarrier()): LoadingWaitSta
   const state: LoadingWaitState = { version: 1, sequence: 0, pending: new Map() };
   Reflect.set(target, loadingWaitKey, state); return state;
 }
-export type LoadingWaitOptions = Partial<Pick<LoadingWaitEntry, 'kind' | 'step' | 'owner' | 'startedAt' | 'progressAt' | 'loadedBytes' | 'totalBytes' | 'retry' | 'inline' | 'resource' | 'retryNavigation'>>;
+export type LoadingWaitOptions = Partial<Pick<LoadingWaitEntry, 'kind' | 'step' | 'owner' | 'startedAt' | 'progressAt' | 'loadedBytes' | 'totalBytes' | 'retry' | 'inline' | 'resource' | 'retryNavigation' | 'failmode' | 'line' | 'dueAt'>>;
 /** Register work without changing its lifetime or concurrency. Only an explicit
  * failed-operation callback offers RETRY; pending work never implies reload. */
 export function beginLoadingWait(label: string, options: LoadingWaitOptions = {}): number {
@@ -49,7 +55,9 @@ export function beginLoadingWait(label: string, options: LoadingWaitOptions = {}
     startedAt: options.startedAt ?? now, progressAt: options.progressAt ?? now, loadedBytes: options.loadedBytes ?? 0,
     totalBytes: options.totalBytes ?? null, retry: options.retry ?? null,
     progress: '', inline: options.inline ?? false, ...(options.resource === undefined ? {} : {resource: options.resource}),
-    ...(options.retryNavigation === undefined ? {} : {retryNavigation: options.retryNavigation}) });
+    ...(options.retryNavigation === undefined ? {} : {retryNavigation: options.retryNavigation}),
+    ...(options.failmode === undefined ? {} : {failmode: options.failmode}), ...(options.line === undefined ? {} : {line: options.line}),
+    ...(options.dueAt === undefined ? {} : {dueAt: options.dueAt}) });
   return id;
 }
 /** Only real byte growth or a semantic progress-key change changes the reported progress age. */
