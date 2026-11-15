@@ -1,15 +1,8 @@
 import { app } from '../../src/client/engine/app/runtime';
-import { parse } from 'valibot';
-import { CreatureGuestSchema } from '@wildshard/format/speciesBookRows';
-import { ReturnProgram } from '../../src/shared/game/population/returnProgram';
-import { strikeFromData } from '../../src/shared/engine/ai/strikeRows';
-import rows from './originalBalbalRows.json' with { type: 'json' };
+import { ActorProjectionV2 } from '../../src/server/game/population/actorProjectionV2';
+import { frozenRuntimeJson } from './frozen/snapshots';
 
-const generated=parse(CreatureGuestSchema,rows);
-let strike: ReturnType<typeof strikeFromData>|undefined;
-let projected: ReturnProgram|undefined;
-/** Public fixture rows preserve the original callback ordering without a shard import. */
-export function program():ReturnProgram {
-  strike??=strikeFromData(generated.strike);
-  return projected??=ReturnProgram.page(generated.program,app.levelScope??undefined);
-}
+/** Frozen author rows feed the real production binder and its scoped cache. */
+export const projection = new ActorProjectionV2('balbal', frozenRuntimeJson('balbal-projection.json'), app);
+export const BALBAL_SPECIES = projection.binding;
+export function program(): ReturnType<ActorProjectionV2['program']> { return projection.program(); }

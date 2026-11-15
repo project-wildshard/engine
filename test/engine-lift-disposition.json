@@ -9446,7 +9446,7 @@
     "file": "test/balbal-program.test.ts",
     "outcome": "restored",
     "target": "test/balbal-program.test.ts",
-    "decision": "Restored in place (CI21 E-RUNTIME): the public engine-owned frozen Balbal rows preserve strike-before-program admission without Nalati fixture, held-loan, or generator imports.",
+    "decision": "Restored in place (CI21 E-RUNTIME): frozen author projection rows feed the real ActorProjectionV2 binder, preserving production strike-before-program ordering and scoped caching. J206 correction removes the prior fixture-local ordering substitute.",
     "originalTests": [
       "a strike refusal cannot publish a program or start a later encounter",
       "native strike binding precedes program allocation and is reused",
@@ -9942,7 +9942,7 @@
     "file": "test/native-ground-assembly.test.ts",
     "outcome": "restored",
     "target": "test/native-ground-assembly.test.ts",
-    "decision": "Restored in place (CI21 E-RUNTIME): Pinned product descriptors supply their own admitted asset bytes for original terrain decoding, native checkpoint and restore suffix law.",
+    "decision": "Restored in place (CI21 E-RUNTIME): pinned sampling/navigation bytes pass through productClosureFile and the native verified reader before both checkpoint/restore runtimes consume them.",
     "originalTests": [
       "declared sampling rows retain the original native checkpoint and restore suffix"
     ],

@@ -11,6 +11,7 @@ import { snapshotSimHost, serializeSimSnapshot, decodeSimSnapshot } from '../src
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { canonicalSimDigest } from '../src/test/engine/simState';
+import { productClosureFile } from '../src/shared/game/shardfile/shardProduct';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 
@@ -25,7 +26,10 @@ test('declared sampling rows retain the original native checkpoint and restore s
   const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing pinned native output descriptor');
   const nativeFiles = new Set([product.shardfile.navigation?.file, product.shardfile.terrain?.sampling?.file]);
-  const assets = new Map(descriptor.index.files.filter(file => nativeFiles.has(file.hash)).map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
+  const assets = new Map(await Promise.all(descriptor.index.files.filter(file => nativeFiles.has(file.hash)).map(async file => {
+    const key = file.commons === true ? `commons:${file.hash}` : file.hash;
+    return [key, await productClosureFile(product, key)] as const;
+  })));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const context={shard:product.shardfile,assets,rapier,product};
   // The shipped decoder keeps the frozen admission and storage law, row for row.

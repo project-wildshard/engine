@@ -6,12 +6,14 @@ import { CreatureGuestSchema } from '@wildshard/format/speciesBookRows';
 import { program } from './fixtures/projectedCreature';
 import * as strikes from '../src/shared/engine/ai/strikeRows';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import rows from './fixtures/originalBalbalRows.json' with { type: 'json' };
+import { frozenRuntimeJson } from './fixtures/frozen/snapshots';
+import { lendFrozenPasture } from './fixtures/frozen/runtimePrograms';
+const rows = frozenRuntimeJson('balbal-guest.json');
 
 const generated=parse(CreatureGuestSchema,rows);
 
 let scope:Scope;
-beforeEach(()=>{scope=new Scope('balbal-program');scope.expose(app,'levelScope',scope);});
+beforeEach(()=>{scope=new Scope('balbal-program');scope.expose(app,'levelScope',scope);lendFrozenPasture(scope);});
 afterEach(()=>{vi.restoreAllMocks();scope.dispose();});
 
 test('a strike refusal cannot publish a program or start a later encounter',()=>{
