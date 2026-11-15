@@ -2,7 +2,7 @@
 // largest size. No re-encode: every level the phone keeps is the master's own bytes, so the look is the master's at
 // any distance the phone draws.
 import {describe, expect, it} from 'vitest';
-import {glbImages, ktx2Info, phoneTier, tierGlb, tierKtx2, trimKtx2, type TextureRole} from '../src/cook/game/tierTextures';
+import {glbImages, ktx2Info, phoneTier, phoneTierSize, tierGlb, tierKtx2, trimKtx2, type TextureRole} from '../src/cook/game/tierTextures';
 import {phoneOverlay} from '../src/cook/game/entryTotals';
 
 const LEVEL_INDEX = 80;
@@ -160,6 +160,19 @@ describe('phoneTier (S12b)', () => {
     expect(rowsOf(tier?.discovery ?? new Uint8Array())?.shard.phone['/assets/fan.glb']).toBe(made?.url);
     // with neither the target nor its source, the row stays as it is
     expect(tier?.kept.has('/assets/gpu/gone-44444444.glb')).toBe(true);
+  });
+
+  it('keeps a painted sky panorama at its own size: the whole sky is seen at screen size (SH-nalati-6)', () => {
+    // Nalati's phone panorama (4128 x 760) was cut to 258 x 47 by the 512 cap, and its painted sky drew as a blur.
+    const sky = {'/assets/gpu/nalati/panorama-55555555.ktx2': ktx2(2048), '/assets/gpu/sky/dome-66666666.ktx2': ktx2(2048)};
+    const tier = phoneTier(discovery({'/assets/nalati/panorama.phone.webp': '/assets/gpu/nalati/panorama-55555555.ktx2',
+      '/assets/far-reach/sky/dome.phone.webp': '/assets/gpu/sky/dome-66666666.ktx2', '/assets/rock.png': '/assets/gpu/rock-c9b1bd73.ktx2'}),
+    url => sky[url as keyof typeof sky] ?? files[url]);
+    expect([...tier?.files.keys() ?? []]).toEqual(['/assets/gpu/rock-c9b1bd73.ktx2']);
+    expect(rowsOf(tier?.discovery ?? new Uint8Array())?.shard.phone['/assets/nalati/panorama.phone.webp']).toBe('/assets/gpu/nalati/panorama-55555555.ktx2');
+    expect(tier?.kept.has('/assets/gpu/sky/dome-66666666.ktx2')).toBe(true);
+    // A name that only contains the word stays a 512 row.
+    expect(phoneTierSize('/assets/props/panoramaview-sign.png')).toBe(512);
   });
 
   it('keeps a target a kept row still names, beside its phone file', () => {

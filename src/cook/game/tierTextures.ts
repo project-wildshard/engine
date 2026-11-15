@@ -252,14 +252,16 @@ export function ktx2GpuBytes(bytes: Uint8Array): number {
 }
 
 /** S12b: the largest side a phone draws from one KTX2 table row, or undefined to keep the file as it is. The table's source
- *  key is the author's hint (D5): a `#layer` twin (a terrain layer, tiled at a texel a metre) and a horizon strip are S4's
- *  1024 rows, kept on purpose; every other row is 512 on a phone. */
+ *  key is the author's hint (D5): a `#layer` twin (a terrain layer, tiled at a texel a metre), a horizon strip and a painted
+ *  sky panorama (a `panorama` file or a `sky/` folder: the whole sky, seen at screen size) are kept on purpose; every other
+ *  row is 512 on a phone. The panorama was cut to 258 x 47 from its 4128 x 760 phone file and Nalati's sky drew as a blur
+ *  (SHARD-REPOS SH-nalati-6, 2026-11-15). */
 export const PHONE_TIER_MAX = 512;
 /** S12d: the cap a kept row (a `#layer` twin, a horizon) is encoded under: none it reaches, so it keeps its own size and only
  *  its encoding changes to 6×6, as S4's hand-made set had it. */
 export const KEPT_ENCODE_MAX = 16_384;
 export function phoneTierSize(source: string): number | undefined {
-  return source.endsWith('#layer') || /\/horizon\//u.test(source) ? undefined : PHONE_TIER_MAX;
+  return source.endsWith('#layer') || /\/(?:horizon|sky)\/|\/panorama[.-][^/]*$/u.test(source) ? undefined : PHONE_TIER_MAX;
 }
 
 /** One phone file the cook made: `from` is the table target it stands in for, `url` its own content-named URL. */
