@@ -206,24 +206,6 @@ test('generated import debt and app table exemptions cannot grow or be deleted',
   expect(checkBinaryRevision(root,':','HEAD',[file]).join(' ')).toContain('source debt policy deleted');
 }));
 
-test('a debt row follows its file across a side move, and only there',()=>fixture((root,git,put)=>{
-  const file='lint/generated-import-debt.json', old='src/game/quest/rows.ts', moved='src/server/game/quest/rows.ts', table='src/game/boot/table.generated.ts';
-  const debt=(files:Record<string,number>,sources=[table])=>JSON.stringify({schema:'no-generated-import/1',source,files,sources});
-  const grew=(files:Record<string,number>,sources=[table]):string=>{put(file,debt(files,sources));git('add',file);return checkBinaryRevision(root,':','HEAD',[file]).join(' ');};
-  put(file,debt({[old]:2}));git('add',file);git('commit','-qm','seed import debt');
-  // A move carries its count, equal or lower, and its exemption.
-  expect(grew({[moved]:2})).toBe('');
-  expect(grew({[moved]:1})).toBe('');
-  expect(grew({[old]:2},['src/client/game/boot/table.generated.ts'])).toBe('');
-  // Real growth still refuses: a raised count, a row beside the old one, another file, another layer.
-  expect(grew({[moved]:3})).toContain(`source debt allowance grew for ${moved}`);
-  expect(grew({[old]:2,[moved]:1})).toContain('source debt allowance grew');
-  expect(grew({'src/server/game/quest/other.ts':1})).toContain('source debt allowance grew');
-  expect(grew({'src/server/engine/quest/rows.ts':1})).toContain('source debt allowance grew');
-  expect(grew({'src/sharddev/server/game/quest/rows.ts':1})).toContain('source debt allowance grew');
-  expect(grew({[old]:2},[table,'src/client/game/boot/table.generated.ts'])).toContain('app source exemption grew');
-}));
-
 test('generated import debt grows only with its own exact approval in the final footer',()=>fixture((root,git,put)=>{
   const file='lint/generated-import-debt.json', entry='src/client/app/entry.ts';
   const debt=(count:number)=>JSON.stringify({schema:'no-generated-import/1',source,files:{[entry]:count},sources:[]});

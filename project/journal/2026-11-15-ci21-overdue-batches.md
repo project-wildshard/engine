@@ -26,3 +26,15 @@ reason recorded in `test/engine-lift-disposition.json`.
   runs again in place, 14 of 14 green and typechecked again. Its one
   "SDK publisher" test imported sharddev's `writeOutputProduct` (that
   folder left engine) and is dropped; that half is sharddev's.
+- E-LAYOUT: the twelve files that still exist run again in place
+  (102 tests green, typechecked; six left the tsconfig excludes). 29
+  cases are retired (J186), each named with its reason in the
+  disposition: their fixtures build or plan the pre-lift layout
+  (`src/client/app/entry.ts`, `src/engine/...`, `src/shards/...`), and
+  14 of them are sort-sides' one-time P1 side sort. `entry-totals` kept
+  its case and only dropped Pine's own `packs-set.json` read.
+  `closed-components`, `platform-namespace-reach`,
+  `platform-pending-users` and `shard-component-crumbs` were already
+  deleted with the old census (HR9) and unlisted.
+- Every Vitest run failed at config load while a batch was overdue,
+  which is why no single test could be run without unlisting first.

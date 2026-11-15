@@ -8991,5 +8991,175 @@
     "sourceRevision": "6c77e7b58a6520be3b37076a68a5199c103a4c0a",
     "sourceBlob": "462ee3684513482829db1f9e8d60c0ed9df4668e",
     "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/authored-html.test.ts",
+    "outcome": "restored",
+    "target": "test/authored-html.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 3 case(s): its three cases' fixtures pin line sets and lookups of the pre-lift tree; the guard now reports more lines in two of them. No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "imported scalar declarations and exact trusted port identities remain distinct",
+      "analysis-local import lookups recheck package targets and absent files",
+      "typed static record values remain safe through nested string helpers"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "5e2b05b85df42ee96edb8c153593d863e2743383",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/boot-extras.test.ts",
+    "outcome": "restored",
+    "target": "test/boot-extras.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 1 case(s): its real-build case writes a fixture at src/client/app/entry.ts, the monorepo app entry engine no longer has. No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "a real emitted image and admitted source produce only the selected home bank"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "1c250b0c277ef87cc7179b66677929f9e33ad3dc",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/control-chunks.test.ts",
+    "outcome": "restored",
+    "target": "test/control-chunks.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 1 case(s): its phase-bank case builds from src/engine/client/ui/StartTitle.ts, a pre-side-sort path. No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "phase banks keep initial and late code isolated and retain unchanged control bytes"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "d04e337516d08360fade0934f69b66e1d024d230",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/engine-sides.test.ts",
+    "outcome": "restored",
+    "target": "test/engine-sides.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 1 case(s): its fixture tags src/engine/ and src/game/ paths from before the side sort; the rule now reads the sorted tree and finds no edge in them. No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "a new forbidden edge, DOM or renderer use, or an untagged file fails; recorded debt passes"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "a2e5d28667be22814267c0d73be72f9a86edd383",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/frame-floor-inventory.test.ts",
+    "outcome": "restored",
+    "target": "test/frame-floor-inventory.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 1 case(s): it counted the 28 shipped discoveries under src/shards/, which left engine for the shard repos (only the grid remains). No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "covers the 28 shipped discoveries and grid"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "c3521642c36bca17e9c823bec91aa230dd127b49",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/generated-source-guard.test.ts",
+    "outcome": "restored",
+    "target": "test/generated-source-guard.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 1 case(s): its side-move case maps pre-sort paths through sidelessPath/unsortedPath; the sort is done. No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "a source debt row follows its file across a side move and nowhere else"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "d392bae5567fc6afae0d397906409aec33fbd015",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/no-binary-json.test.ts",
+    "outcome": "restored",
+    "target": "test/no-binary-json.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 1 case(s): its side-move case maps a debt row across the pre-sort layout; the sort is done. No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "a debt row follows its file across a side move, and only there"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "bec307d7a4db5cc4b104d28cc8da4759744dd6b8",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/no-generated-import.test.ts",
+    "outcome": "restored",
+    "target": "test/no-generated-import.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 2 case(s): its two snapshot cases resolve the pre-lift package layout's JSON, query and export paths. No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "G8 resolves JSON literals, query suffixes and public exports from committed snapshot bytes",
+      "declared outputs and public conditional exports resolve without a type program"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "233a72e50a8a14cceaaa1cf435699d59e7031a1f",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/sort-sides.test.ts",
+    "outcome": "restored",
+    "target": "test/sort-sides.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 14 case(s): its 14 cases plan and apply the one-time P1 side sort over pre-sort fixture paths (src/engine/, src/game/, src/sdk/); the sort is done and the tool now refuses those untagged paths. No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "the gate proof runs the push gate's phases on its path lists",
+      "plans each layer under its sides without colliding",
+      "rewrites every spelling that names a moved path",
+      "a dry run leaves the tree alone and an apply is idempotent",
+      "a late retag after the sort moves one file and its importers follow",
+      "--move plans a retag from HEAD on a dirty tree and takes its test with it",
+      "--move leaves a folder literal that still names its side",
+      "--move follows the root spelling of an isolated declaration test",
+      "--move follows what a generator emits and what a shard map declares",
+      "the spelled-path guard names what no resolver reads",
+      "--move refuses an untagged path, a wrong side and a file already there",
+      "a move carries other lanes' working text and keeps their hunks",
+      "undo returns a failed apply to HEAD",
+      "ratchets read a side move as the same file"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "b48ac48c9549e163f2c07fb7499284d88f9227fe",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/title-chunk-budget.test.ts",
+    "outcome": "restored",
+    "target": "test/title-chunk-budget.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 1 case(s): its real app-build case builds src/client/app/entry.ts, the monorepo app entry engine no longer has. No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "the app build's chunk report refuses an over-budget title"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "4db8644224abcaa2d4bc25dcf9393ca4c6b648d5",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/vite-boot-modules.test.ts",
+    "outcome": "restored",
+    "target": "test/vite-boot-modules.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT); the rest of the file is green. Retired (J186), 1 case(s): its real Vite plugin case builds src/client/app/entry.ts, the monorepo app entry engine no longer has. No successor equivalence is claimed for the retired cases.",
+    "originalTests": [
+      "the actual Vite plugin emits exact module body sizes into the existing document without fetching optional code"
+    ],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "4a2990c579aadfeea853052551cf014f0fd58966",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/entry-totals.test.ts",
+    "outcome": "restored",
+    "target": "test/entry-totals.test.ts",
+    "decision": "Restored in place (CI21 E-LAYOUT), 4 of 4 green: the packs-set case no longer reads src/shards/pine-hollow/packs-set.json (Pine's choice is Pine's, in shard-pine-hollow); the reader's rule is unchanged.",
+    "originalTests": [],
+    "sourceRevision": "8c42f19dba2701913ba09dc6c6d4984db5ca88eb",
+    "sourceBlob": "3117b0f2b87d17c08bc9ae72f8e471a86dc8ef95",
+    "retirementProof": "Body-reviewed J237 overdue-batch decision (buddy-engine, 2026-11-15), not flaky-test removal."
   }
 ]

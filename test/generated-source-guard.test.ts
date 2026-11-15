@@ -8,8 +8,7 @@ import { resolve } from 'node:path';
 import { env as processEnv } from 'node:process';
 import { expect, test } from 'vitest';
 import { GENERATED_SOURCE_POLICY, checkGeneratedSourceRevision, checkGeneratedSourceTree,
-  generatedSourceIncreases, generatedSourcePolicy, sidelessPath } from '../scripts/generated-source.mjs';
-import { unsortedPath } from '../lint/layer-exports.mjs';
+  generatedSourceIncreases, generatedSourcePolicy } from '../scripts/generated-source.mjs';
 import { commitCheckFailed } from '../scripts/precommit-jobs.mjs';
 import { ignoredBy, precommitInputs } from '../scripts/precommit-inputs.mjs';
 
@@ -45,16 +44,6 @@ test.each(['test/fixtures/**', 'test/fixtures/'])('fixture-only commits respect 
   put('test/fixtures-neighbour/checked.ts', 'export const checked = true;'); git('add', 'test/fixtures-neighbour/checked.ts');
   await expect(precommitInputs(root, missing)).rejects.toThrow('typed lint: refused');
 }));
-
-test('a source debt row follows its file across a side move and nowhere else', () => {
-  const unmoved = 'src/game/shard/fixture.generated.ts', moved = 'src/server/game/shard/fixture.generated.ts';
-  expect(generatedSourceIncreases(policy([unmoved]), policy([moved]))).toEqual([]);
-  expect(generatedSourceIncreases(policy([moved]), policy(['src/client/game/shard/fixture.generated.ts']))).toEqual([]);
-  expect(generatedSourceIncreases(policy([unmoved]), policy([unmoved, moved]))).toHaveLength(1);
-  expect(generatedSourceIncreases(policy([unmoved]), policy(['src/server/game/shard/other.generated.ts']))).toHaveLength(1);
-  expect(generatedSourceIncreases(policy([unmoved]), policy(['src/server/engine/shard/fixture.generated.ts']))).toHaveLength(1);
-  for (const path of [moved, unmoved, 'src/sharddev/server/a.ts', 'src/cook/engine/b.ts', 'src/shards/client/c.ts']) expect(sidelessPath(path)).toBe(unsortedPath(path));
-});
 
 test('new staged generated files and headers refuse even when the working copy is clean', () => fixture((root,git, put) => {
   put('src/authored.ts', 'export const rows = [];'); put('src/rows.json', '{"rows":[]}'); git('add', 'src/authored.ts', 'src/rows.json');

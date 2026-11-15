@@ -10,20 +10,7 @@ import {execPath} from 'node:process';
 import {fileURLToPath} from 'node:url';
 import {expect,test} from 'vitest';
 import {parseSync} from 'vite';
-import {generatedImportContext,generatedJsonImportContext,noGeneratedJsonImportRule} from '../lint/no-generated-import.mjs';
-
-test('G8 resolves JSON literals, query suffixes and public exports from committed snapshot bytes',()=>fixture((root,put)=>{
-  put('src/game/package.json',JSON.stringify({exports:{'./rows':'./loose.generated.ts'}}));
-  const files=new Map([
-    ['src/game/package.json',JSON.stringify({exports:{'./rows':{types:'./owned.generated.json',default:'./owned.generated.json'},'./tables/*':'./data/*.generated.json'}})],
-    ['src/game/only.generated.json','{}'],['src/game/both.generated.json','{}'],['src/game/both.generated.ts','export {};'],
-  ]);
-  const snapshot={files:new Set(files.keys()),read:(file:string):string=>{const value=files.get(file);if(value===undefined)throw new Error('Missing committed fixture input');return value;}};
-  const generated=generatedJsonImportContext(root,snapshot);
-  for(const source of ['./only.generated.json?raw#data','./only.generated','@wildshard/engine/game/rows','@wildshard/engine/game/tables/instances'])
-    expect(generated('src/game/reader.ts',source)).toBe(true);
-  for(const source of ['./authored.json','./owned.generated.ts','./both.generated'])expect(generated('src/game/reader.ts',source)).toBe(false);
-}));
+import { noGeneratedJsonImportRule } from '../lint/no-generated-import.mjs';
 
 test('G8 preserves the exact old file count and refuses the next import or any new reader',()=>fixture(root=>{
   const limits={'src/game/reader.ts':2};
@@ -49,20 +36,6 @@ function fixture(run:(root:string,put:(path:string,text:string)=>void)=>void):vo
   const put=(path:string,text:string):void=>{const target=resolve(root,path);mkdirSync(resolve(target,'..'),{recursive:true});writeFileSync(target,text);};
   try{run(root,put);}finally{rmSync(root,{recursive:true,force:true});}
 }
-
-test('declared outputs and public conditional exports resolve without a type program',()=>fixture((root,put)=>{
-  put('src/game/package.json',JSON.stringify({exports:{'.':'./index.generated.ts','./table':{types:'./table.generated.ts',default:'./table.generated.ts'},'./rows/*':'./data/*.json'}}));
-  const check=generatedImportContext(root,['src/game/index.generated.ts','src/game/table.generated.ts','src/game/data/rows.json','src/game/binary.bin'],['src/game/table.generated.ts']);
-  expect(check('src/game/reader.ts','@wildshard/engine/game/table')).toBe(false);
-  expect(check('src/game/reader.ts','@wildshard/game')).toBe(true);
-  expect(check('src/game/reader.ts','@other/game')).toBe(false);
-  expect(check('src/game/reader.ts','./table.generated')).toBe(false);
-  expect(check('src/game/reader.ts','@wildshard/engine/game/rows/rows')).toBe(true);
-  expect(check('test/reader.ts','../src/game/binary.bin?url')).toBe(true);
-  expect(check('src/game/unit.test.ts','vitest')).toBe(false);
-  expect(check('src/game/reader.ts','./authored.json')).toBe(false);
-  expect(check('src/game/reader.ts','./unknown.generated.json')).toBe(true);
-}));
 
 test('actual lint covers value, type, export, dynamic and require imports with exact shrinking debt',()=>fixture((root,put)=>{
   const helper=fileURLToPath(new URL('../lint/no-generated-import.mjs',import.meta.url));

@@ -1,13 +1,6 @@
 import { expect, test } from 'vitest';
-import { controlChunkSelector, controlChunkFileName, controlChunkGroups } from '../scripts/app-build/controlChunks';
-import { build } from 'vite';
-import { writtenBundle } from '../scripts/app-build/writtenBundle';
-// oxlint-disable-next-line import/no-nodejs-modules -- Resolve the owned miniature emitted-entry fixture.
-import { resolve } from 'node:path';
-// oxlint-disable-next-line import/no-nodejs-modules -- Create and remove only this test's miniature build files.
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { controlChunkSelector, controlChunkFileName } from '../scripts/app-build/controlChunks';
 import { readModuleFiles } from '../src/client/engine/boot/download';
-import { bootModuleFiles } from '../scripts/app-build/bootModules';
 
 test('control batches retain title, session, lazy and shard boundaries through cycles', () => {
   const root = '/fixture';
@@ -95,74 +88,6 @@ test('asset URL banks share exact phase requirements without merging shard code 
   expect(select('/fixture/src/shards/three/only.png', graph)).not.toBe(first);
   expect(select('/fixture/src/shards/one/late.png', graph)).toBeNull();
   expect(select('/fixture/src/shards/one/gameplay.ts', graph)).toBeNull();
-});
-
-test('phase banks keep initial and late code isolated and retain unchanged control bytes', async () => {
-  mkdirSync('tmp/control-chunks', { recursive: true });
-  const root = mkdtempSync(resolve('tmp/control-chunks/entries-'));
-  try {
-    for (const folder of ['src/client/engine/ui', 'src/client/engine/app', 'src/shared/engine/app', 'src/server/engine/app', 'src/client/game/grid', 'src/shared/game/grid', 'src/server/game/grid', 'src/client/game/travel', 'src/client/game/shardfile', 'src/shared/game/shardfile', 'src/server/game/shardfile', 'calibration']) mkdirSync(resolve(root, folder), { recursive: true });
-    writeFileSync(resolve(root, 'index.html'), '<script type="module" src="/src/client/app/entry.ts"></script>');
-    writeFileSync(resolve(root, 'calibration/index.html'), '<script type="module" src="/calibration/entry.ts"></script>');
-    writeFileSync(resolve(root, 'calibration/entry.ts'), 'import {runtime} from "../src/client/engine/app/runtime"; globalThis.calibration = runtime;');
-    writeFileSync(resolve(root, 'src/client/engine/app/runtime.ts'), 'globalThis.runtimeStarted = performance.now(); export const runtime = globalThis.runtimeStarted;');
-    writeFileSync(resolve(root, 'src/rows.json'), '{"rows":[[1,2],[3,4]]}');
-    writeFileSync(resolve(root, 'src/core.ts'), 'import {runtime} from "./engine/client/app/runtime"; import rows from "./rows.json"; export const control = {runtime, rows};');
-    writeFileSync(resolve(root, 'src/client/game/grid/session.ts'), 'export const grid = true;');
-    writeFileSync(resolve(root, 'src/client/game/shardfile/client.ts'), 'export const client = true;');
-    writeFileSync(resolve(root, 'src/optional.ts'), 'globalThis.optionalValue = "first late value";');
-    const title = ['engine/client/ui/StartTitle', 'game/client/mainMenu', 'game/client/grid/pageEntry', 'game/client/travel/travel'];
-    for (const file of title) writeFileSync(resolve(root, `src/${file}.ts`), 'export const label = "title";');
-    writeFileSync(resolve(root, 'src/client/app/entry.ts'), `async function startSelected(){return Promise.all([import('./core'),import('./rows.json')]);}
-      globalThis.launch = startSelected; globalThis.optional = () => import('./optional');
-      globalThis.grid = () => import('./game/client/grid/session');
-      globalThis.title = () => Promise.all([${title.map(file => `import('./${file}')`).join(',')}]);`);
-    const outDir = resolve(root, 'dist');
-    await build({ root, configFile: false, logLevel: 'silent', build: { outDir, manifest: true, sourcemap: 'hidden', cssCodeSplit: false,
-      rolldownOptions: { input: { main: resolve(root, 'index.html'), calibration: resolve(root, 'calibration/index.html') },
-        preserveEntrySignatures: false, output: { strictExecutionOrder: true, chunkFileNames: controlChunkFileName,
-          codeSplitting: { groups: controlChunkGroups(root) } } } } });
-    const bundle = writtenBundle(outDir, root);
-    const modules = (entry: string): Set<string> => {
-      const pending = Object.entries(bundle).filter(([, file]) => file.facadeModuleId === resolve(root, entry)).map(([name]) => name);
-      expect(pending).toHaveLength(1);
-      const found = new Set<string>(), names = new Set<string>();
-      while (pending.length > 0) {
-        const name = pending.pop();
-        if (name === undefined || found.has(name)) continue;
-        found.add(name); const file = bundle[name];
-        if (file === undefined) throw new Error('Missing actual emitted dependency');
-        pending.push(...file.imports ?? []);
-        for (const id of Object.keys(file.modules ?? {})) names.add(id);
-      }
-      return names;
-    };
-    const runtime = resolve(root, 'src/client/engine/app/runtime.ts');
-    expect(modules('index.html').has(runtime)).toBe(false);
-    expect(modules('calibration/index.html').has(runtime)).toBe(true);
-    const optional = resolve(root, 'src/optional.ts'), control = resolve(root, 'src/core.ts');
-    expect(modules('index.html').has(optional)).toBe(false);
-    expect(modules('calibration/index.html').has(optional)).toBe(false);
-    expect(bootModuleFiles(bundle, [resolve(root, 'src/rows.json')]).length).toBeGreaterThan(0);
-    expect(Object.entries(bundle).filter(([, file]) => Object.hasOwn(file.modules ?? {}, resolve(root, 'src/rows.json')))
-      .map(([name]) => name)).toHaveLength(1);
-    expect(Object.entries(bundle).find(([, file]) => Object.hasOwn(file.modules ?? {}, resolve(root, 'src/rows.json')))?.[0])
-      .toMatch(/\/startup-data-/u);
-    const grid = resolve(root, 'src/client/game/grid/session.ts');
-    const gridBank = Object.entries(bundle).find(([, file]) => Object.hasOwn(file.modules ?? {}, grid));
-    expect(gridBank?.[0]).toMatch(/\/grid-session-/u);
-    expect(Object.keys(gridBank?.[1].modules ?? {})).toEqual([grid]);
-    const controlBytes = (files: typeof bundle): readonly string[] => Object.entries(files)
-      .filter(([, file]) => Object.hasOwn(file.modules ?? {}, control)).map(([name, file]) => `${name}\n${file.code}`).sort();
-    const before = controlBytes(bundle);
-    expect(before.length).toBeGreaterThan(0);
-    writeFileSync(resolve(root, 'src/optional.ts'), 'globalThis.optionalValue = "changed late value";');
-    await build({ root, configFile: false, logLevel: 'silent', build: { outDir, manifest: true, sourcemap: 'hidden', cssCodeSplit: false,
-      rolldownOptions: { input: { main: resolve(root, 'index.html'), calibration: resolve(root, 'calibration/index.html') },
-        preserveEntrySignatures: false, output: { strictExecutionOrder: true, chunkFileNames: controlChunkFileName,
-          codeSplitting: { groups: controlChunkGroups(root) } } } } });
-    expect(controlBytes(writtenBundle(outDir, root))).toEqual(before);
-  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('a shared chunk named after the checkout folder gets one fixed name, so its importers are the same bytes everywhere', () => {

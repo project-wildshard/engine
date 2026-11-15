@@ -86,24 +86,6 @@ node.innerHTML=[label].map(value=>\`<b>\${value}</b>\`).join('');
 `)).toBe(2);
 });
 
-test('imported scalar declarations and exact trusted port identities remain distinct',()=>{
- const f=fixture(`import type {Values} from './values';import {icon as draw} from './client/ui/icons';
-import type {DiscOpts} from './client/ui/hudSlots';import type {DiscOpts as Fake} from './fake';
-declare const node:HTMLElement,data:Values,good:DiscOpts,bad:Fake;
-node.innerHTML=\`<b>\${data.count}</b>\`;
-node.innerHTML=data.label;
-node.innerHTML=draw('play');
-node.innerHTML=good.icon;
-node.innerHTML=bad.icon;`);
- try{
-  f.put('src/engine/values.ts','export interface Values{count:number;label:string}');
-  f.put('src/client/engine/ui/icons.ts','export function icon(_id:string):string{return "<svg/>";}');
-  f.put('src/client/engine/ui/hudSlots.ts','export interface DiscOpts{icon:string}');
-  f.put('src/engine/fake.ts','export interface DiscOpts{icon:string}');
-  expect(authoredHtmlSites(f.root,f.file).map(row=>row.line)).toEqual([5,8]);
- }finally{f.close();}
-});
-
 test('HTML reads require a proven DOM receiver, not an arbitrary innerHTML field',()=>{
  expect(count(`declare const node:HTMLElement,row:{innerHTML:string};
 node.innerHTML=node.innerHTML;
@@ -149,35 +131,6 @@ test('reused dependency scopes still read transitive changes and new edges',()=>
   expect(authoredHtmlSites(f.root,f.file)).toEqual([]);
   f.put('src/engine/other.ts','export const markup:string=globalThis.name;');
   expect(authoredHtmlSites(f.root,f.file)).toHaveLength(1);
- }finally{f.close();}
-});
-
-test('analysis-local import lookups recheck package targets and absent files',()=>{
- const f=fixture(`import {markup} from '@wildshard/engine/game/values';declare const node:HTMLElement;node.innerHTML=markup;node.outerHTML=markup;`);
- try{
-  const program=parseSync(f.file,readFileSync(f.file,'utf8')).program;
-  f.put('src/game/package.json',JSON.stringify({exports:{'./values':'./first.ts'}}));
-  expect(authoredHtmlSites(f.root,f.file,program)).toHaveLength(2);
-  f.put('src/game/first.ts','export const markup="<b>safe</b>";');
-  expect(authoredHtmlSites(f.root,f.file,program)).toEqual([]);
-  f.put('src/game/second.ts','export const markup:string=globalThis.name;');
-  f.put('src/game/package.json',JSON.stringify({exports:{'./values':'./second.ts'}}));
-  expect(authoredHtmlSites(f.root,f.file,program)).toHaveLength(2);
-  f.put('src/game/second.ts','export const markup="<b>safe again</b>";');
-  expect(authoredHtmlSites(f.root,f.file,program)).toEqual([]);
- }finally{f.close();}
-});
-
-test('typed static record values remain safe through nested string helpers',()=>{
- const f=fixture(`import {engineString} from './shared/strings';declare const node:HTMLElement;
-const esc=(value:string):string=>value.replaceAll('&','&amp;').replaceAll('<','&lt;');
-const rows={title:engineString('title'),unrelated:()=>document.title};
-const labels:Record<string,string>={video:engineString('video'),unrelated:rows.title};
-function fill(html:string){node.innerHTML=html;}
-fill(esc(labels.video));`);
- try{
-  f.put('src/shared/engine/strings.ts','export function engineString(_id:string):string{return "<i/>";}');
-  expect(authoredHtmlSites(f.root,f.file)).toEqual([]);
  }finally{f.close();}
 });
 

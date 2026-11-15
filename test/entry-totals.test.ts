@@ -110,7 +110,6 @@ test('a shard packs the whole level unless its packs-set.json selects the fence 
     for (const bad of [{version: 1, set: 'whole'}, {version: 2, set: 'fence'}, {version: 1, set: 'fence', extra: true}]) {
       writeFileSync(file, JSON.stringify(bad)); expect(() => readPacksSet(file)).toThrow();
     }
-    expect(readPacksSet(resolve('src/shards/pine-hollow/packs-set.json'))).toBe('fence');
   } finally { rmSync(root, {recursive: true, force: true}); }
 });
 
