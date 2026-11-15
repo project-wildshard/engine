@@ -398,6 +398,19 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.remoteMain()).toBe(before);
   }, 60_000);
 
+  test('TS15: a failed boundaries job blocks land and is not retried as a flaky test file', () => {
+    const f = fixture(), wt = f.worktree('boundaries');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    const before = f.remoteMain();
+    f.state({ red: { 'plan/boundaries': { ci: 'boundaries' } } });
+    const stopped = f.land(wt);
+    expect(stopped.status).toBe(1);
+    expect(stopped.stdout).toMatch(/ci run \d+ failure: boundaries \(failure\)/u);
+    expect(stopped.stdout).not.toContain('non-blocking: boundaries');
+    expect(f.remoteMain()).toBe(before);
+    expect(f.read(f.files.receipts)).toMatch(/STOP hosted CI red .*boundaries/u);
+  }, 60_000);
+
   test('LS1 (J250): a rebase across two main commits that each move the live revisions lands with no stamp conflict', () => {
     const f = fixture();
     // The real revision helpers over a real tree: a render file and the package's dependency specs are inputs of both.
@@ -894,8 +907,8 @@ describe('failedJobs', () => {
   test('splits non-blocking quarantine jobs from blocking reds', () => {
     const jobs = [['tests (4)', 'failure'], ['quarantine (1)', 'failure'], ['quarantine', 'timed_out'], ['static', 'success'], ['e2e', 'cancelled'], ['quarantine-check', 'failure'], ['boundaries', 'failure']]
       .map(([name, conclusion]) => ({ name, conclusion }));
-    // EV3b: J186's report-only boundaries job never blocks either.
-    expect(failedJobs({ jobs })).toEqual({ blocking: ['tests (4) (failure)', 'e2e (cancelled)', 'quarantine-check (failure)'], nonblocking: ['quarantine (1) (failure)', 'quarantine (timed_out)', 'boundaries (failure)'] });
+    // TS15: the soaked boundaries job now blocks; quarantine alone remains report-only.
+    expect(failedJobs({ jobs })).toEqual({ blocking: ['tests (4) (failure)', 'e2e (cancelled)', 'quarantine-check (failure)', 'boundaries (failure)'], nonblocking: ['quarantine (1) (failure)', 'quarantine (timed_out)'] });
     expect(failedJobs(null)).toEqual({ blocking: [], nonblocking: [] });
   });
 });
@@ -922,7 +935,9 @@ test('CIQ1: boundaries and quarantine skip plan/** runs, and main runs them with
   };
   for (const name of ['boundaries', 'quarantine']) {
     const block = job(name);
-    expect(block, name).toContain("    if: ${{ !startsWith(github.ref, 'refs/heads/plan/') }}\n    continue-on-error: true");
+    expect(block, name).toContain("    if: ${{ !startsWith(github.ref, 'refs/heads/plan/') }}");
+    if (name === 'quarantine') expect(block).toMatch(/^ {4}continue-on-error: true$/mu);
+    else expect(block).not.toMatch(/^ {4}continue-on-error:/mu);
     // a main push that reused the plan run would skip it for every landed SHA: no reuse step here
     expect(block, name).not.toContain('ci-exact-reuse.mjs');
     expect(block, name).not.toContain('steps.reuse');
@@ -1030,7 +1045,7 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
       const code = steps.find(step => step.startsWith('id: code')) ?? '';
       expect(body, name).not.toMatch(/^ {4}needs:/mu);
       if (name !== 'tests') {
-        // CIQ1: the non-blocking jobs skip plan/** runs by ref and never reuse one (the CIQ1 test above)
+        // CIQ1: main-only jobs skip plan/** runs by ref and never reuse one (the CIQ1 test above).
         expect(code, name).toContain("if: steps.paths.outputs.docs != 'true'");
         continue;
       }
@@ -1042,9 +1057,10 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     }
     expect(jobs.get('tests')).toContain("name: Run this job's packed share");
     expect(jobs.get('tests')).toContain('--units=static,e2e,plan-proofs,tests,products');
-    // EV3b: boundaries (report-only, 223-338 s) is its own non-blocking job from t=0, never behind products.
+    // TS15/EV3b: boundaries is blocking on its own runner from t=0, never behind products.
     expect(jobs.get('tests')).not.toContain('boundaries');
-    expect(jobs.get('boundaries')).toMatch(/^ {4}continue-on-error: true$/mu);
+    expect(jobs.get('boundaries')).not.toMatch(/^ {4}continue-on-error:/mu);
+    expect(readFileSync('.github/workflows/engine-boundaries.yml', 'utf8')).not.toMatch(/^ {4}continue-on-error:/mu);
     expect(jobs.get('boundaries')).toContain('scripts/ci-pack.mjs --jobs=1 --job=1 --units=boundaries');
     // EV3: six shares, the last of them Ring 1's products alone.
     expect(jobs.get('tests')).toContain('job: [1, 2, 3, 4, 5, 6]');
@@ -1062,7 +1078,7 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(names(packUnits(runUnits(6, ['tests']), 6)).every(bin => bin.length === 1)).toBe(true);
     // EV3b: ci.yml runs boundaries alone in its own job; the planner weighs it at its measured 258-392 s (p50 320).
     expect(names(packUnits(runUnits(0, ['boundaries']), 1))).toEqual([['boundaries']]);
-    expect(runUnits(0, ['boundaries'])[0]).toMatchObject({ seconds: 320, blocking: false });
+    expect(runUnits(0, ['boundaries'])[0]).toMatchObject({ seconds: 320, blocking: true });
   });
 
   test('products starts the last job and shards fill it once it is the least loaded (EV3b)', () => {
@@ -1096,8 +1112,10 @@ describe('TS10 flaky strikes', () => {
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-native.json'), JSON.stringify({ files: [{ file: 'test/slow.test.ts', state: 'passed', durationMs: 61_000 }, { file: 'test/ok.test.ts', state: 'passed', durationMs: 5 }] }));
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-ordinary.json'), JSON.stringify({ files: [{ file: 'test/red.test.ts', state: 'failed', durationMs: 5 }] }));
     writeFileSync(join(root, 'engine-ci-2/engine-ci/shard-3-wall.json'), JSON.stringify({ overBudget: false }));
-    job([{ name: 'shard:3', blocking: true, code: 1 }, { name: 'boundaries', blocking: false, code: 1 }]);
+    job([{ name: 'shard:3', blocking: true, code: 1 }, { name: 'quarantine', blocking: false, code: 1 }]);
     expect(flakyFiles(root, ['tests (2) (failure)'])).toEqual(['test/red.test.ts']);
+    job([{ name: 'shard:3', blocking: true, code: 1 }, { name: 'boundaries', blocking: true, code: 1 }]);
+    expect(flakyFiles(root, ['tests (2) (failure)'])).toBeNull();
     // Anything but test files keeps it red: another failed job, a red static unit, a shard over its wall, no report.
     expect(flakyFiles(root, ['tests (2) (failure)', 'quarantine-check (failure)'])).toBeNull();
     expect(flakyFiles(root, ['tests (5) (failure)'])).toBeNull();

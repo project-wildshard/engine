@@ -15,7 +15,7 @@
 //               in its job. With more than one job it starts the last job (EV3), so it never lands behind job 1's
 //               shards (that made job 1 the long pole, p50 12.6 min against 9.1); the other units pack over every job,
 //               and the last takes shards once it is the least loaded (EV3b: alone it ran 5.2-8.1 min against 9.6-11.3).
-//   boundaries  engine-boundaries' push half, cook-to-play on Ring 1's products: report-only (J186), so non-blocking.
+//   boundaries  engine-boundaries' push half, cook-to-play on Ring 1's products; blocking after TS15's green soak.
 //               It needs the full pins (its Ring 1 cook reads raw tarballs only `pnpm pins` fetches, run 43303094170),
 //               then installs Ring 1's and Chromium itself and builds its own tree, so it needs no other unit: ci.yml
 //               runs it as its own non-blocking job from t=0 (EV3b; after products in job 6 it took that job to 13.7
@@ -46,7 +46,7 @@ const FOLLOWS=Object.freeze(/** @type {Record<string,string>} */({boundaries:'pr
  * 2026-11-12): that job then packs like the rest, so the shards fill the 2-4 min products leaves free there. Alone it ran
  * 5.2-8.1 min while jobs 1-5 ran 9.6-11.3 (runs 43313302390 .. 43315974456). Its shards still run before products. */
 const OWN_JOB=new Set(['products']);
-const NONBLOCKING=new Set(['quarantine','boundaries']);
+const NONBLOCKING=new Set(['quarantine']);
 const SHARD_LIMIT_MS=300_000;
 /** @typedef {{name:string,phase:number,seconds:number,blocking:boolean}} Unit */
 /** @typedef {{name:string,phase:number,blocking:boolean,started:number,charged:number,ended:number,seconds:number,code:number}} UnitResult */
