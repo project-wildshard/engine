@@ -137,6 +137,16 @@ test('O26: a world without mesh collision reads only the index and its collision
   expect(f.fetch.mock.calls.map(([url]) => url)).toEqual([f.url, collision]);
 });
 
+test('TEMPLATE-E2E: with no baked far folder, a world without mesh collision reads its own far row, and none is null', async () => {
+  const f = fixture('scene-far-fixture'), names = ['world/collision', 'world/tiles', 'world/props', 'look/look'] as const;
+  const urls = names.map((name) => new URL(`sections/${name}.json`, f.url).href);
+  names.forEach((name, i) => { const payload = outputSectionPayloads(f.source).get(name), url = urls[i];
+    if (payload === undefined || url === undefined) throw new Error(`Missing ${name} fixture`); f.wires.set(url, new TextEncoder().encode(encodeCanonicalJson(payload))); });
+  // the empty source declares no far row, so even read whatever its world it gives the baked folder's way (null)
+  expect(await readGridProductFar(f.url, f.source.identity.slug, f.options, true)).toBeNull();
+  expect(new Set(f.fetch.mock.calls.map(([url]) => url))).toEqual(new Set([f.url, ...urls]));
+});
+
 test('G608: a product without near content reads only the index and its tiles section for its near view', async () => {
   const f = fixture(), tiles = new URL('sections/world/tiles.json', f.url).href, payload = outputSectionPayloads(f.source).get('world/tiles');
   if (payload === undefined) throw new Error('Missing tiles fixture');

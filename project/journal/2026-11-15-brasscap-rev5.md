@@ -19,3 +19,19 @@
   ladder's foot (8.4, -28.4); the porch and camp 3 legs pass unchanged.
 - `test/pins/cooked.json` is a report baseline, not a gate, and was not
   re-recorded (Template's rev 6 left it too).
+
+## The far proxy (same lane, after a two-page loopback)
+
+- Entering rev 5 failed at "far.json blender-template: 404": the grid
+  read a product's own far row only for a mesh-collision world and
+  otherwise fetched `assets/baked/<slug>/far.json`. Rev 5 is a scene
+  upload: no mesh collision, no repo bake, but a far row in its tiles.
+- `loadFar` now asks `readGridShardfileFar(slug, anyWorld)` with
+  `anyWorld` true when `publicBytes()` has no baked far for the slug;
+  the far GLB is then the far file the index lists as a GLB when no
+  props row names one. Slugs with a repo bake (Template, Pastel Plain,
+  the native shards) are unchanged.
+- Proof: engine's online-rig (memory saves, throwaway key) with this
+  tree's build; two pages entered Brasscap by Shard Select, each drew
+  13 bandits and 6 wyrm-look bodies (the Wyrm, 3 wyrmlings, 2 drakes),
+  page A shot a bandit (one kill) while B watched.

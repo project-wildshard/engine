@@ -248,7 +248,8 @@ function neighbourTiles(scope: Scope, prepare: (tile: PreparedRingTile) => Promi
 async function loadFar(slug: string): Promise<{ prepared: FarPrepared; bytes: number }> {
   // Pure authored projects have no repo bake: their proxy comes from their product's sections and far files (O26: read
   // hash-verified on their own, not after admitting the whole product), instead of a nonexistent far.json
-  const shardfile = await readGridShardfileFar(slug);
+  // a slug the build baked no far for (an upload with no mesh collision) reads its product's far row whatever its world
+  const shardfile = await readGridShardfileFar(slug, publicBytes()[`/assets/baked/${slug}/far.json`] === undefined);
   if (shardfile !== null) return loadShardfileFar(shardfile.rows, shardfile.read);
   const response = await fetch(versionedUrl(`/assets/baked/${slug}/far.json`));
   if (!response.ok) throw new Error(`far.json ${slug}: ${String(response.status)}`);
