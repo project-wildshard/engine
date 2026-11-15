@@ -21,3 +21,4 @@ Meta TEST-COVERAGE row 32, lane mini-pages on the Mac mini.
 - Census commit: Qara and Qyran save steps reboot by URL (a reload lost `?chunk=` and sat on the title 150 s); qara is out of
   the census set (its captain comes only after a thinned patrol, and one run in three it never came).
 - No-ASTC commit: the boot case and its control, typed for scripts/tsconfig.json.
+- Boundaries commit: the catalogue job and the report job's full-history checkout.

@@ -22,6 +22,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # vitest.config.ts reads lift-pending ownership from the introducing commits: a shallow clone stops Vitest at startup
+          fetch-depth: 0
       - uses: ./.github/actions/ring-setup
       - run: node scripts/pins.ts install --ring 1
       - run: pnpm gen:inputs
@@ -41,21 +43,6 @@ jobs:
       - run: bash scripts/ci-playwright-install.sh chromium
       - name: Cook, attach, and play the same bytes
         run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
-      # S12d: the app build's phone 6x6 encodes ride the spawn-part cache (a cold full-pin cook is minutes).
-      - if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ~/.cache/wildshard/gen/spawn-parts-br
-          key: ring1-spawn-parts-br-${{ github.sha }}
-          restore-keys: ring1-spawn-parts-br-
-      # Ring 2: all 28 real products and a clean build exceed ten seconds.
-      - name: Census all pinned title and grid heads
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: |
-          node scripts/pins.ts install
-          pnpm build:game
-          node scripts/app-build/splitOutput.mjs dist --join
-          node --import ./scripts/bake-loader.mjs scripts/catalogue-all-heads.ts dist
       - name: Check the full Nalati server herd tick budget
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts
@@ -69,3 +56,27 @@ jobs:
       - name: Remove this run's output
         if: always()
         run: node -e "require('node:fs').rmSync('tmp/engine-boundaries', {recursive:true,force:true})"
+  # EG-20 (meta TEST-COVERAGE row 32): the shipped title and grid against the immutable pins, on its own and blocking. Inside the
+  # report job it was skipped whenever an earlier step went red (every scheduled run 2026-11-12 to 11-15) and `continue-on-error`
+  # called that green. Ring 2: all 28 real products and a clean build exceed ten seconds.
+  catalogue:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      # S12d: the app build's phone 6x6 encodes ride the spawn-part cache (a cold full-pin cook is minutes).
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ring1-spawn-parts-br-${{ github.sha }}
+          restore-keys: ring1-spawn-parts-br-
+      - name: Census all pinned title and grid heads
+        run: |
+          node scripts/pins.ts install
+          pnpm build:game
+          node scripts/app-build/splitOutput.mjs dist --join
+          node --import ./scripts/bake-loader.mjs scripts/catalogue-all-heads.ts dist
