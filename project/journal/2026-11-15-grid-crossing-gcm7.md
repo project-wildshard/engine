@@ -18,3 +18,11 @@
   Nalati the step out showed a 2.4 to 2.55 s "Region world" card on the road and the step back an "Entry warm-up" card and a
   hold: facing Driftwood's mouth, the road built Driftwood's world and retired the home kept behind. The road now keeps the
   home (last-cell retention) and builds a neighbour's world only at its wall.
+- ZE2 (no stop at the home edge). The walk's stops at the lines were the page's own transfer fences: online the page's
+  crossing commits when the server's site changes, a round trip after the feet pass the server's 10 m leave or 6 m enter
+  line, and the fences stood at 10.1 m and 5.9 m, so the feet waited there (a collider probe on the stall found the
+  entry fence at 5.67 m). The fences now stand at 20 m (the cell's own strip is 23.75 m) and 1 m, and the feet walk on
+  while the commit lands. Nalati on the mini's preview: out stops 97 to 210 ms before, 48 to 101 ms after. Two holds
+  are left and are the server's: the walk back in stops at the server road's own cell wall (2 m out, `roadWorld.ts`)
+  while the server reloads the home its GC5 road warm evicted (standalone keeps 1 resident), and Driftwood's step out
+  still stands 150 to 340 ms at 10.4 m.

@@ -8,10 +8,15 @@ import { PLATFORM_COLLIDER_OWNER } from './stripColliders';
 
 /** Conservative native wall/handle allowance per four-sided cell, reserved before construction. */
 export const TRANSFER_WALL_BYTES = 65_536;
-/** Outgoing feet may reach the >10 m target threshold, but never pass this solid hold line before a durable commit. */
-export const TRANSFER_EXIT_LIMIT = 10.1;
-/** Incoming contact reaches the <=6 m target threshold without crossing the cell boundary in the highway frame. */
-export const TRANSFER_ENTER_LIMIT = 5.9;
+/**
+ * Outgoing feet pass the >10 m target threshold and walk on over the cell's own strip (23.75 m wide) while the commit
+ * lands: a fixed step or two on the page's own law, a round trip when the server says when (ZONE-ENTRY ZE2; at 10.1 m
+ * the feet stood at the line for that round trip). They never pass this solid hold line before a durable commit.
+ */
+export const TRANSFER_EXIT_LIMIT = 20;
+/** Incoming feet pass the <=6 m target threshold and walk on to 1 m short of the cell boundary in the highway frame
+ *  while the commit lands (ZE2: at 5.9 m they stood at the line for the server's round trip). */
+export const TRANSFER_ENTER_LIMIT = 1;
 /** Cell centres in this physics frame; entry walls enclose highway destinations, exit walls enclose the active region. */
 export interface TransferWallCell { readonly x: number; readonly z: number }
 

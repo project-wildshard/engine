@@ -71,7 +71,7 @@ test('board transfer fence reaches the entry trigger with the unchanged edge fil
       expect(tagOf(collider)?.material !== 'ground').toBe(!isTerrainCollider(collider));
     }
     for (let tick = 0; tick < 120; tick++) { physics.step(); motor.move(feet, { x: 0, y: 0, z: -.5 }, true); }
-    expect(feet.z).toBeCloseTo(-306.515, 2);
+    expect(feet.z).toBeCloseTo(-311.415, 2); // ZE2: 1 m short of the cell, past its 6 m trigger
     expect(Math.abs(feet.z + 562.5) - 250).toBeLessThan(6);
     expect(motor.result.horizontalFreedom).toBeLessThan(.01);
   } finally { motor.dispose(); scope.dispose(); physics.dispose(); }
