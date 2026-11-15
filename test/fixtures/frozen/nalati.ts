@@ -60,3 +60,8 @@ export function lendFrozenNalatiAdmission(owner: Scope): void {
 
 /** Reuses the pinned admission guest where a compact public stealth envelope is enough. */
 export const frozenAdmissionProgram = admission;
+
+export function frozenAdmissionNative(host: import('../../../src/server/engine/sim').SimHost): ReturnProgram {
+  lendFrozenNalatiAdmission(host.scope);
+  return ReturnProgram.native(host, frozenAdmissionProgram);
+}

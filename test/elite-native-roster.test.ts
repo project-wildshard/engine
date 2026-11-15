@@ -1,4 +1,4 @@
-import {admissionNative} from './fixtures/nalati-return-modules';
+import { frozenAdmissionNative as admissionNative } from './fixtures/frozen/nalati';
 import { expect, expectTypeOf, test, vi } from 'vitest';
 import { NativeEliteRoster, NativeEliteProjection, type NativeEliteRosterRows, type NativeEliteScript } from '../src/server/engine/ai/eliteRoster';
 import { NativeEliteLifecycle } from '../src/server/engine/ai/eliteLifecycle';

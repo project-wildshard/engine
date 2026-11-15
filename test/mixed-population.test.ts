@@ -1,4 +1,4 @@
-import {lendDriftwoodReturns} from './fixtures/driftwood-return-modules';
+import { lendFrozenReturns as lendDriftwoodReturns } from './fixtures/frozen/returns';
 import { installMixedPopulation } from '@wildshard/engine/game/population/mixedRoster';
 import { orchardPopulation } from './fixtures/mixed-population';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real Rapier exercises the native host.

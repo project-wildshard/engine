@@ -1,3 +1,4 @@
+import type { RayTargets } from '../src/shared/engine/combat/targets';
 import {fixtureProductFile,fixtureJsonCheck} from './fixtures/productFile';
 import {nalatiWetBlock} from './fixtures/nalati-wet';
 import { lendFrozenPasture as lendNalatiPasture } from './fixtures/frozen/runtimePrograms';
@@ -51,7 +52,7 @@ test('declared wildlife waits for animals, owns one frame and retires its hook',
   try {
     expect(() => clientWildlife(ctx)).toThrow('not installed');
     const hits:string[]=[];
-    const request={origin:new Vector3(),dir:new Vector3(0,0,1),maxDist:10,hit:null};
+    const request: RayTargets={origin:new Vector3(),dir:new Vector3(0,0,1),maxDist:10,hit:null};
     application.events.answer('combat.targets.ray',value=>{hits.push('prior');return value;},scope);
     const ray=vi.spyOn(PageWildlifeView.prototype,'raycastWeapon').mockImplementation((_origin,_direction,_maximum,prior)=>{hits.push('wildlife');return prior;});
     await installClientWildlife(ctx, feature);

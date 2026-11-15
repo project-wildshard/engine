@@ -5,9 +5,10 @@ import { StrikeRunner } from '../src/shared/engine/ai/strikes';
 import { strikeFromData } from '../src/shared/engine/ai/strikeRows';
 import { patrolContactLands } from '../src/server/game/boss/patrolNative';
 import { frozenNalatiJson } from './fixtures/frozen/nalati';
-import { parse, record, string, unknown } from 'valibot';
+import { parse, object } from 'valibot';
+import { CreatureStrikeSchema } from '@wildshard/format/creatures';
 
-const strikes = parse(record(string(), unknown()), frozenNalatiJson('nalati-strikeProfiles-original.json'));
+const strikes = parse(object({arrow: CreatureStrikeSchema}), frozenNalatiJson('nalati-strikeProfiles-original.json'));
 const arrow = strikes['arrow'];
 if (arrow === undefined) throw new Error('Missing frozen arrow strike');
 

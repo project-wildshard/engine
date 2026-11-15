@@ -23,7 +23,7 @@ const COUNT = 100_000, rng = seeded(0x5EED), xs = Float64Array.from({ length: CO
 const digest = (fn: (x: number, y: number) => number): string => createHash('sha256').update(new Uint8Array(xs.map((x, at) => fn(x, ys[at] ?? 0)).buffer)).digest('hex').slice(0, 16);
 
 const { sin, cos, tan, exp, log, atan, atan2, asin, acos, pow, hypot } = portableMath;
-const table = (math: typeof portableMath): Record<string, string> => ({ sin: digest(math.sin), cos: digest(math.cos), tan: digest(math.tan), exp: digest(x => math.exp(x / 2)),
+const table = (math: Omit<typeof portableMath, 'hypot'>): Record<string, string> => ({ sin: digest(math.sin), cos: digest(math.cos), tan: digest(math.tan), exp: digest(x => math.exp(x / 2)),
   log: digest(x => math.log(Math.abs(x) + 1e-3)), atan: digest(math.atan), atan2: digest(math.atan2), asin: digest(x => math.asin(x / 21)), acos: digest(x => math.acos(x / 21)),
   pow: digest((x, y) => math.pow(Math.abs(x), y)), powInt: digest((x, y) => math.pow(x, Math.round(y))) });
 

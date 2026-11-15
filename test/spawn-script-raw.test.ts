@@ -1,6 +1,7 @@
 import {expect,test,vi} from 'vitest';
 import {SkinnedMesh} from 'three';
-import {charge,chargeModule,chargeModuleSize} from './fixtures/nalati-charge';
+import { frozenCharge as charge, frozenChargeModule as chargeModule } from './fixtures/frozen/spawnScript';
+const chargeModuleSize = chargeModule.length;
 import {SpawnScript,readSpawnScript} from '../src/server/game/population/spawnScript';
 import {Scope} from '../src/shared/engine/app/scope';
 import type {AnimalManager} from '../src/server/engine/entities/AnimalManager';

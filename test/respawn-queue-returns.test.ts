@@ -1,12 +1,11 @@
 import {Scope} from '../src/shared/engine/app/scope';
-import {lendDriftwoodReturns} from './fixtures/driftwood-return-modules';
+import { lendFrozenReturns as lendDriftwoodReturns, frozenSaltmarsh } from './fixtures/frozen/returns';
 import { afterEach, expect, test } from 'vitest';
 import { RespawnQueue } from '../src/shared/game/population/respawn';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { RETURN_PROGRAM } from './fixtures/driftwood-guest-programs';
+import { frozenReturnProgram as RETURN_PROGRAM } from './fixtures/frozen/returns';
 import { Rng } from '../src/shared/engine/core/rng';
 import { setTerrainHeight } from '../src/shared/engine/world/terrainHeight';
-import { compileDecisionScripts } from '../src/sharddev/buildDecisionScripts';
 
 const owners:Scope[]=[];afterEach(()=>{for(const owner of owners.splice(0))owner.dispose();});
 function returns():ReturnProgram {const owner=lendDriftwoodReturns(new Scope('return fixture'));owners.push(owner);return ReturnProgram.page(RETURN_PROGRAM,owner);}
@@ -89,13 +88,7 @@ test('v1 placement retries preserve spawn-stream order and saved queue objects',
 });
 
 test('independent salt-marsh projection refuses atomically after borrowing a draw', async () => {
-  const declaration = { ...RETURN_PROGRAM.script, id: 'saltmarsh.returns', source: 'behaviour/marsh.as' };
-  const built = await compileDecisionScripts([declaration], {
-    fields: new Map(Object.values(declaration.fields).sort().map((name, i) => [name, i + 1])),
-    channels: new Map(Object.values(declaration.channels).sort().map((name, i) => [name, i + 1])),
-    signals: new Map(Object.values(declaration.signals).sort().map((name, i) => [name, i + 1])),
-  }, new Map([['behaviour/marsh.as', "import { Read, Do, Channel, Signal } from './generated/saltmarshReturns';\n@inline export function onSignal(signal:i32,value:f64,source:i32):void { const draw=Read.random(); if(signal==Signal.schedule){Do.channel(Channel.due,7+draw);return;} Do.channel(Channel.x,draw); unreachable(); }"]]), { asLineCeiling: 10 });
-  const script = built.rows[0], blob = built.blobs[0]; if (script === undefined || blob === undefined) throw new Error('Missing fixture guest');
+  const {script} = frozenSaltmarsh, blob = {bytes: Uint8Array.from(Buffer.from(frozenSaltmarsh.bytes, 'base64'))};
   expect(() => ReturnProgram.page({ script: { ...script, module: `blobs/wasm/${'0'.repeat(64)}.wasm` }, bytes: btoa(String.fromCodePoint(...blob.bytes)) })).toThrow('Return module hash mismatch');
   const program = ReturnProgram.page({ script, bytes: btoa(String.fromCodePoint(...blob.bytes)) }), rng = new Rng(13), control = new Rng(13);
   expect(program.project('schedule', {}, rng)).toEqual({ due: 7 + control.next() });

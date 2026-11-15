@@ -136,6 +136,46 @@
       "name": "nalati-crowd-view.json",
       "bytes": 1561,
       "sha256": "df983bd9c45d53a166735caa2e7ace95839e02fd10d8e5fa315a9420b2eab6b7"
+    },
+    {
+      "name": "nalati-riding-programs.json",
+      "bytes": 34980,
+      "sha256": "a3f025b25c2f1c1030f359547ee23b57a2a9ccd6d4b7d6564a437c717e406ebe"
+    },
+    {
+      "name": "nalati-riding-wasm.wasm",
+      "bytes": 47229,
+      "sha256": "09463dfbd52f3bf943c9f1203ad1bab3febca73ad0da10a8e242aaf418fb0b09"
+    },
+    {
+      "name": "nalati-riding-witness.bin",
+      "bytes": 26795,
+      "sha256": "84bd39abf54a633b3946e0e1dea7c1816565609c034799f5310db55a7b65d4ca"
+    },
+    {
+      "name": "nalati-charge.json",
+      "bytes": 2860,
+      "sha256": "0be2eae65953b7ca551e831dd320be0580bc758bdd28f22281b7a3b2f8188619"
+    },
+    {
+      "name": "nalati-charge.wasm",
+      "bytes": 11878,
+      "sha256": "a1a7812164e869892d97f600ff29ae7bcc9906c1529cbac0f541cb46793d76c0"
+    },
+    {
+      "name": "nalati-held.json",
+      "bytes": 36163,
+      "sha256": "11ad4eacf44a4488bf886637df0430cd60a26463bd1595d69e8e6f316dce508e"
+    },
+    {
+      "name": "nalati-held-wasm.wasm",
+      "bytes": 19976,
+      "sha256": "a35c2e6a3527a6e3509d7df83b76c203878bba6b806eb92ef03de1b963d316d5"
+    },
+    {
+      "name": "nalati-held-witness.bin",
+      "bytes": 39814,
+      "sha256": "87e51e95e14a28cbc1d98828d8cec1864bccef8237e4cf941bb6b208b5fcb5e9"
     }
   ],
   "supplement": {
@@ -150,6 +190,8 @@
   "exportRecipes": {
     "export-night.mjs": "import { createServer } from 'vite';\nimport { writeFileSync, readFileSync } from 'node:fs';\nconst shard='<checkouts>/shard-nalati';\nwriteFileSync('tmp/codex-tc48/ecology.mjs',`export const NALATI_ECOLOGY=${JSON.stringify({modes:JSON.parse(readFileSync(shard+'/src/data/ecology.json','utf8')).modes})};`);\nconst server=await createServer({configFile:false,optimizeDeps:{noDiscovery:true,include:[]},resolve:{alias:{'./ecology.mjs':'<engine>/tmp/codex-tc48/ecology.mjs',three:process.cwd()+'/node_modules/three'}},server:{middlewareMode:true},appType:'custom'});\ntry {\nconst {nalatiNightRows}=await server.ssrLoadModule(`${shard}/src/generators/nightRows.ts`);\nconst weather=JSON.parse(readFileSync('test/fixtures/frozen/nalati/nalati-weather-original.json','utf8'));\nwriteFileSync('test/fixtures/frozen/nalati/nalati-night.json',JSON.stringify(nalatiNightRows({script:weather.script,bytes:''}))+'\\n');\n} finally {await server.close();}\n",
     "export-runtime.mjs": "import {readFileSync,writeFileSync} from 'node:fs';\nimport {readDecisionSources} from '@wildshard/sharddev/buildDecisionScripts';\nimport {compileReturnProjectionV2} from '@wildshard/sharddev/returnProjectionV2';\nimport {nalatiTitanRows} from '<checkouts>/shard-nalati/src/generators/stormTitanRows.mjs';\nconst source='<checkouts>/shard-nalati';\nconst built=await nalatiTitanRows((input,registries,authored,options)=>compileReturnProjectionV2(input,registries,authored,options),readDecisionSources(source+'/src'));\nwriteFileSync('tmp/codex-tc48/titan.json',JSON.stringify({programs:built.programs,titan:{wasm:Buffer.from(built.titan.wasm).toString('base64'),witness:Buffer.from(built.titan.witness).toString('base64')},pasture:{wasm:Buffer.from(built.pasture.wasm).toString('base64'),witness:Buffer.from(built.pasture.witness).toString('base64')}}));\nconst {nalatiHeadlessAssembly}=await import(source+'/src/generators/nativeGroups.ts');\nconst admission=JSON.parse(readFileSync('test/fixtures/frozen/nalati/nalati-admission-original.json','utf8'));\nconst assembly=nalatiHeadlessAssembly(built.programs.wind,admission);\nwriteFileSync('tmp/codex-tc48/assembly.json',JSON.stringify(assembly));\n",
-    "export-species.mjs": "import {readFileSync,writeFileSync} from 'node:fs';\nimport {compileDecisionScripts} from '@wildshard/sharddev/buildDecisionScripts';\nimport {compileReturnProjectionV2} from '@wildshard/sharddev/returnProjectionV2';\nimport {nalatiSpeciesProgram} from '<checkouts>/shard-nalati/src/generators/speciesProgram.ts';\nimport {CreatureGuestSchema} from '@wildshard/format/speciesBookRows';\nimport {parse} from 'valibot';\nconst source='<checkouts>/shard-nalati';\nconst files=await nalatiSpeciesProgram({compileDecisionRows:compileDecisionScripts,compileReturnProjection:compileReturnProjectionV2,cached:(step,make)=>Promise.resolve(make(new Map(step.inputs.map(name=>[name,new Uint8Array(readFileSync(source+(name.startsWith('/')?'/public'+name:'/src/'+name)))]))))},input=>input,input=>parse(CreatureGuestSchema,input),hash=>`/assets/nalati/baked/bodies-${hash}.bin`);\nfor(const [name,bytes] of files) writeFileSync('tmp/codex-tc48/species-'+name,bytes);\nconst {bakeSheepBody}=await import(source+'/src/generators/sheepBody.ts');\nconst {bytes,...metadata}=bakeSheepBody();\nwriteFileSync('tmp/codex-tc48/sheep.bin',bytes);writeFileSync('tmp/codex-tc48/sheep.json',JSON.stringify(metadata));\n"
+    "export-species.mjs": "import {readFileSync,writeFileSync} from 'node:fs';\nimport {compileDecisionScripts} from '@wildshard/sharddev/buildDecisionScripts';\nimport {compileReturnProjectionV2} from '@wildshard/sharddev/returnProjectionV2';\nimport {nalatiSpeciesProgram} from '<checkouts>/shard-nalati/src/generators/speciesProgram.ts';\nimport {CreatureGuestSchema} from '@wildshard/format/speciesBookRows';\nimport {parse} from 'valibot';\nconst source='<checkouts>/shard-nalati';\nconst files=await nalatiSpeciesProgram({compileDecisionRows:compileDecisionScripts,compileReturnProjection:compileReturnProjectionV2,cached:(step,make)=>Promise.resolve(make(new Map(step.inputs.map(name=>[name,new Uint8Array(readFileSync(source+(name.startsWith('/')?'/public'+name:'/src/'+name)))]))))},input=>input,input=>parse(CreatureGuestSchema,input),hash=>`/assets/nalati/baked/bodies-${hash}.bin`);\nfor(const [name,bytes] of files) writeFileSync('tmp/codex-tc48/species-'+name,bytes);\nconst {bakeSheepBody}=await import(source+'/src/generators/sheepBody.ts');\nconst {bytes,...metadata}=bakeSheepBody();\nwriteFileSync('tmp/codex-tc48/sheep.bin',bytes);writeFileSync('tmp/codex-tc48/sheep.json',JSON.stringify(metadata));\n",
+    "export-more-guests.mjs": "import {readFileSync,writeFileSync} from 'node:fs';\nimport {compileDecisionScripts,readDecisionSources} from '@wildshard/sharddev/buildDecisionScripts';\nimport {compileReturnProjectionV2} from '@wildshard/sharddev/returnProjectionV2';\nimport {nalatiRidingRows} from '<checkouts>/shard-nalati/src/generators/ridingRows.mjs';\nimport {NALATI_ECOLOGY} from '<checkouts>/shard-nalati/src/generators/ecology.mjs';\nimport {nalatiChargeRows} from '<checkouts>/shard-nalati/src/generators/chargeRows.ts';\nimport {DRIFTWOOD_RETURN_FIELDS as fields,DRIFTWOOD_RETURN_CHANNELS as channels,DRIFTWOOD_RETURN_SIGNALS as signals} from '<checkouts>/shard-driftwood/src/generators/guestPrograms.ts';\nconst nalati='<checkouts>/shard-nalati';\nconst riding=await nalatiRidingRows(compileReturnProjectionV2,name=>readFileSync(nalati+'/src/'+name,'utf8'),NALATI_ECOLOGY);\nconst base64=bytes=>Buffer.from(bytes).toString('base64');\nwriteFileSync('tmp/codex-tc48/riding.json',JSON.stringify({programs:riding.programs,wasm:base64(riding.wasm),witness:base64(riding.witness)}));\nconst charge=await nalatiChargeRows(compileDecisionScripts,readDecisionSources(nalati+'/src'));\nwriteFileSync('tmp/codex-tc48/charge.json',JSON.stringify({rows:charge.rows,wasm:base64(charge.wasm)}));\nconst aliases=names=>Object.fromEntries(names.map(name=>[name,name]));\nconst registry=names=>new Map([...names].sort().map((name,i)=>[name,i+1]));\nconst input={id:'driftwood.returns',abi:'1.0',side:'sim',module:`blobs/wasm/${'0'.repeat(64)}.wasm`,source:'behaviour/returns.as',binding:{shard:true},pages:1,onFail:'hold',on:['signal'],tick:null,stateVersion:1,state:[],params:{},reads:['field','random','groundHeight','radial'],commands:['channel'],fields:aliases(fields),channels:aliases(channels),signals:aliases(signals)};\nconst registries={fields:registry(fields),channels:registry(channels),signals:registry(signals)};\nconst built=await compileDecisionScripts([input],registries,readDecisionSources('<checkouts>/shard-driftwood/src'),{asLineCeiling:1716});\nconst RETURN_PROGRAM={script:built.rows[0],bytes:''};\nwriteFileSync('test/fixtures/frozen/returns.json',JSON.stringify({...RETURN_PROGRAM,bytes:base64(built.blobs[0].bytes)})+'\\n');\n\n{\n  const declaration = { ...RETURN_PROGRAM.script, id: 'saltmarsh.returns', source: 'behaviour/marsh.as' };\n  const built = await compileDecisionScripts([declaration], {\n    fields: new Map(Object.values(declaration.fields).sort().map((name, i) => [name, i + 1])),\n    channels: new Map(Object.values(declaration.channels).sort().map((name, i) => [name, i + 1])),\n    signals: new Map(Object.values(declaration.signals).sort().map((name, i) => [name, i + 1])),\n  }, new Map([['behaviour/marsh.as', \"import { Read, Do, Channel, Signal } from './generated/saltmarshReturns';\\n@inline export function onSignal(signal:i32,value:f64,source:i32):void { const draw=Read.random(); if(signal==Signal.schedule){Do.channel(Channel.due,7+draw);return;} Do.channel(Channel.x,draw); unreachable(); }\"]]), { asLineCeiling: 10 });\n\nwriteFileSync('test/fixtures/frozen/saltmarsh-returns.json',JSON.stringify({script:built.rows[0],bytes:base64(built.blobs[0].bytes)})+'\\n');\n}\n\n{\n  const declaration = { ...RETURN_PROGRAM.script, id: 'marsh.returns', source: 'behaviour/marsh.as' };\n  const built = await compileDecisionScripts([declaration], {\n    fields: new Map(Object.values(declaration.fields).sort().map((name, i) => [name, i + 1])),\n    channels: new Map(Object.values(declaration.channels).sort().map((name, i) => [name, i + 1])),\n    signals: new Map(Object.values(declaration.signals).sort().map((name, i) => [name, i + 1])),\n  }, new Map([['behaviour/marsh.as', `import { Read, Do, Field, Channel, Signal } from './generated/marshReturns';\n@inline export function onSignal(signal:i32,value:f64,source:i32):void {\n  if(signal==Signal.schedule) Do.channel(Channel.due,Read.field(0,Field.now)+Read.field(0,Field.minimum));\n  if(signal==Signal.eligible) Do.channel(Channel.eligible,Read.field(0,Field.now)>=Read.field(0,Field.due)&&Read.field(0,Field.playerX)>10?1:0);\n  if(signal==Signal.place) { Do.channel(Channel.x,Read.field(0,Field.x)+2); Do.channel(Channel.z,Read.field(0,Field.z)-1); Do.channel(Channel.retry,0); }\n}`]]), { asLineCeiling: 10 });\n\nwriteFileSync('test/fixtures/frozen/marsh-returns.json',JSON.stringify({script:built.rows[0],bytes:base64(built.blobs[0].bytes)})+'\\n');\n}\n",
+    "export-held.mjs": "import {readFileSync,writeFileSync} from 'node:fs';\nimport {nalatiHeldSource} from '<checkouts>/shard-nalati/src/generators/heldMetadata.ts';\nconst held=nalatiHeldSource(JSON.parse(readFileSync('tmp/codex-tc48/species-species.json','utf8')));\nwriteFileSync('tmp/codex-tc48/held.json',JSON.stringify(held));\n"
   }
 }

@@ -2,11 +2,16 @@ import { Rng } from '../../src/shared/engine/core/rng';
 import type { MixedPopulationInput } from '@wildshard/engine/game/population/mixedRoster';
 import { readSpeciesPrograms } from '@wildshard/format/speciesPrograms';
 import { SIM_LEVEL } from './sim-level/level';
-import { DRIFTWOOD_SPECIES_PROGRAMS } from '../../src/shards/driftwood-isle/generators/speciesPrograms';
-import { RETURN_PROGRAM } from './driftwood-guest-programs';
-import { enemyPlacements } from '../../src/shards/driftwood-isle/generators/enemyPlacement';
-import { keeperRows } from '../../src/shards/driftwood-isle/generators/keeperRows';
-import source from '../../src/shards/driftwood-isle/data/mixedPopulation.json' with { type: 'json' };
+import { frozenRuntimeJson } from './frozen/snapshots';
+import { parse, object, unknown } from 'valibot';
+const inputs = parse(object({species: unknown(), keeper: unknown(), rows: unknown()}), frozenRuntimeJson('mixed-inputs.json'));
+import { PopulationKeeperRowsSchema } from '@wildshard/format/populationKeeper';
+const admitted = readSpeciesPrograms(inputs.species);
+if (admitted.program === undefined) throw new Error('Frozen mixed population lacks its creature program');
+const DRIFTWOOD_SPECIES_PROGRAMS = {...admitted, program: admitted.program};
+import { frozenReturnProgram as RETURN_PROGRAM } from './frozen/returns';
+import { MixedPopulationSchema } from '@wildshard/format/mixedPopulation';
+const source = parse(MixedPopulationSchema, inputs.rows);
 
 /** An unrelated orchard population uses one practice animal and a reserved
  * guardian, a different roster bound, floor, return gate and empty pose clips. */
@@ -14,7 +19,7 @@ export function orchardPopulation(extra?: { readonly id: string; readonly x: num
   const sample = SIM_LEVEL.entities[0], native = DRIFTWOOD_SPECIES_PROGRAMS.native[0], guard = DRIFTWOOD_SPECIES_PROGRAMS.program.species.find(row => row.kind === 'crab');
   if (sample === undefined || native === undefined || guard === undefined) throw new Error('Missing fixture species');
   const kind = 'orchard-hog', guardian = 'orchard-guard', spec = { ...sample.spec, kind }, guardSpec = { ...sample.spec, kind: guardian }, stream = new Rng(40).snapshot();
-  const placement = enemyPlacements(), sourceKeeper = keeperRows(placement, RETURN_PROGRAM);
+  const sourceKeeper = parse(PopulationKeeperRowsSchema, inputs.keeper);
   const pose = { custom: true, joints: [
     { name: 'body', parent: -1, position: [0, 1, 0], order: 'YXZ', scale: [1, 1, 1] },
     { name: 'head', parent: 0, position: [0, 1, 0], order: 'YXZ', scale: [1, 1, 1] },

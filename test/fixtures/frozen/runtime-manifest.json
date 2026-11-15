@@ -1,0 +1,38 @@
+{
+  "sourceRevisions": {
+    "shard-nalati": "ea62309fa4fae8f9bfdc22a7c639f2a4a14dc5d2",
+    "shard-driftwood": "b95685d9ffc1118f097243b1ba4196285a7e1eeb",
+    "sharddev": "23d05fd147700fe5e9c929749f7d8cb63cdf7761"
+  },
+  "files": {
+    "elite-kernels.json": {
+      "bytes": 4643,
+      "sha256": "8a0257f0e8a88d50588aff16ef39393917c4c798e44e1cb7badc7a9f30014684"
+    },
+    "melee-sword-items.json": {
+      "bytes": 5612,
+      "sha256": "1d215a4e809d246103e9f5ad000c4487f4ff18f6e6dd0a2ddb7c34a8d72f01c9"
+    },
+    "returns.json": {
+      "bytes": 10374,
+      "sha256": "3835c5a41bcefcf704171dac0715c34aba58cb61880990eb4f7e4cbe85ed71b9"
+    },
+    "marsh-returns.json": {
+      "bytes": 7728,
+      "sha256": "2cb52707cdcaadcebbe3b3395f49a1ab69736fe90ecd1097e9602935e547a247"
+    },
+    "saltmarsh-returns.json": {
+      "bytes": 7036,
+      "sha256": "e951027e986888726d22a4af57d2f74fda9fb3785629ba69fb8d4025b3af67d3"
+    },
+    "mixed-inputs.json": {
+      "bytes": 30294,
+      "sha256": "2347097af1972ce82d973b7162e97efd8b76f6cb016aa32b8614ef311c3400f3"
+    }
+  },
+  "exportRecipes": {
+    "export-extras.mjs": "import {writeFileSync} from 'node:fs';\nimport {NALATI_ECOLOGY} from '<checkouts>/shard-nalati/src/generators/ecology.mjs';\nimport {DRIFTWOOD_SWORDS} from '<checkouts>/shard-driftwood/src/generators/items.ts';\nwriteFileSync('test/fixtures/frozen/elite-kernels.json',JSON.stringify(NALATI_ECOLOGY.keeperElites)+'\\n');\nwriteFileSync('test/fixtures/frozen/melee-sword-items.json',JSON.stringify(DRIFTWOOD_SWORDS)+'\\n');\n",
+    "export-more-guests.mjs": "import {readFileSync,writeFileSync} from 'node:fs';\nimport {compileDecisionScripts,readDecisionSources} from '@wildshard/sharddev/buildDecisionScripts';\nimport {compileReturnProjectionV2} from '@wildshard/sharddev/returnProjectionV2';\nimport {nalatiRidingRows} from '<checkouts>/shard-nalati/src/generators/ridingRows.mjs';\nimport {NALATI_ECOLOGY} from '<checkouts>/shard-nalati/src/generators/ecology.mjs';\nimport {nalatiChargeRows} from '<checkouts>/shard-nalati/src/generators/chargeRows.ts';\nimport {DRIFTWOOD_RETURN_FIELDS as fields,DRIFTWOOD_RETURN_CHANNELS as channels,DRIFTWOOD_RETURN_SIGNALS as signals} from '<checkouts>/shard-driftwood/src/generators/guestPrograms.ts';\nconst nalati='<checkouts>/shard-nalati';\nconst riding=await nalatiRidingRows(compileReturnProjectionV2,name=>readFileSync(nalati+'/src/'+name,'utf8'),NALATI_ECOLOGY);\nconst base64=bytes=>Buffer.from(bytes).toString('base64');\nwriteFileSync('tmp/codex-tc48/riding.json',JSON.stringify({programs:riding.programs,wasm:base64(riding.wasm),witness:base64(riding.witness)}));\nconst charge=await nalatiChargeRows(compileDecisionScripts,readDecisionSources(nalati+'/src'));\nwriteFileSync('tmp/codex-tc48/charge.json',JSON.stringify({rows:charge.rows,wasm:base64(charge.wasm)}));\nconst aliases=names=>Object.fromEntries(names.map(name=>[name,name]));\nconst registry=names=>new Map([...names].sort().map((name,i)=>[name,i+1]));\nconst input={id:'driftwood.returns',abi:'1.0',side:'sim',module:`blobs/wasm/${'0'.repeat(64)}.wasm`,source:'behaviour/returns.as',binding:{shard:true},pages:1,onFail:'hold',on:['signal'],tick:null,stateVersion:1,state:[],params:{},reads:['field','random','groundHeight','radial'],commands:['channel'],fields:aliases(fields),channels:aliases(channels),signals:aliases(signals)};\nconst registries={fields:registry(fields),channels:registry(channels),signals:registry(signals)};\nconst built=await compileDecisionScripts([input],registries,readDecisionSources('<checkouts>/shard-driftwood/src'),{asLineCeiling:1716});\nconst RETURN_PROGRAM={script:built.rows[0],bytes:''};\nwriteFileSync('test/fixtures/frozen/returns.json',JSON.stringify({...RETURN_PROGRAM,bytes:base64(built.blobs[0].bytes)})+'\\n');\n\n{\n  const declaration = { ...RETURN_PROGRAM.script, id: 'saltmarsh.returns', source: 'behaviour/marsh.as' };\n  const built = await compileDecisionScripts([declaration], {\n    fields: new Map(Object.values(declaration.fields).sort().map((name, i) => [name, i + 1])),\n    channels: new Map(Object.values(declaration.channels).sort().map((name, i) => [name, i + 1])),\n    signals: new Map(Object.values(declaration.signals).sort().map((name, i) => [name, i + 1])),\n  }, new Map([['behaviour/marsh.as', \"import { Read, Do, Channel, Signal } from './generated/saltmarshReturns';\\n@inline export function onSignal(signal:i32,value:f64,source:i32):void { const draw=Read.random(); if(signal==Signal.schedule){Do.channel(Channel.due,7+draw);return;} Do.channel(Channel.x,draw); unreachable(); }\"]]), { asLineCeiling: 10 });\n\nwriteFileSync('test/fixtures/frozen/saltmarsh-returns.json',JSON.stringify({script:built.rows[0],bytes:base64(built.blobs[0].bytes)})+'\\n');\n}\n\n{\n  const declaration = { ...RETURN_PROGRAM.script, id: 'marsh.returns', source: 'behaviour/marsh.as' };\n  const built = await compileDecisionScripts([declaration], {\n    fields: new Map(Object.values(declaration.fields).sort().map((name, i) => [name, i + 1])),\n    channels: new Map(Object.values(declaration.channels).sort().map((name, i) => [name, i + 1])),\n    signals: new Map(Object.values(declaration.signals).sort().map((name, i) => [name, i + 1])),\n  }, new Map([['behaviour/marsh.as', `import { Read, Do, Field, Channel, Signal } from './generated/marshReturns';\n@inline export function onSignal(signal:i32,value:f64,source:i32):void {\n  if(signal==Signal.schedule) Do.channel(Channel.due,Read.field(0,Field.now)+Read.field(0,Field.minimum));\n  if(signal==Signal.eligible) Do.channel(Channel.eligible,Read.field(0,Field.now)>=Read.field(0,Field.due)&&Read.field(0,Field.playerX)>10?1:0);\n  if(signal==Signal.place) { Do.channel(Channel.x,Read.field(0,Field.x)+2); Do.channel(Channel.z,Read.field(0,Field.z)-1); Do.channel(Channel.retry,0); }\n}`]]), { asLineCeiling: 10 });\n\nwriteFileSync('test/fixtures/frozen/marsh-returns.json',JSON.stringify({script:built.rows[0],bytes:base64(built.blobs[0].bytes)})+'\\n');\n}\n",
+    "export-mixed.mjs": "import {writeFileSync,readFileSync} from 'node:fs';\nimport {DRIFTWOOD_SPECIES_PROGRAMS} from '<checkouts>/shard-driftwood/src/generators/speciesPrograms.ts';\nimport {enemyPlacements} from '<checkouts>/shard-driftwood/src/generators/enemyPlacement.ts';\nimport {keeperRows} from '<checkouts>/shard-driftwood/src/generators/keeperRows.ts';\nconst returns=JSON.parse(readFileSync('test/fixtures/frozen/returns.json','utf8'));\nwriteFileSync('test/fixtures/frozen/mixed-inputs.json',JSON.stringify({species:DRIFTWOOD_SPECIES_PROGRAMS,keeper:keeperRows(enemyPlacements(),{...returns,bytes:''}),rows:JSON.parse(readFileSync('<checkouts>/shard-driftwood/src/data/mixedPopulation.json','utf8'))})+'\\n');\n"
+  }
+}

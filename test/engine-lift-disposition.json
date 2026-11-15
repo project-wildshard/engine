@@ -9768,5 +9768,186 @@
     "sourceRevision": "a88686574cb9e85a88354084a342b531821cd663",
     "sourceBlob": "c8e6fedca09657b060f598e95ef40bf9151bfae0",
     "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/map-binding.test.ts",
+    "outcome": "restored",
+    "target": "test/map-binding.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen geography blocks retain original raster map boundaries and POI answers.",
+    "originalTests": [
+      "map callback preserves void return, output component order and ignored inputs",
+      "whole triplet admission rejects malformed rows and getters, with detached independent instances",
+      "unchanged actual raster bytes retain map answers, boundaries and POIs"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "be4612a0fee3ea9e03e4ec9e073d51879f43e454",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/terrain-triplets.test.ts",
+    "outcome": "restored",
+    "target": "test/terrain-triplets.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen geography blocks retain pigment and surface outputs against the independent predecessor sampler.",
+    "originalTests": [
+      "ground writes the original output in component order and surface allocates independent tuples",
+      "the entire strict triplet and every encoded component refuse before exposing either callback",
+      "input changes and unrelated declarations cannot redirect existing sampled callbacks",
+      "actual declared pigment and surface retain the predecessor native sampler answers"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "486097e65598515f58abf388885dc0a904ab632d",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/elite-native-roster.test.ts",
+    "outcome": "restored",
+    "target": "test/elite-native-roster.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen admission, native kernel rows and strikes preserve constructor ordering, readonly types and owner refusals.",
+    "originalTests": [
+      "canonical roster declarations retain the original readonly public definition and wire",
+      "native and borrowed constructors keep row order before any Core registration",
+      "whole row suffix refuses before any native controller or registration",
+      "foreign or out-of-order borrowed owner refuses before suffix construction or Core registration",
+      "owner and callable replacements after borrowed construction publish no Core entries",
+      "the original adapter retains the borrowed controller and exact historical wire"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "6555ba2d874a5a5999321cc49b6e71105744c7f8",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/driftwood-sword-profiles.test.ts",
+    "outcome": "restored",
+    "target": "test/sword-profile-key-order.test.ts",
+    "decision": "Restored in engine under generic name; pinned sword rows preserve native key-order admission and changed-profile refusal.",
+    "originalTests": [
+      "canonical section key order cannot change native sword admission"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "cee32fd9ac40cb8e94a4a26f62add0e02f7b8762",
+    "retirementProof": "No cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/return-memory-preparation.test.ts",
+    "outcome": "restored",
+    "target": "test/return-memory-preparation.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen admission, held, riding, titan and pasture guests retain seven isolated memory reservations, deferred initialization and refusal checks.",
+    "originalTests": [
+      "the seven real return consumers reserve seven isolated memories and initialize only at their original construction",
+      "preparation keeps full raw loan, descriptor, witness and retirement refusals before allocation",
+      "a native reservation cannot be forged, reused, transferred, or consumed with other bytes"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "90497b9d036b8126398daa23dbd3d8739e88c588",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/return-program-shared-memory.test.ts",
+    "outcome": "restored",
+    "target": "test/return-program-shared-memory.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen riding program and independent witness retain stateless shared-memory and stateful isolation behavior.",
+    "originalTests": [
+      "return programs share one memory per page count and answer exactly as alone",
+      "stateless decision modules take turns in one memory; stateful modules keep their own"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "03e05acff1a1f13d21659aa7dd98cd3d3ad185b5",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/native-roster-returns.test.ts",
+    "outcome": "restored",
+    "target": "test/native-roster-returns.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Pinned marsh guest retains native respawn identities, reverse queue order and quiet restore over real Rapier.",
+    "originalTests": [
+      "salt-marsh native returns retain predecessor identities, queue order and quiet restore"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "420615979c45e9a840091289dbb8108df3aaa253",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/driftwood-ecology-queue.test.ts",
+    "outcome": "restored",
+    "target": "test/respawn-queue-returns.test.ts",
+    "decision": "Restore the generic runtime proof with pinned guests; retain every original case and remove SDK/shard producer imports.",
+    "originalTests": [
+      "respawns retain rolled delays, night and distance gates, reverse order and entry identity",
+      "the native bound refuses atomically while the page retains fresh, uncapped results",
+      "forward traversal removes adjacent due entries and retains ineligible entries in place",
+      "v1 returns preserve queue identity, exact boundary gates and fixed-delay draws",
+      "v1 placement retries preserve spawn-stream order and saved queue objects",
+      "independent salt-marsh projection refuses atomically after borrowing a draw"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "1f38260b32e7deab973c330efe25db58f9e73da6",
+    "retirementProof": "No cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/nalati-charge-raw.test.ts",
+    "outcome": "restored",
+    "target": "test/spawn-script-raw.test.ts",
+    "decision": "Restore the generic runtime proof with pinned guests; retain every original case and remove SDK/shard producer imports.",
+    "originalTests": [
+      "the named spawn module stays raw in the original asset map and default readers retain inline bytes",
+      "raw scope, hash and mixed-input refusals precede programme instantiation",
+      "raw and inline captain execution retain original body, staged effects and byte-exact continuation"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "ad543fc03af9222b9447b7fe451ab2a759cc139a",
+    "retirementProof": "No cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/mixed-population.test.ts",
+    "outcome": "restored",
+    "target": "test/mixed-population.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen species, keeper and return inputs retain synthetic orchard roster replacement and restore behavior.",
+    "originalTests": [
+      "mixed orchard roster replaces the practice slot and restores its reserved body and volley owner"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "98751f470fb7c0e7cbbe9e7471f272a947d1b60f",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/mixed-population-refill.test.ts",
+    "outcome": "restored",
+    "target": "test/mixed-population-refill.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen species, keeper and return inputs retain one-player refill and multiplayer respawn law over real Rapier.",
+    "originalTests": [
+      "creature.tamed",
+      "a room brings an untimed kind back on the refill wait, sooner with players near, never in sight",
+      "a tame owes its spot in a room, and leaves the mount it became alive",
+      "one player owes nothing for either, and their tick is the tick it was",
+      "at the roster bound a return takes the slot a dead body left, on and on",
+      "a roster full of living bodies forgives the return, and a full queue forgives the debt"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "297049b5aa297e6557d92219c7633ca17c7e09ee",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
+  },
+  {
+    "repo": "engine",
+    "file": "test/native-ground-assembly.test.ts",
+    "outcome": "restored",
+    "target": "test/native-ground-assembly.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Pinned product descriptors supply their own admitted asset bytes for original terrain decoding, native checkpoint and restore suffix law.",
+    "originalTests": [
+      "declared sampling rows retain the original native checkpoint and restore suffix"
+    ],
+    "sourceRevision": "93f9a5c03fdf11a41d4be3d5956061cdcbc43852",
+    "sourceBlob": "a1df7be0fb0ff46d794d7acd9d5e4a3ba6eb999c",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
   }
 ]

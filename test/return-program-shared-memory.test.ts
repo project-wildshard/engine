@@ -1,9 +1,9 @@
 import {Scope} from '../src/shared/engine/app/scope';
-import {lendNalatiRiding,ridingWitnessBytes} from './fixtures/nalati-return-modules';
+import { lendFrozenPasture as lendNalatiRiding, frozenRidingWitness as ridingWitnessBytes } from './fixtures/frozen/runtimePrograms';
 import { expect, test } from 'vitest';
 import { DecisionModule } from '../src/shared/engine/script/decisionModule';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { NALATI_RIDING_PROGRAMS as programs } from './fixtures/nalati-riding';
+import { frozenRiding as programs } from './fixtures/frozen/runtimePrograms';
 
 // iOS JSC runs a synchronous full GC for each new WebAssembly.Memory past its fast-memory cap (40-80 ms per return
 // program on a Nalati entry). Stateless return programs take turns in one memory per page count instead.

@@ -3,7 +3,7 @@
   "owner": "codex-mock",
   "registeredAt": "2026-11-09T18:47:27Z",
   "deadline": "2026-11-10T18:00:00Z",
-  "inventorySha256": "b634663153ec450b5b0f1c84e127c0cdd718a3089c93df60dc2b488aa2c4bab0",
+  "inventorySha256": "0d672ba1d4852147fc94a789470802bff8a38afce84a2a1485020a346e61fb87",
   "reason": "Inherited pre-lift migration debt, not a flaky-test quarantine. Owner must restore public-boundary successors or document J186 disposition for every listed file before the deadline. Registration proves no test execution. All listed files return to blocking discovery at expiry.",
   "extension": {
     "rule": "J200",

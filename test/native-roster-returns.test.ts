@@ -5,27 +5,14 @@ import { Rng } from '../src/shared/engine/core/rng';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createSimHost } from '../src/server/engine/sim';
 import { createNativeCreatureRoster } from '../src/server/game/shardfile/homeKeeper';
-import { compileDecisionScripts } from '../src/sharddev/buildDecisionScripts';
-import { RETURN_PROGRAM } from './fixtures/driftwood-guest-programs';
+import { frozenMarsh } from './fixtures/frozen/returns';
 import { fixtureNativeRoster } from './fixtures/native-roster';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 test('salt-marsh native returns retain predecessor identities, queue order and quiet restore', async () => {
-  const declaration = { ...RETURN_PROGRAM.script, id: 'marsh.returns', source: 'behaviour/marsh.as' };
-  const built = await compileDecisionScripts([declaration], {
-    fields: new Map(Object.values(declaration.fields).sort().map((name, i) => [name, i + 1])),
-    channels: new Map(Object.values(declaration.channels).sort().map((name, i) => [name, i + 1])),
-    signals: new Map(Object.values(declaration.signals).sort().map((name, i) => [name, i + 1])),
-  }, new Map([['behaviour/marsh.as', `import { Read, Do, Field, Channel, Signal } from './generated/marshReturns';
-@inline export function onSignal(signal:i32,value:f64,source:i32):void {
-  if(signal==Signal.schedule) Do.channel(Channel.due,Read.field(0,Field.now)+Read.field(0,Field.minimum));
-  if(signal==Signal.eligible) Do.channel(Channel.eligible,Read.field(0,Field.now)>=Read.field(0,Field.due)&&Read.field(0,Field.playerX)>10?1:0);
-  if(signal==Signal.place) { Do.channel(Channel.x,Read.field(0,Field.x)+2); Do.channel(Channel.z,Read.field(0,Field.z)-1); Do.channel(Channel.retry,0); }
-}`]]), { asLineCeiling: 10 });
-  const script = built.rows[0], blob = built.blobs[0], sample = SIM_LEVEL.entities[0];
-  if (script === undefined || blob === undefined || sample === undefined) throw new Error('Missing marsh fixture');
-  const program = { script, bytes: btoa(String.fromCodePoint(...blob.bytes)) };
+  const program = frozenMarsh, sample = SIM_LEVEL.entities[0];
+  if (sample === undefined) throw new Error('Missing marsh fixture');
   const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
   const host = createSimHost({ ...SIM_LEVEL, entities: [] }, { rapier }), rng = new Rng(9);
   const { hunt, services } = fixtureNativeRoster(host, rng);

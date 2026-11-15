@@ -4,7 +4,9 @@ import { expect, test } from 'vitest';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
 import { emptyShardfile } from '../src/shared/host/author';
 import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
-import { DRIFTWOOD as source } from './fixtures/driftwood-program';
+import { frozenRuntimeJson } from './fixtures/frozen/snapshots';
+const items = frozenRuntimeJson('melee-sword-items.json');
+const source = {items};
 
 const shardfile = emptyShardfile({ slug: 'sword-profiles-test', name: 'Sword', author: 'Wildshard', revision: 1, seed: 1 });
 function context(items: unknown) {

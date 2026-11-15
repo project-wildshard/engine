@@ -11,7 +11,7 @@ import { snapshotSimHost, serializeSimSnapshot, decodeSimSnapshot } from '../src
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { canonicalSimDigest } from '../src/test/engine/simState';
-import { nalatiNativeAssets } from './proof/nalati-grasslands/nativeAssets';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 
 // Frozen pre-consolidation decoder: the independent old sampling admission and storage law.
@@ -22,8 +22,12 @@ function originalTerrain(bytes: Uint8Array | undefined,seed: number,row: { resol
   return { res: tile.resolution,size: tile.size,seed,landscapeHash: 0,heights: tile.heights,splat: tile.splat,undergrowth: null };
 }
 test('declared sampling rows retain the original native checkpoint and restore suffix',async () => {
-  const product = await loadHeadlessProduct(builtProduct('nalati-grasslands')),rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const context={shard:product.shardfile,assets:nalatiNativeAssets(product.shardfile),rapier,product};
+  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  if (descriptor === undefined) throw new Error('Missing pinned native output descriptor');
+  const nativeFiles = new Set([product.shardfile.navigation?.file, product.shardfile.terrain?.sampling?.file]);
+  const assets = new Map(descriptor.index.files.filter(file => nativeFiles.has(file.hash)).map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const context={shard:product.shardfile,assets,rapier,product};
   // The shipped decoder keeps the frozen admission and storage law, row for row.
   const sampling=product.shardfile.terrain?.sampling,bytes=sampling===undefined?undefined:context.assets.get(sampling.file),row={resolution:256,size:500,seed:context.shard.identity.seed};
   expect(decodeTerrainTile(bytes,row)).toEqual(originalTerrain(bytes,row.seed,row));

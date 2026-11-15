@@ -1,6 +1,6 @@
 import {scalarBlockBytes} from './fixtures/nalati-scalar-blocks';
 // oxlint-disable-next-line import/no-nodejs-modules -- validate numeric geography fixtures without inferring the full generated JSON type
-import { readFileSync } from 'node:fs';
+import { frozenNalatiJson } from './fixtures/frozen/nalati';
 import * as v from 'valibot';
 import { expect,test } from 'vitest';
 import { zlibSync,unzlibSync } from 'fflate';
@@ -13,7 +13,7 @@ import { groundColor,surfaceAt,GROUND } from './fixtures/nalati-terrain';
 
 const finite=v.pipe(v.number(),v.finite());
 const geography=v.parse(v.object({res:finite,size:finite,seed:finite,pigment:ScalarTripletSchema,surface:ScalarTripletSchema}),
-  JSON.parse(readFileSync('test/fixtures/nalati-geography-original.json','utf8')));
+  frozenNalatiJson('nalati-geography-original.json'));
 
 const TERRAIN = GROUND.terrain;
 
