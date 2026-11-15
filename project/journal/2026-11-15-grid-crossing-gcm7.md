@@ -92,3 +92,7 @@
   page followed. The in-page server now enters only the session's home from the road (`GridSimulation` `enterable`) and its
   road lays the page's zone walls and buffer floors (`addZoneWalls`; a restored road drops an older build's plain walls), so
   every other cell is reached only at its gate. `grid-zone-server-road.test.ts`.
+- 18:15 (opus-gcm10, ZE3a/ZE21) The whole-road drive with the home kept: Driftwood resident throughout, 12 frames over 50 ms
+  (worst 83 ms) where the CPU profile shows the page thread idle for most of each (another lane's browser held slot 1 from
+  17:45); short reruns of those stretches are clean, but one at segment 37 linked ink-cel-valley's client-script particle
+  pool (65 ms): a frozen neighbour's pool is now hidden like its creatures (`ClientScriptViews.show`).

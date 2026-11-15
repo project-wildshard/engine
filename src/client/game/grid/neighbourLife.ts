@@ -134,7 +134,11 @@ export class NeighbourLife {
         const object: Object3D | null = view?.mesh ?? null;
         return { entity, object, anchor, emitters };
       });
-      return { scripts, views: new ClientScriptViews(scripts.lane, targets, { root, scope: this.ports.scope }) };
+      const views = new ClientScriptViews(scripts.lane, targets, { root, scope: this.ports.scope });
+      // ZE3a: its particles too, hidden from birth unless its cell is active (ink-cel-valley's pool linked its program for 65 ms
+      // on the road, 2026-11-15)
+      views.show(this.ports.active(instance));
+      return { scripts, views };
     } catch (error) { scripts.dispose(); throw error; }
   }
 
@@ -154,6 +158,7 @@ export class NeighbourLife {
       life.lane?.views.restore();
       const region = this.ports.simulation(life.cell.instance), live = this.ports.active(life.cell.instance);
       // G663: a frozen cell draws none of its creatures and composes no lane
+      life.lane?.views.show(live);
       if (!live) { for (const view of life.creatures.values()) view.mesh.visible = false; continue; }
       for (const view of life.creatures.values()) {
         const sim = region?.host.entities.get(view.id);

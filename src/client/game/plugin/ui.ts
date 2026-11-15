@@ -263,6 +263,9 @@ export class ClientScriptViews {
     ports.scope.onDispose(() => { this.dispose(); });
   }
 
+  /** ZE3a: draw the particles or not (a frozen neighbour's are hidden: their pool's first draw linked its program on the road). */
+  show(visible: boolean): void { if (this.pool !== null) this.pool.points.visible = visible; }
+
   /** Put every composed view back to the base it had before `apply` (run before the views write their own pose). */
   restore(): void {
     for (const p of this.posed) {
