@@ -14,3 +14,8 @@ The composer format and its negative-alpha marker remain untouched.
 Asset and runtime tests cover the real mip chains, source hashes,
 partial failure, scope retirement and last-borrower disposal. The local
 memory proof and final golden verdict remain PZ24d3.
+
+The first live candidate measured 42.4 MiB instead of the target: the
+compressed junction was cached as road.junction, while the builder
+uses road.junctions. The missing-slot assertion failed red first; the
+correct slot now passes. Re-run memory and final goldens on the fix.

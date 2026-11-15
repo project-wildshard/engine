@@ -7,6 +7,7 @@ import {PlatformRenderAdmissionError, type PlatformRenderAdmission} from './rend
 import type {RoadMapShare} from './roadResources';
 
 const KINDS = ['asphalt', 'junction'] as const;
+const IDS = {asphalt: 'road.asphalt', junction: 'road.junctions'} as const;
 /** Native ASTC must have sampled correctly at every mip; unsupported phones keep the procedural maps. */
 export function compressedRoadSupport(tier: string, nativeSupported: boolean): boolean {
   return tier === 'phone' && nativeSupported;
@@ -27,7 +28,7 @@ interface SurfaceLoader {
 
 /** Admit the pair before loading, publish both atomically, and retain one counted owner across road halves. */
 export async function prepareRoadSurfaceMaps(admission: PlatformRenderAdmission, maps: RoadMapShare, loader: SurfaceLoader = {}): Promise<boolean> {
-  if (!(loader.supported ?? compressedRoadSupport(TIER, nativeCompressedFormatSupported('SRGB8_ALPHA8_ASTC_6x6'))) || KINDS.some(kind => maps.has(`road.${kind}`))) return false;
+  if (!(loader.supported ?? compressedRoadSupport(TIER, nativeCompressedFormatSupported('SRGB8_ALPHA8_ASTC_6x6'))) || KINDS.some(kind => maps.has(IDS[kind]))) return false;
   const gpuBytes = KINDS.reduce((bytes, kind) => bytes + roadSurfaceBytes(ROAD_GRAIN_PLANES[kind].width, ROAD_GRAIN_PLANES[kind].height), 0);
   let owner;
   try { owner = admission.allocate({id: 'road.surface-maps', jsBytes: gpuBytes, gpuBytes}, scope => scope); }
@@ -43,7 +44,7 @@ export async function prepareRoadSurfaceMaps(admission: PlatformRenderAdmission,
     const results = await Promise.allSettled(KINDS.map(async kind => {
       const texture = await read(contentURL(`/assets/grid-road/road-${kind}-phone.ktx2`));
       if (owner.disposed || owner.disposing) { texture.dispose(); throw new Error('Road surface owner retired'); }
-      textures.set(`road.${kind}`, texture);
+      textures.set(IDS[kind], texture);
       const image: unknown = texture.image, expected = ROAD_GRAIN_PLANES[kind];
       if (texture.format !== RGBA_ASTC_6x6_Format || texture.colorSpace !== SRGBColorSpace || typeof image !== 'object' || image === null
         || Reflect.get(image, 'width') !== expected.width || Reflect.get(image, 'height') !== expected.height

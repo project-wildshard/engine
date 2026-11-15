@@ -32,6 +32,7 @@ test('surface admission publishes the complete pair once and the last borrower o
       read: url => { const texture = native(url); loaded.push(texture); texture.addEventListener('dispose', () => { disposed++; }); return Promise.resolve(texture); },
       upload: (_texture, current) => { expect(current()).toBe(true); uploads++; return Promise.resolve(); }})).toBe(true);
     expect(uploads).toBe(2); expect(loaded).toHaveLength(2);
+    expect(r.maps.has('road.junctions')).toBe(true); // the road builder's junction slot
     const asphalt = r.maps.take('road.asphalt'); if (asphalt === undefined) throw new Error('Missing shared asphalt');
     r.scope.dispose(); expect(disposed).toBe(1);
     r.maps.release('road.asphalt', asphalt); expect(disposed).toBe(2);
