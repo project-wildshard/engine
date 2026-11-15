@@ -11,3 +11,10 @@
   6.5 s) with the page pinned at the 1200 MB desktop envelope; the other walk's hook took 2 s with ~70 MB of headroom.
 - GC13: the pre-warm beside the source (G723) checked the shared 1.8 GB loading cap on a phone too, so both worlds sat
   on the road at 1.28 GB. The allocator now has a loading envelope; a phone's is its 1.0 GB playing envelope.
+- Road lag (Jake 11-15, "Last time I tried going to the road, there was a lot of lag"; continuous crossing dropped, J352,
+  ZONE-ENTRY). `scripts/grid-road-lag.mjs` steps 12 m out of a home cell's road-facing entryway and back, by real
+  input, and reads every frame from 1 s before to 3 s after each line, any card and the longest stop. Local build on the
+  mini at 2992x1434@2: frames stay at 16.7 ms p95 both ways (one 167 ms and one 300 ms frame on the way back in), but from
+  Nalati the step out showed a 2.4 to 2.55 s "Region world" card on the road and the step back an "Entry warm-up" card and a
+  hold: facing Driftwood's mouth, the road built Driftwood's world and retired the home kept behind. The road now keeps the
+  home (last-cell retention) and builds a neighbour's world only at its wall.
