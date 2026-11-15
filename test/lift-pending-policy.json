@@ -28,7 +28,12 @@
     },
     "landings": {
       "CI21-H1": null,
-      "CI21-H2": null,
+      "CI21-H2": {
+        "repository": "project-wildshard/engine",
+        "commit": "2cce5f9ed996fbac2a40c3a3e539fe9bbfc8514e",
+        "landedAt": "2026-11-15T17:47:18.000Z",
+        "evidence": "First CI21-H2 engine integration https://github.com/project-wildshard/engine/commit/2cce5f9ed996fbac2a40c3a3e539fe9bbfc8514e; integration journal and normal gate bind the published prerequisite and public consumer proof."
+      },
       "CI21-H3": {
         "repository": "project-wildshard/engine",
         "commit": "d2287a1ad45e010f496380cc4263cec16d7f54ce",
@@ -141,7 +146,7 @@
           "CI21-H2"
         ],
         "windowHours": 48,
-        "deadline": null
+        "deadline": "2026-11-17T17:47:18.000Z"
       },
       {
         "id": "E-RENDER-O",
@@ -170,7 +175,7 @@
           "CI21-H3"
         ],
         "windowHours": 48,
-        "deadline": null
+        "deadline": "2026-11-17T17:47:18.000Z"
       },
       {
         "id": "E-RUNTIME",
@@ -216,7 +221,7 @@
           "CI21-H3"
         ],
         "windowHours": 48,
-        "deadline": null
+        "deadline": "2026-11-17T17:47:18.000Z"
       },
       {
         "id": "E-RUNTIME-O",
@@ -242,7 +247,7 @@
           "CI21-H2"
         ],
         "windowHours": 48,
-        "deadline": null
+        "deadline": "2026-11-17T17:47:18.000Z"
       },
       {
         "id": "E-SCRIPT",
@@ -274,7 +279,7 @@
           "CI21-H3"
         ],
         "windowHours": 48,
-        "deadline": null
+        "deadline": "2026-11-17T17:47:18.000Z"
       },
       {
         "id": "E-SCRIPT-O",
@@ -288,7 +293,7 @@
           "CI21-H3"
         ],
         "windowHours": 48,
-        "deadline": null
+        "deadline": "2026-11-17T17:47:18.000Z"
       },
       {
         "id": "E-TOOL",
@@ -323,7 +328,7 @@
           "CI21-H2"
         ],
         "windowHours": 48,
-        "deadline": null
+        "deadline": "2026-11-17T17:47:18.000Z"
       },
       {
         "id": "DRIFT-GAME",
