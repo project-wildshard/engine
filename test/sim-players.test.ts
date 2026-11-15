@@ -145,6 +145,25 @@ test('queued player references name both seats and still restore legacy default 
   } finally { restored?.dispose(); legacy?.dispose(); host.dispose(); }
 });
 
+test('legacy references keep their owned identity when an installer reorders the player registry', () => {
+  const host = hostWithPlayers(2);
+  let restored: SimHost | undefined;
+  try {
+    const saved = snapshotSimHost(host);
+    saved.events.queue.push({ name: 'fault', payload: { kind: 'record', entries: [['owner', { kind: 'player' }], ['other', { kind: 'player', id: 'bot:1' }]] } });
+    restored = restoreSimHost(SIM_LEVEL, { rapier }, saved, fresh => {
+      fresh.addPlayer('bot:1');
+      const owner = player(fresh, 'actor.player');
+      fresh.players.delete(owner.id); fresh.players.set(owner.id, owner);
+    });
+    const payload = restored.events.snapshot(value => value).queue[0]?.payload;
+    expect(payload).toEqual({ owner: player(restored, 'actor.player'), other: player(restored, 'bot:1') });
+    const wrong = structuredClone(saved);
+    wrong.players.reverse();
+    expect(() => restoreSimHost(SIM_LEVEL, { rapier }, wrong)).toThrow('Snapshot instance registrations do not match');
+  } finally { restored?.dispose(); host.dispose(); }
+});
+
 test('a player leaves: body, health and strike go, the lead cannot, and a save no longer holds them', () => {
   const host = hostWithPlayers(2), bot = player(host, 'bot:1'), colliders = host.physics.world.colliders.len();
   expect(host.removePlayer(leadPlayer(host).id)).toBe(false);

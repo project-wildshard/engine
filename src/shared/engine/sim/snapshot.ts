@@ -4,7 +4,6 @@ import { byteArray } from './snapshotPhysics';
 import type { QuestBookSaved } from '../quest/players';
 import type { SimHost, SimLevel, SimSlots, SimValue } from '../../../server/engine/sim';
 import { SIM_API_VERSION } from './apiVersion';
-import { leadPlayer } from './leadPlayer';
 import type { PlayerSim } from '../../../server/engine/sim/playerSim';
 import { SHOVE_TIME } from '../player/shove';
 import type { DrivenMode } from '../player/modes';
@@ -181,7 +180,7 @@ function decode(value: EventValue, host: SimHost): unknown {
   switch (value.kind) {
     case 'value': return value.value;
     case 'undefined': return undefined;
-    case 'player': { const player = value.id === undefined ? leadPlayer(host) : host.players.get(value.id); if (player === undefined) throw new RangeError(`Unknown snapshot player: ${value.id ?? ''}`); return player; }
+    case 'player': { const player = host.players.get(value.id ?? 'actor.player'); if (player === undefined) throw new RangeError(`Unknown snapshot player: ${value.id ?? ''}`); return player; }
     case 'number': return value.value === 'nan' ? Number.NaN : value.value === 'infinity' ? Infinity : -Infinity;
     case 'vector': {
       if (value.value.length !== 3 || !value.value.every(Number.isFinite)) throw new RangeError('Invalid event vector');
@@ -406,9 +405,10 @@ export function restoreInstalledHost(host: SimHost, ports: { rapier: Rapier }, s
   let replacement: Physics | null = null;
   try {
     install?.(host);
-    // The installers ran for the lead player; everyone else rejoins here, before their state lands.
+    // Restores boot an owned actor.player host. Registry order cannot change that legacy identity.
+    // The installers ran for that owner; everyone else rejoins before their state lands.
     for (const entry of saved.players.slice(1)) if (!host.players.has(entry.id)) host.addPlayer(entry.id);
-    if (saved.players[0]?.id !== leadPlayer(host).id || !sameIds(saved.players.map((entry) => entry.id), host.players.keys()) || !sameIds(saved.entities.map((entry) => entry.id), host.entities.keys())
+    if (saved.players[0]?.id !== 'actor.player' || !sameIds(saved.players.map((entry) => entry.id), host.players.keys()) || !sameIds(saved.entities.map((entry) => entry.id), host.entities.keys())
       || !sameIds(saved.strikes.map((entry) => entry.id), host.strikes.keys()) || !sameIds(saved.adapters.map((entry) => entry.id), [...host.adapters].filter(([id, adapter]) => adapter.joined !== true || saved.adapters.some(entry => entry.id === id)).map(([id]) => id))
       || !sameIds(saved.quests.map((entry) => entry.id), host.quests.map((quest) => quest.def.id))
       || saved.players.some(invalidPlayer) || saved.boardColliders?.length === 0) throw new RangeError('Snapshot instance registrations do not match');
