@@ -59,9 +59,20 @@ try {
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
   // every drawn frame [t, ms] and a 50 ms sample of where the feet are and what the screen shows
   await page.evaluate(() => {
-    const W = /** @type {any} */ (window), q = W.__road = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), programs: /** @type {any[]} */ ([]) };
+    const W = /** @type {any} */ (window), q = W.__road = { frames: /** @type {number[][]} */ ([]), samples: /** @type {any[]} */ ([]), programs: /** @type {any[]} */ ([]), slowLinks: /** @type {any[]} */ ([]) };
     // every shader program the renderer links, with when it was first seen: a crossing that compiles one stalls its frame
     const known = new Set(W.__wildshard?.world?.game?.renderer?.info?.programs);
+    // and every program whose first use blocked the page (a link the driver finished only when asked): which, and how long
+
+    const renderer = W.__wildshard?.world?.game?.renderer, gl = renderer?.getContext?.();
+    if (gl !== undefined) {
+      const ask = gl.getProgramParameter.bind(gl);
+      gl.getProgramParameter = (/** @type {WebGLProgram} */ handle, /** @type {number} */ name) => {
+        const t0 = performance.now(), value = ask(handle, name), ms = performance.now() - t0;
+        if (ms > 8) { const found = (renderer.info.programs ?? []).find((/** @type {any} */ row) => row.program === handle); q.slowLinks.push({ t: Math.round(t0), ms: Math.round(ms), name: String(found?.name ?? ''), key: String(found?.cacheKey ?? '').slice(0, 160) }); }
+        return value;
+      };
+    }
     let last = performance.now();
     const raf = (/** @type {number} */ now) => { q.frames.push([Math.round(now), Number((now - last).toFixed(1))]); last = now; requestAnimationFrame(raf); };
     requestAnimationFrame(raf);
@@ -105,7 +116,7 @@ try {
   };
   /** One crossing's numbers from the page's frames and samples around the first sample past the line */
   const measure = async (/** @type {string} */ name, /** @type {number} */ fromT) => {
-    const { frames, samples, programs } = await page.evaluate(after => { const q = /** @type {any} */ (window).__road; return { programs: /** @type {any[]} */ (q.programs.filter((/** @type {any} */ r) => r.t >= after)), frames: /** @type {number[][]} */ (q.frames.filter((/** @type {number[]} */ r) => (r[0] ?? 0) >= after)), samples: /** @type {any[]} */ (q.samples.filter((/** @type {any} */ r) => r.err === undefined && r.t >= after)) }; }, fromT);
+    const { frames, samples, programs, slowLinks } = await page.evaluate(after => { const q = /** @type {any} */ (window).__road; return { slowLinks: /** @type {any[]} */ (q.slowLinks.filter((/** @type {any} */ r) => r.t >= after)), programs: /** @type {any[]} */ (q.programs.filter((/** @type {any} */ r) => r.t >= after)), frames: /** @type {number[][]} */ (q.frames.filter((/** @type {number[]} */ r) => (r[0] ?? 0) >= after)), samples: /** @type {any[]} */ (q.samples.filter((/** @type {any} */ r) => r.err === undefined && r.t >= after)) }; }, fromT);
     const leaving = name.startsWith('out'), line = samples.find((s, i) => i > 0 && (leaving ? s.inside === null && samples[i - 1].inside !== null : s.inside === home.slug && samples[i - 1].inside !== home.slug));
     if (line === undefined) return { name, crossed: false };
     const span = frames.filter(r => (r[0] ?? 0) >= line.t - 1000 && (r[0] ?? 0) <= line.t + 3000).map(r => r[1] ?? 0), sorted = [...span].sort((a, b) => a - b);
@@ -121,12 +132,16 @@ try {
     return { name, crossed: true, lineAt: line.t, frames: span.length, worstFrameMs: sorted.at(-1) ?? 0, p95Ms: sorted[Math.floor(sorted.length * 0.95)] ?? 0, medianMs: sorted[Math.floor(sorted.length / 2)] ?? 0,
       over33: span.filter(ms => ms > 33.4).length, over50: span.filter(ms => ms > 50).length, over100: span.filter(ms => ms > 100).length,
       trace: near.filter((_, i) => i % 2 === 0).map(s => [s.t - line.t, s.x, s.z, s.inside, s.cur, s.cx, s.phase, s.card, s.stage, s.res, s.hy, s.hook]), cardMs: cards.length * 50, cards: [...new Set(cards.map(s => `${String(s.card)}:${String(s.stage)}`))], worstStopMs: worstStop, stopAt, cruiseMps: Number((cruise * 1000).toFixed(2)), phases: [...new Set(near.map(s => s.phase))],
-      programs: programs.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ t: r.t - line.t, name: r.name, key: r.key })) };
+      programs: programs.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ t: r.t - line.t, name: r.name, key: r.key })),
+      slowLinks: slowLinks.filter(r => r.t >= line.t - 1000 && r.t <= line.t + 3000).map(r => ({ t: r.t - line.t, ms: r.ms, name: r.name, key: r.key })) };
   };
   const cdp = profile && engineName === 'chromium' ? await context.newCDPSession(page) : undefined;
   let profileAt = 0;
-  if (cdp !== undefined) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 250 }); await cdp.send('Profiler.start'); profileAt = await t(); }
+  // --profile-lap=<n>: the profile covers that lap (default the first; a later lap shows what a warm page still pays)
+  const profileLap = Number(flag('profile-lap', '1'));
+  if (cdp !== undefined) await cdp.send('Profiler.enable');
   for (let rep = 1; rep <= reps; rep++) {
+    if (cdp !== undefined && rep === profileLap) { await cdp.send('Profiler.setSamplingInterval', { interval: 250 }); await cdp.send('Profiler.start'); profileAt = await t(); }
     let from = await t();
     await walk(outward, s => s.inside === null && Math.abs(local(s)) >= edge + 12);
     await sleep(2500);
@@ -135,9 +150,9 @@ try {
     await walk(outward + Math.PI, s => s.inside === home.slug && Math.abs(local(s)) <= edge - 12);
     await sleep(2500);
     result.crossings.push({ rep, ...await measure('back (road to cell)', from) });
-    if (cdp !== undefined && rep === 1) {
+    if (cdp !== undefined && rep === profileLap) {
       const { profile: taken } = await cdp.send('Profiler.stop');
-      writeFileSync(join(out, `${engineName}${device === '' ? '' : '-phone'}${run ? '-run' : ''}-${homeName}-lap1.cpuprofile.json`), JSON.stringify({ at: profileAt, base, profile: taken }));
+      writeFileSync(join(out, `${engineName}${device === '' ? '' : '-phone'}${run ? '-run' : ''}-${homeName}-lap${String(profileLap)}.cpuprofile.json`), JSON.stringify({ at: profileAt, base, profile: taken }));
     }
     for (const row of result.crossings.slice(-2)) console.log(`${row.crossed === true ? 'ok  ' : 'FAIL'} ${homeName} rep ${String(rep)} ${String(row.name)} ${JSON.stringify({ worst: row.worstFrameMs, p95: row.p95Ms, over50: row.over50, over100: row.over100, card: row.cardMs, stop: row.worstStopMs })}`);
   }
