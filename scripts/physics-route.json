@@ -3093,10 +3093,10 @@
         }
       ],
       "timeout": 40,
-      "notes": "BRASSCAP ENG-3: from rev 2 the blender-template slug is Brasscap Mesa (rev 5 pinned). Legs follow shardfile src/tools/brasscap/canyon.ts ROUTES; each ends at its camp's edge (the camp's tent stands on the route's end) and none crosses the gate, which is shut until the camps fall."
+      "notes": "BRASSCAP ENG-3: from rev 2 the blender-template slug is Brasscap Mesa (rev 3 pinned, ENG-3b). Legs follow shardfile src/tools/brasscap/canyon.ts ROUTES; each ends at its camp's edge (the camp's tent stands on the route's end) and none crosses the gate, which is shut until the camps fall."
     },
     {
-      "name": "canyon branch to the ledge ladder",
+      "name": "canyon branch to the ledge stair",
       "start": {
         "x": -2,
         "z": -22,
@@ -3108,12 +3108,12 @@
           "z": -25.8
         },
         {
-          "x": 8.4,
-          "z": -28.4
+          "x": 16.9,
+          "z": -25.8
         }
       ],
       "timeout": 30,
-      "notes": "Rev 5 (shard-brasscap 57e5c6f, TEMPLATE-E2E): camp 2's ledge is a 6.5 m block (x 10 to 26, z -43 to -25) reached by a ladder on its west face at (9.55, -28.4); the leg ends at the ladder's foot. BRASSCAP ENG-3: from rev 2 the blender-template slug is Brasscap Mesa (rev 5 pinned). Legs follow shardfile src/tools/brasscap/canyon.ts ROUTES; each ends at its camp's edge (the camp's tent stands on the route's end) and none crosses the gate, which is shut until the camps fall."
+      "notes": "BRASSCAP ENG-3: from rev 2 the blender-template slug is Brasscap Mesa (rev 3 pinned, ENG-3b). Legs follow shardfile src/tools/brasscap/canyon.ts ROUTES; each ends at its camp's edge (the camp's tent stands on the route's end) and none crosses the gate, which is shut until the camps fall."
     },
     {
       "name": "side canyon into camp 3",
@@ -3145,7 +3145,7 @@
         }
       ],
       "timeout": 40,
-      "notes": "BRASSCAP ENG-3: from rev 2 the blender-template slug is Brasscap Mesa (rev 5 pinned). Legs follow shardfile src/tools/brasscap/canyon.ts ROUTES; each ends at its camp's edge (the camp's tent stands on the route's end) and none crosses the gate, which is shut until the camps fall."
+      "notes": "BRASSCAP ENG-3: from rev 2 the blender-template slug is Brasscap Mesa (rev 3 pinned, ENG-3b). Legs follow shardfile src/tools/brasscap/canyon.ts ROUTES; each ends at its camp's edge (the camp's tent stands on the route's end) and none crosses the gate, which is shut until the camps fall."
     }
   ],
   "open-plot-frostline-peaks": [
