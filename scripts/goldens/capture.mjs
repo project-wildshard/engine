@@ -212,7 +212,7 @@ try{for(const slug of slugs){
     g.shardFrame();g.composer.render(0);g.shardFrame();g.composer.render(0);
     return{eye:cam.position.toArray(),rotation:cam.rotation.toArray(),fov:cam.fov,frame:g.frameCount,player,hover:w.player.hover===true,settledEye:e.settled};
    });
-   if(drifted&&Math.hypot(observed.player[0]-at.x,observed.player[2]-at.z)>FREE)row.errors.push(`camera ${c.n}: residency player left the probe; repeat solo with --still-room`);
+   if(!Number.isFinite(observed.player[0])||!Number.isFinite(observed.player[2])||Math.hypot(observed.player[0]-at.x,observed.player[2]-at.z)>FREE)row.errors.push(`camera ${c.n}: residency player left the probe; repeat solo with --still-room`);
    const shot=set?`${dir}/${String(c.n).padStart(2,'0')}-${c.name}-${mode}.png`:`${dir}/${i+1}-${c.name}-shardfile.png`;
    // the 24-camera set hides the HUD (every element but the canvases; a canvas read-back misses Nine's layered composite)
    // and the minimap: a canvas smaller than half the viewport stays hidden
@@ -228,5 +228,5 @@ try{for(const slug of slugs){
  }catch(error){row.status='failed';row.failure=String(error);if(page)await page.screenshot({path:`${dir}/failure.jpg`,type:'jpeg',quality:80,scale:'css'}).catch(()=>{});}
  finally{if(SERVE_OVER)row.servedOver=[...overHits].sort();rows.push(row);writeFileSync(`${root}/receipts-${slug}.json`,JSON.stringify(row,null,1));writeFileSync(`${root}/receipts.json`,JSON.stringify(rows,null,2));await context.close();
   console.log(JSON.stringify({slug,status:row.status,poses:row.poses.length,idle:row.poses.map(p=>p.idle.settled),failure:row.failure,errors:row.errors.slice(0,3),warnings:Object.values(row.warnings).reduce((n,c)=>n+c,0),...(SERVE_OVER?{servedOver:overHits.size}:{})}));}
- if(row.status==='failed')process.exitCode=1;
+ if(row.status!=='complete')process.exitCode=1;
 }}finally{try{await browser.close();}finally{await owner?.close();}}

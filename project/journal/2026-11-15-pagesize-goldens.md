@@ -1,5 +1,11 @@
 # PAGE-SIZE golden review
 
+PZ24e2 checks final player displacement for every camera, after all
+live frames, even when the early slope check never detected a drift.
+Non-finite positions fail too. Any camera error now exits nonzero,
+including the pre-existing still-on-board error. Receipts and captures
+remain available to diagnose the failure.
+
 The native road maps and shared deck grain measured 37 MiB of GPU
 textures in Chromium and WebKit on candidate aedd552a, down from 46.
 Both engines captured every shard's 24 cameras. The visual review held
