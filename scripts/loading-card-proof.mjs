@@ -201,8 +201,7 @@ try {
         Reflect.set(window,'__nativeCopy',original);
         navigator.clipboard.writeText=text=>{
           const raw=/** @type {import('../src/shared/engine/boot/timing').BootTiming} */(Reflect.get(window,'__bootTiming')).read();
-          const expected={entries:raw.entries.map(({id,start,end})=>({id,start,end})),resources:raw.resources.length,
-            counters:Object.keys(raw.counters).length,realms:Object.keys(raw.realms??{}).length};
+          const expected={entries:raw.entries.length,resources:raw.resources.length};
           const receipt={text,expected,settled:false,success:false};Reflect.set(window,'__copyReceipt',receipt);
           return original(text).then(()=>{receipt.settled=true;receipt.success=true;return undefined;},(/** @type {unknown} */error)=>{receipt.settled=true;throw error;});
         };
@@ -215,13 +214,13 @@ try {
         const native=await navigator.clipboard.readText();
         if(native!==receipt.text)return {ok:false,reason:'native readback differs'};
         const marker='timeline (LS1):\n',at=native.indexOf(marker);
-        if(at===-1)return {ok:false,reason:'no complete timeline'};
-        const parsed=JSON.parse(native.slice(at+marker.length)),expected=receipt.expected;
-        const entries=parsed.entries.map((/** @type {{id:number,start:number,end:number|null}} */{id,start,end})=>({id,start,end}));
-        const complete=JSON.stringify(entries)===JSON.stringify(expected.entries)&&parsed.resources.length===expected.resources
-          &&Object.keys(parsed.counters).length===expected.counters&&parsed.realms.length===expected.realms;
-        return {ok:complete&&parsed.exportPrivacy==='own-paths-other-urls-and-free-text-removed'&&document.querySelector('.ws-load-copy')?.textContent==='Copied',
-          reason:complete?`complete safe report: ${entries.length} events`:'timeline or numeric facts truncated'};
+        if(at===-1)return {ok:false,reason:'no timeline digest'};
+        const expected=receipt.expected,bytes=new TextEncoder().encode(native).byteLength;
+        const complete=native.includes(`counts: ${expected.entries} spans (`)&&native.includes(`${expected.resources} resources;`)
+          &&native.includes('longest spans (start s + duration s):')&&native.includes('slowest resources (bytes, duration s, source):')
+          &&native.includes('page request-free gaps >0.5 s')&&!native.includes('"entries":');
+        return {ok:complete&&bytes<6000&&document.querySelector('.ws-load-copy')?.textContent==='Copied',
+          reason:complete?`compact safe report: ${bytes} bytes, ${expected.entries} spans, ${expected.resources} resources`:'missing compact timeline facts'};
       });
       if(!copied.ok)faults.push(`copy diagnostics: ${copied.reason}`);
       console.log(`${tag}: native copy ${copied.ok?'ok':'FAILED'} · ${copied.reason}`);

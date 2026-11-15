@@ -1,9 +1,27 @@
 import { expect, it } from 'vitest';
-import { diagnosticPath, diagnosticSummary, safeBootDiagnostics, DIAGNOSTIC_PRIVACY } from './diagnostics';
+import { compactBootDiagnostics, diagnosticBuild, diagnosticPath, diagnosticSummary, safeBootDiagnostics, DIAGNOSTIC_PRIVACY } from './diagnostics';
 import type { BootTiming } from '../../../shared/engine/boot/timing';
 
 // LD3 (J208): Jake's d91507e paste named its 34.6 s wait only as resource-N and operation-N.
 const ORIGIN = 'https://play.wildshard.io';
+
+it('accepts bare commit and legacy build stamps while refusing arbitrary labels',()=>{
+  expect(diagnosticBuild('ad3996fc')).toBe('ad3996fc');
+  expect(diagnosticBuild('ad3996fc139265a6c38f2c583bb11d0d0d0d0d0d')).not.toBe('unknown');
+  expect(diagnosticBuild('d91507e-mw810im4')).toBe('d91507e-mw810im4');
+  for(const value of ['PRIVATE','/b/ad3996fc/x.js','ad3996fc?token=PRIVATE',null])expect(diagnosticBuild(value)).toBe('unknown');
+});
+
+it('lists every request-free gap over 500 ms after merging overlapping page requests',()=>{
+  const timing={entries:[{realm:'page',operation:'game-stage:home',start:0,end:12000}],resources:[
+    {realm:'page',startTime:1000,responseEnd:6000}, {realm:'page',startTime:3000,responseEnd:8000},
+    {realm:'page',startTime:10000,responseEnd:10500}, {realm:'page',startTime:11000,responseEnd:11499},
+    {realm:'worker:1',startTime:0,responseEnd:12000},
+  ]} as unknown as BootTiming;
+  const line=compactBootDiagnostics(timing).timeline.at(-1);
+  expect(line).toBe('page request-free gaps >0.5 s (start+duration s): 0.00+1.00, 8.00+2.00, 11.50+0.50');
+  expect(compactBootDiagnostics(undefined).timeline).toEqual(['timeline (LS1): unavailable']);
+});
 
 it('names this page\'s own files by path and keeps every other URL private', () => {
   expect(diagnosticPath(`${ORIGIN}/b/d91507e-mw810im4/control-0-0-startup-BrJ0bkDk.js`, ORIGIN)).toBe('/b/d91507e-mw810im4/control-0-0-startup-BrJ0bkDk.js');

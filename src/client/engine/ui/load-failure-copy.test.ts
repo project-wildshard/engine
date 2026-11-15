@@ -14,7 +14,7 @@ it('moves Copy diagnostics onto the fatal screen beside Reload and copies the ca
   const card = document.createElement('div'); card.className = 'ws-load';
   const covered = document.createElement('button'); covered.className = 'ws-load-copy'; card.append(covered);
   document.body.append(card);
-  setDiagnosticsSource(() => 'Wildshard boot diagnostics\ntimeline (LS1):\n{"entries":[]}');
+  setDiagnosticsSource(() => 'Wildshard boot diagnostics\ntimeline (LS1):\ncounts: 230 spans, 705 resources\nlongest spans: home 18.5 + 10.0');
   let copied = '';
   vi.stubGlobal('navigator', { clipboard: { writeText: (text: string): Promise<void> => { copied = text; return Promise.resolve(); } } });
   const root = showLoadFailure(failure);
@@ -27,5 +27,7 @@ it('moves Copy diagnostics onto the fatal screen beside Reload and copies the ca
   expect(copy.parentElement?.querySelector('button')?.textContent).not.toBe(copy.textContent);
   copy.click(); await Promise.resolve(); await Promise.resolve();
   expect(copied).toContain('timeline (LS1):');
+  expect(copied).toContain('705 resources');
+  expect(copied).not.toContain('"entries"');
   expect(copy.textContent).toBe('Copied');
 });

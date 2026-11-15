@@ -44,7 +44,7 @@ function numbers(value:unknown,keys:readonly string[]):Record<string,number|bool
 }
 const realm=(value:unknown):string=>typeof value==='string'&&/^(?:page|service-worker|worker:[0-9]{1,5})$/u.test(value)?value:'other';
 /** Only build-system shaped public IDs are labels; arbitrary identifiers are not. */
-export const diagnosticBuild=(value:unknown):string=>typeof value==='string'&&/^[a-f0-9]{7,40}-[a-z0-9]{6,16}$/u.test(value)?value:'unknown';
+export const diagnosticBuild=(value:unknown):string=>typeof value==='string'&&/^[a-f0-9]{7,40}(?:-[a-z0-9]{6,16})?$/u.test(value)?value:'unknown';
 /** LD3: engine operations named in a paste beyond OPERATIONS: an explicit list (Codex review of ca3c1d8: a pattern let
  *  any `app:<text>` through). A name not listed here or in OPERATIONS still becomes `operation-N`. */
 const NAMED_OPERATIONS=new Set(['download:cache-check','app:session-code-ready','app:session-start','app:first-game-step-start',
@@ -192,4 +192,56 @@ export function safeBootDiagnostics(timing:BootTiming|undefined):Readonly<Record
     serviceWorker:{controller:url(worker['controller'])},lastInput:input(source['lastInput']),
     handoff:{...numbers(handoff,['timeOrigin',...DETAIL_NUMBERS]),input:input(handoff['input'])},
   };
+}
+
+/** NB15: only the privacy projection reaches the clipboard. Keep the local
+ * collector complete, but rank its useful facts instead of copying its JSON. */
+export function compactBootDiagnostics(timing:BootTiming|undefined):{summary:readonly string[];timeline:readonly string[]}{
+  const safe=safeBootDiagnostics(timing);
+  if(safe===null)return {summary:[],timeline:['timeline (LS1): unavailable']};
+  const entries=list(safe['entries']).map(record),resources=list(safe['resources']).map(record);
+  const spans=entries.flatMap(row=>{
+    const start=number(row['start']),end=number(row['end']);
+    return start!==null&&end!==null&&end>start?[{name:String(row['operation']),realm:String(row['realm']),start,end,ms:end-start}]:[];
+  });
+  const label=(value:unknown,limit:number):string=>{
+    const text=typeof value==='string'?value:'unknown';
+    return text.length<=limit?text:`${text.slice(0,Math.floor(limit/2))}…${text.slice(-Math.floor(limit/2))}`;
+  };
+  const network=resources.filter(row=>(number(row['transferSize'])??0)>0);
+  const cached=resources.filter(row=>number(row['transferSize'])===0&&(number(row['encodedBodySize'])??0)>0);
+  const bytes=(rows:readonly Readonly<Record<string,unknown>>[],key:string):number=>rows.reduce((sum,row)=>sum+(number(row[key])??0),0);
+  const seconds=(ms:number):string=>(ms/1000).toFixed(2);
+  const duration=(row:Readonly<Record<string,unknown>>):number=>number(row['duration'])??Math.max(0,(number(row['responseEnd'])??0)-(number(row['startTime'])??0));
+  const timeline=[
+    'timeline (LS1):',
+    `counts: ${entries.length} spans (${spans.length} complete), ${resources.length} resources; network ${network.length} / ${bytes(network,'transferSize')} B; cache ${cached.length} / ${bytes(cached,'encodedBodySize')} B; unknown ${resources.length-network.length-cached.length}`,
+    'longest spans (start s + duration s):',
+    ...spans.sort((a,b)=>b.ms-a.ms).slice(0,15).map(row=>`  ${label(row.name,88)} [${row.realm}] ${seconds(row.start)} + ${seconds(row.ms)}`),
+    'slowest resources (bytes, duration s, source):',
+    ...resources.sort((a,b)=>duration(b)-duration(a)).slice(0,10).map(row=>{
+      const transfer=number(row['transferSize']),encoded=number(row['encodedBodySize'])??0;
+      const source=transfer!==null&&transfer>0?'network':transfer===0&&encoded>0?'cache':'unknown';
+      return `  ${label(row['url'],100)} ${transfer!==null&&transfer>0?transfer:encoded} B ${seconds(duration(row))} s ${source}`;
+    }),
+  ];
+  // Only page-clock intervals can describe a page request-free gap. Merge all
+  // outstanding requests: a long download is never reported as idle time.
+  const end=Math.max(0,...entries.filter(row=>row['realm']==='page').map(row=>number(row['end'])??number(row['start'])??0));
+  const intervals=resources.flatMap(row=>{
+    const start=number(row['startTime']),finish=number(row['responseEnd'])??(start===null?null:start+duration(row));
+    return row['realm']==='page'&&start!==null&&finish!==null&&finish>start&&start<end?[{start:Math.max(0,start),end:Math.min(end,finish)}]:[];
+  });
+  const navigation=record(safe['navigation']),responseEnd=number(navigation['responseEnd']);
+  if(responseEnd!==null&&responseEnd>0)intervals.push({start:Math.max(0,number(navigation['requestStart'])??0),end:Math.min(end,responseEnd)});
+  intervals.sort((a,b)=>a.start-b.start);
+  const gaps:string[]=[];
+  let cursor=0;
+  for(const interval of intervals){
+    if(interval.start-cursor>500)gaps.push(`${seconds(cursor)}+${seconds(interval.start-cursor)}`);
+    cursor=Math.max(cursor,interval.end);
+  }
+  if(end-cursor>500)gaps.push(`${seconds(cursor)}+${seconds(end-cursor)}`);
+  timeline.push(`page request-free gaps >0.5 s (start+duration s): ${gaps.join(', ')||'none'}`);
+  return {summary:list(safe['summary']).filter((value):value is string=>typeof value==='string'),timeline};
 }
