@@ -141,12 +141,36 @@ export function addCookedShards(outDir: string, shards: readonly CookedShard[], 
     writeFileSync(serverFile, JSON.stringify(servers));
   }
   html = html.replace(expression, () => `<script type="application/json" id="boot-module-files">${JSON.stringify(bank).replaceAll('<', String.raw`\u003c`)}</script>`);
-  const stamp = /globalThis\.__WS_SHARDFILE_VERDICTS__=(\[.*?\]);?<\/script>/su, stamped = stamp.exec(html);
-  if (stamped?.[1] === undefined) throw new Error('Missing validation verdicts');
-  const before = JSON.parse(stamped[1]) as unknown[];
-  writeFileSync(file, html.replace(stamp, () => `globalThis.__WS_SHARDFILE_VERDICTS__=${JSON.stringify([...before, ...verdicts]).replaceAll('<', String.raw`\u003c`)};</script>`));
+  writeFileSync(file, appendValidationVerdicts(html, verdicts));
   const added = shards.flatMap(row => (row.discovery === undefined ? [] : [titleRowOf(row.discovery, home?.shards.includes(row.slug) === true ? home.base : '')]));
   if (added.length > 0) writeTitleRows(outDir, [...readTitleRows(outDir).filter(row => !added.some(next => next.slug === row.slug)), ...added]);
+}
+
+/** The verdict array shares a script with build labels and other stamps.
+ * Find its JSON boundary without consuming or executing those assignments. */
+export function appendValidationVerdicts(html: string, verdicts: readonly unknown[]): string {
+  const marker = 'globalThis.__WS_SHARDFILE_VERDICTS__=', start = html.indexOf(marker);
+  if (start === -1) throw new Error('Missing validation verdicts');
+  const from = start + marker.length;
+  let depth = 0, quoted = false, escaped = false;
+  for (let at = from; at < html.length; at++) {
+    const char = html[at];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') quoted = false;
+    } else if (char === '"') quoted = true;
+    else if (char === '[' || char === '{') depth++;
+    else if (char === ']' || char === '}') {
+      depth--;
+      if (depth === 0) {
+        const before: unknown = JSON.parse(html.slice(from, at + 1));
+        if (!Array.isArray(before)) throw new Error('Invalid validation verdicts');
+        return html.slice(0, from) + JSON.stringify([...before, ...verdicts]).replaceAll('<', String.raw`\u003c`) + html.slice(at + 1);
+      }
+    }
+  }
+  throw new Error('Unclosed validation verdicts');
 }
 
 /** What a page takes on trust for one tarball: a verdict is earned here, by this build's format validator, whichever validator

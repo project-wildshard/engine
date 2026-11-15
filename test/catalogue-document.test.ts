@@ -8,7 +8,7 @@ import {afterEach, describe, expect, it} from 'vitest';
 import * as v from 'valibot';
 import {packsBookPath} from '../src/shared/game/shardfile/spawnManifest';
 import {StandaloneCatalogueSchema} from '@wildshard/format/standaloneCatalogue';
-import {addCookedShards, catalogueWithAdded, writeCatalogueDocument} from '../scripts/app-build/catalogue';
+import {addCookedShards, appendValidationVerdicts, catalogueWithAdded, writeCatalogueDocument} from '../scripts/app-build/catalogue';
 import {refreshServiceWorker, workerScripts} from '../scripts/app-build/serviceWorker';
 import {installTitleManifests, titleManifests, withCatalogueHeads, type TitleManifest} from '../src/client/game/shard/titleList';
 import {GridAssembly} from '../src/shared/game/grid/assembly';
@@ -70,6 +70,16 @@ describe('the catalogue a page reads', () => {
 });
 
 describe('the bake', () => {
+  it('TS15: adds verdicts beside the build label, with nested arrays and quoted delimiters', () => {
+    const before = [{ nested: ['a];globalThis.x=', 'escaped\\"quote', '</script>'] }];
+    const prefix = '<script>globalThis.__WS_SHARDFILE_VERDICTS__=';
+    const suffix = ';globalThis.__WS_BUILD_LABEL__="v0.1.21";</script>';
+    const html = prefix + JSON.stringify(before).replaceAll('<', String.raw`\u003c`) + suffix;
+    const updated = appendValidationVerdicts(html, [{ path: '/shard.json' }]);
+    expect(updated.endsWith(suffix)).toBe(true);
+    expect(JSON.parse(updated.slice(prefix.length, -suffix.length))).toEqual([...before, { path: '/shard.json' }]);
+    expect(() => appendValidationVerdicts('<script>globalThis.__WS_SHARDFILE_VERDICTS__=[', [])).toThrow('Unclosed');
+  });
   const document_ = {version: 0, stage: 'live', placements: [{instance: 'a-solo', slug: 'a', cell: [0, 0], size: [500, 500, 500]}],
     grid: shipped.grid, shards: [{...fresh, name: '</script><b>'}], missing: []};
   const folder = (): string => mkdtempSync(join(tmpdir(), 'catalogue-'));
