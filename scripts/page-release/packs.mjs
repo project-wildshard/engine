@@ -7,7 +7,7 @@
 import {execFileSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createHash} from 'node:crypto';
-import {readFileSync} from 'node:fs';
+import {existsSync, readFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {brotliDecompressSync} from 'node:zlib';
@@ -16,6 +16,16 @@ import {PACKS_ORIGIN} from './flow.mjs';
 export const BUCKET = 'wildshard-packs';
 export const CLOUDFLARE_ACCOUNT = '0a870ffdd1b0bca67f7fedad77f67957';
 const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(bytes).digest('hex');
+
+/** Server books/parts move together into dist-content/ on a split page release.
+ * @param {string} root @param {string} bookPath */
+export function serverPackOutputRoot(root, bookPath) {
+  for (const name of ['dist', 'dist-content']) {
+    const dir = join(root, name);
+    if (existsSync(join(dir, bookPath))) return dir;
+  }
+  throw new Error(`Server book ${bookPath} is missing from dist/ and dist-content/`);
+}
 
 /**
  * @param {{log: (line: string) => void, exec?: typeof execFileSync, fetch?: typeof fetch, sleep?: (ms: number) => Promise<void>}} options
@@ -54,9 +64,9 @@ export function r2Packs({log, exec = execFileSync, fetch: get = fetch, sleep = d
   }
   /** @param {{root: string, build: string}} context */
   async function load({root, build}) {
-    const dist = join(root, 'dist');
     const {readServerPackBook, serverPackBookPath} = await import(pathToFileURL(join(root, 'src/shared/game/shardfile/serverPack.ts')).href);
-    const bookPath = serverPackBookPath(build), bookBytes = readFileSync(join(dist, bookPath)), book = readServerPackBook(JSON.parse(bookBytes.toString('utf8')));
+    const bookPath = serverPackBookPath(build), dist = serverPackOutputRoot(root, bookPath);
+    const bookBytes = readFileSync(join(dist, bookPath)), book = readServerPackBook(JSON.parse(bookBytes.toString('utf8')));
     if (book.build !== build) throw new Error(`${bookPath} names ${book.build}`);
     /** @type {Map<string, {url: string, bytes: number, hash: string, wireBytes: number, files: readonly (readonly [string, number, number])[]}>} */
     const parts = new Map();

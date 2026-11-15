@@ -253,7 +253,7 @@ export async function copyFromSets({set, missing, store, origin, log, sleep}) {
   }
   /** @type {ContentFile[]} */ const copied = [];
   let failed = 0;
-  await pool(missing.filter(file => held.has(`${file.sha256}:${file.bytes}`)), 4, async file => {
+  await pool(missing.filter(file => held.has(`${file.sha256}:${file.bytes}`)), 8, async file => {
     const from = held.get(`${file.sha256}:${file.bytes}`) ?? '';
     try { await copy(from, contentKey(set, file.path), contentHeaders(file.path), file.bytes); copied.push(file); }
     catch (error) { failed++; log(`content ${set}: copy ${from} failed (${error instanceof Error ? error.message : String(error)}); uploading it`); }
