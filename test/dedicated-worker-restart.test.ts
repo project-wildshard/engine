@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
@@ -28,8 +28,11 @@ test('MP1.3: a drained worker saves and admits its redial without closing its pe
   const table = bench.world.health().table, target = table['driftwood-isle'], peer = table['nalati-grasslands'];
   if (target === undefined || peer === undefined) throw new Error('Expected worker table');
   expect(target).not.toBe(peer);
+  const tick = b.client.latest?.tick ?? 0;
   await bench.world.restartDrainedWorker(target);
   expect(await a.ended()).toBe('restart'); expect(b.closed).toBeNull();
+  await vi.waitFor(() => { expect(b.client.latest?.tick).toBeGreaterThan(tick); });
+  expect(bench.lines).toContainEqual(expect.objectContaining({ at: 'worker.draining', index: target }));
   const redial = new RoomBot(bench.url, 'bench', 'device:a', 'A');
   expect(await redial.arrived()).toBe(true); expect(bench.world.health().players).toBe(2);
   a.drop(); b.drop(); redial.drop(); expect(bench.crashes).toEqual([]);
