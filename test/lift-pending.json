@@ -156,7 +156,6 @@
   "test/original-script-order.test.ts",
   "test/output-runtime.test.ts",
   "test/packed-specimen-files.test.ts",
-  "test/page-boot-discovery.test.ts",
   "test/page-wildlife-view.test.ts",
   "test/patrol-contact.test.ts",
   "test/patrol-encounter-view.test.ts",

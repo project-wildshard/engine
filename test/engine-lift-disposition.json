@@ -9321,5 +9321,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "7f85655c5e7a22528898594c38d6a12efd334a96",
     "retirementProof": "Restored current boot distribution boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/page-boot-discovery.test.ts",
+    "outcome": "restored",
+    "target": "test/page-boot-discovery.test.ts",
+    "decision": "Restored in place (CI21 E-TOOL): a complete engine-owned metadata fixture validates page-mode binding rejection and both discovery forms. The generation checks no longer read Pine Hollow's private authored manifest.",
+    "originalTests": [],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "2e8dada0d0899e9c82c8cf5eec8930e9ebd17184",
+    "retirementProof": "Restored current manifest and discovery boundary; no J186 retirement or successor equivalence claimed."
   }
 ]
