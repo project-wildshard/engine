@@ -23,6 +23,7 @@ interface SmokeProbe {
   readonly pose: (pose: {
     readonly x: number
     readonly z: number
+    readonly yaw?: number
   }) => Promise<void>
 }
 
@@ -30,13 +31,21 @@ declare global {
   var __wildshard: SmokeProbe | undefined
   var __workerClientRow: ((name: string) => number | undefined) | undefined
   var __workerClient:
-    | (() => { readonly savedTick: number; readonly savedOk: boolean })
+    | (() => {
+        readonly savedTick: number
+        readonly savedOk: boolean
+        readonly frames: number
+      })
     | undefined
   var document: {
     readonly visibilityState: string
     dispatchEvent: (event: unknown) => boolean
   }
   var Event: new (type: string) => unknown
+  var history: {
+    readonly state: unknown
+    replaceState: (data: unknown, title: string, url: string) => void
+  }
 }
 
 export type { SmokeVec3 }

@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 
+import { FLOOR_GRID_ENTER } from '../../../scripts/frame-floor-navigation.mjs'
+
 import type { SmokeVec3 } from '../smoke/page-globals.d.ts'
 import type { Page } from '@playwright/test'
 
@@ -14,6 +16,12 @@ interface Poi {
   readonly id: string
   readonly x: number
   readonly z: number
+}
+
+interface Approach {
+  readonly x?: number
+  readonly z?: number
+  readonly yaw?: number
 }
 
 /** The fixture serves the validated Template 1 pin at the origin cell. */
@@ -59,14 +67,29 @@ function pinnedPoi(id: string): Poi {
 }
 
 async function inPlay(page: Page): Promise<void> {
+  await page.bringToFront()
   await page.waitForFunction((): boolean => {
     const probe = globalThis.__wildshard
     return (
       probe?.app.state === 'play' &&
       probe.area()?.slug === '_template' &&
+      (probe.area()?.targets.length ?? 0) > 0 &&
       (probe.world?.game.frameCount ?? 0) > 5
     )
   })
+  const address = new URL(page.url())
+  address.searchParams.set('fps', '30')
+  await page.evaluate((href): void => {
+    globalThis.history.replaceState(globalThis.history.state, '', href)
+  }, address.href)
+  await page.evaluate(FLOOR_GRID_ENTER)
+  await page.waitForFunction(
+    (): boolean => (globalThis.__workerClient?.().frames ?? 0) > 30,
+  )
+  const resume = page.locator('.ws-gmenu.show:not([inert]) .ws-gmenu-close')
+  if (await resume.isVisible()) {
+    await resume.click()
+  }
 }
 
 async function state(page: Page): Promise<State> {
@@ -87,15 +110,25 @@ async function state(page: Page): Promise<State> {
 }
 
 /** Move with the game's harness control, including its server placement message. */
-async function poseAt(page: Page, id: string): Promise<Poi> {
+async function poseAt(
+  page: Page,
+  id: string,
+  approach: Approach = {},
+): Promise<Poi> {
   await inPlay(page)
-  const poi = pinnedPoi(id)
-  await page.evaluate(async ({ x, z }): Promise<void> => {
+  const origin = pinnedPoi(id)
+  const poi: Poi & Approach = {
+    ...origin,
+    x: origin.x + (approach.x ?? 0),
+    z: origin.z + (approach.z ?? 0),
+    ...(approach.yaw === undefined ? {} : { yaw: approach.yaw }),
+  }
+  await page.evaluate(async (pose): Promise<void> => {
     const probe = globalThis.__wildshard
     if (probe === undefined) {
       throw new Error('Missing game probe')
     }
-    await probe.pose({ x, z })
+    await probe.pose(pose)
   }, poi)
   await page.waitForFunction(({ x, z }): boolean => {
     const pos = globalThis.__wildshard?.state().player.pos

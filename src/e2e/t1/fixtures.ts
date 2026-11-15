@@ -1,6 +1,7 @@
 import { devices, expect, test as base } from '@playwright/test'
 
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
+import { inPlay } from './probe.ts'
 
 import type { Browser, BrowserContext, Page } from '@playwright/test'
 
@@ -19,8 +20,12 @@ interface Workers {
 }
 
 /** Enter the installed Template 1 through the same controls as a player. */
-async function seat(page: Page): Promise<void> {
-  await page.goto('/?mute=1&nolock=1&sw=0&fps=30')
+async function enterTemplate(page: Page): Promise<void> {
+  await page.locator('.ws-main-select').waitFor()
+  const dismiss = page.locator('#wsdrop .dismiss')
+  if ((await dismiss.count()) > 0) {
+    await dismiss.click()
+  }
   const developer = page.locator('.ws-main-dev')
   if ((await developer.getAttribute('aria-checked')) !== 'true') {
     await developer.click()
@@ -58,14 +63,12 @@ async function seat(page: Page): Promise<void> {
     .locator(`.ws-menu-card.selected[data-i="${String(index)}"]`)
     .waitFor()
   await page.locator('.ws-menu-play').click()
-  await page.waitForFunction((): boolean => {
-    const probe = globalThis.__wildshard
-    return (
-      probe?.area()?.slug === '_template' &&
-      probe.app.state === 'play' &&
-      (probe.world?.game.frameCount ?? 0) > 5
-    )
-  })
+  await inPlay(page)
+}
+
+async function seat(page: Page): Promise<void> {
+  await page.goto('/?mute=1&nolock=1&sw=0&fps=30')
+  await enterTemplate(page)
 }
 
 async function openWorld(
@@ -141,6 +144,6 @@ const test = base.extend<Fixtures, Workers>({
   },
 })
 
-export { test }
+export { enterTemplate, test }
 export { expect } from '@playwright/test'
 export type { SeatedWorld }
