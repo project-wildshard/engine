@@ -12,12 +12,18 @@ const PAGE = 'position:fixed;inset:0;z-index:2147482600;display:flex;align-items
 const BOX = 'width:min(440px,100%);padding:22px 18px 16px;background:rgba(13,27,38,.92);border:1px solid rgba(255,120,120,.45);border-top:2px solid #ff7878;display:flex;flex-direction:column;gap:10px';
 const BUTTON = 'min-height:48px;padding:13px 16px;cursor:pointer;font:700 12px/1 "JetBrains Mono",Menlo,monospace;letter-spacing:.22em;text-transform:uppercase;border:1px solid rgba(143,227,255,.35);background:rgba(13,27,38,.6);color:#e6f2f8';
 
-/** The one page on screen: a second waiting read shares it. */
+/** The one page on screen: a second waiting read shares it, and takes it over if the first read's wait ends alone (a cancel). */
 let open: Scope | null = null;
+const queued: (() => void)[] = [];
 
 /** Show the page for `owner`'s wait (its disposal closes it). `retry` is the card's RETRY; `measured` is the read's own failure. */
 export function downloadFailedPage(owner: Scope, given: DownloadGiveUp, measured: string, retry: () => void): void {
-  if (open !== null && !open.disposed) return;
+  if (open !== null && !open.disposed) {
+    const again = (): void => { if (!owner.disposed) downloadFailedPage(owner, given, measured, retry); };
+    queued.push(again);
+    owner.onDispose(() => { const at = queued.indexOf(again); if (at !== -1) queued.splice(at, 1); });
+    return;
+  }
   const page = owner.child('download-failed');
   open = page;
   const root = document.createElement('div'), box = document.createElement('div'), tag = document.createElement('p'), title = document.createElement('h1'), body = document.createElement('p');
@@ -41,7 +47,7 @@ export function downloadFailedPage(owner: Scope, given: DownloadGiveUp, measured
     const report = diagnosticsSource();
     void (async () => { copy.textContent = await copyText(`${said}\n\n${report === null ? '' : report()}`) ? engineString('s_download_failed_copied') : engineString('s_download_failed_refused'); })();
   });
-  page.onDispose(() => { root.remove(); if (open === page) open = null; });
+  page.onDispose(() => { root.remove(); if (open === page) open = null; queued.shift()?.(); });
   box.append(tag, title, body, again, check, copy, details); root.append(box);
   mountUi(root, page, document.body);
   again.focus();

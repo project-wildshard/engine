@@ -15,3 +15,6 @@
   reads) or after `DOWNLOAD_GIVE_UP_MS` (30 s) on RETRY with nothing reading again by itself. The count is every read of that
   file so far; Try again is the same RETRY (no new counter), Check connection opens the doctor, Copy diagnostics copies the
   measured failure. The FM3 proof's packs 503 sits on the spawn manifest's own read, so the time bound is what fires there.
+- One claude -p review of the branch: no MUST. Fixed its SHOULDs: per-part last status and failure in the give-up fact,
+  a read that arrives after RETRY clears the fact, a queued second read takes the page over, the lossy wave stops on every
+  path, and a failed heal no longer hides a case's own error.

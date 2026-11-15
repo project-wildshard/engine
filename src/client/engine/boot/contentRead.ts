@@ -4,7 +4,7 @@ import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot
 import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
 import { bootProgress } from '../../../shared/engine/boot/timing';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
-import { downloadGiveUp, onDownloadGiveUp, type DownloadGiveUp } from './downloadGiveUp';
+import { clearDownloadGiveUp, downloadGiveUp, onDownloadGiveUp, type DownloadGiveUp } from './downloadGiveUp';
 
 /** A missing or interrupted transport, never a parsed-content or admission refusal. */
 export class ContentReadError extends Error {
@@ -210,7 +210,10 @@ export async function readContent(url: string, maximum: number, options: Content
       let response: Response;
       try { response = await options.fetch(url, { ...(retried ? { cache: 'reload' } : {}), ...(options.signal === undefined ? {} : { signal: options.signal }) }); }
       catch (error) { options.signal?.throwIfAborted(); throw new ContentReadError(url, 'connection unavailable', error); }
-      return await body(response, url, maximum, options.read, options.expectedBytes, options.response);
+      const bytes = await body(response, url, maximum, options.read, options.expectedBytes, options.response);
+      // FM6 mode 36: a read that waited on RETRY now arrives, so the download works again: a later stall shows the card's line first
+      if (reads > 2) clearDownloadGiveUp();
+      return bytes;
     } catch (error) {
       options.signal?.throwIfAborted();
       if (!(error instanceof ContentReadError)) throw error;

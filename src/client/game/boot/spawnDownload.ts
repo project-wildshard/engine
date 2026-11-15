@@ -391,7 +391,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
   const listedOnly = new Promise<void>(resolve => { markListed = resolve; });
   const stopped = new Promise<never>((_resolve, reject) => { markStopped = reject; });
   // FM6 mode 36: a part that ran out of reads, and the last status a part answered (no HTTP response: null)
-  let exhausted = false, partStatus: number | null = null;
+  const exhausted: { fact: { readonly status: number | null; readonly detail: string } | null } = { fact: null };
   clearDownloadGiveUp();
   const work = (async () => {
     try {
@@ -610,11 +610,13 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
             const file = files[index]; if (file === undefined) continue;
             members.set(file.url, new Promise(resolve => {settle.set(index, resolve); memberSettles.add(resolve);}));
           }
+          // FM6 mode 36: this part's last failed HTTP status (null: no response, or a body that broke)
+          let status: number | null = null;
           // One read of the part. A read after a failure starts over and skips what landed, so no member counts twice.
           const read = async (init: RequestInit | undefined): Promise<void> => {
-            partStatus = null;
+            status = null;
             const response = await ports.fetch(onPacks(part.url, packs), controller.signal, init);
-            partStatus = response.status;
+            if (!response.ok) status = response.status;
             if (!response.ok || response.body === null) throw new Error(`Spawn part unavailable: ${part.url}`);
             const body = new Uint8Array(part.bytes), reader = response.body.getReader();
             let at = 0, next = 0;
@@ -656,7 +658,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
               const last = attempt >= PART_READS || controller.signal.aborted;
               if (last) for (const [index] of order) { const file = files[index]; if (file !== undefined) landed(file.url); }
               controller.signal.throwIfAborted();
-              if (attempt >= PART_READS) { exhausted = true; throw failure; } // the job's failure answers every read still waiting
+              if (attempt >= PART_READS) { exhausted.fact ??= { status, detail: failure instanceof Error ? failure.message : String(failure) }; throw failure; } // the job's failure answers every read still waiting
               if (attempt > 1) { await partPause(); controller.signal.throwIfAborted(); }
             }
           }
@@ -697,7 +699,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
       releaseWaits();
       // FM6 mode 36: a part out of reads refused the job (a cancel is no refusal); a read that falls through and fails too shows
       // the download-failed page, not RETRY's line alone (contentRead.ts)
-      if (!controller.signal.aborted && exhausted) noteDownloadGiveUp({ attempts: PART_READS, status: partStatus, detail: failure instanceof Error ? failure.message : String(failure) });
+      if (!controller.signal.aborted && exhausted.fact !== null) noteDownloadGiveUp({ attempts: PART_READS, ...exhausted.fact });
       error = failure instanceof Error ? failure.message : String(failure); publish(); controller.abort(); nudge(); throw failure;
     }
   })();

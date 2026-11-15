@@ -337,7 +337,7 @@ try {
         const result = await judged(seen, item, page);
         const back = result.outcome === 'pass' && await recovered(page, 30_000);
         return result.outcome !== 'pass' ? { ...result, injection } : back ? { ...result, ...shot === undefined ? {} : { shot }, injection, recovery: 'online: a frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery online', seen, notes: await onScreen(page) };
-      } finally { await context.setOffline(false).catch(() => undefined); await heal(); await entered.context.close(); }
+      } finally { await context.setOffline(false).catch(() => undefined); await heal().catch(() => undefined); await entered.context.close(); }
     },
     // J298: a world the device holds loads offline and says so
     offlineLaunch: async item => {
@@ -360,7 +360,7 @@ try {
         const result = await judged(seen, item, page);
         if (result.outcome !== 'pass') return { ...result, shot, injection };
         return await recovered(page, 45_000) ? { ...result, shot, injection, recovery: 'online: a frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery online', seen, shot, notes: await onScreen(page) };
-      } finally { await context.setOffline(false).catch(() => undefined); await heal(); await entered.context.close(); }
+      } finally { await context.setOffline(false).catch(() => undefined); await heal().catch(() => undefined); await entered.context.close(); }
     },
     // the page frozen (CDP), with or without a visibility change
     freeze: async item => {
@@ -394,8 +394,8 @@ try {
         const waving = { on: item.id === 'lossy' };
         const wave = (async () => { for (let high = true; waving.on; high = !high) { await arm(item.id, [{ route: 'socket', kind: 'delay-frames', direction: 'down', ms: high ? 420 : 20, jitterMs: 0, seed: 7 }]); await sleep(2500); } })();
         if (item.id === 'slow') await arm(item.id, [{ route: 'socket', kind: 'delay-frames', direction: 'both', ms: 160, jitterMs: 0, seed: 7 }]);
-        const seen = await screen(page, item.screen, 15_000, started), shot = seen === null ? undefined : await shoot(page, item.id, 'chip');
-        waving.on = false; await wave;
+        const seen = await screen(page, item.screen, 15_000, started).finally(() => { waving.on = false; }), shot = seen === null ? undefined : await shoot(page, item.id, 'chip');
+        await wave;
         const injection = { socketMatches: await matchedSince(before, 'socket') };
         await heal();
         if (injection.socketMatches === 0) return { outcome: 'harness-fail', reason: 'the delay matched no frame', injection };

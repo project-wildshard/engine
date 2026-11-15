@@ -231,6 +231,7 @@ test('FM6 mode 36: once the download gives up, a read waiting on RETRY shows the
 test('FM6 mode 36: a read on RETRY for DOWNLOAD_GIVE_UP_MS shows the page, counting every read so far; no read starts by itself', async () => {
   const { clearDownloadGiveUp } = await import('./downloadGiveUp');
   const { DOWNLOAD_GIVE_UP_MS } = await import('./contentRead');
+  await import('../ui/downloadFailed');
   clearDownloadGiveUp();
   vi.useFakeTimers();
   try {
