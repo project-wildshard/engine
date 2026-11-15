@@ -12,3 +12,6 @@ Stored title rows now use that canonical resource identity and retain
 the authored route and discovery URL. Both alias forms pass the HTML
 regression; a real bounded Template cook verified all five emitted URLs
 against its published keys. Far Reach's native capture timeout is separate.
+
+The standalone hover-contract workflow calls the same runner; update its
+matrix expectations to the same 14 m/s contract.

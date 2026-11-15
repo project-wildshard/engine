@@ -17,11 +17,12 @@ jobs:
       matrix:
         browser: [chromium, webkit]
         head:
-          - {slug: template, cap: 30}
-          - {slug: blender-template, cap: 30}
-          - {slug: pastel-plain, cap: 30}
-          - {slug: ink-cel-valley, cap: 30}
-          - {slug: open-plot-ember-forge, cap: 30}
+          # These are standalone zone boots (J352); road speed has grid coverage.
+          - {slug: template, cap: 14}
+          - {slug: blender-template, cap: 14}
+          - {slug: pastel-plain, cap: 14}
+          - {slug: ink-cel-valley, cap: 14}
+          - {slug: open-plot-ember-forge, cap: 14}
           - {slug: driftwood-isle, cap: 14}
     env:
       PROOF_BROWSER: ${{ matrix.browser }}
