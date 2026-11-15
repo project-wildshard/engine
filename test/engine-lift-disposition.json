@@ -9364,5 +9364,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "21c9d26893d94909d86ea93f9c0f9686020b9ec6",
     "retirementProof": "Restored current manifest compiler boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/entry-styles.test.ts",
+    "outcome": "restored",
+    "target": "test/entry-styles.test.ts",
+    "decision": "Restored in place (CI21 E-TOOL): the CSS load-order and manifest schema checks use the engine-owned metadata fixture plus a tiny owned style source, not Pine's authored source or discovery program.",
+    "originalTests": [],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "5eabfb06765c16194cb1d9478c5bf77eaafd0e3c",
+    "retirementProof": "Restored current entry-style boundary; no J186 retirement or successor equivalence claimed."
   }
 ]

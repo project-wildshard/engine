@@ -53,7 +53,6 @@
   "test/elite-native-roster.test.ts",
   "test/encounter-room.test.ts",
   "test/encounter-slots.test.ts",
-  "test/entry-styles.test.ts",
   "test/faceted-ao-scope.test.ts",
   "test/generated-isolated-declarations.test.ts",
   "test/glb-embedded-basis.test.ts",
