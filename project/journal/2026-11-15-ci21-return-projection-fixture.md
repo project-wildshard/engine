@@ -9,3 +9,6 @@ virgin-memory tests; each was formerly compiled from the SDK during setup.
 
 It also carries the two-stream group-RNG projection guest, retaining the exact
 declared IO layout in its manifest rather than compiling SDK source in engine.
+
+The group-members guest completes the same move for ordered native member
+effects, including its fixed 1408-byte ABI2 layout.

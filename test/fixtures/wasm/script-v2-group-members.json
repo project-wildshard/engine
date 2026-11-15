@@ -1,0 +1,5 @@
+{
+  "source": "import * as core from './sdk/as/wsV2';\nexport function ws_abi():i32{return 2;}export function ws_io():i32{return 0;}\nexport function ws_init(lo:i32,hi:i32,fuel:i32):i32{return fuel;}\nexport function ws_project(fuel:i32):i32{core.beginState();assert(core.beginBinding(0));\n  core.setState(0,core.state(0)+1);const signal=i32(core.parameter(0));\n  if(signal==4){core.pageOutput(6,3,4);core.pageOutput(2,0,1);core.endBinding();return fuel;}\n  core.pageOutput(1,0,core.field(1),signal==3?2:core.field(0));\n  core.pageOutput(2,0,signal==2?99:1);core.pageOutput(3,0,1.2,2.3,3.4);\n  core.pageOutput(4,0,6,7,8);core.pageOutput(5,0,.5);core.pageOutput(6,3,4);\n  core.endBinding();return fuel;}",
+  "fixture": "script-v2-group-members.wasm",
+  "ioBytes": 1408
+}

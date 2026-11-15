@@ -1,4 +1,4 @@
-import { beforeAll, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
 import { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
@@ -7,8 +7,7 @@ import { GroupStepV2 } from '../src/shared/engine/script/groupStepV2';
 import { ObservationColumnsV2, type V2ColumnOwners } from '../src/shared/engine/script/observationColumnsV2';
 import { parseGroupStepV2, GroupStepV2Schema, groupStepLayoutV2 } from '@wildshard/format/scriptGroupStepV2';
 import { ObservationColumnsV2Schema } from '@wildshard/format/scriptObservationColumnsV2';
-import { compileScriptV2 } from '../src/sharddev/bake/compileScriptV2';
-import { v2CoreSource } from '../src/sharddev/as/wsV2';
+import { fixtureBytes } from '@wildshard/engine/test/nativeBytes';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
 
@@ -25,19 +24,7 @@ const rows = parseGroupStepV2({bank:[{name:'count',kind:'number'}],columns,membe
     {id:5,words:2,member:0,native:{kind:'look-weight'}},
     {id:6,words:2,native:{kind:'grass',channel:'answer'}},
   ],outputs:6,pages:1,fuel:400000});
-let bytes:Uint8Array;
-beforeAll(async()=>{
-  bytes=await compileScriptV2(`import * as core from './sdk/as/wsV2';
-    export function ws_abi():i32{return 2;}export function ws_io():i32{return 0;}
-    export function ws_init(lo:i32,hi:i32,fuel:i32):i32{return fuel;}
-    export function ws_project(fuel:i32):i32{core.beginState();assert(core.beginBinding(0));
-      core.setState(0,core.state(0)+1);const signal=i32(core.parameter(0));
-      if(signal==4){core.pageOutput(6,3,4);core.pageOutput(2,0,1);core.endBinding();return fuel;}
-      core.pageOutput(1,0,core.field(1),signal==3?2:core.field(0));
-      core.pageOutput(2,0,signal==2?99:1);core.pageOutput(3,0,1.2,2.3,3.4);
-      core.pageOutput(4,0,6,7,8);core.pageOutput(5,0,.5);core.pageOutput(6,3,4);
-      core.endBinding();return fuel;}`,{lane:'project',ioBytes:groupStepLayoutV2(rows).bytes,sources:{'sdk/as/wsV2.ts':v2CoreSource(0)}});
-});
+const bytes=fixtureBytes(new URL('./fixtures/wasm/script-v2-group-members.wasm',import.meta.url));
 function actor():AnimalSim {
   return new AnimalSim({kind:'sample',label:'Sample',variant:'plain',rarity:'common',hp:20,aggressive:false,
     dims:{bodyY:.6,bodyHalfLen:.5,bodyRadius:.3,headRadius:.2,legLen:.5,feet:[],halfWidth:.3},
