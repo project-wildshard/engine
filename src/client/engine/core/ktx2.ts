@@ -43,9 +43,17 @@ import { parseKtx2 } from '@wildshard/format/ktx2Cost';
 import { waitFor } from '../../../shared/engine/boot/waits';
 import { bootTask } from '../../../shared/engine/boot/timing';
 
-/** where scripts/app-build/basis.ts copies three's transcoder: versioned by three's revision, so the SW / HTTP caches never mix two */
 /** Before transcoding `files`: start what their parses will need (the raw-texel zstd decoder) from the caller's stack. */
 export function prepareKtx2Decode(files: Iterable<Uint8Array | undefined>): void { prepareKtx2Zstd(files); }
+/** Whether a named native WebGL compressed format sampled correctly at every mip on this device.
+ * The name is a format label from the texture capability probe, for example SRGB8_ALPHA8_ASTC_6x6.
+ * Unknown formats and a device without a completed WebGL2 probe return false. */
+export function nativeCompressedFormatSupported(format: string): boolean {
+  const probe = ktx2Probe();
+  return probe.ran && probe.formats.some(row => row.format === format && row.ok);
+}
+
+/** The transcoder path is versioned by three's revision, keeping SW and HTTP caches compatible. */
 export const BASIS_PATH: Parameters<KTX2Loader['setTranscoderPath']>[0] = `/basis/r${THREE.REVISION}/`;
 
 let loader: KTX2Loader | null = null;

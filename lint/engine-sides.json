@@ -701,6 +701,7 @@
     "src/client/game/grid/roadGrain.ts": "client",
     "src/client/game/grid/roadGrain.worker.ts": "client",
     "src/client/game/grid/roadGrainPreparation.ts": "client",
+    "src/client/game/grid/roadCompressedSurfaces.ts": "client",
     "src/client/game/grid/roadLook.ts": "client",
     "src/client/game/grid/roadLookPlatform.ts": "client",
     "src/client/game/grid/roadResources.ts": "client",

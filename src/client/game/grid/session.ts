@@ -114,6 +114,7 @@ import { readCompiledGridStrips } from '../../../shared/game/grid/compiledStrips
 import { startRoadGrain } from './roadGrainPreparation';
 import { startRoadSigns } from './roadSignPreparation';
 import { RoadMapShare } from './roadResources';
+import { prepareRoadSurfaceMaps } from './roadCompressedSurfaces';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
 
 import { admittedRuntimeProduct } from '../shardfile/runtimeProduct';
@@ -506,8 +507,11 @@ export class GridSession {
         (url, signal) => fetch(url, { signal }), pause, 'outer');
       return compiledOuter?.strips ?? generatePlatformSliced(source.cells, source.empty, pause, OUTER_RING_STRETCH_MS, await seamPlans(), (x, z) => !ring(x, z)); // T10: built in play after controls, short stretches beside the frame
     };
+    const maps = new RoadMapShare();
+    await waitFor('Grid road surfaces', prepareRoadSurfaceMaps(admission, maps), 'worker');
+    if (roadScope.disposed || roadScope.disposing) throw new Error('Grid session left during surface preparation');
     const roadInput = { strips, home, pitch: assembly.pitch, layout, scene: host.scene,
-      scope: roadScope, camera: () => host.frame?.camera, plans, admission, tileBacking, maps: new RoadMapShare(),
+      scope: roadScope, camera: () => host.frame?.camera, plans, admission, tileBacking, maps,
       ...(grain === undefined ? {} : { grain: grain.get }), ...(signs === undefined ? {} : { signs: signs.get }) };
     const pause = async (): Promise<void> => { await construction.check(); };
     // Spawn heap (T10): no closure here may capture `compiled`. Every closure of this scope shares one context, and the

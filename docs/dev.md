@@ -423,3 +423,28 @@ CLI, HTTP/WebSocket/TLS upstreams and native byte/close observations. All
 13 faults, seeded controls, token/config/bind refusal, healing and parent
 EOF run under ten seconds. This manual/Ring 2 proof never enters pre-push;
 it does not qualify a game failure screen or replace FM3's browser census.
+
+## Native compressed road surfaces
+
+The phone grid uses native ASTC 6x6 sRGB asphalt and junction maps only
+when the device probe sampled that exact format correctly at every mip.
+`nativeCompressedFormatSupported(format)` in engine `core/ktx2` is the
+public capability query; unknown formats or an incomplete probe return
+false. Desktop, unsupported GPUs and failed reads retain the original
+procedural painters. The composer keeps its signed-alpha colour marker.
+
+The two maps are admitted before loading, uploaded before publication,
+and shared by both road halves. One parent claim owns the pair until
+retirement. Partial failures publish neither map and release their claim.
+
+Reproduce the assets through the browser lane, with owned scratch:
+
+```
+scripts/browser-lane.sh node scripts/bake-road-surfaces.mjs \
+  --scratch=tmp/<lane>/road-bake --out=public/assets/grid-road
+```
+
+The manifest binds both source files and every asset hash. Run
+`test/road-surface-assets.test.ts` and the grid's
+`road-compressed-surfaces.test.ts`; memory and all-six Chromium/WebKit
+goldens are required before landing a changed format.
