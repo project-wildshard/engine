@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import * as THREE from 'three';
 import { pickTarget } from '../src/client/engine/explore/pick';
 import { MERGED_VIEW, SHADOW_LAYER } from '../src/client/engine/core/shadowLayer';
-import { mergeView } from '../src/client/game/shardfile/groundMerge';
+import { mergeView, propMerge } from '../src/client/game/shardfile/groundMerge';
 import { Scope } from '../src/shared/engine/app/scope';
 
 // Meta SHARD-SOURCE ss4d (the stage-4 review): AP8 merges a static prop into one view mesh per material and moves the
@@ -31,4 +31,19 @@ test('a shadow-only depth proxy is still not pickable', () => {
   const tile = new THREE.Group(), proxy = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
   proxy.position.y = 0.5; proxy.layers.set(SHADOW_LAYER); tile.add(proxy); tile.updateMatrixWorld(true);
   expect(pickTarget(ray(), [{ object: tile, entry: 'cabin' }])).toBeNull();
+});
+
+test('a merged prop wins over its merge copy, even for a target that holds both', () => {
+  const world = new THREE.Group(), tile = new THREE.Group(), material = new THREE.MeshStandardMaterial();
+  const prop = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material); prop.position.y = 0.5;
+  tile.add(prop); world.add(tile); world.updateMatrixWorld(true);
+  const scope = new Scope('pick.test');
+  mergeView(world, prop, material, scope);
+  propMerge(world, material, { receive: prop.receiveShadow, order: prop.renderOrder }).rebuild();
+  world.updateMatrixWorld(true);
+  expect(world.children.some((c) => c.name === 'props.merged')).toBe(true);
+  const hit = pickTarget(ray(), [{ object: world, entry: 'scene.world' }, { object: tile, entry: 'scene.hut' }]);
+  expect(hit?.target.entry).toBe('scene.hut');
+  scope.dispose();
+  expect(prop.userData[MERGED_VIEW]).toBe(false);
 });

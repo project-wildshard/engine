@@ -12,3 +12,8 @@
   CI21 batch deadline (`test/lift-pending-policy.json`, J237) passed with
   codex-mock's batches pending. Local runs here pin the clock with
   `WS_CI_EXCLUSION_AT`; a push waits on that owner.
+
+Review round (one `claude -p`, no MUST): a pick never lands on the merge's
+own view mesh (`props.merged`, now `MERGED_COPY`), so a target holding both
+the member and its merge copy still resolves to the member's tile; the
+merged-view mark clears when the member's scope disposes.

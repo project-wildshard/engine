@@ -15,9 +15,12 @@ export const SHADOW_LAYER = 9;
  * (`explore/pick.ts`), where a true shadow-only caster (a cabin's depth proxy) stays unpickable.
  */
 export const MERGED_VIEW = 'mergedView';
+/** The name of a merge's own view mesh (AP8): it stands in for its members, so a pick reads the member, never it. */
+export const MERGED_COPY = 'props.merged';
 
 /** Whether a raycast hit on `object` is a drawn surface for a raycaster on `view`'s layers: on one of them, or a merged
  *  member its merge draws. */
 export function drawnSurface(object: Object3D, view: Layers): boolean {
+  if (object.name === MERGED_COPY) return false;
   return object.layers.test(view) || object.userData[MERGED_VIEW] === true;
 }
