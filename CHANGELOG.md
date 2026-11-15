@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.21 (2026-11-15)
+
+- The hoverboard is faster online too: 14 m/s in a shard and 30 on the road, and boost is four times that (56 and 120).
+- The HOVER tab says BOOST while boost is on.
+- When something fails, the game says why and retries by itself: release reads, paused downloads and voice, which has Try again.
+- Moving between shards is steadier on phones, and the grid waits for room before it loads a neighbour.
+- Behind the scenes: agents now move the server's cook to each new release themselves, so a release needs no hands from Jake.
+
 ## v0.1.20 (2026-11-14)
 
 - Big desktop screens stay smoother: the game drops its render sharpness a step when frames run slow and raises it again when there is room.
