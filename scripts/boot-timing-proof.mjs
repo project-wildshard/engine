@@ -62,7 +62,7 @@ if(expectedBuild!==undefined) {
   const pick=option('browser')??'both';assert.ok(['both','chromium','webkit'].includes(pick));
   for (const name of ['chromium','webkit'].filter(browserName=>pick==='both'||pick===browserName)) {
     const engine=name==='chromium'?chromium:webkit;
-    const browser = await engine.launch({headless:true, ...(name === 'chromium' ? {args:[...KEYCHAIN_ARGS, '--mute-audio']} : {})});
+    const browser = await engine.launch({headless:true, ...(name === 'chromium' ? {args:[...KEYCHAIN_ARGS, '--mute-audio', ...(process.argv.includes('--gpu') ? ['--use-angle=metal', '--ignore-gpu-blocklist'] : [])]} : {})});
     try {
       const context = await browser.newContext({...devices['iPhone 16 Pro'], deviceScaleFactor:2});
       await saveFixture(context, {scope:'device',key:'devMode',data:true});
