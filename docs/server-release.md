@@ -112,7 +112,14 @@ signs the next staging serial, `staging check`, `staging go-live`,
 strict staging proofs, `release.sh vX.Y.Z --finish` (the tag signs
 production), `production build` and `upload` (any time after the
 build is green), `production check`, `production go-live
---after-staging-proofs`, then `--human-static`.
+--after-staging-proofs`, then `--human-static`. Last, the cook follows
+production: `node scripts/release-cook.mjs vX.Y.Z` moves the box's cook
+worker to the tag over the agents' account (`wildshard-config cook`,
+AUTO-RELEASE J355), installing that verb first from a signed tag if the
+box lacks it. npm needs no step: the tag's `npm-publish.yml` publishes by
+trusted publishing, and npm lists a 13 MB engine about 10 minutes later
+(`Your package is being processed`); never rerun that job while it
+processes (E409), and never `npm stage approve`.
 
 Pack writes use `wrangler r2 object put` with wrangler's login.
 

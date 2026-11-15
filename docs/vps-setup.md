@@ -88,7 +88,14 @@ one of Jake's inputs; it names each one, and a rerun picks up from there:
 - `/etc/wildshard/cook.env`: the engine tag and build the worker cooks
   for, the notify token api-server sends, and the four R2 packs rows
   (or `COOK_STORE_DIR` on a scratch box). Until then the cook worker
-  stays off; the game servers do not need it.
+  stays off; the game servers do not need it. After the first fill,
+  agents move the tag and build themselves (AUTO-RELEASE, J355):
+  `sudo wildshard-config cook vX.Y.Z` takes the build from the signed
+  release that names the tag, writes `/etc/wildshard/cook.settings`
+  (`640 root:wildshard-cook`, read after `cook.env`, so its two keys
+  win), runs `rebuild.sh --cook` (step 4 alone) and rolls back if the
+  worker does not answer `/health`. `wildshard-config show cook` says
+  what it names; the secrets stay in `cook.env`.
 - `passwd raynos`, printed as `next`, for sudo and the console.
 
 Caddy's package would serve a page on port 80, so it is installed with
