@@ -44,6 +44,12 @@ test('the driver has two modes, neither of them production, and refuses anything
   expect(driver).toContain("if (mode !== 'replica' && mode !== 'staging')");
 });
 
+test('the driver can keep a run in a lane-owned scratch folder', () => {
+  expect(driver).toContain("'work-dir': { type: 'string' }");
+  expect(driver).toContain("values['work-dir'] ?? 'tmp/mmo-bots'");
+  expect(driver).toContain("throw new Error('--work-dir stays under tmp/')");
+});
+
 test('forwarded addresses belong to a loopback replica alone; staging gets the one Mac address and the 4-socket door limit', () => {
   expect(() => botTarget('wss://wildshard.tailb41b20.ts.net:8443/', 'forwarded', 2)).toThrow(/loopback replica only/u);
   expect(() => botTarget('ws://127.0.0.1:18796/', 'forwarded', 32)).not.toThrow();

@@ -25,7 +25,8 @@
 // code, built here under the release's build name, so the release's packs still match it. The bots are built from the same
 // commit, so their code and wire are the server's exactly. It must descend from the release's build; the report names it
 // (`serverFrom`). Every value that reaches the host's shell is a checked slug, number, hex or fixed path.
-// Everything goes in tmp/mmo-bots/<stamp>/, and the release tree is removed after the run; the report stays.
+// Everything goes in tmp/mmo-bots/<stamp>/ by default, or in the bounded `--work-dir tmp/<lane>/...` path; the release tree is
+// removed after the run and the report stays.
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -47,7 +48,8 @@ const [mode = '', ...rest] = process.argv.slice(2);
 const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, seconds: { type: 'string' }, seats: { type: 'string', default: '32' }, workers: { type: 'string', default: '4' },
   cells: { type: 'string', default: 'driftwood-isle' }, database: { type: 'string', default: 'memory:' }, keep: { type: 'boolean', default: false },
   remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' },
-  'bots-on-host': { type: 'boolean', default: false }, 'bot-cpus': { type: 'string', default: '14-15' }, tailnet: { type: 'boolean', default: false } } });
+  'bots-on-host': { type: 'boolean', default: false }, 'bot-cpus': { type: 'string', default: '14-15' }, tailnet: { type: 'boolean', default: false },
+  'work-dir': { type: 'string' } } });
 const serverFrom = values['server-from'];
 if (serverFrom !== undefined && (mode !== 'replica' || !/^[0-9a-f]{40}$/u.test(serverFrom))) throw new Error('--server-from is a full commit, for a replica');
 // These reach the host's shell inside the replica's env line: only slugs and whole numbers.
@@ -60,7 +62,9 @@ if (botsOnHost && remote === undefined) throw new Error('--bots-on-host needs --
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
 const bots = Number(values.bots ?? (mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
 if (!Number.isInteger(bots) || bots < 1 || bots > 64 || !Number.isFinite(seconds) || seconds < 5 || seconds > 3600) throw new Error('--bots 1..64, --seconds 5..3600');
-const stamp = new Date().toISOString().replaceAll(/[-:]/gu, '').replace(/\..*/u, 'Z'), work = join(ROOT, 'tmp/mmo-bots', stamp), tag = `${mode === 'replica' ? 'r' : 's'}${stamp.slice(9, 15)}`;
+const workRoot = absolute(ROOT, 'tmp'), workBase = absolute(ROOT, values['work-dir'] ?? 'tmp/mmo-bots');
+if (workBase !== workRoot && !workBase.startsWith(`${workRoot}/`)) throw new Error('--work-dir stays under tmp/');
+const stamp = new Date().toISOString().replaceAll(/[-:]/gu, '').replace(/\..*/u, 'Z'), work = join(workBase, stamp), tag = `${mode === 'replica' ? 'r' : 's'}${stamp.slice(9, 15)}`;
 mkdirSync(work, { recursive: true });
 /** @param {Record<string, unknown>} line */
 const note = line => { const text = JSON.stringify({ at: 'mmo-bots', ...line }); console.info(text); writeFileSync(join(work, 'run.log'), `${text}\n`, { flag: 'a' }); };
