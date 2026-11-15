@@ -149,7 +149,7 @@ export const ASSET_VERSIONS: Readonly<Record<string, string>> = {
   "/assets/far-reach/tex/stormeye.webp": 'a8f28043',
   "/assets/grid-road/road-asphalt-phone.ktx2": '1f9a805a',
   "/assets/grid-road/road-junction-phone.ktx2": 'a94834d6',
-  "/assets/grid-road/road-surfaces.json": '08b01a35',
+  "/assets/grid-road/road-surfaces.json": 'b291e0c8',
   "/assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.gain.png": '04afee5b',
   "/assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr": '5244534e',
   "/assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.sky.jpg": 'dad57443',

@@ -1,8 +1,24 @@
 {
-  "format": 1,
+  "format": 2,
   "vkFormat": 166,
-  "painterSHA256": "6b5cd03e04d8f3b65fdee5c9fe93709245e3f748da5166ac98b71888cacdad99",
-  "bakeSHA256": "c1322e15ce4842afc788aae880195535c3e4350e175fdae53a83accb7a64fad9",
+  "sourcesSHA256": {
+    "src/client/game/grid/roadSurfaceMaps.ts": "6b5cd03e04d8f3b65fdee5c9fe93709245e3f748da5166ac98b71888cacdad99",
+    "src/client/game/grid/roadGrain.ts": "43266ed886b9ce8caa1090c05ec9397ca75a69e940a433886eb472e11e18eadc",
+    "src/shared/game/grid/roadLayout.ts": "36d5aa94633245e7ea714a773959180938b095ecf267693d0bdf49b55895344e",
+    "scripts/bake-road-surfaces.entry.ts": "c1322e15ce4842afc788aae880195535c3e4350e175fdae53a83accb7a64fad9",
+    "scripts/bake-road-surfaces.mjs": "1fa4fa180c53ef23105b41eb6720528804ea9eeb760b348e8af5181c5fa73617"
+  },
+  "encoder": {
+    "version": "Basis Universal LDR/HDR GPU Texture Supercompression System v2.50.0",
+    "options": [
+      "-ktx2",
+      "-ldr_6x6",
+      "-effort",
+      "4",
+      "-srgb",
+      "-mipmap"
+    ]
+  },
   "assets": [
     {
       "kind": "asphalt",

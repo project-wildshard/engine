@@ -24,17 +24,21 @@ try {
   images = await page.evaluate('globalThis.__bakeRoadSurfaces()');
 } finally { await browser.close(); }
 const hash = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(bytes).digest('hex');
+const encoderVersion = execFileSync('basisu', ['-version'], {encoding: 'utf8'}).split('\n')[0].trim();
+const encoderOptions = ['-ktx2', '-ldr_6x6', '-effort', '4', '-srgb', '-mipmap'];
+const sourcePaths = ['src/client/game/grid/roadSurfaceMaps.ts', 'src/client/game/grid/roadGrain.ts',
+  'src/shared/game/grid/roadLayout.ts', 'scripts/bake-road-surfaces.entry.ts', 'scripts/bake-road-surfaces.mjs'];
 const assets = [];
 for (const image of images) {
   const source = join(scratch, `${image.kind}.png`), target = join(out, `road-${image.kind}-phone.ktx2`);
   writeFileSync(source, Buffer.from(image.png));
-  execFileSync('basisu', ['-ktx2', '-ldr_6x6', '-effort', '4', '-srgb', '-mipmap', source, '-output_file', target], {stdio: 'ignore'});
+  execFileSync('basisu', [...encoderOptions, source, '-output_file', target], {stdio: 'ignore'});
   const bytes = readFileSync(target), levels = bytes.readUInt32LE(40);
   let gpuBytes = 0;
   for (let level = 0; level < levels; level++) gpuBytes += Number(bytes.readBigUInt64LE(80 + level * 24 + 16));
   assets.push({kind: image.kind, file: `road-${image.kind}-phone.ktx2`, width: image.width, height: image.height, levels, bytes: bytes.length, gpuBytes, sha256: hash(bytes)});
   console.log(`${image.kind}: ${image.width}x${image.height}, ${bytes.length} bytes, ${gpuBytes} GPU bytes`);
 }
-writeFileSync(join(out, 'road-surfaces.json'), `${JSON.stringify({format: 1, vkFormat: 166,
-  painterSHA256: hash(readFileSync('src/client/game/grid/roadSurfaceMaps.ts')),
-  bakeSHA256: hash(readFileSync('scripts/bake-road-surfaces.entry.ts')), assets}, null, 2)}\n`);
+writeFileSync(join(out, 'road-surfaces.json'), `${JSON.stringify({format: 2, vkFormat: 166,
+  sourcesSHA256: Object.fromEntries(sourcePaths.map(path => [path, hash(readFileSync(path))])),
+  encoder: {version: encoderVersion, options: encoderOptions}, assets}, null, 2)}\n`);

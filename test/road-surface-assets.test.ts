@@ -8,10 +8,15 @@ import {expect, test} from 'vitest';
 test('phone road maps match their painters and contain complete native ASTC 6x6 mip chains', () => {
   const hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
   const manifest = JSON.parse(readFileSync('public/assets/grid-road/road-surfaces.json', 'utf8')) as {
-    painterSHA256: string; bakeSHA256: string; assets: {file: string; width: number; height: number; sha256: string; gpuBytes: number}[];
+    format: number; sourcesSHA256: Record<string, string>; encoder: {version: string; options: string[]}; assets: {file: string; width: number; height: number; sha256: string; gpuBytes: number}[];
   };
-  expect(manifest.painterSHA256).toBe(hash(readFileSync('src/client/game/grid/roadSurfaceMaps.ts')));
-  expect(manifest.bakeSHA256).toBe(hash(readFileSync('scripts/bake-road-surfaces.entry.ts')));
+  expect(manifest.format).toBe(2);
+  const sources = ['src/client/game/grid/roadSurfaceMaps.ts', 'src/client/game/grid/roadGrain.ts',
+    'src/shared/game/grid/roadLayout.ts', 'scripts/bake-road-surfaces.entry.ts', 'scripts/bake-road-surfaces.mjs'];
+  expect(Object.keys(manifest.sourcesSHA256).sort()).toEqual([...sources].sort());
+  for (const source of sources) expect(manifest.sourcesSHA256[source], source).toBe(hash(readFileSync(source)));
+  expect(manifest.encoder.version).toMatch(/^Basis Universal .+ v[0-9]+\.[0-9]+/u);
+  expect(manifest.encoder.options).toEqual(['-ktx2', '-ldr_6x6', '-effort', '4', '-srgb', '-mipmap']);
   expect(manifest.assets).toHaveLength(2);
   let total = 0;
   for (const asset of manifest.assets) {

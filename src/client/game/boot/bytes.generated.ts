@@ -442,7 +442,7 @@ export const PUBLIC_BYTES = {
   "/assets/gpu/tex/wood_trunk_wall/nor_gl-e1b1ecf7.ktx2": 5098654,
   "/assets/grid-road/road-asphalt-phone.ktx2": 211919,
   "/assets/grid-road/road-junction-phone.ktx2": 385931,
-  "/assets/grid-road/road-surfaces.json": 775,
+  "/assets/grid-road/road-surfaces.json": 1401,
   "/assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.gain.png": 50440,
   "/assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr": 5451493,
   "/assets/hdri/kloofendal_48d_partly_cloudy_puresky_2k.sky.jpg": 350530,
