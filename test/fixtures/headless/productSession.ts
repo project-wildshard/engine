@@ -1,7 +1,5 @@
 // oxlint-disable-next-line import/no-unassigned-import -- The sim's Math goes in before any module body runs.
 import '../../../src/shared/engine/core/portableMathFirst';
-// oxlint-disable-next-line import/no-nodejs-modules -- Native integration owns the admitted named product bytes.
-import {readFileSync} from 'node:fs';
 import {HeadlessSimulation} from '../../../src/server/host/headless';
 import {loadHeadlessProduct} from '../../../src/server/host/headlessProduct';
 import {productHeadlessSections} from '../../../src/shared/host/headlessSections';
@@ -9,6 +7,7 @@ import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescrip
 import {builtProduct} from '../builtProduct';
 import {createNativeProofWorker,type NativeProofKind} from '../headless-worker';
 import {recordNativeProcessUsage} from './processUsage';
+import {admittedProduct} from './admittedProductCache';
 
 recordNativeProcessUsage();
 
@@ -23,16 +22,8 @@ const defaultProductWorker:ProductWorkerFactory=(...args)=>HeadlessSimulation.cr
  * Readiness still awaits the same worker admission and initial checkpoint. */
 export async function beginProductSession(slug:string,variant?:ProductSessionVariant,snapshot?:string,createWorker:ProductWorkerFactory=defaultProductWorker):Promise<{ready:()=>Promise<ProductSimulation>;assets:ReadonlyMap<string,Uint8Array>;product:Awaited<ReturnType<typeof loadHeadlessProduct>>}> {
   if(variant!==undefined&&variantHosts[variant]!==slug)throw new Error('Native proof variant does not match product');
-  const directory=builtProduct(slug),product=await loadHeadlessProduct(directory),source=product.shardfile;
+  const directory=builtProduct(slug),{product,assets}=await admittedProduct(directory,'full'),source=product.shardfile;
   const descriptor=outputDescriptor(source);if(descriptor===undefined)throw new Error('Missing admitted headless inventory');
-  const assets=new Map(descriptor.index.files.map(file=>{
-    const buffer=readFileSync(`${directory}/${file.path}`);
-    // A complete native buffer already owns exactly these bytes. Pooled views
-    // still copy so every admitted asset retains offset zero and exact storage.
-    const bytes=buffer.byteOffset===0&&buffer.byteLength===buffer.buffer.byteLength
-      ?new Uint8Array(buffer.buffer):Uint8Array.from(buffer);
-    return [file.commons===true?`commons:${file.hash}`:file.hash,bytes] as const;
-  }));
   const sections=productHeadlessSections(product);
   const nativeKinds={'driftwood-isle':'driftwood','pine-hollow':'pine','nine-dragon-stack':'nine','nalati-grasslands':'nalati'} as const;
   const nativeKind=variant??(!sections.has('sim/runtime-plan')&&(slug==='driftwood-isle'||slug==='pine-hollow'||slug==='nine-dragon-stack'||slug==='nalati-grasslands')?nativeKinds[slug]:undefined);
