@@ -47,14 +47,22 @@ function receipt(lane, path) {
   } catch { return undefined; }
 }
 
-/** @param {string} root */
-function pidfileLive(root) {
+/** @param {string} root @param {number} depth */
+function pidfileLive(root, depth = 0) {
   for (const name of ['.pid', 'pid', 'pidfile', 'server.pid', 'dev.pid']) {
     try {
       const pid = Number(readFileSync(join(root, name), 'utf8').trim());
       if (!Number.isSafeInteger(pid) || pid < 1) continue;
       try { process.kill(pid, 0); return true; } catch (error) { if (error instanceof Error && 'code' in error && error.code === 'EPERM') return true; }
     } catch {/* Unreadable evidence is skipped. */}
+  }
+  if (depth < 2) {
+    try {
+      for (const entry of readdirSync(root, { withFileTypes: true })) {
+        if (entry.isDirectory() && !entry.isSymbolicLink() && entry.name.startsWith('dev-') &&
+          pidfileLive(join(root, entry.name), depth + 1)) return true;
+      }
+    } catch {/* No readable dev-process children. */}
   }
   return false;
 }
@@ -97,7 +105,10 @@ export function laneLive(path, { receipts = RECEIPTS, activeHours, cwdLive, cwds
     return { state: 'live', reason: 'a process cwd or pidfile is live' };
   if (cwdLive === undefined && directories === null) return { state: 'live', reason: 'process evidence unreadable' };
   const record = readOwner(root);
-  if (!record) return { state: 'unknown', reason: 'no readable .owner' };
+  if (!record) {
+    const hours = activeHours ?? activeHoursSince(lstatSync(root).mtime, { log: activeLog });
+    return { state: 'unknown', reason: hours >= 72 ? 'no readable .owner; at least 72 active hours, investigate' : 'no readable .owner' };
+  }
   const line = receipt(record.lane, receipts);
   if (line && /\s(?:DONE|ENDED):/u.test(line)) return { state: 'ended', reason: 'ending receipt' };
   const evidence = sessionLive === undefined ? sessionEvidence(record.session, activeLog) : { live: sessionLive, latest: 0 };
