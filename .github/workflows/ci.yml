@@ -230,6 +230,21 @@ jobs:
             tmp/template-e2e-ci/t1/results/
           retention-days: 7
           if-no-files-found: ignore
+      # TEMPLATE-E2E T1E-2a: products already built Ring 1. Export those
+      # exact bytes plus the Template pin read by POI and memory-server probes.
+      - name: Bundle the shared Template suite build
+        if: steps.pack.outputs.products == 'true'
+        run: |
+          WS_LANE_NAME=template-e2e-ci node scripts/scratch-dir.mjs template-e2e-ci "Shared Ring-1 client and Template pin"
+          tar -cf tmp/template-e2e-ci/products.tar dist out/_template test/pins/saves
+      - name: Publish the shared Template suite build
+        if: steps.pack.outputs.products == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: template-e2e-products
+          path: tmp/template-e2e-ci/products.tar
+          retention-days: 3
+          if-no-files-found: error
       - name: Keep the recorded Ring 1 baseline
         if: inputs.record && steps.pack.outputs.products == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

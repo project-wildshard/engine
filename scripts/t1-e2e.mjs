@@ -16,9 +16,9 @@ await new Promise((resolve, reject) => { listener.close(error => error ? reject(
 const out = resolvePath(process.env.WS_T1_BUILD_DIR ?? `${scratch}/t1/client`);
 const browserTemp = resolvePath(scratch,'t1/browser-tmp');
 mkdirSync(browserTemp, { recursive: true });
-const env = { ...process.env, TMPDIR: browserTemp, WS_T1_PORT: String(address.port), WS_T1_BUILD_DIR: out };
+const env = { ...process.env, TMPDIR: browserTemp, WS_T1_PORT: String(address.port), WS_T1_BUILD_DIR: out, WILDSHARD_CATALOGUE: resolvePath('out/.ring-catalogue.json') };
 const commands = process.env.WS_T1_BUILD_DIR === undefined ? [
-  ['pnpm', 'pins'], ['pnpm', 'gen:inputs'], ['python3', 'scripts/heavy-lane.py', 'build', '--', 'node', 'scripts/build-app.mjs', '--outDir', out],
+  ['node', 'scripts/pins.ts', 'install', '--ring', '1'], ['pnpm', 'gen:inputs'], ['python3', 'scripts/heavy-lane.py', 'build', '--', 'node', 'scripts/build-app.mjs', '--outDir', out],
 ] : [];
 commands.push(['pnpm', 'exec', 'playwright', 'test', '--config', 'src/e2e/t1/playwright.config.ts', ...process.argv.slice(2)]);
 for (const [command, ...args] of commands) {
