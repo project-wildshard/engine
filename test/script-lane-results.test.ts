@@ -1,26 +1,10 @@
-import { beforeAll, expect, test } from 'vitest';
-import { compileScript } from '@wildshard/sharddev/compileScript';
+import { expect, test } from 'vitest';
+import { fixtureBytes } from '@wildshard/engine/test/nativeBytes';
 import { ScriptLane, installScriptLane, type ScriptLanePort } from '../src/server/engine/script/lane';
 import { DeclaredScriptWorld } from '../src/shared/engine/script/state';
 import type { SimHost, SimStateAdapter } from '../src/server/engine/sim';
 
-let bytes: Uint8Array = new Uint8Array();
-beforeAll(async () => {
-  bytes = await compileScript(`
-let calls:i32=0;
-export function abi_version():i32{return 0;}
-export function init(lo:i32,hi:i32):void{calls=lo;}
-export function in_ptr():i32{return 16384;}
-export function in_cap():i32{return 4096;}
-export function out_ptr():i32{return 24576;}
-export function out_cap():i32{return 32;}
-export function out_count():i32{return 2;}
-export function on_tick():void{
- calls++;let value=load<f64>(16400);if(value==99)unreachable();
- store<f64>(24576,1);store<f64>(24584,1);store<f64>(24592,value);
- store<f64>(24616,3);store<f64>(24624,9);store<f64>(24632,1);store<f64>(24640,load<f64>(16384));
-}`, { maximumPages: 1 });
-});
+const bytes=fixtureBytes(new URL('./fixtures/wasm/script-lane-results.wasm',import.meta.url));
 function fixture(divisor = 1): ScriptLane {
   const world = new DeclaredScriptWorld({ fields: { 1: [-10, 10] }, archetypes: [], events: [9], maxEntities: 1 },
     [{ id: 1, name: 'real owner', position: [0, 0, 0], fields: { 1: 0 }, frozen: false, interactive: true }],

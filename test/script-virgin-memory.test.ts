@@ -1,20 +1,11 @@
-import { beforeAll, expect, test, vi } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import { FixedMemory, fixedMemoryCensus, freshScriptMemory, prewarmFixedMemories } from '../src/shared/engine/script/fixedMemory';
 import { prepareScriptMemoryLease, ScriptHost } from '../src/shared/engine/script/host';
 import { ScriptWorld } from '../src/shared/engine/script/effects';
-import { compileScript } from '@wildshard/sharddev/compileScript';
+import { fixtureBytes } from '@wildshard/engine/test/nativeBytes';
 
-let bytes: Uint8Array = new Uint8Array();
-beforeAll(async () => {
-  bytes = await compileScript(`let value:i32=0;
-    export function abi_version():i32{return 0;}
-    export function init(lo:i32,hi:i32):void{value=lo;store<i32>(32768,value);}
-    export function in_ptr():i32{return 16384;}export function in_cap():i32{return 4096;}
-    export function out_ptr():i32{return 24576;}export function out_cap():i32{return 32;}
-    export function out_count():i32{return 0;}
-    export function on_tick():void{value++;store<i32>(32768,value);}`, { maximumPages: 2 });
-});
+const bytes=fixtureBytes(new URL('./fixtures/wasm/script-virgin-memory.wasm',import.meta.url));
 function host(): ScriptHost {
   return new ScriptHost({ world: new ScriptWorld({ fields: {}, archetypes: [], events: [], maxEntities: 1 },
     [{ id: 1, name: 'door', position: [0, 0, 0], fields: {}, frozen: false, interactive: true }]), query: () => [] });
