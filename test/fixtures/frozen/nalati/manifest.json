@@ -76,6 +76,22 @@
       "name": "nalati-weather-original.json",
       "bytes": 6943,
       "sha256": "8a48b3361c08bee51e08348dcbe1a3b6f0698b888d6e16a3182787a6bbec0233"
+    },
+    {
+      "name": "nalati-night.json",
+      "bytes": 17480,
+      "sha256": "4e12c384e7b30f3bdb9fdcb9d381a0b3d28deb54c7fb7a7537611e9675bba3c8"
+    },
+    {
+      "name": "nalati-weather-original.wasm",
+      "bytes": 29379,
+      "sha256": "c8bc0a34e42bd416a8dd8d6d76b08a4d80cb3d548579b4d2cd651b02eab3fced"
     }
-  ]
+  ],
+  "supplement": {
+    "sourceRepository": "project-wildshard/shard-nalati",
+    "sourceCommit": "ea62309fa4fae8f9bfdc22a7c639f2a4a14dc5d2",
+    "night": "src/generators/nightRows.ts; ecology.modes read verbatim from src/data/ecology.json (ecologyRows forwards this field unchanged)",
+    "weather": "engine test/fixtures/nalati-weather-original.wasm; hash pinned by weather script.module"
+  }
 }

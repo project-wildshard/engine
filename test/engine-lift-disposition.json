@@ -9545,5 +9545,20 @@
     "sourceRevision": "d3ed088555a695916d7c03e284dbc3408b09594e",
     "sourceBlob": "59e8197afa6d20cbfb6f5f255dec9733d213b106",
     "retirementProof": "Restored public weather entry boundary; no J186 retirement or successor equivalence claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/client-timed-encounters.test.ts",
+    "outcome": "restored",
+    "target": "test/client-timed-encounters.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): Frozen night rows, weather guest and arrow profile preserve all three client admission, publication and retirement cases without moved shard fixtures.",
+    "originalTests": [
+      "finite construction rows refuse callbacks, paths and an unknown storm alias",
+      "the original two figure copies publish one watch and defer the day-clock loan until update",
+      "retirement during named-file admission refuses before encounter presentation and publication"
+    ],
+    "sourceRevision": "7ad578358b81ceaf380fd56a2faa72e9da6cdf0f",
+    "sourceBlob": "456426255e9f8e64fbd49096000eaacb5a742983",
+    "retirementProof": "Restored public runtime boundary; no cases retired."
   }
 ]

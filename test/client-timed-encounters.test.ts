@@ -1,7 +1,6 @@
 import {fixtureProductFile,fixtureJsonCheck} from './fixtures/productFile';
-// oxlint-disable-next-line import/no-nodejs-modules -- Read the actual generated envelope, not a static generated import.
-import { readFileSync } from 'node:fs';
-import { NALATI_NIGHT } from './fixtures/nalati-night';
+import { frozenNalatiJson } from './fixtures/frozen/nalati';
+const NALATI_NIGHT = frozenNalatiJson('nalati-night.json');
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { BoxGeometry, MeshBasicMaterial, PerspectiveCamera, Scene, Vector3, type Vector2 } from 'three';
@@ -40,7 +39,7 @@ function fixture(retireOnRead = false) {
     bindMeshMap: () => { throw new Error('No mapped watch looks'); }, instance: () => ({material: new MeshBasicMaterial(), setParam: () => undefined})});
   // Match the emitted combat wire; CueDirector borrows the separate presentation cues.
   const {cues, ...raw} = v.parse(v.record(v.string(), v.unknown()), structuredClone(NALATI_NIGHT));
-  const strikes = v.parse(v.record(v.string(), v.unknown()), JSON.parse(readFileSync('test/fixtures/nalati-strikeProfiles-original.json', 'utf8')));
+  const strikes = v.parse(v.record(v.string(), v.unknown()), frozenNalatiJson('nalati-strikeProfiles-original.json'));
   const admitted = v.parse(TimedEncountersSchema, {...raw,
     presentation: 'quarry', contact: {strike: strikes['arrow'], tags: ['creature.quarry'], origin: 'actor'}});
   const script = parseDecisionScripts([admitted.program.script])[0];
