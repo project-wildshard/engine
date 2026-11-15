@@ -181,6 +181,7 @@ if(expectedBuild!==undefined) {
       }
       const timing=await page.evaluate(snapshot);
       assert.ok(timing);
+      if(process.argv.includes('--inspect')) console.log(JSON.stringify({stretches:timing.entries.filter(row=>row.end!==null&&row.end-row.start>500).map(row=>({operation:row.operation,ms:Math.round((row.end??row.start)-row.start)}))}));
       assert.equal(Object.keys(timing.overflow??{}).length,0,'bounded collector overflowed');
       if(process.argv.includes('--inspect')) console.log(JSON.stringify({server:timing.entries.filter(row=>row.operation.startsWith('server:')).map(row=>({operation:row.operation,realm:row.realm,start:row.start,end:row.end})),clientPreloads:timing.entries.filter(row=>row.operation==='app:client-module-preload').map(row=>row.detail),workerResources:timing.resources.filter(row=>row.realm!=='page').map(row=>row.url)}));
       const operations=new Set(timing.entries.map(row=>row.operation));
