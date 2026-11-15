@@ -8,6 +8,7 @@ import { join, resolve as absolute } from 'node:path';
 import { Client } from 'pg';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { rigOptions } from './online-rig-options.mjs';
 
 const ROOT = absolute(import.meta.dirname, '..');
 /** The rig's four loopback ports, from 18796 (a lane beside another rig names its own: WS_RIG_PORTS=18856; its dist is stamped
@@ -44,16 +45,16 @@ export async function intoWorld(page) {
   await page.waitForFunction(() => (/** @type {NonNullable<typeof window.__workerClient>} */ (window.__workerClient))().frames > 30, undefined, { timeout: 60_000 });
 }
 
-/** `pgBin` 'memory:' keeps the saves in the server's memory, for a proof that never reads them back (voice-proof.mjs): no Postgres.
+/** `saves: 'memory'` (or legacy `pgBin` 'memory:') keeps the saves in the server's memory, for a proof that never reads them back (voice-proof.mjs): no Postgres.
  * `more` are other shards the release names, `cells` the server's `WORLD_CELLS` (default `shard`), and `socket` the address the
  * release names when a proof puts its own front door before the server (grid-gate-proof.mjs). Every rig has the road;
  * J353 removed the continuous-crossing switch. `workers` sets `WORLD_WORKERS` (the rig's release is production's,
  * 4 by default; staging runs 2). FM3: `origins` are loopback page origins the server also lets in, and `channel`
  * is the release file's channel (`production`).
- * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin: string, pgData: string, shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string }} options */
-export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgData, shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production' }) {
+ * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string }} options */
+export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production' }) {
   if (origins.some(origin => new URL(origin).origin !== origin || new URL(origin).hostname !== '127.0.0.1')) throw new Error('A rig lets in loopback page origins only');
-  const memory = pgBin === 'memory:';
+  const { memory } = rigOptions({ saves, pgBin, pgData, socket });
   const key = JSON.parse(readFileSync(keyFile, 'utf8')), build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist), DATABASE = memory ? 'memory:' : database('saves_online');
   mkdirSync(work, { recursive: true });
   const slugs = [shard, ...more], books = slugs.map(slug => `${slug}=${run(['--input-type=module', '-e', `console.log((await import('./scripts/built-product.mjs')).readBuiltShardfile(process.cwd(), '${slug}'))`], 'the product read').trim()}`);
