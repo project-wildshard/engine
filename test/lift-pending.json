@@ -6,7 +6,6 @@
   "test/approved-population-returns.test.ts",
   "test/arena-ground.test.ts",
   "test/arena-portal.test.ts",
-  "test/arena-room-fight.test.ts",
   "test/author-discovery.test.ts",
   "test/author-errors.test.ts",
   "test/author-lut-sampling.test.ts",

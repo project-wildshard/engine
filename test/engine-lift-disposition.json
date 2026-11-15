@@ -9167,7 +9167,10 @@
     "file": "test/boot-smoke-dispatch.test.ts",
     "outcome": "deleted-j186",
     "decision": "J186: the former 53-case workflow-text census was coupled to the retired Vercel deploy workflow and its private job roster. The release now has a different explicit producer path; no player or author boundary remains in this deleted file.",
-    "originalTests": ["the current main wave ships its own exact producer without waiting for its ship aggregate", "foreign, stale, pull-request and malformed producer identities cannot deploy"],
+    "originalTests": [
+      "the current main wave ships its own exact producer without waiting for its ship aggregate",
+      "foreign, stale, pull-request and malformed producer identities cannot deploy"
+    ],
     "sourceRevision": "388e11ae33990c1f62dc0adc37719b877002ffa4",
     "sourceBlob": "39ad4e168b7daa0afceafe4b9fbf16e76ae944a9",
     "retirementProof": "Individual body-reviewed J186 disposition; deleted with the retired deploy workflow in e185ba55, not flaky-test removal or successor equivalence."
@@ -9177,7 +9180,10 @@
     "file": "test/prepare-release-workflow.test.ts",
     "outcome": "deleted-j186",
     "decision": "J186: this six-case YAML-text census asserted private cache and prepare-step layout of the retired Vercel deploy workflow. It did not run a release or exercise a public author or player boundary.",
-    "originalTests": ["prepare enables Vercel only on push and binds both packs to the exact source run", "prepare cache compression keeps every restored family and its native bytes"],
+    "originalTests": [
+      "prepare enables Vercel only on push and binds both packs to the exact source run",
+      "prepare cache compression keeps every restored family and its native bytes"
+    ],
     "sourceRevision": "388e11ae33990c1f62dc0adc37719b877002ffa4",
     "sourceBlob": "f715068afff59a4b8138667caf831d48bb09c063",
     "retirementProof": "Individual body-reviewed J186 disposition; deleted with the retired deploy workflow in e185ba55, not flaky-test removal or successor equivalence."
@@ -9187,7 +9193,9 @@
     "file": "test/platform-build-tools.test.ts",
     "outcome": "deleted-j186",
     "decision": "J186: the old census fabricated monorepo source trees and asserted private line-accounting and build-tool attribution. The host-ruler replacement intentionally retired that internal representation rather than preserving a coupled unit harness.",
-    "originalTests": ["keeps build-only data, generators and config out of runtime users"],
+    "originalTests": [
+      "keeps build-only data, generators and config out of runtime users"
+    ],
     "sourceRevision": "4e30881ead02d9b9d21cfc6985fb0fc9be3e643a",
     "sourceBlob": "3147732d2d7baae659a37204a2d8ddfafc4234c2",
     "retirementProof": "Individual body-reviewed J186 disposition; deleted by the old-census retirement in 33d5e4e9, not flaky-test removal or successor equivalence."
@@ -9197,7 +9205,10 @@
     "file": "test/platform-chargebacks.test.ts",
     "outcome": "deleted-j186",
     "decision": "J186: the former chargeback suite pinned private source spans, shard ownership tables and approval bookkeeping from the pre-lift monorepo. It did not traverse a released product or public CLI boundary.",
-    "originalTests": ["reviewed Pine and Driftwood branches charge their actual owners", "whole-module cuts retire their old receipts while unknown missing modules still refuse"],
+    "originalTests": [
+      "reviewed Pine and Driftwood branches charge their actual owners",
+      "whole-module cuts retire their old receipts while unknown missing modules still refuse"
+    ],
     "sourceRevision": "4e30881ead02d9b9d21cfc6985fb0fc9be3e643a",
     "sourceBlob": "d2e6f4cbb41c6820222dd66e2704b6692f30cb33",
     "retirementProof": "Individual body-reviewed J186 disposition; deleted by the old-census retirement in 33d5e4e9, not flaky-test removal or successor equivalence."
@@ -9207,7 +9218,9 @@
     "file": "test/platform-output-reach.test.ts",
     "outcome": "deleted-j186",
     "decision": "J186: this test fabricated output trees to assert private output-census host and line attribution. The old census and its internal model were retired; it was not a public product admission or player journey.",
-    "originalTests": ["output census roots users only in emitted section hosts and authored runtime"],
+    "originalTests": [
+      "output census roots users only in emitted section hosts and authored runtime"
+    ],
     "sourceRevision": "4e30881ead02d9b9d21cfc6985fb0fc9be3e643a",
     "sourceBlob": "2de054b74ddab41d1cadc9cc2bbd98346c27b3f9",
     "retirementProof": "Individual body-reviewed J186 disposition; deleted by the old-census retirement in 33d5e4e9, not flaky-test removal or successor equivalence."
@@ -9218,7 +9231,11 @@
     "outcome": "restored",
     "target": "test/gen-programs.test.ts",
     "decision": "Restored in place (CI21 E-TOOL), 2 of 3 cases remain: generationPlan still exercises the engine's public preparation graph over a synthetic author tree. Retired (J186), 1 case: it imported the removed engine copy of build-shardfiles.mjs only to pin absence of an older scheduler; engine no longer builds shardfiles and that private module has no successor here.",
-    "originalTests": ["only a value-level named generate export selects the SDK program contract", "scoped products resolve composed folders once without executing source", "converted preparation and builder imports never load the legacy scheduler"],
+    "originalTests": [
+      "only a value-level named generate export selects the SDK program contract",
+      "scoped products resolve composed folders once without executing source",
+      "converted preparation and builder imports never load the legacy scheduler"
+    ],
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "e5e754b342c296aaecf1a4f084f413d7c9555cce",
     "retirementProof": "Individual body-reviewed J186 disposition; no flaky-test removal or successor equivalence is claimed for the retired scheduler-absence case."
@@ -9229,7 +9246,11 @@
     "outcome": "restored",
     "target": "test/ci-fail-fast.test.ts",
     "decision": "Restored in place (CI21 E-TOOL): the remaining real process-group case executes engine ci-checks.mjs and verifies that a first failure cancels its owned sibling before the sibling effect. Retired (J186), 20 deleted Python cases: they pinned the Vercel workflow's old reporter, prepare publication and job matrix; that workflow left engine in e185ba55.",
-    "originalTests": ["a first parallel check failure cancels its owned sibling before a later side effect", "test_interrupt_stops_owned_descendants_and_preserves_foreign_process", "test_behaviour_matrix_keeps_independent_jobs_and_runs_every_case"],
+    "originalTests": [
+      "a first parallel check failure cancels its owned sibling before a later side effect",
+      "test_interrupt_stops_owned_descendants_and_preserves_foreign_process",
+      "test_behaviour_matrix_keeps_independent_jobs_and_runs_every_case"
+    ],
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "d71ecee0e705eff8f7cde0abde6ce2394a4c174c",
     "retirementProof": "Individual body-reviewed J186 disposition for the deleted Python workflow suite (source 388e11ae, blob d567d72b); the restored engine process-group proof ran directly."
@@ -9273,7 +9294,14 @@
     "outcome": "restored",
     "target": "test/local-gate-scenarios.test.ts",
     "decision": "Restored in place (CI21 E-TOOL): the selector now names only current product-reader scenarios. Six removed monorepo scenario entries are retired under J186 because their files and private product contracts no longer exist; current ground-encounter and mover-carry readers retain the selection boundary.",
-    "originalTests": ["pine-npc-figure-product", "chapter-director-product", "pine-quest-actions-product", "pine-prop-product", "native-runtime-plan", "template-map-generation"],
+    "originalTests": [
+      "pine-npc-figure-product",
+      "chapter-director-product",
+      "pine-quest-actions-product",
+      "pine-prop-product",
+      "native-runtime-plan",
+      "template-map-generation"
+    ],
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "0eb821d1d5f8bcfaa27dfedf7ab570720e3de6a8",
     "retirementProof": "Individual body-reviewed J186 disposition for six missing scenario files; the restored test reads only existing public products."
@@ -9284,7 +9312,9 @@
     "outcome": "restored",
     "target": "test/platform-output-reader.test.ts",
     "decision": "Restored in place (CI21 E-TOOL): the engine-owned fixture emits one registered JSON file row with its exact hash, byte lengths and schema, then reads and corrupts the real output boundary. The two private sharddev blob-constructor unit cases do not belong in engine.",
-    "originalTests": ["admits registered named JSON, refuses private names and detects corrupt blob bytes"],
+    "originalTests": [
+      "admits registered named JSON, refuses private names and detects corrupt blob bytes"
+    ],
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "3dee5000b53916de2360cf7926cca6e7e555513d",
     "retirementProof": "Individual J186 disposition for the two private constructor assertions; no successor equivalence is claimed."
@@ -9338,7 +9368,9 @@
     "file": "test/shard-words-pin.test.ts",
     "outcome": "deleted-j186",
     "decision": "J186: this source-freshness test executes gen-shard-words over src/shards, a private multi-shard source tree that is no longer part of engine. The retained lint/shard-words.pin.json remains the engine's immutable word boundary; updates are now produced by the owning shard export workflow, so engine cannot truthfully regenerate or compare its private inputs.",
-    "originalTests": ["the pinned shard words match src/shards"],
+    "originalTests": [
+      "the pinned shard words match src/shards"
+    ],
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "be3209090eee14962d4cb48d3e6f05f4909f7cbb",
     "retirementProof": "Individual body-reviewed J186 disposition: retired source freshness, not the retained engine lint pin or a flaky test."
@@ -9397,5 +9429,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "4076ae1d89611ecd4471b1377d7189cf2b8e9fcc",
     "retirementProof": "J186: dynamic shard-source generation is not an engine public boundary after the split; keep engine's generic committed-input proof and test the producer in sharddev."
+  },
+  {
+    "repo": "engine",
+    "file": "test/arena-room-fight.test.ts",
+    "outcome": "restored",
+    "target": "test/arena-room-fight.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME): the generic arena-page schema now reads a compact engine-owned frozen page, not Nalati's authored fixture.",
+    "originalTests": [],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "1d52ed33d918fcaab70272e8609cda653140264b",
+    "retirementProof": "Restored current arena schema boundary; no J186 retirement or successor equivalence claimed."
   }
 ]
