@@ -280,10 +280,11 @@ export class MoverRuntime {
   }
   /** Queue a host-validated interact command; scene dispatch resolves the stable mover id, never an arbitrary function export. */
   command(id: string, action: 1 | 2 | 3, player?: string): void {
+    const rider = player === this.nativeOwner ? undefined : player;
     const row = this.data.find(m => m.id === id); if (row === undefined) throw new Error('Unknown mover');
     if (row.carry !== undefined) {
-      if (this.riding(id) || this.carrying(player) || action === 3) return;
-      if (player === undefined) this.riders.delete(id); else this.riders.set(id, player);
+      if (this.riding(id) || this.carrying(rider) || action === 3) return;
+      if (rider === undefined) this.riders.delete(id); else this.riders.set(id, rider);
     }
     this.pending.set(id, action);
   }
@@ -293,8 +294,8 @@ export class MoverRuntime {
     if (id !== undefined && rows.length === 0) throw new Error('Unknown mover');
     return rows.some(row => row.carry !== undefined && (this.pending.has(row.id) || [1, 0.5].includes(this.host.world.entity(row.entity)?.fields[6] ?? 0)));
   }
-  /** Whether `player` (the lead when absent) is on a carry mover: each carries the one who called it. */
-  carrying(player?: string): boolean { return this.data.some(row => row.carry !== undefined && this.riders.get(row.id) === player && this.riding(row.id)); }
+  /** Whether `player` (the configured owner when absent) is on a carry mover. */
+  carrying(player?: string): boolean { const rider = player === this.nativeOwner ? undefined : player; return this.data.some(row => row.carry !== undefined && this.riders.get(row.id) === rider && this.riding(row.id)); }
   /** View-only edges, including first arrival hints, never an authored update hook. */
   takeRideTransitions(id: string): readonly MoverRideTransition[] { return this.rideEvents.get(id)?.splice(0) ?? []; }
   /** Borrow the same declared prompts on the page; the native command names are the stable mover ids. */

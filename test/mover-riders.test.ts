@@ -12,6 +12,9 @@ import { SimNetWorld } from '../src/server/engine/net/simWorld';
 import { createSimHost,type SimHost } from '../src/server/engine/sim';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { MoverScriptDriver,playerGrounds,type MoverRuntime } from '../src/server/game/plugin/mover';
+import { installPlayerOwned } from '../src/server/game/loot/playerOwned';
+import { PlayerStore } from '../src/server/host/dedicated/playerStore';
+import { DeclaredQuests } from '../src/shared/game/quest/declared';
 import { questBooks } from '../src/shared/engine/quest/players';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
@@ -32,16 +35,33 @@ function install(host: SimHost, owner?: string): MoverRuntime {
 const landing = (end: 0 | 1): Vector3 => { const at = row.carry?.landings[end]; if (at === undefined) throw new Error('Missing landing'); return new Vector3(...at); };
 function rapierNow(): ReturnType<typeof loadRapier> { return loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))); }
 
-test('an explicit mover owner can be another seat while the first player stays ashore', async () => {
+test('two room seats keep their quest, inventory and mover state separate', async () => {
   const host = createSimHost(level, { rapier: await rapierNow() });
   try {
-    const rider = host.addPlayer(BOT, { x: 3, y: 1, z: 3 }), first = leadPlayer(host), stood = first.position.clone(), motion = install(host, BOT);
+    const rider = host.addPlayer(BOT, { x: 3, y: 1, z: 3 }), first = leadPlayer(host), stood = first.position.clone();
+    const stores = new Map([[first.id, new PlayerStore({}, () => undefined)], [BOT, new PlayerStore({}, () => undefined)]]);
+    const goods = installPlayerOwned(host, 'carry-test', undefined, true, id => {
+      const store = stores.get(id); if (store === undefined) throw new Error(`Missing store ${id}`); return store.slots;
+    });
+    new DeclaredQuests(host, { flags: ['secret:islet', 'quest:ride'], triggers: [], dialogue: [], quests: [{ id: 'ride', title: 'Cross the river',
+      steps: [{ id: 'arrive', objective: 'Reach the islet', done: { all: ['secret:islet'] } }], completeFlag: 'quest:ride', onComplete: { coins: 3 } }] },
+    { fact: () => undefined, coins: (amount, id) => { goods.of(id).file({ grant: 'coins', name: 'coins', amount }); } });
+    goods.of(first.id).add('hide', 1); goods.of(BOT).add('hide', 2);
+    const motion = install(host, BOT);
     motion.command(row.id, 1);
+    host.step();
+    expect(motion.carrying(BOT)).toBe(true); expect(motion.carrying(first.id)).toBe(false);
     for (let tick = 0; tick < 550 && motion.riding(row.id); tick++) host.step();
     expect(rider.position.distanceTo(landing(1))).toBeLessThan(1e-6);
+    host.step();
     expect(first.position.distanceTo(stood)).toBeLessThan(1);
     expect(questBooks(host).of(BOT).flags.has('secret:islet')).toBe(true);
     expect(questBooks(host).of(first.id).flags.has('secret:islet')).toBe(false);
+    expect(questBooks(host).of(BOT).quests.find(quest => quest.def.id === 'ride')?.isComplete).toBe(true);
+    expect(questBooks(host).of(first.id).quests.find(quest => quest.def.id === 'ride')?.isComplete).toBe(false);
+    expect(goods.of(BOT).purse.coins).toBe(3); expect(goods.of(first.id).purse.coins).toBe(0);
+    expect(goods.of(BOT).count('hide')).toBe(2); expect(goods.of(first.id).count('hide')).toBe(1);
+    expect(stores.get(BOT)?.documents()).not.toEqual(stores.get(first.id)?.documents());
   } finally { host.dispose(); }
 });
 
