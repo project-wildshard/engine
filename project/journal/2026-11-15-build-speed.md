@@ -42,3 +42,12 @@ Their CLI modules guard execution, stores belong to each case, and the
 compiler case owns its materials. Isolated: 5.015 CPU-s / 5.687 s wall;
 shared seeds 7/73: 2.581/2.611 CPU-s / 2.990/3.057 s wall. All cases
 pass without changing assertions or test clocks.
+
+The first hosted branch run (43763440481) found TS7's ownership test over
+30 s on the full Template bank. Use a small real format-2 disk product:
+valid sections plus one server binary and one page image, both admitted
+by loadHeadlessProduct. All read-count, independent-array/source, complete
+bank, mode and retry assertions remain. A shared-byte mutant fails the
+old and bounded fixtures on the same ownership assertion, without a
+clock failure. Shipped-product integration stays in the Pine journey.
+Bounded positives: 44.48/30.03 ms; real Pine continuation 10.70 s.
