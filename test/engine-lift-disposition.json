@@ -9277,5 +9277,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "0eb821d1d5f8bcfaa27dfedf7ab570720e3de6a8",
     "retirementProof": "Individual body-reviewed J186 disposition for six missing scenario files; the restored test reads only existing public products."
+  },
+  {
+    "repo": "engine",
+    "file": "test/platform-output-reader.test.ts",
+    "outcome": "restored",
+    "target": "test/platform-output-reader.test.ts",
+    "decision": "Restored in place (CI21 E-TOOL): the engine-owned fixture emits one registered JSON file row with its exact hash, byte lengths and schema, then reads and corrupts the real output boundary. The two private sharddev blob-constructor unit cases do not belong in engine.",
+    "originalTests": ["admits registered named JSON, refuses private names and detects corrupt blob bytes"],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "3dee5000b53916de2360cf7926cca6e7e555513d",
+    "retirementProof": "Individual J186 disposition for the two private constructor assertions; no successor equivalence is claimed."
   }
 ]

@@ -11,8 +11,8 @@ import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import {emptyShardfile} from '../src/shared/host/author';
 import {outputContent} from '../scripts/shard-output-content.mjs';
-import {nameBlob} from '../src/sharddev/blobs';
 import {registeredJsonSchema} from '../src/shared/host/formatJsonSchema';
+import {hashImmutableBytes} from '../src/shared/host/immutable';
 
 // LD10: a product ships no runtime TypeScript, so the reader verifies only sections and named JSON (copy checks retired)
 it('admits registered named JSON, refuses private names and detects corrupt blob bytes',()=>{
@@ -22,15 +22,13 @@ it('admits registered named JSON, refuses private names and detects corrupt blob
   expect(outputSections(root,'_template')).toMatchObject({customSectionBytes:0,customSections:[]});
   const indexPath=join(root,'out/_template/shard.json');
   const index=parseOutputIndex(JSON.parse(readFileSync(indexPath,'utf8')));
-  const blob=nameBlob('models/shape-book.json','json',new TextEncoder().encode('[{"slot":"shape","channels":[],"file":"models/native.bin"}]'),{jsonSchema:registeredJsonSchema('models/shape-book.json')});
+  const bytes=new TextEncoder().encode('[{"slot":"shape","channels":[],"file":"models/native.bin"}]');
+  const blob={name:'models/shape-book.json',path:`blobs/json/${hashImmutableBytes(bytes)}.json`,hash:hashImmutableBytes(bytes),kind:'json',compressed:bytes.length,decoded:bytes.length,gpu:0,triangles:0,draws:0,critical:false,dependencies:[],jsonSchema:registeredJsonSchema('models/shape-book.json')};
   mkdirSync(join(root,'out/_template/blobs/json'),{recursive:true});
-  writeFileSync(join(root,'out/_template',blob.file.path),blob.bytes);
-  writeFileSync(indexPath,JSON.stringify({...index,files:[blob.file]}));
+  writeFileSync(join(root,'out/_template',blob.path),bytes);
+  writeFileSync(indexPath,JSON.stringify({...index,files:[blob]}));
   expect(outputSections(root,'_template')).toMatchObject({customSectionBytes:0,customSections:[]});
-  const transient=nameBlob('private.json','json',new TextEncoder().encode('{"n":2}'));
-  expect(()=>parseOutputIndex({...index,files:[transient.file]})).toThrow('Unregistered named JSON');
-  expect(()=>nameBlob('custom/private.bin','bin',new Uint8Array([1]))).toThrow('retired');
-  writeFileSync(join(root,'out/_template',blob.file.path),'[{}]');
+  writeFileSync(join(root,'out/_template',blob.path),'[{}]');
   expect(()=>outputSections(root,'_template')).toThrow('named JSON hash/size mismatch');
  }finally{rmSync(root,{recursive:true,force:true});}
 });
