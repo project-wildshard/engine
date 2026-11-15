@@ -11,7 +11,18 @@ import { createCatalogueAudio } from '@wildshard/engine/audio/levelAudio';
 import { parseAudioData } from '@wildshard/format/audio';
 import * as settings from '@wildshard/engine/ui/Settings';
 import { ENGINE_MUSIC_STYLE } from '@wildshard/engine/audio/bootAudio';
-import source from '../src/shards/driftwood-isle/data/audioSource.json' with { type: 'json' };
+
+const source = { audio: {
+  cues: [],
+  music: { id: 'fixture.score', base: 'island', slots: ['island', 'pine'], bootSlots: ['title', 'island', 'pine'], controlTension: 'late',
+    lifecycle: { persistent: false, dispose: true, logChanges: false }, synthLead: 'marimba', minFade: 0, source: null,
+    sets: { island: 'base', pine: 'base' }, selection: [{ slots: ['island'], when: [] }], selectMode: 'first',
+    catalogue: { mode: 'bank', extraStings: [], stingSets: {} } },
+  samples: { bed: 'fixture', set: 'fixture', loopGains: { fixture: 0.5 },
+    catalogue: { inventoryOmitSlots: [], loopOrder: ['fixture'], overlaySamples: true, ownMusic: false, priorityOwn: false } },
+  score: 'default', routing: [],
+  ambience: null,
+} };
 
 await installAssetFixture();
 

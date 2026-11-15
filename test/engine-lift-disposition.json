@@ -9288,5 +9288,16 @@
     "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
     "sourceBlob": "3dee5000b53916de2360cf7926cca6e7e555513d",
     "retirementProof": "Individual J186 disposition for the two private constructor assertions; no successor equivalence is claimed."
+  },
+  {
+    "repo": "engine",
+    "file": "test/boot-audio-packs.test.ts",
+    "outcome": "restored",
+    "target": "test/boot-audio-packs.test.ts",
+    "decision": "Restored in place (CI21 E-TOOL): the public product reader receives a synthetic, schema-valid audio declaration with a nullable ambience field. It verifies exact signed product bytes and the native late-clip grouping without importing a Driftwood author source.",
+    "originalTests": [],
+    "sourceRevision": "e3c7453982f3b0c57eff080035a9976000a87db0",
+    "sourceBlob": "5f4f479e553c8fad35e77f8e7ccad80e0e43c8b8",
+    "retirementProof": "Restored current product-reader boundary; no J186 retirement or successor equivalence claimed."
   }
 ]
