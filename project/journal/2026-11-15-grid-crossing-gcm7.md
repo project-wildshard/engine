@@ -46,3 +46,9 @@
 - ZE8 (opus-gcm8): `bufferAt` (zoneWalls.ts) finds the walled cell whose 8 x 10 m buffer the feet stand in, `GateCount`
   counts 5 to 0 once a second and fires once, and `GateCard` pins a Shard Select-style DOM card to the gate's face through
   the camera. The session fires `host.enterZone` at 0; ZE10 wires it to the loading screen.
+- ZE3 (opus-gcm8): `scripts/road-drive-proof.mjs` drives every segment of the junction lattice (60 of 60 in 80 steps: every
+  row, every column, outer ring included) with the run key held, steering in the page to waypoints that keep 10 m off each
+  roundabout's island, then walks back into the home. A 3-segment check from Driftwood on the mini (build `58bf1ea3`):
+  7.2 m/s, 0 frames over 50 ms, stops 54-101 ms, no card, but the page held Nalati and then nothing: the home is retired
+  on the road (`playingMB` touched the 1200 MB desktop envelope beside Nalati). ZE1's one-home path is what fixes that;
+  the whole drive (about 45 km, ~105 min at 7.2 m/s) runs on the mini once ZE1 lands.
