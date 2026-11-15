@@ -21,7 +21,15 @@ export default defineConfig({
     baseURL: BASE_URL,
     trace: 'retain-on-failure',
     ...devices['Desktop Chrome'],
-    launchOptions: { args: [...KEYCHAIN_ARGS, '--mute-audio'] },
+    launchOptions: {
+      args: [
+        ...KEYCHAIN_ARGS,
+        '--mute-audio',
+        ...(process.platform === 'darwin'
+          ? ['--use-angle=metal', '--ignore-gpu-blocklist']
+          : []),
+      ],
+    },
   },
   webServer: {
     command: `node scripts/preview-server.mjs --port ${String(E2E_PORT)} --outDir "${process.env['WS_T1_BUILD_DIR'] ?? 'dist'}" --telemetry-dir tmp/${process.env['WS_LANE_NAME'] ?? 't1-e2e'}/t1/telemetry`,

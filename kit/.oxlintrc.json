@@ -87,7 +87,13 @@
             // A test drives one page through its own handle (src/e2e/smoke/).
             "from": "package",
             "package": "playwright-core",
-            "name": ["Page", "Route", "ConsoleMessage"]
+            "name": [
+              "Page",
+              "Route",
+              "ConsoleMessage",
+              "Browser",
+              "BrowserContext"
+            ]
           },
           {
             "from": "package",
@@ -96,7 +102,8 @@
               "PlaywrightTestArgs",
               "PlaywrightTestOptions",
               "PlaywrightWorkerArgs",
-              "PlaywrightWorkerOptions"
+              "PlaywrightWorkerOptions",
+              "WorkerInfo"
             ]
           }
         ]
@@ -168,7 +175,7 @@
     },
     {
       // A journey spec is one story in test.step blocks, and it reads the page's own double-underscore globals.
-      "files": ["e2e/smoke/**"],
+      "files": ["e2e/smoke/**", "e2e/t1/**"],
       "rules": {
         "eslint/max-statements": "off",
         "eslint/max-lines-per-function": "off",
