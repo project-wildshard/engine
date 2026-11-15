@@ -1,4 +1,4 @@
-# Brasscap rev 5 pinned (opus-brassgun4, TEMPLATE-E2E)
+# Brasscap rev 5, then rev 6, pinned (opus-brassgun4, TEMPLATE-E2E)
 
 - Staging showed no bandits or Wyrm in Brasscap's cell although the
   0.5.1 upload (rev 5, `a53826e5…`, shard-brasscap `57e5c6f`) went to the
@@ -40,3 +40,16 @@
   null for one with no far row), and the derived far GLB must match the
   index row's commons flag, as `read` does. Tests cover the derived GLB,
   the commons mismatch and both mesh cases.
+
+## Rev 6 pinned (same lane, after main's recovery b52607cf)
+
+- Main's cook refused rev 5 at "Blocked edge entry east lane 0 at
+  47.20m, y -0.151" (codex-netlag put the pins back on rev 3). The dunes
+  faded to road height only between 190 and 230 m, inside the 50 m entry
+  walk. shard-brasscap `1e8c369` fades them between 150 and 195 m;
+  `edbd9bb` recaptures the hero.
+- Upload 0.5.2 is `blender-template` rev 6 (`e99b0fb4…`, 20,506,624
+  bytes, staging channel). The cook worker refuses rev 5 and proves rev 6
+  with the same local script; `ring-cook` proves it in 8.3 s. Pins,
+  saves refusal and the physics route move to rev 6 together (the camps
+  are rev 5's, so the ledge-ladder leg stands).

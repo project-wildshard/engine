@@ -190,7 +190,7 @@ export function readGridShardfileFar(slug: string, anyWorld = false): Promise<Gr
 }
 /** A shardfile far proxy's rows and a verified reader for its declared far files. */
 export interface GridShardfileFar { readonly rows: ShardfileFarRows; readonly read: (ref: string) => Promise<Uint8Array> }
-/** `readGridShardfileFar` for one product URL (null: no mesh-collision world, so its far proxy is the baked folder's).
+/** `readGridShardfileFar` for one product URL (null: no mesh-collision world, unless `anyWorld`, so its far proxy is the baked folder's).
  *  `anyWorld`: the build baked no far folder for this slug, so any world's own far row is read (TEMPLATE-E2E: Brasscap rev 5
  *  has no mesh collision and no repo bake; null then only when its tiles carry no far row). */
 export async function readGridProductFar(url: string, identity: string, options: ProductOptions, anyWorld = false): Promise<GridShardfileFar | null> {
