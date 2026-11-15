@@ -26,3 +26,12 @@
   are left and are the server's: the walk back in stops at the server road's own cell wall (2 m out, `roadWorld.ts`)
   while the server reloads the home its GC5 road warm evicted (standalone keeps 1 resident), and Driftwood's step out
   still stands 150 to 340 ms at 10.4 m.
+- The server's two holds, measured with probe builds on the mini (not committed). With the server's GC5 road warm off
+  (`room.ts` `warm`), Driftwood's walk back in stops 55 to 57 ms (98 to 349 ms with it): the warm opens the cell ahead,
+  standalone keeps one resident, so the home is evicted and rebuilt behind the server road's wall. ZE1 deletes the warm.
+  Driftwood's step out stands while the server checkpoints the home it leaves: `capture` (the whole cell's snapshot,
+  synchronous) takes 122 to 134 ms in the in-page server, and the page's fixed steps stop with it (the motion tick
+  stands still for ~150 ms at 10.4 m), so the stop is 150 to 340 ms. Nalati's smaller world: 48 to 101 ms.
+- Phone layout (Chromium with Playwright's iPhone 15 Pro; the mini's headless WebKit times out at launch): the first
+  lap has one 166 to 417 ms frame at the edge each way (2 of 4 legs), the second lap none; stops 62 to 432 ms. That
+  first-lap edge frame is ZE2's other half (the home's interior and tiles admitted on the edge frame).
