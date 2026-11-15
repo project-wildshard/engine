@@ -17,6 +17,7 @@ import { bundleDescriptor, releasePublicKey, releaseShards, signRelease } from '
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { worldCells } from '../src/server/host/dedicated/gridCells';
 import { publishChannel, serverPacksReady } from '../scripts/server-release/publish.mjs';
+import { copyItemCatalogue } from '../scripts/server-release/items.mjs';
 import { readReleaseFile } from '../src/server/host/dedicated/releaseFile';
 import { readSignedRelease } from '../src/client/host/online/release';
 import type { ReleaseFile } from '../src/shared/host/releaseRows';
@@ -178,6 +179,27 @@ test('J234: both channels sign a build only after its server book and parts are 
     expect(channel('production')).toMatchObject({ engineBuild: newest, serial: 2 });
     await expect(publish(newest, true, 'production')).rejects.toThrow(/Only staging/u);
     expect(writes).toBe(4);
+    // Q37: publication copies the API document once, then signs its immutable identity.
+    const source = { version: 1, items: [{ id: 'sword', maxTier: 3 }, { id: 'amulet', maxTier: 1 }] };
+    objects.set('/api/items.json', JSON.stringify(source));
+    const apiRead: typeof fetch = async (_url, init) => fetch(`http://127.0.0.1:${String(address.port)}/api/items.json`, init);
+    const items = await copyItemCatalogue(client, 'packs', apiRead), body = objects.get(items.path);
+    expect(JSON.parse(body ?? '')).toEqual({ version: 1, items: [...source.items].reverse() });
+    expect(await copyItemCatalogue(client, 'packs', apiRead)).toEqual(items);
+    expect(writes, 'the same hash-named object is not overwritten').toBe(5);
+    const candidate = { ...release(newest), items };
+    expect(await serverPacksReady(client, 'packs', candidate)).toBeNull();
+    const signedItems = await publishChannel({ client, bucket: 'packs', candidate, privateKey: pem, publicKey, isAncestor,
+      packsReady: next => serverPacksReady(client, 'packs', next) });
+    expect(signedItems.status).toBe('published'); expect(channel().items).toEqual(items);
+    expect(await readSignedRelease(signedItems.signed, publicKey)).toEqual(signedItems.release);
+    objects.delete(items.path);
+    expect(await serverPacksReady(client, 'packs', candidate)).toBe(`no item catalogue at ${items.path}`);
+    objects.set(items.path, 'corrupt');
+    expect(await serverPacksReady(client, 'packs', candidate)).toBe(`item catalogue hash mismatch at ${items.path}`);
+    await expect(copyItemCatalogue(client, 'packs', apiRead)).rejects.toThrow('Existing item catalogue hash mismatch');
+    objects.set('/api/items.json', JSON.stringify({ version: 1, items: [source.items[0], source.items[0]] }));
+    await expect(copyItemCatalogue(client, 'packs', apiRead)).rejects.toThrow('Duplicate platform item');
   } finally { client.destroy(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); }
 });
 

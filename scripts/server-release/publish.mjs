@@ -8,6 +8,7 @@ import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, S3Serv
 import * as v from 'valibot';
 import { readServerPackBook, serverPackBookPath } from '../../src/shared/game/shardfile/serverPack.ts';
 import { bundleDescriptor, COMMIT, DEFAULT_SERVER_SHARDS, publication, readPublication, releasePublicKey, releaseShards, signRelease } from './sign.mjs';
+import { copyItemCatalogue, itemBytesMatch } from './items.mjs';
 
 /** @typedef {import('../../src/shared/host/releaseRows.ts').ReleaseFile} ReleaseFile */
 /** @typedef {{client: S3Client, bucket: string, candidate: ReleaseFile, privateKey: string, publicKey: string, isAncestor: (older: string, newer: string) => boolean,
@@ -22,6 +23,12 @@ const missing = error => error instanceof S3ServiceException && (error.name === 
  *  no book strands every check behind it. Null when the book and every part the release's shards and grid need are in the bucket.
  * @param {S3Client} client @param {string} bucket @param {ReleaseFile} release @returns {Promise<string | null>} */
 export async function serverPacksReady(client, bucket, release) {
+  if (release.items !== undefined) {
+    let body;
+    try { body = await (await client.send(new GetObjectCommand({ Bucket: bucket, Key: release.items.path }))).Body?.transformToByteArray(); }
+    catch (error) { if (missing(error)) return `no item catalogue at ${release.items.path}`; throw error; }
+    if (body === undefined || !itemBytesMatch(body, release.items)) return `item catalogue hash mismatch at ${release.items.path}`;
+  }
   const key = serverPackBookPath(release.engineBuild);
   let text;
   try { text = await (await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))).Body?.transformToString(); }
@@ -126,7 +133,8 @@ async function main() {
   const client = new S3Client({ region: 'auto', endpoint: `https://${account}.r2.cloudflarestorage.com`, credentials });
   try {
     const packsReady = (/** @type {ReleaseFile} */ release) => serverPacksReady(client, bucket, release);
-    const result = await publishChannel({ client, bucket, candidate, privateKey, publicKey, isAncestor, align, packsReady });
+    const items = await copyItemCatalogue(client, bucket);
+    const result = await publishChannel({ client, bucket, candidate: { ...candidate, items }, privateKey, publicKey, isAncestor, align, packsReady });
     writeFileSync(values.out, `${result.signed}\n`);
     console.log(JSON.stringify({ status: result.status, channel: result.release.channel, serial: result.release.serial, engineBuild: result.release.engineBuild, object: `releases/${result.release.channel}.json`,
       ...result.reason === undefined ? {} : { held: candidate.engineBuild, reason: result.reason } }));

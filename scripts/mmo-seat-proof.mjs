@@ -16,16 +16,20 @@ const signed=await(await fetch('https://packs.wildshard.io/releases/staging.json
 assert.equal(release.channel,'staging');assert.equal(release.socket,'wss://rooms-staging.wildshard.io');
 const version=await(await fetch('https://staging.wildshard.io/version.json')).json();assert.equal(version.build,release.engineBuild);
 const browser=await(engine==='webkit'?webkit:chromium).launch({headless:true,args:engine==='webkit'?[]:[...KEYCHAIN_ARGS,'--use-angle=metal']});
-const faults=[],report={engine,build:version.build,serial:release.serial};
+/** @type {string[]} */ const faults=[];
+/** @type {{engine:string,build:string,serial:number,coldTitle?:boolean,visibleAfterPlay?:boolean,leaveMs?:number,errors?:string[]}} */
+const report={engine,build:version.build,serial:release.serial};
 try {
- const page=async()=>{const c=await browser.newContext({viewport:{width:960,height:600}});await saveFixture(c,{scope:'device',key:'devMode',data:true});await c.addInitScript(guardStagingSockets,release.socket);await c.addInitScript(()=>{window.requestAnimationFrame=callback=>setTimeout(()=>callback(performance.now()),1000/30);window.cancelAnimationFrame=id=>clearTimeout(id);});const p=await c.newPage();p.on('pageerror',e=>faults.push(e.message));return p;};
+ const page=async()=>{const c=await browser.newContext({viewport:{width:960,height:600}});await saveFixture(c,{scope:'device',key:'devMode',data:true});await c.addInitScript(guardStagingSockets,release.socket);await c.addInitScript(()=>{window.requestAnimationFrame=callback=>window.setTimeout(()=>callback(performance.now()),1000/30);window.cancelAnimationFrame=id=>window.clearTimeout(id);});const p=await c.newPage();p.on('pageerror',e=>faults.push(e.message));return p;};
  const a=await page(),b=await page(),tag=Date.now().toString(36).slice(-5),nameA=`Seat ${tag} A`,nameB=`Seat ${tag} B`;
  await a.goto('https://staging.wildshard.io/?chunk=driftwood-isle&fps=30&mute=1&nolock=1');
  await a.locator('.ws-main-select').waitFor({timeout:45000});
  report.coldTitle=await a.evaluate(()=>!window.__workerClient&&!window.__wildshard?.world);
  assert.equal(report.coldTitle,true);console.log('PASS cold title has no world or seat');
  await b.goto('https://staging.wildshard.io/?chunk=driftwood-isle&fps=30&mute=1&nolock=1&skipintro=1');
+ /** @param {import('playwright').Page} p @param {string} name */
  const named=async(p,name)=>{await p.locator('#ws-name-box input').waitFor({timeout:90000});await p.locator('#ws-name-box input').fill(name);await p.locator('#ws-name-box button[type=submit]').click();};
+ /** @param {import('playwright').Page} p @param {string} name @param {boolean} [alreadyNamed] */
  const enter=async(p,name,alreadyNamed=false)=>{if(!alreadyNamed)await named(p,name);await p.waitForFunction(()=>window.__workerClient&&window.__wildshard?.world?.player,undefined,{timeout:90000});await p.evaluate(FLOOR_GRID_ENTER);await p.waitForFunction(()=>(window.__workerClient?.().frames??0)>30,undefined,{timeout:30000});};
  await enter(b,nameB);console.log('observer seated');
  const before=await b.evaluate(()=>window.__onlinePlayers?.()??[]);assert.equal(before.some(r=>new RegExp(playerNameSource(nameA),'u').test(r.name)),false);

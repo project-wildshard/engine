@@ -14,10 +14,13 @@ export interface ReleaseFile {
   readonly bundle?: { readonly name: string; readonly sha256: string };
   /** The address clients dial. For the first sitting this is the quick tunnel's name (C22). */
   readonly socket?: string;
+  /** Q37: immutable trusted item data, copied from the API before this release is signed. */
+  readonly items?: { readonly path: string; readonly sha256: string; readonly bytes: number };
 }
 const Whole = v.pipe(v.number(), v.integer(), v.minValue(0));
 /** A release file's body, once its signature has held. */
 export const ReleaseSchema: v.GenericSchema<ReleaseFile> = v.object({ channel: v.picklist(['production', 'staging', 'preview']), serial: Whole, engineBuild: v.pipe(v.string(), v.minLength(1)), saveEpoch: v.pipe(Whole, v.minValue(1)), shards: v.array(v.object({ slug: v.string(), revision: Whole })),
-  bundle: v.exactOptional(v.object({ name: v.pipe(v.string(), v.minLength(1)), sha256: v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/u)) })), socket: v.exactOptional(v.string()) });
+  bundle: v.exactOptional(v.object({ name: v.pipe(v.string(), v.minLength(1)), sha256: v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/u)) })), socket: v.exactOptional(v.string()),
+  items: v.exactOptional(v.pipe(v.strictObject({ path: v.pipe(v.string(), v.regex(/^assets\/catalogue\/items-[0-9a-f]{64}\.json$/u)), sha256: v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/u)), bytes: v.pipe(v.number(), v.safeInteger(), v.minValue(1), v.maxValue(1_048_576)) }), v.check(row => row.path === `assets/catalogue/items-${row.sha256}.json`, 'Item catalogue digest and path disagree'))) });
 /** The file on R2: the body as signed, and its signature in hex (C20). */
 export const SignedSchema: v.GenericSchema<{ readonly body: string; readonly signature: string }> = v.object({ body: v.string(), signature: v.string() });
