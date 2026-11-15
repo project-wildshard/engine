@@ -35,3 +35,7 @@
 - Phone layout (Chromium with Playwright's iPhone 15 Pro; the mini's headless WebKit times out at launch): the first
   lap has one 166 to 417 ms frame at the edge each way (2 of 4 legs), the second lap none; stops 62 to 432 ms. That
   first-lap edge frame is ZE2's other half (the home's interior and tiles admitted on the edge frame).
+- ZE2 (opus-gcm8): the in-page server no longer captures a cell's whole world at the step onto the road. The world left
+  stays resident with all it holds, so its capture is owed and taken at its eviction (parking the owner's seat for the
+  capsule a capture reads); progress saves still write a cell as its progress moves. A reload while on the road loses only
+  what moved in the cell since its last progress save. `test/grid-leave-owed-capture.test.ts`, red first.

@@ -25,7 +25,10 @@ export interface GridSimulationPorts {
   /**
    * An owner that keeps every continuation itself, and reloads them in `load` (E5.2b, a phone's worker). It captures an occupied
    * world when told to, in whatever form it stores. Nothing is captured on admission or packed in memory: capturing a whole
-   * physics world grows a wasm heap that never gives it back, and a world nobody entered has nothing to keep.
+   * physics world grows a wasm heap that never gives it back, and a world nobody entered has nothing to keep. ZONE-ENTRY ZE2:
+   * it is not told at a leave. The world left stays resident with everything it held, so its capture is owed until its
+   * eviction, the only time it is lost: a whole world's capture stood the in-page server's tick for 122 to 134 ms
+   * (Driftwood) on the step onto the road. What a reload in between loses is only what moved since its last progress save.
    */
   durable?: (instance: string, host: SimHost) => boolean;
   read?: (instance: string) => SimSnapshot | undefined;
@@ -97,6 +100,8 @@ export class GridSimulation {
   private readonly requests = new Map<string, Promise<void>>();
   private readonly cancelFrames = new Set<() => void>();
   private readonly cleanupIssues: string[] = [];
+  /** Worlds left with their `durable` capture not yet taken (ZE2): it is taken at their eviction. */
+  private readonly owed = new Set<string>();
   private sequence: Promise<void> = Promise.resolve();
   private used = 0;
   private disposed = false;
@@ -230,7 +235,15 @@ export class GridSimulation {
   /** Snapshot before leaving the active region. Failure keeps both its world and the traveller authoritative. */
   checkpoint(instance: string): boolean {
     const resident = this.residents.get(instance); if (resident === undefined || this.disposed) return false;
-    if (this.ports.durable !== undefined) return !this.occupied(instance) || this.ports.durable(instance, resident.value.host);
+    if (this.ports.durable !== undefined) {
+      if (this.occupied(instance)) { this.owed.add(instance); return true; }
+      if (!this.owed.has(instance)) return true;
+      // Nobody stands here, so the owner's seat holds no capsule; a capture reads one, as a parked seat holds.
+      const { host } = resident.value, parked = !this.seat(host, this.owner).hasMotor;
+      if (parked) this.parkOwner(host);
+      try { if (!this.ports.durable(instance, host)) return false; } finally { if (parked) this.unparkOwner(host); }
+      this.owed.delete(instance); return true;
+    }
     const snapshot = this.occupied(instance) ? snapshotSimHost(resident.value.host) : this.snapshots.read(instance);
     if (snapshot === undefined) throw new Error('Missing admitted grid continuation');
     const packed = this.snapshots.pack(instance, snapshot); if (packed === null) return false;
@@ -261,7 +274,7 @@ export class GridSimulation {
       commit: () => {
         if (closed) return; closed = true;
         if (this.disposed || this.residents.get(instance) !== resident) return;
-        this.residents.delete(instance);
+        this.residents.delete(instance); this.owed.delete(instance);
         if (this.ports.read !== undefined) this.snapshots.drop(instance);
         // Each cleanup runs even if another fails. The infallible allocator commit exposes failures for the session owner.
         for (const dispose of [() => { this.ports.invalidated?.(instance); }, () => { resident.value.dispose(); }, () => { resident.lease?.release(); }]) {
