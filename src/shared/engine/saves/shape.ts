@@ -15,14 +15,29 @@ const optionsOf = (schema: Node): readonly Schema[] => schema['options'] as Sche
 const lazy = (schema: Node, input: unknown): Schema => (schema['getter'] as (input: unknown) => Schema)(input);
 /** A lazy getter that cannot answer without its input: whatever it reaches is unknown. */
 const OPAQUE: Node = { type: 'opaque' };
+/** A lazy getter that takes no input answers the same for every value: its answer, once per lazy schema. */
+const resolvedLazies = new WeakMap<object, unknown>();
+function inputFree(s: Node): unknown {
+  const getter = s['getter'];
+  if (typeof getter !== 'function' || getter.length > 0) return OPAQUE;
+  if (!resolvedLazies.has(s)) {
+    let answer: unknown = OPAQUE;
+    try { answer = (getter as () => unknown)(); } catch { /* a getter that throws without input is opaque */ }
+    resolvedLazies.set(s, answer);
+  }
+  return resolvedLazies.get(s);
+}
 /** The schemas directly inside `schema`. A lazy one's is its getter's answer with no input. */
 function children(s: Node): unknown[] {
   const out: unknown[] = [];
   for (const key of ['wrapped', 'item', 'value', 'rest']) if (record(s[key])) out.push(s[key]);
   if (record(s['entries'])) out.push(...Object.values(s['entries']));
   for (const key of ['items', 'options']) if (Array.isArray(s[key])) out.push(...(s[key] as unknown[]).filter(record));
-  // A lazy getter's answer can depend on its input: whatever it reaches is unknown until a real value resolves it.
-  if (s.type === 'lazy') return [OPAQUE];
+  // A lazy getter's answer can depend on its input: whatever it reaches is unknown until a real value resolves it. One that
+  // declares no input can't (the JSON slots' recursive `v.lazy(() => …)`): its answer is walked like any child, so a save of
+  // plain JSON reaches no object and `known` / `keepUnknown` return it as is (NINE-DRAGON-BENCHMAX NB2: walking each boot
+  // trace write cost ~85 ms at CPU x4, ~24 s of Nine's shaders and firstFrame on NB1).
+  if (s.type === 'lazy') return [inputFree(s)];
   return out.filter(child => child === OPAQUE || (record(child) && child['kind'] === 'schema'));
 }
 /** Which object types a schema reaches, once per schema: `strict` for `known`, `objects` for `keepUnknown`. Most save

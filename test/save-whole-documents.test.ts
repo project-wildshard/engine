@@ -132,3 +132,15 @@ test('unknown fields stay under a lazy schema and with numeric ids, and a lazy s
   const tree = (leaf: v.GenericSchema): v.GenericSchema => { const node: v.GenericSchema = v.lazy(() => v.union([leaf, v.array(node)])); return node; };
   expect(JSON.stringify(saveShape(tree(v.string())))).not.toBe(JSON.stringify(saveShape(tree(v.number()))));
 });
+
+test('an input-free lazy is walked: plain JSON comes back as is, a strict object under one is still trimmed', () => {
+  // NINE-DRAGON-BENCHMAX NB2: the JSON slots' recursive lazy was opaque, so every boot trace write walked its whole record
+  const json: v.GenericSchema = v.lazy(() => v.union([v.null(), v.string(), v.number(), v.boolean(), v.array(json), v.record(v.string(), json)]));
+  const trace = { stage: 'shaders', checkpoints: [{ atMs: 1, facts: { programs: 3, ok: true, none: null } }] };
+  expect(known(json, trace)).toBe(trace);
+  const next = { ...trace, stage: 'firstFrame' };
+  expect(keepUnknown(json, trace, next)).toBe(next);
+  const row = v.strictObject({ id: v.number() });
+  const rows: v.GenericSchema = v.lazy(() => v.union([v.null(), v.array(row), v.array(rows)]));
+  expect(known(rows, [{ id: 1, extra: true }])).toEqual([{ id: 1 }]);
+});
