@@ -66,7 +66,7 @@ export interface CellHostOptions {
   /** QA 11-15 row 8 (G540): honour a Developer page's boost bit (on unless `WORLD_BOOST=off`, `cellWorker.ts`). */
   readonly developerBoost?: boolean;
   /**
-   * GC15 (`WORLD_CROSSING=worker`): the grid pack's road strips. Given, this worker hosts the road between its cells, each of its grid
+   * J353: the grid pack's road strips. Given, this worker hosts the road between its cells, each of its grid
    * cells opens onto it instead of standing in lone walls, and a seat walks cell, road, cell on one socket. Left out, or no strips, every cell is lone.
    */
   readonly road?: () => Promise<readonly GridCollisionStrip[]>;

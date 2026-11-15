@@ -75,7 +75,7 @@ export interface DedicatedRoomOptions {
   /** GO3: the grid instance this room is, which names it everywhere else and numbers its frames. Left out, the shard's own grid cell. */
   readonly cell?: string;
   /**
-   * GC15 (`WORLD_CROSSING=worker`): this worker's road, which the cell opens onto instead of standing lone. Its seam
+   * J353: this worker's road, which the cell opens onto. Its seam
    * strips are built into the cell's world, and a seat whose feet leave the cell asks the door to cross onto the road.
    */
   readonly road?: DedicatedRoomRoad;

@@ -25,16 +25,6 @@ export function worldSettings(channel: string, env: Readonly<Record<string, stri
   return { workers: Number(env['WORLD_WORKERS'] ?? start.workers), seats: Number(env['WORLD_SEATS'] ?? start.seats) };
 }
 
-/**
- * GC35 (J322, Jake 11-13: "World crossing should be on by default. There should never be any walls"): each worker hosts the road between
- * its cells unless `WORLD_CROSSING=off` (a bench's lone cells). Unset, or blank, is `worker`.
- */
-export function worldCrossing(value: string | undefined): boolean {
-  if (value === undefined || value === '' || value === 'worker') return true;
-  if (value === 'off') return false;
-  throw new Error(`WORLD_CROSSING=${value}: only worker (the default) or off`);
-}
-
 /** SC8: a cell's awake cost in ms per tick (measured, or an Open Plot's when it has none). */
 export function cellCost(slug: string): number { return COST.get(slug) ?? UNMEASURED; }
 

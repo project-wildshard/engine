@@ -10,7 +10,7 @@
 // card, so they take `client`. The warm visit must fetch its route's own phone manifest; a later visit may read it from the
 // page's store and fetch none, so it is judged against the manifest its warm visit fetched.
 // `cross` (preview only) is a player's way into an Open Plot: Shard select, its deck neighbour (CROSS_IN), ENTER WORLD, then a
-// walk across the road into the plot through the in-page server. Staging can't cross (`WORLD_CROSSING` is unset there) and the
+// walk across the road into the plot through the in-page server. The production path now uses zone entry; this historical
 // local build's world door refuses it, so only preview runs it. Its sound window is the first 10 s after the crossing, and the
 // plot's own score must become the music's score in it; its manifest is the neighbour's grid one.
 //

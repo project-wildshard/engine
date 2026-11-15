@@ -49,7 +49,6 @@ import type { NeighbourRegion } from './neighbourLife';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { HomeResidencyClaim } from './pageResidency';
 import { LiveGridHost, type LiveGridAdmission, type LiveGridFrame, type LiveGridRegion, type LiveGridState } from './live';
-import { prepareApproachProductInputs } from './approachProductInputs';
 import { installGridCrossing, type GridCheckpointResult, type GridCrossingSession, type GridCrossingState } from '../../../shared/game/grid/crossing';
 import { GridWallet, stowGridMount } from '../../../shared/game/grid/wallet';
 import type { LedgerCatalogueItem } from '../../../shared/game/ledger';
@@ -309,8 +308,6 @@ export class LiveGridSession {
         return { physics: ports.physics, walls: ports.walls, dispose: () => { highwayScope.dispose(); } };
       } },
       admit: (cell, required) => this.admit(cell, required),
-      buildAhead: true, // GC5 / GC36: the road builds the world ahead of its line
-      prepareTransport: (cell, signal) => prepareApproachProductInputs(cell.slug, { allocator: ports.allocator, scope }, signal, assembly.local(traveller.position, cell)),
       ...(ports.prepareNeighbourTiles === undefined ? {} : { prepareNeighbour: ports.prepareNeighbourTiles }),
       prioritize: (cell) => prioritizeGridProduct(cell.slug, { allocator: ports.allocator, scope }),
       pause: () => yieldGridAdmission(scope),

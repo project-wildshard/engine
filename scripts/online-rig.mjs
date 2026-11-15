@@ -46,12 +46,12 @@ export async function intoWorld(page) {
 
 /** `pgBin` 'memory:' keeps the saves in the server's memory, for a proof that never reads them back (voice-proof.mjs): no Postgres.
  * `more` are other shards the release names, `cells` the server's `WORLD_CELLS` (default `shard`), and `socket` the address the
- * release names when a proof puts its own front door before the server (grid-gate-proof.mjs). `crossing` (on by default, GC35 / J322; false sets
- * `WORLD_CROSSING=off`, a bench's lone cells) is `WORLD_CROSSING=worker` (GC15): each worker hosts the road between its cells from the grid pack the bake left in this checkout (grid-crossing-walk-proof.mjs),
- * and `workers` sets `WORLD_WORKERS` (the rig's release is production's, 4 by default; staging runs 2). FM3: `origins` are page origins the
- * server also lets in (a loopback proxy before the page server, failmode-proof.mjs), and `channel` the release file's channel (`production`).
- * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin: string, pgData: string, shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, crossing?: boolean, workers?: number, origins?: string[], channel?: string }} options */
-export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgData, shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, crossing = true, workers, origins = [], channel = 'production' }) {
+ * release names when a proof puts its own front door before the server (grid-gate-proof.mjs). Every rig has the road;
+ * J353 removed the continuous-crossing switch. `workers` sets `WORLD_WORKERS` (the rig's release is production's,
+ * 4 by default; staging runs 2). FM3: `origins` are loopback page origins the server also lets in, and `channel`
+ * is the release file's channel (`production`).
+ * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin: string, pgData: string, shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string }} options */
+export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgData, shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production' }) {
   if (origins.some(origin => new URL(origin).origin !== origin || new URL(origin).hostname !== '127.0.0.1')) throw new Error('A rig lets in loopback page origins only');
   const memory = pgBin === 'memory:';
   const key = JSON.parse(readFileSync(keyFile, 'utf8')), build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist), DATABASE = memory ? 'memory:' : database('saves_online');
@@ -83,7 +83,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, pgBin, pgDat
 
   const world = (running = build) => {
     const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, RELEASE_URL: `http://127.0.0.1:${String(RELEASE_PORT)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(WORLD_PORT), ALLOWED_ORIGINS: [`http://127.0.0.1:${String(PAGE_PORT)}`, ...origins].join(','), WILDSHARD_BUILD: running, WORLD_CELLS: cells, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) }, WORLD_CROSSING: crossing ? 'worker' : 'off', ...workers === undefined ? {} : { WORLD_WORKERS: String(workers) } } });
+      env: { ...process.env, RELEASE_URL: `http://127.0.0.1:${String(RELEASE_PORT)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(WORLD_PORT), ALLOWED_ORIGINS: [`http://127.0.0.1:${String(PAGE_PORT)}`, ...origins].join(','), WILDSHARD_BUILD: running, WORLD_CELLS: cells, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) }, ...workers === undefined ? {} : { WORLD_WORKERS: String(workers) } } });
     room.stdout.pipe(log, { end: false }); room.stderr.pipe(log, { end: false });
     return room;
   };

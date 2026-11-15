@@ -25,7 +25,7 @@ import { sendSentryTest, serverSentry } from './serverSentry';
 import {PlaytestFile} from './playtest';
 import { World, type PlayerSaves, type WorkerLink } from './world';
 import { cloudflareTurn } from './voiceRelay';
-import { worldCrossing, worldSettings } from './workerTable';
+import { worldSettings } from './workerTable';
 import { doorTrust } from './doorTrust';
 import { WHOLE_GRID, cellShard, placeCell, placedCells, worldCells } from './gridCells';
 import { PlacementWatch, fetchPlacementFile } from './placementFile';
@@ -67,8 +67,10 @@ const reports = new ServerReports({ build, channel: release.channel, telemetryUr
 const url = process.env['DATABASE_URL'] ?? savesUrl(release.channel), saves: PlayerSaves = url === 'memory:' ? memoryPlayerSaves() : await openPlayerSaves(url, new URL('migrations/', import.meta.url), release.saveEpoch, log, issue => { reports.contract(issue); });
 const recordTag=setting('RECORD_TAG');
 const turnKey = setting('WILDSHARD_TURN_KEY_ID'), turnToken = setting('WILDSHARD_TURN_KEY_TOKEN');
-// GC15, GC35: each worker opens its road and lets a seat walk between the cells it hosts; only `WORLD_CROSSING=off` keeps cells lone (J322).
-const crossing = worldCrossing(setting('WORLD_CROSSING'));
+// J353: zone entry is the only implementation. Old box files may retain this row during rollout.
+const legacyWorldCrossing = setting('WORLD_CROSSING');
+if (legacyWorldCrossing !== undefined) log({ at: 'world.crossing.ignored', value: legacyWorldCrossing, reason: 'zone-entry' });
+const crossing = true;
 // SA33: where the API's signed placement file is, and its own key's public half. Both or neither; only a whole-grid world grows.
 const placementAt = setting('PLACEMENT_URL'), placementKey = setting('PLACEMENT_PUBLIC_KEY');
 if ((placementAt === undefined) !== (placementKey === undefined)) throw new Error('PLACEMENT_URL and PLACEMENT_PUBLIC_KEY go together');
@@ -78,7 +80,7 @@ const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting
 
 /** One row of the table is one worker thread, started once (J182). */
 function bootWorker(slugs: readonly string[]): WorkerLink {
-  const data: CellWorkerData = { slugs, build, origin, cache, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), ...(crossing ? { crossing } : {}), ...(metrics === undefined ? {} : { metrics: true }),...(playtest===undefined?{}:{playtest:true}) };
+  const data: CellWorkerData = { slugs, build, origin, cache, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), crossing: true, ...(metrics === undefined ? {} : { metrics: true }),...(playtest===undefined?{}:{playtest:true}) };
   const worker = new Worker(new URL('cellWorker.mjs', import.meta.url), { workerData: data });
   let stopped = false;
   return { send: (order, transfer = []) => { worker.postMessage(order, transfer as never); },

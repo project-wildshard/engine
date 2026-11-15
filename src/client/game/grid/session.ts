@@ -107,10 +107,8 @@ import { leaseMapImage } from '../shardfile/mapImage';
 import { crossingSaveStatus, installBorderShimmer, type BorderShimmerState, type CrossingSaveStatus } from './borderShimmer';
 import { refusalReporter, saveFailedReporter } from './screenReports';
 import { GAME_STRINGS } from '../../../shared/game/strings';
-import { GridCellWaitingError, classifyRefusal, pageShardRefusals, refusalReason, type ShardRefusal } from './refusal';
+import { classifyRefusal, pageShardRefusals, type ShardRefusal } from './refusal';
 import { tileRing } from '../shardfile/tileDriver';
-import { CellLoading, type CellLoadingInput } from './cellLoading';
-import { CellLoadingCard } from './cellScreens';
 import { readGridSeamData, type GridSeamAddress } from '../../../shared/game/grid/seamData';
 import { readCompiledGridStrips } from '../../../shared/game/grid/compiledStrips';
 import { startRoadGrain } from './roadGrainPreparation';
@@ -392,11 +390,6 @@ export class GridSession {
   private readonly farMissing = new Set<string>();
   /** each slug's shown name */
   private readonly names = new Map<string, string>();
-  /** G555: the one step-by-step loading screen over a cell entry or re-entry that waits */
-  private readonly cellLoading: CellLoading;
-  private cellLoadingPolled = 0;
-  /** when each cell's current wait began, so its screen counts only the hooks of this load */
-  private readonly loadingSince = new Map<string, number>();
 
   /** Overlap only this page's actual initial-home metadata with remaining page setup. */
   startInitialHomeMetadata(): void {
@@ -690,10 +683,8 @@ export class GridSession {
       // GC12: drawn only while the traveller stands at that edge (the feet in the home frame)
       ports: { closed: (id) => this.live === null || !this.live.live.ready(id),
         feet: () => { const at = this.world(); return { x: at.x - home.origin.x, z: at.z - home.origin.z }; } } });
-    // QA 2026-11-13: a waiting cell's loading steps on SHARD SELECT's loading card, inset over the live world
-    this.cellLoading = new CellLoading(new CellLoadingCard(), (waiting) => this.neighbours.some(row => row.instance === waiting));
     setParkedMatricesFrozen(true); // G580 T2: a hidden parked world skips matrix updates during its warm-up
-    host.scope.onDispose(() => { this.cellLoading.close(); if (host.heldFrame !== undefined) host.heldFrame.enabled = false; setWarmUpHeld(false); setParkedMatricesFrozen(false); setBuildHeldTimed(false); setBuildUrgent(false); });
+    host.scope.onDispose(() => { if (host.heldFrame !== undefined) host.heldFrame.enabled = false; setWarmUpHeld(false); setParkedMatricesFrozen(false); setBuildHeldTimed(false); setBuildUrgent(false); });
     // G78: a shimmer line at every shard border on its real ground; G119: SAVING… / SAVE FAILED, RETRY while a crossing waits
     const rows = new Map((edges ?? []).map((cell) => [cell.instance, cell.edges]));
     let status: CrossingSaveStatus = null, polled = 0;
@@ -972,62 +963,6 @@ export class GridSession {
     this.reportRefusal(cell.instance, cell.slug, refusal, error);
     this.refusals.set(cell.instance, refusal); this.issues.set(cell.instance, error instanceof Error ? error.message : String(error)); pageShardRefusals().note(cell.slug, refusal);
   }
-  /**
-   * G555's read-only port: the cell whose entry waits (the one the traveller is in before its gameplay is ready, else the
-   * nearest unready cell within 12 m of its edge), with its readiness fences, its claims, its entered hooks since this wait
-   * began and its refusal; null when none waits.
-   */
-  private cellLoadingInput(): CellLoadingInput | null {
-    const live = this.live; if (live === null) return null;
-    // GC6: a world built ahead whose entry still prepares holds its crossing on the road: the screen shows it
-    const current = live.live.current(), ready = (id: string): boolean => live.live.ready(id) && !live.entryPending(id) && (current !== id || live.gameplayReady());
-    let target: GridCell | undefined = current !== null && !ready(current) ? this.assembly.cell(current) : undefined;
-    if (target === undefined) {
-      const at = this.world();
-      let best = 12;
-      for (const cell of this.assembly.cells) {
-        if (ready(cell.instance)) continue;
-        const d = Math.hypot(Math.max(0, Math.abs(at.x - cell.origin.x) - CHUNK_HALF), Math.max(0, Math.abs(at.z - cell.origin.z) - CHUNK_HALF));
-        if (d <= best) { best = d; target = cell; }
-      }
-    }
-    if (target === undefined) { this.loadingSince.clear(); return null; }
-    const id = target.instance, since = this.loadingSince.get(id) ?? diagnosticNow(); this.loadingSince.set(id, since);
-    const raw = live.refusal(id), refusal = this.refusal(id);
-    const reason = refusal !== null ? refusalReason(refusal)
-      : raw instanceof GridCellWaitingError ? GAME_STRINGS.grid.waiting(this.shardName(id)) : null;
-    let claimed = 0, product = false;
-    for (const entry of this.allocator.claims()) {
-      if (entry.owner === id) claimed += entry.bytes;
-      if (entry.owner === 'grid' && entry.id === `product:grid:${target.slug}`) { claimed += entry.bytes; product = true; }
-    }
-    // its entered hooks of this run: from its latest beforeWorld (a road-prepared world ran some before the screen opened)
-    const stages = live.live.readiness.status(id), timings = live.hookTimings(), own = timings.completed.filter(row => row.instance === id);
-    let run = -1; own.forEach((row, index) => { if (row.hook === 'beforeWorld') run = index; });
-    const hooks = new Set((run === -1 ? own.filter(row => row.start >= since) : own.slice(run)).map(row => row.hook));
-    const hook = timings.current?.instance === id ? timings.current.hook : null;
-    return { instance: id, slug: target.slug, name: this.shardName(id), refusal: reason, product: product || stages.runtime || stages.ready,
-      claimedMB: claimed / 1e6, requested: stages.requested, runtime: stages.runtime, colliders: stages.colliders, sim: stages.sim,
-      hooks, hook, hybrid: hooks.size > 0 || hook !== null, entered: current === id, gameplayReady: current === id && live.gameplayReady(),
-      warm: live.warmPreparation(id) };
-  }
-  /** At most four times a second: the loading screen reads the allocator and the live session. */
-  private stepCellLoading(): void {
-    const now = diagnosticNow(); if (now - this.cellLoadingPolled < 250) return;
-    this.cellLoadingPolled = now; this.cellLoading.step(this.cellLoadingInput());
-    // G580 T2 (Developer): the traveller waits at the wall while its screen shows, so its warm-up may issue more a frame
-    // G580 T2 / T5: a held traveller's warm-up issues more programs a frame and its builds run a bigger budget
-    setWarmUpHeld(this.cellLoading.open !== null);
-    setBuildHeldTimed(this.cellLoading.open !== null);
-    // GC6: a world the traveller heads into, or the road (where its entry prepares), builds with the urgent budget
-    const live = this.live;
-    setBuildUrgent(live !== null && (live.live.building() || live.entriesPending()));
-  }
-  private refusal(instance: string): ShardRefusal | null {
-    const live = this.live?.refusal(instance);
-    return this.refusals.get(instance) ?? (live === undefined ? null : classifyRefusal(live));
-  }
-  private shardName(instance: string): string { const slug = this.assembly.cell(instance).slug; return this.names.get(slug) ?? slug; }
 
   /** Complete deferred native seams before a distant entry or road recovery. One page promise, no second scheduler. */
   prepareOuterStrips(): Promise<void> {
@@ -1188,8 +1123,7 @@ export class GridSession {
     if (!this.initialFarReady && this.host.backgroundReady?.() !== false && this.rings.ready()) this.initialFarReady = true;
     this.roadTiles?.step({ x: at.x, z: at.z, vx: this.velocity.x * clamp, vz: this.velocity.z * clamp });
     for (const cell of this.neighbours) if (this.placeholderBlocksTiles(cell.instance)) this.rings.retireRefinement(cell.instance);
-    this.stepCellLoading();
-    if (this.host.heldFrame !== undefined) this.host.heldFrame.enabled = this.cellLoading.open !== null && this.live?.travelState().crossing.phase === 'preparing';
+    if (this.host.heldFrame !== undefined) this.host.heldFrame.enabled = false;
     this.shimmer.step();
     const active = this.live === null ? this.home.instance : this.live.live.current();
     const eye = this.host.eye?.();
@@ -1258,7 +1192,7 @@ export class GridSession {
       pitch: this.assembly.pitch,
       home: this.home.instance, inside: gridCells.cell?.instance ?? null, feet: { x: Math.round(at.x * 100) / 100, z: Math.round(at.z * 100) / 100 },
       cells: this.assembly.cells.map((cell) => { const d = drawn(cell.instance); return { instance: cell.instance, slug: cell.slug, cell: cell.cell, shows: shows(cell.instance, d), drawn: d }; }),
-      strips: this.strips.length, road: this.road, seams: this.seams, softWalls: this.softWalls.state(), shimmer: this.shimmer.state(), cellLoading: this.cellLoading.open, cellStage: this.cellLoading.stage, cellStep: this.cellLoading.now, hybrid: this.live?.hybridState() ?? null, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
+      strips: this.strips.length, road: this.road, seams: this.seams, softWalls: this.softWalls.state(), shimmer: this.shimmer.state(), cellLoading: null, cellStage: null, cellStep: null, hybrid: this.live?.hybridState() ?? null, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
       residentMB: Math.round(cost.accounted / 1e4) / 100, playingMB: Math.round(cost.playing / 1e4) / 100, envelopeMB: Math.round(this.allocator.envelope() / 1e4) / 100,
       accountedBytes: cost.accounted,
       rings: { frame: stats.frame, far: stats.resident.far, l1: stats.resident.l1, l0: stats.resident.l0, refused: stats.refused, inFlight: stats.inFlight, queued: stats.queued,

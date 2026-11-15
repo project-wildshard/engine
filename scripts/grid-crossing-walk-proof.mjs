@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // GC15 (GRID-CROSSING): the first page walk across a cell border online, on this Mac. The rig's server runs WORLD_CELLS=grid with
-// WORLD_CROSSING=worker on staging's two workers (Nalati alone; Driftwood, Pine Hollow, Sunscar and Far Reach and their road on the other), its origin carries the grid pack, and a real browser enters Driftwood
+// the always-on road on staging's two workers (Nalati alone; Driftwood, Pine Hollow, Sunscar and Far Reach and their road on the other), its origin carries the grid pack, and a real browser enters Driftwood
 // from the deck's card, then walks into a same-worker neighbour (Sunscar, or Pine Hollow), boosts back into Driftwood and boosts out again, by
 // real input. Each leg passes with no stop (no 1.5 s under 0.15 m a sample while the key is held), no page reload, and control in the
 // target cell (the page inside it, gameplay ready, the player moving). It writes time-to-control per leg beside GC1's baseline.
@@ -69,10 +69,10 @@ if (served !== '' && !/^https:\/\/(staging|preview)\.wildshard\.io\/?$|^http:\/\
 const workers = Number(process.argv.find(arg => arg.startsWith('--workers='))?.slice(10) ?? 2);
 if (!Number.isInteger(workers) || workers < 1) throw new Error('--workers takes a whole number from 1');
 const rig = served !== '' ? { base: served.replace(/\/$/, ''), close: () => Promise.resolve() }
-  : await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: HOME, more: ['pine-hollow', 'far-reach', 'sunscar-dunes', 'nalati-grasslands'], cells: 'grid', crossing: true, workers });
+  : await openRig({ dist, work, keyFile, pgBin: 'memory:', pgData: '', shard: HOME, more: ['pine-hollow', 'far-reach', 'sunscar-dunes', 'nalati-grasslands'], cells: 'grid', workers });
 let code = 1, browser = /** @type {import('playwright').Browser | null} */ (null);
 /** @type {Record<string, unknown>} */
-const result = { lane: 'opus-gc15c', engine: engineName, layout: phone ? 'phone 402x874 touch' : `desktop ${String(desk[0])}x${String(desk[1])}@${String(desk[2])}`, site: served !== '' ? served : 'local rig, WORLD_CELLS=grid, WORLD_CROSSING=worker, WORLD_WORKERS=2 (staging: Nalati alone, Driftwood with Pine Hollow, Sunscar and Far Reach)' };
+const result = { lane: 'opus-gc15c', engine: engineName, layout: phone ? 'phone 402x874 touch' : `desktop ${String(desk[0])}x${String(desk[1])}@${String(desk[2])}`, site: served !== '' ? served : 'local rig, WORLD_CELLS=grid, WORLD_WORKERS=2 (staging: Nalati alone, Driftwood with Pine Hollow, Sunscar and Far Reach)' };
 try {
   let open = served !== '' ? { cells: 25 } : null;
   for (let tries = 0; tries < 300 && open === null; tries++) { open = await fetch(`http://127.0.0.1:${String(WORLD_PORT)}/health`).then(found => found.ok ? found.json() : null).catch(() => null); if (open === null) await sleep(200); }

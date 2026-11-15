@@ -17,7 +17,7 @@ import { loopLag } from './loopLag';
 export interface CellWorkerData { readonly slugs: readonly string[]; readonly build: string; readonly origin: string; readonly cache: string; readonly holdMs?: number;readonly playtest?:boolean;
   /** J107's start-over wait, a proof's override (`EMPTY_MS`): 5 minutes when absent. */
   readonly emptyMs?: number;
-  /** GC15: `WORLD_CROSSING=worker`, this worker hosts the road between its cells. */
+  /** Every worker hosts its road; J353 removed the mode switch. */
   readonly crossing?: boolean;
   /** SA33: the cells the door had placed when it booted this worker; a worker's module state is its own. */
   readonly placed?: readonly PlacedCell[];

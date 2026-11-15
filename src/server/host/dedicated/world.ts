@@ -122,7 +122,7 @@ export interface WorldOptions {
   /** VH10: the pages a browser may open a socket from; `null` is any. The game's own hosts when absent. */
   readonly allowedOrigins?: readonly string[] | null;
   /**
-   * GC15 (`WORLD_CROSSING=worker`): each worker hosts a road. SA34a: a placed cell then opens on the worker of its nearest open cell, whose
+   * J353: each worker hosts a road. SA34a: a placed cell then opens on the worker of its nearest open cell, whose
    * road hands a seat into it, and every worker's road is told of it; without roads it boots on a worker of its own (SA33).
    */
   readonly roads?: boolean;
@@ -460,7 +460,7 @@ export class World {
   }
   /**
    * GC15: a seat's feet left cell `from` for `to`. On the same worker the door reads their save on `to`'s shard and orders the move, which
-   * keeps the seat and the socket. A cell and its worker's road (`WORLD_CROSSING`) cross the same way, with no save to read for the road. Between workers nothing moves yet (GC15 (3): `exportPlayer`/`importPlayer` and re-pointing the socket).
+   * keeps the seat and the socket. A cell and its worker's road cross the same way, with no save to read for the road. Between workers nothing moves yet (GC15 (3): `exportPlayer`/`importPlayer` and re-pointing the socket).
    */
   private async crossing(from: string, device: string, to: string, at: ResumeAt): Promise<void> {
     const link = this.linkOf(to), name = this.names.get(device);

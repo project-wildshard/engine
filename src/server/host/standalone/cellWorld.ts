@@ -64,7 +64,7 @@ export interface CellWorld extends GridResident {
 /** What a host lends a cell it opens. */
 export interface CellWorldOptions {
   readonly saves: SaveStore;
-  /** A cell with no road around it (a one-shard page, `WORLD_CROSSING=off`): its fall floor sets a player back on the ground they last
+  /** A one-shard page's fall floor sets a player back on the ground they last
    *  stood on instead of a death. It has no edge walls (GC36, J322), so past its edge a player falls to that floor. */
   readonly lone: boolean;
   /** C6: a room holds every solid, since no one list can follow every player. Left out, a native world keeps its solids near its lead. */

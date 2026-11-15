@@ -95,7 +95,7 @@ test('wildshard-config narrows ALLOWED_ORIGINS to the game hosts, keeping the ch
   expect(config(root, 'set', 'production', 'ALLOWED_ORIGINS', 'https://play.wildshard.io', '--production').status).toBe(0);
 });
 
-// SA33, GC33 (Jake, 2026-11-13): the placement pair and WORLD_CROSSING. Each placement key takes one exact value or blank, and the
+// SA33: the placement pair. Each placement key takes one exact value or blank, and the
 // two go together, as main.ts throws at boot on one without the other.
 const STAGING_FILE = 'https://packs.wildshard.io/releases/staging-placements.json';
 const PLACEMENT_KEY = /^export const PLACEMENT_PUBLIC_KEY = '([0-9a-f]+)';$/mu.exec(readFileSync('scripts/preview-grid.ts', 'utf8'))?.[1] ?? '';
@@ -118,10 +118,7 @@ test('wildshard-config refuses a placement file or key that is not the API\'s ow
     [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY', ''], 'go together'],
     [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_URL', STAGING_FILE], 'each key once'],
     [['set', 'staging', 'PLACEMENT_URL', STAGING_FILE, 'PLACEMENT_PUBLIC_KEY'], 'usage'],
-    [['set', 'staging', 'WORLD_CROSSING', 'on'], 'WORLD_CROSSING must be'],
-    [['set', 'staging', 'WORLD_CROSSING', ''], 'WORLD_CROSSING must be'],
     [['set', 'production', 'PLACEMENT_URL', 'https://packs.wildshard.io/releases/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY], 'a production change needs --production'],
-    [['set', 'production', 'WORLD_CROSSING', 'off'], 'a production change needs --production'],
   ] as const) {
     const run = config(root, ...args);
     expect(run.status, args.join(' ')).toBe(1);
@@ -137,11 +134,10 @@ test('wildshard-config sets the placement pair in one write and one restart, cle
   expect(both.status, both.out).toBe(0);
   expect(both.out.match(/doing {3}restart/gu)).toHaveLength(1);
   expect(config(root, 'show', 'staging').out).toBe(`PLACEMENT_URL=${STAGING_FILE}\nPLACEMENT_PUBLIC_KEY=${PLACEMENT_KEY}\n`);
-  expect(config(root, 'set', 'staging', 'WORLD_CROSSING', 'worker').status).toBe(0);
   // Blanking one half would boot into the throw; blanking both is off.
   expect(config(root, 'set', 'staging', 'PLACEMENT_URL', '').out).toContain('go together');
   expect(config(root, 'set', 'staging', 'PLACEMENT_URL', '', 'PLACEMENT_PUBLIC_KEY', '').status).toBe(0);
-  expect(config(root, 'show', 'staging').out).toBe('WORLD_CROSSING=worker\nPLACEMENT_URL=\nPLACEMENT_PUBLIC_KEY=\n');
+  expect(config(root, 'show', 'staging').out).toBe('PLACEMENT_URL=\nPLACEMENT_PUBLIC_KEY=\n');
   // Production takes its own file, flagged.
   const production = config(root, 'set', 'production', 'PLACEMENT_URL', 'https://packs.wildshard.io/releases/production-placements.json', 'PLACEMENT_PUBLIC_KEY', PLACEMENT_KEY, '--production');
   expect(production.status, production.out).toBe(0);

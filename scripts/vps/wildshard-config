@@ -45,7 +45,6 @@ SETTINGS = {
     'RECORD_TAG': lambda value, channel: re.fullmatch(r'[A-Za-z0-9._-]{0,64}', value) is not None,
     'ALLOWED_ORIGINS': lambda value, channel: (set(value.split(',')) <= set(GAME_HOSTS) and len(set(value.split(','))) == len(value.split(','))
                                                and GAME_HOSTS[CHANNELS[channel]['host']] in value.split(',')),
-    'WORLD_CROSSING': lambda value, channel: value in ('off', 'worker'),
     'PLACEMENT_URL': lambda value, channel: value in ('', placements(channel)),
     'PLACEMENT_PUBLIC_KEY': lambda value, channel: value in ('', PLACEMENT_PUBLIC_KEY),
     # SC2: the channel's own port, which the box's Prometheus scrapes, or blank (off). The server binds it on 127.0.0.1 only.
@@ -56,7 +55,6 @@ RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), non
          'WORLD_SEATS': 'a whole number from 1 to 2000', 'RECORD_TAG': 'up to 64 of A-Z a-z 0-9 . _ -',
          'ALLOWED_ORIGINS': "comma-separated, none twice, from https://play.wildshard.io, https://staging.wildshard.io and "
                             "https://preview.wildshard.io, keeping the channel's own (production play, staging staging)",
-         'WORLD_CROSSING': 'off or worker',
          'PLACEMENT_URL': "https://packs.wildshard.io/releases/<channel>-placements.json for this channel, or blank",
          'PLACEMENT_PUBLIC_KEY': f'the API placement key {PLACEMENT_PUBLIC_KEY}, or blank',
          'METRICS_PORT': "the channel's own metrics port (production 9790, staging 9791), or blank (off)"}

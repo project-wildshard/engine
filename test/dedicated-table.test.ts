@@ -1,13 +1,11 @@
 import { expect, test } from 'vitest';
-import { cellCost, COSTS_MEASURED, workerTable, worldCrossing, worldSettings } from '../src/server/host/dedicated/workerTable';
-
+import { cellCost, COSTS_MEASURED, workerTable, worldSettings } from '../src/server/host/dedicated/workerTable';
 // J182, J185: which worker runs which cell, fixed at startup, on a worker count the bench sets.
 const REST = ['_template', 'blender-template', 'ink-cel-valley', 'pastel-plain', ...Array.from({ length: 16 }, (_unused, index) => `open-plot-${String(index)}`)];
 const ALL = ['driftwood-isle', 'nalati-grasslands', 'nine-dragon-stack', 'pine-hollow', 'sunscar-dunes', 'far-reach', ...REST];
 // The grid as production opens it (`WORLD_CELLS=grid`): instances, as `server.listening` names them.
 const GRID = ['driftwood-isle', 'pine-hollow', 'template-2', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pastel-plain', 'blender-template', 'nine-dragon-stack',
   'ink-cel-valley', ...['0-0', '1-0', '2-0', '3-0', '4-0', '0-1', '4-1', '0-2', '4-2', '0-3', '4-3', '0-4', '2-4', '3-4', '4-4'].map(at => `open-plot-${at}`)];
-
 const sorted = (rows: readonly string[]): string[] => [...rows].sort();
 const load = (row: readonly string[]): number => row.reduce((total, slug) => total + cellCost(slug), 0);
 
@@ -67,13 +65,4 @@ test('each channel starts on its own count and cap, and the bench\'s answer is o
   expect(worldSettings('staging', {})).toEqual({ workers: 2, seats: 16 });
   expect(worldSettings('production', { WORLD_WORKERS: '8', WORLD_SEATS: '50' })).toEqual({ workers: 8, seats: 50 });
   expect(() => worldSettings('preview', {})).toThrow(/No game server/u);
-});
-
-// GRID-CROSSING GC35 (J322): crossing is on by default; only an explicit off keeps a server's cells lone.
-test('a world with no WORLD_CROSSING setting crosses; only off turns it off', () => {
-  expect(worldCrossing(undefined)).toBe(true);
-  expect(worldCrossing('')).toBe(true);
-  expect(worldCrossing('worker')).toBe(true);
-  expect(worldCrossing('off')).toBe(false);
-  expect(() => worldCrossing('on')).toThrow(/only worker/u);
 });

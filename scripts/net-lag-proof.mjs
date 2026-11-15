@@ -200,7 +200,7 @@ for (const engineName of engines) {
       let site = { base, close: () => Promise.resolve() }, socket = /^https:\/\/(staging|preview)\./u.test(base) ? arg('socket', 'wss://rooms-staging.wildshard.io') : arg('socket', '');
       if (rigArg !== '') {
         const [dist = '', work = '', keyFile = ''] = rigArg.split(','), { openRig, WORLD_PORT } = await import('./online-rig.mjs');
-        site = await openRig({ dist: absolute(dist), work: absolute(work, slug), keyFile, pgBin: 'memory:', pgData: '', shard: slug, crossing: false });
+        site = await openRig({ dist: absolute(dist), work: absolute(work, slug), keyFile, pgBin: 'memory:', pgData: '', shard: slug });
         socket = `ws://127.0.0.1:${String(WORLD_PORT)}`;
       }
       try {

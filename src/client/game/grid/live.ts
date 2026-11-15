@@ -3,7 +3,7 @@ import { prepareFrameMotors, type FrameMember } from '@wildshard/engine/physics/
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import { TraversalReadiness, readinessModel, type ReadinessBundle, type ReadinessLink, type ReadinessTicket } from '@wildshard/engine/sim/readiness';
 import type { ReadinessWalls } from '@wildshard/engine/physics/readinessWalls';
-import { CHUNK_HALF, CONTENT_CAPS, ENTRY_WIDTH } from '@wildshard/engine/core/config';
+import { CHUNK_HALF, CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { GhostWorlds, type GhostRegion } from '../../../shared/game/grid/ghosts';
 import { WORK_SLICE_MS, workSlice } from '@wildshard/engine/core/workSlice';
@@ -15,7 +15,6 @@ import type { HomeResidencyClaim } from './pageResidency';
 import { ApproachInputsDeferredError } from './productInputs';
 import { PRODUCT_DEFERRED } from './productLeases';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
-import { tileOf, type CellTile } from '../../../shared/game/shardfile/tileOrder';
 import type { RegionShell } from './regionShell';
 
 /** A region on a page: the world its traveller's motor walks in. The server runs it and keeps its save. */
@@ -59,19 +58,11 @@ export interface LiveGridPorts {
   admit: (cell: GridCell, required?: boolean) => Promise<LiveGridAdmission>;
   /** Actual world construction or a verified render approach outranks product-only prefetch until its finite preparation drains. */
   prioritize?: (cell: GridCell) => () => void;
-  /** Render-only approach: the signal owns the pin, including after preparation completes. */
-  prepareNeighbour?: (cell: GridCell, start: { readonly x: number; readonly z: number }, signal: AbortSignal) => Promise<void>;
-  /** Verified, charged inputs for one named source-exit approach, held until
-   * abort. No regional world/readiness may publish from this IO-only port. */
-  prepareTransport?: (cell: GridCell, signal: AbortSignal) => Promise<void>;
   /** Browser presentation boundary between admission batches; absent leaves the standalone Node scheduler unchanged. */
   pause?: () => Promise<void>;
   /** Metadata-only prefetch eligibility. Unsupported far proxies do not consume cold request slots; explicit transfers
    *  still run normal admission and readiness. Absent: every cell is a candidate, as in standalone Node drivers. */
   prefetchable?: (cell: GridCell) => boolean;
-  /** GC5 / GC36 (J322: no hold at the line): on the road, build the world of the cell the traveller heads into, ahead of
-   *  its line, so its entry finds it resident. Absent (standalone drivers): only actual entry builds a world (T7). */
-  buildAhead?: boolean;
   /** Product-only prefetch waits while this is false (T10: the page's spawn settle); required entry never waits. Absent: always. */
   backgroundReady?: () => boolean;
   bindFrame: (frame: LiveGridFrame) => void;
@@ -115,50 +106,6 @@ interface RetiringRegion { readonly instance: string; readonly resident: Residen
   readonly finished: Promise<void>; readonly settle: () => void }
 interface Resident { region: LiveGridRegion; lease: ResidencyLease; reservations: number; evicting: boolean; retainable: boolean; evictionBound?: boolean; disposalFailed?: boolean }
 
-// Contact corrections at a closed readiness wall are not a U-turn. Accumulate real horizontal travel
-// before selecting another approach, so sub-centimetre capsule recoil cannot evict the world just prepared.
-const APPROACH_TRAVEL_METRES = 0.1;
-// GC5: the page pre-warms a neighbour's world from inside the source, at the distance the traveller covers at its speed in that
-// world's last measured build time (2 s at least; before it is measured, the slowest build so far or 14 s, capped at 16 s), times a margin. Kept while the traveller stays within
-// WARM_KEEP_METRES of it; the lead is capped below that, so a pre-warm never starts where it would be dropped.
-const DEMAND_METRES = 80, HELD_RETRY_MS = 5000, HEADING_HOLD_MS = 600, FIXED_HZ = 60, WARM_DEFAULT_SECONDS = 14, WARM_MIN_SECONDS = 2, WARM_MAX_SECONDS = 16, WARM_MARGIN = 1.25, WARM_LEAD_METRES = 8, WARM_LEAD_CAP_METRES = 200, WARM_KEEP_METRES = 240;
-const entryAxes = [['x', 'z'], ['z', 'x']] as const;
-// Distance can decrease while passing parallel to a cell. Only a ray into its first boundary's midpoint mouth
-// predicts entry; product downloads remain radial, but an unrelated native world must not block the real turn-in.
-function headsToEntry(cell: GridCell, feet: GridPoint, previous: GridPoint): boolean {
-  const delta = { x: feet.x - previous.x, z: feet.z - previous.z };
-  let first = Infinity, offset = Infinity;
-  for (const [axis, other] of entryAxes) for (const side of [-1, 1]) {
-    const direction = delta[axis]; if (direction === 0) continue;
-    const time = (cell.origin[axis] + side * CHUNK_HALF - feet[axis]) / direction;
-    if (time < 0 || time >= first) continue;
-    const lateral = Math.abs(feet[other] + time * delta[other] - cell.origin[other]);
-    if (lateral <= CHUNK_HALF) { first = time; offset = lateral; }
-  }
-  return offset <= ENTRY_WIDTH / 2;
-}
-
-// A boulevard predicts its next midpoint turn, before the player aims at the perpendicular mouth.
-// A small lateral turn names its side before the ray reaches the narrow mouth.
-// Straight travel retains both sides, so an undecided junction remains ambiguous.
-function boulevardApproachDistance(cell: GridCell, feet: GridPoint, previous: GridPoint, pitch: number): number | undefined {
-  const delta = { x: feet.x - previous.x, z: feet.z - previous.z };
-  for (const [axis, other] of entryAxes) for (const side of [-1, 1]) {
-    const road = cell.origin[axis] + side * pitch / 2, lateral = cell.origin[other] - feet[other];
-    if (Math.abs(feet[axis] - road) > ENTRY_WIDTH / 2 || Math.abs(delta[axis]) > Math.abs(delta[other]) / 4
-      || delta[other] * lateral <= 0 || delta[axis] * side > Math.abs(delta[other]) / 20) continue;
-    return Math.abs(lateral) + pitch / 2 - CHUNK_HALF;
-  }
-  return undefined;
-}
-
-/** Real background failures stay closed until retry. Expected optional headroom
- * deferrals remain retryable after cost changes and never report a load failure. */
-async function background(instance: string, admission: Promise<unknown>, alive: () => boolean): Promise<void> {
-  try { await admission; }
-  catch (error) { if (alive() && !(error instanceof ApproachInputsDeferredError)) console.error(`[grid] ${instance}: admission failed; it stays closed until a retry`, error); }
-}
-
 /** One page traveller with frozen owned regions. Borrowed homes keep the existing standalone composition;
  * owned homes begin on neutral page physics and transfer the sole preallocation claim to their first runtime. */
 export class LiveGridHost {
@@ -187,25 +134,9 @@ export class LiveGridHost {
   private frameGeneration = 0;
   private readonly transitions: { from: string | null; to: string | null }[] = [];
   private crossings = 0;
-  private warms = 0;
-  /** QA row 43: when a traveller held at a cell's wall may next retry its failed build */
-  private readonly heldRetryAt = new Map<string, number>();
-  /** the other mouth the traveller inside the source turned to, and since when (HEADING_HOLD_MS) */
-  private turnedSince: { instance: string; at: number } | null = null;
-  /** GC5: why the last pre-warm the heading asked for did not start (its product still reading, an exclusive runtime, or the budget) */
-  private warmRefusal: string | null = null;
   /** GC6: the neighbour whose product is read as demand (the nearest edge's, or the heading's) and not yet admitted: radial
    *  reads of other cells wait while it is missing, so they don't take back the headroom its read needs. */
   private demanded: string | null = null;
-  private previousFeet: GridPoint | undefined;
-  /** fixed steps since `previousFeet` moved, for the traveller's speed (GC5) */
-  private stepsSincePrevious = 0;
-  /** GC5: each cell's last measured world build, in seconds (product to colliders and sim ready) */
-  private readonly builtSeconds = new Map<string, number>();
-  private readonly candidateDistances = new Map<GridCell,number>();
-  private readonly approachWork:{candidates:GridCell[];boulevard:GridCell[]}[]=[];
-  /** This host already owns the assembly and its frozen cells for its whole lifetime. */
-  private targetCells: readonly GridCell[] | undefined;
   private initialHomePending: boolean;
   private readonly highwayLease: ResidencyLease;
   private readonly highway: LiveGridHighway;
@@ -250,13 +181,13 @@ export class LiveGridHost {
   }
   /** Render/global coordinates are derived, never written into an authored regional host. */
   worldFeet(): GridPoint { const p = this.ports.player.position, origin = this.origin(this.active); return { x: p.x + origin.x, y: p.y, z: p.z + origin.z }; }
-  /** Pure 6 m enter / 10 m leave selection; calling it does not change the live page frame. */
+  /** Gate selects only the home and road. Worker retains the parked 6 m enter / 10 m leave selection. */
   target(feet: Readonly<GridPoint>): string | null {
     if (![feet.x, feet.y, feet.z].every(Number.isFinite)) throw new RangeError('Invalid live grid feet');
     const distance = (cell: GridCell): number => Math.max(Math.abs(feet.x - cell.origin.x), Math.abs(feet.z - cell.origin.z)) - CHUNK_HALF;
     if (this.active !== null && distance(this.assembly.cell(this.active)) <= 10) return this.active;
-    const cells = this.targetCells ??= [...this.assembly.cells].sort((a, b) => a.instance.localeCompare(b.instance));
-    return cells.find((cell) => distance(cell) <= 6)?.instance ?? null;
+    const home = this.assembly.cell(this.ports.home.instance);
+    return distance(home) <= 6 ? home.instance : null;
   }
   /** Admission includes colliders, initialized sim and parsed runtime module; entered hooks are a separate gameplay fence. */
   ready(instance: string | null): boolean {
@@ -298,7 +229,6 @@ export class LiveGridHost {
         this.deferredProducts.delete(instance); this.deferredDemand.delete(instance); this.products.set(instance, admission); return admission;
       } catch (error) {
         this.tileMetadata.delete(instance);
-        if (this.tileApproach?.instance === instance) { this.tileApproach.controller.abort(); this.tileApproach = null; }
         const refused = error instanceof ApproachInputsDeferredError || (error instanceof Error && error.message.includes(PRODUCT_DEFERRED));
         // GC6 (QA 11-14 row 6): inside Driftwood the page held 3 to 5 neighbours' radial products (1199 of 1200 MB), pinned
         // while held, so Nalati's demand read was refused the whole approach and its world was built only on the road. A
@@ -318,7 +248,7 @@ export class LiveGridHost {
   private releaseSpeculative(kept: string): number {
     const feet = this.worldFeet(), keep = (id: string): boolean => id === kept || id === this.active || id === this.ahead
       || this.constructing.has(id) || this.requests.has(id) || this.residents.has(id)
-      || id === this.tileApproach?.instance || id === this.transportApproach?.instance;
+      || id === this.transportApproach?.instance;
     const idle = [...this.products.keys()].filter(id => !keep(id))
       .sort((a, b) => this.distance(this.assembly.cell(b), feet) - this.distance(this.assembly.cell(a), feet));
     for (const id of idle) {
@@ -333,49 +263,12 @@ export class LiveGridHost {
   /** GC5 / GC36: the cell whose world the road is building or built ahead of its line (`buildAhead`), kept until the
    *  traveller enters a cell or heads into another's mouth. */
   private ahead: string | null = null;
-  /** GC9: the optional read last raised to demand, so a pending radial read is raised once, not every tick */
-  private raised: Promise<LiveGridAdmission> | null = null;
-  private tileApproach: { instance: string; tile: CellTile; controller: AbortController } | null = null;
   private transportApproach: { instance: string; controller: AbortController; work: Promise<void> } | null = null;
   private retiredTransport: Promise<void> = Promise.resolve();
   private stopApproachTransport(): void {
     const previous = this.transportApproach; if (previous === null) return;
     this.transportApproach = null; previous.controller.abort();
     this.retiredTransport = this.settle(previous.work);
-  }
-  private prepareApproachTransport(cell: GridCell): void {
-    const prepare = this.ports.prepareTransport;
-    if (prepare === undefined || this.transportApproach?.instance === cell.instance) return;
-    this.stopApproachTransport();
-    const controller = new AbortController(), previous = this.retiredTransport;
-    // Acquire priority synchronously, before this tick's speculative IO runs.
-    // The old key keeps its own priority until its already-started reads drain.
-    const releasePriority = this.ports.prioritize?.(cell);
-    const work = (async (): Promise<void> => {
-      try { await previous; if (!this.disposed && !controller.signal.aborted) await prepare(cell, controller.signal); }
-      finally { releasePriority?.(); }
-    })();
-    const approach = { instance: cell.instance, controller, work }; this.transportApproach = approach;
-    void background(cell.instance, work, () => !this.disposed && !controller.signal.aborted);
-  }
-  private prepareNeighbour(cell: GridCell, feet: GridPoint): void {
-    const start = { x: Math.max(-CHUNK_HALF, Math.min(CHUNK_HALF, feet.x - cell.origin.x)),
-      z: Math.max(-CHUNK_HALF, Math.min(CHUNK_HALF, feet.z - cell.origin.z)) };
-    const tile = tileOf(start.x, start.z), prior = this.tileApproach;
-    if (prior?.instance === cell.instance && prior.tile.i === tile.i && prior.tile.j === tile.j) return;
-    // A diagonal approach can reach another mouth of the same destination.
-    // Retarget only across tile boundaries; keep exactly one speculative pin.
-    prior?.controller.abort();
-    const controller = new AbortController();
-    this.tileApproach = { instance: cell.instance, tile, controller };
-    const prepare = this.ports.prepareNeighbour;
-    if (prepare === undefined) return;
-    const pending = (async (): Promise<void> => {
-      const releasePriority = this.ports.prioritize?.(cell);
-      try { await prepare(cell, start, controller.signal); }
-      finally { releasePriority?.(); }
-    })();
-    void background(cell.instance, pending, () => !this.disposed && !controller.signal.aborted);
   }
   private ensure(instance: string): Promise<void> {
     if (this.disposed) return Promise.reject(new Error('Live grid is disposed'));
@@ -403,7 +296,6 @@ export class LiveGridHost {
       await (timing === undefined ? previous : timing.run('queue', () => previous));
       await this.retiredTransport;
       this.assertAlive();
-      const buildStart = diagnosticNow();
       const admitted = timing === undefined ? await this.prefetchProduct(instance, true) : await timing.run('metadata', () => this.prefetchProduct(instance, true));
       admission = admitted;
       this.assertAlive();
@@ -438,7 +330,6 @@ export class LiveGridHost {
         this.assertAlive();
         this.residents.set(instance, { region, lease, reservations: 0, evicting: false, retainable: admitted.isolatedPreparation === true });
         this.readiness.complete(ticket, 'colliders'); this.readiness.complete(ticket, 'sim');
-        this.builtSeconds.set(instance, (diagnosticNow() - buildStart) / 1000);
         lease.update({ needed: false, distance: this.distance(cell) });
       } catch (error) {
         try { region?.dispose(); }
@@ -510,13 +401,6 @@ export class LiveGridHost {
     resident.lease.update({ needed: false, distance: this.distance(this.assembly.cell(instance)) });
     return this.lastCell === last;
   }
-  /** GC5: how far from a neighbour's square its world starts building at `speed` (m/s): its measured build time, or the
-   *  slowest measured so far or the default, at least WARM_MIN_SECONDS, with a margin; capped below the keep distance. */
-  private warmLead(instance: string, speed: number): number {
-    const measured = this.builtSeconds.get(instance) ?? Math.max(WARM_DEFAULT_SECONDS, ...this.builtSeconds.values());
-    const seconds = Math.min(WARM_MAX_SECONDS, Math.max(WARM_MIN_SECONDS, measured));
-    return Math.min(WARM_LEAD_CAP_METRES, WARM_LEAD_METRES + speed * seconds * WARM_MARGIN);
-  }
   private distance(cell: GridCell, p = this.worldFeet()): number { return Math.hypot(Math.max(0, Math.abs(p.x - cell.origin.x) - CHUNK_HALF), Math.max(0, Math.abs(p.z - cell.origin.z) - CHUNK_HALF)); }
   /** Only the active/reserved world and one bounded departed world can remain.
    * A different actual entry retires the departure before any new allocation. */
@@ -550,183 +434,11 @@ export class LiveGridHost {
   /** Before the existing page physics/player step: radial requests are U-turn safe, and current-world walls synchronize first. */
   beforeFixed(): void {
     if (this.disposed) return;
-    const work=this.approachWork.pop()??{candidates:[],boulevard:[]};
-    try{this.beforeFixedWithWork(work);}
-    finally{work.candidates.length=0;work.boulevard.length=0;if(!this.disposed)this.approachWork.push(work);}
+    this.beforeFixedWithWork();
   }
-  private beforeFixedWithWork(work:{candidates:GridCell[];boulevard:GridCell[]}):void{
-    if (this.tileApproach?.instance === this.active && this.ports.gameplayReady(this.tileApproach.instance)) {
-      this.tileApproach.controller.abort(); this.tileApproach = null;
-    }
-    const feet = this.worldFeet(), previous = this.previousFeet;
-    const travelledDistance = previous === undefined ? 0 : Math.hypot(feet.x - previous.x, feet.z - previous.z);
-    // More than a second of modeled travel between fixed samples is a pose/portal jump.
-    // Establish a new origin instead of spending a constructor on its accidental direction.
-    const travelled = previous !== undefined && travelledDistance >= APPROACH_TRAVEL_METRES && travelledDistance <= this.ports.readiness.link.speed;
-    const steps = ++this.stepsSincePrevious, speed = travelled ? travelledDistance * FIXED_HZ / steps : 0;
-    if (previous === undefined || travelledDistance >= APPROACH_TRAVEL_METRES) { this.previousFeet = feet; this.stepsSincePrevious = 0; }
-    // Prefetch the closest cells' products (never their worlds: G663). Unsupported far proxies do not consume the count
-    // before enterable cells inside the cold readiness bound.
-    const candidates=work.candidates,cells=this.assembly.cells;
-    for(let i=0,length=cells.length;i<length;i++){
-      const cell=cells[i];if(cell!==undefined&&cell.instance!==this.active&&(this.ports.prefetchable?.(cell)??true))candidates.push(cell);
-    }
-    // Fixed cell poses and this tick's captured feet: avoid repeating hypot inside every sort comparison.
-    for (const cell of candidates) this.candidateDistances.set(cell,this.distance(cell,feet));
-    candidates.sort((a,b) => (this.candidateDistances.get(a) ?? Infinity) - (this.candidateDistances.get(b) ?? Infinity) || a.instance.localeCompare(b.instance));
-    // Immutable products are selected by distance, without a whole-world count cap.
-    const nearby = candidates;
-    // The frame-transfer reservation protects an actual entry; inactive whole worlds retire in steps. A world built ahead
-    // (`buildAhead`) stays while the traveller is on the road and has not turned into another mouth (below); one pre-warmed
-    // from inside the source (GC5) stays while the traveller is within WARM_KEEP_METRES of it.
-    if (this.active !== null && this.ahead !== null && (this.ahead === this.active
-      || this.distance(this.assembly.cell(this.ahead), feet) > WARM_KEEP_METRES)) this.ahead = null;
+  private beforeFixedWithWork():void{
+    // J353: the road and placeholders remain, but a page never reads, prepares or admits a second cell.
     this.retireInactiveRegions();
-    // GC6: the demanded neighbour stays demanded until its product is in, it is entered, or the traveller is far from it
-    const demanded = this.demanded;
-    if (demanded !== null && (this.products.has(demanded) || this.residents.has(demanded) || demanded === this.active || this.issues.has(demanded)
-      || this.distance(this.assembly.cell(demanded), feet) > DEMAND_METRES + WARM_LEAD_METRES * 4)) this.demanded = null;
-    for (const cell of nearby) {
-      const estimate = readinessModel(this.ports.readiness.bundle(cell), this.ports.readiness.link), distance = this.distance(cell, feet);
-      if (this.demanded !== null && this.demanded !== cell.instance) continue;
-      if (this.assembly.approaching(distance, estimate.distance) && !this.issues.has(cell.instance) && this.ports.backgroundReady?.() !== false) void background(cell.instance, this.prefetch([cell.instance], 'radial'), () => !this.disposed);
-    }
-    // GC5: the neighbour across the source's nearest edge, within DEMAND_METRES, has its product read as demand, standing or
-    // moving: a player at a cell's edge reaches it in seconds at a boost, and the radial read above is only a guess the shared
-    // budget declines while every neighbour competes for it (Pine's read alone is 6 to 8 s). One at a time, the nearest.
-    if (this.active !== null && this.ports.buildAhead === true) {
-      const near = candidates[0];
-      // GC9: a radial read already pending for it is raised to demand once (the budget declined Pine's radial read again and
-      // again while it stood pending, so the demand read never started inside Driftwood and Pine's world was built on the road)
-      const pending = near === undefined ? undefined : this.productRequests.get(near.instance);
-      if (near !== undefined && this.distance(near, feet) <= DEMAND_METRES && !this.products.has(near.instance) && !this.residents.has(near.instance)
-        && (pending === undefined || !pending.required && this.raised !== pending.work) && !this.issues.has(near.instance) && !this.constructing.has(near.instance)
-        && this.deferredDemand.get(near.instance) !== this.ports.allocator.revision && this.ports.backgroundReady?.() !== false) {
-        if (pending !== undefined) this.raised = pending.work;
-        this.demanded = near.instance;
-        void background(near.instance, this.prefetchProduct(near.instance, true, 'explicit', true), () => !this.disposed);
-      }
-    }
-    // Approach preparation owns render tiles only, never a regional world or gameplay hooks.
-    const moving = !travelled ? undefined : candidates.find(cell => headsToEntry(cell, feet, previous)
-      && this.distance(cell, feet) < this.distance(cell, previous) - 0.000001);
-    const source = this.active === null ? undefined : this.assembly.cell(this.active);
-    const sourceDistance = source === undefined ? Infinity : Math.max(Math.abs(feet.x - source.origin.x), Math.abs(feet.z - source.origin.z));
-    const transportApproach = this.transportApproach;
-    if (transportApproach !== null) {
-      const cell = this.assembly.cell(transportApproach.instance);
-      if (moving !== undefined && moving.instance !== cell.instance
-        || this.distance(cell, feet) >= this.assembly.pitch
-        || source !== undefined && source.instance !== cell.instance && sourceDistance < CHUNK_HALF - 1) this.stopApproachTransport();
-    }
-    const tileApproach = this.tileApproach;
-    if (tileApproach !== null) {
-      const cell = this.assembly.cell(tileApproach.instance);
-      if (moving !== undefined && moving.instance !== cell.instance
-        || this.distance(cell, feet) > readinessModel(this.ports.readiness.bundle(cell), this.ports.readiness.link).distance) {
-        tileApproach.controller.abort(); this.tileApproach = null;
-      }
-    }
-    // The world built ahead goes once the traveller is a pitch from it, or heads from the road into another mouth (a stop
-    // keeps it). Checked while a build runs too, which the gate below skips.
-    const wallReach = 6 + this.ports.player.motor.opts.radius + 0.5 + this.ports.readiness.link.speed / 60;
-    const departed = this.transitions.at(-1)?.from;
-    // QA 11-13 row 43: on the road within a cell's wall reach the traveller is at that cell's wall, whatever the heading: a
-    // jump or a recoil off the wall reads as a heading back into the cell just left, which let the world built ahead go.
-    const held = this.ports.buildAhead === true && this.active === null && this.assembly.at(feet.x, feet.z) === undefined
-      ? nearby.find(cell => cell.instance !== departed && this.distance(cell, feet) <= wallReach) : undefined;
-    // Inside the source a new heading must hold HEADING_HOLD_MS before it retires the world built ahead: steering that
-    // wobbles near a corner would otherwise build and dispose a whole world per flip.
-    const turned = moving !== undefined && moving.instance !== this.ahead;
-    if (!turned || this.active === null) this.turnedSince = null;
-    else if (this.turnedSince?.instance !== moving.instance) this.turnedSince = { instance: moving.instance, at: diagnosticNow() };
-    const settledTurn = turned && (this.active === null || diagnosticNow() - (this.turnedSince?.at ?? 0) >= HEADING_HOLD_MS);
-    if (this.ahead !== null && (this.distance(this.assembly.cell(this.ahead), feet) >= this.assembly.pitch
-      || held === undefined && settledTurn && (this.assembly.at(feet.x, feet.z) === undefined || this.active !== null))) this.ahead = null;
-    if (this.requests.size === 0) {
-      const boulevard=work.boulevard;
-      if(travelled&&moving===undefined)for(let i=0,length=candidates.length;i<length;i++){
-        const cell=candidates[i];if(cell!==undefined&&cell.instance!==departed
-          &&(boulevardApproachDistance(cell,feet,previous,this.assembly.pitch)??Infinity)
-            <=readinessModel(this.ports.readiness.bundle(cell),this.ports.readiness.link).distance)boulevard.push(cell);
-      }
-      // Product metadata identifies bounded native alternatives even when the nearer opaque product filled
-      // the radial prefetch count. This admits immutable products/modules, never their foundations.
-      for (const cell of boulevard) if (!this.issues.has(cell.instance)) void background(cell.instance, this.prefetch([cell.instance], 'boulevard'), () => !this.disposed);
-      // A unique next junction can prepare tiles. Equidistant sides wait for a turn.
-      let predicted: GridCell | undefined, nextDistance = Infinity;
-      for (const cell of boulevard) {
-        const distance = boulevardApproachDistance(cell, feet, previous ?? feet, this.assembly.pitch);
-        if (distance === undefined) continue;
-        if (distance < nextDistance - 0.000001) { predicted = cell; nextDistance = distance; }
-        else if (Math.abs(distance - nextDistance) <= 0.000001) predicted = undefined;
-      }
-      // A stationary sample is not a redirect. Keep the verified render owner
-      // until a named heading or the distance fence replaces it; the cell just
-      // left must not steal that pin merely because its wall is still nearest.
-      const heldApproach = this.tileApproach === null ? undefined : this.assembly.cell(this.tileApproach.instance);
-      const approach = moving ?? predicted ?? heldApproach
-        ?? nearby.find(cell => cell.instance !== departed && this.distance(cell, feet) <= wallReach);
-      const named = moving ?? predicted, outsideSource = sourceDistance >= CHUNK_HALF;
-      if (named !== undefined && outsideSource && !this.residents.has(named.instance) && !this.issues.has(named.instance)
-        && this.distance(named, feet) < this.assembly.pitch) this.prepareApproachTransport(named);
-      // GC5 / GC36 (J322: no walls, no hold at the line): on the road, a traveller heading into a cell's mouth builds that
-      // cell's world now, not at the line. Built on demand there, the walk stood 2 to 5 s at the neighbour's closed edge
-      // while its world was made (2 to 4 s in Chromium). The entry's own preparation then finds it resident. The departed
-      // cell retires first, as the entry would retire it; a U-turn builds it again, as any entry does.
-      // Only from the road itself: past a cell's line (inside its square, before the 6 m entry) the heading names the cell
-      // beyond it, which would retire the world just built for the one underfoot.
-      // QA 11-13 row 43 (Jake on staging: 11 s at Template's wall, "saved state and its systems", no progress): a traveller
-      // standing at a neighbour's closed wall makes no heading (under 0.1 m a sample), so a world built ahead and then let go
-      // was never asked for again, and online the server crosses only past the line the wall holds them short of. Held at
-      // a closed wall on the road, that cell's world is always building.
-      // A failed build is tried again while they stand there, at most every HELD_RETRY_MS (never on a cleanup failure).
-      if (held !== undefined && this.issues.has(held.instance) && !this.residents.has(held.instance) && !this.requests.has(held.instance) && !this.productRequests.has(held.instance)
-        && diagnosticNow() >= (this.heldRetryAt.get(held.instance) ?? 0)) { this.heldRetryAt.set(held.instance, diagnosticNow() + HELD_RETRY_MS); this.retry(held.instance); }
-      if (held !== undefined && !this.residents.has(held.instance) && !this.issues.has(held.instance)) {
-        this.ahead = held.instance;
-        if (this.retireInactiveRegions(held.instance)) void background(held.instance, this.ensure(held.instance), () => !this.disposed);
-      }
-      else if (held === undefined && this.ports.buildAhead === true && moving !== undefined && this.active === null && this.assembly.at(feet.x, feet.z) === undefined
-        && !this.residents.has(moving.instance) && !this.issues.has(moving.instance)
-        && this.distance(moving, feet) < this.assembly.pitch && this.retireInactiveRegions(moving.instance)) {
-        this.ahead = moving.instance;
-        void background(moving.instance, this.ensure(moving.instance), () => !this.disposed);
-      }
-      // GC5 (QA 11-13 row 39: boosts held 4 to 7.6 s at the neighbour's loading wall, the road being under 3 s at 18 m/s):
-      // inside the source, heading into a neighbour's mouth, its world is built once the traveller is its measured build
-      // time away at this speed. Only beside an isolated source and for an isolated product (opaque runtimes stay exclusive,
-      // built only on the road), and only when both fit beside each other (G723); else the road builds it as before.
-      if (this.ports.buildAhead === true && moving !== undefined && this.active !== null && this.ahead === null
-        && this.residents.get(this.active)?.retainable === true && !this.residents.has(moving.instance) && !this.issues.has(moving.instance)
-        && this.distance(moving, feet) <= this.warmLead(moving.instance, speed)) {
-        const product = this.products.get(moving.instance);
-        // The heading names it: its product is read as demand (it may evict speculative neighbours' products), not as a radial
-        // guess, which the shared budget declines while the page's other neighbours compete for the same headroom.
-        if (product === undefined) {
-          this.warmRefusal = 'product';
-          this.demanded = moving.instance;
-          if (!this.productRequests.has(moving.instance) && this.deferredDemand.get(moving.instance) !== this.ports.allocator.revision)
-            void background(moving.instance, this.prefetchProduct(moving.instance, true, 'explicit', true), () => !this.disposed);
-        }
-        else if (product.isolatedPreparation !== true) this.warmRefusal = 'exclusive';
-        else if (!this.ports.allocator.canPrepareAlongside(this.active, moving.instance, product.bytes,
-          { playing: this.ports.allocator.envelope(), loading: CONTENT_CAPS.loading })) this.warmRefusal = 'budget';
-        else {
-          this.ahead = moving.instance; this.warms++; this.warmRefusal = null;
-          void background(moving.instance, this.ensure(moving.instance), () => !this.disposed);
-        }
-      }
-      if (approach !== undefined && this.ports.prepareNeighbour !== undefined && this.tileMetadata.has(approach.instance)
-        && !this.residents.has(approach.instance) && !this.issues.has(approach.instance)
-        && (this.active === null || moving === approach)
-        // A held owner survives a stationary/teleported sample without moving
-        // its entry tile. Only a real named approach may retarget that pin.
-        && (heldApproach === undefined || moving === approach || predicted === approach)
-        && this.assembly.approaching(this.distance(approach, feet), readinessModel(this.ports.readiness.bundle(approach), this.ports.readiness.link).distance)) {
-        this.prepareNeighbour(approach, feet);
-      }
-    }
     const walls = this.active === null ? this.highway.walls : this.region(this.active)?.walls;
     walls?.sync(this.readiness);
   }
@@ -887,7 +599,6 @@ export class LiveGridHost {
       motors.commit();
       this.ports.player.motor = rider.motor; this.active = to;
       if (to !== null) this.forgetLastCell();
-      this.previousFeet = this.worldFeet(); // A committed spawn/frame placement is not the traveller's heading.
       this.ports.bindFrame({ instance: to, physics: this.physics(to), motor: rider.motor, origin });
       this.residents.get(to ?? '')?.lease.update({ needed: true }); this.residents.get(from ?? '')?.lease.update({ needed: to === null });
       this.crossings++; this.transitions.push({ from, to }); if (this.transitions.length > 256) this.transitions.shift(); finish();
@@ -900,7 +611,7 @@ export class LiveGridHost {
       playingBytes: this.ports.allocator.ownerCost(last.instance).playing, capBytes: Math.min(this.ports.allocator.envelope(), policy.playingBytes) };
   }
   /** Read-only crossing evidence and failures for the real grid physics harness. */
-  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, ahead: { instance: this.ahead, warms: this.warms, refused: this.warmRefusal, deferred: [...new Set([...this.deferredProducts.keys(), ...this.deferredDemand.keys()])], demanded: this.demanded, released: this.released }, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.productRequests.keys()])].sort(), pendingWork: [
+  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.productRequests.keys()])].sort(), pendingWork: [
     ...[...this.requests.keys()].sort().map(instance => ({ instance, kind: 'world' as const, trigger: 'entry' as const })),
     ...[...this.productRequests].sort(([a], [b]) => a.localeCompare(b)).map(([instance, request]) => ({ instance, kind: request.required ? 'required-metadata' as const : 'optional-metadata' as const, trigger: request.trigger })),
   ], issues: Object.fromEntries(this.issues), gameplayReady: this.active === null || this.ports.gameplayReady(this.active), ...(this.ports.lastCell === undefined ? {} : { retainedCell: this.retainedState() }), retirements: this.retirements.map(row => ({ ...row })), retiring: [...this.retiring.keys()], ghosts: { count: this.ghosts.count(), regions: this.ghosts.regions() } }; }
@@ -910,7 +621,6 @@ export class LiveGridHost {
     this.disposed = true;
     this.forgetLastCell();
     this.stopApproachTransport();
-    this.tileApproach?.controller.abort(); this.tileApproach = null;
     this.tileMetadata.clear();
     for (const cancel of this.frames) cancel();
     // Return the still-live page traveller before freeing a world that contains its current controller.
