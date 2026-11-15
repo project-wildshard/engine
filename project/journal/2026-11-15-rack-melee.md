@@ -12,3 +12,8 @@ rack take (an `itemActions` row of action 3) was in hand from the start.
   (`takenLine`, which `leverLines` now uses too).
 - Client (`dataCellKit.ts`): a racked weapon starts locked and unlocks and comes to hand when its line reads 1, as a lever does.
 - Test: `test/declared-rack-melee.test.ts` (Template's sword on a fixture rack).
+
+Review (one-shot `claude -p`): MUST fixed: the page sends a rack's prompt by its own id, so `leverPrompts` now maps a melee
+rack's prompt to its scene too, and the test presses the prompt id. SHOULD taken: the client racks the server's set exactly.
+SHOULD left open in the plan: TC-E3's places are every map POI, so a player who dies inside a hazard POI (Brasscap's pit)
+comes back there; a POI opt-out is a follow-up row.

@@ -83,13 +83,14 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
   const prompts = new Map<string, { readonly at: readonly [number, number, number]; readonly radius: number }[]>();
   for (const row of shard.targets.interactions) prompts.set(row.scene, [...(prompts.get(row.scene) ?? []), row]);
   // A rack's prompt names its lever's scene: the page sends the prompt's own id, and this kit runs it, not a script (a shard may have none).
-  const leverPrompts = new Map(shard.targets.interactions.flatMap(row => (shard.targets.itemActions ?? []).some(action => action.scene === row.scene && levers.has(action.item)) ? [[row.id, row.scene] as const] : []));
   const slots = declaredKitSlots(shard.items.rows), weapons = [...slots.keys()];
   // TEMPLATE-E2E TC-E1c: the loadout's primary lever is in hand from the start; any other waits for its rack
   const primary = shard.items.loadout.primary;
   const scenes = new Map((shard.targets.itemActions ?? []).filter(row => rows.some(item => item.id === row.item)).map(row => [row.scene, row] as const));
   // TEMPLATE-E2E TC-E4 (J361: Mossgate's sword is found on a rack): a melee weapon a rack takes starts on that rack, per player
   const rackMelee = rackMeleeRows(shard);
+  // A rack's prompt arrives by its own id (the page's wire id): a lever's or a racked melee weapon's names its scene
+  const leverPrompts = new Map(shard.targets.interactions.flatMap(row => (shard.targets.itemActions ?? []).some(action => action.scene === row.scene && (levers.has(action.item) || rackMelee.has(action.item))) ? [[row.id, row.scene] as const] : []));
   const fields = (shard.targets.itemFields ?? []).flatMap(row => {
     const field = shard.state.player.find(entry => entry.id === row.fieldId);
     return field === undefined || field.privacy === 'host' ? [] : [{ item: row.item, name: field.name, property: row.property }];

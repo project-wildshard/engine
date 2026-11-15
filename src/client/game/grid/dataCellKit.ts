@@ -77,7 +77,9 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   // TE-ENG2: a lever follows the server's owned lines; taken, it unlocks and comes to hand
   const levers = weapons.flatMap(weapon => { const lever = declaredLever(weapon); return lever === null ? [] : [lever]; });
   // TEMPLATE-E2E TC-E4: a melee weapon on a rack follows its owned taken line the same way
-  const onRacks = rackMeleeRows(source), racked = new Set(weapons.filter(weapon => weapon !== first && onRacks.has(weapon.id)));
+  // the server's set exactly (never the loadout primary). A kit with no primary whose first weapon is racked still draws it
+  // in hand (a kit cannot lock its first); the server refuses its blows until it is taken
+  const onRacks = rackMeleeRows(source), racked = new Set(weapons.filter(weapon => onRacks.has(weapon.id)));
   app.addContentSystem({ id: 'grid.data-cell-kit', phase: 'update', run: (dt, t) => {
     for (const lever of levers) {
       if (wirePage.client !== null && here()) {

@@ -60,7 +60,7 @@ test('a melee weapon on a rack: no swap to it, taken near its rack into the hand
   expect(line(sim, TAKEN)).toBe(0);
   // At the rack it comes to hand.
   player.position.set(AT[0] + 1, player.position.y, AT[2]); player.motor.resetAt(player.position);
-  expect(kit.scene(PLAYER, SCENE)).toBe(true);
+  expect(kit.scene(PLAYER, 'fixture.sword-rack.use')).toBe(true); // the rack's prompt, by its own id, as the page sends it
   tick(sim, kit);
   expect(player.held).toBe(slot);
   expect(line(sim, TAKEN)).toBe(1);
