@@ -12,7 +12,7 @@
 // <task> is one plain folder name: letters, digits, '.', '_' and '-', not starting with '.', never containing '/' or
 // '..'. The helper deletes nothing. It refuses a folder that already exists unless that folder's .owner names this
 // same session (then it prints the path again), so it never takes over another lane's or an ownerless folder.
-import { mkdirSync, readFileSync, rmdirSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, rmdirSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -75,7 +75,14 @@ export function scratchDir(task, purpose, { root = ROOT, env = process.env, now 
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
     const existing = readOwner(join(dir, '.owner'));
-    if (existing && owner.session && existing.session === owner.session) return dir;
+    if (existing && owner.session && existing.session === owner.session) {
+      // A lane name can outlive a task. Advance its cursor when it resumes,
+      // without ever exposing a half-written ownership record.
+      const next = join(dir, `.owner-${process.pid}`);
+      writeFileSync(next, `${JSON.stringify(owner, null, 2)}\n`, { flag: 'wx' });
+      renameSync(next, join(dir, '.owner'));
+      return dir;
+    }
     throw new Error(existing
       ? `${dir} already belongs to session ${String(existing.session)}; pick another task name`
       : `${dir} already exists with no .owner; pick another task name`);

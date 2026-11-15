@@ -17,6 +17,9 @@ test('ending a session preserves owned, foreign, ownerless and linked scratch', 
     }
     writeFileSync(join(root, 'tmp/mine/.owner'), JSON.stringify({ session: 'ending', task: 'mine' }));
     writeFileSync(join(root, 'tmp/foreign/.owner'), JSON.stringify({ session: 'other' }));
+    mkdirSync(join(root, 'tmp/busy/dev-123'), { recursive: true });
+    writeFileSync(join(root, 'tmp/busy/.owner'), JSON.stringify({ session: 'ending' }));
+    writeFileSync(join(root, 'tmp/busy/dev-123/server.pid'), String(process.pid));
     symlinkSync(join(root, 'tmp/mine'), join(root, 'tmp/linked'));
     const result = spawnSync(process.execPath, [hook], {
       input: JSON.stringify({ session_id: 'ending', cwd: '/' }), encoding: 'utf8',
@@ -24,6 +27,7 @@ test('ending a session preserves owned, foreign, ownerless and linked scratch', 
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /tmp\/mine.*Copy first/u);
     assert.doesNotMatch(result.stdout, /tmp\/foreign/u);
+    assert.doesNotMatch(result.stdout, /tmp\/busy/u);
     const purge = spawnSync(process.execPath, [hook, '--purge'], { encoding: 'utf8' });
     assert.equal(purge.status, 0);
     for (const name of ['mine', 'foreign', 'ownerless', '.scratch-trash'])
