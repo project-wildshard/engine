@@ -638,5 +638,8 @@
  "test/grid-crossing-ratchet.test.ts",
  "test/title-chunk-budget.test.ts",
  "test/title-prefetch.test.ts",
- "test/graph-budget.test.ts"
+ "test/graph-budget.test.ts",
+ "test/grid-layout-j305.test.ts",
+ "test/grid-format-v047.test.ts",
+ "test/nightly-plan.test.ts"
 ]
