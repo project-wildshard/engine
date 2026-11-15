@@ -4,7 +4,8 @@
 import { spawnSync } from 'node:child_process';
 
 const started=performance.now();
-const result=spawnSync(process.execPath,['scripts/t1-e2e.mjs'],{
+const specs=process.argv.length>2?process.argv.slice(2):['boot.spec.ts','fixtures.spec.ts','probe.spec.ts'];
+const result=spawnSync(process.execPath,['scripts/t1-e2e.mjs',...specs],{
   stdio:'inherit',
   env:{...process.env,WS_LANE_NAME:process.env.WS_LANE_NAME??'template-e2e-ci'},
 });
