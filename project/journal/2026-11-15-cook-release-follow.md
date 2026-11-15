@@ -18,3 +18,8 @@
 - Review fixes: the timer no longer installs its own script onto itself; a tag
   is proved to resolve to the signed build before the checkout or marker can
   change; and `--check` verifies the release without writing its state file.
+
+- Rebased onto v0.1.21's AUTO-RELEASE work: `cook.settings` now overrides the
+  signed follow state, which overrides legacy `cook.env` values. The service
+  reads all three in that order and its restart hash covers them. Focused
+  `test/vps-rebuild.test.ts` passes after the composition.

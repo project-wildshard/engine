@@ -203,9 +203,7 @@ test('rebuild.sh needs every file setup.sh needs beside it', () => {
       ?.split(' ') ?? []
   expect(needed.length).toBeGreaterThan(4)
   const listed =
-    /for name in ([a-z.\- ]+); do\n\s+if \[ ! -f "\$HERE\/\$name" \]; then say stop "\$name must sit beside rebuild.sh"/u
-      .exec(source)?.[1]
-      ?.split(' ') ?? []
+    /REQUIRED=\(([a-z.\- ]+)\)/u.exec(source)?.[1]?.split(' ') ?? []
   for (const name of needed) expect(listed, name).toContain(name)
 })
 

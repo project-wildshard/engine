@@ -22,7 +22,8 @@ HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ETC=/etc/wildshard HOME_DIR=/var/lib/wildshard SYSTEMD=/etc/systemd/system
 PG_VERSION=16 NODE=/usr/bin/node NODE_MAJOR=24 PNPM=pnpm@10.34.9
 KEY_DIR=/home/raynos/wildshard-e7 KEY_FILE=/home/raynos/wildshard-e7/release-public-key.hex
-COOK_ENV=/etc/wildshard/cook.env COOK_STATE=/etc/wildshard/cook-release.env COOK_HOME=/var/lib/wildshard-cook COOK_SRC=/opt/wildshard/engine COOK_LIB=/usr/local/lib/wildshard-cook COOK_PNPM_STORE=/var/lib/wildshard-pnpm-store
+COOK_ENV=/etc/wildshard/cook.env COOK_STATE=/etc/wildshard/cook-release.env COOK_HOME=/var/lib/wildshard-cook COOK_SRC=/opt/wildshard/engine COOK_LIB=/usr/local/lib/wildshard-cook
+COOK_PNPM_STORE=/var/lib/wildshard-pnpm-store
 COOK_GROUP=wildshard-cook
 COOK_SETTINGS=/etc/wildshard/cook.settings
 # 8790 and 8791 are the game's loopback ports; the cook worker's own default was 8791 too.
@@ -396,7 +397,7 @@ else
   bash "$HERE/setup.sh"
   PHASE2=1
 fi
-fi # COOK_ONLY: the follow timer only refreshes the cook source and service.
+fi # COOK_ONLY: --cook skips steps 1 to 3
 
 # --- 4. The cook worker (C4, J28): its own user, an engine checkout it can read and not write, and its unit.
 have_cook_user() { id wildshard-cook >/dev/null 2>&1 && getent group wildshard-cook >/dev/null; }
@@ -525,7 +526,11 @@ fi
 # What the running worker last read of cook.env, signed follow state and cook.settings, as a hash in its root-owned checkout.
 # A changed value restarts it; absent optional files preserve the legacy cook.env-only hash.
 cook_env_hash() {
-  { cat "$COOK_ENV"; cat "$COOK_STATE" 2>/dev/null || true; cat "$COOK_SETTINGS" 2>/dev/null || true; } | sha256sum | cut -d' ' -f1
+  {
+    cat "$COOK_ENV"
+    if [ -r "${COOK_STATE:-}" ]; then cat "$COOK_STATE"; fi
+    if [ -r "${COOK_SETTINGS:-}" ]; then cat "$COOK_SETTINGS"; fi
+  } | sha256sum | cut -d' ' -f1
 }
 
 if put "$SYSTEMD/wildshard-cook.service" 644 root:root <<EOF
