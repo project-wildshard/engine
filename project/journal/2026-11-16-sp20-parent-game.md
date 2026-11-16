@@ -37,3 +37,7 @@ unchanged600second limit; Pine finished273seconds with four CPU slots.
 The landing rebase preserves NB19's eighth inline-author option and puts
 the dedicated exact-hash option ninth. Exact activation cannot use inline
 inputs; author inline candidates retain their existing source reader.
+
+After rebasing onto current main, the additive-version cook control uses the
+mandatory full-check port too. Refresh the frozen dependency graph before
+qualification: main now requires format 0.12 compatibility helpers.

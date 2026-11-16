@@ -11,7 +11,7 @@ import {parseOutputIndex,assembleOutputShardfile} from '@wildshard/format/output
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {productTarball} from '../src/cook/game/productTarball';
 import {runCookJob} from '../src/cook/game/cookJob';
-import {validateSimulation} from '../src/server/host/headless';
+import {checkShardfile} from '../src/server/host/checkShardfile';
 import {admitProduct,type ProductOptions} from '../src/client/game/shardfile/product';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
 
@@ -34,7 +34,7 @@ test('the preceding additive product admits and cooks without rewriting its orig
  expect(admitted.source.version).toBe('0.1');
  const scratch=mkdtempSync(join(tmpdir(),'format-compat-'));
  try{
-  const report=await runCookJob(tar,scratch,{prove:validateSimulation,wireBytes:(_url,bytes)=>bytes.length,now:()=>performance.now()});
+  const report=await runCookJob(tar,scratch,{check:(shard,assets,sections)=>checkShardfile(shard,assets,{sections}),wireBytes:(_url,bytes)=>bytes.length,now:()=>performance.now()});
   expect(report.hash).toBe(originalHash);
   expect(report.proof).not.toBe('unmeasured');
   expect(readFileSync(join(scratch,'client',report.header))).toEqual(Buffer.from(header));
