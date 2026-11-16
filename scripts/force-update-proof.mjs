@@ -36,6 +36,12 @@ const local=`http://127.0.0.1:${String(address.port)}`, path='/slug/nine-dragon-
 const profile=join(work,'profile');
 let context;
 const errors=/** @type {string[]} */ ([]);
+// A worker can replace a navigation itself. Accept only that native interruption;
+// the following build/controller/menu assertions still have to succeed.
+/** @param {() => Promise<unknown>} navigate */
+async function workerNavigation(navigate){
+  try{await navigate();}catch(error){if(!(error instanceof Error)||!error.message.includes('Frame load interrupted'))throw error;}
+}
 async function launch(){
   const ctx=await webkit.launchPersistentContext(profile,{headless:true,userAgent:devices['iPhone 17 Pro'].userAgent,viewport:{width:402,height:874},screen:{width:402,height:874},isMobile:true,hasTouch:true,deviceScaleFactor:1});
   if(style==='standalone')await ctx.addInitScript(()=>{Object.defineProperty(navigator,'standalone',{get:()=>true});const native=window.matchMedia.bind(window);window.matchMedia=query=>query==='(display-mode: standalone)'?new Proxy(native(query),{get:(media,key)=>{if(key==='matches')return true;const value=Reflect.get(media,key,media);return typeof value==='function'?value.bind(media):value;}}):native(query);});
@@ -48,7 +54,8 @@ try{
   await page.waitForFunction(build=>Reflect.get(globalThis,'__WS_BUILD_ID__')===build,legacy.build,{timeout:30000});
   await page.evaluate(async()=>{await navigator.serviceWorker.register('/sw.js',{scope:'/',updateViaCache:'all'});});
   await page.waitForFunction(async()=>{const registration=await navigator.serviceWorker.getRegistration();return registration?.active!==null&&registration?.active!==undefined;},undefined,{timeout:45000});
-  await page.reload({waitUntil:'domcontentloaded'});
+  await workerNavigation(()=>page.reload({waitUntil:'domcontentloaded'}));
+  await page.waitForFunction(build=>Reflect.get(globalThis,'__WS_BUILD_ID__')===build,legacy.build,{timeout:45000});
   await page.waitForFunction(()=>navigator.serviceWorker.controller!==null,undefined,{timeout:45000});
   await page.evaluate(async()=>{
     localStorage.setItem('j383.settings','preserve');localStorage.setItem('j383.account','preserve');
@@ -61,7 +68,7 @@ try{
   upstream=candidate;
   const started=Date.now();context=await launch();page=context.pages()[0]??await context.newPage();
   page.on('pageerror',error=>{errors.push(error.name);});
-  await page.goto(local+path,{waitUntil:'domcontentloaded',timeout:60000});
+  await workerNavigation(()=>page.goto(local+path,{waitUntil:'domcontentloaded',timeout:60000}));
   await page.waitForFunction(build=>Reflect.get(globalThis,'__WS_BUILD_ID__')===build,current.build,{timeout:60000});
   await page.waitForFunction(()=>document.querySelector('[data-title-shell]')===null&&document.querySelector('#hud.intro .ws-menu:not(.hide),#hud.intro .ws-main:not(.hide),#hud.intro .ws-menu-carousel')!==null,undefined,{timeout:60000});
   const elapsed=Date.now()-started;

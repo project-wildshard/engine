@@ -26,8 +26,14 @@ browser and standalone-style modes (1.486-1.516 seconds on the first matrix).
 All retained account/settings/game-database sentinels and removed the old
 download and compiled-program caches. Native CSP prevents remote API writes
 and game joins without Playwright interception changing service-worker
-behavior. Final iPhone 17 Pro user-agent rerun and hosted CI follow the commit.
+behavior. The final iPhone 17 Pro user-agent matrix against clean e1c2d224
+passes all six profiles: v19 browser/standalone 1518/1520 ms, exact v22
+1529/1513 ms, v23 5668/6752 ms. Every case uses updateViaCache=all and one
+external launch. A native worker may interrupt the priming navigation; the
+proof accepts only that interruption, then still asserts the legacy build
+and controller before seeding. No scripted reload occurs after switching
+the origin to the candidate. Hosted CI qualification follows.
 85 focused cases, lint, types and CSS passed before the final intent marker.
 
 No hook escape hatch was used. v0.1.30 was already cut; this rides v0.1.31.
-The physical staging playtest is PZ29/PZ11, and asks Jake for no chores.
+The physical staging playtest is PZ30/PZ11, and asks Jake for no chores.
