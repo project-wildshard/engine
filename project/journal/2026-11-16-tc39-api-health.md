@@ -50,3 +50,12 @@ the selected pin file's API origin, validate the gh fixture's jq shape,
 and relax the header-flush timing to the existing deadline. A proposed
 static YAML-string assertion was declined: it would mirror the query;
 the real qualification query is executed and workflow syntax checked.
+
+Rebase to main3d58034d exposed a false save-definition finding:
+journey.spec.ts only seeds the existing devMode key via saveFixture.
+Name this exact file in the reasoned OUTSIDE map, preserving production
+save discovery and the ABI lock. Existing3case save contract proof
+passes. A direct extra lint run outside the declared lint tree finds
+two preexisting style errors in the file; no unrelated rewrite made.
+The parallel push cancelled siblings after this deterministic save
+failure, so the cancelled CLI is not an independent flake claim.
