@@ -12,3 +12,6 @@ ZE7, the grey stand-ins seen from the turn-ins:
   beside a kept one. `canPrepareAlongside`, `loadingEnvelope` and `pageLoadingBytes` are deleted with their tests.
 - ZE10b: the gate's 0 hands `enterZone` an arrival pose (`arrivalPose`: the entryway's centre line, 14 m in, past the
   gate, facing the centre) and the reload form carries it in the travel handoff's `arrive`, which the target's spawn reads.
+- ZE13: `grid-zone-tour.mjs` enters every cell by the gate facing the current home, one after another in one tab, and
+  `grid-zone-report.mjs` writes the cells × measures page and exits 1 past `test/grid-zone-ratchet.json` (seeded loose:
+  24 cells, 60 s count to control, 55 s loading, 1200 MB; tighten from the first preview tour).
