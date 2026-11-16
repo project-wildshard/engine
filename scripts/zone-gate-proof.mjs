@@ -2,7 +2,8 @@
 // ZONE-ENTRY ZE5 and ZE8 (J352): the walls and the gate card, by real input. From Driftwood (Shard Select), step out of its east
 // entryway onto the road and shoot Nalati's wall across it; walk into Nalati's west buffer and shoot the gate card at 5 and at 2;
 // at 3 back out and shoot it gone; walk in again, read 5 (the reset) and shoot it at 2. Each shot's page state (the gate's cell, count and card text)
-// goes in one JSON. `--fire` stands on to 0 and records the zone entry: the navigation, the loading screen and the cell as the new home (ZE10).
+// goes in one JSON. `--fire` stands on to 0 and records the zone entry: the navigation, the loading screen and the cell as the new home (ZE10),
+// the arrival 14 m in on the entryway's centre line facing in and a free walk back out onto the road (ZE10b).
 //   scripts/browser-lane.sh node scripts/zone-gate-proof.mjs --base=<preview or loopback url> --out=<dir> [--device='iPhone 15 Pro'] [--viewport=2992x1434@2]
 // The walker is set 20 m inside Driftwood's east entryway by the in-page harness pose, so preview or a loopback page only (J205).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -18,6 +19,9 @@ if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base
 const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '2992x1434@2')) ?? [0, '2992', '1434', '2']).slice(1).map(Number);
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 const HALF = 250;
+/** ZE10b: control in the new home on its west entryway's centre line 14 m in (within 1.5 m), facing in, then out onto the road. */
+const arrivedPastGate = (/** @type {any} */ fired) => fired?.ready === true && fired.walkedOut === true && fired.arrived !== null
+  && Math.abs(fired.arrived.x + HALF - 14) < 1.5 && Math.abs(fired.arrived.z) < 1.5 && Math.abs(Math.abs(fired.arrived.yaw) - Math.PI / 2) < 0.2;
 mkdirSync(out, { recursive: true });
 const tag = `${engineName}${device === '' ? '' : '-phone'}`;
 const result = { base, engine: engineName, viewport: '', at: new Date().toISOString(), build: '', shots: /** @type {Record<string, unknown>[]} */ ([]), fired: /** @type {unknown} */ (null), errors: /** @type {string[]} */ ([]), note: '' };
@@ -78,13 +82,27 @@ try {
     const ready = await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 180_000, polling: 250 }).then(() => true).catch(() => false);
     const home = await page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard?.shard?.grid?.state?.(); return { home: st?.live?.live?.home ?? st?.home ?? null, current: st?.live?.live?.current ?? null, slug: W.__wildshard?.shard?.slug ?? null }; }).catch(() => null);
     if (ready) await page.screenshot({ path: join(out, `${tag}-entered.png`) });
-    result.fired = { navigated: left, before, after: page.url(), ready, home };
+    // ZE10b: the arrival (the new home's own frame: its west entryway's centre line, 14 m in, facing east into the cell), then a free
+    // walk back out of the new home onto the road (no wall: the home has none)
+    /** @type {{ x: number, z: number, yaw: number } | null} */
+    let arrived = null, walkedOut = false;
+    if (ready) {
+      await sleep(1500);
+      arrived = await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; return { x: Number(p.position.x.toFixed(2)), z: Number(p.position.z.toFixed(2)), yaw: Number(p.yaw.toFixed(3)) }; });
+      for (const ends = Date.now() + 20_000; Date.now() < ends;) {
+        const x = await page.evaluate(() => /** @type {any} */ (window).__wildshard.world.player.position.x);
+        if (x < -HALF - 5) { walkedOut = true; break; }
+        await face(Math.PI / 2); await page.keyboard.down('KeyW'); await sleep(400); await page.keyboard.up('KeyW');
+      }
+      await page.screenshot({ path: join(out, `${tag}-walked-out.png`) });
+    }
+    result.fired = { navigated: left, before, after: page.url(), ready, home, arrived, walkedOut };
   }
   const named = (/** @type {string} */ name) => /** @type {any} */ (result.shots.find(row => row.name === name))?.gate;
   const [at5, gone, again, at2] = ['gate-5', 'backed-away', 'gate-again', 'gate-2'].map(named);
   console.log(JSON.stringify({ at5, at2, gone, again, fired: result.fired }));
   await context.close();
-  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || /** @type {any} */ (result.fired)?.ready === true) ? 0 : 1;
+  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || arrivedPastGate(/** @type {any} */ (result.fired))) ? 0 : 1;
 } catch (error) { result.note = String(error).slice(0, 400); console.log(`FAIL ${result.note}`); }
 finally {
   writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);
