@@ -14,6 +14,7 @@ import {dirname, join} from 'node:path';
 import {prepareAssetDecoders} from '@wildshard/format/shardfileAssets';
 import {validateShardfileFolder, type ValidatedShardfile as ValidatedProduct} from '@wildshard/format/shardfileValidation';
 import type {Shardfile} from '@wildshard/format/shardSchema';
+import type {ShardfileCheckReport, ShardfileEntryProof} from '@wildshard/engine/game/shardfile/checkReport';
 import {readTar} from '@wildshard/format/tar';
 import {cookShard, openShardfile, serverRows, type CookReport, type OpenShardfile, type WireBytes} from './shardCook';
 import type {PartEncoder} from './spawnParts';
@@ -23,14 +24,18 @@ export const MAX_SHARDFILE_BYTES = 450_000_000;
 /** A shardfile the cook refuses for what it is. A retry can't change it, unlike a killed child or a lost network. */
 export class ShardfileRefusedError extends Error {
   override readonly name = 'ShardfileRefusedError';
+  readonly report: ShardfileCheckReport | undefined;
+  constructor(message: string, options?: ErrorOptions & {readonly report?: ShardfileCheckReport}) {
+    super(message, options); this.report = options?.report;
+  }
 }
 
-export interface SimulationProof {readonly ticks: number; readonly lanes: number; readonly steps: number}
+export type SimulationProof = ShardfileEntryProof;
 export interface CookJobPorts {
   /** Trusted notice identity; reject a valid product for another shard before its simulation/cook. */
   readonly expectedSlug?: string;
-  /** F3 (b). Injected: the proof lives in the SDK, above this layer. */
-  readonly prove: (shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, sections: ReadonlyMap<string, unknown>) => Promise<SimulationProof>;
+  /** SP19: mandatory full check, composed by the host above this layer. */
+  readonly check: (shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, sections: ReadonlyMap<string, unknown>) => Promise<ShardfileCheckReport>;
   readonly wireBytes: WireBytes;
   readonly now: () => number;
   readonly maxBytes?: number;
@@ -44,6 +49,7 @@ export interface CookJobReport {
   readonly slug: string;
   readonly hash: string;
   readonly proof: SimulationProof | 'unmeasured';
+  readonly check: ShardfileCheckReport;
   readonly cook: CookReport;
   readonly header: string;
   readonly server: ServerPackReport;
@@ -86,14 +92,14 @@ export function cookReceipt(files: ReadonlyMap<string, Uint8Array>): CookReceipt
   } catch { return undefined; }
 }
 
-/** A failed proof is a verdict on these bytes: another try walks the same lanes. A dead child never reaches this. */
-async function proved(product: ValidatedProduct, ports: CookJobPorts): Promise<SimulationProof | 'unmeasured'> {
-  try {
-    const proof = await ports.prove(product.shard, product.assets, product.sections);
-    // A successful empty traversal is not evidence that gameplay was exercised.
-    return proof.ticks > 0 && proof.lanes > 0 && proof.steps > 0 ? proof : 'unmeasured';
+/** Only a complete shared check can admit new bytes. Infrastructure errors remain retryable. */
+async function checked(product: ValidatedProduct, ports: CookJobPorts): Promise<ShardfileCheckReport> {
+  const report = await ports.check(product.shard, product.assets, product.sections);
+  if (!new Set([product.index.identity.slug]).has(report.slug)) throw new Error('The check reported another shard');
+  if (!report.pass || report.proof === 'refused') {
+    throw new ShardfileRefusedError(report.failures.map(row => row.message).join('\n') || 'Full shardfile check refused', {report});
   }
-  catch (error) { throw new ShardfileRefusedError(error instanceof Error ? error.message : 'Simulation proof failed', {cause: error}); }
+  return report;
 }
 
 function writeServerPack(shard: OpenShardfile, out: string): ServerPackReport {
@@ -115,13 +121,14 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   if (ports.expectedSlug !== undefined && !new Set([ports.expectedSlug]).has(product.index.identity.slug)) {
     throw new ShardfileRefusedError(`A shardfile for ${product.index.identity.slug} under ${ports.expectedSlug}`);
   }
-  const proof = product.shard.runtime === null ? await proved(product, ports) : 'unmeasured' as const;
+  const check = await checked(product, ports);
+  const proof = check.proof === 'refused' ? 'unmeasured' : check.proof;
   const client = join(out, 'client');
   const renderer = ports.renderer === undefined ? {} : {renderer: ports.renderer};
   const cook = await cookShard(tarball, client, {wireBytes: ports.wireBytes, now: ports.now, ...renderer, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn})});
   // Each manifest names the header at its product URL, and no part holds it (DL18); its `?v=` is what caches it.
   const shard = openShardfile(tarball, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
   mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, shard.header);
-  return {slug: product.index.identity.slug, hash: sha256(tarball), proof, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000,
+  return {slug: product.index.identity.slug, hash: sha256(tarball), proof, check, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000,
     ...(receipt === undefined ? {} : {receipt})};
 }

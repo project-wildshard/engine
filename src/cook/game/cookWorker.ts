@@ -15,7 +15,7 @@ import {execFile, spawn} from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createHash, timingSafeEqual} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
-import {cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The notify endpoint is plain HTTP (J30).
 import {createServer, type IncomingMessage, type Server} from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
@@ -75,6 +75,8 @@ export interface CookIndex {
   readonly server: CookJobReport['server'];
   readonly serverPack?: NonNullable<CookJobReport['cook']['server']>;
   readonly proof: 'proved' | 'unmeasured';
+  /** Absent in legacy indexes: never use them to approve a pending upload. */
+  readonly check?: CookJobReport['check'];
   readonly seconds: number;
   /** J262 (SP1a): which author preparation the cook went by; an index from before it has none. */
   readonly preparation?: CookJobReport['cook']['preparation'];
@@ -116,7 +118,7 @@ export interface CookLimits {
 export const DEFAULT_LIMITS: CookLimits = {seconds: 600, memoryMB: 6144, heapMB: 4096};
 
 export interface JobOutcomeOk {readonly kind: 'cooked'; readonly report: CookJobReport; readonly peakMB: number}
-export interface JobOutcomeRefused {readonly kind: 'refused'; readonly reason: string}
+export interface JobOutcomeRefused {readonly kind: 'refused'; readonly reason: string; readonly check?: CookJobReport['check']}
 export interface JobOutcomeKilled {readonly kind: 'killed'; readonly reason: string}
 export type JobOutcome = JobOutcomeOk | JobOutcomeRefused | JobOutcomeKilled;
 
@@ -176,16 +178,26 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
     child.on('error', error => { scope.dispose(); resolve({kind: 'killed', reason: error.message}); });
     child.on('close', (code, signal) => {
       scope.dispose();
-      const last = stdout.trim().split('\n').at(-1) ?? '';
+      const resultFile = `${out}.result.json`;
+      let last: string;
+      try { last = existsSync(resultFile) ? readFileSync(resultFile, 'utf8') : stdout.trim().split('\n').at(-1) ?? ''; }
+      catch { resolve({kind: 'killed', reason: 'Unreadable cook result'}); return; }
       if (why !== undefined) { resolve({kind: 'killed', reason: why}); return; }
-      if (code === 3) { resolve({kind: 'refused', reason: refusal(last)}); return; }
-      if (code === 0) { resolve({kind: 'cooked', report: JSON.parse(last) as CookJobReport, peakMB: peak}); return; }
+      if (code === 3) { resolve(refusal(last)); return; }
+      if (code === 0) {
+        try { resolve({kind: 'cooked', report: JSON.parse(last) as CookJobReport, peakMB: peak}); }
+        catch { resolve({kind: 'killed', reason: 'Invalid cook result'}); }
+        return;
+      }
       resolve({kind: 'killed', reason: `exit ${code ?? signal ?? 'unknown'}: ${stderr.trim().split('\n').slice(0, 6).join(' | ').slice(0, 600)}`});
     });
   });
 }
-function refusal(line: string): string {
-  try { const value: unknown = JSON.parse(line); return typeof value === 'object' && value !== null && 'refused' in value && typeof value.refused === 'string' ? value.refused : 'refused'; } catch { return 'refused'; }
+function refusal(line: string): JobOutcomeRefused {
+  try {
+    const value = JSON.parse(line) as {readonly refused?: unknown; readonly check?: CookJobReport['check']};
+    return {kind: 'refused', reason: typeof value.refused === 'string' ? value.refused : 'refused', ...(value.check === undefined ? {} : {check: value.check})};
+  } catch { return {kind: 'refused', reason: 'refused'}; }
 }
 
 /** Read a stream up to a cap: `fetch` undoes Content-Encoding on its own, so the cap has to sit on the decoded side. */
@@ -314,6 +326,7 @@ export interface CookRow {
   readonly slug: string; readonly hash: string; readonly state: 'cooked' | 'present' | 'refused' | 'failed'; readonly detail?: string; readonly seconds?: number; readonly peakMB?: number;
   /** J262: set on a cook that ran, so a recook's list names every shardfile cooked on a stale preparation. */
   readonly preparation?: CookJobReport['cook']['preparation'];
+  readonly check?: CookJobReport['check'];
 }
 const TRANSIENT_TRIES = 3;
 /** SP6: a failed upload is tried again after this, doubling per failure up to FAILED_RETRY_MAX_MS. A failure past its retries
@@ -363,7 +376,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const target = join(serverPacks, report.slug, hash), parked = `${target}.${process.pid}.tmp`;
     rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
-    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys: [...keys, ...loose.map(key => folder + key)], loose: folder, server: report.server, serverPack: report.cook.server, proof: report.proof === 'unmeasured' ? 'unmeasured' : 'proved', seconds: report.seconds,
+    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys: [...keys, ...loose.map(key => folder + key)], loose: folder, server: report.server, serverPack: report.cook.server, proof: report.proof === 'unmeasured' ? 'unmeasured' : 'proved', check: report.check, seconds: report.seconds,
       ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
       ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}})};
     await store.put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});
@@ -372,18 +385,23 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const file = join(work, 'shard.tar'), out = join(work, 'out');
     writeFileSync(file, tarball);
     const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug));
-    if (outcome.kind === 'refused') return {...head, state: 'refused', detail: outcome.reason};
+    if (outcome.kind === 'refused') return {...head, state: 'refused', detail: outcome.reason, ...(outcome.check === undefined ? {} : {check: outcome.check})};
     if (outcome.kind === 'killed') return {...head, state: 'failed', detail: outcome.reason};
+    if (!outcome.report.check?.pass) return {...head, state: 'failed', detail: 'The job supplied no successful full check'};
     if (outcome.report.hash !== head.hash) return {...head, state: 'failed', detail: 'The job cooked other bytes'};
     if (!new Set([shardSlugOf(head.slug)]).has(outcome.report.slug)) return {...head, state: 'refused', detail: `A shardfile for ${outcome.report.slug} under ${head.slug}`};
     await publish(work, outcome.report, head.hash);
     const {preparation} = outcome.report.cook;
-    return {...head, state: 'cooked', seconds: outcome.report.seconds, peakMB: outcome.peakMB, ...(preparation === undefined ? {} : {preparation})};
+    return {...head, state: 'cooked', check: outcome.report.check, seconds: outcome.report.seconds, peakMB: outcome.peakMB, ...(preparation === undefined ? {} : {preparation})};
   };
   const cookOnce = async (head: {readonly slug: string; readonly hash: string}): Promise<CookRow> => {
     const known = verdicts.get(head.hash);
     if (known?.state === 'refused') return known;
-    if (await store.has(indexKey(build, head.hash))) return {...head, state: 'present'};
+    const held = await store.get(indexKey(build, head.hash));
+    if (held !== undefined) {
+      const index = JSON.parse(new TextDecoder().decode(held)) as CookIndex;
+      if (index.check?.pass && index.hash === head.hash && new Set([shardSlugOf(head.slug)]).has(index.slug)) return {...head, state: 'present', check: index.check};
+    }
     mkdirSync(scratch, {recursive: true});
     const work = mkdtempSync(join(scratch, 'job-'));
     try { return await attempt(head, await source.download(head.hash), work); }

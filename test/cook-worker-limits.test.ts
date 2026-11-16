@@ -9,6 +9,8 @@ import {join} from 'node:path';
 import {describe, expect, it} from 'vitest';
 import {writeTar} from '@wildshard/format/tar';
 import {createCookWorker, indexKey, objectHeaders, runJob, type JobLauncher} from '../src/cook/game/cookWorker';
+import {validateShardfileFolder} from '@wildshard/format/shardfileValidation';
+import {checkShardfile} from '../src/server/host/checkShardfile';
 import {runCookJob, ShardfileRefusedError} from '../src/cook/game/cookJob';
 import {folderStore, r2Store} from '../src/cook/game/packStore';
 import {hashOf, rawTar, slug, useCookHarness} from './fixtures/cookWorkerHarness';
@@ -42,9 +44,27 @@ describe('the cook worker', () => {
   }, 60_000);
 
   it('takes a failed simulation proof as a refusal: another try walks the same lanes', async () => {
-    const ports = {prove: (): Promise<never> => Promise.reject(new Error('Blocked edge entry north lane 1')), wireBytes: (): number => 0, now: (): number => 0};
+    const ports = {check: (shard: Parameters<typeof checkShardfile>[0], assets: ReadonlyMap<string, Uint8Array>) => checkShardfile(shard, assets, {validate: () => Promise.reject(new Error('Blocked edge entry north lane 1'))}), wireBytes: (): number => 0, now: (): number => 0};
     await expect(runCookJob(h.real, join(h.scratch, 'unproved'), ports)).rejects.toThrow(ShardfileRefusedError);
   }, 60_000);
+
+  it.each(['budget', 'entry'] as const)('keeps the shared %s refusal unchanged before any pack is published', async failure => {
+    const product = validateShardfileFolder({read: path => {const value = h.files.get(path); if (value === undefined) throw new Error(path); return value;}, paths: () => h.files.keys()}, {hash: hashOf});
+    const message = `Blocked portal route: ${'edge detail '.repeat(200)}`;
+    const validate = failure === 'entry' ? (): Promise<never> => Promise.reject(new Error(message))
+      : () => Promise.resolve({ticks: 240, lanes: 4, steps: 16, scripts: {p95Micros: 1e9, maxMicros: 1e9, samples: 180}, fuel: {p95: 10, max: 20, samples: 240}});
+    const check = (shard: typeof product.shard, assets: ReadonlyMap<string, Uint8Array>) => checkShardfile(shard, assets, {validate});
+    const author = await check(product.shard, product.assets);
+    expect(author.pass).toBe(false);
+    try {
+      await runCookJob(h.real, join(h.scratch, `refused-${failure}`), {check, wireBytes: () => 0, now: () => 0});
+      throw new Error('The cook admitted a refused shard');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ShardfileRefusedError);
+      expect((error as ShardfileRefusedError).report).toEqual(author);
+      expect((error as Error).message).toEqual(author.failures.map(row => row.message).join('\n'));
+    }
+  });
 
   it('refuses a shardfile for another slug: a notice cannot put bytes on a shard', async () => {
     const hash = hashOf(h.real), cook = createCookWorker({build: 'b3', store: folderStore(join(h.scratch, 'other')), source: h.source(new Map([[hash, h.real]])), launcher: h.launcher(), serverPacks: join(h.scratch, 'server-other'), scratch: join(h.scratch, 'work')});
@@ -58,6 +78,11 @@ describe('the cook worker', () => {
     writeFileSync(script, text);
     return runJob({...h.launcher(script, limits), wrap}, join(work, 'x.tar'), join(work, 'out'));
   };
+
+  it('keeps a complete refusal beyond the diagnostic capture cap', async () => {
+    const outcome = await job('report.mjs', `import {writeFileSync} from 'node:fs'; const detail = 'entry '.repeat(400000); writeFileSync(process.argv[3] + '.result.json', JSON.stringify({refused: detail})); console.log('diagnostic'); process.exit(3);`);
+    expect(outcome).toEqual({kind: 'refused', reason: 'entry '.repeat(400000)});
+  }, 30_000);
 
   it('kills a job past its clock', async () => {
     const outcome = await job('hang.mjs', 'for (;;) { /* a bomb the proof never ended */ }', {seconds: 2});

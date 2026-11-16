@@ -18,6 +18,8 @@ describe('the cook worker', () => {
     expect(row.state, row.detail).toBe('cooked');
     const index = JSON.parse(new TextDecoder().decode(await h.store.get(indexKey('b1', hash)))) as CookIndex;
     expect(index).toMatchObject({version: 1, build: 'b1', slug, hash, proof: 'unmeasured'});
+    expect(index.check).toMatchObject({slug, pass: true, proof: 'unmeasured'});
+    expect(index.check?.performance.scripts.scripts.samples).toBe(180);
     expect(index.manifests).toHaveLength(4);
     for (const key of index.keys) expect(await h.store.has(key), key).toBe(true);
     expect(index.keys.filter(key => key.endsWith('.pack.br')).length).toBeGreaterThan(0);
@@ -31,7 +33,7 @@ describe('the cook worker', () => {
     expect(held).toContain('shard.json');
     expect(index.server.bytes).toBeLessThan(h.real.length / 4);
     expect(held.filter(path => /\.(?:ktx2|glb|webp|png|jpe?g|mp3|m4a)$/u.test(path))).toEqual([]);
-    expect((await cook.cook({slug, hash})).state).toBe('present');
+    expect(await cook.cook({slug, hash})).toMatchObject({state: 'present', check: index.check});
     // A new engine build cooks its own index, and its parts are the ones already stored (J83).
     const before = (await h.store.list('assets/spawn/parts/')).length, next = h.worker(new Map([[hash, h.real]]), 'b2');
     expect((await next.recook(['live'])).map(item => item.state)).toEqual(['cooked']);
