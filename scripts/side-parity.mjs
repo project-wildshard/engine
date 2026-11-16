@@ -221,7 +221,8 @@ async function recordPage(argv) {
         await page.goto(`${base}/?chunk=${slug}&tier=phone&skipintro=1&nolock=1&sw=0&mute=1`, { waitUntil: 'commit', timeout });
         await waitForPhysicsBoot(page, 'standalone', timeout);
         await page.waitForTimeout(Number(flag('settle', '3000')));
-        const rows = await page.evaluate(`(${colliderInventory.toString()})(window.__wildshard.world.game.app.physics)`);
+        // a page's movers ride the wire; the room's half stands at tick 0, so each is read at its declared rest (TEMPLATE-E2E TC-E5c)
+        const rows = await page.evaluate(`(() => { window.__wildshard.shard?.shardfileMovers?.rest(); return (${colliderInventory.toString()})(window.__wildshard.world.game.app.physics); })()`);
         const at = await page.evaluate(() => { const p = window.__wildshard.world.player.position; return [Math.round(p.x), Math.round(p.y), Math.round(p.z)]; });
         recorded.shards[slug] = rows; recorded.at[slug] = at;
         console.error(`side-parity page ${slug}: ${rows.length} colliders, ${groupInventory(rows).size} owners`);

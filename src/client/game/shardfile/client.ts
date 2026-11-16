@@ -11,6 +11,7 @@ import { addBakedTerrainCollider } from '@wildshard/engine/physics/terrainTiles'
 import { retireTerrain } from '@wildshard/engine/physics/terrain';
 import { timeClientPreparation } from './preparationTiming';
 import { wirePage } from './wirePage';
+import { installDataPageMovers } from './dataPageMovers';
 import { admitClientPlan, installClientPhase, type AdmittedClientPlan, type ClientPhase } from './clientPlan';
 import { materialTextureRefs } from '@wildshard/format/materials';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
@@ -501,6 +502,15 @@ export class ShardfileClient {
     const flags = new Flags(source.identity.slug, false);
     // A prop's colliders are world data: the page predicts against them, and the server holds its own.
     const colliders = installShardfileColliders(source, this.assets.retained, () => world.physics, ctx.scope);
+    // TEMPLATE-E2E TC-E5c: a plain data shard's lift and doors stand on its page; a client plan's movers install their own
+    if (this.bindings.trustedRuntime !== true && !(this.plan?.features ?? []).some(row => row.kind === 'world.movers' || row.kind === 'motion.channels')) {
+      const movers = installDataPageMovers(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map(), prompts: runtime.interactables });
+      if (movers !== null) {
+        ctx.scope.onDispose(() => { if (movers.riding()) world.player.carried = false; });
+        // side parity (SS1) reads the page's colliders beside a room's at tick 0: every mover's collider at its declared rest
+        ctx.debug.expose('shardfileMovers', { rest: () => { for (const row of movers.data) { const at = { position: { ...row.at }, euler: { ...row.euler }, enabled: row.enabled }; movers.replayPose(row.id, at, at); } } });
+      }
+    }
     yield;
     // SF59: graph params read the frame owner's clock (the level backdrop's, G158) and the live public state
     // a field the sim does not hold (a runtime-bound host field) reads the runtime's port (G345)
