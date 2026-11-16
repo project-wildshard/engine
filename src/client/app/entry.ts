@@ -275,23 +275,20 @@ function pageTitleImports(): ReturnType<typeof preparePageTitleImports> {
   titleImports ??= preparePageTitleImports();
   return titleImports;
 }
-async function showPageTitle(refusal = '', preparation?: Scope, observeIdle?: (wait: () => Promise<void>) => void): Promise<void> {
+async function showPageTitle(refusal = ''): Promise<void> {
   // S20: the title's ended note reads lastEnd(), settled (the imports take longer than the lock query)
   const [[{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }]] = await Promise.all([pageTitleImports().ready(), settleLastEnd()]);
-  if (preparation?.disposed === true || preparation?.disposing === true || document.querySelector('.ws-load[data-failed="true"]') !== null) return;
+  if (document.querySelector('.ws-load[data-failed="true"]') !== null) return;
   const mountedCatalogue = installedCatalogue(), mountedTitles = titleManifests();
   // SF21a: a tap or validated recovery selects a grid; unrecorded process loss returns to title
-  const grid = installGridTitle({ preserveIntent: preparation !== undefined });
-  let earlySelect = document.querySelector<HTMLDetailsElement>('[data-launch-menu]')?.open === true;
+  const grid = installGridTitle();
   let menu: ReturnType<typeof buildTitleMenu> | undefined;
   // the composition root wires the game's main menu (over its shard deck) into the engine's title (E405)
   const title = showStartTitle(({ settings, notice }) => {
     const lines = [refusal, notice ?? '', grid.note].filter((line) => line !== '').join('\n');
-    const screen = earlySelect ? 'select' : menu?.screen ?? grid.screen;
-    earlySelect = false;
+    const screen = menu?.screen ?? grid.screen;
     menu = buildTitleMenu({
       active: null,
-      ...(preparation === undefined ? {} : { readAhead: false, fullHero: false }),
       onEnter: (card) => { travel({ to: card.slug, mode: 'enter' }); },
       onExplore: (card) => { travel({ to: card.slug, mode: 'explore' }); },
       onGrid: grid.onGrid,
@@ -301,9 +298,7 @@ async function showPageTitle(refusal = '', preparation?: Scope, observeIdle?: (w
       ...(lines === '' ? {} : { notice: lines }),
     });
     return menu;
-  }, { preparing: preparation !== undefined });
-  observeIdle?.(() => menu?.whenIdle() ?? Promise.resolve());
-  preparation?.onDispose(title.dispose);
+  });
   // Published cards can arrive after the first menu. Rebuild through the same
   // owner as Developer changes, preserving its selected card and menu screen.
   void (async (): Promise<void> => {
@@ -312,7 +307,6 @@ async function showPageTitle(refusal = '', preparation?: Scope, observeIdle?: (w
     await menu?.whenIdle();
     title.refresh();
   })();
-  if (preparation !== undefined) return;
   // DL10 (Debug 'Early shader compile', default off): after the title's first frames, one trivial shader link starts the
   // GPU process's compiler, so a cold entry's first program does not pay its 1-1.4 s start-up
   showDropOnTitle();
@@ -427,17 +421,6 @@ async function startPage(): Promise<void> {
   }
 }
 
-/** An optional runtime menu never delays or refuses world admission. */
-async function showPreparationTitle(owner: Scope): Promise<void> {
-  let whenIdle = (): Promise<void> => Promise.resolve();
-  const retire = (): void => { owner.dispose(); };
-  owner.listen(document, 'ws:ready', () => { void whenIdle().then(retire, retire); }, { once: true });
-  try { await showPageTitle('', owner, wait => { whenIdle = wait; }); }
-  catch (error: unknown) {
-    if (!owner.disposed && !owner.disposing) console.warn('[title] preparation menu unavailable', error);
-  }
-}
-
 /**
  * ZONE-ENTRY ZE10a2 and ZE10a3: the page enters a grid home again without a reload. The level is unloaded, the session's Game
  * retired (its canvas context kept for the next one), and the page's start runs again, reading the grid intent and the title
@@ -510,10 +493,11 @@ async function startSelected(): Promise<void> {
   const listed = unloadedTitleRow(search.get('chunk'), game.shard);
   const arrival = listed?.shardfile === undefined ? game.shard : { ...game.shard, slug: listed.slug, name: listed.name, shardfile: listed.shardfile };
   const loading = beginLoading({ id: arrival.slug, name: arrival.name, trace: game.shard.boot?.phone?.trace === true });
-  if (document.documentElement.classList.contains('boot-menu')) {
-    const preparation = loading.scope.child('preparation menu');
-    void showPreparationTitle(preparation);
-  }
+  // BUGBASH-LOOP (J385, Jake 2026-11-16): a loading world shows exactly one screen, its own full-screen card. No live menu
+  // over it (PZ27b2 put the main menu, then Shard Select, over the world's mounting HUD and shrank this card to a 3 px bar),
+  // and never the launch shell (a page that booted a world from the title's address still carries it).
+  document.documentElement.classList.remove('boot-menu');
+  document.querySelector('[data-title-shell]')?.remove();
   const moduleText = document.getElementById('boot-module-files')?.textContent;
   const moduleRows: unknown = moduleText === undefined ? undefined : JSON.parse(moduleText);
   const gridEntryModule = import('@wildshard/engine/game/grid/pageEntry');

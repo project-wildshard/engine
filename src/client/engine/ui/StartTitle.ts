@@ -11,11 +11,11 @@ import type { TitleDeckView } from './HUD';
 export type StartTitleDeck = (opts: { settings: () => void; notice?: string }) => TitleDeckView;
 
 /** Present the supplied title deck while the entry prepares. */
-export function showStartTitle(buildDeck: StartTitleDeck, options: { readonly preparing?: boolean } = {}): { readonly refresh: () => void; readonly dispose: () => void } {
+export function showStartTitle(buildDeck: StartTitleDeck): { readonly refresh: () => void; readonly dispose: () => void } {
   const scope = pageScope.child('ui.StartTitle'), slots = new HudSlots();
   const hud = document.getElementById('hud');
   if (hud === null) throw new Error('Start title: missing #hud');
-  if (options.preparing !== true) hud.classList.add('intro');
+  hud.classList.add('intro');
   const interrupted = previousBootLine();
   let deck: TitleDeckView | undefined;
   const refresh = (): void => {
@@ -31,11 +31,11 @@ export function showStartTitle(buildDeck: StartTitleDeck, options: { readonly pr
     if (index !== -1) deck.select(index, false);
     deck.start();
     document.querySelector('[data-title-shell]')?.remove();
-    performance.mark(options.preparing === true ? 'wildshard.preparation-menu' : 'wildshard.title');
+    performance.mark('wildshard.title');
   };
   refresh();
   scope.onDispose(onDev(refresh));
   scope.onDispose(() => { deck?.dispose(); });
-  if (options.preparing !== true) document.dispatchEvent(new Event('ws:ready'));
+  document.dispatchEvent(new Event('ws:ready'));
   return { refresh, dispose: () => { scope.dispose(); } };
 }

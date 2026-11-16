@@ -58,7 +58,7 @@ test('a split document cannot expose a loading card before its real arrival meta
   expect(window.document.documentElement.style.getPropertyValue('--ws-load-portrait')).toContain('/assets/saved-destination.jpg');
 });
 
-test('plain launch paints its hero and a working HTML menu without application modules', () => {
+test('plain launch paints its hero and progress without application modules', () => {
   const window = firstDocument(''), panel = window.document.querySelector('[data-title-shell]');
   if (panel === null) throw new Error('Missing inline title');
   expect(window.document.documentElement.classList.contains('title-first')).toBe(true);
@@ -67,7 +67,7 @@ test('plain launch paints its hero and a working HTML menu without application m
   // RL3: no boat, no wait box, no Retry; QA 11-13 (Jake): the build pill (it reloads) and a moving bar
   const hero = panel.querySelector('.ws-launch-hero');
   if (hero === null) throw new Error('Missing title art');
-  expect([...panel.children].map(child => child.className)).toEqual(['ws-launch-hero', 'ws-launch-brand', 'ws-launch-pill', 'ws-launch-menu', 'ws-launch-load']);
+  expect([...panel.children].map(child => child.className)).toEqual(['ws-launch-hero', 'ws-launch-brand', 'ws-launch-pill', 'ws-launch-load']);
   expect(window.getComputedStyle(hero).backgroundImage).toMatch(/main-crossroads-square-first-[a-f0-9]{16}\.jpg/u); // PZ19: the ~30 kB first cut
   const preload = window.document.querySelector('link[as="image"]');
   expect(preload?.getAttribute('href')).toMatch(/^\/assets\/title\/main-crossroads-square-first-[a-f0-9]{16}\.jpg$/u);
@@ -78,15 +78,10 @@ test('plain launch paints its hero and a working HTML menu without application m
   expect(window.getComputedStyle(progress).display).toBe('none');
 });
 
-test('HTML Shard Select and Back respond before any module and expose native shard links', () => {
-  const window = firstDocument(''), shell = window.document.querySelector('[data-title-shell]');
-  const select = shell?.querySelector('[data-launch-select]'), worlds = shell?.querySelector('[data-launch-worlds]'), back = shell?.querySelector('[data-launch-back]');
-  const menu = shell?.querySelector('[data-launch-menu]');
-  if (!(select instanceof window.HTMLElement) || !(back instanceof window.HTMLButtonElement) || !(worlds instanceof window.HTMLElement) || !(menu instanceof window.HTMLDetailsElement)) throw new Error('Missing first menu');
-  select.click();
-  expect(menu.open).toBe(true);
-  back.click();
-  expect(menu.open).toBe(false);
+test('BUGBASH-LOOP (J385): the launch shell has no Shard Select of its own', () => {
+  const shell = firstDocument('').document.querySelector('[data-title-shell]');
+  expect(shell?.querySelector('details, summary, nav, [data-launch-select], [data-launch-worlds]')).toBeNull();
+  expect(shell?.textContent).not.toMatch(/shard select/iu);
 });
 
 test('environment flags alone (the phone harness, ?v=) launch the same title and hero preload', () => {
@@ -98,48 +93,27 @@ test('environment flags alone (the phone harness, ?v=) launch the same title and
   expect(firstDocument('?tier=phone&chunk=driftwood-isle').document.documentElement.classList.contains('title-first')).toBe(false);
 });
 
-test('a selected shard keeps a live menu above its thin loading progress', () => {
+test('BUGBASH-LOOP (J385): a selected shard paints its full-screen loading card, never the title shell or a thin bar', () => {
   const window = firstDocument('?chunk=driftwood-isle'), panel = window.document.querySelector('[data-title-shell]');
   if (panel === null) throw new Error('Missing title shell');
-  expect(window.document.documentElement.classList.contains('title-first')).toBe(false);
-  expect(window.getComputedStyle(panel).display).toBe('flex');
+  const doc = window.document.documentElement;
+  expect(doc.classList.contains('title-first')).toBe(false);
+  expect(doc.classList.contains('boot-menu')).toBe(false);
+  expect(window.getComputedStyle(panel).display).toBe('none');
   expect(window.document.querySelector('link[as="image"]')).toBeNull();
-  expect(window.document.querySelector('.ws-load[data-shell]')).not.toBeNull();
   const root = window.document.querySelector('.ws-load[data-shell]');
   if (!(root instanceof window.HTMLElement)) throw new Error('Missing loading shell');
   expect(window.getComputedStyle(root).position).toBe('fixed');
-  expect(window.getComputedStyle(root).display).toBe('block');
-  expect(window.getComputedStyle(root).height).toBe('3px');
+  expect(window.getComputedStyle(root).height).not.toBe('3px');
+  // LS2 (J188): the card's three phases, clock and ledger are on screen, not collapsed into a bar
+  for (const selector of ['.ws-load-clock', '.ws-load-meta', '[data-phase="start"]', '[data-phase="download"]', '[data-phase="load"]', '.ws-load-foot']) {
+    const field = root.querySelector(selector);
+    if (!(field instanceof window.HTMLElement)) throw new Error(`Missing progress field ${selector}`);
+    expect(window.getComputedStyle(field).display).not.toBe('none');
+  }
   // J323 follow-up: the source names plain links, which the build bundles into one sheet; the stamped document never blocks on it
   const stamped = stampBuildHtml(html, 'f2a636b3-mx1');
   expect([...stamped.matchAll(/<link rel="stylesheet"[^>]*>/gu)].every(([link]) => link.includes('media="print"') && link.includes('onload='))).toBe(true);
-});
-
-test('thin progress retains the full ledger and an explicitly held Debug load keeps its controls', () => {
-  const window = firstDocument('?chunk=driftwood-isle'), root = window.document.querySelector('.ws-load[data-shell]');
-  if (!(root instanceof window.HTMLElement)) throw new Error('Missing public loading shell');
-  // LS2 (J188): the three phases replace the two tracks, the memory/CPU diagnostics line and the simple bar's line
-  const detailed = ['.ws-load-clock', '.ws-load-meta', '[data-phase="start"]', '[data-phase="download"]', '[data-phase="load"]', '.ws-load-foot'];
-  const visible = (): void => {
-    expect(Object.hasOwn(window.document.documentElement.dataset, 'dev')).toBe(false);
-    for (const selector of detailed) {
-      const field = root.querySelector(selector);
-      if (!(field instanceof window.HTMLElement)) throw new Error(`Missing progress field ${selector}`);
-      expect(window.getComputedStyle(field).display).not.toBe('none');
-    }
-  };
-  for (const selector of detailed) expect(root.querySelector(selector)).not.toBeNull();
-  expect(window.getComputedStyle(root).height).toBe('3px');
-  const style = window.document.createElement('style');
-  style.textContent = readFileSync('src/client/engine/ui/loading.css', 'utf8'); window.document.head.append(style);
-  delete root.dataset['shell'];
-  expect(window.getComputedStyle(root).height).toBe('3px');
-  root.dataset['hold'] = '';
-  visible();
-  delete root.dataset['hold'];
-  root.dataset['failed'] = 'true';
-  visible();
-  for (const dead of ['.ws-load-simple', '.ws-load-diagnostics', '[data-el="line"]']) expect(root.querySelector(dead)).toBeNull();
 });
 
 test('RL3: a page whose entry graph never arrived reloads once at 12 s; a running slow boot, the title or the card never', () => {
@@ -215,15 +189,15 @@ test('late catalogue refresh preserves the selected card and retires with the ti
   expect(document.querySelector('#hud')?.children.length).toBe(0);
 });
 
-test('a menu covering preparation cannot publish world readiness', () => {
-  document.body.innerHTML = '<div id="hud"></div>';
+test('BUGBASH-LOOP (J385): the title always hides the play HUD (#hud.intro) and publishes readiness', () => {
+  document.body.innerHTML = '<div id="hud" class="touch"></div>';
   const ready = vi.fn((): void => undefined);
   document.addEventListener('ws:ready', ready);
   try {
     const title = showStartTitle(() => ({ root: document.createElement('div'), cards: [], index: 0,
-      select: () => undefined, activate: () => undefined, start: () => undefined, dispose: () => undefined }), { preparing: true });
-    expect(ready).not.toHaveBeenCalled();
-    expect(document.getElementById('hud')?.classList.contains('intro')).toBe(false);
+      select: () => undefined, activate: () => undefined, start: () => undefined, dispose: () => undefined }));
+    expect(ready).toHaveBeenCalledTimes(1);
+    expect(document.getElementById('hud')?.classList.contains('intro')).toBe(true);
     title.dispose();
   } finally { document.removeEventListener('ws:ready', ready); }
 });
