@@ -15,6 +15,7 @@ export interface CookAudit {version:1;cook:CookRevision;products:ProductAudit[]}
 export async function auditCook(receiptFile:string):Promise<CookAudit> {
   const receipt=JSON.parse(readFileSync(receiptFile,'utf8')) as {cook?:CookRevision;store:string;heads:{slug:string;hash:string}[];indexes:CookIndex[]};
   if(receipt.cook===undefined)throw new Error('Cook receipt has no source revision; run ring-cook again');
+  if(receipt.cook.revision!==cookRevision().revision)throw new Error('Cook receipt source revision is stale; run this cook again');
   const store=folderStore(receipt.store),products:ProductAudit[]=[];
   const hash=(bytes:Uint8Array):string=>createHash('sha256').update(bytes).digest('hex');
   const read=async(key:string):Promise<Uint8Array>=>{const body=await store.get(key);if(body===undefined)throw new Error(`Cook has no ${key}`);return body;};

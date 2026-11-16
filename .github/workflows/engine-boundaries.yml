@@ -49,6 +49,9 @@ jobs:
       - name: Cook, attach, and play the same bytes
         if: ${{ !cancelled() && steps.inputs.outcome == 'success' && steps.browser.outcome == 'success' }}
         run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
+      - name: Plant and heal actual cold-cook faults
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        run: node scripts/coverage-cook-drill.mjs tmp/engine-boundaries/cook-drill
       - name: Check the full Nalati server herd tick budget
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts

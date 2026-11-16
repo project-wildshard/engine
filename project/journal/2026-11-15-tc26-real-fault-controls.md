@@ -57,3 +57,28 @@ PGlite. Dropping its authentication refusal turns all four unauthenticated
 requests from 401 to 200 and fails that same test. Both actual owners
 pass again after healing. Dependency setup is isolated and offline; the
 first bootstrap populated only two already-locked packages in the store.
+
+The cold-cook drill is Actions/Linux-only. It runs the actual production
+worker with a fresh store three times: original, an alignment change
+that grows real parts, then healed. It requires a changed cook revision,
+actual larger decompressed part bodies, the production part-diff report,
+and byte-equal healing. The same real original store is then refused
+against a changed source and accepted after healing. auditCook now
+rejects stale source revisions before reporting qualification.
+
+Retained the actual TC21 seven-receiver red verdict (Actions 43761148646,
+artifact 14183773772, SHA256
+834ba583642f1a47ed9a0564cd1c0f513d229b001ccd92e1b2e056156b59d37a).
+The real report CLI must refuse it and retain every actual owning-repo
+issue link. The drill disables that report hold, sees its assertion red,
+then restores it. This replays evidence, not a new seven-repo dispatch.
+
+Page fault evidence already exists in a27757d6 / 54e3e967, landed with
+row 32 (db15eef4), journal 2026-11-15-page-census.md: BUG-28 dropped
+open-arena words, heard 163/drawn 0 and a bar without a body; healed green.
+This is the recorded owner witness, not a new graphical capture here.
+
+coverage-soak reads actual Actions logs and committed case bodies. It
+requires matching case count, all passing, no skipped/cancelled cases,
+and actual green observations spanning seven days. A new current suite
+cannot inherit the earlier four-case body's age or fake the clock.

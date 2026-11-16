@@ -1,7 +1,7 @@
 // TC26: real product controls, explicit CI only, outside Vitest and hooks.
 import '../../src/shared/engine/core/portableMathFirst.ts';
 import assert from 'node:assert/strict';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawnSync} from 'node:child_process';
 import {mkdirSync,mkdtempSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {test} from 'node:test';
@@ -125,6 +125,21 @@ timed('cook-source',async()=>{
   assert.deepEqual(ring2.heads,[pins.find(row=>row.slug==='blender-template')]);
   assert.throws(()=>ring2.read(ring2.heads[0].hash),/ENOENT/u,'A missing Ring 2 head cannot be replaced by the format corpus');
   assert.throws(()=>ring1.read('0'.repeat(64)),/unselected input/u);
+});
+
+timed('shard-red',()=>{
+  const bytes=readFileSync('test/fixtures/ring3-red.json'),report=JSON.parse(bytes);
+  assert.equal(report.ok,false);assert.equal(report.rows.length,7);
+  assert.ok(report.rows.every(row=>row.status==='failure'&&row.issue?.startsWith(`https://github.com/project-wildshard/${row.repo}/issues/`)),'Actual failed receivers must retain their owning-repo issues');
+  mkdirSync('tmp',{recursive:true});const work=mkdtempSync(resolve('tmp/coverage-ring3-'));
+  try{
+    writeFileSync(join(work,'verdict.json'),bytes);
+    const child=spawnSync(process.execPath,['--experimental-transform-types','scripts/ring3.ts','report',work],{encoding:'utf8',timeout:9000});
+    assert.equal(child.signal,null);assert.equal(child.error,undefined);
+    assert.equal(child.status,1,'TC26_RED_SHARD_HELD: actual red receiver aggregate must refuse qualification');
+    assert.match(child.stdout,/RELEASE HELD/u);
+    for(const row of report.rows)assert.ok(child.stdout.includes(row.issue),'The real owner route must remain visible');
+  }finally{rmSync(work,{recursive:true,force:true});}
 });
 
 timed('export',()=>{

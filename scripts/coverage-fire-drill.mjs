@@ -29,6 +29,9 @@ const faults=[
     find:'const bytes = writeTar(files), hash =',plant:'const bytes = writeTar(files).subarray(0, 513), hash =',reason:/tar:/u},
   {id:'save-field',ring:1,owner:'engine:src/shared/engine/script/state.ts',file:'src/shared/engine/script/state.ts',
     find:'shared: [...this.shared], players:',plant:'shared: this.shared.map((value, index) => this.declaration.shared[index]?.id === 101 ? 0 : value), players:',reason:/TC26_SAVE_FIELD/u},
+  {id:'shard-red',ring:3,owner:'engine:scripts/ring3.ts',file:'scripts/ring3.ts',
+    find:'console.log(markdown(report));\n    if (!report.ok) process.exitCode = 1;\n  } else throw new Error',
+    plant:'console.log(markdown(report));\n    process.exitCode = 0;\n  } else throw new Error',reason:/TC26_RED_SHARD_HELD/u},
 ];
 /** @type {unknown[]} */const results=[];
 /** @param {string} id */
