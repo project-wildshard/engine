@@ -11,7 +11,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { groups } from '../src/shared/engine/physics/groups';
 import { snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
-import { canonicalSimDigest } from './fake/simState';
+import { canonicalSimDigest } from '../src/test/engine/simState';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import { mountedPlayerOf } from '../src/server/game/riding/native';
