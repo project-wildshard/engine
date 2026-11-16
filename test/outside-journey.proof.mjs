@@ -8,6 +8,7 @@ import {RoomBot} from './fixtures/dedicated/roomBot.ts';
 import {outsideJourney} from './fixtures/dedicated/outsideJourney.ts';
 
 let bench, room;
+let prepared = false;
 const bots = [];
 const sleep = ms => new Promise(resolve => {setTimeout(resolve, ms);});
 async function until(ready, ms = 1000) {
@@ -31,6 +32,7 @@ async function prepare() {
   warm.stop(); warm.transport.control('ready', new Uint8Array([1]).buffer);
   assert.equal(await warm.ended(1000), 'closed'); warm.drop();
   await until(() => bench.world.health().players === 0 && room.holding === 0);
+  prepared = true;
 }
 try {
 await test('outside mode refuses replica, private routing and extra clients before any network work', () => {
@@ -57,7 +59,7 @@ await test('ordinary inputs walk, damage, drop, resume the same real body and re
 });
 
 await test('real damage without a delivered hit confirmation cannot complete and still releases', {timeout: 5000}, async () => {
-  assert.ok(room, 'real gateway fixture must have opened');
+  assert.ok(prepared, 'real gateway fixture must have finished preparation');
   let suppressed = 0;
   const healthBefore = new Map([...room.host.entities].map(([id, row]) => [id, row.hp]));
   const connect = () => {
@@ -80,7 +82,7 @@ await test('real damage without a delivered hit confirmation cannot complete and
 });
 
 await test('cancelling an admitted player releases its actual body and local client', {timeout: 5000}, async () => {
-  assert.ok(bench, 'real gateway fixture must have opened');
+  assert.ok(prepared, 'real gateway fixture must have finished preparation');
   const abort = new AbortController();
   const connect = () => {
     const bot = new RoomBot(bench.url, 'bench', 'device:tc45-abort'); bots.push(bot);

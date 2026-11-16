@@ -84,3 +84,11 @@ qualify; raw spec remains diagnostic when XML cannot finish. Root cause
 is now observed, not hypothesized. Failed raw logs are retained in meta
 docs/plans/test-coverage/evidence/tc45-outside-bot/, including run/attempt
 from43927709988 and current43930406973. No expiry-only evidence claim.
+
+Final small correction review has no MUST/one SHOULD: mark preparation
+complete only after the warm player, real creature fixture and empty
+gateway have all settled. Dependent cases check that final marker, so
+no async journey starts after partial fixture preparation. Format0.12
+frozen installation resolves stale-worktree lint types after mainc7.
+All four rows consolidate on this branch for one exact admission; old
+a8 CI is superseded rather than carried across the moving base.
