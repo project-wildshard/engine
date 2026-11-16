@@ -55,3 +55,8 @@ export linked packages through the outer checkout. It now installs the
 same frozen dependencies offline into its own virtual store; production
 permissions remain unchanged. These are transport/setup corrections,
 not new graphical work. No cook runs locally.
+
+Review confirms exact-row precedence and the private installation. Its
+collision-case suggestion is now in the same existing download test: a
+distinct bare row cannot override the authored row. The small case checks
+selection/routing; the hosted proof must still witness real part bodies.

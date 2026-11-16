@@ -60,9 +60,11 @@ test('a whole-level address whose manifest has no part table is refused', async 
   expect(reads.map(url => new URL(url).pathname)).not.toContain(file.url);
 });
 
-test.each(['book-good', '_book-alias'])('this build\'s packs book runs %s to whole-level completion', async slug => {
-  const stored = slug.replace(/^_/u, '');
-  const {download, reads} = run(slug, whole => Response.json({book: 'packs', build: `build-${slug}`, ...entry(stored, whole)}), true, stored);
+test.each(['book-good', '_book-alias', '_book-collision'])('this build\'s packs book runs %s to whole-level completion', async slug => {
+  const bare = slug.replace(/^_/u, ''), stored = slug === '_book-collision' ? slug : bare;
+  const {download, reads} = run(slug, (whole, fallback) => Response.json({book: 'packs', build: `build-${slug}`, client: {
+    ...(slug === '_book-collision' ? {[bare]: {phone: fallback}} : {}), [stored]: {phone: whole},
+  }}), true, stored);
   await download.ready;
   expect(download.snapshot()).toMatchObject({complete: true, error: null, filesDone: 1});
   expect(reads.map(url => new URL(url).pathname)).toEqual([expect.stringMatching(BOOK), `/assets/spawn/${slug}-client-phone-fedcba9876543210.json`, file.url]);
