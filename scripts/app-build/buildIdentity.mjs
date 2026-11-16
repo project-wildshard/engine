@@ -127,7 +127,9 @@ export function stampBuildDocuments(directory, facts) {
   }
   for (const name of documents) {
     const path = resolve(directory, name);
-    const html=stampBuildHtml(readFileSync(path, 'utf8'), version.build, builtAt === undefined ? facts : { ...facts, builtAt });
-    writeFileSync(path, version.rendererRevision === undefined ? html : html.replace('<script>globalThis.__WS_BUILD_ID__=',`<script>globalThis.__WS_RENDERER_REVISION__=${JSON.stringify(version.rendererRevision)};globalThis.__WS_BUILD_ID__=`));
+    const stamped=stampBuildHtml(readFileSync(path, 'utf8'), version.build, builtAt === undefined ? facts : { ...facts, builtAt });
+    const client = typeof version.clientVersion === 'string' ? `globalThis.__WS_CLIENT_VERSION__=${JSON.stringify(version.clientVersion)};` : '';
+    const renderer = version.rendererRevision === undefined ? '' : `globalThis.__WS_RENDERER_REVISION__=${JSON.stringify(version.rendererRevision)};`;
+    writeFileSync(path, stamped.replace('<script>globalThis.__WS_BUILD_ID__=', `<script>${client}${renderer}globalThis.__WS_BUILD_ID__=`));
   }
 }

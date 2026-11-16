@@ -12,10 +12,12 @@ import { builtAtOf } from './builtAt.mjs';
  *  offers the reload), asset-index.json and asset-manifest.json beside the bundle (was vite.config.ts's version plugin): scripts/build-app.mjs writes them right after the bundler, before the documents are stamped from
  *  version.json and before the service worker counts them. */
 export function writeVersionFiles(outDir: string, build: string): void {
+  const client: unknown = JSON.parse(readFileSync('package.json', 'utf8'));
+  if (typeof client !== 'object' || client === null || !('version' in client) || typeof client.version !== 'string') throw new Error('Missing client version');
   const {WILDSHARD_PREPARATION_ONLY} = process.env;
   const epoch: unknown = JSON.parse(readFileSync('save-epoch.json', 'utf8'));
   if (typeof epoch !== 'object' || epoch === null || !('saveEpoch' in epoch) || epoch.saveEpoch !== WILDSHARD_IDENTITY.saveEpoch) throw new Error('Save epoch metadata must match game identity');
-  writeFileSync(join(outDir, 'version.json'), JSON.stringify({ build, saveEpoch: epoch.saveEpoch, rendererRevision: rendererRevision(), preparationOnly: WILDSHARD_PREPARATION_ONLY === '1', time: new Date(Number(builtAtOf(process.env.WS_BUILT_AT))).toISOString(), describe: gitDescribe(process.cwd()) }));
+  writeFileSync(join(outDir, 'version.json'), JSON.stringify({ build, clientVersion: client.version, minClient: '0.1.24', saveEpoch: epoch.saveEpoch, rendererRevision: rendererRevision(), preparationOnly: WILDSHARD_PREPARATION_ONLY === '1', time: new Date(Number(builtAtOf(process.env.WS_BUILT_AT))).toISOString(), describe: gitDescribe(process.cwd()) }));
   writeFileSync(join(outDir, 'asset-index.json'), assetIndex());
   writeFileSync(join(outDir, 'asset-manifest.json'), JSON.stringify(hashTree('assets')));
 }

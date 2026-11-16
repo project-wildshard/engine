@@ -76,7 +76,7 @@ test('worker updates revalidate unchanged bytes and fetch a changed script in fu
     expect(core.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
     expect(core.headers.get('vary')?.toLowerCase() ?? '').not.toContain('origin');
     expect(await core.text()).toBe(original);
-    expect(first.status).toBe(200); expect(first.headers.get('cache-control')).toBe('no-cache');
+    expect(first.status).toBe(200); expect(first.headers.get('cache-control')).toBe('no-store');
     expect(await first.text()).toBe(original);
     const firstTag = first.headers.get('etag');
     if (firstTag === null) throw new Error('Worker has no revalidation tag');
@@ -94,7 +94,7 @@ test('worker updates revalidate unchanged bytes and fetch a changed script in fu
     expect(changed.length).toBe(original.length);
     writeFileSync(file, changed);
     const update = await fetch(url, { headers: { 'if-none-match': firstTag } });
-    expect(update.status).toBe(200); expect(update.headers.get('cache-control')).toBe('no-cache');
+    expect(update.status).toBe(200); expect(update.headers.get('cache-control')).toBe('no-store');
     expect(await update.text()).toBe(changed); expect(update.headers.get('etag')).not.toBe(firstTag);
     const nextTag = update.headers.get('etag');
     if (nextTag === null) throw new Error('Changed worker has no revalidation tag');

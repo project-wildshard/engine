@@ -91,7 +91,7 @@
 
 /sw.js
   ! Cache-Control
-  Cache-Control: no-cache
+  Cache-Control: no-store
 
 /version.json
   ! Cache-Control

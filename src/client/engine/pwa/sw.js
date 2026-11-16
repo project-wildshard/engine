@@ -1,3 +1,4 @@
+import { FORCE_CACHE_MARKER, forceCacheState, setForceCacheState, wipeDownloadedCaches } from './forceCache';
 import { workerScope } from '../app/workerScope.js';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { cacheChannel, cacheName, ownsCache, PRODUCTION_MARK } from './cacheNames';
@@ -141,7 +142,9 @@ async function importPrevious(assets, books) {
   if (code.length > 0) await books.put(bookKey('previous'), Response.json({ files: code }));
 }
 
+let nuclearUpdate = false;
 workerScope.listen(self, 'install', event => {
+  if (self.registration?.active !== null && self.registration?.active !== undefined) event.waitUntil(self.skipWaiting());
   // Native cache routes avoid waking the worker for already installed title code.
   // Both engines get the controlling worker's exact baked document.
   const pattern = pathname => ({ protocol: self.location.protocol.slice(0, -1), hostname: self.location.hostname,
@@ -153,6 +156,13 @@ workerScope.listen(self, 'install', event => {
   ]) : undefined;
   event.waitUntil((async () => {
     await routes;
+    // J383: escape a legacy registration before any shell/generation download can strand the install.
+    if (self.registration?.active !== null && self.registration?.active !== undefined && await forceCacheState() !== 'complete') {
+      nuclearUpdate = true;
+      // A full legacy cache must not prevent the very migration that frees it.
+      await setForceCacheState('pending').catch(() => undefined);
+      return;
+    }
     // OF12: production marks the origin, so another channel's worker here keeps production's caches
     if (CHANNEL === 'production') await caches.open(PRODUCTION_MARK);
     const [assets, shell, books] = await Promise.all([store(ASSETS), store(SHELL), caches.open(BOOKS)]);
@@ -172,7 +182,7 @@ workerScope.listen(self, 'install', event => {
     if (running === null || running === undefined) return;
     const runningBuild = await buildOfWorker(running);
     if (runningBuild !== undefined && await (await caches.open(BOOKS)).match(bookKey(runningBuild)) !== undefined) await precacheGeneration();
-    await self.skipWaiting();
+    // The update requested skipWaiting synchronously, but installation still waits for a whole modern generation.
   })());
 });
 
@@ -321,6 +331,16 @@ async function carryNetworkFirst() {
 
 workerScope.listen(self, 'activate', event => {
   event.waitUntil((async () => {
+    if (nuclearUpdate || await forceCacheState() === 'pending') {
+      stores.clear();
+      await wipeDownloadedCaches().catch(() => false);
+      await self.clients.claim();
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // Functional events may wait for activate; never await these navigations here.
+      for (const client of clients) if (typeof client.navigate === 'function') void client.navigate(client.url).catch(() => undefined);
+      return;
+    }
+    if (await forceCacheState() === null) await setForceCacheState('complete').catch(() => undefined);
     const books = await caches.open(BOOKS), current = bookKey(BUILD);
     const keys = await books.keys(), previous = keys.findLast(key => key.url !== current)?.url;
     const kept = new Set(FILES.map(abs));
@@ -341,7 +361,7 @@ workerScope.listen(self, 'activate', event => {
     // activate, unless production runs here too; nothing on this channel writes them again, so in effect it happens once.
     const productionHere = CHANNEL !== 'production' && await caches.has(PRODUCTION_MARK);
     for (const name of await caches.keys()) {
-      if (name === SHELL || name === PRODUCTION_MARK) continue;
+      if (name === SHELL || name === PRODUCTION_MARK || name === FORCE_CACHE_MARKER) continue;
       const legacy = CHANNEL === 'production' && (name.startsWith('ws-static-') || name === 'ws-immutable');
       if (name.startsWith(SHELL_FAMILY) || legacy) await caches.delete(name);
       else if (CHANNEL !== 'production' && !productionHere && ownsCache(name, 'production')) await caches.delete(name);

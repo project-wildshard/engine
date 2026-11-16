@@ -41,6 +41,8 @@ import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wi
 import { slugOfPath, slugPathOf } from './slugPath';
 
 
+import { installForceUpdate } from '@wildshard/engine/boot/forceUpdate';
+
 declare const __BUILD_ID__: string;
 const earlyTiming = bootTiming();
 if (earlyTiming !== undefined) {
@@ -369,7 +371,8 @@ function showDrop(drop: ReturnType<typeof takeDrop>): void {
   })().catch(() => undefined);
 }
 
-export const entered: Promise<unknown> = enterPage();
+const clientVersion: unknown = Reflect.get(globalThis, '__WS_CLIENT_VERSION__');
+export const entered: Promise<unknown> = installForceUpdate(typeof clientVersion === 'string' ? clientVersion : '', entryScope).then(accepted => accepted ? enterPage() : undefined);
 guardBoot(entered);
 
 /** Composition root: select authored content and inject reusable kit recipes. */

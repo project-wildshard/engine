@@ -38,7 +38,7 @@ interface WorkerEvent {
 }
 class StoredCache {
   readonly entries = new Map<string, Response>();
-  private key(input: Request | string): string { return typeof input === 'string' ? input : input.url; }
+  private key(input: Request | string): string { return typeof input === 'string' ? new URL(input, origin).href : input.url; }
   match(input: Request | string, options?: { ignoreSearch?: boolean }): Promise<Response | undefined> {
     const key = this.key(input), found = options?.ignoreSearch === true ? [...this.entries.keys()].find(entry => entry.split('?')[0] === key.split('?')[0]) : key;
     return Promise.resolve(found === undefined ? undefined : this.entries.get(found)?.clone());
@@ -67,8 +67,9 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
     const claim = vi.fn(() => Promise.resolve()), skipWaiting = vi.fn(() => Promise.resolve());
     const routes = vi.fn<(rules: NativeRoute[]) => Promise<void>>(() => Promise.resolve());
     const live = new Set<string>(), workers = new Set<string>();
+    const navigate = vi.fn((_address: string) => Promise.resolve(null));
     const get = (id: string): Promise<{ id: string; type?: string } | undefined> => Promise.resolve(workers.has(id) ? { id, type: 'worker' } : live.has(id) ? { id } : undefined);
-    const self = { location: new URL(origin), registration: { scope: `${origin}/`, get active() { const build = origin_.active; return build === null ? null : { postMessage: (_message: unknown, [port]: MessagePort[]) => { port?.postMessage({ type: 'BUILD', build }); } }; } }, clients: { claim, get }, skipWaiting,
+    const self = { location: new URL(origin), registration: { scope: `${origin}/`, get active() { const build = origin_.active; return build === null ? null : { postMessage: (_message: unknown, [port]: MessagePort[]) => { port?.postMessage({ type: 'BUILD', build }); } }; } }, clients: { claim, get, matchAll: () => Promise.resolve([...live].map(id => ({ id, url: url(`/slug/${id}`), navigate }))) }, skipWaiting,
       addEventListener: (kind: string, listener: (event: WorkerEvent) => void) => { listeners.set(kind, [...listeners.get(kind) ?? [], listener]); } };
     const source = bundled.replaceAll('__BUILD_ID__', build)
       .replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME).replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(page)).replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
@@ -83,12 +84,49 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
         waitUntil: promise => { work.push(promise); }, respondWith: promise => { work.push(Promise.resolve(promise).then(value => { response = value; return value; })); } });
       await Promise.all(work); return response;
     };
-    return { dispatch, claim, skipWaiting, routes, live, workers };
+    return { dispatch, claim, skipWaiting, routes, live, workers, navigate };
   };
   return { caches, open, books, fetch, load, origin: origin_ };
 }
 
 const precached = { data: { type: 'PRECACHE' } };
+test('J383 escapes a pre-marker worker without downloading a new generation and reloads its clients', async () => {
+  const f = fixture(), old = f.load('legacy', ['/b/legacy/entry-aaaaaaaa.js']);
+  await old.dispatch('install'); await old.dispatch('activate');
+  await f.caches.delete('ws-force-update-j383-v1');
+  await (await f.open('old-downloads')).put('/old', new Response('stale'));
+  f.origin.active = 'legacy';
+  const next = f.load('new', ['/b/new/entry-bbbbbbbb.js']); next.live.add('nine-dragon-stack');
+  f.fetch.mockRejectedValue(new Error('Large downloads are unavailable'));
+  await next.dispatch('install');
+  expect(next.skipWaiting).toHaveBeenCalledTimes(1);
+  await next.dispatch('activate');
+  expect(next.claim).toHaveBeenCalledTimes(1);
+  expect(next.navigate).toHaveBeenCalledWith(url('/slug/nine-dragon-stack'));
+  expect(await f.caches.has('old-downloads')).toBe(false);
+  expect((await f.caches.keys())).toEqual(['ws-force-update-j383-v1']);
+});
+
+test('J383 still takes over when the legacy cache is too full to store its pending marker', async () => {
+  const f = fixture(); f.origin.active = 'legacy';
+  const marker = await f.open('ws-force-update-j383-v1');
+  vi.spyOn(marker, 'put').mockRejectedValueOnce(new DOMException('Full', 'QuotaExceededError'));
+  const next = f.load('new', ['/b/new/entry-bbbbbbbb.js']); next.live.add('phone');
+  await next.dispatch('install'); await next.dispatch('activate');
+  expect(next.claim).toHaveBeenCalledTimes(1); expect(next.navigate).toHaveBeenCalledTimes(1);
+});
+
+test('J383 completion survives normal preview and staging activates without a production marker', async () => {
+  for (const page of [previewDocument, document.replace('/production.json', '/staging.json')]) {
+    const f = fixture(), first = f.load('A', [], shell, {}, page);
+    await first.dispatch('install'); await first.dispatch('activate'); f.origin.active = 'A';
+    const next = f.load('B', [], shell, {}, page);
+    await next.dispatch('install'); await next.dispatch('activate');
+    expect(await f.caches.has('ws-force-update-j383-v1')).toBe(true);
+    expect(next.claim).not.toHaveBeenCalled(); expect(next.navigate).not.toHaveBeenCalled();
+  }
+});
+
 test('install precaches only the shell; control precaches hashed files before publishing a generation', async () => {
   const f = fixture(), worker = f.load('A', ['/assets/a-aaaaaaaa.js', shared]);
   await worker.dispatch('install'); await worker.dispatch('activate');
@@ -342,7 +380,8 @@ test('STALESHELL: over a whole build, an update downloads its whole generation i
   failing = true;
   const cut = f.load('B', ['/b/B/entry-bbbbbbbb.js', '/b/B/shared-cccccccc.js']);
   await expect(cut.dispatch('install')).rejects.toThrow(/Precache failed/u);
-  expect(cut.skipWaiting).not.toHaveBeenCalled();
+  // J383 asks for takeover immediately, but a rejected install can never activate even after skipWaiting.
+  expect(cut.skipWaiting).toHaveBeenCalledTimes(1);
   expect(await (await f.open('ws-builds-v1')).match(url('/__ws_build__/B'))).toBeUndefined();
   // the browser's next update check resumes from what the shared cache holds, and B takes over once it holds all of it
   failing = false; f.fetch.mockClear();
@@ -856,7 +895,7 @@ test('OF12: a preview worker and a staging worker on one origin keep disjoint ca
   await preview.dispatch('install'); await preview.dispatch('activate'); await preview.dispatch('message', precached);
   await preview.dispatch('fetch', { request: new Request(url(programs)) });
   const previewOnly = await contents();
-  expect([...previewOnly.keys()].sort()).toEqual(['ws-preview-assets-v1', 'ws-preview-builds-v1', 'ws-preview-shell-v3-P1']);
+  expect([...previewOnly.keys()].sort()).toEqual(['ws-force-update-j383-v1', 'ws-preview-assets-v1', 'ws-preview-builds-v1', 'ws-preview-shell-v3-P1']);
   const staging = f.load('S1', files, shell, {}, stagingDocument);
   await staging.dispatch('install'); await staging.dispatch('activate'); await staging.dispatch('message', precached);
   await staging.dispatch('fetch', { request: new Request(url(programs)) });
@@ -879,17 +918,17 @@ test('OF12: production keeps its names and marks the origin; another channel dro
   const files = ['/assets/a-aaaaaaaa.js'];
   const prod = fixture(), worker = prod.load('A', files);
   await worker.dispatch('install'); await worker.dispatch('activate'); await worker.dispatch('message', precached);
-  expect((await prod.caches.keys()).sort()).toEqual(['ws-assets-v1', 'ws-builds-v1', 'ws-production-mark', 'ws-shell-v3-A']);
+  expect((await prod.caches.keys()).sort()).toEqual(['ws-assets-v1', 'ws-builds-v1', 'ws-force-update-j383-v1', 'ws-production-mark', 'ws-shell-v3-A']);
   const staging = prod.load('S1', files, shell, {}, stagingDocument);
   await staging.dispatch('install'); await staging.dispatch('activate');
   expect((await prod.caches.keys()).filter(name => !name.startsWith('ws-staging-')).sort(), 'production ran here: its caches stay')
-    .toEqual(['ws-assets-v1', 'ws-builds-v1', 'ws-production-mark', 'ws-shell-v3-A']);
+    .toEqual(['ws-assets-v1', 'ws-builds-v1', 'ws-force-update-j383-v1', 'ws-production-mark', 'ws-shell-v3-A']);
   // the staging origin itself: its pre-OF12 caches had production's names; the first channel-named worker drops them once
   const old = fixture();
   for (const name of ['ws-assets-v1', 'ws-builds-v1', 'ws-shell-v3-old', 'ws-content-v1', 'ws-immutable']) await (await old.open(name)).put(url('/x'), new Response('x'));
   const first = old.load('S1', files, shell, {}, stagingDocument);
   await first.dispatch('install'); await first.dispatch('activate');
-  expect((await old.caches.keys()).sort()).toEqual(['ws-staging-assets-v1', 'ws-staging-builds-v1', 'ws-staging-shell-v3-S1']);
+  expect((await old.caches.keys()).sort()).toEqual(['ws-force-update-j383-v1', 'ws-staging-assets-v1', 'ws-staging-builds-v1', 'ws-staging-shell-v3-S1']);
 });
 
 
