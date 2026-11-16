@@ -12120,5 +12120,45 @@
         "assertions": "All three original native cases, including direct private synchronous factoring size/identity/reference assertions; default blocking discovery and compiler/typed lint."
       }
     ]
+  },
+  {
+    "repo": "engine",
+    "file": "test/world-scene-graph-pages.test.ts",
+    "outcome": "restored",
+    "target": "test/world-scene-graph-pages.test.ts",
+    "decision": "CI21 SDK-tail assertion split: SDK 5222fdabe8b82425498240a0eb03751271241265 test/world-scene-graph-pages.test.ts retains all five author/format cases. The original private native admitWorldSceneModelGraphs result assertion stays in this default-blocking engine companion against exact SDK-produced frozen input, with no SDK or shard imports.",
+    "originalTests": [
+      "native variants reconstruct from shared nodes with independent member identities",
+      "page admission checks unselected native graphs and refuses malformed transport",
+      "packing preserves the authored wire order before native parser defaults",
+      "page metadata fits the product index while local references retain node constraints",
+      "native pages keep the aggregate JSON ceiling and complete defining provenance"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "a07c98048c6362d11573a9661d6a4f789edee3ca",
+    "retirementProof": "No case or assertion retired. SDK retains all original packing/member identity, malformed transport, byte-owner, full wire order, schema size/provenance and aggregate cap assertions. Engine retains native catalogue admission of both graph members and adds a corrupt-byte refusal. Exact snapshot hash/producer/module blob/full recipe are in frozen runtime-manifest.json.",
+    "assertionDestinations": [
+      {
+        "repo": "sharddev",
+        "revision": "5222fdabe8b82425498240a0eb03751271241265",
+        "target": "test/world-scene-graph-pages.test.ts",
+        "originalTests": [
+          "native variants reconstruct from shared nodes with independent member identities",
+          "page admission checks unselected native graphs and refuses malformed transport",
+          "packing preserves the authored wire order before native parser defaults",
+          "page metadata fits the product index while local references retain node constraints",
+          "native pages keep the aggregate JSON ceiling and complete defining provenance"
+        ]
+      },
+      {
+        "repo": "engine",
+        "branch": "plan/ci21sdk-tail",
+        "target": "test/world-scene-graph-pages.test.ts",
+        "originalTests": [
+          "native variants reconstruct from shared nodes with independent member identities"
+        ],
+        "assertions": "Actual native catalogue consumer admits original two graph members; frozen expected rows retain complete defining wire, corrupt bytes refuse."
+      }
+    ]
   }
 ]

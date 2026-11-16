@@ -112,6 +112,5 @@
   "test/template-source-layout.test.ts",
   "test/tile-bakes.test.ts",
   "test/view-author-metadata.test.ts",
-  "test/world-assembly-schema.test.ts",
-  "test/world-scene-graph-pages.test.ts"
+  "test/world-assembly-schema.test.ts"
 ]

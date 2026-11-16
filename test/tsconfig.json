@@ -342,7 +342,6 @@
     "view-author-metadata.test.ts",
     "vitest-module-cache.test.ts",
     "world-assembly-schema.test.ts",
-    "world-scene-graph-pages.test.ts",
     "declared-entry-targets-debug.test.ts",
     "fixtures/frozen/nalati-dressing-phone.json",
     "fixtures/frozen/nalati/nalati-poi-paint-original.json"
@@ -396,6 +395,7 @@
     "../pages/placed-slug.ts",
     "../pages/slug-meta.ts",
     "../pages/slug-names.ts",
-    "schema-code-memory.test.ts"
+    "schema-code-memory.test.ts",
+    "world-scene-graph-pages.test.ts"
   ]
 }
