@@ -343,7 +343,13 @@ jobs:
           echo '### API validator identity' >> "$GITHUB_STEP_SUMMARY"
           echo 'Reader proof: ${{ steps.health-proof.outcome }}' >> "$GITHUB_STEP_SUMMARY"
           if test -f tmp/api-health/report.json; then
-            node --input-type=module -e 'import{readFileSync,appendFileSync}from"node:fs";const r=JSON.parse(readFileSync("tmp/api-health/report.json","utf8"));appendFileSync(process.env.GITHUB_STEP_SUMMARY,`\nLive identity: ${r.ok?"MATCH":r.complete?"MISMATCH":"UNAVAILABLE"}; engine ${r.expected}, API ${r.observed??"missing"}.\n`);'
+            node --input-type=module <<'NODE'
+          import {readFileSync, appendFileSync} from 'node:fs';
+          const r = JSON.parse(readFileSync('tmp/api-health/report.json', 'utf8'));
+          const state = r.ok ? 'MATCH' : r.complete ? 'MISMATCH' : 'UNAVAILABLE';
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            `\nLive identity: ${state}; engine ${r.expected}, API ${r.observed ?? 'missing'}.\n`);
+          NODE
           else
             echo 'Live identity: no receipt was produced.' >> "$GITHUB_STEP_SUMMARY"
           fi
