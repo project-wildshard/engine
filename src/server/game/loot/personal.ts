@@ -1,4 +1,6 @@
 import * as v from 'valibot';
+import type { Shardfile } from '@wildshard/format/shardSchema';
+import { Rng, fnv1a32 } from '@wildshard/engine/core/rng';
 import { WeightedTable, type TableDrop } from '@wildshard/engine/ai/weighted';
 import type { SimHost } from '@wildshard/engine/sim';
 import { bountyKey } from '../../../shared/game/loot/Bounty';
@@ -73,4 +75,23 @@ export function installPersonalLoot(host: SimHost, ports: PersonalLootPorts): vo
       for (const { item, count } of items) { ledgerDedupe.push(itemKey(player, item)); ports.grantItem?.(player, item, count); host.events.emit('reward.granted', { player, coins: 0, body: actor.id, item }); }
     }
   }, host.scope);
+}
+
+/** Where a cell's personal rolls are paid. */
+export interface CellLootPayee {
+  readonly coins: (player: string, amount: number) => void;
+  readonly item: (player: string, item: string, count: number) => void;
+}
+/** TEMPLATE-E2E TC-E6 (Jake, 2026-11-15: "kills drop loot"): a grid data cell's kills pay each player who did meaningful
+ *  damage their own roll off the shard's `economy` loot tables, as a native room's do (J105). A grid cell's page draws its
+ *  creatures as neighbour life and pays nothing itself, so the cell pays a lone player too, and so does a room (`pageless`:
+ *  a dedicated room or a CI journey has no page to pay anyone, as a native room's `alone`); only a one-shard page keeps
+ *  paying its own lone player. A shard with no coin or trophy table installs nothing. An author proof installs the same
+ *  rolls (meta MU6), so a tape's `requiredItems` counts what a kill pays. */
+export function installCellLoot(host: SimHost, shard: Pick<Shardfile, 'rows'>, pay: CellLootPayee, alone: boolean): void {
+  const economy = { rows: { loot: shard.rows.loot } }, coins = personalCoinTable(economy), items = personalItemTable(economy);
+  if (coins === null && items === null) return;
+  // A cell's save names only the engine's random streams (sim.snapshot v3), so its rolls keep no stream of their own.
+  const seed = host.rng.seedValue, draws = (roll: string): (() => number) => { const rng = new Rng(fnv1a32(`${String(seed)}:${roll}`)); return () => rng.next(); };
+  installPersonalLoot(host, { coins, alone, draws, ...(items === null ? {} : { items }), grant: pay.coins, grantItem: pay.item });
 }

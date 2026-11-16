@@ -53,6 +53,7 @@ import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { installDeclaredTalks } from '../shardfile/declaredTalks';
 import { pressTalk, talkPress, tapeTargets } from '../shardfile/talkPress';
 import { nativeInventories } from '../../../shared/game/inventoryLaw';
+import { installCellLoot } from '../loot/personal';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { installShardfileColliders, shardfileColliderIds } from "../../../shared/game/shardfile/collisionBindings";
 import { validateMeshCollisionAssets } from "@wildshard/format/meshCollisionAssets";
@@ -768,28 +769,34 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
   });
   interface Fact { name: string; actorId: string; tick: number }
   const facts: Fact[] = [], baselineFacts: Fact[] = [];
-  const make = (record: Fact[], saved?: SimSnapshot): ShardfileSimulation => {
+  // MU6: what a scene or data shard pays its player, as a data cell pays it (cellWorld): quest coins and each kill's own
+  // rolls off the shard's loot tables, by item, `coins` for coins. A native pack registers itself (`nativeInventories`).
+  const goods: Record<string, number> = {}, baselineGoods: Record<string, number> = {};
+  const make = (record: Fact[], paid: Record<string, number>, saved?: SimSnapshot): ShardfileSimulation => {
     let current: ShardfileSimulation | undefined;
+    const pay = (item: string, count: number): void => { if (count > 0) paid[item] = (paid[item] ?? 0) + count; };
     const native = { ...ports, quest: { fact: (name: string, actorId: string) => {
       if (current === undefined) throw new Error('Fact emitted outside an installed native tick');
       record.push({ name, actorId, tick: current.host.state.tick });
-    }, coins: () => undefined } };
+    }, coins: (amount: number) => { pay('coins', amount); } } };
+    const loot = (host: SimHost): void => { installCellLoot(host, source, { coins: (_player, amount) => { pay('coins', amount); }, item: (_player, item, count) => { pay(item, count); } }, true); };
     current = createShardfileSim(source, assets, native);
-    if (saved !== undefined) {
+    if (saved === undefined) loot(current.host);
+    else {
       const level = current.host.level; current.dispose(); current = undefined;
       const installed: { value?: ShardfileSimulation } = {};
-      const host = restoreSimHost(level, { rapier: ports.rapier }, saved, fresh => { installed.value = bindShardfileSim(fresh, source, assets, { ...native, restoring: true }); });
+      const host = restoreSimHost(level, { rapier: ports.rapier }, saved, fresh => { installed.value = bindShardfileSim(fresh, source, assets, { ...native, restoring: true }); loot(fresh); });
       current = installed.value;
       if (current === undefined) { host.dispose(); throw new Error('Missing restored author owner'); }
     }
     return current;
   };
-  const highway = make([]), baseline = make(baselineFacts);
+  const highway = make([], {}), baseline = make(baselineFacts, baselineGoods);
   let resident: ShardfileSimulation | undefined, admitted = false, durable = false, loads = 0;
   const saved = new Map<string, SimSnapshot>();
   const grid = new GridSimulation(assembly, { highway, allocator, residentBytes: () => source.budgets.sim.resident,
     admitted: () => admitted, read: id => saved.get(id), save: (id, value) => { if (!durable) return false; saved.set(id, structuredClone(value)); return true; },
-    load: (_cell, snapshot) => { insist(allocator.has(`sim:${instance}`), 'physics allocated before reservation'); loads++; resident = make(facts, snapshot); return Promise.resolve(resident); },
+    load: (_cell, snapshot) => { insist(allocator.has(`sim:${instance}`), 'physics allocated before reservation'); loads++; resident = make(facts, goods, snapshot); return Promise.resolve(resident); },
   });
   try {
     insist(!grid.ready(instance), 'unloaded cell is ready'); await grid.prefetch([instance]);
@@ -823,6 +830,8 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     const restoredSuffix = regionalContinuation(resident.host), baselineSuffix = regionalContinuation(baseline.host);
     insist(restoredSuffix === baselineSuffix, `restored regional suffix diverged in ${continuationDiff(restoredSuffix, baselineSuffix)}`);
     insist(JSON.stringify(facts) === JSON.stringify(baselineFacts), 'restored facts diverged or repeated');
+    const sorted = (paid: Record<string, number>): string => JSON.stringify(Object.entries(paid).sort(([a], [b]) => a.localeCompare(b)));
+    insist(sorted(goods) === sorted(baselineGoods), `restored rewards diverged or repeated: ${JSON.stringify({ restored: goods, baseline: baselineGoods })}`);
     const values = new Map<string, string>();
     const storage = { get length() { return values.size; }, key: (index: number) => [...values.keys()][index] ?? null,
       getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); }, removeItem: (key: string) => { values.delete(key); } };
@@ -841,8 +850,11 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     });
     for (const fact of filed) { const receipt = owner.record(fact); insist(receipt.status !== 'pending', 'ledger write pending'); if (receipt.status === 'granted') granted++; }
     for (const name of plan.requiredFacts) insist(facts.some(fact => fact.name === name), `native fact missing: ${name}`);
-    // F27: the packs as the tape left them; a required stack short of its count names what the packs hold
-    const inventory = nativeInventories(resident.host);
+    // F27: the packs as the tape left them; a required stack short of its count names what the packs hold. MU6: a scene or
+    // data shard's player holds what the tape was paid (quest coins, kill rolls) and the ledger's item rewards, as `player`.
+    const inventory = nativeInventories(resident.host), paid: Record<string, number> = { ...goods };
+    for (const row of Object.values(owner.state().items)) paid[row.item] = (paid[row.item] ?? 0) + row.quantity;
+    if (Object.keys(paid).length > 0 && inventory['player'] === undefined) inventory['player'] = paid;
     for (const [item, count] of Object.entries(plan.requiredItems ?? {})) {
       const held = Object.values(inventory).reduce((sum, pack) => sum + (pack[item] ?? 0), 0);
       insist(held >= count, `inventory holds ${String(held)} of ${item}, the tape requires ${String(count)}; packs: ${JSON.stringify(inventory)}`);

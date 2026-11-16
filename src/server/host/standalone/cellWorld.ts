@@ -8,7 +8,6 @@ import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { questBooks } from '@wildshard/engine/quest/players';
-import { Rng, fnv1a32 } from '@wildshard/engine/core/rng';
 import { decodeSimSnapshot, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 import type { SaveStore } from '@wildshard/engine/saves/store';
@@ -36,7 +35,7 @@ import { pageRuntimeState } from '@wildshard/engine/game/shardfile/runtimeState'
 import { commandsOf } from '@wildshard/engine/game/grid/roomNet';
 import { pageSavedFlags } from '@wildshard/engine/world/interact/flags';
 import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
-import { installPersonalLoot, personalCoinTable, personalItemTable } from '@wildshard/engine/game/loot/personal';
+import { installCellLoot } from '@wildshard/engine/game/loot/personal';
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../headlessRuntime';
 import { registerInstalled } from '@wildshard/engine/game/shardfile/installedSides';
 import { productHeadlessSections } from '@wildshard/engine/host/headlessSections';
@@ -96,19 +95,10 @@ function fallFloorOf(input: HeadlessRuntimeInput, host: SimHost, lone: boolean):
   return new FallFloor(input.product === undefined ? shardFallFloor(input.shard.manifest?.bounds?.floor) : shardPlayArea(input.shard.manifest?.bounds, input.product), lone, host.level.player.at);
 }
 
-/** TEMPLATE-E2E TC-E6 (Jake, 2026-11-15: "kills drop loot"): a grid data cell's kills pay each player who did meaningful
- *  damage their own roll off the shard's `economy` loot tables, as a native room's do (J105). A grid cell's page draws its
- *  creatures as neighbour life and pays nothing itself, so the cell pays a lone player too, and so does a room (`pageless`:
- *  a dedicated room or a CI journey has no page to pay anyone, as a native room's `alone`); only a one-shard page keeps
- *  paying its own lone player. A shard with no coin or trophy table installs nothing. */
+/** TC-E6: a data cell's kills pay their own rolls into the tick's effects (`installCellLoot`). */
 function installDataCellLoot(host: SimHost, shard: HeadlessRuntimeInput['shard'], effects: HeadlessEffect[], alone: boolean): void {
-  const economy = { rows: { loot: shard.rows.loot } }, coins = personalCoinTable(economy), items = personalItemTable(economy);
-  if (coins === null && items === null) return;
-  // A cell's save names only the engine's random streams (sim.snapshot v3), so its rolls keep no stream of their own.
-  const seed = host.rng.seedValue, draws = (roll: string): (() => number) => { const rng = new Rng(fnv1a32(`${String(seed)}:${roll}`)); return () => rng.next(); };
-  installPersonalLoot(host, { coins, alone, draws, ...(items === null ? {} : { items }),
-    grant: (player, amount) => { effects.push({ kind: 'coins', amount, actorId: player }); },
-    grantItem: (player, item, count) => { effects.push({ kind: 'item', item, count, actorId: player }); } });
+  installCellLoot(host, shard, { coins: (player, amount) => { effects.push({ kind: 'coins', amount, actorId: player }); },
+    item: (player, item, count) => { effects.push({ kind: 'item', item, count, actorId: player }); } }, alone);
 }
 
 /** A cell with no native plan: a data shard, which any host can run from its output. */
