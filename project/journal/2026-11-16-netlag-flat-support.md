@@ -56,3 +56,23 @@ The scope review has no MUST. Its missing ray-normal coverage is now
 included: a flat prior normal must reject the same new gentle grade.
 The room digests above were captured from the corrected native runs;
 the page-law course keeps its initial flat-box digest values.
+
+Hosted CI exposed two omitted baseline updates: the 240-tick Ring 1
+chains and the eight 40,000-tick motion traces. No native movement
+assertion failed there. A control disables only the new rest call on
+the same reviewed source and pins, then restores the exact source.
+All eight old Ring chains match, and all eight old motion traces pass.
+The corrected motor changes five Ring products; its Mac measurements
+match the uploaded Linux measurements byte for byte. Both platform
+profiles now use those measured values, preserving the other three.
+
+The corrected long traces are re-recorded with their original seeds,
+40,000 ticks, required modes and two identical runs.
+No tolerances, repeatability checks or mode assertions changed. The
+Ring control restored full pins before the trace tests ran; no pins
+install overlapped a test. Source/hash metadata and old/new reports
+live in tmp/codex-netlag/ring-control-* and traces-old/new-law logs.
+
+The baseline delta review has no MUST. It also checks that the
+Linux trace values reported by hosted run 43822358907 match the Mac
+re-record. These portability facts remain here after scratch cleanup.

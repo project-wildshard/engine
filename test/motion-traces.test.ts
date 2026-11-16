@@ -30,6 +30,8 @@ import {lendFrozenPasture as lendNalatiRiding} from './fixtures/frozen/runtimePr
 // ticks). The page's law on the feel side is B1's (test/motion-trace.test.ts). A law row moves the host traces on purpose:
 // re-record in that commit with MOTION_TRACE_RECORD=1. Any other change must leave all eight alone. The hashes hold on every
 // platform: this is what fails when a Mac and a Linux server stop agreeing (J97).
+// NL13b2 (J280): flat static support changes the law. Disabling only that rest call matches all eight old chains;
+// the corrected law is re-recorded with the same seeds, mode coverage, tick counts and repeat-run checks.
 
 const TICKS = 40_000, HASH_EVERY = 500, SEGMENT = 900;
 const BASELINE = 'test/fixtures/motion-trace/seven-traces.json', RECORDING = process.env['MOTION_TRACE_RECORD'] === '1';
