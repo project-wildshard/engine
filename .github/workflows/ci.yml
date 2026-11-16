@@ -603,8 +603,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-selection.mjs
       - id: code
-        if: steps.active.outputs.run == 'true' && steps.paths.outputs.docs != 'true'
-        run: echo "run=true" >> "$GITHUB_OUTPUT"
+        if: steps.paths.outputs.docs != 'true'
+        run: echo "run=${{ steps.active.outputs.run }}" >> "$GITHUB_OUTPUT"
       - if: steps.code.outputs.run == 'true'
         uses: ./.github/actions/ring-setup
         with:
