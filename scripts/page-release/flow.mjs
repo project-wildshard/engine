@@ -96,6 +96,7 @@ export function pinnedReleaseKey(configured) {
  * @property {Channel} channel
  * @property {string} build  The full source SHA.
  * @property {PageHost} host
+ * @property {boolean} [codeRetention] FM7: sign and verify the actual retained-code graph. Legacy callers omit it.
  * @property {PackStore} packs
  * @property {ContentPublisher} [content]  PZ2: publish the page's content set before the page goes up (page-release.mjs
  *   --content). PZ6: the build then stamps the set's base into the page and keeps the split (dist-content/ is published).
@@ -167,6 +168,10 @@ export async function runPhase(phase, deps) {
     } else {
       plan(`stamp dist/index.html with the content set's base on ${PACKS_ORIGIN}/content/ and bake its service worker again (PZ6)`);
       if (!dry) deps.run('node', ['--import', './scripts/bake-loader.mjs', 'scripts/page-release/stamp-content.mjs', 'dist'], {});
+    }
+    if (deps.codeRetention === true) {
+      plan('sign code-retention.json from the actual deploy-chunks.json; unscheduled retirement has no invented deadline');
+      if (!dry) deps.run('node', ['scripts/code-retention.mjs', deps.host.outputDir(context), channel.channel], {});
     }
     for (const line of deps.host.describe('package', context)) plan(line);
     if (!dry) await deps.host.package(context);
@@ -293,6 +298,9 @@ export function contentBaseIn(html) {
   return typeof base === 'string' && base !== '' ? base : undefined;
 }
 
+/** @param {Deps} deps @returns {readonly string[]} */
+const checkedDocuments = deps => deps.codeRetention === true ? [...CHECKED_DOCUMENTS, 'code-retention.json'] : CHECKED_DOCUMENTS;
+
 /**
  * The packaged page names this build, this channel's release file and key, and never the other channel's file.
  * @param {ChannelConfig} channel @param {Deps} deps @param {HostContext} context @param {(message: string) => void} refuse
@@ -302,7 +310,7 @@ function checkOutput(channel, deps, context, refuse) {
   const out = deps.host.outputDir(context);
   /** @type {Record<string, string>} */
   const files = {};
-  for (const name of CHECKED_DOCUMENTS) files[name] = sha256(deps.readFile(`${out}/${name}`));
+  for (const name of checkedDocuments(deps)) files[name] = sha256(deps.readFile(`${out}/${name}`));
   const version = JSON.parse(Buffer.from(deps.readFile(`${out}/version.json`)).toString('utf8'));
   if (version.build !== deps.build) refuse(`version.json names ${version.build}, not ${deps.build}`);
   if (version.saveEpoch !== deps.manifest.saveEpoch) refuse(`version.json save epoch ${version.saveEpoch} is not ${deps.manifest.saveEpoch}`);
@@ -322,9 +330,9 @@ function checkOutput(channel, deps, context, refuse) {
 
 /** @param {Deps} deps @param {HostContext & {deployment: Deployment}} deployed @param {(message: string) => void} refuse */
 async function checkDeployed(deps, deployed, refuse) {
-  const remote = await deps.host.deployedDigests(deployed, CHECKED_DOCUMENTS);
+  const remote = await deps.host.deployedDigests(deployed, checkedDocuments(deps));
   const out = deps.host.outputDir(deployed);
-  for (const name of CHECKED_DOCUMENTS) {
+  for (const name of checkedDocuments(deps)) {
     const found = remote.get(name);
     const local = found === undefined ? '' : createHash(found.algorithm).update(deps.readFile(`${out}/${name}`)).digest('hex');
     if (found === undefined || found.digest !== local) refuse(`deployed ${name} of ${deployed.deployment.id} differs from the local build`);

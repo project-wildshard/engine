@@ -537,3 +537,21 @@ test('page publication configuration cannot replace the pinned trust root', () =
     expect(run.stdout).toBe('');
   }
 });
+
+test('retention-enabled publisher signs before packaging and gates alias on its exact deployed bytes', async () => {
+  const {deps, calls, files, deployedFiles} = rig();
+  deps.codeRetention = true;
+  const run = deps.run;
+  deps.run = (file, args, env) => {
+    run(file, args, env);
+    if (args[0] === 'scripts/code-retention.mjs') {
+      files.set('/out/code-retention.json', Buffer.from('signed retained-code graph'));
+      deployedFiles.set('/out/code-retention.json', Buffer.from('signed retained-code graph'));
+    }
+  };
+  await through(deps, 'check');
+  expect(calls.indexOf('run node scripts/code-retention.mjs /out staging')).toBeLessThan(calls.indexOf('package'));
+  deployedFiles.set('/out/code-retention.json', Buffer.from('different graph'));
+  await expect(runPhase('go-live', deps)).rejects.toThrow('code-retention.json');
+  expect(calls).not.toContain('goLive');
+});

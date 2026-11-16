@@ -31,7 +31,8 @@ export interface Deps {
   channel: Channel;
   build: string;
   host: PageHost;
-  packs: PackStore;
+  codeRetention?: boolean;
+    packs: PackStore;
   content?: ContentPublisher;
   run: (file: string, args: string[], env: Record<string, string>) => void;
   fetchJSON: (url: string) => Promise<unknown>;

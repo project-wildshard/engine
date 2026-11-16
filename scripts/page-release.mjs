@@ -87,15 +87,15 @@ let phase = '';
 try {
   for (phase of phaseList.split(',')) {
     const {refusals} = await runPhase(/** @type {any} */ (phase), {
-      root, channel: /** @type {any} */ (channel), build, host, releaseKey,
+      root, channel: /** @type {any} */ (channel), build, host, releaseKey, codeRetention: true,
       packs: r2Packs({log}),
       ...(flag('content') === undefined ? {} : {content: {
         publish: ({dir, cors, dryRun}) => publishContent({dir, origin: cors, dryRun, log,
           scratch: join(root, 'tmp/page-release/content'), store: r2Content({root, scratch: join(root, 'tmp/page-release/content'), token: cloudflareToken, copies: contentCopies})}),
       }}),
       run: (file, argv, env) => {
-        const signing = file === 'node' && argv[2] === 'scripts/page-release/preview.mjs' && signingKey !== undefined
-          ? {E7_RELEASE_SIGNING_KEY: signingKey} : {};
+        const signing = file === 'node' && (argv[2] === 'scripts/page-release/preview.mjs' || argv[0] === 'scripts/code-retention.mjs') && signingKey !== undefined
+          ? {E7_RELEASE_SIGNING_KEY: signingKey, E7_RELEASE_PUBLIC_KEY: releaseKey} : {};
         execFileSync(file, argv, {cwd: root, env: {...process.env, ...env, ...signing}, stdio: 'inherit'});
       },
       fetchJSON: async url => (await fetch200(url)).json(),
