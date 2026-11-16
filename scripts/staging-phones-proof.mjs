@@ -80,7 +80,9 @@ function inspector(find, kind) {
       return said.result?.value;
     } catch (error) { if (/Inspector closed|timeout/u.test(String(error))) { page?.close(); page = null; } throw error; }
   };
-  return { errors, evaluate, connect, close: () => { page?.close(); page = null; } };
+  /** @param {string} method @param {Record<string, unknown>} [params] */
+  const send = async (method, params) => (page ?? await connect()).send(method, params);
+  return { errors, evaluate, send, connect, close: () => { page?.close(); page = null; } };
 }
 
 /** Mobile Safari in a booted Simulator, through its Web Inspector socket (ios_webkit_debug_proxy) and idb's HID touches. @param {string} udid @returns {Phone} */
@@ -150,7 +152,13 @@ function android(serial) {
     swipe: async (from, to, ms) => { adb('shell', 'input', 'touchscreen', 'swipe', r(from.x), r(from.y), r(to.x), r(to.y), r(ms)); await Promise.resolve(); },
     tap: async at => { adb('shell', 'input', 'touchscreen', 'tap', r(at.x), r(at.y)); await Promise.resolve(); },
     scale: async () => Number(await page.evaluate('window.devicePixelRatio')),
-    shot: async name => { writeFileSync(join(shots, `${name}.png`), execFileSync(tool, ['-s', serial, 'exec-out', 'screencap', '-p'], { maxBuffer: 64 << 20, timeout: 60_000 })); await Promise.resolve(); },
+    // `screencap` aborts on the hosted emulator's gfxstream (hasReadColorBufferDma): the page's own capture is the fallback.
+    shot: async name => {
+      const png = execFileSync(tool, ['-s', serial, 'exec-out', 'screencap', '-p'], { maxBuffer: 64 << 20, timeout: 60_000 });
+      if (png.length > 1000) { writeFileSync(join(shots, `${name}.png`), png); return; }
+      const said = v.parse(v.looseObject({ data: v.string() }), await Promise.race([page.send('Page.captureScreenshot', { format: 'png' }), sleep(20_000).then(() => { throw new Error('Page.captureScreenshot timed out'); })]));
+      writeFileSync(join(shots, `${name}.png`), Buffer.from(said.data, 'base64'));
+    },
     close: async () => {
       page.close();
       try { writeFileSync(join(shots, 'logcat.txt'), execFileSync(tool, ['-s', serial, 'logcat', '-d', '-t', '4000'], { encoding: 'utf8', maxBuffer: 64 << 20, timeout: 60_000 })); } catch { /* A dead emulator has no log. */ }
@@ -158,7 +166,9 @@ function android(serial) {
     } };
 }
 
-const SHOWN = String.raw`({ text: (document.body?.innerText ?? '').replace(/\s+/gu, ' ').slice(0, 160), href: location.href, worker: typeof window.__workerClient === 'function' })`;
+// What a waiting phone shows, and whether it still paints: `raf` counts frames since the first look (a hidden or stalled page
+// holds it still), `step` is the loading card's step.
+const SHOWN = String.raw`({ text: (document.body?.innerText ?? '').replace(/\s+/gu, ' ').slice(0, 160), href: location.href, worker: typeof window.__workerClient === 'function', vis: document.visibilityState, focus: document.hasFocus(), step: document.querySelector('.ws-load')?.dataset.step ?? null, shell: document.querySelector('.ws-load')?.hasAttribute('data-shell') ?? null, raf: (window.__xrRaf ??= (() => { let n = 0; const f = () => { n++; requestAnimationFrame(f); }; requestAnimationFrame(f); return () => n; })())() })`;
 /** @param {Phone} phone @param {string} expression @param {number} ms @param {string} [what] */
 const until = async (phone, expression, ms, what = expression) => {
   const end = Date.now() + ms;
@@ -221,6 +231,7 @@ let code = 1;
 try {
   await phone.open(`${BASE}/version.json`);
   await phone.evaluate(SETUP);
+  console.log(`  ${row} browser and GPU at open: ${JSON.stringify(await phone.evaluate(GPU).catch((/** @type {unknown} */ error) => String(error).slice(0, 200)))}`);
   await phone.evaluate(`location.replace(${JSON.stringify(url)}); true`).catch(() => undefined);
   await until(phone, "document.querySelector('#ws-name-box input') !== null", 240_000, 'the title and its Name box');
   note(row, 'the title shows, with the Name box', true, await phone.evaluate('({ build: globalThis.__WS_BUILD_ID__, href: location.href })'));
