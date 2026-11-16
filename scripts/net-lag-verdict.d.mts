@@ -3,6 +3,7 @@ export interface BridgeSample {
   under?: number;
   falls?: number;
   corrections?: number;
+  injectedSinks?: number[];
   forcedFrames?: number;
   forcedFrameMs?: number;
   spanSamples?: number;
@@ -17,6 +18,7 @@ export interface ProofRow extends Record<string, unknown> {
   b4?: BridgeSample & { ok: boolean };
 }
 export function bridgeVerdict(sample: BridgeSample): BridgeSample & { ok: boolean; replayExercised: boolean };
+export function installBridgeCorrections(): void;
 export function proofVerdict(row: ProofRow, mode: 'correctness' | 'timing'): ProofRow & {
   measurement: 'correctness' | 'timing';
   checked: string[];

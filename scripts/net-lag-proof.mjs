@@ -20,7 +20,7 @@ import { chromium, webkit } from 'playwright';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
-import { bridgeVerdict, proofVerdict } from './net-lag-verdict.mjs';
+import { bridgeVerdict, installBridgeCorrections, proofVerdict } from './net-lag-verdict.mjs';
 
 const arg = (/** @type {string} */ name, /** @type {string} */ fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const DECK = ['driftwood-isle', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pine-hollow', 'nine-dragon-stack'];
@@ -115,7 +115,7 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
         }
         return false;
       }, TITLES[slug] ?? slug.toUpperCase().replaceAll('-', ' ')).catch(() => false);
-      if (await page.getByText(/could not load/iu).isVisible().catch(() => false)) throw new Error('the shard could not load');
+      if (await page.getByText(/could not load|the world didn.t download/iu).isVisible().catch(() => false)) throw new Error('the shard could not load');
       await sleep(clicked ? 6000 : 1000);
     }
     await page.locator('#ws-name-box input').fill(`Lag ${engineName[0] ?? 'x'}${Date.now().toString(36).slice(-3)}`);
@@ -209,22 +209,26 @@ async function crossBridge(page) {
   };
   const telemetry = () => page.evaluate(() => {
     const worker = window.__workerClient?.();
-    if (worker === undefined || !Number.isFinite(worker.falls) || !Number.isFinite(worker.corrections)) throw new Error('Missing bridge correction telemetry');
+    if (worker === undefined || !Number.isFinite(worker.falls) || !Number.isFinite(worker.corrections) || worker.closed !== null) throw new Error('Missing or closed bridge correction telemetry');
     return { falls: worker.falls, corrections: worker.corrections };
   });
   const fallsBefore = (await telemetry()).falls;
   for (const [x = 0, z = 0] of TO_BRIDGE) if (!await go(x, z, true, false)) { await stop(); return { reached: false, at: await where(), under: 0, falls: 0, lowest: null }; }
+  await page.evaluate(installBridgeCorrections);
+  await page.waitForFunction(() => /** @type {any} */ (window).__netLag.bridgeFault.ready, undefined, { timeout: timeout(10_000) });
   const correctionsBefore = (await telemetry()).corrections;
   const framesBefore = await page.evaluate(() => /** @type {any} */ (window).__netLag.slowFrames);
-  await page.evaluate(() => { /** @type {any} */ (window).__netLag.slowMs = 60; });
+  await page.evaluate(() => { const S = /** @type {any} */ (window).__netLag; S.slowMs = 60; S.bridgeFault.armed = 0.3; });
   let reached = true;
   for (const [index, [x = 0, z = 0]] of ACROSS.entries()) reached = await go(x, z, index % 2 === 1, true) && reached;
+  await page.evaluate(() => { /** @type {any} */ (window).__netLag.bridgeFault.armed = 1; });
   for (const [x = 0, z = 0] of [...ACROSS].reverse().slice(1)) reached = await go(x, z, true, true) && reached;
   await page.evaluate(() => { /** @type {any} */ (window).__netLag.slowMs = 0; });
   await stop();
   const after = await telemetry(), falls = after.falls - fallsBefore;
   const forcedFrames = await page.evaluate(() => /** @type {any} */ (window).__netLag.slowFrames) - framesBefore;
-  return { reached, under, falls, corrections: after.corrections - correctionsBefore, forcedFrames, forcedFrameMs: 60, spanSamples, lowest: Number.isFinite(lowest) ? Number(lowest.toFixed(2)) : null };
+  const injections = await page.evaluate(() => { const F = /** @type {any} */ (window).__netLag.bridgeFault; F.cleanup(); return F.confirmed; });
+  return { reached, under, falls, corrections: after.corrections - correctionsBefore, injections, injectedSinks: injections.map((/** @type {{sink:number}} */ row) => row.sink), forcedFrames, forcedFrameMs: 60, spanSamples, lowest: Number.isFinite(lowest) ? Number(lowest.toFixed(2)) : null };
 }
 
 const rows = /** @type {Record<string, any>[]} */ ([]);

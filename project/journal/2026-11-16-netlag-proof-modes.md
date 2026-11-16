@@ -12,8 +12,18 @@ Bridge-only mode now runs the actual Driftwood route and forced
 60 ms frames without producing frame, rate or interpolation verdicts.
 It records correction counts, forced draws and observations inside
 the span. Missing telemetry, unexercised reconciliation, no rendered
-slow frames, a fall or a missed route cannot qualify B4. The existing
-native regression separately injects owner-position errors.
+slow frames, a fall or a missed route cannot qualify B4.
+
+Review caught a vacuous dependency on natural corrections. The proof
+now captures the main NetClient via the existing bot debug surface,
+ends that temporary bot immediately, and restores its one-shot public
+render-observer hook. Public frame observers replace only the latest
+owner block with a copied block 0.3 m lower outbound and 1 m lower on
+return. Saved wire frames stay intact. Each injection counts only
+after the predictor's correction observer confirms that exact tick.
+This works when a batch discards older packets and needs no shipped
+gameplay switch. A serialized-hook regression proves copy isolation,
+newest-block selection, confirmation and observer cleanup.
 
 The timeout scale affects only startup and route waits. It leaves
 physics, the 180 ms link, the timed phase length and all B1/B2/B3

@@ -85,7 +85,10 @@ function cross(delay: number, sprint: boolean, sink: number, frameMs = 1000 / 60
       // Fixed simulation stays at 60 Hz; owner messages are delivered only at drawn-frame boundaries.
       if (tick + 1 >= Math.floor(nextDelivery * 60 / 1000 + 1e-6)) {
         maxBatch = Math.max(maxBatch, waiting.length);
-        for (const frame of waiting.splice(0)) {
+        const frame = waiting.at(-1);
+        waiting.length = 0;
+        // NetPlayer compares the newest owner block once, discarding older packets in this batch.
+        if (frame !== undefined) {
           if (sink !== 0 && !sunk && player.position.x > (A.x + B.x) / 2 - 3) { frame.owner[PY] = (frame.owner[PY] ?? 0) - sink; sunk = true; }
           world.frame(frame.tick, frame.seq);
           predictor.reconcile(frame.seq, frame.owner);
