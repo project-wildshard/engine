@@ -133,17 +133,19 @@ function serverPackReader(root: string, slug: string, build: () => string, sourc
  * P1-E5.2: the worker's product reader, loadHeadlessProduct over `fetch`. It verifies the same index, sizes and SHA-256
  * addresses with the same checks; only where the bytes come from differs.
  */
-export function fetchServerProduct(base: string, rapier: Rapier, held?: HeldRead, patch?: (shard: Shardfile) => Shardfile): Promise<HeadlessRuntimeInput> {
-  return readServerProduct(new URL(base, globalThis.location.href).href, workerBuild, serverBytes, rapier, held, undefined, patch);
+export function fetchServerProduct(base: string, rapier: Rapier, held?: HeldRead, patch?: (shard: Shardfile) => Shardfile, ownServer = false): Promise<HeadlessRuntimeInput> {
+  return readServerProduct(new URL(base, globalThis.location.href).href, workerBuild, serverBytes, rapier, held, undefined, patch, ownServer);
 }
 /** A shard's server inputs under `root`, whichever server is reading: `source` is what differs. `hash`, a placed slug's shardfile (SA47),
  *  lets a slug the build's book lacks open from the cook's index. `patch` (DEVSERVER, SHARD-SOURCE AP19: `withDevGameplay`) changes
  *  the read shardfile before the product is made of it. */
-export async function readServerProduct(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead, hash?: string, patch?: (shard: Shardfile) => Shardfile): Promise<HeadlessRuntimeInput> {
+export async function readServerProduct(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead, hash?: string, patch?: (shard: Shardfile) => Shardfile, ownServer = false): Promise<HeadlessRuntimeInput> {
   const slug = new URL('.', root).pathname.split('/').at(-2) ?? '';
   // C2: all of it is in the pack this build's book names, the server class only there (J91). The page lends what it holds
   // (DL25), so that moves no bytes. A host with no book, or one offline after a new build, reads what the device kept.
-  const serverFile = serverPackReader(root, slug, build, source, hash);
+  // NB19: an author's own inline candidate has no pack yet (the book names the pinned revision's): it is read beside `root`,
+  // and every byte is still verified against its descriptor below.
+  const serverFile = ownServer ? (path: string): Promise<Uint8Array> => source(new URL(path, root), path) : serverPackReader(root, slug, build, source, hash);
   const read = async (path: string): Promise<Uint8Array> => {
     if (path.startsWith('server/')) return serverFile(path);
     const url = new URL(path, root), lent = await held?.(url.href);

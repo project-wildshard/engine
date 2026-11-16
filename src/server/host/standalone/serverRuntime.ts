@@ -15,6 +15,8 @@ export interface ServerWorkerStart {
   readonly goto: string | null;
   /** ZE10b: where in `goto` a gate's zone entry arrives (the cell's own frame), or null */
   readonly enter?: { readonly x: number; readonly z: number; readonly yaw: number } | null;
+  /** NB19: the page's own inline candidate, whose server files are read beside it (shell.ts `ownServer`), or null. */
+  readonly ownServer?: string | null;
 }
 
 /** Physics, once, from the page's own copy where it holds one (DL25). */
@@ -26,6 +28,9 @@ const rapierOf = (held: HeldRead | undefined): Promise<Rapier> => {
   })();
   return physics;
 };
+
+/** NB19: whether `cell` is the page's own inline candidate, whose server files are read beside it (shell.ts `ownServer`). */
+const ownsServer = (start: ServerWorkerStart, cell: string): boolean => typeof start.ownServer === 'string' && start.ownServer === cell;
 
 // P1-E5.2 (J49): the module worker every standalone target boots. There is no main-thread path to this code. The page
 // hands over the control port, the game port, the harness's and, on a page with a download, the port for what it holds, once;
@@ -39,7 +44,7 @@ export function runServerWorker(event: MessageEvent<unknown>): void {
   const [control, game, harness, reads] = event.ports;
   if (control === undefined || game === undefined) return;
   const held = reads === undefined ? undefined : askHeldReads(reads);
-  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, ...typeof start.goto === 'string' && start.enter !== undefined && start.enter !== null ? { enter: start.enter } : {}, load: async (boot, slug, patch) => fetchServerProduct(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held), held, patch),
+  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, ...typeof start.goto === 'string' && start.enter !== undefined && start.enter !== null ? { enter: start.enter } : {}, load: async (boot, slug, patch) => fetchServerProduct(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held), held, patch, ownsServer(start, slug)),
     strips: boot => fetchGridCollision(boot.base),
     onSaveRefused: error => { console.warn('Standalone save refused, falling back', error); } });
 }

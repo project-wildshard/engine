@@ -480,6 +480,13 @@ async function installInPageEntry(): Promise<void> {
   Reflect.set(window, '__wildshardZonePending', zoneEntryPending);
 }
 
+/** NB19: the inline candidate's discovery document, read where the page serves it. */
+async function readJson(url: string): Promise<unknown> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Inline hybrid discovery answered ${response.status}`);
+  return JSON.parse(await response.text());
+}
+
 async function startSelected(): Promise<void> {
   const selected = bootAwait('app:selected-discovery', import('./shardSelection').then(async selection => {
     await selection.prepareSelectedShard();
@@ -558,7 +565,7 @@ async function startSelected(): Promise<void> {
     starterModule, hoverboardModule, voicesModule, boarModule, familiesModule, sourceModule, runtimeModule,
     gridEntryModule, pathsModule, prefetchModule])));
   const [{ sharedWeaponVoices, declaredWeaponVoices }, { BOAR_LOOK }, { declaredKitItemFamilies, declaredItemIcon },
-    { configuredShardfile, installShardfileProduct, installManifestShardfile, preparePageResidency }, { browserShardfileOptions },
+    { configuredShardfile, installShardfileProduct, installManifestShardfile, preparePageResidency, inlineHybridArrival, selectInlineHybrid }, { browserShardfileOptions },
     { pageGridRecovery }, { loadingPath }, { gridPrefetchStatus }] = await Promise.all([
     voicesModule, boarModule, familiesModule, sourceModule, runtimeModule, gridEntryModule, pathsModule,
     prefetchModule,
@@ -568,8 +575,12 @@ async function startSelected(): Promise<void> {
   try {
     imports.check();
     loading.setPrefetchSource(gridPrefetchStatus);
-    const source = pageGridRecovery() === null ? await bootTask('app:product-source-and-read', () => configuredShardfile(document, browserShardfileOptions(document.baseURI, inlineOwner))) : null;
-    page = preparePageResidency(arrival, source?.identity.slug);
+    const inline = pageGridRecovery() === null ? await bootTask('app:product-source-and-read', () => configuredShardfile(document, browserShardfileOptions(document.baseURI, inlineOwner))) : null;
+    // NB19: an inline candidate that declares a runtime enters as the catalogue enters it, by its own discovery's
+    // client-plan entry; only a page that owns its inline candidate may (inlineHybridArrival), and the bare inline path refuses.
+    const hybrid = inline === null ? null : await inlineHybridArrival(inline, browserShardfileOptions(document.baseURI, inlineOwner), readJson);
+    const source = hybrid === null ? inline : null, admitted = hybrid ?? arrival;
+    page = preparePageResidency(admitted, source?.identity.slug);
     // The script memory bank, sized by route: each reserve can cost JSC a full GC (e472f34069), so a grid page reserves
     // the full-ALL route's demand for its cell activations in play, and a standalone page, which builds its one world under
     // the loader, a few. NINE-DRAGON-BENCHMAX NB4: Nine's standalone page took 1 of the 45 by control and after play
@@ -591,6 +602,7 @@ async function startSelected(): Promise<void> {
       detail: { memoryTurns, memoryWaitMs, grid } });
     await packs.ready();
     await completePageCatalogue(page.mode, catalogue?.ready);
+    if (hybrid !== null) selectInlineHybrid(hybrid);
     const path = page.mode === 'grid' ? 'grid' : 'shardfile';
     if (path === 'shardfile') modules('client');
     if (path === 'grid') modules('grid');
@@ -607,7 +619,7 @@ async function startSelected(): Promise<void> {
     // DL11: setup overlaps the download (each read waits for its own file); control waits for the whole set (finish.ts)
     if (spawnJob !== null) await waitFor('Spawn download', spawnJob.listed ?? spawnJob.ready, 'file');
     const manifest = await bootAwait('app:product-admission', source === null
-      ? installManifestShardfile(arrival, { ...browserShardfileOptions(document.baseURI, true), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready)
+      ? installManifestShardfile(admitted, { ...browserShardfileOptions(document.baseURI, true), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready)
       : installShardfileProduct(source, { ...browserShardfileOptions(document.baseURI, inlineOwner), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready));
     // Keep the seam out of code and descriptor admission; world construction
     // can overlap this read and retains its original full-geometry barrier.

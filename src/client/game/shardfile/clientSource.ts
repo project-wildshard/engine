@@ -24,6 +24,8 @@ import { game } from '../shard/registry';
 import { installShards, shards } from '../shard/list';
 import type { ShardManifest } from '../shard/manifest';
 import { toLevelSpec } from '../shard/spec';
+import { shardFromDiscovery } from '../shard/discovery';
+import { ownInlineCandidate } from './inlineOwner';
 import { productPaintedLook } from '../looks/paintedLook';
 import { emptyLook } from './emptyLook';
 import { shardfileLook } from './look';
@@ -135,6 +137,44 @@ export async function installShardfileProduct(input: unknown, providedOptions: P
   if (prepared !== undefined) await prepared();
   const source = clientSource(admitted, options, bindings);
   return selectSource(source, options.firstParty);
+}
+
+/**
+ * NINE-DRAGON-BENCHMAX NB19 (mini QA 11-16 row 42): the page that owns its author's inline candidate (`wildshard dev`,
+ * `wildshard prepare`; entry.ts `inlineOwner`) composes the candidate's declared runtime the way a catalogue page composes
+ * the published shard: through the candidate's own discovery document (C3), read same-origin where a release serves it,
+ * whose entry is the data-only client-plan entry (discovery.ts `planEntry`, as `prepareClientPlanShard` admits it). The
+ * caller enters the returned manifest by `installManifestShardfile`, as a catalogue arrival.
+ *
+ * Trust is unchanged: `installShardfileProduct` still refuses every runtime, so does every page that does not own its
+ * inline candidate (a released page's inline product is never first-party), and a candidate whose discovery names no
+ * client-plan entry, another identity or another descriptor. Returns null when the candidate declares no runtime.
+ */
+export async function inlineHybridArrival(source: Shardfile, options: Pick<ProductOptions, 'base' | 'firstParty'>,
+  read: (url: string) => Promise<unknown>, discover: (document: unknown) => ShardManifest = shardFromDiscovery): Promise<ShardManifest | null> {
+  if (source.runtime === null) return null;
+  if (!options.firstParty) throw new Error('Custom runtime requires trusted hybrid composition');
+  const { slug: folder } = source.identity;
+  if (!/^[a-z0-9][a-z0-9-]*$/u.test(folder)) throw new Error('Inline hybrid identity is not a shard folder');
+  const url = new URL(`/shardfiles/${folder}/discovery.json`, options.base);
+  const document = await read(url.href);
+  const native = typeof document === 'object' && document !== null ? Reflect.get(document, 'native') : undefined;
+  const load = typeof native === 'object' && native !== null ? Reflect.get(native, 'load') : undefined;
+  if (typeof load !== 'object' || load === null || Reflect.get(load, '$call') !== 'planEntry') throw new Error('Inline hybrid requires its discovery client-plan entry');
+  const manifest = discover(document), discoveredIdentity = manifest.slug.replace(/^_/u, '');
+  if (discoveredIdentity !== folder) throw new Error('Inline hybrid discovery identity differs');
+  const descriptor = manifest.gridShardfile === undefined ? undefined : new URL(manifest.gridShardfile, options.base);
+  if (manifest.shardfile !== undefined || descriptor === undefined || descriptor.origin !== url.origin
+    || descriptor.pathname !== `/shardfiles/${folder}/shard.json` || descriptor.search !== '' || descriptor.hash !== '') {
+    throw new Error('Inline hybrid discovery must name its own same-origin descriptor');
+  }
+  return manifest;
+}
+
+/** Make an inline hybrid arrival (`inlineHybridArrival`) the selected shard, as catalogue selection does before admission. */
+export function selectInlineHybrid(manifest: ShardManifest): ShardManifest {
+  ownInlineCandidate(manifest.slug.replace(/^_/u, ''));
+  return selectSource(manifest, true);
 }
 
 function selectSource(source: ShardManifest, firstParty: boolean): ShardManifest {

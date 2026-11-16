@@ -44,6 +44,9 @@ export interface StandaloneConfig {
   readonly name?: string;
   /** A one-shard page: the server runs this cell alone, with no road and no walls (GC36). */
   readonly lone?: true;
+  /** NB19: `slug` is the page's own inline candidate (`wildshard dev`, `wildshard prepare`): its server files are read beside
+   *  `base`, hash-verified, not from this build's book, which names only the pinned revision. */
+  readonly ownServer?: true;
   /** J311: a grid page's Shard select pick (a cell instance): the server starts the session in that cell. */
   readonly goto?: string;
   /** ZE10b: where in `goto` a gate's zone entry arrives, in the cell's own frame */
@@ -207,7 +210,7 @@ export function startStandalone(config: StandaloneConfig): StandaloneShell {
   // C3: the page's catalogue, read at boot, is the worker's too; it has no document to read it from. So are its build's
   // verdicts, which a worker's reads ask for as the page's do (they are stamped into the document, and into nothing else).
   bootMark('worker:configuration-send');
-  worker.postMessage({ catalogue: installedCatalogue() ?? null, validator: Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__') ?? null, verdicts: Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__') ?? null, goto: config.goto ?? null, enter: config.enter ?? null } satisfies ServerWorkerStart,
+  worker.postMessage({ catalogue: installedCatalogue() ?? null, validator: Reflect.get(globalThis, '__WS_SHARDFILE_VALIDATOR__') ?? null, verdicts: Reflect.get(globalThis, '__WS_SHARDFILE_VERDICTS__') ?? null, goto: config.goto ?? null, enter: config.enter ?? null, ownServer: config.ownServer === true ? config.slug : null } satisfies ServerWorkerStart,
     [control.port2, game.port2, harness.port2, ...reads === undefined ? [] : [reads.port2]]);
   if (reads !== undefined && config.held !== undefined) answerHeldReads(reads.port1, config.held);
   // The worker sits beside this module, so an emitted module's `/b/<build>/` folder is the server's real build (J57).
