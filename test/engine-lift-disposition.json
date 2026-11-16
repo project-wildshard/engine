@@ -11899,7 +11899,7 @@
     "originalTests": [
       "a reload choice answers pointerup without applying or navigating until the explicit button",
       "undoing a staged choice clears it and keyboard clicks remain available",
-      "SR11: the title panel is the in-game tabs, and a quality pick reloads once from Graphics \u25b8 Reload now",
+      "SR11: the title panel is the in-game tabs, and a quality pick reloads once from Graphics ▸ Reload now",
       "retired diagnostics are absent while Clear downloads remains in Developer",
       "storage lives under Clear downloads rather than a diagnostic row"
     ],
@@ -11952,7 +11952,7 @@
     ],
     "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
     "sourceBlob": "f7c203ee2c508cee95932bc4d1ae19f9101ad4b6",
-    "retirementProof": "No cases retired. Full pinned carried quest envelope, exact named prop geometry and original ABI1 Kokpar Wasm lent to its original scope; player carrier, cadence/effects, owner replacement/retirement and hostile admission controls unchanged."
+    "retirementProof": "No cases retired. Full pinned carried quest envelope, exact named prop geometry and original ABI1 Kokpar Wasm lent to its original scope; player carrier, cadence/effects, owner replacement/retirement and hostile admission controls unchanged. Original predecessor makeCarriedQuestRows input is replaced by the complete pinned product quests/carried.json envelope. The original all-Nalati module loan is narrowed to the sole Kokpar ABI1 module used by these cases; every original assertion and the exact module identity remain."
   },
   {
     "repo": "engine",
@@ -11969,7 +11969,7 @@
     ],
     "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
     "sourceBlob": "0b8832171486f3d701bd6d60d69fa129e43088b3",
-    "retirementProof": "No cases retired. Both original texture-free GLBs frozen byte-for-byte; native Three GLTFLoader/MeshoptDecoder replaces SDK readSourceModel, which used that same parser after removing texture declarations (these sources have none). All rig, materials, glow, socket, clone and swimming assertions unchanged."
+    "retirementProof": "No cases retired. Both original texture-free GLBs frozen byte-for-byte; native Three GLTFLoader/MeshoptDecoder replaces SDK readSourceModel, which used that same parser after removing texture declarations (these sources have none). All rig, materials, glow, socket, clone and swimming assertions unchanged. Runtime guard proves both original GLBs have no texture resources, material texture references or texture extensions; animation sampler declarations remain unchanged."
   },
   {
     "repo": "engine",
@@ -11982,7 +11982,7 @@
     ],
     "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
     "sourceBlob": "293263cd62c127074128044de00f79f3aa220366",
-    "retirementProof": "No cases retired. Original helper admitted in engine; real pinned Nine product supplies trusted runtime/native item profiles, exact frozen full Jian presentation and original grapple profile/hooks. Original Sword/EquipmentService/GrappleTool and duplicate entry assertions unchanged."
+    "retirementProof": "No cases retired. Original helper admitted in engine; real pinned Nine product supplies trusted runtime/native item profiles, exact frozen full Jian presentation and original grapple profile/hooks. Original Sword/EquipmentService/GrappleTool and duplicate entry assertions unchanged. Serve the complete original headlessConstants JSON bytes (including spawnY, portalRide and pieces), preserving irrelevant-field admission coverage; parsed grapple fields are only used to form enteredRows."
   },
   {
     "repo": "engine",

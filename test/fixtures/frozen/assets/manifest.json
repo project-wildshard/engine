@@ -102,56 +102,71 @@
     "product-crate-2.glb": {
       "bytes": 1920,
       "sha256": "0bf316c08c54723164ae4a28c544c0a0531488a1f4b1e52b7a7293833c9447e8",
+      "sourceRepository": "project-wildshard/sharddev",
       "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af"
     },
     "product-crate-8.glb": {
       "bytes": 1920,
       "sha256": "b5f8f76428d4f86ddf9dfa581cb1fc75bc6bc666a2e72c77922357bce642d2c7",
+      "sourceRepository": "project-wildshard/sharddev",
       "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af"
     },
     "product-crate.ktx2": {
       "bytes": 237,
       "sha256": "d4ceb5d869ced6199f5f1ca51433594f06dbc027c1ce4330e5fa5d432cb15cdb",
+      "sourceRepository": "project-wildshard/sharddev",
       "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af"
     },
     "product-crate-phone.ktx2": {
       "bytes": 237,
       "sha256": "9e69844fefab6201a96f2bb67466884c58de8264fdb1eb040b56d7902aa20e43",
+      "sourceRepository": "project-wildshard/sharddev",
       "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af"
     },
     "kokpar.wasm": {
       "bytes": 10468,
       "sha256": "9b537d68433363e0ab4e432ef35f73fcd799638b31be7c83d0a499042ef3557f",
       "sourcePin": "nalati-grasslands",
-      "sourceName": "quests/carried.json",
-      "sourceSha256": "793707b1f09380d5eb349dcaa5c061cf3f7f8a29c4efea886f8c7a71ced5491e"
+      "sourceName": "blobs/wasm/9b537d68433363e0ab4e432ef35f73fcd799638b31be7c83d0a499042ef3557f.wasm",
+      "sourceSha256": "9b537d68433363e0ab4e432ef35f73fcd799638b31be7c83d0a499042ef3557f",
+      "pinManifestSha256": "87a917080511e4d7e5f04e36dea2e54d9dc10af5624f5ce461036fa6234e65b6"
     },
     "carried-prop.bin": {
       "bytes": 14904,
       "sha256": "ec1282219cd79471dbbdfa8d58e801ebb4b95e73d44106f7e325eb0fc9028440",
       "sourcePin": "nalati-grasslands",
       "sourceName": "models/specimens/quest-prop.bin",
-      "sourceSha256": "ec1282219cd79471dbbdfa8d58e801ebb4b95e73d44106f7e325eb0fc9028440"
+      "sourceSha256": "ec1282219cd79471dbbdfa8d58e801ebb4b95e73d44106f7e325eb0fc9028440",
+      "pinManifestSha256": "87a917080511e4d7e5f04e36dea2e54d9dc10af5624f5ce461036fa6234e65b6"
     },
     "driftwood-arms.glb": {
       "bytes": 373240,
       "sha256": "2c233b8c91c82a26c8fbfd3867095cbfec6cec81caa9bd9a12b243075236550a",
-      "sourceRepository": "project-wildshard/engine",
-      "sourceCommit": "b3d31d608f9cad04407e066416b80e670de19471",
-      "sourcePath": "public/assets/models/driftwood-fp/fp-arms.glb"
+      "sourceRepository": "project-wildshard/shard-driftwood",
+      "sourceCommit": "8ad490a25575918000d41aa698a02fcc03c14178",
+      "sourcePath": "public/assets/models/driftwood-fp/fp-arms.glb",
+      "sourcePin": "driftwood-isle",
+      "sourceName": "mounts/assets/models/driftwood-fp/fp-arms.glb",
+      "sourceSha256": "2c233b8c91c82a26c8fbfd3867095cbfec6cec81caa9bd9a12b243075236550a",
+      "pinManifestSha256": "8ea1cd38748ff98926a027c20a9cfe93d9a5dbc179d7c0bdad03e1bc4bf0c41c"
     },
     "nine-arms.glb": {
       "bytes": 2478580,
       "sha256": "def60ea43b2168097fbc3e61875d08d322740762e94d820fa8979d15a992a0f8",
-      "sourceRepository": "project-wildshard/engine",
-      "sourceCommit": "b3d31d608f9cad04407e066416b80e670de19471",
-      "sourcePath": "public/assets/nine-dragon/viewmodel/fp-rig.glb"
+      "sourceRepository": "project-wildshard/shard-nine-dragon",
+      "sourceCommit": "92aa2be264066f87d3f0af43bf4fd3b287cd36d3",
+      "sourcePath": "public/assets/nine-dragon/viewmodel/fp-rig.glb",
+      "sourcePin": "nine-dragon-stack",
+      "sourceName": "mounts/assets/nine-dragon/viewmodel/fp-rig.glb",
+      "sourceSha256": "def60ea43b2168097fbc3e61875d08d322740762e94d820fa8979d15a992a0f8",
+      "pinManifestSha256": "69d28eb86473b67b76c3bcfbb2dbe83483ad751c3f144d1230c90b084e75cc25"
     }
   },
   "exportRecipes": {
     "export-assets.mjs": "import {writeFileSync,mkdirSync} from 'node:fs';\nimport {BoxGeometry,MeshStandardMaterial,MeshBasicMaterial,BufferGeometry,BufferAttribute,Matrix4} from 'three';\nimport {staticGlb} from '@wildshard/sharddev/bake/glb';\nimport {bakeRawColourPixels} from '@wildshard/sharddev/bake/rawTexture';\nconst dir='test/fixtures/frozen/assets';mkdirSync(dir,{recursive:true});\nconst put=(name,rows)=>{writeFileSync(`${dir}/${name}.glb`,staticGlb(rows));for(const row of rows){row.geometry.dispose();row.material.dispose();}};\nfor(const [file,name,native,width,height,depth,colour] of [\n ['hero','hero',true,1,2,3,0x345678],['hull','source',true,1,2,3,0x345678],\n ['specimen','specimen',false,1,1,1,0xffffff],['bound-specimen','bound-specimen',false,1,1,1,0xffffff],['retry-specimen','retry-specimen',false,1,1,1,0xffffff]])\n put(file,[{name,geometry:new BoxGeometry(width,height,depth),material:new MeshStandardMaterial({color:colour}),...(native?{nativeAttributes:true}:{})}]);\nconst triangle=()=>new BufferGeometry().setAttribute('position',new BufferAttribute(new Float32Array([0,0,0,1,0,0,0,1,0]),3));\nconst scene=triangle();scene.setAttribute('normal',new BufferAttribute(new Float32Array([0,0,1,0,0,1,0,0,1]),3));scene.setAttribute('uv',new BufferAttribute(new Float32Array(6),2));put('scene',[{geometry:scene,material:new MeshStandardMaterial(),nativeAttributes:true}]);\nfor(const part of ['draw','other'])for(const posed of [false,true]) {\n const shape=triangle();shape.setAttribute('normal',new BufferAttribute(new Float32Array([0,0,2,0,0,2,0,0,2]),3));\n put(`whole-${part}-${posed?'posed':'plain'}`,[{geometry:shape,material:new MeshBasicMaterial(),nativeAttributes:true,transform:posed?new Matrix4().makeTranslation(3,2,1):new Matrix4(),extras:{wholePartition:{id:part,vertices:{runs:[0,3]},triangles:{runs:[0,1]},vertexCount:3,indexCount:0,index:'none'}}}]);\n}\nconst pixels=Uint8ClampedArray.from({length:8*4*4},(_,index)=>(index*31+17)%256);\nfor(const colourSpace of ['srgb','linear'])writeFileSync(`${dir}/raw-${colourSpace}.ktx2`,bakeRawColourPixels({width:8,height:4,pixels},{colourSpace}));\nfor(let i=0;i<8;i++) {\n const part=`phase-${i}`,shape=triangle();shape.setAttribute('normal',new BufferAttribute(new Float32Array([0,0,2,0,0,2,0,0,2]),3));\n put(`whole-${part}-plain`,[{geometry:shape,material:new MeshBasicMaterial(),nativeAttributes:true,transform:new Matrix4(),extras:{wholePartition:{id:part,vertices:{runs:[0,3]},triangles:{runs:[0,1]},vertexCount:3,indexCount:0,index:'none'}}}]);\n}\n",
     "ci21-nalati-packed-bodies.txt": "Copy the two original content-addressed blobs from engine out/nalati-grasslands/blobs/bin/<sha256>.bin into nalati-bodies.bin and nalati-balbal-cracks.bin. Source hashes and lengths are in files. The packed body is already zlib-compressed on the wire; preserve these bytes. nalati-species-view.json (H2 frozen envelope) binds the packed body hash/length; original Nalati a0ae32b:test/fixtures/nalati-species-world.ts defines the catalogue/registration/preload setup.",
-    "ci21-product-specimen.mjs": "import {writeFileSync,readFileSync} from 'node:fs';\nimport {createHash} from 'node:crypto';\nimport {BoxGeometry,MeshStandardMaterial} from 'three';\nimport {staticGlb} from '<checkouts>/sharddev/src/sharddev/bake/glb.ts';\nimport {bakeRawColourPixels} from '<checkouts>/sharddev/src/sharddev/bake/rawTexture.ts';\nconst dir='test/fixtures/frozen/assets',manifest=JSON.parse(readFileSync(dir+'/manifest.json','utf8'));\nfunction put(name,bytes){writeFileSync(dir+'/'+name,bytes);manifest.files[name]={bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),sourceCommit:'da2a4ddb564db35b5c3bcba4ba1358de92ced1af'};}\nfor(const width of [2,8]){const geometry=new BoxGeometry(width,2,3),material=new MeshStandardMaterial();try{put(`product-crate-${width}.glb`,staticGlb([{name:'crate',geometry,material}]));}finally{geometry.dispose();material.dispose();}}\nconst pixels=Uint8ClampedArray.from({length:32},(_,index)=>(index*37+19)%256);\nput('product-crate.ktx2',bakeRawColourPixels({width:4,height:2,pixels}));\nput('product-crate-phone.ktx2',bakeRawColourPixels({width:4,height:2,pixels:Uint8ClampedArray.from(pixels,value=>255-value)}));\nmanifest.exportRecipes['ci21-product-specimen.mjs']=readFileSync('tmp/codex-tc48/export-assets.mjs','utf8').replaceAll('<checkouts>/','<checkouts>/');\nwriteFileSync(dir+'/manifest.json',JSON.stringify(manifest,null,2)+'\\n');\n",
-    "ci21-engine-tail-pins.py": "import json,hashlib,subprocess\nfrom pathlib import Path\nbase=Path('test/fixtures/frozen');runtime=json.loads((base/'runtime-manifest.json').read_text());assets=json.loads((base/'assets/manifest.json').read_text())\ndef snapshot(name,value,provenance):\n b=(json.dumps(value,separators=(',',':'),ensure_ascii=False)+'\\n').encode();(base/name).write_bytes(b);runtime['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\ndef blob(name,b,provenance):\n (base/'assets'/name).write_bytes(b);assets['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\ndef named(slug,name):\n root=Path('out')/slug;d=json.loads((root/'shard.json').read_text());f=next(f for f in d['files'] if f.get('name')==name);b=(root/f['path']).read_bytes();assert hashlib.sha256(b).hexdigest()==f['hash'];return b,{'sourcePin':slug,'sourceName':name,'sourceSha256':f['hash']}\nb,p=named('nalati-grasslands','quests/carried.json');carried=json.loads(b);snapshot('carried-quest.json',carried,p)\nh=carried['program']['script']['module'];blob('kokpar.wasm',Path('out/nalati-grasslands',h).read_bytes(),p)\nb,p=named('nalati-grasslands','models/specimens/quest-prop.bin');blob('carried-prop.bin',b,p)\nb,p=named('nalati-grasslands','world/dressing-phone.json');row=next(r for r in json.loads(b)['instances'] if r['id']=='nalati-kokpar-riders');snapshot('kokpar-riders.json',row,p)\nsnapshot('kokpar-layout.json',{'x':-61,'z':36,'rx':34,'rz':22,'rot':.25},{'sourceRepository':'project-wildshard/shard-nalati','sourceCommit':subprocess.check_output(['git','-C','<checkouts>/shard-nalati','rev-parse','HEAD'],text=True).strip(),'sourcePath':'src/generators/layout.ts KOKPAR'})\nb,p=named('nine-dragon-stack','weapons/jian-row.json');snapshot('nine-held-presentation.json',json.loads(b),p)\nfor name,path in [('driftwood-arms.glb','public/assets/models/driftwood-fp/fp-arms.glb'),('nine-arms.glb','public/assets/nine-dragon/viewmodel/fp-rig.glb')]:\n blob(name,Path(path).read_bytes(),{'sourceRepository':'project-wildshard/engine','sourceCommit':'b3d31d608f9cad04407e066416b80e670de19471','sourcePath':path})\nrecipe=Path('tmp/codex-tc48/export-pins.py').read_text().replace('<checkouts>/','<checkouts>/')\nruntime['exportRecipes']['ci21-engine-tail-pins.py']=recipe;assets['exportRecipes']['ci21-engine-tail-pins.py']=recipe\n(base/'runtime-manifest.json').write_text(json.dumps(runtime,indent=2)+'\\n');(base/'assets/manifest.json').write_text(json.dumps(assets,indent=2)+'\\n')\n"
-  }
+    "ci21-product-specimen.mjs": "import {writeFileSync,readFileSync} from 'node:fs';\nimport {createHash} from 'node:crypto';\nimport {BoxGeometry,MeshStandardMaterial} from 'three';\nimport {staticGlb} from '<checkouts>/sharddev/src/sharddev/bake/glb.ts';\nimport {bakeRawColourPixels} from '<checkouts>/sharddev/src/sharddev/bake/rawTexture.ts';\nconst dir='test/fixtures/frozen/assets',manifest=JSON.parse(readFileSync(dir+'/manifest.json','utf8'));\nfunction put(name,bytes){writeFileSync(dir+'/'+name,bytes);manifest.files[name]={bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),sourceRepository:'project-wildshard/sharddev',sourceCommit:'da2a4ddb564db35b5c3bcba4ba1358de92ced1af'};}\nfor(const width of [2,8]){const geometry=new BoxGeometry(width,2,3),material=new MeshStandardMaterial();try{put(`product-crate-${width}.glb`,staticGlb([{name:'crate',geometry,material}]));}finally{geometry.dispose();material.dispose();}}\nconst pixels=Uint8ClampedArray.from({length:32},(_,index)=>(index*37+19)%256);\nput('product-crate.ktx2',bakeRawColourPixels({width:4,height:2,pixels}));\nput('product-crate-phone.ktx2',bakeRawColourPixels({width:4,height:2,pixels:Uint8ClampedArray.from(pixels,value=>255-value)}));\nmanifest.exportRecipes['ci21-product-specimen.mjs']=readFileSync('tmp/codex-tc48/export-assets.mjs','utf8').replaceAll('<checkouts>/','<checkouts>/');\nwriteFileSync(dir+'/manifest.json',JSON.stringify(manifest,null,2)+'\\n');\n",
+    "ci21-engine-tail-pins.py": "import json,hashlib,subprocess\nfrom pathlib import Path\nbase=Path('test/fixtures/frozen');runtime=json.loads((base/'runtime-manifest.json').read_text());assets=json.loads((base/'assets/manifest.json').read_text())\ndef snapshot(name,value,provenance):\n b=(json.dumps(value,separators=(',',':'),ensure_ascii=False)+'\\n').encode();(base/name).write_bytes(b);runtime['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\ndef blob(name,b,provenance):\n (base/'assets'/name).write_bytes(b);assets['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\ndef named(slug,name):\n root=Path('out')/slug;d=json.loads((root/'shard.json').read_text());f=next(f for f in d['files'] if f.get('name')==name);b=(root/f['path']).read_bytes();assert hashlib.sha256(b).hexdigest()==f['hash'];return b,{'sourcePin':slug,'sourceName':name,'sourceSha256':f['hash'],'pinManifestSha256':hashlib.sha256((root/'shard.json').read_bytes()).hexdigest()}\ndef rawSnapshot(name,b,provenance):\n (base/name).write_bytes(b);runtime['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\nb,p=named('nalati-grasslands','quests/carried.json');carried=json.loads(b);rawSnapshot('carried-quest.json',b,p)\nh=carried['program']['script']['module'];wire=Path('out/nalati-grasslands',h).read_bytes();blob('kokpar.wasm',wire,{**p,'sourceName':h,'sourceSha256':hashlib.sha256(wire).hexdigest()})\nb,p=named('nalati-grasslands','models/specimens/quest-prop.bin');blob('carried-prop.bin',b,p)\nb,p=named('nalati-grasslands','world/dressing-phone.json');rawSnapshot('nalati-dressing-phone.json',b,p);runtime['files'].pop('kokpar-riders.json',None)\nsnapshot('kokpar-layout.json',{'x':-61,'z':36,'rx':34,'rz':22,'rot':.25},{'sourceRepository':'project-wildshard/shard-nalati','sourceCommit':subprocess.check_output(['git','-C','<checkouts>/shard-nalati','rev-parse','HEAD'],text=True).strip(),'sourcePath':'src/generators/layout.ts KOKPAR'})\nb,p=named('nine-dragon-stack','weapons/jian-row.json');rawSnapshot('nine-held-presentation.json',b,p)\nfor name,path in [('driftwood-arms.glb','public/assets/models/driftwood-fp/fp-arms.glb'),('nine-arms.glb','public/assets/nine-dragon/viewmodel/fp-rig.glb')]:\n slug,repo=('driftwood-isle','shard-driftwood') if name.startswith('driftwood') else ('nine-dragon-stack','shard-nine-dragon')\n root=Path('out')/slug;wire=(root/'mounts'/path.removeprefix('public/')).read_bytes();rev=subprocess.check_output(['git','-C','<checkouts>/'+repo,'rev-parse','HEAD'],text=True).strip()\n original=subprocess.check_output(['git','-C','<checkouts>/'+repo,'show',rev+':'+path]);assert wire==original\n blob(name,wire,{'sourceRepository':'project-wildshard/'+repo,'sourceCommit':rev,'sourcePath':path,'sourcePin':slug,'sourceName':'mounts/'+path.removeprefix('public/'),'sourceSha256':hashlib.sha256(wire).hexdigest(),'pinManifestSha256':hashlib.sha256((root/'shard.json').read_bytes()).hexdigest()})\nrecipe=Path('tmp/codex-tc48/export-pins.py').read_text().replace('<checkouts>/','<checkouts>/')\nruntime['exportRecipes']['ci21-engine-tail-pins.py']=recipe;assets['exportRecipes']['ci21-engine-tail-pins.py']=recipe\n(base/'runtime-manifest.json').write_text(json.dumps(runtime,indent=2)+'\\n');(base/'assets/manifest.json').write_text(json.dumps(assets,indent=2)+'\\n')\n"
+  },
+  "recipePathConvention": "Local checkout prefixes in recorded recipes are replaced with <checkouts>; expand this placeholder before replay. Recipes write complete provenance entries using actual git revisions."
 }

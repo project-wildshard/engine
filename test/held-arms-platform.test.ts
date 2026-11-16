@@ -17,6 +17,25 @@ import { heldArmsGear } from '../src/client/game/models/heldGear';
 import { RigArms } from '../src/client/game/systems/viewmodel/rigArms';
 import { ARM_CLIPS, armClipNames } from '../src/client/game/systems/viewmodel/armClips';
 
+/** The original SDK adapter stripped textures before using this same native parser.
+ * These pinned sources have no texture declarations, so parse their exact bytes. */
+function originalRig(name: string): Uint8Array<ArrayBuffer> {
+  const bytes = frozenAsset(name), jsonLength = new DataView(bytes.buffer).getUint32(12, true);
+  const document: unknown = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength)));
+  if (typeof document !== 'object' || document === null || ['textures', 'images', 'samplers'].some(key => Object.hasOwn(document, key))) throw new Error('Frozen original rig has texture resources');
+  function textureFree(value: unknown): void {
+    if (Array.isArray(value)) { for (const row of value) textureFree(row); return; }
+    if (typeof value !== 'object' || value === null) return;
+    for (const [key, field] of Object.entries(value)) {
+      if (key.endsWith('Texture')) throw new Error('Frozen original rig has texture declarations');
+      if ((key === 'extensionsUsed' || key === 'extensionsRequired') && Array.isArray(field)
+        && field.some((extension: unknown) => typeof extension === 'string' && /texture|basisu/iu.test(extension))) throw new Error('Frozen original rig has texture extensions');
+      textureFree(field);
+    }
+  }
+  textureFree(document); return bytes;
+}
+
 // A fictional harbour look uses the native rig loader and resolver. Spies observe the file/compiler
 // seams; neither seam is a parameter of the held host's public API.
 type Looks = Awaited<ReturnType<typeof lookCompiler.runtimeLookMaterials>>;
@@ -48,7 +67,7 @@ let queuedLooks: Looks[] = [];
 
 beforeEach(() => {
   vi.spyOn(rigLoader, 'loadRigFile').mockImplementation(async () => {
-    const source = { gltf: await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(frozenAsset('driftwood-arms.glb').buffer, '') };
+    const source = { gltf: await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(originalRig('driftwood-arms.glb').buffer, '') };
     const root = source.gltf.scene.getObjectByName('vm_root');
     if (root === undefined) throw new Error('Missing fixture rig root');
     root.userData['rig'] = row.skeleton;
@@ -134,7 +153,7 @@ test('held arms refuse malformed rows and missing catalogue bindings before dres
 
 test('shared rig player preserves the multi-mesh Jian and held grapple clips', async () => {
   vi.mocked(rigLoader.loadRigFile).mockImplementation(() =>
-    new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(frozenAsset('nine-arms.glb').buffer, ''));
+    new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(originalRig('nine-arms.glb').buffer, ''));
   const contract = { skeleton: 'nine-dragon-fp', clips: armClipNames(ARM_CLIPS), sockets: ['R_weapon', 'L_claw'] };
   const bake = { skeleton: contract.skeleton, clips: ARM_CLIPS,
     joints: ['R', 'L'].map(side => ['shoulder', 'upperarm', 'forearm', 'twist1', 'twist2', 'twist3', 'hand'].map(joint => `${side}_${joint}`)) };

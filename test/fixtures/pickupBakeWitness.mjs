@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { zlibSync, unzlibSync } from 'fflate';
 import { authoredPickups } from '@wildshard/engine/game/generators/pickups';
 import { readFileSync } from 'node:fs';
+import { jsonBytes } from '../../scripts/bake-output.mjs';
 import { frozenRuntimeJson } from './frozen/snapshots.ts';
 import { parse, record, string } from 'valibot';
 import { QuestInteractionTableSchema } from '@wildshard/format/questInteractionSource';
@@ -97,6 +98,5 @@ const looks = authoredPickups.map(row => ({ id: row.id, model: row.model, name: 
   parts: row.parts.map(({ geometry: _geometry, ...part }) => part) }));
 const rows = { file: 'src/client/game/generators/pickups.ts', seed, coin: coin.key, geometries, looks,
   banks: [{ file: bankFile, bytes: bankBytes.length, members }] };
-const expected=JSON.parse(readFileSync('src/client/game/data/pickupCatalogue.json','utf8'));
-if(JSON.stringify(rows)!==JSON.stringify(expected))throw new Error('Pickup catalogue differs');
+if(!readFileSync('src/client/game/data/pickupCatalogue.json').equals(jsonBytes(rows)))throw new Error('Pickup catalogue bytes differ');
 console.log(JSON.stringify({ variants: geometries.length, rawBytes, compressedBytes, encodedBytes: 0, legacyEncodedBytes, traces }, null, 2));
