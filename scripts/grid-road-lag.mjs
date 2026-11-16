@@ -6,6 +6,7 @@
 //   scripts/browser-lane.sh node scripts/grid-road-lag.mjs --base=<staging, preview or loopback> --out=<dir> [--home=driftwood|nalati]
 //     [--viewport=2992x1434@2] [--reps=3] [--engine=chromium|webkit] [--run] (sprint) [--device='iPhone 15 Pro'] (a phone: its viewport, touch and agent)
 //     [--profile] (Chromium: the page thread's CPU profile over the first lap, with `at`, its start on the page's clock)
+//     [--online] (a loopback world build, as road-lag-rig.mjs runs it: the walked approach, as on staging)
 // On preview or a loopback page the walker is set 20 m inside the home cell's road-facing entryway by the in-page harness pose; on
 // staging (an online seat can't be placed) only Driftwood is walked to its east entryway from the spawn. Never production (J205).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -22,7 +23,8 @@ const programRow = (r, at) => ({ t: r.t - at, name: r.name, key: r.key, ...(r.ag
 const shifted = (r, at) => ({ ...r, t: r.t - at });
 const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), run = process.argv.includes('--run'), profile = process.argv.includes('--profile'), reps = Number(flag('reps', '3'));
 if (!/^https:\/\/(preview|staging)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: grid-road-lag.mjs --base=<staging, preview or loopback url> --out=<dir> [--home=driftwood|nalati] [--viewport=WxH@dpr] [--reps=n]');
-const online = base.includes('staging');
+// `--online`: a loopback world build's page (road-lag-rig.mjs's local rig), walked as staging is: its seat can't be placed
+const online = base.includes('staging') || process.argv.includes('--online');
 /** Each home's road-facing entryway (the middle of an edge, in the cell's own metres) and the yaw that walks out through it (the
  *  page's motor faces atan2(own - target): +x is -π/2, -x is π/2, +z is π, -z is 0). Driftwood's east faces Nalati, Nalati's west faces Driftwood. */
 const HOMES = /** @type {Record<string, { slug: string, card: string, axis: 'x' | 'z', sign: number, approach: [number, number][] }>} */ ({
@@ -111,9 +113,13 @@ try {
     await page.keyboard.down('ShiftLeft');
     for (const [x, z] of home.approach) {
       await page.keyboard.down('KeyW');
-      for (let ends = Date.now() + 90_000, near = Infinity; Date.now() < ends && near > 3; await sleep(250)) {
+      // a body held by a post or rail (the local rig's fresh seat spawns on Driftwood's pier) hops it: no 0.5 m in a second jumps
+      for (let ends = Date.now() + 90_000, near = Infinity, last = { x: Infinity, z: Infinity, t: Date.now() }; Date.now() < ends && near > 3; await sleep(250)) {
         const at = await sample(); near = Math.hypot(at.x - x, at.z - z); await face(Math.atan2(at.x - x, at.z - z));
+        if (Math.hypot(at.x - last.x, at.z - last.z) >= 0.5) last = { x: at.x, z: at.z, t: Date.now() };
+        else if (Date.now() - last.t > 1000) { await page.keyboard.press('Space'); last.t = Date.now(); }
       }
+      const rows = /** @type {any} */ (result); rows.approach ??= []; rows.approach.push(await sample());
       await page.keyboard.up('KeyW');
     }
     await page.keyboard.up('ShiftLeft');
