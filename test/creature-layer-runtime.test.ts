@@ -66,7 +66,7 @@ test('hunting numbers and health refuse missing, partial and nonfinite values', 
     expect(() => requireHuntTuning(invalid, 'fixture'), key).toThrow('Missing hunting numbers');
   }
   expect(requireHuntTuning(HUNT, 'fixture')).toBe(HUNT);
-  expect(speciesHealth('fixture', 23, 117)).toBe(23);
-  expect(speciesHealth('fixture', undefined, 117)).toBe(117);
-  for (const hp of [undefined, NaN, Infinity, 0, -1]) expect(() => speciesHealth('fixture', hp, undefined)).toThrow('fixture');
+  expect(speciesHealth('fixture', 23, 117, false)).toBe(23);
+  expect(speciesHealth('fixture', undefined, 117, false)).toBe(117);
+  for (const hp of [NaN, Infinity, 0, -1]) expect(() => speciesHealth('fixture', hp, undefined, false)).toThrow('fixture');
 });

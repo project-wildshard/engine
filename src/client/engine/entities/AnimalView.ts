@@ -208,7 +208,7 @@ export class Animal extends AnimalSim {
 constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityId = `creature.${model.kind}.${String(seed)}`) {
     const v = model.variantDef;
     super({ kind: model.kind, label: v.label || model.species.label, variant: v.id, rarity: v.rarity,
-      hp: speciesHealth(model.species.kind, v.hp, model.species.tuning?.hp),
+      hp: speciesHealth(model.species.kind, v.hp, model.species.tuning?.hp, model.species.aggressive),
       aggressive: model.species.aggressive ?? false, dims: model.dims, mods: variantMods(model.species, v),
       ...(model.species.flight === undefined ? {} : { flight: model.species.flight }),
       ...(model.species.lockable === undefined ? {} : { lockable: model.species.lockable }) }, seed, scale, entityId, {

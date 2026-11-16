@@ -24,10 +24,16 @@ import type { SpeciesFlight } from '../../ai/flight';
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'legendary';
 
-/** Health comes from the chosen variant or authored tuning, never its label or aggression. */
-export function speciesHealth(id: string, variant: number | undefined, tuning: number | undefined): number {
-  const hp = variant ?? tuning;
-  if (hp === undefined || !Number.isFinite(hp) || hp <= 0) throw new Error(`Species '${id}' has no valid health`);
+/** SB25 (STAGING-BUGBASH): the built-in health every species had before d39d6c1d, 60 for a grazer and 100 for a
+ * charger (the old DEER_TUNING / BOAR_TUNING hp). Shipped shards (Pine Hollow's deer) author no hp, and d39d6c1d's
+ * throw stopped them loading at all. Same lifetime as huntPattern's LEGACY_*_TUNING: until those shards author it. */
+export const LEGACY_HEALTH = { grazer: 60, charger: 100 } as const;
+
+/** Health comes from the chosen variant, else authored tuning, else the pre-d39d6c1d built-in for its aggression.
+ * An authored value that is not a positive finite number still throws: that is an authoring bug, not a missing number. */
+export function speciesHealth(id: string, variant: number | undefined, tuning: number | undefined, aggressive: boolean | undefined): number {
+  const hp = variant ?? tuning ?? (aggressive === true ? LEGACY_HEALTH.charger : LEGACY_HEALTH.grazer);
+  if (!Number.isFinite(hp) || hp <= 0) throw new Error(`Species '${id}' has no valid health`);
   return hp;
 }
 
