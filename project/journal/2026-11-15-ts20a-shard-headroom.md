@@ -17,6 +17,12 @@ charge and 230/240/300 s targets stay unchanged. More shards pay more
 process startup; hosted charged walls, including artifact upload, decide
 whether this resolves the incident. No estimate is a hosted proof.
 
+The historical replay includes one existing skipped browser case's file
+collection clock. It does not claim 1555 passed files. Replaying only the
+1554 passed-file weights, retaining that file as an unknown in the full
+inventory, still selects 18 shards below 230 s. Keeping all 16 originally
+unknown files conservative selects 22, also below 230 s.
+
 The regression retains the real inventory and measured clocks, checks
 that every old count exceeds the reserve, and requires the selected plan
 to fit it without losing or duplicating a file.

@@ -89,7 +89,7 @@ test('new files over budget only on their 60 s guesses plan on the median with a
 });
 
 test('the real shard-3 AMBER inventory fits the existing headroom without losing files', () => {
-  // All 1,555 passed file clocks from main run 43792777770, not synthetic
+  // All 1,555 reported file clocks from main run 43792777770, not synthetic
   // weights: its final charged shard-3 wall was 314,066 ms.
   process.env['WS_TIMINGS_DIR'] = join(scratch, 'amber-replay');
   writeTimings({ version: 1, run: amberRun.run, sha: amberRun.sha, measuredAt: 0, full: amberRun.full, ring1: {} });
