@@ -75,6 +75,7 @@ export const DONE = {
   // M6: the code every shard shares — systems, effects, gear, the fields that scatter — declared, so a new thing drawn or
   // registered by hand here fails too
   'shared (src/world, src/player, src/entities, …)': {
+    'src/client/engine/world/instanceClusters.ts': { why: 'meta SHARD-SOURCE AP33a: a props tile\'s parsed scatter InstancedMesh is cut into per-cluster draws of the same geometry and material; the tile\'s copies stay data, nothing new is placed', counts: { InstancedMesh: 1 } },
     'src/client/engine/render/scatterInstances.ts': { why: '2d917c567c: the existing bounded scatter draw moved from Nalati dressing; authored placements and collision remain data', counts: { InstancedMesh: 1 } },
     'src/client/game/ambient/wingField.ts': { why: '2d917c567c: the former two ambient wing draws share one row-owned allocation site; creatures remain model-owned', counts: { InstancedMesh: 1 } },
     'src/client/game/devScene/hook.ts': { why: 'SHARD-SOURCE AP5 (J347): the DEVSERVER-only dev hook `wildshard watch` drives; it redraws an author\'s three.js parts as the author wrote them, never in a production bundle (check-devserver.mjs)', counts: { InstancedMesh: 1 } },
