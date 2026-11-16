@@ -39,3 +39,11 @@
   body exceeded 72 columns. Admit the published release source at the
   publisher while retaining publishChannel's forward-only rule; wrap the
   helper body and prove preparation through the actual commit-msg hook.
+
+- RB4 preflight after the v0.1.23 hold lifted: rebase on df155405,
+  ordinary pins, game lint and typecheck green; all 74 touched Vitest
+  cases and 36 touched hook cases pass. Both review MUSTs have focused
+  red/green evidence; no second review round or full local suite.
+- Helper candidates and proof logs moved to engine/tmp/codex-ms before
+  the standard land cleanup removes this reused worktree. Repo-kit and
+  consumer release changes still wait for RB4/RB5 in the approved order.
