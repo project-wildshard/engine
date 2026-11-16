@@ -15,3 +15,10 @@
   the road is gone (GC15 (3)'s between-worker walk, GC30b's walk into Far Reach, a walk into a placed cell): the walker reaches the
   buffer and is held at the gate; those tests now say so. Through an entryway the home's own walls never bite (its crossing fires 6 m
   in, the gate stands at 10), so the filter's red test is the mechanism one in `grid-zone-server-road.test.ts`.
+
+- **ZE14 (offline), in progress.** Offline, a gate to a cell this device never downloaded reads "Not downloaded" and its 0 does
+  nothing (`spawnHeld` in `spawnDownload.ts`: the cell's grid manifest and every file it lists are in a cache; `session.ts`
+  `gateReason`/`gateOpen`). Preview online reads the far files of each cell its far ring leaves out (`keepRoadSet`), so an offline
+  visit whose camera stood elsewhere finds them: Sunscar's offline deck entry asked for Sky Harbor's collision and failed before.
+  `scripts/zone-offline-proof.mjs` proves both gates on a loopback build. Left: the in-page solo server reads every cell's whole
+  product offline and ~1,800 of those page reads fail (Nalati's too), though the entry reaches control.

@@ -7,3 +7,5 @@
 .ws-gate-card .ws-gate-name { font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; }
 .ws-gate-card .ws-gate-line { margin-top: 6px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.75; }
 .ws-gate-card .ws-gate-count { margin-top: 8px; font-size: 44px; line-height: 1; color: var(--ws-cyan, #38e6ff); }
+/* ZE14: a reason in place of the count (offline, "Not downloaded") reads as a line, not a number */
+.ws-gate-card .ws-gate-count.ws-gate-reason { font-size: 16px; line-height: 1.3; letter-spacing: 0.12em; text-transform: uppercase; }

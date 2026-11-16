@@ -94,6 +94,8 @@ export const GAME_STRINGS = {
     saveFailed: 'SAVE FAILED, RETRY',
     /** ZE8: the gate card's line under a walled cell's name, over its count */
     gatePreparing: 'Preparing to enter',
+    /** ZE14: in place of the count, offline, at a cell this device never downloaded */
+    gateNotDownloaded: 'Not downloaded',
     off: 'Off',
     on: 'On',
   },

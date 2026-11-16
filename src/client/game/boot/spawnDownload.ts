@@ -922,6 +922,24 @@ function readPacksBook(): Promise<unknown> {
   packsBook = {url, book};
   return book;
 }
+/** ZONE-ENTRY ZE14: whether this device holds a level's whole download: its manifest and every file it lists are in a cache
+ *  (the service worker's or this page's own). Offline, a gate to a cell it never downloaded shows "Not downloaded" and never
+ *  starts an entry that would stop on its loading card. Reads caches only; a manifest or packs book it can't read is a no. */
+export async function spawnHeld(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode = '000'): Promise<boolean> {
+  if (typeof caches === 'undefined') return false;
+  try {
+    const selected = spawnSelection(slug, flow, tier, mode); if (selected === null) return false;
+    const address = packsOn ? packsSelection(await readPacksBook(), slug, flow, tier, mode) : selected.address;
+    if (address === null) return false;
+    const held = await caches.match(onPacks(address.url, selected.base), {ignoreVary: true});
+    if (held === undefined || !held.ok) return false;
+    const manifest = readSpawnManifest(await held.json());
+    // a member is kept under its page URL (`keep`) or, on a content base, the content URL the service worker read it by
+    const match = async (url: string): Promise<Response | undefined> => await caches.match(url, {ignoreVary: true}) ?? (contentURL(url) === url ? undefined : caches.match(contentURL(url), {ignoreVary: true}));
+    const found = await Promise.all(manifest.files.map(file => match(new URL(file.url, document.baseURI).href)));
+    return found.every(response => response !== undefined && response.ok);
+  } catch { return false; }
+}
 /** Adopt only a matching complete live operation. This performs no cache or
  * network IO and never promotes a receipt, saved size or inferred progress. */
 export function adoptCompletedSpawnDownload(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode = '000'): SpawnDownload | null {

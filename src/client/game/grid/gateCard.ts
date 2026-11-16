@@ -28,6 +28,7 @@ export class GateCard {
   readonly root: HTMLElement;
   private readonly name: HTMLElement;
   private readonly count: HTMLElement;
+  private readonly line: HTMLElement;
   private readonly at = new Vector3();
   private shown: string | null = null;
 
@@ -35,7 +36,7 @@ export class GateCard {
     const root = this.root = document.createElement('div');
     root.className = 'ws-gate-card'; root.hidden = true; root.setAttribute('role', 'status');
     this.name = document.createElement('div'); this.name.className = 'ws-gate-name';
-    const line = document.createElement('div'); line.className = 'ws-gate-line'; line.textContent = GAME_STRINGS.grid.gatePreparing;
+    const line = this.line = document.createElement('div'); line.className = 'ws-gate-line'; line.textContent = GAME_STRINGS.grid.gatePreparing;
     this.count = document.createElement('div'); this.count.className = 'ws-gate-count';
     root.append(this.name, line, this.count); parent.append(root);
     scope.onDispose(() => { root.remove(); });
@@ -54,6 +55,9 @@ export class GateCard {
     if (key !== this.shown) {
       this.shown = key; this.name.textContent = view.name;
       this.count.textContent = view.reason ?? String(Math.max(1, view.count));
+      // a cell it can't enter isn't being prepared: its reason stands alone under the name
+      const reason = view.reason !== undefined && view.reason !== null;
+      this.line.hidden = reason; this.count.classList.toggle('ws-gate-reason', reason);
     }
     const scale = Math.min(1.2, Math.max(0.45, FULL_AT / distance));
     const x = (this.at.x * 0.5 + 0.5) * width, y = (-this.at.y * 0.5 + 0.5) * height;

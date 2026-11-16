@@ -55,6 +55,7 @@ import { arrivalPose, bufferAt, walledCells, zoneWallEdges } from '../../../shar
 import { GateCount, type GateCountState } from '../../../shared/game/grid/gateCount';
 import { GateCard } from './gateCard';
 import { DEVSERVER, gridMode } from './menu';
+import { spawnHeld } from '../boot/spawnDownload';
 import { gridCells, pageGridInstance } from '../plugin/context';
 import { prepareHomeMetadata, withInitialHomeMetadata } from './homeMetadata';
 import { bootSteppedTiles, stepRingsUntil } from './loadingRings';
@@ -374,6 +375,9 @@ export class GridSession {
   /** Initial visible fallbacks precede optional near/model decoding. Once ready,
    * ordinary distance streaming and explicit crossings keep their own fences. */
   private initialFarReady = false;
+  /** ZE14: the far ring's left-out cells whose far files preview has read for its offline road set (`keepRoadSet`), and the queue */
+  private readonly roadSetKept = new Set<string>();
+  private roadSetWork: Promise<void> = Promise.resolve();
   private readonly roadPlans: Map<Mesh, CullPlan>;
   private roadTiles: RoadTileBacking | null = null;
   private readonly roadBudget: { readonly view: () => RoadViewCost | null; readonly resident: () => RoadResident };
@@ -392,6 +396,8 @@ export class GridSession {
   /** ZE8: the gate count and its card */
   private readonly gate = new GateCount();
   private gateState: GateCountState = { cell: null, count: 5, fire: null };
+  /** ZE14: offline, whether each buffer's cell is downloaded (`spawnHeld`), asked once per approach; null while the cache answers */
+  private readonly gateHeld = new Map<string, boolean | null>();
   private readonly gateCard: GateCard | null;
   /** G342 / G385: the near-placeholder tier, shipped for everyone: the four nearest cells draw their near view */
   private readonly near: NearPlaceholders;
@@ -1114,11 +1120,46 @@ export class GridSession {
     else if (presence.kind === 'enter') gridCells.enter({ instance: presence.instance, slug: presence.slug });
   }
 
+  /** ZE14: preview (a build with no world server) plays offline from what its service worker kept. The far ring reads only the
+   *  cells its memory budget admits, nearest first from the camera, so a later offline visit whose camera stood elsewhere asked
+   *  for a cell this one left out and failed (Sunscar: Sky Harbor's collision). Online, each left-out cell's far files are read
+   *  once, one cell at a time behind the ring's own work, so the worker keeps them; nothing is decoded or held. */
+  private async keepFarFiles(slug: string): Promise<void> {
+    if (this.host.scope.disposed) return;
+    const far = await readGridShardfileFar(slug, publicBytes()[`/assets/baked/${slug}/far.json`] === undefined);
+    for (const ref of far?.rows.far?.files ?? []) { if (this.host.scope.disposed) return; await far?.read(ref); }
+  }
+  private keepRoadSet(): void {
+    if (typeof navigator === 'undefined' || !navigator.onLine || (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined) return;
+    for (const { instance } of this.rings.farPlan().omitted) {
+      if (this.roadSetKept.has(instance)) continue;
+      this.roadSetKept.add(instance);
+      const slug = this.assembly.cell(instance).slug;
+      this.roadSetWork = this.roadSetWork.then(() => this.keepFarFiles(slug)).catch(() => undefined);
+    }
+  }
   /** ZE8: the count while the feet stand in a walled cell's buffer; at 0 that cell's zone entry, once. */
   private stepGate(at: { x: number; z: number }): void {
     const buffer = bufferAt(this.assembly.cells, this.home, at);
+    if (buffer === null) this.gateHeld.clear();
     this.gateState = this.gate.step(buffer?.instance ?? null, diagnosticNow());
-    if (this.gateState.fire !== null && buffer !== null) this.host.enterZone?.(this.gateState.fire, arrivalPose(buffer, at));
+    // ZE14: offline, a cell this device never downloaded is never entered: its card says so and the 0 does nothing
+    if (this.gateState.fire !== null && buffer !== null && this.gateOpen(buffer.instance)) this.host.enterZone?.(this.gateState.fire, arrivalPose(buffer, at));
+  }
+  /** ZE14: the gate's cell can be entered from here: online, or downloaded (a cell still being asked about is not, yet) */
+  private gateOpen(instance: string): boolean { const held = this.gateHeldNow(instance); return held === undefined || held === true; }
+  /** ZE14: why the gate's cell can't be entered: offline and not downloaded; a cell still being asked about keeps its count */
+  private gateReason(instance: string): string | null { return this.gateHeldNow(instance) === false ? GAME_STRINGS.grid.gateNotDownloaded : null; }
+  /** ZE14: undefined online; offline, whether the cell is downloaded, null until the caches answer */
+  private gateHeldNow(instance: string): boolean | null | undefined {
+    if (typeof navigator === 'undefined' || navigator.onLine) return undefined;
+    if (!this.gateHeld.has(instance)) {
+      this.gateHeld.set(instance, null);
+      const mode = gridMode(DEVSERVER), slug = this.assembly.cell(instance).slug;
+      void spawnHeld(slug, 'grid', TIER, `${Number(mode.developer)}${Number(mode.devserver)}${Number(mode.nineDragon)}`)
+        .then(held => this.gateHeld.has(instance) && this.gateHeld.set(instance, held), () => this.gateHeld.set(instance, false));
+    }
+    return this.gateHeld.get(instance) ?? null;
   }
   private shardName(instance: string): string { const slug = this.assembly.cell(instance).slug; return this.names.get(slug) ?? slug; }
   private drawGate(at: { x: number; z: number }): void {
@@ -1126,7 +1167,7 @@ export class GridSession {
     if (card === null) return;
     if (cell === null) { card.hide(); return; }
     const origin = this.assembly.cell(cell).origin, home = this.home.origin;
-    card.show({ centre: { x: origin.x - home.x, z: origin.z - home.z }, feet: { x: at.x - home.x, z: at.z - home.z }, name: this.shardName(cell), count: this.gateState.count },
+    card.show({ centre: { x: origin.x - home.x, z: origin.z - home.z }, feet: { x: at.x - home.x, z: at.z - home.z }, name: this.shardName(cell), count: this.gateState.count, reason: this.gateReason(cell) },
       this.host.frame?.camera, innerWidth, innerHeight);
   }
 
@@ -1165,6 +1206,7 @@ export class GridSession {
     // Home readiness alone cannot release optional model work: its parser can
     // otherwise queue ahead of far files still arriving for the startup barrier.
     if (!this.initialFarReady && this.host.backgroundReady?.() !== false && this.rings.ready()) this.initialFarReady = true;
+    if (this.initialFarReady) this.keepRoadSet();
     this.roadTiles?.step({ x: at.x, z: at.z, vx: this.velocity.x * clamp, vz: this.velocity.z * clamp });
     for (const cell of this.neighbours) if (this.placeholderBlocksTiles(cell.instance)) this.rings.retireRefinement(cell.instance);
     if (this.host.heldFrame !== undefined) this.host.heldFrame.enabled = false;
