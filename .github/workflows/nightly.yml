@@ -14,6 +14,15 @@ on:
         description: Diagnose the Ring 3 sender only (does not qualify Ring 2 or a release)
         type: boolean
         default: false
+      diagnostic_head:
+        description: Diagnose one committed head only (no nightly qualification)
+        type: string
+        default: ''
+      diagnostic_browser:
+        description: Browser for the single-head diagnostic
+        type: choice
+        options: [chromium, webkit]
+        default: chromium
       pins_channel:
         description: Reviewed pin snapshot to test (staging release hash awaits AP-26)
         type: choice
@@ -25,11 +34,11 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: nightly-${{ github.ref }}${{ inputs.suite_only && '-suite-diagnostic' || '' }}
+  group: nightly-${{ github.ref }}${{ inputs.suite_only && '-suite-diagnostic' || '' }}${{ inputs.diagnostic_head && format('-head-{0}-{1}', inputs.diagnostic_head, inputs.diagnostic_browser) || '' }}
   cancel-in-progress: false
 jobs:
   ring3:
-    if: always() && (needs.report.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.ring3_only))
+    if: always() && !inputs.diagnostic_head && (needs.report.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.ring3_only))
     needs: report
     uses: ./.github/workflows/ring-3.yml
     with:
@@ -38,7 +47,7 @@ jobs:
       NIGHTLY_APP_CLIENT_ID: ${{ secrets.NIGHTLY_APP_CLIENT_ID }}
       NIGHTLY_APP_PRIVATE_KEY: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
   plan:
-    if: ${{ !inputs.ring3_only }}
+    if: ${{ !inputs.ring3_only && !inputs.diagnostic_head }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -57,6 +66,7 @@ jobs:
       - id: plan
         run: echo "matrix=$(node scripts/nightly.ts plan)" >> "$GITHUB_OUTPUT"
   tests:
+    if: ${{ !inputs.diagnostic_head }}
     needs: plan
     strategy:
       fail-fast: false
@@ -96,7 +106,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   heads:
-    if: ${{ !inputs.suite_only }}
+    if: ${{ !inputs.suite_only && !inputs.diagnostic_head }}
     needs: plan
     strategy:
       fail-fast: false
@@ -155,7 +165,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   report:
-    if: always() && !inputs.ring3_only && !inputs.suite_only
+    if: always() && !inputs.ring3_only && !inputs.suite_only && !inputs.diagnostic_head
     needs: [plan, tests, heads]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -201,4 +211,53 @@ jobs:
             tmp/nightly/reports/verdict.json
             tmp/nightly/reports/summary.md
           if-no-files-found: error
+          retention-days: 7
+
+  head-diagnostic:
+    if: github.event_name == 'workflow_dispatch' && inputs.diagnostic_head != ''
+    runs-on: ${{ inputs.diagnostic_browser == 'webkit' && 'macos-15' || 'ubuntu-24.04' }}
+    timeout-minutes: 75
+    env:
+      NIGHTLY_HEAD: ${{ inputs.diagnostic_head }}
+      NIGHTLY_BROWSER: ${{ inputs.diagnostic_browser }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+      - name: Refuse a head outside the committed nightly pins
+        id: head
+        run: |
+          node --test scripts/nightly-head-group.proof.ts
+          echo "group=$(node scripts/nightly-head-group.ts "$NIGHTLY_HEAD")" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/ring-setup
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/pins
+          key: nightly-pins-${{ runner.os }}-${{ hashFiles('test/pins/shardfiles.json') }}
+      - run: node scripts/pins.ts install
+      - run: bash scripts/ci-playwright-install.sh "$NIGHTLY_BROWSER"
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: nightly-encodes-${{ github.sha }}
+          restore-keys: |
+            nightly-encodes-
+            ring1-spawn-parts-br-
+      - run: pnpm build:game
+      - run: node scripts/app-build/splitOutput.mjs dist --join
+      - name: Exercise the production cold-pack and phone path
+        env:
+          NIGHTLY_GROUP: ${{ steps.head.outputs.group }}
+        run: node scripts/nightly-heads.ts "$NIGHTLY_BROWSER" "$NIGHTLY_GROUP" tmp/nightly/reports "$NIGHTLY_HEAD"
+      - name: Keep diagnostic receipts only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nightly-head-diagnostic
+          path: tmp/nightly/reports/heads-*.json
+          if-no-files-found: warn
           retention-days: 7

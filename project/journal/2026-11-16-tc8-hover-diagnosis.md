@@ -21,3 +21,9 @@ proofs cover actual committed pins and admission refusal.
 
 The six native observations and hosted receipts live in meta under
 TEST-COVERAGE evidence/tc8-028d1bec. No local browser or cook ran.
+
+The first standalone diagnostic workflow could not dispatch before its
+file reached the default branch (actual GitHub 404). The diagnostic now
+uses optional inputs and a mutually exclusive job on the existing
+nightly workflow, so it is reviewable and runnable from a plan branch.
+Diagnostic runs skip suites, the full matrix, report and Ring 3.

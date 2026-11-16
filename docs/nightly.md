@@ -245,16 +245,17 @@ in their requested repo tmp directory and clean their private exports.
 
 ## Single-head diagnosis
 
-Dispatch `nightly-head-diagnostic.yml` on the candidate branch with a
-committed `head` slug and `browser` (`chromium` or `webkit`). It validates
+Dispatch `nightly.yml` on the candidate branch with `diagnostic_head`
+set to a committed slug and `diagnostic_browser` set to `chromium` or
+`webkit`. It validates
 the actual pin, uses its normal nightly partition, then runs the same
 cold-pack and phone path for only that head. Build encodes may be reused;
 the head's cook store remains cold on the hosted worker. It adds no
 scheduled or ordinary push job.
 
-The `nightly-head-diagnostic` artifact holds raw phase receipts. This
-workflow has no verdict, report, Ring 3 dispatch, tag or release step;
-it cannot qualify a full night. Full qualification still requires every
+The `nightly-head-diagnostic` artifact holds raw phase receipts. Diagnostic
+mode skips the suites, full head matrix, verdict report and Ring 3;
+it has no tag or release step and cannot qualify a full night. Full qualification still requires every
 head/browser and both complete suite partitions in `nightly.yml`.
 
 A failed hover phase keeps its original error plus before/after player
