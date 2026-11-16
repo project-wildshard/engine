@@ -149,3 +149,27 @@ compiler type and retain the negative/mutable declaration proof. The
 inherited CLI still required the removed tsconfig.shards.json; process
 that historical config only when present, retaining mandatory test config
 checks. Ordinary generation and --check now work in the engine checkout.
+
+## Landing against the updated motion law, 2026-11-16
+
+Land preflight stopped at eight restored motion-trace digests after rebasing
+onto a650b20724e485bb2dc8732ba96d6d83599fa5cc. Main's NL13 law commits
+836097ab/a650b207 retry partial flat-floor stalls while preserving walls
+and slopes. The active shorter page-law hashes were already updated on
+main; the newly restored 40,000-tick traces still held the former law.
+
+Causal before-control: read CharacterMotor.ts from approved965fce4d, return
+only that source from a Vite pre-load plugin at the original module id
+(so relative imports keep their native resolution), disable the test
+transform cache, and run the unchanged motion-traces file. All8 original
+digest sequences pass on the otherwise current rebased tree. Thus the
+NL13 motor change alone accounts for the delta; no new CI21 fixture
+changes or platform drift is involved.
+
+Use the test's documented MOTION_TRACE_RECORD=1 recorder with the current
+main motor. Preserve all8 sequences,80 hashes each,40,000 ticks per case
+and every mode/callback/camera/snapshot assertion. The ordinary replay
+plus motion-trace.test.ts, net-predict-flat-floor.test.ts and
+character-motor-values.test.ts passes4 files/14 cases, including floor
+progress, wall refusal and allocating-motor parity. No production code or
+test bodies changed. The original approved branch CI43810155741 is green.
