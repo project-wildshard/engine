@@ -57,7 +57,8 @@ export const TIER_TABLE = {
     // its camera can see (`slabRanges.ts`): Nine's phone spawn view 0.56 to ~0.47 M slab triangles, other views ~half
     slabRanges: true,
     // NB8 (mini-nb8d): with WEBGL_multi_draw, each slab chunk draws only its visible k-d leaves, each leaf cut to its
-    // triangles at least this angle × its distance thick (`visibleSlabDraws`): under ~0.7 device pixels at DPR 2. 0 = the run
+    // triangles at least this angle × its distance long (`visibleSlabDraws`; mini-nb8g: longest edge, not thickness, so
+    // cables and trim stay): a dropped triangle is a speck under ~0.7 device pixels at DPR 2. 0 = the run
     slabLodAngle: 0.001,
     // NB8 (mini-nb8e): with WEBGL_multi_draw, a frustum-culled slab key's chunks in a bank draw as one merged geometry
     // (`slabMerge.ts`): Nine's 12 plain chunks are 1 draw; the leaf cut keeps its triangles where they were

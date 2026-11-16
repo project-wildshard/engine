@@ -16,9 +16,9 @@ export interface SlabRanges {
   /** per node, the root first: left child, right child (-1 for a leaf), first triangle, end triangle */
   readonly nodes: Int32Array;
   readonly triangles: number;
-  /** per triangle in the reordered index, its thickness (twice its area over its longest edge: the narrowest it can look
-   *  on screen); within a leaf the triangles run thickest first, so a leaf's triangles above a size are a prefix of it */
-  readonly thickness: Float32Array;
+  /** per triangle in the reordered index, its size (its longest edge: a triangle shorter than a pixel every way is a
+   *  speck); within a leaf the triangles run largest first, so a leaf's triangles above a size are a prefix of it */
+  readonly size: Float32Array;
 }
 
 /** triangles per leaf: a leaf's box test costs ~6 plane checks, and 256 triangles of a wall kit is a few metres */
@@ -54,13 +54,13 @@ export function* slabRangesJob(geometry: BufferGeometry, leaf: number = SLAB_LEA
   if (!plain) for (let v = 0; v < position.count; v++) { xyz[v * 3] = position.getX(v); xyz[v * 3 + 1] = position.getY(v); xyz[v * 3 + 2] = position.getZ(v); }
   // centroids (times three) and triangle ids, permuted together so every pass reads front to back
   const cx = new Float32Array(triangles), cy = new Float32Array(triangles), cz = new Float32Array(triangles), order = new Uint32Array(triangles);
-  const thick = new Float32Array(triangles);
+  const sized = new Float32Array(triangles);
   let work = 0;
   for (let t = 0; t < triangles; t++) {
     const a = (corners[t * 3] ?? 0) * 3, b = (corners[t * 3 + 1] ?? 0) * 3, c = (corners[t * 3 + 2] ?? 0) * 3;
     cx[t] = (xyz[a] ?? 0) + (xyz[b] ?? 0) + (xyz[c] ?? 0); cy[t] = (xyz[a + 1] ?? 0) + (xyz[b + 1] ?? 0) + (xyz[c + 1] ?? 0); cz[t] = (xyz[a + 2] ?? 0) + (xyz[b + 2] ?? 0) + (xyz[c + 2] ?? 0);
     order[t] = t;
-    thick[t] = thicknessOf(xyz, corners[t * 3] ?? 0, corners[t * 3 + 1] ?? 0, corners[t * 3 + 2] ?? 0);
+    sized[t] = sizeOf(xyz, corners[t * 3] ?? 0, corners[t * 3 + 1] ?? 0, corners[t * 3 + 2] ?? 0);
     if (++work >= SLAB_JOB_STEP) { work = 0; yield; }
   }
   const rows: number[] = [];
@@ -95,21 +95,21 @@ export function* slabRangesJob(geometry: BufferGeometry, leaf: number = SLAB_LEA
     if (work >= SLAB_JOB_STEP) { work = 0; yield; }
   }
   const nodes = Int32Array.from(rows), count = nodes.length / 4, boxes = new Float32Array(count * 6);
-  // NB8 (mini-nb8d): each leaf's triangles thickest first, so the phone's size cut (`visibleSlabDraws`) is a prefix of it
+  // NB8 (mini-nb8d): each leaf's triangles largest first, so the phone's size cut (`visibleSlabDraws`) is a prefix of it
   for (let node = 0; node < count; node++) {
     if ((nodes[node * 4] ?? -1) >= 0) continue;
     const from = nodes[node * 4 + 2] ?? 0, to = nodes[node * 4 + 3] ?? 0;
-    order.subarray(from, to).sort((a, b) => (thick[b] ?? 0) - (thick[a] ?? 0));
+    order.subarray(from, to).sort((a, b) => (sized[b] ?? 0) - (sized[a] ?? 0));
     work += to - from;
     if (work >= SLAB_JOB_STEP) { work = 0; yield; }
   }
   // the index in its new order (one pass: no draw sees it half done), then each leaf's box read front to back, then
   // every parent's (children follow parents)
-  const source = index.array, thickness = new Float32Array(triangles);
+  const source = index.array, size = new Float32Array(triangles);
   for (let t = 0; t < triangles; t++) {
     const was = order[t] ?? 0, from = was * 3;
     source[t * 3] = corners[from] ?? 0; source[t * 3 + 1] = corners[from + 1] ?? 0; source[t * 3 + 2] = corners[from + 2] ?? 0;
-    thickness[t] = thick[was] ?? 0;
+    size[t] = sized[was] ?? 0;
   }
   for (let node = count - 1; node >= 0; node--) {
     const left = nodes[node * 4] ?? -1, right = nodes[node * 4 + 1] ?? -1;
@@ -128,18 +128,19 @@ export function* slabRangesJob(geometry: BufferGeometry, leaf: number = SLAB_LEA
     boxes[node * 6] = bx0; boxes[node * 6 + 1] = by0; boxes[node * 6 + 2] = bz0; boxes[node * 6 + 3] = bx1; boxes[node * 6 + 4] = by1; boxes[node * 6 + 5] = bz1;
   }
   index.needsUpdate = true;
-  return { boxes, nodes, triangles, thickness };
+  return { boxes, nodes, triangles, size };
 }
 
-/** a triangle's thickness: twice its area over its longest edge, the height it stands off that edge */
-function thicknessOf(xyz: ArrayLike<number>, a: number, b: number, c: number): number {
+/** a triangle's size: its longest edge. NB8 (mini-nb8g): not its thickness (its height off that edge): a long thin
+ *  triangle under a pixel thick still draws as a line, and the thickness cut at 0.001 rad visibly dropped cables, the
+ *  tree's ribbons and the gate's trim on Nine's phone spawn (same-instant A/B, ~2.1 k px); only a triangle short every
+ *  way is a speck */
+function sizeOf(xyz: ArrayLike<number>, a: number, b: number, c: number): number {
   const ax = xyz[a * 3] ?? 0, ay = xyz[a * 3 + 1] ?? 0, az = xyz[a * 3 + 2] ?? 0;
   const ux = (xyz[b * 3] ?? 0) - ax, uy = (xyz[b * 3 + 1] ?? 0) - ay, uz = (xyz[b * 3 + 2] ?? 0) - az;
   const vx = (xyz[c * 3] ?? 0) - ax, vy = (xyz[c * 3 + 1] ?? 0) - ay, vz = (xyz[c * 3 + 2] ?? 0) - az;
   const wx = vx - ux, wy = vy - uy, wz = vz - uz;
-  const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
-  const longest = Math.sqrt(Math.max(ux * ux + uy * uy + uz * uz, vx * vx + vy * vy + vz * vz, wx * wx + wy * wy + wz * wz));
-  return longest > 0 ? Math.sqrt(cx * cx + cy * cy + cz * cz) / longest : 0;
+  return Math.sqrt(Math.max(ux * ux + uy * uy + uz * uz, vx * vx + vy * vy + vz * vz, wx * wx + wy * wy + wz * wz));
 }
 
 const frustum = new Frustum(), clip = new Matrix4();
@@ -184,9 +185,9 @@ export function visibleSlabRun(ranges: SlabRanges, world: Matrix4, camera: Camer
 
 /**
  * NINE-DRAGON-BENCHMAX NB8 (mini-nb8d): the phone's draw of a slab chunk as one multi-draw of exactly its visible leaves,
- * each cut to its triangles at least `angle` × the leaf's distance thick (`SlabRanges.thickness`: a leaf runs thickest
- * first, so its kept triangles are a prefix). A triangle thinner than that is under a pixel where it stands (0.001 rad is
- * ~0.7 device pixels at the phone's ~100° portrait at DPR 2), so it only shimmers; the shadow passes, warms and raycasts
+ * each cut to its triangles at least `angle` × the leaf's distance long (`SlabRanges.size`: a leaf runs largest first,
+ * so its kept triangles are a prefix). A triangle shorter than that every way is a speck under a pixel where it stands
+ * (0.001 rad is ~0.7 device pixels at the phone's ~100° portrait at DPR 2), so it only shimmers; the shadow passes, warms and raycasts
  * still read the whole chunk. Leaves next to each other in the index join into one range, as do two ranges at most
  * `SLAB_DRAW_GAP` triangles apart (the gap is drawn), so a view's ranges stay a few hundred.
  */
@@ -214,7 +215,7 @@ function push(out: SlabDraws, from: number, to: number): void {
 }
 function collect(ranges: SlabRanges, node: number, angle: number, out: SlabDraws): void {
   if (!visible(ranges.boxes, node)) return;
-  const { nodes, boxes, thickness } = ranges, left = nodes[node * 4] ?? -1;
+  const { nodes, boxes, size } = ranges, left = nodes[node * 4] ?? -1;
   if (left >= 0) { collect(ranges, left, angle, out); collect(ranges, nodes[node * 4 + 1] ?? 0, angle, out); return; }
   const from = nodes[node * 4 + 2] ?? 0, to = nodes[node * 4 + 3] ?? 0, at = node * 6;
   // the camera's distance to the leaf's box (0 inside it), in the chunk's own frame
@@ -222,9 +223,9 @@ function collect(ranges: SlabRanges, node: number, angle: number, out: SlabDraws
   const dy = Math.max((boxes[at + 1] ?? 0) - local.y, 0, local.y - (boxes[at + 4] ?? 0));
   const dz = Math.max((boxes[at + 2] ?? 0) - local.z, 0, local.z - (boxes[at + 5] ?? 0));
   const floor = angle * Math.sqrt(dx * dx + dy * dy + dz * dz);
-  // the first triangle thinner than the floor (the leaf runs thickest first)
+  // the first triangle smaller than the floor (the leaf runs largest first)
   let lo = from, hi = to;
-  while (lo < hi) { const mid = (lo + hi) >> 1; if ((thickness[mid] ?? 0) >= floor) lo = mid + 1; else hi = mid; }
+  while (lo < hi) { const mid = (lo + hi) >> 1; if ((size[mid] ?? 0) >= floor) lo = mid + 1; else hi = mid; }
   if (lo > from) push(out, from, lo);
 }
 
@@ -305,7 +306,7 @@ function hookOf(gl: MultiDrawGl): DrawHook {
  *  range is restored after every draw, so shadow passes, warms, raycasts and bounds read the whole chunk. With an
  *  `angle` (the phone tier's `slabLodAngle`), `WEBGL_multi_draw` and an instanced part (three draws it with
  *  `drawElementsInstanced`), the draw is instead its visible leaves cut to their triangles at least `angle` × distance
- *  thick (`visibleSlabDraws`), in one multi-draw; otherwise it stays the run. */
+ *  long (`visibleSlabDraws`), in one multi-draw; otherwise it stays the run. */
 export function cullSlabRanges(part: Object3D & { geometry: BufferGeometry }, ranges: SlabRanges, angle = 0): void {
   const geometry = part.geometry, { start, count } = geometry.drawRange;
   const instanced = (part as Object3D & { isInstancedMesh?: boolean }).isInstancedMesh === true;

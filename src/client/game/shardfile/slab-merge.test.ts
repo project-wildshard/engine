@@ -77,7 +77,7 @@ test('the sliced job yields and builds exactly the tree and order of the one-go 
   expect(Array.from(again.index?.array ?? [])).toEqual(Array.from(merged.index?.array ?? []));
 });
 
-test('with the leaf cut, a merged key draws every triangle in view at least angle × distance thick, in one call', () => {
+test('with the leaf cut, a merged key draws every triangle in view at least angle × distance long, in one call', () => {
   const view = new PerspectiveCamera(70, 402 / 874, 0.1, 2000);
   view.position.set(20, 1.7, 15); view.updateMatrixWorld(true);
   const frustum = new Frustum().setFromProjectionMatrix(new Matrix4().multiplyMatrices(view.projectionMatrix, view.matrixWorldInverse));
@@ -93,7 +93,7 @@ test('with the leaf cut, a merged key draws every triangle in view at least angl
   for (let t = 0; t < ranges.triangles; t++) {
     let seen = false, near = Infinity;
     for (let k = 0; k < 3; k++) { point.fromBufferAttribute(position, index.getX(t * 3 + k)); seen ||= frustum.containsPoint(point); near = Math.min(near, point.distanceTo(view.position)); }
-    if (!seen || (ranges.thickness[t] ?? 0) < 0.001 * near) continue;
+    if (!seen || (ranges.size[t] ?? 0) < 0.001 * near) continue;
     inView++;
     expect(kept.has(t)).toBe(true);
   }

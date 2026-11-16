@@ -89,13 +89,14 @@ test('a chunk of one leaf keeps its order and no ranges', () => {
   expect(spatialSlabRanges(geometry)).toBeNull();
 });
 
-// NINE-DRAGON-BENCHMAX NB8 (mini-nb8d): the phone's size cut. The street again, with a 1 cm ledge strip beside each wall
-// quad: from 30 m a ledge is 0.00033 rad thick, a third of the phone's 0.001 floor; a wall quad is 25 cm.
+// NINE-DRAGON-BENCHMAX NB8 (mini-nb8d, mini-nb8g): the phone's size cut. The street again, beside each 25 cm wall quad a
+// 3 m ledge strip 1 cm thick (a cable or a trim: a line on screen however thin, so it stays) and a 1 cm speck: from 30 m
+// a speck is ~0.00047 rad long, under half the phone's 0.001 floor.
 function ledgedStreet(): BufferGeometry {
   const positions: number[] = [], corners: number[] = [];
   for (let i = 0; i < 1500; i++) {
     const x = -200 + (i * 7919 % 1500) * 400 / 1500, z = (i % 3) * 6 - 6, y = (i % 5) * 4;
-    for (const [w, h, dy] of [[0.25, 3, 0], [3, 0.01, 3]] as const) {
+    for (const [w, h, dy] of [[0.25, 3, 0], [3, 0.01, 3], [0.01, 0.01, 3.5]] as const) {
       const at = positions.length / 3;
       positions.push(x, y + dy, z, x + w, y + dy, z, x + w, y + dy + h, z, x, y + dy + h, z);
       corners.push(at, at + 1, at + 2, at, at + 2, at + 3);
@@ -115,18 +116,18 @@ const drawn = (draws: SlabDraws): Set<number> => {
   return out;
 };
 
-test('each leaf runs thickest first, and a triangle\'s thickness is its height off its longest edge', () => {
+test('each leaf runs largest first, and a triangle\'s size is its longest edge', () => {
   const geometry = ledgedStreet(), ranges = spatialSlabRanges(geometry);
   if (ranges === null) throw new Error('expected ranges');
   for (let node = 0; node < ranges.nodes.length / 4; node++) {
     if ((ranges.nodes[node * 4] ?? -1) >= 0) continue;
-    for (let t = (ranges.nodes[node * 4 + 2] ?? 0) + 1; t < (ranges.nodes[node * 4 + 3] ?? 0); t++) expect(ranges.thickness[t] ?? 0).toBeLessThanOrEqual(ranges.thickness[t - 1] ?? 0);
+    for (let t = (ranges.nodes[node * 4 + 2] ?? 0) + 1; t < (ranges.nodes[node * 4 + 3] ?? 0); t++) expect(ranges.size[t] ?? 0).toBeLessThanOrEqual(ranges.size[t - 1] ?? 0);
   }
-  const sizes = [...ranges.thickness].map(v => Math.round(v * 1000));
-  expect(new Set(sizes)).toEqual(new Set([Math.round(1000 * 0.25 * 3 / Math.hypot(0.25, 3)), Math.round(1000 * 0.01 * 3 / Math.hypot(0.01, 3))]));
+  const sizes = [...ranges.size].map(v => Math.round(v * 10000));
+  expect(new Set(sizes)).toEqual(new Set([Math.hypot(0.25, 3), Math.hypot(3, 0.01), Math.hypot(0.01, 0.01)].map(v => Math.round(v * 10000))));
 });
 
-test('the phone draws every triangle in view at least angle × distance thick, and leaves the far ledges out', () => {
+test('the phone draws every triangle in view at least angle × distance long, keeps every thin ledge, and leaves far specks out', () => {
   const geometry = ledgedStreet(), ranges = spatialSlabRanges(geometry);
   if (ranges === null) throw new Error('expected ranges');
   // at the street's west end looking down it between two rows of walls: near ledges beside the camera, far ones to 400 m
@@ -136,17 +137,20 @@ test('the phone draws every triangle in view at least angle × distance thick, a
   expect(kept.size).toBe(draws.total);
   const frustum = new Frustum().setFromProjectionMatrix(new Matrix4().multiplyMatrices(view.projectionMatrix, view.matrixWorldInverse), WebGLCoordinateSystem);
   const index = geometry.index, position = geometry.getAttribute('position'); if (index === null) throw new Error('no index');
-  let ledges = 0, ledgesKept = 0, near = 0;
+  let specks = 0, specksKept = 0, near = 0, ledges = 0;
   for (let t = 0; t < ranges.triangles; t++) {
     const box = new Box3(); for (let k = 0; k < 3; k++) box.expandByPoint(new Vector3().fromBufferAttribute(position, index.getX(t * 3 + k)).applyMatrix4(world));
     if (!frustum.intersectsBox(box)) continue;
-    const thickness = ranges.thickness[t] ?? 0, distance = box.distanceToPoint(view.position);
-    if (thickness >= angle * distance) expect(kept.has(t)).toBe(true);
-    if (thickness < 0.05) { ledges++; if (kept.has(t)) { ledgesKept++; if (distance < 10) near++; } }
+    const size = ranges.size[t] ?? 0, distance = box.distanceToPoint(view.position);
+    if (size >= angle * distance) expect(kept.has(t)).toBe(true);
+    // a ledge 1 cm thick and 3 m long draws as a line from anywhere in view: it is never cut (the thickness cut dropped them)
+    if (size > 2 && box.max.y - box.min.y < 0.05) { ledges++; expect(kept.has(t)).toBe(true); }
+    if (size < 0.05) { specks++; if (kept.has(t)) { specksKept++; if (distance < 14) near++; } }
   }
-  // the near ledges stay; most of the ledges in view are past 10 m and go
+  // the ledges in view all stay; the specks within 14 m stay; most of the specks in view are past it and go
+  expect(ledges).toBeGreaterThan(100);
   expect(near).toBeGreaterThan(0);
-  expect(ledgesKept).toBeLessThan(ledges / 2);
+  expect(specksKept).toBeLessThan(specks / 2);
   const [start, end] = visibleSlabRun(ranges, world, view);
   expect(draws.total).toBeLessThan((end - start) * 0.75);
   // angle 0: every visible leaf whole, no more than the run
