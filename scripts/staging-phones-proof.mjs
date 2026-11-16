@@ -23,7 +23,7 @@ const SOCKETS = new Set(['wss://rooms-staging.wildshard.io', 'wss://wildshard.ta
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const device = flag('device', ''), tag = flag('tag', Date.now().toString(36).slice(-6)), out = flag('out', 'tmp/staging-phones'), solo = process.argv.includes('--solo');
-const peerWait = Number(flag('peer-wait', '25')) * 60_000;
+const peerWait = Number(flag('peer-wait', '15')) * 60_000;
 if (device !== 'safari' && device !== 'android') throw new Error('usage: staging-phones-proof.mjs --device=safari|android --tag=<run> --out=<dir>');
 if (!/^[a-z0-9]{1,10}$/u.test(tag)) throw new Error('--tag is 1 to 10 lowercase letters or digits');
 const row = device === 'safari' ? 'XR-7' : 'XR-8', me = `XR ${device === 'safari' ? 'iOS' : 'Android'} ${tag}`, peer = `XR ${device === 'safari' ? 'Android' : 'iOS'} ${tag}`;
@@ -158,12 +158,15 @@ function android(serial) {
     } };
 }
 
+const SHOWN = String.raw`({ text: (document.body?.innerText ?? '').replace(/\s+/gu, ' ').slice(0, 160), href: location.href, worker: typeof window.__workerClient === 'function' })`;
 /** @param {Phone} phone @param {string} expression @param {number} ms @param {string} [what] */
 const until = async (phone, expression, ms, what = expression) => {
   const end = Date.now() + ms;
-  let last = '';
+  let last = '', told = Date.now();
   while (Date.now() < end) {
     try { if (await phone.evaluate(expression) === true) return; } catch (error) { last = String(error).slice(0, 160); }
+    // A slow phone says what it shows every 30 s, so a timeout reads as a story, not a wall.
+    if (Date.now() - told > 30_000) { told = Date.now(); console.log(`  waiting for ${what.slice(0, 60)}: ${JSON.stringify(await phone.evaluate(SHOWN).catch((/** @type {unknown} */ error) => String(error).slice(0, 120)))}`); }
     await sleep(400);
   }
   throw new Error(`Timed out: ${what.slice(0, 160)}${last === '' ? '' : ` (${last})`}`);
