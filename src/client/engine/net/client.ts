@@ -136,6 +136,9 @@ export class NetClient {
    *  while the page loads the cell): it drops them until the cell's welcome. */
   hold(): void { this.left(); this.holding = true; }
   private holding = false;
+  private readonly heldFrames = new Set<() => void>();
+  /** ZE10d2: a frame arrived while held: the link is alive though nothing is decoded (the redial's watch hears it); returns the unsubscribe. */
+  onHeldFrame(listener: () => void): () => void { this.heldFrames.add(listener); return () => { this.heldFrames.delete(listener); }; }
   /** Call when a new link replaces the old one, before its `hello`; returns the unsubscribe. */
   onRejoin(listener: () => void): () => void { this.rejoins.add(listener); return () => { this.rejoins.delete(listener); }; }
   /** Call for every frame decoded; returns the unsubscribe. */
@@ -231,7 +234,7 @@ export class NetClient {
     for (const record of records) {
       const span = { bytes, start: record.start, end: record.end };
       if (record.tag === TAG_WELCOME) { bootMark('server:welcome-receive'); this.holding = false; this.welcomed(span); }
-      else if (this.holding) this.dropped++;
+      else if (this.holding) { this.dropped++; if (record.tag === TAG_FRAME) for (const listener of this.heldFrames) listener(); }
       else if (record.tag === TAG_EVENTS) this.events(span);
       else if (record.tag === TAG_FRAME) this.decoded(this.server?.read(span) ?? null, arrived);
       else this.dropped++;

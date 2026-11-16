@@ -63,7 +63,8 @@ for (const [to, side, worker] of [[WEST, -1, 'its own worker'], [EAST, 1, 'the o
     expect(at?.z).toBeCloseTo(0, 5);
     expect(road?.entering(IDENTITY.player), 'frozen at the gate').toBe(to);
     // The old session goes; the client hears nothing of the road it is leaving while the next one loads
-    await new Promise(resolve => { setTimeout(resolve, 500); });
+    // a phone takes seconds to load the cell: longer than the redial's 3 s with no frame, which must not drop the held link
+    await new Promise(resolve => { setTimeout(resolve, 4000); });
     expect(page.shell.client.latest, 'held: the road\'s frames are not the next cell\'s').toBeNull();
     expect(road?.holds(IDENTITY.player), 'still on the road while the page loads').toBe(true);
     // The next session takes the shell over and says ready

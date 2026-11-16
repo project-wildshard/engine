@@ -146,7 +146,7 @@ try {
     page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations.push({ url: frame.url().replace(base, ''), at: Date.now() }); });
     /** @type {any} */ (result).navigations = navigations;
     const consoleRows = /** @type {string[]} */ ([]); /** @type {any} */ (result).console = consoleRows;
-    page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning' || /reload|recover|unload|leav/iu.test(message.text())) consoleRows.push(`${message.type()}: ${message.text().slice(0, 300)}`); });
+    page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning' || /reload|recover|unload|leav|\[grid\]/iu.test(message.text())) consoleRows.push(`${message.type()}: ${message.text().slice(0, 300)}`); });
     // the old world goes one of two ways: the same-page entry (ZE10a3) retires its Game in this document (marked from inside the
     // page, the window marker kept), or the reload form's new document (`?chunk=`; the entry first rewrites the old page's own
     // address, a same-document event 0.2 s before the old document went)

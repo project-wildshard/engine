@@ -382,7 +382,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     handedOver = null;
     if (kept !== null) {
       const next = booted === kept.cell ? gridOf(kept.cell, true) : undefined;
-      if (next !== undefined && kept.shell.adopt !== undefined) { kept.shell.adopt({ loaded: slug, grid: next }); return kept.shell; }
+      if (next !== undefined && kept.shell.adopt !== undefined) { console.info(`[grid] zone entry: this session takes the link over in ${kept.cell}`); kept.shell.adopt({ loaded: slug, grid: next }); return kept.shell; }
+      console.warn(`[grid] zone entry: the link handed over at ${kept.cell}'s gate goes (this session booted ${String(booted)})`);
       // another cell booted: the link goes, and the door's hold seats this session's own dial past the gate (ZE9c)
       kept.shell.dispose();
     }
@@ -422,6 +423,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const enter = shell.enter;
   if (enter !== undefined && ports.grid !== null) scope.onDispose(lendOnlineGate(async cell => {
     const at = await enter(cell);
+    console.info(`[grid] zone entry: the door ${at === null ? 'refused' : 'answered'} ${cell}${ended || scope.disposed ? ' (session gone)' : ''}`);
     if (at === null || ended || scope.disposed) return null;
     ended = true; leaves(); handedOver = { shell, cell };
     return at;

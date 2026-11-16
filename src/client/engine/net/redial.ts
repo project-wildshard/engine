@@ -97,7 +97,9 @@ export class Redial {
   constructor(options: RedialOptions) {
     this.options = options; this.transport = options.transport; this.now = options.now ?? diagnosticNow; this.random = options.random ?? jitterFrom(this.now()); this.online = options.online ?? browserOnline;
     this.tickAt = this.now();
-    this.offFrame = options.client.onFrame(() => { this.heard(); });
+    // ZE10d2: a held client (a gate's entry, the cell loading) still hears its link's frames
+    const offHeard = options.client.onFrame(() => { this.heard(); }), offHeld = options.client.onHeldFrame(() => { this.heard(); });
+    this.offFrame = () => { offHeard(); offHeld(); };
     this.offClose = this.watchClose(options.transport);
     this.scope.interval(WATCH_MS, () => { this.watch(); });
   }
