@@ -307,7 +307,7 @@ export class SweptMelee extends Melee {
     if (move === null) { super.serverHit(hit); return; }
     this.aimPose(_aimOrigin, _aimRotation); this.aimRay(_aimOrigin, _fwd);
     _v2.copy(_fwd).applyAxisAngle(Y_AXIS, Math.PI / 2); sweptStrikePush(_push, _fwd, _v2, move.sweep);
-    this.landed(move, hit.kind, _hitPoint.copy(hit.at), this.player.position.y, hit.killed);
+    this.landed(move, hit.kind, _hitPoint.copy(hit.at), this.player.position.y, hit.killed, hit.species ?? hit.kind);
     this.onMoveHit(move, hit.killed);
   }
   /** The start the server refused goes at once, with whatever it queued (P1-E5.3-E5). */
@@ -536,11 +536,12 @@ export class SweptMelee extends Melee {
     // knockback: away from the player, biased the way the sweep travels (Animal.stagger flattens it)
     sweptStrikePush(_push, _fwd, _v2, move.sweep);
     if (!killed) animal.stagger?.(_push, move.stagger);
-    this.landed(move, animal.kind, point, animal.position.y, killed);
+    const species = animal.species === undefined || animal.species === '' ? animal.kind : animal.species;
+    this.landed(move, animal.kind, point, animal.position.y, killed, species);
     this.onMoveHit(move, killed);
   }
   /** What a blow plays, wherever it was settled. `point`, and `_push`, `_fwd` for its throw, are the caller's. */
-  private landed(move: Move, kind: string, point: THREE.Vector3, feetY: number, killed: boolean): void {
+  private landed(move: Move, kind: string, point: THREE.Vector3, feetY: number, killed: boolean, species = kind): void {
     // hit-stop (C2): the first contact of a swing stops the WORLD (Game.hitStop — the swing, the target, the player) for the
     // move's 60 / 90 / 140 ms; the stars, trail fade and camera kick run on worldTime.realDt through it
     if (!this.hitDone) { this.hitDone = true; this.game.hitStop(move.hitStop * this.swingScale); this.jolt = move === this.mv.heavy ? 1.6 : 1; this.fx.kick(move.kick.pitch * 0.5, move.kick.roll * 0.5); }
@@ -548,7 +549,7 @@ export class SweptMelee extends Melee {
     // contact debris by what was struck (C4): shell shards off a crab, splinters off the sailor, a sand puff at anything
     // else's feet; the iron blade throws sparks off shell and timber
     const heavyK = move === this.mv.heavy ? 1.6 : 1;
-    const debris = this.defaults.debris(kind);
+    const debris = move.debris?.overrides?.find(row => row.target === species)?.effect ?? move.debris?.default ?? this.defaults.debris(kind);
     const debrisPoint = debris.atFeet ? _v3.set(point.x, feetY + 0.05, point.z) : point;
     this.impacts.burst(debris.surface, debrisPoint, _push, Math.round(debris.count * heavyK));
     if (this.iron && debris.sparks) this.impacts.burst('sparks', point, _push, Math.round(10 * heavyK));

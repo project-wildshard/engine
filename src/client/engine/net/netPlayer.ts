@@ -123,8 +123,10 @@ export class NetPlayer implements PlayerLink {
       // an own blow plays the moment it is heard: the predicted swing already ran (J47)
       if (event.kind !== 'hit' || event.confirmFor === 0) return;
       this.attacks.confirm(event.confirmFor);
-      const kind = this.client.entities.get(event.target)?.initial['kind'];
-      this.weapons?.serverHit({ kind: typeof kind === 'string' ? kind : '', at: new Vector3(...event.at), head: event.head, killed: event.killed, amount: event.amount, seq: event.confirmFor });
+      const initial = this.client.entities.get(event.target)?.initial, kind = initial?.['kind'], species = initial?.['species'];
+      this.weapons?.serverHit({ kind: typeof kind === 'string' ? kind : '',
+        ...(typeof species === 'string' && species !== '' ? { species } : {}),
+        at: new Vector3(...event.at), head: event.head, killed: event.killed, amount: event.amount, seq: event.confirmFor });
     }),
     client.onRide(event => { if (event.rider === client.welcome?.handle) this.heard.push(event); }),
     // A crossing is a snap (§5.2): nothing is sent until the next world's first frame seats this body there, in its coordinates.

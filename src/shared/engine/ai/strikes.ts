@@ -1,4 +1,5 @@
 import type { CombatTag } from '../combat/pipeline';
+import type { StrikeDebrisPolicy } from '@wildshard/format/strikeDebris';
 import { Hfsm } from './hfsm';
 
 export interface BrainPoint { x: number; y: number; z: number }
@@ -28,6 +29,7 @@ export interface StrikeContext {
   hit: (spec: StrikeSpec) => void;
 }
 export interface StrikeSpec {
+  debris?: StrikeDebrisPolicy;
   id: string; shape: StrikeShape; windup: number; active: number; recover: number; cooldown: number;
   range: number; damage: number; tags: readonly CombatTag[];
   weight: (ctx: StrikeContext) => number;

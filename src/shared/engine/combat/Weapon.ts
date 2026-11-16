@@ -17,7 +17,7 @@ export interface WeaponState {
 }
 export interface AimInfo { kind: string; distance: number }
 /** A blow of this client's that the server settled (J47), in the page's terms. `at` is where its shooter saw it land. */
-export interface OwnHit { readonly kind: string; readonly at: Vector3; readonly head: boolean; readonly killed: boolean; readonly amount: number; readonly seq: number }
+export interface OwnHit { readonly kind: string; readonly species?: string; readonly at: Vector3; readonly head: boolean; readonly killed: boolean; readonly amount: number; readonly seq: number }
 /** A held weapon's line to the server when one owns its player (P1-E5.3-E1): what its next command should carry. */
 export interface WeaponWire {
   /** An attack press. `started`: it started here, which the server confirms or

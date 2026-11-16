@@ -29,8 +29,8 @@ export function isMeleeProfile(row: EquipmentRow): row is MeleeProfile {
 
 /** Numeric admitted contact/clock data; the engine owns no schema or shard-specific equipment content. */
 export interface MeleeCombatProfile extends Pick<MeleeProfile, 'family' | 'damage' | 'reach' | 'swingScale' | 'cooldown' | 'comboGap' | 'chainLag' | 'heavyCharge' | 'lunge' | 'sweep'> {
-  moves: { combo: readonly (Pick<Move, 'windup' | 'slashEnd' | 'total' | 'damage'> & Partial<Pick<Move, 'stagger' | 'sweep' | 'reach'>>)[];
-    heavy: Pick<Move, 'windup' | 'slashEnd' | 'total' | 'damage'> & Partial<Pick<Move, 'stagger' | 'sweep' | 'reach'>> };
+  moves: { combo: readonly (Pick<Move, 'windup' | 'slashEnd' | 'total' | 'damage'> & Partial<Pick<Move, 'stagger' | 'sweep' | 'reach' | 'debris'>>)[];
+    heavy: Pick<Move, 'windup' | 'slashEnd' | 'total' | 'damage'> & Partial<Pick<Move, 'stagger' | 'sweep' | 'reach' | 'debris'>> };
 }
 
 /** Compose admitted numeric combat data with an existing native pose recipe. Preserve identity, metadata, cues and all view fields. */

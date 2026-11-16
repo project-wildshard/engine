@@ -17,6 +17,7 @@ import { applyMeleeCombatProfile, type MeleeProfile } from '../src/shared/engine
 import { hitscan } from '../src/client/engine/combat/view/hitscan';
 import { Projectiles } from '../src/client/engine/combat/view/projectile';
 import { SweptMelee } from '../src/client/engine/combat/view/SweptMelee';
+import { Impacts } from '../src/client/engine/fx/Impacts';
 import type { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import type { Targets, TargetHit } from '../src/client/engine/combat/types';
 import type { Player } from '../src/client/engine/player/Player';
@@ -162,6 +163,38 @@ test('Driftwood: a real walk, free swings and the page\'s own Sword land the sam
       expect(trace).toEqual(server); expect(twin.alive).toBe(false);
       pushes.slice(0, -1).forEach((push, swing) => { push.forEach((axis, index) => { expect(axis).toBeCloseTo(thrown[swing]?.[index] ?? Number.NaN, 1); }); });
     } finally { browser.dispose(); }
+  } finally { live.dispose(); }
+}, 120_000);
+
+test('declared move debris resolves actual local and confirmed contacts by species row with the original heavy scaling', async () => {
+  const { product, resident } = await shipped('driftwood-isle'), live = await resident();
+  try {
+    const crab = nearest(live, 'crab'); hold(live); tick(live, 2); facing(live, crab, 1.4);
+    crab.species = 'fixture.shell'; crab.hp = crab.maxHp = 10000;
+    const page = pageWorld(live, chest(crab)), row = v.parse(MeleeWeaponProfileSchema, weaponRow(product.shardfile, 'weapon.driftwood-isle.wood').profile);
+    const debris = { default: { surface: 'sand' as const, count: 4, atFeet: true, sparks: false }, overrides: [
+      { target: 'fixture.shell', effect: { surface: 'shell' as const, count: 2, atFeet: false, sparks: false } },
+      { target: 'fixture.timber', effect: { surface: 'wood' as const, count: 3, atFeet: false, sparks: false } },
+    ] };
+    const admitted = v.parse(MeleeWeaponProfileSchema, { ...row, moves: { combo: row.moves.combo.map(move => ({ ...move, debris })), heavy: { ...row.moves.heavy, debris } } });
+    const targets = pageTargets(live);
+    expect(targets.raycast(page.eye, page.direction, 3.5)?.animal).toBe(crab);
+    const profile = applyMeleeCombatProfile(SWORD_WOOD, admitted), sword = pageSword(page, targets, profile);
+    const burst = vi.spyOn(Impacts.for(page.game), 'burst'), stop = vi.spyOn(page.game, 'hitStop');
+    try {
+      sword.tryFire(); for (let frame = 0; frame < 30; frame++) sword.update(1 / 60, frame / 60);
+      expect(burst).toHaveBeenCalledWith('shell', expect.any(Vector3), expect.any(Vector3), 2);
+      const stops = stop.mock.calls.length;
+      sword.serverHit({ kind: crab.kind, species: 'fixture.timber', at: chest(crab), head: false, killed: false, amount: 1, seq: 1 });
+      expect(burst).toHaveBeenLastCalledWith('wood', expect.any(Vector3), expect.any(Vector3), 3);
+      expect(stop).toHaveBeenCalledTimes(stops);
+      sword.serverHit({ kind: crab.kind, species: 'fixture.other', at: chest(crab), head: false, killed: false, amount: 1, seq: 2 });
+      expect(burst).toHaveBeenLastCalledWith('sand', expect.any(Vector3), expect.any(Vector3), 4);
+      sword.adsHeld = true; for (let frame = 30; frame < 110; frame++) sword.update(1 / 60, frame / 60);
+      sword.adsHeld = false; sword.update(1 / 60, 110 / 60); expect(sword.heavySwing).toBe(true);
+      sword.serverHit({ kind: crab.kind, species: 'fixture.timber', at: chest(crab), head: false, killed: false, amount: 1, seq: 3 });
+      expect(burst).toHaveBeenLastCalledWith('wood', expect.any(Vector3), expect.any(Vector3), 5);
+    } finally { burst.mockRestore(); stop.mockRestore(); }
   } finally { live.dispose(); }
 }, 120_000);
 
