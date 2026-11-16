@@ -162,7 +162,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: nightly-heads-${{ matrix.browser }}-${{ matrix.group }}
-          path: tmp/nightly/reports/heads-*.json
+          path: |
+            tmp/nightly/reports/heads-*.json
+            tmp/nightly/reports/failures/**/*.json
           if-no-files-found: error
           retention-days: 7
   report:
@@ -259,6 +261,8 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: nightly-head-diagnostic
-          path: tmp/nightly/reports/heads-*.json
+          path: |
+            tmp/nightly/reports/heads-*.json
+            tmp/nightly/reports/failures/**/*.json
           if-no-files-found: warn
           retention-days: 7

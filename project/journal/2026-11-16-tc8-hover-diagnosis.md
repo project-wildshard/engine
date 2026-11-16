@@ -67,3 +67,11 @@ prints them. Its 600-second deadline stays; Ring 1's smaller envelope
 stays. This corrects the qualification envelope; it does not establish
 the cause of Pine's timeout. A targeted hosted run will check the cook
 under production limits.
+
+The old runner deleted every boot/Explorer failure receipt, retaining
+only a truncated phase error. Their common directory also allowed an
+Explorer success to overwrite the boot JSON. Each observer now gets its
+own subdirectory; failed heads retain their actual JSON observations in
+the uploaded artifact before large packs/captures are retired. Successful
+heads keep the existing compact receipt. No screenshot or trace archive
+is added to the artifact, and admission does not change.

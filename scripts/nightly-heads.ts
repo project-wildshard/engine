@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // An already-built checkout, cold worker products, actual phone UI, no shard source fetch.
 import {execFileSync} from 'node:child_process';
-import {mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
+import {cpSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {createServer} from 'node:http';
 import {homedir} from 'node:os';
 import {join, resolve as resolvePath} from 'node:path';
@@ -116,8 +116,10 @@ try {
       browser = browserName === 'webkit' ? await webkit.launch({headless: true}) : await chromium.launch({headless: true,
         args: [...KEYCHAIN_ARGS, `--use-angle=${process.platform === 'darwin' ? 'metal' : 'swiftshader'}`, '--ignore-gpu-blocklist', '--mute-audio']});
       const activeBrowser = browser, url = preview.url;
+      const bootEvidence = join(evidence, 'boot'), explorerEvidence = join(evidence, 'explorer');
+      mkdirSync(bootEvidence); mkdirSync(explorerEvidence);
       await phase('boot', async () => {
-        const boot = await bootCase(activeBrowser, url, mode, evidence, route, true, async page => {
+        const boot = await bootCase(activeBrowser, url, mode, bootEvidence, route, true, async page => {
           await phase('hover', async () => {
             // J352: these product boots are inside a zone, whose cruise is
             // 14 m/s. Road cruise is exercised by the grid tests.
@@ -192,7 +194,7 @@ try {
         if ([...fetched].some(key => !index.keys.includes(key))) throw new Error('Page fetched an object outside this head cook');
         return {route, entry: mode, gameplayFrames: boot.frame, ms: boot.elapsedMs, fetched: used};
       });
-      await phase('explorer', async () => {await sweepExplorer(activeBrowser, url, route, evidence, true); return {route, rendered: true};});
+      await phase('explorer', async () => {await sweepExplorer(activeBrowser, url, route, explorerEvidence, true); return {route, rendered: true};});
     } catch (error) {
       if (!result.phases.some(row => row.name === 'boot')) result.phases.push({name: 'boot', ok: false, error: (error instanceof Error ? error.stack ?? String(error) : String(error)).slice(0, 4000)});
       checkpoint();
@@ -202,6 +204,8 @@ try {
         const server = packs; server.closeAllConnections();
         await new Promise<void>((resolve, reject) => {server.close(error => {if (error === undefined) resolve(); else reject(error);});}).catch(retirementFailed);
       }
+      if (result.phases.some(row => !row.ok)) cpSync(evidence, join(out, 'failures', `${browserName}-${groupText}-${head.slug}`),
+        {recursive: true, filter: path => statSync(path).isDirectory() || path.endsWith('.json')});
       // Own generated outputs only. Reports are checkpointed separately from large packs/captures.
       rmSync(cooked, {recursive: true, force: true}); rmSync(evidence, {recursive: true, force: true});
     }
