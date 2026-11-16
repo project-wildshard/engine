@@ -1,4 +1,4 @@
-import { installWorldFixture } from './fixtures/worldSetup';
+import {installFrozenSpeciesWorld as installWorldFixture} from './fixtures/frozen/speciesWorld';
 import { afterEach, expect, test, vi } from 'vitest';
 import { AnimalFactory, type AnimalModel } from '../src/client/engine/entities/AnimalFactory';
 import { SkyRig } from '../src/client/engine/world/skyRig';

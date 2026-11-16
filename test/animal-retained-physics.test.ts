@@ -13,7 +13,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createSimHost } from '../src/server/engine/sim';
 import { addPiece } from '../src/shared/engine/physics/pieces';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
-import { installWorldFixture } from './fixtures/worldSetup';
+import {installKitWorldFixture as installWorldFixture} from './fixtures/kit-world';
 
 await installWorldFixture();
 

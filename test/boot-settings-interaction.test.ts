@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest';
-import { installWorldFixture } from './fixtures/worldSetup';
+import {installKitWorldFixture as installWorldFixture} from './fixtures/kit-world';
 import { Scope } from '../src/shared/engine/app/scope';
 import { activeLevel, bindLevelSelection } from '../src/shared/engine/level/selection';
 import { openBootSettings } from '../src/client/engine/ui/BootSettings';
@@ -66,7 +66,7 @@ test('SR11: the title panel is the in-game tabs, and a quality pick reloads once
     openBootSettings();
     const root = document.querySelector('.ws-gmenu');
     if (root === null) throw new Error('missing title Settings');
-    const tabs = [...root.querySelectorAll<HTMLElement>('.ws-gmenu-svtab')].filter(b => !b.hidden).map(b => b.dataset['svTab']);
+    const tabs = [...root.querySelectorAll<HTMLElement>('.ws-gmenu-svtab')].filter(b => b.hidden === false).map(b => b.dataset['svTab']);
     expect(tabs).toEqual(['graphics', 'sound', 'controls', 'saves', 'system']);
     expect(root.querySelector('[data-setting="volume"]')).not.toBeNull(); // Sound is the in-game Sound
     expect(root.querySelector('[data-setting="musicStyle"]')).toBeNull(); // AUDIO AU16 (J304): one music style, no choice

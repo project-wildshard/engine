@@ -4,7 +4,9 @@ import { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { SimHost } from '@wildshard/engine/sim';
 import { nativeGroupBrain } from '@wildshard/format/groupBrains';
 import { NativeGroupCollection } from '@wildshard/engine/game/shardfile/groupRuntime';
-import brains from '../../src/shards/nalati-grasslands/data/brains.json' with { type: 'json' };
+import {parse,object,record,string,unknown} from 'valibot';
+import {frozenRuntimeJson} from './frozen/snapshots';
+const brains=parse(object({pack:record(string(),unknown())}),frozenRuntimeJson('nalati-brains.json'));
 import { SIM_LEVEL } from './sim-level/level';
 
 /** A real group owner that never acts, for a riding fixture: no host entity, random stream or step participant. */

@@ -11826,5 +11826,115 @@
     "sourceRevision": "aeb86d1388e11bc4533aa1c8d5d7f4de6eddaa2e",
     "sourceBlob": "ed9eb8deab75947ea286f9a5355ed494935e6d54",
     "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/creature-spawner.test.ts",
+    "outcome": "restored",
+    "target": "test/creature-spawner.test.ts",
+    "decision": "CI21 E-GAME: The creature spawner materializes ordered groups through the manager, retires only the actors it owns (one per slice step), keeps the native corpse fade clock while the player returns near, and reports a refused manager decision once without stopping other animals or later frames. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "materializes ordered groups through the manager and retires only owned actors",
+      "native corpse gates keep the original fade clock while the player returns near",
+      "a sliced retirement retires one owned actor a step, then nothing more",
+      "a refused manager decision reports once without stopping other animals or later frames"
+    ],
+    "sourceRevision": "c4387bd420f92a08c50ffa9040ffac9e62b5e7be",
+    "sourceBlob": "cbda62d72c806ab9702fd5bf66fdfc715841ab7d",
+    "retirementProof": "No cases retired. Original assertion bodies unchanged; Pine boar/look/clip values exported from exact locked SDK0.2.12/engine0.1.18/format0.4.9 graph; actual pinned product controls remain."
+  },
+  {
+    "repo": "engine",
+    "file": "test/creature-refill.test.ts",
+    "outcome": "restored",
+    "target": "test/creature-refill.test.ts",
+    "decision": "CI21 E-GAME: J109/J108: a spawn point refills on a timer, faster with more players near it, never in front of a player or past the shard budget. A room that shrinks to one player holds what it owes. One player's game changes by no byte. The herd sim refills kills and tames only in rooms. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "the rate is the players near the point, and one player is always exactly 1",
+      "one player owes nothing, draws nothing and keeps no state",
+      "two players near fill a point twice as fast as two players away from it",
+      "nothing appears in front of a player, or past the budget, and both only delay it",
+      "a room that shrinks to one player holds what it owes, and its save row lives only while something is owed",
+      "a return stays out of sight of whichever player is nearest it",
+      "the herd sim refills a kill and a tame in a room, and neither for one player",
+      "a shipped host runs a home twice as fast with two players near, and one player keeps the 50 s clock",
+      "a shipped room refills a fallen herd animal through a save, and its solo twin never gains the row"
+    ],
+    "sourceRevision": "c4387bd420f92a08c50ffa9040ffac9e62b5e7be",
+    "sourceBlob": "b0c36cedd97ae51edc7274be9ed986daf65e7ead",
+    "retirementProof": "No cases retired. Original assertion bodies unchanged; same original Pine boar fixture replaces moved generator imports."
+  },
+  {
+    "repo": "engine",
+    "file": "test/mounted-figure.test.ts",
+    "outcome": "restored",
+    "target": "test/mounted-figure.test.ts",
+    "decision": "CI21 E-RENDER-O: A seated figure on a different rig (a marsh ferryman) binds its own joints and cue clocks without another channel program. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "a marsh ferryman binds different joints and cue clocks without another channel program"
+    ],
+    "sourceRevision": "c4387bd420f92a08c50ffa9040ffac9e62b5e7be",
+    "sourceBlob": "768213fcb8e0848edb140a6baad79fd6195d3656",
+    "retirementProof": "No cases retired. Original mounted profile and raw shape pins replace moved Nalati generators. Removed unused whole-world setup: SeatedFigure consumes the explicit raw shapes/profile/owner. Original clip, joint and refusal assertions unchanged."
+  },
+  {
+    "repo": "engine",
+    "file": "test/animal-retained-physics.test.ts",
+    "outcome": "restored",
+    "target": "test/animal-retained-physics.test.ts",
+    "decision": "CI21 E-RENDER-O: When the source scope retires, animal floors keep their destination physics bodies if retained and drop them correctly if not, across the herd view, forest and sky rig. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "animal floors retain destination physics across source retirement: %s"
+    ],
+    "sourceRevision": "c4387bd420f92a08c50ffa9040ffac9e62b5e7be",
+    "sourceBlob": "b9b8fc6cdd912afdb0afa21da1856d18bfdcc530",
+    "retirementProof": "No cases retired. Use existing installKitWorldFixture for the actual registry/assets/shared species; original retained physics assertions unchanged."
+  },
+  {
+    "repo": "engine",
+    "file": "test/boot-settings-interaction.test.ts",
+    "outcome": "restored",
+    "target": "test/boot-settings-interaction.test.ts",
+    "decision": "CI21 E-RENDER-O: The boot settings menu stages a reload choice on pointerup without applying or navigating until the explicit Apply, supports undo and keyboard clicks, the real title panel reloads only once on Apply, retired diagnostics are gone, and storage sits under Clear downloads. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "a reload choice answers pointerup without applying or navigating until the explicit button",
+      "undoing a staged choice clears it and keyboard clicks remain available",
+      "SR11: the title panel is the in-game tabs, and a quality pick reloads once from Graphics ▸ Reload now",
+      "retired diagnostics are absent while Clear downloads remains in Developer",
+      "storage lives under Clear downloads rather than a diagnostic row"
+    ],
+    "sourceRevision": "c4387bd420f92a08c50ffa9040ffac9e62b5e7be",
+    "sourceBlob": "1bd6ce8d89d7d69347df8a6c35f1f86a9b024450",
+    "retirementProof": "No cases retired. Existing installKitWorldFixture supplies the actual registry/assets/shared species. The assertions are preserved. The sole body rewrite makes the visible-tab predicate explicit (hidden === false instead of !hidden) for the current DOM boolean/string union; happy-dom returns booleans, preserving original visibility selection."
+  },
+  {
+    "repo": "engine",
+    "file": "test/animal-model-preparation.test.ts",
+    "outcome": "restored",
+    "target": "test/animal-model-preparation.test.ts",
+    "decision": "CI21 E-RENDER-O: AnimalFactory prepares exact cached animal model variants in the calling owner across spent frame slices, refuses further construction once the owner retires mid-slice, keeps every bear/horse/wolf joint and posed vertex through one bind inversion, and prepares every potential variant when placement leaves the roll to the manager. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "prepares exact cached variants in the calling owner across spent frame slices",
+      "retiring the owner during a pending slice refuses further model construction",
+      "one bind inversion preserves every native %s joint and posed vertex",
+      "prepares all potential variants when authored placement leaves the manager to roll"
+    ],
+    "sourceRevision": "c4387bd420f92a08c50ffa9040ffac9e62b5e7be",
+    "sourceBlob": "24dba0ad3b77b88c07949df8889c578187ec655d",
+    "retirementProof": "No cases retired. Full frozen H2 Nalati presentation/hullBook/looks, exact original compressed packed bodies and crack bytes, actual Pine elk declaration and native catalogue preload. Preserve all model variants, frame-slice and closed-owner controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/net-ride.test.ts",
+    "outcome": "restored",
+    "target": "test/net-ride.test.ts",
+    "decision": "CI21 E-RUNTIME-O: A ride put back over a real NetClient and NetRoom replays exactly: its words and its capsule are its whole state, with the saddle predicted on the page. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "%s: a gallop is predicted, and corrected nowhere",
+      "a ride put back replays exactly: its words and its capsule are the whole of its state"
+    ],
+    "sourceRevision": "c4387bd420f92a08c50ffa9040ffac9e62b5e7be",
+    "sourceBlob": "3b48d1c36f53658a1dd41069c9f29927f80bade6",
+    "retirementProof": "No cases retired. Original riding Wasm/witness and exact same-owner module loan; original Nalati pack brain fields parsed by nativeGroupBrain; full frozen species catalogue. Preserve all original replay words, capsule and riding continuation assertions."
   }
 ]

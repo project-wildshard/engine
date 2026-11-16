@@ -25,9 +25,8 @@ import { installMountedPlayer, type NativeMountedPlayer } from '../src/server/ga
 import { SIM_CREATURE_RECIPE } from '../src/test/game/creatureRecipe';
 import { dormantHerd } from './fixtures/dormant-herd';
 import { courseHeightAt, HostSide, loadCourseRapier, PageSide, TARGET_ID, type MotionScenario } from './fixtures/motion-trace/parity';
-import { lendNalatiPasture, lendNalatiRiding } from './fixtures/nalati-return-modules';
-import { installWorldFixture } from './fixtures/worldSetup';
-import { NALATI_RIDING_PROGRAMS as programs } from './fixtures/nalati-riding';
+import {lendFrozenPasture as lendNalatiPasture, lendFrozenRiding as lendNalatiRiding, frozenRiding as programs} from './fixtures/frozen/runtimePrograms';
+import {installFrozenSpeciesWorld as installWorldFixture} from './fixtures/frozen/speciesWorld';
 
 await installWorldFixture();
 

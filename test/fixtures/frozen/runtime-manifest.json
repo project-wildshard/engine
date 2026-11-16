@@ -69,6 +69,27 @@
       "sourceRepository": "project-wildshard/sharddev",
       "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
       "captureEngineRevision": "aeb86d13"
+    },
+    "pine-creature-world.json": {
+      "bytes": 126490,
+      "sha256": "67941097975ee9df3a65b3b99c4c2f2f1b2cf69a377706dd46d592d35a7fd5d4",
+      "sourceRepository": "project-wildshard/shard-pine-hollow",
+      "sourceCommit": "6f94b9c150fb81e8ca70c4be88ec458d2434fdb5",
+      "sdk": "0.2.12",
+      "engine": "0.1.18",
+      "format": "0.4.9",
+      "sourcePaths": [
+        "src/generators/speciesRows.ts",
+        "src/generators/nativeView.ts",
+        "src/generators/thrallClips.ts"
+      ]
+    },
+    "nalati-brains.json": {
+      "bytes": 1281,
+      "sha256": "4c44951f5c866bb7a90334ca2bfa449e51ff1e5fcd5f1bd2f86a4b92b14d5e17",
+      "sourceRepository": "project-wildshard/shard-nalati",
+      "sourcePath": "src/data/brains.json",
+      "sourceCommit": "a0ae32bfab5e80400a20d39eb381804bcc84814f"
     }
   },
   "exportRecipes": {
@@ -79,6 +100,10 @@
     "export-projection.mjs": "import {readFileSync,writeFileSync} from 'node:fs';\nimport {actorProjection} from '<checkouts>/shard-nalati/src/generators/actorProjection.ts';\nimport {parse} from 'valibot';\nimport {CreatureGuestSchema} from '@wildshard/format/speciesBookRows';\nconst guest=parse(CreatureGuestSchema,JSON.parse(readFileSync('test/fixtures/frozen/nalati/nalati-species-view.json','utf8')).presentation.guest);\nwriteFileSync('test/fixtures/frozen/balbal-guest.json',JSON.stringify(guest)+'\\n');\nwriteFileSync('test/fixtures/frozen/balbal-projection.json',JSON.stringify(actorProjection(guest))+'\\n');\n",
     "ci21-cosmetic-zero-channel.mjs": "// SDK source da2a4ddb; run pnpm install --frozen-lockfile first.\nimport {writeFileSync} from 'node:fs';\nimport {ClientChannels} from '<checkouts>/sharddev/src/sharddev/clientChannels.ts';\nconst row=new ClientChannels('cosmetic');row.output('y',row.constant(0));\nwriteFileSync('<checkouts>/engine/test/fixtures/frozen/cosmetic-zero-channel.json',JSON.stringify([row.build()])+'\\n');\n// Run under Node with the SDK format hook and relative TypeScript resolution.\n",
     "ci21-cosmetic-one-channel.mjs": "// SDK source da2a4ddb; run pnpm install --frozen-lockfile first.\nimport {writeFileSync} from 'node:fs';\nimport {ClientChannels} from '<checkouts>/sharddev/src/sharddev/clientChannels.ts';\nconst row=new ClientChannels('cosmetic');row.output('y',row.constant(1));\nwriteFileSync('<checkouts>/engine/test/fixtures/frozen/cosmetic-one-channel.json',JSON.stringify([row.build()])+'\\n');\n// Run under Node with the SDK format hook and relative TypeScript resolution.\n",
-    "ci21-decision-worker-product.ts": "// SDK da2a4ddb; pnpm install --frozen-lockfile first.\n// Replay original engine aeb86d13:test/decision-simulation.test.ts, case SDK worker executes.\n// Alias its ../src/sharddev/projectOutput to this wrapper; nameBlob to the pinned SDK, compileScript through the source-keyed guest export recipe.\n// The original fixture() and beforeAll define the exact shard, Wasm and arguments; preserve native Maps/bytes over v8 I/O.\nimport {mergeProjectBlobs as merge} from '<checkouts>/sharddev/src/sharddev/projectOutput.ts';\nimport {writeFileSync} from 'node:fs';\nimport {createHash} from 'node:crypto';\nexport function mergeProjectBlobs(...args:Parameters<typeof merge>){\n const inputSha256=createHash('sha256').update(JSON.stringify(args[0])).digest('hex');\n const result=merge(...args);\n writeFileSync('tmp/codex-tc48/decision-worker-product.json',JSON.stringify({inputSha256,sourceCommit:'da2a4ddb564db35b5c3bcba4ba1358de92ced1af',shard:result.shard,assets:[...result.assets].map(([hash,bytes])=>[hash,Buffer.from(bytes).toString('base64')])})+'\\n');\n return result;\n}\n"
+    "ci21-decision-worker-product.ts": "// SDK da2a4ddb; pnpm install --frozen-lockfile first.\n// Replay original engine aeb86d13:test/decision-simulation.test.ts, case SDK worker executes.\n// Alias its ../src/sharddev/projectOutput to this wrapper; nameBlob to the pinned SDK, compileScript through the source-keyed guest export recipe.\n// The original fixture() and beforeAll define the exact shard, Wasm and arguments; preserve native Maps/bytes over v8 I/O.\nimport {mergeProjectBlobs as merge} from '<checkouts>/sharddev/src/sharddev/projectOutput.ts';\nimport {writeFileSync} from 'node:fs';\nimport {createHash} from 'node:crypto';\nexport function mergeProjectBlobs(...args:Parameters<typeof merge>){\n const inputSha256=createHash('sha256').update(JSON.stringify(args[0])).digest('hex');\n const result=merge(...args);\n writeFileSync('tmp/codex-tc48/decision-worker-product.json',JSON.stringify({inputSha256,sourceCommit:'da2a4ddb564db35b5c3bcba4ba1358de92ced1af',shard:result.shard,assets:[...result.assets].map(([hash,bytes])=>[hash,Buffer.from(bytes).toString('base64')])})+'\\n');\n return result;\n}\n",
+    "ci21-pine-creatures-export.test.ts": "import {test} from 'vitest';\nimport {writeFileSync,readFileSync,existsSync} from 'node:fs';\nimport assert from 'node:assert/strict';\ntest('one-shot exact Pine boar fixture export',async()=>{\n const {PINE_BOAR,pineElk}=await import('<checkouts>/shard-pine-hollow/src/generators/speciesRows.ts');\n const {SPECIES_LOOKS}=await import('<checkouts>/shard-pine-hollow/src/generators/nativeView.ts');\n const {THRALL_CLIPS}=await import('<checkouts>/shard-pine-hollow/src/generators/thrallClips.ts');\n const bytes=JSON.stringify({boar:PINE_BOAR,elk:pineElk(),looks:SPECIES_LOOKS,clips:THRALL_CLIPS},(_key,value)=>{if(typeof value==='function')throw Error('Executable value in frozen Pine input');return value;})+'\\n';\n const path='tmp/codex-tc48/pine-creatures-locked.json';if(existsSync(path))assert.equal(readFileSync(path,'utf8'),bytes);else writeFileSync(path,bytes,{flag:'wx'});\n});\n",
+    "ci21-pine-creatures-config.mjs": "import config from '../../vitest.config.ts';\nimport {createRequire} from 'node:module';\nconst sdk='<cached-sdk-0.2.12-exact-locked-graph>/package.json';\nconst r=createRequire(sdk),pine='<checkouts>/shard-pine-hollow/';\nconst plugin={name:'pine-fixture-export-dependencies',enforce:'pre',resolveId(source,importer){\n if(source.startsWith('@wildshard/sharddev'))return r.resolve(source.replace('@wildshard/sharddev','@wildshard/sdk'));\n if(importer?.startsWith(pine)&&!source.startsWith('.')&&!source.startsWith('/')&&!source.startsWith('node:'))return r.resolve(source);\n}};\nconfig.test.projects=config.test.projects.filter(project=>project.test.name==='node');\nfor(const project of config.test.projects){project.plugins.push(plugin);project.test.include=['tmp/codex-tc48/export-pine.test.ts'];project.test.exclude=[];project.test.server.deps.inline=[/@wildshard\\//u];}\nexport default config;\n",
+    "ci21-nalati-brains.txt": "Copy shard-nalati a0ae32bfab5e80400a20d39eb381804bcc84814f:src/data/brains.json byte-for-byte. Runtime nativeGroupBrain parses the original pack fields. No derived brain logic.",
+    "ci21-pine-creatures-reproduction.txt": "At engine c4387bd4, materialize recipe ci21-pine-creatures-export.test.ts as tmp/codex-tc48/export-pine.test.ts and ci21-pine-creatures-config.mjs as tmp/codex-tc48/pine-export.mjs. Set <checkouts> and the exact locked SDK0.2.12 cached graph path; it must resolve engine0.1.18/format0.4.9. Run pnpm exec vitest run --config tmp/codex-tc48/pine-export.mjs. Copy tmp/codex-tc48/pine-creatures-locked.json byte-for-byte to test/fixtures/frozen/pine-creature-world.json. Verify length126490 and sha25667941097975ee9df3a65b3b99c4c2f2f1b2cf69a377706dd46d592d35a7fd5d4. Remove owned capture scratch after verifying."
   }
 }
