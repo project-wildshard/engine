@@ -3,6 +3,14 @@ on:
   schedule:
     - cron: '37 7 * * *'
   workflow_dispatch:
+  # Observe a source change before it reaches main; dispatch/schedule remain available.
+  push:
+    paths:
+      - .github/workflows/outside-bot.yml
+      - scripts/mmo-bots.mjs
+      - test/fixtures/dedicated/outsideJourney.ts
+      - test/fixtures/dedicated/outsideBotEntry.ts
+      - test/outside-journey.proof.mjs
 permissions:
   contents: read
 concurrency:
@@ -10,6 +18,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   observe:
+    if: github.repository == 'project-wildshard/engine'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     continue-on-error: true
