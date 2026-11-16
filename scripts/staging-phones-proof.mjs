@@ -150,7 +150,14 @@ function android(serial) {
       const held = await page.connect();
       await held.send('Page.navigate', { url }); await sleep(1500);
     },
-    swipe: async (from, to, ms) => { adb('shell', 'input', 'touchscreen', 'swipe', r(from.x), r(from.y), r(to.x), r(to.y), r(ms)); await Promise.resolve(); },
+    // Not `input swipe`: it slides the finger over `ms`, and Chrome hands the page one coalesced move per frame, so on the
+    // emulator's software GPU (1 to 2 fps) the stick read 0.08 (local API 37, 2026-11-16). The thumb goes down, moves to
+    // the end in five steps, holds there for `ms`, then lifts.
+    swipe: async (from, to, ms) => {
+      const steps = [1, 2, 3, 4, 5].map(step => `input touchscreen motionevent MOVE ${r(from.x + (to.x - from.x) * step / 5)} ${r(from.y + (to.y - from.y) * step / 5)}`);
+      adb('shell', [`input touchscreen motionevent DOWN ${r(from.x)} ${r(from.y)}`, ...steps, `sleep ${String(ms / 1000)}`, `input touchscreen motionevent UP ${r(to.x)} ${r(to.y)}`].join('; '));
+      await Promise.resolve();
+    },
     tap: async at => { adb('shell', 'input', 'touchscreen', 'tap', r(at.x), r(at.y)); await Promise.resolve(); },
     scale: async () => Number(await page.evaluate('window.devicePixelRatio')),
     // `screencap` aborts on the hosted emulator's gfxstream (hasReadColorBufferDma): the page's own capture is the fallback.
@@ -234,11 +241,12 @@ try {
   await phone.evaluate(SETUP);
   console.log(`  ${row} browser and GPU at open: ${JSON.stringify(await phone.evaluate(GPU).catch((/** @type {unknown} */ error) => String(error).slice(0, 200)))}`);
   await phone.evaluate(`location.replace(${JSON.stringify(url)}); true`).catch(() => undefined);
-  await until(phone, "document.querySelector('#ws-name-box input') !== null", 240_000, 'the title and its Name box');
+  // The hosted Android emulator draws on a software GPU at 1 to 2 fps: its title took over 4 minutes (run 43977695438).
+  await until(phone, "document.querySelector('#ws-name-box input') !== null", 480_000, 'the title and its Name box');
   note(row, 'the title shows, with the Name box', true, await phone.evaluate('({ build: globalThis.__WS_BUILD_ID__, href: location.href })'));
   await phone.shot('1-title');
   await phone.evaluate(`(() => { const field = document.querySelector('#ws-name-box input'); field.value = ${JSON.stringify(me)}; field.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#ws-name-box').requestSubmit(); return true; })()`);
-  await until(phone, INSIDE, 240_000, 'the world');
+  await until(phone, INSIDE, 480_000, 'the world');
   await phone.evaluate('(window.__wildshard.world.hud.enterNow(), true)');
   await until(phone, '(window.__workerClient?.().frames ?? 0) > 30', 120_000, 'thirty frames');
   if (await phone.evaluate('window.__wildshard?.world?.game.app.clock.paused === true') === true) await phone.evaluate("(() => { const button = [...document.querySelectorAll('button')].find(each => /^resume$/iu.test(each.textContent?.trim() ?? '')); button?.click(); return button !== undefined; })()");
@@ -283,8 +291,11 @@ try {
     }
   }
   // A socket the page closes while it still dials (the title's dial, then the room's) is listed, not failed, as in online-phone-proof.
+  // Chrome also logs every 404 it fetches ("Failed to load resource", Safari's console does not): listed with its address,
+  // not failed, as in online-phone-proof.
   const lines = faultsOf(phone, socket), dial = (/** @type {{text: string}} */ line) => /^WebSocket connection to 'wss:\/\/rooms-staging\.wildshard\.io\/' failed: WebSocket is closed before the connection is established\.$/u.test(line.text);
-  note(row, 'no page error', lines.other.filter(line => !dial(line)).length === 0, { other: lines.other.filter(line => !dial(line)).slice(0, 8), dials: lines.other.filter(dial).length, health: lines.health.length });
+  const load = (/** @type {{text: string}} */ line) => /^Failed to load resource: /u.test(line.text), other = lines.other.filter(line => !dial(line) && !load(line));
+  note(row, 'no page error', other.length === 0, { other: other.slice(0, 8), dials: lines.other.filter(dial).length, loads: lines.other.filter(load).slice(0, 8), health: lines.health.length });
   code = steps.every(each => each.ok) ? 0 : 1;
 } catch (error) {
   note(row, 'the proof stopped', false, { error: String(error).slice(0, 500), errors: phone.errors.slice(-8) });

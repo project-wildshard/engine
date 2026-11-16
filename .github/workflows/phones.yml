@@ -65,7 +65,7 @@ jobs:
   android:
     if: github.repository == 'project-wildshard/engine'
     runs-on: ubuntu-24.04
-    # Open (row 46, XR-8): the API 37 emulator boots, but its launcher ANRs and Chrome never starts on any software renderer.
+    # Open (row 46, XR-8): Chrome starts and loads staging on the API 37 emulator; the touch walk is not yet proved here.
     continue-on-error: true
     timeout-minutes: 50
     steps:
@@ -94,7 +94,9 @@ jobs:
           # for boot-time package work, Chrome's first-run flags before its first start, `am start -W` and a 3-minute wait
           # for Chrome's process. API 36 is the last fallback (its Chrome must be 137+ for WebCrypto Ed25519).
           up=0
-          for attempt in "$newest swiftshader_indirect" "$newest guest" "${api36:-$newest} swiftshader_indirect"; do
+          # Run 43977695438: on `swiftshader_indirect` (the GLES translator) the page failed on a WebGL fence wait (0x911d,
+          # GL_WAIT_FAILED); `swangle_indirect` is ANGLE over SwiftShader Vulkan, which plays at 1 to 2 fps (local API 37).
+          for attempt in "$newest swangle_indirect" "$newest swiftshader_indirect" "${api36:-$newest} swangle_indirect"; do
             set -- $attempt; image=$1 gpu=$2 tag="$(echo "$image" | grep -oE 'android-[0-9.]+')-$gpu"
             echo "::group::attempt $tag"
             yes | "$bin/sdkmanager" --install "$image" > /dev/null
@@ -142,6 +144,8 @@ jobs:
             echo "Chrome's DevTools socket never opened"; "$adb" shell 'cat /proc/net/unix | grep -i devtools' || true
           fi
           "$adb" shell am force-stop com.android.chrome
+          # Run 43977695438's Chrome said `pointer: fine`: say which input devices the emulator gave the guest.
+          "$adb" shell dumpsys input | grep -E "^    [0-9]+: |Sources:" | head -24 || true
           echo "ANDROID_SERIAL=emulator-5554" >> "$GITHUB_ENV"
       - name: XR-8
         run: node scripts/staging-phones-proof.mjs --device=android --solo --tag="$(printf '%s%s' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" | tail -c 9)" --out=tmp/staging-phones
