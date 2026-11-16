@@ -17,3 +17,9 @@ in the blocking suite. No file, assertion, budget or gate is dropped.
 Work directly in the canonical engine main checkout (mini M1/M2).
 No plan branch, worktree or hosted qualification wait. Fix main red
 or AMBER forward; dedicated-zone-enter belongs to mini-fixes.
+
+The next shared push included the new concurrent main-push helper.
+Its24 typed-lint errors blocked the normal clean-copy gate. Fix the
+actual helper under M2: explicit lengths, proper error name, hoisted
+formatter, nonempty no-op comments and structured argument parsing.
+Preserve empty-string error fallback semantics; do not suppress rules.
