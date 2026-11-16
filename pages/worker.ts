@@ -15,6 +15,7 @@
 // file gives it a cell and the API names it (placed-slug.ts), a new author's shard placed after the build.
 
 import { placedName } from './placed-slug.ts'
+import { apiSlugOf, publicNameOf } from './slug-names.ts'
 import { placedMeta, slugMeta, withSlugMeta } from './slug-meta.ts'
 
 interface Fetcher {
@@ -40,6 +41,7 @@ const NOT_FOUND = 404
 const PLAIN = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }
 const DROPPED = ['content-length', 'etag', 'last-modified']
 const OK = 200
+const FOUND = 302
 const PART = /^\/assets\/spawn\/(?:parts|server)\/[^/]+\.pack\.br$/u
 const NOT_MODIFIED = 304
 
@@ -123,7 +125,19 @@ async function slugPage({ request, url, slug }: SlugRequest, env: Env): Promise<
   if (meta === undefined) {
     return new Response(head ? undefined : `No shard is named ${slug}.\n`, { status: NOT_FOUND, headers: PLAIN })
   }
-  return new Response(head ? undefined : withSlugMeta(html, meta), { status: OK, headers: pageHeaders(asset) })
+  // TC-B12: og:url reads the public name
+  const shared = { ...meta, url: new URL(`/slug/${publicNameOf(slug)}`, url.origin).href }
+  return new Response(head ? undefined : withSlugMeta(html, shared), { status: OK, headers: pageHeaders(asset) })
+}
+
+// oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
+async function namedSlug({ request, url, slug }: SlugRequest, env: Env): Promise<Response> {
+  // TC-B12: an old API slug's link goes to its public name (302: the name may still move), which serves the API slug's page
+  const name = publicNameOf(slug)
+  if (name !== slug) {
+    return Response.redirect(new URL(`/slug/${name}${url.search}`, url).href, FOUND)
+  }
+  return await slugPage({ request, url, slug: apiSlugOf(slug) }, env)
 }
 
 // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
@@ -135,7 +149,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return await page(request, url, env)
   }
   if (slug !== undefined) {
-    return await slugPage({ request, url, slug }, env)
+    return await namedSlug({ request, url, slug }, env)
   }
   if (PART.test(url.pathname)) {
     return await part(request, env)

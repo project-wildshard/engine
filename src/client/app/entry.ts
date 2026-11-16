@@ -37,7 +37,7 @@ import { lastEnd, settleLastEnd } from '@wildshard/engine/boot/lastEnd';
 import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
-import { slugOfPath } from './slugPath';
+import { slugOfPath, slugPathOf } from './slugPath';
 
 
 declare const __BUILD_ID__: string;
@@ -133,7 +133,8 @@ async function enterPage(): Promise<unknown> {
   // SA37: on every host, a world build too: PLAY's `/?chunk=` page enters the world's grid at the shard's cell (GO7 below)
   const slugged = slugOfPath(location.pathname);
   if (slugged !== null && requested === null) {
-    if (location.pathname.replace(/\/$/u, '') !== `/slug/${slugged}`) history.replaceState(history.state, '', `/slug/${slugged}${location.search}`); // a retired slug
+    const path = slugPathOf(slugged); // the address bar reads a shard's public name, not its old API slug
+    if (location.pathname.replace(/\/$/u, '') !== path) history.replaceState(history.state, '', `${path}${location.search}`);
     return showSlugPage(slugged);
   }
   // An embedded author product has its own admission. A game URL must name a

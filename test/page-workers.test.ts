@@ -12,6 +12,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { unstable_readConfig } from 'wrangler';
 import worker, { type Env } from '../pages/worker.ts';
 import { PLACEMENT_PUBLIC_KEY as WORKER_KEY } from '../pages/placed-slug.ts';
+import { SLUG_NAMES } from '../pages/slug-names.ts';
+import pageSlugNames from '../src/client/app/slugNames.json' with { type: 'json' };
 import { PLACEMENT_PUBLIC_KEY } from '../src/shared/game/grid/placementRows';
 
 
@@ -52,7 +54,7 @@ test('wrangler deploy --dry-run passes for all three channels', async () => {
   try {
     mkdirSync(join(root, 'pages'));
     mkdirSync(join(root, 'dist'));
-    for (const file of ['wrangler.jsonc', 'worker.ts', 'slug-meta.ts', 'placed-slug.ts']) copyFileSync(resolve('pages', file), join(root, 'pages', file));
+    for (const file of ['wrangler.jsonc', 'worker.ts', 'slug-meta.ts', 'placed-slug.ts', 'slug-names.ts']) copyFileSync(resolve('pages', file), join(root, 'pages', file));
     writeFileSync(join(root, 'dist', 'index.html'), '<!doctype html>');
     const wrangler = resolve('node_modules/.bin/wrangler');
     const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: join(root, 'logs'), CLOUDFLARE_API_TOKEN: '', CI: '1' };
@@ -147,6 +149,7 @@ const ROWS = [
   { slug: 'driftwood-isle', name: 'Driftwood Isle', biome: 'Castaway island & reef', card: { thumb: '/shardfiles/driftwood-isle/t.jpg', portrait: '/shardfiles/driftwood-isle/p.jpg', landscape: '/shardfiles/driftwood-isle/blobs/image/land.jpg' } },
   { slug: 'sky-reach', name: 'Far "Reach"', biome: '', card: { thumb: 'x', portrait: 'x', landscape: 'https://packs.wildshard.io/shardfiles/sky-reach/l.jpg' } },
   { slug: '_template', name: 'Template shard', biome: 'Template.', card: { thumb: 'x', portrait: 'x', landscape: '/shardfiles/_template/l.jpg' } },
+  { slug: 'blender-template', name: 'Brasscap Mesa', biome: 'Mesa.', card: { thumb: 'x', portrait: 'x', landscape: '/shardfiles/blender-template/l.jpg' } },
 ]
 // late-shard: a catalogue head with a placement and no title row (the client's withCatalogueHeads card); auto-placed: SA30's grid
 // cell with no placement, which the client reads as unlisted, so a 404 here too
@@ -277,4 +280,15 @@ test('SA49: a slug placed after the build unfurls with its API name; an unplaced
   asked.length = 0
   await worker.fetch(new Request('https://staging.wildshard.io/slug/driftwood-isle'), { ASSETS: site([]) })
   expect(asked, 'a slug the page names asks nothing').toEqual([])
+})
+
+// TC-B12 (Jake, 2026-11-15: "I don't know why the fuck this slug is called Blender template"): Brasscap Mesa's link is
+// /slug/brasscap-mesa; the API slug's old link goes there, and the page and the worker share one map
+test('a public slug name serves its API slug, and the old link goes to the new one', async () => {
+  const response = await worker.fetch(new Request('https://staging.wildshard.io/slug/brasscap-mesa'), { ASSETS: site([]) })
+  expect(response.status).toBe(200)
+  expect(og(await response.text())).toMatchObject({ title: 'Brasscap Mesa', url: 'https://staging.wildshard.io/slug/brasscap-mesa' })
+  const old = await worker.fetch(new Request('https://staging.wildshard.io/slug/blender-template?x=1'), { ASSETS: site([]) })
+  expect([old.status, old.headers.get('location')]).toEqual([302, 'https://staging.wildshard.io/slug/brasscap-mesa?x=1'])
+  expect(SLUG_NAMES).toEqual(pageSlugNames.names)
 })
