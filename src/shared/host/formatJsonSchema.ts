@@ -88,6 +88,7 @@ import { RoamingEncounterSchema, WakeEncounterSchema, BossEncounterPresentationS
 import { BossProfileSchema, ArenaBossProfileSchema, RoamingBossProfileSchema, SpawnedBossProfileSchema, HeldBossProfileSchema, ScriptBossProfileSchema } from '@wildshard/format/bossProfiles';
 import { NpcRowSchema, NpcMotionSchema, NpcDialogueRowSchema, QuestNpcBindingSchema, QuestNpcBindingsSchema, QuestPageTalksSchema } from '@wildshard/format/npcs';
 import { WeaponProfileSchema, MeleeWeaponProfileSchema, BowWeaponProfileSchema, FirearmWeaponProfileSchema, ThrownWeaponProfileSchema, LashWeaponProfileSchema, ConeWeaponProfileSchema, HeldBowBaseSchema, HeldBowRowsSchema, HeldBowDefinitionSchema, HeldBowFileSchema, HeldFirearmPageSchema } from '@wildshard/format/weaponProfiles';
+import { StrikeDebrisJsonGuard } from '@wildshard/format/strikeDebris';
 import { toJsonSchema, type JsonSchema } from '@valibot/to-json-schema';
 import { finite, strictObject, object, looseObject, tuple, tupleWithRest, optional, array, literal as literalSchema, parse, safeParse as sourceSafeParse, pipe, check as sourceCheck, number, string, boolean, unknown, null as nullSchema, integer, minValue, maxValue, minLength, maxLength, startsWith, length, picklist, record, nullable, exactOptional, safeInteger, regex as sourceRegex, maxEntries, union, variant, assert, is as sourceIs, type VariantOptions, type SafeParseResult, type GenericSchema, type InferInput, type InferOutput } from 'valibot';
 import { PopulationKeeperRowsSchema } from '@wildshard/format/populationKeeper';
@@ -185,6 +186,8 @@ const customSchemas = new Map<object, FormatJsonSchema>([
   [input.entries.id, { type: 'string', maxLength: 128, pattern: '^[a-z][a-z0-9-]*(?:\\.[a-z][a-zA-Z0-9-]*)+$' }],
   [debug.entries.ask, { type: 'string', pattern: '^E[1-9][0-9]*$' }],
 ]);
+// JSON text has already excluded accessors/functions; bridge only this exact defining preflight.
+customSchemas.set(StrikeDebrisJsonGuard, {});
 // Faithful projection of the native four-field header predicate. Registered
 // post documents additionally run complete scaled-post and graph admission.
 customSchemas.set(ScaledPostInputSchema, { type: 'object', required: ['programs', 'draws', 'targets', 'outputs'],
