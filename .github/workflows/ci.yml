@@ -150,11 +150,6 @@ jobs:
         uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      # TC22/J186: report-only; admission review no earlier than 2026-11-23.
-      - name: Observe nightly release refusal and planted failure
-        if: steps.code.outputs.run == 'true' && matrix.job == 1
-        continue-on-error: true
-        run: node --test scripts/release-nightly.proof.ts
       # BROWSER-TESTS-BENCH BB2/BB5 (J231): e2e's headless shell and products' Chromium, cached by Playwright version.
       - id: playwright
         if: steps.code.outputs.run == 'true'
@@ -273,6 +268,13 @@ jobs:
       - name: Record every shard's wall-budget verdict, artifact upload included (J193)
         if: always() && steps.code.outputs.run == 'true'
         run: node scripts/ci-pack.mjs --check-walls --job=${{ matrix.job }}
+      # TC22/J186: report-only, outside the blocking share's wall budget.
+      # Admission review no earlier than 2026-11-23 after a green week.
+      - name: Observe nightly release refusal and planted failure
+        if: steps.code.outputs.run == 'true' && matrix.job == 1
+        continue-on-error: true
+        timeout-minutes: 2
+        run: node --test --test-timeout=10000 scripts/release-nightly.proof.ts
       # TEMPLATE-E2E T1E-2a: products already built Ring 1. Export those
       # exact bytes plus the Template pin read by POI and memory-server probes.
       - name: Bundle the shared Template suite build

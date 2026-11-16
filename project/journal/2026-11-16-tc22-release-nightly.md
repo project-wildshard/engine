@@ -29,3 +29,10 @@ version tag updates through the same nightly guard before the full gate.
 A real Git push to a test-owned bare origin proves a planted failure
 leaves no tag and never reaches the full check. Ordinary pushes do not
 read the nightly. No shared repo-kit source or release operation changes.
+# Follow-up review: keep the soak outside wall accounting
+
+TC39's independent J206 review caught TC22's report-only step before
+the packed share's wall verdict. Its time could therefore fail the
+blocking share despite continue-on-error. Move it after that verdict
+and bound the explicit tests to ten seconds. No admission change.
+The exact branch CI and actual cook receipts must be repeated.
