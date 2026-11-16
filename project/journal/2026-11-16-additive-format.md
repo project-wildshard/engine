@@ -98,3 +98,26 @@ original16666us cold runtime floor is unchanged. The isolated native
 verb-tape case passes9.09s. Keep the already-classified J381 local
 exception for its load-sensitive cold runtime refusal; hosted CI
 remains mandatory, with no fixture fingerprint waiver.
+
+Hosted share2 then caught the published-format install rewriting the
+released-wire dev fixture resolution with gitHosted:true. Preserve
+main's explicit path:/packages/wire plus exact tarball instead. The
+existing wire-lockfile regression stays unchanged; the bound npm wire
+and frozen released commit stay unchanged. This corrects dependency
+metadata, not a codec descriptor or a wire/schema-hash change.
+
+The full engine frozen install from an empty owned store completes in
+6.4s (179 packages). Its released alias is @wildshard/wire0.0.0 and
+exports framing from lib/src/framing.js. Restore normal global-store
+links, verify no alias points into the cold store, then remove that
+disposable store. All146 cases in nine named wire/install/consumer
+suites, lint/types and wire check pass. Review: NO MUST, no SHOULD;
+every wire-related lock line now matches main exactly. Hosted run110e
+has five green test packs; its sole failed pack is the unchanged
+wire-lockfile guard corrected here.
+
+After rebasing onto cc124191, the complete normal ci-static.sh code
+script passes, full pins are restored, and all146 named cases pass
+again. No full-suite override is used. The corrected candidate keeps
+the hosted gate and real post-land single-player preview; its bounded
+CI wait is90 minutes to accommodate the observed runner queue.
