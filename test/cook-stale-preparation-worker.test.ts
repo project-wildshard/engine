@@ -7,21 +7,26 @@ import {mkdtempSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- The worker's launcher takes absolute script paths.
 import {join, resolve} from 'node:path';
-import {afterAll, expect, test} from 'vitest';
+import {afterAll, beforeAll, expect, test} from 'vitest';
 import {writeTar} from '@wildshard/format/tar';
 import {createCookWorker, indexKey} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
 import {digest, json, MOVED, PREPARED, prepared} from './fixtures/stale-preparation';
+import {compileCookWorker} from './fixtures/compileCookWorker';
 
 const root = mkdtempSync(join(tmpdir(), 'cook-stale-preparation-worker-'));
-afterAll(() => { rmSync(root, {recursive: true, force: true}); });
+const entryScope = new AbortController();
+let entry: Awaited<ReturnType<typeof compileCookWorker>> | undefined;
+let preparing: ReturnType<typeof compileCookWorker> | undefined;
+beforeAll(async () => { preparing = compileCookWorker(entryScope.signal); entry = await preparing; });
+afterAll(async () => { entryScope.abort(); await preparing?.catch(() => undefined); entry?.dispose(); rmSync(root, {recursive: true, force: true}); });
 
 test('the cook worker cooks a stale preparation in its bounded child, and its index and row say so', {timeout: 60_000}, async () => {
   const tarball = writeTar(prepared(PREPARED)), hash = digest(tarball), lines: string[] = [];
   const worker = (build: string, renderer?: string): ReturnType<typeof createCookWorker> => createCookWorker({build, store: folderStore(join(root, 'worker-store')),
     source: {heads: () => Promise.resolve([{slug: 'template', hash, revision: 1}]), download: () => Promise.resolve(tarball)},
     serverPacks: join(root, 'worker-server'), scratch: join(root, 'worker-jobs'), log: line => { lines.push(line); },
-    launcher: {root: process.cwd(), execPath: process.execPath, loader: resolve('scripts/bake-loader.mjs'), script: resolve('scripts/cook-job.mjs'), wrap: [],
+    launcher: {root: process.cwd(), execPath: process.execPath, loader: resolve('scripts/bake-loader.mjs'), get script() { if (entry === undefined) throw new Error('Missing fixed cook entry'); return entry.script; }, wrap: [],
       limits: {seconds: 50, memoryMB: 4096, heapMB: 2048}, ...(renderer === undefined ? {} : {renderer})}});
   const stale = await worker('moved', MOVED).cook({slug: 'template', hash});
   expect(stale).toMatchObject({state: 'cooked', preparation: 'stale'});

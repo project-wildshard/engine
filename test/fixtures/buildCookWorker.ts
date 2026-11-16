@@ -46,6 +46,9 @@ const bundle=await build({cwd:root,input:resolve(root,'scripts/cook-job.mjs'),pl
   load(id){
     if(!isAbsolute(id)||!/\.(?:[cm]?[jt]sx?|json)$/u.test(id))return null;
     const bytes=readFileSync(id),text=bytes.toString('utf8');remember(id,bytes);packageAt(id);
+    // Most dependencies have no meta property. Escapes still take the parser
+    // path, so escaped identifiers cannot hide a property that needs rebasing.
+    if(!text.includes('\\')&&(!text.includes('import')||!text.includes('meta')))return {code:text};
     // Bundling must not move encoder Worker URLs, renderer roots or relative
     // package resolution to the temporary output folder. Replace syntax nodes,
     // never a string/comment containing the words import.meta.
