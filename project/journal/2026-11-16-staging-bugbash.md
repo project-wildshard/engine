@@ -23,3 +23,5 @@
 - SB14 (opus-ss16p): mid-swipe ghosting on Shard Select was the off-middle card at opacity 0.55 showing the hero through it.
   Cards off the middle are now dimmed with a filter (solid), `place` lights the card nearest the middle while a finger drags,
   and the snap is 0.24 s. T1 journey spec swipes with CDP touch and checks one lit solid card per frame.
+- SB14 review (claude -p, no MUST): the dim moved from a filter on the card to its children, since Safari can drop a
+  backdrop-filter when the same element has a filter; `place` reads layout before writing; `apply` uses `light`.

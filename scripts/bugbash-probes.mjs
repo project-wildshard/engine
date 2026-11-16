@@ -19,7 +19,8 @@ export function recordDeck(count) {
       lit: cards.filter((card) => card.classList.contains('selected')).length,
       cards: cards.flatMap((card, i) => {
         const rect = card.getBoundingClientRect();
-        return rect.right <= 0 || rect.left >= innerWidth ? [] : [{ i, left: rect.left, right: rect.right, opacity: Number(getComputedStyle(card).opacity) }];
+        const opacity = Math.min(Number(getComputedStyle(card).opacity), ...[...card.children].map((child) => Number(getComputedStyle(child).opacity)));
+        return rect.right <= 0 || rect.left >= innerWidth ? [] : [{ i, left: rect.left, right: rect.right, opacity }];
       }),
     });
     if (frames.length < count) requestAnimationFrame(tick);
@@ -80,17 +81,19 @@ export function markCovers() {
  * @param {import('playwright').Page} page @param {number} y @returns {Promise<number>} */
 export async function touchSwipe(page, y) {
   const cdp = await page.context().newCDPSession(page);
-  /** @param {'touchStart' | 'touchMove' | 'touchEnd'} type @param {number} x */
-  const touch = (type, x) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
-  await touch('touchStart', 330);
-  for (let step = 1; step <= 10; step += 1) {
-    await touch('touchMove', 330 - 26 * step);
-    await new Promise((resolve) => { setTimeout(resolve, 16); });
+  try {
+    /** @param {'touchStart' | 'touchMove' | 'touchEnd'} type @param {number} x */
+    const touch = (type, x) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
+    await touch('touchStart', 330);
+    for (let step = 1; step <= 10; step += 1) {
+      await touch('touchMove', 330 - 26 * step);
+      await new Promise((resolve) => { setTimeout(resolve, 16); });
+    }
+    await touch('touchEnd', 70);
+    return await page.evaluate(() => performance.now());
+  } finally {
+    await cdp.detach();
   }
-  await touch('touchEnd', 70);
-  const released = await page.evaluate(() => performance.now());
-  await cdp.detach();
-  return released;
 }
 
 /** Node side: what a recorded swipe shows wrong (SB14): a see-through card, a frame without exactly one lit card, or two cards

@@ -293,22 +293,23 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   const place = (i: number, extra = 0, animate = true): void => {
     const card = cardEls[i];
     if (card === undefined) return;
+    // layout reads first, then the one style write (no forced recalc per pointermove)
     const shift = list.clientWidth / 2 - (card.offsetLeft + card.offsetWidth / 2) + extra;
-    track.style.transition = animate ? 'transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none';
-    track.style.transform = `translateX(${shift}px)`;
-    // under a dragging finger the lit card is the one nearest the middle, so a swipe never shows two half-lit cards
+    // under a dragging finger the lit card is the one nearest the middle: the lit card hands over once, mid-drag
     let near = i;
     if (extra !== 0) {
       const middle = list.clientWidth / 2 - shift;
       let gap = Infinity;
       cardEls.forEach((e, n) => { const d = Math.abs(e.offsetLeft + e.offsetWidth / 2 - middle); if (d < gap) { gap = d; near = n; } });
     }
+    track.style.transition = animate ? 'transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none';
+    track.style.transform = `translateX(${shift}px)`;
     light(near);
   };
   const apply = (): void => {
     const c = entries[index];
     if (c === undefined) return;
-    cardEls.forEach((e, i) => { e.classList.toggle('selected', i === index); });
+    light(index);
     dots.forEach((d, i) => { d.classList.toggle('on', i === index); });
     // the card's own thumbnail (already on screen in the card) under the hero: until the hero's bytes arrive and decode
     // (a phone network, a busy page), the backdrop is the card's picture, never black (Jake's Pine Hollow, ab93dccfe)
