@@ -1311,11 +1311,12 @@ export class Game {
     const pause = this.frameCount > 0 ? () => waitForDrawnFrame(owner, () => this.frameCount, live) : undefined;
     const uploadBudget = isolateImageUploads ? LIVE_UPLOAD_BUDGET : undefined;
     const sliceMs = this.frameCount > 0 ? LIVE_PRECOMPILE_SLICE_MS : undefined;
-    // Camera equipment leaves with its owner, so its road variants are never needed.
-    const leaving = this.viewmodel.staged(owner);
+    // Camera equipment takes its road (exterior) variants too: a grid page keeps its home, and its owner's equipment, on the
+    // road (ZE21), so they draw there (ZE2f: Driftwood's first step out relinked the first-person iron sword for 418 ms).
+    // A page with no road registers no exterior lighting, so this adds no programs there.
     await precompileLevel(this, progress, { chunkCasters: false, current: live, owner, futureLighting, isolateImageUploads, onStage, drawnOnly: this.frameCount === 0,
       ...(arrival === undefined || futureRoot === undefined ? {} : { arrival: arrivalPrograms(futureRoot, arrival.at, arrival.radius) }),
-      ...(leaving === undefined ? {} : { leaving: [leaving] }), ...(sliceMs === undefined ? {} : { sliceMs }),
+      ...(sliceMs === undefined ? {} : { sliceMs }),
       ...(futureEnvironment === null ? {} : { futureEnvironment }), ...(pause === undefined ? {} : { pause }), ...(uploadBudget === undefined ? {} : { uploadBudget }) });
   }
 

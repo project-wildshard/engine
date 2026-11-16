@@ -271,7 +271,9 @@ test('page preparation uses final program inputs without drawing and fences a ch
     const options = calls[0]?.[2];
     if (typeof options !== 'object' || options === null) throw new Error('Missing program options');
     expect(options).toMatchObject({chunkCasters: false, owner, futureLighting: root, futureEnvironment: environment,
-      isolateImageUploads: true, sliceMs: 6, leaving: [models], drawnOnly: false, onStage: stage, uploadBudget: {ms: 6, bytes: 1}});
+      isolateImageUploads: true, sliceMs: 6, drawnOnly: false, onStage: stage, uploadBudget: {ms: 6, bytes: 1}});
+    // ZONE-ENTRY ZE2f: camera equipment takes its road (exterior) variants: a grid page keeps its home's equipment on the road
+    expect(Reflect.get(options, 'leaving')).toBeUndefined();
     game.frameCount = 0;
     scene.environment = null;
     await Reflect.apply(method, game, [owner, composer, () => !owner.disposed, root, undefined, stage, progress, environment]);
