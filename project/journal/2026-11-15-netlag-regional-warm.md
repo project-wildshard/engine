@@ -100,3 +100,22 @@ cases fail first. Open the same window on first arrival, so the burst
 acquires its newest tick. Thirty-two focused clock/buffer/link cases
 pass, with the delay cap, fall rate and jitter estimator unchanged.
 This reproduces a possible cause; new runtime qualification is owed.
+
+
+## Review: admit projected contacts before physics
+
+The land review found that moving a standalone capsule after Rapier's
+world step updates its narrow-phase shape but leaves its broad-phase
+bounds at the old pose. A creature moving into the path was invisible
+to the player query. The red-first native case walked 29.6 cm through it.
+
+Creature prediction now queues command N's completed creature pose for
+fixed.pre, before physics and command N+1. Presentation only updates its
+row scratch, so it cannot replace that pose with delayed coordinates.
+The same no-extra-step regression now blocks, and all 12 focused
+creature/motion-world cases pass. Replay can repose narrow-phase shapes
+but retains Rapier's last stepped broad phase; that existing API limit
+is explicit rather than claimed as exact replay collision.
+
+The interrupted land never pushed. Static-world windmill experiments
+remain scratch diagnostics; no nudge or predictor tolerance changed.

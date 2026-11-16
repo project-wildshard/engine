@@ -232,7 +232,7 @@ function headOf(body: Animal | undefined, to: Vector3): boolean {
 }
 
 /** Rows onto the bodies, and the near ones into the predicted world as capsules. */
-function showRows(client: NetClient, net: NetPlayer, ports: WorkerClientPorts, bodies: ReadonlyMap<number, RowBody>, renderTick: number, dt: number, row: Float64Array, near: CreaturePredictionRow[], rideable: Set<number>): number {
+function showRows(client: NetClient, ports: WorkerClientPorts, bodies: ReadonlyMap<number, RowBody>, renderTick: number, dt: number, row: Float64Array, near: CreaturePredictionRow[], rideable: Set<number>): number {
   const { interpolator } = client, own = client.welcome?.handle ?? 0, under = client.riders.get(own);
   let shown = 0;
   near.length = 0;
@@ -256,7 +256,6 @@ function showRows(client: NetClient, net: NetPlayer, ports: WorkerClientPorts, b
     const { radius, height } = creatureBodyShape(dims, Number(info.initial['scale'] ?? 1));
     near.push({ handle, x: row[X] ?? 0, y: row[Y] ?? 0, z: row[Z] ?? 0, alive: row[ALIVE] === 1, driven: false, radius, height });
   }
-  net.world.syncRows(near, ports.player.position);
   return shown;
 }
 
@@ -550,7 +549,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   }));
   const decks = new NetMovers(client, wirePage.movers, player.position);
   scope.onDispose(net.world.addMover(decks));
-  scope.onDispose(net.world.addMover(new CreaturePrediction(client.interpolator, net.world, near, player.position)));
+  const creaturePrediction = new CreaturePrediction(client.interpolator, net.world, near, player.position);
+  scope.onDispose(net.world.addMover(creaturePrediction));
+  system({ id: 'proof.worker.creature-contacts', phase: 'fixed.pre', run: () => { creaturePrediction.prepare(); } });
   system({ id: 'proof.worker.reconcile', phase: 'input', run: () => { const at = diagnosticNow(); net.reconcile(); cost = diagnosticNow() - at; } });
   system({ id: 'proof.worker.present', phase: 'update', run: dt => {
     // A page still crossing stands in another world than the frames: those rows aren't its manager's to spawn.
@@ -572,7 +573,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const arrows = client.owned.get(OWNED_ROW.arrows); // plus one, so an empty quiver is a line too
     if (arrows !== undefined && arrows !== arrowsSaid) { arrowsSaid = arrows; ports.weapons.mirrorArrows(arrows - 1); }
     bindMount(); offerMounts(); seatMount(); bindClaw();
-    const shown = showRows(client, net, ports, bodies, renderTick, dt, row, near, rideable);
+    const shown = showRows(client, ports, bodies, renderTick, dt, row, near, rideable);
     others?.frame(renderTick, dt);
     wirePage.frame(here ? bookOf(client.latest?.cell) : null, here, ports.day()); decks.frame(renderTick);
     report.rows = animals === null ? [...client.entities.values()].filter(info => info.cls.cls === ANIMAL_CLASS.cls).length : shown; // a data cell's life draws them

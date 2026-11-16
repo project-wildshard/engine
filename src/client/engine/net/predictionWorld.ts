@@ -1,7 +1,7 @@
 // P1-E5.3-C5 (E5-REPLICATION §5.2): the world the client predicts against, beyond the static collision it already holds.
 // Movers stand at the tick the command will run on the server, not the one on screen, or a player would ride a deck 100 ms
 // behind (J59 Q4). Nearby creatures have collision capsules; their command-time mover projects those separately from
-// their interpolated visible bodies, including during replay. A gate this player has opened is gone for its capsule
+// their interpolated visible bodies. Replay reposes shapes against the last stepped broad phase. A gate opened is gone for its capsule
 // alone (J106). The world is never rolled back: only
 // the character replays (J59 Q10), and a replay re-poses the movers without stepping the world.
 import type { Collider } from '@dimforge/rapier3d-simd';
