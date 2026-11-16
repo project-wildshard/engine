@@ -1200,7 +1200,7 @@ export function installSpeciesHomes(host: SimHost, spec: SpeciesHomesSpec, saved
     keeper.beforeStep?.(kept);
   } }), scales: speciesScales(species), policy: (kind, actor, claim, stream) => {
     const declaredSpecies = species.find(row => row.kind === kind);
-    if (declaredSpecies !== undefined) actor.harvest = declaredSpecies.harvest;
+    if (declaredSpecies !== undefined) { actor.harvest = declaredSpecies.harvest; actor.capExempt = declaredSpecies.capExempt; }
     const at = placed.get(actor.entityId)?.home ?? home?.(actor.entityId);
     const shared: SpeciesBodyPorts = { host, stream, ...(decisions === undefined ? {} : { decisions }), ...(at === undefined ? {} : { home: at }),
       attacks: spec.attackers === Infinity ? { kind: 'unlimited', limit: Infinity } : { kind: 'keeper', claim } };

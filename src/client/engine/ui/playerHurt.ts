@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 import type { Events } from '../../../shared/engine/events/events';
 import type { Scope } from '../../../shared/engine/app/scope';
-import type { CombatPipeline, CombatTag, DeathCause } from '../../../shared/engine/combat/pipeline';
+import type { Actor, CombatPipeline, CombatTag, DeathCause } from '../../../shared/engine/combat/pipeline';
 import type { PlayerHealth } from '../../../shared/engine/combat/health';
 import { hardFallHit } from '../../../shared/engine/player/fall';
 import { hitShoveSpeed } from '../../../shared/engine/player/shove';
@@ -54,8 +54,9 @@ export class PlayerHurt {
     const dx = at.x - p.position.x, dz = at.z - p.position.z, d = Math.hypot(dx, dz);
     this.ports.hurt(dealt / 20, d > 0.3 ? ((dx * Math.cos(p.yaw) - dz * Math.sin(p.yaw)) / d) * 0.7 : 0);
   }
-  creature(a: { kind: string; label: string; position: Vector3 }, amount: number): void {
-    this.combat.hit({ source: 'env', sourceTags: [`creature.${a.kind}`, 'feel.blow', 'cover.checked'],
+  creature(a: { kind: string; label: string; position: Vector3; species?: string; combatActor?: () => Actor }, amount: number): void {
+    const identity = a.species === undefined || a.species === '' ? a.kind : a.species;
+    this.combat.hit({ source: a.combatActor?.() ?? 'env', sourceTags: [`creature.${identity}`, 'feel.blow', 'cover.checked'],
       target: this.health, amount, point: a.position.clone(), dir: new Vector3(), cause: { kind: a.kind, label: a.label } });
   }
   jolt(tag: CombatTag, amount: number, cause: DeathCause, toast?: string): void {

@@ -94,20 +94,20 @@ test('native attachment and reinstall bind row drops without drawing or changing
   const setup = (f: ReturnType<typeof fixture>) => {
     const rng = new Rng(31), { services } = fixtureNativeRoster(f.host, rng);
     const spec = { ...sample.spec, kind: 'boar', variant: 'elite', hp: 1 };
-    const intake = createNativeCreatureRoster(f.host, { specs: [spec], species: [{ kind: 'boar', harvest: drops }],
+    const intake = createNativeCreatureRoster(f.host, { specs: [spec], species: [{ kind: 'boar', harvest: drops, capExempt: true }],
       variants: new Map(), rng, services, hunted: 'every', spawnY: 10 });
     const slot = intake.body('native.carcass', 'boar', 'elite', -1, { x: 0, z: 0 }, 0, [1, 1]);
     return { rng, intake, slot };
   };
   try {
     const a = setup(first), before = a.rng.snapshot(), actor = a.intake.arrive(a.slot);
-    expect(a.rng.snapshot()).toEqual(before); expect(actor.harvest).toBe(drops); expect(actor.species).toBe('');
+    expect(a.rng.snapshot()).toEqual(before); expect(actor.harvest).toBe(drops); expect(actor.species).toBe(''); expect(actor.combatActor().capExempt).toBe(true);
     const adapter = first.host.adapters.get('runtime.actor.native.carcass'); if (adapter === undefined) throw new Error('Missing real recipe');
     const recipe = adapter.snapshot(); expect(typeof recipe).toBe('string');
     expect(JSON.stringify(recipe)).not.toContain('harvest');
     const b = setup(second), stream = b.rng.snapshot();
     const restored = b.intake.reinstall(b.slot, { adapters: [{ id: 'runtime.actor.native.carcass', state: recipe }], entities: [] });
-    expect(restored.harvest).toBe(drops); expect(restored.species).toBe(''); expect(b.rng.snapshot()).toEqual(stream);
+    expect(restored.harvest).toBe(drops); expect(restored.species).toBe(''); expect(restored.combatActor().capExempt).toBe(true); expect(b.rng.snapshot()).toEqual(stream);
     expect(second.host.adapters.get('runtime.actor.native.carcass')?.snapshot()).toBe(recipe);
     second.host.combat.hit({ source: 'env', sourceTags: ['cover.checked'], target: restored.combatActor(), amount: 100,
       point: restored.position.clone(), dir: new Vector3() }); second.host.step();
@@ -135,13 +135,13 @@ test('native empty and absent declarations remain distinct through actual roster
 
 test('species homes bind admitted harvest before their existing policy and preserve native wire labels', () => {
   const f = fixture(), sample = SIM_LEVEL.entities[0]; if (sample === undefined) throw new Error('Missing home recipe');
-  const species = [{ ...BOAR, harvest: drops }];
+  const species = [{ ...BOAR, harvest: drops, capExempt: false }];
   try {
     const homes = installSpeciesHomes(f.host, { step: 'fixture.homes', seed: 17,
       homes: [{ id: 'home.body', kind: BOAR.kind, at: [0, 0], yaw: 0, respawn: 0 }],
       specs: new Map([[BOAR.kind, sample.spec]]), attackers: 1, think: { every: 6, dt: .1 },
       species, brains: admitSpeciesBrains(species, []), custom: (_kind, actor) => {
-        expect(actor.harvest).toBe(drops); expect(actor.species).toBe('');
+        expect(actor.harvest).toBe(drops); expect(actor.species).toBe(''); expect(actor.combatActor().capExempt).toBe(false);
         return { decide: () => undefined, move: () => undefined, snapshot: () => null, restore: () => undefined };
       } });
     expect(homes.homes()[0]?.actor?.harvest).toBe(drops);

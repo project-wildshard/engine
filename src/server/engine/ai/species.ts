@@ -11,6 +11,7 @@ export interface SpeciesVariant {
 }
 export interface SpeciesRow {
   harvest?: readonly HarvestDrop[];
+  capExempt?: boolean;
   id: string; kind: string; label: string; parent?: SpeciesRow;
   variants: SpeciesVariant[]; spawnOnly?: SpeciesVariant[];
   aggressive?: boolean; walkSpeed?: number; chargeSpeed?: number; chargeDamage?: number;

@@ -78,6 +78,7 @@ export class AnimalSim {
   protected fallVelocity = 0;
   harnessHold = false;
   kind: string; variant: string; rarity: Rarity; label: string; aggressive: boolean;
+  capExempt: boolean | undefined;
   mods: VariantMods;
   alive = true;
   hp: number; maxHp: number;
@@ -268,8 +269,15 @@ export class AnimalSim {
   combatActor(): Actor {
     const cached = actors.get(this); if (cached !== undefined) return cached;
     const read = (): AnimalSim => this;
+    let identity = this.species || this.kind;
+    const tags: Actor['tags'][number][] = ['actor.creature', `creature.${identity}`];
     const actor: Actor = {
-      id: this.entityId, tags: ['actor.creature', `creature.${this.kind}`], state: [],
+      id: this.entityId, get tags() {
+        const current = read().species || read().kind;
+        if (current !== identity) { identity = current; tags[1] = `creature.${current}`; }
+        return tags;
+      }, state: [],
+      get capExempt() { return read().capExempt; },
       get alive() { return read().alive; },
       onDamageRequest: (req) => this.damageRequested(req),
       attributes: { get health() { return read().hp; }, set health(value: number) { read().hp = value; }, get maxHealth() { return read().maxHp; }, get damageTakenMul() { return read().mods.damageTaken; } },
