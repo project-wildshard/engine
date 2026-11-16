@@ -1,8 +1,10 @@
 import { installCatalogueFixture } from './fixtures/bootSetup';
-import { expect, test, vi } from 'vitest';
+import { afterAll, expect, test, vi } from 'vitest';
 import { readGridEdges } from '../src/client/game/grid/edgeSources';
 import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';
+import {preserveCatalogue} from './fixtures/catalogueLifetime';
 
+preserveCatalogue(afterAll);
 await installCatalogueFixture();
 
 test.each([false, true])('edge readiness holds the admitted lease until preparation settles (failure %s)', async fail => {

@@ -679,5 +679,8 @@
  "test/grid-page-url.test.ts",
  "test/neighbour-script-particles-hidden.test.ts",
  "test/sim-lane.test.ts",
- "test/sim-transport.test.ts"
+ "test/sim-transport.test.ts",
+ "test/boot-fixture-install.test.ts",
+ "test/grid-module-preparation.test.ts",
+ "test/species-kinds.test.ts"
 ]
