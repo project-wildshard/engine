@@ -45,3 +45,15 @@ Final pair J206 review has no MUST/SHOULD; root recomputed the policy hash
 and checked exact landed destination blobs before deletion. Remove the
 two remaining inert scripts compiler excludes as the review notes. Full
 engine compiler, game lint and side checks pass after the rebase.
+
+Exact43913922562 job3 failed only page-headers: inherited J383 production
+/sw.js sends no-store while historical parity expected no-cache. Preserve
+the frozen old-host fixture and all exercised rules; assert J383's exact
+service-worker no-store policy as an explicit override in the real HTTP
+test. No production header change or weakened assertion/budget. Source
+rebased again onto current9d6d9c95, now declaring format0.11.0; repeat actual
+source package qualification for this new defining dependency graph.
+
+Real HTTP header suite10/10 passes1.69s; J206 has no MUST/SHOULD. Full
+stack is tmp/codex-tc48/engine-2ad-job3.log. Keep fresh hosted qualification
+for the corrected head; do not rerun the old policy mismatch away.
