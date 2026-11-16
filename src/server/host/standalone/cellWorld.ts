@@ -35,6 +35,7 @@ import { pageRuntimeState } from '@wildshard/engine/game/shardfile/runtimeState'
 import { commandsOf } from '@wildshard/engine/game/grid/roomNet';
 import { pageSavedFlags } from '@wildshard/engine/world/interact/flags';
 import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
+import { installPersonalLoot, personalCoinTable, personalItemTable } from '@wildshard/engine/game/loot/personal';
 import { createTrustedHeadlessResident, type HeadlessRuntimeInput, type TrustedHeadlessResident } from '../headlessRuntime';
 import { registerInstalled } from '@wildshard/engine/game/shardfile/installedSides';
 import { productHeadlessSections } from '@wildshard/engine/host/headlessSections';
@@ -94,8 +95,20 @@ function fallFloorOf(input: HeadlessRuntimeInput, host: SimHost, lone: boolean):
   return new FallFloor(input.product === undefined ? shardFallFloor(input.shard.manifest?.bounds?.floor) : shardPlayArea(input.shard.manifest?.bounds, input.product), lone, host.level.player.at);
 }
 
+/** TEMPLATE-E2E TC-E6 (Jake, 2026-11-15: "kills drop loot"): a grid data cell's kills pay each player who did meaningful
+ *  damage their own roll off the shard's `economy` loot tables, as a native room's do (J105). A grid cell's page draws its
+ *  creatures as neighbour life and pays nothing itself, so the cell pays a lone player too; a one-shard page keeps paying
+ *  its own lone player (`alone` false), as off a room. A shard with no coin or trophy table installs nothing. */
+function installDataCellLoot(host: SimHost, shard: HeadlessRuntimeInput['shard'], effects: HeadlessEffect[], lone: boolean): void {
+  const economy = { rows: { loot: shard.rows.loot } }, coins = personalCoinTable(economy), items = personalItemTable(economy);
+  if (coins === null && items === null) return;
+  installPersonalLoot(host, { coins, alone: !lone, ...(items === null ? {} : { items }),
+    grant: (player, amount) => { effects.push({ kind: 'coins', amount, actorId: player }); },
+    grantItem: (player, item, count) => { effects.push({ kind: 'item', item, count, actorId: player }); } });
+}
+
 /** A cell with no native plan: a data shard, which any host can run from its output. */
-async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, effects: HeadlessEffect[]): Promise<Pick<CellWorld, 'host' | 'dispose'> & { readonly sim: () => ShardfileSimulation | undefined; readonly kit: () => DeclaredKitItems | null }> {
+async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimSnapshot | undefined, effects: HeadlessEffect[], lone: boolean): Promise<Pick<CellWorld, 'host' | 'dispose'> & { readonly sim: () => ShardfileSimulation | undefined; readonly kit: () => DeclaredKitItems | null }> {
   await Promise.resolve();
   const { shard, assets, rapier } = input;
   // A data shard's decisions, moves and targets ride its product sections (TE-ENG1's boss rows): without them the
@@ -107,6 +120,7 @@ async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimS
   const kitOf = (sim: ShardfileSimulation): DeclaredKitItems | null => installDeclaredKitItems(sim.host, shard, sim.itemHooks);
   if (snapshot === undefined) {
     const fresh = createShardfileSim(shard, assets, ports), kit = kitOf(fresh);
+    installDataCellLoot(fresh.host, shard, effects, lone);
     installCellHome(fresh.host);
     // SS3: a data shard's simulation builds its declared prop solids; a shard with none built has no server half to claim
     if (fresh.colliders.size > 0) registerInstalled(fresh.host, 'collision');
@@ -114,7 +128,7 @@ async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimS
   }
   const probe = createShardfileSim(shard, assets, ports), { level } = probe.host; probe.dispose();
   const installed: { value?: ReturnType<typeof bindShardfileSim>; kit?: DeclaredKitItems | null } = {};
-  const host = restoreSimHost(level, { rapier }, typeof snapshot === 'string' ? decodeSimSnapshot(snapshot) : snapshot, restored => { installed.value = bindShardfileSim(restored, shard, assets, { ...ports, restoring: true }); installed.kit = kitOf(installed.value); installCellHome(restored); if (installed.value.colliders.size > 0) registerInstalled(restored, 'collision'); });
+  const host = restoreSimHost(level, { rapier }, typeof snapshot === 'string' ? decodeSimSnapshot(snapshot) : snapshot, restored => { installed.value = bindShardfileSim(restored, shard, assets, { ...ports, restoring: true }); installed.kit = kitOf(installed.value); installDataCellLoot(restored, shard, effects, lone); installCellHome(restored); if (installed.value.colliders.size > 0) registerInstalled(restored, 'collision'); });
   return { host, sim: () => installed.value, kit: () => installed.kit ?? null, dispose: () => { (installed.value ?? { dispose: () => { host.dispose(); } }).dispose(); } };
 }
 
@@ -177,7 +191,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
       stepResident(resident, player.id, inputs);
     } };
   }
-  const effects: HeadlessEffect[] = [], { host, dispose, sim, kit } = await bootTask(snapshot === undefined ? 'server:data-simulation-and-collision' : 'server:data-continuation-restore', () => openDataCell(input, snapshot, effects));
+  const effects: HeadlessEffect[] = [], { host, dispose, sim, kit } = await bootTask(snapshot === undefined ? 'server:data-simulation-and-collision' : 'server:data-continuation-restore', () => openDataCell(input, snapshot, effects, lone));
   if (snapshot !== undefined) removeChunkEdgeWalls(host.physics); // GC36: a world saved while lone cells had walls
   installRoomRespawn(host, await dataCellPlaces(input));
   installDeclaredClimate(host, input.shard.rows);
