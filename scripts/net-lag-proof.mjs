@@ -104,6 +104,10 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
     await page.waitForFunction(() => typeof window.__workerClient === 'function' && /** @type {any} */ (window).__wildshard?.world?.player !== undefined, undefined, { timeout: 150_000 });
     await page.evaluate(() => /** @type {any} */ (window).__wildshard?.world?.hud.enterNow());
     await page.waitForFunction(() => (window.__workerClient?.().frames ?? 0) > 30, undefined, { timeout: 90_000 });
+    // skipintro enters programmatically: match the real entry gesture before
+    // settling, so AudioContext construction is not deferred to the first move.
+    // A modifier press moves nothing and fires no gameplay edge.
+    await page.keyboard.press('Shift');
     if (await page.evaluate(() => /** @type {any} */ (window).__wildshard?.world?.game.app.clock.paused === true)) await page.getByRole('button', { name: /^resume$/iu }).click().catch(() => undefined);
     row.enterMs = Date.now() - t0;
     const entered = Date.now(), delays = /** @type {{ t: number, delay: number }[]} */ ([]), heldFrom = await page.evaluate(() => window.__workerClient?.().interpHeld ?? 0);
