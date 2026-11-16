@@ -264,7 +264,8 @@ test('a client crosses a seam while it fuzzes both rooms', { timeout: 60_000 }, 
   let running: StandaloneGrid | undefined;
   const server = runStandaloneServer({ control: control.port1, game: game.port1, load: (_boot, slug) => product(slug), strips: () => Promise.resolve(strips),
     proof: { arrival: { x: -259, y: 0, z: 0 }, booted: grid => { running = grid; } } });
-  const shell = connectStandalone({ slug: 'sunscar-dunes', base: '/shards/sunscar-dunes/', build: 'test', savePrefix: 'wildshard.', storage }, control.port2, game.port2, () => { server.dispose(); });
+  // ZE11 (J352): the road enters only the home, so the seam crossed is the home's (Driftwood, east of the arrival)
+  const shell = connectStandalone({ slug: 'driftwood-isle', base: '/shards/driftwood-isle/', build: 'test', savePrefix: 'wildshard.', storage }, control.port2, game.port2, () => { server.dispose(); });
   const { client } = shell, travels: NetTravel[] = [], hostile = new Hostile(client), fuzz = new Fuzz(SEEDS[0] ?? 1);
   const turn = (): Promise<void> => new Promise(resolve => { setImmediate(resolve); });
   client.onTravel(event => { travels.push(event); });

@@ -5,11 +5,12 @@ import { cell, NEIGHBOUR, ownerX, PageStorage, running, start, until, walk } fro
 
 // P1-E3.9, E5.2b: the grid in the server's half, over real MessagePorts on the server's own clock. A client walks off the road
 // into a cell and back, hearing `travel` both ways, and a reload resumes it wherever it stood. Only a server's bytes are read.
+// ZONE-ENTRY ZE11 (J352): the road enters only the session's home, so the cell walked into is the home.
 // Split by case (VITEST-BENCH VB5): the lone-cell cases are in standalone-grid-lone.test.ts, Nine Dragon's deck and J68's far
 // solids in standalone-grid-restore.test.ts; all three share ./fixtures/standaloneGrid.
 
 test('a client walks off the road into a cell and back, and a reload resumes it wherever it stood', { timeout: 120_000 }, async () => {
-  const storage = new PageStorage(), first = start(storage, { x: -259, y: 0, z: 0 }), travels: NetTravel[] = [], { client } = first.shell;
+  const storage = new PageStorage(), first = start(storage, { x: -259, y: 0, z: 0 }, NEIGHBOUR), travels: NetTravel[] = [], { client } = first.shell;
   client.onTravel(event => { travels.push(event); });
   expect(await first.shell.booted).toEqual({ tick: 0, restored: false });
   first.shell.ready();
@@ -25,7 +26,7 @@ test('a client walks off the road into a cell and back, and a reload resumes it 
   first.stop();
   expect(storage.getItem(`wildshard.standalone-${NEIGHBOUR}`)?.length).toBeGreaterThan(1000);
 
-  const second = start(storage), back: NetTravel[] = [];
+  const second = start(storage, undefined, NEIGHBOUR), back: NetTravel[] = [];
   second.shell.client.onTravel(event => { back.push(event); });
   expect(await second.shell.booted).toEqual({ tick: inside.tick, restored: true });
   second.shell.ready();
@@ -39,7 +40,7 @@ test('a client walks off the road into a cell and back, and a reload resumes it 
   const road = await second.shell.save(); expect(road.ok).toBe(true);
   second.stop();
 
-  const third = start(storage);
+  const third = start(storage, undefined, NEIGHBOUR);
   expect(await third.shell.booted).toEqual({ tick: road.tick, restored: true });
   third.shell.ready();
   await until(() => third.shell.client.latest !== null);

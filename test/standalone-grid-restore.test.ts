@@ -9,7 +9,7 @@ import { assembly, cell, ownerX, PageStorage, running, start, until, walk } from
 test('a client walks off the road onto Nine Dragon\'s deck, and a reload resumes it there', { timeout: 120_000 }, async () => {
   const nine = assembly.cells.find(row => row.slug === 'nine-dragon-stack');
   if (nine === undefined) throw new Error('The grid places no Nine Dragon');
-  const storage = new PageStorage(), first = start(storage, { x: nine.origin.x - 259, y: 0, z: nine.origin.z }), travels: NetTravel[] = [], { client } = first.shell;
+  const storage = new PageStorage(), first = start(storage, { x: nine.origin.x - 259, y: 0, z: nine.origin.z }, 'nine-dragon-stack'), travels: NetTravel[] = [], { client } = first.shell;
   client.onTravel(event => { travels.push(event); });
   await first.shell.booted; first.shell.ready();
   await until(() => client.latest !== null);
@@ -20,7 +20,7 @@ test('a client walks off the road onto Nine Dragon\'s deck, and a reload resumes
   const inside = await first.shell.save(), stood = ownerX(first.shell);
   expect(inside.ok).toBe(true);
   first.stop();
-  const second = start(storage);
+  const second = start(storage, undefined, 'nine-dragon-stack');
   expect(await second.shell.booted).toEqual({ tick: inside.tick, restored: true });
   second.shell.ready();
   await until(() => second.shell.client.latest !== null);
