@@ -35,7 +35,10 @@ export class Hoverboard extends Tool {
     const { pulse, glow } = buildHoverboard(g);
     this.pulse = pulse; this.glow = glow;
     // depth clear so the deck never clips into the terrain; everything renders in the transparent queue after it
-    const clearer = new THREE.Mesh(new THREE.BoxGeometry(0.001, 0.001, 0.001), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, fog: false })); // fogless: draws nothing, shares the fogless MeshBasic program (as the crossbow's);
+    // EP6 (render/viewmodel.ts): the clear is its draw hook; an empty range past its one vertex returns before any GL call, so it
+    // costs no draw (NB8: it was one of the board's 12 on the phone's walk)
+    const clearer = new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3)), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, fog: false }));
+    clearer.geometry.setDrawRange(2, 0);
     clearer.renderOrder = 999; clearer.frustumCulled = false;
     clearer.onBeforeRender = (renderer) => { renderer.clearDepth(); };
     g.add(clearer);
