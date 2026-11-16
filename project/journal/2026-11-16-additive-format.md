@@ -46,3 +46,10 @@ structural policy still checks its strict shape and surface picklist.
 No global custom-schema fallback is added. All109 cases in the three
 originally failing consumers plus reader/output-descriptor suites pass;
 full types and game lint pass. The library retains format0.1.0.1.
+
+Final delta review: NO MUST. Its SHOULD correctly questioned the bridge:
+the output-mode converter starts with the final structural schema, so
+the plain-data preflight bridge is unused. Remove all three added lines;
+the original109 cases still pass, as do full types/lint. Keep only the
+published0.11 defining picklist fix. This avoids a needless permissive
+projection of a standalone guard. No custom mapping override remains.
