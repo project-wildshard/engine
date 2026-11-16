@@ -1,3 +1,4 @@
+import * as bakedUrls from '../../../shared/engine/boot/bakedUrls';
 /** Fetch after level selection; the public data API must not load the content registry. */
 import { Color, DataUtils, type DataTexture } from 'three';
 import type { LookupTexture } from 'postprocessing';
@@ -6,9 +7,9 @@ import type { LookupTexture } from 'postprocessing';
  * The engine's tileable cloud fbm baked at build (world/cloudField.ts, scripts/bake-cloud-field.mjs): raw grey bytes. A level
  * that lists it among its boot's `baked` files gets the sky's cloud texture without marching it (boot/bakedTextures.ts bakedBytes).
  */
-export const CLOUD_FIELD_URL = '/assets/baked/common/cloud-field.bin';
+export const CLOUD_FIELD_URL: typeof bakedUrls.CLOUD_FIELD_URL = bakedUrls.CLOUD_FIELD_URL;
 /** The pond's tiling ripple normal + foam map baked at build (world/water/ripplePixels.ts, scripts/bake-water-ripples.mjs): raw RGBA bytes. */
-export const WATER_RIPPLES_URL = '/assets/baked/common/water-ripples.bin';
+export const WATER_RIPPLES_URL: typeof bakedUrls.WATER_RIPPLES_URL = bakedUrls.WATER_RIPPLES_URL;
 
 export async function preloadBakedTextures(): Promise<number> {
   return (await import('./bakedTextures')).preloadBakedTextures();
