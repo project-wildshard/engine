@@ -17,3 +17,6 @@
 - SB27 (opus-ss16p): the title SETTINGS never opened on staging v0.1.30 or prod v0.1.29. `readDiscovery` read each row's
   `/shardfiles/<slug>/discovery.json` from the page, which 404s since PAGE-SIZE put shard content on the content base, so
   `completeCatalogue` rejected and `openTitleSettings` never opened. It now reads `contentURL(row.discovery)`.
+- SB10 (opus-ss16p): the staging mark sat on the move stick and ATTACK in play and on the last Settings row. It is now one
+  word, STAGING, at the top left under the HUD Settings button, and in the strip above an open menu sheet; the full sentence
+  is its accessible name. T1 phone spec mounts the real rule and words and checks no tappable control under it.

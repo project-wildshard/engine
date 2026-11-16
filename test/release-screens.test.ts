@@ -66,7 +66,8 @@ test('404 and a bad signature: Try again reads once; Title screen stops the load
 test('staging says so for the session', () => {
   const scope = new Scope('test'), mark = stagingMark(scope);
   expect(mark.dataset['failmode']).toBe('staging');
-  expect(mark.textContent).toBe('Staging · not the live world');
+  expect(mark.textContent).toBe('Staging');
+  expect(mark.getAttribute('aria-label')).toBe('Staging · not the live world');
   scope.dispose();
   expect(document.querySelector('[data-failmode="staging"]')).toBeNull();
 });

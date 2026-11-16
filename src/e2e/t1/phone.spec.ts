@@ -1,4 +1,9 @@
 import {
+  markCovers,
+  markSource,
+  mountMark,
+} from '../../../scripts/bugbash-probes.mjs'
+import {
   barStalls,
   untracedChanges,
 } from '../../../scripts/loading-bar-rule.mjs'
@@ -155,4 +160,32 @@ test('phone joystick moves the seated player', async ({
     })
     await session.detach()
   }
+})
+
+// STAGING-BUGBASH SB10: the staging mark (releaseScreens.ts stagingMark, styled by linkScreens.ts) sat on the move stick and
+// ATTACK in play and on the last row of Settings. The online page draws it only on staging, so this mounts the real rule and
+// Words on the phone's play page and its Settings sheet and checks it covers no tappable control.
+test('the staging mark covers no phone control in play or in Settings', async ({
+  page,
+}): Promise<void> => {
+  await page.evaluate(mountMark, markSource(process.cwd()))
+  // The HUD shows after the arrival caption: judge the mark against the controls, not an empty screen
+  await page
+    .locator('.ws-touch-attack')
+    .waitFor({ state: 'visible', timeout: 15_000 })
+  await page.waitForTimeout(3500)
+  await page.screenshot({
+    path: test.info().outputPath('staging-mark-play.png'),
+  })
+  expect(await page.evaluate(markCovers), 'in play').toEqual([])
+  await page.locator('.ws-touch-pause').tap()
+  await page
+    .locator('.ws-gmenu-svtab')
+    .first()
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  await page.waitForTimeout(400)
+  await page.screenshot({
+    path: test.info().outputPath('staging-mark-settings.png'),
+  })
+  expect(await page.evaluate(markCovers), 'in Settings').toEqual([])
 })
