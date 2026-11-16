@@ -34,3 +34,10 @@ Committed-source receipt `a86e33a1`: host 2383/1819/1780 ms,
 door 1105/1122/1118 ms, export 425/291/423 ms, format 465/444/447 ms
 (baseline/planted/healed, complete child processes). Each expected plant
 fails one case with its own assertion or admission reason; all four heal.
+
+J206 read-only review (engine-TC26-TC27-20261115-195839.md) found the soak
+could spend a shard's blocking wall budget. It now runs after wall
+accounting. The drill also invalidates a previous receipt before any
+setup and includes Git export in its cleanup protection. A real Git
+setup refusal overwrites a seeded old success with complete:false and
+leaves no private directory. Actionlint and syntax checks pass.

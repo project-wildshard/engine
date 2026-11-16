@@ -11,9 +11,9 @@ import {linkNodeModules} from './link-node-modules.mjs';
 const root=resolve(import.meta.dirname,'..'),out=resolve(process.argv[2]??join(root,'tmp/coverage-fire-drill'));
 assert.ok(out.startsWith(`${root}/tmp/`),'Drill output must stay in this repository tmp/');
 mkdirSync(out,{recursive:true});
-const work=mkdtempSync(join(out,'run-')),tree=join(work,'tree');mkdirSync(tree);
-const sha=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
-const source=execFileSync('git',['archive','HEAD'],{cwd:root,maxBuffer:512*1024*1024});
+// A failed rerun must never leave an earlier successful qualification visible.
+writeFileSync(join(out,'receipt.json'),JSON.stringify({version:1,complete:false,sha:null,results:[]}));
+const work=mkdtempSync(join(out,'run-')),tree=join(work,'tree');
 /** @type {{id:string,ring:number,owner:string,file:string,find:string,plant:string,reason:RegExp}[]} */
 const faults=[
   {id:'host',ring:1,owner:'engine:src/server/game/riding/nativeTaming.ts',file:'src/server/game/riding/nativeTaming.ts',
@@ -37,6 +37,9 @@ function run(id){
   return {code:child.status,ms:Math.round(performance.now()-began),text};
 }
 try{
+  mkdirSync(tree);
+  const sha=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
+  const source=execFileSync('git',['archive','HEAD'],{cwd:root,maxBuffer:512*1024*1024});
   execFileSync('tar',['-x','-C',tree],{input:source});linkNodeModules(root,tree);
   // Only this export's format alias is replaced. The installed pnpm package
   // and immutable pin cache remain untouched, including during the format plant.
@@ -75,7 +78,7 @@ try{
     writeFileSync(join(out,`${fault.id}-healed.log`),healed.text);
     assert.equal(healed.code,0,`${fault.id}: removing the fault must heal the actual contract`);
     results.push({id:fault.id,ring:fault.ring,owner:fault.owner,baselineMs:before.ms,plantedMs:red.ms,healedMs:healed.ms});
-    writeFileSync(join(out,'receipt.json'),JSON.stringify({sha,results},null,2));
+    writeFileSync(join(out,'receipt.json'),JSON.stringify({version:1,complete:results.length===faults.length,sha,results},null,2));
     console.log(`TC26 ${fault.id}: green, expected red, healed; Ring ${fault.ring}; ${fault.owner}`);
   }
 }finally{rmSync(work,{recursive:true,force:true});}
