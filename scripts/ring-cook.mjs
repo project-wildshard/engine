@@ -10,6 +10,7 @@ await import('./bake-loader.mjs');
 const { createCookWorker, indexKey } = await import('../src/cook/game/cookWorker.ts');
 const { folderStore } = await import('../src/cook/game/packStore.ts');
 const { cookRevision } = await import('./cook-revision.ts');
+const { ringCookInputs } = await import('./ring-cook-inputs.ts');
 const { rendererRevision } = await import('./renderer-revision.mjs');
 const { shardfileValidationRevision } = await import('./shardfile-validation-revision.mjs');
 const { values } = parseArgs({ options: { out: {type:'string',default:'tmp/ring-cook'}, build: {type:'string',default:'ring-local'},
@@ -27,13 +28,11 @@ const { shards } = JSON.parse(readFileSync('test/pins/shardfiles.json','utf8'));
 const allowed = values.ring2 ? shards.map(row => row.slug) : products;
 const selected = values.only === undefined ? allowed : values.only.split(',');
 if (selected.length === 0 || new Set(selected).size !== selected.length || selected.some(slug => !allowed.includes(slug))) throw new Error('Cook selection must name distinct pinned products in this ring');
-const heads = selected.map(slug => {
-  const row = shards.find(pin => pin.slug === slug); if (row === undefined) throw new Error(`Not pinned: ${slug}`); return row;
-});
+const inputs=ringCookInputs(selected,shards,cache,values.ring2),heads=inputs.heads;
 const store = folderStore(join(out,'store'));
 // A fresh run owns its empty cache. At least its first product always encodes cold.
 const worker = createCookWorker({ build: values.build, store, serverPacks: join(out,'server'), scratch: join(out,'jobs'), validator: shardfileValidationRevision(root),
-  source: { heads: () => Promise.resolve(heads.map(row => ({...row, revision:1}))), download: hash => Promise.resolve(readFileSync(join(cache,`${hash}.tar`))) },
+  source: { heads: () => Promise.resolve(heads.map(row => ({...row, revision:1}))), download: hash => Promise.resolve(inputs.read(hash)) },
   launcher: { root, execPath: process.execPath, loader:join(root,'scripts/bake-loader.mjs'), script:join(root,'scripts/cook-job.mjs'),
     wrap:[], limits:{seconds:timeout/1000,memoryMB:4096,heapMB:2048}, renderer: rendererRevision(root) } });
 const recipe = cookRevision(), indexes = [];

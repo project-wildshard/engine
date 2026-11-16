@@ -30,3 +30,14 @@ J206's workflow review also requires a successful browser-install outcome
 before cook-to-play. That step now has its own id and the proof checks
 both input and browser setup outcomes, plus cancellation. Actionlint is
 clean; the earlier report failure remains unchanged and visible.
+
+Resumed TC27: hosted run 43784812801 reached the actual cook and found a
+source mismatch. Ring 1 installs handwritten Template 2 from the frozen
+format dependency, while ring-cook read the unrelated catalogue head
+under blender-template and expected its tar in the cache. The new shared
+ringCookInputs reader follows exactly that existing Ring 1 selection;
+Ring 2 retains catalogue inputs. Both the cook and stored-product reader
+consume the selected bytes directly, without a new download or producer.
+The real format archive is admitted with an empty tar cache in 0.29 s;
+missing Ring 2 archives and unselected hashes still refuse. No pins.ts,
+consumer pin, cook launch, runtime host, or H1/H4/H5 source changed.

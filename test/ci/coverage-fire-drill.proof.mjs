@@ -76,6 +76,22 @@ timed('format',async()=>{
   assert.ok(product.shardfile.state.shared.some(row=>row.name==='blender.door.open'));
 });
 
+timed('cook-source',async()=>{
+  const {ringCookInputs}=await import('../../scripts/ring-cook-inputs.ts');
+  const {formatTemplate}=await import('../../scripts/pin-format.ts');
+  const {readTar}=await import('@wildshard/format/tar');
+  const {parseOutputIndex}=await import('@wildshard/format/outputIndex');
+  const pins=JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')).shards;
+  const format=formatTemplate('blender-template'),ring1=ringCookInputs(['blender-template'],pins,'tmp/absent-cook-cache');
+  assert.equal(ring1.heads[0].hash,format.pin.hash,'TC27_FORMAT_INPUT: Ring 1 must cook its installed handwritten Template 2');
+  const files=readTar(ring1.read(format.pin.hash)),index=parseOutputIndex(JSON.parse(new TextDecoder().decode(files.get('shard.json'))));
+  assert.equal(index.identity.slug,'blender-template');assert.equal(index.identity.revision,format.pin.revision);
+  const ring2=ringCookInputs(['blender-template'],pins,'tmp/absent-cook-cache',true);
+  assert.deepEqual(ring2.heads,[pins.find(row=>row.slug==='blender-template')]);
+  assert.throws(()=>ring2.read(ring2.heads[0].hash),/ENOENT/u,'A missing Ring 2 head cannot be replaced by the format corpus');
+  assert.throws(()=>ring1.read('0'.repeat(64)),/unselected input/u);
+});
+
 timed('export',()=>{
   mkdirSync('tmp/coverage-consumer',{recursive:true});
   const work=mkdtempSync(resolve('tmp/coverage-consumer/run-'));
