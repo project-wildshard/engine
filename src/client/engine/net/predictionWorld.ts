@@ -1,8 +1,8 @@
 // P1-E5.3-C5 (E5-REPLICATION §5.2): the world the client predicts against, beyond the static collision it already holds.
 // Movers stand at the tick the command will run on the server, not the one on screen, or a player would ride a deck 100 ms
-// behind (J59 Q4). Creatures and other players near the client stand as capsules at their interpolated pose, so the feet
-// stop about where the server stops them, and any error is a correction (Source collides with interpolated entities the
-// same way). A gate this player has opened is gone for its capsule alone (J106). None of this is ever rolled back: only
+// behind (J59 Q4). Nearby creatures have collision capsules; their command-time mover projects those separately from
+// their interpolated visible bodies, including during replay. A gate this player has opened is gone for its capsule
+// alone (J106). The world is never rolled back: only
 // the character replays (J59 Q10), and a replay re-poses the movers without stepping the world.
 import type { Collider } from '@dimforge/rapier3d-simd';
 import type { CharacterMotor } from '../../../shared/engine/physics/CharacterMotor';
@@ -38,6 +38,7 @@ export class PredictionWorld {
   private readonly movers = new Set<PredictedMover>();
   private readonly capsules = new Map<number, Collider>();
   private readonly seen = new Set<number>();
+  private readonly translation = { x: 0, y: 0, z: 0 };
   private frameTick = 0;
   private frameSeq = 0;
   constructor(physics: Physics) { this.physics = physics; }
@@ -69,7 +70,8 @@ export class PredictionWorld {
       const half = Math.max(0.01, row.height / 2 - row.radius);
       const capsule = has ?? world.createCollider(R.ColliderDesc.capsule(half, row.radius).setCollisionGroups(groups('CREATURE')));
       if (has === undefined) { tagCollider(capsule, 'flesh', row.handle); capsules.set(row.handle, capsule); }
-      capsule.setTranslation({ x: row.x, y: row.y + row.height / 2 + 0.005, z: row.z });
+      this.translation.x = row.x; this.translation.y = row.y + row.height / 2 + 0.005; this.translation.z = row.z;
+      capsule.setTranslation(this.translation);
       seen.add(row.handle);
     }
     for (const [handle, capsule] of capsules) if (!seen.has(handle)) { world.removeCollider(capsule, false); capsules.delete(handle); }

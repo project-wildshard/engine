@@ -65,3 +65,15 @@ The allocation-equivalence fixture receives the same behavior fix;
 it keeps independent allocating uploads and all exact state/world
 comparisons, including slopes and moving decks. The separate native
 regression checks the requested movement rather than that fixture.
+
+The next capture finds a second source of misses: the page's creature
+capsule still occupies its delayed displayed pose while the room has
+already moved it clear. Drive those collision proxies through the
+existing command/replay mover seam and Interpolator.project, bounded
+to the same half-second run-on as moving decks. The visible bodies
+keep interpolation. Reuse the presentation scratch rows and one
+projection buffer; allocate no per-creature projection objects in a
+command. Clear that scratch on travel. Native cases cover a moving
+blocker, replay, a stationary blocker, bounded/held rows and removal.
+Static windmill contacts remain a separate open issue; neither this
+change nor the floor fix claims the complete B2 runtime bar yet.

@@ -26,7 +26,7 @@ import type { DeathCause } from '@wildshard/engine/combat/pipeline';
 import { deviceIdentity, heldName, type NetIdentity } from '@wildshard/engine/net/identity';
 import { askNameToJoin } from '@wildshard/engine/ui/namePrompt';
 import { NetPlayer, type NetWeapons } from '@wildshard/engine/net/netPlayer';
-import type { PredictedRow } from '@wildshard/engine/net/predictionWorld';
+import { CreaturePrediction, type CreaturePredictionRow } from './creaturePrediction';
 import { ANIMAL_CLASS } from '@wildshard/engine/net/netSchemas';
 import type { OtherPlayers } from '@wildshard/engine/net/otherPlayers';
 import { hurtOther } from '@wildshard/engine/net/hurtOther';
@@ -232,7 +232,7 @@ function headOf(body: Animal | undefined, to: Vector3): boolean {
 }
 
 /** Rows onto the bodies, and the near ones into the predicted world as capsules. */
-function showRows(client: NetClient, net: NetPlayer, ports: WorkerClientPorts, bodies: ReadonlyMap<number, RowBody>, renderTick: number, dt: number, row: Float64Array, near: PredictedRow[], rideable: Set<number>): number {
+function showRows(client: NetClient, net: NetPlayer, ports: WorkerClientPorts, bodies: ReadonlyMap<number, RowBody>, renderTick: number, dt: number, row: Float64Array, near: CreaturePredictionRow[], rideable: Set<number>): number {
   const { interpolator } = client, own = client.welcome?.handle ?? 0, under = client.riders.get(own);
   let shown = 0;
   near.length = 0;
@@ -399,7 +399,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   scope.onDispose(serverStopsForImport(stop));
   // A session that ends with its page still here saves first. What navigates asks through `holdLeaving`, below.
   scope.onDispose(() => { if (ended) return; ended = true; leaves(); shell.pause(); closing = atMostLeaveWait(shell.save()).finally(() => { shell.dispose(); }); });
-  const retired = new Map<string, number>(), spawnMs = new Map<string, number>(), net = new NetPlayer(client, player, physics), show = isDev() ? overlay(ports) : (): void => undefined, row = new Float64Array(ANIMAL_CLASS.row.length), near: PredictedRow[] = [], costs = new Float64Array(240), bodies = new Map<number, RowBody>();
+  const retired = new Map<string, number>(), spawnMs = new Map<string, number>(), net = new NetPlayer(client, player, physics), show = isDev() ? overlay(ports) : (): void => undefined, row = new Float64Array(ANIMAL_CLASS.row.length), near: CreaturePredictionRow[] = [], costs = new Float64Array(240), bodies = new Map<number, RowBody>();
   // the ride: a press goes up, and it starts and ends on the server's word. The body under the rider leaves its row for it
   let mount: Mount | null = null;
   const bindMount = (): void => {
@@ -494,7 +494,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   scope.onDispose(client.onLedger(receipt => { report.receipts.push(`${receipt.grant}:${receipt.name}`); }));
   scope.onDispose(client.onView(({ name }) => { heard[name] = (heard[name] ?? 0) + 1; }));
   const contacts: NetCombatEvent[] = [];
-  scope.onDispose(client.onTravel(() => { contacts.length = 0; }));
+  scope.onDispose(client.onTravel(() => { contacts.length = 0; near.length = 0; }));
   scope.onDispose(client.onCombat(event => {
     contacts.push(event);
     if (event.kind === 'hit' && event.target === client.welcome?.handle) ports.hurt(event.amount, new Vector3(...event.at), event.blow === true);
@@ -550,6 +550,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   }));
   const decks = new NetMovers(client, wirePage.movers, player.position);
   scope.onDispose(net.world.addMover(decks));
+  scope.onDispose(net.world.addMover(new CreaturePrediction(client.interpolator, net.world, near, player.position)));
   system({ id: 'proof.worker.reconcile', phase: 'input', run: () => { const at = diagnosticNow(); net.reconcile(); cost = diagnosticNow() - at; } });
   system({ id: 'proof.worker.present', phase: 'update', run: dt => {
     // A page still crossing stands in another world than the frames: those rows aren't its manager's to spawn.
