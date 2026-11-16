@@ -150,7 +150,7 @@ export class CharacterMotor {
       const result = state.result;
       this.result.grounded = result.grounded; this.result.groundNormalY = result.groundNormalY;
       this.result.downhillX = result.downhillX; this.result.downhillZ = result.downhillZ; this.result.horizontalFreedom = result.horizontalFreedom;
-      this.result.groundCollider = result.groundColliderHandle === null ? null : world.getCollider(result.groundColliderHandle);
+      this.result.groundCollider = result.groundColliderHandle !== null && world.colliders.raw.contains(result.groundColliderHandle) ? world.getCollider(result.groundColliderHandle) : null;
       // J127: a save holds the capsule's Rapier bytes. An older one holds the host's old capsule: rebuild it on this law's,
       // whose climb limit is the constructor's. A capsule the save agrees with keeps the limit it was saved at (a gait's).
       if (Math.abs(this.collider.radius() - opts.radius) < 1e-5) { this.kcc.setMaxSlopeClimbAngle(state.climbAngle); this.kcc.setMinSlopeSlideAngle(state.slideAngle); }
@@ -164,7 +164,7 @@ export class CharacterMotor {
       yaw: this.yaw, anchor: { ...this.anchor }, anchorBodyHandle: this.anchorBody?.handle ?? null,
       climbAngle: this.kcc.maxSlopeClimbAngle(), slideAngle: this.kcc.minSlopeSlideAngle(),
       result: { grounded: result.grounded, groundNormalY: result.groundNormalY, downhillX: result.downhillX, downhillZ: result.downhillZ,
-        horizontalFreedom: result.horizontalFreedom, groundColliderHandle: result.groundCollider?.handle ?? null } };
+        horizontalFreedom: result.horizontalFreedom, groundColliderHandle: result.groundCollider !== null && this.physics.world.colliders.raw.contains(result.groundCollider.handle) ? result.groundCollider.handle : null } };
   }
 
   /** What the next step reads of this motor (the deck it rides and the ground it last stood on) into a flat `out` at `at`,
@@ -173,7 +173,7 @@ export class CharacterMotor {
     const { anchor: a, result: r } = this;
     out[at] = a.x; out[at + 1] = a.y; out[at + 2] = a.z; out[at + 3] = this.anchorBody?.handle ?? -1;
     out[at + 4] = Number(r.grounded); out[at + 5] = r.groundNormalY; out[at + 6] = r.downhillX; out[at + 7] = r.downhillZ;
-    out[at + 8] = r.horizontalFreedom; out[at + 9] = r.groundCollider?.handle ?? -1; out[at + 10] = this.carriedBy;
+    out[at + 8] = r.horizontalFreedom; out[at + 9] = r.groundCollider !== null && this.physics.world.colliders.raw.contains(r.groundCollider.handle) ? r.groundCollider.handle : -1; out[at + 10] = this.carriedBy;
   }
   /** Put a `captureState` back. A body or collider the world has dropped since is let go. */
   restoreState(from: Float64Array, at: number): void {
@@ -183,7 +183,8 @@ export class CharacterMotor {
     if ((this.anchorBody?.handle ?? -1) !== body) this.anchorBody = body !== -1 && world.bodies.contains(body) ? world.getRigidBody(body) : null;
     r.grounded = from[at + 4] === 1; r.groundNormalY = from[at + 5] ?? 1; r.downhillX = from[at + 6] ?? 0; r.downhillZ = from[at + 7] ?? 0;
     r.horizontalFreedom = from[at + 8] ?? 1; this.carriedBy = from[at + 10] ?? 0;
-    if ((r.groundCollider?.handle ?? -1) !== ground) r.groundCollider = ground !== -1 && world.colliders.contains(ground) ? world.getCollider(ground) : null;
+    if (ground === -1 || !world.colliders.raw.contains(ground)) r.groundCollider = null;
+    else if (r.groundCollider?.handle !== ground) r.groundCollider = world.getCollider(ground);
   }
 
   /** Prepare a motor in another world without retiring this one. World-bound ground/ride anchors are reacquired. */

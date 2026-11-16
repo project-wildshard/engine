@@ -237,7 +237,7 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
 }
 /** Install the selected plan into one fresh or strictly restored native host.
  * A failed install disposes its world; installation may emit no gameplay effects. */
-export async function createTrustedHeadlessResident(preparation: HeadlessRuntimeInput, snapshot?: string | Readonly<SimSnapshot | SimSnapshotBytes>, world?: { readonly room?: boolean; readonly grid?: boolean; readonly near?: NearColliders; readonly page?: PageProgress }): Promise<TrustedHeadlessResident> {
+export async function createTrustedHeadlessResident(preparation: HeadlessRuntimeInput, snapshot?: string | Readonly<SimSnapshot | SimSnapshotBytes>, world?: { readonly room?: boolean; readonly grid?: boolean; readonly near?: NearColliders; readonly page?: PageProgress; readonly install?: (host: SimHost, fact: (name: string, entity: string) => void) => void }): Promise<TrustedHeadlessResident> {
   // The roster rolls its herds while this installs, so a room opened afterwards is too late: a save from a native-Math boot
   // would hold recipes its restore on the portable table can't reproduce.
   installPortableMath();
@@ -250,7 +250,7 @@ export async function createTrustedHeadlessResident(preparation: HeadlessRuntime
   const otherCommands = new Map<string, readonly HeadlessCommand[]>();
   const context: HeadlessRuntimeInstallation = { combat, ...(world?.room === true ? { room: true } : {}), restoring: saved !== undefined, ...(saved === undefined ? {} : { snapshot: saved }), commands: () => commands, playerCommands: id => otherCommands.get(id) ?? [], emit: effect => { effects.push(effect); } };
   const ports = { ...plan.ports, rapier: preparation.rapier };
-  const install = (target: SimHost): void => { plan.install(target, context); if (world?.grid === true) installCellHome(target); };
+  const install = (target: SimHost): void => { plan.install(target, context); if (world?.grid === true) installCellHome(target); world?.install?.(target, ledgerPorts(context.emit).fact); };
   let installing: SimHost | undefined;
   let host: SimHost;
   try {

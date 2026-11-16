@@ -506,16 +506,19 @@ function fixedPhasedBossFight<A extends PhasedBossBody>(row: PhasedBossRow, port
 
   const updateAdds = (dt: number): void => {
     const A = row.adds;
-    let alive = 0;
+    const hadAdds = adds.length > 0;
+    let alive = 0, kept = 0;
     for (const b of adds) {
-      if (b.a.alive) { alive++; continue; }
+      if (b.a.alive) { alive++; adds[kept++] = b; continue; }
       b.deadT += dt;
-      if (b.deadT > A.retireAfter && !b.a.hidden) ports.body.retire(b.a);
+      if (b.deadT > A.retireAfter) { if (!b.a.hidden) ports.body.retire(b.a); continue; }
+      adds[kept++] = b;
     }
+    adds.length = kept;
     if (s.mode === A.mode && king) {
       s.waveT += dt;
       if (s.waves % 2 === 1 && s.waveT > A.reinforce && alive > 0) spawnWave();
-      if (alive === 0 && adds.length > 0 && adds.every((b) => !b.a.alive)) {
+      if (alive === 0 && hadAdds) {
         const e = A.cleared.effect;
         views(e.views);
         s.mode = A.cleared.to; s.modeT = e.modeT ?? 0;
@@ -748,7 +751,11 @@ function fixedPhasedBossFight<A extends PhasedBossBody>(row: PhasedBossRow, port
         return {a,niche:add.niche,deadT:add.deadT};});
       // Actor memory, hp, attacks and physics were restored by their owner.
       // Do not replay reset/intro/view calls, retire actors or consume RNG.
-      if(restoredKing!==null)ports.body.bind(restoredKing,brain);
+      if(restoredKing!==null){
+        ports.body.bind(restoredKing,brain);
+        // The saved victory clock already determines retirement. Rebinding must not raise the heap again.
+        restoredKing.hidden=state.victoryT>row.victory.crumble;
+      }
       Object.assign(s,structuredClone(state));king=restoredKing;adds=restoredAdds;
     },
     kill: () => { const k = king; if (k?.alive === true) { s.invuln = false; s.mode = names.fight; k.headWorld(_h); k.applyDamage(k.hp + 10, _h, _w.set(0, 0, -1)); } },

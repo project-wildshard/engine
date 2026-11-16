@@ -1,10 +1,9 @@
-/** How high a slot body stands: a shard's creature view guest raises and sinks it, and on a server that height is the body's row. Only its
- *  height channels land here. The guest's clock lights a body and moves none, so it isn't saved. A dying body's sink is the guest's own
- *  memory, so a world saved with one going under keeps it: any other save starts the guest fresh. It runs only while a body of its kind is out. */
+/** Native slot heights run the shard's creature view guest. Its mutable globals and memory drive both living
+ * bob and a corpse's sink, and remain owned while no body is out. Continue them with the host clock after its first call. */
 import * as v from 'valibot';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
-import { ViewLane } from '@wildshard/engine/script/viewLane';
+import { ViewLane, ViewLaneStateSchema, type ViewLaneState } from '@wildshard/engine/script/viewLane';
 import { admitScriptV2 } from '@wildshard/format/scriptAdmissionV2';
 import { ViewProgramSchema } from '@wildshard/format/viewProgram';
 
@@ -14,8 +13,8 @@ const SLOT_COLUMNS = 7;
 /** The view lane's own floor on a schedule: a server has no display to halve for. */
 const LANE_RATE = 15;
 const natural = v.pipe(v.number(), v.integer(), v.minValue(0)), byte = v.pipe(natural, v.maxValue(255));
-const Saved = v.strictObject({ frames: natural, ids: v.array(v.array(v.nullable(v.string()))), memory: v.array(v.tuple([natural, v.array(byte)])) });
-export interface SavedSlotHeights {readonly frames: number; readonly ids: (string | null)[][]; readonly memory: [number, number[]][]}
+const Saved = v.strictObject({ frames: natural, ids: v.array(v.array(v.nullable(v.string()))), memory: v.array(v.tuple([natural, v.array(byte)])), lane: v.optional(ViewLaneStateSchema) });
+export interface SavedSlotHeights {readonly frames: number; readonly ids: (string | null)[][]; readonly memory: [number, number[]][]; readonly lane?: ViewLaneState}
 /** Where a memory isn't zero: a page of it is mostly nothing, and a save carries each run by where it starts. */
 function runsOf(bytes: Uint8Array): [number, number[]][] {
   const runs: [number, number[]][] = [];
@@ -35,6 +34,7 @@ export class SlotHeights {
   private readonly lane: ViewLane;
   private readonly columns: number;
   private frames = 0;
+  private readonly initialLane: ViewLaneState;
   constructor(bytes: Uint8Array, input: unknown, kind: string, scope: Scope, private readonly bodies: () => readonly AnimalSim[], private readonly ground: (x: number, z: number) => number) {
     const rows = this.rows = v.parse(ViewProgramSchema, input);
     admitScriptV2(bytes, { lane: 'view', ioBytes: rows.budget.ioBytes });
@@ -48,6 +48,7 @@ export class SlotHeights {
     }, 0);
     this.lane = new ViewLane(bytes, rows.budget.pages, { bindings: [{ handle: 1, columns: this.columns }], transforms: [], channels: rows.channels.length, bounds: rows.bounds, targetMs: rows.budget.targetMs, fuel: rows.budget.fuel },
       { write: () => { throw new Error('A slot view has no transforms'); }, upload: () => undefined, channels: values => { this.land(values); } }, [0, 0], undefined, scope);
+    this.initialLane = this.lane.snapshotState();
   }
   private land(values: Float64Array): void {
     for (const [index, row] of this.rows.channels.entries()) {
@@ -64,14 +65,17 @@ export class SlotHeights {
     if (Number.isFinite(memory)) return memory ?? 0;
     return field === 'attackPhase' ? body.attackPhase : field === 'seed' ? body.seed : field === 'scale' ? body.scale : field === 'yOffset' ? body.yOffset : 0;
   }
-  /** The guest's memory while a body of this kind goes under, or null: nothing else is worth a save's bytes. */
+  /** A guest that has run keeps its continuation even between spawns. */
   snapshot(): SavedSlotHeights | null {
-    if (!this.bodies().some(body => !body.alive && this.pools.some(pool => pool.ours && pool.ids.includes(body.entityId)))) return null;
-    return { frames: this.frames, ids: this.pools.map(pool => [...pool.ids]), memory: runsOf(new Uint8Array(this.lane.memory.buffer)) };
+    if (this.frames === 0) return null;
+    return { frames: this.frames, ids: this.pools.map(pool => [...pool.ids]), memory: runsOf(new Uint8Array(this.lane.memory.buffer)), lane: this.lane.snapshotState() };
   }
   restore(input: unknown): void {
     const saved = v.parse(Saved, input), memory = new Uint8Array(this.lane.memory.buffer);
     if (saved.ids.length !== this.pools.length || this.pools.some((pool, index) => saved.ids[index]?.length !== pool.ids.length)) throw new Error('A slot height continuation lost its pools');
+    for (const [at, run] of saved.memory) if (at + run.length > memory.length) throw new Error('A slot height continuation exceeds its memory');
+    // Older native saves predate host clocks. This lane runs every frame at a fixed 15 Hz with a zero cost clock.
+    this.lane.restoreState(saved.lane ?? { ...this.initialLane, sequence: saved.frames, frames: saved.frames });
     memory.fill(0);
     for (const [at, run] of saved.memory) memory.set(run, at);
     this.frames = saved.frames;

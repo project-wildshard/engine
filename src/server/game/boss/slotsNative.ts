@@ -40,7 +40,9 @@ const noTells = (count: number): SlotTell[] => Array.from({ length: count }, () 
 export interface SlotFiles { readonly step: string; readonly rows: string; readonly actors: string; readonly looks: string }
 export interface NativeSlots { readonly law: SlotEncounterLaw<HuntBody, SlotTell>; readonly standing: () => readonly boolean[]; readonly solid: (index: number) => Solid;
   /** A body of this kind that another fight raised: it thinks, poses and saves as the slots' own do. */
-  readonly adopt: (body: HuntBody) => void }
+  readonly adopt: (body: HuntBody) => void;
+  /** Release only another fight's adopted body through the original roster. */
+  readonly release: (body: HuntBody) => void }
 /** What a blow's player held. */
 export type SlotHeld = (request: DamageRequest) => { readonly enabled: boolean; readonly slot: string } | null;
 type Solid = ReturnType<SimHost['physics']['world']['getCollider']>;
@@ -137,9 +139,13 @@ export async function prepareSlots(product: Pick<ShardProduct, 'json' | 'section
       const law = new SlotEncounterLaw<HuntBody, SlotTell>(timing.slots, timing.view, ReturnProgram.native(host, timing.program), {
         sites: placed.sites.map((site, index) => ({ x: site.x, z: site.z, yaw: site.yaw, variant: placed.variantCycle[index % placed.variantCycle.length] ?? 0 })),
         wedges: noTells(timing.view.tell.pool), guest: brain, ground: (x, z) => host.groundHeightAt(x, z), cosmetic: () => host.rng.stream('cosmetic').next(), cues: { cue: () => undefined } });
+      const retire = (body: HuntBody): void => {
+        if (host.entities.get(body.entityId) !== body || !ownedBrains.has(body)) throw new Error('A foreign slot retirement');
+        population.retireElite(body); elite.brains.delete(body); ownedBrains.delete(body); presented.delete(body.entityId);
+      };
       law.attachActors({ factory: { model: (kind, variant) => { population.validateSpawn(kind, variant); return kind; } },
         spawn: (kind, x, z, yaw, variant) => { const body = population.spawnElite(kind, x, z, yaw, variant); bind(body); return body; },
-        retire: body => { population.retireElite(body); elite.brains.delete(body); ownedBrains.delete(body); presented.delete(body.entityId); } });
+        retire });
       for (const body of population.bodies) if (body.kind === declared.kind) bind(body);
       if (restoring) onSimHostRestored(host, () => { for (const [actor, bound] of ownedBrains) elite.brains.set(actor, bound); });
       const heights = new SlotHeights(module, view.rows, declared.kind, host.scope, bodies, (x, z) => host.groundHeightAt(x, z));
@@ -152,7 +158,7 @@ export async function prepareSlots(product: Pick<ShardProduct, 'json' | 'section
         law.restore(saved.law, id => population.bodies.find(body => body.entityId === id && body.kind === declared.kind) ?? null);
         saved.sites.forEach((awake, index) => { standing[index] = awake; });
         if (saved.heights !== undefined) heights.restore(saved.heights);
-      }, physicsRestored: () => { solids.clear(); standing.forEach((awake, index) => { solidAt(index).setEnabled(!awake); }); } });
+      }, physicsRestored: () => { solids.clear(); standing.forEach((awake, index) => { const solid = solidAt(index); if (solid.isEnabled() !== !awake) solid.setEnabled(!awake); }); } });
       host.onStep(`${files.step}.slot-poses`, dt => {
         heights.frame(dt);
         for (const [id, pose] of presented) {
@@ -168,6 +174,9 @@ export async function prepareSlots(product: Pick<ShardProduct, 'json' | 'section
       owners.set(host, { law, standing: () => standing, solid: solidAt, adopt: body => {
         if (body.kind !== declared.kind || host.entities.get(body.entityId) !== body || !population.bodies.includes(body) || law.awake.some(row => row.a === body)) throw new Error('A foreign body for these slots');
         bind(body);
+      }, release: body => {
+        if (law.awake.some(row => row.a === body)) throw new Error('An active slot belongs to its encounter');
+        retire(body);
       } });
       host.scope.onDispose(() => { owners.delete(host); updates.delete(host); presented.clear(); ownedBrains.clear(); solids.clear(); });
     },

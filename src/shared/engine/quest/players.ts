@@ -36,6 +36,8 @@ export class QuestBook {
   private readonly parts = new Map<string, QuestBookPart>();
   /** Rises whenever these flags change: what a replication view compares. */
   version = 0;
+  /** Silent document restores invalidate derived owners until they rebind. */
+  restoreVersion = 0;
   private readonly unwatch: () => void;
   constructor(player: string, flags: Flags, quests: QuestState[]) {
     this.player = player; this.flags = flags; this.quests = quests;
@@ -57,7 +59,7 @@ export class QuestBook {
     this.flags.restore(saved.flags);
     for (const quest of this.quests) { const state = saved.quests.find(row => row.id === quest.def.id); if (state === undefined) throw new RangeError('Snapshot quest book does not match'); quest.restore(state); }
     for (const [id, part] of this.parts) { const value = saved.parts[id]; if (value !== undefined) part.write(value); }
-    this.version++;
+    this.version++; this.restoreVersion++;
   }
   dispose(): void { this.unwatch(); for (const quest of this.quests) quest.dispose(); }
 }

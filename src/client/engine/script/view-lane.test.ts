@@ -17,10 +17,11 @@ const f32 = (x: number): number[] => [0x43, ...new Uint8Array(Float32Array.of(x)
 const f64 = (x: number): number[] => [0x44, ...new Uint8Array(Float64Array.of(x).buffer)];
 const store32 = (addr: number[], value: number[]): number[] => [...addr, ...value, 0x36, 0x02, 0x00];
 const storeF = (addr: number[], value: number[]): number[] => [...addr, ...value, 0x38, 0x02, 0x00];
-function viewModule(channel = false): Uint8Array {
+function viewModule(channel = false, stateful = false, extraGlobals: readonly number[][] = [], freezeHint = 0): Uint8Array {
   const base = [0x20, 3], at = (k: number): number[] => [...base, ...i32(k), 0x6a];
   const view = [
-    0x20, 0, ...f64(1), 0x64, 0x04, 0x40, 0x00, 0x0b, // dt > 1: trap
+    ...(stateful ? [0x23, 0, ...i32(1), 0x6a, 0x24, 0, ...store32(i32(IO + 116), [0x23, 0])] : []),
+    0x20, 0, ...f64(1), 0x64, 0x04, 0x40, ...store32(i32(IO + 64), i32(freezeHint)), 0x00, 0x0b, // dt > 1: trap
     ...i32(T17 + 4), 0x28, 0x02, 0x00, ...i32(IO), 0x6a, 0x21, 3, // base = directory[17].offset + io
     ...store32(i32(T17 + 16), i32(1)), ...store32(at(12), i32(1)),
     ...[0, 5, 10, 15].flatMap(k => storeF(at(16 + k * 4), f32(1))), ...storeF(at(16 + 12 * 4), [0x20, 1, 0xb6]),
@@ -32,10 +33,11 @@ function viewModule(channel = false): Uint8Array {
   const funcs: [number, number[][], number[], string][] = [[0, [], [...i32(2), 0x0b], 'ws_abi'], [0, [], [...i32(IO), 0x0b], 'ws_io'],
     [1, [], [0x20, 2, 0x0b], 'ws_init'], [2, [[1, 0x7f]], view, 'ws_view']];
   const imports = [[...text('env'), ...text('memory'), 2, 0x01, 1, 1]];
-  const exports = funcs.map((row, i) => [...text(row[3]), 0, i]);
+  const globals = [...(stateful ? [[0x7f, 1, ...i32(0), 0x0b]] : []), ...extraGlobals];
+  const exports = [...funcs.map((row, i) => [...text(row[3]), 0, i]), ...globals.map((_, index) => [...text(`__state_${String(index)}`), 3, index])];
   const code = funcs.map(([, locals, body]) => { const b = [...vec(locals), ...body]; return [...leb(b.length), ...b]; });
   return Uint8Array.from([0x00, 0x61, 0x73, 0x6d, 1, 0, 0, 0, ...section(1, vec(types)), ...section(2, vec(imports)),
-    ...section(3, vec(funcs.map(([t]) => [t]))), ...section(7, vec(exports)), ...section(10, vec(code))]);
+    ...section(3, vec(funcs.map(([t]) => [t]))), ...(globals.length > 0 ? section(6, vec(globals)) : []), ...section(7, vec(exports)), ...section(10, vec(code))]);
 }
 const rows: ViewLaneRows = { bindings: [{ handle: 7, columns: 2 }], transforms: [{ binding: 0, output: 0, element: 0 }], channels: 0,
   bounds: { translation: 10, scale: [0.5, 2], shear: 0.1 }, targetMs: 1, fuel: 1000 };
@@ -169,4 +171,104 @@ test('view disposal in a target cannot recycle while that frame still borrows it
   }, [0, 0], undefined, owner);
   expect(view.frame(1 / 60, .25, 20, [sample], 60, clock(.1))).toBe(true);
   expect(fixedMemoryCensus().returned).toBe(before + 1); expect(view.isFrozen).toBe(true);
+});
+
+test('native guest memory and host clocks continue pending frames, rate recovery and refusal exactly', () => {
+  const original = lane(), restored = lane();
+  for (let tick = 0; tick < 5; tick++) original.lane.frame(1 / 60, .25, tick, [sample], 60, clock(5));
+  expect(original.lane.interval).toBe(2);
+  const saved = original.lane.snapshotState();
+  expect(saved.pendingDt).toBeGreaterThan(0);
+  new Uint8Array(restored.lane.memory.buffer).set(new Uint8Array(original.lane.memory.buffer));
+  restored.lane.restoreState(saved);
+  original.written.length = 0; original.uploads.length = 0;
+  for (let tick = 5; tick < 250; tick++) {
+    const dt = tick === 248 ? 2 : 1 / 60;
+    expect(restored.lane.frame(dt, .5, tick, [sample], 60, clock(.1)))
+      .toBe(original.lane.frame(dt, .5, tick, [sample], 60, clock(.1)));
+    expect(restored.lane.snapshotState()).toEqual(original.lane.snapshotState());
+    expect(new Uint8Array(restored.lane.memory.buffer)).toEqual(new Uint8Array(original.lane.memory.buffer));
+  }
+  expect(restored.written).toEqual(original.written);
+  expect(restored.uploads).toEqual(original.uploads);
+  expect(restored.lane.isFrozen).toBe(true);
+  const frozen = lane();
+  new Uint8Array(frozen.lane.memory.buffer).set(new Uint8Array(restored.lane.memory.buffer));
+  frozen.lane.restoreState(restored.lane.snapshotState());
+  expect(frozen.lane.frame(1 / 60, .5, 250, [sample], 60, clock(.1))).toBe(false);
+  expect(frozen.written).toEqual([]);
+});
+
+test('invalid native host continuation is rejected before any state changes', () => {
+  const { lane: view } = lane({ batches: [{ instances: 2, capacity: 2, itemSize: 0 }] });
+  view.frame(1 / 60, .25, 1, [sample], 60, clock(.1));
+  const saved = view.snapshotState();
+  for (const patch of [{ frozen: [0, 0] }, { frozen: [1] }, { totals: [3] }, { totals: [0, 0] },
+    { pendingDt: Infinity }, { level: 31 }, { sequence: -1 }, { frames: 1.5 }]) {
+    expect(() => view.restoreState({ ...saved, ...patch })).toThrow();
+    expect(view.snapshotState()).toEqual(saved);
+  }
+});
+
+
+test('native continuation includes the admitted mutable guest globals', () => {
+  const create = (): ViewLane => new ViewLane(viewModule(false, true), 1, rows,
+    { write: () => undefined, channels: () => undefined, upload: () => undefined });
+  const original = create(), restored = create();
+  for (let tick = 0; tick < 7; tick++) original.frame(1 / 60, .25, tick, [sample], 15, () => 0);
+  const saved = original.snapshotState();
+  expect(saved.globals).toEqual(['00000007']);
+  new Uint8Array(restored.memory.buffer).set(new Uint8Array(original.memory.buffer));
+  restored.restoreState(saved);
+  for (let tick = 7; tick < 12; tick++) {
+    original.frame(1 / 60, .5, tick, [sample], 15, () => 0);
+    restored.frame(1 / 60, .5, tick, [sample], 15, () => 0);
+    expect(new Uint8Array(restored.memory.buffer)).toEqual(new Uint8Array(original.memory.buffer));
+    expect(restored.snapshotState()).toEqual(original.snapshotState());
+  }
+  for (const globals of [[], ['100000000'], ['NaN'], [' 7']]) {
+    const before = restored.snapshotState();
+    expect(() => restored.restoreState({ ...saved, globals })).toThrow();
+    expect(restored.snapshotState()).toEqual(before);
+  }
+});
+
+
+test('all guest numeric global bits continue, including non-finite values and i64 limits', () => {
+  const view = new ViewLane(viewModule(false, false, [[0x7e, 1, 0x42, 0, 0x0b],
+    [0x7c, 1, ...f64(0), 0x0b], [0x7d, 1, ...f32(0), 0x0b]]), 1, rows,
+    { write: () => undefined, channels: () => undefined, upload: () => undefined });
+  for (const globals of [
+    ['8000000000000000', '8000000000000000', '80000000'], // i64 min; signed float zeros
+    ['7fffffffffffffff', '7ff0000000000000', 'ff800000'], // i64 max; infinities
+    ['ffffffffffffffff', '7ff8000000000001', '7fc00001'], // negative i64; quiet NaN payloads
+  ]) {
+    view.restoreState({ ...view.snapshotState(), globals });
+    expect(view.snapshotState().globals).toEqual(globals);
+    const before = view.snapshotState();
+    expect(() => view.restoreState({ ...before, globals: ['0000000000000000', '0000000000000000', 'invalid'] })).toThrow();
+    expect(view.snapshotState()).toEqual(before);
+  }
+});
+
+test('partial binding freezes and nonzero batch totals survive the next real frame', () => {
+  const outputs: number[][] = [[], []];
+  const create = (index: number): ViewLane => new ViewLane(viewModule(false, false, [], 1), 1,
+    { ...rows, bindings: [{ handle: 7, columns: 2 }, { handle: 8, columns: 2 }], batches: [{ instances: 3, capacity: 3, itemSize: 0 }] },
+    { write: () => undefined, channels: () => undefined, batch: (_index, total) => { outputs[index]?.push(total); }, upload: () => undefined });
+  const original = create(0), restored = create(1);
+  original.restoreState({ ...original.snapshotState(), totals: [2] });
+  original.frame(2, .25, 0, [sample, sample], 15, () => 0);
+  expect(original.isFrozen).toBe(false); expect([...original.frozenBindings()]).toEqual([0]);
+  const saved = original.snapshotState();
+  new Uint8Array(restored.memory.buffer).set(new Uint8Array(original.memory.buffer));
+  restored.restoreState(saved);
+  for (let tick = 1; tick <= 5; tick++) {
+    original.frame(1 / 60, .25, tick, [sample, sample], 15, () => 0);
+    restored.frame(1 / 60, .25, tick, [sample, sample], 15, () => 0);
+    expect(restored.snapshotState()).toEqual(original.snapshotState());
+    expect(new Uint8Array(restored.memory.buffer)).toEqual(new Uint8Array(original.memory.buffer));
+  }
+  expect(outputs[0]).toEqual([2, 2, 2, 2, 2]); expect(outputs[1]).toEqual(outputs[0]);
+  expect(() => restored.restoreState({ ...saved, totals: [] })).toThrow();
 });

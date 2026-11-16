@@ -28,7 +28,7 @@ import { installCellHome } from '@wildshard/engine/game/grid/cellHome';
 import { serverDiscoveries, serverPlaces } from '@wildshard/engine/game/quest/serverPlaces';
 import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
 import { RESPAWN_NOW_ACT, STORY_ACT, UNSTUCK_ACT } from '@wildshard/engine/net/acts';
-import { installServerChapters } from '@wildshard/engine/game/quest/serverChapters';
+import { prepareServerChapters } from '@wildshard/engine/game/quest/serverChapters';
 import { installServerDoors } from '@wildshard/engine/game/quest/serverDoors';
 import { pageOpenDoors } from '@wildshard/engine/game/shardfile/buildingDoor';
 import { pageRuntimeState } from '@wildshard/engine/game/shardfile/runtimeState';
@@ -173,9 +173,11 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
     // A world with no save of its own takes the page's: the flags and records its fights read as they install.
     const seeded = snapshot === undefined && options.pageless !== true;
     const page = seeded ? { flags: [...new Set([...new Set([input.shard.identity.slug, cell.instance])].flatMap(level => pageSavedFlags(level)).concat(refused?.flags ?? []))], state: pageRuntimeState(options.saves, cell.instance) } : undefined;
-    const resident = await bootTask(snapshot === undefined ? 'server:simulation-and-collision-create' : 'server:continuation-restore', () => createTrustedHeadlessResident(input, snapshot, page === undefined ? around : { ...around, page })), { host } = resident;
+    const chapters = await prepareServerChapters(input.product, input.shard);
+    const installed = chapters === undefined ? around : { ...around, install: (host: SimHost, record: (name: string, entity: string) => void): void => { chapters(host, record); } };
+    const resident = await bootTask(snapshot === undefined ? 'server:simulation-and-collision-create' : 'server:continuation-restore', () => createTrustedHeadlessResident(input, snapshot, page === undefined ? installed : { ...installed, page })), { host } = resident;
     if (snapshot !== undefined) removeChunkEdgeWalls(host.physics); // GC36: a world saved while lone cells had walls
-    bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product)); await installServerChapters(host, input.product, input.shard, resident.fact); await installServerDoors(host, input.product, seeded ? pageOpenDoors(options.saves, placed) : undefined, snapshot !== undefined);
+    bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product)); await installServerDoors(host, input.product, seeded ? pageOpenDoors(options.saves, placed) : undefined, snapshot !== undefined);
     host.respawn.served = true; actRoutes(host).introLocks = true;
     const owned = ownedOf(host, input, options.owned, options.profiles), fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
     return { host, owned, fallFloor, fall: fallFloor(), resident, dispose: () => { resident.dispose(); }, fact, effects: () => resident.effects,

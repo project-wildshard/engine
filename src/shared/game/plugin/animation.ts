@@ -569,7 +569,7 @@ export function attachNativeCreaturePose(actor: AnimalSim, recipe: NativeCreatur
 } {
   const pose = new NativeCreaturePose(actor, recipe, animate);
   actor.bindVolumes(pose);
-  return { pose, body: Object.assign(actor, { hidden: false, sampleTerrain: (): void => { pose.sampleTerrain(); } }) };
+  return { pose, body: Object.assign(actor, { hidden: 'hidden' in actor && actor.hidden === true, sampleTerrain: (): void => { pose.sampleTerrain(); } }) };
 }
 
 const nativePoseServices = new WeakSet();

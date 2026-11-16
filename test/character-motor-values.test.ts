@@ -52,3 +52,38 @@ for (const lying of [false, true]) test(`every allocating-control native ${lying
     expect(compared).toBe(1024); expect(carried).toBeGreaterThan(0);
   } finally { old.dispose(); now.dispose(); oldWorld.dispose(); newWorld.dispose(); }
 });
+
+for (const replaced of [false, true]) test(`a retired floor${replaced ? ' with a reused native slot' : ''} cannot become a restored support`, async () => {
+  const R = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))), physics = new Physics(R);
+  const floor = physics.world.createCollider(R.ColliderDesc.cuboid(5, .5, 5).setTranslation(0, -.5, 0).setCollisionGroups(groups('WORLD')));
+  const options = { radius: .38, height: 1.7, step: .35, maxClimbDeg: 40, snap: .3, ...PLAYER_BODY };
+  const motor = new CharacterMotor(physics, options), feet = { x: 0, y: .02, z: 0 };
+  let back: Physics | undefined, restored: CharacterMotor | undefined;
+  try {
+    motor.resetAt(feet);
+    for (let tick = 0; tick < 5; tick++) { physics.step(); motor.move(feet, { x: 0, y: -.03, z: 0 }); }
+    expect(motor.result.groundCollider?.handle).toBe(floor.handle);
+    const legacy = motor.snapshot(), legacyFlat = new Float64Array(11);
+    motor.captureState(legacyFlat, 0);
+    physics.world.removeCollider(floor, true);
+    if (replaced) physics.world.createCollider(R.ColliderDesc.cuboid(1, 1, 1).setTranslation(30, 30, 30).setCollisionGroups(groups('WORLD')));
+    if (replaced) expect(physics.world.colliders.contains(floor.handle)).toBe(true); // the wrapper lookup ignores generation
+    expect(physics.world.colliders.raw.contains(floor.handle)).toBe(false);
+    const saved = motor.snapshot(), flat = new Float64Array(11);
+    motor.captureState(flat, 0);
+    expect(saved.result.groundColliderHandle).toBeNull(); expect(flat[9]).toBe(-1);
+    expect(motor.result.groundCollider).toBe(floor); // capture does not mutate the live step
+    motor.restoreState(legacyFlat, 0); expect(motor.result.groundCollider).toBeNull(); // even the equal-handle shortcut
+    motor.restoreState(legacyFlat, 0); expect(motor.result.groundCollider).toBeNull(); // and a fresh lookup
+    back = new Physics(R, physics.world.takeSnapshot()); restored = new CharacterMotor(back, options, legacy);
+    deepStrictEqual(restored.snapshot(), saved);
+    const resumedFeet = { ...feet };
+    for (let tick = 0; tick < 5; tick++) {
+      physics.step(); back.step();
+      motor.carry(feet); restored.carry(resumedFeet);
+      motor.move(feet, { x: .02, y: -.03, z: 0 }); restored.move(resumedFeet, { x: .02, y: -.03, z: 0 });
+      deepStrictEqual(resumedFeet, feet); deepStrictEqual(restored.snapshot(), motor.snapshot());
+      deepStrictEqual(back.world.takeSnapshot(), physics.world.takeSnapshot());
+    }
+  } finally { restored?.dispose(); back?.dispose(); motor.dispose(); physics.dispose(); }
+});

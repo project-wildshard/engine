@@ -412,6 +412,13 @@ export function restoreInstalledHost(host: SimHost, ports: { rapier: Rapier }, s
       || !sameIds(saved.strikes.map((entry) => entry.id), host.strikes.keys()) || !sameIds(saved.adapters.map((entry) => entry.id), [...host.adapters].filter(([id, adapter]) => adapter.joined !== true || saved.adapters.some(entry => entry.id === id)).map(([id]) => id))
       || !sameIds(saved.quests.map((entry) => entry.id), host.quests.map((quest) => quest.def.id))
       || saved.players.some(invalidPlayer) || saved.boardColliders?.length === 0) throw new RangeError('Snapshot instance registrations do not match');
+    // Dynamic owners may reinstall in a different order. Keep the saved body
+    // iteration order, as adapters below keep their continuation order.
+    for (const entry of saved.entities) {
+      const entity = host.entities.get(entry.id);
+      if (entity === undefined) throw new RangeError('Snapshot body registration disappeared');
+      host.entities.delete(entry.id); host.entities.set(entry.id, entity);
+    }
     for (const entry of saved.entities) host.entities.get(entry.id)?.restore(entry.state);
     for (const entry of saved.players) restorePlayer(host, entry);
     for (const entry of saved.strikes) host.strikes.get(entry.id)?.restore(entry.state, host.strikeSpecifications(entry.id));

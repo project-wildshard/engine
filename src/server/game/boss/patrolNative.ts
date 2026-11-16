@@ -18,6 +18,8 @@ import { StrikeRunner, type StrikeSpec } from '@wildshard/engine/ai/strikes';
 import { strikeFromData } from '@wildshard/engine/ai/strikeRows';
 import { canReach } from '@wildshard/engine/ai/reach';
 import { floorBelow, worldHit } from '@wildshard/engine/physics/query';
+import { CharacterMotor } from '@wildshard/engine/physics/CharacterMotor';
+import { withOwner } from '@wildshard/engine/app/ownership';
 import { pinBrain } from '@wildshard/engine/ai/pinning';
 import { variantMods } from '@wildshard/engine/entities/species/registry';
 import { sayFightView } from '@wildshard/engine/sim/shardRows';
@@ -179,7 +181,18 @@ export async function preparePatrol(product:Pick<ShardProduct,'json'>,files:Patr
       const recipe=poseRows.rows.find(row=>row.kind===body.kind&&row.variant===body.variant);
       if(recipe===undefined)throw new Error('Patrol rider lacks its actual contact pose');
       const scope=host.scope.child('patrol-actor');scopes.set(body.entityId,scope);
-      if(quiet){if(!restoringViews)body.scale*=rows.ride.quietScale;pinBrain(body,scope);}
+      if(quiet){
+        if(!restoringViews){
+          body.scale*=rows.ride.quietScale;
+          // A deferred rider can already own a nearby capsule. Apply the quiet body scale now, before its first move.
+          if(body.motor!==null){
+            body.motor.dispose();
+            const motor=withOwner(null,()=>new CharacterMotor(host.physics,host.creatureMotorOptions(body)));
+            motor.resetAt(body.position);body.motor=motor;
+          }
+        }
+        pinBrain(body,scope);
+      }
       const pose=new NativeCreaturePose(body,recipe.pose);poses.set(body.entityId,pose);
       body.sampleTerrain=()=>{pose.sampleTerrain();};body.headWorld=out=>{pose.headWorld(out);return out;};
       return pose;

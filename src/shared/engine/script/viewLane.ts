@@ -7,8 +7,9 @@
  * an invalid frame or a fuel refusal uploads nothing and freezes the binding the guest's hint names (else the module);
  * frozen targets never upload again. The rate is host-owned: display rate, halved after three successive scheduled
  * calls over the time target, never below 15 Hz while the display supplies it, one level back after 120 calls each
- * under half the target. Nothing here is saved or reaches the sim.
+ * under half the target. Native owners may continue the host clock alongside their guest memory.
  */
+import * as schema from 'valibot';
 import { readV2Module } from '@wildshard/format/scriptModuleV2';
 import { admitScriptV2 } from '@wildshard/format/scriptAdmissionV2';
 import type { Scope } from '../app/scope';
@@ -72,6 +73,55 @@ export interface ViewTargets {
 /** A binding's stamped samples for this frame: its previous / current sim ticks and 2 × columns values. */
 export interface ViewSample { readonly previousTick: number; readonly currentTick: number; readonly values: ArrayLike<number> }
 
+const natural = schema.pipe(schema.number(), schema.safeInteger(), schema.minValue(0));
+/** Host state paired with a native owner's exact guest memory. */
+export interface ViewLaneState {
+  readonly sequence: number; readonly frames: number; readonly pendingDt: number; readonly level: number;
+  readonly overruns: number; readonly healthy: number; readonly disabled: boolean;
+  readonly frozen: number[]; readonly totals: number[]; readonly globals: string[];
+}
+export const ViewLaneStateSchema: schema.GenericSchema<ViewLaneState> = schema.strictObject({
+  sequence: natural, frames: natural, pendingDt: schema.pipe(schema.number(), schema.finite(), schema.minValue(0)),
+  level: schema.pipe(natural, schema.maxValue(30)), overruns: natural, healthy: natural,
+  disabled: schema.boolean(), frozen: schema.array(natural), totals: schema.array(natural), globals: schema.array(schema.string()),
+});
+
+interface GlobalBits { readonly read: () => number | bigint; readonly write: (value: number | bigint) => void }
+interface StateGlobal { readonly global: WebAssembly.Global; readonly type: number; bits?: GlobalBits }
+const globalBridges = new Map<number, WebAssembly.Module>();
+/** JS canonicalizes NaNs at a float global boundary. Reinterpret inside Wasm so even a refused guest's payload survives. */
+function globalBits(entry: StateGlobal): GlobalBits {
+  if (entry.bits !== undefined) return entry.bits;
+  const type = entry.type, wide = type === 0x7c || type === 0x7e, integer = wide ? 0x7e : 0x7f;
+  let module = globalBridges.get(type);
+  if (module === undefined) {
+    const section = (id: number, bytes: readonly number[]): number[] => [id, bytes.length, ...bytes];
+    const get = [0, 0x23, 0, ...(type === 0x7c ? [0xbd] : type === 0x7d ? [0xbc] : []), 0x0b];
+    const set = [0, 0x20, 0, ...(type === 0x7c ? [0xbf] : type === 0x7d ? [0xbe] : []), 0x24, 0, 0x0b];
+    module = new WebAssembly.Module(Uint8Array.from([0, 97, 115, 109, 1, 0, 0, 0,
+      ...section(1, [2, 0x60, 0, 1, integer, 0x60, 1, integer, 0]),
+      ...section(2, [1, 3, 101, 110, 118, 5, 115, 116, 97, 116, 101, 3, type, 1]),
+      ...section(3, [2, 0, 1]), ...section(7, [2, 3, 103, 101, 116, 0, 0, 3, 115, 101, 116, 0, 1]),
+      ...section(10, [2, get.length, ...get, set.length, ...set])]));
+    globalBridges.set(type, module);
+  }
+  const instance = new WebAssembly.Instance(module, { env: { state: entry.global } });
+  const read = instance.exports['get'], write = instance.exports['set'];
+  if (typeof read !== 'function' || typeof write !== 'function') throw new Error('Missing native global bridge');
+  const bits: GlobalBits = { read: read as () => number | bigint, write: write as (value: number | bigint) => void };
+  entry.bits = bits; return bits;
+}
+function globalWord(entry: StateGlobal): string {
+  const width = entry.type === 0x7c || entry.type === 0x7e ? 64 : 32;
+  return BigInt.asUintN(width, BigInt(globalBits(entry).read())).toString(16).padStart(width / 4, '0');
+}
+function globalValue(word: string, type: number): number | bigint {
+  const wide = type === 0x7c || type === 0x7e;
+  if (!(wide ? /^[0-9a-f]{16}$/u : /^[0-9a-f]{8}$/u).test(word)) throw new Error('Invalid view global bits');
+  const value = BigInt.asIntN(wide ? 64 : 32, BigInt(`0x${word}`));
+  return wide ? value : Number(value);
+}
+
 export class ViewLane {
   private readonly storage: FixedMemory;
   get memory(): WebAssembly.Memory { if (this.closed) throw new Error('View memory owner has ended'); return this.storage.expose(); }
@@ -85,7 +135,7 @@ export class ViewLane {
   private retire(): void {
     this.ended = true;
     if (this.busy !== 0) return;
-    this.instance = undefined;
+    this.instance = undefined; this.globals = [];
     const empty = new ArrayBuffer(0);
     this.view = new DataView(empty); this.columns = new Float64Array(empty); this.channels = new Float64Array(empty);
     this.storage.retire(this.retirement);
@@ -99,6 +149,7 @@ export class ViewLane {
   private readonly matrix = new Float32Array(16);
   /** each batch's last landed total (a frame starts from it) */
   private readonly totals: number[] = [];
+  private globals: StateGlobal[] = [];
   private sequence = 0;
   private frames = 0;
   private pendingDt = 0;
@@ -113,7 +164,7 @@ export class ViewLane {
     prepared?: { readonly memory: PreparedViewMemory; readonly scope: Scope },
     /** Only native adapters whose target callbacks copy ALL borrowed views. */
     owner?: Scope) {
-    this.rows = rows; this.targets = targets;
+    this.rows = rows; this.targets = targets; this.totals.push(...(rows.batches ?? []).map(() => 0));
     this.retirement = owner === undefined ? undefined : new WeakRef(owner);
     if (owner?.disposed === true || owner?.disposing === true || (owner !== undefined && prepared !== undefined && owner !== prepared.scope)) throw new Error('View memory owner has ended or differs');
     // the v2 structural reader (memory the only import, fixed pages, no start / table / SIMD); H2's fuel and entry
@@ -156,6 +207,12 @@ export class ViewLane {
         const at = this.region(BINDINGS) + i * 64;
         this.view.setUint32(at, row.handle, true); this.view.setUint32(at + 12, 3, true); this.view.setUint32(at + 44, 1, true); // enabled | due, divisor 1
       }
+      this.globals = [...read.exports].flatMap(([name, entry]) => {
+        if (entry.kind !== 3 || name !== `__state_${String(entry.index)}`) return [];
+        const row = read.globals[entry.index], global = this.instance?.exports[name];
+        if (row?.mutable !== true || !(global instanceof WebAssembly.Global)) throw new Error('View state global differs');
+        return [{ global, type: row.type }];
+      });
       const left = this.call('ws_init', seed[0], seed[1], rows.fuel);
       if (!Number.isInteger(left) || left < 0 || left > rows.fuel) throw new Error('View init fuel refused');
     } catch (error) { this.retire(); throw error; }
@@ -166,6 +223,31 @@ export class ViewLane {
   get interval(): number { return 2 ** this.level; }
   get isFrozen(): boolean { return this.disabled || this.closed; }
   frozenBindings(): ReadonlySet<number> { return this.frozen; }
+
+  /** Capture between calls; memory remains the native owner's responsibility. */
+  snapshotState(): ViewLaneState {
+    if (this.closed || this.busy !== 0) throw new Error('View continuation requires an idle live owner');
+    return { sequence: this.sequence, frames: this.frames, pendingDt: this.pendingDt, level: this.level,
+      overruns: this.overruns, healthy: this.healthy, disabled: this.disabled, frozen: [...this.frozen], totals: [...this.totals], globals: this.globals.map(globalWord) };
+  }
+  /** Validate fully before replacing clocks, rate policy and landed batch counts. */
+  restoreState(input: unknown): void {
+    if (this.closed || this.busy !== 0) throw new Error('View continuation requires an idle live owner');
+    const saved = schema.parse(ViewLaneStateSchema, input);
+    if (new Set(saved.frozen).size !== saved.frozen.length || saved.frozen.some(index => index >= this.rows.bindings.length)
+      || saved.totals.length !== (this.rows.batches?.length ?? 0)
+      || saved.totals.some((total, index) => total > (this.rows.batches?.[index]?.instances ?? 0))) throw new Error('View continuation differs from its bindings');
+    if (saved.globals.length !== this.globals.length) throw new Error('View continuation lost a state global');
+    const globals = saved.globals.map((word, index) => {
+      const entry = this.globals[index]; if (entry === undefined) throw new Error('Missing view global');
+      return globalValue(word, entry.type);
+    });
+    globals.forEach((value, index) => { const entry = this.globals[index]; if (entry !== undefined) globalBits(entry).write(value); });
+    this.sequence = saved.sequence; this.frames = saved.frames; this.pendingDt = saved.pendingDt; this.level = saved.level;
+    this.overruns = saved.overruns; this.healthy = saved.healthy; this.disabled = saved.disabled;
+    this.frozen.clear(); for (const index of saved.frozen) this.frozen.add(index);
+    this.totals.splice(0, this.totals.length, ...saved.totals);
+  }
 
   /**
    * One displayed frame: accumulate `dt` (the paused / clamped presentation delta), and on a scheduled frame write the

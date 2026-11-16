@@ -55,6 +55,7 @@ import { installNativeTaming, type NativeTamingRows } from '../riding/nativeTami
 import { prepareNativeStealth } from '../stealth/nativeStealth';
 import { installGrapple } from '../grapple/native';
 import { arenaSpecies, installArenaEntry } from '../boss/arenaRoomEntry';
+import { readEncounterPoses } from '../population/encounterBook';
 import { parseGrappleProfile } from '@wildshard/format/grapple';
 import { tagOf } from '@wildshard/engine/physics/surface';
 import { installTrampleTrail } from '../../../shared/game/systems/looks/trampleField';
@@ -155,7 +156,8 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     }
     case 'boss.arena': {
       const input = await readAssemblyInput<unknown>(product, { file: row.file }), spec = arenaSpecies(await readAssemblyInput<unknown>(product, { file: 'server/arena-species.json' }));
-      return run => { if (run.context.room === true) { installArenaEntry(run.host, input, row, { spec, grantItem: at.ports.grantItem(run.context), snapshot: run.context.snapshot }); registerInstalled(run.host, 'arenaRoom'); } };
+      const poses = at.ports.room === true ? await readEncounterPoses(product, [row.body.kind]) : undefined;
+      return run => { if (run.context.room === true) { installArenaEntry(run.host, input, row, { spec, ...(poses === undefined ? {} : { poses }), grantItem: at.ports.grantItem(run.context), snapshot: run.context.snapshot }); registerInstalled(run.host, 'arenaRoom'); } };
     }
     case 'held.arms': {
       const arms = await prepareHeldArms(product, { ...row, weather: await readAssemblyInput<unknown>(product, row.weather) }), stealth = prepareNativeStealth(product);

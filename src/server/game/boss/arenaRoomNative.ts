@@ -58,11 +58,13 @@ export interface ArenaRoomNativePorts<A extends ArenaRoomBody> {
   readonly rewardPoint?: () => EncounterReward | null;
   /** A player the fight just put back: their motor and kit. */
   readonly returned?: (player: PlayerSim) => void;
+  /** The body's admitted contact pose, carried by this existing arena owner. */
+  readonly poses?: { readonly snapshot: () => unknown; readonly restore: (value: unknown) => void };
 }
 const THINK = 0.1;
 const finite = v.pipe(v.number(), v.finite());
 const Door = v.strictObject({ inside: v.boolean(), elapsed: finite, fade: finite, pending: v.nullable(v.picklist(['enter', 'exit'])) });
-const Saved = v.strictObject({ think: finite, sealed: v.boolean(), fight: v.unknown(), sand: v.unknown(), doors: v.exactOptional(v.array(v.tuple([v.string(), Door]))) });
+const Saved = v.strictObject({ think: finite, sealed: v.boolean(), fight: v.unknown(), sand: v.unknown(), doors: v.exactOptional(v.array(v.tuple([v.string(), Door]))), poses: v.exactOptional(v.unknown()) });
 
 /** Install the fight in its armed state, waiting at the door. No body is spawned until the first reset. */
 export function installArenaRoom<A extends ArenaRoomBody>(host: SimHost, rows: ArenaRoomNativeRows, ports: ArenaRoomNativePorts<A>): {
@@ -90,18 +92,22 @@ export function installArenaRoom<A extends ArenaRoomBody>(host: SimHost, rows: A
   const { phased: fight, script } = arenaRoomFight<A>({
     room: { floorHeightAt: (x, z) => ground.floorAt(x, z), addSand: (...pile) => { ground.addSand(...pile); }, clearSand: () => { ground.clearSand(); },
       drainSand: (dt, rate) => { ground.drainSand(dt, rate); }, inChamber: p => ground.inChamber(p), setSealed: on => { sealWanted = on; seal(); } },
-    body: { spawn: ports.spawnBody, retire: ports.retire, bind: (actor, brain) => { actor.combatActor().damageMul = request => brain.damageMul(actor, request.point); }, ready: (actor, floorY) => { actor.yOffset = floorY - actor.position.y; } },
+    body: { spawn: ports.spawnBody, retire: ports.retire, bind: (actor, brain) => { actor.combatActor().damageMul = request => brain.damageMul(actor, request.point); }, ready: (actor, floorY) => { actor.yOffset = floorY - actor.position.y; actor.position.y = floorY; } },
     spawnAdd: ports.spawnAdd, target, combat: host.combat, physics: () => host.physics, rng: () => host.rng.stream('ai').next(), feed: () => undefined,
   }, rows.fight, () => Object.fromEntries(profile.fight.views.map(id => [id, (...args: number[]): void => { sayFightView(host, id, args); }])));
   const row = installBossRow(host, { step: rows.step, row: rows.definition.id, definition: rows.definition, script, body: () => fight.body(), shielded: () => script.shielded,
     hazardTag: rows.fight.damageTag, saved: ports.saved, persist: ports.persist, armed: true,
     ...(ports.spawnReward === undefined ? {} : { spawnReward: ports.spawnReward }), ...(ports.rewardPoint === undefined ? {} : { rewardPoint: ports.rewardPoint }), ...(ports.returned === undefined ? {} : { returned: ports.returned }),
     fight: { snapshot: () => ({ think, sealed: sealWanted, fight: fight.continuation(actor => actor.entityId), sand: sand.snapshot(),
+      ...(ports.poses === undefined ? {} : { poses: ports.poses.snapshot() }),
       ...(rows.portal === undefined ? {} : { doors: [...doors].map(([id, law]) => [id, law.snapshot()]) }) }),
       restore: value => {
-        const saved = v.parse(Saved, value); think = saved.think; sealWanted = saved.sealed;
+        const saved = v.parse(Saved, value);
+        if (saved.poses !== undefined && ports.poses === undefined) throw new Error('Arena continuation lost its contact pose owner');
+        think = saved.think; sealWanted = saved.sealed;
         for (const [id, door] of saved.doors ?? []) { const portal = rows.portal; if (portal !== undefined) { const law = new ArenaPortalLaw(portal.program, portal.rows, portal.entrance); law.restore(door); doors.set(id, law); } }
         sand.restore(saved.sand); sand.republish(); fight.restore(saved.fight, ports.find);
+        if (saved.poses !== undefined) ports.poses?.restore(saved.poses);
       } } });
   owner.party = row.party; owner.fight = fight;
   const { portal } = rows;
