@@ -1,5 +1,6 @@
 import { ITEMS, isItemId } from '../../shared/game/bag/itemCatalog';
-import { harvestDrops } from '../../shared/game/harvest';
+import { declaredHarvestDrops, harvestDrops } from '../../shared/game/harvest';
+import type { HarvestDrop } from '@wildshard/format/harvestRows';
 import type { IconId } from '@wildshard/engine/ui/icons';
 import { findTitleManifest } from './shard/titleList';
 import { findShard } from './shard/registry';
@@ -33,8 +34,8 @@ import { DEFAULT_PACK_SLOTS, addInventory, takeInventory } from '../../shared/ga
 export type ItemId = string;
 
 /** what a carcass of (kind, variant) yields when harvested */
-export function harvestOf(kind: string, variant?: string): ItemId[] {
-  return harvestDrops(kind, variant).filter(isItemId);
+export function harvestOf(kind: string, variant?: string, declared?: readonly HarvestDrop[]): ItemId[] {
+  return (declared === undefined ? harvestDrops(kind, variant) : declaredHarvestDrops(declared, variant ?? '')).filter(isItemId);
 }
 
 export const PACK_SLOTS: 12 = DEFAULT_PACK_SLOTS;
@@ -68,7 +69,7 @@ export class Inventory {
   /** does this shard's pack take `id` at all? (Pine Hollow: only PINE_PACK_KINDS; Nalati, Nine Dragon: nothing) */
   keeps(id: ItemId): boolean { return !isNoPackChunk(this.chunkId) && (inventoryManifest(saveSlug(this.chunkId))?.bag?.pack.keeps?.includes(id) ?? true); }
   /** what this shard's pack takes from a carcass: harvestOf, less the kinds it does not keep (empty = no [E] Harvest) */
-  harvest(kind: string, variant?: string): ItemId[] { return harvestOf(kind, variant).filter((id) => this.keeps(id)); }
+  harvest(kind: string, variant?: string, declared?: readonly HarvestDrop[]): ItemId[] { return harvestOf(kind, variant, declared).filter((id) => this.keeps(id)); }
   /** did the save this pack loaded hold `id`, a kind the pack no longer keeps? ('warden-longbow' → Owned) */
   /** Legacy ownership reads accept row identities, including items absent from the live pack catalogue. */
   had(id: string): boolean { const legacy: ReadonlySet<string> = this.legacy; return legacy.has(id); }

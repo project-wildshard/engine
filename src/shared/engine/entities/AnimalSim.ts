@@ -1,3 +1,4 @@
+import type { HarvestDrop } from '@wildshard/format/harvestRows';
 import { Vector3, MathUtils } from 'three';
 import type { AnimalPoseLaw } from './animalPose';
 import { FlightMotion, type SpeciesFlight } from '../ai/flight';
@@ -69,6 +70,8 @@ const hitHead = new Vector3();
 
 /** Creature state and motion. All world services arrive as ports; there is no scene, rig or active app. */
 export class AnimalSim {
+  /** Admitted gameplay metadata; absent only on older native bodies, never part of their saved spec fingerprint. */
+  harvest: readonly HarvestDrop[] | undefined;
   protected readonly flight: FlightMotion | null;
   protected readonly impulseVelocity: Vector3 = new Vector3();
   protected falling = false;

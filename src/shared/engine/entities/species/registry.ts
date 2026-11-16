@@ -1,3 +1,4 @@
+import type { HarvestDrop } from '@wildshard/format/harvestRows';
 import type { RigContract } from '../../../../client/engine/anim/rig';
 import { validateCreatureBones as validateDeclaredBones } from '@wildshard/format/skinData';
 import { WeightedTable } from '../../ai/weighted';
@@ -233,6 +234,7 @@ export interface FurStyle {
 }
 
 export interface SpeciesDef {
+  harvest?: readonly HarvestDrop[];
   flight?: SpeciesFlight;
   /** LOCK / target taps; defaults to false on ground species and true on flight species. */
   lockable?: boolean;

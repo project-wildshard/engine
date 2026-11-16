@@ -1,3 +1,4 @@
+import type { HarvestDrop } from '@wildshard/format/harvestRows';
 import type { HuntTuning } from './hunt';
 import type { VariantMods, Rarity, ThinkCtx } from '../../../shared/engine/entities/species/registry';
 import type { Animal } from '../../../client/engine/entities/AnimalView';
@@ -9,6 +10,7 @@ export interface SpeciesVariant {
   hp?: number; mods?: Partial<VariantMods>;
 }
 export interface SpeciesRow {
+  harvest?: readonly HarvestDrop[];
   id: string; kind: string; label: string; parent?: SpeciesRow;
   variants: SpeciesVariant[]; spawnOnly?: SpeciesVariant[];
   aggressive?: boolean; walkSpeed?: number; chargeSpeed?: number; chargeDamage?: number;
