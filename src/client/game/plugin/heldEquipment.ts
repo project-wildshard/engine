@@ -54,6 +54,9 @@ export type CatalogueLauncher = HeldLauncher<ReturnType<typeof heldLauncherProfi
 export type CatalogueFirearm = HeldFirearm<ReturnType<typeof heldFirearmSettings>['profile']>;
 interface FirearmModel { geo: Record<string, THREE.BufferGeometry>; steel: TexSet; wood: TexSet; rows: HeldEquipmentRows['firearm']['rows'] }
 const catalogues = new Map<string, HeldEquipment>();
+/** ZONE-ENTRY ZE10a3: a same-page entry admits the held catalogues again; their textures were uploaded by the old renderer
+ *  and the Memory saver let go of the pixels, so the new renderer could not upload them (Pine's second entry threw). */
+export function forgetHeldCatalogues(): void { catalogues.clear(); }
 
 /** Client-only held presentation loaded from the platform section. Construction and preparation are explicit session operations;
  * immutable pools are borrowed, detail copies and atlases retain the original ownership policy. */

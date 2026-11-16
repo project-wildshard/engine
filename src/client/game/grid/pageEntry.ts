@@ -168,6 +168,9 @@ export function enterZone(instance: string, arrive?: { readonly x: number; reado
   }, null);
 }
 
+/** ZE10a3: whether a zone entry's loading screen is still up (a second gate's 0 waits for it), for the harness. */
+export function zoneEntryPending(): boolean { return navigating !== null && !navigating.disposed; }
+
 /** ZE10a2: the grid intent a same-page re-entry boots from (the harness's `__wildshardReenter`), as a tap writes it. */
 export function intendGridHome(instance: string, slug: string): void { pageGridIntents().set({ instance, slug }); }
 
@@ -184,6 +187,9 @@ export function gridPageUrl(href: string): URL {
 
 /** The boot's one read of the tap intent (used or not), overridden by validated recovery before ordinary admission.
  * In grid mode the address becomes the bare title URL, preventing an unrecorded automatic restart. */
+let entryCapture: Scope | null = null;
+/** ZE10a3: a same-page entry retires the last entry's initial reload capture with its world. */
+export function retireEntryReloadCapture(): void { entryCapture?.dispose(); entryCapture = null; }
 export function bootPageMode(slug: string): PageMode {
   let intent = null;
   try { intent = pageGridIntents().consume(slug); } catch { /* blocked storage: no intent, the normal shard flow */ }
@@ -211,7 +217,9 @@ export function bootPageMode(slug: string): PageMode {
     const road = recovery?.road ?? safeGridRecovery(assembly, Date.now()).road;
     // The live session replaces this initial capture once it owns real position/save state.
     // A stale product or module can request a planned reload before that session exists.
-    registerBeforeReload(pageScope, reason => gridRecovery(saves).write(assembly, home, road, reason === 'settings' ? 'reload' : reason)); // SR12: a Settings reload continues play
+    // ZE10a3: one entry's capture at a time, retired by a same-page entry, so a reload between two sessions never names the cell left
+    entryCapture?.dispose(); entryCapture = pageScope.child('grid-entry-reload');
+    registerBeforeReload(entryCapture, reason => gridRecovery(saves).write(assembly, home, road, reason === 'settings' ? 'reload' : reason)); // SR12: a Settings reload continues play
   }
   if (mode === 'grid' && typeof history !== 'undefined') {
     try { history.replaceState(history.state, '', gridPageUrl(location.href)); } catch { /* a sandboxed frame: the URL stays */ }

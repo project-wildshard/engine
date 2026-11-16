@@ -34,7 +34,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { harnessPins } from '@wildshard/engine/app/identity';
 import { bootRoute, onlineTitleFirst } from './bootRoute';
 import { arrivalTier, consumeTitleArrival, pendingTitleArrival, setTitleArrival } from '@wildshard/engine/boot/titleArrival';
-import { lastEnd, settleLastEnd } from '@wildshard/engine/boot/lastEnd';
+import { lastEnd, markUnload, settleLastEnd } from '@wildshard/engine/boot/lastEnd';
 import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
@@ -429,16 +429,33 @@ async function showPreparationTitle(owner: Scope): Promise<void> {
 async function installInPageEntry(): Promise<void> {
   const [{ app }, { setInPageEntry }] = await Promise.all([import('@wildshard/engine/app/runtime'), import('@wildshard/engine/game/travel/travel')]);
   const again = async (slug: string, art: string | undefined, url: URL | undefined): Promise<void> => {
-    await app.unloadLevel();
-    app.render?.dispose(true);
-    // the old world's idle caches (its kit, its textures) go as a fresh page would drop them: the next home is charged alone
-    app.assets.evictIdleCaches();
-    if (url !== undefined) history.replaceState(history.state, '', url);
-    search = new URLSearchParams(location.search);
-    // the running manifest is resolved once a page; the next session's is the target, as a fresh page at this address would read
-    (await import('@wildshard/engine/game/shard/registry')).setActiveChunk(slug);
-    // ZE10c: the target's art is read only once the old world is gone
-    if (art !== undefined && art !== '') document.documentElement.style.setProperty('--ws-load-portrait', `url("${art}")`);
+    try {
+      await app.unloadLevel();
+      // the old world's idle caches (its kit, its textures) go as a fresh page would drop them, through the renderer that
+      // uploaded them (a disposed renderer deletes nothing on the GPU): the next home is charged alone
+      app.assets.evictIdleCaches();
+      (await import('@wildshard/engine/core/assets')).forgetUploadedSources();
+      (await import('@wildshard/engine/game/plugin/heldEquipment')).forgetHeldCatalogues();
+      // the session's Game goes; its canvas context stays for the next one (a fresh canvas after a forced loss stalled the next boot)
+      app.render?.dispose(true);
+      if (url !== undefined) history.replaceState(history.state, '', url);
+      search = new URLSearchParams(location.search);
+      crashResume = null; // the first boot's crash resume, never the next zone's
+      const [{ setActiveChunk }, { retireEntryReloadCapture }, { resetProductControl }] = await Promise.all([import('@wildshard/engine/game/shard/registry'),
+        import('@wildshard/engine/game/grid/pageEntry'), import('@wildshard/engine/game/shardfile/runtimeProduct')]);
+      retireEntryReloadCapture();
+      resetProductControl();
+      // the running manifest is resolved once a page; the next session's is the target, as a fresh page at this address would read
+      setActiveChunk(slug);
+      // ZE10c: the target's art is read only once the old world is gone
+      if (art !== undefined && art !== '') document.documentElement.style.setProperty('--ws-load-portrait', `url("${art}")`);
+    } catch (error) {
+      // a teardown that fails leaves this page unfit for a second session: the fresh page takes the same handoff and arrival
+      console.warn('[grid] same-page entry could not retire the last world; entering on a fresh page', error);
+      markUnload('zone entry (fresh page after a failed same-page retire)');
+      location.replace(url ?? location.href);
+      return;
+    }
     await start();
   };
   // a world build (staging, play) keeps the fresh page until the online seat's same-page handover has its own proof (ZE16's staging
@@ -454,6 +471,8 @@ async function installInPageEntry(): Promise<void> {
   // the zone entry itself, as a gate's 0 calls it, and the pending arrival a boot would read
   Reflect.set(window, '__wildshardEnterZone', async (instance: string): Promise<void> => { (await import('@wildshard/engine/game/grid/pageEntry')).enterZone(instance); });
   Reflect.set(window, '__wildshardArrival', (slug: string) => pendingTitleArrival(slug));
+  const { zoneEntryPending } = await import('@wildshard/engine/game/grid/pageEntry');
+  Reflect.set(window, '__wildshardZonePending', zoneEntryPending);
 }
 
 async function startSelected(): Promise<void> {

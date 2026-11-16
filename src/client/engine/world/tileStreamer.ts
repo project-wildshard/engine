@@ -113,7 +113,11 @@ export function scopedTilePorts<D extends { readonly scope: Scope }>(owner: Scop
       if (active.get(tile.key) !== scope || !awaiting.delete(prepared)) throw new Error('tile ports: tile is not awaiting publication');
       try {
         const view = publish(tile, prepared);
-        return { mask: excluded => { view.mask(excluded); }, shadow: enabled => { view.shadow(enabled); }, dispose: () => { scope.dispose(); } };
+        // a tile (or the ports' owner) already retiring has nothing left to mask or shade: a level's disposal retires a parent's
+        // mesh before its children re-mask it (ZONE-ENTRY ZE10a3's same-page entry: Sunscar's unload threw "only an installed
+        // coarse (L1) tile can mask quadrants")
+        const gone = (): boolean => scope.disposed || scope.disposing || owner.disposed || owner.disposing;
+        return { mask: excluded => { if (!gone()) view.mask(excluded); }, shadow: enabled => { if (!gone()) view.shadow(enabled); }, dispose: () => { scope.dispose(); } };
       } catch (error) { throw failed(scope, error); }
     },
     discard: (_tile, prepared) => { awaiting.delete(prepared); prepared.scope.dispose(); },

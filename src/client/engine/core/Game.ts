@@ -1891,8 +1891,9 @@ export class Game {
     driver.wake();
   }
 
-  /** Stop the page engine and release its renderer and scopes. `keepContext` (ZONE-ENTRY ZE10a2, a same-page re-entry) leaves
-   *  the canvas's WebGL context alive for the next session's Game, which builds its renderer on the same context. */
+  /** Stop the page engine and release its renderer and scopes. `keepContext` (ZONE-ENTRY ZE10a2, a same-page entry) leaves the
+   *  canvas's WebGL context to the next session's Game: this renderer's programs are deleted (three's dispose drops only its
+   *  tables) and the GL state is reset to what a fresh renderer assumes. */
   dispose(keepContext = false): void {
     this.dead = true;
     this.levelScope.dispose();
@@ -1901,6 +1902,10 @@ export class Game {
     try { this._composer?.dispose(); } catch (e) { console.warn('[level] the composer did not dispose', e); }
     try { this.lookStrategy?.dispose?.(); } catch (e) { console.warn('[level] the render strategy did not dispose', e); }
     this.renderer.renderLists.dispose();
+    if (keepContext) {
+      for (const program of this.renderer.info.programs ?? []) { try { program.destroy(); } catch (e) { console.warn('[level] a program did not delete', e); } }
+      this.renderer.resetState();
+    }
     this.renderer.dispose();
     if (!keepContext) this.renderer.forceContextLoss();
     this.rootScene.clear();

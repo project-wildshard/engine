@@ -76,6 +76,8 @@ async function staleRecovery(): Promise<void> {
 }
 
 let productControlsReady = false, observesProductControl = false;
+/** ZE10a3: a same-page entry's next session boots before control again (its parser, revalidation and pacing as a fresh page's). */
+export function resetProductControl(): void { productControlsReady = false; }
 /** Browser connectivity and visited-product storage feed the same admission path as headless validation. */
 export function browserShardfileOptions(base: string, firstParty = false): ProductOptions {
   const spawn = currentSpawnDownload(), resolve = (url: string): string => spawn?.resolve(url) ?? url;

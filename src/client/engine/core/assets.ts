@@ -89,6 +89,9 @@ const imageUsers = new WeakMap<ImageBitmap | HTMLImageElement, Set<WeakRef<THREE
 interface SharedSource { readonly source: THREE.TextureSource<unknown>; readonly flipY: boolean }
 const sourceLoads = new Map<string, Promise<SharedSource>>();
 const sourceKey = (url: string, srgb: boolean): string => `${url}|${srgb ? 'srgb' : 'linear'}`;
+/** ZONE-ENTRY ZE10a3: a same-page entry's new renderer cannot upload a source the Memory saver let go at the old one's
+ *  upload, so the next session's textures read their files again, as a fresh page's would. */
+export function forgetUploadedSources(): void { sharedSources.clear(); }
 function shareSource(owned: THREE.TextureSource<unknown>, flipY: boolean, key: string, srgb: boolean, image: ImageBitmap | HTMLImageElement): void {
   // `key` is the decode cache's own key (`imageKey`: `url@size` for a trimmed decode): it is released under that same key
   const shared = sourceKey(key, srgb), source = new WeakRef(owned);
