@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { expect, test } from 'vitest';
-import { DetailRing, RING_CELL, detailField, layerSeed, ringShape, type DetailLayerFiles, type DetailLayerSource } from './detailRing';
+import { DetailRing, RING_CELL, RING_INSTANCES_MAX, detailField, layerSeed, ringShape, type DetailLayerFiles, type DetailLayerSource } from './detailRing';
 import { DetailLayer, ringFade } from './detailLayer';
 import { PATCH_ORDER, patchShader } from '../render/shaderPatches';
 import { patchWindField } from './wind';
@@ -83,6 +83,8 @@ test('the phone grows half the radius and fills half the slots', () => {
   desk.update(-10, 0); phone.update(-10, 0);
   expect(phone.matrices.length).toBe(desk.matrices.length / 8);
   expect(ringShape({ cell: 0.5, clumps: 64 }, 40, false).slots).toBe(96); // capped
+  // a radius-200 ring keeps its instance total bounded: fewer slots a cell, never past RING_INSTANCES_MAX
+  for (const phoneTier of [false, true]) { const wide = ringShape({ cell: 0.5, clumps: 64 }, 200, phoneTier); expect(wide.side * wide.side * wide.slots).toBeLessThanOrEqual(RING_INSTANCES_MAX); expect(wide.slots).toBeGreaterThanOrEqual(1); }
 });
 
 test('two layers seed differently; a budget spreads the reseed over frames', () => {

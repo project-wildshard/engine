@@ -35,6 +35,16 @@ export interface ClientDetailPorts {
   readonly phone: boolean;
 }
 
+/**
+ * The rows' three files each: from the retained library, else read (format 0.7.0 does not require them in `library`, so a
+ * valid shard may leave them out; the sdk puts them there).
+ */
+export async function detailLayerFiles(rows: readonly LookDetail[] | undefined, retained: ReadonlyMap<string, Uint8Array>, read: (hash: string) => Promise<Uint8Array>): Promise<ReadonlyMap<string, Uint8Array>> {
+  const files = new Map<string, Uint8Array>();
+  for (const hash of new Set((rows ?? []).flatMap((row) => [row.mesh.file, row.mask, row.heights]))) files.set(hash, retained.get(hash) ?? await read(hash));
+  return files;
+}
+
 /** Install every detail layer; returns the layers (empty when the look has none). */
 export function installClientDetails(rows: readonly LookDetail[] | undefined, assets: ReadonlyMap<string, Uint8Array>, ports: ClientDetailPorts): readonly DetailLayer[] {
   if (rows === undefined || rows.length === 0) return [];

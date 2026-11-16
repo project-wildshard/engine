@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { expect, test } from 'vitest';
 import type { LookDetail } from '@wildshard/format/look-details';
-import { installClientDetails, linearTint } from './clientDetails';
+import { detailLayerFiles, installClientDetails, linearTint } from './clientDetails';
 
 // Meta SHARD-SOURCE AP32d1: a shard's look.details row on the page, one InstancedMesh per layer from its library files.
 
@@ -47,4 +47,12 @@ test('the sRGB tint reaches instanceColor as linear, and a short file or a missi
   expect(() => installClientDetails([row], short, { ...base, materials: p.materials })).toThrow(/Detail layer refused: detail grass: mask holds 3 bytes/u);
   expect(() => installClientDetails([row], assets(), { ...base, materials: new Map() })).toThrow(/Detail layer grass: material scene.grass.detail did not compile/u);
   expect(installClientDetails(undefined, assets(), { ...base, materials: p.materials })).toHaveLength(0);
+});
+
+test('a detail file left out of the library is read, not refused (format 0.7.0 does not require it there)', async () => {
+  const all = assets(), retained = new Map([[HASH('a'), all.get(HASH('a')) ?? new Uint8Array()]]), asked: string[] = [];
+  const files = await detailLayerFiles([row], retained, (hash) => { asked.push(hash); return Promise.resolve(all.get(hash) ?? new Uint8Array()); });
+  expect(asked.sort()).toEqual([HASH('b'), HASH('c')]);
+  expect([...files.keys()].sort()).toEqual([HASH('a'), HASH('b'), HASH('c')]);
+  expect(await detailLayerFiles(undefined, retained, () => Promise.reject(new Error('no read')))).toEqual(new Map());
 });

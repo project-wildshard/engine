@@ -63,6 +63,8 @@ export interface RingShape { readonly radius: number; readonly side: number; rea
 export const RING_CELL = 4;
 /** At most this many instances in one ring cell on desktop (the phone gets half). */
 export const RING_SLOTS_MAX = 96;
+/** the most instances one layer's ring holds (about 3 MB of matrices): a radius-200 ring grows fewer slots a cell */
+export const RING_INSTANCES_MAX = 49_152;
 const EMPTY = 0x7fffffff;
 const U16 = 65535;
 const U8 = 255;
@@ -90,8 +92,10 @@ export function detailField(source: DetailLayerSource, files: DetailLayerFiles):
 export function ringShape(field: Pick<DetailField, 'cell' | 'clumps'>, radius: number, phone: boolean): RingShape {
   const reach = phone ? radius / 2 : radius;
   const full = Math.ceil(field.clumps * (RING_CELL / field.cell) ** 2);
-  const desktop = Math.max(1, Math.min(RING_SLOTS_MAX, full));
-  return { radius: reach, side: Math.ceil((reach * 2) / RING_CELL), slots: phone ? Math.max(1, Math.ceil(desktop / 2)) : desktop };
+  const desktop = Math.max(1, Math.min(RING_SLOTS_MAX, full)), side = Math.ceil((reach * 2) / RING_CELL);
+  // a wide, dense ring keeps at most RING_INSTANCES_MAX instances (its tables and draw stay bounded): fewer slots a cell
+  const tier = phone ? Math.max(1, Math.ceil(desktop / 2)) : desktop;
+  return { radius: reach, side, slots: Math.max(1, Math.min(tier, Math.floor(RING_INSTANCES_MAX / (side * side)))) };
 }
 
 /** mulberry32: a small seeded generator, the same stream on every host. */
