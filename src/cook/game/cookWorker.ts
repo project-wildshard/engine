@@ -263,8 +263,12 @@ export async function storeUsage(store: PackStore, budget: number): Promise<Stor
 /** J83: keep what a kept build's index names, and delete the rest, indexes of other builds included.
  * PAGE-SIZE PZ5: a kept build's server book (`assets/spawn/server-<build>.json`, page-release packs.mjs) and every part it
  * names are kept too, so a carried build's solo server still finds them; the content sets are never collected. */
-export async function collectGarbage(store: PackStore, builds: readonly string[], budget: number, now: number, grace: number = GC_GRACE_MS): Promise<GcReport> {
+export async function collectGarbage(store: PackStore, builds: readonly string[], budget: number, now: number, grace: number = GC_GRACE_MS, requiredBuilds: readonly string[] = []): Promise<GcReport> {
   if (builds.length === 0) throw new Error('Garbage collection needs the builds to keep: an empty list would delete everything');
+  // The CLI lends every live/carried channel build. Refuse an incomplete
+  // keep set before any delete, even if another caller forgot the union.
+  const missing = requiredBuilds.filter(build => !builds.includes(build));
+  if (missing.length > 0) throw new Error(`Garbage collection keep list misses channel builds: ${missing.join(', ')}`);
   const kept = new Set<string>();
   for (const build of builds) {
     for (const row of await store.list(`index/${build}/`)) {
