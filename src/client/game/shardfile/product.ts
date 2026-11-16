@@ -9,7 +9,7 @@ import { productCacheCompletion } from './productCacheCompletion';
 import { builtValidationReceipt, readValidationReceipt, validationRevision, validationSourceBytes, type ValidationReceipt } from "@wildshard/format/validationReceipt";
 import { assertStateCompatibility, parseOutputLineageIndex, parseStateLineage } from '@wildshard/format/stateLineage';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
-import { SHARDFILE_VERSION, shardfileRevision } from '@wildshard/format/version';
+import { compatibleShardfileVersion, shardfileRevision } from '@wildshard/format/version';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { builtIndexHash } from '@wildshard/format/builtIndexes';
 
@@ -474,7 +474,7 @@ async function admitProductWork(input: unknown, options: ProductOptions, trace?:
   trace?.mark('sections');
   await options.pause?.();
   if (!isBuildValidatedOutput(raw)) await preflightProduct(raw, options.pause);
-  if (version(raw) !== SHARDFILE_VERSION) throw new Error('Shardfile needs the current format');
+  if (!compatibleShardfileVersion(version(raw))) throw new Error('Shardfile needs the current or previous additive format');
   const source = options.firstParty && isBuildValidatedOutput(raw) ? raw : await parseCheckedProduct(raw), assets = new Map<string, Uint8Array>(), hashes = new Map<Uint8Array, string>();
   carryOutputDescriptor(raw, source);
   if (!options.firstParty) assertExternalShardSlug(source.identity.slug);
@@ -501,7 +501,7 @@ async function admitProductWork(input: unknown, options: ProductOptions, trace?:
   if (receipt !== null) acceptValidatedCost(source, worst, options.memory);
   if (source.runtime !== null && !options.firstParty) throw new Error('Custom runtime requires a trusted first-party shard');
   if (hasDeclaredClientPage(source) && !options.firstParty) throw new Error('Native page features require a trusted first-party shard');
-  if (!options.offline && visited !== null && visited !== undefined && isOutputIndex(visited.source) && version(visited.source) === SHARDFILE_VERSION) {
+  if (!options.offline && visited !== null && visited !== undefined && isOutputIndex(visited.source) && compatibleShardfileVersion(version(visited.source))) {
     let previous: unknown;
     // Only its identity and state are compared: an older build's sections can fail this build's schemas (G531 retired
     // `entries.public`), and refusing them would leave a returning player's shard unloadable.

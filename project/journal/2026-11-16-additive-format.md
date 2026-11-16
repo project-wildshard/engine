@@ -1,0 +1,23 @@
+# Read the previous additive shard format
+
+> Written by: Codex
+> State: built locally, 2026-11-16; final review and API-first delivery pending.
+
+WR11 pins published format0.9.0 and uses its J319 four-part additive
+window for admission and cached lineage. The real previous0.1 corpus
+passes Product admission, native simulation validation and the full cook;
+its tar hash and emitted header bytes stay exact. Future and breaking
+formats refuse before transport. Restoring old exact equality makes this
+same positive case fail at the version guard; restoring the window passes.
+
+The package exposes image-icon variants already defined by ONE-FORMAT.
+The old journal adapter narrows its legacy icon arm and keeps its prior
+undefined/default fallback; image rendering remains with its owner.
+Full lint and types pass. The three native contract controls pass. The
+old Pine journal case remains normally excluded by lift-pending policy.
+
+The original NET-LAG quiet gate ended07:30:17 without starting a matrix.
+Only then was this lane's clean, landed plan/netlag4 checkout reused for
+WR11, avoiding another worktree. All prior raw reports and fixed builds
+remain untouched in their original scratch folder. No new timing window
+or epoch cut is part of this change.

@@ -57,8 +57,11 @@ function declaredJournal(row: JournalRow, image?: (ref: string) => string): Shar
   return { chunkId: row.chunkId, skin: { className: row.className, title: row.title, tabs: row.tabs,
     ...(row.trophyTab === undefined ? {} : { trophyTab: row.trophyTab }),
     stamp: entry => entry.kind === 'place' ? row.stamp.place : row.stamp.default,
-    icon: entry => row.icons.find(rule => (rule.entryKind === undefined || rule.entryKind === entry.kind)
-      && (rule.matchKind === undefined || rule.matchKind === entry.match?.kind))?.icon,
+    icon: entry => {
+      const rule = row.icons.find(value => (value.entryKind === undefined || value.entryKind === entry.kind)
+        && (value.matchKind === undefined || value.matchKind === entry.match?.kind));
+      return rule !== undefined && 'icon' in rule ? rule.icon : undefined;
+    },
     stats: (entry, state) => journalStats(entry.kind === 'place' ? row.stats.place : row.stats.default, entry, state),
     ...(row.chalk === undefined ? {} : { chalk: { ...row.chalk, atlas: image(row.chalk.atlas) } }) }, entries,
     ...(row.trophies === undefined ? {} : { trophies: row.trophies }), ...(row.wall === undefined ? {} : { wall: row.wall }) };
