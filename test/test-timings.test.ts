@@ -8,6 +8,7 @@ import { afterAll, afterEach, expect, test } from 'vitest';
 import { collectTimings, readTimings, readWeights, timingsDir, writeTimings } from '../scripts/test-timings.mjs';
 import { createEnginePlan } from '../scripts/engine-ci-plan.ts';
 import { readDurations } from '../scripts/test-shard-plan.ts';
+import amberRun from './fixtures/ci/amber-43792777770.json' with { type: 'json' };
 
 mkdirSync(resolve('tmp'), { recursive: true });
 const scratch = mkdtempSync(resolve('tmp/test-timings-'));
@@ -85,4 +86,22 @@ test('new files over budget only on their 60 s guesses plan on the median with a
     expect(over.files).toContain('test/m00.test.ts');
   } finally { console.log = log; }
   expect(lines.some(line => line.includes('AMBER shard floor') && line.includes('test/m00.test.ts 200 s'))).toBe(true);
+});
+
+test('the real shard-3 AMBER inventory fits the existing headroom without losing files', () => {
+  // All 1,555 passed file clocks from main run 43792777770, not synthetic
+  // weights: its final charged shard-3 wall was 314,066 ms.
+  process.env['WS_TIMINGS_DIR'] = join(scratch, 'amber-replay');
+  writeTimings({ version: 1, run: amberRun.run, sha: amberRun.sha, measuredAt: 0, full: amberRun.full, ring1: {} });
+  const files = Object.keys(amberRun.full), plan = createEnginePlan('full', files);
+  expect(files).toHaveLength(1555);
+  expect(plan.unknown).toEqual([]);
+  // Every old choice exhausted the 240 s reserve. The selected plan must
+  // now meet the preferred 230 s bar with the same factor/setup charge.
+  expect(plan.curve.filter(row => row.count <= 15).every(row => row.seconds > 240)).toBe(true);
+  expect(Math.max(...plan.shards.map(shard => shard.expectedSeconds))).toBeLessThanOrEqual(230);
+  expect(plan).toMatchObject({ factor: 1.35, setupSeconds: 70 });
+  const actual = plan.shards.flatMap(shard => [...shard.native, ...shard.ordinary]);
+  expect([...actual].sort()).toEqual([...files].sort());
+  expect(new Set(actual).size).toBe(files.length);
 });

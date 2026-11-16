@@ -54,14 +54,11 @@ export function createEnginePlan(ring:'full'|'1',files:readonly string[]):Engine
   const active=new Set(files),nativeGroups=Object.entries(CI_NATIVE_GROUPS).map(([name,members])=>({name:`@native:${name}`,files:members.filter(file=>active.has(file))})).filter(group=>group.files.length>0);
   const grouped=new Set<string>(nativeGroups.flatMap(group=>group.files));
   const {factor,setupSeconds}=CALIBRATION;
-  // Full CI can use two overflow jobs without increasing its concurrent
-  // runner allotment. Ring 1 retains its existing search range.
-  // 14 -> 15 (coordinator call, reversible, 2026-11-11, FAST-SLOW-TESTS FS6):
-  // since CI packing (7c97b585) shards run one after another inside the five
-  // packed jobs, so one more shard only lengthens a job a little. It lets
-  // FL11-FL13 leave quarantine: 14 shards floor at 247 s with them, 15 plan
-  // at 235.7 s, still under the 240 s per-shard ceiling.
-  const maxShards=ring==='full'?15:12;
+  // TS20a (J295): run 43792777770 exceeded 300 s on shard 3. Its measured
+  // inventory cannot meet the existing 240 s headroom within 15 shards.
+  // Search farther; the curve still chooses the fewest eligible shards,
+  // packed into the same six jobs. Ring 1 keeps its existing search range.
+  const maxShards=ring==='full'?24:12;
   /** Shards and their curve, charging every unmeasured file `fallback` seconds. */
   const build=(fallback:number)=>{
     const weights=new Map(files.map(file=>[file,baseline[file]??fallback]));
