@@ -86,10 +86,11 @@ jobs:
           yes | "$bin/sdkmanager" --install emulator platform-tools "$image" > /dev/null
           echo no | "$bin/avdmanager" create avd -n xr8 -k "$image" -d pixel_7 --force
           mkdir -p tmp/staging-phones
+          # The stock data partition fills up before Chrome starts (No space left on device): 8 GB, wiped each boot.
           # No GPU here: try each software renderer until Chrome draws a page and the emulator outlives it.
           for gpu in swiftshader_indirect angle_indirect guest; do
             echo "gpu $gpu"
-            nohup "$ANDROID_HOME/emulator/emulator" -avd xr8 -no-window -no-audio -no-boot-anim -no-snapshot -gpu "$gpu" -memory 4096 -cores 3 > "tmp/staging-phones/emulator-$gpu.log" 2>&1 &
+            nohup "$ANDROID_HOME/emulator/emulator" -avd xr8 -no-window -no-audio -no-boot-anim -no-snapshot -gpu "$gpu" -memory 4096 -cores 3 -partition-size 8192 -wipe-data > "tmp/staging-phones/emulator-$gpu.log" 2>&1 &
             timeout 120 "$adb" wait-for-device
             timeout 420 bash -c "until [ \"\$('$adb' shell getprop sys.boot_completed | tr -d '\r')\" = 1 ]; do sleep 3; done" || true
             "$adb" shell am start -a android.intent.action.VIEW -n com.android.chrome/com.google.android.apps.chrome.Main -d https://staging.wildshard.io/version.json || true
