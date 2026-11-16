@@ -9,6 +9,13 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.24 (2026-11-15)
+
+- A phone that kept an old version in its cache no longer sits on the title saying "still waiting": the new version takes over by itself, even on bad Wi-Fi.
+- New versions download in the background while you play and switch in on your next visit, never as a reload in the middle of a game.
+- Reloading keeps you on the page you were on, such as a shard's own link, instead of going back to the main menu.
+- When the title's loading bar stalls, it says what it is waiting for, and tapping reload fetches a fresh copy past the cache.
+
 ## v0.1.23 (2026-11-15)
 
 - New and updated shards are cooked for the world again: since Saturday the cook refused every upload as over its space.
