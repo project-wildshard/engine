@@ -21,7 +21,7 @@ type SlabTile = WorldSceneSlabLibrary['tiles'][number];
 /** the bake's tag on each slab mesh (`sharddev/bake/slabs.ts`): its key, tile and place in its file */
 const SlabTag = v.object({ key: v.string(), tile: v.number(), chunk: v.number() });
 const EMPTY: ReadonlySet<number> = new Set();
-/** NB8: each phone chunk geometry's k-d leaf tree (`slabRanges.ts`), built on read before its first upload */
+/** NB8: each phone chunk geometry's leaf tree (`slabRanges.ts`), built on read before its first upload */
 const RANGES = new WeakMap<BufferGeometry, SlabRanges>();
 
 function slabMesh(node: Object3D): node is Mesh { return node instanceof Mesh; }

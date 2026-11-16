@@ -1,4 +1,4 @@
-import { type BufferGeometry, type Camera, Frustum, Matrix4, type Object3D, WebGLCoordinateSystem } from 'three';
+import { BufferAttribute, type BufferGeometry, type Camera, Frustum, Matrix4, type Object3D, WebGLCoordinateSystem } from 'three';
 import { drawNeutral } from '@wildshard/engine/render/drawNeutral';
 
 /**
@@ -13,7 +13,7 @@ import { drawNeutral } from '@wildshard/engine/render/drawNeutral';
 export interface SlabRanges {
   /** per node: box min xyz, max xyz in the geometry's own frame */
   readonly boxes: Float32Array;
-  /** per node: left child, right child (-1 for a leaf), first triangle, end triangle */
+  /** per node, the root first: left child, right child (-1 for a leaf), first triangle, end triangle */
   readonly nodes: Int32Array;
   readonly triangles: number;
 }
@@ -21,83 +21,79 @@ export interface SlabRanges {
 /** triangles per leaf: a leaf's box test costs ~6 plane checks, and 256 triangles of a wall kit is a few metres */
 export const SLAB_LEAF_TRIANGLES = 256;
 
-function select(order: Uint32Array, key: Float32Array, lo: number, hi: number, k: number): void {
-  // Hoare quickselect on key[order[i]] over [lo, hi), placing the k-th smallest at k with smaller-or-equal keys left of it
-  let left = lo, right = hi - 1;
-  while (right > left) {
-    const a = key[order[left] ?? 0] ?? 0, b = key[order[(left + right) >> 1] ?? 0] ?? 0, c = key[order[right] ?? 0] ?? 0;
-    const pivot = Math.max(Math.min(a, b), Math.min(Math.max(a, b), c));
-    let i = left, j = right;
-    while (i <= j) {
-      while ((key[order[i] ?? 0] ?? 0) < pivot) i++;
-      while ((key[order[j] ?? 0] ?? 0) > pivot) j--;
-      if (i <= j) { const t = order[i] ?? 0; order[i] = order[j] ?? 0; order[j] = t; i++; j--; }
-    }
-    if (k <= j) right = j; else if (k >= i) left = i; else return;
-  }
-}
-
 /**
- * Reorder `geometry`'s index into k-d leaf order (before upload) and return the tree over its leaves, or null when the
- * chunk is one leaf (nothing below the object's own test) or has no index or positions.
+ * Reorder `geometry`'s index along a k-d tree of its triangles' centroids (each node split at the middle of its longest
+ * extent, to leaves of at most `leaf` triangles), before upload, and return that tree; null when the chunk is one leaf
+ * (nothing below the object's own test) or has no index or positions. Each level is one linear partition pass.
  */
 export function spatialSlabRanges(geometry: BufferGeometry, leaf: number = SLAB_LEAF_TRIANGLES): SlabRanges | null {
   const index = geometry.index, position = geometry.getAttribute('position');
   if (index === null || position === undefined || index.count % 3 !== 0) return null;
   const triangles = index.count / 3;
   if (triangles <= leaf) return null;
-  const source = index.array, corners = new Uint32Array(index.count);
-  for (let i = 0; i < index.count; i++) corners[i] = index.getX(i);
-  const px = new Float32Array(position.count), py = new Float32Array(position.count), pz = new Float32Array(position.count);
-  for (let v = 0; v < position.count; v++) { px[v] = position.getX(v); py[v] = position.getY(v); pz[v] = position.getZ(v); }
-  const centre = [new Float32Array(triangles), new Float32Array(triangles), new Float32Array(triangles)] as const;
+  const source = index.array, corners = new Uint32Array(source);
+  // the bake's positions are plain float32 xyz; any other layout is read through the attribute
+  const plain = position instanceof BufferAttribute && position.itemSize === 3 && !position.normalized && position.array instanceof Float32Array;
+  const xyz = plain ? position.array : new Float32Array(position.count * 3);
+  if (!plain) for (let v = 0; v < position.count; v++) { xyz[v * 3] = position.getX(v); xyz[v * 3 + 1] = position.getY(v); xyz[v * 3 + 2] = position.getZ(v); }
+  // centroids (times three) and triangle ids, permuted together so every pass reads front to back
+  const cx = new Float32Array(triangles), cy = new Float32Array(triangles), cz = new Float32Array(triangles), order = new Uint32Array(triangles);
   for (let t = 0; t < triangles; t++) {
-    const a = corners[t * 3] ?? 0, b = corners[t * 3 + 1] ?? 0, c = corners[t * 3 + 2] ?? 0;
-    centre[0][t] = ((px[a] ?? 0) + (px[b] ?? 0) + (px[c] ?? 0)) / 3;
-    centre[1][t] = ((py[a] ?? 0) + (py[b] ?? 0) + (py[c] ?? 0)) / 3;
-    centre[2][t] = ((pz[a] ?? 0) + (pz[b] ?? 0) + (pz[c] ?? 0)) / 3;
+    const a = (corners[t * 3] ?? 0) * 3, b = (corners[t * 3 + 1] ?? 0) * 3, c = (corners[t * 3 + 2] ?? 0) * 3;
+    cx[t] = (xyz[a] ?? 0) + (xyz[b] ?? 0) + (xyz[c] ?? 0); cy[t] = (xyz[a + 1] ?? 0) + (xyz[b + 1] ?? 0) + (xyz[c + 1] ?? 0); cz[t] = (xyz[a + 2] ?? 0) + (xyz[b + 2] ?? 0) + (xyz[c + 2] ?? 0);
+    order[t] = t;
   }
-  const order = new Uint32Array(triangles);
-  for (let t = 0; t < triangles; t++) order[t] = t;
-  const capacity = 2 * Math.ceil(triangles / leaf), boxes = new Float32Array(capacity * 6), nodes = new Int32Array(capacity * 4);
-  let used = 0;
+  const rows: number[] = [];
+  // top-down: a node's row is [left, right, first triangle, end triangle]; the root is node 0, children follow it
   const build = (lo: number, hi: number): number => {
-    const node = used++, n = hi - lo;
-    nodes[node * 4 + 2] = lo; nodes[node * 4 + 3] = hi;
-    if (n <= leaf) {
-      nodes[node * 4] = -1; nodes[node * 4 + 1] = -1;
-      let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
-      for (let i = lo; i < hi; i++) for (let k = 0; k < 3; k++) {
-        const v = corners[(order[i] ?? 0) * 3 + k] ?? 0, x = px[v] ?? 0, y = py[v] ?? 0, z = pz[v] ?? 0;
-        if (x < x0) x0 = x; if (y < y0) y0 = y; if (z < z0) z0 = z; if (x > x1) x1 = x; if (y > y1) y1 = y; if (z > z1) z1 = z;
-      }
-      boxes.set([x0, y0, z0, x1, y1, z1], node * 6);
-      return node;
-    }
-    // split the longest centroid extent, on a leaf boundary so every leaf but the last is full
+    const node = rows.length / 4; rows.push(-1, -1, lo, hi);
+    if (hi - lo <= leaf) return node;
     let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
     for (let i = lo; i < hi; i++) {
-      const t = order[i] ?? 0, x = centre[0][t] ?? 0, y = centre[1][t] ?? 0, z = centre[2][t] ?? 0;
+      const x = cx[i] ?? 0, y = cy[i] ?? 0, z = cz[i] ?? 0;
       if (x < x0) x0 = x; if (y < y0) y0 = y; if (z < z0) z0 = z; if (x > x1) x1 = x; if (y > y1) y1 = y; if (z > z1) z1 = z;
     }
-    const ex = x1 - x0, ey = y1 - y0, ez = z1 - z0, axis = ex >= ey && ex >= ez ? 0 : ey >= ez ? 1 : 2;
-    const mid = lo + Math.floor(Math.ceil(n / leaf) / 2) * leaf;
-    select(order, centre[axis], lo, hi, mid);
-    const left = build(lo, mid), right = build(mid, hi);
-    nodes[node * 4] = left; nodes[node * 4 + 1] = right;
-    for (let k = 0; k < 3; k++) {
-      boxes[node * 6 + k] = Math.min(boxes[left * 6 + k] ?? 0, boxes[right * 6 + k] ?? 0);
-      boxes[node * 6 + 3 + k] = Math.max(boxes[left * 6 + 3 + k] ?? 0, boxes[right * 6 + 3 + k] ?? 0);
+    const ex = x1 - x0, ey = y1 - y0, ez = z1 - z0, key = ex >= ey && ex >= ez ? cx : ey >= ez ? cy : cz;
+    const cut = key === cx ? (x0 + x1) / 2 : key === cy ? (y0 + y1) / 2 : (z0 + z1) / 2;
+    let i = lo, j = hi - 1;
+    while (i <= j) {
+      if ((key[i] ?? 0) < cut) { i++; continue; }
+      // swap row i with row j and look at the new row i again
+      let t: number;
+      t = cx[i] ?? 0; cx[i] = cx[j] ?? 0; cx[j] = t; t = cy[i] ?? 0; cy[i] = cy[j] ?? 0; cy[j] = t;
+      t = cz[i] ?? 0; cz[i] = cz[j] ?? 0; cz[j] = t; t = order[i] ?? 0; order[i] = order[j] ?? 0; order[j] = t; j--;
     }
+    // every centroid on one side of the middle (all equal along the axis): split the run in half as it stands
+    const mid = i === lo || i === hi ? (lo + hi) >> 1 : i;
+    const left = build(lo, mid), right = build(mid, hi);
+    rows[node * 4] = left; rows[node * 4 + 1] = right;
     return node;
   };
   build(0, triangles);
+  // the index in its new order, then each leaf's box read front to back, then every parent's (children follow parents)
   for (let t = 0; t < triangles; t++) {
     const from = (order[t] ?? 0) * 3;
     source[t * 3] = corners[from] ?? 0; source[t * 3 + 1] = corners[from + 1] ?? 0; source[t * 3 + 2] = corners[from + 2] ?? 0;
   }
+  const nodes = Int32Array.from(rows), count = nodes.length / 4, boxes = new Float32Array(count * 6);
+  for (let node = count - 1; node >= 0; node--) {
+    const left = nodes[node * 4] ?? -1, right = nodes[node * 4 + 1] ?? -1;
+    if (left >= 0) {
+      for (let k = 0; k < 3; k++) {
+        boxes[node * 6 + k] = Math.min(boxes[left * 6 + k] ?? 0, boxes[right * 6 + k] ?? 0);
+        boxes[node * 6 + 3 + k] = Math.max(boxes[left * 6 + 3 + k] ?? 0, boxes[right * 6 + 3 + k] ?? 0);
+      }
+      continue;
+    }
+    let bx0 = Infinity, by0 = Infinity, bz0 = Infinity, bx1 = -Infinity, by1 = -Infinity, bz1 = -Infinity;
+    for (let c = (nodes[node * 4 + 2] ?? 0) * 3, end = (nodes[node * 4 + 3] ?? 0) * 3; c < end; c++) {
+      const v = (source[c] ?? 0) * 3, x = xyz[v] ?? 0, y = xyz[v + 1] ?? 0, z = xyz[v + 2] ?? 0;
+      if (x < bx0) bx0 = x; if (y < by0) by0 = y; if (z < bz0) bz0 = z; if (x > bx1) bx1 = x; if (y > by1) by1 = y; if (z > bz1) bz1 = z;
+    }
+    boxes[node * 6] = bx0; boxes[node * 6 + 1] = by0; boxes[node * 6 + 2] = bz0; boxes[node * 6 + 3] = bx1; boxes[node * 6 + 4] = by1; boxes[node * 6 + 5] = bz1;
+  }
   index.needsUpdate = true;
-  return { boxes: boxes.slice(0, used * 6), nodes: nodes.slice(0, used * 4), triangles };
+  return { boxes, nodes, triangles };
 }
 
 const frustum = new Frustum(), clip = new Matrix4();
