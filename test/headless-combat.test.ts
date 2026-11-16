@@ -1,4 +1,5 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The combat journey runs the shipped product bytes and physics module.
+import { Scope } from '../src/shared/engine/app/scope';
 import { readFileSync } from 'node:fs';
 import { afterEach, expect, test, vi } from 'vitest';
 import * as v from 'valibot';
@@ -196,6 +197,40 @@ test('declared move debris resolves actual local and confirmed contacts by speci
       expect(burst).toHaveBeenLastCalledWith('wood', expect.any(Vector3), expect.any(Vector3), 5);
     } finally { burst.mockRestore(); stop.mockRestore(); }
   } finally { live.dispose(); }
+}, 120_000);
+
+test('native local and confirmed debris resolve the admitted row while wire species stays empty', async () => {
+  const { product, resident } = await shipped('driftwood-isle'), live = await resident();
+  const previous = app.levelScope, scope = new Scope('native-contact-row');
+  app.levelScope = scope;
+  try {
+    const species = product.section('actors/species-programs');
+    for (const row of [...(species.program?.species ?? []), ...species.page]) app.species.registerRow(row, scope);
+    const crab = nearest(live, 'crab'), rowId = app.species.rowId(crab.kind);
+    if (rowId === undefined) throw new Error('Missing admitted native contact row');
+    expect(crab.species).toBe(''); hold(live); tick(live, 2); facing(live, crab, 1.4);
+    crab.hp = crab.maxHp = 10000;
+    const page = pageWorld(live, chest(crab)), row = v.parse(MeleeWeaponProfileSchema, weaponRow(product.shardfile, 'weapon.driftwood-isle.wood').profile);
+    const debris = { default: { surface: 'sand' as const, count: 4, atFeet: true, sparks: false },
+      overrides: [{ target: rowId, effect: { surface: 'shell' as const, count: 2, atFeet: false, sparks: false } }] };
+    const admitted = v.parse(MeleeWeaponProfileSchema, { ...row, moves: { combo: row.moves.combo.map(move => ({ ...move, debris })), heavy: { ...row.moves.heavy, debris } } });
+    const targets = pageTargets(live), sword = pageSword(page, targets, applyMeleeCombatProfile(SWORD_WOOD, admitted));
+    expect(targets.raycast(page.eye, page.direction, 3.5)?.animal).toBe(crab);
+    const burst = vi.spyOn(Impacts.for(page.game), 'burst');
+    try {
+      sword.tryFire(); for (let frame = 0; frame < 30; frame++) sword.update(1 / 60, frame / 60);
+      expect(burst).toHaveBeenCalledWith('shell', expect.any(Vector3), expect.any(Vector3), 2);
+      sword.serverHit({ kind: crab.kind, species: '', at: chest(crab), head: false, killed: false, amount: 1, seq: 1 });
+      expect(burst).toHaveBeenLastCalledWith('shell', expect.any(Vector3), expect.any(Vector3), 2);
+      expect(crab.species).toBe('');
+      sword.serverHit({ kind: crab.kind, species: crab.kind, at: chest(crab), head: false, killed: false, amount: 1, seq: 2 });
+      expect(burst).toHaveBeenLastCalledWith('sand', expect.any(Vector3), expect.any(Vector3), 4);
+      expect(crab.species).toBe('');
+      scope.dispose();
+      sword.serverHit({ kind: crab.kind, species: '', at: chest(crab), head: false, killed: false, amount: 1, seq: 3 });
+      expect(burst).toHaveBeenLastCalledWith('sand', expect.any(Vector3), expect.any(Vector3), 4);
+    } finally { burst.mockRestore(); }
+  } finally { scope.dispose(); app.levelScope = previous; live.dispose(); }
 }, 120_000);
 
 test('Pine: arrows and rifle rounds fly and strike on the tick, and match the page\'s Projectiles and hitscan', async () => {

@@ -87,6 +87,15 @@ export class SpeciesService {
     const map = this.cache.get(scope) ?? new Map<string, SpeciesDef>(); map.set(kind, resolved); this.cache.set(scope, map);
     return resolved;
   }
+  /** The active page's admitted identity for a native kind; no fallback content or look id. */
+  rowId(kind: string): string | undefined {
+    const scope = this.active(); if (scope === null) return undefined;
+    for (let i = this.rows.length - 1; i >= 0; i--) {
+      const entry = this.rows[i];
+      if (entry !== undefined && entry.scope.belongsTo(scope) && entry.value.kind === kind) return entry.value.id;
+    }
+    return undefined;
+  }
   /** The kinds the active level registered a row or a look for. */
   kinds(): string[] {
     const scope = this.active(); if (scope === null) return [];
