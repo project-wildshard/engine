@@ -121,3 +121,21 @@ script passes, full pins are restored, and all146 named cases pass
 again. No full-suite override is used. The corrected candidate keeps
 the hosted gate and real post-land single-player preview; its bounded
 CI wait is90 minutes to accommodate the observed runner queue.
+
+## Carried-main author proof control
+
+WR11's exact branch CI43906174646 passed all six test packs and four
+browser groups. The shared land carried it onto moving main at551bd849.
+The owed normal static checks passed, then the named tests found the new
+TC-NE5b author-proof case from234c5083 using today's author defaults with
+the same frozen SDK product. That case arrived while branch CI waited.
+
+Retain the captured0.1 format and requires.sdk values in this case too.
+The frozen input fingerprint8193f702, product, Wasm bytes and refusal/
+actual native tape assertions stay unchanged. This urgent integration
+correction uses J290 mode1 in engine-quickfix; no additional plan land
+or timing allowance is required. Preview qualification resumes on the
+corrected source before WR11 is ticked.
+
+All nine named suites pass147 cases with the correction; full lint and
+types pass. The normal mode1 push gate remains enabled for this fix.

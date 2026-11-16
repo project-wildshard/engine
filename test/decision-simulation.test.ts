@@ -306,6 +306,9 @@ test('SDK worker executes the declared v1 section and reports its real fuel rath
 test('author proof admits the declared v1 section only when given the sections, then runs the tape', async () => {
   const { proveAuthorSimulation } = await import('../src/server/host/headless');
   const f = fixture(); f.source.budgets.sim.resident = 1_000_000;
+  // The same frozen ABI-1 SDK product retains its captured input versions.
+  f.source.version = '0.1';
+  f.source.requires.sdk = '0.1';
   const product = frozenDecisionWorkerProduct(f.source, bytes);
   const plan = { version: 1 as const, tape: Array.from({ length: 8 }, () => []), checkpointTick: 4, requiredFacts: ['tc-ne5b.never-filed'] };
   await expect(proveAuthorSimulation(product.shard, product.assets, plan)).rejects.toThrow(/Import signature outside ABI|wrong ABI export/u);
