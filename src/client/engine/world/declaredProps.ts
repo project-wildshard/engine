@@ -58,6 +58,8 @@ const surfaceKey = (s: Surface): string =>
 /** a graph look (an SF59 graph's classic GLSL program): it reads its own channels and colours, so it binds its mesh map
  *  and nothing else (as a family variant it took the GLB's vertex colours on top) */
 const isGraphMaterial = (m: Material): boolean => Reflect.get(m, 'isGraphShaderMaterial') === true;
+/** ZE7c: a graph reads the mesh's colour itself; one that never reads it is not multiplied by the props' baked colours */
+const takesVertexColours = (m: Material): boolean => !isGraphMaterial(m) || Reflect.get(m, 'readsVertexColour') === true;
 /** bind a named surface's slots (glTF's unflipped UV convention: the normal map's green runs the other way, as GLTFLoader sets it) */
 function applyMaps(m: Material, named: NonNullable<Surface['named']>): void {
   const { maps } = named;
@@ -170,7 +172,7 @@ export async function installDeclaredProps(props: DeclaredProps, ports: {
       const named = surfaces;
       const familyConvert = (source: Material | undefined): Material => {
         const glb = source === undefined ? null : surfaceOf(source), standard = source instanceof MeshStandardMaterial ? source : null;
-        const m = acquireVariant(family, { colour: glb?.color ?? null, roughness: standard?.roughness ?? null, metalness: standard?.metalness ?? null, map: texture, vertexColours, flat,
+        const m = acquireVariant(family, { colour: glb?.color ?? null, roughness: standard?.roughness ?? null, metalness: standard?.metalness ?? null, map: texture, vertexColours: vertexColours && takesVertexColours(family), flat,
           side: source?.side ?? family.side, transparent: source?.transparent ?? family.transparent, opacity: source?.opacity ?? family.opacity });
         // the GLB's own material is only read: it never reaches the GPU
         source?.dispose(); held.push(m); return m;

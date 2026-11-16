@@ -70,6 +70,11 @@ function readsInstanceColour(nodes: Readonly<Record<string, GraphNode>>): boolea
   return Object.values(nodes).some(node => node.op === 'instanceColour' || (node.body !== undefined && readsInstanceColour(node.body.nodes)));
 }
 
+/** whether a graph (or a loop body in it) reads the mesh's vertex colour */
+function readsVertexColour(nodes: Readonly<Record<string, GraphNode>>): boolean {
+  return Object.values(nodes).some(node => node.op === 'vertexColour' || node.op === 'vertexColourAlpha' || (node.body !== undefined && readsVertexColour(node.body.nodes)));
+}
+
 /** the compiled materials that own their graph's shadow depth (their clones share it) */
 const depthOwners = new WeakSet<THREE.Material>();
 
@@ -88,6 +93,9 @@ export class GraphShaderMaterial extends THREE.ShaderMaterial {
    *  same pixels: `wsInstanceColour()` is white without them), so it shares the coloured instances' program instead of
    *  compiling its own (Nine's architecture drew instanced sets and sitters apart from its walkers and plants) */
   instanceColour = false;
+  /** ZE7c: the graph reads the mesh's colour (`vertexColour`). One that does not is never multiplied by it: a props family
+   *  variant keeps three's `vertexColors` off for it (declaredProps), or baked measure grey turned Pastel's rock grey */
+  readsVertexColour = false;
   /** a lit graph's image-based light: the drawn scene's prefiltered environment (`syncGraphEnvironment`), as a node
    *  material reads `scene.environment` */
   envMap: THREE.Texture | null = null;
@@ -176,6 +184,7 @@ export class GraphShaderMaterial extends THREE.ShaderMaterial {
     this.codec = source instanceof GraphShaderMaterial && source.codec !== null ? new ClassicCodec() : null;
     this.shadowDepth = source instanceof GraphShaderMaterial ? source.shadowDepth : null;
     this.instanceColour = source instanceof GraphShaderMaterial && source.instanceColour;
+    this.readsVertexColour = source instanceof GraphShaderMaterial && source.readsVertexColour;
     // S2: three's light uniforms are always the copy's own holders (lightUniforms.ts): shared, a draw of one in another
     // render state repoints the other's lights at that state's arrays
     for (const [name, uniform] of Object.entries(uniforms)) {
@@ -288,6 +297,7 @@ function shaderMaterial(glsl: GraphGlsl, opts: GraphShaderOptions): GraphShaderM
   m.name = outline ? 'graph:outline' : `graph:${ir.kind}`;
   if (readsCodec(shaders.vertexShader)) m.codec = new ClassicCodec();
   m.instanceColour = readsInstanceColour(ir.nodes);
+  m.readsVertexColour = readsVertexColour(ir.nodes);
   m.defaultAttributeValues = attributeDefaults(glsl, m);
   if (ir.kind === 'post') { m.depthTest = false; m.depthWrite = false; return m; }
   if (outline) { m.side = THREE.BackSide; return m; }
