@@ -110,6 +110,9 @@ export interface LastEnd {
   /** QA 11-12 row 35 (Jake: "I expected reload to go back to main menu"): the player reloaded the page themselves (the browser's
    *  reload button, pull-to-refresh), with no word from the game. It lands on the title, and the title shows no drop modal. */
   player?: true;
+  /** STAGING-BUGBASH SB8: a fresh page after the player left for another page and came back (the page before ended on screen,
+   *  this one came from outside the game). It opens what it was asked to, and the title shows no drop modal. */
+  left?: true;
 }
 /** Content supplies persistence at explicit reload boundaries, never at ordinary navigation. `settings`: a Settings pick
  *  reloads back into the world where the player stands (SETTINGS-REDESIGN SR12); unlike `reload` it does not return to the title. */
@@ -156,10 +159,10 @@ export class PageLife {
   private readonly storage: typeof store;
   private readonly nav: () => string;
 
-  private readonly page: () => { href: string; startedAt: number };
+  private readonly page: () => { href: string; startedAt: number; referrer?: string };
 
   constructor(scope: Scope, storage: typeof store = store, nav: () => string = navigationType,
-    page: () => { href: string; startedAt: number } = () => ({ href: inPage() ? location.href : '', startedAt: typeof performance === 'undefined' ? Date.now() : performance.timeOrigin }),
+    page: () => { href: string; startedAt: number; referrer?: string } = () => ({ href: inPage() ? location.href : '', startedAt: typeof performance === 'undefined' ? Date.now() : performance.timeOrigin, referrer: inPage() ? document.referrer : '' }),
     locks: PageLocks | null = browserLocks()) {
     this.storage = storage;
     this.locks = locks;
@@ -306,7 +309,12 @@ export class PageLife {
     if (u !== null) return { kind: 'intentional', reason: `${str(u, 'reason')} (${Math.round((now - ut) / 1000)} s before this load)`, at: ut, resident: str(u, 'resident'), slug: str(u, 'slug'), mode: str(u, 'mode'), build: str(u, 'build'), ...base };
     // no word from the game and no crash, on a reload: the player's own (browser button, pull-to-refresh), unless index.html's self-reload claimed it
     if (this.playerReload(nav, hid, discarded, now)) return { kind: 'intentional', reason: 'player reload (the browser reload button or pull-to-refresh)', at: now, resident: '', slug: '', mode: '', build: '', ...base, reload: true, player: true };
-    return { kind: 'fresh', reason: 'fresh launch', at: 0, resident: '', slug: '', mode: '', build: '', ...base };
+    // STAGING-BUGBASH SB8: the page before ended on screen and this one came by an ordinary navigation from outside the game
+    // (another address, a link, a bookmark): the player left and came back, so the title stays quiet. The game's own unmarked
+    // navigation arrives with this origin's page as the referrer, and still reads as one. A fresh page either way: a link opens
+    // its shard (only the player's reload lands on the title).
+    const left = this.playerLeft(nav, hid, discarded) ? { left: true as const } : {};
+    return { ...left, kind: 'fresh', reason: 'fresh launch', at: 0, resident: '', slug: '', mode: '', build: '', ...base };
   }
 
   /** QA 11-12 row 35: the player reloaded this page (no word from the game, no crash). The page before ended visible, moments ago
@@ -317,6 +325,15 @@ export class PageLife {
     const age = now - num(hid, 't');
     if (!this.selfReloaded()) return age >= 0 && age < PLAYER_RELOAD_MS;
     return age >= 0 && age < PLAYER_RETRY_MS && str(hid, 'href') !== '' && str(hid, 'href') === this.page().href;
+  }
+
+  /** SB8: the page before this tab's ended visible, and this document came by a plain navigation whose referrer is not this
+   *  origin (none, or another site) */
+  private playerLeft(nav: string, hid: unknown, discarded: boolean): boolean {
+    if (discarded || nav !== 'navigate' || str(hid, 'vis') !== 'visible') return false;
+    const { href, referrer = '' } = this.page();
+    if (referrer === '') return true;
+    try { return new URL(referrer).origin !== new URL(href).origin; } catch { return false; }
   }
 
   /** index.html's self-reload claimed `boot.selfReload` just before this document started (blocked storage: it could not claim,

@@ -29,8 +29,9 @@ function tab() {
     clear: (key) => { (key.endsWith('Once') ? local : session).delete(`drop.${key}`); },
   };
   /** a new page in this tab, loaded the way `nav` says (PerformanceNavigationTiming.type), at `href`, its document started at `startedAt` */
-  const page = (nav = 'navigate', { href = location.href, startedAt = Date.now() }: { href?: string; startedAt?: number } = {}): { life: PageLife; notes: DropNotes } =>
-    ({ life: new PageLife(scope(), life, () => nav, () => ({ href, startedAt })), notes: new DropNotes(dropStore) });
+  // the game's own navigations come from this origin's pages (SB8: from anywhere else, the player left and came back)
+  const page = (nav = 'navigate', { href = location.href, startedAt = Date.now(), referrer = location.href }: { href?: string; startedAt?: number; referrer?: string } = {}): { life: PageLife; notes: DropNotes } =>
+    ({ life: new PageLife(scope(), life, () => nav, () => ({ href, startedAt, referrer })), notes: new DropNotes(dropStore) });
   return { session, page };
 }
 
@@ -104,6 +105,16 @@ test('a system reload is no player reload: a discarded tab, or an iOS tab killed
   const next = u.page('reload'), end = next.life.lastEnd();
   expect(end.player).toBeUndefined();
   expect(next.notes.take(end)).toMatchObject({ kind: 'restart' });
+});
+
+test('SB8: back from another page (a typed address, a link): the page opens what it was asked to, and the title is quiet', () => {
+  const t = tab(); loadNalati(t);
+  window.dispatchEvent(new Event('pagehide'));
+  const next = t.page('navigate', { referrer: '' }), end = next.life.lastEnd();
+  expect(end).toMatchObject({ kind: 'fresh', left: true });
+  expect(end.player).toBeUndefined();
+  expect(toTitle(end)).toBe(false);
+  expect(next.notes.take(end)).toBeNull();
 });
 
 test('a fresh open of a shard URL (deep link, bookmark, typed) opens the shard', () => {

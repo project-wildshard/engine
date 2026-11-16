@@ -111,3 +111,21 @@ test('a hidden page lets its lock go, and takes it back from the bfcache (S20)',
   document.dispatchEvent(new Event('visibilitychange'));
   expect(f.held.size).toBe(1);
 });
+
+test('SB8: leaving a world for another page and coming back is the player\'s, and quiet; the game\'s unmarked hop is not', () => {
+  const f = fixture();
+  window.dispatchEvent(new Event('pagehide')); // the world page ends on screen (Playwright's goto about:blank, a typed address)
+  const back = f.page('navigate').lastEnd();
+  expect(back).toMatchObject({ kind: 'fresh', left: true });
+  expect(back.player).toBeUndefined();
+  // the same leave, but the next document came from this origin's page: the game navigated without a mark
+  const g = fixture();
+  window.dispatchEvent(new Event('pagehide'));
+  const scope = new Scope('sb8-hop'); scopes.push(scope);
+  const hop = new PageLife(scope, (kind) => {
+    const values = kind === 'local' ? g.local : g.session;
+    return { getItem: (key: string): string | null => values.get(key) ?? null, setItem: (key: string, value: string): void => { values.set(key, value); }, removeItem: (key: string): void => { values.delete(key); } };
+  }, () => 'navigate', () => ({ href: 'https://staging.wildshard.io/', startedAt: Date.now(), referrer: 'https://staging.wildshard.io/driftwood-isle' }), null);
+  expect(hop.lastEnd()).toMatchObject({ kind: 'fresh' });
+  expect(hop.lastEnd().left).toBeUndefined();
+});

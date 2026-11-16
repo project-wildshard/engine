@@ -182,6 +182,8 @@ export class DropNotes {
     }
     // QA 11-12 row 35: the player's own browser reload is their token: a quiet title, no modal and no report
     if (end.player === true) return null;
+    // SB8: the player left for another page and came back: theirs too
+    if (end.left === true) return null;
     const said = end.kind === 'fresh' ? '' : end.reason;
     if (pending !== null && time(pending, 'at') >= time(expected, 't')) {
       return this.once({ kind: 'error', what: text(pending, 'what'), reason: text(pending, 'reason'), step: text(pending, 'step'), world: text(pending, 'world'),
