@@ -399,7 +399,11 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
   }
   // C3: a title or menu `<img>` reads a shard's images by the URLs its level manifest names, before any fetch layer exists.
   const images = half.shard.index.files.flatMap(row => row.name?.startsWith('ui/images/') === true ? [row.path] : []);
-  for (const path of images) {
+  // SHARD-SOURCE SA48: a file no whole set holds (a lazy GLB the entry read set never reaches) is still read at its
+  // product URL, as an app build serves its whole shard file folder; without it a placed slug's page waits on a 404.
+  const packed = new Set(whole.flatMap(row => row.rows.map(file => file.hash)));
+  const unpacked = half.shard.index.files.flatMap(row => packed.has(row.hash) || row.name?.startsWith('ui/images/') === true ? [] : [row.path]);
+  for (const path of [...images, ...unpacked]) {
     const file = join(out, 'shardfiles', half.shard.slug, path);
     mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.shard.read(path));
   }

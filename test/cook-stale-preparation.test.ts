@@ -74,6 +74,17 @@ test('a stale preparation cooks to the same bytes as the matching renderer, and 
   expect(moved.files['programs/template.json']).toBe(digest(prepared(PREPARED).get('mounts/programs/template.json') ?? new Uint8Array()));
 });
 
+test('SA48: every file of the shard is in a whole set or loose at its product URL', {timeout: 60_000}, async () => {
+  const files = prepared(PREPARED), cooked = await cook(writeTar(files), 'whole-or-loose', PREPARED);
+  const index = parseOutputIndex(json(files.get('shard.json'))), packed = new Set<string>();
+  for (const row of cooked.report.manifests.filter(manifest => manifest.set === 'whole')) {
+    for (const file of (json(readFileSync(join(root, 'whole-or-loose', row.url.slice(1)))) as {files: {hash: string}[]}).files) packed.add(file.hash);
+  }
+  const loose = index.files.filter(row => !packed.has(row.hash));
+  for (const row of loose) expect(cooked.files[join('shardfiles', index.identity.slug, row.path)]).toBe(row.hash);
+  expect(index.files.length).toBeGreaterThan(0);
+});
+
 test('one changed byte of a stale cook.json still refuses before any part is written', async () => {
   const files = prepared(PREPARED), held = files.get('cook.json');
   if (held === undefined) throw new Error('No preparation');
