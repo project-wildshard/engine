@@ -337,7 +337,6 @@
     "telemetry-record.test.mjs",
     "template-generation.test.ts",
     "test-domain.test.ts",
-    "tile-bakes.test.ts",
     "view-author-metadata.test.ts",
     "vitest-module-cache.test.ts",
     "world-assembly-schema.test.ts",

@@ -12194,5 +12194,49 @@
         "assertions": "Complete original second case, including private unscoped ReturnProjectionV2.prepareGroup refusal."
       }
     ]
+  },
+  {
+    "repo": "engine",
+    "file": "test/tile-bakes.test.ts",
+    "outcome": "restored",
+    "target": "test/tile-bakes.test.ts",
+    "decision": "CI21 SDK-tail case split: seven SDK product/writer declarations (eight runtime cases) retain actual writer and public native tile consumer; the original private policy/approval case stays in the default-blocking engine suite. No cases or assertions retired.",
+    "originalTests": [
+      "a new product requires all 64+16 coordinates and every full 5x5",
+      "the exact L%s cap is allowed, one extra unit is debt for every metric",
+      "exact coordinate debt permits its current cost but no new or worsened overrun",
+      "5x5 totals include all rows and count shared transitive assets once separately",
+      "full 5x5 cap checks include the corner and permit the exact aggregate cap",
+      "duplicate, out-of-grid and dishonest cell bounds refuse before policy",
+      "corrupt section bytes and a mismatched index receipt cannot borrow debt",
+      "policy rows are strict and increases/identity swaps require exact approval trailers"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "88a639c19a028068de6e1aaa6b00fc376cd418a7",
+    "retirementProof": "Every assertion remains in one of the two owners. Exact all-coordinate, cap, transitive assets, debt and dishonest/corrupt bytes tests stay SDK; all strict private policy/identity/trailer refusals stay native. SDK revision pinned after review/commit.",
+    "assertionDestinations": [
+      {
+        "repo": "sharddev",
+        "branch": "plan/ci21sdk-tail",
+        "target": "test/tile-bakes.test.ts",
+        "originalTests": [
+          "a new product requires all 64+16 coordinates and every full 5x5",
+          "the exact L%s cap is allowed, one extra unit is debt for every metric",
+          "exact coordinate debt permits its current cost but no new or worsened overrun",
+          "5x5 totals include all rows and count shared transitive assets once separately",
+          "full 5x5 cap checks include the corner and permit the exact aggregate cap",
+          "duplicate, out-of-grid and dishonest cell bounds refuse before policy",
+          "corrupt section bytes and a mismatched index receipt cannot borrow debt"
+        ]
+      },
+      {
+        "repo": "engine",
+        "branch": "plan/ci21sdk-tail",
+        "target": "test/tile-bakes.test.ts",
+        "originalTests": [
+          "policy rows are strict and increases/identity swaps require exact approval trailers"
+        ]
+      }
+    ]
   }
 ]
