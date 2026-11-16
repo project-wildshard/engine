@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// P2 / EG-13: a real build ships Template only; production store attachment adds
-// the other two Ring 1 pins. Each then reaches actual gameplay from those bytes.
+// P2 / EG-13: a real build ships Template only; production store attachment
+// replaces it and adds the other two Ring 1 pins. All three play those bytes.
 // Ring 2: includes a fresh client build and cold q11 cooks (over ten seconds).
 import {execFileSync} from 'node:child_process';
 import {mkdirSync,mkdtempSync,readFileSync,realpathSync,rmSync,writeFileSync} from 'node:fs';
@@ -68,8 +68,18 @@ try {
   const address=packs.address();if(address===null||typeof address==='string')throw new Error('No pack origin');
   const origin=`http://127.0.0.1:${address.port}`;
   const pinCache=process.env.WILDSHARD_PIN_CACHE??join(homedir(),'.cache/wildshard/pins');
+  // The production installer preserves bundled products. Retire Template's
+  // bundled route so it too must read this run's cook, as nightly-heads does.
+  const htmlFile=join(dist,'index.html'),html=readFileSync(htmlFile,'utf8');
+  const expression=/(<script type="application\/json" id="boot-module-files">)([^<]+)(<\/script>)/u;
+  const text=expression.exec(html)?.[2];if(text===undefined)throw new Error('Missing build bank');
+  const bank=JSON.parse(text);
+  const expected=['template','blender-template','sunscar-dunes'];
+  for(const slug of Object.keys(bank.spawnManifests.client))if(expected.includes(bareSlug(slug)))delete bank.spawnManifests.client[slug];
+  writeFileSync(htmlFile,html.replace(expression,(_match,before,_body,after)=>`${before}${JSON.stringify(bank).replaceAll('<',String.raw`\u003c`)}${after}`));
   const added=await addStoredShards(dist,receipt.heads,store,hash=>Promise.resolve(readFileSync(join(pinCache,`${hash}.tar`))),{base:origin,shards:[]},live);
-  if(added.length!==2||!added.includes('blender-template')||!added.includes('sunscar-dunes'))throw new Error(`Store attached ${added}`);
+  if(added.length!==expected.length||expected.some(slug=>!added.includes(slug)))throw new Error(`Store attached ${added}`);
+  if(receipt.indexes.length!==expected.length||expected.some(slug=>receipt.indexes.filter(index=>index.slug===slug).length!==1))throw new Error('Cook must name each Ring 1 product exactly once');
   preview=await serve(tree,'',true);pool=browserPool(root,1,process.platform==='darwin'?'metal':'swiftshader',true);
   const browser=await pool.browser(0),results=[];
   const titleText=/<script type="application\/json" id="ws-title-rows">([^<]*)<\/script>/u.exec(readFileSync(join(dist,'index.html'),'utf8'))?.[1];
@@ -78,15 +88,16 @@ try {
   for(const index of receipt.indexes) {
     const route=titles.find(row=>bareSlug(row.slug)===bareSlug(index.slug))?.slug;
     if(route===undefined)throw new Error(`No public title route for ${index.slug}`);
+    fetched.clear();
     const result=await bootCase(browser,preview.url,'standalone',out,route,true);
-    results.push({slug:index.slug,route,frames:result.frame,ms:result.elapsedMs});
+    const used=[...fetched];
+    if(!used.some(key=>/^assets\/spawn\/parts\/[a-f0-9]+\.pack\.br$/u.test(key)))throw new Error(`${index.slug}: no client part from this cook reached gameplay`);
+    for(const key of used)if(!index.keys.includes(key))throw new Error(`${index.slug}: page fetched outside its cook: ${key}`);
+    results.push({slug:index.slug,route,frames:result.frame,ms:result.elapsedMs,fetched:used});
   }
-  const keys=new Set(receipt.indexes.filter(row=>added.includes(row.slug)).flatMap(row=>row.keys));
-  if(fetched.size===0)throw new Error('No cooked part reached the page');
-  for(const key of fetched)if(!keys.has(key))throw new Error(`Page fetched outside this cook: ${key}`);
   const refusals=[];
   for(const slug of ['template','not-in-this-catalogue'])refusals.push(await uncataloguedShardCase(browser,preview.url,slug));
-  const proof={sha,build,added,fetched:[...fetched],results,refusals};
+  const proof={sha,build,added,fetched:[...new Set(results.flatMap(result=>result.fetched))],results,refusals};
   writeFileSync(join(out,'cook-to-play.json'),JSON.stringify(proof));console.log(JSON.stringify(proof));
 } finally {
   writeFileSync(join(out,'store-requests.json'),JSON.stringify(fetches));
