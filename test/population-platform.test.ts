@@ -2,6 +2,7 @@ import { populationEnvironment } from '../src/server/game/population/environment
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { pineShelter as shelterProgram } from './fixtures/engine-lift/pins';
 import { fixtureNativeRoster } from './fixtures/native-roster';
+import { FIXTURE_HUNT_TUNING } from './fixtures/hunt-tuning';
 import { flatPopulationEnvironment } from './fixtures/population-environment';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the actual shipped native physics owner, without a browser.
 import { readSpeciesPrograms } from '@wildshard/format/speciesPrograms';
@@ -59,7 +60,7 @@ test('made-up salt-marsh roster reserves and adopts a body without draws and res
     return { id, kind: spec.kind, variant: spec.variant, spec, seed, scale, scripted: true };
   };
   const reserved = roll('creature:0'), home = roll('creature:1');
-  const population = readSpeciesPrograms({ page: [], native: [{ id: spec.kind, kind: spec.kind, label: 'Marsh Beast',
+  const population = readSpeciesPrograms({ page: [], native: [{ id: spec.kind, kind: spec.kind, label: 'Marsh Beast', tuning: FIXTURE_HUNT_TUNING,
     variants: [{ id: spec.variant, label: 'Reed', weight: 1, rarity: 'common', scale: [1, 2] }] }],
     hunt: { limit: 8, player: 'host', fight: {}, bands: { states: [], legacyKinds: [] }, hit: { namespace: 'marsh', tags: [] } } });
   const rows = { version: 1, environment: 'fixture.habitat', step: 'marsh.roster', seed: 87, bodyCount: 1, limit: 8, scripted: 'sidestep', encounter: 'dusk.guard',

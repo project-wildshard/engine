@@ -63,6 +63,7 @@ import { installDeclaredEncounters } from "../shard/declaredEncounters";
 import type { Shardfile } from "@wildshard/format/shardSchema";
 import { speciesResolver, simStrikes } from "./brain";
 import { prepareCreaturePolicies } from "../shardfile/creatureLayers";
+import { installLayerHunts } from "../shardfile/layerHunts";
 import { createShardfileScriptLane, verifiedScriptModules, type ScriptModuleAssets, type ShardScriptPorts } from "../shardfile/scripts";
 import { installDeclaredBrains, type DeclaredBrainPorts } from "../shardfile/brainRuntime";
 import { installDataRespawns } from "../shardfile/dataRespawn";
@@ -648,6 +649,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
     }
     installDeclaredBrains(host, creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataPorts?.brains);
     installDataRespawns(host, creatures.spawns);
+    installLayerHunts(host, shard.rows, creatures);
     dataPorts?.install();
     const decisionRows = decisionScriptsFromSections(ports.sections);
     const decisionActors = new Set(decisionRows.flatMap(row => Object.values(row.actors)));

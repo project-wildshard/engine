@@ -55,7 +55,7 @@ declare module '../../../client/engine/events/maps' {
  *   Blood burst + ground decal, sounds, AI reaction and onKill all fire from applyDamage.
  *   animal.fadeOut()  — dissolve a harvested carcass over 1.5 s (animal.hidden afterwards)
  *
- * The hunting loop (DEER_TUNING / BOAR_TUNING below): every animal carries an `awareness` meter 0..1. It rises while the
+ * The hunting loop: every animal carries an `awareness` meter 0..1. It rises while the
  * player is inside the SIGHT cone (body heading ± sightCone, out to sightRange — far less while grazing head-down) or
  * inside the HEARING radius (any direction; grows with the player's speed: still < crouch < walk < sprint), and decays
  * otherwise. At `alertAt` the head comes up and the animal FREEZES staring at you for freezeMin..freezeMax s — that is
@@ -77,8 +77,7 @@ declare module '../../../client/engine/events/maps' {
  * Species + variants: every kind comes from the species registry (`src/engine/entities/species/<kind>.ts`, see
  * AnimalFactory.ts). Each spawn rolls a VariantDef by weight with the seeded rng — its `scale`, `hp` and `mods`
  * (speed / chargeDist / damageTaken / chargeDamage / relentless) are applied HERE on top of the species'
- * HuntTuning (DEER_TUNING / BOAR_TUNING below stay the untouched baseline; a species may ship its own
- * `tuning`). A 'legendary' variant is capped at ONE alive per kind (the roll falls back to the rare tier).
+ * explicit HuntTuning. A 'legendary' variant is capped at ONE alive per kind (the roll falls back to the rare tier).
  * HerdPlan.variants restricts a herd's pool to those ids.
  *
    * Dev helpers: animals.spawn(kind, x, z, yaw, variant?, placement?) adds a single animal (no herd AI target) — `variant`

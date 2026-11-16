@@ -6,10 +6,6 @@ import type { Vector3 } from 'three';
 
 /** Historical species hunt tuning; native presets and all overrides remain exact. */
 export type HuntTuning = law.HuntTuning;
-/** Original deer preset, retaining object identity and every numeric bit. */
-export const DEER_TUNING: law.HuntTuning = law.DEER_TUNING;
-/** Original charger preset, retaining object identity and every numeric bit. */
-export const BOAR_TUNING: law.HuntTuning = law.BOAR_TUNING;
 /** Original committed-contact arc in radians. */
 export const CHARGE_ARC: number = law.CHARGE_ARC;
 /** Original hurt acceptance arc in radians. */

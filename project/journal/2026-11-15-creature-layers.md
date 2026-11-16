@@ -32,3 +32,25 @@ The real simulation now moves an inline pursuit actor and restores its body
 and policy state exactly after another second of stepping. Semantic controls
 cover named references, flat rows, group ownership and input immutability.
 Hunting installation and removal of health/tuning guesses remain CC4b2b.
+
+## Hunting ownership, 2026-11-16
+
+CC4b2b binds layered hunts to the existing StalkerBrain, roster cadence and
+memory codec. The adapter borrows actual host bodies, ground, water, damage,
+focused players and the saved AI stream. Its continuation includes the hunt
+clock, senses and full memory; restoring runs no policy. Different species
+may share a kind label without sharing tuning. Group-owned creatures remain
+under their explicit group controller.
+
+Hunt numbers now come entirely from the species row and its authored override.
+Missing or nonfinite fields refuse instead of choosing content from aggression.
+The engine's two baseline presets are gone. Both page health construction paths
+require variant or tuning health. The made-up marsh lifecycle fixture now names
+the exact numbers it previously obtained implicitly.
+
+Twenty-one focused controls pass, including real hunting motion and exact
+continuation. Fourteen layer/roster controls pass after the fixture update.
+The shipped Driftwood population and server-file cases pass; its worker case
+hit its existing ten-second limit in the combined run, then passes alone in
+8.13 seconds total. Full types, game lint and side checks pass. Full sixty-second
+before/after product hashes remain CC4c.

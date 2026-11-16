@@ -23,6 +23,13 @@ import type { SpeciesFlight } from '../../ai/flight';
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'legendary';
 
+/** Health comes from the chosen variant or authored tuning, never its label or aggression. */
+export function speciesHealth(id: string, variant: number | undefined, tuning: number | undefined): number {
+  const hp = variant ?? tuning;
+  if (hp === undefined || !Number.isFinite(hp) || hp <= 0) throw new Error(`Species '${id}' has no valid health`);
+  return hp;
+}
+
 
 /** Per-variant gameplay multipliers, applied by AnimalManager at spawn on top of the species' HuntTuning. */
 export interface VariantMods {
@@ -257,7 +264,7 @@ export interface SpeciesDef {
   chargeSpeed?: number;
   /** damage of one charge contact (default 25) */
   chargeDamage?: number;
-  /** the hunting-loop numbers; omit for the manager's DEER_TUNING / BOAR_TUNING (deer / boar keep theirs there) */
+  /** Explicit hunting-loop numbers; the hunt refuses an incomplete declaration. */
   tuning?: HuntTuning;
   /** AnimalSound names for the ambient call and the hurt cry (default deer_call / boar_grunt+boar_squeal);
    *  `callVariants` limits the ambient call to those variant ids (elk: bulls bugle, cows don't) and

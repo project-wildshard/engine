@@ -8,7 +8,7 @@ import { TIER } from '../core/tier';
 import { frameCost } from '../../../shared/engine/core/frameCost';
 import { heightAt } from '../../../shared/engine/world/Heightfield';
 import type { AnimalMaterial, AnimalModel, AnimalRig } from './AnimalFactory';
-import { variantMods, type RigAnimCtx } from '../../../shared/engine/entities/species/registry';
+import { variantMods, speciesHealth, type RigAnimCtx } from '../../../shared/engine/entities/species/registry';
 import { app, gameplayRandom } from '../app/runtime';
 import type { DamageRequest } from '../../../shared/engine/combat/pipeline';
 import { AnimalSim, damageFor as simDamageFor, type AnimalPoseSample, type AnimalVolumePort } from '../../../shared/engine/entities/AnimalSim';
@@ -208,7 +208,7 @@ export class Animal extends AnimalSim {
 constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityId = `creature.${model.kind}.${String(seed)}`) {
     const v = model.variantDef;
     super({ kind: model.kind, label: v.label || model.species.label, variant: v.id, rarity: v.rarity,
-      hp: v.hp ?? model.species.tuning?.hp ?? (model.species.aggressive === true ? 100 : 60),
+      hp: speciesHealth(model.species.kind, v.hp, model.species.tuning?.hp),
       aggressive: model.species.aggressive ?? false, dims: model.dims, mods: variantMods(model.species, v),
       ...(model.species.flight === undefined ? {} : { flight: model.species.flight }),
       ...(model.species.lockable === undefined ? {} : { lockable: model.species.lockable }) }, seed, scale, entityId, {

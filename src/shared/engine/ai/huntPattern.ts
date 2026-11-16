@@ -21,7 +21,7 @@ import { reengage, backoffPoint, aroundPoint, RING_DEFAULT, BACKOFF_MAX_T, BREAK
  * `Rng` (the manager's `Rng(SEED + 31)`) feeds placement, every spawn's rolls (`spawnRolls` then `adopt`) and every
  * decision, in exactly the order the browser always drew them.
  *
- * The hunting loop (DEER_TUNING / BOAR_TUNING below): every animal carries an `awareness` meter 0..1. It rises while the
+ * The hunting loop: every animal carries an `awareness` meter 0..1. It rises while the
  * player is inside the SIGHT cone or the HEARING radius and decays otherwise. At `alertAt` the head comes up and the
  * animal FREEZES staring at you (the shot window), then bolts if it still senses you (`boltAt`), or relaxes. It flees
  * only until `fleeUntil..fleeUntilMax` m away, then looks back and grazes again, "wary" for `waryTime` s. One spooked
@@ -72,34 +72,27 @@ export interface HuntTuning {
   } | undefined;
 }
 
-export const DEER_TUNING: HuntTuning = {
-  hp: 60,
-  // Huntable, not paranoid (user: "I need to be able to get close and shoot them"): head-on a deer notices you
-  // walking at ~22 m; from behind / the side you get to ~12 m on foot. Only sprinting inside 24 m is heard.
-  sightRange: 30, sightRangeGraze: 14, sightCone: MathUtils.degToRad(55),
-  hearStill: 3, hearCrouch: 6, hearWalk: 12, hearSprint: 24,
-  noticeRate: 0.3, forgetRate: 0.3, alertAt: 0.45, boltAt: 1.0,
-  // 4–7 s head-up stare: plenty of time to raise the crossbow and take the shot
-  freezeMin: 4.0, freezeMax: 7.0, relaxAfter: 3.5, panicDist: 6,
-  // gallop 6.0 (you sprint 7.2 — you CAN close on one) and only to 35–50 m, then it trots, stops and looks back
-  runSpeed: 6.0, trotSpeed: 3.2, fleeMinTime: 1.5, fleeUntil: 35, fleeUntilMax: 50, fleeMaxTime: 8, lookBack: 2.5,
-  waryTime: 10, waryBoost: 1.2,
-  herdAlertRadius: 8, herdBoltDelayMin: 0.4, herdBoltDelayMax: 1.2,
-  impactSpook: 4, impactAlert: 10,
-};
-
-export const BOAR_TUNING: HuntTuning = {
-  hp: 100,
-  // poor eyes, good nose: a short cone but it hears a walker from 22 m
-  sightRange: 22, sightRangeGraze: 14, sightCone: MathUtils.degToRad(60),
-  hearStill: 4, hearCrouch: 7, hearWalk: 14, hearSprint: 28,
-  noticeRate: 0.5, forgetRate: 0.2, alertAt: 0.35, boltAt: 1.0,
-  freezeMin: 1.5, freezeMax: 2.8, relaxAfter: 4, panicDist: 10, // panicDist doubles as the charge trigger
-  runSpeed: 6.8, trotSpeed: 3.6, fleeMinTime: 2, fleeUntil: 40, fleeUntilMax: 60, fleeMaxTime: 10, lookBack: 2,
-  waryTime: 20, waryBoost: 1.5,
-  herdAlertRadius: 12, herdBoltDelayMin: 0.2, herdBoltDelayMax: 0.7,
-  impactSpook: 7, impactAlert: 18,
-};
+/** Every hunt supplies complete numbers; labels and aggression select no content. */
+export function requireHuntTuning(value: Partial<HuntTuning> | undefined, kind: string): HuntTuning {
+  const fields: Record<keyof Omit<HuntTuning, 'stalk'>, true> = {
+    hp: true, sightRange: true, sightRangeGraze: true, sightCone: true, hearStill: true, hearCrouch: true,
+    hearWalk: true, hearSprint: true, noticeRate: true, forgetRate: true, alertAt: true, boltAt: true,
+    freezeMin: true, freezeMax: true, relaxAfter: true, panicDist: true, runSpeed: true, trotSpeed: true,
+    fleeMinTime: true, fleeUntil: true, fleeUntilMax: true, fleeMaxTime: true, lookBack: true, waryTime: true,
+    waryBoost: true, herdAlertRadius: true, herdBoltDelayMin: true, herdBoltDelayMax: true, impactSpook: true, impactAlert: true,
+  };
+  if (value === undefined || Object.keys(fields).some(key => typeof Reflect.get(value, key) !== 'number'
+    || !Number.isFinite(Reflect.get(value, key)))) throw new Error(`Missing hunting numbers for species '${kind}'`);
+  if (value.stalk !== undefined) {
+    const stalk = value.stalk;
+    const numbers: Record<keyof Omit<NonNullable<HuntTuning['stalk']>, 'roar'>, true> = {
+      detect: true, speed: true, giveUp: true, rechargeCd: true, huffMin: true, huffMax: true, fleeBelowHp: true, fleeChance: true,
+    };
+    if (typeof stalk.roar !== 'string' || Object.keys(numbers).some(key => typeof Reflect.get(stalk, key) !== 'number'
+      || !Number.isFinite(Reflect.get(stalk, key)))) throw new Error(`Invalid hunting stalk numbers for species '${kind}'`);
+  }
+  return value as HuntTuning;
+}
 
 const GRAZER_WALK = 1.3, CHARGER_WALK = 1.1, BOAR_CHARGE = 7.5, CHARGE_HIT_DIST = 1.4;   // species defaults (SpeciesDef.walkSpeed / chargeSpeed override)
 const CHARGE_WHEN_HIT_DIST = 25;   // a wounded boar this close turns on you instead of running
@@ -127,7 +120,7 @@ export interface HuntMemory {
   fleeUntil: number;    // m from the player at which this animal stops running (seeded per animal)
   chargeCd: number;
   callT: number;
-  awareness: number;    // 0..1 sense meter (see DEER_TUNING)
+  awareness: number;    // 0..1 sense meter, driven by the authored tuning
   freeze: number;       // alert: seconds of head-up stare left before it may bolt
   spooked: boolean;     // alert: bolt as soon as the freeze ends, whatever the senses say (herd panic, impact, hit)
   wary: number;         // seconds of sharpened senses left after a scare
@@ -337,9 +330,9 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
     const cached = this.tuningCache.get(a.kind);
     if (cached !== undefined) return cached;
     const sp = this.species(a.kind);
-    const base = sp.tuning ?? (sp.aggressive ? BOAR_TUNING : DEER_TUNING);
+    const base = sp.tuning;
     const over = this.faunaTuning()?.[a.kind];
-    let t = over !== undefined ? { ...base, ...over, stalk: over.stalk ?? base.stalk } : base;   // ShardManifest.faunaTuning: the shard's overrides (Driftwood's far-sighted beach boars)
+    let t = requireHuntTuning(over !== undefined ? { ...base, ...over, stalk: over.stalk ?? base?.stalk } : base, a.kind);
     // E297 fight rules: a charger without a stalk (the boar) gets one — it comes for you instead of bolting
     if (this.rules !== null && sp.aggressive === true && sp.think === undefined && t.stalk === undefined) t = { ...t, stalk: { ...RULES_STALK, roar: sp.sounds?.call ?? fallbackSound(true, 'call') } };
     this.tuningCache.set(a.kind, t);

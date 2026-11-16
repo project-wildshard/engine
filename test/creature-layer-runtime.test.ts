@@ -7,6 +7,8 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { emptyShardfile } from '../src/shared/host/author';
 import { createShardfileSim, prepareShardfileSimRestore } from '../src/server/game/plugin/simulation';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
+import { requireHuntTuning } from '../src/shared/engine/ai/huntPattern';
+import { speciesHealth } from '../src/shared/engine/entities/species/registry';
 
 function fixture() {
   const base = emptyShardfile({ slug: 'layer-policy', name: 'Layer policy', author: 'Test', revision: 1, seed: 7 });
@@ -24,9 +26,21 @@ function fixture() {
   return { ...base, rows, creatures: { brains: [], groups: [], spawns: [spawn] } };
 }
 
-test('an inline layer policy runs in the real simulation and restores its continuation', async () => {
+const HUNT = { hp: 117, sightRange: 18, sightRangeGraze: 12, sightCone: 1, hearStill: 2, hearCrouch: 4, hearWalk: 8, hearSprint: 16,
+  noticeRate: 0.5, forgetRate: 0.2, alertAt: 0.3, boltAt: 1, freezeMin: 1, freezeMax: 2, relaxAfter: 3, panicDist: 5,
+  runSpeed: 4, trotSpeed: 2, fleeMinTime: 1, fleeUntil: 20, fleeUntilMax: 30, fleeMaxTime: 8, lookBack: 2,
+  waryTime: 10, waryBoost: 1.2, herdAlertRadius: 8, herdBoltDelayMin: 0.2, herdBoltDelayMax: 0.5, impactSpook: 6, impactAlert: 12 };
+
+test.each(['pursue', 'hunt'] as const)('an inline %s policy runs in the real simulation and restores its continuation', async brain => {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const shard = fixture(), input = JSON.stringify(shard), first = createShardfileSim(shard, new Map(), { rapier });
+  const shard = fixture(), row = shard.rows.species[0];
+  if (brain === 'hunt') {
+    if (row?.temperament === undefined) throw new Error('Missing fixture temperament');
+    row.temperament.brain = 'hunt'; row.temperament.tuning = HUNT; row.temperament.reaction = 'skittish';
+    const spawn = shard.creatures.spawns[0]; if (spawn === undefined) throw new Error('Missing fixture spawn');
+    spawn.at = [2, 0, 2];
+  }
+  const input = JSON.stringify(shard), first = createShardfileSim(shard, new Map(), { rapier });
   const restored = prepareShardfileSimRestore(shard, new Map(), { rapier });
   try {
     const body = first.host.entities.get('fixture.actor');
@@ -41,4 +55,18 @@ test('an inline layer policy runs in the real simulation and restores its contin
     expect(restored.host.adapters.get('brain.fixture.actor')?.snapshot()).toEqual(first.host.adapters.get('brain.fixture.actor')?.snapshot());
     expect(JSON.stringify(shard)).toBe(input);
   } finally { restored.host.dispose(); first.host.dispose(); }
+});
+
+test('hunting numbers and health refuse missing, partial and nonfinite values', () => {
+  expect(() => requireHuntTuning(undefined, 'fixture')).toThrow('fixture');
+  for (const key of Object.keys(HUNT)) {
+    const missing = { ...HUNT }; Reflect.deleteProperty(missing, key);
+    expect(() => requireHuntTuning(missing, 'fixture'), key).toThrow('Missing hunting numbers');
+    const invalid = { ...HUNT }; Reflect.set(invalid, key, NaN);
+    expect(() => requireHuntTuning(invalid, 'fixture'), key).toThrow('Missing hunting numbers');
+  }
+  expect(requireHuntTuning(HUNT, 'fixture')).toBe(HUNT);
+  expect(speciesHealth('fixture', 23, 117)).toBe(23);
+  expect(speciesHealth('fixture', undefined, 117)).toBe(117);
+  for (const hp of [undefined, NaN, Infinity, 0, -1]) expect(() => speciesHealth('fixture', hp, undefined)).toThrow('fixture');
 });
