@@ -39,7 +39,7 @@ const exp=arg('exp','')?readFileSync(arg('exp',''),'utf8'):'';// --exp=<file.js>
 const only=selectGoldenCameraNumbers(arg('cams',''));
 const slugs=selectGoldenShards(canonical,arg('shards',undefined));
 const nativeBinding=mode==='shardfile'&&slugs.includes('nine-dragon-stack')?await goldenRefinementBinding(base,source):null;
-const FRAMES=120,SETTLE_MS=30000,LIVE=60,FREE=4,EYE=1.7,ON_FOOT=new Set(['far-reach']);
+const FRAMES=120,SETTLE_MS=30000,LIVE=60,FREE=4,EYE=1.7,AWAY=20,ON_FOOT=new Set(['far-reach']);
 // --textures=ktx2|img pins the page's texture mode (the harness pin, src/engine/boot/gpuFiles.ts) to judge a texture-policy
 // change on a clean build; omitted, the shipped Auto policy picks
 const TEXTURES=arg('textures','');if(!['','ktx2','img'].includes(TEXTURES))throw Error(`--textures=${TEXTURES}`);
@@ -159,8 +159,11 @@ try{for(const slug of slugs){
   row.entry=await page.evaluate(()=>({url:location.href,id:window.__wildshard.world.game.level.id}));
   const want=slug;if(row.entry.id!==want)throw Error(`Not ${mode}: ${row.entry.id}`);row.mode=mode;
   // the golden camera is a spectator: its player takes no damage (Pine's bear-den elite killed it, and the death fade put it
-  // back at spawn with the ring and the grass field)
-  await page.evaluate(()=>{const hp=window.__wildshard.world.game.app.player;if(hp)hp.attributes.incomingCap=0;});
+  // back at spawn with the ring and the grass field). The cap holds on a main-thread page. On a worker page only the server lands
+  // a blow: Pine's den bears woke, charged, knocked the eye-height player of camera 11 down the slope and killed it, and the shot
+  // streamed its ground cover round spawn, 250 m away (meta SH-ALL-11). There the server holds every creature where it stands.
+  row.still=await page.evaluate(()=>{const hp=window.__wildshard.world.game.app.player;if(hp)hp.attributes.incomingCap=0;
+   if(!window.__workerClientStill)return false;window.__workerClientStill();return true;});
   for(let i=0;i<canonical[slug].length;i++){
    const c=canonical[slug][i];if(only&&!only.has(c.n??i+1))continue;
    const probe=c.probe??{x:c.feet?.[0]??c.eye[0],z:c.feet?.[2]??c.eye[2],yaw:-c.yaw*Math.PI/180,pitch:c.pitch*Math.PI/180,...c.feet?{y:c.feet[1]}:{}};
@@ -221,7 +224,10 @@ try{for(const slug of slugs){
     await page.screenshot({path:shot,type:'png',scale:'device'});await hide.evaluate(e=>e.remove());}
    else await page.screenshot({path:shot,type:'png',scale:'css'});
    await page.evaluate(()=>{for(const o of window.__wsBoards??[])o.visible=true;window.__wsBoards=[];});
-   row.poses.push({n:c.n??i+1,name:c.name,free,drifted,sunk,idle,live,residency,...observed,...(exp?{exp:expResult}:{}),shot});
+   // the ring, the grass and the culling stream round the player: one that ended up far from its pose (killed and respawned,
+   // knocked away) shot the camera's view with somewhere else's ground cover, so the frame is an error, not a golden
+   const away=Math.hypot(observed.player[0]-at.x,observed.player[2]-at.z);if(away>AWAY)row.errors.push(`camera ${c.n??i+1}: the player stood ${away.toFixed(0)} m from its pose at the shot`);
+   row.poses.push({n:c.n??i+1,name:c.name,free,drifted,sunk,away,idle,live,residency,...observed,...(exp?{exp:expResult}:{}),shot});
    writeFileSync(`${root}/receipts-${slug}.json`,JSON.stringify(row,null,1));
   }
   row.status=row.errors.length===0?'complete':'errors';

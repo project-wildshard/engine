@@ -80,7 +80,7 @@ export interface OnlineShell {
   progress: () => LinkProgress;
   dialNow: () => void;
   why: () => LinkCause;
-  pause: () => void; resume: () => void; hold: (on: boolean) => void; bossGod: () => void; hardHits: (by: number) => void;
+  pause: () => void; resume: () => void; hold: (on: boolean) => void; bossGod: () => void; still: () => void; hardHits: (by: number) => void;
   place: (x: number, y: number, z: number, yaw: number) => void; raise: (flag: string) => void;
   /** QA row 16: the player chose to go (the menu's exit, another world). The body leaves now, not after J114's hold.
    *  Resolves once the door has closed the link; a page waits for it at most `atMostLeaveWait`. */
@@ -156,7 +156,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   const tickOf = (): number => client.latest?.tick ?? 0, idle = (): void => undefined;
   return { client, voice, redials: true, booted, ready: () => { loaded = true; unseated?.control('ready'); unseated = null; },
     visible: hiddenMs => { redial.check(hiddenMs); }, retry: () => { redial.retry(); }, progress: () => redial.progress, why: () => redial.why, dialNow: () => { redial.dialNow(); },
-    pause: idle, resume: idle, hold: idle, bossGod: idle, hardHits: idle, place: idle, raise: idle,
+    pause: idle, resume: idle, hold: idle, bossGod: idle, still: idle, hardHits: idle, place: idle, raise: idle,
     // The door hears a quit on any link of this build: seated, still admitted, or handed a held body back. A link that is down (a redial's
     // wait) gets a fresh one to say it on, so a held body goes too. No redial follows: the page is going.
     // FL27: a door that heard the quit closes plainly. A link it closed `stalled` was dropped before the quit reached it (it went out

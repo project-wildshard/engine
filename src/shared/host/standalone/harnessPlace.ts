@@ -8,6 +8,10 @@ export interface HarnessHits { readonly hits: number }
 /** A Developer's `?bossGod`: a fight's blows stop reaching a player, as the page's own rule stops them on a page. */
 export interface HarnessGod { readonly god: true }
 export const isHarnessGod = (value: unknown): value is HarnessGod => typeof value === 'object' && value !== null && 'god' in value && value.god === true;
+/** A golden camera's spectator: every creature in the world the player stands in holds where it is, from now on, so none
+ * wakes, charges or bites the player the camera streams round (Pine's bear den killed it, and the shot streamed round spawn). */
+export interface HarnessStill { readonly still: true }
+export const isHarnessStill = (value: unknown): value is HarnessStill => typeof value === 'object' && value !== null && 'still' in value && value.still === true;
 /** Raise one of this player's flags, for a door whose quest step a proof can't reach in its minutes (a thrall hunt at night). */
 export interface HarnessFlag { readonly flag: string }
 export const isHarnessFlag = (value: unknown): value is HarnessFlag => typeof value === 'object' && value !== null && 'flag' in value && typeof value.flag === 'string';

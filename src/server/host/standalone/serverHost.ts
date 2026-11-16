@@ -18,7 +18,7 @@ import type { GridPoint } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import { StandaloneGrid } from './gridServer';
-import { isHarnessFlag, isHarnessGod, isHarnessHits, isHarnessJoin, isHarnessMove, isHarnessPlace } from '../../../shared/host/standalone/harnessPlace';
+import { isHarnessFlag, isHarnessGod, isHarnessHits, isHarnessJoin, isHarnessMove, isHarnessPlace, isHarnessStill } from '../../../shared/host/standalone/harnessPlace';
 import { WorkerLoopback } from '../../../shared/host/standalone/workerLoopback';
 import { isDevColliders, isDevGround, swapDevBoxes, swapDevGround } from '@wildshard/engine/game/devColliders';
 import { isDevRestart, withDevGameplay, type DevGameplay, type DevPlace, type DevRestarted } from '@wildshard/engine/game/devGameplay';
@@ -146,7 +146,7 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
       if (live === undefined) return;
       if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && isDevColliders(event.data)) swapDevBoxes(live.host.physics, live.host.scope, devBoxes, event.data.wildshardDevColliders, event.data.boxes);
       else if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ && isDevGround(event.data)) swapDevGround(live.host.physics, live.host.scope, devGround, event.data.wildshardDevGround, groundPorts);
-      else if (isHarnessJoin(event.data) && port !== undefined) live.join(event.data, new WorkerLoopback(port)); else if (isHarnessFlag(event.data)) live.raise(event.data.flag); else if (isHarnessMove(event.data)) live.place(event.data, event.data.move); else if (isHarnessPlace(event.data)) live.place(event.data); else if (isHarnessHits(event.data)) live.hardHits(event.data.hits); else if (isHarnessGod(event.data)) live.bossGod();
+      else if (isHarnessJoin(event.data) && port !== undefined) live.join(event.data, new WorkerLoopback(port)); else if (isHarnessFlag(event.data)) live.raise(event.data.flag); else if (isHarnessMove(event.data)) live.place(event.data, event.data.move); else if (isHarnessPlace(event.data)) live.place(event.data); else if (isHarnessHits(event.data)) live.hardHits(event.data.hits); else if (isHarnessGod(event.data)) live.bossGod(); else if (isHarnessStill(event.data)) live.still();
     };
     clock = new ServerClock({ now: diagnosticNow, wait: (ms, run) => { const timer = scope.timeout(ms, run); return () => { scope.cancelTimer(timer); }; },
       step: () => { const live = grid; if (live === undefined) return; try { live.tick(); progress(live); } catch (error) { fail(error); } } });

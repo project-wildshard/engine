@@ -273,8 +273,14 @@ export class StandaloneGrid {
   }
   /** A Developer's `?bossGod`, on the pipeline that now lands the blow, and a lair's script, whose contact wears no fight's tag. */
   bossGod(): void { this.host.combat.playerRules(this.host.scope, { bossGod: true }); actRoutes(this.host).god = true; }
+  /** A golden camera's spectator (`HarnessStill`): from now on every creature in the world the player stands in holds where it is. */
+  still(): void { this.stilled = true; }
+  private stilled = false;
   open(): void { this.rooms.open(); }
-  tick(): void { this.rooms.tick(); }
+  tick(): void {
+    if (this.stilled) for (const actor of this.host.entities.values()) actor.harnessHold = true; // each tick: a creature that streams in later holds too
+    this.rooms.tick();
+  }
   /** Resolves true when every write so far reached the real storage, and tells `held` which of its saves that makes good. */
   private settle(held: readonly { settled: (durable: boolean) => void }[]): Promise<boolean> {
     this.settling = this.settling.then(() => this.options.storage.settled()).then(durable => { for (const slots of held) slots.settled(durable); return durable; });

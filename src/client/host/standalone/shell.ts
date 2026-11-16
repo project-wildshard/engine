@@ -11,7 +11,7 @@ import { saveDocuments } from '@wildshard/engine/saves/indexed';
 import type { SaveStorage } from '@wildshard/engine/saves/store';
 import { ServerMessageSchema, ShellMessageSchema, type ProbedRow, type ServerMessage, type ShellMessage } from '@wildshard/format/standaloneControl';
 import { answerHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
-import type { HarnessFlag, HarnessGod, HarnessHits, HarnessJoin, HarnessMove, HarnessPlace } from '../../../shared/host/standalone/harnessPlace';
+import type { HarnessFlag, HarnessGod, HarnessHits, HarnessJoin, HarnessMove, HarnessPlace, HarnessStill } from '../../../shared/host/standalone/harnessPlace';
 import type { DevBox, DevCollidersMessage, DevGround, DevGroundMessage } from '@wildshard/engine/game/devColliders';
 import { isDevRestart, type DevGameplay, type DevPlace, type DevRestarted, type DevRestartMessage } from '@wildshard/engine/game/devGameplay';
 import type { ServerWorkerStart } from '../../../server/host/standalone/serverRuntime';
@@ -70,6 +70,8 @@ export interface StandaloneShell {
   hold: (on: boolean) => void;
   /** A Developer's `?bossGod`, for the server that lands a fight's blows. */
   bossGod: () => void;
+  /** A golden camera's spectator: every creature in the player's world holds where it is. */
+  still: () => void;
   /** A harness's word that one of this player's flags is up. */
   raise: (flag: string) => void;
   /** A proof's second client, a real one on its own link: it stands at this point in this cell, and `move` puts its body elsewhere. */
@@ -173,6 +175,7 @@ export function connectStandalone(config: StandaloneConfig, control: MessagePort
     place: (x, y, z, yaw) => { harness?.postMessage({ x, y, z, yaw } satisfies HarnessPlace, []); },
     hardHits: by => { harness?.postMessage({ hits: by } satisfies HarnessHits, []); },
     bossGod: () => { harness?.postMessage({ god: true } satisfies HarnessGod, []); },
+    still: () => { harness?.postMessage({ still: true } satisfies HarnessStill, []); },
     raise: flag => { harness?.postMessage({ flag } satisfies HarnessFlag, []); },
     devColliders: (name, boxes) => { if (typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__) harness?.postMessage({ wildshardDevColliders: name, boxes } satisfies DevCollidersMessage, []); },
     devRestart,
