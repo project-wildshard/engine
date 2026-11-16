@@ -45,7 +45,8 @@ export function bootRoadCompletionState(): unknown;
 /** Preserve the original error as cause and bound a failed-page diagnostic to 1000 ms. */
 export function bootRoadFailure(read:()=>Promise<unknown>, primary:unknown):Promise<Error>;
 
-/** Run an actual built title through gameplay; reused by the cooked-store proof. */
+/** Run an actual built title through gameplay; reused by the cooked-store proof.
+ * afterGameplay observes ten live frames before the independent native capture. */
 export function bootCase(browser:Browser,base:string,mode:"standalone"|"grid"|"public-policy"|"arrival",out:string,shard?:string,developer?:boolean,afterGameplay?:((page:Page)=>Promise<void>)|null,configureContext?:((context:BrowserContext)=>Promise<void>)|null):Promise<{elapsedMs:number;frame:number;gameplayFrames?:{initial:number|null;final:number|null};faults:string[];fatal:string[]}>;
 
 export function gameplayRenderer():{renderer:string;vendor:string;unmaskedRenderer:string|null;unmaskedVendor:string|null;version:string;lost:boolean};

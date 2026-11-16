@@ -560,14 +560,17 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
       if (read.faults.length > 0) console.log(`${shard}: play stall (report only): ${read.faults.join('; ')} · ${read.leaves.join(', ')}`);
     }
     phases.framesCompleteMs = Date.now() - started;
+    // Exercise entered gameplay before a software-composited PNG can consume
+    // tens of wall seconds while the real simulation and its enemies keep running.
+    // Capture still runs under its original deadline and can independently fail.
+    if (afterGameplay !== null) await afterGameplay(page);
+    if (faults.length > 0) throw new Error(JSON.stringify(faults));
     await captureBootFrame(page, mode === 'grid' ? 'grid HOME' : `${shard} gameplay`, deadline, frames);
     const roadDeadline = Date.now() + 90000;
     const templateRoad = mode === 'grid' ? await bootTemplateRoad(page, faults, frames, roadDeadline) : null;
     const road = mode === 'grid' ? await bootSignalRoad(page, faults, frames, roadDeadline) : null;
     const result = { mode, phases, frames, gameplayFrames, stalls, playStall, gridWaits: gridWaits.samples, templateRoad, road, telemetryPosts, lifecycleReports, gridNavigationObserved, elapsedMs: Date.now() - started, ...await page.evaluate(bootObservation), faults, reports };
     if (faults.length > 0 || result.fatal.length > 0) throw new Error(JSON.stringify(result));
-    if (afterGameplay !== null) await afterGameplay(page);
-    if (faults.length > 0) throw new Error(JSON.stringify(faults));
     writeFileSync(join(out, `${receipt}.json`), `${JSON.stringify(result, null, 2)}\n`);
     return result;
   } catch (error) {

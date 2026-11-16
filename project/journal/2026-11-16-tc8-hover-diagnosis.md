@@ -83,3 +83,13 @@ true before the failure receipt. Live gameplay frames can precede the
 async equipment entry owner. The hover journey now waits at most10s for
 the actual owned/enabled board and allowed input before tapping. The
 mount/model/unmount checks keep their10s deadlines; no state is assigned.
+
+The retained JSON from readiness rerun43825443319 shows the full cause:
+boot's final state is `dead` after slow software PNG capture, before the
+hover callback. Equipment readiness alone is insufficient. The entered
+gameplay callback now runs immediately after the real ten live frames,
+before capture can spend tens of wall seconds letting enemies attack an
+idle rider. This is the only non-null callback consumer; ordinary smoke
+and cooked-store calls keep their behavior. The native PNG and its
+deadline remain an independent boot check. No clock, enemy or health
+state is modified. Re-run actual Template to verify this ordering.
