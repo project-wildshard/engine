@@ -10,7 +10,7 @@ import {observerCommand} from '../scripts/mmo-observer-client.mjs';
 const cleanups:(()=>void|Promise<void>)[]=[];
 afterEach(async()=>{for(const cleanup of cleanups.splice(0).reverse())await cleanup();});
 function folder(){
- const root=resolve('tmp/codex-netlag',`child-${randomUUID()}`);mkdirSync(root);
+ const root=resolve(process.env['VITEST_TMP_ROOT']??'tmp/vitest',`child-${randomUUID()}`);mkdirSync(root,{recursive:true});
  cleanups.push(()=>rmSync(root,{recursive:true}));return root;
 }
 function fileReady(path:string){return new Promise<void>((ready,reject)=>{

@@ -11,8 +11,10 @@ async function fixture(){
  const release={channel:'staging',serial:1,saveEpoch:1,engineBuild:'a'.repeat(40),shards:[{slug:'driftwood-isle',revision:1}],
   socket:'ws://127.0.0.1:37900/',bundle:{name:'v0.1.0/server.tar.gz',sha256:createHash('sha256').update(bytes).digest('hex')}};
  const state={release,health:{build:release.engineBuild,serial:1,players:0,cells:1,workers:2},bytes,signature:null as string|null,
-  bundleReads:0,healthReads:0,chunked:false,requested:null as (()=>void)|null,unavailable:false};
+  bundleReads:0,healthReads:0,redirectReads:0,redirect:null as string|null,chunked:false,requested:null as (()=>void)|null,unavailable:false};
  const server=createServer((request,response)=>{
+  if(request.url===state.redirect){response.writeHead(302,{location:'/redirect-target'}).end();return;}
+  if(request.url==='/redirect-target'){state.redirectReads++;response.end(JSON.stringify(state.health));return;}
   if(request.url==='/hang'){state.requested?.();return;}
   if(request.url==='/release.json'){
    if(state.unavailable){response.writeHead(503).end();return;}
@@ -109,4 +111,20 @@ test('an ordinary endpoint outage remains distinguishable from authenticated ref
 test('remote overrides cannot select production or unrelated observation hosts',()=>{
  assert.throws(()=>observationInputs({publicKey:'00',releaseUrl:'https://packs.wildshard.io/releases/production.json'}),/staging only/u);
  assert.throws(()=>observationInputs({publicKey:'00',healthUrl:'https://example.test/health'}),/staging only/u);
+});
+
+
+for(const path of ['/release.json','/health'])test(`unsigned redirect from ${path} never reaches its destination`,async()=>{
+ const {state,options}=await fixture();state.redirect=path;
+ await assert.rejects(observationInputs(options).read());assert.equal(state.redirectReads,0);
+});
+
+
+test('seat headroom subtracts only native observers already playing on this serial',async()=>{
+ const {state,options}=await fixture(),input=observationInputs(options);state.health.players=12;
+ assert.equal((await input.read()).reason,'seats');
+ assert.equal((await input.read(undefined,[1,1])).ready,true);
+ assert.equal((await input.read(undefined,[2,2])).reason,'seats');
+ state.health.players=13;assert.equal((await input.read(undefined,[1,1])).reason,'seats');
+ await assert.rejects(input.read(undefined,[1,1,1]),/generations/u);
 });

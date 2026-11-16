@@ -12,6 +12,13 @@ export const sourceBuild=__BUILD_ID__;
 export function connect(socket:string,device:string,name:string):NativeObserverBot{
  botTarget(socket,'own',2);
  const bot=new RoomBot(socket,sourceBuild,device,name);
+ // The native decoder deletes a genuine zero-valued owned event from its map.
+ // Observe these exact writes; absence before a coin event is not a measured zero.
+ const owned=bot.client.owned,write=owned.set,remove=owned.delete,clear=owned.clear;
+ let coins:number|null=null;
+ owned.set=(key,value)=>{if(key===OWNED_ROW.coins)coins=value;return write.call(owned,key,value);};
+ owned.delete=key=>{if(key===OWNED_ROW.coins)coins=0;return remove.call(owned,key);};
+ owned.clear=()=>{coins=null;clear.call(owned);};
  let closedAt:number|null=null,checkpoint:DurableCheckpoint|null=null;
  const control=bot.transport.onControl((kind,bytes)=>{if(kind==='world')checkpoint=checkpointFrom(bytes)??checkpoint;});
  const off=bot.transport.onClose(()=>{closedAt=performance.now();});
@@ -19,10 +26,10 @@ export function connect(socket:string,device:string,name:string):NativeObserverB
   read:()=>{
    const frame=bot.client.latest,owner=frame===null?null:bot.client.owner(frame);
    return {tick:frame?.tick??null,stand:owner===null?null:{x:Number(owner['px']),z:Number(owner['pz'])},
-    coins:frame===null?null:bot.coins(OWNED_ROW.coins),checkpoint,closed:bot.closed,closedAt};
+    coins:frame===null?null:coins,checkpoint,closed:bot.closed,closedAt};
   },
   move:()=>{bot.thumb=tick=>({viewTick:0,steer:{keyX:0,keyY:1,stickX:0,stickY:0},yaw:tick/90,pitch:0,buttons:0});},
-  close:()=>{control();off();bot.drop();},
+  close:()=>{control();off();owned.set=write;owned.delete=remove;owned.clear=clear;bot.drop();},
  };
 }
 

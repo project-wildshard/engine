@@ -11,7 +11,7 @@ import type {PreparedObserver} from './releaseObserver';
 /** Actual native entry, bundled exactly as the archived-source builder bundles it. */
 export async function nativeObserverClient():Promise<PreparedObserver>{
  const sourceBuild=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
- const output=resolve('tmp/codex-netlag',`native-observer-${randomUUID()}`);
+ const output=resolve(process.env['VITEST_TMP_ROOT']??'tmp/vitest',`native-observer-${randomUUID()}`);
  mkdirSync(output,{recursive:true});
  const require=createRequire(resolve('package.json'));
  const file=resolve(output,'client.mjs');

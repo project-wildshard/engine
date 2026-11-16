@@ -19,9 +19,9 @@ export class ObservationRefusedError extends Error{
 }
 
 /** One response must fit the budget even when Content-Length is absent or false.
- * @param {string|URL} url @param {number} maximum @param {AbortSignal} signal */
-async function bounded(url,maximum,signal){
- const response=await fetch(url,{cache:'no-store',signal});
+ * @param {string|URL} url @param {number} maximum @param {AbortSignal} signal @param {boolean} [artifact] */
+async function bounded(url,maximum,signal,artifact=false){
+ const response=await fetch(url,{cache:'no-store',signal,redirect:artifact?'follow':'error'});
  if(!response.ok){await response.body?.cancel();throw new Error(`Observation input refused HTTP ${response.status}`);}
  const length=response.headers.get('content-length');
  if(length!==null&&(!/^\d+$/u.test(length)||!whole(Number(length))||Number(length)>maximum)){
@@ -65,8 +65,9 @@ export function observationInputs(options){
  /** @type {Set<string>} */const verified=new Set();
  return {
   /** Verify signature, destination, artifact and health before any native hello.
-   * @param {AbortSignal} [signal] */
-  async read(signal){
+   * @param {AbortSignal} [signal] @param {readonly number[]} [liveGenerations] */
+  async read(signal,liveGenerations=[]){
+   if(liveGenerations.length>2||liveGenerations.some(serial=>!whole(serial)))throw new Error('Invalid observer live generations');
    const signals=[AbortSignal.timeout(timeoutMs)];
    if(options.signal!==undefined)signals.push(options.signal);
    if(signal!==undefined)signals.push(signal);
@@ -85,7 +86,7 @@ export function observationInputs(options){
    if(pieces.length!==2||pieces.some(piece=>!SEGMENT.test(piece)))throw new ObservationRefusedError('bundle-path');
    const key=JSON.stringify([release.engineBuild,release.bundle.name,release.bundle.sha256]);
    if(!verified.has(key)){
-    const bytes=await bounded(`${bundleOrigin.href.replace(/\/$/u,'')}/${release.bundle.name}`,maxArtifactBytes,deadline);
+    const bytes=await bounded(`${bundleOrigin.href.replace(/\/$/u,'')}/${release.bundle.name}`,maxArtifactBytes,deadline,true);
     if(createHash('sha256').update(bytes).digest('hex')!==release.bundle.sha256)throw new ObservationRefusedError('bundle-hash');
     if(verified.size===8){const oldest=verified.values().next().value;if(oldest!==undefined)verified.delete(oldest);}
     verified.add(key);
@@ -95,8 +96,9 @@ export function observationInputs(options){
    try{health=JSON.parse(healthText);}catch(error){throw new ObservationRefusedError('health-metadata',error);}
    if(typeof health!=='object'||health===null||typeof health.build!=='string'||!BUILD.test(health.build)||!whole(health.serial)||!whole(health.players)||!whole(health.cells)||!whole(health.workers))
     throw new ObservationRefusedError('health-metadata');
+   const joining=2-liveGenerations.filter(serial=>serial===release.serial).length;
    const reason=health.build!==release.engineBuild?'health-build':health.serial!==release.serial?'health-serial':
-    health.cells===0||health.workers===0?'health-starting':health.players+2+4>16?'seats':null;
+    health.cells===0||health.workers===0?'health-starting':health.players+joining+4>16?'seats':null;
    return {release,health:{build:health.build,serial:health.serial,players:health.players,cells:health.cells,workers:health.workers},ready:reason===null,reason,verifiedBundle:true};
   },
  };

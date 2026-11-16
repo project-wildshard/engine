@@ -6,5 +6,5 @@ export interface ObservationInputOptions {
  timeoutMs?:number;maxArtifactBytes?:number;signal?:AbortSignal;
 }
 export function observationInputs(options:ObservationInputOptions):{
- read:(signal?:AbortSignal)=>Promise<{release:ReleaseFile;ready:boolean;reason:string|null;health:{build:string;serial:number;players:number;cells:number;workers:number};verifiedBundle:true}>;
+ read:(signal?:AbortSignal,liveGenerations?:readonly number[])=>Promise<{release:ReleaseFile;ready:boolean;reason:string|null;health:{build:string;serial:number;players:number;cells:number;workers:number};verifiedBundle:true}>;
 };

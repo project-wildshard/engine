@@ -16,11 +16,12 @@ export interface ObservationSnapshot {
 }
 export interface PreparedObserver {
  readonly sourceBuild:string;
+ readonly harness?:Readonly<Record<string,string>>;
  readonly connect:(socket:string,device:string,name:string)=>NativeObserverBot;
  readonly dispose?:()=>Promise<void>;
 }
 export interface ObserverOptions {
- readonly read:(signal:AbortSignal)=>Promise<ObservationSnapshot>;
+ readonly read:(signal:AbortSignal,liveGenerations?:readonly number[])=>Promise<ObservationSnapshot>;
  readonly prepare:(snapshot:ObservationSnapshot,signal:AbortSignal)=>Promise<PreparedObserver>;
  readonly devices:readonly [string,string];
  readonly labels?:readonly [string,string];
@@ -34,16 +35,19 @@ interface Session {
  before:NativeReading|null;closeAt:number|null;closeReason:string|null;backMs:number|null;
 }
 /** A stricter checkpoint comparison may be inconclusive after legitimate progress changes. */
-function continuityOf(sessions:readonly Session[]):{kind:'restored'|'lost'|'unknown';reason:string|null}{
+function continuityOf(sessions:readonly Session[],targetSerial:number):{kind:'restored'|'lost'|'unknown';reason:string|null}{
  if(sessions.length!==2)return {kind:'unknown',reason:'missing-durable-witness'};
  for(const session of sessions){
+  if(session.generation!==targetSerial||session.attempts<2||session.closeAt===null)return {kind:'unknown',reason:'redial-incomplete'};
   const before=session.before,after=session.latest,old=before?.checkpoint,next=after?.checkpoint;
   if(before===null||after===null||old===undefined||old===null||next===undefined||next===null)
    return {kind:'unknown',reason:'missing-durable-witness'};
+  if(before.coins===null||after.coins===null)return {kind:'unknown',reason:'missing-native-coins'};
   if(next.shard!==old.shard)return {kind:'unknown',reason:'checkpoint-shard-changed'};
   if(next.seq<old.seq||next.ledgerSerial<old.ledgerSerial||
    (before.coins!==null&&after.coins!==null&&after.coins<before.coins)||
    (next.seq===old.seq&&next.progressHash!==old.progressHash))return {kind:'lost',reason:'checkpoint-progress-lost'};
+  if(next.seq===old.seq)return {kind:'unknown',reason:'no-drain-checkpoint'};
   if(next.progressHash!==old.progressHash)return {kind:'unknown',reason:'checkpoint-progress-changed'};
  }
  return {kind:'restored',reason:null};
@@ -78,18 +82,21 @@ export async function observeRelease(options:ObserverOptions){
   if(target!==null&&session.generation===target.release.serial&&session.moved&&session.backMs===null&&session.closeAt!==null)
    session.backMs=Math.max(0,Math.round(performance.now()-session.closeAt));
  };
- const report=(status:Status,reason:string|null)=>({
+ const outcome:{current:{status:Status;reason:string|null;continuity:'restored'|'lost'|'unknown'}|null}={current:null};
+ function report(status:Status,reason:string|null,continuity:'restored'|'lost'|'unknown'='unknown'){
+ const result={
   status,reason,from:baseline===null?null:mark(baseline.release),to:target===null?null:mark(target.release),
-  clientBuild:prepared?.sourceBuild??null,elapsedMs:Math.round(performance.now()-started),
-  continuity:target===null?'unknown' as const:continuityOf(sessions).kind,failedSaves:null,
+  clientBuild:prepared?.sourceBuild??null,clientHarness:prepared?.harness??null,elapsedMs:Math.round(performance.now()-started),
+  continuity,failedSaves:null,
   checkpointCoverage:['quest-book','owned-store','ledger','native-coins'] as const,
   saveCompletionTime:null,peerWorkers:{kind:'whole-release' as const,untouchedWorkerEvidence:null},
   bots:sessions.map(session=>({label:session.label,attempts:session.attempts,before:session.before,
    after:session.generation===target?.release.serial?session.latest:null,closeReason:session.closeReason,
    backToMovingObservedMs:session.backMs})),faults,
- });
+ };outcome.current=result;return result;
+ }
  const read=async():Promise<ObservationSnapshot|null>=>{
-  try{return await options.read(signal);}
+  try{return await options.read(signal,sessions.filter(session=>session.latest?.tick!==undefined&&session.latest.tick!==null&&session.latest.closed===null).map(session=>session.generation));}
   catch(error){
    if(error instanceof ObservationRefusedError)throw error;
    if(!signal.aborted&&faults.length<16)faults.push('input-unavailable');
@@ -155,20 +162,26 @@ export async function observeRelease(options:ObserverOptions){
    for(const session of sessions)sample(session);
    const targetSerial=target?.release.serial;
    if(targetSerial!==undefined&&sessions.every(session=>session.generation===targetSerial&&session.moved&&session.latest?.closed===null))
-    {const proof=continuityOf(sessions);return report(proof.kind==='restored'?'observed':proof.kind==='lost'?'failed':'inconclusive',proof.reason);}
+    {const proof=continuityOf(sessions,targetSerial);
+     if(proof.reason!=='missing-durable-witness'&&proof.reason!=='missing-native-coins')
+      return report(proof.kind==='restored'?'observed':proof.kind==='lost'?'failed':'inconclusive',proof.reason,proof.kind);
+    }
    await pause(pollMs,undefined,{signal});
   }
   return report(options.signal?.aborted===true?'cancelled':'inconclusive',options.signal?.aborted===true?'cancelled':target===null?'no-release-change':'redial-incomplete');
  }catch(error){
   if(error instanceof ObservationRefusedError)return report('refused',error.code);
   if(signal.aborted)return report(options.signal?.aborted===true?'cancelled':'inconclusive',
-   options.signal?.aborted===true?'cancelled':baseline===null?'no-baseline':target===null?'no-release-change':'redial-incomplete');
+   options.signal?.aborted===true?'cancelled':baseline===null?'no-baseline':target===null?'no-release-change':continuityOf(sessions,target.release.serial).reason??'redial-incomplete');
   throw error;
  }finally{
   clearTimeout(timeout);
   const errors:unknown[]=[];
   for(const bot of owned.reverse())try{bot.close();}catch(error){errors.push(error);}
   try{await prepared?.dispose?.();}catch(error){errors.push(error);}
-  if(errors.length>0)throw new AggregateError(errors,'Observer cleanup failed');
+  if(errors.length>0){
+   if(outcome.current!==null){outcome.current.status='failed';outcome.current.reason='cleanup-failed';outcome.current.continuity='unknown';faults.push('cleanup-failed');}
+   else throw new AggregateError(errors,'Observer cleanup failed');
+  }
  }
 }

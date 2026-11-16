@@ -21,7 +21,7 @@ afterAll(async()=>{await prepared?.dispose?.();});
 
 const closers:(()=>Promise<void>)[]=[];
 afterEach(async()=>{for(const close of closers.splice(0).reverse())await close();});
-async function fixture(durable=false,loseProgress=false,shard=durable?'blender-template':'driftwood-isle',changeProgress=false){
+async function fixture(durable=false,loseProgress=false,shard=durable?'blender-template':'driftwood-isle',changeProgress=false,staleCheckpoint=false){
  let restart:()=>void=()=>{throw Error('No promotion installed');};
  const database=durable?await openPglite():null;
  if(database!==null){closers.push(database.close);await migrate(database);}
@@ -47,13 +47,13 @@ async function fixture(durable=false,loseProgress=false,shard=durable?'blender-t
  const keys=generateKeyPairSync('ed25519'),bytes=Buffer.from('signed observation fixture artifact');
  const release={channel:'staging' as const,serial:1,saveEpoch:1,engineBuild:sourceBuild,shards:[{slug:shard,revision:1}],
   socket:first.url,bundle:{name:'v0.1.0/server.tar.gz',sha256:createHash('sha256').update(bytes).digest('hex')}};
- const state={signature:null as string|null,healthSerial:null as number|null,hang:false,requested:null as (()=>void)|null};
+ const state={signature:null as string|null,healthSerial:null as number|null,healthBuild:null as string|null,hang:false,requested:null as (()=>void)|null};
  const server=createServer((request,response)=>{
   if(state.hang){state.requested?.();return;}
   if(request.url==='/release.json'){
    const body=JSON.stringify(release);response.end(JSON.stringify({body,signature:state.signature??sign(null,Buffer.from(body),keys.privateKey).toString('hex')}));return;
   }
-  if(request.url==='/health'){response.end(JSON.stringify({...current.world.health(),serial:state.healthSerial??serial}));return;}
+  if(request.url==='/health'){response.end(JSON.stringify({...current.world.health(),build:state.healthBuild??current.world.health().build,serial:state.healthSerial??serial}));return;}
   if(request.url==='/v0.1.0/server.tar.gz'){response.end(bytes);return;}
   response.writeHead(404).end();
  });
@@ -75,6 +75,7 @@ async function fixture(durable=false,loseProgress=false,shard=durable?'blender-t
  const advanced=new Promise<void>((resolve,reject)=>{done=resolve;failed=reject;});
  restart=()=>{void (async()=>{
   assert.equal(await first.world.drain(),true);await first.close();firstClosed=true;
+  if(staleCheckpoint&&database!==null)await database.query('update player_save set seq = 1');
   if(loseProgress&&database!==null){
    const saved=await saves.read('device:observer-probe-0',shard);
    if(saved.doc===null)throw Error('Missing durable loss control');
@@ -88,7 +89,7 @@ async function fixture(durable=false,loseProgress=false,shard=durable?'blender-t
   read:async()=>(await inputs.read()).release,failed:error=>{throw error;},
   changed:async next=>{first.world.beginGrace(next.engineBuild);}});
  closers.push(()=>{watcher.dispose();return Promise.resolve();});
- return {release,state,options,playing,counts:()=>({disposed,connections,closed}),
+ return {release,state,options,playing,announceWithoutRestart(){Object.assign(release,{serial:2,engineBuild:'b'.repeat(40)});state.healthSerial=2;state.healthBuild='b'.repeat(40);},counts:()=>({disposed,connections,closed}),
   async advance(){
    // The signed watch starts the real grace; its expiry drains and boots a new native World.
    if(changeProgress){
@@ -103,7 +104,7 @@ async function fixture(durable=false,loseProgress=false,shard=durable?'blender-t
 }
 
 test('two real native identities redial after signed serial/build change and clean every client',{timeout:120000},async()=>{
- const f=await fixture();const observed=observeRelease(f.options);
+ const f=await fixture();const observed=observeRelease({...f.options,durationMs:6000});
  await Promise.race([f.playing,observed.then(result=>{throw Error('No playing baseline: '+JSON.stringify(result));})]);await f.advance();const result=await observed;
  assert.equal(result.status,'inconclusive',JSON.stringify(result));assert.equal(result.reason,'missing-durable-witness');assert.deepEqual(result.from,{serial:1,build:sourceBuild});
  assert.deepEqual(result.to,{serial:2,build:'b'.repeat(40)});assert.equal(result.clientBuild,sourceBuild);
@@ -132,7 +133,7 @@ test('a mismatched prepared source refuses before native hellos',{timeout:120000
 
 test('native redial waits for the signed new health identity',{timeout:120000},async()=>{
  const f=await fixture();f.state.healthSerial=1;
- const observed=observeRelease(f.options);
+ const observed=observeRelease({...f.options,durationMs:6000});
  await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);
  await f.advance();
  await new Promise<void>(resolve=>{setTimeout(resolve,100);});
@@ -178,4 +179,30 @@ test('new persistent progress is inconclusive rather than guessed',{timeout:1200
  await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);await f.advance();
  const result=await observed;assert.equal(result.status,'inconclusive',JSON.stringify(result));
  assert.equal(result.reason,'checkpoint-progress-changed');assert.equal(result.continuity,'unknown');
+});
+
+
+test('a target without an actual native redial never claims restored continuity',{timeout:120000},async()=>{
+ const f=await fixture(true),observed=observeRelease({...f.options,durationMs:3000});
+ await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);
+ f.announceWithoutRestart();const result=await observed;
+ assert.equal(result.status,'inconclusive',JSON.stringify(result));assert.equal(result.continuity,'unknown');
+ assert.equal(result.reason,'redial-incomplete');assert.equal(result.to?.serial,2);
+ assert.deepEqual(result.bots.map(bot=>bot.attempts),[1,1]);
+});
+test('cleanup failure preserves a failed report after attempting every native close',{timeout:120000},async()=>{
+ const f=await fixture(),controller=new AbortController();
+ const result=await observeRelease({...f.options,signal:controller.signal,
+  prepare:async()=>({...await f.options.prepare(),dispose:async()=>{throw Error('Controlled cleanup failure');}}),
+  event:phase=>{if(phase==='baseline-playing')controller.abort();}});
+ assert.equal(result.status,'failed');assert.equal(result.reason,'cleanup-failed');assert.equal(result.continuity,'unknown');
+ assert.equal(f.counts().closed,2);assert.ok(result.faults.includes('cleanup-failed'));
+});
+
+
+test('a redial without a newer durable checkpoint stays inconclusive',{timeout:120000},async()=>{
+ const f=await fixture(true,false,'blender-template',false,true),observed=observeRelease(f.options);
+ await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);await f.advance();
+ const result=await observed;assert.equal(result.status,'inconclusive',JSON.stringify(result));
+ assert.equal(result.reason,'no-drain-checkpoint');assert.equal(result.continuity,'unknown');
 });

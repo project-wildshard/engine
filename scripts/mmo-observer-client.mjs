@@ -1,6 +1,6 @@
 // E7.2c.b.2: native clients from the authenticated baseline's exact Git source.
 import {spawn} from 'node:child_process';
-import {randomUUID} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {copyFileSync,createWriteStream,existsSync,mkdirSync,readFileSync,rmSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
@@ -60,21 +60,26 @@ export async function prepareObserverClient(snapshot,signal,{root,work}){
   if(code!==0)throw new Error(`Observer client ${command} refused with exit ${code}`);
  };
  const dispose=()=>{
-  if(existsSync(tree)){
+  const failures=[];
+  try{if(existsSync(tree)){
    // Only processes in this unique owned archive tree; never a pattern kill.
    stopWorktreeProcesses(tree);
    rmSync(tree,{recursive:true});
-  }
-  for(const path of [out,archive])if(existsSync(path))rmSync(path,{recursive:true});
-  return Promise.resolve();
+  }}catch(error){failures.push(error);}
+  for(const path of [out,archive])try{if(existsSync(path))rmSync(path,{recursive:true});}catch(error){failures.push(error);}
+  return failures.length===0?Promise.resolve():Promise.reject(new AggregateError(failures,'Observer source cleanup failed'));
  };
  try{
   const present=await observerCommand('git',['cat-file','-e',`${build}^{commit}`],{cwd:root,signal,log});
   if(present!==0)await run('git',['fetch','--quiet','origin',build],root);
   await run('git',['archive','--format=tar','--output',archive,build],root);
   await run('tar',['-xf',archive,'-C',tree],root);rmSync(archive);
-  for(const name of ['roomBot.ts','mmoBotsGuard.ts','releaseObserverBot.ts'])
-   copyFileSync(join(root,'test/fixtures/dedicated',name),join(tree,'test/fixtures/dedicated',name));
+  /** @type {Record<string,string>} */const harness={};
+  for(const name of ['roomBot.ts','mmoBotsGuard.ts','releaseObserverBot.ts']){
+   const source=join(root,'test/fixtures/dedicated',name);
+   harness[name]=createHash('sha256').update(readFileSync(source)).digest('hex');
+   copyFileSync(source,join(tree,'test/fixtures/dedicated',name));
+  }
   const use=`MMO observer install ${randomUUID()}`;
   const install=[
    "import {spawnSync} from 'node:child_process';",
@@ -87,6 +92,6 @@ export async function prepareObserverClient(snapshot,signal,{root,work}){
    '--entry','releaseObserverBot=test/fixtures/dedicated/releaseObserverBot.ts'],tree);
   const module=await import(pathToFileURL(join(out,'releaseObserverBot.mjs')).href);
   if(module.sourceBuild!==build||typeof module.connect!=='function')throw new Error('Compiled observer source identity differs');
-  return {sourceBuild:module.sourceBuild,connect:module.connect,dispose};
+  return {sourceBuild:module.sourceBuild,connect:module.connect,harness,dispose};
  }catch(error){await dispose();throw error;}
 }

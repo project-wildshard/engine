@@ -30,7 +30,7 @@ export function observerIdentities(base){
   writeFileSync(path,JSON.stringify(devices),{mode:0o600,flag:'wx'});
  }
  const file=lstatSync(path);
- if(!file.isFile()||file.isSymbolicLink()||(file.mode&0o077)!==0||file.uid!==process.getuid?.())
+ if(!file.isFile()||file.isSymbolicLink()||file.size>512||(file.mode&0o077)!==0||file.uid!==process.getuid?.())
   throw new Error('Observer identity file must be an owned private regular file');
  const devices=JSON.parse(readFileSync(path,'utf8'));
  if(!Array.isArray(devices)||devices.length!==2||devices.some(value=>typeof value!=='string'||!/^device:observer-[a-f0-9-]{36}$/u.test(value))||devices[0]===devices[1])
@@ -57,7 +57,7 @@ export async function runObserver(args,root=ROOT){
  const inputs=observationInputs({publicKey}),cancel=new AbortController();
  const stop=()=>{cancel.abort();};process.once('SIGINT',stop);process.once('SIGTERM',stop);
  try{
-  const report=await observeRelease({read:signal=>inputs.read(signal),
+  const report=await observeRelease({read:(signal,liveGenerations)=>inputs.read(signal,liveGenerations),
    prepare:async(snapshot,signal)=>{try{return await prepareObserverClient(snapshot,signal,{root,work});}
     catch(error){if(signal.aborted)throw signal.reason;throw new ObservationRefusedError('client-prepare',error);}},
    devices:observerIdentities(realBase),
