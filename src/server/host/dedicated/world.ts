@@ -181,6 +181,8 @@ export class World {
   private readonly entries = new Map<string, { readonly from: string; readonly to: string; readonly at: ResumeAt }>();
   /** ZE9c: entries whose socket went mid-load: a redial while the road still holds the frozen body is seated in the cell past its gate. */
   private readonly redials = new Map<string, { readonly from: string; readonly to: string; readonly at: ResumeAt }>();
+  /** ZE9b: entries whose page said `ready` and whose move is under way: the cell, so a move the worker refuses is answered to the page. */
+  private readonly moving = new Map<string, string>();
   private asked = 0;
   /** SA33: cells whose late worker is booting, so a second open of the same cell boots nothing. */
   private readonly booting = new Set<string>();
@@ -293,6 +295,8 @@ export class World {
     return opened;
   }
   private heard(index: number, news: WorkerNews): void {
+    // ZE9c review: the road let a held body go: no redial can arrive for it now
+    if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from !== undefined && this.redials.get(news.device)?.from === from) this.redials.delete(news.device); }
     if (news.kind === 'found') { this.finds.get(news.id)?.(news); this.finds.delete(news.id); }
     // GO7: a late `left` from the cell a goto moved them out of must not unseat them (or free their Name) in the new one.
     // GC15: a crossing's source lets the seat go before `crossed` says where it went: the seat stays counted until then.
@@ -317,7 +321,7 @@ export class World {
     else if (news.kind === 'drained') { this.drains.get(index)?.(); this.drains.delete(index); }
     else if (news.kind === 'crossing') void this.crossing(news.slug, news.device, news.to, news.at);
     else if (news.kind === 'entering') void this.entering(news.slug, news.device, news.to, news.at);
-    else if (news.kind === 'handedOut') { if (!news.out && this.outs.get(news.device)?.from === news.from) { this.outs.delete(news.device); this.abandon(news.device, news.from); this.thaw(news.from, news.device); } }
+    else if (news.kind === 'handedOut') { if (!news.out && this.outs.get(news.device)?.from === news.from) { this.outs.delete(news.device); this.abandon(news.device, news.from); this.thaw(news.from, news.device, this.moving.get(news.device), 'refused'); this.moving.delete(news.device); } }
     else if (news.kind === 'crossed') {
       const begun = this.crossings.get(news.device);
       if (begun !== undefined) this.options.crossed?.(diagnosticNow() - begun, news.moved);
@@ -326,8 +330,9 @@ export class World {
       if (this.seated.get(news.device) === news.from) {
         if (news.moved) { this.seated.set(news.device, news.to); this.names.set(news.device, news.name); this.voiceBodies.get(news.device)?.(news.body); }
         else if (!news.stays) { this.seated.delete(news.device); this.names.delete(news.device); }
-        else this.thaw(news.from, news.device);
+        else this.thaw(news.from, news.device, this.moving.get(news.device), 'refused');
       }
+      this.moving.delete(news.device);
       this.options.log({ at: 'cell.crossed', index, device: news.device, from: news.from, to: news.to, moved: news.moved });
     }
   }
@@ -461,6 +466,8 @@ export class World {
     this.redials.delete(device);
     const arrival = redial !== undefined && redial.from === holding && this.links.has(redial.to) ? redial : undefined;
     const aim = arrival?.to ?? goto;
+    // a redial that can't go on into the cell (the road no longer holds it, or the cell went): the frozen body plays on
+    if (redial !== undefined && arrival === undefined) this.thaw(redial.from, device, redial.to);
     // DT4: the Name everyone sees and the secret-keyed body id; never the raw player id, which is a bearer credential
     this.devicePlayer(end, { name: this.names.get(device) ?? typed, body });
     // GC15: a seat mid-crossing is in neither cell for the door to ask: the client dials again in a moment.
@@ -562,6 +569,7 @@ export class World {
     this.entries.set(device, entry);
     end.control('arrive', encodeArrive({ cell: to, at }));
     const readied = await new Promise<boolean>(resolve => {
+      if (!end.isOpen) { resolve(false); return; }
       const offs: (() => void)[] = [];
       const done = (ready: boolean): void => { for (const off of offs.splice(0)) off(); resolve(ready); };
       const timer = this.scope.timeout(this.options.readyMs ?? READY_MS, () => { done(false); });
@@ -576,9 +584,10 @@ export class World {
     if (!readied) { this.refuse('enter-timeout'); this.thaw(from, device, to, 'timeout'); return; }
     if (this.seated.get(device) !== from || this.draining) { this.thaw(from, device, to, 'moved'); return; }
     this.options.log({ at: 'cell.entering', device, from, to });
+    this.moving.set(device, to);
     await this.crossing(from, device, to, at);
     // the move never began (the door would not make it): the body plays on at the gate
-    if (!this.crossings.has(device) && this.seated.get(device) === from && !this.outs.has(device)) this.thaw(from, device, to, 'refused');
+    if (!this.crossings.has(device) && this.seated.get(device) === from && !this.outs.has(device)) { this.moving.delete(device); this.thaw(from, device, to, 'refused'); }
   }
   /** ZE9b: the zone entry of `device`, frozen on road `from`, is off: the road lets the body go, and the page hears why (if it still listens). */
   private thaw(from: string, device: string, to?: string, reason: string | null = null): void {
