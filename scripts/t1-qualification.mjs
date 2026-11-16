@@ -3,7 +3,7 @@
 // committed start date or a green report-wrapper exit.
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, appendFileSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { scratchDir } from './scratch-dir.mjs';
@@ -44,11 +44,18 @@ export function qualifiedT1Run(run, now, scope) {
 }
 /** @param {Parameters<typeof qualifiedT1Run>[0][]} runs @param {number} now @param {string} scope */
 export function t1Qualification(runs, now, scope) {
-  const qualified = [...new Map(runs.filter(run => qualifiedT1Run(run, now, scope)).map(run => [run.id, run])).values()]
+  const observed = [...new Map(runs.filter(run => Number.isSafeInteger(run.id) && /^[a-f0-9]{40}$/u.test(run.sha)
+    && run.event === 'push' && run.branch === 'main' && Number.isFinite(run.created) && run.created <= now
+    && run.created >= now - 7 * 24 * 60 * 60 * 1000 && run.receipts.some(row => row?.scope === scope
+      && row.complete === true && row.sha === run.sha && String(row.run) === String(run.id) && row.platform === 'linux'))
+    .map(run => [run.id, run])).values()];
+  const reds = observed.filter(run => !qualifiedT1Run(run, now, scope));
+  const lastRed = Math.max(-Infinity, ...reds.map(run => run.created));
+  const qualified = observed.filter(run => run.created > lastRed && qualifiedT1Run(run, now, scope))
     .sort((left, right) => left.created - right.created);
   const first = qualified.length === 0 ? null : Math.min(...qualified.map(run => Math.max(...run.receipts.map(row => row.started + row.wallMs))));
   const block = qualified.length >= 3 && first !== null && now - first >= WINDOW_MS;
-  return { version: 1, at: now, scope, block, first, runs: qualified.map(run => run.id), reason: block
+  return { version: 1, at: now, scope, block, first, redRuns: reds.map(run => run.id), runs: qualified.map(run => run.id), reason: block
     ? 'Three complete hosted main pushes and three report days proved'
     : 'Need three complete hosted main pushes and three report days' };
 }
@@ -89,12 +96,12 @@ export async function readT1Qualification(env, now = Date.now()) {
     candidates.push(...artifacts.filter(row => !row.expired && row.workflow_run?.head_branch === 'main'));
     if (data.artifacts.length < 100) break;
   }
-  // Probe the report-window boundary and recent pushes. This bounds API work
-  // on a busy repo; absent or inconclusive history keeps reporting.
+  // Read every receipt in the report window, plus its preceding anchor.
+  // The lookup deadline keeps incomplete history advisory.
   candidates.sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));
   const mature = candidates.filter(row => Date.parse(row.created_at) <= now - WINDOW_MS
-    && Date.parse(row.created_at) >= now - 7 * 24 * 60 * 60 * 1000).slice(0, 10);
-  const selected = [...new Map([...mature, ...candidates.slice(0, 10)].map(row => [row.id, row])).values()]
+    && Date.parse(row.created_at) >= now - 7 * 24 * 60 * 60 * 1000).slice(0, 1);
+  const selected = [...new Map([...mature, ...candidates.filter(row => Date.parse(row.created_at) > now - WINDOW_MS)].map(row => [row.id, row])).values()]
     .sort((left, right) => Date.parse(left.created_at) - Date.parse(right.created_at));
   const runs = [];
   for (const candidate of selected) {
@@ -119,8 +126,6 @@ export async function readT1Qualification(env, now = Date.now()) {
       receipts.push(JSON.parse(decoded.stdout));
     }
     runs.push({ id, sha: run.head_sha, created: Date.parse(run.created_at), event: run.event, branch: run.head_branch, receipts });
-    const result = t1Qualification(runs, now, scope);
-    if (result.runs.length >= 3) return result;
   }
   return t1Qualification(runs, now, scope);
 }
@@ -133,5 +138,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   const lane = process.env.WS_LANE_NAME ?? 'template-e2e-ci';
   const scratch = scratchDir(lane, 'Template qualification evidence', { env: { ...process.env, WS_LANE_NAME: lane } });
   writeFileSync(resolve(scratch, 'qualification.json'), `${JSON.stringify(result)}\n`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `blocking=${String(result.block)}\n`);
   console.log(`T1 qualification: ${result.block ? 'blocking' : 'report-only'}; ${result.reason}; ${result.runs.length} complete pushes`);
 }

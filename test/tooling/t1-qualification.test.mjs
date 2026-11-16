@@ -71,3 +71,15 @@ test('the shared policy blocks only with fresh matching three-day proof', () => 
   expect(activeT1Gate({ ...policy, runs: [1, 1, 1] }, scope, now)).toBe(false);
   expect(activeT1Gate(null, scope, now)).toBe(false);
 });
+
+test('a failed or incomplete main receipt resets the clean report window', () => {
+  const red = run(4, 2 * DAY);
+  Object.assign(red.receipts[3], { status: 1, verdict: 'fail' });
+  const greens = [run(1, 4 * DAY), run(2, 3.5 * DAY), run(3, 3.25 * DAY)];
+  const verdict = t1Qualification([...greens, red, run(5, DAY)], now, scope);
+  expect(verdict.block).toBe(false);
+  expect(verdict.redRuns).toEqual([4]);
+  expect(verdict.runs).toEqual([5]);
+  red.receipts.pop();
+  expect(t1Qualification([...greens, red], now, scope).block).toBe(false);
+});

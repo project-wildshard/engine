@@ -17,3 +17,11 @@ report receipt retains exit 1 rather than claiming pass. The restored
 phone suite is rerun after that drill. Current A content is absent, so
 no live receipt can yet promote the suite. Neither synthetic dates nor
 local Metal results qualify the hosted window.
+
+Final-land review: setup failures now write failed receipts; the workflow's
+advisory job policy covers download/install failures until qualification.
+A red or incomplete current-suite main receipt resets the report window.
+The collector reads every available receipt in that window and its anchor;
+incomplete lookups remain advisory. Product sharing follows the existing
+shard wall check, so suite setup is not charged to unrelated test shards.
+The rebased 15-test browser suite and focused checks passed locally.

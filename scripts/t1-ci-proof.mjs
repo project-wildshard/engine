@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// Preserve the actual result during Q4's report window. A hosted receipt,
-// rather than this wrapper's reporting exit, is the qualification evidence.
+// Preserve failures during Q4's report window, including setup failures.
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -16,38 +15,45 @@ export function t1Verdict(result, wallMs) {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const suite = process.env.WS_T1_SHARD;
-  if (suite === undefined || !Object.hasOwn(T1_SHARDS, suite)) throw new Error('WS_T1_SHARD must be A, B, C or D');
-  const dist = process.env.WS_T1_BUILD_DIR;
-  if (dist === undefined) throw new Error('A T1 CI shard requires the shared WS_T1_BUILD_DIR; it never builds a client');
-  const build = JSON.parse(readFileSync(resolve(dist, 'version.json'), 'utf8')).build;
-  if (typeof build !== 'string' || build === '') throw new Error('Shared client has no build id');
-  const sha = process.env.GITHUB_SHA;
-  const prefix = build.split('-')[0];
-  if (sha !== undefined && (!/^[a-f0-9]{40}$/u.test(sha) || !/^[a-f0-9]{7,40}$/u.test(prefix) || !sha.startsWith(prefix))) {
-    throw new Error('Shared T1 build does not belong to this source SHA');
-  }
+  const requested = process.env.WS_T1_SHARD;
+  const suite = requested !== undefined && Object.hasOwn(T1_SHARDS, requested) ? requested : 'unknown';
   const lane = process.env.WS_LANE_NAME ?? 'template-e2e-ci';
   const env = { ...process.env, WS_LANE_NAME: lane };
   const scratch = scratchDir(lane, 'Template suite shard receipts', { env });
   mkdirSync(resolve(scratch, 't1'), { recursive: true });
-  const scope = t1Scope();
+  const started = Date.now();
+  /** @type {string|null} */ let scope = null;
+  /** @type {string|null} */ let build = null;
+  /** @type {number|null} */ let status = null;
+  /** @type {string|null} */ let signal = null;
+  /** @type {string|null} */ let error = null;
   let reportOnly = true;
   try {
-    const qualification = JSON.parse(readFileSync(resolve(scratch, 'qualification.json'), 'utf8'));
-    reportOnly = !(process.env.CI && activeT1Gate(qualification, scope, Date.now()));
-  } catch { /* Absent history cannot establish a qualification. */ }
-  const started = Date.now();
-  const command = ['scripts/t1-e2e.mjs', `--project=${suite}`, '--global-timeout=120000'];
-  const result = spawnSync(process.execPath, command, { stdio: 'inherit', env });
+    scope = t1Scope();
+    try {
+      const policy = JSON.parse(readFileSync(resolve(scratch, 'qualification.json'), 'utf8'));
+      reportOnly = !(process.env.CI && activeT1Gate(policy, scope, Date.now()));
+    } catch { /* Missing evidence keeps reporting. */ }
+    if (suite === 'unknown') throw new Error('WS_T1_SHARD must be A, B, C or D');
+    const dist = process.env.WS_T1_BUILD_DIR;
+    if (dist === undefined) throw new Error('A T1 CI shard requires the shared WS_T1_BUILD_DIR');
+    const candidate = JSON.parse(readFileSync(resolve(dist, 'version.json'), 'utf8')).build;
+    if (typeof candidate !== 'string' || candidate === '') throw new Error('Shared client has no build id');
+    build = candidate;
+    const sha = process.env.GITHUB_SHA, prefix = build.split('-')[0];
+    if (sha !== undefined && (!/^[a-f0-9]{40}$/u.test(sha) || !/^[a-f0-9]{7,40}$/u.test(prefix) || !sha.startsWith(prefix))) {
+      throw new Error('Shared T1 build does not belong to this source SHA');
+    }
+    const result = spawnSync(process.execPath, ['scripts/t1-e2e.mjs', `--project=${suite}`, '--global-timeout=120000'], { stdio: 'inherit', env });
+    status = result.status; signal = result.signal; error = result.error?.message ?? null;
+  } catch (caught) { error = caught instanceof Error ? caught.message : String(caught); }
   const wallMs = Date.now() - started;
-  const verdict = t1Verdict(result, wallMs);
+  const verdict = error === null ? t1Verdict({ status, signal }, wallMs) : 'fail';
   const receipt = { version: 1, suite, scope, complete: t1ContentReady(), sha: process.env.GITHUB_SHA ?? null, run: process.env.GITHUB_RUN_ID ?? null,
     event: process.env.GITHUB_EVENT_NAME ?? null, ref: process.env.GITHUB_REF ?? null,
-    started, build, platform: process.platform, wallMs, budgetMs: T1_BUDGET_MS,
-    status: result.status, signal: result.signal, error: result.error?.message ?? null, verdict, reportOnly };
+    started, build, platform: process.platform, wallMs, budgetMs: T1_BUDGET_MS, status, signal, error, verdict, reportOnly };
   writeFileSync(resolve(scratch, `t1/receipt-${suite}.json`), `${JSON.stringify(receipt)}\n`);
-  const line = `T1 ${suite}: ${verdict.toUpperCase()}, ${(wallMs / 1000).toFixed(1)}s / 120s, exit ${String(result.status)}, shared build ${build} (${reportOnly ? 'report-only' : 'blocking'})`;
+  const line = `T1 ${suite}: ${verdict.toUpperCase()}, ${(wallMs / 1000).toFixed(1)}s / 120s, exit ${String(status)}, shared build ${build ?? 'unavailable'} (${reportOnly ? 'report-only' : 'blocking'})`;
   console.log(line);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${line}\n`);
   if (verdict !== 'pass') {

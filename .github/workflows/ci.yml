@@ -66,6 +66,7 @@ jobs:
     outputs:
       reused-run: ${{ steps.reuse.outputs.run }}
       code-run: ${{ steps.code.outputs.run }}
+      t1-blocking: ${{ steps.t1-policy.outputs.blocking }}
     strategy:
       fail-fast: false
       matrix:
@@ -231,28 +232,6 @@ jobs:
             tmp/template-e2e-ci/t1/results/
           retention-days: 7
           if-no-files-found: ignore
-      # TEMPLATE-E2E T1E-2a: products already built Ring 1. Export those
-      # exact bytes plus the Template pin read by POI and memory-server probes.
-      - name: Bundle the shared Template suite build
-        if: steps.pack.outputs.products == 'true'
-        run: |
-          WS_LANE_NAME=template-e2e-ci node scripts/scratch-dir.mjs template-e2e-ci "Shared Ring-1 client and Template pin"
-      - name: Read the actual Template qualification receipts
-        if: steps.pack.outputs.products == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/t1-qualification.mjs
-      - name: Archive the shared Template build and qualification
-        if: steps.pack.outputs.products == 'true'
-        run: tar -cf tmp/template-e2e-ci/products.tar dist out/_template test/pins/saves tmp/template-e2e-ci/qualification.json
-      - name: Publish the shared Template suite build
-        if: steps.pack.outputs.products == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: template-e2e-products
-          path: tmp/template-e2e-ci/products.tar
-          retention-days: 3
-          if-no-files-found: error
       - name: Keep the recorded Ring 1 baseline
         if: inputs.record && steps.pack.outputs.products == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -289,6 +268,29 @@ jobs:
       - name: Record every shard's wall-budget verdict, artifact upload included (J193)
         if: always() && steps.code.outputs.run == 'true'
         run: node scripts/ci-pack.mjs --check-walls --job=${{ matrix.job }}
+      # TEMPLATE-E2E T1E-2a: products already built Ring 1. Export those
+      # exact bytes plus the Template pin read by POI and memory-server probes.
+      - name: Bundle the shared Template suite build
+        if: steps.pack.outputs.products == 'true'
+        run: |
+          WS_LANE_NAME=template-e2e-ci node scripts/scratch-dir.mjs template-e2e-ci "Shared Ring-1 client and Template pin"
+      - name: Read the actual Template qualification receipts
+        id: t1-policy
+        if: steps.pack.outputs.products == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/t1-qualification.mjs
+      - name: Archive the shared Template build and qualification
+        if: steps.pack.outputs.products == 'true'
+        run: tar -cf tmp/template-e2e-ci/products.tar dist out/_template test/pins/saves tmp/template-e2e-ci/qualification.json
+      - name: Publish the shared Template suite build
+        if: steps.pack.outputs.products == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: template-e2e-products
+          path: tmp/template-e2e-ci/products.tar
+          retention-days: 3
+          if-no-files-found: error
       # One run stands for every commit since the last finished run (was the verdict-coverage job; each share now
       # names the range and flags its own red, so a main push needs no extra job).
       - name: Name the commits this verdict covers
@@ -320,6 +322,7 @@ jobs:
     # products build; exact-reuse and docs-only runs create no second suite.
     needs: tests
     if: needs.tests.outputs.code-run == 'true'
+    continue-on-error: ${{ needs.tests.outputs.t1-blocking != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
