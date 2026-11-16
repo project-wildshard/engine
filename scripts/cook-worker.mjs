@@ -80,8 +80,9 @@ if (command === 'serve') {
 } else if (command === 'gc') {
   // PZ5: a carried build's book, parts and content stay on R2, so a build any channel still carries is never collected.
   const channels = await liveDeployBuilds();
-  const builds = [...new Set([...rest, ...channels.flatMap(row => row.builds)])];
-  console.log(JSON.stringify({ channels, ...await collectGarbage(store, builds, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES), Date.now()) }));
+  const required = channels.flatMap(row => row.builds);
+  const builds = [...new Set([...rest, ...required])];
+  console.log(JSON.stringify({ channels, ...await collectGarbage(store, builds, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES), Date.now(), undefined, required) }));
 } else if (command === 'report') {
   console.log(JSON.stringify(await storeUsage(store, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES))));
 } else {
