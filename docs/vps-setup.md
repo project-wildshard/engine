@@ -358,3 +358,36 @@ Cloudflare's [bucket creation instructions](https://developers.cloudflare.com/r2
 and [rclone settings](https://developers.cloudflare.com/r2/examples/rclone/)
 are the operator reference. Only Jake creates or installs these secrets.
 E7 retains today's network wire; wire v1 is separate work under J197.
+
+## Resident cell capacity (SERVER-CELLS SC9)
+
+Measured on the box, 2026-11-13, by `scripts/cell-mem-bench.mjs`
+with four workers: 1 / 2 / 8 / 16 / 25 resident cells used
+349 / 684 / 1,028 / 1,112 / 1,205 MB RSS with one bot in each.
+At 25 cells the old worker table reached 11.9 ms tick p95 and
+60 ticks/s. The cost-weighted table (`c3708f59`, SC8, 2026-11-14)
+reduced the worst worker to 8.6 ms p95, with 60 ticks/s on every
+worker and all 25 bots seated. Size workers by awake cost; these
+measurements do not establish a player cap or a 49-cell capacity.
+SC7 still owes the 49-cell matrix when those cells exist.
+
+Read-only recheck on 2026-11-16: production has 25 resident cells
+on four workers with an 18 GiB unit cap; staging has 26 (Thin Ice
+is placed) on two workers with a 6 GiB cap. Dormant cells stay
+resident and take no world ticks. The limits are memory per unit
+and awake work per worker, rather than the number of empty cells.
+
+Prometheus and the node exporter are live, loopback only; Prometheus
+scrapes both channels every 15 seconds and retains 15 days, without
+remote write. `METRICS_PORT` is 9790 on production and 9791 on
+staging. Query from `ssh wildshard-agent` using loopback curl; see
+meta `docs/architecture/monitoring.md` (SC2).
+
+The agent-read SC3 checks report sustained worker tick p95 above
+12 ms, rate below 55 ticks/s or worker loop lag p99 above 50 ms
+for five minutes; RSS above 60% of the unit cap (10.8 GiB production,
+3.6 GiB staging); or resident cells below the greater of 25 and the
+channel's six-hour peak. Read them with
+`python3 ~/.cache/wildshard/coord/metrics_checks.py` on the MacBook.
+Full measurements and the open 49-cell proof live in meta
+`docs/plans/SERVER-CELLS-PLAN.md`; estimates never count as that proof.
