@@ -67,7 +67,7 @@ test('a third discovery darkens B until C is installed and stale version replies
   await vi.waitFor(() => { expect(third.messages).toContainEqual({type: 'SKIP_WAITING'}); });
   expect(second.messages).not.toContainEqual({type: 'SKIP_WAITING'});
   third.state = 'activated'; third.dispatchEvent(new Event('statechange'));
-  await vi.waitFor(() => { expect(replace).toHaveBeenCalledExactlyOnceWith('/'); });
+  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }); expect(replace).not.toHaveBeenCalled(); // the URL is kept (Jake, 2026-11-15)
   expect(wsSw.waiting).toBeNull();
-  expect(container.register).not.toHaveBeenCalled(); expect(reload).not.toHaveBeenCalled();
+  expect(container.register).not.toHaveBeenCalled();
 });

@@ -47,11 +47,11 @@ test('RL5: a waiting worker that never finishes its precache still reloads hard 
   await vi.advanceTimersByTimeAsync(2900);
   expect(replace).not.toHaveBeenCalled(); expect(reload).not.toHaveBeenCalled();
   await vi.advanceTimersByTimeAsync(300);
-  expect(replace).toHaveBeenCalledExactlyOnceWith('/'); expect(reload).not.toHaveBeenCalled();
+  expect(reload).toHaveBeenCalledOnce(); expect(replace).not.toHaveBeenCalled(); // the URL is kept (Jake, 2026-11-15)
   expect(document.getElementById('ws-reloading')?.textContent).toContain('slow to switch over');
   // an offline page never skips waiting into a build whose code it does not hold (DL1)
   expect(waiting.messages).not.toContainEqual({ type: 'SKIP_WAITING' });
   // and a hand-over that lands later never navigates a second time
   await vi.advanceTimersByTimeAsync(10_000);
-  expect(replace).toHaveBeenCalledOnce();
+  expect(reload).toHaveBeenCalledOnce(); expect(replace).not.toHaveBeenCalled();
 });

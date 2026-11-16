@@ -46,7 +46,7 @@ test('QC3: the lit pill activates the waiting worker before it reloads, so the n
   // RL2 navigated here, in the tap's own turn: the old worker served the next document and the new one stayed waiting
   await Promise.resolve(); expect(replace).not.toHaveBeenCalled(); expect(reload).not.toHaveBeenCalled();
   waiting.state = 'activated'; waiting.dispatchEvent(new Event('statechange'));
-  await vi.waitFor(() => { expect(replace).toHaveBeenCalledExactlyOnceWith('/'); });
-  expect(reload).not.toHaveBeenCalled(); expect(window.__ws_sw?.waiting).toBeNull();
+  await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); }); expect(replace).not.toHaveBeenCalled(); // the URL is kept (Jake, 2026-11-15)
+  expect(window.__ws_sw?.waiting).toBeNull();
   expect(waiting.messages.filter(message => typeof message === 'object' && message !== null && 'type' in message && message.type === 'SKIP_WAITING')).toHaveLength(1);
 });

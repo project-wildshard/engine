@@ -9,7 +9,7 @@ afterEach(async () => {
   vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();
 });
 
-test('RL2 / QC3: one tap on the title adopts a waiting worker and loads a fresh title', async () => {
+test('RL2 / QC3: one tap on the title adopts a waiting worker and reloads where the page is', async () => {
   vi.useFakeTimers(); vi.stubGlobal('__BUILD_ID__', 'fixture-before');
   vi.stubGlobal('fetch', () => Promise.resolve(Response.json({ build: 'fixture-before' })));
   const replace = vi.fn<(url: string) => void>(), reload = vi.fn();
@@ -24,8 +24,9 @@ test('RL2 / QC3: one tap on the title adopts a waiting worker and loads a fresh 
   const pill = document.querySelector('.ws-update');
   if (!(pill instanceof HTMLButtonElement)) throw new Error('Missing update pill');
   pill.dispatchEvent(new Event('pointerup')); pill.click();
-  expect(adopt).toHaveBeenCalledExactlyOnceWith('/', 'update at title', expect.any(Number));
+  // Jake, 2026-11-15: the reload keeps the URL; adopt reloads in place (to undefined), never a fresh `/`
+  expect(adopt).toHaveBeenCalledExactlyOnceWith(undefined, 'update at title', expect.any(Number));
   await vi.advanceTimersByTimeAsync(150);
-  expect(replace).toHaveBeenCalledExactlyOnceWith('/'); expect(reload).not.toHaveBeenCalled();
+  expect(replace).not.toHaveBeenCalled(); expect(reload).not.toHaveBeenCalled();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
 });

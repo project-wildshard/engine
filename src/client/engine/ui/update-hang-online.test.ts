@@ -47,6 +47,6 @@ test('RL5: online, a precache still running at 2 s is skipped past, so the tap l
   expect(waiting.messages).not.toContainEqual({ type: 'SKIP_WAITING' });
   await vi.advanceTimersByTimeAsync(200);
   expect(waiting.messages).toContainEqual({ type: 'SKIP_WAITING' });
-  expect(replace).toHaveBeenCalledExactlyOnceWith('/'); expect(reload).not.toHaveBeenCalled();
+  expect(reload).toHaveBeenCalledOnce(); expect(replace).not.toHaveBeenCalled(); // the URL is kept (Jake, 2026-11-15)
   expect(document.getElementById('ws-reloading')?.textContent).not.toContain('slow to switch over');
 });

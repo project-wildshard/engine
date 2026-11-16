@@ -13,14 +13,15 @@ import { leaveAfterPaint } from '../boot/leaveAfterPaint';
  *
  * RL3: the tap's own turn turns the control into a loading button and puts the full-page RELOADING cover up
  * (src/client/engine/ui/reloadCover.ts), before the save, the worker or anything else is awaited. The cover stays until
- * the page unloads. RL2: on the title it loads a fresh `/`, anywhere else the page reloads where it is.
+ * the page unloads. The page reloads where it is, its path, query and hash kept (Jake, 2026-11-15: "Tap to reload does not
+ * respect the URL ... I was on /slug/blender-template"; this replaces RL2's fresh `/` on the title).
  * QC3: a waiting worker is activated first (SKIP_WAITING, then its `activated` state) so the next document is the new
  * build's. RL5: that hand-over gets RELOAD_FALLBACK_MS from the tap; past it the page reloads hard and the cover says so.
  * Nothing to adopt (no worker, or it retired) is a plain reload. Every path ends in a navigation, one painted frame after
  * the cover (leaveAfterPaint).
  */
 
-/** The title (or its menus) is up: the reload lands on a fresh `/` rather than where the page is. */
+/** The title (or its menus) is up: only what the next boot records differs; the reload keeps the URL either way. */
 export function titleShowing(): boolean {
   return document.querySelector('#hud.intro .ws-menu:not(.hide), #hud.intro .ws-main:not(.hide)') !== null;
 }
@@ -38,8 +39,7 @@ export function reloadForPlayer(control: HTMLElement | null, { newer = false, wh
     gone = true;
     leaveAfterPaint(() => {
       leftByPlayer(); markReload(reason);
-      if (title) location.replace('/');
-      else location.reload();
+      location.reload();
     });
   };
   if (sw === undefined) { leaveSaved(plain); return; }
@@ -49,7 +49,7 @@ export function reloadForPlayer(control: HTMLElement | null, { newer = false, wh
     // the hand-over ran out of time (not merely "nothing to adopt"): say so, in amber, on the way out
     const hard = (): void => { if (diagnosticNow() - tapped >= RELOAD_FALLBACK_MS - 50) reloadingLine(engineString('s_reloading_slow'), 'slow'); plain(); };
     if (left <= 0) { hard(); return; }
-    void sw.adopt(title ? '/' : undefined, reason, left)
+    void sw.adopt(undefined, reason, left)
       .then(sent => { if (sent) gone = true; else hard(); return undefined; }, hard);
   });
 }

@@ -73,7 +73,7 @@ test('R9 (R3 / R4): Reload in the pause menu answers in the tap\'s own turn with
   expect(location.reload).toHaveBeenCalledOnce();
 });
 
-test('R9 (QC3 / RL5): on the title, Reload offers a waiting worker the 3 s budget; one it cannot adopt is a fresh title', async () => {
+test('R9 (QC3 / RL5): on the title, Reload offers a waiting worker the 3 s budget; one it cannot adopt reloads where the page is', async () => {
   vi.useFakeTimers();
   const adopt = vi.fn((_to?: string, _why?: string, _within?: number) => Promise.resolve(false));
   Object.defineProperty(window, '__ws_sw', { configurable: true, value: { waiting: { state: 'installed' }, adopt } });
@@ -82,10 +82,11 @@ test('R9 (QC3 / RL5): on the title, Reload offers a waiting worker the 3 s budge
   tap(reload);
   expect(document.getElementById('ws-reloading')?.textContent).toContain('Switching to the new build');
   await vi.advanceTimersByTimeAsync(0);
-  expect(adopt).toHaveBeenCalledExactlyOnceWith('/', 'settings build: reload at title', expect.any(Number));
+  // Jake, 2026-11-15: a reload keeps the URL (a `/slug/<x>` page stays itself), never a fresh `/`
+  expect(adopt).toHaveBeenCalledExactlyOnceWith(undefined, 'settings build: reload at title', expect.any(Number));
   expect(adopt.mock.calls[0]?.[2]).toBeLessThanOrEqual(3000);
   await vi.advanceTimersByTimeAsync(150);
-  expect(location.replace).toHaveBeenCalledExactlyOnceWith('/'); expect(location.reload).not.toHaveBeenCalled();
+  expect(location.reload).toHaveBeenCalledOnce(); expect(location.replace).not.toHaveBeenCalled();
 });
 
 test('R9: offline, Check asks nothing and says it cannot check', async () => {
