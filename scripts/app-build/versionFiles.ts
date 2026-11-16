@@ -6,6 +6,7 @@ import { WILDSHARD_IDENTITY } from '../../src/client/game/identity';
 import { rendererRevision } from '../renderer-revision.mjs';
 import { engineRelease } from '../changelog.mjs';
 import { builtAtOf } from './builtAt.mjs';
+import { clientFloor } from './clientFloor';
 
 /** version.json's document for `build`, from the build root's package.json and save-epoch.json. `describe` is the pill's words
  *  (changelog.mjs `engineRelease`): STAGING-BUGBASH SB7, staging v0.1.31's pill read v0.1.31 while version.json, from the raw
@@ -16,7 +17,7 @@ export function versionJson(build: string, root: string = process.cwd()): { buil
   const WILDSHARD_PREPARATION_ONLY = process.env['WILDSHARD_PREPARATION_ONLY'];
   const epoch: unknown = JSON.parse(readFileSync(join(root, 'save-epoch.json'), 'utf8'));
   if (typeof epoch !== 'object' || epoch === null || !('saveEpoch' in epoch) || epoch.saveEpoch !== WILDSHARD_IDENTITY.saveEpoch) throw new Error('Save epoch metadata must match game identity');
-  return { build, clientVersion: client.version, minClient: '0.1.31', saveEpoch: WILDSHARD_IDENTITY.saveEpoch, rendererRevision: rendererRevision(), preparationOnly: WILDSHARD_PREPARATION_ONLY === '1', time: new Date(Number(builtAtOf(process.env['WS_BUILT_AT']))).toISOString(), describe: engineRelease(root).describe };
+  return { build, clientVersion: client.version, minClient: clientFloor(client.version), saveEpoch: WILDSHARD_IDENTITY.saveEpoch, rendererRevision: rendererRevision(), preparationOnly: WILDSHARD_PREPARATION_ONLY === '1', time: new Date(Number(builtAtOf(process.env['WS_BUILT_AT']))).toISOString(), describe: engineRelease(root).describe };
 }
 
 /** version.json (the build id, written into each document by build-app and never into content-hashed runtime modules, so

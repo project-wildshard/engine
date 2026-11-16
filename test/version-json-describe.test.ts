@@ -28,3 +28,11 @@ test('version.json names an untagged release build by its release, as the pill d
 test('version.json is written from the build root', () => {
   expect(versionJson('x', process.cwd()).clientVersion).toBe((JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { version: string }).version);
 });
+
+test.each([['0.1.29', '0.1.29'], ['0.1.30', '0.1.30'], ['0.1.31', '0.1.31'], ['0.1.32', '0.1.31'], ['0.2.0', '0.1.31']])('version.json for %s emits a floor it can boot under', (version, floor) => {
+  const repo = createTempRepo();
+  try {
+    repo.commit({ 'package.json': JSON.stringify({ version }), 'save-epoch.json': readFileSync('save-epoch.json', 'utf8') }, `chore(release): v${version}`);
+    expect(versionJson('main-build', repo.dir)).toMatchObject({ clientVersion: version, minClient: floor });
+  } finally { repo.cleanup(); }
+});
