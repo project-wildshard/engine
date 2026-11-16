@@ -23,7 +23,7 @@ import { Vector3 } from 'three';
 import { parsePromptRegistrations, createHeadlessPromptPicker } from '../../../shared/game/quest/interactionRows';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { GridAssembly } from '../../../shared/game/grid/assembly';
-import { carryMotion, GridSimulation } from '../grid/simulation';
+import { carryMotion, GridSimulation, motionOf } from '../grid/simulation';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { leadSnapshot, isSimHostRestoring, snapshotSimHost, regionalContinuation, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
@@ -830,7 +830,9 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     // The traveler is the highway's while the region is out, and the highway's five ticks move it as any tick does (a body
     // walking, or standing on a slope, goes on moving: meta MU6, opus-ssne1's meadow knoll). The restore must carry it in
     // exactly as the highway left it.
-    const player = leadSnapshot(snapshotSimHost(highway.host));
+    const player = leadSnapshot(snapshotSimHost(highway.host)), roadSeat = highway.host.players.get(player.id);
+    if (roadSeat === undefined) throw new Error('Author proof: missing highway traveler');
+    const roadMotion = JSON.stringify(motionOf(roadSeat));
     (await grid.prepare(null, instance)).commit();
     insist(regionalContinuation(resident.host) === continuation, 'regional continuation changed on restore');
     insist(loads === 2, 'restore did not create a fresh residency');
@@ -842,6 +844,9 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     for (let next = 0; next < plan.checkpointTick; next++) { baseline.host.step(leadCommands(baseline.host, inputAt(next, baseline))); healthy(baseline); }
     const travelled = resident.host.players.get(restoredPlayer.id), kept = baseline.host.players.get(restoredPlayer.id);
     if (travelled === undefined || kept === undefined) throw new Error('Author proof: missing traveler');
+    // The handoff copies the restored traveler, so the restore must have carried its motion as the highway left it.
+    insist(JSON.stringify(motionOf(travelled)) === roadMotion, `traveler motion changed on restore: ${JSON.stringify({ highway: JSON.parse(roadMotion) as unknown, restored: motionOf(travelled) })}`);
+    kept.health.restore(travelled.health.snapshot());
     kept.position.copy(travelled.position); kept.yaw = travelled.yaw;
     kept.motor.resetAt(kept.position); kept.motor.syncTransfer(travelled.motor, kept.position); carryMotion(travelled, kept);
     for (let next = plan.checkpointTick; next < plan.ticks; next++) { grid.step(inputAt(next, resident)); healthy(resident); }
