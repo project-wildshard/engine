@@ -453,6 +453,7 @@
   ],
   "files": [
     "../vitest.config.ts",
+    "../test/fixtures/dedicated/mmoBotsGuard.ts",
     "../vite/rapier.ts"
   ]
 }
