@@ -28,3 +28,17 @@ weak redirect control and diagnostic-selection gaps; all were fixed.
 The wall-budget correction also belongs to the earlier TC22 branch.
 This reader's land waits for TC22+TC28 to reach main with their own
 current exact hosted proofs. No local cook or deployment is performed.
+
+## Combined exact admission and sequential pin setup
+
+Main advanced twice while branch CI queued. The current reader branch
+already contains the cleanly rebased TC22+TC28 implementation, so all
+three rows now land together with current release, cook and HTTP proof
+at the same SHA. This replaces the earlier separate-land order above.
+
+The first land overlapped a still-running pins refresh. Generation read
+that incomplete input view and committed truncated boot stamps; normal
+pre-push refused the resulting dirt, so nothing reached origin. After
+pins completed, a second verified install and input generation restored
+all three files byte-for-byte to the pre-generation reader source.
+Keep this corrective commit as the audit trail; no hook was bypassed.
