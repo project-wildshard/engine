@@ -140,7 +140,7 @@ async function preparePage(ctx: ShardContext, rows: QuestPageRows, lent: Readonl
   const isItem = (id: string | undefined): id is ItemId => id !== undefined && id in ITEMS;
   const sfx = kit.sfx;
   kit.onEvent = sfx.bindEvents(rows.events, { toast: text => { h.hud.toast(text); },
-    item: id => isItem(id) ? { label: ITEMS[id].label, add: n => { h.inventory.add(id, n); } } : null,
+    item: id => { const row = isItem(id) ? ITEMS[id] : undefined; return row === undefined ? null : { label: row.label, add: n => { if (id !== undefined) h.inventory.add(id, n); } }; },
     calls: new Map([...rows.services.map(id => [id, () => { services.run(id); }] as const), ...collections]) });
   return { entry, rows, product, shell, world, h, scope, d, update, ironDrop, story, services, content, traderStall, flags, floorAt, place, setAnchor, anchors, kit,
     ui, scenes, pages, panel };
