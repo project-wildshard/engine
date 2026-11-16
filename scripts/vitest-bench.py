@@ -9,7 +9,8 @@ macOS and Linux includes every reaped descendant), the largest single-process ma
     python3 scripts/vitest-bench.py run [--out tmp/vitest-bench/results.json] [--slots 2] [FILE ...]
     python3 scripts/vitest-bench.py table [--in tmp/vitest-bench/results.json] [--top 30]
     python3 scripts/vitest-bench.py pack [--in ...] [--workers 4,5,6,10]
-    python3 scripts/vitest-bench.py observe [--count 3]   (passive census of real push gates)
+    python3 scripts/vitest-bench.py observe --out tmp/YOUR-LANE/census.json [--pid PID | --count 3]
+    (passive identity-aware census; sampled CPU lower bounds, not exact full-gate totals)
 
 `run` resumes: files already in the results JSON at the same commit are skipped. The bench is the machine's
 lowest-priority caller. It starts a file only while no full-test lease is held or queued, nobody else waits for
@@ -682,84 +683,114 @@ def command_pack(args):
                       'packedWallSeconds': {n: round(pack(net, n), 1) for n in args.workers}}, indent=1))
 
 
-def cpu_seconds(text):
-    """ps time text ([D-]H:MM:SS.ss or M:SS.ss) to seconds."""
-    days, _, text = text.rpartition('-')
-    parts = [float(part) for part in text.split(':')]
-    seconds = sum(value * 60 ** index for index, value in enumerate(reversed(parts)))
-    return seconds + (int(days) * 86400 if days else 0)
+# Match the executable and its entry script, not a wrapper that mentions the gate.
+# --pid remains available for launchers/options whose argv ps cannot disambiguate.
+GATE_ROOT = r'^(?:\S*/)?node(?:24)?(?:\s+--[^\s]+)*\s+(?:\S*/)?\.githooks/push-checks\.mjs(?:\s|$)'
+
+
+def gate_candidates(output, pattern):
+    roots = []
+    for line in output.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
+            pid, uid = map(int, parts[:2])
+            if pid > 1 and pid != os.getpid() and uid == os.getuid() and pattern.search(parts[2]):
+                roots.append(pid)
+    return sorted(set(roots))
+
+
+def choose_gate(roots):
+    if len(roots) > 1:
+        raise SystemExit('ambiguous gate roots; give --pid for the intended owner')
+    return roots[0] if roots else None
+
+
+def observe_root(args):
+    if args.pid is not None:
+        return args.pid
+    pattern = re.compile(args.root)
+    until = time.monotonic() + args.wait_seconds
+    while True:
+        try:
+            output = subprocess.run(['ps', '-axo', 'pid=,uid=,command='], check=True,
+                                    capture_output=True, text=True,
+                                    timeout=max(.05, min(5, until - time.monotonic()))).stdout
+        except subprocess.TimeoutExpired:
+            raise SystemExit('process inventory exceeded discovery deadline; give --pid or retry later')
+        root = choose_gate(gate_candidates(output, pattern))
+        if root is not None:
+            return root
+        if time.monotonic() >= until:
+            raise SystemExit('no matching gate before discovery deadline; give --pid or retry later')
+        time.sleep(min(args.interval, max(0, until - time.monotonic())))
+
+
+def census_summary(report, status):
+    start, end, cpu, cpu_by_kind, samples = None, None, 0, collections.Counter(), 0
+    with report.open() as reader:
+        for line in reader:
+            row = json.loads(line)
+            if row['type'] == 'start':
+                start = row
+            elif row['type'] == 'sample':
+                samples += 1
+                for process in row['processes']:
+                    delta = process['cpuDeltaNsLowerBound'] / 1e9
+                    cpu += delta
+                    cpu_by_kind[kind_of(process['name'])] += delta
+            elif row['type'] == 'end':
+                end = row
+    if start is None or end is None:
+        raise SystemExit(f'incomplete census; raw observation retained at {report}')
+    kinds = collections.Counter(kind_of(process['name']) for process in end['observedProcesses'])
+    return {'root': start['root'], 'startedAtMs': start['startedAtMs'],
+            'gateKind': 'unverified', 'rawReport': os.path.relpath(report, ROOT),
+            'observationWallSeconds': end['seconds'], 'sampledCpuSecondsLowerBound': cpu,
+            'averageObservedCpuCoresLowerBound': cpu / end['seconds'] if end['seconds'] else None,
+            'peakIntervalCpuCoresLowerBound': end['peak']['intervalCpuCoresLowerBound'],
+            'peakSummedRssMB': end['peak']['summedRssBytes'] / 2**20,
+            'peakProcesses': end['peak']['processes'], 'processes': len(end['observedProcesses']),
+            'processesByKind': dict(kinds), 'sampledCpuSecondsByKindLowerBound': dict(cpu_by_kind),
+            'remaining': end['remaining'], 'reason': end['reason'], 'incompleteReads': end['incompleteReads'],
+            'allObservedChildrenDrained': status == 0 and end['rootMeasured'] and not end['remaining']
+                                          and end['reason'] == 'observed tree drained',
+            'samples': samples, 'observerCpuSeconds': end['observerCpuNs'] / 1e9,
+            'limits': start['limits'],
+            'exactGateCpu': None,
+            'qualification': 'Not an exact full-gate total: attach full/split provenance and reaped-tree '
+                             'user/system rusage separately. A sampled empty tree does not prove '
+                             'that every short-lived descendant was observed.'}
 
 
 def command_observe(args):
-    """Passively census one real gate: every process under a root whose command matches --root, sampled with ps.
-    Records per-process peak cumulative user/total CPU (a process living under one interval is missed), peak summed
-    RSS, peak process count, and CPU parallelism over time. Runs nothing itself."""
-    log = lambda message: print(time.strftime('%H:%M:%S'), message, flush=True)
-    pattern = re.compile(args.root)
-    gates = 0
-    while gates < args.count:
-        roots = []
-        while not roots:
-            out = subprocess.run(['ps', '-axo', 'pid=,command='], capture_output=True, text=True).stdout
-            roots = [int(line.split(None, 1)[0]) for line in out.splitlines() if pattern.search(line) and 'vitest-bench' not in line]
-            if not roots:
-                time.sleep(args.interval)
-        root = min(roots)
-        log(f'observing gate root pid {root}')
-        began, seen, timeline, peak_rss, peak_procs = time.monotonic(), {}, [], 0, 0
-        while True:
-            out = subprocess.run(['ps', '-axo', 'pid=,ppid=,utime=,time=,rss=,comm='], capture_output=True, text=True).stdout
-            table = {}
-            for line in out.splitlines():
-                parts = line.split(None, 5)
-                if len(parts) == 6:
-                    table[int(parts[0])] = (int(parts[1]), cpu_seconds(parts[2]), cpu_seconds(parts[3]), int(parts[4]) * 1024, parts[5])
-            if root not in table:
-                break
-            children = collections.defaultdict(list)
-            for pid, row in table.items():
-                children[row[0]].append(pid)
-            tree, stack = [], [root]
-            while stack:
-                pid = stack.pop()
-                tree.append(pid)
-                stack.extend(children.get(pid, ()))
-            for pid in tree:
-                _, user, total, _, comm = table[pid]
-                old = seen.get(pid, (0, 0, comm))
-                seen[pid] = (max(old[0], user), max(old[1], total), comm)
-            peak_rss = max(peak_rss, sum(table[pid][3] for pid in tree))
-            peak_procs = max(peak_procs, len(tree))
-            timeline.append([round(time.monotonic() - began, 2), round(sum(v[1] for v in seen.values()), 2),
-                             len(tree), round(sum(table[pid][3] for pid in tree) / 2**20)])
-            time.sleep(args.interval)
-        wall = time.monotonic() - began
-        user = sum(v[0] for v in seen.values())
-        total = sum(v[1] for v in seen.values())
-        by_kind = collections.Counter()
-        cpu_by_kind = collections.Counter()
-        for _, cpu, comm in seen.values():
-            by_kind[kind_of(comm)] += 1
-            cpu_by_kind[kind_of(comm)] += cpu
-        # Busiest 10 s window of CPU parallelism.
-        peak_parallel = 0.0
-        for index, (at, cpu, _, _) in enumerate(timeline):
-            for later in timeline[index:]:
-                if later[0] - at >= 10:
-                    peak_parallel = max(peak_parallel, (later[1] - cpu) / (later[0] - at))
-                    break
-        row = {'root': root, 'observedAt': int(time.time()), 'wallSeconds': round(wall, 1), 'userSeconds': round(user, 1),
-               'systemSeconds': round(total - user, 1), 'cpuSeconds': round(total, 1),
-               'averageParallelism': round(total / wall, 2) if wall else None, 'peak10sParallelism': round(peak_parallel, 2),
-               'peakTreeRssMB': round(peak_rss / 2**20), 'peakProcesses': peak_procs, 'processes': len(seen),
-               'processesByKind': dict(by_kind), 'cpuSecondsByKind': {k: round(v, 1) for k, v in cpu_by_kind.most_common()},
-               'loadAtEnd': round(os.getloadavg()[0], 1), 'timeline': timeline[::max(1, len(timeline) // 400)]}
-        data = load(args.out) or {'schema': 1, 'gates': []}
-        data['gates'].append(row)
+    """Observe existing owners through the identity-aware recorder; never launch or signal a gate."""
+    schema = 'vitest-gate-census/2'
+    if args.out.exists():
+        data = json.loads(args.out.read_text())
+        if data.get('schema') != schema or not isinstance(data.get('observations'), list):
+            raise SystemExit('incompatible census summary; use a new --out path for version 2 observations')
+    else:
+        data = {'schema': schema, 'observations': []}
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    for _ in range(args.count):
+        root = observe_root(args)
+        report = args.out.with_name(f'{args.out.stem}.{time.time_ns()}.{root}.jsonl')
+        command = [sys.executable, str(ROOT / 'scripts/cpu-census.py'), '--pid', str(root),
+                   '--report', str(report), '--interval', str(args.interval), '--seconds', str(args.seconds),
+                   '--drain-seconds', str(args.drain_seconds)]
+        print(f'observing root pid {root}; raw report {report}', flush=True)
+        result = subprocess.run(command, capture_output=True, text=True,
+                                timeout=args.seconds + args.drain_seconds + 15)
+        if not report.exists():
+            raise SystemExit(result.stderr.strip() or 'census refused before observation')
+        row = census_summary(report, result.returncode)
+        data['observations'].append(row)
         save(args.out, data)
-        log(f"gate {root}: wall {row['wallSeconds']}s cpu {row['cpuSeconds']}s (user {row['userSeconds']}, sys {row['systemSeconds']}) "
-            f"avg parallelism {row['averageParallelism']} peak10s {row['peak10sParallelism']} rss {row['peakTreeRssMB']}MB")
-        gates += 1
+        print(json.dumps({'root': root, 'sampledCpuSecondsLowerBound': row['sampledCpuSecondsLowerBound'],
+                          'allObservedChildrenDrained': row['allObservedChildrenDrained'],
+                          'reason': row['reason']}), flush=True)
+        if result.returncode != 0:
+            raise SystemExit(result.returncode)
 
 
 def main():
@@ -788,11 +819,25 @@ def main():
     packer.add_argument('--workers', type=lambda text: [int(n) for n in text.split(',')], default=[2, 4, 5, 6, 8, 10])
     packer.add_argument('--overhead', type=float, default=0.0, help='per-process startup seconds to subtract')
     observe = sub.add_parser('observe')
-    observe.add_argument('--root', default=r'node \.githooks/push-checks\.mjs')
-    observe.add_argument('--out', default=str(ROOT / 'tmp' / 'vitest-bench' / 'gates.json'))
+    roots = observe.add_mutually_exclusive_group()
+    roots.add_argument('--root', default=GATE_ROOT, help='anchored process-command regex; refuses ambiguous roots')
+    roots.add_argument('--pid', type=int, help='existing owner PID; observation never launches or signals it')
+    observe.add_argument('--out', type=Path, required=True, help='version-2 summary in your owned repository scratch')
+    observe.add_argument('--wait-seconds', type=float, default=120, help='discovery deadline, at most 120 seconds')
+    observe.add_argument('--seconds', type=float, default=1200, help='observation deadline, at most 3600 seconds')
+    observe.add_argument('--drain-seconds', type=float, default=10)
     observe.add_argument('--interval', type=float, default=0.5)
     observe.add_argument('--count', type=int, default=1)
     args = parser.parse_args()
+    if args.command == 'observe':
+        if not .05 <= args.interval <= 10 or not 0 <= args.wait_seconds <= 120 or not 1 <= args.seconds <= 3600 or not 0 <= args.drain_seconds <= 30 or args.count < 1:
+            parser.error('give bounded observation/discovery intervals and a positive count')
+        if args.pid is not None and (args.pid <= 1 or args.pid == os.getpid() or args.count != 1):
+            parser.error('--pid needs one existing owner and --count=1')
+        try:
+            re.compile(args.root)
+        except re.error as error:
+            parser.error(f'invalid --root expression: {error}')
     {'run': command_run, 'table': command_table, 'pack': command_pack, 'observe': command_observe}[args.command](args)
 
 

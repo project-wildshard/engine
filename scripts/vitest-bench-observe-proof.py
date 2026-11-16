@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""TS12a outer-edge proof: real gate argv, measured descendants and an unsignalled orphan."""
+import argparse
+import importlib.util
+import json
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.dont_write_bytecode = True
+
+
+def module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    loaded = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(loaded)
+    return loaded
+
+
+bench = module('bench', ROOT / 'scripts/vitest-bench.py')
+controls = module('controls', ROOT / 'scripts/cpu-census-proof.py')
+
+
+def cli(work, *options):
+    return [sys.executable, str(ROOT / 'scripts/vitest-bench.py'), 'observe',
+            '--out', str(work / 'summary.json'), '--interval', '.05', '--seconds', '6',
+            '--drain-seconds', '.2', *options]
+
+
+def first_sample(work):
+    reports = list(work.glob('summary.*.jsonl'))
+    return any('"type":"sample"' in report.read_text() for report in reports)
+
+
+def finish(observer, work, expected):
+    stdout, stderr = observer.communicate(timeout=8)
+    assert observer.returncode == expected, (stdout, stderr)
+    data = json.loads((work / 'summary.json').read_text())
+    assert data['schema'] == 'vitest-gate-census/2' and len(data['observations']) == 1, data
+    row = data['observations'][0]
+    assert row['gateKind'] == 'unverified' and row['exactGateCpu'] is None, row
+    assert 'cpuSeconds' not in row and 'userSeconds' not in row and 'systemSeconds' not in row, row
+    assert row['samples'] >= 2 and row['peakSummedRssMB'] > 0, row
+    assert (ROOT / row['rawReport']).is_file()
+    return row
+
+
+def descendants(work, leak):
+    work.mkdir()
+    root = subprocess.Popen([sys.executable, str(ROOT / 'scripts/cpu-census-proof.py'),
+                             '--fixture', str(work), str(int(leak))], cwd=ROOT,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+    observer = None
+    try:
+        controls.wait_for(lambda: (work / 'ready').exists())
+        children = json.loads((work / 'ready').read_text())
+        observer = subprocess.Popen(cli(work, '--pid', str(root.pid)), cwd=ROOT,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        controls.wait_for(lambda: first_sample(work))
+        (work / 'go').touch()
+        # The real gate parent reaps its owner. Retaining a zombie would make
+        # the recorder correctly report an unreadable, uncertain identity.
+        assert root.wait(timeout=4) == 0
+        row = finish(observer, work, 2 if leak else 0)
+        if leak:
+            assert row['reason'] == 'live observed descendants after root exit', row
+            assert not row['allObservedChildrenDrained'], row
+            assert any(child['pid'] == children[0] for child in row['remaining']), row
+            (work / 'after-observer').touch()
+            controls.wait_for(lambda: (work / 'writer-survived').exists() and (work / 'writer-cpu').exists())
+            return {'orphanReported': True, 'writerNotSignalled': True}
+        assert row['allObservedChildrenDrained'] and not row['remaining'], row
+        assert row['processesByKind'].get('python', 0) >= 3, row
+        busy_cpu = int((work / 'busy-cpu').read_text()) / 1e9
+        assert row['sampledCpuSecondsLowerBound'] >= busy_cpu * .6, row
+        assert row['sampledCpuSecondsLowerBound'] < busy_cpu + .5, row
+        return {'sampledCpuLowerBound': row['sampledCpuSecondsLowerBound'],
+                'busyCpuIndependent': busy_cpu, 'drained': True, 'exactTotalAbsent': True}
+    finally:
+        (work / 'go').touch()
+        (work / 'after-observer').touch()
+        if observer is not None and observer.poll() is None:
+            observer.terminate()
+            observer.wait(timeout=2)
+        if root.poll() is None:
+            root.terminate()
+        root.wait(timeout=2)
+
+
+def discovery(work):
+    (work / '.githooks').mkdir(parents=True)
+    script = work / '.githooks/push-checks.mjs'
+    stop = work / 'stop'
+    script.write_text("import {existsSync,writeFileSync} from 'node:fs';\n"
+                      "writeFileSync(process.argv[2],'ready');\n"
+                      "setInterval(()=>{if(existsSync(process.argv[3]))process.exit(0);},10);\n")
+    node = shutil.which('node')
+    owners, observer = [], None
+    try:
+        # Older than both Node roots, with the old regex embedded in its argv.
+        owners.append(subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(10)',
+                                        'node', '.githooks/push-checks.mjs'], cwd=work))
+        for entry, label in [(str(script), 'absolute'), ('.githooks/push-checks.mjs', 'relative')]:
+            owners.append(subprocess.Popen([node, entry, str(work / label), str(stop)], cwd=work))
+        controls.wait_for(lambda: (work / 'absolute').exists() and (work / 'relative').exists())
+        table = subprocess.check_output(['ps', '-p', ','.join(str(owner.pid) for owner in owners),
+                                         '-o', 'pid=,uid=,command='], text=True)
+        roots = bench.gate_candidates(table, re.compile(bench.GATE_ROOT))
+        assert roots == sorted(owner.pid for owner in owners[1:]), (roots, table)
+        try:
+            bench.choose_gate(roots)
+        except SystemExit as error:
+            assert 'ambiguous' in str(error)
+        else:
+            raise AssertionError('ambiguous real gate owners must refuse')
+        missing = subprocess.run(cli(work, '--root', '^TS12a-impossible-root$', '--wait-seconds', '.05'),
+                                 capture_output=True, text=True, timeout=2)
+        assert missing.returncode != 0 and 'discovery deadline' in missing.stderr, missing
+        legacy = work / 'summary.json'
+        legacy.write_text('{"schema":1,"gates":[]}')
+        incompatible = subprocess.run(cli(work, '--pid', str(owners[1].pid)),
+                                      capture_output=True, text=True, timeout=2)
+        assert incompatible.returncode != 0 and 'incompatible census summary' in incompatible.stderr
+        legacy.unlink()
+        # Exercise bounded discovery through the CLI on the real absolute Node root.
+        pattern = '^' + re.escape(node) + r'\s+' + re.escape(str(script)) + r'(?:\s|$)'
+        observer = subprocess.Popen(cli(work, '--root', pattern, '--wait-seconds', '.5'), cwd=ROOT,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        controls.wait_for(lambda: first_sample(work))
+        stop.touch()
+        for owner in owners[1:]:
+            assert owner.wait(timeout=2) == 0
+        row = finish(observer, work, 0)
+        assert row['root']['pid'] == owners[1].pid and row['allObservedChildrenDrained'], row
+        return {'relativeAndAbsoluteRoots': True, 'wrapperExcluded': True, 'ambiguousRefused': True,
+                'missingBounded': True, 'legacySummaryRefused': True, 'actualCliDiscovery': True}
+    finally:
+        stop.touch()
+        if observer is not None and observer.poll() is None:
+            observer.terminate()
+            observer.wait(timeout=2)
+        for owner in owners:
+            if owner.poll() is None:
+                owner.terminate()
+            owner.wait(timeout=2)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--scratch', type=Path, required=True)
+    args = parser.parse_args()
+    args.scratch.mkdir(parents=True, exist_ok=True)
+    began = time.monotonic()
+    with tempfile.TemporaryDirectory(dir=args.scratch) as temporary:
+        work = Path(temporary)
+        result = {'discovery': discovery(work / 'discovery'),
+                  'normal': descendants(work / 'normal', False),
+                  'orphan': descendants(work / 'orphan', True)}
+    print(json.dumps({**result, 'seconds': time.monotonic() - began}))
+
+
+if __name__ == '__main__':
+    main()
