@@ -2,12 +2,21 @@ import { expect, test, vi } from 'vitest';
 import { BufferGeometry, Float32BufferAttribute, MeshBasicMaterial, Texture } from 'three';
 import { initializeTier, TIER } from '../src/client/engine/core/tier';
 import { PosedDraw } from '../src/client/game/looks/posedInstances';
-import type { PosedAssetSet } from '../src/client/game/plugin/geometry';
+import type { PosedAssetRange, PosedAssetSet } from '../src/client/game/plugin/geometry';
 import { lendLooks } from '../src/client/game/shardfile/lentLooks';
 import rows from './fixtures/posed-draw-rows.json' with { type: 'json' };
 
 // CI21 (J232): engine reads no shard source (J65). This is Pine's shipped `look/wildlife-draw.json` row, copied byte for
 // byte from the pinned pine-hollow product (revision 2, blob 5dba1513…569c), so the posed-tier law runs on a real row.
+
+function isRangeBox(box: readonly number[]): box is PosedAssetRange['box'] {
+  return box.length === 6 && box.every(Number.isFinite);
+}
+const ranges: readonly PosedAssetRange[] = rows.assets.ranges.map(range => {
+  const { box } = range;
+  if (!isRangeBox(box)) throw new Error('Invalid frozen posed range box');
+  return { ...range, box };
+});
 
 for (const tier of ['phone', 'desktop'] as const) test(`cold ${tier} wildlife preparation awaits only its selected bird sources`, async () => {
   const previous = TIER, disposals: (() => void)[] = [];
@@ -17,7 +26,7 @@ for (const tier of ['phone', 'desktop'] as const) test(`cold ${tier} wildlife pr
   let finish: () => void = () => undefined;
   const wait = new Promise<void>(resolve => { finish = resolve; });
   const load = vi.fn<(input: unknown) => Promise<PosedAssetSet>>(async () => {
-    await wait; return { geometry, atlas, ranges: rows.assets.ranges };
+    await wait; return { geometry, atlas, ranges };
   });
   const url = (name: string): string => `/cold-wildlife-${tier}/${name}`;
   lendLooks({ onDispose: run => { disposals.push(run); } }, { materials: new Map([[rows.name, material]]), setParam: () => undefined, setTexture: () => undefined, bindMeshMap: () => material });

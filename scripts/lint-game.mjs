@@ -4,22 +4,41 @@
 import { spawnSync } from 'node:child_process';
 import {existsSync,lstatSync} from 'node:fs';
 import {lintEnvironment} from './lint-tools.mjs';
+import ci21Tests from '../lint/ci21-engine-tests.json' with { type: 'json' };
 
 const TREE = ['src/client/engine', 'src/shared/engine', 'src/server/engine', 'src/client/game', 'src/shared/game', 'src/server/game', 'src/cook/game', 'src/client/host', 'src/shared/host', 'src/server/host', 'src/client/app', 'scripts', 'lint', 'vite'];
 const LIFTED = new RegExp(`^(?:${TREE.join('|')})/`, 'u');
+const ENGINE_TESTS = new Set(ci21Tests);
+const COMPLETE = [...TREE, ...ENGINE_TESTS];
 const asked = process.argv.slice(2);
 const threads = process.env.WS_PUSH_LINT_THREADS;
 if (threads !== undefined && !/^[1-9]\d*$/u.test(threads)) throw new Error('Invalid push lint worker limit');
-const files = asked.filter(path => LIFTED.test(path));
+const files = asked.filter(path => LIFTED.test(path) || ENGINE_TESTS.has(path));
 if (asked.length > 0 && files.length === 0) process.exit(0);
 const options=['-c', '.oxlintrc.json', '--deny-warnings', ...(threads === undefined ? [] : ['--threads', threads])],environment=lintEnvironment();
-let run = spawnSync('oxlint', [...options,...(asked.length === 0 ? TREE : files)], { stdio: asked.length===0?'inherit':'pipe',encoding:'utf8',env:environment });
+/** A restored test must remain a real, eligible input, even beside other lintable files.
+ * @param {string[]} required */
+function checkRestoredTests(required){
+ if(required.length===0)return;
+ const missing=required.filter(path=>!existsSync(path)||!lstatSync(path).isFile());
+ if(missing.length>0)throw new Error(`lint-game: restored engine tests are missing: ${missing.join(', ')}`);
+ const listed=spawnSync('oxlint',['-c','.oxlintrc.json','--debug','files',...required],{encoding:'utf8',env:environment});
+ if(listed.error!==undefined)throw listed.error;
+ const eligible=new Set((listed.stdout??'').trim().split(/\r?\n/u));
+ const ignored=required.filter(path=>!eligible.has(path));
+ if(listed.status!==0||ignored.length>0)throw new Error(`lint-game: restored engine tests are not eligible: ${ignored.join(', ')}\n${listed.stderr??''}`);
+}
+if(ci21Tests.length===0)throw new Error('lint-game: restored engine test admission table is empty');
+checkRestoredTests(asked.length===0?ci21Tests:files.filter(path=>ENGINE_TESTS.has(path)));
+
+let run = spawnSync('oxlint', [...options,...(asked.length === 0 ? COMPLETE : files)], { stdio: asked.length===0?'inherit':'pipe',encoding:'utf8',env:environment });
 if(asked.length>0){
   process.stdout.write(run.stdout??'');process.stderr.write(run.stderr??'');
   if(run.status!==0&&`${run.stdout??''}\n${run.stderr??''}`.includes('No files found to lint')){
     const generated=files.every(path=>/(?:^|\/)[^/]*\.generated\.[^/]+$/u.test(path)&&existsSync(path)&&lstatSync(path).isFile());
     console.error(generated?'lint-game: existing generated outputs have no configured lint inputs; checking the declared selection':'lint-game: selected paths have no eligible lint inputs; running the complete declared tree');
-    run=spawnSync('oxlint',[...options,...(generated?['--no-error-on-unmatched-pattern',...files]:TREE)],{stdio:'inherit',encoding:'utf8',env:environment});
+    if(!generated)checkRestoredTests(ci21Tests);
+    run=spawnSync('oxlint',[...options,...(generated?['--no-error-on-unmatched-pattern',...files]:COMPLETE)],{stdio:'inherit',encoding:'utf8',env:environment});
   }
 }
 if (run.error !== undefined) throw run.error;
