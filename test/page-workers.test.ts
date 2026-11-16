@@ -13,7 +13,7 @@ import { unstable_readConfig } from 'wrangler';
 import worker, { type Env } from '../pages/worker.ts';
 import { PLACEMENT_PUBLIC_KEY as WORKER_KEY } from '../pages/placed-slug.ts';
 import { SLUG_NAMES } from '../pages/slug-names.ts';
-import pageSlugNames from '../src/client/app/slugNames.json' with { type: 'json' };
+import pageSlugNames from '../src/shared/game/slugNames.json' with { type: 'json' };
 import { PLACEMENT_PUBLIC_KEY } from '../src/shared/game/grid/placementRows';
 
 

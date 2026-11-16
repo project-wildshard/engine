@@ -1710,6 +1710,7 @@
     "src/shared/game/inventoryLaw.ts": "shared",
     "src/shared/game/harvest.ts": "shared",
     "src/shared/game/ledger.ts": "shared",
+    "src/shared/game/slugNames.ts": "shared",
     "src/shared/game/loadout/itemCatalogue.ts": "shared",
     "src/shared/game/loadout/persistence.ts": "shared",
     "src/shared/game/loadout/pouch.ts": "shared",

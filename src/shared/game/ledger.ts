@@ -2,14 +2,38 @@ import * as v from 'valibot';
 import type { SaveKeyDef, SaveStore, SaveSlot } from '@wildshard/engine/saves/store';
 import type { SimHost, SimValue } from '@wildshard/engine/sim';
 import { LedgerFactSchema, parseLedgerRules, type LedgerFact, type LedgerRule } from '@wildshard/format/ledger';
+import { retiredSlugs } from './slugNames';
 
 const natural = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER));
 const schema: v.GenericSchema<BoundedLedgerSaveInput, BoundedLedgerSave> = v.looseObject({ facts: v.record(v.string(), LedgerFactSchema),
   entitlements: v.optional(v.record(v.string(), v.looseObject({ grants: natural, lastTick: natural })), {}),
   items: v.record(v.string(), v.looseObject({ item: v.string(), tier: natural, quantity: natural })),
   achievements: v.record(v.string(), v.looseObject({ shard: v.string(), id: v.string(), title: v.string(), count: natural, threshold: natural, earned: v.boolean() })) });
-type LedgerState = v.InferOutput<typeof schema>;
+export type LedgerState = v.InferOutput<typeof schema>;
 const ledgerSave = { key: 'platform.ledger', scope: 'profile' as const, version: 1, schema, initial: (): LedgerState => ({ facts: {}, entitlements: {}, items: {}, achievements: {} }) };
+
+const entitlementKey = (name: string): unknown[] | null => {
+  try { const parsed: unknown = JSON.parse(name); return Array.isArray(parsed) ? parsed : null; } catch { return null; }
+};
+/** A renamed shard keeps its profile progress (TC-SHIP-g): achievements and catalogue entitlements saved under a retired
+ *  slug also count under its replacement (Brasscap Mesa's blender-template). Entries already under the new slug win and
+ *  the old entries stay, as the page's shard saves do (TC-SHIP-a). Returns whether it added anything. */
+export function carryRetiredLedger(state: LedgerState, retired: readonly (readonly [string, string])[] = retiredSlugs()): boolean {
+  let changed = false;
+  for (const [old, now] of retired) {
+    for (const row of Object.values(state.achievements)) {
+      const key = JSON.stringify([now, row.id]);
+      if (row.shard === old && state.achievements[key] === undefined) { state.achievements[key] = { ...row, shard: now }; changed = true; }
+    }
+    for (const [name, grant] of Object.entries(state.entitlements)) {
+      const parsed = entitlementKey(name);
+      if (parsed === null || parsed.length !== 3 || parsed[1] !== old) continue;
+      const key = JSON.stringify([parsed[0], now, parsed[2]]);
+      if (state.entitlements[key] === undefined) { state.entitlements[key] = { ...grant }; changed = true; }
+    }
+  }
+  return changed;
+}
 
 /** A placement identity remains stable when its cell changes; several instances may use one package. */
 export interface LedgerInstance { id: string; shard: string; cell?: readonly [number, number] }
@@ -66,7 +90,9 @@ export class Ledger {
     this.slot = store.define(ledgerSave);
   }
   /** Includes pending in-memory saves, following SaveStore's offline fallback; receipts distinguish durability. */
-  state(): LedgerState { return this.slot.read(); }
+  state(): LedgerState { return this.read(); }
+  /** The saved slot with a renamed shard's progress under its new slug (TC-SHIP-g); the next grant's write keeps it. */
+  private read(): LedgerState { const state = this.slot.read(); carryRetiredLedger(state); return state; }
   /** Inspect the saved slot before a dedicated host permits any fallback or write. */
   get admitted(): boolean { const status = this.slot.status?.(); return status === 'absent' || status === 'valid'; }
   /** Facts offered so far (recorded or not): a checkpoint that skips idle writes treats any as a change. */
@@ -78,7 +104,7 @@ export class Ledger {
     const fact = v.parse(LedgerFactSchema, input), id = ledgerFactId(fact), mapping = this.rules.get(JSON.stringify([fact.shard, fact.revision, fact.name]));
     if (this.instances.get(fact.instance) !== fact.shard || mapping === undefined || mapping.revision !== fact.revision
       || mapping.rule.origin.kind !== fact.origin.kind || mapping.rule.origin.source !== fact.origin.source) throw new Error('Fact identity or provenance is not admitted');
-    const state = this.slot.read(), prior = state.facts[id];
+    const state = this.read(), prior = state.facts[id];
     if (prior !== undefined && (prior.name !== fact.name || prior.origin.kind !== fact.origin.kind || prior.origin.source !== fact.origin.source)) throw new Error('Fact identity reused for another outcome');
     if (prior === undefined) {
       let changed = false;

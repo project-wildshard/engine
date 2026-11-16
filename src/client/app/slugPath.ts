@@ -1,9 +1,9 @@
-import named from './slugNames.json' with { type: 'json' };
+import { retiredSlugs as retired, SLUG_NAMES } from '@wildshard/engine/game/slugNames';
 
 /** A retired `/slug/` name and the slug that replaced it (`slugNames.json`): Brasscap Mesa was the API's old corpus slug
  *  blender-template (Jake, 2026-11-15: "I don't know why the fuck this slug is called Blender template"); since TC-SHIP-a
  *  the catalogue names it brasscap-mesa. pages/worker.ts sends the old link to the new one; the page reads it as the new. */
-const PUBLIC: Readonly<Record<string, string | undefined>> = named.names;
+const PUBLIC = SLUG_NAMES;
 const API = PUBLIC;
 
 /** SA36: the API slug a `/slug/<name>` path names (src/client/game/slugPage.ts is its page), or null for any other path. A
@@ -14,9 +14,7 @@ export function slugOfPath(pathname: string): string | null {
 }
 
 /** Each retired slug and the slug that replaced it, for the save namespaces a rename carries (TC-SHIP-a). */
-export function retiredSlugs(): readonly (readonly [string, string])[] {
-  return Object.entries(PUBLIC).flatMap(([old, now]) => now === undefined ? [] : [[old, now] as const]);
-}
+export function retiredSlugs(): readonly (readonly [string, string])[] { return retired(); }
 
 /** The slug a `?chunk=` link names today: a retired slug's replacement, else the slug itself (TC-SHIP-a). */
 export function currentSlug(slug: string): string {

@@ -36,6 +36,9 @@ is the reviewed first pin.
   Template 2: Ring 1, `--from-format`, `pin-format.ts`, the determinism corpus
   case and e2e's product (which now borrows brasscap-mesa's pinned row).
   `test/pins.test.ts` lets Ring 1 name it with no API head.
-- Left as is: the profile ledger keys achievements and entitlements by shard
-  slug, so ones earned under blender-template stay in the profile under that
-  name and brasscap-mesa's count from zero (meta TC-SHIP-g).
+- The profile ledger keys achievements and entitlements by shard slug, so ones
+  earned under blender-template counted for nothing under brasscap-mesa. Since
+  TC-SHIP-g the ledger's read carries a retired slug's entries under its
+  replacement (the new slug's own entries win, the old ones stay), so the
+  server's profile read and the next grant both see them. The retired-slug map
+  moved to `src/shared/game/slugNames.json` (`game/slugNames`) for both.
