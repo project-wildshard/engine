@@ -6,28 +6,39 @@ import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {observeRelease,type PreparedObserver} from './fixtures/dedicated/releaseObserver';
 import {observationInputs} from '../scripts/mmo-release-observer-inputs.mjs';
-import {roomBench} from './fixtures/dedicated/roomBench';
+import {roomBench,serverInput} from './fixtures/dedicated/roomBench';
 import {ReleaseWatch} from '../src/server/host/dedicated/releaseFile';
 import {openPglite} from './fixtures/pgliteDatabase';
 import {migrate} from '../src/server/host/dedicated/saves/migrate';
 import {PlayerStore} from '../src/server/host/dedicated/playerStore';
 import {RoomBot} from './fixtures/dedicated/roomBot';
 import {playerSavesOver,memoryPlayerSaves} from '../src/server/host/dedicated/playerSaves';
+import {cellShard} from '../src/server/host/dedicated/gridCells';
+import {catalogueDocument} from '../src/shared/game/grid/catalogueDocument';
+import {installCatalogue} from '../src/shared/game/grid/catalogueSlot';
 
 const sourceBuild=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 let connect:PreparedObserver['connect'],prepared:PreparedObserver;
-beforeAll(async()=>{prepared=await nativeObserverClient();connect=prepared.connect;});
-afterAll(async()=>{await prepared?.dispose?.();});
+const catalogue=catalogueDocument();
+const load=(slug:string)=>serverInput(slug==='template'?'_template':slug);
+beforeAll(async()=>{
+ // Keep the durable control on the shipped Template, with an actual instance/slug alias.
+ const template=<T extends {instance:string;slug:string}>(row:T):T=>row.instance==='blender-template'?{...row,slug:'template'}:row;
+ installCatalogue({...catalogue,placements:catalogue.placements.map(template),grid:{...catalogue.grid,cells:catalogue.grid.cells.map(template)}});
+ prepared=await nativeObserverClient();connect=prepared.connect;
+});
+afterAll(async()=>{installCatalogue(catalogue);await prepared?.dispose?.();});
 
 const closers:(()=>Promise<void>)[]=[];
 afterEach(async()=>{for(const close of closers.splice(0).reverse())await close();});
 async function fixture(durable=false,loseProgress=false,shard=durable?'blender-template':'driftwood-isle',changeProgress=false,staleCheckpoint=false){
+ const saveShard=cellShard(shard);
  let restart:()=>void=()=>{throw Error('No promotion installed');};
  const database=durable?await openPglite():null;
  if(database!==null){closers.push(database.close);await migrate(database);}
  const saves=database===null?memoryPlayerSaves():playerSavesOver(database,0,()=>{});
  if(durable){
-  const seed=await roomBench({saves,cells:[shard]});
+  const seed=await roomBench({saves,cells:[shard],load});
   const bots=['device:observer-probe-0','device:observer-probe-1'].map((device,index)=>new RoomBot(seed.url,'bench',device,`seed-${index}`));
   try{
    for(const [index,bot] of bots.entries()){
@@ -41,7 +52,7 @@ async function fixture(durable=false,loseProgress=false,shard=durable?'blender-t
   }finally{for(const bot of bots)bot.drop();await seed.close();}
  }
 
- const first=await roomBench({build:sourceBuild,saves,cells:[shard],workers:1,graceMs:80,restart:()=>{restart();}});
+ const first=await roomBench({build:sourceBuild,saves,cells:[shard],load,workers:1,graceMs:80,restart:()=>{restart();}});
  let current=first,serial=1,firstClosed=false;
  closers.push(async()=>{if(!firstClosed)await first.close();if(current!==first)await current.close();});
  const keys=generateKeyPairSync('ed25519'),bytes=Buffer.from('signed observation fixture artifact');
@@ -77,13 +88,13 @@ async function fixture(durable=false,loseProgress=false,shard=durable?'blender-t
   assert.equal(await first.world.drain(),true);await first.close();firstClosed=true;
   if(staleCheckpoint&&database!==null)await database.query('update player_save set seq = 1');
   if(loseProgress&&database!==null){
-   const saved=await saves.read('device:observer-probe-0',shard);
+   const saved=await saves.read('device:observer-probe-0',saveShard);
    if(saved.doc===null)throw Error('Missing durable loss control');
-   const store=new PlayerStore(saved.doc.store,()=>{});store.slots.purse.write(0,shard);
-   await database.query('update player_save set doc = $1 where player_id = $2',
-    [JSON.stringify({...saved.doc,store:store.documents()}),'device:observer-probe-0']);
+   const store=new PlayerStore(saved.doc.store,()=>{});store.slots.purse.write(0,saveShard);
+   await database.query('update player_save set doc = $1 where player_id = $2 and epoch = 0 and shard = $3',
+    [JSON.stringify({...saved.doc,store:store.documents()}),'device:observer-probe-0',saveShard]);
   }
-  current=await roomBench({build:'b'.repeat(40),saves,cells:[shard],workers:1});serial=2;
+  current=await roomBench({build:'b'.repeat(40),saves,cells:[shard],load,workers:1});serial=2;
  })().then(done,failed);};
  const watcher=new ReleaseWatch({serving:{...release},everyMs:3600000,
   read:async()=>(await inputs.read()).release,failed:error=>{throw error;},
