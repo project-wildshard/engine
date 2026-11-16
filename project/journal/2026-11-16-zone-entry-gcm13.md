@@ -1,0 +1,4 @@
+# Zone entry, gcm13 (opus-gcm13, 2026-11-16)
+
+- ZE10c: the old page stops reading the target's card art (`--ws-load-portrait` is 'none' on the gate's 0; the fresh page paints `shown.art` from the handoff). The gate proof fails on any target read before the old document leaves, and compares playingMB at the arrival pose with a fresh Nalati boot stood there as long: desktop 943.5 vs 943.5 MB, phone 876.5 vs 881.2 MB. It reads each gate state before the shot (a 2992 px shot outlasted a count's second at load 15).
+- Tooling: the road drive proof names every program first linked on a drive with the objects drawing it (`newPrograms`); `turn-in-shots --pick=fx,fy` hides scene nodes in turn to name what draws a point. Pastel Plain's grey blocks from the road are its live cell fill (`ring:pastel-plain:l0/*` props, `graph:material:rock`), not a stand-in.

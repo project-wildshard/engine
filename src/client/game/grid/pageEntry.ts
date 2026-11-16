@@ -150,7 +150,9 @@ export function enterZone(instance: string, arrive?: { readonly x: number; reado
   const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
   if (cell === undefined || target === undefined) return; // a cell this build can't open stays behind its gate
   const shown = gridDestination({ slug: target.slug }, target);
-  document.documentElement.style.setProperty('--ws-load-portrait', shown.art === '' ? 'none' : `url("${shown.art}")`);
+  // ZE10c: the target's card art is the target's bytes, so this page never reads it: the card shows plain here, and the fresh page
+  // paints the art from the handoff (`shown.art`, index.html's arrival read) once this document and its world are gone
+  document.documentElement.style.setProperty('--ws-load-portrait', 'none');
   startEntryDownload(target.slug, 'grid');
   startGridStripDownload(gridMode(DEVSERVER), cell.instance, 'metadata');
   navigating = beginNavigationShell(shown.name, pageScope, () => {

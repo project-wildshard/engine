@@ -23,6 +23,32 @@ const HALF = 250;
 const arrivedPastGate = (/** @type {any} */ fired) => fired?.ready === true && fired.walkedOut === true && fired.arrived !== null
   && Math.abs(fired.arrived.x + HALF - 14) < 1.5 && Math.abs(fired.arrived.z) < 1.5 && Math.abs(Math.abs(fired.arrived.yaw) - Math.PI / 2) < 0.2;
 mkdirSync(out, { recursive: true });
+/** ZE10c: how long the arrival and the fresh boot each stand at the arrival pose before playingMB is read */
+const SETTLE_MS = 10_000;
+/**
+ * Boot a home by its Shard Select card in `context`, wait for control, stand at `pose` (the home's frame) for SETTLE_MS (after the
+ * same 1.5 s the arrival waits), and return playingMB then.
+ * @param {import('playwright').BrowserContext} context @param {string} card @param {{ x: number, z: number, yaw: number }} pose
+ */
+async function bootCard(context, card, pose) {
+  const page = await context.newPage();
+  await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
+  await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
+  await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { volume: 0 } });
+  await page.goto(`${base}/?mute=1&nolock=1`, { waitUntil: 'load' });
+  await page.locator('.ws-main-select').click({ timeout: 120_000 });
+  if (await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false)) { await page.locator('#ws-name-box input').fill('fresh'); await page.locator('#ws-name-box button[type=submit]').click(); }
+  await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
+  const index = await page.evaluate(name => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes(name)), card);
+  if (index < 0) throw new Error(`No ${card} card`);
+  await page.locator('.ws-menu-dots i').nth(index).click();
+  await page.locator('.ws-menu-play').click();
+  await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 180_000, polling: 250 });
+  await sleep(1500);
+  await page.evaluate(({ x, z, yaw }) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(x, z, yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, yaw); }, pose);
+  await sleep(SETTLE_MS);
+  return page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
+}
 const tag = `${engineName}${device === '' ? '' : '-phone'}`;
 const result = { base, engine: engineName, viewport: '', at: new Date().toISOString(), build: '', shots: /** @type {Record<string, unknown>[]} */ ([]), fired: /** @type {unknown} */ (null), errors: /** @type {string[]} */ ([]), note: '' };
 const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
@@ -59,7 +85,8 @@ try {
       await face(Math.atan2(at.x - x, at.z - origin.z)); await page.keyboard.down('KeyW'); await sleep(Math.min(400, Math.abs(at.x - x) * 200)); await page.keyboard.up('KeyW');
     }
   };
-  const shoot = async (/** @type {string} */ name) => { await page.screenshot({ path: join(out, `${tag}-${name}.png`) }); result.shots.push({ name, ...await state() }); };
+  // the state is read first: a full-size shot can take longer than a count's second on a loaded laptop (the count then read one on)
+  const shoot = async (/** @type {string} */ name) => { const seen = await state(); await page.screenshot({ path: join(out, `${tag}-${name}.png`) }); result.shots.push({ name, ...seen }); };
   await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [HALF - 20, 0]);
   await sleep(4000);
   await walkTo(origin.x + HALF + 31.25); await face(-Math.PI / 2); await sleep(1500);
@@ -81,6 +108,12 @@ try {
     /** @type {{ url: string, at: number }[]} */
     const reads = [];
     page.on('request', request => { if (/\/shardfiles\/nalati-grasslands\//u.test(request.url())) reads.push({ url: request.url().replace(base, ''), at: Date.now() }); });
+    /** every main-frame navigation from the fire on (a second one is a reload after the entry) */
+    const navigations = /** @type {{ url: string, at: number }[]} */ ([]);
+    page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations.push({ url: frame.url().replace(base, ''), at: Date.now() }); });
+    /** @type {any} */ (result).navigations = navigations;
+    const consoleRows = /** @type {string[]} */ ([]); /** @type {any} */ (result).console = consoleRows;
+    page.on('console', message => { if (message.type() === 'error' || /reload|recover/iu.test(message.text())) consoleRows.push(message.text().slice(0, 200)); });
     const left = await page.waitForEvent('framenavigated', { timeout: 6000 }).then(() => true).catch(() => false), leftAt = Date.now();
     await page.screenshot({ path: join(out, `${tag}-gate-0-loading.png`) }).catch(() => undefined);
     const ready = await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 180_000, polling: 250 }).then(() => true).catch(() => false);
@@ -89,10 +122,12 @@ try {
     // ZE10b: the arrival (the new home's own frame: its west entryway's centre line, 14 m in, facing east into the cell), then a free
     // walk back out of the new home onto the road (no wall: the home has none)
     /** @type {{ x: number, z: number, yaw: number } | null} */
-    let arrived = null, walkedOut = false;
+    let arrived = null, walkedOut = false, /** @type {number | null} */ controlMB = null;
     if (ready) {
       await sleep(1500);
       arrived = await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; return { x: Number(p.position.x.toFixed(2)), z: Number(p.position.z.toFixed(2)), yaw: Number(p.yaw.toFixed(3)) }; });
+      // settled where it arrived (the fresh boot below stands at the same pose for as long)
+      await sleep(SETTLE_MS); controlMB = await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
       for (const ends = Date.now() + 20_000; Date.now() < ends;) {
         const x = await page.evaluate(() => /** @type {any} */ (window).__wildshard.world.player.position.x);
         if (x < -HALF - 5) { walkedOut = true; break; }
@@ -101,14 +136,23 @@ try {
       await page.screenshot({ path: join(out, `${tag}-walked-out.png`) });
     }
     const enteredMB = ready ? await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null) : null;
-    result.fired = { navigated: left, before, after: page.url(), ready, home, arrived, walkedOut, enteredMB,
+    // ZE10c: a fresh Nalati boot (Shard Select, its own new context) stood at the arrival pose and read as long after: the entry's
+    // playingMB there is held within 50 MB of it (one world in memory)
+    const freshContext = await browser.newContext(phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 });
+    let freshMB = /** @type {number | null} */ (null);
+    try { freshMB = await bootCard(freshContext, 'Nalati Grasslands', arrived ?? { x: 14 - HALF, z: 0, yaw: -Math.PI / 2 }); } catch (error) { result.errors.push(`fresh Nalati boot: ${String(error).slice(0, 200)}`); }
+    await freshContext.close();
+    result.fired = { navigations, navigated: left, before, after: page.url(), ready, home, arrived, walkedOut, enteredMB, controlMB, freshMB,
       residency: { leftAt, readsBeforeLeaving: reads.filter(row => row.at < leftAt).map(row => row.url), firstReadAfterMs: left ? (reads.find(row => row.at >= leftAt)?.at ?? null) === null ? null : (reads.find(row => row.at >= leftAt)?.at ?? 0) - leftAt : null } };
   }
   const named = (/** @type {string} */ name) => /** @type {any} */ (result.shots.find(row => row.name === name))?.gate;
   const [at5, gone, again, at2] = ['gate-5', 'backed-away', 'gate-again', 'gate-2'].map(named);
   console.log(JSON.stringify({ at5, at2, gone, again, fired: result.fired }));
   await context.close();
-  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || arrivedPastGate(/** @type {any} */ (result.fired))) ? 0 : 1;
+  const fired = /** @type {any} */ (result.fired);
+  // ZE10c: nothing of the target read before the old document went, and memory at control within 50 MB of a fresh boot
+  const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50;
+  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld)) ? 0 : 1;
 } catch (error) { result.note = String(error).slice(0, 400); console.log(`FAIL ${result.note}`); }
 finally {
   writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);
