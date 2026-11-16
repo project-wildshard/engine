@@ -569,7 +569,7 @@
       "shardCompanions": [
         {
           "repository": "project-wildshard/shard-nalati",
-          "revision": "2dc30cc0aea8e07f5e3d69307e0ec6dede9a5233",
+          "revision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
           "targetPath": "test/nalati-loft-author.test.ts",
           "originalTests": [
             "the owned loft compiler retains every original ambient channel, bound and topology bit"
@@ -599,7 +599,7 @@
       "shardCompanions": [
         {
           "repository": "project-wildshard/shard-nalati",
-          "revision": "2dc30cc0aea8e07f5e3d69307e0ec6dede9a5233",
+          "revision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
           "targetPath": "test/nalati-geometry-cache-ports.test.ts",
           "originalTests": [
             "granite and ordinary/scrambled blobs retain all original geometry bits and stream state"
@@ -630,9 +630,9 @@
       "shardCompanions": [
         {
           "repository": "project-wildshard/shard-nalati",
-          "revision": "2dc30cc0aea8e07f5e3d69307e0ec6dede9a5233",
+          "revision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
           "targetPath": "test/nalati-original-species.test.ts",
-          "targetBlob": "3b4d2157d0d840416dbdbd21186942a351b02a04",
+          "targetBlob": "7d7b737dc89fca19ccf425a18356d6c7931fff9e",
           "originalTests": [
             "cold source oracle and every detached warm loan retain all five complete original files",
             "individual original file loans are detached and unknown names refuse"
@@ -647,14 +647,14 @@
             "sourceRevision": "aa2a7d1153588897c87d4bad724f6f47e6909972",
             "sourceBlob": "a37da4cc06128e9815126edfc9ea51a70f5067a6",
             "targetPath": "test/fixtures/nalati-original-species.ts",
-            "targetBlob": "6e0df649e0107ecb9fd3b041566394e17cbb63b4",
-            "changes": "Public installed bake-loader and9s caps; optional private directory memoizes one full checked map per absolute root. Both default/private paths use the same bytes.slice loan. Caller explicitly releases private memo and disk root afterAll. No fallback or pin changes."
+            "targetBlob": "e1bf905559a65f78370d78765ef47773f2bcfc57",
+            "changes": "Public installed bake-loader and14s compiler-child caps; optional private directory memoizes one full checked map per absolute root. Both default/private paths use the same bytes.slice loan. Caller explicitly releases private memo and disk root afterAll. No fallback or pin changes."
           },
           "preparationHelper": {
             "targetPath": "test/fixtures/prepare-nalati-original-species.ts",
             "targetBlob": "78ade7c29e8a0081d7333e46ea7bdb112b80fb96"
           },
-          "changes": "Every original assertion retained in Happy DOM20.14.5. Cold source cache and loan source cache are independently constructed. Both tests loan from one memoized private map; removing slice fails case2. Cold cache cleans in finally, shared loan cache/memo clean afterAll. Caps10s/child9s, original30s. Existing Ring2 only.",
+          "changes": "Every original assertion retained in Happy DOM20.14.5. Cold source cache and loan source cache are independently constructed. Both tests loan from one memoized private map; removing slice fails case2. Cold cache cleans in finally, shared loan cache/memo clean afterAll. Original30s case cap,14s per compiler child (two cold builds fit inside28s plus assertions). Existing Ring2 only: hosted x64 run43845352388 timed out both cold source constructions at the newly introduced9s child fence; Mac mini cold constructions take3.6s each. Full five files/8.34MB and both independent real compilers retained; no production budget or other case cap changes.",
           "compilerSupport": [
             "test/fixtures/nalati-original-species.ts"
           ]
@@ -665,9 +665,9 @@
   "additionalDestinationManifests": [
     {
       "repository": "project-wildshard/shard-nalati",
-      "revision": "2dc30cc0aea8e07f5e3d69307e0ec6dede9a5233",
+      "revision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
       "path": "test/ci21-wire-ports.json",
-      "blob": "28506d60dbb7c8fa0a6111498126110c033741e5"
+      "blob": "7a9f1112824c420b997a27130329ddf8fdaf3656"
     }
   ]
 }
