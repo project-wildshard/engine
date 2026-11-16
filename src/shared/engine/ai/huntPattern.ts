@@ -94,6 +94,36 @@ export function requireHuntTuning(value: Partial<HuntTuning> | undefined, kind: 
   return value as HuntTuning;
 }
 
+/** Historical native source compatibility only; remove with the M8 producer moves. */
+const LEGACY_GRAZER_TUNING: HuntTuning = {
+  hp: 60,
+  // Huntable, not paranoid (user: "I need to be able to get close and shoot them"): head-on a deer notices you
+  // walking at ~22 m; from behind / the side you get to ~12 m on foot. Only sprinting inside 24 m is heard.
+  sightRange: 30, sightRangeGraze: 14, sightCone: MathUtils.degToRad(55),
+  hearStill: 3, hearCrouch: 6, hearWalk: 12, hearSprint: 24,
+  noticeRate: 0.3, forgetRate: 0.3, alertAt: 0.45, boltAt: 1.0,
+  // 4–7 s head-up stare: plenty of time to raise the crossbow and take the shot
+  freezeMin: 4.0, freezeMax: 7.0, relaxAfter: 3.5, panicDist: 6,
+  // gallop 6.0 (you sprint 7.2 — you CAN close on one) and only to 35–50 m, then it trots, stops and looks back
+  runSpeed: 6.0, trotSpeed: 3.2, fleeMinTime: 1.5, fleeUntil: 35, fleeUntilMax: 50, fleeMaxTime: 8, lookBack: 2.5,
+  waryTime: 10, waryBoost: 1.2,
+  herdAlertRadius: 8, herdBoltDelayMin: 0.4, herdBoltDelayMax: 1.2,
+  impactSpook: 4, impactAlert: 10,
+};
+
+const LEGACY_CHARGER_TUNING: HuntTuning = {
+  hp: 100,
+  // poor eyes, good nose: a short cone but it hears a walker from 22 m
+  sightRange: 22, sightRangeGraze: 14, sightCone: MathUtils.degToRad(60),
+  hearStill: 4, hearCrouch: 7, hearWalk: 14, hearSprint: 28,
+  noticeRate: 0.5, forgetRate: 0.2, alertAt: 0.35, boltAt: 1.0,
+  freezeMin: 1.5, freezeMax: 2.8, relaxAfter: 4, panicDist: 10, // panicDist doubles as the charge trigger
+  runSpeed: 6.8, trotSpeed: 3.6, fleeMinTime: 2, fleeUntil: 40, fleeUntilMax: 60, fleeMaxTime: 10, lookBack: 2,
+  waryTime: 20, waryBoost: 1.5,
+  herdAlertRadius: 12, herdBoltDelayMin: 0.2, herdBoltDelayMax: 0.7,
+  impactSpook: 7, impactAlert: 18,
+};
+
 const GRAZER_WALK = 1.3, CHARGER_WALK = 1.1, BOAR_CHARGE = 7.5, CHARGE_HIT_DIST = 1.4;   // species defaults (SpeciesDef.walkSpeed / chargeSpeed override)
 const CHARGE_WHEN_HIT_DIST = 25;   // a wounded boar this close turns on you instead of running
 /** melee shards: the charge wind-up per species (s) when the species declares none */
@@ -238,6 +268,8 @@ export interface HuntPorts<A extends AnimalSim> {
 }
 
 export interface HuntConfig {
+  /** Only the older native managers opt in, until their producers emit complete numbers. */
+  legacyTuning?: 'v0';
   rng: Rng;
   fight: FightRules;
   /** the shard's per-kind overrides (ShardManifest.faunaTuning), read once per kind at its first use */
@@ -270,7 +302,7 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
   private readonly tuningCache = new Map<string, HuntTuning>();
   private readonly hunting: {
     rng: Rng; ports: HuntPorts<A>; ground: HuntGround; player: Vector3; sampleTerrain: (actor: A) => void;
-    faunaTuning: HuntConfig['faunaTuning']; species: (kind: string) => HuntSpecies;
+    legacyTuning: HuntConfig['legacyTuning']; faunaTuning: HuntConfig['faunaTuning']; species: (kind: string) => HuntSpecies;
     melee: boolean; rules: FightRules | null; tokens: AggressionDirector<A>;
   } | null;
   private repaths = 0;
@@ -282,7 +314,7 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
     const rng = config.rng, ground = ports.ground, faunaTuning = config.faunaTuning, species = config.species ?? speciesDef;
     const melee = config.fight.telegraphed === true;
     const rules = config.fight.attackers === undefined || !Number.isFinite(config.fight.attackers) ? null : config.fight;
-    this.hunting = { rng, ports, ground, player, sampleTerrain, faunaTuning, species, melee, rules, tokens: new AggressionDirector<A>(rules?.attackers ?? Infinity) };
+    this.hunting = { rng, ports, ground, player, sampleTerrain, legacyTuning: config.legacyTuning, faunaTuning, species, melee, rules, tokens: new AggressionDirector<A>(rules?.attackers ?? Infinity) };
   }
   private requireHunt(): NonNullable<typeof this.hunting> { if (this.hunting === null) throw new Error('Incompatible stalker hunt pattern'); return this.hunting; }
   private get rng(): Rng { return this.requireHunt().rng; }
@@ -325,12 +357,12 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
   beginTick(dt: number): void { this.clock += dt; }
   resetRepaths(): void { this.repaths = 0; }
 
-  /** the species' hunting-loop numbers: its own `tuning`, else the baseline for its temperament, with the shard's overrides */
+  /** Complete authored numbers; only an opted-in historical native manager keeps its old source semantics. */
   tuningFor(a: { readonly kind: string }): HuntTuning {
     const cached = this.tuningCache.get(a.kind);
     if (cached !== undefined) return cached;
     const sp = this.species(a.kind);
-    const base = sp.tuning;
+    const base = sp.tuning ?? (this.requireHunt().legacyTuning === 'v0' ? (sp.aggressive ? LEGACY_CHARGER_TUNING : LEGACY_GRAZER_TUNING) : undefined);
     const over = this.faunaTuning()?.[a.kind];
     let t = requireHuntTuning(over !== undefined ? { ...base, ...over, stalk: over.stalk ?? base?.stalk } : base, a.kind);
     // E297 fight rules: a charger without a stalk (the boar) gets one — it comes for you instead of bolting

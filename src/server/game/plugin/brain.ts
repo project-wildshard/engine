@@ -1274,7 +1274,7 @@ export function createNativeHunt(host: SimHost, row: NativeHuntRow, ports: {
   if (bands !== null) host.useBodyBands({ rate: body => body.driven || (bands.scripted === true && body.scripted) || bands.states.includes(body.state) ? 'always'
     : bands.legacyKinds.includes(body.kind) ? 'legacy' : 'ai', ...(ports.present === undefined ? {} : { present: ports.present }) });
   const reach = (actor: HuntBody, point: Vector3): boolean => canReach(actor, point, host.physics);
-  const hunt = new StalkerBrain<HuntBody>({ pattern: 'hunt', config: { rng: ports.rng, fight: row.fight, faunaTuning: () => row.tuning, species: kind => {
+  const hunt = new StalkerBrain<HuntBody>({ pattern: 'hunt', config: { legacyTuning: 'v0', rng: ports.rng, fight: row.fight, faunaTuning: () => row.tuning, species: kind => {
       const known = ports.species.get(kind); if (known === undefined) throw new Error(`Native hunt has no species row '${kind}'`); return known; } },
     ports: { ground: ports.ground, nav: () => ports.nav, reach, wanderGoal: actor => ports.wanderGoal?.(actor.herd) ?? null, unaware: () => false,
       now: () => host.clock.now * 1000, sound: () => undefined,

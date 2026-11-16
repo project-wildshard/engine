@@ -1,7 +1,7 @@
 import { expect,test } from 'vitest';
 import { Vector3 } from 'three';
 import { Rng } from '../../../shared/engine/core/rng';
-import { HuntingStalkerCore,type HuntGround } from '../../../shared/engine/ai/huntPattern';
+import { HuntingStalkerCore,type HuntGround, type HuntConfig } from '../../../shared/engine/ai/huntPattern';
 import type { AnimalSim } from '../../../shared/engine/entities/AnimalSim';
 import { decodeTerrainTile,encodeTerrainTile,bilinearTerrainSamplers,type TerrainTileData } from '@wildshard/format/terrainTileBytes';
 import { bakedSamplers } from '@wildshard/format/bakedTerrainSampling';
@@ -50,4 +50,18 @@ test('hunt controller exposes its original ground, not a second registry or repl
   expect(core.ground).toBe(ground);ports.ground = { ...ground,heightAt: () => 99 };expect(core.ground).toBe(ground);
   expect(Reflect.set(core,'ground',ports.ground)).toBe(false);expect(core.ground.heightAt(0,0)).toBe(3);
   expect(() => new HuntingStalkerCore<AnimalSim>([]).ground).toThrow('Incompatible stalker hunt pattern');
+});
+
+// Older native managers retain their source contract until the M8 producer moves.
+test('historical hunt numbers require the explicit v0 owner and never relax authored tuning', () => {
+  const ground: HuntGround = { heightAt: () => 0,normalY: () => 1,trailDistance: () => Infinity,cabinMask: () => 0,inChunk: () => true,
+    streamAt: () => null,waterLevel: () => -Infinity,pond: () => null,sea: () => false,wetAt: () => false,trees: () => [],treeless: () => true,terrain: () => true,chunkHalf: 250 };
+  const ports = { ground,nav: () => null,reach: () => true,wanderGoal: () => null,unaware: () => false,now: () => 0,sound: () => undefined,charge: () => undefined };
+  const core = (config: Pick<HuntConfig, 'species' | 'legacyTuning'>) => new HuntingStalkerCore<AnimalSim>([], {
+    config: { rng: new Rng(7), fight: {}, faunaTuning: () => undefined, ...config }, ports, player: new Vector3(), sampleTerrain: () => undefined });
+  expect(() => core({ species: () => ({ aggressive: false }) }).tuningFor({ kind: 'deer' })).toThrow('Missing hunting numbers');
+  const historical = core({ legacyTuning: 'v0', species: () => ({ aggressive: false }) });
+  expect(historical.tuningFor({ kind: 'own.label' })).toMatchObject({ hp: 60, runSpeed: 6, freezeMin: 4, fleeUntil: 35 });
+  expect(core({ legacyTuning: 'v0', species: () => ({ aggressive: true }) }).tuningFor({ kind: 'own.label' })).toMatchObject({ hp: 100, runSpeed: 6.8, freezeMin: 1.5, fleeUntil: 40 });
+  expect(() => core({ legacyTuning: 'v0', species: () => ({ tuning: { ...historical.tuningFor({ kind: 'own.label' }), hp: Number.NaN } }) }).tuningFor({ kind: 'own.label' })).toThrow('Missing hunting numbers');
 });
