@@ -93,6 +93,14 @@ class Darwin:
             raise OSError(c.get_errno(), 'libproc census unavailable or owner exited')
         return value
 
+    def process(self, pid):
+        if type(pid) is not int or not 0 < pid < 2 ** 31:
+            raise ValueError('process PID must be a positive integer')
+        row = self.read(pid, 3, self.BSD)
+        born = row.seconds * 1_000_000_000 + row.micros * 1000
+        return Process(pid, row.parent, row.uid, f'{pid}:{born}', born,
+                       (row.name or row.comm).decode(errors='replace'), row.status == 5)
+
     def processes(self):
         count = self.lib.proc_listallpids(None, 0)
         if count <= 0:
@@ -109,10 +117,7 @@ class Darwin:
             if pid <= 0:
                 continue
             try:
-                row = self.read(pid, 3, self.BSD)
-                born = row.seconds * 1_000_000_000 + row.micros * 1000
-                rows[pid] = Process(pid, row.parent, row.uid, f'{pid}:{born}', born,
-                                    (row.name or row.comm).decode(errors='replace'), row.status == 5)
+                rows[pid] = self.process(pid)
             except OSError as error:
                 # An unrelated PID can end or be inaccessible during enumeration.
                 self.unreadable[pid] = error.errno
@@ -165,6 +170,16 @@ class Linux:
         left, right = text.index('('), text.rindex(')')
         return text[left + 1:right], text[right + 2:].split()
 
+    def process(self, pid):
+        if type(pid) is not int or not 0 < pid < 2 ** 31:
+            raise ValueError('process PID must be a positive integer')
+        directory = Path('/proc') / str(pid)
+        uid = directory.stat().st_uid
+        name, fields = self.stat(directory / 'stat')
+        born = int(fields[19])
+        return Process(pid, int(fields[1]), uid, f'{self.boot}:{pid}:{born}',
+                       self.epoch_ns + born * self.quantum_ns, name, fields[0] == 'Z')
+
     def processes(self):
         rows, present = {}, set()
         self.unreadable = {}
@@ -176,11 +191,8 @@ class Linux:
                     raise CensusRefused('census PID inventory exceeds cap')
                 present.add(int(directory.name))
                 try:
-                    uid = directory.stat().st_uid
-                    name, fields = self.stat(Path(directory.path) / 'stat')
-                    pid, born = int(directory.name), int(fields[19])
-                    rows[pid] = Process(pid, int(fields[1]), uid, f'{self.boot}:{pid}:{born}',
-                                        self.epoch_ns + born * self.quantum_ns, name, fields[0] == 'Z')
+                    pid = int(directory.name)
+                    rows[pid] = self.process(pid)
                 except (OSError, ValueError, IndexError) as error:
                     self.unreadable[int(directory.name)] = error.errno if isinstance(error, OSError) else None
                     continue
