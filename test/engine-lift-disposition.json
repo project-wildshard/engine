@@ -11389,5 +11389,222 @@
     "sourceBlob": "67f4807b9f4001acf13ee8213404220f2b40923f",
     "destinationRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
     "retirementProof": "No cases retired; original assertions and negative controls retained with owning-repo imports/fixtures."
+  },
+  {
+    "repo": "engine",
+    "file": "test/arena-ground.test.ts",
+    "outcome": "restored",
+    "target": "test/arena-ground.test.ts",
+    "decision": "CI21 E-GAME: CI12: the renderer-free arena room ground (volumes, floor, sand, piles, drains, clears and the 15 Hz publishing clock) answers exactly as the room's inline code did and continues from its checkpoint, and the portal law continues exactly through a fade. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "the ground answers as the room did, and continues from its checkpoint",
+      "the portal law continues from its checkpoint exactly, through a fade"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "f5d0ef14b991fa1903a424a0665255f91502bd22",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/arena-portal.test.ts",
+    "outcome": "restored",
+    "target": "test/arena-portal.test.ts",
+    "decision": "CI21 E-GAME: CI12: the arena room portal law makes the same decisions the inline portal did, frame by frame: same program inputs at the same frames, and the same entries, exits, slows and fades over a walk to the door, through the corridor and chamber, a fight and both kinds of exit. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "the portal law decides as the inline portal did, frame by frame"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "c8d38c6b4e149e582ecf97e5045e87cf12596bfd",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/elite-native-kernels.test.ts",
+    "outcome": "restored",
+    "target": "test/elite-native-kernels.test.ts",
+    "decision": "CI21 E-GAME: Native elite kernel rows keep the original kernels, contact selection, the second reach check, lifecycle routing, ledge bounds, terrain sampler receiver and damage-contact precedence. They refuse bad suffixes, owners and callables before registration, close callbacks on (sliced) ancestor retirement, and resume or refuse correctly across a physics snapshot replacement. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "native kernel rows preserve original kernels, contact selection and the second reach check",
+      "independent quarry rows choose original kernels and route only their declared lifecycle ids",
+      "all native profile/contact suffixes and authored getters refuse before registration or entropy",
+      "a trailing pouncer rejects the original ledge bound before any controller construction",
+      "native terrain queries preserve the original concrete sampler receiver and fence replacement",
+      "native owner and callable replacement refuse before construction and ancestor disposal closes the binder",
+      "sliced ancestor retirement closes native callbacks before the child is disposed",
+      "equal native damage amounts retain the declared pattern contact precedence",
+      "native kernels resume against the restored physics owner after real snapshot replacement",
+      "`a physics replacement at reach ${String(swapAt)} refuses before damage`"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "f41cecb7009a65acd443827cb2aa737ea52446d0",
+    "retirementProof": "No cases retired. Original file restored byte for byte; its engine-owned frozen fixture dependencies were repaired in prior commits. Complete original native ownership and continuation assertions run."
+  },
+  {
+    "repo": "engine",
+    "file": "test/encounter-room.test.ts",
+    "outcome": "restored",
+    "target": "test/encounter-room.test.ts",
+    "decision": "CI21 E-GAME: P1-E3.4/J107/J104: bosses and elites serve whoever is there. A bot past the threshold is struck instead of the lead. A fallen bot goes back alone while the room keeps its progress through a save. The fight resets only when everyone has left. Health and targets scale with the players engaged at the start, on the platform curves. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "a boss wakes for a bot past its threshold and strikes that bot, not the lead",
+      "J107: a bot that falls goes back alone, the room carries on with its progress, through a save",
+      "J107: the fight resets only when everyone has left",
+      "J104: health and targets scale with the players engaged at the start, on the platform curves",
+      "J104: from five players a boss blow lands on the next nearest too",
+      "a client over the real codec reads the same fight the server runs",
+      "an elite engages a bot at its lair and leashes only when nobody is near",
+      "native elite kernels hurt and knock the player nearest the elite"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "0ebae40bdff6827a3b0a56692d89214fa76f8770",
+    "retirementProof": "No cases retired. Original file restored byte for byte; its engine-owned frozen fixture dependencies were repaired in prior commits. Complete original native ownership and continuation assertions run."
+  },
+  {
+    "repo": "engine",
+    "file": "test/taming-binding-order.test.ts",
+    "outcome": "restored",
+    "target": "test/taming-binding-order.test.ts",
+    "decision": "CI21 E-GAME: Native taming: a mount refusal comes before any player pose, entropy or continuation change; due sampling draws three values even when the mount was just lost; a native mount callback can query taming without replacing the outer action loans; and a bond replaces the original companion in native allocation and publication order. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "native mount refusal precedes player pose, entropy and taming continuation changes",
+      "due sampling draws three values even when the mounted actor was just lost",
+      "a native mount callback can query taming without replacing the outer action loans",
+      "a bond replaces the original companion in native allocation and publication order"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "507ca6ce23d7f3daff6ef9baaeda205b314e56bf",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/taming-guest-legacy.test.ts",
+    "outcome": "restored",
+    "target": "test/taming-guest-legacy.test.ts",
+    "decision": "CI21 E-GAME: Guest/native taming keeps the historical wire and native order from every saved state, eligible queries are read-only, an original mid-round checkpoint continues byte-exactly, and driven-off and shot events keep one-shot trust, alert and historical drove ordering. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "guest/native taming preserves historical wire and native order from %s",
+      "eligible queries are read only and an original mid-round checkpoint continues byte exactly",
+      "driven-off and shot events preserve one-shot trust, alert and historical drove ordering"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "29c77f0f36e7fcd8e879c53f41a81aa8ab4bd177",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/taming-world-actions.test.ts",
+    "outcome": "restored",
+    "target": "test/taming-world-actions.test.ts",
+    "decision": "CI21 E-GAME: V2 world actions resolve every taming operation to the same native owners. They refuse whole banks with undeclared ids, foreign target kinds, non-finite operands or reserved words; refuse before prefix effects on a missing loan, replaced service, earlier retirement, sliced ancestor or replaced mount; and refuse malformed continuation keys before acceptance. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "all taming operations resolve declared kinds to the same native owners",
+      "undeclared ids, foreign target kinds, nonfinite operands and reserved words refuse whole banks",
+      "a missing native loan or replaced service refuses before prefix effects",
+      "retirement by an earlier native effect refuses the next operation",
+      "taming refuses a sliced ancestor or replaced mount without drawing or projecting",
+      "malformed %s refuses continuation and native prefix before acceptance"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "206fb4991e9d4fa811bc6455c526f44f31e09c67",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-v2-group-authorities.test.ts",
+    "outcome": "restored",
+    "target": "test/script-v2-group-authorities.test.ts",
+    "decision": "CI21 E-GAME: Real group AS drives the original pack and herd brains: contact, sound, claim and attack effects keep receiver and synchronous order; malformed suffixes or foreign groups reject every prefix; retirement and reentry fence later effects; token loans keep the original per-cap continuation. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "original pack contact, context sound/claim and body attack methods retain receiver and synchronous order",
+      "original herd contact/pass-through/context hurt and knockdown preserve original native owners",
+      "a malformed suffix or foreign concrete group rejects all contact, attack and context prefixes",
+      "contact reentry cannot retarget body effects and ancestor retirement fences the remaining suffix",
+      "strict native names and attack/contact arities admit without executable selectors",
+      "earlier contact adoption retains emitted body and optional original notification stays optional",
+      "environment result reads the same original ports only at its post-contact native slot",
+      "concrete page Animal callback owners remain typed without widening or wrapping",
+      "retirement inside original token registration prevents the subsequent context claim",
+      "original herd notifications and adoption keep captured old leader and original members order",
+      "native token selection reuses the original per-cap cache and rejects masks without a token mutation",
+      "group sensing uses unchanged original ports and current context without an augmented senses object",
+      "malformed notification suffix prevents native adoption and wrong nearest callable fails before query",
+      "the existing two-stream capacity admits shared-only initialization and later both original owners",
+      "token loans preserve the legacy minimal-member group and exact original per-cap continuation",
+      "compiled native declarations stay detached and frozen without per-operation cloning"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "3e6f2f140fd17007d3e7acfca04f0af970001e34",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-v2-group-context.test.ts",
+    "outcome": "restored",
+    "target": "test/script-v2-group-context.test.ts",
+    "decision": "CI21 E-GAME: Real group AS drives native hunt steering, path cache and confinement in emitted order; steering reentry does not retarget emitted actors; a missing or foreign context or a malformed suffix refuses before any publication; context rows have strict named admission. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "real native Hunt steering, path cache and confinement match the original context in emitted order",
+      "steering reentry changes current owner without retargeting the already-emitted actor",
+      "a missing/foreign context or malformed suffix refuses before any prefix and state/RNG publication",
+      "same-object method replacement and prefix ancestor retirement fence later context effects",
+      "context operation rows have strict named admission and fixed member operand arity"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "7944899868d9f8b85930ac10515fbf4958cc64ad",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-v2-group-native.test.ts",
+    "outcome": "restored",
+    "target": "test/script-v2-group-native.test.ts",
+    "decision": "CI21 E-GAME: Real group AS resumes after native normal sampling with exact shared RNG order; only emitted member senses run; page aggression goes through register then ai.claim and native aggression through its token owner; mixed or missing suffixes refuse before sampling; a consumed segment cannot run twice. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "real AS resumes after original normal sampling in the same call with exact shared RNG order",
+      "only emitted member senses execute at conditional segments with their original arguments and receivers",
+      "page aggression uses original register then ai.claim, native aggression uses its original token owner",
+      "mixed or missing native suffix refuses before sampling, claim, bank or RNG publication",
+      "callable replacement and ancestor retirement refuse prepared publication, and run is once-only",
+      "strict named rows reject malformed result arity, member selectors, radii and unknown operations",
+      "a single native result retains full operand and channel preflight and frozen publication",
+      "retirement during a native query prevents result publication and the consumed segment cannot run twice"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "4a38504b641f39f7f3c8026bd3f592472239582a",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-v2-group-reference-effects.test.ts",
+    "outcome": "restored",
+    "target": "test/script-v2-group-reference-effects.test.ts",
+    "decision": "CI21 E-GAME: Group AS reference effects match native damage, stagger and health in emitted order; crowd prey damage authority is lent without AnimalSim storage; unknown or foreign references publish nothing; preflight pins membership and ancestor retirement fences suffix effects. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "actual AS reference effects match original native damage, stagger and health in emitted order",
+      "the original crowd prey damage authority is lent without AnimalSim storage",
+      "unknown or foreign reference and malformed suffix publish no member prefix, damage, state or RNG",
+      "preflight pins original membership and callable but later adoption never retargets emitted actors",
+      "ancestor retirement by an earlier native result prevents reference and member suffix effects",
+      "reference effect grammar is strict with fixed handles and no nullable or member target aliases"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "48b407f47482f75e4d6312a2ae25309b519f146b",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/script-v2-group-references.test.ts",
+    "outcome": "restored",
+    "target": "test/script-v2-group-references.test.ts",
+    "decision": "CI21 E-GAME: Native crowd prey supplies detached pose columns, a stable wire and the original damage authority; foreign, removed or replaced reference loans refuse before bank or RNG publication; native nearest uses the declared roster, a strict horizontal range and the first live tie. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "real native crowd prey supplies detached pose columns, stable wire and original damage authority",
+      "foreign, removed or replaced reference loans refuse before group bank or RNG publication",
+      "pose capture admission is strict, absent bindings refuse, and ancestor retirement fences the original owner",
+      "native nearest uses the declared actual roster, horizontal strict range and first live tie"
+    ],
+    "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
+    "sourceBlob": "cf03bde7af6db6c3c477815e0f260d48ca926842",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
   }
 ]

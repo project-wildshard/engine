@@ -1,10 +1,9 @@
-import {lendNalatiRiding,ridingWitnessBytes} from './nalati-riding-loan';
+import {lendFrozenRiding as lendNalatiRiding, frozenRidingWitness as ridingWitnessBytes, frozenRiding as programs} from './frozen/runtimePrograms';
 import {TamingBinding as LegacyTamingBinding} from './tamingLegacyBinding';
 import { Vector3 } from 'three';
 import { TamingSession as TamingBinding } from '../../src/shared/game/riding/taming';
 import { Scope } from '../../src/shared/engine/app/scope';
 import type { TamingHorse, TamingHerd, TamingServices } from '../../src/shared/game/riding/bindingTypes';
-import { NALATI_RIDING_PROGRAMS as programs } from './nalati-riding';
 
 export function tamingRig(saved: string | null = null, actorId='wild',companionId:string|null=null,kind='ordinary',scale=1,legacy=false,scope=new Scope('taming-order'),draws:readonly number[]=[.25]) {
   const events: string[] = [];

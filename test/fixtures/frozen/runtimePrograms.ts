@@ -1,4 +1,4 @@
-import { parse, object, string } from 'valibot';
+import { parse, object, string, record, number } from 'valibot';
 import { DecisionScriptsSchema } from '@wildshard/format/decisionScripts';
 import { ReturnProjectionV2Schema } from '@wildshard/format/returnProjectionV2';
 import { ReturnProgramSchema } from '@wildshard/format/namedJsonContracts';
@@ -9,7 +9,7 @@ import type { Scope } from '../../../src/shared/engine/app/scope';
 import { frozenNalatiBytes, frozenNalatiJson, frozenAdmissionAssets, frozenAdmissionModules } from './nalati';
 
 const programSchema = object({...ReturnProgramSchema.entries, script: DecisionScriptsSchema.pipe[2].item, v2: ReturnProjectionV2Schema});
-export const frozenRiding = parse(object({approach: programSchema, breaking: programSchema, riding: programSchema}), frozenNalatiJson('nalati-riding-programs.json'));
+export const frozenRiding = parse(object({initial: record(string(), number()), approach: programSchema, breaking: programSchema, riding: programSchema}), frozenNalatiJson('nalati-riding-programs.json'));
 export const frozenHeld = parse(object({held: object({program: programSchema})}), frozenNalatiJson('nalati-held.json')).held;
 export const frozenTitanPrograms = parse(object({
   attack: programSchema, fire: programSchema,
@@ -34,6 +34,19 @@ export function lendFrozenPasture(owner: Scope): void {
 }
 
 export const frozenRidingWitness = frozenNalatiBytes('nalati-riding-witness.bin');
+const ridingArtifact = frozenRiding.approach.v2.artifact;
+const ridingScript = parse(object({module: string()}), frozenRiding.approach.script);
+const ridingModules = new Map([
+  [ridingScript.module.slice('blobs/wasm/'.length, -'.wasm'.length), frozenRidingWitness],
+  [ridingArtifact.hash, frozenNalatiBytes('nalati-riding-wasm.wasm')],
+]);
+const ridingDeclarations = parse(ReturnModulesSchema, [{id: 'nalati.mounts.projection', module: `blobs/wasm/${ridingArtifact.hash}.wasm`,
+  side: 'sim', abi: 2, lane: ridingArtifact.lane, pages: ridingArtifact.pages, ioBytes: ridingArtifact.ioBytes,
+  compilerRevision: ridingArtifact.compilerRevision, admissionRevision: ridingArtifact.admissionRevision}]);
+/** Original riding-only loan, without borrowing the full population bank. */
+export function lendFrozenRiding(owner: Scope): void {
+  ReturnProgram.lendModules(owner, ridingModules, ridingDeclarations);
+}
 export const frozenTitanModule = frozenNalatiBytes('nalati-titan-wasm.wasm');
 const attack = Buffer.from(frozenNalatiBytes('nalati-titan-witness.bin')).toString('base64');
 const wind = Buffer.from(frozenNalatiBytes('nalati-pasture-witness.bin')).toString('base64');

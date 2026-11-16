@@ -8,8 +8,7 @@ import { Rng } from '../src/shared/engine/core/rng';
 import { GroupStepV2, prepareGroupNativeV2, type GroupStepNativeOwnersV2, type GroupStepOperationV2 } from '../src/shared/engine/script/groupStepV2';
 import type { V2ColumnOwners } from '../src/shared/engine/script/observationColumnsV2';
 import { parseGroupStepV2, GroupStepV2Schema, groupStepLayoutV2 } from '@wildshard/format/scriptGroupStepV2';
-import { compileScriptV2 } from '../src/sharddev/bake/compileScriptV2';
-import { v2CoreSource } from '../src/sharddev/as/wsV2';
+import {frozenV2Guest as compileScriptV2, frozenV2CoreSource as v2CoreSource} from './fixtures/frozen/scriptGuests';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
 
