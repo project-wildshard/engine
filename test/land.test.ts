@@ -277,7 +277,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     g.commit(kept, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     expect(g.land(kept, ['--keep']).stdout).not.toContain('cleaned');
     expect(existsSync(kept)).toBe(true);
-    expect(parseArgs([])).toEqual({ pollSeconds: 30, timeoutMinutes: 60, appearMinutes: 5, rounds: 5, keep: false, preflight: true });
+    expect(parseArgs([])).toEqual({ pollSeconds: 60, timeoutMinutes: 60, appearMinutes: 5, rounds: 5, keep: false, preflight: true });
     expect(parseArgs(['--no-preflight']).preflight).toBe(false);
   }, 60_000);
 
