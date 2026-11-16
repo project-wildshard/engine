@@ -20,6 +20,7 @@ const LOCK = 'src/shared/engine/saves/saves.lock.json';
 const OUTSIDE: Readonly<Record<string, string>> = {
   'src/e2e/t1/fixtures.ts': 'browser fixture seeds existing device keys; it defines no persisted save contract',
   'src/e2e/t1/online-fixtures.ts': 'browser fixture seeds existing device keys; it defines no persisted save contract',
+  'src/e2e/t1/journey.spec.ts': 'browser journey seeds the existing devMode device key; it defines no persisted save contract',
   'src/shared/game/loadout/persistence.ts': 'a shard file supplies its key, fields and version (rows.persistence): the shard owns that ABI',
   'src/client/game/pageSaveKeys.ts': 'stubs: they only name keys an import keeps',
   'src/shared/game/plugin/director.ts': 'a director queue scope, not a save key',
