@@ -25,3 +25,11 @@ The collector reads every available receipt in that window and its anchor;
 incomplete lookups remain advisory. Product sharing follows the existing
 shard wall check, so suite setup is not charged to unrelated test shards.
 The rebased 15-test browser suite and focused checks passed locally.
+
+Local pre-push validation after the save-lock refusal: the two browser
+fixtures only seed existing device keys, so the save inventory classifies
+them explicitly. No save definition or lock fingerprint changes.
+`check:saves` passes all 3 checks. The actual exported static lane passes
+lint, types, format, sides, asks, page events, wire and saves. The split
+selection for the remote branch range passes 31 files / 153 tests;
+`test:kit` passes 12. The previously rebased 15 browser specs also pass.
