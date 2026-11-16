@@ -221,6 +221,9 @@
     ]
   },
   "exports": {
+    "./lint/sim-closure.mjs": "./lint/sim-closure.mjs",
+    "./scripts/no-binary-json.mjs": "./scripts/no-binary-json.mjs",
+    "./scripts/source-generation-outputs.json": "./scripts/source-generation-outputs.json",
     "./core/faults": "./src/shared/engine/core/faults.ts",
     "./core/fixedStep": "./src/shared/engine/core/fixedStep.ts",
     "./core/portableMath": "./src/shared/engine/core/portableMath.ts",
@@ -1255,6 +1258,7 @@
     "./scripts/frame-floor-settings.mjs": "./scripts/frame-floor-settings.mjs",
     "./scripts/gen-api.mjs": "./scripts/gen-api.mjs",
     "./scripts/gen-budget-derivations.mjs": "./scripts/gen-budget-derivations.mjs",
+    "./scripts/gen-programs.mjs": "./scripts/gen-programs.mjs",
     "./scripts/gen-shard-words.mjs": "./scripts/gen-shard-words.mjs",
     "./scripts/gen-starter-arm-clips.mjs": "./scripts/gen-starter-arm-clips.mjs",
     "./scripts/gen-starter-bag.mjs": "./scripts/gen-starter-bag.mjs",
