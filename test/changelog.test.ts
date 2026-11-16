@@ -1,6 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- It reads the real CHANGELOG.md and package.json.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
+import { createTempRepo } from '../src/test/helpers/git.ts';
 import { engineRelease, noteProblem, parseChangelog, pushProblems, releaseProblems } from '../scripts/changelog.mjs';
 import { buildLabel, shortBuild } from '../src/client/engine/ui/buildCheck';
 import { changelogDate, shortBuild as menuShortBuild, versionLabel } from '../src/client/game/whatsNewBanner';
@@ -72,4 +73,16 @@ test('the title names a build by the engine version and the 7-character commit',
   expect(versionLabel('0.1.14', '5a43d1c', '')).toBe('v0.1.14 · 5a43d1c');
   expect(changelogDate('2026-11-10')).toBe('10 NOV 2026');
   expect(changelogDate('')).toBe('');
+});
+
+
+test('release branch pushes check their own committed version and changelog', () => {
+  const repo = createTempRepo();
+  try {
+    const valid = repo.commit({ 'package.json': JSON.stringify({ version: '1.2.3' }), 'CHANGELOG.md': SECTION('1.2.3', [NOTE]) }, 'Release notes');
+    const missing = repo.commit({ 'CHANGELOG.md': SECTION('1.2.2', [NOTE]) }, 'Missing release notes');
+    const line = (sha: string): string => `refs/heads/release/v1.2.3 ${sha} refs/heads/release/v1.2.3 ${'0'.repeat(40)}\n`;
+    expect(pushProblems(line(valid), repo.dir)).toEqual([]);
+    expect(pushProblems(line(missing), repo.dir).join()).toMatch(/release\/v1\.2\.3:.*no section/u);
+  } finally { repo.cleanup(); }
 });

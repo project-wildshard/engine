@@ -62,6 +62,17 @@ describe('pre-commit hook', () => {
     const result = run(['commit', '-q', '-m', MSG]);
     assert.equal(result.status, 0, result.stderr);
   });
+  test('release worktrees commit only on their matching release branch', () => {
+    for (const name of ['v1.2.3', 'dryrun-v1.2.3']) {
+      const { run, write } = planWorktree(`release-${name}`, `release/${name}`);
+      write('b.txt', 'release notes\n');
+      const result = run(['commit', '-q', '-m', MSG]);
+      assert.equal(result.status, 0, result.stderr);
+      run(['switch', '-q', '-c', 'release/v9.9.9']);
+      write('c.txt', 'wrong release\n');
+      blocked(run(['commit', '-q', '-m', MSG]), /not release\//);
+    }
+  });
   test('a plan worktree refuses another branch or a detached HEAD', () => {
     const { run, write } = planWorktree('foo', 'plan/bar');
     write('b.txt', 'b\n');

@@ -63,3 +63,11 @@ describe('session brief: main only', () => {
     assert.doesNotMatch(out, /!!/);
   });
 });
+
+test('the session brief allows version release remotes and still names stray refs', () => {
+  const { git, brief } = setup();
+  git(['update-ref', 'refs/remotes/origin/release/v1.2.3', 'HEAD']);
+  assert.doesNotMatch(brief(), /!! remote/);
+  git(['update-ref', 'refs/remotes/origin/release/feature', 'HEAD']);
+  assert.match(brief(), /!! remote origin\/release\/feature/);
+});

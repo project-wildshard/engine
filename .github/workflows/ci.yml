@@ -18,7 +18,7 @@ on:
   # exact SHA to go green here, then fast-forwards main to it. Main's run of
   # that same SHA reuses the branch run (scripts/ci-exact-reuse.mjs).
   push:
-    branches: [main, 'plan/**']
+    branches: [main, 'plan/**', 'release/**']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -48,10 +48,10 @@ concurrency:
   # every commit before it (the descendant-green rule: scripts/main-watch.mjs reads a cancel as superseded, never red,
   # and each run's summary names the commits it covers). One group per SHA ran 131 of 2026-11-13's 135 main pushes
   # in full (a land rebases, so exact reuse rarely fires): 39 % of the org's runner time in the 15:00-18:00 Cancun
-  # burst, when lands queued 15-25 min behind the 20-job cap. A release commit (`chore(release): vX.Y.Z`, repo-kit
-  # release.sh) keeps its own group: release --finish and server-release need that exact SHA green.
-  group: ci-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && format('-qualification-{0}', github.run_id) || '' }}${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'chore(release):') && format('-{0}', github.sha) || '' }}
-  # A newer push to the same plan branch supersedes its older SHA; main never cancels.
+  # burst, when lands queued 15-25 min behind the 20-job cap. Releases run on their own release/vX.Y.Z ref
+  # (RELEASE-BRANCHES RB1); their CI is independent of main and is never cancelled.
+  group: ci-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && format('-qualification-{0}', github.run_id) || '' }}
+  # A newer push to the same plan branch supersedes its older SHA; main and release refs never cancel.
   cancel-in-progress: ${{ github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/plan/') }}
 
 jobs:

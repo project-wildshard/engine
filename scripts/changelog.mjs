@@ -113,7 +113,8 @@ export function pushProblems(lines, cwd = process.cwd()) {
     if (/^0+$/u.test(local)) return [];
     const tag = /^refs\/tags\/(v\d+\.\d+\.\d+)$/u.exec(remote)?.[1];
     if (tag !== undefined) return problemsAt(`${local}^{commit}`, tag, cwd).map(p => `${tag}: ${p}`);
-    return remote === 'refs/heads/main' ? problemsAt(local, undefined, cwd).map(p => `main: ${p}`) : [];
+    return remote === 'refs/heads/main' || remote.startsWith('refs/heads/release/')
+      ? problemsAt(local, undefined, cwd).map(p => `${remote.slice('refs/heads/'.length)}: ${p}`) : [];
   });
 }
 

@@ -1036,7 +1036,7 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect((await reused([run()], ciJobs, {}, { scope: (at: number) => String(at > Date.parse('2026-11-10T20:10:00Z')), now: steady.now })).reason).toMatch(/predates a quarantine or lift-pending change/u);
     expect((await exactBranchProof('ci.yml', env('http://127.0.0.1:9'), steady)).reused).toBe(false);
   });
-  test('main pushes coalesce into one concurrency group; a release commit keeps its own (CIQ1, J222)', () => {
+  test('main pushes coalesce while release branches run independently (RB1)', () => {
     const text = readFileSync('.github/workflows/ci.yml', 'utf8');
     const top = text.split('\njobs:\n')[0] ?? '';
     const template = /^ {2}group: (.+)$/mu.exec(top)?.[1];
@@ -1054,10 +1054,12 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     // A burst of main pushes shares one group: GitHub keeps the running run and only the newest pending one.
     expect(evaluate(template, main)).toBe(evaluate(template, next));
     expect(evaluate(cancel, main)).toBe('false');
-    // release.sh --finish and server-release need the release commit's own exact-SHA run: never coalesced away.
-    const release = { ...next, event: { head_commit: { message: 'chore(release): v0.1.19\n\nbody' } } };
+    // Release CI is scoped to its own ref and main cannot cancel it.
+    const release = { ...next, ref: 'refs/heads/release/v0.1.19' };
     expect(evaluate(template, release)).not.toBe(evaluate(template, main));
-    expect(evaluate(template, release)).not.toBe(evaluate(template, { ...release, sha: 'c'.repeat(40) }));
+    expect(evaluate(template, release)).not.toBe(evaluate(template, { ...release, ref: 'refs/heads/release/v0.1.20' }));
+    expect(evaluate(cancel, release)).toBe('false');
+    expect(evaluate(template, { ...main, event: { head_commit: { message: 'chore(release): v0.1.19' } } })).toBe(evaluate(template, main));
     // A qualification dispatch never replaces a pending publication run.
     expect(evaluate(template, { ...main, event_name: 'workflow_dispatch' })).not.toBe(evaluate(template, main));
     // A plan branch keeps one group, and its newer push cancels the older run.
@@ -1068,7 +1070,7 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
 
   test('ci runs on plan/** pushes; every job gates itself on the reuse check, and ring-1 is gone (CI-JOB-PACKING)', () => {
     const text = readFileSync('.github/workflows/ci.yml', 'utf8');
-    expect(text).toMatch(/push:\n {4}branches: \[main, 'plan\/\*\*'\]/u);
+    expect(text).toMatch(/push:\n {4}branches: \[main, 'plan\/\*\*', 'release\/\*\*'\]/u);
     expect(text).toContain("startsWith(github.ref, 'refs/heads/plan/')");
     expect(existsSync('.github/workflows/ring-1.yml')).toBe(false);
     expect(readFileSync('.github/workflows/engine-boundaries.yml', 'utf8')).not.toMatch(/^ {2}push:/mu);

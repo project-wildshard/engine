@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Optional promotion helper. The schedule never tags; J184 leaves promotion in charge.
+// Optional promotion helper. A nightly selects a release cut point; release.sh owns branches and tags.
 // J167: require the downloaded exact-SHA green nightly verdict before any network/write.
 // A commit that already has a version tag is left alone: an unchanged tree needs no second release.
 import { execFileSync } from 'node:child_process';
@@ -25,8 +25,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (git('tag', '--points-at', 'HEAD').split('\n').some((tag) => /^v\d/u.test(tag))) console.log('This commit is already tagged');
   else {
     const tag = nextTag(git('tag', '--list', 'v*').split('\n'));
-    git('tag', tag);
-    git('push', 'origin', tag);
-    console.log(`Tagged ${tag}`);
+    console.log(`release.sh ${tag} --prepare --from ${git('rev-parse', 'HEAD')}`);
   }
 }

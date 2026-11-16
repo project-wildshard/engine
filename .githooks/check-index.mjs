@@ -30,9 +30,13 @@ if (process.env.ALLOW_BRANCH !== '1') {
   if (linked) {
     const slug = planWorktreeSlug(top, common);
     if (slug === null) problems.push(`this linked worktree (${top}) is not <repo>/.worktrees/<slug>; make one with git worktree add -b plan/<slug> .worktrees/<slug> origin/main`);
-    else if (rebasing ? rebaseHeadName(rebaseDir) !== `refs/heads/plan/${slug}` : branch !== `plan/${slug}`) {
+    else {
+      const release = /^release-((?:dryrun-)?v\d+\.\d+\.\d+)$/u.exec(slug)?.[1];
+      const expected = release === undefined ? `plan/${slug}` : `release/${release}`;
+      if (rebasing ? rebaseHeadName(rebaseDir) !== `refs/heads/${expected}` : branch !== expected) {
       const what = rebasing ? `a rebase of ${rebaseHeadName(rebaseDir) ?? 'a detached HEAD'}` : branch ? `branch "${branch}"` : 'detached';
-      problems.push(`HEAD is ${what}, not plan/${slug} (this worktree's plan branch)`);
+      problems.push(`HEAD is ${what}, not ${expected} (this worktree's branch)`);
+      }
     }
   } else if (branch !== 'main' && !rebasing) {
     problems.push(`HEAD is ${branch ? `branch "${branch}"` : 'detached'}, not main; plan work belongs in <repo>/.worktrees/<slug> on plan/<slug>`);
