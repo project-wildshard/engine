@@ -14,6 +14,10 @@ on:
         description: Diagnose the Ring 3 sender only (does not qualify Ring 2 or a release)
         type: boolean
         default: false
+      cook_cache_only:
+        description: Diagnose real cook-cache reuse only (does not qualify Ring 2 or a release)
+        type: boolean
+        default: false
       diagnostic_head:
         description: Diagnose one committed head only (no nightly qualification)
         type: string
@@ -38,11 +42,11 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: nightly-${{ github.ref }}${{ inputs.suite_only && '-suite-diagnostic' || '' }}${{ inputs.diagnostic_head && format('-head-{0}-{1}', inputs.diagnostic_head, inputs.diagnostic_browser) || '' }}${{ inputs.diagnostic_drill && '-fault-drill' || '' }}
+  group: nightly-${{ github.ref }}${{ inputs.suite_only && '-suite-diagnostic' || '' }}${{ inputs.cook_cache_only && '-cook-cache-diagnostic' || '' }}${{ inputs.diagnostic_head && format('-head-{0}-{1}', inputs.diagnostic_head, inputs.diagnostic_browser) || '' }}${{ inputs.diagnostic_drill && '-fault-drill' || '' }}
   cancel-in-progress: false
 jobs:
   ring3:
-    if: always() && !inputs.diagnostic_head && !inputs.diagnostic_drill && (needs.report.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.ring3_only))
+    if: always() && !inputs.cook_cache_only && !inputs.diagnostic_head && !inputs.diagnostic_drill && (needs.report.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.ring3_only))
     needs: report
     uses: ./.github/workflows/ring-3.yml
     with:
@@ -51,7 +55,7 @@ jobs:
       NIGHTLY_APP_CLIENT_ID: ${{ secrets.NIGHTLY_APP_CLIENT_ID }}
       NIGHTLY_APP_PRIVATE_KEY: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
   plan:
-    if: ${{ !inputs.ring3_only && !inputs.diagnostic_head && !inputs.diagnostic_drill }}
+    if: ${{ !inputs.ring3_only && !inputs.cook_cache_only && !inputs.diagnostic_head && !inputs.diagnostic_drill }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -70,7 +74,7 @@ jobs:
       - id: plan
         run: echo "matrix=$(node scripts/nightly.ts plan)" >> "$GITHUB_OUTPUT"
   tests:
-    if: ${{ !inputs.diagnostic_head && !inputs.diagnostic_drill }}
+    if: ${{ !inputs.cook_cache_only && !inputs.diagnostic_head && !inputs.diagnostic_drill }}
     needs: plan
     strategy:
       fail-fast: false
@@ -111,7 +115,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   heads:
-    if: ${{ !inputs.suite_only && !inputs.diagnostic_head && !inputs.diagnostic_drill }}
+    if: ${{ !inputs.cook_cache_only && !inputs.suite_only && !inputs.diagnostic_head && !inputs.diagnostic_drill }}
     needs: plan
     strategy:
       fail-fast: false
@@ -172,7 +176,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   report:
-    if: always() && !inputs.ring3_only && !inputs.suite_only && !inputs.diagnostic_head && !inputs.diagnostic_drill
+    if: always() && !inputs.cook_cache_only && !inputs.ring3_only && !inputs.suite_only && !inputs.diagnostic_head && !inputs.diagnostic_drill
     needs: [plan, tests, heads]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -221,7 +225,7 @@ jobs:
           retention-days: 7
 
   head-diagnostic:
-    if: github.event_name == 'workflow_dispatch' && (inputs.diagnostic_head != '' || inputs.diagnostic_drill)
+    if: github.event_name == 'workflow_dispatch' && !inputs.cook_cache_only && (inputs.diagnostic_head != '' || inputs.diagnostic_drill)
     runs-on: ${{ inputs.diagnostic_browser == 'webkit' && 'macos-15' || 'ubuntu-24.04' }}
     timeout-minutes: 75
     env:
@@ -278,4 +282,29 @@ jobs:
             tmp/nightly/reports/**/failures/**/*.json
             tmp/nightly/reports/drill.json
           if-no-files-found: warn
+          retention-days: 7
+
+  # TC28/J186: a real week of reports before explicit admission. The
+  # artifact's complete:true, never this report-only job's green, is proof.
+  cook-cache:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.cook_cache_only)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - name: Actual input closure, persistent hit, revision isolation and GC race
+        run: node --import ./scripts/bake-loader.mjs --test scripts/cook-cache.proof.ts
+      - name: Real cold, encoder reuse and independent cold cook
+        run: node scripts/cook-cache-hosted.proof.mjs
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cook-cache
+          path: tmp/cook-cache-report
+          if-no-files-found: error
           retention-days: 7

@@ -69,6 +69,25 @@ The previous completed nightly's verdict, including a red one, supplies
 the new/existing/resolved comparison. An unavailable or expired baseline
 is stated plainly; current failures still hold the tag.
 
+## Cook cache: TC28
+
+TC28's `cook-cache` job runs on scheduled nights and explicit
+`cook_cache_only=true` dispatches. It is report-only under J186; its
+artifact must say `complete:true` before anyone claims the proof passed.
+The dispatch skips the ordinary suite, head matrix, verdict and Ring3,
+uses its own concurrency group, and cannot qualify a full night/release.
+
+The quick three-case proof checks every cook input (including a newly
+imported input), a persistent hit through a fresh worker with a counting
+child, two revisions' own headers and an interleaved GC. It runs outside
+hooks. The hosted-only companion runs actual prime/reused/independent
+cold Template2 cooks through the bounded worker and real simulation
+prover, checks unchanged encoder-cache inode/timestamp/body identities, and compares product keys and byte
+hashes plus every server file and the full index except elapsed time.
+It rejects retries, records time/RSS, verifies the quick receipt, and
+refuses a local invocation. J370 keeps unmeasured proof legal. New tests
+need their own green week before an explicit admission decision.
+
 ## TC22: the release entry reads the latest nightly
 
 Engine's pre-push reads version tags through `scripts/release-nightly.ts`.
