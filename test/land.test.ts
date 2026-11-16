@@ -1199,7 +1199,9 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
       expect(body, name).not.toMatch(/^ {4}needs:/mu);
       if (name !== 'tests' && name !== 'products') {
         // CIQ1: main-only jobs skip plan/** runs by ref and never reuse one (the CIQ1 test above).
-        expect(code, name).toContain("if: steps.paths.outputs.docs != 'true'");
+        // Quarantine also requires a nonempty inventory. A conjoined guard
+        // must still exclude docs, without requiring docs to be first.
+        expect(code, name).toMatch(/if: [^\n]*steps\.paths\.outputs\.docs != 'true'/u);
         continue;
       }
       // The blocking job is never skipped wholesale: a failed reuse check is a red job, never a false green.
