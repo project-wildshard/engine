@@ -229,6 +229,19 @@ export function stalePinProducts(root){
  return stale;
 }
 
+/** A full `pnpm pins` removes every out/ product `stalePinProducts` names, so land's gen:inputs never refuses a tree the pins
+ * just installed (opus-bugfix2, 2026-11-16: the Brasscap rename left a worktree's out/blender-template behind until a hand
+ * rm -rf). Only folders under out/ with a pin receipt; anything else in out/ stays. Their public/ mounts went with the ledger.
+ * @param {string} root @returns {{folder:string,revision:unknown}[]} the products removed */
+export function pruneStalePinProducts(root){
+ const stale=stalePinProducts(root).filter(row=>folderName(row.folder));
+ for(const {folder} of stale){
+  insideTree(root,join('out',folder));
+  rmSync(join(root,'out',folder),{recursive:true,force:true});
+ }
+ return stale;
+}
+
 /** Whether a format-dependency receipt's `source` (`{path:'@wildshard/format/<folder>', indexHash}`, scripts/pin-format.ts)
  * names the `shard.json` the tree's installed format package holds today.
  * @param {string} root @param {object} source @returns {boolean} */

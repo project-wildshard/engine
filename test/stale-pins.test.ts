@@ -1,13 +1,13 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- a format index's hash
 import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- a temporary tree with out/ and a pins file
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- the same
 import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- the same
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { stalePinProducts } from '../scripts/pins-reuse.mjs';
+import { pruneStalePinProducts, stalePinProducts } from '../scripts/pins-reuse.mjs';
 
 // gen:inputs stamps public/ (scripts/app-build/gen.ts), where the pins publish their products' mounts. A tree installed
 // before a pin bump and rebased past it kept Far Reach revision 1's mounts, and every land from it put 21 rows back in the
@@ -48,4 +48,20 @@ test('a format-dependency product (Ring 1\'s blender-template, the format\'s Tem
   expect(stalePinProducts(root)).toEqual([{ folder: 'far-reach', revision: 1 }]);
   writeFileSync(join(installed, 'shard.json'), index.replace('"revision":1', '"revision":2'));
   expect(stalePinProducts(root), 'the format dependency moved past it').toEqual([{ folder: 'blender-template', revision: 1 }, { folder: 'far-reach', revision: 1 }]);
+});
+
+// opus-bugfix2, 2026-11-16 23:04 UTC: after the Brasscap rename a worktree's stale out/blender-template survived `pnpm pins`, so
+// land's gen:inputs stopped on it until a hand rm -rf. A full `pnpm pins` now removes exactly what gen:inputs would refuse.
+test('pnpm pins removes the products gen:inputs calls stale, and only those, only under out/', () => {
+  const index = '{"identity":{"slug":"blender-template","revision":1}}', indexHash = createHash('sha256').update(index).digest('hex');
+  const source = { kind: 'format-dependency', path: '@wildshard/format/corpus/handwritten', indexHash };
+  tree(['brasscap9', 'pine5'], { 'blender-template': { hash: 'format1', revision: 1, source }, 'brasscap-mesa': { hash: 'brasscap9', revision: 9 },
+    'far-reach': { hash: 'far1', revision: 1 }, 'pine-hollow': { hash: 'pine5', revision: 5 }, scratch: 'unreadable' });
+  mkdirSync(join(root, 'out/build-cache'), { recursive: true });
+  writeFileSync(join(root, 'out/notes.txt'), 'not a product');
+  expect(pruneStalePinProducts(root)).toEqual([{ folder: 'blender-template', revision: 1 }, { folder: 'far-reach', revision: 1 }]);
+  expect(readdirSync(join(root, 'out')).sort()).toEqual(['brasscap-mesa', 'build-cache', 'notes.txt', 'pine-hollow', 'scratch']);
+  expect(stalePinProducts(root), 'gen:inputs has nothing left to refuse').toEqual([]);
+  expect(pruneStalePinProducts(root), 'a second run removes nothing').toEqual([]);
+  expect(existsSync(join(root, 'test/pins/shardfiles.json'))).toBe(true);
 });

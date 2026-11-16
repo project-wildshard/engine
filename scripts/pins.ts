@@ -39,7 +39,7 @@ import { dirname, join, resolve } from 'node:path';
 import { shardfileValidationRevision } from './shardfile-validation-revision.mjs';
 import { rendererRevision } from './renderer-revision.mjs';
 import { excludePublished } from './pins-exclude.mjs';
-import { dropManifest, folderName, insideTree, lockPins, mountPath, pinsKey, reusePins, writeManifest } from './pins-reuse.mjs';
+import { dropManifest, folderName, insideTree, lockPins, mountPath, pinsKey, pruneStalePinProducts, reusePins, writeManifest } from './pins-reuse.mjs';
 import type { PackedIndex } from './pin-packs.ts';
 import { fetchPinnedPublicAssets, pinnedPublicAssets } from './pin-assets.ts';
 import { assertKtx2TableTargets } from '../src/shared/game/shardfile/ktx2Targets.ts';
@@ -210,6 +210,11 @@ function mountsOf(folder: string): Set<string> {
   return paths;
 }
 
+/** A full install leaves no out/ product the pins don't name, so land's gen:inputs has nothing stale to refuse (pins-reuse.mjs). */
+function pruneStale(root: string): void {
+  for (const row of pruneStalePinProducts(root)) console.log(`pins: removed out/${row.folder} (revision ${String(row.revision)}), a product no pin names`);
+}
+
 /** One install of this tree at a time, full or reused: out/.pins.lock (pins-reuse.mjs). */
 async function install(only: readonly string[], source: 'pins' | 'format' | 'ring' = 'pins'): Promise<readonly Pin[]> {
   const release = lockPins(process.cwd());
@@ -227,6 +232,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
       writeFileSync(LEDGER, json({ revision: shardfileValidationRevision(root), published: paths } satisfies Ledger));
       excludePublished(paths);
       await installSaves((readJson(PINS) as PinFile).shards.map(row => row.slug));
+      pruneStale(root);
       const from = reused.source === root ? 'this tree, unchanged' : `${reused.mode} of ${reused.source}`;
       console.log(`pins reused: ${from}; ${reused.files} files, ${(reused.bytes / 2 ** 20).toFixed(0)} MiB verified by sha256 (clone ${reused.seconds.clone.toFixed(1)}s, verify ${reused.seconds.verify.toFixed(1)}s), ${paths.length} mounts published`);
       return (readJson(PINS) as PinFile).shards;
@@ -348,6 +354,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   if (remoteSlugs.length > 0) await installSaves(remoteSlugs);
   // The manifest certifies these bytes only for the inputs the install read: a pin or source edited meanwhile changes the key.
   if (full && failed === 0 && pinsKey(root, shardfileValidationRevision(root)) === key) writeManifest(root, key, productHashes, mountHashes);
+  if (full) pruneStale(root);
   console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);
   return pins;
 }
