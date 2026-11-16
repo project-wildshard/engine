@@ -945,6 +945,8 @@ def main():
     observe.add_argument('--command-log', type=Path, help='matching full-test-day.log; required with --proof-root')
     args = parser.parse_args()
     if args.command == 'observe':
+        if (args.proof_root is None) != (args.command_log is None):
+            parser.error('qualification requires both --proof-root and --command-log')
         if not .05 <= args.interval <= 10 or not 0 <= args.wait_seconds <= 120 or not 1 <= args.seconds <= 3600 or not 0 <= args.drain_seconds <= 30 or args.count < 1:
             parser.error('give bounded observation/discovery intervals and a positive count')
         if args.pid is not None and (args.pid <= 1 or args.pid == os.getpid() or args.count != 1):

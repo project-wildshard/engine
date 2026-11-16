@@ -189,31 +189,51 @@ if(mode==='failed')process.exitCode=7;
             command = [sys.executable, str(ENGINE / 'scripts/cpu-census.py'), '--pid', str(owner['pid']),
                        '--expected-identity', owner['identity'], '--report', str(raw),
                        '--interval', '.05', '--seconds', '10', '--drain-seconds', '.3']
-        if observer and name == 'missing':
-            command = command[:-2]  # Deliberately omit the command-log input.
+        if observer and name in ('missing-log', 'missing-proof', 'legacy'):
+            if name == 'missing-log':
+                command = command[:-2]
+            elif name == 'missing-proof':
+                command = command[:-4] + command[-2:]
+            else:
+                command = command[:-4]
         recorder = subprocess.Popen(command,
                                     cwd=repo, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if observer and name in ('missing-log', 'missing-proof'):
+            out, err = recorder.communicate(timeout=3)
+            assert recorder.returncode == 2 and 'requires both --proof-root and --command-log' in err, (out, err)
+            assert wrapper.poll() is None and not (root / 'summary.json').exists()
+            assert not list(root.glob('summary.*.jsonl')) and not raw.exists()
+            os.kill(owner['pid'], 0)  # Liveness probe only; never deliver a signal.
+            (root / 'go').touch()
+            out, err = wrapper.communicate(timeout=15)
+            assert wrapper.returncode == 0, (out, err)
+            return {'mode': name, 'qualified': False, 'exitCode': 2,
+                    'rawRetained': False, 'ownerAliveAtRefusal': True}
         wait_for(lambda: any(root.glob('summary.*.jsonl')) if observer else raw.exists() and raw.stat().st_size > 0,
                  [wrapper, recorder])
         (root / 'go').touch()
         out, err = wrapper.communicate(timeout=15)
         assert wrapper.returncode == (7 if name == 'failed' else 0), (out, err)
         out, err = recorder.communicate(timeout=12)
-        expected = 2 if observer and name in ('docs', 'related', 'split', 'reused', 'failed', 'missing', 'orphan') else 0
+        expected = 2 if observer and name in ('docs', 'related', 'split', 'reused', 'failed', 'orphan') else 0
         assert recorder.returncode == expected, (name, out, err)
         if observer:
             summary = json.loads((root / 'summary.json').read_text())['observations'][0]
-            assert summary['producerQualification']['qualified'] == (expected == 0), summary
-            assert (summary['exactGateCpu'] is not None) == (expected == 0), summary
-            assert summary['gateKind'] == ('full' if expected == 0 else 'unverified')
-            assert summary['qualificationWallSeconds'] >= 0 and summary['qualificationCpuSeconds'] >= 0
+            qualified = expected == 0 and name != 'legacy'
+            if name == 'legacy':
+                assert 'producerQualification' not in summary
+            else:
+                assert summary['producerQualification']['qualified'] == qualified, summary
+                assert summary['qualificationWallSeconds'] >= 0 and summary['qualificationCpuSeconds'] >= 0
+            assert (summary['exactGateCpu'] is not None) == qualified, summary
+            assert summary['gateKind'] == ('full' if qualified else 'unverified')
             assert summary['allObservedChildrenDrained'] is (name != 'orphan')
             assert (ENGINE / summary['rawReport']).exists()
             if name == 'orphan':
                 assert summary['remaining'] and not (root / 'orphan-finished').exists()
                 (root / 'orphan-release').touch()
                 wait_for(lambda: (root / 'orphan-finished').exists(), [], seconds=5)
-            outcome = {'mode': name, 'qualified': expected == 0, 'exitCode': expected, 'rawRetained': True}
+            outcome = {'mode': name, 'qualified': qualified, 'exitCode': expected, 'rawRetained': True}
             if name == 'orphan':
                 outcome['writerFinishedNaturally'] = True
             return outcome
@@ -308,7 +328,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='gate-census-proof-', dir=args.scratch) as directory:
         root = Path(directory)
         if args.case == 'observer':
-            cases = [fixture(root, mode, observer=True) for mode in ('full', 'tail-delay', 'docs', 'related', 'split', 'reused', 'failed', 'missing', 'orphan')]
+            cases = [fixture(root, mode, observer=True) for mode in ('full', 'tail-delay', 'docs', 'related', 'split', 'reused', 'failed', 'missing-log', 'missing-proof', 'legacy', 'orphan')]
             print(json.dumps({'observerCases': cases, 'fixtureOnly': True}))
             return
         actual = fixture(root, 'actual')

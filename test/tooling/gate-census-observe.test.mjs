@@ -11,7 +11,9 @@ test('TS12e2 the observer qualifies fresh full evidence and retains every refuse
  expect(report.observerCases).toEqual([
   {mode:'full',qualified:true,exitCode:0,rawRetained:true},
   {mode:'tail-delay',qualified:true,exitCode:0,rawRetained:true},
-  ...['docs','related','split','reused','failed','missing'].map(mode=>({mode,qualified:false,exitCode:2,rawRetained:true})),
+  ...['docs','related','split','reused','failed'].map(mode=>({mode,qualified:false,exitCode:2,rawRetained:true})),
+  ...['missing-log','missing-proof'].map(mode=>({mode,qualified:false,exitCode:2,rawRetained:false,ownerAliveAtRefusal:true})),
+  {mode:'legacy',qualified:false,exitCode:0,rawRetained:true},
   {mode:'orphan',qualified:false,exitCode:2,rawRetained:true,writerFinishedNaturally:true},
  ]);
 },30000);
