@@ -102,8 +102,15 @@ async function startWatcher() {
   }
   if (readFileSync(lock, 'utf8').trim() === String(process.pid)) {
     const log = openSync(join(root, WATCH_LOG), 'a');
-    child = spawn('python3', ['scripts/heavy-lane.py', 'build', '--max', '30', '--', process.execPath, '--import', './scripts/format-hook.mjs', 'scripts/e2e-watcher.mjs'],
-      { cwd: root, detached: true, stdio: ['ignore', log, log], env: { ...process.env, WILDSHARD_CATALOGUE: join(root, CATALOGUE) } });
+    /** @type {NodeJS.ProcessEnv} */
+    const env = { ...process.env, WILDSHARD_CATALOGUE: join(root, CATALOGUE) };
+    // The service owns an independent heavy ticket. Its first build may borrow
+    // the requesting run's CPU budget; later rebuilds acquire their own.
+    for (const name of ['WS_HEAVY_TOKEN', 'WS_CPU_BROKER', 'WS_CPU_SLOTS']) delete env[name];
+    if (env.WS_HEAVY_SCHEDULER_ROOT === undefined && env.WS_HEAVY_ROOT !== undefined) env.WS_HEAVY_SCHEDULER_ROOT = env.WS_HEAVY_ROOT;
+    delete env.WS_HEAVY_ROOT;
+    child = spawn('python3', ['scripts/heavy-lane.py', 'build', '--watch-service', '--max', '30', '--', process.execPath, '--import', './scripts/format-hook.mjs', 'scripts/e2e-watcher.mjs'],
+      { cwd: root, detached: true, stdio: ['ignore', log, log], env });
     child.unref();
   }
   const deadline = performance.now() + START_TIMEOUT_MS;

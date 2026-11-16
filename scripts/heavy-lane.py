@@ -653,6 +653,7 @@ def main():
     parser.add_argument('kind', choices=[*RESOURCES, 'status'])
     parser.add_argument('--quiet', action='store_true', help='log output; print only a verdict or failing tail')
     parser.add_argument('--background', action='store_true', help='yield unattended generation/builds with utility QoS')
+    parser.add_argument('--watch-service', action='store_true', help='e2e watcher admits CPU per active rebuild')
     parser.add_argument('--checkout-scope', action='store_true', help='one coordinated push per checkout, with shared CPU admission')
     parser.add_argument('--observation-kind', choices=['release'], help='report-only caller provenance; never affects admission or checks')
     parser.add_argument('--admission-wait-seconds', type=float, default=None,
@@ -662,6 +663,12 @@ def main():
     separator = argv.index('--') if '--' in argv else len(argv)
     command = argv[separator + 1:]
     args = parser.parse_args(argv[:separator])
+    service = args.watch_service
+    if service and (args.kind != 'build' or len(command) != 4
+                    or Path(command[0]).name not in ('node', 'nodejs')
+                    or command[1:] != ['--import', './scripts/format-hook.mjs', 'scripts/e2e-watcher.mjs']
+                    or Path.cwd().resolve() != Path(__file__).resolve().parent.parent):
+        parser.error('watch-service is reserved for the official e2e watcher with per-rebuild CPU admission')
     admission_wait_seconds = WAIT_SECONDS if args.admission_wait_seconds is None else args.admission_wait_seconds
     if not math.isfinite(admission_wait_seconds) or not 0 < admission_wait_seconds <= 6000:
         parser.error('admission wait must be positive and at most 6000 seconds')
@@ -682,7 +689,7 @@ def main():
     observe_command = 'full-test' in resources
     owns_lane = inherited(root, resources)
     cpu_env = {**os.environ, 'WS_HEAVY_SCHEDULER_ROOT': str(root)}
-    cpu_parent = build_cpu_module().ancestor_cpu_budget(cpu_env) if args.kind == 'build' else None
+    cpu_parent = build_cpu_module().ancestor_cpu_budget(cpu_env) if args.kind == 'build' and not service else None
     ordered = mirror_first(command, [sys.executable, str(Path(__file__).resolve()), *argv[:separator], '--'])
     if ordered is not None:
         if cpu_parent is not None:
@@ -696,6 +703,8 @@ def main():
         code = subprocess.call(ordered)
         return code if code >= 0 else 128 - code
     if owns_lane:
+        if service:
+            parser.error('the independent e2e watcher must own its service ticket')
         env = dict(os.environ)
         if args.kind == 'build':
             started, load, code = time.time(), load_average(), 127
@@ -776,12 +785,12 @@ def main():
                'WS_HEAVY_SCHEDULER_ROOT': str(root)}
         # Nested wrappers inherit their owner's QoS; CI has no taskpolicy.
         launch = launch_command(args.kind, command, env)
-        if args.kind == 'build':
+        if args.kind == 'build' and not service:
             env, cpu_owned, cpu_parent = build_cpu_admit(env, deadline)
         if observe_command:
             command_began = (time.time(), time.monotonic())
         child = (start_build_child(launch, env, tuple(fd.fileno() for fd in held), cpu_owned)
-                 if args.kind == 'build' else subprocess.Popen(launch, env=env, start_new_session=True,
+                 if args.kind == 'build' and not service else subprocess.Popen(launch, env=env, start_new_session=True,
                                  pass_fds=tuple(fd.fileno() for fd in held)))
         entry['childPid'] = child.pid
         with scheduler(root):
@@ -796,10 +805,10 @@ def main():
             command_before = child_cpu()
         try:
             code = (wait_build_child(child, args.max * 60, cpu_parent, cpu_owned)
-                    if args.kind == 'build' else child.wait(timeout=args.max * 60))
+                    if args.kind == 'build' and not service else child.wait(timeout=args.max * 60))
         except subprocess.TimeoutExpired:
             print('heavy-lane: owned command timed out', file=sys.stderr)
-            (build_cpu_module().owned_command.terminate_command(child) if args.kind == 'build' else terminate(child))
+            (build_cpu_module().owned_command.terminate_command(child) if args.kind == 'build' and not service else terminate(child))
             code = 124
         if command_began is not None:
             command_result = command_usage(child, command_began, command_owner, command_before)
@@ -807,7 +816,7 @@ def main():
         return code if code >= 0 else 128 - code
     except KeyboardInterrupt:
         code = 130
-        (build_cpu_module().owned_command.terminate_command(child) if args.kind == 'build' else terminate(child))
+        (build_cpu_module().owned_command.terminate_command(child) if args.kind == 'build' and not service else terminate(child))
         if child is not None and command_began is not None:
             command_result = command_usage(child, command_began, command_owner, command_before)
         return 130
@@ -823,7 +832,7 @@ def main():
         raise
     finally:
         try:
-            if args.kind == 'build':
+            if args.kind == 'build' and not service:
                 try:
                     build_cpu_module().owned_command.terminate_command(child)
                 finally:

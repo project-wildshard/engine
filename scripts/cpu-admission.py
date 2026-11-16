@@ -203,7 +203,11 @@ def acquire_cpu(root, entry, capacity, deadline):
     # GVS G10 (J230): the grant is saved, so a store prune's scan sees it; only now check the prune's
     # reservation. One of the two always sees the other. While a prune runs, give the grant back and wait.
     if lane.store_reservation() is not None:
-        release_cpu(root, entry['token'])
+        if entry.get('ownedCommand', {}).get('selfWork') is True:
+            # The service has not received its grant yet, so it is still idle.
+            complete_build_work(root, entry['token'])
+        else:
+            release_cpu(root, entry['token'])
         return False
     return True
 
@@ -224,6 +228,12 @@ def release_cpu(root, token):
                     kept.append(row)
             state[key] = kept
     return released
+
+
+def complete_build_work(root, token):
+    with lane.scheduler(root) as state:
+        for key in ('cpuQueue', 'cpuActive'):
+            state[key] = [row for row in state.get(key, []) if row['token'] != token]
 
 
 def publish_cpu_child(root, token, child):
@@ -247,7 +257,7 @@ def publish_cpu_child(root, token, child):
         owned['child'] = child
 
 
-def register_borrowed_cpu(root, entry, env=None):
+def register_borrowed_cpu(root, entry, env=None, work_owner=None):
     """Track a command lifetime within its verified live ancestor budget.
 
     Validate ancestry outside the lock. Inside it, join only the same still-live
@@ -255,12 +265,15 @@ def register_borrowed_cpu(root, entry, env=None):
     its reservation until command reclaim completes; it never enters the FIFO.
     """
     env = os.environ if env is None else env
-    budget = ancestor_cpu_budget(env)
+    provider = os.getpid() if work_owner is None else work_owner
+    if work_owner is not None and (work_owner != os.getppid() or entry.get('ownedCommand', {}).get('selfWork') is not True):
+        raise RuntimeError(PARENT_REFUSAL)
+    budget = ancestor_cpu_budget(env, requester=work_owner)
     if budget is None or cpu_root(env) != root:
         raise RuntimeError(PARENT_REFUSAL)
     context = json.loads(env[PARENT_CONTEXT])
-    if (not owned_command.valid_ownership(entry.get('ownedCommand'), os.getpid())
-            or entry['pid'] != os.getpid() or entry['slots'] != budget['slots']):
+    if (not owned_command.valid_ownership(entry.get('ownedCommand'), provider)
+            or entry['pid'] != provider or entry['slots'] != budget['slots']):
         raise RuntimeError(PARENT_REFUSAL)
     with lane.scheduler(root) as state:
         active = state.setdefault('cpuActive', [])
@@ -385,9 +398,66 @@ def borrow_parent(weight):
         if ancestor_cpu_budget(requester=os.getppid()) != budget:
             raise RuntimeError(PARENT_REFUSAL)
 
+
+def hold_build_work(repo):
+    """A private-group service cooperatively marks one in-process build interval.
+
+    The row belongs to the actual service, not this pipe helper. Unexpected EOF
+    or helper loss cannot release it. Only an explicit completed-work message
+    releases a still-live owner; otherwise normal owned-group reclaim applies.
+    """
+    owner = owned_command.capture(os.getppid())
+    if owner['group'] != owner['pid']:
+        raise RuntimeError('Build work owner needs its own private command group')
+    caller = owned_command.capture(owner['parent'])
+    root = cpu_root()
+    root.mkdir(parents=True, exist_ok=True)
+    parent = ancestor_cpu_budget(requester=owner['pid'])
+    try:
+        policy = _regular_json(root / 'queue.json')
+    except FileNotFoundError:
+        policy = {}
+    maximum = max(1, (os.cpu_count() or 1) - 2)
+    capacity = policy.get('cpuCapacity', maximum)
+    if type(capacity) is not int or not 1 <= capacity <= maximum:
+        raise RuntimeError('Invalid build-work CPU policy')
+    slots = min(4, capacity) if parent is None else parent['slots']
+    owned = {'schema': owned_command.SCHEMA, 'provider': owner, 'caller': caller,
+             'child': owner, 'selfWork': True,
+             'members': owned_command.group_members(owner['group'], [owner])}
+    entry = {'token': uuid.uuid4().hex, 'pid': owner['pid'], 'holder': owner['pid'],
+             'owner': caller['pid'], 'repo': str(Path(repo).resolve()), 'slots': slots,
+             'ownedCommand': owned}
+    began, completed = time.monotonic(), False
+    try:
+        if parent is not None:
+            register_borrowed_cpu(root, entry, work_owner=owner['pid'])
+        else:
+            while not acquire_cpu(root, entry, capacity, began + 300):
+                if not owned_command.same_process(owner):
+                    return 130
+                if time.monotonic() >= began + 300:
+                    raise TimeoutError('Build-work CPU admission exceeded five minutes')
+                time.sleep(.01)
+        print(json.dumps({'lease': entry['token'], 'slots': slots, 'capacity': capacity,
+                          'queueSeconds': time.monotonic() - began}), flush=True)
+        # R is sent only after all bundle/finish work has settled. EOF is loss.
+        completed = os.read(sys.stdin.fileno(), 1) == b'R'
+        return 0 if completed else 130
+    finally:
+        if completed and owned_command.same_process(owner):
+            complete_build_work(root, entry['token'])
+        else:
+            # Save the reclaim intent before signalling this helper's own group.
+            with lane.scheduler(root) as state:
+                for row in state.get('cpuQueue', []) + state.get('cpuActive', []):
+                    if row['token'] == entry['token']:
+                        row['ownedCommand']['reclaim'] = {'started': time.monotonic(), 'members': owned['members']}
+            release_cpu(root, entry['token'])
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['hold', 'run', 'inspect-parent', 'borrow'])
+    parser.add_argument('mode', choices=['hold', 'run', 'inspect-parent', 'borrow', 'build-work'])
     parser.add_argument('--slots', default='1')
     parser.add_argument('--repo', default=os.getcwd())
     parser.add_argument('--capacity', type=int)
@@ -395,6 +465,8 @@ def main():
     split = argv.index('--') if '--' in argv else len(argv)
     args = parser.parse_args(argv[:split])
     command = argv[split + 1:]
+    if args.mode == 'build-work':
+        return hold_build_work(args.repo)
     if args.mode == 'inspect-parent':
         try:
             print(json.dumps(ancestor_cpu_budget(requester=os.getppid())))

@@ -6,6 +6,6 @@ import {resolve} from 'node:path';
 
 test('actual app-build commands preserve admission, ownership and nested ordering',()=>{
  const report=JSON.parse(execFileSync(process.execPath,['scripts/build-cpu-proof.mjs',resolve(process.env.VITEST_TMP_ROOT??'tmp/vitest','build-cpu')],{encoding:'utf8',timeout:25000,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}}));
- expect(report.controls).toHaveLength(14);
+ expect(report.controls).toHaveLength(15);
  expect(report.allChildrenDrained).toBe(true);
 },30000);

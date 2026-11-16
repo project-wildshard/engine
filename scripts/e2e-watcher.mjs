@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // TB-1 (J233): the warm Rolldown watcher behind `pnpm test:e2e`. One per worktree. It runs under a heavy-lane build
-// lease (scripts/e2e-client.mjs starts it), bundles the real client once through the same pipeline as build-app.mjs,
+// service ticket (scripts/e2e-client.mjs starts it), with CPU admitted only for startup/rebuild/finish work.
+// It bundles the real client once through the same pipeline as build-app.mjs,
 // then rebuilds on each source change and serves the finished build with scripts/preview-server.mjs. A smoke run asks
 // it for a settled build over HTTP on 127.0.0.1. It exits after E2E_WATCH_IDLE_MIN idle minutes (default 10), which
 // frees the lease, and when what it loaded once changes: the catalogue or the installed Template 2 (the client's
@@ -23,6 +24,7 @@ import { basename, join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { E2E_DIR, CLIENT_DIR, STATE_FILE, BUILD_ID, preparedKey } from './e2e-paths.mjs';
+import { holdBuildCpu, parentCpuContext, PARENT_CONTEXT } from './cpu-admission.mjs';
 
 const root = process.cwd();
 const e2e = resolvePath(root, E2E_DIR), bundleDir = join(e2e, 'bundle'), client = resolvePath(root, CLIENT_DIR);
@@ -31,6 +33,33 @@ const idleMs = Number(process.env.E2E_WATCH_IDLE_MIN ?? '10') * 60_000;
 // A change event needs one poll to be seen (100 ms below): a ready request waits this long before it trusts "quiet".
 const SETTLE_MS = 300;
 mkdirSync(e2e, { recursive: true });
+
+/** @type {Awaited<ReturnType<typeof holdBuildCpu>>|undefined} */
+let cpu;
+/** @type {Promise<void>|undefined} */
+let acquiring;
+let releasing = Promise.resolve();
+async function acquireCpu() {
+  await releasing;
+  if (cpu !== undefined) return;
+  acquiring ??= (async () => {
+    cpu = await holdBuildCpu();
+    process.env[PARENT_CONTEXT] = parentCpuContext(cpu.proof);
+    void cpu.lost.then(() => { console.error('e2e-watcher: active build CPU admission lost'); return process.kill(process.pid, 'SIGTERM'); });
+  })();
+  try { await acquiring; } finally { acquiring = undefined; }
+}
+async function releaseCpu() {
+  const held = cpu;
+  if (held === undefined) return;
+  cpu = undefined;
+  delete process.env[PARENT_CONTEXT];
+  releasing = held.release();
+  await releasing;
+}
+// Startup imports and preparation are work too. Idle preview/control serving
+// remains outside these intervals; each subsequent bundle waits in buildStart.
+await acquireCpu();
 
 process.env.WS_BUILD_ID = BUILD_ID;
 process.env.WS_APP_DEFER_PUBLIC_COPY = '1';
@@ -50,12 +79,18 @@ let waiters = [];
 let lastAsked = performance.now(), bundleStarted = performance.now(), finishing = Promise.resolve();
 const wake = () => { const list = waiters; waiters = []; for (const resolve of list) resolve(); };
 const settled = () => !status.bundling && !status.dirty && status.finished === status.started;
+const releaseIfIdle = async () => { if (settled()) await releaseCpu(); };
+/** @param {number} bundle */
+async function finishAndRelease(bundle) {
+  try { await finish(bundle); } finally { await releaseIfIdle(); }
+}
 /** @param {number} ms */
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
 /** finishAppBuild over bundle number `bundle`, in a fresh generation folder; one at a time, in order. @param {number} bundle */
 async function finish(bundle) {
   if (bundle !== status.started) return;
+  await acquireCpu();
   const begun = performance.now(), generation = join(e2e, `gen-${String(bundle)}-${String(Date.now())}`);
   status.finishBegun = begun;
   /** @type {string|null} */
@@ -93,7 +128,7 @@ async function ready() {
     if (status.changedAt <= status.finishBegun || !settled()) break;
     const bundle = status.started;
     status.finished = bundle - 1;
-    finishing = finishing.then(() => finish(bundle));
+    finishing = finishing.then(() => finishAndRelease(bundle));
   }
 }
 
@@ -102,6 +137,7 @@ for (const name of readdirSync(e2e)) if (name === 'bundle' || name.startsWith('g
 prepareAppBuild();
 const watcher = await build({
   root, configFile: join(root, 'vite.config.ts'),
+  plugins: [{ name: 'e2e-owned-build-cpu', enforce: 'pre', buildStart: acquireCpu }],
   build: { outDir: bundleDir, emptyOutDir: true, watch: { chokidar: { usePolling: true, interval: 100 } } },
 });
 /** @param {{code:string,error?:unknown,result?:{close?:() => Promise<void>}}} event */
@@ -113,12 +149,13 @@ const onEvent = event => {
   if (event.code === 'ERROR') {
     status.error = event.error instanceof Error ? event.error.message : String(event.error);
     status.bundling = false; status.finished = status.started; wake();
+    finishing = finishing.then(releaseIfIdle);
   }
   if (event.code === 'BUNDLE_END') {
     const bundle = status.started;
     status.bundling = false; status.bundleMs = performance.now() - bundleStarted;
     void event.result?.close?.();
-    finishing = finishing.then(() => finish(bundle));
+    finishing = finishing.then(() => finishAndRelease(bundle));
   }
 };
 watcher.on('event', onEvent);
@@ -149,6 +186,8 @@ const origin = await new Promise((resolve, reject) => {
 async function stop(code = 0) {
   rmSync(state, { force: true });
   await watcher.close().catch(() => undefined);
+  await finishing.catch(() => undefined);
+  await releaseCpu();
   if (preview.exitCode === null) { const closed = once(preview, 'exit'); preview.kill('SIGTERM'); await closed; }
   process.exit(code);
 }

@@ -86,7 +86,9 @@ def valid_ownership(owned, provider_pid):
     return (valid_record(provider) and provider['pid'] == provider_pid
             and valid_record(caller) and provider['parent'] == caller['pid']
             and (child is None or valid_record(child)
-                 and child['parent'] == provider_pid and child['group'] == child['pid']))
+                 and child['group'] == child['pid']
+                 and (child['parent'] == provider_pid
+                      or owned.get('selfWork') is True and child == provider)))
 
 
 def stale_reason(owned, provider_pid, repo):
@@ -171,7 +173,7 @@ def reclaim(owned, provider_pid):
         return True  # No publication means the barrier never ran actual work.
     try:
         group = child['group']
-        state = owned.setdefault('reclaim', {'started': time.monotonic(), 'members': [child]})
+        state = owned.setdefault('reclaim', {'started': time.monotonic(), 'members': owned.get('members', [child])})
         now = time.monotonic()
         if now < state.get('nextCheck', 0):
             return False
