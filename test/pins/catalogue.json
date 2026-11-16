@@ -900,8 +900,8 @@
     {
       "slug": "template",
       "name": "Template shard",
-      "revision": 6,
-      "hash": "d9d5cb68310cb1e573bd68c2827eb32be9e8f0aeeffe0ca3adb0c47cdc58f599"
+      "revision": 7,
+      "hash": "21ad259ab42e851556ff5ddc943b87c1a00b880d10225c9c287fd5d22a60742a"
     }
   ],
   "missing": []
