@@ -28,6 +28,8 @@ function wire(url: URL, headers: Record<string, string> = {}, method = 'GET'): P
 // old host's header rules, frozen when the page moved (OV9): every rule must give the same answer from wrangler dev
 // (pages/wrangler.jsonc, pages/worker.ts and a dist that holds _headers as the build copies it). In the frozen rules the
 // later rule wins per header; _headers detaches (`! Name`) to say the same.
+// J383 intentionally strengthens the mutable worker loader to no-store. Keep
+// the old host fixture frozen and assert that explicit new policy below.
 
 /** A frozen rule's `source` → RegExp: literal text, `(.*)` and `(a|b)` groups, `\\.` a literal dot (the forms it uses). */
 function ruleSource(source: string): RegExp {
@@ -117,10 +119,11 @@ function served(): string {
   return page.base;
 }
 
-test('wrangler dev with _headers answers every frozen header rule the same', async () => {
+test('wrangler dev keeps frozen headers plus J383 worker policy', async () => {
   const hit = new Set<number>();
   for (const path of PATHS) {
     const expected = ruleHeaders(path, hit);
+    if (path === '/sw.js') expected.set('cache-control', 'no-store');
     // identity: the stored part must still say br; everything else is compared unencoded.
     const response = await wire(new URL(path, served()), { 'accept-encoding': 'identity' });
     expect(response.status, path).toBe(200);

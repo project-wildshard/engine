@@ -41,3 +41,9 @@ The physical staging playtest is PZ30/PZ11, and asks Jake for no chores.
 Final indicator correction: J383 asked for a tiny Updating line. Keep the
 existing screen visible and place the status above the bottom safe area,
 without covering the viewport or taking pointer input.
+
+Hosted qualification caught an additional OV2 frozen-host parity assertion
+that still required sw.js no-cache. The actual worker correctly answers
+J383's stronger no-store policy. Keep the historical host fixture frozen
+and explicitly require the approved worker-loader policy in the real local
+Wrangler HTTP test; every other frozen header remains compared unchanged.
