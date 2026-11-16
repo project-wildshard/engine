@@ -23,7 +23,7 @@ import { Vector3 } from 'three';
 import { parsePromptRegistrations, createHeadlessPromptPicker } from '../../../shared/game/quest/interactionRows';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { GridAssembly } from '../../../shared/game/grid/assembly';
-import { GridSimulation } from '../grid/simulation';
+import { carryMotion, GridSimulation } from '../grid/simulation';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { leadSnapshot, isSimHostRestoring, snapshotSimHost, regionalContinuation, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
@@ -836,8 +836,16 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     insist(loads === 2, 'restore did not create a fresh residency');
     const restoredPlayer = leadSnapshot(snapshotSimHost(resident.host));
     insist(JSON.stringify(restoredPlayer.position) === JSON.stringify(player.position) && restoredPlayer.yaw === player.yaw, `traveler pose changed on restore: ${JSON.stringify({ highway: { position: player.position, yaw: player.yaw }, restored: { position: restoredPlayer.position, yaw: restoredPlayer.yaw } })}`);
+    // The baseline never leaves, so it plays to the checkpoint and then takes the traveler as the restore brought it back:
+    // a player still falling from its spawn fell five more ticks on the highway, and a creature that watches the player
+    // would otherwise turn by a few ulps more in one run than the other (sharddev's Template, entities.4 yaw).
+    for (let next = 0; next < plan.checkpointTick; next++) { baseline.host.step(leadCommands(baseline.host, inputAt(next, baseline))); healthy(baseline); }
+    const travelled = resident.host.players.get(restoredPlayer.id), kept = baseline.host.players.get(restoredPlayer.id);
+    if (travelled === undefined || kept === undefined) throw new Error('Author proof: missing traveler');
+    kept.position.copy(travelled.position); kept.yaw = travelled.yaw;
+    kept.motor.resetAt(kept.position); kept.motor.syncTransfer(travelled.motor, kept.position); carryMotion(travelled, kept);
     for (let next = plan.checkpointTick; next < plan.ticks; next++) { grid.step(inputAt(next, resident)); healthy(resident); }
-    for (let next = 0; next < plan.ticks; next++) { baseline.host.step(leadCommands(baseline.host, inputAt(next, baseline))); healthy(baseline); }
+    for (let next = plan.checkpointTick; next < plan.ticks; next++) { baseline.host.step(leadCommands(baseline.host, inputAt(next, baseline))); healthy(baseline); }
     const restoredSuffix = regionalContinuation(resident.host), baselineSuffix = regionalContinuation(baseline.host);
     insist(restoredSuffix === baselineSuffix, `restored regional suffix diverged in ${continuationDiff(restoredSuffix, baselineSuffix)}`);
     insist(JSON.stringify(facts) === JSON.stringify(baselineFacts), 'restored facts diverged or repeated');
