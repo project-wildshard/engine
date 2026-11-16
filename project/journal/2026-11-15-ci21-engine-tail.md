@@ -136,3 +136,9 @@ registration, and all three dependent proof/portable/population suites.
 The new texture guard initially caught animation samplers; it now checks
 root texture resources and material references while retaining animation
 samplers. No product or assertion was weakened.
+
+Rebased all 25 branch commits onto main1acc2fb0. Two conflicts overlapped
+main's existing Bash4 and absolute-temp fixes; preserve those implementations.
+Normal pins install verified9,218 files/1,660MiB, frozen dependencies refreshed
+to format0.5.10. Rebased 13-file regression107 cases, layer compiler and
+focused typed lint pass; input generation left no tracked changes.
