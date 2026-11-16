@@ -134,10 +134,12 @@ export async function validateSimulation(shard: Shardfile, assets: ReadonlyMap<s
 }
 
 /** Prove author data in an isolated native worker; trusted runtime bindings and injected facts are refused. */
-export async function proveAuthorSimulation(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, input: AuthorProofPlan): Promise<AuthorProofReport> {
+/** `sections` are the checked project's output sections, as `validateSimulation` takes them (TC-NE5b): a shard without an
+ * engine output descriptor otherwise admits every Wasm as ABI 0, and a v1 decision fails `Import signature outside ABI`. */
+export async function proveAuthorSimulation(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, input: AuthorProofPlan, sections?: ReadonlyMap<string, unknown>): Promise<AuthorProofReport> {
   const plan = v.parse(AuthorProofPlanSchema, input);
   if (shard.runtime !== null) throw new Error('Author proof requires data-only gameplay');
-  const sim = await HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory' });
+  const sim = await HeadlessSimulation.create(shard, assets, undefined, { deadline: 'advisory', ...(sections === undefined ? {} : { sections }) });
   try { return await sim.prove(plan); } finally { await sim.dispose(); }
 }
 

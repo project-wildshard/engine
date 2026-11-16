@@ -298,6 +298,19 @@ test('SDK worker executes the declared v1 section and reports its real fuel rath
   } finally { await session.dispose(); }
 });
 
+/** TC-NE5b (QA 11-16 row 18): `wildshard prove` gave the worker no sections, so a shard with no engine output descriptor
+ * admitted its v1 decision as ABI 0 and refused it before the tape ran. With the checked sections it reaches the tape. */
+test('author proof admits the declared v1 section only when given the sections, then runs the tape', async () => {
+  const { proveAuthorSimulation } = await import('../src/server/host/headless');
+  const f = fixture(); f.source.budgets.sim.resident = 1_000_000;
+  const product = frozenDecisionWorkerProduct(f.source, bytes);
+  const plan = { version: 1 as const, tape: Array.from({ length: 8 }, () => []), checkpointTick: 4, requiredFacts: ['tc-ne5b.never-filed'] };
+  await expect(proveAuthorSimulation(product.shard, product.assets, plan)).rejects.toThrow(/Import signature outside ABI|wrong ABI export/u);
+  const reached = await proveAuthorSimulation(product.shard, product.assets, plan, f.sections).then(() => 'passed', (error: unknown) => String(error));
+  expect(reached).not.toMatch(/Import signature outside ABI|wrong ABI export/u);
+  expect(reached).toContain('tc-ne5b.never-filed');
+}, 60_000);
+
 test('encounter bindings sleep until the real fight starts and retain inactive checkpoint state', async () => {
   const f = fixture(bytes, { encounter: 'encounter.0' }), R = await rapier;
   const sim = createShardfileSim(f.source, f.assets, { ...f.options, rapier: R });
