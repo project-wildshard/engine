@@ -71,7 +71,7 @@ describe('worktree new', () => {
     const {canonical, base} = repos();
     put(canonical, 'dist-content/assets/content.bin', 'regenerable content');
     const receipts = join(base, 'receipts.log');
-    const made = worktree(canonical, ['new', 'foo', '--no-install'], {WS_LANE_NAME: 'lane-x', WS_LANE_RECEIPTS: receipts, CODEX_THREAD_ID: 'thread-worktree-fixture'});
+    const made = worktree(canonical, ['new', 'foo', '--no-install'], {WS_LANE_NAME: 'lane-x', WS_LANE_RECEIPTS: receipts, CLAUDE_CODE_SESSION_ID: 'inherited-parent', CODEX_THREAD_ID: 'thread-worktree-fixture'});
     expect(made.status, made.stderr).toBe(0);
     const tree = join(canonical, '.worktrees/foo');
     expect(git(tree, ['rev-parse', '--abbrev-ref', 'HEAD'])).toBe('plan/foo');
