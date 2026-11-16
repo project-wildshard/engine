@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.23 (2026-11-15)
+
+- New and updated shards are cooked for the world again: since Saturday the cook refused every upload as over its space.
+- Lamps carried by players and creatures move their light with them, and the 16 nearest lamps light the scene.
+- Brasscap Mesa keeps its far view from the road, and a shard's creatures respawn where they were placed.
+- You can take a melee weapon from its rack, and creatures in a shared shard stay in their own cell.
+- Behind the scenes: each release pins its item list, and cached downloads survive a release.
+
 ## v0.1.22 (2026-11-15)
 
 - Brasscap Mesa: you walk in with the lever-action in hand, its rack restocks your rounds, and every bandit and beast in the cell is drawn.
