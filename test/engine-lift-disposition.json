@@ -12213,7 +12213,7 @@
     ],
     "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
     "sourceBlob": "88a639c19a028068de6e1aaa6b00fc376cd418a7",
-    "retirementProof": "Every assertion remains in one of the two owners. Exact all-coordinate, cap, transitive assets, debt and dishonest/corrupt bytes tests stay SDK; all strict private policy/identity/trailer refusals stay native. SDK revision pinned after review/commit.",
+    "retirementProof": "Every assertion remains in one of the two owners. Exact all-coordinate, cap, transitive assets, debt and dishonest/corrupt bytes tests stay SDK; all strict private policy/identity/trailer refusals stay native. SDK destination 8d8ff19eaebdc9115ac2dfb63eeeed31279fc3f6.",
     "assertionDestinations": [
       {
         "repo": "sharddev",
@@ -12227,7 +12227,8 @@
           "full 5x5 cap checks include the corner and permit the exact aggregate cap",
           "duplicate, out-of-grid and dishonest cell bounds refuse before policy",
           "corrupt section bytes and a mismatched index receipt cannot borrow debt"
-        ]
+        ],
+        "revision": "8d8ff19eaebdc9115ac2dfb63eeeed31279fc3f6"
       },
       {
         "repo": "engine",
