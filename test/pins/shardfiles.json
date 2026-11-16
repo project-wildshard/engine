@@ -3,9 +3,9 @@
   "shards": [
     {
       "slug": "blender-template",
-      "revision": 8,
-      "hash": "5677f04f6d4b7f12fe976d2636ca3a081d67c0b003aa9c539046c563f8377d50",
-      "bytes": 20502016
+      "revision": 9,
+      "hash": "1a8dad51ad26237bcf6f3c8cd737f7698ac279b38a8fc510159e0ff7933759d9",
+      "bytes": 20504064
     },
     {
       "slug": "driftwood-isle",
