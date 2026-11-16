@@ -49,14 +49,32 @@ export const KEPT_RELEASE_MS: number = 7 * 24 * 60 * 60 * 1000;
 
 /** The release file at `url`, never from a cache: a stale one would dial an old address. It throws past `deadlineMs`. */
 export async function fetchSignedRelease(url: string, publicKey: string, deadlineMs: number = RELEASE_DEADLINE_MS, read: typeof fetch = fetch): Promise<ReleaseFile> {
-  return readSignedRelease(await fetchReleaseText(url, deadlineMs, read), publicKey);
+  return (await verifiedRead(url, publicKey, deadlineMs, read)).file;
 }
 const browserOnline = (): boolean => typeof navigator === 'undefined' || navigator.onLine;
-async function fetchReleaseText(url: string, deadlineMs: number, read: typeof fetch, online: () => boolean = browserOnline): Promise<string> {
+/** SB29: requesting abort does not settle a producer's promise. Bound the entire read, including body and WebCrypto. */
+async function releaseDeadline<T>(url: string, deadlineMs: number, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const abort = new AbortController(), scope = new Scope('online.release-read');
-  scope.timeout(deadlineMs, () => { abort.abort(); });
+  const expired = new Promise<never>((_resolve, reject) => {
+    scope.timeout(deadlineMs, () => {
+      reject(new ReleaseReadError(`No release file at ${url} in ${String(deadlineMs)} ms`, { kind: 'timeout', ms: deadlineMs }));
+      abort.abort();
+    });
+  });
+  try { return await Promise.race([work(abort.signal), expired]); }
+  finally { scope.dispose(); }
+}
+function verifiedRead(url: string, publicKey: string, deadlineMs: number, read: typeof fetch, online: () => boolean = browserOnline): Promise<{ text: string; file: ReleaseFile }> {
+  return releaseDeadline(url, deadlineMs, async signal => {
+    const text = await fetchReleaseText(url, signal, read, online);
+    signal.throwIfAborted();
+    const file = await readSignedRelease(text, publicKey);
+    return { text, file };
+  });
+}
+async function fetchReleaseText(url: string, signal: AbortSignal, read: typeof fetch, online: () => boolean): Promise<string> {
   try {
-    const response = await read(url, { cache: 'no-store', signal: abort.signal });
+    const response = await read(url, { cache: 'no-store', signal });
     if (!response.ok) throw new ReleaseReadError(`No release file at ${url}: ${String(response.status)}`, { kind: 'status', status: response.status, retryAfterMs: retryAfterMs(response.headers.get('retry-after')) });
     // FM5 mode 38: an answer from somewhere else, or a page instead of the file, isn't the world's file; nothing in it is followed
     if (response.redirected && response.url !== '' && new URL(response.url).origin !== new URL(url).origin) throw new ReleaseReadError(`The release read was sent to another address (${String(response.status)})`, { kind: 'portal', why: 'redirect' });
@@ -65,20 +83,19 @@ async function fetchReleaseText(url: string, deadlineMs: number, read: typeof fe
     return text;
   } catch (error) {
     if (error instanceof ReleaseReadError) throw error;
-    if (abort.signal.aborted) throw new ReleaseReadError(`No release file at ${url} in ${String(deadlineMs)} ms`, { kind: 'timeout', ms: deadlineMs }, error);
     throw new ReleaseReadError(error instanceof Error ? error.message : String(error), online() ? { kind: 'network' } : { kind: 'offline' }, error);
-  } finally { scope.dispose(); }
+  }
 }
 /** OF4: the last release file a page read and believed: which release, when, and its text as signed. */
 export interface KeptRelease { readonly of: string; readonly at: number; readonly text: string }
 export interface ReleaseKeep { readonly read: () => KeptRelease | null; readonly write: (kept: KeptRelease) => void }
 
 /** The kept copy, only if it is this release's, no older than 7 days and its signature holds again now. Anything else is no copy. */
-export async function keptRelease(url: string, publicKey: string, keep: ReleaseKeep, now: number = Date.now()): Promise<ReleaseFile | null> {
+export async function keptRelease(url: string, publicKey: string, keep: ReleaseKeep, now: number = Date.now(), deadlineMs: number = RELEASE_DEADLINE_MS): Promise<ReleaseFile | null> {
   try {
     const kept = keep.read(), age = kept === null ? -1 : now - kept.at;
     if (kept?.of !== url || age < 0 || age > KEPT_RELEASE_MS) return null;
-    return await readSignedRelease(kept.text, publicKey);
+    return await releaseDeadline(url, deadlineMs, () => readSignedRelease(kept.text, publicKey));
   } catch { return null; }
 }
 
@@ -121,9 +138,9 @@ export interface ReleaseWait {
  *  replaces it once its own signature holds. With no copy the page waits for the read (8 s at most each), and a failed read throws, or,
  *  given `wait` (FM5), shows why and reads again by its policy until a verified file answers or the player leaves. */
 export async function releaseToDial(url: string, publicKey: string, ports: { readonly keep: ReleaseKeep; readonly fetch?: typeof fetch; readonly now?: () => number; readonly deadlineMs?: number; readonly wait?: ReleaseWait; readonly online?: () => boolean }): Promise<ReleaseToDial> {
-  const now = ports.now ?? Date.now, kept = await keptRelease(url, publicKey, ports.keep, now());
+  const now = ports.now ?? Date.now, kept = await keptRelease(url, publicKey, ports.keep, now(), ports.deadlineMs);
   const reading = async (): Promise<ReleaseFile> => {
-    const text = await fetchReleaseText(url, ports.deadlineMs ?? RELEASE_DEADLINE_MS, ports.fetch ?? fetch, ports.online), file = await readSignedRelease(text, publicKey);
+    const { text, file } = await verifiedRead(url, publicKey, ports.deadlineMs ?? RELEASE_DEADLINE_MS, ports.fetch ?? fetch, ports.online);
     // a release only moves forward (J179, the server's own rule in releaseFile.ts): an older signed file never replaces the kept one
     if (kept !== null && file.serial < kept.serial) throw new Error(`A release file older than the kept one (${String(file.serial)} < ${String(kept.serial)})`);
     try { ports.keep.write({ of: url, at: now(), text }); } catch { /* a page that can keep nothing reads again next time */ }
