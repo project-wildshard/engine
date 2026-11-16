@@ -84,7 +84,10 @@ export function gitDescribe(root) {
 export function releaseDescribe(raw, version, subjects) {
   const tag = `v${version}`;
   if (raw === tag || raw.startsWith(`${tag}-`)) return raw;
-  return subjects.includes(`chore(release): ${tag}`) ? tag : raw;
+  // HEAD is the release commit: the release; n commits past it: counted from it, as describe would with the tag
+  const at = subjects.indexOf(`chore(release): ${tag}`), sha = /-g([0-9a-f]+)$/u.exec(raw)?.[1];
+  if (at === 0) return tag;
+  return at > 0 && sha !== undefined ? `${tag}-${String(at)}-g${sha}` : raw;
 }
 
 /** First-parent commit subjects from HEAD back to `raw`'s base tag (the newest 400 with none), [] with no git.

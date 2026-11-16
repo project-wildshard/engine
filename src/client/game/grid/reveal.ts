@@ -93,7 +93,7 @@ export function installGridReveal(host: GridRevealHost): () => boolean {
     scope.dispose();
   };
   // SB5: the loading card's still copy stays up over the hidden canvas until this frame (Loading.ts `holdLoadingVeil`)
-  const releaseVeil = holdLoadingVeil(scope);
+  const releaseVeil = holdLoadingVeil(scope, () => host.entered() && !app.ui.still);
   const begin = (at: number): void => {
     started = at;
     host.canvas.style.visibility = ''; // this frame draws the sky pose (the late phase runs before the render)
@@ -123,7 +123,8 @@ export function installGridReveal(host: GridRevealHost): () => boolean {
   // still holds the loading steps' warm-up draws. Both it and the HUD stay hidden until `begin` (round 40: a 0.4 s frame
   // of the HUD over broken orange and blue triangles on the phone).
   host.hudRoot.classList.add('ws-grid-revealing'); host.canvas.style.visibility = 'hidden';
-  const release = (): void => { if (live && started >= 0) end(now()); };
+  // a menu, the background or a return lets the veil go even before the reveal starts (nothing waits under it then)
+  const release = (): void => { releaseVeil(); if (live && started >= 0) end(now()); };
   // any touch or click takes over: before the touch layer sees it (the capture phase), so the same touch moves or looks
   let skipAsked = false;
   const skip = (): void => {

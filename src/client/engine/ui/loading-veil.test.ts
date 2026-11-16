@@ -46,3 +46,11 @@ it('no hold, no copy; a hold that never lets go still fades within VEIL_MS', asy
   expect(veil()).toBeNull();
   stuck.dispose();
 });
+
+it('a hold that does not want the world next (a title-first page, a pause menu) leaves no copy', async () => {
+  const title = new Scope('title-first'); holdLoadingVeil(title, () => false);
+  const loading = new Loading({ id: 'title', name: 'Title' }), done = loading.done();
+  await vi.advanceTimersByTimeAsync(400); await done;
+  expect(veil()).toBeNull();
+  title.dispose();
+});

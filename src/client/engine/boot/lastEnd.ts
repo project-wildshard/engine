@@ -328,7 +328,9 @@ export class PageLife {
   }
 
   /** SB8: the page before this tab's ended visible, and this document came by a plain navigation whose referrer is not this
-   *  origin (none, or another site) */
+   *  origin (none, or another site). It rests on the site sending a referrer on its own navigations (no Referrer-Policy is
+   *  set): a `no-referrer` policy would make every unmarked game navigation read as the player's. The browser's Back is a
+   *  back_forward navigation and keeps the drop modal. */
   private playerLeft(nav: string, hid: unknown, discarded: boolean): boolean {
     if (discarded || nav !== 'navigate' || str(hid, 'vis') !== 'visible') return false;
     const { href, referrer = '' } = this.page();

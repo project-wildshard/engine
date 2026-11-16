@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { finishFirstPlay, firstPlayCardUp, firstPlayDone, resetFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
@@ -69,4 +69,15 @@ test('SB9: while the card is up the hints and the voice tip wait; DONE and the I
   saveWorldToggle(false);
   expect(again.querySelector('.ws-firstplay-va')).toBeNull();
   expect(firstPlayCardUp()).toBe(false);
+});
+
+test('SB9 (review): an ignored card holds the others back only until it has faded to rest', () => {
+  vi.useFakeTimers();
+  try {
+    finishFirstPlay(); saveWorldToggle(true);
+    mount();
+    expect(firstPlayCardUp()).toBe(true);
+    vi.advanceTimersByTime(FADE_MS + 10);
+    expect(firstPlayCardUp()).toBe(false);
+  } finally { vi.useRealTimers(); }
 });

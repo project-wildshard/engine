@@ -27,6 +27,8 @@ test('a build names itself by git describe against the version tags (WL19c)', ()
 
 test('a release build names its release before the tag exists (STAGING-BUGBASH SB7)', () => {
   expect(releaseDescribe('v0.1.28-96-gf8ff9bd9', '0.1.30', ['chore(release): v0.1.30', 'test(ci21): repair'])).toBe('v0.1.30');
+  // a commit past the release (a fast-forwarded main, J384) counts from it, never the bare release
+  expect(releaseDescribe('v0.1.28-97-gabcdef1', '0.1.30', ['fix(sim): x', 'chore(release): v0.1.30'])).toBe('v0.1.30-1-gabcdef1');
   expect(releaseDescribe('v0.1.30', '0.1.30', [])).toBe('v0.1.30');
   expect(releaseDescribe('v0.1.30-4-gabcdef1', '0.1.30', ['chore(release): v0.1.30'])).toBe('v0.1.30-4-gabcdef1');
   // main between releases keeps git describe: no release commit for its version since the last tag
@@ -40,7 +42,7 @@ test('a release build names its release before the tag exists (STAGING-BUGBASH S
     repo.commit({ 'package.json': JSON.stringify({ version: '0.1.30' }), 'CHANGELOG.md': SECTION('0.1.30', [NOTE]) }, 'chore(release): v0.1.30');
     expect(engineRelease(repo.dir).describe).toBe('v0.1.30');
     repo.commit({ 'b.txt': 'b' }, 'fix(boot): a release-branch fix');
-    expect(engineRelease(repo.dir).describe).toBe('v0.1.30');
+    expect(engineRelease(repo.dir).describe).toMatch(/^v0\.1\.30-1-g[0-9a-f]+$/u);
   } finally { repo.cleanup(); }
 });
 

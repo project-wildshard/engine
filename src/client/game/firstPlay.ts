@@ -54,7 +54,8 @@ export function installFirstPlay(scope: Scope, root: HTMLElement, slug: string):
 /** The toggle, in a scope of its own that DONE disposes (exported for its test and the worst-case HUD). */
 export function showToggle(parent: Scope, root: HTMLElement, closed: () => void = () => undefined): HTMLElement {
   const scope = parent.child('gfx-toggle');
-  scope.onDispose(firstPlayCardShown()); // SB9: the hints and the voice tip wait for DONE
+  // SB9: the hints and the voice tip wait for DONE, or until the card has faded to rest (an ignored card holds nothing for good)
+  const cardDown = firstPlayCardShown(); scope.onDispose(cardDown); scope.timeout(FADE_MS, cardDown);
   const el = (tag: string, cls: string, text = ''): HTMLElement => { const n = document.createElement(tag); n.className = cls; n.textContent = text; return n; };
   const box = el('section', 'ws-firstplay-v ws-firstplay-va');
   box.setAttribute('role', 'group'); box.setAttribute('aria-label', COPY.title);
