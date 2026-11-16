@@ -22,3 +22,10 @@ The export case is an outside-consumer contract, not seven actual Ring 3
 receiver runs. The four original faults do not close the expanded twelve
 fault campaign, hosted ring delivery, or the required new-test soak.
 No existing test, runtime, pin or sibling repository changes.
+
+The full isolated drill passes all four green/red/healed triples. Copying
+format exposed its private meshoptimizer dependency; the export now
+links its declared dependencies to the existing immutable installation.
+No installation or shared package is modified. The CI-only positive
+controls are wired as a non-blocking one-week soak. The manual command
+and its exact evidence limits are documented in docs/nightly.md.

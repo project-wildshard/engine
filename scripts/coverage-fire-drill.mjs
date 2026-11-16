@@ -3,8 +3,8 @@
 // pnpm store. Positive and healed controls must pass the same actual contract.
 import assert from 'node:assert/strict';
 import {execFileSync,spawnSync} from 'node:child_process';
-import {mkdirSync,mkdtempSync,readFileSync,realpathSync,rmSync,unlinkSync,writeFileSync} from 'node:fs';
-import {join,resolve} from 'node:path';
+import {mkdirSync,mkdtempSync,readFileSync,realpathSync,rmSync,symlinkSync,unlinkSync,writeFileSync} from 'node:fs';
+import {dirname,join,resolve} from 'node:path';
 import {clonePaths} from './apfs-clone.mjs';
 import {linkNodeModules} from './link-node-modules.mjs';
 
@@ -45,6 +45,12 @@ try{
   clonePaths([[realpathSync(join(root,'node_modules/@wildshard/format')),format],
     [join(root,'out'),join(tree,'out')],
     [join(root,'public/assets/physics/rapier.wasm'),join(tree,'public/assets/physics/rapier.wasm')]]);
+  const installedFormat=realpathSync(join(root,'node_modules/@wildshard/format'));
+  const formatPackage=JSON.parse(readFileSync(join(format,'package.json'),'utf8'));
+  for(const name of Object.keys(formatPackage.dependencies??{})){
+    const link=join(format,'node_modules',name);mkdirSync(dirname(link),{recursive:true});
+    symlinkSync(realpathSync(resolve(installedFormat,'../..',name)),link);
+  }
   for(const fault of faults){
     const before=run(fault.id);
     writeFileSync(join(out,`${fault.id}-baseline.log`),before.text);

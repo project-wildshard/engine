@@ -220,6 +220,12 @@ jobs:
         env:
           RING_RECORD: ${{ inputs.record && 'true' || 'false' }}
         run: node scripts/ci-pack.mjs --jobs=${{ strategy.job-total }} --job=${{ matrix.job }} --concurrency=2 --units=static,e2e,plan-proofs,tests,products
+      # TC26/J186: new outer-edge contracts soak for one week before blocking.
+      # Explicit CI-only cases keep both hooks and Vitest discovery unchanged.
+      - name: Soak actual host, door, format and outside-author contracts
+        if: steps.code.outputs.run == 'true' && matrix.job == 1
+        continue-on-error: true
+        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/coverage-fire-drill.proof.mjs
       - name: Retain actual membership, budget and timing evidence
         if: always() && steps.code.outputs.run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

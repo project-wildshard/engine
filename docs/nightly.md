@@ -191,3 +191,31 @@ membership. An optional final slug limits a local diagnostic to a member
 of its partition; its partial receipt can never clear a nightly verdict.
 Use separate report directories for separate local diagnostics. A
 hosted checkout runs exactly one partition and is discarded afterwards.
+
+## Coverage fault drill
+
+TC26's four real outer-edge contracts run explicitly, outside hooks and
+Vitest discovery:
+
+```sh
+node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/coverage-fire-drill.proof.mjs
+```
+
+They use the existing Nalati and Template pins, native physics, the installed
+format's handwritten Template 2 and a separate outside-author package.
+Each complete case keeps 9.5 seconds including cleanup. Nalati and Template
+use controlled positions to isolate actual approach and door inputs; no
+trust, reward or script field is assigned. This is not a walked journey.
+CI reports these new contracts non-blocking during their one-week soak
+from 2026-11-15 through 2026-11-22; promotion to a gate remains explicit.
+
+From a committed checkout with pins and generated inputs installed, run
+`node scripts/coverage-fire-drill.mjs tmp/coverage-fire-drill` manually.
+It exports that HEAD, copies only its own format dependency, and plants
+one fault at a time. Baseline green, a specific assertion/admission red,
+and healed green are all required. Timeouts and process failures refuse
+qualification. The output receipt names the responsible repository/path
+and intended ring contract. It sends no issue, invokes no live service,
+cooks nothing and cleans its export. The outside-author case proves the
+Ring 3 import contract, not the seven hosted shard receivers. The expanded
+twelve-fault campaign remains open.
