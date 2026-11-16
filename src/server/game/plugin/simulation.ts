@@ -27,6 +27,7 @@ import { GridSimulation } from '../grid/simulation';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { leadSnapshot, isSimHostRestoring, snapshotSimHost, regionalContinuation, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
+import { installTouchBodies } from '../shardfile/touchBodies';
 import { restoreSimHost, prepareSimHostRestore, type PreparedSimHostRestore } from '@wildshard/engine/sim/restore';
 import { SaveStore } from '@wildshard/engine/saves/store';
 import { Ledger } from '../../../shared/game/ledger';
@@ -505,6 +506,8 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
         pendingColliders = undefined;
       } } : {}),
     });
+    // SHARD-SOURCE SS9b: touchable panels are dynamic bodies a player pushes; a restore rebinds them from the saved world
+    installTouchBodies(host, shard.props?.bodies ?? [], ports.restoring === true || isSimHostRestoring(host));
     const hooks = ports.hooks ?? shard.hooks;
     const actors = new Map<string, number>(), reverse = new Map<number, string>();
     for (const id of [first.id, ...host.entities.keys()]) {
