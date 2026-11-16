@@ -19,7 +19,9 @@ import {dirname, join} from 'node:path';
 const [tarball, out] = process.argv.slice(2), file = join(out, 'client', ${JSON.stringify(part)});
 mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, 'part'); mkdirSync(join(out, 'server'), {recursive: true});
 const hash = createHash('sha256').update(readFileSync(tarball)).digest('hex');
-console.log(JSON.stringify({slug: ${JSON.stringify(slug)}, hash, proof: 'unmeasured', cook: {manifests: []}, header: '', server: {}, seconds: 0}));
+// The job is a named stand-in; the worker still requires its successful full check.
+const check = {slug: ${JSON.stringify(slug)}, pass: true, proof: 'unmeasured', performance: {}, failures: []};
+console.log(JSON.stringify({slug: ${JSON.stringify(slug)}, hash, proof: 'unmeasured', check, cook: {manifests: []}, header: '', server: {}, seconds: 0}));
 `;
 const TWO_HOURS_S = 7_200;
 const hashOf = (text: string): string => createHash('sha256').update(text).digest('hex');
@@ -47,7 +49,8 @@ function collectingBefore(store: PackStore, key: string, keep: string): PackStor
 
 test('GC during a cook keeps a part the cook reused', async () => {
   const store = folderStore(join(scratch, 'store')), hash = hashOf('two');
-  await worker('old', store).cook({slug, hash: hashOf('one')});
+  const first = await worker('old', store).cook({slug, hash: hashOf('one')});
+  expect(first.state, first.detail).toBe('cooked');
   const old = Date.now() / 1000 - TWO_HOURS_S;
   utimesSync(join(scratch, 'store', part), old, old);
 

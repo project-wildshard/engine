@@ -20,3 +20,8 @@ Controls compare author/cook budget and entry refusals unchanged, retain a
 limits, and recover the complete report from the cook index. Six-shard and
 SDK consumer qualification are still owed; this journal does not claim hosted
 qualification or deployment.
+
+The first hosted run exposed the GC test's stand-in report omitting the new
+mandatory check. Its fixture now supplies an explicitly fake successful report,
+and asserts the first cook succeeds before testing reuse and collection. The
+worker's admission remains mandatory; the failed run was canceled before retry.
