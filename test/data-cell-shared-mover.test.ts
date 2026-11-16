@@ -8,7 +8,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from './fixtures/builtProduct';
+import { builtProduct } from '../src/test/game/builtProduct';
 
 // TEMPLATE-E2E TC-E5: a cell's `native` `track` mover with a `shared` trigger turns when a hook sets its field. Template's own
 // door hook (`behaviour/door.as`) toggles shared field 101 (`template.door.open`) from its door prompt; a lift row added here
