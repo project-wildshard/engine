@@ -29,14 +29,8 @@ import { DEFAULT_PACK_SLOTS, addInventory, takeInventory } from '../../shared/ga
  */
 
 
-export type ItemId = 'venison' | 'deer-hide' | 'boar-meat' | 'boar-hide' | 'boar-tusk' | 'antlers' | 'elk-meat' | 'elk-hide' | 'bear-pelt' | 'bear-claw'
-  | 'crab-meat' | 'crab-claw' | 'crab-shell' | 'coconut' | 'monkey-fur' | 'silver-fur' | 'doubloon'
-  // Pine Hollow's elite + boss trophies (PH-C2 / PH-C3, src/shards/pine-hollow/); 'warden-longbow' is the King's drop as a flag
-  // until the longbow itself (Nalati's Bow.ts) is ported
-  | 'ironhide-tusk' | 'ghost-antler' | 'blackpaw-claw' | 'imperial-crown' | 'amber-heartwood' | 'warden-longbow'
-  // Pine Hollow's collectibles and the lodge (PH-C6 / C8, src/shards/pine-hollow/quest/): resin is the trader's currency-free swap
-  // good, a ribbon is what a lodge contract pays
-  | 'amber-resin' | 'lodge-ribbon';
+/** Item identities come from the active shard catalogue. */
+export type ItemId = string;
 
 /** what a carcass of (kind, variant) yields when harvested */
 export function harvestOf(kind: string, variant?: string): ItemId[] {
@@ -49,7 +43,7 @@ const inventoryManifest=(slug:string)=>findShard(slug)??findTitleManifest(slug);
 const isNoPackChunk = (chunkId: string): boolean => inventoryManifest(saveSlug(chunkId))?.bag?.pack.slots === 0; // a level with no pack declares 0 slots (its manifest's bag)
 
 export class Inventory {
-  private counts: Partial<Record<ItemId, number>>;
+  private counts: Record<ItemId, number>;
   private order: ItemId[];
   /** kinds an older save held that this shard's pack no longer keeps (read once by the loadout's migration) */
   private legacy = new Set<ItemId>();
@@ -60,13 +54,14 @@ export class Inventory {
   readonly chunkId: string;
   constructor(chunkId: string) {
     this.chunkId = chunkId;
-    const saved = inventorySave.read(saveSlug(chunkId)) as { counts: Partial<Record<ItemId, number>>; order: ItemId[] };
-    this.counts = saved.counts;
+    const saved = inventorySave.read(saveSlug(chunkId));
+    this.counts = Object.create(null) as Record<string, number>;
     this.order = [];
     for (const id of saved.order) {
-      if (!(id in ITEMS)) { delete this.counts[id]; continue; } // a kind the game no longer has (Nalati's, E314 C)
-      if (this.keeps(id)) this.order.push(id);
-      else { if ((this.counts[id] ?? 0) > 0) this.legacy.add(id); delete this.counts[id]; }
+      const count = Object.hasOwn(saved.counts, id) ? saved.counts[id] : undefined;
+      if (!isItemId(id) || count === undefined || !Number.isSafeInteger(count) || count <= 0 || this.order.includes(id)) continue;
+      if (this.keeps(id)) { this.counts[id] = count; this.order.push(id); }
+      else this.legacy.add(id);
     }
   }
 
@@ -83,24 +78,27 @@ export class Inventory {
   checkpoint(): boolean { return !this.writes || inventorySave.write({ counts: this.counts, order: this.order }, saveSlug(this.chunkId)); }
   /** Take the pack from who owns it (J130): it tells who listens. */
   mirror(counts: ReadonlyMap<string, number>): void {
-    const known = [...counts.keys()].filter((id): id is ItemId => id in ITEMS);
-    this.counts = Object.fromEntries(known.map(id => [id, counts.get(id) ?? 0]));
-    this.order = [...this.order.filter(id => counts.has(id)), ...known.filter(id => !this.order.includes(id))];
+    const entries = [...counts].filter(([id, count]) => isItemId(id) && this.keeps(id) && Number.isSafeInteger(count) && count > 0);
+    this.counts = Object.fromEntries(entries);
+    const known = new Set(entries.map(([id]) => id));
+    this.order = [...this.order.filter(id => known.has(id)), ...[...known].filter(id => !this.order.includes(id))];
     this.onChange?.();
   }
 
   /** false, and nothing added, for a kind this shard does not keep or a new kind with every slot taken */
   add(id: ItemId, n = 1): boolean {
-    if (!addInventory({ counts: this.counts, order: this.order }, { has: (kind) => kind in ITEMS, keeps: (kind) => this.keeps(kind), slots: () => this.slots }, id, n)) return false;
+    if (!Number.isSafeInteger(n) || n <= 0 || !Number.isSafeInteger(this.count(id) + n)) return false;
+    if (!addInventory({ counts: this.counts, order: this.order }, { has: isItemId, keeps: (kind) => this.keeps(kind), slots: () => this.slots }, id, n)) return false;
     this.save(); this.onChange?.();
     return true;
   }
   /** this shard's pack size (0: no pack, no PACK tab — Nalati, Nine Dragon) */
   get slots(): number { return inventoryManifest(saveSlug(this.chunkId))?.bag?.pack.slots ?? (isNoPackChunk(this.chunkId) ? 0 : PACK_SLOTS); }
   /** how many of `id` the pack holds */
-  count(id: ItemId): number { return this.counts[id] ?? 0; }
+  count(id: ItemId): number { return isItemId(id) ? this.counts[id] ?? 0 : 0; }
   /** take `n` of `id` out of the pack (a trade); false, and nothing taken, when there are fewer. At 0 the slot frees up. */
   take(id: ItemId, n = 1): boolean {
+    if (!isItemId(id) || !Number.isSafeInteger(n)) return false;
     const state = { counts: this.counts, order: this.order };
     if (!takeInventory(state, id, n)) return false;
     if (n <= 0) return true;
@@ -108,10 +106,12 @@ export class Inventory {
     this.save(); this.onChange?.();
     return true;
   }
-  get items(): { id: ItemId; count: number; label: string; icon: IconId }[] { return this.order.map((id) => ({ id, count: this.counts[id] ?? 0, ...ITEMS[id] })); }
+  get items(): { id: ItemId; count: number; label: string; icon: IconId }[] {
+    return this.order.flatMap(id => { const row = ITEMS[id]; return row === undefined ? [] : [{ id, count: this.counts[id] ?? 0, ...row }]; });
+  }
   /** Move all travel-enabled lines together; one save write, preserving local lines and order. */
   takeTravel(rows: ReadonlyMap<string, ItemRow>): { id: ItemId; count: number }[] {
-    const carry = this.items.filter((line) => (rows.get(line.id)?.travels ?? ITEMS[line.id].travels) && line.count > 0).map(({ id, count }) => ({ id, count }));
+    const carry = this.items.filter((line) => (rows.get(line.id)?.travels ?? ITEMS[line.id]?.travels ?? false) && line.count > 0).map(({ id, count }) => ({ id, count }));
     if (carry.length === 0) return carry;
     const moved = new Set(carry.map((line) => line.id));
     for (const { id } of carry) delete this.counts[id];
@@ -119,5 +119,5 @@ export class Inventory {
     this.save(); this.onChange?.();
     return carry;
   }
-  get total(): number { return this.order.reduce((s, id) => s + (this.counts[id] ?? 0), 0); }
+  get total(): number { return this.items.reduce((sum, row) => sum + row.count, 0); }
 }

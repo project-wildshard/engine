@@ -38,7 +38,7 @@ export function travelService(ports: TravelPorts): { travel: (request: TravelReq
   return {
     travel: (request: TravelRequest): void => {
       const source = ports.source();
-      const carry = source?.inventory.items.filter((line) => (source.rows.get(line.id)?.travels ?? ITEMS[line.id].travels) && line.count > 0).map(({ id, count }) => ({ id, count })) ?? [];
+      const carry = source?.inventory.items.filter((line) => (source.rows.get(line.id)?.travels ?? ITEMS[line.id]?.travels ?? false) && line.count > 0).map(({ id, count }) => ({ id, count })) ?? [];
       const handoff: TravelHandoff = { v: 1, from: source?.shard ?? null, to: request.to, mode: request.mode, arrive: request.arrive ?? null, carry, at: ports.now() };
       // Carry is removed together, only once the receiving page has a durable handoff.
       if (ports.slot.write(handoff)) source?.inventory.takeTravel(source.rows);

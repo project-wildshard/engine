@@ -683,9 +683,10 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
       harvested.add(selectedCarcass);
       const drops = inventory.harvest(carcass.kind, carcass.variant); // Pine Hollow: only what Mott takes (E314 C)
       const show = (got: readonly ItemId[]): void => {
-        const said = `${got.map((id) => ITEMS[id].label).join(' + ') || 'Nothing'} harvested · ${inventory.total} in the pack`, first = got[0];
+        const entries = got.flatMap(id => { const row = ITEMS[id]; return row === undefined ? [] : [row]; });
+        const name = entries.map(row => row.label).join(' + '), said = `${name || 'Nothing'} harvested · ${inventory.total} in the pack`, first = entries[0];
         if (first === undefined) hud.toast(said);
-        else hud.pickupCard({ name: got.map((id) => ITEMS[id].label).join(' + '), icon: ITEMS[first].icon, detail: `${inventory.total} in the pack` });
+        else hud.pickupCard({ name, icon: first.icon, detail: `${inventory.total} in the pack` });
         audio.hitMarker();
       };
       const give = (): void => {
