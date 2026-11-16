@@ -47,24 +47,25 @@ class FakeGl {
 test('storage calls are charged to the resource bound at that call; no bind is wrapped', () => {
   const gl = new FakeGl(), ledger = new MemoryAttribution();
   const stop = installAllocationJournal(gl, ledger);
-  // a wrapped method is an own property of the context (the journal sets it there); the binds stay the prototype's
-  const wrapped = (name: string): boolean => Object.hasOwn(gl, name);
-  expect(['activeTexture', 'bindTexture', 'bindBuffer', 'bindVertexArray', 'bindRenderbuffer'].filter(wrapped)).toEqual([]);
-  expect(wrapped('bufferData') && wrapped('texStorage2D')).toBe(true);
-  // a 2D texture on unit 3 (64 × 32 RGBA8, one level) and a cube on unit 0 (16², 6 faces, RGBA8)
-  const flat = gl.createTexture(), cube = gl.createTexture();
-  gl.activeTexture(0x84c0 + 3); gl.bindTexture(0x0de1, flat); gl.texStorage2D(0x0de1, 1, 0x8058, 64, 32);
-  gl.activeTexture(0x84c0); gl.bindTexture(0x8513, cube); gl.texStorage2D(0x8513, 1, 0x8058, 16, 16);
-  // an array buffer, and an element buffer held by a vertex array that is unbound before its data
-  const vertices = gl.createBuffer(), indices = gl.createBuffer(), vao = gl.createVertexArray();
-  gl.bindBuffer(0x8892, vertices); gl.bufferData(0x8892, new Float32Array(100), 0x88e4);
-  gl.bindVertexArray(vao); gl.bindBuffer(0x8893, indices); gl.bindVertexArray(null); gl.bindVertexArray(vao);
-  gl.bufferData(0x8893, new Uint16Array(30), 0x88e4);
-  const depth = gl.createRenderbuffer();
-  gl.bindRenderbuffer(0x8d41, depth); gl.renderbufferStorage(0x8d41, 0x81a5, 8, 8);
-  const bytes = (): number => ledger.summary().totals.gpu;
-  expect(bytes()).toBe(64 * 32 * 4 + 16 * 16 * 4 * 6 + 400 + 60 + 8 * 8 * 2);
-  gl.deleteTexture(flat);
-  expect(bytes()).toBe(16 * 16 * 4 * 6 + 400 + 60 + 8 * 8 * 2);
-  stop();
+  try {
+    // a wrapped method is an own property of the context (the journal sets it there); the binds stay the prototype's
+    const wrapped = (name: string): boolean => Object.hasOwn(gl, name);
+    expect(['activeTexture', 'bindTexture', 'bindBuffer', 'bindVertexArray', 'bindRenderbuffer'].filter(wrapped)).toEqual([]);
+    expect(wrapped('bufferData') && wrapped('texStorage2D')).toBe(true);
+    // a 2D texture on unit 3 (64 × 32 RGBA8, one level) and a cube on unit 0 (16², 6 faces, RGBA8)
+    const flat = gl.createTexture(), cube = gl.createTexture();
+    gl.activeTexture(0x84c0 + 3); gl.bindTexture(0x0de1, flat); gl.texStorage2D(0x0de1, 1, 0x8058, 64, 32);
+    gl.activeTexture(0x84c0); gl.bindTexture(0x8513, cube); gl.texStorage2D(0x8513, 1, 0x8058, 16, 16);
+    // an array buffer, and an element buffer held by a vertex array that is unbound before its data
+    const vertices = gl.createBuffer(), indices = gl.createBuffer(), vao = gl.createVertexArray();
+    gl.bindBuffer(0x8892, vertices); gl.bufferData(0x8892, new Float32Array(100), 0x88e4);
+    gl.bindVertexArray(vao); gl.bindBuffer(0x8893, indices); gl.bindVertexArray(null); gl.bindVertexArray(vao);
+    gl.bufferData(0x8893, new Uint16Array(30), 0x88e4);
+    const depth = gl.createRenderbuffer();
+    gl.bindRenderbuffer(0x8d41, depth); gl.renderbufferStorage(0x8d41, 0x81a5, 8, 8);
+    const bytes = (): number => ledger.summary().totals.gpu;
+    expect(bytes()).toBe(64 * 32 * 4 + 16 * 16 * 4 * 6 + 400 + 60 + 8 * 8 * 2);
+    gl.deleteTexture(flat);
+    expect(bytes()).toBe(16 * 16 * 4 * 6 + 400 + 60 + 8 * 8 * 2);
+  } finally { stop(); }
 });
