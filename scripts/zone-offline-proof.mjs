@@ -3,25 +3,25 @@
 // cards while online (the service worker keeps what each read), then goes offline and boots Driftwood from Shard Select. Its west
 // gate (Sunscar, never visited) shows "Not downloaded" in place of the count and never enters; its east gate (Nalati, visited)
 // counts to 0 and enters Nalati, which reaches control as the new home. Every failed request after going offline is logged.
-//   scripts/browser-lane.sh node scripts/zone-offline-proof.mjs --base=<loopback url> --out=<dir> [--device='iPhone 15 Pro']
+//   scripts/browser-lane.sh node scripts/zone-offline-proof.mjs --base=<loopback url> --out=<dir> [--device='iPhone 17 Pro'] [--engine=chromium|webkit]
 // Loopback only: the walker is placed by the in-page harness pose (J205).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
-import { chromium, devices } from 'playwright';
+import { chromium, devices, webkit } from 'playwright';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), device = flag('device', '');
+const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), device = flag('device', ''), engineName = flag('engine', 'chromium');
 if (!/^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: zone-offline-proof.mjs --base=<loopback url> --out=<dir>');
 mkdirSync(out, { recursive: true });
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 const HALF = 250, PITCH = 562.5, WARM_MS = 25_000;
-const tag = device === '' ? 'desk' : 'phone';
-const result = { base, device, at: new Date().toISOString(), build: '', warm: /** @type {string[]} */ ([]), unvisited: /** @type {unknown} */ (null), visited: /** @type {unknown} */ (null),
+const tag = `${engineName}-${device === '' ? 'desk' : 'phone'}`;
+const result = { base, device, engine: engineName, at: new Date().toISOString(), build: '', warm: /** @type {string[]} */ ([]), unvisited: /** @type {unknown} */ (null), visited: /** @type {unknown} */ (null),
   failed: /** @type {string[]} */ ([]), errors: /** @type {string[]} */ ([]), note: '' };
-const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
 let code = 1;
 try {
   result.build = await fetch(`${base}/version.json`).then(async found => String((await found.json()).build)).catch(() => '');
