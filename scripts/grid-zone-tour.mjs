@@ -63,6 +63,10 @@ try {
   const navigations = /** @type {{ url: string, at: number }[]} */ ([]);
   page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations.push({ url: frame.url().replace(base, ''), at: Date.now() }); });
   /** @type {any} */ (result).navigations = navigations;
+  // the page's errors and warnings, with the time since the tour began (a stuck entry names its cause here)
+  const consoleRows = /** @type {string[]} */ ([]), began = Date.now(); /** @type {any} */ (result).console = consoleRows;
+  page.on('console', message => { if ((message.type() === 'error' || message.type() === 'warning') && !/THREE\.Clock|GL_INVALID/u.test(message.text())) consoleRows.push(`${String(Math.round((Date.now() - began) / 1000))}s ${message.type()}: ${message.text().slice(0, 300)}`); });
+  page.on('pageerror', error => { consoleRows.push(`${String(Math.round((Date.now() - began) / 1000))}s pageerror: ${error.message.slice(0, 300)}`); });
   await page.evaluate(() => { /** @type {any} */ (window).__zeTourMark = 1; });
   for (const slug of order) {
     // a page that loaded again after the last entry's control (its marker gone) is recorded on that entry, then waited for
