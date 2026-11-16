@@ -231,3 +231,27 @@ describe('session brief: ./tmp line', () => {
     assert.match(run(repoWithTmp({ folders: false })).out, /^-- \.\/tmp is empty --$/m);
   });
 });
+
+// Meta MINI-FLOW MF2 (J380): the last 10 decisions, read from the meta checkout beside this clone.
+describe('session brief: last 10 decisions from meta', () => {
+  const run = (env) => {
+    const clean = Object.fromEntries(Object.entries(process.env).filter(([key]) => !['HERDR_ENV', 'WS_META_DIR'].includes(key)));
+    const result = spawnSync('bash', [BRIEF], { input: '', encoding: 'utf8', env: { ...clean, ...env } });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  };
+  test('prints meta\'s brief-decisions.sh lines right after the header, at most 11', () => {
+    const meta = fixtureScratch('fake-meta');
+    after(() => rmSync(meta, { recursive: true, force: true }));
+    mkdirSync(join(meta, 'scripts'), { recursive: true });
+    const lines = ['== Last 10 decisions (meta abc1234, 2026-11-16 09:00 Cancún; full text: x) ==', ...Array.from({ length: 12 }, (_, i) => `  J${400 - i} Decision ${400 - i}`)];
+    writeFileSync(join(meta, 'scripts', 'brief-decisions.sh'), `#!/usr/bin/env bash\nprintf '%s\\n' ${lines.map((line) => `'${line}'`).join(' ')}\n`);
+    const out = run({ WS_META_DIR: meta });
+    const at = out.indexOf('== Last 10 decisions');
+    assert.ok(at > 0 && at < out.indexOf('-- other agents'), out);
+    assert.deepEqual(out.slice(at).split('\n').slice(0, 12), [...lines.slice(0, 11), '-- other agents in this repo (herdr) --']);
+  });
+  test('no meta checkout there, no decision lines', () => {
+    assert.doesNotMatch(run({ WS_META_DIR: join(ROOT, 'no-such-meta') }), /Last 10 decisions/);
+  });
+});

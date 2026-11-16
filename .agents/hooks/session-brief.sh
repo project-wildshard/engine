@@ -39,6 +39,14 @@ if [ "$(git config core.hooksPath 2>/dev/null)" != ".githooks" ]; then
   echo "!! git hooks are OFF in this clone. Run: git config core.hooksPath .githooks"
 fi
 
+# The last 10 decisions (meta MINI-FLOW MF2, J380: "we need caps like last 10 decisions"), 11 lines on top of
+# J273's 40. Read from the meta checkout beside this clone (~/projects/games/project-wildshard-meta), so their
+# format lives in meta's scripts/brief-decisions.sh and never needs an engine land. No meta there, no lines.
+meta="${WS_META_DIR:-$(dirname "${common:-$root/.git}")/../../project-wildshard-meta}"
+if [ -f "$meta/scripts/brief-decisions.sh" ]; then
+  bash "$meta/scripts/brief-decisions.sh" 2>/dev/null | head -11
+fi
+
 if [ "${HERDR_ENV:-}" != 1 ]; then
   show "other agents in this repo (herdr)" 3 "(not running inside herdr)" ""
 else
