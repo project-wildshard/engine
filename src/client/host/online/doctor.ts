@@ -85,7 +85,7 @@ export function healthIsPrivate(socket: string, pageOrigin: string): boolean {
   try {
     const rooms = new URL(socket), page = new URL(pageOrigin);
     const site = (host: string): string => host.split('.').slice(-2).join('.');
-    return rooms.protocol === 'wss:' && rooms.hostname !== page.hostname && site(rooms.hostname) === site(page.hostname) && rooms.hostname.includes('.');
+    return rooms.protocol === 'wss:' && /^rooms(?:-[\w-]+)?\./u.test(rooms.hostname) && site(rooms.hostname) === site(page.hostname);
   } catch { return false; }
 }
 

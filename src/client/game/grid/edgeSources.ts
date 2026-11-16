@@ -113,8 +113,8 @@ export async function readGridEdges(cell: GridCell, reader: GridEdgeReaderPorts)
     return { kind: 'declared', profiles: latticeRows(LATTICE, (i, j) => terrain.heightAt(-250 + i * step, -250 + j * step) - datum, colour), observations: observe([], water) };
   }
   // STAGING-BUGBASH SB12: a cell this page has no shard data for (a shard the API placed and carded from its catalogue name,
-  // SA46) has no committed bake either; asking 404'd in the console on every grid page. The session keeps it at road level
-  if (manifest === undefined) throw new Error(`no shard data for ${cell.slug}: its edges stay at road level`);
+  // SA46) has no committed bake either; asking 404'd in the console on every grid page. Its edges stay closed at road level
+  if (manifest === undefined) return { kind: 'declared', profiles: latticeRows(LATTICE, () => 0, () => [...NEUTRAL]), observations: observe([], undefined) };
   const response = await reader.fetch(versionedUrl(`/assets/baked/${cell.slug}/terrain.bin`));
   if (!response.ok) throw new Error(`terrain.bin ${cell.slug}: ${String(response.status)}`);
   const { res, heights } = bakeHeights(new Uint8Array(await response.arrayBuffer()));

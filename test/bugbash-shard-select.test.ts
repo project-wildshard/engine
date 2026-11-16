@@ -75,13 +75,15 @@ test('SB12: an upload whose catalogue name is only its slug is a test placement:
 test('SB12: a grid cell whose shard this page has no data for keeps road-level edges without asking for a terrain bake', async () => {
   installShards([]);
   const fetch = vi.fn(() => Promise.resolve(new Response('', { status: 404 })));
-  await expect(readGridEdges({ instance: 'mu9-auto-20261116', slug: 'mu9-auto-20261116', cell: [1, 3], origin: { x: 0, y: 0, z: 0 } }, { fetch }))
-    .rejects.toThrow(/no shard data/u);
+  const edges = await readGridEdges({ instance: 'mu9-auto-20261116', slug: 'mu9-auto-20261116', cell: [1, 3], origin: { x: 0, y: 0, z: 0 } }, { fetch });
+  expect(edges.kind).toBe('declared');
+  if (edges.kind === 'declared') expect([edges.observations.north.entryWidth, Math.max(...edges.profiles.east.heights)]).toEqual([0, 0]);
   expect(fetch).not.toHaveBeenCalled();
 });
 
 test('SB15: a phone pill shows the short describe, which fits beside SHARD SELECT', () => {
   expect(compactBuildLabel('v0.1.28-96-gf8ff9bd9')).toBe('v0.1.28+96');
+  expect(compactBuildLabel('v0.1.28-96-gf8ff9bd9-dirty')).toBe('v0.1.28+96');
   expect(compactBuildLabel('v0.1.31')).toBe('v0.1.31');
   expect(compactBuildLabel('v0.1.5 · a8144a5')).toBe('v0.1.5 · a8144a5');
 });

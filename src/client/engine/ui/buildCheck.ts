@@ -37,7 +37,7 @@ export function buildLabel(id: string = runningBuild(), version: string = engine
  *  the commit count (`v0.1.28+96`), so the pill fits beside the WILDSHARD logo and SHARD SELECT untruncated; Settings ▸ Build
  *  keeps the whole describe. A release (`v0.1.31`) and the version · commit label are already short. */
 export function compactBuildLabel(label: string): string {
-  return label.replace(/^(v\d+\.\d+\.\d+)-(\d+)-g[0-9a-f]+$/u, '$1+$2');
+  return label.replace(/^(v\d+\.\d+\.\d+)-(\d+)-g[0-9a-f]+(?:-dirty)?$/u, '$1+$2');
 }
 
 /** The live build's id, or null: offline (the PWA plays from its cache), a failed request, or an answer with no build. */

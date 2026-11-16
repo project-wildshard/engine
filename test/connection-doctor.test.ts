@@ -144,4 +144,5 @@ test('STAGING-BUGBASH SB20: the hosted rooms address beside the page keeps /heal
   // a tailnet door and a local door answer /health with CORS, and the doctor reads their build and players
   expect(healthIsPrivate('wss://wildshard.tailb41b20.ts.net', 'https://staging.wildshard.io')).toBe(false);
   expect(healthIsPrivate('ws://127.0.0.1:18797/', 'http://127.0.0.1:4173')).toBe(false);
+  expect(healthIsPrivate('wss://wildshard.tailb41b20.ts.net', 'https://page.tailb41b20.ts.net')).toBe(false);
 });
