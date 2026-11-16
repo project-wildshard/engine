@@ -187,7 +187,8 @@ test('native guest memory and host clocks continue pending frames, rate recovery
     expect(restored.lane.frame(dt, .5, tick, [sample], 60, clock(.1)))
       .toBe(original.lane.frame(dt, .5, tick, [sample], 60, clock(.1)));
     expect(restored.lane.snapshotState()).toEqual(original.lane.snapshotState());
-    expect(new Uint8Array(restored.lane.memory.buffer)).toEqual(new Uint8Array(original.lane.memory.buffer));
+    // Compare every byte on every frame without the generic per-element matcher.
+    expect(Buffer.from(restored.lane.memory.buffer).equals(Buffer.from(original.lane.memory.buffer))).toBe(true);
   }
   expect(restored.written).toEqual(original.written);
   expect(restored.uploads).toEqual(original.uploads);
