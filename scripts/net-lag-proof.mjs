@@ -38,10 +38,12 @@ const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 
 /** In the page: drawn frames (page frames that rendered), a forced-slow-frame switch, and the socket delay. Self-contained. @param {number} delay */
 function pageProbe(delay) {
-  const W = /** @type {any} */ (window), S = W.__netLag = { on: false, drawn: /** @type {number[]} */ ([]), last: 0, slowMs: 0, rendered: false, worst: 0 };
+  const W = /** @type {any} */ (window), S = W.__netLag = { on: false, drawn: /** @type {number[]} */ ([]), last: /** @type {number|null} */ (null), frameNow: 0, slowMs: 0, rendered: false, worst: 0 };
   // a drawn frame is a page frame that rendered at least once (a frame may render offscreen passes too; a capped one renders none)
   // B2's worst render offset, over the window the proof opens (the client's own `worstOffset` runs from entry)
-  const frame = (/** @type {number} */ now) => { const offset = W.__wildshard?.world?.player?.renderOffset; if (S.on && offset !== undefined) S.worst = Math.max(S.worst, offset.length()); if (S.rendered) { if (S.on && S.last !== 0) S.drawn.push(now - S.last); S.last = now; S.rendered = false; } requestAnimationFrame(frame); };
+  // Installed before boot, this callback precedes the game's RAF. Record that
+  // RAF's timestamp at render, not the variable delay to our next callback.
+  const frame = (/** @type {number} */ now) => { S.frameNow = now; S.rendered = false; const offset = W.__wildshard?.world?.player?.renderOffset; if (S.on && offset !== undefined) S.worst = Math.max(S.worst, offset.length()); requestAnimationFrame(frame); };
   requestAnimationFrame(frame);
   const hook = () => {
     const renderer = W.__wildshard?.world?.game?.renderer;
@@ -50,6 +52,7 @@ function pageProbe(delay) {
     const render = renderer.render.bind(renderer);
     renderer.render = (/** @type {unknown} */ scene, /** @type {unknown} */ camera) => {
       if (S.slowMs > 0 && !S.rendered) { const until = performance.now() + S.slowMs; while (performance.now() < until) { /* NL5's forced long frame */ } }
+      if (!S.rendered) { if (S.on && S.last !== null) S.drawn.push(S.frameNow - S.last); S.last = S.frameNow; }
       S.rendered = true;
       return render(scene, camera);
     };

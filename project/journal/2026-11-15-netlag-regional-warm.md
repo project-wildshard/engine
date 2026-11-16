@@ -41,3 +41,13 @@ Four small metric controls run in the ordinary Vitest inventory and
 cover elapsed time, zero corrections, the rounding boundary and reset.
 Existing runtime reports keep their original nominal-duration rates;
 the Sky Reach misses remain open, rather than being relabelled green.
+
+After rebasing, ZE2d already contains the regional warm-rig production
+call. Keep its single call and retain this lane's regression coverage.
+The WebKit qualification still missed B1 on the phone layout and B2 on
+both layouts. A controlled RAF regression then found that the proof
+dated draws at the following observer callback: real 33/40/33 ms gaps
+became 56/17/33 ms. Record the current rendering RAF instead, counting
+offscreen passes once. Two red-first cases pin irregular capped frames
+and a zero-timestamp start. This corrects measurement; runtime bars
+remain open until a new build and qualification finish.
