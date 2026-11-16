@@ -294,6 +294,7 @@
 .ws-gmenu .ws-gmenu-sticker span { font-size: 7.5px; letter-spacing: 0.18em; text-transform: uppercase; text-align: center; color: var(--ws-text-dim); }
 .ws-gmenu .ws-gmenu-stickicon { width: 52%; height: 50%; }
 .ws-gmenu .ws-gmenu-stickicon img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.ws-gmenu .ws-gmenu-stickicon.tinted { background-color: currentColor; mask-size: contain; mask-position: center; mask-repeat: no-repeat; }
 .ws-gmenu .ws-gmenu-sticker:not(.found) .ws-gmenu-stickicon { opacity: 0.45; }
 .ws-gmenu .ws-gmenu-sticker.found { border-style: solid; border-color: rgba(143, 227, 255, 0.45); background: rgba(143, 227, 255, 0.06); color: #efe0c2; }
 .ws-gmenu .ws-gmenu-sticker.found span { color: #fff; }

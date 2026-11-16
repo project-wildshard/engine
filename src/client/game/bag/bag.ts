@@ -217,8 +217,13 @@ export function renderFinds(p: HTMLElement, v: FindsView, scope: Scope = uiScope
       const html = `<i class="ws-gmenu-stickicon">${typeof it.icon === 'string' ? icon(it.icon) : ''}</i><span></span>`;
       const decorate = (node: HTMLElement): void => {
         if (typeof it.icon !== 'string') {
-          const image = document.createElement('img'); image.alt = ''; image.draggable = false; image.decoding = 'async'; image.src = it.icon.image;
-          node.querySelector('.ws-gmenu-stickicon')?.append(image);
+          const holder = node.querySelector<HTMLElement>('.ws-gmenu-stickicon');
+          if (it.icon.tint === 'currentColor' && holder !== null) {
+            holder.classList.add('tinted'); holder.style.maskImage = `url(${JSON.stringify(it.icon.image)})`;
+          } else {
+            const image = document.createElement('img'); image.alt = ''; image.draggable = false; image.decoding = 'async'; image.src = it.icon.image;
+            holder?.append(image);
+          }
         }
         fill(node, 'span', it.found ? it.label : '???'); for (const prize of it.prize ?? []) node.append(words('ws-gmenu-prize', prize, 'em'));
       };
