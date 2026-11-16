@@ -32,3 +32,15 @@ test('a server shove reconverges inside the glide', () => {
   expect(run.corrections).toBeLessThan(40);
   expect(run.feetGap).toBeLessThan(.02);
 });
+
+// NL13: a constant 180 ms link on a clear, static route is the control for
+// Sky Reach's browser misses. This route avoids the course's steps and decks.
+test.each([30, 60])('a fixed 180 ms link at %i fps introduces no clear-ground corrections', fps => {
+  const clear: MotionScenario = {id: 'fixed-link-clear', start: {x: 20, z: 0, yaw: 0}, ticks: 0, intent: () => ({})};
+  const run = wirePlay(R, clear, {seconds: 20, frameMs: () => 1000 / fps,
+    link: {latencyMs: 90, jitterMs: 0, lossPct: 0, reorderPct: 0, random: () => 0.5},
+    press: (frame, page) => {if (frame === 0) page.player.keys.add('KeyW');}});
+  expect(run.steps).toBe(run.sent);
+  expect(run.corrections).toBe(0);
+  expect(run.feetGap).toBeLessThan(.02);
+});

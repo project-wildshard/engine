@@ -20,3 +20,9 @@ This matches entry's activation without changing movement or timing
 bars. The controlled rig at 180 ms now has no slow animal draws or
 long tasks on either layout; phone B1 passes. Desktop has one 83 ms
 gap without a measured task/draw, and B2 still misses on both layouts.
+
+During the release hold, two small native controls walk a clear static
+course for twenty seconds at thirty/sixty fps over a fixed 180 ms link.
+Both have zero corrections and drain every sent command. Constant
+latency alone does not reproduce Sky Reach's misses in that course;
+the browser/world integration still needs a cause and runtime proof.
