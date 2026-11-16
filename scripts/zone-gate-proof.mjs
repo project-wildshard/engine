@@ -8,6 +8,8 @@
 // The walker is set 20 m inside Driftwood's east entryway by the in-page harness pose, so preview or a loopback page only (J205).
 // `--target=sunscar-dunes` (ZE10d) runs the same west of Driftwood, through Sunscar's east gate. After the walk back out the walker
 // steps into Driftwood's own buffer and reads its gate (the old home is walled now), then steps out again before the count ends.
+// `--online` (ZE10d2): a loopback world build on the local rig (zone-gate-rig.mjs runs it): the seat can't be placed, so the walker
+// walks from the spawn to Driftwood's east entryway; the entry must keep the page's one game socket open and dial no other.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from 'playwright';
@@ -16,7 +18,7 @@ import { saveFixture } from './debug-settings.mjs';
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire');
+const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire'), online = process.argv.includes('--online');
 if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: zone-gate-proof.mjs --base=<preview or loopback url> --out=<dir>');
 const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '2992x1434@2')) ?? [0, '2992', '1434', '2']).slice(1).map(Number);
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
@@ -26,6 +28,9 @@ const TARGETS = /** @type {Record<string, { name: string, dir: number }>} */ ({ 
 const targetSlug = flag('target', 'nalati-grasslands'), target = TARGETS[targetSlug];
 if (target === undefined) throw new Error(`--target is one of ${Object.keys(TARGETS).join(', ')}`);
 const dir = target.dir;
+/** ZE10d2: the walked approach from the rig's fresh seat (on Driftwood's pier) to its east entryway, as grid-road-lag.mjs walks it */
+const APPROACH = /** @type {[number, number][]} */ ([[235, -194], [235, 0]]);
+if (online && dir !== 1) throw new Error('--online walks to Driftwood\'s east entryway only: --target=nalati-grasslands');
 /** ZE10b: control in the new home on its Driftwood-side entryway's centre line 14 m in (within 1.5 m), facing in, then out onto the road. */
 const arrivedPastGate = (/** @type {any} */ fired) => fired?.ready === true && fired.walkedOut === true && fired.arrived !== null
   && Math.abs(dir * fired.arrived.x + HALF - 14) < 1.5 && Math.abs(fired.arrived.z) < 1.5 && Math.abs(Math.abs(fired.arrived.yaw) - Math.PI / 2) < 0.2;
@@ -67,6 +72,13 @@ try {
   result.viewport = phone === undefined ? `${String(desk[0])}x${String(desk[1])}@${String(desk[2])}` : `${device} ${String(phone.viewport.width)}x${String(phone.viewport.height)}@${String(phone.deviceScaleFactor)}`;
   const context = await browser.newContext(phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 }), page = await context.newPage();
   page.on('pageerror', error => { result.errors.push(error.message.slice(0, 240)); });
+  // ZE10d2: every socket the page opens, and whether each is still open (the game's link is the one to the world's port)
+  if (online) await context.addInitScript(() => {
+    const W = /** @type {any} */ (window), Real = W.WebSocket;
+    W.__zeSockets = [];
+    W.WebSocket = class extends Real { constructor(/** @type {any[]} */ ...args) { super(...args); W.__zeSockets.push({ url: String(args[0]), at: Date.now(), socket: this }); } };
+  });
+  const sockets = () => page.evaluate(() => /** @type {any[]} */ (/** @type {any} */ (window).__zeSockets ?? []).map(row => ({ url: String(row.url).replace(/[?#].*$/u, ''), at: row.at, open: row.socket.readyState === 1 }))).catch(() => null);
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { volume: 0 } });
@@ -94,7 +106,21 @@ try {
   };
   // the state is read first: a full-size shot can take longer than a count's second on a loaded laptop (the count then read one on)
   const shoot = async (/** @type {string} */ name) => { const seen = await state(); await page.screenshot({ path: join(out, `${tag}-${name}.png`) }); result.shots.push({ name, ...seen }); };
-  await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [dir * (HALF - 20), 0]);
+  if (online) {
+    // the seat walks: W and sprint held toward each point, a hop when a post or rail holds it (no 0.5 m in a second)
+    await page.keyboard.down('ShiftLeft');
+    for (const [x, z] of APPROACH) {
+      await page.keyboard.down('KeyW');
+      for (let ends = Date.now() + 90_000, near = Infinity, last = { x: Infinity, z: Infinity, t: Date.now() }; Date.now() < ends && near > 3; await sleep(250)) {
+        const at = await state(), lx = at.x - origin.x, lz = at.z - origin.z;
+        near = Math.hypot(lx - x, lz - z); await face(Math.atan2(lx - x, lz - z));
+        if (Math.hypot(at.x - last.x, at.z - last.z) >= 0.5) last = { x: at.x, z: at.z, t: Date.now() };
+        else if (Date.now() - last.t > 1000) { await page.keyboard.press('Space'); last.t = Date.now(); }
+      }
+      await page.keyboard.up('KeyW');
+    }
+    await page.keyboard.up('ShiftLeft');
+  } else await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [dir * (HALF - 20), 0]);
   await sleep(4000);
   await walkTo(origin.x + dir * (HALF + 31.25)); await face(-dir * Math.PI / 2); await sleep(1500);
   await shoot('road-wall');
@@ -110,7 +136,7 @@ try {
   await until(gate => gate?.count === 2); await shoot('gate-2');
   if (fire) {
     // stand on: 0 opens the loading screen and the page enters the cell as its home
-    const before = page.url();
+    const before = page.url(), socketsBefore = online ? await sockets() : null;
     // ZE10c: the target's world reads (its shardfile bytes) against the moment the old document went (the reload form)
     /** @type {{ url: string, at: number }[]} */
     const reads = [];
@@ -202,7 +228,11 @@ try {
     let freshMB = /** @type {number | null} */ (null);
     try { freshMB = await bootCard(freshContext, target.name, arrived ?? { x: dir * (14 - HALF), z: 0, yaw: -dir * Math.PI / 2 }); } catch (error) { result.errors.push(`fresh ${target.name} boot: ${String(error).slice(0, 200)}`); }
     await freshContext.close();
-    result.fired = { navigations, departure: departure?.how ?? null, samePage, navigated: left, before, after: page.url(), ready, home, zonePending, arrived, walkedOut, oldHomeGate, oldHomeLeft, enteredMB, controlMB, freshMB,
+    // ZE10d2: the same socket: the game link open before the 0 is still open, and no game link was dialled after it
+    const socketsAfter = online ? await sockets() : null, game = (/** @type {any} */ row) => /:\d+\/?$/u.test(row.url) && !row.url.includes(new URL(base).host);
+    const oneSocket = !online ? null : socketsBefore !== null && socketsAfter !== null && socketsBefore.some(game)
+      && socketsAfter.filter(game).length === socketsBefore.filter(game).length && [...socketsAfter].reverse().find(game)?.open === true;
+    result.fired = { navigations, departure: departure?.how ?? null, samePage, oneSocket, socketsBefore, socketsAfter, navigated: left, before, after: page.url(), ready, home, zonePending, arrived, walkedOut, oldHomeGate, oldHomeLeft, enteredMB, controlMB, freshMB,
       residency: pageReads !== null && pageReads.left !== null ? { clock: 'page', zeroToLeftMs: Number.isFinite(zero) ? Math.round(pageReads.left - zero) : null,
         roadViewReads: pageReads.reads.filter(row => row.start < zero).length,
         readsBeforeLeaving: pageReads.reads.filter(row => row.start >= zero && row.start < /** @type {number} */ (pageReads.left)).map(row => row.url.replace(base, '')),
@@ -218,7 +248,7 @@ try {
   // both clocks: the page's resource timing (exact order, the window's reads only) and the script's request log (the in-page server
   // worker's reads too)
   const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && (fired.residency.script?.readsBefore ?? 0) === 0 && typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50;
-  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.oldHomeLeft === true && fired.zonePending === false)) ? 0 : 1;
+  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.oldHomeLeft === true && fired.zonePending === false && (!online || fired.oneSocket === true))) ? 0 : 1;
 } catch (error) { result.note = String(error).slice(0, 400); console.log(`FAIL ${result.note}`); }
 finally {
   writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);

@@ -6,7 +6,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { NetClient } from '@wildshard/engine/net/client';
 import type { NetIdentity } from '@wildshard/engine/net/identity';
 import { Redial, type LinkCause, type LinkProgress, type LinkState } from '@wildshard/engine/net/redial';
-import { decodeCountdown, type Countdown } from '@wildshard/engine/net/socketFrames';
+import { decodeArrive, decodeCountdown, decodeEnter, encodeEnter, type ArriveWord, type Countdown } from '@wildshard/engine/net/socketFrames';
 import { encodeDeviceWord, worldReadsDevice } from '@wildshard/engine/net/deviceWord';
 import { subscribePersistence, type PersistenceWord } from '@wildshard/engine/net/persistenceWord';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
@@ -93,8 +93,16 @@ export interface OnlineShell {
   probe: () => Promise<{ readonly tick: number; readonly tickMs: number; readonly rows: readonly never[] }>;
   join: () => never;
   flushRecords:()=>void;
+  /** ZONE-ENTRY ZE10d2 (J352): a gate's 0. Says `enter` {cell}; the door's `arrive` answers with the pose past the gate (the cell's own
+   *  frame), and from then the client holds (the road's frames name the cell being left) until the next welcome. Null: refused, the
+   *  link went, or no answer in time; the body plays on at the gate. */
+  enter?: (cell: string) => Promise<ArriveWord['at'] | null>;
+  /** ZE10d2: the next session on this page takes this link over in `cell` (a grid instance): its `ready` is the door's go. */
+  rehome?: (cell: string) => void;
   dispose: () => void;
 }
+/** ZE10d2: how long a gate's `enter` waits for the door's answer before the page plays on at the gate. */
+const ENTER_ANSWER_MS = 10_000;
 
 /** DT3: how long a socket's device word waits for the renderer to name its GPU before it goes without it. */
 const DEVICE_GPU_WAIT_MS = 10_000;
@@ -110,6 +118,8 @@ function sendDevice(transport: WebSocketTransport, build: string): void {
 /** The link alone, with no page around it. `startOnline` is this with the strips. */
 export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShell {
   let playtest=false;
+  // ZE10d2: the grid cell this link's page is in, moved by a gate's `rehome`
+  let gridCell = config.gridCell;
   let loaded = false, link: WebSocketTransport | null = null, down = false, unseated: WebSocketTransport | null = null, arrive: (value: { tick: number; restored: boolean }) => void = () => undefined;
   const booted = new Promise<{ tick: number; restored: boolean }>(resolve => { arrive = resolve; });
   const voices = new Set<(word: VoiceHeard) => void>(), encoder = new TextEncoder(), decoder = new TextDecoder();
@@ -133,11 +143,11 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
       if (control === 'countdown') { const said = decodeCountdown(bytes); if (said !== null) view.countdown(said); return; }
       if (control !== 'resume') return;
       const resume = v.parse(ResumeSchema, JSON.parse(new TextDecoder().decode(bytes))), seat = resume.shard;
-      if (config.gridCell !== undefined) {
+      if (gridCell !== undefined) {
         const cell = resume.cell ?? seat;
         // The hint is a hint: a write that fails must not hold the seat.
         try { view.placed?.(cell, resume.at); } catch { /* the next resume writes it */ }
-        if (cell !== config.gridCell) { (view.regrid ?? view.elsewhere)(cell); return; }
+        if (cell !== gridCell) { (view.regrid ?? view.elsewhere)(cell); return; }
       } else if (seat !== config.loaded) { view.elsewhere(seat); return; }
       arrive({ tick: 0, restored: false });
       if (loaded) transport.control('ready'); else unseated = transport;
@@ -154,7 +164,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   const offFirst = client.onFrame(() => {
     offFirst();
     const frame = client.latest?.cell, cell = frame === undefined || frame === 0 ? undefined : config.gridCells?.[frame - 1];
-    if (config.gridCell !== undefined && cell !== undefined && cell !== config.gridCell) { (view.regrid ?? view.elsewhere)(cell); return; }
+    if (gridCell !== undefined && cell !== undefined && cell !== gridCell) { (view.regrid ?? view.elsewhere)(cell); return; }
     arrive({ tick: client.latest?.tick ?? 0, restored: true });
   });
   client.hello(config.build, config.identity);
@@ -181,6 +191,22 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     save: () => Promise.resolve({ tick: tickOf(), ok: true }), probe: () => Promise.resolve({ tick: tickOf(), tickMs: 0, rows: [] }),
     join: () => { throw new Error('A second client belongs to a server in this page'); },
     flushRecords:()=>{records?.flush();},
+    enter: cell => new Promise<ArriveWord['at'] | null>(resolve => {
+      const on = link;
+      if (on === null || down) { resolve(null); return; }
+      const asking = new Scope('online.enter'), offs: (() => void)[] = [], done = (at: ArriveWord['at'] | null): void => { for (const off of offs.splice(0)) off(); asking.dispose(); resolve(at); };
+      asking.timeout(ENTER_ANSWER_MS, () => { done(null); });
+      offs.push(on.onClose(() => { done(null); }), on.onControl((control, bytes) => {
+        if (control === 'enter' && decodeEnter(bytes)?.cell === cell) { done(null); return; } // the door's `enter` is only ever a refusal
+        if (control !== 'arrive') return;
+        const said = decodeArrive(bytes);
+        if (said === null || said.cell !== cell) return;
+        // from here the road's frames name the cell being left: the next session hears nothing until the cell's welcome
+        client.hold(); done(said.at);
+      }));
+      on.control('enter', encodeEnter({ cell }));
+    }),
+    rehome: cell => { gridCell = cell; loaded = false; unseated = down ? null : link; },
     dispose: () => { records?.dispose(); redial.dispose(); client.dispose(); link?.close('disposed'); } };
 }
 
@@ -321,9 +347,16 @@ async function askWorld(config: { readonly release: string; readonly key: string
 }
 
 /** Enter the one world this build names. A stale tab reloads into the server's build once, and only then gives up. */
-export async function startOnline(config: StartOnline): Promise<OnlineShell> {
+/** ZE10d2: a page's online session that the next session on the same page can take over after a gate's `enter` (`adopt`). */
+export interface StartedOnline extends OnlineShell {
+  /** The next session's slug and grid: the seat's cell, its place hint and re-entry are the new session's, and its `ready` the door's go. */
+  readonly adopt: (next: { readonly loaded: string; readonly grid: NonNullable<StartOnline['grid']> }) => void;
+}
+export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   // OF4: a verified kept release file dials at once (offline too), and the fresh read follows; with none, the page waits for the read
   const { release: at, key, keep, identity, recordTag, grid, leaving = OWN_LEAVING, ...link } = config;
+  // ZE10d2: a gate's adoption moves the page's slug, grid and goto to the cell entered (a redial then asks for that cell)
+  let loadedNow = link.loaded, gridNow = grid, goto = grid?.goto === true ? grid.cell : undefined;
   // FM5: with no kept copy and no file, the page says why (offline, the file's server down or busy, a portal, a bad signature) and
   // reads again by release.ts's policy until a verified file answers; Title screen stops the load
   const waiting = new Scope('online.release-wait');
@@ -333,14 +366,13 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   const { file: release, fresh } = dial, { socket } = release;
   // QA row 16: a level page enters only from a tap. A reload this page makes itself carries the tap that brought it here.
   const entering = (slug: string): void => { leaving.arrive(slug); };
-  const stale = async (): Promise<boolean> => { entering(link.loaded); const going = await leaving.reloadStale(); if (!going) leaving.unarrive(); return going; };
+  const stale = async (): Promise<boolean> => { entering(loadedNow); const going = await leaving.reloadStale(); if (!going) leaving.unarrive(); return going; };
   // only a fresh read says the world moved on: a kept copy's build is the past, and an offline page can't reload anyway
   if (fresh === null && release.engineBuild !== link.build) await stale();
   if (socket === undefined) throw new Error('The release file names no address');
   const scope = new Scope('online.page');
   // FM5 mode 46: the staging world says so for the session (the release file's own verified channel)
   if (release.channel === 'staging') stagingMark(scope);
-  const goto = grid?.goto === true ? grid.cell : undefined;
   let dialing = socket;
   // MP2.4: the page asked for the Name before it got here (namePrompt.ts, once per device); Skip keeps the device's own (Guest)
   const named = identity();
@@ -350,22 +382,22 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
   const screens = linkScreens(scope, {
     retry: () => { shellNow?.retry(); }, dialNow: () => { shellNow?.dialNow(); }, doctor,
     // Play here / Play again reload into the world: the tap that brought the player here comes along (QA row 16)
-    reload: () => { entering(link.loaded); void leaving.reloadByHand(); },
+    reload: () => { entering(loadedNow); void leaving.reloadByHand(); },
     progress: () => shellNow?.progress() ?? { dials: 0, nextDialMs: null, downMs: 0 }, why: () => shellNow?.why() ?? 'closed',
     // FM4b modes 21 and 22: the Slow and Unstable chips read the link's own measurements
     stats: () => shellNow?.client.stats,
   });
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
-  const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(link.loaded); void leaving.reloadByHand(); }); };
+  const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(loadedNow); void leaving.reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
   const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto), address: () => gotoSocket(dialing, goto), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => { waitingForSeat = state === 'full'; screens.link(state, reason); if (state === 'ended' && reason === 'reload') void ended(); },
     // The cut (5.5): an old server refused a v1 hello. Reload only into another build; on this one, the server is updating.
     cut: () => { void leaving.reloadStale(); },
     countdown: said => { screens.countdown(said); preload(); },
-    placed: (cell, stand) => { if (stand !== undefined) grid?.placed(cell, stand); },
+    placed: (cell, stand) => { if (stand !== undefined) gridNow?.placed(cell, stand); },
     // A grid page re-enters the grid in the seat's cell: the tap that brought it here comes along (QA row 16), and the URL stays bare.
-    regrid: cell => { entering(link.loaded); leaving.unload(`online seat in another grid cell (${cell})`); grid?.reenter(cell); },
+    regrid: cell => { entering(loadedNow); leaving.unload(`online seat in another grid cell (${cell})`); gridNow?.reenter(cell); },
     elsewhere: seat => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); leaving.unload(`online seat elsewhere (${seat})`); location.replace(url); },
   });
   shellNow = shell;
@@ -391,5 +423,6 @@ export async function startOnline(config: StartOnline): Promise<OnlineShell> {
     const hiddenMs = hiddenAt === null ? 0 : diagnosticNow() - hiddenAt;
     hiddenAt = null; shell.visible(hiddenMs); screens.visible();
   });
-  return { ...shell, dispose: () => { scope.dispose(); shell.dispose(); } };
+  return { ...shell, dispose: () => { scope.dispose(); shell.dispose(); },
+    adopt: next => { loadedNow = next.loaded; gridNow = next.grid; goto = next.grid.cell; shell.rehome?.(next.grid.cell); } };
 }

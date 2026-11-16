@@ -12,6 +12,7 @@ import { pageGridIntents } from './intent';
 import { DEVSERVER, gridMode, type MenuMode } from './menu';
 import { gridRecovery, recoveryCatalogue, type GridRecoveryRecord, type GridServerSite } from '../../../shared/game/grid/recovery';
 import { setPageGoto, setPageMode } from '../../../shared/game/grid/pageMode';
+import { onlineGate } from './onlineGate';
 import { pageGridCells as gridCells } from '../../../shared/game/grid/cellEvents';
 import type { PageMode } from '../plugin/context';
 import { findTitleManifest, type TitleManifest } from '../shard/titleList';
@@ -155,16 +156,33 @@ export function enterZone(instance: string, arrive?: { readonly x: number; reado
   document.documentElement.style.setProperty('--ws-load-portrait', 'none');
   // the same-page entry (ZE10a3) reads nothing of the target until its old world is gone, so no read-ahead here; the reload
   // form's read-ahead runs across the navigation
-  if (!entersInPage()) { startEntryDownload(target.slug, 'grid'); startGridStripDownload(gridMode(DEVSERVER), cell.instance, 'metadata'); }
+  // (a world page whose session lent no gate keeps the fresh page: its read-ahead runs too)
+  const world = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined;
+  if (!entersInPage() || (world && onlineGate() === null)) { startEntryDownload(target.slug, 'grid'); startGridStripDownload(gridMode(DEVSERVER), cell.instance, 'metadata'); }
   navigating = beginNavigationShell(shown.name, pageScope, () => {
     if (!gridRecovery(saves).clearLoop()) throw new Error('Grid recovery guard could not be cleared');
-    clearGridRecovery();
-    pageGridIntents().set({ instance: cell.instance, slug: target.slug, goto: true, ...(arrive === undefined ? {} : { arrive }) });
-    // ZE10b: the target's own spawn reads `arrive` (play.ts `arrivalSpawn`): the entryway's centre line past the gate, facing in.
-    // ZE10a3: the page stays (the app's same-page entry, else a fresh page); the screen is the next session's once it settles.
     const attempt = navigating;
-    travel({ to: target.slug, mode: 'enter', shown, ...(arrive === undefined ? {} : { arrive: { x: arrive.x, z: arrive.z, yaw: arrive.yaw } }),
-      inPage: () => { attempt?.dispose(); } });
+    const go = (pose: typeof arrive, inPage: boolean): void => {
+      clearGridRecovery();
+      pageGridIntents().set({ instance: cell.instance, slug: target.slug, goto: true, ...(pose === undefined ? {} : { arrive: pose }) });
+      // ZE10b: the target's own spawn reads `arrive` (play.ts `arrivalSpawn`): the entryway's centre line past the gate, facing in.
+      // ZE10a3: the page stays (the app's same-page entry, else a fresh page); the screen is the next session's once it settles.
+      travel({ to: target.slug, mode: 'enter', shown, ...(pose === undefined ? {} : { arrive: { x: pose.x, z: pose.z, yaw: pose.yaw } }),
+        ...(inPage ? { inPage: () => { attempt?.dispose(); } } : {}) });
+    };
+    // ZE10d2: a world page asks its seat in: the door freezes it at the gate and answers the pose past it, and the next session on this
+    // page takes the same link over. A refusal (or no answer) leaves the page playing at the gate; a world page with no gate to ask
+    // (no online session lent one) keeps the fresh page and its goto
+    const gate = onlineGate();
+    if (!world) { go(arrive, true); return; }
+    if (gate === null) { go(arrive, false); return; }
+    void (async () => {
+      try {
+        const at = await gate(cell.instance);
+        if (at === null) { attempt?.dispose(); return; }
+        go({ x: at.x, z: at.z, yaw: at.yaw }, true);
+      } catch { attempt?.dispose(); }
+    })();
   }, null);
 }
 

@@ -475,9 +475,9 @@ async function installInPageEntry(): Promise<void> {
     }
     await start();
   };
-  // a world build (staging, play) keeps the fresh page until the online seat's same-page handover has its own proof (ZE16's staging
-  // walk): the world's socket and goto are the old session's; preview and solo enter in the page
-  if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ === undefined) setInPageEntry((request, url) => again(request.to, request.shown?.art, url, request.inPage));
+  // ZE10d2: a world build (staging, play) enters in the page too once its gate has handed the online link to the next session
+  // (`pageEntry.ts` `enterZone` asks only then); preview and solo always do
+  setInPageEntry((request, url) => again(request.to, request.shown?.art, url, request.inPage));
   if (harnessPins() === undefined) return;
   Reflect.set(window, '__wildshardReenter', async (instance: string, slug: string): Promise<void> => {
     const { intendGridHome } = await import('@wildshard/engine/game/grid/pageEntry');

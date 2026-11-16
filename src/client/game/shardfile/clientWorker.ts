@@ -49,6 +49,7 @@ import type { Mount } from '../riding/mount';
 import { NetMovers } from '../plugin/moverViews';
 import { spawnHeldBytes } from '../boot/spawnDownload';
 import { travel } from '../travel/travel';
+import { lendOnlineGate } from '../grid/onlineGate';
 import type { ShardSlug } from '../../../shared/game/shard/slug';
 import { DAY_ROW, NET_POSE } from '@wildshard/engine/sim/shardRows';
 import { POSE_NAMES } from '@wildshard/engine/net/acts';
@@ -140,8 +141,14 @@ const onlineLeaving: OnlineLeaving = {
   reloadByHand: async () => { await (await import('@wildshard/engine/boot/browserChunkRecovery')).reloadPastWorker(); },
   settle: () => { void (async () => { (await import('@wildshard/engine/boot/browserChunkRecovery')).settleRefusedBuild(); })(); },
 };
-interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean } }) => Promise<Shell> }
-interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: readonly DevBox[]) => void; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; still: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void }
+interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: OnlineGrid }) => Promise<Shell> }
+interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: readonly DevBox[]) => void; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; still: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void;
+  /** ZE10d2: an online shell's gate word and its adoption by the next session on this page (`shell.ts` `StartedOnline`) */
+  enter?: (cell: string) => Promise<{ readonly x: number; readonly z: number; readonly yaw: number } | null>;
+  adopt?: (next: { readonly loaded: string; readonly grid: OnlineGrid }) => void }
+interface OnlineGrid { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly goto?: boolean }
+/** ZE10d2: the online shell a gate's `enter` handed over (its seat frozen at the gate of `cell`), for the next session on this page. */
+let handedOver: { readonly shell: Shell; readonly cell: string } | null = null;
 
 const SAVE_EVERY_MS = 30_000;
 /** How long the card waits for the server's first rows, and how often it looks. A server that has booted says them in a tick. */
@@ -368,15 +375,25 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   // page whose seat is in another cell enters the grid again there, never a `?chunk=` page; GO5's hint makes that rare.
   const onlineModule = (): Promise<OnlineModule> => bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as Promise<OnlineModule>;
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
+    const { grid } = ports, booted = grid?.booted;
+    const gridOf = (cell: string, goto: boolean): OnlineGrid | undefined => grid === null ? undefined : { cell, cells: grid.cells.map(row => row.instance), placed: (at, pose) => { grid.serverPlace?.(at, pose); }, reenter: next => { grid.reenter?.(next); }, ...(goto ? { goto: true } : {}) };
+    // ZE10d2: a gate's 0 handed this page's link over: the seat is frozen at that cell's gate, and this session's `ready` seats it past
+    const kept = handedOver;
+    handedOver = null;
+    if (kept !== null) {
+      const next = booted === kept.cell ? gridOf(kept.cell, true) : undefined;
+      if (next !== undefined && kept.shell.adopt !== undefined) { kept.shell.adopt({ loaded: slug, grid: next }); return kept.shell; }
+      // another cell booted: the link goes, and the door's hold seats this session's own dial past the gate (ZE9c)
+      kept.shell.dispose();
+    }
     const { startOnline } = await onlineModule();
     // MP2.4: a page that came in without the title's PLAY (a link, a reload) asks for the Name here, once per device, before it joins
     const answered = await askNameToJoin(scope, { parent: document.body, doctor: () => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: 'join' })); } });
     // a page that left while it asked never joins (Codex review): a cancelled load must not take the device's seat
     if (!answered || scope.disposed) throw new Error('The page left before it joined the world');
-    const { grid } = ports, booted = grid?.booted;
+    const first = booted === undefined ? undefined : gridOf(booted, pageGoto() === booted);
     return startOnline({ ...world, keep: releaseKeep(), leaving: onlineLeaving, loaded: slug, build, identity: name => deviceIdentity(storage, savePrefix, name),
-      ...(grid === null || booted === undefined ? {} : { grid: { cell: booted, cells: grid.cells.map(cell => cell.instance), placed: (cell, at) => { grid.serverPlace?.(cell, at); }, reenter: cell => { grid.reenter?.(cell); },
-        ...(pageGoto() === booted ? { goto: true } : {}) } }) });
+      ...(first === undefined ? {} : { grid: first }) });
   };
   const world = (globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__;
   // OFFLINE OF2 (J298): a build with a world sends every page online; the world's word never picks the server. A grid page whose world
@@ -392,12 +409,23 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   }
   // A page that can keep nothing still joins, with a device id for this page only.
   const shell = await (world !== undefined && serverRoute(world) === 'online' ? online(world, page ?? pageOnlyStorage()) : standalone()), { client } = shell;
+  // ZE10d2: a handed-over link no session took (this one is not online) goes; the door's hold keeps the seat for a later dial
+  if (handedOver !== null) { handedOver.shell.dispose(); handedOver = null; }
   void shell.booted.catch(() => undefined);
   // QA row 16: a navigation the game chose leaves the world's seat from the moment there is a shell, even mid-load (a returning held
   // body may already be back). Once the page can save, the hold below replaces this one.
   let ended = false, leaves = shell.leave === undefined ? (): void => undefined : holdLeaving(async () => { shell.pause(); await shell.leave?.(); });
   // Settings stops a server before it touches what the server saves: that stop must not save.
   const stop = (): void => { if (!ended) { ended = true; leaves(); shell.dispose(); } };
+  // ZE10d2 (J352): a world page's gate. On the door's `arrive` the seat is frozen at the gate and the next session on this page takes
+  // the link over: this session ends with no quit (the hold below would say one) and no dispose
+  const enter = shell.enter;
+  if (enter !== undefined && ports.grid !== null) scope.onDispose(lendOnlineGate(async cell => {
+    const at = await enter(cell);
+    if (at === null || ended || scope.disposed) return null;
+    ended = true; leaves(); handedOver = { shell, cell };
+    return at;
+  }));
   scope.onDispose(serverStopsForImport(stop));
   // A session that ends with its page still here saves first. What navigates asks through `holdLeaving`, below.
   scope.onDispose(() => { if (ended) return; ended = true; leaves(); shell.pause(); closing = atMostLeaveWait(shell.save()).finally(() => { shell.dispose(); }); });

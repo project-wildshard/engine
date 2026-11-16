@@ -132,6 +132,10 @@ export class NetClient {
     for (const listener of this.rejoins) listener();
     this.hello(said.build, said.identity, ledgerSerial);
   }
+  /** ZONE-ENTRY ZE10d2: what this client holds named the cell it is leaving by a gate, and the next frames do too (the road's,
+   *  while the page loads the cell): it drops them until the cell's welcome. */
+  hold(): void { this.left(); this.holding = true; }
+  private holding = false;
   /** Call when a new link replaces the old one, before its `hello`; returns the unsubscribe. */
   onRejoin(listener: () => void): () => void { this.rejoins.add(listener); return () => { this.rejoins.delete(listener); }; }
   /** Call for every frame decoded; returns the unsubscribe. */
@@ -226,7 +230,8 @@ export class NetClient {
     try { records = readMessage(bytes).records; } catch { this.dropped++; return; }
     for (const record of records) {
       const span = { bytes, start: record.start, end: record.end };
-      if (record.tag === TAG_WELCOME) { bootMark('server:welcome-receive'); this.welcomed(span); }
+      if (record.tag === TAG_WELCOME) { bootMark('server:welcome-receive'); this.holding = false; this.welcomed(span); }
+      else if (this.holding) this.dropped++;
       else if (record.tag === TAG_EVENTS) this.events(span);
       else if (record.tag === TAG_FRAME) this.decoded(this.server?.read(span) ?? null, arrived);
       else this.dropped++;
