@@ -149,6 +149,7 @@ export function installMixedPopulation(host: SimHost, ports: MixedPopulationInpu
     .map(({ kind, variant, pose }) => ({ kind, variant, pose: continuationPose(pose) })), ROSTER, callbacks);
 
   const intake = createNativeCreatureRoster<MixedPopulationBody>(host, {
+    species: [...ports.population.native, ...program.species],
     specs: specs.values(), variants: new Map(roster.variants.map(row => [row.kind, row.rows])),
     rng, spawnY: ports.spawnY, bodyPhase: roster.bodyPhase, attackTurnCap: rows.attackTurnCap, heightfield: 'any', services: admitNativeRosterServices(host, ISLAND_STEP, hunt, poses), hunted: [...FAUNA] });
   const entityIds = intake.identities;

@@ -81,6 +81,7 @@ export function installPopulationRoster(host: SimHost, ports: PopulationRosterPo
   // over the page's terrain grid (the host's ground), every kind adopted by the hunting brain, no turn cap, a restoring
   // host's saved floor flags
   const intake = createNativeCreatureRoster<NativeCreatureSlot>(host, { specs: [...bake.actors, ...bake.parked].map(row => row.spec), duplicates: 'first',
+    species: ports.population.native,
     variants: new Map(), rng, spawnY: ports.spawnY, services: admitNativeRosterServices(host, rows.step, hunt), hunted: 'every', ...(ports.saved === undefined ? {} : { saved: ports.saved }) });
   /** Every body this roster made, listed or kept out of the list by a fight, by entity id. */
   const made = (id: string): NativePopulationActor | null => intake.byId.get(id)?.actor ?? null;

@@ -16,6 +16,7 @@ import { CharacterMotor } from '@wildshard/engine/physics/CharacterMotor';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { creatureBodyDistance, keepsCreatureBody } from '@wildshard/engine/sim/bands';
 import { StalkerBrain } from '@wildshard/engine/ai/stalker';
+import type { SpeciesData } from '@wildshard/format/speciesPrograms';
 
 /**
  * A creature's floor in a renderer-free host (the creature manager's `creatureFloor`; Pine Hollow, Sky Reach): the first
@@ -284,6 +285,8 @@ export function nativeCreatureRecipes(specs: Iterable<AnimalSimSpec>, duplicates
  *  host's saved floor flags. The roster calls no shard code: a shard acts on the bodies it is handed back. */
 export interface NativeRosterRows {
   readonly specs: Iterable<AnimalSimSpec>;
+  /** Admitted gameplay metadata, rebound at attachment without changing a saved simulation recipe. */
+  readonly species?: readonly Pick<SpeciesData, 'kind' | 'harvest'>[];
   /** Which baked spec a kind.variant keeps when the bake lists it twice (`nativeCreatureRecipes`). */
   readonly duplicates?: 'first' | 'last';
   readonly variants: ReadonlyMap<string, readonly { readonly id: string; readonly scale: readonly [number, number] }[]>;
@@ -365,6 +368,8 @@ export function createNativeCreatureRoster<B extends NativeCreatureSlot>(host: S
   const service = nativeRosterServices.get(host)?.get(rows.services);
   if (service === undefined) throw new Error('Missing built-in native roster service');
   const recipes = nativeCreatureRecipes(rows.specs, rows.duplicates), byId = new Map<string, B>(), { hunt, poses } = service;
+  const species = new Map(rows.species?.map(row => [row.kind, row]));
+  if (species.size !== (rows.species?.length ?? 0)) throw new Error('Duplicate native roster species');
   const identities = new NativeActors<HuntBody>('creature', 16384);
   const hunted = rows.hunted === 'every' ? null : new Set(rows.hunted);
   const phase = rows.bodyPhase;
@@ -385,6 +390,8 @@ export function createNativeCreatureRoster<B extends NativeCreatureSlot>(host: S
       throw new Error('Foreign native roster admission');
     poses?.binding.preflight(item); identities.preflight(item);
     const actor = poses === undefined ? bareBody(native) : poses.binding.attach(native, item);
+    const declared = species.get(item.kind);
+    if (declared !== undefined) actor.harvest = declared.harvest;
     identities.materialize(item, actor);
     if (item.herd >= 0) identities.own(item.id, { group: `herd:${String(item.herd)}`, encounter: null, listed: true });
     item.actor = actor; byId.set(item.id, item); hunt.herds[item.herd]?.members.push(actor);

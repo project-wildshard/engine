@@ -16,6 +16,11 @@ import { registerItemRow } from '../src/shared/game/bag/itemCatalog';
 import { installShards } from '../src/client/game/shard/list';
 import { installTitleManifests } from '../src/client/game/shard/titleList';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
+import { Rng } from '../src/shared/engine/core/rng';
+import { createNativeCreatureRoster } from '../src/server/game/shardfile/homeKeeper';
+import { fixtureNativeRoster } from './fixtures/native-roster';
+import { admitSpeciesBrains, installSpeciesHomes } from '../src/server/game/plugin/brain';
+import { BOAR } from '../src/client/game/systems/species/boar';
 
 let rapier: Awaited<ReturnType<typeof loadRapier>>;
 beforeAll(async () => { rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))); });
@@ -80,5 +85,65 @@ test('full packs retain original partial grant/consumption policy and malformed 
     expect(f.saved.snapshot()).toEqual(before);
     f.claim(); expect(f.pack.count('moon.trophy')).toBe(2); expect(f.pack.count('sun.trophy')).toBe(0); expect(f.saved.snapshot()).toEqual([]);
     f.claim(); expect(f.pack.count('moon.trophy')).toBe(2);
+  } finally { f.host.dispose(); }
+});
+
+test('native attachment and reinstall bind row drops without drawing or changing saved recipes and wire labels', () => {
+  const first = fixture(), second = fixture();
+  const sample = SIM_LEVEL.entities[0]; if (sample === undefined) throw new Error('Missing native recipe');
+  const setup = (f: ReturnType<typeof fixture>) => {
+    const rng = new Rng(31), { services } = fixtureNativeRoster(f.host, rng);
+    const spec = { ...sample.spec, kind: 'boar', variant: 'elite', hp: 1 };
+    const intake = createNativeCreatureRoster(f.host, { specs: [spec], species: [{ kind: 'boar', harvest: drops }],
+      variants: new Map(), rng, services, hunted: 'every', spawnY: 10 });
+    const slot = intake.body('native.carcass', 'boar', 'elite', -1, { x: 0, z: 0 }, 0, [1, 1]);
+    return { rng, intake, slot };
+  };
+  try {
+    const a = setup(first), before = a.rng.snapshot(), actor = a.intake.arrive(a.slot);
+    expect(a.rng.snapshot()).toEqual(before); expect(actor.harvest).toBe(drops); expect(actor.species).toBe('');
+    const adapter = first.host.adapters.get('runtime.actor.native.carcass'); if (adapter === undefined) throw new Error('Missing real recipe');
+    const recipe = adapter.snapshot(); expect(typeof recipe).toBe('string');
+    expect(JSON.stringify(recipe)).not.toContain('harvest');
+    const b = setup(second), stream = b.rng.snapshot();
+    const restored = b.intake.reinstall(b.slot, { adapters: [{ id: 'runtime.actor.native.carcass', state: recipe }], entities: [] });
+    expect(restored.harvest).toBe(drops); expect(restored.species).toBe(''); expect(b.rng.snapshot()).toEqual(stream);
+    expect(second.host.adapters.get('runtime.actor.native.carcass')?.snapshot()).toBe(recipe);
+    second.host.combat.hit({ source: 'env', sourceTags: ['cover.checked'], target: restored.combatActor(), amount: 100,
+      point: restored.position.clone(), dir: new Vector3() }); second.host.step();
+    actRoutes(second.host).claims.get('harvest.native.carcass')?.(leadPlayer(second.host).id);
+    expect(second.pack.count('moon.trophy')).toBe(2); expect(second.pack.count('sun.trophy')).toBe(1);
+    a.intake.sleep(a.slot); const replacement = a.intake.arrive(a.slot);
+    expect(replacement.harvest).toBe(drops); expect(a.rng.snapshot()).toEqual(before);
+  } finally { first.host.dispose(); second.host.dispose(); }
+});
+
+test('native empty and absent declarations remain distinct through actual roster materialization', () => {
+  const sample = SIM_LEVEL.entities[0]; if (sample === undefined) throw new Error('Missing native recipe');
+  for (const harvest of [[], undefined]) {
+    const f = fixture();
+    try {
+      const rng = new Rng(31), { services } = fixtureNativeRoster(f.host, rng);
+      const intake = createNativeCreatureRoster(f.host, { specs: [sample.spec], species: [{ kind: sample.spec.kind,
+        ...(harvest === undefined ? {} : { harvest }) }], variants: new Map(), rng, services, hunted: 'every', spawnY: 10 });
+      const actor = intake.arrive(intake.body('native.empty', sample.spec.kind, sample.spec.variant, -1, { x: 0, z: 0 }, 0, [1, 1]));
+      expect(actor.harvest).toBe(harvest); expect(actor.species).toBe('');
+      expect(declaredHarvestDrops(actor.harvest ?? [], actor.variant)).toEqual([]);
+    } finally { f.host.dispose(); }
+  }
+});
+
+test('species homes bind admitted harvest before their existing policy and preserve native wire labels', () => {
+  const f = fixture(), sample = SIM_LEVEL.entities[0]; if (sample === undefined) throw new Error('Missing home recipe');
+  const species = [{ ...BOAR, harvest: drops }];
+  try {
+    const homes = installSpeciesHomes(f.host, { step: 'fixture.homes', seed: 17,
+      homes: [{ id: 'home.body', kind: BOAR.kind, at: [0, 0], yaw: 0, respawn: 0 }],
+      specs: new Map([[BOAR.kind, sample.spec]]), attackers: 1, think: { every: 6, dt: .1 },
+      species, brains: admitSpeciesBrains(species, []), custom: (_kind, actor) => {
+        expect(actor.harvest).toBe(drops); expect(actor.species).toBe('');
+        return { decide: () => undefined, move: () => undefined, snapshot: () => null, restore: () => undefined };
+      } });
+    expect(homes.homes()[0]?.actor?.harvest).toBe(drops);
   } finally { f.host.dispose(); }
 });
