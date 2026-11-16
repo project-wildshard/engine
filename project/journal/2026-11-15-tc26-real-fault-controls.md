@@ -82,3 +82,16 @@ coverage-soak reads actual Actions logs and committed case bodies. It
 requires matching case count, all passing, no skipped/cancelled cases,
 and actual green observations spanning seven days. A new current suite
 cannot inherit the earlier four-case body's age or fake the clock.
+
+Completion review found two soak integrity gaps: cancelled workflows may
+still contain a completed red soak, and failed collection could preserve
+an old eligible receipt. Collection now includes completed cancelled
+runs and invalidates its receipt before any GitHub access. Missing local
+commit objects fall back to the public immutable source; unresolved
+history cannot qualify.
+
+The section plant now removes the actual section file, rather than
+emptying it. The cold drill uses the existing owned-command process-tree
+drain and cancellation support, and supplies the frozen tree's real
+source-file inventory to renderer fingerprinting. This avoids both an
+orphaned cook on timeout and crossing into the outer checkout's Git root.

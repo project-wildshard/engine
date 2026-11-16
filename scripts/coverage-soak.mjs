@@ -9,6 +9,7 @@ import {join,resolve} from 'node:path';
 
 const root=resolve(import.meta.dirname,'..'),out=resolve(process.argv[2]??join(root,'tmp/coverage-soak'));
 assert.ok(out.startsWith(`${root}/tmp/`));mkdirSync(out,{recursive:true});
+writeFileSync(join(out,'receipt.json'),JSON.stringify({version:1,eligible:false,collection:'running'}));
 const api=path=>JSON.parse(execFileSync('gh',['api',path],{encoding:'utf8',timeout:30000,maxBuffer:16*1024*1024}));
 const git=args=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
 const sourcePath='test/ci/coverage-fire-drill.proof.mjs',source=git(['show',`HEAD:${sourcePath}`]);
@@ -16,9 +17,12 @@ const hash=text=>createHash('sha256').update(text).digest('hex'),sourceHash=hash
 const expected=[...source.matchAll(/timed\('([^']+)'/gu)].map(match=>match[1]);assert.ok(expected.length>0);
 const branch=git(['branch','--show-current']);assert.ok(branch);
 const page=api(`repos/project-wildshard/engine/actions/workflows/ci.yml/runs?branch=${encodeURIComponent(branch)}&per_page=100`);
-const observations=[];
-for(const run of page.workflow_runs.filter(row=>row.status==='completed'&&row.conclusion!=='cancelled')){
-  let committed;try{committed=git(['show',`${run.head_sha}:${sourcePath}`]);}catch{continue;}
+const observations=[];let completeHistory=page.workflow_runs.length<100;
+for(const run of page.workflow_runs.filter(row=>row.status==='completed')){
+  let committed;try{committed=git(['show',`${run.head_sha}:${sourcePath}`]);}catch{
+    try{const file=api(`repos/project-wildshard/engine/contents/${sourcePath}?ref=${run.head_sha}`);committed=Buffer.from(file.content,'base64').toString('utf8').trim();}
+    catch{completeHistory=false;continue;}
+  }
   if(hash(committed)!==sourceHash)continue;
   const jobs=api(`repos/project-wildshard/engine/actions/runs/${run.id}/jobs?per_page=100`).jobs;
   const matches=jobs.flatMap(job=>(job.steps??[]).filter(step=>step.name==='Soak actual host, door, format and outside-author contracts').map(step=>({job,step})));
@@ -36,7 +40,7 @@ observations.sort((a,b)=>Date.parse(a.started??'')-Date.parse(b.started??''));
 const lastFailure=observations.reduce((last,row,index)=>row.ok?last:index,-1),clean=observations.slice(lastFailure+1).filter(row=>row.ok);
 const first=clean[0],last=clean.at(-1),week=7*24*60*60*1000;
 const due=first===undefined?null:Date.parse(first.started)+week;
-const eligible=page.workflow_runs.length<100&&first!==undefined&&last!==undefined&&Date.parse(last.completed)>=due;
-const report={version:1,branch,sourceHash,cases:expected,generatedAt:new Date().toISOString(),completeHistory:page.workflow_runs.length<100,eligible,due:due===null?null:new Date(due).toISOString(),observations};
+const eligible=completeHistory&&first!==undefined&&last!==undefined&&Date.parse(last.completed)>=due;
+const report={version:1,branch,sourceHash,cases:expected,generatedAt:new Date().toISOString(),completeHistory,eligible,due:due===null?null:new Date(due).toISOString(),observations};
 writeFileSync(join(out,'receipt.json'),JSON.stringify(report,null,2));
 console.log(eligible?'Soak complete: actual passing observations span seven days':due===null?'Soak open: no completed hosted run of the current case body yet':`Soak open until a green observation after ${new Date(due).toLocaleString('en-CA',{timeZone:'America/Cancun',hour12:false})} Cancún`);

@@ -24,7 +24,7 @@ const faults=[
   {id:'export',ring:3,owner:'engine:package.json',file:'package.json',find:'',plant:'',reason:/ERR_PACKAGE_PATH_NOT_EXPORTED/u},
   {id:'format',ring:1,owner:'shardfile:src/format/shardSchema.ts',file:'node_modules/@wildshard/format/src/format/shardSchema.ts',
     find:'  version: v.literal(SHARDFILE_VERSION),',plant:'  version: v.literal(SHARDFILE_VERSION),\n  tc26Required: v.string(),',reason:/tc26Required/u},
-  {id:'dropped-section',ring:1,owner:'shardfile:corpus/handwritten',file:'',find:'',plant:'',reason:/Shardfile section hash or size mismatch/u},
+  {id:'dropped-section',ring:1,owner:'shardfile:corpus/handwritten',file:'',find:'',plant:'',reason:/ENOENT[\s\S]*sections\//u},
   {id:'broken-tar',ring:1,owner:'shardfile:src/format/tar.ts',file:'scripts/pin-format.ts',
     find:'const bytes = writeTar(files), hash =',plant:'const bytes = writeTar(files).subarray(0, 513), hash =',reason:/tar:/u},
   {id:'save-field',ring:1,owner:'engine:src/shared/engine/script/state.ts',file:'src/shared/engine/script/state.ts',
@@ -78,7 +78,7 @@ try{
       planted=original.replace(fault.find,fault.plant);
     }
     let red;
-    try{writeFileSync(path,planted);red=run(fault.id);}
+    try{if(fault.id==='dropped-section')unlinkSync(path);else writeFileSync(path,planted);red=run(fault.id);}
     finally{writeFileSync(path,original);}
     writeFileSync(join(out,`${fault.id}-planted.log`),red.text);
     assert.equal(red.code,1,`${fault.id}: exactly one case must fail`);
