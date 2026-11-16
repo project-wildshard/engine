@@ -448,3 +448,29 @@ The manifest binds both source files and every asset hash. Run
 `test/road-surface-assets.test.ts` and the grid's
 `road-compressed-surfaces.test.ts`; memory and all-six Chromium/WebKit
 goldens are required before landing a changed format.
+
+
+## Worker engine determinism (Ring 2 report)
+
+Run `WILDSHARD_RING=1 node --experimental-transform-types --import
+./scripts/sim-node-loader.mjs scripts/determinism/report.ts` as one command.
+It reads ordinary installed pins (three products and five server slices),
+serves their exact admitted server bytes, and compares a real 48-tick walk
+in Node and a dedicated WebKit worker. Each tick compares the full public
+serialized save without rounding. A reversed-input control must fail the
+same comparator. This opens no renderer and runs no cook.
+
+The report remains outside hooks and push suites: compiling the worker,
+starting a second engine and admitting all eight real worlds exceed ten
+seconds. `engine-boundaries` runs it as an independent report-only job and
+retains `tmp/worker-determinism/report.json`, including source/dirty state,
+input identities, per-tick hashes and the divergent-tape witness.
+`--engine=chromium` is a development control, never a JavaScriptCore proof.
+Browser launch or worker failure is a refusal; it does not fall back.
+Every browser, worker, server and generated bundle is closed or removed.
+
+The comparison uses the full-check admission branch on both sides, whole
+solids and a pageless fresh world. It covers neither near-solid streaming
+nor progress seeded from a prior page. TC33 needs the hosted artifact to
+say WebKit, completeRing/ok true, dirty false, eight products and a real
+browser version/user agent; the Chromium control cannot close it.

@@ -65,6 +65,33 @@ jobs:
       - name: Remove this run's output
         if: always()
         run: node -e "require('node:fs').rmSync('tmp/engine-boundaries', {recursive:true,force:true})"
+  # EG26: JavaScriptCore is a separate engine from Chromium/V8. Report-only Ring 2; never a hook or push test.
+  worker-determinism:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: node scripts/pins.ts install --ring 1
+      - run: bash scripts/ci-playwright-install.sh webkit
+      - run: pnpm gen:inputs
+      - name: Compare the same real tape in Node and a WebKit worker
+        run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs scripts/determinism/report.ts
+        env:
+          WILDSHARD_RING: '1'
+      - name: Keep the worker comparison and divergent-tape control
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: worker-determinism
+          path: tmp/worker-determinism/report.json
+          retention-days: 7
+      - name: Remove this run's output
+        if: always()
+        run: node -e "require('node:fs').rmSync('tmp/worker-determinism', {recursive:true,force:true})"
   # EG-20 (meta TEST-COVERAGE row 32): the shipped title and grid against the immutable pins, on its own and blocking. Inside the
   # report job it was skipped whenever an earlier step went red (every scheduled run 2026-11-12 to 11-15) and `continue-on-error`
   # called that green. Ring 2: all 28 real products and a clean build exceed ten seconds.
