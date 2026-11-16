@@ -21,3 +21,9 @@ Only then was this lane's clean, landed plan/netlag4 checkout reused for
 WR11, avoiding another worktree. All prior raw reports and fixed builds
 remain untouched in their original scratch folder. No new timing window
 or epoch cut is part of this change.
+
+The one-shot engine review reports NO MUST. Its focused controls now
+cover canonical0.1.0.0 Product admission and require the actual refused
+version in future/breaking errors. The format pin is exact0.9.0 so an
+outside engine install cannot silently advance the compatibility window.
+All four native cases pass. APIv0.18.0 is live at5b616f8 before this land.

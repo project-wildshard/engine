@@ -7,7 +7,8 @@ import {tmpdir} from 'node:os';
 import {expect,test} from 'vitest';
 import {SHARDFILE_VERSION} from '@wildshard/format/version';
 import {readTar} from '@wildshard/format/tar';
-import {parseOutputIndex} from '@wildshard/format/outputIndex';
+import {parseOutputIndex,assembleOutputShardfile} from '@wildshard/format/outputIndex';
+import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {productTarball} from '../src/cook/game/productTarball';
 import {runCookJob} from '../src/cook/game/cookJob';
 import {validateSimulation} from '../src/server/host/headless';
@@ -47,6 +48,27 @@ for(const version of ['0.1.0.2','0.1.1.0'])test(`future or breaking ${version} r
  let reads=0;
  const options:ProductOptions={base,offline:false,firstParty:true,
   hash:value=>Promise.resolve(hashImmutableBytes(value)),fetch:()=>{reads++;return Promise.reject(new Error('Unexpected transport'));}};
- await expect(admitProduct({...index,version},options)).rejects.toThrow(/Expected|additive format/u);
+ await expect(admitProduct({...index,version},options)).rejects.toThrow(version);
  expect(reads).toBe(0);
+});
+
+
+test('the canonical zero-counter alias admits through the engine reader',async()=>{
+ const files=readTar(productTarball(fixture)),header=files.get('shard.json');
+ if(header===undefined)throw new Error('Missing fixture header');
+ const input:unknown=JSON.parse(new TextDecoder().decode(header));
+ const index=parseOutputIndex({...parseOutputIndex(input),version:'0.1.0.0'});
+ const sections=new Map<string,unknown>();
+ for(const row of index.sections){
+  const value:unknown=JSON.parse(new TextDecoder().decode(files.get(row.path)));
+  sections.set(row.name,value);
+ }
+ const source=assembleOutputShardfile(index,sections);
+ const descriptor={...index,build:{...index.build,sourceHash:hashImmutableBytes(validationSourceBytes(source))}};
+ const options:ProductOptions={base,offline:false,firstParty:true,
+  hash:bytes=>Promise.resolve(hashImmutableBytes(bytes)),fetch:url=>{
+   const bytes=files.get(url.slice(base.length));
+   return Promise.resolve(bytes===undefined?new Response(null,{status:404}):new Response(Uint8Array.from(bytes)));
+  }};
+ expect((await admitProduct(descriptor,options)).source.version).toBe('0.1.0.0');
 });
