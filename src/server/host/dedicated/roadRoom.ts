@@ -85,7 +85,13 @@ export class RoadRoom implements CrossTarget {
     const lead = this.host.players.get(LEAD_SEAT);
     if (lead !== undefined) { lead.motor.setEnabled(false); this.host.parked.add(lead.id); }
     // ZE9a: a frozen body is led (it goes on the wire), so its client predicts no step of its own while it stands at the gate
-    this.host.leading.push(player => { for (const seat of this.seats.values()) if (seat.frozen !== null && seat.body === player.id) return true; return false; });
+    const frozen = (body: string): boolean => { for (const seat of this.seats.values()) if (seat.frozen !== null && seat.body === body) return true; return false; };
+    this.host.leading.push(player => frozen(player.id));
+    // Own native motion as well as prediction: dropping input alone still permits idle and impulse movement.
+    this.host.events.answer('player.traversal', answer => {
+      const player = this.host.traversing;
+      return player !== null && frozen(player.id) ? true : answer;
+    }, this.host.scope);
     this.sim = new SimNetWorld(this.host, 0);
     this.sim.nameOf = body => [...this.seats.values()].find(seat => seat.body === body)?.name;
     this.net = new NetRoom({ world: this.sim, build: options.build, step: inputs => { this.step(inputs); }, shout: line => { options.post({ kind: 'chat', line }); }, ...(options.reports === undefined ? {} : { reports: options.reports }) });

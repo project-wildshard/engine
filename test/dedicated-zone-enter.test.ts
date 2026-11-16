@@ -53,6 +53,8 @@ test('enter freezes a walker in Sunscar\'s buffer, and is refused short of it an
   if (frozen === undefined) throw new Error('the frozen body stands on the road');
   await new Promise(resolve => { setTimeout(resolve, 200); });
   const still = { x: frozen.position.x, z: frozen.position.z }, t0 = Date.now(), trace: string[] = [];
+  // An entry owns the pose, including an impulse applied while it is frozen.
+  frozen.impulse.set(2, 0, 0);
   // 1.5 s of every input: back east at a sprint, then west into the gate with a jump; nothing moves it (unfrozen, a sprint leg is ~5 m).
   // Main ci 43961757496 drifted 0.07 m once and never locally: a thaw in the window's last tick moves that much, so each sample says
   // whether the road still holds the freeze, and a lifted freeze fails as itself, with the door's answer, before the drift does.
@@ -73,7 +75,7 @@ test('enter freezes a walker in Sunscar\'s buffer, and is refused short of it an
   const why = `answers ${JSON.stringify(answers)}, socket closes ${closes}, samples ${trace.join(', ') || 'none moved'}`;
   expect(thawedAt, `the freeze holds through every input (${why})`).toBeNull();
   expect(answers, `the entry was taken, not refused (${why})`).toHaveLength(2);
-  expect(drift, `frozen: inputs move nothing (${why})`).toBeLessThan(0.05);
+  expect(drift, `frozen: inputs and impulses move nothing (${why})`).toBeLessThan(0.05);
   expect(frozen.led, 'led on the wire, so the page predicts no step').toBe(true);
   // A second word while entering is refused; the seat stays frozen on Driftwood's road, on one socket
   enter(WEST);
