@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.31 (2026-11-16)
+
+- Restore reliable world entry and full-screen loading from Shard Select.
+- Prevent Pine Hollow from crashing while loading wildlife.
+- Refresh old Home Screen installs and show loading progress sooner.
+- Improve the world cards and version shown in Shard Select.
+- Improve arrival and movement when crossing between zones.
+
 ## v0.1.29 (2026-11-16)
 
 - Enter neighboring zones through their gates without a page reload.
