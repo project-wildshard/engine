@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -180,9 +181,99 @@ def release_cpu(root, token):
             state[key] = [row for row in state.get(key, []) if row['token'] != token and lane.alive(row['pid'])]
 
 
+
+PARENT_CONTEXT = 'WS_CPU_PARENT_GRANT'
+PARENT_REFUSAL = 'Inherited CPU grant is unavailable or is not an actual ancestor grant'
+
+
+def cpu_root(env=None):
+    env = os.environ if env is None else env
+    return Path(env.get('WS_CPU_ROOT', env.get('WS_HEAVY_SCHEDULER_ROOT', str(Path.home() / '.wildshard-heavy-lanes')))).resolve()
+
+
+def parent_cpu_context(proof, env=None, owner_pid=None):
+    token = proof.get('lease')
+    if not isinstance(token, str) or not 0 < len(token) <= 128:
+        raise RuntimeError(PARENT_REFUSAL)
+    return json.dumps({'version': 1, 'root': str(cpu_root(env)), 'lease': token,
+                       'ownerPid': os.getpid() if owner_pid is None else owner_pid})
+
+
+def _regular_json(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022 or not 0 < info.st_size <= 1024 * 1024:
+            raise ValueError(PARENT_REFUSAL)
+        with os.fdopen(fd, 'rb', closefd=False) as reader:
+            data = reader.read(1024 * 1024 + 1)
+        if len(data) != info.st_size:
+            raise ValueError(PARENT_REFUSAL)
+        return json.loads(data)
+    finally:
+        os.close(fd)
+
+
+def ancestor_cpu_budget(env=None, requester=None):
+    """Read one canonical ledger; a context alone never grants a budget.
+
+    A deliberately different private scheduler has its own domain. In the
+    same domain, malformed, expired or non-ancestor evidence fails closed.
+    No exception includes the capability or its raw input.
+    """
+    env = os.environ if env is None else env
+    raw = env.get(PARENT_CONTEXT)
+    if raw is None:
+        return None
+    try:
+        if not isinstance(raw, str) or not 0 < len(raw) <= 8192:
+            raise ValueError()
+        context = json.loads(raw)
+        if not isinstance(context, dict) or set(context) != {'version', 'root', 'lease', 'ownerPid'} or type(context['version']) is not int or context['version'] != 1:
+            raise ValueError()
+        owner = context['ownerPid']
+        if not isinstance(context['root'], str) or not isinstance(context['lease'], str) or not 0 < len(context['lease']) <= 128 or type(owner) is not int or owner <= 1:
+            raise ValueError()
+        root = cpu_root(env)
+        if context['root'] != str(root):
+            return None
+        state = _regular_json(root / 'queue.json')
+        if not isinstance(state, dict) or type(state.get('cpuCapacity')) is not int or state['cpuCapacity'] < 1 or not isinstance(state.get('cpuActive'), list):
+            raise ValueError()
+        matches = [row for row in state['cpuActive'] if isinstance(row, dict) and row.get('token') == context['lease']]
+        if len(matches) != 1:
+            raise ValueError()
+        grant = matches[0]
+        if grant.get('holder') != owner or type(grant.get('pid')) is not int or grant['pid'] <= 1 or type(grant.get('slots')) is not int or not 1 <= grant['slots'] <= state['cpuCapacity']:
+            raise ValueError()
+        output = subprocess.run(['ps', '-Ao', 'pid=,ppid=,uid='], capture_output=True, text=True, timeout=3, check=True).stdout
+        if len(output) > 4 * 1024 * 1024:
+            raise ValueError()
+        inventory = {}
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) == 3 and all(part.isdigit() for part in parts):
+                pid, parent, uid = map(int, parts)
+                inventory[pid] = (parent, uid)
+        uid = os.getuid()
+        if inventory.get(grant['pid'], (None, None))[1] != uid or inventory.get(owner, (None, None))[1] != uid:
+            raise ValueError()
+        pid = os.getpid() if requester is None else requester
+        # requester starts at its parent: a sibling holding the capability
+        # cannot borrow; Python inspection is itself a child of the Node owner.
+        cursor, seen = inventory.get(pid, (0, 0))[0], set()
+        while cursor > 1 and cursor not in seen:
+            if cursor == owner:
+                return {'slots': grant['slots'], 'capacity': state['cpuCapacity'], 'parentPid': owner}
+            seen.add(cursor)
+            cursor = inventory.get(cursor, (0, 0))[0]
+        raise ValueError()
+    except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
+        raise RuntimeError(PARENT_REFUSAL) from None
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['hold', 'run'])
+    parser.add_argument('mode', choices=['hold', 'run', 'inspect-parent'])
     parser.add_argument('--slots', default='1')
     parser.add_argument('--repo', default=os.getcwd())
     parser.add_argument('--capacity', type=int)
@@ -190,6 +281,13 @@ def main():
     split = argv.index('--') if '--' in argv else len(argv)
     args = parser.parse_args(argv[:split])
     command = argv[split + 1:]
+    if args.mode == 'inspect-parent':
+        try:
+            print(json.dumps(ancestor_cpu_budget(requester=os.getppid())))
+            return 0
+        except RuntimeError:
+            print(PARENT_REFUSAL, file=sys.stderr)
+            return 2
     maximum = max(1, (os.cpu_count() or 1) - 2)
     capacity = args.capacity if args.capacity is not None else maximum
     if not 1 <= capacity <= maximum:
