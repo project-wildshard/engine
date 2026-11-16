@@ -147,7 +147,7 @@ export function requirePublishedGreen(report: Verdict, expected: Plan): void {
   requireGreen(report, expected);
   if (report.run === undefined || report.run === null || !/^\d+$/u.test(report.run)) throw new Error('J167: a green hosted nightly run ID is required; tag held');
   const latest: unknown = JSON.parse(execFileSync('gh', ['api',
-    'repos/project-wildshard/engine/actions/workflows/nightly.yml/runs?branch=main&status=completed&per_page=1',
+    'repos/project-wildshard/engine/actions/workflows/nightly.yml/runs?branch=main&event=schedule&status=completed&per_page=1',
     '--jq', '.workflow_runs[0]'], {encoding: 'utf8', timeout: 20000, maxBuffer: 1024 * 1024}));
   requireLatest(report, expected, latest);
 }

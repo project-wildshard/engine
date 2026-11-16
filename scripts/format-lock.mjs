@@ -47,6 +47,20 @@ function parseLock(text) {
   return { importers, keys: keys.map(key => key[1]), rows };
 }
 
+/** The resolved package version, rather than the manifest range's lower bound.
+ * @param {string} text @param {string} [importer] @returns {string} */
+export function lockedFormatVersion(text, importer = '.') {
+  const {importers, rows} = parseLock(text), locked = importers.get(importer);
+  if (locked === undefined) throw new Error(`${LOCK}: importer ${importer} has no ${FORMAT} resolution`);
+  const matches = rows.filter(row => locked.registry !== undefined
+    ? row.registry && row.version === locked.registry
+    : !row.registry && locked.commit !== undefined && row.commit === locked.commit);
+  const version = matches[0]?.version;
+  if (matches.length !== 1 || typeof version !== 'string' || !/^\d+\.\d+\.\d+$/u.test(version))
+    throw new Error(`${LOCK}: importer ${importer} has no unique exact ${PACKAGE} version`);
+  return version;
+}
+
 /** Everything that needs no network: the pins agree, and the lock row is the release they name.
  * @param {(path: string) => string | undefined} read @param {readonly string[]} workflows */
 export function formatLockFailures(read, workflows = []) {

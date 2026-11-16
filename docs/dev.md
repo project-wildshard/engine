@@ -496,3 +496,35 @@ The restored suffix is 60 idle ticks after earning, not re-earning from
 an earlier checkpoint. Coin-effect replay deduplication belongs to the
 room LedgerBook/bootId path and is outside these fact-receipt assertions.
 Dunes' complete story and the per-slice host-wake bar remain separate.
+
+### API validator identity (TC39 / AP-16)
+
+`node scripts/api-health.ts` reads the exact resolved shard-format package
+from `pnpm-lock.yaml` and compares it with `/api/health` on the deployed
+API. The manifest's caret lower bound and the shard schema version are
+different identities. A missing, malformed or unreachable health response
+fails the observation; a mismatch names both package versions. One
+three-second deadline covers the HTTP headers and JSON body.
+
+The report-only Ring 2 `api-health` job records two independent results:
+`proof.xml` qualifies the reader's test week; `report.json` observes the
+deployment. `api_health_only=true` dispatches only this job, requires no
+package install, and cannot qualify a nightly or become its baseline.
+Artifacts last fourteen days. A green job alone proves neither result.
+
+Run the real HTTP integration proof explicitly after a frozen install:
+
+```sh
+TC39_INSTALLED_FORMAT=1 node --test --test-timeout=10000 scripts/api-health.proof.ts
+```
+
+That environment flag requires the lock resolution to match the installed
+package's name and version. The isolated nightly has no install, so this
+one check skips there; all HTTP and diagnostic-selection cases still run.
+The proof stays outside hook discovery and after CI wall accounting.
+Admission needs its own actual green week and explicit review no earlier
+than November 23, 2026. Skipped steps are not green observations.
+
+The API deployment and normal reviewed pin alignment are tracked by meta
+`test-coverage/MACBOOK-WAITS.md` MW12 and mini QA39. Until they ship, the
+live report can correctly be red while the reader proof passes.
