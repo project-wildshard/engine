@@ -267,3 +267,13 @@ The full nightly maps the decimal Actions run ID to its low 32 bits for
 `NET_FUZZ_SEEDS`. The network fuzzer keeps its uint32 admission boundary;
 the full run ID remains the report identity. Reproduce the selected seed
 with `node scripts/nightly-seed.ts <run-id>`.
+
+For the actual input fault drill, set `diagnostic_drill=true` beside a
+diagnostic head/browser. The hosted job builds once, then cold-cooks and
+boots three fresh pages: baseline, actual hover control removed, healed.
+The ordinary touch assertion must reject the absent control while boot,
+native draw and Explorer still pass. The production verdict compares
+those real receipts and requires exactly one new hover failure, then
+exactly that resolution. `drill.json` and all raw receipts are retained.
+Only the selected head/browser was observed; missing coverage still
+holds qualification. A driver crash/timeout cannot pass the drill.

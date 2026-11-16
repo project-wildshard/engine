@@ -23,6 +23,10 @@ on:
         type: choice
         options: [chromium, webkit]
         default: chromium
+      diagnostic_drill:
+        description: Run baseline, lost hover control, and healed on the diagnostic head only
+        type: boolean
+        default: false
       pins_channel:
         description: Reviewed pin snapshot to test (staging release hash awaits AP-26)
         type: choice
@@ -34,11 +38,11 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: nightly-${{ github.ref }}${{ inputs.suite_only && '-suite-diagnostic' || '' }}${{ inputs.diagnostic_head && format('-head-{0}-{1}', inputs.diagnostic_head, inputs.diagnostic_browser) || '' }}
+  group: nightly-${{ github.ref }}${{ inputs.suite_only && '-suite-diagnostic' || '' }}${{ inputs.diagnostic_head && format('-head-{0}-{1}', inputs.diagnostic_head, inputs.diagnostic_browser) || '' }}${{ inputs.diagnostic_drill && '-fault-drill' || '' }}
   cancel-in-progress: false
 jobs:
   ring3:
-    if: always() && !inputs.diagnostic_head && (needs.report.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.ring3_only))
+    if: always() && !inputs.diagnostic_head && !inputs.diagnostic_drill && (needs.report.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.ring3_only))
     needs: report
     uses: ./.github/workflows/ring-3.yml
     with:
@@ -47,7 +51,7 @@ jobs:
       NIGHTLY_APP_CLIENT_ID: ${{ secrets.NIGHTLY_APP_CLIENT_ID }}
       NIGHTLY_APP_PRIVATE_KEY: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
   plan:
-    if: ${{ !inputs.ring3_only && !inputs.diagnostic_head }}
+    if: ${{ !inputs.ring3_only && !inputs.diagnostic_head && !inputs.diagnostic_drill }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -66,7 +70,7 @@ jobs:
       - id: plan
         run: echo "matrix=$(node scripts/nightly.ts plan)" >> "$GITHUB_OUTPUT"
   tests:
-    if: ${{ !inputs.diagnostic_head }}
+    if: ${{ !inputs.diagnostic_head && !inputs.diagnostic_drill }}
     needs: plan
     strategy:
       fail-fast: false
@@ -107,7 +111,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   heads:
-    if: ${{ !inputs.suite_only && !inputs.diagnostic_head }}
+    if: ${{ !inputs.suite_only && !inputs.diagnostic_head && !inputs.diagnostic_drill }}
     needs: plan
     strategy:
       fail-fast: false
@@ -168,7 +172,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   report:
-    if: always() && !inputs.ring3_only && !inputs.suite_only && !inputs.diagnostic_head
+    if: always() && !inputs.ring3_only && !inputs.suite_only && !inputs.diagnostic_head && !inputs.diagnostic_drill
     needs: [plan, tests, heads]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -217,12 +221,13 @@ jobs:
           retention-days: 7
 
   head-diagnostic:
-    if: github.event_name == 'workflow_dispatch' && inputs.diagnostic_head != ''
+    if: github.event_name == 'workflow_dispatch' && (inputs.diagnostic_head != '' || inputs.diagnostic_drill)
     runs-on: ${{ inputs.diagnostic_browser == 'webkit' && 'macos-15' || 'ubuntu-24.04' }}
     timeout-minutes: 75
     env:
       NIGHTLY_HEAD: ${{ inputs.diagnostic_head }}
       NIGHTLY_BROWSER: ${{ inputs.diagnostic_browser }}
+      NIGHTLY_DRILL: ${{ inputs.diagnostic_drill && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -255,7 +260,12 @@ jobs:
       - name: Exercise the production cold-pack and phone path
         env:
           NIGHTLY_GROUP: ${{ steps.head.outputs.group }}
-        run: node scripts/nightly-heads.ts "$NIGHTLY_BROWSER" "$NIGHTLY_GROUP" tmp/nightly/reports "$NIGHTLY_HEAD"
+        run: |
+          if [ "$NIGHTLY_DRILL" = true ]; then
+            node scripts/nightly-head-drill.ts "$NIGHTLY_BROWSER" "$NIGHTLY_GROUP" tmp/nightly/reports "$NIGHTLY_HEAD"
+          else
+            node scripts/nightly-heads.ts "$NIGHTLY_BROWSER" "$NIGHTLY_GROUP" tmp/nightly/reports "$NIGHTLY_HEAD"
+          fi
       - name: Keep diagnostic receipts only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -263,6 +273,9 @@ jobs:
           name: nightly-head-diagnostic
           path: |
             tmp/nightly/reports/heads-*.json
+            tmp/nightly/reports/**/heads-*.json
             tmp/nightly/reports/failures/**/*.json
+            tmp/nightly/reports/**/failures/**/*.json
+            tmp/nightly/reports/drill.json
           if-no-files-found: warn
           retention-days: 7

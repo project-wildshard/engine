@@ -22,13 +22,14 @@ const {objectHeaders, DEFAULT_LIMITS} = await import('../src/cook/game/cookWorke
 const {addStoredShards} = await import('./app-build/catalogue.ts');
 const {bareSlug} = await import('../src/shared/game/grid/catalogueSlot.ts');
 const {packsBookPath} = await import('../src/shared/game/shardfile/spawnManifest.ts');
-const [browserName, groupText, directory = 'tmp/nightly/reports', only] = process.argv.slice(2);
+const [browserName, groupText, directory = 'tmp/nightly/reports', only, fault = 'none'] = process.argv.slice(2);
 if (browserName !== 'chromium' && browserName !== 'webkit') throw new Error('Choose chromium or webkit');
+if (fault !== 'none' && (fault !== 'hover-control' || only === undefined)) throw new Error('A hover-control fault requires a single diagnostic head');
 const expected = plan(), selected = partition(expected.heads, Number(groupText));
 if (only !== undefined && !selected.some(row => row.slug === only)) throw new Error('Head outside partition');
 const out = resolvePath(directory), root = process.cwd(), dist = join(root, 'dist');
 mkdirSync(out, {recursive: true});
-const report: HeadsReport = {...expected, kind: 'heads', browser: browserName, group: Number(groupText), results: []};
+const report: HeadsReport & {diagnosticFault: string} = {...expected, kind: 'heads', browser: browserName, group: Number(groupText), diagnosticFault: fault, results: []};
 const receipt = join(out, `heads-${browserName}-${groupText}.json`);
 const checkpoint = () => {writeFileSync(`${receipt}.next`, `${JSON.stringify(report, null, 2)}\n`); renameSync(`${receipt}.next`, receipt);};
 checkpoint();
@@ -153,6 +154,9 @@ try {
                 world.game.app.input.allowed('hover') && world.weapons.tools.some(tool => tool.id === 'tool.hoverboard' && tool.enabled);
             }, undefined, {timeout: 10000});
             action = 'mount';
+            // Manual negative control only: the real page loses its actual
+            // input control. The ordinary tap/oracle must catch this regression.
+            if (fault === 'hover-control') await control.evaluate(button => { button.remove(); });
             await control.tap({timeout: 5000});
             const tappedAt = await page.evaluate(() => performance.now());
             await page.waitForFunction(() => {

@@ -93,3 +93,13 @@ idle rider. This is the only non-null callback consumer; ordinary smoke
 and cooked-store calls keep their behavior. The native PNG and its
 deadline remain an independent boot check. No clock, enemy or health
 state is modified. Re-run actual Template to verify this ordering.
+
+The manual diagnostic drill builds once and cold-cooks three fresh
+instances of one real pin: baseline, actual hover control removed,
+healed. The ordinary tap must reject the missing control; all other
+phases and thirty actual native draw frames must pass. Its bounded
+locator assertion is distinct from a process timeout/crash, which the
+driver refuses. The production verdict compares the actual partial
+receipts, requires one new hover failure and exactly that resolution,
+and continues HOLD for every missing head/browser/suite. No synthetic
+green receipts or release qualification enter the drill.
