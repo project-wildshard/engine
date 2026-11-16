@@ -41,3 +41,19 @@ accounting. The drill also invalidates a previous receipt before any
 setup and includes Git export in its cleanup protection. A real Git
 setup refusal overwrites a seeded old success with complete:false and
 leaves no private directory. Actionlint and syntax checks pass.
+
+Expanded TC26 with actual missing-section, broken-archive and door-save
+continuation controls. Dropped section bytes and a truncated real format
+archive enter the unchanged production readers; the door is opened with
+its real interaction, serialized and restored into a fresh native host.
+No state is granted. The parent plants each defect only in its export.
+
+A separate owner drill archives exact local API-server and Dunes commits,
+without changing their checkouts or publishing source. Dunes commit
+10837c6 runs its actual Ring 3 package-boundary checker against this
+exported engine; removing the outputDescriptor export turns it red.
+API-server dc37421 runs its existing real accounts-me route test with
+PGlite. Dropping its authentication refusal turns all four unauthenticated
+requests from 401 to 200 and fails that same test. Both actual owners
+pass again after healing. Dependency setup is isolated and offline; the
+first bootstrap populated only two already-locked packages in the store.

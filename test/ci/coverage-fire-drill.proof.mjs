@@ -76,6 +76,41 @@ timed('format',async()=>{
   assert.ok(product.shardfile.state.shared.some(row=>row.name==='blender.door.open'));
 });
 
+timed('dropped-section',async()=>{
+  const {loadHeadlessProduct}=await import('../../src/server/host/headlessProduct.ts');
+  const product=await loadHeadlessProduct('node_modules/@wildshard/format/corpus/handwritten');
+  assert.equal(product.slug,'blender-template');
+});
+
+timed('broken-tar',async()=>{
+  const {formatTemplate}=await import('../../scripts/pin-format.ts');
+  const {readTar}=await import('@wildshard/format/tar');
+  const files=readTar(formatTemplate('blender-template').bytes);
+  assert.ok(files.has('shard.json'),'Actual published Template 2 archive must be admitted');
+});
+
+timed('save-field',async()=>{
+  const {createShardfileSim,bindShardfileSim}=await import('../../src/server/game/plugin/simulation.ts');
+  const {leadPlayer}=await import('../../src/shared/engine/sim/leadPlayer.ts');
+  const {serializeSimSnapshot,snapshotSimHostBytes,decodeSimSnapshot}=await import('../../src/shared/engine/sim/snapshot.ts');
+  const {restoreSimHost}=await import('../../src/server/engine/sim/restore.ts');
+  const input=await productInput('_template'),ports={rapier:input.rapier,quest:{fact:()=>undefined,coins:()=>undefined}};
+  const sim=createShardfileSim(input.shard,input.assets,ports);
+  let restored,again;
+  try{
+    const player=leadPlayer(sim.host),target=input.shard.targets.interactions.find(row=>row.scene==='template.door.toggle');
+    assert.ok(target&&sim.lane);
+    const [x,,z]=target.at;player.position.set(x,sim.host.groundHeightAt(x,z-1.5)+.05,z-1.5);player.motor.resetAt(player.position);
+    assert.equal(sim.interact(target.id),true);sim.host.step();
+    assert.equal(sim.lane.world.publicField('template.door.open'),1);
+    const saved=serializeSimSnapshot(snapshotSimHostBytes(sim.host));
+    restored=restoreSimHost(sim.host.level,ports,decodeSimSnapshot(saved),host=>{
+      again=bindShardfileSim(host,input.shard,input.assets,{...ports,restoring:true});
+    });
+    assert.equal(again?.lane?.world.publicField('template.door.open'),1,'TC26_SAVE_FIELD: real restored door must retain its public field');
+  }finally{restored?.dispose();sim.dispose();}
+});
+
 timed('cook-source',async()=>{
   const {ringCookInputs}=await import('../../scripts/ring-cook-inputs.ts');
   const {formatTemplate}=await import('../../scripts/pin-format.ts');
