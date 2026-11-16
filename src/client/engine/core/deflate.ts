@@ -1,4 +1,4 @@
-import { base64Bytes as decodeBase64, unshuffleLanes as restoreWords, decodeDeflatedLanes } from '../../../shared/engine/core/byteCodec';
+import { base64Bytes as decodeBase64, unshuffleLanes as restoreWords, decodeDeflatedLanes, inflateDeflatedBytes } from '../../../shared/engine/core/byteCodec';
 import { pageScope } from '../../../shared/engine/app/resources';
 import { WORK_SLICE_MS, workSlice } from '../../../shared/engine/core/workSlice';
 import { zstdLaneSize } from './zstdFrame';
@@ -45,9 +45,8 @@ export async function fetchLaneBytes(url: string): Promise<Uint8Array> {
 }
 /** zlib bytes already in hand, inflated by the platform's paced stream decoder (as `fetchDeflatedBytes`); the input is not kept. */
 export function inflateBytes(bytes: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
-  const body = new Response(bytes.slice()).body;
-  if (body === null) return Promise.reject(new Error('Inflate requires a byte stream'));
-  return inflateStream(body);
+  const slice = workSlice(WORK_SLICE_MS, pageScope);
+  return inflateDeflatedBytes(bytes, slice.check);
 }
 /** Decode admitted lane bytes. Size-declared Zstd uses the existing worker;
  * original zlib files retain native paced inflate. Both restore identical words. */
@@ -59,7 +58,7 @@ export async function decodeLaneBytes(bytes: Uint8Array): Promise<Uint8Array> {
     return restoreLaneBytes(await decodeZstdBlock(owned, size));
   }
   const slice = workSlice(WORK_SLICE_MS, pageScope);
-  return decodeDeflatedLanes(owned, slice.check);
+  return decodeDeflatedLanes(bytes, slice.check);
 }
 async function restoreLaneBytes(lanes: Uint8Array): Promise<Uint8Array> {
   const out = new Uint8Array(lanes.length), slice = workSlice(WORK_SLICE_MS, pageScope), words = lanes.length / 4;

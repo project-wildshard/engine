@@ -47,7 +47,7 @@ export function unshuffleLanes(lanes: Uint8Array, out: Uint8Array<ArrayBuffer> =
 
 /** Inflate owned zlib bytes through the native platform stream. The caller may
  * yield between input blocks; the decoder never reads app state or keeps input. */
-export async function inflateBytes(bytes: Uint8Array, check: () => Promise<void> | undefined = () => undefined): Promise<Uint8Array<ArrayBuffer>> {
+export async function inflateDeflatedBytes(bytes: Uint8Array, check: () => Promise<void> | undefined = () => undefined): Promise<Uint8Array<ArrayBuffer>> {
   const owned = bytes.slice();
   let offset = 0;
   const stream = new ReadableStream<BufferSource>({
@@ -65,12 +65,10 @@ export async function inflateBytes(bytes: Uint8Array, check: () => Promise<void>
  * Returns independent bytes, preserving all bit patterns and offset inputs.
  * Zstd is admitted and dispatched by the page's worker adapter before this call. */
 export async function decodeDeflatedLanes(bytes: Uint8Array, check: () => Promise<void> | undefined = () => undefined): Promise<Uint8Array> {
-  const lanes = await inflateBytes(bytes, check), out = new Uint8Array(lanes.length), words = lanes.length / 4;
+  const lanes = await inflateDeflatedBytes(bytes, check), out = new Uint8Array(lanes.length), words = lanes.length / 4;
   for (let start = 0; start < words; start += 16_384) {
     await check();
     unshuffleLanes(lanes, out, start, Math.min(words, start + 16_384));
   }
-  // An empty partial word would otherwise skip the loop's validation.
-  if (lanes.length % 4 !== 0) throw new Error('unshuffleLanes: not whole words');
   return out;
 }

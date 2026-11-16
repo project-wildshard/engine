@@ -21,3 +21,11 @@ Page deflate keeps its existing public entries and supplies the page work
 slice; Zstd remains on its existing admitted worker path. No ambient shim,
 codec copy or public API removal. Source consumer compiler proof is required
 before publication is queued; existing package pins stay unchanged.
+
+J206 review engine-ci21-0930 has no MUST. Root independently verified
+destination Git blobs/landed ancestry after reviewer Git restrictions.
+Resolve suggestions: remove dead scripts compiler excludes, reuse the
+shared inflater from the page byte entry, avoid duplicate zlib input
+copy, remove dead length check, prove input-block checkpoints with a
+full incompressible offset fixture, and name inflateDeflatedBytes.
+The fetch stream keeps its reader cancellation path. No gate bypass.
