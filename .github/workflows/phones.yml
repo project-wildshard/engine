@@ -86,9 +86,18 @@ jobs:
           yes | "$bin/sdkmanager" --install emulator platform-tools "$image" > /dev/null
           echo no | "$bin/avdmanager" create avd -n xr8 -k "$image" -d pixel_7 --force
           mkdir -p tmp/staging-phones
-          nohup "$ANDROID_HOME/emulator/emulator" -avd xr8 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 4096 -cores 3 > tmp/staging-phones/emulator.log 2>&1 &
-          timeout 120 "$adb" wait-for-device
-          timeout 420 bash -c "until [ \"\$('$adb' shell getprop sys.boot_completed | tr -d '\r')\" = 1 ]; do sleep 3; done"
+          # No GPU here: try each software renderer until Chrome draws a page and the emulator outlives it.
+          for gpu in swiftshader_indirect angle_indirect guest; do
+            echo "gpu $gpu"
+            nohup "$ANDROID_HOME/emulator/emulator" -avd xr8 -no-window -no-audio -no-boot-anim -no-snapshot -gpu "$gpu" -memory 4096 -cores 3 > "tmp/staging-phones/emulator-$gpu.log" 2>&1 &
+            timeout 120 "$adb" wait-for-device
+            timeout 420 bash -c "until [ \"\$('$adb' shell getprop sys.boot_completed | tr -d '\r')\" = 1 ]; do sleep 3; done" || true
+            "$adb" shell am start -a android.intent.action.VIEW -n com.android.chrome/com.google.android.apps.chrome.Main -d https://staging.wildshard.io/version.json || true
+            sleep 25
+            if [ "$("$adb" get-state 2>/dev/null)" = device ] && "$adb" shell pidof com.android.chrome > /dev/null; then echo "gpu $gpu holds Chrome"; break; fi
+            echo "gpu $gpu lost the emulator or Chrome"; "$adb" emu kill || true; pkill -f qemu-system || true; sleep 5
+          done
+          "$adb" shell am force-stop com.android.chrome
           "$adb" shell dumpsys package com.android.chrome | grep -m1 versionName
           echo "ANDROID_SERIAL=emulator-5554" >> "$GITHUB_ENV"
       - name: XR-8, and XR-9 with the iOS Simulator

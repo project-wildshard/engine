@@ -116,7 +116,7 @@ function safari(udid) {
     swipe: async (from, to, ms) => { await idb(['swipe', r(from.x), r(from.y), r(to.x), r(to.y), '--duration', String(ms / 1000), '--delta', '3']); },
     tap: async at => { await idb(['tap', r(at.x), r(at.y)]); },
     scale: () => Promise.resolve(1),
-    shot: name => { execFileSync('xcrun', ['simctl', 'io', udid, 'screenshot', join(shots, `${name}.png`)], { stdio: 'ignore', timeout: 60_000 }); return Promise.resolve(); },
+    shot: async name => { execFileSync('xcrun', ['simctl', 'io', udid, 'screenshot', join(shots, `${name}.png`)], { stdio: 'ignore', timeout: 60_000 }); await Promise.resolve(); },
     close: async () => { page.close(); proxy.kill('SIGTERM'); await sleep(200); } };
 }
 
@@ -150,7 +150,7 @@ function android(serial) {
     swipe: async (from, to, ms) => { adb('shell', 'input', 'touchscreen', 'swipe', r(from.x), r(from.y), r(to.x), r(to.y), r(ms)); await Promise.resolve(); },
     tap: async at => { adb('shell', 'input', 'touchscreen', 'tap', r(at.x), r(at.y)); await Promise.resolve(); },
     scale: async () => Number(await page.evaluate('window.devicePixelRatio')),
-    shot: name => { writeFileSync(join(shots, `${name}.png`), execFileSync(tool, ['-s', serial, 'exec-out', 'screencap', '-p'], { maxBuffer: 64 << 20, timeout: 60_000 })); return Promise.resolve(); },
+    shot: async name => { writeFileSync(join(shots, `${name}.png`), execFileSync(tool, ['-s', serial, 'exec-out', 'screencap', '-p'], { maxBuffer: 64 << 20, timeout: 60_000 })); await Promise.resolve(); },
     close: async () => {
       page.close();
       try { writeFileSync(join(shots, 'logcat.txt'), execFileSync(tool, ['-s', serial, 'logcat', '-d', '-t', '4000'], { encoding: 'utf8', maxBuffer: 64 << 20, timeout: 60_000 })); } catch { /* A dead emulator has no log. */ }
