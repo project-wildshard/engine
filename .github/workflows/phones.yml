@@ -8,6 +8,13 @@ on:
   schedule:
     - cron: '41 8 * * *'
   workflow_dispatch:
+    inputs:
+      peer_tag:
+        # XR-9 with an Android emulator outside GitHub (the Mac mini's, row 46): Safari waits in the room for
+        # `XR Android <peer_tag>`, and the hosted Android job is skipped. Run the other phone with the same --tag.
+        description: 'Meet an outside Android phone with this --tag (1 to 10 lowercase letters or digits)'
+        required: false
+        default: ''
   push:
     paths:
       - scripts/staging-phones-proof.mjs
@@ -52,8 +59,16 @@ jobs:
           xcrun simctl bootstatus "$udid" -b > /dev/null
           echo "SIM_UDID=$udid" >> "$GITHUB_ENV"
       - name: XR-7
-        # --solo until the Android leg boots Chrome (row 46): XR-9 needs both phones in the room.
-        run: node scripts/staging-phones-proof.mjs --device=safari --solo --tag="$(printf '%s%s' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" | tail -c 9)" --out=tmp/staging-phones
+        # --solo unless a peer_tag names an outside Android phone: the hosted emulator has no touchscreen (run 43980542858
+        # listed only a keyboard and a power button), so XR-8 and XR-9 run against the Mac mini's emulator (row 46).
+        env:
+          PEER_TAG: ${{ inputs.peer_tag }}
+        run: |
+          if [ -n "$PEER_TAG" ]; then
+            node scripts/staging-phones-proof.mjs --device=safari --tag="$PEER_TAG" --peer-wait=30 --out=tmp/staging-phones
+          else
+            node scripts/staging-phones-proof.mjs --device=safari --solo --tag="$(printf '%s%s' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" | tail -c 9)" --out=tmp/staging-phones
+          fi
       - name: Keep the report and screenshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -63,9 +78,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
   android:
-    if: github.repository == 'project-wildshard/engine'
+    if: github.repository == 'project-wildshard/engine' && !inputs.peer_tag
     runs-on: ubuntu-24.04
-    # Open (row 46, XR-8): Chrome starts and loads staging on the API 37 emulator; the touch walk is not yet proved here.
+    # Open (row 46): Chrome starts on the hosted API 37 emulator, but the guest has no touchscreen, so XR-8 is proved on the mini.
     continue-on-error: true
     timeout-minutes: 50
     steps:
@@ -95,8 +110,9 @@ jobs:
           # for Chrome's process. API 36 is the last fallback (its Chrome must be 137+ for WebCrypto Ed25519).
           up=0
           # Run 43977695438: on `swiftshader_indirect` (the GLES translator) the page failed on a WebGL fence wait (0x911d,
-          # GL_WAIT_FAILED); `swangle_indirect` is ANGLE over SwiftShader Vulkan, which plays at 1 to 2 fps (local API 37).
-          for attempt in "$newest swangle_indirect" "$newest swiftshader_indirect" "${api36:-$newest} swangle_indirect"; do
+          # GL_WAIT_FAILED); on `swangle_indirect` (run 43980542858) the system server died before the proof began. The
+          # mini's arm64 emulator draws through ANGLE on SwiftShader Vulkan and plays at 1 to 2 fps.
+          for attempt in "$newest swiftshader_indirect" "$newest swangle_indirect" "${api36:-$newest} swiftshader_indirect"; do
             set -- $attempt; image=$1 gpu=$2 tag="$(echo "$image" | grep -oE 'android-[0-9.]+')-$gpu"
             echo "::group::attempt $tag"
             yes | "$bin/sdkmanager" --install "$image" > /dev/null
