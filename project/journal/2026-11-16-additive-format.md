@@ -58,7 +58,7 @@ J381 push hatch, authorized by the coordinator after the second gate:
 SKIP_CHECK=1 bypasses the local push-check runner; --no-preflight reuses
 its already-green417-second preflight (233 files/1341 passing cases).
 The sole later split failure is test/headless-verb-tape-worker.test.ts:
-a default runtime first tick crossed its10ms deadline at16824us under
+a cold runtime first tick crossed its16666us floor at16824us under
 load. Its test, native fixture and tickWorkerHost bytes are unchanged
 from main8cdbd68c. The exact native child passes that baseline and this
 branch. Baseline split results cache records this case green in9397ms;
@@ -68,3 +68,8 @@ no whole-baseline-green claim is made. Report the existing timing fixture
 No threshold or runtime guard changes. Secret/history/changelog guards
 and hosted exact-head CI remain mandatory. Check any carried rebase's
 static gates and the landed single-player preview before reporting.
+
+The carried rebase required refreshing stale template revision8 outputs.
+Normal pins admitted27/27, inputs regeneration and full types/lint pass.
+No generation bypass: retain J381 only for the classified local timing
+flake; hosted CI and the landed preview remain required.
