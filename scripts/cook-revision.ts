@@ -2,9 +2,10 @@ import {createHash} from 'node:crypto';
 import {existsSync,readFileSync,statSync} from 'node:fs';
 import {dirname,relative,resolve} from 'node:path';
 import ts from '@typescript/typescript6';
+import {rendererRevision} from './renderer-revision.mjs';
 
 interface Package {exports:Record<string,string>;dependencies:Record<string,string>}
-export interface CookRevision {revision:string;files:readonly string[];node:string;brotli:string;format:string}
+export interface CookRevision {revision:string;files:readonly string[];node:string;brotli:string;format:string;renderer:string}
 
 /** Actual runtime import walk of the byte producer, including literal worker URLs.
  * Proof execution is supplied by the host and is never a reusable verdict. */
@@ -36,7 +37,7 @@ export function cookRevision(root=resolve(import.meta.dirname,'..')):CookRevisio
       if(ts.isImportDeclaration(node)&&ts.isStringLiteral(node.moduleSpecifier)) {
         const clause=node.importClause;
         const bindings=clause?.namedBindings;
-        const types=clause?.phaseModifier===ts.SyntaxKind.TypeKeyword||clause?.name===undefined&&bindings!==undefined&&ts.isNamedImports(bindings)&&bindings.elements.every(row=>row.isTypeOnly);
+        const types=clause?.phaseModifier===ts.SyntaxKind.TypeKeyword||clause?.name===undefined&&bindings!==undefined&&ts.isNamedImports(bindings)&&bindings.elements.length>0&&bindings.elements.every(row=>row.isTypeOnly);
         if(!types)follow(node.moduleSpecifier.text);
       } else if(ts.isExportDeclaration(node)&&node.moduleSpecifier!==undefined&&ts.isStringLiteral(node.moduleSpecifier)&&!node.isTypeOnly)follow(node.moduleSpecifier.text);
       else if(ts.isCallExpression(node)&&node.expression.kind===ts.SyntaxKind.ImportKeyword) {
@@ -52,9 +53,13 @@ export function cookRevision(root=resolve(import.meta.dirname,'..')):CookRevisio
   }
   // Host encoder wiring is an input; its injected simulation prover is not the byte producer.
   seen.add('scripts/cook-job.mjs');seen.add('scripts/cook-revision.ts');seen.add('pnpm-lock.yaml');
+  // The actual permission-limited child always loads these hooks. Its
+  // renderer input also decides whether author preparation can be reused.
+  seen.add('scripts/bake-loader.mjs');seen.add('scripts/format-hook.mjs');
   const files=[...seen].sort(),node=process.versions.node.split('.')[0]??'',brotli=process.versions.brotli??'';
   const format=pkg.dependencies['@wildshard/format'];if(format===undefined)throw new Error('No pinned cook format');
-  const hash=createHash('sha256').update(JSON.stringify({schema:'cook-revision/1',node,brotli,format}));
+  const renderer=rendererRevision(root);
+  const hash=createHash('sha256').update(JSON.stringify({schema:'cook-revision/2',node,brotli,format,renderer}));
   for(const file of files)hash.update(file).update('\0').update(readFileSync(resolve(root,file))).update('\0');
-  return {revision:hash.digest('hex'),files,node,brotli,format};
+  return {revision:hash.digest('hex'),files,node,brotli,format,renderer};
 }
