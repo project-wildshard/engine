@@ -56,32 +56,34 @@ test('a seat walks by input out of its home and back in; another cell\'s wall an
   a.thumb = heading(Math.PI / 2, NET_BUTTONS.sprint);
   await vi.waitFor(() => { expect(road.bodyOf('device:a')?.position.x ?? 0, 'A into Sunscar\'s buffer').toBeLessThan(WEST_EDGE - 2); }, { timeout: 30_000, interval: 100 });
   let deepest = Infinity;
-  for (const ends = Date.now() + 3000; Date.now() < ends;) {
+  for (const ends = Date.now() + 2000; Date.now() < ends;) {
     await sleep(50);
     expect(west.holds('device:a'), 'A is never handed into Sunscar').toBe(false);
     deepest = Math.min(deepest, road.bodyOf('device:a')?.position.x ?? Infinity);
   }
   expect(road.holds('device:a'), 'A stays on the road').toBe(true);
   expect(deepest, 'held at Sunscar\'s gate').toBeGreaterThan(WEST_GATE);
-  // Off the entryway, 40 m north along Sunscar's edge, walked there by input (a pose set under a running bot is undone by its
-  // next move): its wall stands on the edge line
+  // Off the entryway (ENTRY_WIDTH 8 m), 15 m north along Sunscar's edge, walked there by input (a pose set under a running bot is undone by its
+  // next move): its wall stands on the edge line. Every leg from here runs (ZE6's main-watch: walked, the file took 73 s on CI
+  // against its 60 s budget; the legs are 40 to 60 m of road)
   const at = (): { x: number; z: number } => road.bodyOf('device:a')?.position ?? { x: NaN, z: NaN };
-  a.thumb = heading(-Math.PI / 2);
+  const run = (yaw: number) => heading(yaw, NET_BUTTONS.sprint);
+  a.thumb = run(-Math.PI / 2);
   await vi.waitFor(() => { expect(at().x, 'back out of the buffer').toBeGreaterThan(WEST_EDGE + 6); }, { timeout: 20_000, interval: 50 });
-  a.thumb = heading(Math.PI);
-  await vi.waitFor(() => { expect(at().z, 'north along the road').toBeGreaterThan(40); }, { timeout: 30_000, interval: 50 });
-  a.thumb = heading(Math.PI / 2);
+  a.thumb = run(Math.PI);
+  await vi.waitFor(() => { expect(at().z, 'north along the road').toBeGreaterThan(15); }, { timeout: 30_000, interval: 50 });
+  a.thumb = run(Math.PI / 2);
   deepest = Infinity;
-  for (const ends = Date.now() + 4000; Date.now() < ends;) { await sleep(50); deepest = Math.min(deepest, at().x); }
+  for (const ends = Date.now() + 2000; Date.now() < ends;) { await sleep(50); deepest = Math.min(deepest, at().x); }
   expect(deepest, 'held at Sunscar\'s wall off the entryway').toBeGreaterThan(WEST_EDGE);
   expect(deepest, 'it walked up to the wall').toBeLessThan(WEST_EDGE + 2);
   expect(west.holds('device:a'), 'A is never handed into Sunscar').toBe(false);
   // Back to Driftwood's west entryway by input: its walls stand open for A, and the road hands A back in
-  a.thumb = heading(-Math.PI / 2);
+  a.thumb = run(-Math.PI / 2);
   await vi.waitFor(() => { expect(at().x, 'off the wall').toBeGreaterThan(WEST_EDGE + 4); }, { timeout: 20_000, interval: 50 });
-  a.thumb = heading(0);
+  a.thumb = run(0);
   await vi.waitFor(() => { expect(at().z, 'south to the entryways\' line').toBeLessThan(0.5); }, { timeout: 30_000, interval: 50 });
-  a.thumb = heading(-Math.PI / 2);
+  a.thumb = run(-Math.PI / 2);
   await vi.waitFor(() => { expect(home.holds('device:a'), `A back into Driftwood from x ${String(road.bodyOf('device:a')?.position.x.toFixed(2))}`).toBe(true); }, { timeout: 30_000, interval: 100 });
   expect(a.closed, 'one socket throughout').toBeNull();
   expect(b.closed, 'one socket throughout').toBeNull();
