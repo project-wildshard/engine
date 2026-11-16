@@ -67,6 +67,7 @@ import { clientViews } from './clientViews';
 import { createShardfileClientScripts, captureClientScriptPosition } from './clientScripts';
 
 import { installClientWater, undrawnWater } from './clientWater';
+import { installClientDetails } from './clientDetails';
 import { standaloneClientTiles } from './tileContent';
 import { tileRing } from './tileDriver';
 import { buildYield } from '@wildshard/engine/core/workSlice';
@@ -291,6 +292,9 @@ export class ShardfileClient {
     const waterClocks: ((dt: number) => void)[] = [];
     installClientWater(undrawnWater(this.source.water, this.plan?.features ?? []), { root: ctx.root, scope: ctx.scope, materials: presentation.materials, outline: presentation.outline, frame: (run) => { waterClocks.push(run); } });
     if (waterClocks.length > 0) ctx.system({ id: 'game.shardfile.water', phase: 'update', run: (dt) => { for (const run of waterClocks) run(dt); } });
+    // SHARD-SOURCE AP32d1: the look's detail layers (grass, ferns), each a camera ring of seeded clumps from its library files
+    installClientDetails(this.source.look.details, this.assets.retained, { root: ctx.root, scope: ctx.scope, materials: presentation.materials, phone: TIER === 'phone',
+      viewer: () => runtime.viewer(), frame: (run) => { ctx.system({ id: 'game.shardfile.details', phase: 'late', run }); } });
     const nativeWorld = this.nativeFeatures || this.mode === 'presentation';
     const start = nativeWorld ? ctx.manifest.spawn : this.source.spawn;
     const collider = nativeWorld && this.source.terrain !== null ? await this.assets.read(this.source.terrain.collider) : undefined;
