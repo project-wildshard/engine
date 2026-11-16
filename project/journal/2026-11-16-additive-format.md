@@ -27,3 +27,12 @@ cover canonical0.1.0.0 Product admission and require the actual refused
 version in future/breaking errors. The format pin is exact0.9.0 so an
 outside engine install cannot silently advance the compatibility window.
 All four native cases pass. APIv0.18.0 is live at5b616f8 before this land.
+
+WR11 same-byte upload/cook witness, 2026-11-16: API's actual signed route
+accepted the retained N-1 archive with status201 and an identity migration
+at N. The normal native cook-job CLI accepts those exact bytes with hash
+96103c3fba31054e78372ad2e336ec328832e64bcd1c6e4f6893c69ce38db8f0,
+runs240 simulation ticks/92 lanes, and retains the uploaded header bytes.
+It reports stale preparation (fixture renderer), so this is a format/cook
+proof, not permission to move a channel or bless a production renderer.
+Rebased on main8883790a; lint/types and97 touched cases pass before land.
