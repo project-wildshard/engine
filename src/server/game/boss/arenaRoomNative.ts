@@ -90,7 +90,7 @@ export function installArenaRoom<A extends ArenaRoomBody>(host: SimHost, rows: A
   const { phased: fight, script } = arenaRoomFight<A>({
     room: { floorHeightAt: (x, z) => ground.floorAt(x, z), addSand: (...pile) => { ground.addSand(...pile); }, clearSand: () => { ground.clearSand(); },
       drainSand: (dt, rate) => { ground.drainSand(dt, rate); }, inChamber: p => ground.inChamber(p), setSealed: on => { sealWanted = on; seal(); } },
-    body: { spawn: ports.spawnBody, retire: ports.retire, bind: (actor, brain) => { actor.combatActor().damageMul = request => brain.damageMul(actor, request.point); }, ready: (actor, floorY) => { actor.yOffset = floorY - actor.position.y; } },
+    body: { spawn: ports.spawnBody, retire: ports.retire, bind: (actor, brain) => { actor.combatActor().damageMul = request => brain.damageMul(actor, request.point); }, ready: (actor, floorY) => { actor.yOffset = floorY - actor.position.y; actor.position.y = floorY; } },
     spawnAdd: ports.spawnAdd, target, combat: host.combat, physics: () => host.physics, rng: () => host.rng.stream('ai').next(), feed: () => undefined,
   }, rows.fight, () => Object.fromEntries(profile.fight.views.map(id => [id, (...args: number[]): void => { sayFightView(host, id, args); }])));
   const row = installBossRow(host, { step: rows.step, row: rows.definition.id, definition: rows.definition, script, body: () => fight.body(), shielded: () => script.shielded,
