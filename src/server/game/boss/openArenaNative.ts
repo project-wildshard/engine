@@ -141,7 +141,7 @@ export async function prepareOpenArena(product: Pick<ShardProduct, 'json' | 'sec
         for(const {item,count} of row.grants)ports.grantItem?.(player,item,count);
         if(bounty.room&&bounty.owed.length>0)return;
         reward=false;rewardPoint=null;
-        const saved=boss.snapshot().saved;records.bosses.write({...records.bosses.read(),[data.definition.id]:{...saved,rewardTaken:true}});
+        boss.takeReward();
       };
       const sayLooks=arenaWords(host,fight);
       const run=(dt:number):void=>{
@@ -169,6 +169,10 @@ export async function prepareOpenArena(product: Pick<ShardProduct, 'json' | 'sec
         weather:()=>({state:actual.storm.weather.state,left:actual.storm.weather.phaseLeft}),
         rewardPrompt:()=>rewardPoint===null?null:{position:rewardPoint.clone(),radius:2.6,label:data.reward.prompt}});
       host.scope.onDispose(()=>{owners.delete(host);updates.delete(host);shares.delete(host);weather.delete(host);});
+      // The next intro step reads the previous frame's heart before drawing
+      // its new pose. Rebuild derived body matrices from the restored clock
+      // and pose now, without advancing the guest or replaying any effects.
+      if(ports.restoring)onSimHostRestored(host,()=>{if(fight.body.visible)fight.body.update(host.clock.now,camera);});
       if(ports.restoring&&ports.closedInputOwner!==undefined){
         const check=ports.closedInputOwner;
         onSimHostRestored(host,()=>{
