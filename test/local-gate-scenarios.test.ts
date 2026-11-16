@@ -10,7 +10,8 @@ test.each([
   'mover-carry',
 ])('%s consumes an existing product without building an app or starting a server', name => {
   const source = readFileSync(`test/${name}.test.ts`, 'utf8');
-  expect(source).toContain('builtFolder(');
+  // The lift-pending scripts/ suites keep their bytes (CI21), so they still call the old name (SA25).
+  expect(source).toContain(name.startsWith('scripts/') ? 'builtProduct(' : 'builtFolder(');
   expect(source).not.toMatch(/node:child_process|scripts\/build-shardfiles|createServer\(|localhost:3000/u);
 });
 
