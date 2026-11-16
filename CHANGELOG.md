@@ -9,6 +9,14 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.25 (2026-11-16)
+
+- Forced updates explain why the browser needs to reload.
+- Tree sets keep their intended detail ranges.
+- Creature combat shows health bars and hit reactions; Brasscap uses calmer ground camps.
+- New creator uploads reach the cook worker without restarting it.
+- Authoring tools load installed engine packages on Node 26.
+
 ## v0.1.24 (2026-11-15)
 
 - A phone holding an old version no longer sits on "still waiting": the new version takes over by itself, even on bad Wi-Fi.
