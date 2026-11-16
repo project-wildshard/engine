@@ -114,20 +114,29 @@ forward (J179).
 live signed file and `/health`, and lists what would refuse today. It
 builds, uploads and aliases nothing.
 
-The order of one release: `staging build`, `staging upload` (packs
-before the producer signs, J234), CI and Ring 1 green, the producer
-signs the next staging serial, `staging check`, `staging go-live`,
-strict staging proofs, `release.sh vX.Y.Z --finish` (the tag signs
-production), `production build` and `upload` (any time after the
-build is green), `production check`, `production go-live
---after-staging-proofs`, then `--human-static`. Last, the cook follows
-production: `node scripts/release-cook.mjs vX.Y.Z` moves the box's cook
-worker to the tag over the agents' account (`wildshard-config cook`,
-AUTO-RELEASE J355), installing that verb first from a signed tag if the
-box lacks it. npm needs no step: the tag's `npm-publish.yml` publishes by
-trusted publishing, and npm lists a 13 MB engine about 10 minutes later
-(`Your package is being processed`); never rerun that job while it
-processes (E409), and never `npm stage approve`.
+Release from `release/vX.Y.Z` (meta RELEASE-BRANCHES, J360/J362).
+From clean main, run
+`../repo-kit/release.sh vX.Y.Z --prepare --notes <file>`. The helper
+selects the newest green main containing the previous tag and writes
+version, changelog and stamps on the release branch. Main keeps moving.
+
+Use clean channel clones at that exact release head. Run `staging
+build`, `staging upload` (packs before signing, J234), wait for exact
+branch CI and the signed staging serial, then `staging check`,
+`staging go-live` and the strict staging proofs. `release.sh vX.Y.Z
+--finish` tags the exact green head; the tag signs production and
+starts trusted npm publishing. `--published` waits for npm's listing;
+never rerun the publish job while npm processes it. Production build
+and upload may run once the build is green. Run `production check`,
+`production go-live --after-staging-proofs`, then the static Doctor
+with `--human-static` (J205).
+
+The cook follows production: `node scripts/release-cook.mjs vX.Y.Z`
+moves it through `wildshard-agent` and `wildshard-config cook` (J355).
+Finish from primary main with `release.sh vX.Y.Z --merge-back`: merge
+without fast-forward, retry against moving main, then remove the
+published branch/tree. The next prepare requires this tag in main
+history. Release cadence is daily plus on demand (J362).
 
 Pack writes use `wrangler r2 object put` with wrangler's login.
 
@@ -144,19 +153,12 @@ is `CLOUDFLARE_API_TOKEN` from the environment (GitHub Actions), else
 wrangler's own login (production from the MacBook, J274); it is never
 in argv and child output is printed redacted.
 
-**Staging alignment.** Run this workflow by hand (`workflow_dispatch`) on
-main with `build` set to a full green main SHA whose packs are published:
-`gh workflow run server-release.yml --ref main -f build=<sha>`. It signs
-that build as the next staging serial. This is how a held build goes
-live once its packs land. It is forward-only (J234, Jake: "Fix forward.
-We have to fix forward. I guess a one-time rollback is fine"): the build
-must descend from the one staging names, or the run fails. The one
-rollback was staging serial 65 to `a8144a5` on 2026-11-10. It signs
-with main's tooling, but rebuilds the bundle in the named build's own
-tree and refuses unless it matches the asset already on its
-`server-staging-<sha>` tag, so a replaced archive is never signed. The
-packs gate still applies, CI and Ring 1 must be green for that SHA, and
-production can never be aligned.
+**Staging alignment.** Dispatch `server-release.yml` on main with
+`-f build=<sha>` only for a published exact green `release/vX.Y.Z`
+head whose packs are ready. The source selector verifies that branch
+and its own CI; ordinary main CI never advances staging. The build
+must descend from the current staging build (J234). Production is
+selected by its version tag and cannot be aligned by hand.
 
 Every run signs with main's current publisher, checked out at the root,
 and builds the bundle in the source's own tree under `./source`. So a
@@ -165,12 +167,11 @@ fix-forward rules. A tag push runs the workflow file at its tag, so a
 tag on a commit from before this rule would run that commit's old
 publisher, which has no production gate. Never tag one.
 
-A `vMAJOR.MINOR.PATCH` tag qualifies for production. Its peeled commit
-must belong to main and have the same two green main-push workflows. A
-tag arriving while they run waits up to 40 minutes. A red result fails;
-rerun that tag's server-release workflow after its main CI succeeds.
-Tags from before this producer existed are ignored. No manual promotion
-or second channel-writing workflow should race this producer.
+A `vMAJOR.MINOR.PATCH` tag qualifies for production when its peeled
+commit is reachable from its published release branch or main and has
+exact-head green CI for that source. The producer waits for that proof,
+then preserves the packs-first and fix-forward gates. Dry-run branches
+and tags never publish a channel.
 
 J205 reserves live production for humans. Agent proofs, bots and soaks
 use the signed staging channel, its exact matching client/server build,

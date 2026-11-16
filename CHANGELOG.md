@@ -4,8 +4,12 @@ Every engine version, patch releases included, has a section here before it is t
 five bullets in plain language, written for players and Jake, never commit subjects. The title screen's WHAT'S NEW
 box shows the section for `package.json`'s version, beside the build's short commit.
 
-To release: add the next version's section at the top, commit and push it, then, from the canonical checkout on main,
-run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the helper lives in the sibling repo-kit clone).
+To release: pass one to five player-facing bullets in a notes file to
+`../repo-kit/release.sh vX.Y.Z --prepare --notes <file>` from main.
+The helper writes this section, version and stamps on `release/vX.Y.Z`
+(J360/J362; meta RELEASE-BRANCHES). After staging proofs, `--finish`
+tags that exact green head; after publication, `--merge-back` brings
+it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
