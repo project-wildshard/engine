@@ -34,3 +34,7 @@ The driver also treats a signalled child exit as failure instead of
 turning null into exit0. Existing replica/performance paths retain
 their health checks and address rules. No local cook, staging play,
 release, deployment or box action was run on the mini.
+
+The existing11case bot guard check reads the original copied-fixture
+list literally. Name that unchanged base list and append the two new
+outside files, preserving both the invariant and the existing check.

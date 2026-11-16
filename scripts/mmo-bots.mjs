@@ -117,7 +117,9 @@ mkdirSync(tree, { recursive: true });
 const source = serverFrom ?? release.engineBuild;
 if (serverFrom !== undefined) try { git(['merge-base', '--is-ancestor', release.engineBuild, serverFrom]); } catch { throw new Error(`--server-from ${serverFrom} does not descend from the release's ${release.engineBuild}`); }
 execFileSync('tar', ['-x', '-C', tree], { input: git(['archive', source]) });
-for (const name of ['mmoBotsEntry.ts', 'mmoBotsGuard.ts', 'mmoBotsStats.ts', ...(outsideProof ? ['outsideBotEntry.ts', 'outsideJourney.ts'] : [])]) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
+const botFiles = ['mmoBotsEntry.ts', 'mmoBotsGuard.ts', 'mmoBotsStats.ts'];
+if (outsideProof) botFiles.push('outsideBotEntry.ts', 'outsideJourney.ts');
+for (const name of botFiles) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
 let begun = performance.now();
 // CI=1 keeps the install non-interactive; --config.ci=false keeps the global store on, which pnpm drops under ci (GVS G9)
 execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent', '--config.ci=false'], { cwd: tree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
