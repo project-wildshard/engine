@@ -38,3 +38,7 @@ or coverage is silently removed, and no empty replacement is added.
 Local proofs use named files. Full-suite work belongs to hosted CI; no
 coordinator-only override is used. Ring 1 installs were restored to the
 normal full pins, followed by strict input generation, before checkpoint.
+
+The Ring 1 selection parses its manifest with the existing Valibot intake.
+Malformed configuration cannot silently opt back into complete products.
+Root-config focused lint and the layer typecheck pass.

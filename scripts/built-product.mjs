@@ -99,9 +99,10 @@ export function readBuiltShardfile(sourceRoot, name, { cacheRoot = shardfileCach
   // failure, never permission to test against client assets instead.
   if (env.WILDSHARD_RING === '1' && !hasShardSource(root)) {
     const rings = resolve(root, 'test/pins/rings.json');
-    /** @type {{'1'?: {slices?: string[]}}} */
-    const ring = existsSync(rings) ? JSON.parse(readFileSync(rings, 'utf8')) : {};
-    if (ring['1']?.slices?.includes(name)) {
+    const slices = existsSync(rings)
+      ? v.parse(v.object({ '1': v.object({ slices: v.array(v.string()) }) }), JSON.parse(readFileSync(rings, 'utf8')))['1'].slices
+      : [];
+    if (slices.includes(name)) {
       const slice = resolve(root, 'out/.slices', name);
       if (!existsSync(resolve(slice, 'shard.json'))) throw new Error(`Missing Ring 1 server slice ${name}; run: node scripts/pins.ts install --ring 1`);
       return slice;
