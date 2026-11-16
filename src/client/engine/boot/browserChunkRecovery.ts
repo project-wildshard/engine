@@ -4,7 +4,7 @@ import { countReload } from '../core/reloadGuard';
 import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot/loadingWaits';
 import { markReload, type ReloadReason } from './lastEnd';
 import { leaveAfterPaint } from './leaveAfterPaint';
-import { createChunkRecovery, reloadIntoNewerBuild, type ChunkRecoveryPorts } from './chunkRecovery';
+import { createChunkRecovery, reloadIntoNewerBuild, sayingReload, type ChunkRecoveryPorts } from './chunkRecovery';
 import { captureBrowserError, engineScreenTags } from '../telemetry/browserErrors';
 
 declare const __BUILD_ID__: string;
@@ -69,7 +69,9 @@ async function dropWorker(): Promise<boolean> {
  * `keepPlace`: the player's place is on a server, so the page comes back to this URL and not to the title (J174). */
 export function reloadRefusedBuild(keepPlace = false): Promise<boolean> {
   if (typeof window === 'undefined' || typeof __BUILD_ID__ !== 'string') return Promise.resolve(false);
-  const ports = recoveryPorts(() => !documentLeaving, keepPlace ? 'background' : 'reload');
+  // OF24: a forced update says so on one line (the RELOADING cover), then reloads once, at this URL
+  const ports = sayingReload(recoveryPorts(() => !documentLeaving, keepPlace ? 'background' : 'reload'),
+    () => showReloadingSoon('This version no longer fits the world · loading the update'));
   // A server won't take this build, so staying is no option: a slower reload beats a player left outside the world.
   return reloadIntoNewerBuild(keepPlace ? { ...ports, prepare: async build => await ports.prepare(build) || dropWorker() } : ports);
 }

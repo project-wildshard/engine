@@ -16,3 +16,7 @@ install, the old build stays whole), over a build that is not whole it takes ove
 (pill and 12 s self-reload) drops the worker and reloads the same URL. The player's reload keeps the URL (Jake 21:10:
 "/slug/blender-template ... went to the homepage"). Proof: headless WebKit at 402x874 on a 400 kbit/s, 300 ms, 5% stall
 profile, unfixed release stuck on all three loads, fixed release on the slug page in the first visit.
+
+OF24, same day: a forced update (a server refuses this build at hello, `reloadRefusedBuild`) now puts one line up on the
+RELOADING cover, "This version no longer fits the world · loading the update", then reloads once at the same URL
+(`sayingReload` in `chunkRecovery.ts`); the session's one reload claim still stops any loop.

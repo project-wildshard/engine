@@ -29,6 +29,12 @@ export async function reloadIntoNewerBuild(ports: ChunkRecoveryPorts): Promise<b
     ports.reload(); return true;
   } catch { return false; }
 }
+/** OFFLINE OF24 (Jake, 2026-11-15: a forced update shows one clear line, then one reload): the same ports, whose one reload
+ *  first puts `say`'s line up (it resolves once the line is painted, or failed to be), then reloads in place. The claim
+ *  still allows one reload a session, so a build no server takes says it once and never loops. */
+export function sayingReload(ports: ChunkRecoveryPorts, say: () => Promise<void>): ChunkRecoveryPorts {
+  return { ...ports, reload: () => { void say().catch(() => undefined).then(() => { ports.reload(); return undefined; }); } };
+}
 /** Concurrent module/CSS failures share one bounded discovery and one durable reload claim. */
 export function createChunkRecovery(ports: ChunkRecoveryPorts): (error: unknown) => Promise<boolean> {
   let pending: Promise<boolean> | undefined;

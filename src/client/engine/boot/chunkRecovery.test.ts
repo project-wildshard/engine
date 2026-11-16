@@ -1,5 +1,5 @@
 import {expect, test, vi} from 'vitest';
-import {createChunkRecovery, reloadIntoNewerBuild, staleChunkFailure} from './chunkRecovery';
+import {createChunkRecovery, reloadIntoNewerBuild, sayingReload, staleChunkFailure} from './chunkRecovery';
 
 const base = 'https://game.test/';
 const missingJs = new TypeError('Failed to fetch dynamically imported module: https://game.test/assets/pageEntry-1234abcd.js');
@@ -71,4 +71,18 @@ test('a refused build moves only to a newer one, once', async () => {
   const same = fixture(); same.version.mockResolvedValue('old-build');
   expect(await reloadIntoNewerBuild(same.ports)).toBe(false);
   expect(same.claim).not.toHaveBeenCalled();
+});
+
+test('OF24: a forced update puts its one line up before its one reload, and a second refusal neither says nor reloads', async () => {
+  const f = fixture(), order: string[] = [];
+  f.reload.mockImplementation(() => { order.push('reload'); });
+  const say = vi.fn(() => { order.push('line'); return Promise.resolve(); });
+  expect(await reloadIntoNewerBuild(sayingReload(f.ports, say))).toBe(true);
+  await vi.waitFor(() => { expect(order).toEqual(['line', 'reload']); });
+  expect(await reloadIntoNewerBuild(sayingReload(f.ports, say))).toBe(false); // the session's one reload is spent: no loop
+  expect(say).toHaveBeenCalledOnce(); expect(f.reload).toHaveBeenCalledOnce();
+  // a line that fails to paint never holds the reload back
+  const g = fixture();
+  expect(await reloadIntoNewerBuild(sayingReload(g.ports, () => Promise.reject(new Error('no cover'))))).toBe(true);
+  await vi.waitFor(() => { expect(g.reload).toHaveBeenCalledOnce(); });
 });
