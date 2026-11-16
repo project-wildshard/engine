@@ -51,8 +51,10 @@ export async function runVitest(args: readonly string[]): Promise<number> {
     });
     let brokerFailed=false;
     void (async()=>{try{await broker?.lost;}catch(error){brokerFailed=true;console.error(error);child.kill('SIGTERM');}})();
-    const interrupt = (): void => { child.kill('SIGINT'); };
-    const terminate = (): void => { child.kill('SIGTERM'); };
+    // CPU-BROKER: the push gate stops this run by signalling its whole tree, the broker included. Then the broker's exit
+    // is the stop, not its cause (it once hid a red check:saves). The signal reaches this handler before the exit.
+    const interrupt = (): void => { broker?.expectExit(); child.kill('SIGINT'); };
+    const terminate = (): void => { broker?.expectExit(); child.kill('SIGTERM'); };
     process.on('SIGINT', interrupt);
     process.on('SIGTERM', terminate);
     try {

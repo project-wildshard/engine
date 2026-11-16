@@ -82,8 +82,13 @@ async def serve(root, capacity):
             stopping.set()
 
     loop.add_reader(sys.stdin.fileno(), control_closed)
+    def signalled(name):
+        # CPU-BROKER: say who stopped it; a gate that stops a run signals the broker too.
+        print('CPU broker: stopped by ' + name.name, file=sys.stderr, flush=True)
+        stopping.set()
+
     for name in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(name, stopping.set)
+        loop.add_signal_handler(name, signalled, name)
     print(json.dumps({'port': port, 'token': token}), flush=True)
     try:
         await stopping.wait()

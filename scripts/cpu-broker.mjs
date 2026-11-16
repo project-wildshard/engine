@@ -13,8 +13,15 @@ const grantSchema=v.object({lease:v.string(),slots:v.number(),capacity:v.number(
 export async function startCpuBroker(options={}){
  const root=resolvePath(options.root??process.env.WS_CPU_ROOT??process.env.WS_HEAVY_SCHEDULER_ROOT??resolvePath(homedir(),'.wildshard-heavy-lanes'));
  const child=spawn('python3',[resolvePath('scripts/cpu-broker.py'),'--root',root,...(options.capacity===undefined?[]:['--capacity',String(options.capacity)])],{stdio:['pipe','pipe','pipe']});
- let buffer='',errors='',ready=false,closing=false;
+ let buffer='',errors='',ready=false,closing=false,expected=false;
  child.stderr.on('data',data=>{errors+=data.toString();});
+ // A stopped run can lose the broker before close() ends its pipe.
+ child.stdin.on('error',()=>undefined);
+ /** CPU-BROKER: 'close' follows the drained stderr, so a loss carries all the broker said.
+  * @type {Promise<{code:number|null,signal:NodeJS.Signals|null}>} */
+ const closed=new Promise(resolve=>{child.once('close',(code,signal)=>{resolve({code,signal});});});
+ /** @param {{code:number|null,signal:NodeJS.Signals|null}} result */
+ const how=result=>result.signal??`exit ${String(result.code)}`;
  /** @type {Promise<v.InferOutput<typeof endpointSchema>>} */
  const readiness=new Promise((resolve,reject)=>{
   child.once('error',reject);child.once('exit',code=>{if(!ready)reject(new Error(`CPU broker refused (${code}): ${errors}`));});
@@ -23,15 +30,20 @@ export async function startCpuBroker(options={}){
   }});
  });
  const endpoint=await readiness;
- /** @type {Promise<void>} */
- const ended=new Promise(resolve=>{if(child.exitCode!==null||child.signalCode!==null)resolve();else child.once('exit',()=>resolve());});
- const lost=ended.then(()=>{if(!closing)throw new Error(`CPU broker exited before its owner: ${errors}`);return undefined;});
+ const lost=closed.then(result=>{
+  if(!closing&&!expected)throw new Error(`CPU broker exited before its owner (${how(result)}): ${errors.trim()||'no output'}`);
+  return undefined;
+ });
  // Consumers observe loss explicitly; installing a handler also covers early failure.
  void lost.catch(()=>undefined);
- return {environment:JSON.stringify({...endpoint,root:realpathSync(root)}),pid:child.pid,lost,close:async()=>{
-  if(!closing){closing=true;child.stdin.end();}await ended;
-  if(child.exitCode!==0)throw new Error(`CPU broker cleanup failed (${child.exitCode}): ${errors}`);
- }};
+ return {environment:JSON.stringify({...endpoint,root:realpathSync(root)}),pid:child.pid,lost,
+  /** The owner is itself being stopped (the gate SIGTERMs the whole run): the broker's exit is then no loss. */
+  expectExit:()=>{expected=true;},
+  close:async()=>{
+   if(!closing){closing=true;child.stdin.end();}
+   const result=await closed;
+   if(result.code!==0&&!(expected&&result.signal!==null))throw new Error(`CPU broker cleanup failed (${how(result)}): ${errors}`);
+  }};
 }
 
 /** A connection is the file's grant lifetime; the owner must await close before reuse.

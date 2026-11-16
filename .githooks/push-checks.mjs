@@ -50,7 +50,9 @@ export async function parallelChecks(tasks,options={}) {
     return ['python3',resolve('scripts/cpu-admission.py'),'run','--slots',String(slots),'--',...command];
   })}));
   const active=new Set(),results=[],started=Date.now(),grace=options.graceMs??1500;
-  let refused=false;
+  // CPU-BROKER: the first failure stops every other task. A task that ends after that was stopped, not refused on its
+  // own: its line names the cause, so the first RED is the real one (a stopped vitest once read as a broker fault).
+  let refused=false,cause='';
   const signal=(group,name)=>{if(typeof group!=='number')return;try{process.kill(-group,name);}catch(error){if(error.code!=='ESRCH')throw error;}};
   const groups=child=>{
     if(typeof child.pid!=='number')return [];
@@ -59,16 +61,16 @@ export async function parallelChecks(tasks,options={}) {
     while(changed){changed=false;for(const [pid,parent] of rows)if(descendants.has(parent)&&!descendants.has(pid)){descendants.add(pid);changed=true;}}
     return [...new Set([child.pid,...rows.filter(([pid])=>descendants.has(pid)).map(([, ,group])=>group)])];
   };
-  const stop=()=>{
-    if(refused)return;refused=true;
+  const stop=why=>{
+    if(refused)return;refused=true;cause=why;
     for(const child of active){child.groups=groups(child);for(const group of child.groups)signal(group,'SIGTERM');child.escalation=setTimeout(()=>{for(const group of child.groups)signal(group,'SIGKILL');},grace);}
   };
-  const interrupted=()=>stop();process.on('SIGINT',interrupted);process.on('SIGTERM',interrupted);
+  const interrupted=()=>stop('an interrupt');process.on('SIGINT',interrupted);process.on('SIGTERM',interrupted);
   let timedOut=false;
-  const deadline=options.timeoutMs===undefined?undefined:setTimeout(()=>{timedOut=true;stop();},options.timeoutMs);
+  const deadline=options.timeoutMs===undefined?undefined:setTimeout(()=>{timedOut=true;stop('the deadline');},options.timeoutMs);
   try {
     await Promise.all(tasks.map(async task=>{
-      const at=Date.now();let output='',code=0;
+      const at=Date.now();let output='',code=0,own=false;
       for(const command of task.commands){
         if(refused){code=1;break;}
         const child=spawn(command[0],command.slice(1),{cwd:options.cwd,env:options.env,detached:true,stdio:['ignore','pipe','pipe']});
@@ -80,12 +82,12 @@ export async function parallelChecks(tasks,options={}) {
         active.delete(child);clearTimeout(child.escalation);
         // Drain grandchildren even if their immediate parent exits first.
         for(const group of child.groups??[child.pid])signal(group,'SIGKILL');
-        if(code!==0){stop();break;}
+        if(code!==0){own=!refused;stop(`${task.name} failed`);break;}
       }
-      const seconds=(Date.now()-at)/1000;results.push({name:task.name,code,seconds});
+      const seconds=(Date.now()-at)/1000,stopped=code!==0&&!own;results.push({name:task.name,code,seconds,...(stopped?{stoppedBy:cause}:{})});
       if(process.env.GITHUB_ACTIONS)console.log(`::group::${task.name}`);
       if(output.trim())console.log(output.trim());
-      console.error(`  - ${task.name} ${code===0?'green':'RED'} in ${seconds.toFixed(1)} s`);
+      console.error(`  - ${task.name} ${code===0?'green':stopped?'stopped':'RED'} in ${seconds.toFixed(1)} s${stopped?`: ${cause}`:''}`);
       if(process.env.GITHUB_ACTIONS)console.log('::endgroup::');
     }));
   } finally {clearTimeout(deadline);process.off('SIGINT',interrupted);process.off('SIGTERM',interrupted);}
