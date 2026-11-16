@@ -71,13 +71,16 @@ is stated plainly; current failures still hold the tag.
 
 ## TC22: the release entry reads the latest nightly
 
-`scripts/release-check.mjs`, called by the release helper before preparing
-or finishing an engine release, downloads the latest completed scheduled
-main nightly's `nightly-verdict` artifact (production pins). It refuses any `newFailures` before
+Engine's pre-push reads version tags through `scripts/release-nightly.ts`.
+This covers the current branch-based release helper, which pushes its
+exact green release tag without calling the legacy release-check entry.
+The guard downloads the latest completed scheduled main nightly's
+`nightly-verdict` artifact (production pins). It refuses `newFailures` before
 using a cached full check or starting a fresh one. Missing artifacts,
 malformed reports and mismatched run/source identities also hold release.
-`--probe` only queries the local full-check cache; it cannot release and
-does not contact GitHub.
+Ordinary pushes and deleted tags keep their existing checks. The legacy
+`scripts/release-check.mjs` also calls the guard before cached or fresh
+checks; its `--probe` only queries the local cache and cannot release.
 
 Under J370, existing failures alone pass this automatic check. J167's
 any-red check below remains manual until the first full green night;
@@ -85,8 +88,9 @@ this change does not qualify a red night. The selected scheduled run must
 have its full verdict; manual staging or diagnostic runs cannot clear release.
 
 The explicit `node --test scripts/release-nightly.proof.ts` plants a new
-failure through the actual release entry, proves refusal before the local
-gate, and checks missing/stale reports, existing failures and cleanup.
+failure through the actual pre-push and local bare origin, proves no tag
+reaches origin or the full gate, and checks missing/stale reports,
+existing failures, ordinary pushes, cache-entry refusal and cleanup.
 CI observes it without blocking; admission review is no earlier than
 2026-11-23, after a real week, and requires an explicit decision.
 

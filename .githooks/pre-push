@@ -9,6 +9,8 @@
 #    (.githooks/pin-provenance.mjs). Escape hatch: ALLOW_PIN_PUSH=1.
 # 5. Push lane (full `pnpm check`): .githooks/run-checks.mjs.
 #    Bypass: SKIP_CHECK=1.
+# Release tags first read the latest scheduled nightly (TC22), even when
+# the branch-based release helper or a cached gate skips release-check.
 # Enable once per clone: git config core.hooksPath .githooks
 set -euo pipefail
 top="$(git rev-parse --show-toplevel)"
@@ -18,6 +20,11 @@ printf '%s\n' "$refs" | node "$hooks/check-push.mjs" "$2"
 if [ -f "$top/scripts/changelog.mjs" ]; then printf '%s\n' "$refs" | node "$top/scripts/changelog.mjs" refs; fi
 printf '%s\n' "$refs" | node "$hooks/agents-md.mjs" push
 printf '%s\n' "$refs" | node "$hooks/pin-provenance.mjs"
+# Avoid loading release-only tooling for ordinary pushes (generic hook
+# fixtures and non-engine consumers have no scripts/release-nightly.ts).
+if [[ "$refs" =~ [[:space:]]refs/tags/v[0-9]+\.[0-9]+\.[0-9]+[[:space:]] ]]; then
+  printf '%s\n' "$refs" | node "$top/scripts/release-nightly.ts" refs
+fi
 export WS_PUSH_REFS="$refs"
 export WS_PUSH_DESTINATION="$2"
 exec node "$hooks/run-checks.mjs" push
