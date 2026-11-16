@@ -435,8 +435,10 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
   for (const spawn of shard.creatures.spawns) {
     const body = host.entities.get(spawn.id);
     if (body !== undefined) {
+      const species = shard.rows.species.find(row => row.id === spawn.species);
       body.species = spawn.species;
-      body.harvest = shard.rows.species.find(row => row.id === spawn.species)?.harvest ?? [];
+      body.harvest = species?.harvest ?? [];
+      body.capExempt = species?.capExempt;
     }
   }
   if (shard.nativeGround !== null) throw new Error('Native ground retains its trusted runtime simulation; a flat declared proxy is forbidden');

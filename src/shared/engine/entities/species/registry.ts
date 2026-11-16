@@ -235,6 +235,7 @@ export interface FurStyle {
 
 export interface SpeciesDef {
   harvest?: readonly HarvestDrop[];
+  capExempt?: boolean;
   flight?: SpeciesFlight;
   /** LOCK / target taps; defaults to false on ground species and true on flight species. */
   lockable?: boolean;

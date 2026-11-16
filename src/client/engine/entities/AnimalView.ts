@@ -216,6 +216,7 @@ constructor(rig: AnimalRig, model: AnimalModel, seed: number, scale = 1, entityI
       floorBelow: (x, z, fromY, maxDrop) => app.physics === null ? heightAt(x, z) : floorBelow(app.physics, x, z, fromY, maxDrop),
     });
     this.harvest = model.species.harvest;
+    this.capExempt = model.species.capExempt;
     this.mesh = rig.mesh; this.bones = rig.bones; this.model = model;
     this.mesh.scale.setScalar(scale);
     this.mesh.rotation.order = 'YXZ';

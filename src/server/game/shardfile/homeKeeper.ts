@@ -286,7 +286,7 @@ export function nativeCreatureRecipes(specs: Iterable<AnimalSimSpec>, duplicates
 export interface NativeRosterRows {
   readonly specs: Iterable<AnimalSimSpec>;
   /** Admitted gameplay metadata, rebound at attachment without changing a saved simulation recipe. */
-  readonly species?: readonly Pick<SpeciesData, 'kind' | 'harvest'>[];
+  readonly species?: readonly Pick<SpeciesData, 'kind' | 'harvest' | 'capExempt'>[];
   /** Which baked spec a kind.variant keeps when the bake lists it twice (`nativeCreatureRecipes`). */
   readonly duplicates?: 'first' | 'last';
   readonly variants: ReadonlyMap<string, readonly { readonly id: string; readonly scale: readonly [number, number] }[]>;
@@ -391,7 +391,7 @@ export function createNativeCreatureRoster<B extends NativeCreatureSlot>(host: S
     poses?.binding.preflight(item); identities.preflight(item);
     const actor = poses === undefined ? bareBody(native) : poses.binding.attach(native, item);
     const declared = species.get(item.kind);
-    if (declared !== undefined) actor.harvest = declared.harvest;
+    if (declared !== undefined) { actor.harvest = declared.harvest; actor.capExempt = declared.capExempt; }
     identities.materialize(item, actor);
     if (item.herd >= 0) identities.own(item.id, { group: `herd:${String(item.herd)}`, encounter: null, listed: true });
     item.actor = actor; byId.set(item.id, item); hunt.herds[item.herd]?.members.push(actor);
