@@ -6,6 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
+import {stripVTControlCharacters} from 'node:util';
 
 const root=resolve(import.meta.dirname,'..'),out=resolve(process.argv[2]??join(root,'tmp/coverage-soak'));
 assert.ok(out.startsWith(`${root}/tmp/`));mkdirSync(out,{recursive:true});
@@ -25,7 +26,7 @@ const page=api(`repos/project-wildshard/engine/actions/workflows/ci.yml/runs?bra
 const observations=[];let completeHistory=page.workflow_runs.length<100;
 for(const run of page.workflow_runs.filter(row=>row.status==='completed')){
   let committed;try{committed=git(['show',`${run.head_sha}:${sourcePath}`]);}catch{
-    try{const file=api(`repos/project-wildshard/engine/contents/${sourcePath}?ref=${run.head_sha}`);committed=Buffer.from(file.content,'base64').toString('utf8').trim();}
+    try{committed=execFileSync('gh',['api','--header','Accept: application/vnd.github.raw+json',`repos/project-wildshard/engine/contents/${sourcePath}?ref=${run.head_sha}`],{encoding:'utf8',timeout:30000,maxBuffer:1024*1024}).trim();}
     catch{completeHistory=false;continue;}
   }
   if(hash(committed)!==sourceHash)continue;
@@ -34,10 +35,9 @@ for(const run of page.workflow_runs.filter(row=>row.status==='completed')){
   const matches=jobs.flatMap(job=>(job.steps??[]).filter(step=>step.name==='Soak actual host, door, format and outside-author contracts').map(step=>({job,step})));
   if(matches.length!==1){observations.push({run:run.id,sha:run.head_sha,started:run.run_started_at??run.created_at,completed:run.updated_at,ok:false,error:'Expected exactly one soak step'});continue;}
   const {job,step}=matches[0];
-  const log=execFileSync('gh',['api','--allow-escape-sequences',`repos/project-wildshard/engine/actions/jobs/${job.id}/logs`],{encoding:'utf8',timeout:30000,maxBuffer:32*1024*1024})
-    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/gu,'');
+  const log=stripVTControlCharacters(execFileSync('gh',['api','--allow-escape-sequences',`repos/project-wildshard/engine/actions/jobs/${job.id}/logs`],{encoding:'utf8',timeout:30000,maxBuffer:32*1024*1024}));
   const begin=log.indexOf('##[group]Run node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/coverage-fire-drill.proof.mjs');
-  const end=begin<0?-1:log.indexOf('##[group]',begin+10),body=begin<0?'':log.slice(begin,end<0?undefined:end);
+  const end=begin===-1?-1:log.indexOf('##[group]',begin+10),body=begin===-1?'':log.slice(begin,end===-1?undefined:end);
   const counts=Object.fromEntries(['tests','pass','fail','skipped','cancelled','todo'].map(name=>[name,Number(new RegExp(`(?:#|ℹ)\\s+${name}\\s+(\\d+)`,'u').exec(body)?.[1]??'NaN')]));
   const ok=step.conclusion==='success'&&counts.tests===expected.length&&counts.pass===expected.length&&counts.fail===0&&counts.skipped===0&&counts.cancelled===0&&counts.todo===0;
   observations.push({run:run.id,sha:run.head_sha,job:job.id,started:step.started_at,completed:step.completed_at,ok,counts,logHash:hash(body)});

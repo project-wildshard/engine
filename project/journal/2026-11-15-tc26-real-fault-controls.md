@@ -107,3 +107,8 @@ Their command, receipt and audit inputs are now declared; full layer types
 pass. The inherited respawn type error was a stale local format install
 after rebase, resolved by offline frozen install of main's existing lock
 (0.5.10), with no source or lock edit.
+
+The rebased nine-case positive suite passes in 2.39 s with format 0.5.10.
+Its only moved fixture import now uses main's src/test/game/headlessNative;
+no fixture was edited. Soak collection uses the standard Node VT stripper
+and GitHub raw response, satisfying the normal lint rules without bypass.

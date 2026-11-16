@@ -23,7 +23,7 @@ async function productInput(slug){
 }
 
 timed('host',async()=>{
-  const {createNativeProofResident,prepareProductPlan}=await import('../fixtures/headless-native.ts');
+  const {createNativeProofResident,prepareProductPlan}=await import('../../src/test/game/headlessNative.ts');
   const {nativeTamingOf}=await import('../../src/server/game/riding/nativeTaming.ts');
   const {leadPlayer}=await import('../../src/shared/engine/sim/leadPlayer.ts');
   const resident=await createNativeProofResident(await productInput('nalati-grasslands'),prepareProductPlan);
