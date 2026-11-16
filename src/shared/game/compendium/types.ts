@@ -13,7 +13,7 @@ import type { IconId } from '@wildshard/engine/ui/icons';
 /** what an entry is: a species page, a named variant, an elite, the boss, a place */
 export type EntryKind = 'species' | 'variant' | 'elite' | 'boss' | 'place';
 /** An admitted image URL or the older glyph, retained until source migration. */
-export type CompendiumIcon = IconId | { readonly image: string };
+export type CompendiumIcon = IconId | { readonly image: string; readonly tint?: 'currentColor' };
 
 /**
  * An entry's state, in order — it only ever moves forward:

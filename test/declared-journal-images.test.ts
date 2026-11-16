@@ -41,6 +41,11 @@ test('a bounded inert SVG reaches the existing image resolver without an adjacen
   expect(() => preflightAssetGraph(selected.shardfile)).not.toThrow();
   expect(declaredProductCompendium(selected, 'journal.custom').skin.icon?.(entry)).toEqual({ image });
 });
+test('declared alpha tint survives the real admitted product resolver', () => {
+  const file = picture(), selected = product([{ image: file.hash, tint: 'currentColor' }]);
+  expect(() => preflightAssetGraph(selected.shardfile)).not.toThrow();
+  expect(declaredProductCompendium(selected, 'journal.custom').skin.icon?.(entry)).toEqual({ image: base.url(file.name), tint: 'currentColor' });
+});
 test('unknown and non-image references refuse at asset admission and eager journal installation', () => {
   const descriptor = outputDescriptor(base.shardfile), other = descriptor?.index.files.find(row => row.kind !== 'image' && row.name !== undefined);
   if (other === undefined) throw new Error('Real fixture needs a non-image file');
