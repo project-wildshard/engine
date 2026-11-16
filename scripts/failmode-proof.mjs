@@ -31,6 +31,8 @@ import { openChaosProxy } from './chaos-proxy-core.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
+import { qualifyResult } from './failmode-results.mjs';
+import { claimFixture, fixtureKey } from './online-rig-owned.mjs';
 import { rawLeak, selectCases, verdict } from './failmode-cases.mjs';
 
 process.env.WS_RIG_PORTS ??= '18856';
@@ -46,7 +48,7 @@ if (args[0] === '--prepare') {
   const named = args[1];
   if (named === undefined || named.startsWith('--')) throw new Error('--prepare <work>');
   const work = absolute(named);
-  mkdirSync(work, { recursive: true });
+  claimFixture(work);
   const keyFile = join(work, 'key.json');
   if (!existsSync(keyFile)) {
     const pair = generateKeyPairSync('ed25519');
@@ -54,7 +56,7 @@ if (args[0] === '--prepare') {
   }
   const key = JSON.parse(readFileSync(keyFile, 'utf8')), owner = `failmode-${String(process.pid)}`;
   const built = spawnSync('bash', ['scripts/serve-build.sh', '--shard', SHARD, '--name', 'failmode', '--hours', '1'], { cwd: ROOT, encoding: 'utf8',
-    env: { ...process.env, SERVE_OWNER: owner, WILDSHARD_RELEASE_URL: RELEASE_URL, WILDSHARD_RELEASE_KEY: key.public }, stdio: ['ignore', 'pipe', 'pipe'] });
+    env: { ...process.env, SERVE_OWNER: owner, WILDSHARD_RELEASE_URL: RELEASE_URL, WILDSHARD_RELEASE_KEY: key.public, VITE_API_ORIGIN: PAGE_ORIGIN }, stdio: ['ignore', 'pipe', 'pipe'] });
   const out = /→ (\S+)/u.exec(built.stderr)?.[1], port = /127\.0\.0\.1:(\d+)/u.exec(built.stdout)?.[1];
   try {
     if (built.status !== 0 || out === undefined) throw new Error(`the build failed: ${built.stderr.slice(-2000)}`);
@@ -62,6 +64,7 @@ if (args[0] === '--prepare') {
     rmSync(dist, { recursive: true, force: true });
     if (spawnSync('cp', ['-cR', out, dist], { stdio: 'inherit' }).status !== 0) throw new Error('copying the build failed');
     if (!readFileSync(join(dist, 'index.html'), 'utf8').includes(RELEASE_URL)) throw new Error('the build is not stamped with the proxy release address');
+    writeFileSync(join(work, 'fixture.json'), JSON.stringify({ schema: 'failmode-fixture/1', release: RELEASE_URL, api: PAGE_ORIGIN, publicKey: key.public, build: JSON.parse(readFileSync(join(dist, 'version.json'), 'utf8')).build }));
     console.log(JSON.stringify({ dist, keyFile }));
   } finally {
     if (port !== undefined) spawnSync('bash', ['scripts/serve-build.sh', 'stop', port], { cwd: ROOT, env: { ...process.env, SERVE_OWNER: owner }, stdio: 'ignore' });
@@ -80,7 +83,10 @@ if (!['', 'screen', 'injection'].includes(refusal)) throw new Error('--refusal=s
 const drop = selectCases('drop')[0];
 const cases = refusal === '' ? selectCases(flag('scenario', 'all')) : drop === undefined ? [] : [refusal === 'screen' ? { ...drop, id: 'drop', screen: 'no-such-screen', mode: 'R1' } : { ...drop, id: 'unmatched', run: 'unmatched', mode: 'R2' }], out = join(absolute(work), 'failmodes'), shots = join(out, 'shots');
 if (!readFileSync(join(dist, 'index.html'), 'utf8').includes(RELEASE_URL)) throw new Error(`${dist} is not stamped with ${RELEASE_URL}: build it with --prepare`);
-rmSync(out, { recursive: true, force: true }); mkdirSync(shots, { recursive: true });
+fixtureKey(keyFile);
+const fixture = JSON.parse(readFileSync(join(absolute(dist, '..'), 'fixture.json'), 'utf8'));
+if (fixture.schema !== 'failmode-fixture/1' || fixture.release !== RELEASE_URL || fixture.api !== PAGE_ORIGIN || fixture.publicKey !== fixtureKey(keyFile).public || fixture.build !== JSON.parse(readFileSync(join(dist, 'version.json'), 'utf8')).build) throw new Error('The owned fixture stamp, key and build must agree');
+claimFixture(work); mkdirSync(shots, { recursive: true });
 const sha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim();
 
 /** @typedef {import('./failmode-cases.mjs').Case} Case */
@@ -90,12 +96,17 @@ const sha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8
 /** @typedef {{ ids: string, ms: number, copy: string, leak: string | null }} Seen */
 
 const { openRig } = await import('./online-rig.mjs');
-const rig = await openRig({ dist, work: join(absolute(work), 'rig'), keyFile, pgBin, pgData, shard: SHARD, socket: SOCKET, origins: [PAGE_ORIGIN], isolated: true });
+let rig;
+try { rig = await openRig({ dist, work: join(absolute(work), 'rig'), keyFile, pgBin, pgData, shard: SHARD, socket: SOCKET, origins: [PAGE_ORIGIN], isolated: true }); } catch (error) {
+  writeFileSync(join(out, 'receipt.json'), JSON.stringify({ schema: 'failmode-proof/1', sha, engine, baseline, phase: 'setup', harnessFault: String(error).slice(0, 600), exit: 2, cases: [] }));
+  process.exit(2);
+}
 let proxy = /** @type {Awaited<ReturnType<typeof openChaosProxy>> | null} */ (null), launched = /** @type {import('playwright').Browser | null} */ (null);
 const rows = /** @type {(Result & { mode: string, id: string, owner: string, screen: string, inject: string, ms: number })[]} */ ([]);
+let browserVersion = '';
 let harnessFault = /** @type {string | null} */ (null);
 try {
-  rmSync(join(absolute(work), 'proxy'), { recursive: true, force: true });
+  // openChaosProxy claims its fresh directory; never delete pre-existing fixture files.
   proxy = await openChaosProxy({ work: join(absolute(work), 'proxy'), pageUpstream: rig.base, releaseUpstream: `http://127.0.0.1:${String(Number(process.env.WS_RIG_PORTS) + 3)}`, worldUpstream: `http://127.0.0.1:${String(Number(process.env.WS_RIG_PORTS) + 1)}`, pagePort: PROXY_PAGE, worldPort: PROXY_WORLD });
   const token = readFileSync(proxy.ready.tokenFile, 'utf8');
   /** The proxy's state, or its rules replaced. @param {{ scenario: string, rules: object[] }} [body] */
@@ -111,16 +122,30 @@ try {
   const matchedSince = async (before, route) => ((await control()).counters.matches[route] ?? 0) - (before.counters.matches[route] ?? 0);
 
   launched = await (engine === 'webkit' ? webkit : chromium).launch({ headless: true, args: engine === 'webkit' ? [] : [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist'] });
-  const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
+  browserVersion = launched.version();
+  const { defaultBrowserType: _engine, ...device } = devices['iPhone 16 Pro'];
+  const phone = { ...device, viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 } };
+  const allowedOrigins = new Set([PAGE_ORIGIN, new URL(SOCKET).origin]);
+  const guardFaults = /** @type {string[]} */ ([]);
+  let pageFaults = /** @type {string[]} */ ([]);
   const URL_PLAY = `${PAGE_ORIGIN}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
   /** A fresh device: its own context, Developer on, its errors and visibility changes kept. @param {() => void} [init] */
   const fresh = async init => {
     const context = await /** @type {import('playwright').Browser} */ (launched).newContext(phone), errors = /** @type {string[]} */ ([]);
+    await context.route('**/*', async route => {
+      const url = new URL(route.request().url());
+      if (allowedOrigins.has(url.origin)) await route.continue();
+      else { guardFaults.push('refused off-fixture HTTP request'); await route.abort('blockedbyclient'); }
+    });
+    await context.routeWebSocket('**/*', async socket => {
+      if (allowedOrigins.has(new URL(socket.url()).origin)) socket.connectToServer();
+      else { guardFaults.push('refused off-fixture WebSocket'); await socket.close(); }
+    });
     await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
     await context.addInitScript(() => { const seen = /** @type {string[]} */ ([]); Object.defineProperty(globalThis, '__fmVisibility', { value: seen }); document.addEventListener('visibilitychange', () => { seen.push(document.visibilityState); }); });
     if (init !== undefined) await context.addInitScript(init);
     const page = await context.newPage();
-    page.on('pageerror', error => { errors.push(error.message.slice(0, 240)); });
+    page.on('pageerror', error => { const message = error.message.slice(0, 240); errors.push(message); pageFaults.push(message); });
     page.on('console', line => { if (line.type() === 'error') errors.push(line.text().slice(0, 240)); if (process.env.FM_TRACE === '1') console.log(`  [page ${line.type()}] ${line.text().slice(0, 300)}`); });
     page.on('response', response => { if (process.env.FM_TRACE === '1' && response.status() >= 400) console.log(`  [http ${String(response.status())}] ${response.url().slice(0, 200)}`); });
     page.on('framenavigated', frame => { if (frame === page.mainFrame() && process.env.FM_TRACE === '1') console.log(`  [nav] ${frame.url()}`); });
@@ -172,7 +197,7 @@ try {
   /** What a player reads now, for a case whose screen never came. @param {import('playwright').Page} page */
   const onScreen = async page => ({ visible: await visibleIds(page), text: (await page.evaluate(() => document.body.textContent).catch(() => '') ?? '').replaceAll(/\s+/gu, ' ').slice(0, 300) });
   /** A shot named for the case. @param {import('playwright').Page} page @param {string} id @param {string} what */
-  const shoot = async (page, id, what) => { const file = `${id.replace('/', '-')}-${what}.png`; await page.screenshot({ path: join(shots, file) }).catch(() => undefined); return file; };
+  const shoot = async (page, id, what) => { const file = `${id.replace('/', '-')}-${what}.png`; await page.screenshot({ path: join(shots, file) }); return file; };
   /** Back in play: frames move on and no card or page is up (a notice may be). @param {import('playwright').Page} page @param {number} timeout */
   const recovered = async (page, timeout) => {
     const until = Date.now() + timeout, start = await frames(page);
@@ -275,7 +300,7 @@ try {
         await sleep(2000);
         const copies = await page.evaluate(text => [...document.querySelectorAll('#ws-chat [data-lines] > *')].filter(node => (node.textContent ?? '').includes(text)).length, line);
         if (result.outcome !== 'pass') return { ...result, shot };
-        return sent && copies === 1 ? { ...result, shot, recovery: 'the held line sent once' } : { outcome: 'ui-fail', reason: `held line sent ${String(copies)} times`, seen, shot };
+        return sent && copies === 1 ? { ...result, shot, injection: { socketMatches: await matchedSince(before, 'socket') }, recovery: 'the held line sent once' } : { outcome: 'ui-fail', reason: `held line sent ${String(copies)} times`, seen, shot };
       } finally { await heal(); await entered.context.close(); }
     },
     // a second tab of the same device takes the seat; Play here takes it back
@@ -518,9 +543,10 @@ try {
 
   let lastPlay = 0;
   for (const item of cases) {
-    const started = Date.now();
+    let started = Date.now();
     /** @type {Result} */
     let result;
+    pageFaults = [];
     if (item.blocked !== undefined) result = { outcome: 'blocked-dependency', reason: item.blocked };
     else if (item.chromiumOnly === true && engine !== 'chromium') result = { outcome: 'unsupported', reason: `${engine} cannot produce this lifecycle fault; a native-Safari Ring 2 proof is owed` };
     else {
@@ -528,10 +554,13 @@ try {
       if (runner === undefined) throw new Error(`no runner ${String(item.run)} for ${item.id}`);
       // the server's 10 connects a minute per address: play cases wait it out, never lift it
       if (item.phase !== 'boot' || item.id === 'offline-launch') { const wait = lastPlay + cooldownMs - Date.now(); if (wait > 0) { console.log(`.. ${item.id}: waiting ${String(Math.round(wait / 1000))} s for the connect window`); await sleep(wait); } }
+      started = Date.now();
       try { result = await runner(item); } catch (error) { result = { outcome: 'harness-fail', reason: String(error).slice(0, 400) }; }
       lastPlay = Date.now();
     }
-    const row = { mode: item.mode, id: item.id, owner: item.owner, screen: item.screen, inject: item.inject, ms: Date.now() - started, ...result };
+    if (guardFaults.length > 0 || pageFaults.length > 0) result = { outcome: 'harness-fail', reason: guardFaults[0] ?? `uncaught page exception: ${pageFaults[0]}` };
+    result = qualifyResult(item, result, Date.now() - started);
+    const row = { deadlineMs: item.deadlineMs, mode: item.mode, id: item.id, owner: item.owner, screen: item.screen, inject: item.inject, ms: Date.now() - started, ...result };
     rows.push(row);
     console.log(`${result.outcome.padEnd(18)} ${item.mode.padEnd(4)} ${item.id}${result.reason === undefined ? '' : `: ${result.reason}`}`);
     if (result.outcome === 'harness-fail' && !baseline) break;
@@ -550,7 +579,7 @@ const code = harnessFault !== null ? 2 : verdict(rows);
 /** @type {Record<string, number>} */
 const counts = {};
 for (const row of rows) counts[row.outcome] = (counts[row.outcome] ?? 0) + 1;
-writeFileSync(join(out, 'receipt.json'), JSON.stringify({ schema: 'failmode-proof/1', sha, engine, browser: engine, baseline, at: new Date().toISOString(), pages: PAGE_ORIGIN, socket: SOCKET,
+writeFileSync(join(out, 'receipt.json'), JSON.stringify({ schema: 'failmode-proof/1', sha, engine, browser: browserVersion, baseline, build: fixture.build, channel: 'loopback-fixture', at: new Date().toISOString(), pages: PAGE_ORIGIN, socket: SOCKET,
   saves: pgBin === 'memory:' ? 'memory (no persistence case selected reads them)' : 'owned Postgres', harnessFault, counts, exit: code, cases: rows }, null, 1));
 console.log(`${JSON.stringify(counts)} -> ${join(out, 'receipt.json')}`);
 process.exit(code);

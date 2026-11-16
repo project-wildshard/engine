@@ -6,7 +6,7 @@
 
 /** @typedef {'boot' | 'load' | 'play' | 'title' | 'doctor'} Phase */
 /** @typedef {'pass' | 'ui-fail' | 'blocked-dependency' | 'unsupported' | 'harness-fail'} Outcome */
-/** @typedef {{ mode: string, id: string, owner: string, phase: Phase, screen: string, inject: string, recover: string, run?: string,
+/** @typedef {{ mode: string, id: string, owner: string, phase: Phase, screen: string, inject: string, recover: string, deadlineMs: number, run?: string,
  *   blocked?: string, chromiumOnly?: boolean, parent?: string }} Case */
 
 /** @type {readonly Case[]} */
@@ -68,7 +68,7 @@ export const CASES = Object.freeze([
   { mode: '44', id: 'pack-broken', owner: 'FM6', phase: 'load', screen: 'packs-5xx', inject: 'packs truncate 64 bytes, healed after 6 s', recover: 'the world loads with verified bytes', run: 'packsFault' },
   { mode: '45', id: 'sleep-wake', owner: 'FM4b', phase: 'play', screen: 'background-long', inject: 'CDP freeze 35 s with no visibility change', recover: 'seated again: no card', run: 'freeze', chromiumOnly: true },
   { mode: '46', id: 'staging', owner: 'FM5', phase: 'boot', screen: 'staging', inject: 'the fixture release signed with channel staging (loopback only)', recover: 'stays for the session', run: 'staging' },
-]);
+].map(item => Object.freeze({ ...item, deadlineMs: item.id === 'lost' ? 360_000 : 300_000 })));
 
 /** The cases a `--scenario=` asks for: `all`, or a comma list of ids (a parent id brings its `b` case too). Unknown ids throw. @param {string} asked */
 export function selectCases(asked) {

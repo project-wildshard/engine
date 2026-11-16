@@ -86,7 +86,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   publish(1, build);
   const release = createServer((_request, response) => { response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(signed); });
   await new Promise((resolve, reject) => { release.once('error', reject); release.listen(RELEASE_PORT, '127.0.0.1', () => { resolve(null); }); });
-  resources.push(() => new Promise((resolve, reject) => { release.closeAllConnections(); release.close(error => { if (error) reject(error); else resolve(undefined); }); }));
+  resources.push(async () => { release.closeAllConnections(); await release[Symbol.asyncDispose](); });
 
   const pgCtl = join(pgBin, 'pg_ctl'), log = createWriteStream(join(work, 'server.log'));
   resources.push(() => { log.end(); });
@@ -121,18 +121,26 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     room.kill('SIGTERM');
   });
   /** @param {import('node:child_process').ChildProcess} room */
-  const exited = room => new Promise(resolve => { room.on('exit', resolve); setTimeout(resolve, 15_000); });
+  const exited = room => new Promise((resolve, reject) => {
+    if (room.exitCode !== null || room.signalCode !== null) { resolve(undefined); return; }
+    const timer = setTimeout(() => { reject(new Error('The owned world did not drain')); }, 15_000);
+    room.once('exit', () => { clearTimeout(timer); resolve(undefined); });
+  });
   /** The page host's half of a deploy: the page's origin serves this build from now on. @param {string} built */
   const serve = async built => {
     const pageServer = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', absolute(built), '--port', String(PAGE_PORT), '--telemetry-dir', join(work, 'telemetry')], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
     resources.push(() => stopped(pageServer));
-    for (let tries = 0; tries < 100; tries++) {
+    let last = 'no response';
+    for (let tries = 0; tries < 300; tries++) {
       if (pageServer.exitCode !== null || pageServer.signalCode !== null) throw new Error('The owned page server exited before readiness');
-      const ready = await fetch(`http://127.0.0.1:${String(PAGE_PORT)}/version.json`, { signal: AbortSignal.timeout(1000) }).then(async found => found.ok && (await found.json()).build === buildOf(built)).catch(() => false);
+      const ready = await fetch(`http://127.0.0.1:${String(PAGE_PORT)}/version.json`, { signal: AbortSignal.timeout(2000) }).then(async found => {
+        const version = await found.json(); last = `status ${String(found.status)}, build ${String(version.build)}`;
+        return found.ok && version.build === buildOf(built);
+      }).catch((/** @type {unknown} */ error) => { last = error instanceof Error ? error.name : 'read failed'; return false; });
       if (ready) return pageServer;
       await sleep(100);
     }
-    throw new Error('The owned page server did not serve its build');
+    throw new Error(`The owned page server did not serve its build (${last})`);
   };
   let main = world();
   resources.push(() => stopped(main));
@@ -148,7 +156,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     pagesServe: async built => { await stopped(pages); pages = await serve(built); },
     close };
   } catch (error) {
-    try { await close(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'Online rig setup and cleanup failed', { cause: error }); }
+    try { await close(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'Online rig setup and cleanup failed', { cause: cleanup }); }
     throw error;
   }
 }

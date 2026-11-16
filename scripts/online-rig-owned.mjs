@@ -69,7 +69,7 @@ export function ownedPostgres({ bin, data, port }) {
     if (pid[1] !== realpathSync(full) || Number(pid[3]) !== port) throw new Error('Owned Postgres identity differs from its fresh data directory');
     return { data: full, close };
   } catch (error) {
-    try { close(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'Owned Postgres setup and cleanup failed', { cause: error }); }
+    try { close(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'Owned Postgres setup and cleanup failed', { cause: cleanup }); }
     throw error;
   }
 }
