@@ -27,7 +27,12 @@ async function fixture() {
   const parked = [...species.values()].map((row, i) => ({ seed: sample.seed, scale: sample.scale, id: `recipe.${i}`, kind: row.kind, variant: row.variant,
     spec: { ...sample.spec, kind: row.kind, variant: row.variant }}));
   flatPopulationEnvironment(host);
-  installPopulationRoster(host, { population: readSpeciesPrograms(PINE_SPECIES_PROGRAMS), nav: null, spawnY: 20,
+  const population = readSpeciesPrograms(PINE_SPECIES_PROGRAMS);
+  // This fixture lends only encounter recipes, not an ordinary forest.
+  // Admit exactly the variants its real guest programs can request.
+  const encounterPopulation = { ...population, native: population.native.map(family => ({ ...family,
+    variants: family.variants.filter(variant => species.has(`${family.kind}.${variant.id}`)) })).filter(family => family.variants.length > 0) };
+  installPopulationRoster(host, { population: encounterPopulation, nav: null, spawnY: 20,
     bake: { actors: [], parked, herds: [] } }, { version: 1, environment: 'fixture.habitat', step: 'pine.roster', seed: 1368, bodyCount: 0, limit: 512,
     scripted: 'sidestep', encounter: 'test', poseKinds: [], spawn: { x: 0, z: 0 }, fauna: [], identities: [], ordinary: {}, reserves: [], homes: [] });
   const day = new DayCycle(keyedSkyDaySpec(PINE_SKY)); await day.set(PINE_SKY.phases.night);

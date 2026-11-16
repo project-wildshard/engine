@@ -51,3 +51,11 @@ Compiler, focused typed lint and all three proof cases pass (6.013s).
 The earlier hosted fuel proof is complete at50341a4e; its fresh-world
 case took11.196s on Linux, so the explicit Ring2/report-only isolation
 is retained. This is never a hook or an ordinary-suite test.
+
+Normal hosted CI exposed three elite-fixture failures: its zero-body
+roster lends only encounter recipes while declaring the entire ordinary
+forest species table, whose older rows omit health. The fixture now
+admits exactly the variants named by its actual guest spawn programs;
+all three real guest cases pass. Production validation remains strict,
+and the full-world unseen-variant regression stays required. This
+changes no production source or health defaults.
