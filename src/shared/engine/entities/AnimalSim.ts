@@ -174,6 +174,14 @@ export class AnimalSim {
   get flying(): boolean { return this.flight !== null; }
   get lockable(): boolean { return this.simSpec.lockable ?? this.flying; }
   get lockRange(): number | undefined { return this.simSpec.flight?.lockRange; }
+  /** TEMPLATE-E2E TC-E2: a dead body stands again, whole (a data spawn's `respawn`); `place` it first. */
+  revive(): void {
+    if (this.alive) return;
+    this.alive = true; this.hp = this.maxHp; this.state = 'idle'; this.deathT = -1; this.lastHitT = -Infinity;
+    this.flinch = 0; this.flinchRoll = 0; this.flinchPitch = 0; this.stunT = 0; this.pushT = 0; this.brace = 0;
+    this.speed = 0; this.desiredSpeed = 0; this.strafe = 0; this.desiredStrafe = 0; this.attackT = -1;
+    this.impulseVelocity.set(0, 0, 0);
+  }
   place(x: number, z: number, yaw: number, y?: number): void {
     this.position.set(x, y ?? this.simPorts.heightAt(x, z), z);
     const flight = this.simSpec.flight;

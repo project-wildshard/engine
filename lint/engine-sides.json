@@ -1286,6 +1286,7 @@
     "src/server/game/shardfile/borrowedDecisions.ts": "server",
     "src/server/game/shardfile/bossRow.ts": "server",
     "src/server/game/shardfile/brainRuntime.ts": "server",
+    "src/server/game/shardfile/dataRespawn.ts": "server",
     "src/server/game/shardfile/decisions.ts": "server",
     "src/server/game/shardfile/declaredClimate.ts": "server",
     "src/server/game/shardfile/declaredKitItems.ts": "server",

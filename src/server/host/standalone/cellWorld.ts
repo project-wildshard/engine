@@ -145,7 +145,7 @@ const PLACE_RADIUS = 8;
 export async function dataCellPlaces(input: Pick<HeadlessRuntimeInput, 'shard' | 'product'>): Promise<readonly PlaceArea[]> {
   const published = input.product === undefined ? [] : await serverPlaces(input.product);
   if (published.length > 0) return published;
-  return (input.shard.manifest?.pois ?? []).map(poi => ({ id: poi.id, label: poi.name, x: poi.x, z: poi.z, r: poi.r ?? PLACE_RADIUS }));
+  return (input.shard.manifest?.pois ?? []).filter(poi => poi.respawn !== false).map(poi => ({ id: poi.id, label: poi.name, x: poi.x, z: poi.z, r: poi.r ?? PLACE_RADIUS }));
 }
 
 /** Whether this output runs on the trusted headless owner. */

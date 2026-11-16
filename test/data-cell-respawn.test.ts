@@ -41,3 +41,9 @@ test('a player who reached camp 2 and falls comes back at camp 2, not the spawn'
     expect(Math.hypot(lead.position.x - CAMP.x, lead.position.z - CAMP.z)).toBeLessThan(CAMP.r);
   } finally { cell.dispose(); }
 });
+
+test('a map POI with respawn: false is no respawn place (a death in the Wyrm pit does not come back in the pit)', async () => {
+  const source = shard();
+  Object.assign(source, { manifest: { pois: [{ id: 'depot', name: 'Depot', x: 0, z: 0 }, { id: 'pit', name: 'Wyrm pit', x: 30, z: 30, r: 10, respawn: false }, CAMP] } as never });
+  expect((await dataCellPlaces({ shard: source })).map(place => place.id)).toEqual(['depot', 'camp-2']);
+});
