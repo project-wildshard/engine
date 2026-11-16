@@ -35,3 +35,39 @@ test('SB28: a part read that fails offline spends no read, waits for online, the
   expect(partReads).toBe(offlineReads + 1);
   expect(download.snapshot()).toMatchObject({complete: true, error: null});
 }, 10_000);
+
+test('SB28: offline, an HTTP answer still spends its reads (a device that says offline while its server answers)', async () => {
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+  let partReads = 0;
+  const download = downloadSpawnManifest(address, {packs: true, cached: () => Promise.resolve(undefined),
+    fetch: url => {
+      const path = new URL(url).pathname;
+      if (path === part.url) { partReads++; return Promise.resolve(new Response('missing', {status: 503})); }
+      return Promise.resolve(new Response(path === address.url ? text : new Uint8Array(3)));
+    }}, base);
+  await expect(download.ready).rejects.toThrow(`Spawn part unavailable: ${part.url}`);
+  expect(partReads).toBe(3);
+}, 10_000);
+
+test('SB28: a transport failure waits offline at most two minutes, then counts', async () => {
+  vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']});
+  try {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    // DL20's pause between reads is an AbortSignal timeout: run it on the fake clock too
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => { const stop = new AbortController(); setTimeout(() => { stop.abort(); }, ms); return stop.signal; });
+    let partReads = 0;
+    const download = downloadSpawnManifest(address, {packs: true, cached: () => Promise.resolve(undefined),
+      fetch: url => {
+        const path = new URL(url).pathname;
+        if (path === part.url) { partReads++; return Promise.reject(new TypeError('Failed to fetch')); }
+        return Promise.resolve(new Response(path === address.url ? text : new Uint8Array(3)));
+      }}, base);
+    let settled: unknown = 'pending';
+    download.ready.then(() => { settled = 'ready'; }, (error: unknown) => { settled = error; });
+    await vi.advanceTimersByTimeAsync(119_000);
+    expect(settled).toBe('pending'); expect(partReads).toBe(1);
+    await vi.advanceTimersByTimeAsync(3 * 121_000 + 5_000);
+    expect(settled).toBeInstanceOf(TypeError);
+    expect(partReads).toBe(3);
+  } finally { vi.useRealTimers(); }
+}, 10_000);

@@ -71,18 +71,24 @@ export function shardFromDiscovery(input: unknown, home?: string): ShardManifest
   } as Parameters<typeof defineAuthoredShard>[3], images);
 }
 
+/** SB28: off the boot path a read that failed twice throws instead of waiting on a RETRY nobody sees. */
+const refuse = (error: ContentReadError): Promise<never> => { throw error; };
+
 /** A discovery document is tens of KB; anything near this is not one. */
 const DISCOVERY_BYTES = 8_000_000;
 
 /** The manifest of a title row, read from its product. */
-export async function readDiscovery(row: Pick<TitleManifest, 'slug' | 'discovery'>, read: typeof fetch = fetch): Promise<ShardManifest> {
+export async function readDiscovery(row: Pick<TitleManifest, 'slug' | 'discovery'>, read: typeof fetch = fetch,
+  { wait = false }: { readonly wait?: boolean } = {}): Promise<ShardManifest> {
   if (row.discovery === undefined) throw new Error(`${row.slug} has no discovery document`);
   // STAGING-BUGBASH SB27: since PAGE-SIZE the document is shard content on the page's content base; the page's own
   // `/shardfiles/` answers 404 there. Its home stays the row's own (a page path has none): its art keys keep their page
   // URLs, so the explore compare images it names are still page paths (not yet read from the base; review note).
-  // SB28: a read the network can't answer waits on the loading card's RETRY (QA 11-12 row 36) and goes again when the
-  // device is back online, never SOMETHING BROKE at `app:selected-discovery`; a missing document still throws
-  const bytes = await readContent(contentURL(row.discovery), DISCOVERY_BYTES, { fetch: (url, init) => read(url, init), missingThrows: true })
+  // SB28: on the boot path (`wait`) a read the network can't answer waits on the loading card's RETRY (QA 11-12 row 36) and goes
+  // again when the device is back online, never SOMETHING BROKE at `app:selected-discovery`; off it (the title's Settings, with
+  // no loading card) a second failed read throws as before. A missing document always throws.
+  const bytes = await readContent(contentURL(row.discovery), DISCOVERY_BYTES, { fetch: (url, init) => read(url, init), missingThrows: true,
+    ...(wait ? {} : { retry: refuse }) })
     .catch((error: unknown) => {
       throw error instanceof ContentReadError && error.status !== null ? new Error(`Discovery of ${row.slug} answered ${String(error.status)}`, { cause: error }) : error;
     });

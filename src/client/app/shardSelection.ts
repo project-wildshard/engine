@@ -8,16 +8,17 @@ import { selectedManifests, gridManifests, type SelectedManifests } from './sele
 
 /** C3: a title row's loader reads its product's discovery; a row with none (a catalogue shard from before J86) has no loader. */
 const hasDiscovery=(row:TitleManifest|undefined):row is TitleManifest=>row?.discovery!==undefined;
-const loaders=()=>Object.fromEntries(titleManifests().filter(hasDiscovery).map(row=>[row.slug,()=>readDiscovery(row)]));
+// SB28: the boot path's reads wait on the loading card's RETRY when the network drops; the title's Settings (no card) passes false
+const loaders=(wait=true)=>Object.fromEntries(titleManifests().filter(hasDiscovery).map(row=>[row.slug,()=>readDiscovery(row,fetch,{wait})]));
 
 /** A grid may synchronously read every primary neighbour after consuming its intent, and desktop keeps every shard for its
  * background prefetch. Frozen standalone copies remain available through their own loaders. */
-export function preparePageCatalogue():Promise<SelectedManifests>{
-  return gridManifests(titleManifests().filter(hasDiscovery),loaders());
+export function preparePageCatalogue(wait=true):Promise<SelectedManifests>{
+  return gridManifests(titleManifests().filter(hasDiscovery),loaders(wait));
 }
 
-export async function completeCatalogue():Promise<void>{
-  installShards((await preparePageCatalogue()).manifests);
+export async function completeCatalogue(wait=true):Promise<void>{
+  installShards((await preparePageCatalogue(wait)).manifests);
   // the running shard resolves now, as it did when the registry built it at import: the level is configured early
   void game.shard;
 }

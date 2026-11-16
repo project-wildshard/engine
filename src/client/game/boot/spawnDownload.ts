@@ -99,11 +99,14 @@ const PART_PAUSE_MS = 1000;
 const partPause = (): Promise<void> => new Promise(resolve => { AbortSignal.timeout(PART_PAUSE_MS).onabort = () => { resolve(); }; });
 /** SB28: the device says it has no network (a page with no `navigator` is never offline). */
 const deviceOffline = (): boolean => typeof navigator !== 'undefined' && !navigator.onLine;
-/** SB28: settles when the device is back online or the job is cancelled. */
-const backOnline = (signal: AbortSignal): Promise<void> => new Promise(resolve => {
-  if (!deviceOffline() || signal.aborted || typeof window === 'undefined') { resolve(); return; }
-  const scope = new Scope('spawn-part-offline'), done = (): void => { scope.dispose(); resolve(); };
-  scope.listen(window, 'online', done); scope.listen(signal, 'abort', done);
+/** SB28: the longest one offline wait holds a part's read before the read counts after all. */
+const OFFLINE_WAIT_MS = 120_000;
+/** SB28: true when the device is back online or the job is cancelled; false when OFFLINE_WAIT_MS passed still offline. */
+const backOnline = (signal: AbortSignal): Promise<boolean> => new Promise(resolve => {
+  if (!deviceOffline() || signal.aborted || typeof window === 'undefined') { resolve(true); return; }
+  const scope = new Scope('spawn-part-offline'), done = (back: boolean): void => { scope.dispose(); resolve(back); };
+  scope.listen(window, 'online', () => { done(true); }); scope.listen(signal, 'abort', () => { done(true); });
+  scope.timeout(OFFLINE_WAIT_MS, () => { done(false); });
 });
 /** While the entry's download runs, a level read it does not list (a loader reading a file its set lacks) waits for the
  *  whole set, as every read did before DL11. Level reads: `/shardfiles/` and `/assets/` content, not spawn files, boot
@@ -621,16 +624,18 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
           }
           // FM6 mode 36: this part's last failed HTTP status (null: no response, or a body that broke)
           let status: number | null = null;
+          // SB28: the last read failed in transport (the fetch or its body stream threw), not an HTTP answer or a bad byte
+          let transport = false;
           // One read of the part. A read after a failure starts over and skips what landed, so no member counts twice.
           const read = async (init: RequestInit | undefined): Promise<void> => {
-            status = null;
-            const response = await ports.fetch(onPacks(part.url, packs), controller.signal, init);
+            status = null; transport = false;
+            const response = await ports.fetch(onPacks(part.url, packs), controller.signal, init).catch((failure: unknown) => { transport = true; throw failure; });
             if (!response.ok) status = response.status;
             if (!response.ok || response.body === null) throw new Error(`Spawn part unavailable: ${part.url}`);
             const body = new Uint8Array(part.bytes), reader = response.body.getReader();
             let at = 0, next = 0;
             for (;;) {
-              const chunk = await reader.read(); if (chunk.done) break;
+              const chunk = await reader.read().catch((failure: unknown) => { transport = true; throw failure; }); if (chunk.done) break;
               if (at + chunk.value.byteLength > part.bytes) {void reader.cancel(); throw new Error(`Spawn part longer than listed: ${part.url}`);}
               body.set(chunk.value, at); at += chunk.value.byteLength;
               // a slow part still shows it moves: every chunk publishes, as a loose file's read does (verified bytes
@@ -664,8 +669,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
             try { await read(attempt === 1 ? undefined : {cache: 'reload'}); break; } catch (failure) {
               counts.failed++;
               // STAGING-BUGBASH SB28: a read that fails while the device is offline spends none of DL20's reads; the part waits
-              // for the network (the loading card says the download paused) and reads again, never "could not load" at finish
-              if (deviceOffline() && !controller.signal.aborted) { await backOnline(controller.signal); controller.signal.throwIfAborted(); attempt--; continue; }
+              // for the network and reads again. Only a transport failure, and only up to OFFLINE_WAIT_MS: a device that says it is
+              // offline while its server answers (a webview, a LAN host) still spends its reads and reaches the give-up page
+              if (transport && deviceOffline() && !controller.signal.aborted && await backOnline(controller.signal)) { controller.signal.throwIfAborted(); attempt--; continue; }
               // a retry keeps its members' arriving share (arrive never lowers it); only the last failure drops it
               const last = attempt >= PART_READS || controller.signal.aborted;
               if (last) for (const [index] of order) { const file = files[index]; if (file !== undefined) landed(file.url); }

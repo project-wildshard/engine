@@ -14,7 +14,7 @@ test('SB28: a discovery read that fails offline waits, then reads again when the
     calls++;
     return calls <= 2 ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(new Response('{}'));
   };
-  const reading = readDiscovery({ slug: 'driftwood-isle', discovery: 'https://packs.test/discovery/driftwood-isle.json' }, read);
+  const reading = readDiscovery({ slug: 'driftwood-isle', discovery: 'https://packs.test/discovery/driftwood-isle.json' }, read, { wait: true });
   let settled: unknown = 'pending';
   reading.then(() => { settled = 'read'; }, (error: unknown) => { settled = error; });
   await new Promise(resolve => { setTimeout(resolve, 50); });
@@ -23,4 +23,11 @@ test('SB28: a discovery read that fails offline waits, then reads again when the
   window.dispatchEvent(new Event('online'));
   await expect(reading).rejects.toThrow(/Invalid discovery document/u);
   expect(calls).toBe(3);
+});
+
+test('SB28: off the boot path (the title\'s Settings) a discovery read that fails twice still throws', async () => {
+  let calls = 0;
+  const read: typeof fetch = () => { calls++; return Promise.reject(new TypeError('Failed to fetch')); };
+  await expect(readDiscovery({ slug: 'driftwood-isle', discovery: 'https://packs.test/discovery/driftwood-isle.json' }, read)).rejects.toThrow(/connection unavailable/u);
+  expect(calls).toBe(2);
 });
