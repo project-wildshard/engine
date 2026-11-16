@@ -53,3 +53,18 @@ the plain-data preflight bridge is unused. Remove all three added lines;
 the original109 cases still pass, as do full types/lint. Keep only the
 published0.11 defining picklist fix. This avoids a needless permissive
 projection of a standalone guard. No custom mapping override remains.
+
+J381 push hatch, authorized by the coordinator after the second gate:
+SKIP_CHECK=1 bypasses the local push-check runner; --no-preflight reuses
+its already-green417-second preflight (233 files/1341 passing cases).
+The sole later split failure is test/headless-verb-tape-worker.test.ts:
+a default runtime first tick crossed its10ms deadline at16824us under
+load. Its test, native fixture and tickWorkerHost bytes are unchanged
+from main8cdbd68c. The exact native child passes that baseline and this
+branch. Baseline split results cache records this case green in9397ms;
+the wider archived selection has unrelated fixture setup failures, so
+no whole-baseline-green claim is made. Report the existing timing fixture
+(last VITEST-BENCH owner codex-pinefix2) to HOW-WE-BUILD/coordinator.
+No threshold or runtime guard changes. Secret/history/changelog guards
+and hosted exact-head CI remain mandatory. Check any carried rebase's
+static gates and the landed single-player preview before reporting.
