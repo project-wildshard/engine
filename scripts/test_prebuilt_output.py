@@ -21,7 +21,9 @@ class PrebuiltTests(unittest.TestCase):
     def setUp(self):
         Path('tmp').mkdir(exist_ok=True)
         self.temporary = tempfile.TemporaryDirectory(dir='tmp')
-        self.root = Path(self.temporary.name)
+        # Python versions returning a relative temporary path must still make
+        # the external-directory symlink target an actual absolute owner.
+        self.root = Path(self.temporary.name).resolve()
         self.source, self.target, self.packet = [self.root / name for name in ('source', 'target', 'packet')]
         self.target.mkdir()
         version = json.dumps({'build': SHA[:9] + '-fixture'})

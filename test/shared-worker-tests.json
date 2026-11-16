@@ -665,5 +665,9 @@
  "test/agent-time.test.ts",
  "test/commit-lane.test.ts",
  "test/ci-bisect.test.ts",
- "test/player-command-retired.test.ts"
+ "test/player-command-retired.test.ts",
+ "test/push-input-cache.test.ts",
+ "test/prebuilt-output.test.ts",
+ "test/precommit-vocabulary.test.ts",
+ "test/commit-message-preflight.test.ts"
 ]
