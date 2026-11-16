@@ -6,7 +6,7 @@
   "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
   "destinationManifest": {
     "repository": "project-wildshard/sharddev",
-    "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+    "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
     "path": "test/ci21-sdk-tail.json",
     "blob": "18d65df74632902687c6fce650d72e0cf9b99cb9"
   },
@@ -23,7 +23,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/defined-sections.test.ts",
         "targetBlob": "0d9ed35506b7a9af38e1e560cd849b73047b7741",
         "tests": [
@@ -48,7 +48,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/named-json-admission.test.ts",
         "targetBlob": "c025464cdf3975da68991a70821698f28039c1af",
         "tests": [
@@ -76,7 +76,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/registered-json.test.ts",
         "targetBlob": "354e71e3098726fdaf86bb8107b14f656fdc30bd",
         "tests": [
@@ -103,7 +103,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/world-assembly-schema.test.ts",
         "targetBlob": "bbdb30a71b5945406516853a64f4383f04846589",
         "tests": [
@@ -125,7 +125,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/carried-terrain-ports.test.ts",
         "targetBlob": "52f29401f1cc134e61197f95056e0682a932f12b",
         "tests": [
@@ -151,7 +151,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/output-runtime.test.ts",
         "targetBlob": "0fde9f3ab5bab203cfe19d0bc68ac1e957697169",
         "tests": [
@@ -176,7 +176,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "src/sharddev/bake/script-v2-radial.test.ts",
         "targetBlob": "ea3063772987cd827db07375b69bac8e2c454478",
         "tests": [
@@ -197,7 +197,7 @@
       "originalStillPending": false,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/schema-code-memory.test.ts",
         "targetBlob": "7e2f7bea9448f94df6260c40a4c9ec90d7a40b2e",
         "tests": [
@@ -236,7 +236,7 @@
       "originalStillPending": false,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/world-scene-graph-pages.test.ts",
         "targetBlob": "8deb39a2d436749ac349a0380f6aad0c9a45e5d2",
         "tests": [
@@ -273,7 +273,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/return-projection-inventory.test.ts",
         "targetBlob": "98c4c6cfa5aee9737b6265a09e903f84168b554a",
         "tests": [
@@ -300,7 +300,7 @@
       "originalStillPending": false,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/return-program-group-v2.test.ts",
         "targetBlob": "111f64f3634fe450d96b9c14eaaf0434ab93fb95",
         "tests": [
@@ -344,7 +344,7 @@
       "originalStillPending": false,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/tile-bakes.test.ts",
         "targetBlob": "a3937af6551e9e3c491d979fa38b67cb1486bed1",
         "tests": [
@@ -384,7 +384,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/species-barrel-author-ports.test.ts",
         "targetBlob": "d898960a2aa7b9c8b53841cc91e38f71db0b3b3b",
         "tests": [
@@ -445,7 +445,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/view-author-metadata.test.ts",
         "targetBlob": "788be41fba3c836b5e6ea5ab8fad44e1848b76fd",
         "tests": [
@@ -505,7 +505,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/terrain-field-author-port.test.ts",
         "targetBlob": "85ec5ba9e392465170eafdefca3392d99566d6ad",
         "tests": [
@@ -537,9 +537,9 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "revision": "0426c2bb26236e11cbae11f1b1be5979f9309ace",
         "targetPath": "test/scripts/_template-boss.test.ts",
-        "targetBlob": "9f5607d9cdde62042ed06168aa1c7c880a06c750",
+        "targetBlob": "d3ca97aaaccef398c3df9229fc7ddc383fe055e8",
         "tests": [
           "Template boss runs published Wasm decisions and resumes a logical save"
         ]
