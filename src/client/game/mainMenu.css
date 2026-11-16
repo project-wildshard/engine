@@ -4,8 +4,10 @@
    It stacks over today's shard deck (.ws-menu), which SHARD SELECT reveals; the build chip stays the shell's own. */
 .ws-title-stack { position: absolute; inset: 0; pointer-events: auto; transition: opacity 0.6s ease; }
 .ws-title-stack.hide { opacity: 0; pointer-events: none; }
-.ws-title-stack > .ws-menu { transition: opacity 0.3s ease; }
-.ws-main { position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 3); container-type: size; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; transition: opacity 0.3s ease; color: var(--ws-text); }
+/* STAGING-BUGBASH SB18 (J385): the main menu and SHARD SELECT cut in one frame. The main menu sits above the deck, so its 0.3 s
+   fade-out showed it again for 300 ms after the Name prompt's SKIP */
+.ws-title-stack > .ws-menu { transition: none; }
+.ws-main { position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 3); container-type: size; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; color: var(--ws-text); }
 .ws-main.hide { opacity: 0; pointer-events: none; }
 .ws-main .ws-main-hero { position: absolute; inset: 0; background-size: cover; background-position: 50% 30%; background-color: #0b1622; pointer-events: none; }
 .ws-main::before { content: ''; position: absolute; inset: 0; z-index: calc(var(--ws-layer-hud) + 1); pointer-events: none; background: linear-gradient(180deg, rgba(6, 10, 18, 0.42) 0%, rgba(6, 10, 18, 0) 22%, rgba(6, 10, 18, 0) 55%, rgba(6, 10, 18, 0.5) 100%); }
@@ -170,6 +172,8 @@
   /* Jake 2026-11-10 (the pill over the D): on the phone title the pill ends before the 36 px logo does (its last letter's
      spacing ends near 250 px) and ellipsises a longer word instead of running onto it */
   :root:has(.ws-title-stack:not(.hide) > .ws-main:not(.hide)):not(:has(.ws-gmenu.show)) .ws-update { max-width: calc(100vw - 16px - 258px); }
+  /* STAGING-BUGBASH SB15: SHARD SELECT's title ends at 242 px (BACK, then the title); the pill starts 8 px past it, never on it */
+  :root:has(.ws-title-stack:not(.hide) > .ws-menu-carousel:not(.hide)):not(:has(.ws-gmenu.show)) .ws-update { max-width: calc(100vw - 16px - 250px); }
 }
 @media (orientation: landscape) and (max-height: 500px) {
   :root:has(.ws-title-stack:not(.hide) > .ws-main:not(.hide)):not(:has(.ws-gmenu.show)) { --ws-pill-line: calc(10px + env(safe-area-inset-top, 0px) + 0.475 * 28px); }
