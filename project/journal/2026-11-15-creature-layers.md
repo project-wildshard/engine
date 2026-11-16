@@ -54,3 +54,19 @@ The shipped Driftwood population and server-file cases pass; its worker case
 hit its existing ten-second limit in the combined run, then passes alone in
 8.13 seconds total. Full types, game lint and side checks pass. Full sixty-second
 before/after product hashes remain CC4c.
+
+## Full simulation oracle, 2026-11-16
+
+CC4c's five pairs all match across every real fixed tick: the two format
+corpus fixtures, pinned Brasscap and Pine, and a real author build from an old
+kind and then its explicit layers. That is 36,000 ticks. The author pair's
+normal CLI builds also produce identical output indices. Pine has 164 bodies,
+Brasscap 19, and the moving author fixture one; the two corpus fixtures remain
+static on this input, which is recorded rather than hidden.
+
+The engine runner hashes complete per-tick position/state/health histories,
+checks the actual host tick, and records product, physics and loaded-source
+hashes. The committed receipt and reproduction notes are under
+test/proof/one-format/. The SDK's normal writer emits admitted draft fixtures
+with expanded layers/native tuning and unchanged immutable assets. Shader
+preparation and staging rendering remain their separate M1 rows.

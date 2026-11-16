@@ -1,0 +1,497 @@
+{
+  "state": "built, unlanded, 2026-11-16",
+  "row": "CC4c",
+  "engineBefore": "b892969b9fe36c04afc2415b20e16353bc435954",
+  "engineAfter": "23b064dff4d5013fe813c2ee7812c528abe2b8a9",
+  "sdk": "24d5a6c520cf7cd374922a189f8b185b1de3aaae",
+  "format": "bbe862387cfe2600ba7513efd5945c500cd150db",
+  "physics": "2935a533335952cf160de69186d03e8b3ad2895b65d20df1b74d197a7498bd6f",
+  "input": "3600 actual fixed ticks; square walk in four 900-tick phases; no attacks",
+  "coverage": "Per-tick exact entity id, position, yaw, state, hp and alive history; seven checkpoints; host tick checked on every sample. Library and server asset hash lists match exactly.",
+  "cases": [
+    {
+      "case": "corpus",
+      "slug": "blender-template",
+      "ticks": 3600,
+      "history": "f57d494a04cd250ef8a752edbd27c1c5ec9fa1bd488fe5d2eb951b0243cc03f2",
+      "seen": 1,
+      "moved": 0,
+      "beforeProduct": "74c9c55252164ba63462406941f3cde0b7d194ab915643da348d49a8a68d759c",
+      "afterProduct": "f0d8a239a83fdad46512b308c0827ecd95e52024d707be753cb3b2910c79baa0",
+      "immutableAssetHashesEqual": true,
+      "frames": [
+        {
+          "tick": 0,
+          "count": 1,
+          "digest": "4edb974a2bd10c1e87aa460a1e4aafbd2ed5e5ee9105bb955cfda6331cf2998c"
+        },
+        {
+          "tick": 600,
+          "count": 1,
+          "digest": "4edb974a2bd10c1e87aa460a1e4aafbd2ed5e5ee9105bb955cfda6331cf2998c"
+        },
+        {
+          "tick": 1200,
+          "count": 1,
+          "digest": "4edb974a2bd10c1e87aa460a1e4aafbd2ed5e5ee9105bb955cfda6331cf2998c"
+        },
+        {
+          "tick": 1800,
+          "count": 1,
+          "digest": "4edb974a2bd10c1e87aa460a1e4aafbd2ed5e5ee9105bb955cfda6331cf2998c"
+        },
+        {
+          "tick": 2400,
+          "count": 1,
+          "digest": "4edb974a2bd10c1e87aa460a1e4aafbd2ed5e5ee9105bb955cfda6331cf2998c"
+        },
+        {
+          "tick": 3000,
+          "count": 1,
+          "digest": "4edb974a2bd10c1e87aa460a1e4aafbd2ed5e5ee9105bb955cfda6331cf2998c"
+        },
+        {
+          "tick": 3600,
+          "count": 1,
+          "digest": "4edb974a2bd10c1e87aa460a1e4aafbd2ed5e5ee9105bb955cfda6331cf2998c"
+        }
+      ],
+      "beforeSources": [
+        {
+          "path": "src/server/game/grid/simulation.ts",
+          "hash": "a55b27e8ffb170bc84f8b36c418b653d53614fdeeb25295732b50f5b55391d63"
+        },
+        {
+          "path": "src/server/game/plugin/simulation.ts",
+          "hash": "c044549e2569104134d9a79881f53c1743d41417fc8608f5d272feea394cfdd2"
+        },
+        {
+          "path": "src/server/game/shardfile/brainRuntime.ts",
+          "hash": "8cbf6b54fba094dcdff9a342b994cf61bf7b5a370bfd3a4fddf3a329009b3b59"
+        },
+        {
+          "path": "src/server/game/shardfile/creatureLayers.ts",
+          "hash": "abb9da9c0a896f95cbb321c96440e254f6979354cc0a9ffb13b2a86296e540ee"
+        },
+        {
+          "path": "src/shared/engine/ai/huntPattern.ts",
+          "hash": "8bc6c58c0ee03f9901e1f8d2343ded9b93f88cadb3f816962d3bf19228a14fcc"
+        }
+      ],
+      "afterSources": [
+        {
+          "path": "src/server/game/grid/simulation.ts",
+          "hash": "a55b27e8ffb170bc84f8b36c418b653d53614fdeeb25295732b50f5b55391d63"
+        },
+        {
+          "path": "src/server/game/plugin/simulation.ts",
+          "hash": "a328904d517ca4f2e765cdba79880f6775c7fdee36454a30ad8e8ca2fba5a977"
+        },
+        {
+          "path": "src/server/game/shardfile/brainRuntime.ts",
+          "hash": "8cbf6b54fba094dcdff9a342b994cf61bf7b5a370bfd3a4fddf3a329009b3b59"
+        },
+        {
+          "path": "src/server/game/shardfile/creatureLayers.ts",
+          "hash": "59f5c721a6ea04975bbbe5906d8a3fd04ac46b28433175c497a11939954bebb0"
+        },
+        {
+          "path": "src/server/game/shardfile/layerHunts.ts",
+          "hash": "0957fd8a655f536f6790fc49127bea8bfd42c2f93dab3751e81e12deaf1f9154"
+        },
+        {
+          "path": "src/shared/engine/ai/huntPattern.ts",
+          "hash": "2f360bb046f7859a8cb8fecc9d7d659fdbf86134ea505154d1f4d2ee3a94bcc0"
+        }
+      ]
+    },
+    {
+      "case": "pine",
+      "slug": "pine-hollow",
+      "ticks": 3600,
+      "history": "0792f478f759805f98ed32e08b4232933f10a61a93aeb9eaffe251d1c303e835",
+      "seen": 164,
+      "moved": 11,
+      "beforeProduct": "c1363d35e8d1e52c31b6b28a2ca22e891eb4bd8322a05f1a0903742b01b20bbd",
+      "afterProduct": "9c5b153db06bfc8ec58c5fdc655b292555de57b552dcbc8af1d39a42f61fe05b",
+      "immutableAssetHashesEqual": true,
+      "frames": [
+        {
+          "tick": 0,
+          "count": 164,
+          "digest": "3280565a24b97dd0ebb5bc1fd15c2a4670986240661080cd0413d326a670290c"
+        },
+        {
+          "tick": 600,
+          "count": 164,
+          "digest": "214a025d4375e1dd5a39ca485e60d9eaffdaab7c584f2bdd615daf8a50e6f361"
+        },
+        {
+          "tick": 1200,
+          "count": 164,
+          "digest": "214a025d4375e1dd5a39ca485e60d9eaffdaab7c584f2bdd615daf8a50e6f361"
+        },
+        {
+          "tick": 1800,
+          "count": 164,
+          "digest": "214a025d4375e1dd5a39ca485e60d9eaffdaab7c584f2bdd615daf8a50e6f361"
+        },
+        {
+          "tick": 2400,
+          "count": 164,
+          "digest": "214a025d4375e1dd5a39ca485e60d9eaffdaab7c584f2bdd615daf8a50e6f361"
+        },
+        {
+          "tick": 3000,
+          "count": 164,
+          "digest": "214a025d4375e1dd5a39ca485e60d9eaffdaab7c584f2bdd615daf8a50e6f361"
+        },
+        {
+          "tick": 3600,
+          "count": 164,
+          "digest": "214a025d4375e1dd5a39ca485e60d9eaffdaab7c584f2bdd615daf8a50e6f361"
+        }
+      ],
+      "beforeSources": [
+        {
+          "path": "src/server/game/grid/simulation.ts",
+          "hash": "a55b27e8ffb170bc84f8b36c418b653d53614fdeeb25295732b50f5b55391d63"
+        },
+        {
+          "path": "src/server/game/plugin/simulation.ts",
+          "hash": "c044549e2569104134d9a79881f53c1743d41417fc8608f5d272feea394cfdd2"
+        },
+        {
+          "path": "src/server/game/shardfile/brainRuntime.ts",
+          "hash": "8cbf6b54fba094dcdff9a342b994cf61bf7b5a370bfd3a4fddf3a329009b3b59"
+        },
+        {
+          "path": "src/server/game/shardfile/creatureLayers.ts",
+          "hash": "abb9da9c0a896f95cbb321c96440e254f6979354cc0a9ffb13b2a86296e540ee"
+        },
+        {
+          "path": "src/shared/engine/ai/huntPattern.ts",
+          "hash": "8bc6c58c0ee03f9901e1f8d2343ded9b93f88cadb3f816962d3bf19228a14fcc"
+        }
+      ],
+      "afterSources": [
+        {
+          "path": "src/server/game/grid/simulation.ts",
+          "hash": "a55b27e8ffb170bc84f8b36c418b653d53614fdeeb25295732b50f5b55391d63"
+        },
+        {
+          "path": "src/server/game/plugin/simulation.ts",
+          "hash": "a328904d517ca4f2e765cdba79880f6775c7fdee36454a30ad8e8ca2fba5a977"
+        },
+        {
+          "path": "src/server/game/shardfile/brainRuntime.ts",
+          "hash": "8cbf6b54fba094dcdff9a342b994cf61bf7b5a370bfd3a4fddf3a329009b3b59"
+        },
+        {
+          "path": "src/server/game/shardfile/creatureLayers.ts",
+          "hash": "59f5c721a6ea04975bbbe5906d8a3fd04ac46b28433175c497a11939954bebb0"
+        },
+        {
+          "path": "src/server/game/shardfile/layerHunts.ts",
+          "hash": "0957fd8a655f536f6790fc49127bea8bfd42c2f93dab3751e81e12deaf1f9154"
+        },
+        {
+          "path": "src/shared/engine/ai/huntPattern.ts",
+          "hash": "2f360bb046f7859a8cb8fecc9d7d659fdbf86134ea505154d1f4d2ee3a94bcc0"
+        }
+      ]
+    },
+    {
+      "case": "brasscap",
+      "slug": "blender-template",
+      "ticks": 3600,
+      "history": "ff53fe72765d7efd02d48fdf24d8ce5abbc69b26285e063fb9ee50716b92f756",
+      "seen": 19,
+      "moved": 12,
+      "beforeProduct": "5c5adc5c3558e0120d539e527c059e77a3f25ba7ea84c41b6e361cb8faaba778",
+      "afterProduct": "24d9561ddd7005a39a3d267fcb1ec9c25fd8caecc21ccaa306ecd9079d617fe9",
+      "immutableAssetHashesEqual": true,
+      "frames": [
+        {
+          "tick": 0,
+          "count": 19,
+          "digest": "2c719aa226741d6cb5452b2edaaaf5ff7aee3befe0f570cde04461c966a6ddb2"
+        },
+        {
+          "tick": 600,
+          "count": 19,
+          "digest": "ef5ace04d454e7c07b6d38cc69c6356023ce8cbf13eb2fe68deba678f0ceb18e"
+        },
+        {
+          "tick": 1200,
+          "count": 19,
+          "digest": "8c1c676d443ef86f5107ce6e756fabcbcb261618b82d721ffab7662a909b7855"
+        },
+        {
+          "tick": 1800,
+          "count": 19,
+          "digest": "00e1632eae6ac82fd245976517883c752306a8df3bb9a4798ed602c60c9fd420"
+        },
+        {
+          "tick": 2400,
+          "count": 19,
+          "digest": "5d2a937c3a550e190134898a73b9bb8a2ff2f84d942d5b7b5f7f12908562de86"
+        },
+        {
+          "tick": 3000,
+          "count": 19,
+          "digest": "053c31b9756109f08d9eca999baeee90e8cf8ad57c753490050806ebab81982e"
+        },
+        {
+          "tick": 3600,
+          "count": 19,
+          "digest": "6d39b6679c6cd7b0a93840822eacde5181bcf7a3709fa6eef015ccbca7f80d06"
+        }
+      ],
+      "beforeSources": [
+        {
+          "path": "src/server/game/grid/simulation.ts",
+          "hash": "a55b27e8ffb170bc84f8b36c418b653d53614fdeeb25295732b50f5b55391d63"
+        },
+        {
+          "path": "src/server/game/plugin/simulation.ts",
+          "hash": "c044549e2569104134d9a79881f53c1743d41417fc8608f5d272feea394cfdd2"
+        },
+        {
+          "path": "src/server/game/shardfile/brainRuntime.ts",
+          "hash": "8cbf6b54fba094dcdff9a342b994cf61bf7b5a370bfd3a4fddf3a329009b3b59"
+        },
+        {
+          "path": "src/server/game/shardfile/creatureLayers.ts",
+          "hash": "abb9da9c0a896f95cbb321c96440e254f6979354cc0a9ffb13b2a86296e540ee"
+        },
+        {
+          "path": "src/shared/engine/ai/huntPattern.ts",
+          "hash": "8bc6c58c0ee03f9901e1f8d2343ded9b93f88cadb3f816962d3bf19228a14fcc"
+        }
+      ],
+      "afterSources": [
+        {
+          "path": "src/server/game/grid/simulation.ts",
+          "hash": "a55b27e8ffb170bc84f8b36c418b653d53614fdeeb25295732b50f5b55391d63"
+        },
+        {
+          "path": "src/server/game/plugin/simulation.ts",
+          "hash": "a328904d517ca4f2e765cdba79880f6775c7fdee36454a30ad8e8ca2fba5a977"
+        },
+        {
+          "path": "src/server/game/shardfile/brainRuntime.ts",
+          "hash": "8cbf6b54fba094dcdff9a342b994cf61bf7b5a370bfd3a4fddf3a329009b3b59"
+        },
+        {
+          "path": "src/server/game/shardfile/creatureLayers.ts",
+          "hash": "59f5c721a6ea04975bbbe5906d8a3fd04ac46b28433175c497a11939954bebb0"
+        },
+        {
+          "path": "src/server/game/shardfile/layerHunts.ts",
+          "hash": "0957fd8a655f536f6790fc49127bea8bfd42c2f93dab3751e81e12deaf1f9154"
+        },
+        {
+          "path": "src/shared/engine/ai/huntPattern.ts",
+          "hash": "2f360bb046f7859a8cb8fecc9d7d659fdbf86134ea505154d1f4d2ee3a94bcc0"
+        }
+      ]
+    },
+    {
+      "case": "export",
+      "slug": "brasscap-mesa",
+      "ticks": 3600,
+      "history": "7402da1ee848d30cdc2e7550026406be2872c386278a0e421b6e785085318715",
+      "seen": 12,
+      "moved": 0,
+      "beforeProduct": "3c3d7f85b55b0baf38ae895f9c1cce2fef723d3d762efbccf51bd8aa881dadf1",
+      "afterProduct": "627be3c2eb00eb9babfe9db18d4d401edc1847bcc41b42e6f0aa45b363e6500f",
+      "immutableAssetHashesEqual": true,
+      "frames": [
+        {
+          "tick": 0,
+          "count": 12,
+          "digest": "eede2f43fe6623ec89666076eb1a43a5f88d0f64d86abf4c50728353b81b725a"
+        },
+        {
+          "tick": 600,
+          "count": 12,
+          "digest": "0a1a26544671cfed88db6fcf3aea4108dc745a39e24c5afeb5dda5bf809fd2ab"
+        },
+        {
+          "tick": 1200,
+          "count": 12,
+          "digest": "a0353ffbee2aa66b8777783c024da0dc4bf21d46450ea18423434307859eff8c"
+        },
+        {
+          "tick": 1800,
+          "count": 12,
+          "digest": "80d667a0b6aaeb9d7765021b095e11667f5fe9f32420ad0a83f7fa86acd0a915"
+        },
+        {
+          "tick": 2400,
+          "count": 12,
+          "digest": "70caa7fe1733f7cd3d99c035142848c14657c8cc0aabbd4b5c9f843eec9e51cb"
+        },
+        {
+          "tick": 3000,
+          "count": 12,
+          "digest": "1b094479774b54679ef96b347781beabcca6b510eee7863a3d5531dd4c4cd965"
+        },
+        {
+          "tick": 3600,
+          "count": 12,
+          "digest": "1c366cdd7e70e8c10bfe0fb52f918172ad2da4c3a237986cee0b5af9e2faca4e"
+        }
+      ],
+      "beforeSources": [
+        {
+          "path": "src/server/game/grid/simulation.ts",
+          "hash": "a55b27e8ffb170bc84f8b36c418b653d53614fdeeb25295732b50f5b55391d63"
+        },
+        {
+          "path": "src/server/game/plugin/simulation.ts",
+          "hash": "c044549e2569104134d9a79881f53c1743d41417fc8608f5d272feea394cfdd2"
+        },
+        {
+          "path": "src/server/game/shardfile/brainRuntime.ts",
+          "hash": "8cbf6b54fba094dcdff9a342b994cf61bf7b5a370bfd3a4fddf3a329009b3b59"
+        },
+        {
+          "path": "src/server/game/shardfile/creatureLayers.ts",
+          "hash": "abb9da9c0a896f95cbb321c96440e254f6979354cc0a9ffb13b2a86296e540ee"
+        },
+        {
+          "path": "src/shared/engine/ai/huntPattern.ts",
+          "hash": "8bc6c58c0ee03f9901e1f8d2343ded9b93f88cadb3f816962d3bf19228a14fcc"
+        }
+      ],
+      "afterSources": [
+        {
+          "path": "src/server/game/grid/simulation.ts",
+          "hash": "a55b27e8ffb170bc84f8b36c418b653d53614fdeeb25295732b50f5b55391d63"
+        },
+        {
+          "path": "src/server/game/plugin/simulation.ts",
+          "hash": "a328904d517ca4f2e765cdba79880f6775c7fdee36454a30ad8e8ca2fba5a977"
+        },
+        {
+          "path": "src/server/game/shardfile/brainRuntime.ts",
+          "hash": "8cbf6b54fba094dcdff9a342b994cf61bf7b5a370bfd3a4fddf3a329009b3b59"
+        },
+        {
+          "path": "src/server/game/shardfile/creatureLayers.ts",
+          "hash": "59f5c721a6ea04975bbbe5906d8a3fd04ac46b28433175c497a11939954bebb0"
+        },
+        {
+          "path": "src/server/game/shardfile/layerHunts.ts",
+          "hash": "0957fd8a655f536f6790fc49127bea8bfd42c2f93dab3751e81e12deaf1f9154"
+        },
+        {
+          "path": "src/shared/engine/ai/huntPattern.ts",
+          "hash": "2f360bb046f7859a8cb8fecc9d7d659fdbf86134ea505154d1f4d2ee3a94bcc0"
+        }
+      ]
+    },
+    {
+      "case": "legacy",
+      "slug": "legacy-sim",
+      "ticks": 3600,
+      "history": "e6b086693727c97bfdf57b02d4f860be24ddf4054b26cbd4d2c8659a38813c2a",
+      "seen": 1,
+      "moved": 1,
+      "beforeProduct": "9edc3fcc89706a741d85360488307b8dc3c39083eca8dc0e3fb1bd9ab31db3a6",
+      "afterProduct": "9edc3fcc89706a741d85360488307b8dc3c39083eca8dc0e3fb1bd9ab31db3a6",
+      "immutableAssetHashesEqual": true,
+      "frames": [
+        {
+          "tick": 0,
+          "count": 1,
+          "digest": "d53bc1dba08907e9ebe81062eae25c97076e5f41ce5e86434741dc6e006ad22a"
+        },
+        {
+          "tick": 600,
+          "count": 1,
+          "digest": "6bae7bf0285b5f311d79d33bdd97ccf1163ff3cf4ac044b05cc0cb0c3a5df0c1"
+        },
+        {
+          "tick": 1200,
+          "count": 1,
+          "digest": "2d861249e21cf3f47ac2de73d2f4477a44141549b5ea142f5d08b3fe9e52d82d"
+        },
+        {
+          "tick": 1800,
+          "count": 1,
+          "digest": "9a37c2cc2d0b9261d4580a907e637409034f43e9b7e9af6890714c03c77174cf"
+        },
+        {
+          "tick": 2400,
+          "count": 1,
+          "digest": "6e22149d6c695289d6f1e079af7b727af1548c856418435cd45fbfeaf08165e4"
+        },
+        {
+          "tick": 3000,
+          "count": 1,
+          "digest": "b5f4ede120f30332e2b47837ba0d388103a9323e7792740addd4b62a0ef2a2a3"
+        },
+        {
+          "tick": 3600,
+          "count": 1,
+          "digest": "d288522f7b195601b978a2ea1c6f63c217965a27cfe2018ef13f8423fc77c2fd"
+        }
+      ],
+      "beforeSources": [
+        {
+          "path": "src/server/game/grid/simulation.ts",
+          "hash": "a55b27e8ffb170bc84f8b36c418b653d53614fdeeb25295732b50f5b55391d63"
+        },
+        {
+          "path": "src/server/game/plugin/simulation.ts",
+          "hash": "a328904d517ca4f2e765cdba79880f6775c7fdee36454a30ad8e8ca2fba5a977"
+        },
+        {
+          "path": "src/server/game/shardfile/brainRuntime.ts",
+          "hash": "8cbf6b54fba094dcdff9a342b994cf61bf7b5a370bfd3a4fddf3a329009b3b59"
+        },
+        {
+          "path": "src/server/game/shardfile/creatureLayers.ts",
+          "hash": "59f5c721a6ea04975bbbe5906d8a3fd04ac46b28433175c497a11939954bebb0"
+        },
+        {
+          "path": "src/server/game/shardfile/layerHunts.ts",
+          "hash": "0957fd8a655f536f6790fc49127bea8bfd42c2f93dab3751e81e12deaf1f9154"
+        },
+        {
+          "path": "src/shared/engine/ai/huntPattern.ts",
+          "hash": "2f360bb046f7859a8cb8fecc9d7d659fdbf86134ea505154d1f4d2ee3a94bcc0"
+        }
+      ],
+      "afterSources": [
+        {
+          "path": "src/server/game/grid/simulation.ts",
+          "hash": "a55b27e8ffb170bc84f8b36c418b653d53614fdeeb25295732b50f5b55391d63"
+        },
+        {
+          "path": "src/server/game/plugin/simulation.ts",
+          "hash": "a328904d517ca4f2e765cdba79880f6775c7fdee36454a30ad8e8ca2fba5a977"
+        },
+        {
+          "path": "src/server/game/shardfile/brainRuntime.ts",
+          "hash": "8cbf6b54fba094dcdff9a342b994cf61bf7b5a370bfd3a4fddf3a329009b3b59"
+        },
+        {
+          "path": "src/server/game/shardfile/creatureLayers.ts",
+          "hash": "59f5c721a6ea04975bbbe5906d8a3fd04ac46b28433175c497a11939954bebb0"
+        },
+        {
+          "path": "src/server/game/shardfile/layerHunts.ts",
+          "hash": "0957fd8a655f536f6790fc49127bea8bfd42c2f93dab3751e81e12deaf1f9154"
+        },
+        {
+          "path": "src/shared/engine/ai/huntPattern.ts",
+          "hash": "2f360bb046f7859a8cb8fecc9d7d659fdbf86134ea505154d1f4d2ee3a94bcc0"
+        }
+      ]
+    }
+  ]
+}
