@@ -95,3 +95,9 @@ emptying it. The cold drill uses the existing owned-command process-tree
 drain and cancellation support, and supplies the frozen tree's real
 source-file inventory to renderer fingerprinting. This avoids both an
 orphaned cook on timeout and crossing into the outer checkout's Git root.
+
+The narrow follow-up review confirms all four corrections; no remaining
+MUST/SHOULD finding. Eight core triples and both actual owner triples pass
+on committed source a9a773f0 before clean rebase. The operator guide now
+names every command and the real observation-based soak. No cold cook ran
+on the mini. Hosted execution remains the next proof.

@@ -194,28 +194,51 @@ hosted checkout runs exactly one partition and is discarded afterwards.
 
 ## Coverage fault drill
 
-TC26's four real outer-edge contracts run explicitly, outside hooks and
+TC26's nine positive contracts run explicitly, outside hooks and
 Vitest discovery:
 
 ```sh
 node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/coverage-fire-drill.proof.mjs
 ```
 
-They use the existing Nalati and Template pins, native physics, the installed
-format's handwritten Template 2 and a separate outside-author package.
-Each complete case keeps 9.5 seconds including cleanup. Nalati and Template
-use controlled positions to isolate actual approach and door inputs; no
-trust, reward or script field is assigned. This is not a walked journey.
-CI reports these new contracts non-blocking during their one-week soak
-from 2026-11-15 through 2026-11-22; promotion to a gate remains explicit.
+They use pinned Nalati and Template, native physics, the installed format's
+handwritten product, real save/restore, the Ring 1 input reader and a retained
+seven-receiver verdict. Controlled positions isolate real approach and door
+inputs; no trust, reward or script field is assigned. This is not a walked
+journey. Each complete case keeps 9.5 seconds including cleanup. CI runs the
+positive cases non-blocking after its blocking wall check. Promotion requires
+matching hosted green observations spanning seven days, with no intervening
+observed failure. Collect actual run/job/log evidence with:
+
+```sh
+node scripts/coverage-soak.mjs tmp/coverage-soak
+```
 
 From a committed checkout with pins and generated inputs installed, run
 `node scripts/coverage-fire-drill.mjs tmp/coverage-fire-drill` manually.
-It exports that HEAD, copies only its own format dependency, and plants
-one fault at a time. Baseline green, a specific assertion/admission red,
-and healed green are all required. Timeouts and process failures refuse
-qualification. The output receipt names the responsible repository/path
-and intended ring contract. It sends no issue, invokes no live service,
-cooks nothing and cleans its export. The outside-author case proves the
-Ring 3 import contract, not the seven hosted shard receivers. The expanded
-twelve-fault campaign remains open.
+Its eight plants cover taming, the actual door scene, a supplemental outside
+author export, a required format field, an absent real section, a truncated
+real tar, saved door state and release-hold loss. Each needs baseline green,
+a specific assertion/admission red, and healed green. Timeouts and process
+failures refuse qualification. Only an owned frozen export is mutated;
+installed packages and pin caches stay immutable.
+
+The removed-export and lost-auth owner proofs use the actual Dunes boundary
+checker and API accounts/me route test in isolated exports:
+
+```sh
+node scripts/coverage-owner-drill.mjs ../api-server ../shard-dunes tmp/coverage-owners
+```
+
+The owner receipt records each repository's tested SHA and responsible fix
+path. The seven-shard hold proof replays the real retained Ring 3 artifact;
+it does not dispatch fresh receivers or qualify a current release candidate.
+The page-census fault uses row 32's recorded BUG28 witness, rather than a new
+graphical capture in this campaign.
+
+Only the public Linux Actions worker runs the cold cook portion:
+`node scripts/coverage-cook-drill.mjs tmp/engine-boundaries/cook-drill`.
+It uses three independent cold stores, a real byte-producer edit, production
+part-diff reporting, healed byte equality and rejection of a stale result.
+The runner refuses a local invocation. These scripts retain receipts/logs
+in their requested repo tmp directory and clean their private exports.
