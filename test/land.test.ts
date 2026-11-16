@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
 import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
-import { failedJobs, flakyFiles, mainPushArgs, parseArgs, prePushCause, quarantineFile, REF_LOCK, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
+import { failedJobs, flakyFiles, mainPushArgs, parseArgs, preflightSteps, prePushCause, quarantineFile, REF_LOCK, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
 const LAND = resolve('scripts/land.mjs');
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -251,7 +251,8 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     g.commit(kept, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     expect(g.land(kept, ['--keep']).stdout).not.toContain('cleaned');
     expect(existsSync(kept)).toBe(true);
-    expect(parseArgs([])).toEqual({ pollSeconds: 30, timeoutMinutes: 60, appearMinutes: 5, rounds: 5, keep: false });
+    expect(parseArgs([])).toEqual({ pollSeconds: 30, timeoutMinutes: 60, appearMinutes: 5, rounds: 5, keep: false, preflight: true });
+    expect(parseArgs(['--no-preflight']).preflight).toBe(false);
   }, 60_000);
 
   test('J358: a failed copy keeps the landed worktree and local branch', () => {
@@ -476,6 +477,47 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(f.remoteMain()).toBe(before);
     expect(() => parseArgs(['--rounds=2', '--force'])).toThrow(/never force-pushes main/u);
   }, 60_000);
+
+  // BUILD-MAX 2026-11-15: 14 of 22 stopped lands failed a check that runs locally. The preflight runs those first, here.
+  const plantPnpm = (f: Fixture, red: string | null) => {
+    const log = join(f.root, 'pnpm.log');
+    writeFileSync(join(f.root, 'bin/pnpm'), `#!/bin/sh\necho "$*" >> '${log}'\n${red === null ? '' : `[ "$1" = ${red} ] && { echo 'planted ${red} error'; exit 2; }\n`}exit 0\n`);
+    return () => f.read(log).trim().split('\n').filter(Boolean);
+  };
+
+  test('preflight: lint:game, typecheck, then the Vitest files related to the changed code, before the plan push', () => {
+    const f = fixture(), calls = plantPnpm(f, null);
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    f.commit(wt, 'docs/feature.md', '# Feature\n', 'docs: feature');
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(calls().filter(line => !line.startsWith('install'))).toEqual(['lint:game', 'typecheck', 'exec vitest related --run --passWithNoTests src/feature.ts']);
+    expect(result.stdout.indexOf('preflight vitest green')).toBeLessThan(result.stdout.indexOf('pushing'));
+  }, 60_000);
+
+  test('preflight: a red check stops land before any push or CI wait, naming its log; --no-preflight skips it', () => {
+    const f = fixture(), calls = plantPnpm(f, 'typecheck');
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    const result = f.land(wt);
+    expect(result.status).toBe(1);
+    const log = /Log: (\S+)/u.exec(result.stdout)?.[1] ?? '';
+    expect(result.stdout).toContain('land STOP preflight typecheck is red');
+    expect(readFileSync(log, 'utf8')).toContain('planted typecheck error');
+    expect(log.startsWith(wt), 'the log stays out of the tree').toBe(false);
+    expect(calls()).toEqual(['lint:game', 'typecheck']);
+    expect([f.read(f.files.prepush), f.read(f.files.gh)]).toEqual(['', '']);
+    expect(f.read(f.files.receipts)).toContain(`STOP preflight typecheck red on ${f.git(wt, ['rev-parse', 'HEAD']).slice(0, 10)}, nothing pushed: ${log}`);
+    const skipped = f.land(wt, ['--keep', '--no-preflight']);
+    expect(skipped.status, skipped.stdout).toBe(0);
+    expect(skipped.stdout).toContain('preflight skipped (--no-preflight)');
+  }, 60_000);
+
+  test('preflightSteps: Vitest only when code changed, on that code alone', () => {
+    expect(preflightSteps(['docs/a.md', 'package.json']).map(([name]) => name)).toEqual(['lint:game', 'typecheck']);
+    expect(preflightSteps(['docs/a.md', 'src/a.ts', 'test/a.test.ts', 'scripts/b.mjs']).at(-1)).toEqual(['vitest', ['exec', 'vitest', 'related', '--run', '--passWithNoTests', 'src/a.ts', 'test/a.test.ts', 'scripts/b.mjs']]);
+  });
 
   test('a red pre-push on the plan push stops before any CI wait', () => {
     const f = fixture();
@@ -717,6 +759,8 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(found).toBe(join(f.root, 'bin/pnpm'));
   });
 
+  // These two are about the rebase install alone; the preflight's own pnpm calls are tested above.
+  const NO_PREFLIGHT = ['--keep', '--no-preflight'];
   test('a rebase that brings in a lockfile change installs before the pushes; one that does not, does not', () => {
     const f = fixture();
     // A fake pnpm on the fixture's PATH logs each call, so the test sees exactly what land runs.
@@ -726,7 +770,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const wt = f.worktree('foo');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
-    const result = f.land(wt);
+    const result = f.land(wt, NO_PREFLIGHT);
     expect(result.status, result.stdout).toBe(0);
     expect(result.stdout).toMatch(/install\s+pnpm-lock\.yaml changed in the rebase; pnpm install --frozen-lockfile/u);
     expect(f.read(calls).trim().split('\n')).toEqual(['install --frozen-lockfile --config.confirmModulesPurge=false']);
@@ -736,7 +780,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const plain = g.worktree('bar');
     g.commit(plain, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     g.state({ once: { marker: join(g.root, 'once'), command: ['sh', g.peerScript('src/other.ts', null, 'export const other = 2;')] } });
-    const quiet = g.land(plain);
+    const quiet = g.land(plain, NO_PREFLIGHT);
     expect(quiet.status, quiet.stdout).toBe(0);
     expect(quiet.stdout).not.toMatch(/frozen-lockfile/u);
     expect(existsSync(`${calls}.g`)).toBe(false);
@@ -751,7 +795,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     const wt = f.worktree('foo');
     f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
     f.state({ once: { marker: join(f.root, 'once'), command: ['sh', f.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
-    const result = f.land(wt);
+    const result = f.land(wt, NO_PREFLIGHT);
     expect(result.status, result.stdout).toBe(0);
     expect(f.read(calls).trim().split('\n')).toEqual(['install --frozen-lockfile --config.confirmModulesPurge=false users=1']);
     expect(readdirSync(users)).toEqual([]);
@@ -765,14 +809,14 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
       const plain = g.worktree('bar');
       g.commit(plain, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
       g.state({ once: { marker: join(g.root, 'once'), command: ['sh', g.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
-      const stopped = g.land(plain);
+      const stopped = g.land(plain, NO_PREFLIGHT);
       expect(stopped.status).not.toBe(0);
       expect(stopped.stdout + stopped.stderr).toMatch(/store prune is running/u);
       expect(existsSync(`${calls}.g`)).toBe(false);
       // J206 review: the rebase already moved HEAD, so the next land must still owe and run the install first.
       prune.kill();
       await new Promise(gone => prune.once('exit', gone));
-      const again = g.land(plain);
+      const again = g.land(plain, NO_PREFLIGHT);
       expect(again.status, again.stdout + again.stderr).toBe(0);
       expect(g.read(`${calls}.g`).trim().split('\n')).toEqual(['install --frozen-lockfile --config.confirmModulesPurge=false']);
     } finally { prune.kill(); }
@@ -787,7 +831,7 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     writeFileSync(join(h.repo, '.git/info/exclude'), 'node_modules\n');
     symlinkSync(join(h.root, 'canonical-modules'), join(linked, 'node_modules'));
     h.state({ once: { marker: join(h.root, 'once'), command: ['sh', h.peerScript('pnpm-lock.yaml', null, 'lockfile with wire')] } });
-    const refused = h.land(linked);
+    const refused = h.land(linked, NO_PREFLIGHT);
     expect(refused.status).not.toBe(0);
     expect(refused.stdout + refused.stderr).toMatch(/node_modules is a symlink/u);
     expect(existsSync(`${calls}.h`)).toBe(false);

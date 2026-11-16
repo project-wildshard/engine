@@ -13,6 +13,9 @@
 //   6. Fast-forward the canonical checkout when it is on main and clean (J247, WL7).
 //   7. A `landed` receipt; main-watch follows main's own `ci` and reports it (LS5).
 //   8. Delete origin's plan branch and remove this worktree (--keep skips it).
+// Before step 2's push, a preflight runs lint:game, typecheck and the Vitest files related to the branch's changed code,
+// here, and stops on the first red with its log (BUILD-MAX 2026-11-15: 14 of 22 stopped lands failed a check that runs
+// locally, each after a push and a wait). --no-preflight skips it.
 // Main's CI runs after every landing; if it goes red, the lane that landed last fixes it forward or reverts it.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {keepCopy,worktreeState} from './keep-copy.mjs';
@@ -109,6 +112,16 @@ const isAncestor=(cwd,ancestor,descendant)=>tryGit(cwd,['merge-base','--is-ances
 /** @param {string} cwd @param {string} from @param {string} to */
 const short=(/** @type {string} */ sha)=>sha.slice(0,10);
 
+/** The preflight's checks, in order, for a branch whose diff from main is `files` (BUILD-MAX 2026-11-15). Vitest runs
+ * only when code changed, on the tests related to that code (`vitest related`, which includes a changed test itself).
+ * @param {string[]} files @returns {[string,string[]][]} */
+export function preflightSteps(files){
+ const code=files.filter(file=>/^(?:src|test|scripts)\/.+\.[cm]?[jt]sx?$/u.test(file));
+ /** @type {[string,string[]][]} */const steps=[['lint:game',['lint:game']],['typecheck',['typecheck']]];
+ if(code.length>0)steps.push(['vitest',['exec','vitest','related','--run','--passWithNoTests',...code]]);
+ return steps;
+}
+
 /** `owner/name` of a GitHub remote URL, or null.
  * @param {string} remote */
 export function githubSlug(remote){
@@ -119,7 +132,7 @@ export function githubSlug(remote){
 /** Refuse anything but the known options. Any spelling of force is refused by name.
  * @param {string[]} argv */
 export function parseArgs(argv){
- const options={pollSeconds:30,timeoutMinutes:60,appearMinutes:5,rounds:5,keep:false};
+ const options={pollSeconds:30,timeoutMinutes:60,appearMinutes:5,rounds:5,keep:false,preflight:true};
  for(const arg of argv){
   if(/^-f$|force/iu.test(arg))throw new StopError(`refused ${arg}: land never force-pushes main (J240: fast-forward only). If main moved, land rebases and retries by itself`);
   const [name,value]=arg.split('=',2);
@@ -127,11 +140,12 @@ export function parseArgs(argv){
   // --no-watch-main is accepted for old callers: land never watches main now (LS8).
   if(name==='--no-watch-main'&&value===undefined)continue;
   if(name==='--keep'&&value===undefined)options.keep=true;
+  else if(name==='--no-preflight'&&value===undefined)options.preflight=false;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--poll')options.pollSeconds=number;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--timeout')options.timeoutMinutes=number;
   else if(value!==undefined&&Number.isFinite(number)&&number>0&&name==='--appear')options.appearMinutes=number;
   else if(value!==undefined&&Number.isSafeInteger(number)&&number>0&&name==='--rounds')options.rounds=number;
-  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--poll=SECONDS] [--timeout=MINUTES] [--appear=MINUTES] [--rounds=N] [--keep]`);
+  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--poll=SECONDS] [--timeout=MINUTES] [--appear=MINUTES] [--rounds=N] [--keep] [--no-preflight]`);
  }
  return options;
 }
@@ -715,6 +729,27 @@ class Landing{
   throw new StopError(`main push of ${short(head)} failed and main did not move: ${result.stdout.trim()}\nA red pre-push names its failing check above; fix forward and run land again.`);
  }
 
+ /** lint:game, typecheck and the related Vitest files, here, before anything is pushed; the first red stops land with
+  * its log. The logs live in this worktree's git dir, so they never dirty the tree and go when the worktree does.
+  * @param {string} main */
+ localChecks(main){
+  if(!this.options.preflight){this.say('preflight','skipped (--no-preflight)');return;}
+  const head=this.head(),files=git(this.root,['diff','--name-only','--no-renames',`${main}...${head}`]).split('\n').filter(Boolean);
+  const dir=resolve(this.root,git(this.root,['rev-parse','--git-path','land-preflight']));
+  mkdirSync(dir,{recursive:true});
+  for(const [name,args] of preflightSteps(files)){
+   const log=join(dir,`${short(head)}-${name.replace(':','-')}.log`),began=Date.now();
+   this.say('preflight',`${name} on ${short(head)}`);
+   const ran=spawnSync('pnpm',args,{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:256<<20});
+   writeFileSync(log,`$ pnpm ${args.join(' ')}\n${ran.stdout??''}${ran.stderr??''}${ran.error===undefined?'':`\n${String(ran.error)}\n`}`);
+   if(ran.status!==0){
+    this.receipt(`STOP preflight ${name} red on ${short(head)}, nothing pushed: ${log}`);
+    throw new StopError(`preflight ${name} is red on ${short(head)}; nothing was pushed. Log: ${log}\nFix it on ${this.branch} and run land again (--no-preflight skips the preflight).`);
+   }
+   this.say('preflight',`${name} green in ${String(Math.round((Date.now()-began)/1000))} s`);
+  }
+ }
+
  async run(){
   const stamps=this.clean();
   const start=this.head();this.expected=start;
@@ -734,6 +769,7 @@ class Landing{
    if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return 0;}
   }
   this.regenerate();
+  this.localChecks(main);
   /** @type {{sha:string,base:string}|null} */let tested=null;
   let needHosted=true,rule='exact',why='main had not moved since the hosted run';
   for(let round=1;round<=this.options.rounds;round++){
