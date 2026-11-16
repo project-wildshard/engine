@@ -73,3 +73,28 @@ The carried rebase required refreshing stale template revision8 outputs.
 Normal pins admitted27/27, inputs regeneration and full types/lint pass.
 No generation bypass: retain J381 only for the classified local timing
 flake; hosted CI and the landed preview remain required.
+
+Hosted share4 exposed one deterministic frozen SDK fixture failure in
+decision-simulation.test.ts. Reproduced locally:24 cases pass and its
+exact-input guard refuses the ABI-1 SDK worker case. The captured
+product is format0.1; the new author default is0.1.0.1 in both version
+and requires.sdk. Set only this case's original values explicitly to
+0.1. Preserve the input
+fingerprint8193f702, original product and WASM bytes, actual native
+worker execution and fuel/decision assertions. Other cases retain the
+current author default. This is a fixture-input fix, with no runtime,
+hash guard, timing threshold or hosted-CI bypass.
+
+The unchanged current-main consumer passes25/25 on the MMO branch
+(only unrelated bot edits there). Fixed WR11 passes134/134 across six
+consumer/reader/native suites, full game lint and types. Resumed Opus
+review has NO MUST; its requires.sdk SHOULD is resolved by the second
+explicit original value and that passing run. The frozen pin and its
+8193f702 fingerprint remain byte-for-byte unchanged.
+
+After the latest main rebase, fresh pins/static/134 cases pass again.
+Main fa069888 scales the separate20-second parent spawn fence; the
+original16666us cold runtime floor is unchanged. The isolated native
+verb-tape case passes9.09s. Keep the already-classified J381 local
+exception for its load-sensitive cold runtime refusal; hosted CI
+remains mandatory, with no fixture fingerprint waiver.

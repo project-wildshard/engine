@@ -285,6 +285,9 @@ test('fresh-host restore retains a staged strike catalogue and logical decision 
 test('SDK worker executes the declared v1 section and reports its real fuel rather than admitting it as v0', async () => {
   const { HeadlessSimulation } = await import('../src/server/host/headless');
   const f = fixture(); f.source.budgets.sim.resident = 1_000_000;
+  // This frozen ABI-1 SDK product captured the preceding format, not today's author default.
+  f.source.version = '0.1';
+  f.source.requires.sdk = '0.1';
   const product = frozenDecisionWorkerProduct(f.source,bytes);
   const session = await HeadlessSimulation.create(product.shard, product.assets, undefined, { deadline: 'advisory', sections: f.sections });
   try {
