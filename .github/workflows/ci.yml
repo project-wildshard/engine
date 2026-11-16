@@ -298,6 +298,13 @@ jobs:
         if: steps.code.outputs.run == 'true' && matrix.job == 1
         continue-on-error: true
         run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/coverage-fire-drill.proof.mjs
+      # TC7: new complete journeys report for a week before becoming gates.
+      - name: Soak full Dunes and real pin-grid journeys
+        if: steps.code.outputs.run == 'true' && matrix.job == 1
+        continue-on-error: true
+        run: |
+          node scripts/pins.ts install --ring 1
+          node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test --test-reporter=tap test/ci/dunes-journey.proof.mjs test/ci/pin-grid-journey.proof.mjs
       # One run stands for every commit since the last finished run (was the verdict-coverage job; each share now
       # names the range and flags its own red, so a main push needs no extra job).
       - name: Name the commits this verdict covers

@@ -26,8 +26,10 @@ forwarded-storage acknowledgements are included.
 Four cases pass in 4.04 seconds total on the mini: Template 293 ms,
 hall 204 ms, Dunes 1.03 s and crossing 3.36 s including cold road mesh
 preparation. Each complete case retains a 9.5-second wall limit. Typed
-lint passes. CI calls these explicitly; hooks and Vitest do not discover
-the new journeys. Every created document and collision file is removed.
+lint passes. CI reports the two new journeys after wall accounting, non-blocking
+for the plan's required one-week soak. The original declared journeys
+retain their existing gate. Hooks and Vitest do not discover the new
+journeys. Every created document and collision file is removed.
 
 TC7 remains partial: the five installed slices have no sibling tapes.
 Named host wakes need their owners' published input artifacts; idle
