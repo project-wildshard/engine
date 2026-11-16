@@ -8,3 +8,7 @@
   handle and rebinds them after a restore replaces the world (a missing or changed body refuses).
 - `bindShardfileSim` installs them for every data shard. Test: `test/touch-bodies.test.ts` (a walk pushes the crate over
   0.5 m, the wire pose matches, a restore matches and goes on identically, a duplicate id refuses).
+- SS9c: `shardfile/touchViews.ts` gives each row a kinematic stand-in (WORLD group) in the one-shard page's physics or a
+  grid cell's, posed off the wire's `script:<id>` row, and draws its named panel there (`moverPanelPose` with the row's
+  rest); a cell takes the wire once the feet enter it and its drawn panel (`neighbourPanels.ts`) keeps the id after.
+  Test: `test/touch-views.test.ts`.

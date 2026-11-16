@@ -1040,6 +1040,7 @@
     "src/client/game/shardfile/tiledMesh.ts": "client",
     "src/client/game/shardfile/tileDriver.ts": "client",
     "src/client/game/shardfile/tileEntry.ts": "client",
+    "src/client/game/shardfile/touchViews.ts": "client",
     "src/client/game/shardfile/water.ts": "client",
     "src/client/game/shardfile/weatherFields.ts": "client",
     "src/client/game/shardfile/wholeGeometryPieces.ts": "client",

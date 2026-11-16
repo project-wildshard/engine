@@ -12,6 +12,7 @@ import { retireTerrain } from '@wildshard/engine/physics/terrain';
 import { timeClientPreparation } from './preparationTiming';
 import { wirePage } from './wirePage';
 import { installDataPageMovers } from './dataPageMovers';
+import { installDataPageBodies } from './touchViews';
 import { admitClientPlan, installClientPhase, type AdmittedClientPlan, type ClientPhase } from './clientPlan';
 import { materialTextureRefs } from '@wildshard/format/materials';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
@@ -585,6 +586,8 @@ export class ShardfileClient {
     // TEMPLATE-E2E TC-E5c: a plain data shard's lift and doors stand on its page; a client plan's movers install their own
     if (this.bindings.trustedRuntime !== true && !(this.plan?.features ?? []).some(row => row.kind === 'world.movers' || row.kind === 'motion.channels')) {
       const movers = installDataPageMovers(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map(), prompts: runtime.interactables });
+      // SHARD-SOURCE SS9c: a touchable crate stands where the server's body is, its panel drawn there
+      installDataPageBodies(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map() });
       if (movers !== null) {
         ctx.scope.onDispose(() => { if (movers.riding()) world.player.carried = false; });
         // side parity (SS1) reads the page's colliders beside a room's at tick 0: every mover's collider at its declared rest

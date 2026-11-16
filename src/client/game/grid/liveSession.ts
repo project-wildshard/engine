@@ -68,6 +68,7 @@ import { GridCellWaitingError } from './refusal';
 import { withCopyLayout } from './copyLayout';
 import { dataCellWorld, type RegionShell } from './regionShell';
 import { installDataCellMovers, type DataCellMovers } from './dataCellMovers';
+import { installDataCellBodies } from '../shardfile/touchViews';
 import type { PanelRegion } from './neighbourPanels';
 import { wirePage } from '../shardfile/wirePage';
 import type { CollisionStrip } from '../../../shared/game/grid/collisionStrips';
@@ -244,6 +245,8 @@ export class LiveGridSession {
   /** each admitted region's authored spawn (its level's player start) and its ground / water queries, local */
   /** TC-E5b: each admitted data cell's movers, claimed for the wire as the feet enter it. */
   private readonly dataMovers = new Map<string, DataCellMovers>();
+  /** SS9c: each resident cell's touchable bodies, claimed with its movers. */
+  private readonly dataBodies = new Map<string, { readonly claim: () => void }>();
   private readonly regions = new Map<string, { readonly spawn: LiveGridSpawn; readonly items: Shardfile['items']['rows']; readonly queries: PlayerFrameQueries; readonly colliders: PanelRegion['colliders']; readonly prompts: ReturnType<typeof copyPrompts>; readonly audio: PlotAudioScene | null;
     /** TC-E1b: the copy's admitted source and assets, its declared kit built from them on entry */
     readonly kit: { readonly source: Shardfile; readonly assets: ReadonlyMap<string, Uint8Array> } | null;
@@ -292,7 +295,7 @@ export class LiveGridSession {
     scope.onDispose(gridCells.onLeave(() => { this.hybrid.leave(); this.prepareDeferredEntries(); }));
     scope.onDispose(gridCells.onLeave(() => { this.leavePlotAudio(); this.leaveDataKit(); this.leaveDataTalks(); }));
     scope.onDispose(gridCells.onEnter(cell => {
-      if (!this.runtimeResidents.has(cell.instance)) { this.dataMovers.get(cell.instance)?.claim(); this.enterPlotAudio(cell.instance); this.enterDataKit(cell.instance); this.enterDataTalks(cell.instance); ports.lightingSettled?.(); return; }
+      if (!this.runtimeResidents.has(cell.instance)) { this.dataMovers.get(cell.instance)?.claim(); this.dataBodies.get(cell.instance)?.claim(); this.enterPlotAudio(cell.instance); this.enterDataKit(cell.instance); this.enterDataTalks(cell.instance); ports.lightingSettled?.(); return; }
       this.startedRuntimes.add(cell.instance);
       const activation = this.hybrid.enter(cell);
       this.activation = activation;
@@ -729,6 +732,9 @@ export class LiveGridSession {
         // TC-E5b: its lift and doors stand on this page, posed off the wire once the feet are in it
         const movers = installDataCellMovers(copySource, shell, cell.instance);
         if (movers !== null) { this.dataMovers.set(cell.instance, movers); if (gridCells.cell?.instance === cell.instance) movers.claim(); }
+        // SS9c: its touchable crates stand on this page where the server has them, once the feet are in it
+        const touch = installDataCellBodies(copySource, shell, cell.instance);
+        if (touch !== null) { this.dataBodies.set(cell.instance, touch); if (gridCells.cell?.instance === cell.instance) touch.claim(); }
         const transfer = regionTransferWalls(shell, this.page.traveller.motor.opts.radius), start = shell.level.player;
         shell.physics.step();
         transfer.sync(); this.transferWalls.set(cell.instance, transfer);
@@ -748,7 +754,7 @@ export class LiveGridSession {
             try { await hangCellDataSky(request); } catch (error) { console.warn(`[region sky] ${cell.instance}`, error); }
           })();
         }
-        const unlist = (): void => { if (this.plotAudio?.instance === cell.instance) this.leavePlotAudio(); if (this.dataKit?.instance === cell.instance) this.leaveDataKit(); if (this.dataTalks?.instance === cell.instance) this.leaveDataTalks(); this.plotBanks.delete(cell.instance); this.regions.delete(cell.instance); this.dataMovers.delete(cell.instance); this.transferWalls.delete(cell.instance); };
+        const unlist = (): void => { if (this.plotAudio?.instance === cell.instance) this.leavePlotAudio(); if (this.dataKit?.instance === cell.instance) this.leaveDataKit(); if (this.dataTalks?.instance === cell.instance) this.leaveDataTalks(); this.plotBanks.delete(cell.instance); this.regions.delete(cell.instance); this.dataMovers.delete(cell.instance); this.dataBodies.delete(cell.instance); this.transferWalls.delete(cell.instance); };
         return { host: shell, shell, dispose: () => {
           unlist();
           try { shell.dispose(); } finally { retained.release(); }

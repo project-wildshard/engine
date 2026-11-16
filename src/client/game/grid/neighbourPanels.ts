@@ -66,7 +66,7 @@ export class NeighbourPanels {
   /** Draw one neighbour's declared panels in its cell root (the session's shared per-slug load supplies views and bytes). */
   async admit(cell: GridCell, root: Group, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, views: ClientTileViews): Promise<void> {
     const props = source.props;
-    if (props === null || props.panels.length === 0 || source.targets.panels.length === 0 && source.movers.length === 0 || this.cells.has(cell.instance)) return;
+    if (props === null || props.panels.length === 0 || source.targets.panels.length === 0 && source.movers.length === 0 && (props.bodies ?? []).length === 0 || this.cells.has(cell.instance)) return;
     const panels = await views.panels(props, assets, root, this.ports.scope);
     if (this.ports.scope.disposed) return;
     // a panel's programs compile in the page's warm-up, off the drive's frames: hidden until then, then shown by sync
@@ -88,6 +88,17 @@ export class NeighbourPanels {
       const panel = panels.get(row.id); if (panel === undefined) continue;
       const view = { pose: moverPanelPose(panel, row) }, key = moverLookKey(cell.instance, row.id);
       panel.visible = row.enabled; // drawn at rest until the wire poses it (review SHOULD)
+      wirePage.moverLooks.set(key, view);
+      if (!wirePage.movers.has(row.id)) wirePage.movers.set(row.id, view);
+      this.ports.scope.onDispose(() => {
+        if (wirePage.moverLooks.get(key) === view) wirePage.moverLooks.delete(key);
+        if (wirePage.movers.get(row.id) === view) wirePage.movers.delete(row.id);
+      });
+    }
+    // SHARD-SOURCE SS9c: a touchable body's look is its named panel, posed off the wire like a mover's
+    for (const row of props.bodies ?? []) {
+      const panel = panels.get(row.panel); if (panel === undefined) continue;
+      const view = { pose: moverPanelPose(panel, { at: row.at, euler: { x: 0, y: row.yaw, z: 0 } }) }, key = moverLookKey(cell.instance, row.id);
       wirePage.moverLooks.set(key, view);
       if (!wirePage.movers.has(row.id)) wirePage.movers.set(row.id, view);
       this.ports.scope.onDispose(() => {
