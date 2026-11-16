@@ -17,7 +17,10 @@ frustum test kept nearly all of them.
   its pipeline. Tier knob `slabRanges` (phone true, desktop false).
 - The tree is built in linear passes (a middle-of-extent split per node over centroid arrays permuted with the ids):
   Nine's 0.70 M slab triangles take ~37 ms at CPU x1 (a count-median quickselect took ~50 ms and culled the spawn
-  view 24 k better; a Morton radix sort took ~27 ms and culled every view worse). NB1 x4 readyFrame 1.1 to 1.3 s.
+  view 24 k better; a Morton radix sort took ~27 ms and culled every view worse). Built on read, that cost NB1 x4
+  readyFrame 1.1 to 1.3 s, so a chunk read under the loader's settle now gets its runs after the settle, a few a work
+  slice, its reordered index uploaded again (interleaved x4 pairs, a busy machine: readyFrame 1.5 / 1.6 / 1.4 s
+  against main's 1.7 / 1.7 / 1.4 s). A read in play still builds before its first upload.
 - NB1, phone, x4, 402×874: spawn slab 0.563 to 0.490 M (1.22 to 1.15 M), reverse 0.32 to 0.05 M, 40 m up the street
   0.50 to 0.11 M, side views 0.47-0.55 to 0.15-0.29 M. A same-instant A/B (the main scene drawn twice into its target,
   runs on and off, no frame between) differs in 0 pixels at all 8 poses.
