@@ -10,6 +10,7 @@ import type { AnimalSimSpec, AnimalSim } from "@wildshard/engine/entities/Animal
 import type { SimStrike, SimValue, SimHost } from "@wildshard/engine/sim";
 import { type StrikeSpec, StrikeRunner, type StrikeContext } from "@wildshard/engine/ai/strikes";
 import type { ShardRows } from "@wildshard/format/rows";
+import { resolveCreatureLayers } from '../shardfile/creatureLayers';
 import { parseScriptSpecies, type ScriptSpeciesSchema, type ScriptSpeciesData } from "@wildshard/format/speciesScripts";
 import { parseEliteScript, type EliteScriptData } from "@wildshard/format/eliteScripts";
 import * as v from "valibot";
@@ -30,7 +31,7 @@ import { OrbitDiverBrain } from "@wildshard/engine/ai/orbitDiver";
 import { BurstFlyerBrain } from "@wildshard/engine/ai/burstFlyer";
 import { ChallengeGrazerBrain } from "@wildshard/engine/ai/challengeGrazer";
 import { PatrolDiverBrain } from "@wildshard/engine/ai/patrolDiver";
-import { CreatureBodyRecipeSchema, CreatureHomeSchema, CreatureStrikeSchema, type CreatureBodyRecipe, type CreatureMemoryActions } from "@wildshard/format/creatures";
+import { CreatureBodyRecipeSchema, CreatureHomeSchema, CreatureStrikeSchema, type CreatureBodyRecipe, type CreatureMemoryActions, type ShardCreatures } from "@wildshard/format/creatures";
 import { canReach } from "@wildshard/engine/ai/reach";
 import type { SimSnapshot } from "@wildshard/engine/sim/snapshot";
 import { parseGrazer, grazerPreset, type GrazerSchema, parseChallengeGrazer, type ChallengeGrazerSchema, type ShardChallengeGrazer, type ShardRamGrazer } from "@wildshard/format/grazers";
@@ -298,12 +299,15 @@ export function selectCreatureSites<T extends { readonly x: number; readonly z: 
 }
 
 /** Resolve both species and variant, preserving authored health and gameplay multipliers. */
-export function speciesResolver(rows: ShardRows): (speciesId: string, variantId: string) => AnimalSimSpec {
+export function speciesResolver(rows: ShardRows, brains: ShardCreatures['brains'] = []): (speciesId: string, variantId: string) => AnimalSimSpec {
   const catalogue = new Map(rows.species.map((row) => [row.id, row]));
+  const layers = resolveCreatureLayers(rows, brains);
   return (speciesId, variantId) => {
     const row = catalogue.get(speciesId), selected = row?.variants.find((variantRow) => variantRow.id === variantId);
     if (row === undefined || selected === undefined) throw new Error('Unresolved declared species/variant');
-    return { kind: row.kind, label: selected.label, variant: selected.id, rarity: selected.rarity, hp: selected.hp, aggressive: row.aggressive, lockable: row.lockable,
+    const resolved = layers.get(speciesId);
+    return { kind: row.kind, label: selected.label, variant: selected.id, rarity: selected.rarity, hp: selected.hp,
+      aggressive: resolved === undefined ? row.aggressive : resolved.temperament.reaction === 'aggressive', lockable: row.lockable,
       dims: { ...row.dims, feet: row.dims.feet.map(([x, z]) => [x, z]) }, mods: { ...selected.mods }, ...(row.flight === undefined ? {} : { flight: { ...row.flight } }) };
   };
 }

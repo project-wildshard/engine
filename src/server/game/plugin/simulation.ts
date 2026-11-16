@@ -398,7 +398,7 @@ function shardfileSimInput(shard: Shardfile, assets: ReadonlyMap<string, Uint8Ar
   const weapon = ports.weapon ?? HOST_PROBE;
   return {level: { version: SIM_API_VERSION, id: shard.identity.slug, seed: shard.identity.seed,
     ground: { size: 500, height: 0 }, player: { at: { x: shard.spawn.x, y: shard.spawn.y, z: shard.spawn.z }, yaw: shard.spawn.yaw, speed: Math.min(5, shard.authorCaps.speed) },
-    entities: buildPlatformSpawns(shard.creatures.spawns, speciesResolver(shard.rows), simStrikes(shard.rows)), weapon, quests: [],
+    entities: buildPlatformSpawns(shard.creatures.spawns, speciesResolver(shard.rows, shard.creatures.brains), simStrikes(shard.rows)), weapon, quests: [],
   }, ports: { ...ports, ground: ports.ground !== false && terrain === undefined && shard.meshCollision === null && shard.entryways.some(entry => (entry.kind ?? 'ground') === 'ground'), heightAt }};
 }
 /** Install the ordinary native simulation once. */

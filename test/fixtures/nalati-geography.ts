@@ -22,11 +22,16 @@ const palette:v.GenericSchema<unknown,MapPaletteRow>=v.object({ground:paint,
     v.object({kind:v.literal('dot'),x:finite,z:finite,r:finite,fill:v.string()}),
   ])),pois:v.array(v.object({x:finite,z:finite,label:v.string(),color:v.string()})),
 });
-const geography=v.object({res:finite,size:finite,seed:finite,map:palette,
+interface GeographyFixture {
+  res: number; size: number; seed: number; map: MapPaletteRow;
+  channels: Record<'wet' | 'mapRed' | 'mapGreen' | 'mapBlue', v.InferOutput<typeof ScalarLatticeSchema>>;
+}
+// Keep the declaration portable when the defining format is a separate installed package or candidate checkout.
+const geography:v.GenericSchema<unknown,GeographyFixture>=v.object({res:finite,size:finite,seed:finite,map:palette,
   channels:v.object({wet:ScalarLatticeSchema,mapRed:ScalarLatticeSchema,mapGreen:ScalarLatticeSchema,mapBlue:ScalarLatticeSchema})});
 
 /** Independent admitted fixture for map/sampler comparisons, without static JSON inference. */
-export function readNalatiGeography():v.InferOutput<typeof geography>{
+export function readNalatiGeography():GeographyFixture{
   const input:unknown=frozenNalatiJson('nalati-geography-original.json');
   return v.parse(geography,input);
 }
