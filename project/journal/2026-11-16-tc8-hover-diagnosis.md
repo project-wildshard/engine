@@ -51,3 +51,11 @@ WebKit now uses its public Playwright viewport PNG API within the same
 original capture deadline. Font/compositor readiness, actual PNG pixel
 analysis, black-frame refusal and ordinary Chromium capture remain.
 Hosted single-head runs verify the actual browser boundary.
+
+The full night's Template 404 is the old whole-level manifest, not the
+new cook's asset. Detaching only the inline entry row left `_template`
+in the packs book, whose exact lookup precedes the new `template` row.
+The diagnostic now detaches both entry and whole rows (and optional
+program inventory) before the production installer attaches the cold
+product. Each head starts from the original book, restored on cleanup.
+The production installer's rule to keep a build's own product is unchanged.

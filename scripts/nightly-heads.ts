@@ -21,6 +21,7 @@ const {folderStore} = await import('../src/cook/game/packStore.ts');
 const {objectHeaders, DEFAULT_LIMITS} = await import('../src/cook/game/cookWorker.ts');
 const {addStoredShards} = await import('./app-build/catalogue.ts');
 const {bareSlug} = await import('../src/shared/game/grid/catalogueSlot.ts');
+const {packsBookPath} = await import('../src/shared/game/shardfile/spawnManifest.ts');
 const [browserName, groupText, directory = 'tmp/nightly/reports', only] = process.argv.slice(2);
 if (browserName !== 'chromium' && browserName !== 'webkit') throw new Error('Choose chromium or webkit');
 const expected = plan(), selected = partition(expected.heads, Number(groupText));
@@ -33,6 +34,7 @@ const checkpoint = () => {writeFileSync(`${receipt}.next`, `${JSON.stringify(rep
 checkpoint();
 const {build} = read(join(dist, 'version.json')) as {build: string};
 requireBuild(build, expected);
+const bookFile = join(dist, packsBookPath(build)), originalBook = readFileSync(bookFile, 'utf8');
 const live = read('test/pins/catalogue.json') as StandaloneCatalogue;
 const originalHTML = readFileSync(join(dist, 'index.html'), 'utf8');
 const work = mkdtempSync(join(out, '.heads-'));
@@ -92,8 +94,15 @@ try {
       const expression = /(<script type="application\/json" id="boot-module-files">)([^<]+)(<\/script>)/u;
       const bankText = expression.exec(originalHTML)?.[2];
       if (bankText === undefined) throw new Error('Missing build bank');
-      const bank = JSON.parse(bankText) as {spawnManifests: {client: Record<string, unknown>}};
+      const bank = JSON.parse(bankText) as {spawnManifests: {client: Record<string, unknown>}; entryPrograms?: Record<string, unknown>};
       for (const slug of Object.keys(bank.spawnManifests.client)) if (bareSlug(slug) === bareSlug(head.slug)) delete bank.spawnManifests.client[slug];
+      if (bank.entryPrograms !== undefined) for (const slug of Object.keys(bank.entryPrograms)) if (bareSlug(slug) === bareSlug(head.slug)) delete bank.entryPrograms[slug];
+      // Detach the whole-level row too. Its authored `_template` key wins
+      // exact lookup over a newly installed canonical `template` cook row,
+      // otherwise sending an old manifest URL to the new cold pack store.
+      const book = JSON.parse(originalBook) as {client: Record<string, unknown>};
+      for (const slug of Object.keys(book.client)) if (bareSlug(slug) === bareSlug(head.slug)) delete book.client[slug];
+      writeFileSync(bookFile, JSON.stringify(book));
       writeFileSync(join(dist, 'index.html'), originalHTML.replace(expression, (_, before, _body, after) => `${before}${JSON.stringify(bank).replaceAll('<', String.raw`\u003c`)}${after}`));
       const added = await addStoredShards(dist, [head], store,
         hash => Promise.resolve(readFileSync(join(process.env.WILDSHARD_PIN_CACHE ?? join(homedir(), '.cache/wildshard/pins'), `${hash}.tar`))),
@@ -197,5 +206,5 @@ try {
       rmSync(cooked, {recursive: true, force: true}); rmSync(evidence, {recursive: true, force: true});
     }
   }
-} finally {preview?.close(); writeFileSync(join(dist, 'index.html'), originalHTML); rmSync(work, {recursive: true, force: true}); checkpoint();}
+} finally {preview?.close(); writeFileSync(join(dist, 'index.html'), originalHTML); writeFileSync(bookFile, originalBook); rmSync(work, {recursive: true, force: true}); checkpoint();}
 if (report.results.some(row => row.phases.length !== 5 || row.phases.some(phase => !phase.ok))) process.exitCode = 1;
