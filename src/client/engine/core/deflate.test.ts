@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { zlibSync } from 'fflate';
 import { decodeLaneBytes, unshuffleLanes } from './deflate';
+import { base64Bytes, decodeDeflatedLanes } from '../../../shared/engine/core/byteCodec';
 
 test('verified lane files decode offset bytes without a fetch or input mutation', async () => {
   const words=32769,lanes=Uint8Array.from({length:words*4},(_,index)=>(index*79+31)&255),compressed=zlibSync(lanes);
@@ -78,4 +79,16 @@ test('range and alias refusals precede all writes', () => {
   expect(input).toEqual(new Uint8Array(32).fill(9));
   expect(() => unshuffleLanes(input, new Uint8Array(31))).toThrow('bad output/range');
   expect(() => unshuffleLanes(new Uint8Array(3), output)).toThrow('not whole words');
+});
+
+// Same source algorithm, with no page owner, renderer or private URL in its closure.
+test('the public codec retains offset lane bytes and input ownership outside the app', async () => {
+  const raw = Uint8Array.from({ length: 131_080 }, (_, index) => (index * 79 + 31) & 255);
+  const packed = zlibSync(raw), backing = new Uint8Array(packed.length + 13); backing.set(packed, 7);
+  const before = backing.slice(); let checks = 0;
+  const bytes = await decodeDeflatedLanes(backing.subarray(7, 7 + packed.length), () => { checks++; return undefined; });
+  expect(bytes).toEqual(unshuffleLanes(raw)); expect(backing).toEqual(before); expect(checks).toBeGreaterThan(1);
+  expect(base64Bytes('AP+A')).toEqual(new Uint8Array([0, 255, 128]));
+  await expect(decodeDeflatedLanes(zlibSync(new Uint8Array(3)))).rejects.toThrow('not whole words');
+  await expect(decodeDeflatedLanes(new Uint8Array([1, 2, 3]))).rejects.toThrow();
 });

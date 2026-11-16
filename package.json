@@ -1334,7 +1334,8 @@
     "./game/quest/chapterRecords": "./src/server/game/quest/chapterRecords.ts",
     "./game/boss/arenaCollision": "./src/shared/game/boss/arenaCollision.ts",
     "./game/boss/arenaGround": "./src/shared/game/boss/arenaGround.ts",
-    "./boot/forceUpdate": "./src/client/engine/boot/forceUpdate.ts"
+    "./boot/forceUpdate": "./src/client/engine/boot/forceUpdate.ts",
+    "./core/byteCodec": "./src/shared/engine/core/byteCodec.ts"
   },
   "sideEffects": [
     "./src/client/**/*",
