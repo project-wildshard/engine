@@ -11,9 +11,13 @@ export function projectedSite<T extends ProjectedSite>(sites: readonly T[], prog
   readonly minimum: number; readonly maximum: number;
   readonly observations: Readonly<Record<string, number>>;
   readonly away?: { readonly x: number; readonly z: number };
+  /** A caller may score fewer sites per request to stay within guest fuel.
+   * Other callers retain their eight-site batches and random-stream grouping. */
+  readonly batchSize?: number;
 }, random?: Rng): { readonly index: number; readonly site: T } | null {
-  const { origin, minimum, maximum, away } = request;
+  const { origin, minimum, maximum, away, batchSize = 8 } = request;
   if (!Number.isSafeInteger(request.limit) || request.limit < 1 || request.limit > 16384 || sites.length > request.limit || !Number.isFinite(minimum) || minimum < 0 || !Number.isFinite(maximum) || maximum < minimum
+    || !Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 8
     || !Number.isFinite(origin.x) || !Number.isFinite(origin.z)
     || (away !== undefined && (!Number.isFinite(away.x) || !Number.isFinite(away.z)))
     || Object.values(request.observations).some(value => !Number.isFinite(value))
@@ -27,8 +31,8 @@ export function projectedSite<T extends ProjectedSite>(sites: readonly T[], prog
   const before = random?.snapshot();
   let best: { index: number; site: T; score: number } | null = null;
   try {
-    for (let start = 0; start < admitted.length; start += 8) {
-      const batch = admitted.slice(start, start + 8);
+    for (let start = 0; start < admitted.length; start += batchSize) {
+      const batch = admitted.slice(start, start + batchSize);
       const result = program.project(request.signal, { ...request.observations, candidates: batch.length }, random, batch.map(row => row.observations));
       const index = result['index'], score = result['score'];
       if (index === undefined || !Number.isSafeInteger(index) || index < 0 || index >= batch.length || score === undefined || !Number.isFinite(score)) throw new Error('Invalid projected site result');

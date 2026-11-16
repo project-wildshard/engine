@@ -1,0 +1,39 @@
+# SH-pine: new regression reports for a week before it can block (J186).
+name: pine-shelter-contract
+on:
+  push:
+    branches: ['main']
+    paths:
+      - src/server/game/population/projectedSites.ts
+      - src/server/game/population/shelter.ts
+      - test/pine-shelter-fuel.proof.mjs
+      - .github/workflows/pine-shelter-contract.yml
+  workflow_dispatch:
+  schedule:
+    - cron: '43 8 * * *'
+permissions:
+  contents: read
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: node scripts/pins.ts install pine-hollow
+      - name: Fresh world and actual guest selection
+        run: node --experimental-transform-types --test test/pine-shelter-fuel.proof.mjs
+      - name: Retain actual criteria even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pine-shelter-contract
+          path: tmp/pine-shelter-contract/receipt.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove owned receipt
+        if: always()
+        run: node -e "require('node:fs').rmSync('tmp/pine-shelter-contract',{recursive:true,force:true})"
