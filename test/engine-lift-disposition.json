@@ -13164,5 +13164,17 @@
         "revision": "6a35c57f9c0c7d4003e4041ac38689eb3335ed5b"
       }
     ]
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/platform-runtime-closure.test.ts",
+    "outcome": "deleted-j186",
+    "decision": "Historical HOST-RULER HR9/HR10 removed the old census and its outputReport implementation; sharddev3c8ee599 deleted scripts/shard-output-report.mjs on2026-11-14 because its engine census imports were deleted and nothing ran it. This single complete case orchestrates that retired report/percentage contract. Do not resurrect the removed production census to make an excluded legacy test run. Keep the surviving runtimeClosures production module unchanged. No successor equivalence is claimed (J232 rare monorepo retirement).",
+    "originalTests": [
+      "reports per-shard raw escapes with no percentage or source fallback"
+    ],
+    "sourceRevision": "f9a2dd4c2925714e89c06218f953a599a6fb4389",
+    "sourceBlob": "093f69907e0fd52c80fd539a637a800656498337",
+    "retirementProof": "Historical source deletion: sharddev3c8ee599759c6cb50bf6ba5481991634795fa901; engine HR9 already removed the census. SDK runtime/syntax proof would otherwise require reviving removed production code."
   }
 ]

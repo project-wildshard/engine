@@ -74,7 +74,6 @@
   "test/pine-native-story-admission.test.ts",
   "test/pine-product-reads.test.ts",
   "test/pine-quest-verbs.test.ts",
-  "test/platform-runtime-closure.test.ts",
   "test/program-discovery-bootstrap.test.ts",
   "test/quest-step-native-parity.test.ts",
   "test/quest-step-pine-native-parity.test.ts",
