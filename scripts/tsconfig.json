@@ -454,6 +454,7 @@
   "files": [
     "../vitest.config.ts",
     "../test/fixtures/dedicated/mmoBotsGuard.ts",
+    "../test/fixtures/dedicated/releaseObserver.ts",
     "../vite/rapier.ts"
   ]
 }
