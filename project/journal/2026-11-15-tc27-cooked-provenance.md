@@ -17,3 +17,11 @@ indexes and an installer that preserves Template refuse qualification.
 No runtime, pins, shared nightly code or cook implementation changed.
 `node --check scripts/cook-to-play.mjs` passes. The Mac mini does not run
 the cook or graphical proof locally; normal branch CI owns that evidence.
+
+Hosted report 43783265173 exposed an independent gating gap: six existing
+released-save cases fail (five eagerly read GLBs from server-only slices;
+Blender's old-level refusal expectation also disagrees with today's pin),
+so Actions skipped cook-to-play entirely. Those cases belong to TC29/33
+and are untouched. The report now lets the stored-product proof run once
+input setup succeeds, even when another report step fails; cancellation
+and failed setup still stop it. No failure is hidden or made green.

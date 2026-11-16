@@ -26,7 +26,8 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/ring-setup
       - run: node scripts/pins.ts install --ring 1
-      - run: pnpm gen:inputs
+      - id: inputs
+        run: pnpm gen:inputs
       # Ring 2: re-cutting five large raw heads is outside Ring 1.
       - name: Re-cut the pinned server slices
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -40,8 +41,12 @@ jobs:
           WS_VITEST_MAX_WORKERS: '2'
           NET_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
           COOK_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
-      - run: bash scripts/ci-playwright-install.sh chromium
+      # TC27: an unrelated hostile-peer/restore report must not skip the
+      # stored-product proof. A failed setup or cancellation still stops it.
+      - if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        run: bash scripts/ci-playwright-install.sh chromium
       - name: Cook, attach, and play the same bytes
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
         run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
       - name: Check the full Nalati server herd tick budget
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
