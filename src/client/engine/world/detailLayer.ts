@@ -86,7 +86,8 @@ function ringMaterial(material: THREE.Material, radius: number, sway: DetailLaye
           transformed += ( off * im ) / s2 * sqrt( s2 );`;
     }
     if (trample !== undefined) {
-      declare += trample.glsl;
+      // a look material that already bends on the field (the painterly grass's) keeps its one declaration
+      if (!shader.vertexShader.includes('vec2 trampleBend(')) declare += trample.glsl;
       Object.assign(shader.uniforms, trample.uniforms);
       bend += TRAMPLE_BEND;
     }

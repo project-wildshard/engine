@@ -80,7 +80,20 @@ test('an owned field gets every mover pushed and one update a frame; a field ano
   expect(pushes[4]).toEqual([10.5, 0, 0.55, 1, 0, 0]);
   // owned elsewhere: the layer bends on it, but nothing pushes or updates from here
   const before = updates.length, others: ((dt: number) => void)[] = [];
-  installClientDetails([row], assets(), { ...base, frame: (run) => { others.push(run); }, trample: { field, uniforms: {}, glsl: '', movers: null } });
+  installClientDetails([row], assets(), { ...base, frame: (run) => { others.push(run); }, trample: { field, uniforms: {}, glsl: 'vec2 trampleBend( vec2 p ) { return vec2( 0.0 ); }', movers: () => null } });
   for (const run of others) run(0.1);
   expect(updates).toHaveLength(before);
+});
+
+test('a mover missing for a frame is forgotten: it comes back pushed still, not with a stride', () => {
+  const pushes: number[][] = [], p = ports(), frames: ((dt: number) => void)[] = [];
+  const field = { push: (x: number, _z: number, _radius: number, _strength = 1, vx = 0, vz = 0) => { pushes.push([x, vx, vz]); }, update: () => undefined };
+  let seen = true, x = 0;
+  installClientDetails([row], assets(), { root: p.root, materials: p.materials, phone: false, scope: { onDispose: () => undefined } as never, viewer: () => ({ x: 0, z: 0 }),
+    frame: (run) => { frames.push(run); }, trample: { field, uniforms: {}, glsl: 'vec2 trampleBend( vec2 p ) { return vec2( 0.0 ); }',
+      movers: () => (seen ? [{ id: 'creature:boar', x, z: 0, radius: 0.7 }] : []) } });
+  for (const run of frames) run(0.1);
+  seen = false; for (const run of frames) run(0.1);
+  seen = true; x = 2; for (const run of frames) run(0.1);
+  expect(pushes.at(-1)).toEqual([2, 0, 0]);
 });

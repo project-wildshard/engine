@@ -11,3 +11,8 @@
   it (a native forest's grass does), pushes the player (0.55 m) and every creature body (0.7 m) each frame with their
   velocity, a step over 30 m/s pushed still, and advances it once a frame.
 - SS7b test: two movers push with their velocity, the field updates once a frame, a 10 m jump pushes still, an owned field is left alone.
+- Review fixes: the page settles who owns the field on its first frame, after every plan phase (a forest page registers
+  during the world phase, so deciding earlier drove the field twice a frame); no push while a practice room is open
+  (E321); a mover missing for a frame is forgotten; a look that already declares `trampleBend` keeps its one copy.
+  Left: creatures drawn by a herd view may be pushed twice (two of 16 slots); a layer bends on the module field even when
+  another field owns the page; shadows stay upright.

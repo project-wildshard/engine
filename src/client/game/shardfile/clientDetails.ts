@@ -24,9 +24,10 @@ export interface DetailMover { readonly id: string; readonly x: number; readonly
 /** The page's trample field for the layers (the engine's `systems/looks/trample.ts`). */
 export interface DetailTramplePort extends DetailTrample {
   readonly field: { push: (x: number, z: number, radius: number, strength?: number, vx?: number, vz?: number) => void; update: (dt: number, playerPos: { x: number; z: number }) => void };
-  /** the movers to push each frame, the player first; null when another system on the page owns the field (it pushes and
-   *  advances it), so the layers only bend on it */
-  readonly movers: (() => Iterable<DetailMover>) | null;
+  /** the movers to push this frame, the player first; null when another system on the page owns the field (it pushes and
+   *  advances it) or no push should land (a practice room is open), so the layers only bend on it. Asked every frame, so
+   *  the owner can be settled once every plan phase has had its turn to register one. */
+  readonly movers: () => Iterable<DetailMover> | null;
 }
 
 /** A step faster than this (m/s) is a teleport or a respawn: pushed with no velocity (Grass.ts's 30 m/s). */
@@ -84,20 +85,24 @@ export function installClientDetails(rows: readonly LookDetail[] | undefined, as
     ports.scope.onDispose(() => { layer.mesh.removeFromParent(); layer.dispose(); });
     return layer;
   });
-  const movers = ports.trample?.movers ?? null, field = ports.trample?.field, last = new Map<string, { x: number; z: number }>();
+  const movers = ports.trample?.movers, field = ports.trample?.field, last = new Map<string, { x: number; z: number; seen: boolean }>();
   ports.frame((dt) => {
     const eye = ports.viewer();
     for (const layer of layers) layer.update(eye);
-    if (movers === null || field === undefined) return;
+    const now = movers?.() ?? null;
+    if (now === null || field === undefined) return;
     let player: { x: number; z: number } | null = null;
-    for (const mover of movers()) {
+    for (const seen of last.values()) seen.seen = false;
+    for (const mover of now) {
       const before = last.get(mover.id);
       let vx = before === undefined || dt <= 0 ? 0 : (mover.x - before.x) / dt, vz = before === undefined || dt <= 0 ? 0 : (mover.z - before.z) / dt;
       if (vx * vx + vz * vz > TELEPORT_SPEED * TELEPORT_SPEED) { vx = 0; vz = 0; }
       field.push(mover.x, mover.z, mover.radius, 1, vx, vz);
-      if (before === undefined) last.set(mover.id, { x: mover.x, z: mover.z }); else { before.x = mover.x; before.z = mover.z; }
+      if (before === undefined) last.set(mover.id, { x: mover.x, z: mover.z, seen: true }); else { before.x = mover.x; before.z = mover.z; before.seen = true; }
       player ??= mover;
     }
+    // a mover missing this frame is forgotten, so coming back somewhere else is not read as a stride
+    for (const [id, seen] of last) if (!seen.seen) last.delete(id);
     field.update(dt, player ?? eye);
   });
   return layers;
