@@ -25,7 +25,7 @@ function sharedProofFile(root,env,tree,runtime){
 const exclusionsSchema=v.object({files:v.array(v.string()),deadline:v.nullable(v.string())});
 const pidSchema=v.pipe(v.number(),v.integer(),v.minValue(2));
 const ownerSchema=v.object({pid:pidSchema,identity:v.string(),bornNs:v.string(),uid:v.pipe(v.number(),v.integer(),v.minValue(0))});
-const leaseSchema=v.object({token:v.string(),runnerPid:pidSchema,childPid:pidSchema,resources:v.array(v.string()),
+const leaseSchema=v.object({token:v.string(),runnerPid:pidSchema,childPid:v.nullable(pidSchema),resources:v.array(v.string()),
   queuedAt:v.number(),startedAt:v.number()});
 const measurementSchema=v.object({profile:v.string(),captured:v.string(),machine:v.string(),platform:v.string(),arch:v.string(),
   owner:v.nullable(ownerSchema),lease:v.nullable(leaseSchema)});
@@ -119,7 +119,10 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   const exclusions=exclusionScope(cwd);
   const dependencies=pushDependencyIdentity(cwd,env);
   const runtime=createHash('sha256').update(JSON.stringify({profile,host:hostname(),node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions,dependencies,pins:pinned.key})).digest('hex');
-  return {tree,commit,runtime,root:resolve(cwd),exclusions,dependencies,measurement:producerMeasurement(profile,env),
+  // Captures also serve pre-lease reuse and after-check comparisons. Retain
+  // only the publication inputs; discarded captures need no kernel probe.
+  return {tree,commit,runtime,root:resolve(cwd),exclusions,dependencies,profile,
+    producerEnv:{WS_HEAVY_ROOT:env.WS_HEAVY_ROOT,WS_HEAVY_TOKEN:env.WS_HEAVY_TOKEN},
     sharedFile:dependencies===null?null:sharedProofFile(cwd,env,tree,runtime),file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
 }
 
@@ -147,9 +150,10 @@ export function readPushProof(context,selection){
  * @param {{mode:'full'|'related'|'docs',files:string[]}} selection @param {number} seconds */
 export function writePushProof(context,selection,seconds){
   if(JSON.stringify(exclusionScope(context.root))!==JSON.stringify(context.exclusions)||!scopeLive(context.exclusions))throw new Error('Push proof exclusion scope changed while checking; rerun the full gate');
+  const measurement=producerMeasurement(context.profile,context.producerEnv);
   const proof={version:2,tree:context.tree,runtime:context.runtime,run:randomUUID(),commit:context.commit,
     finished:new Date().toISOString(),seconds,mode:selection.mode,files:selection.files,exclusions:context.exclusions,
-    measurement:context.measurement};
+    measurement};
   mkdirSync(dirname(context.file),{recursive:true});
   const temporary=`${context.file}.${process.pid}`;writeFileSync(temporary,`${JSON.stringify(proof)}\n`,{mode:0o600});renameSync(temporary,context.file);
   if(selection.mode==='full'&&context.sharedFile!==null){
