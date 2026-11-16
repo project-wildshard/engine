@@ -27,6 +27,10 @@ export interface CardPorts {
   readonly deadlineMs?: number;
 }
 
+const unnamed = (slug: string, name: string): boolean => name.trim().toLowerCase() === slug.toLowerCase();
+/** `mu9-auto-20261116` → `Mu9 Auto 20261116` */
+const slugName = (slug: string): string => slug.split(/[-_]+/u).filter(word => word !== '').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
 /** One slug's catalogue row, or undefined for anything but an entry that names this slug. Never throws. */
 async function catalogueCard(slug: string, order: number, ports: CardPorts): Promise<TitleManifest | undefined> {
   try {
@@ -37,7 +41,10 @@ async function catalogueCard(slug: string, order: number, ports: CardPorts): Pro
     const text = await response.text();
     if (text.length > ENTRY_BYTES) return undefined;
     const entry = v.safeParse(EntrySchema, JSON.parse(text));
-    return entry.success && new Set([slug]).has(entry.output.slug) ? catalogueTitleRow(slug, entry.output.name, order) : undefined;
+    if (!entry.success || !new Set([slug]).has(entry.output.slug)) return undefined;
+    // STAGING-BUGBASH SB12: an upload named only by its slug (staging's `mu9-auto-20261116`, an auto-placement test) is a test
+    // placement: a Developer sees it under a readable name, a player not at all
+    return unnamed(slug, entry.output.name) ? { ...catalogueTitleRow(slug, slugName(slug), order), status: 'hidden' } : catalogueTitleRow(slug, entry.output.name, order);
   } catch { return undefined; }
 }
 

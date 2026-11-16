@@ -18,7 +18,7 @@ import { engineString } from '../../../shared/engine/strings';
  */
 import { isDev, onDev } from '../core/devMode';
 import { reloadForPlayer } from './playerReload';
-import { buildLabel, checkLiveBuild, liveBuildOf, shortBuild, workerControlled } from './buildCheck';
+import { buildLabel, checkLiveBuild, compactBuildLabel, liveBuildOf, shortBuild, workerControlled } from './buildCheck';
 
 
 // The update pill exists before content is selected; keep App and Three out of the entry graph.
@@ -58,7 +58,7 @@ let newLabel = '';
 function paint(): void {
   const text = el.querySelector('[data-el="text"]');
   if (!text || busy) return;
-  text.textContent = !newer ? (narrow?.matches === true ? runningLabel : engineString('s_9e4fe13a912d', [runningLabel])) : isDev()
+  text.textContent = !newer ? (narrow?.matches === true ? compactBuildLabel(runningLabel) : engineString('s_9e4fe13a912d', [runningLabel])) : isDev()
     ? engineString('s_update_next_boundary_dev', [newLabel]) : engineString('s_update_next_boundary');
 }
 const lightUp = (label: string): void => {

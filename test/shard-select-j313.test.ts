@@ -39,7 +39,7 @@ const deckOf = (showHidden: boolean, mode: MenuMode): TitleDeck => {
 const view = (deck: TitleDeck): { name: string; tag: string; enters: boolean }[] => Array.from(deck.root.querySelectorAll('.ws-menu-card')).map((card) => ({
   name: card.querySelector('b')?.textContent ?? '',
   tag: card.querySelector('.ws-menu-card-exp')?.textContent ?? '',
-  enters: card.querySelector('.ws-menu-card-tag:not(.ws-menu-card-needs)') !== null,
+  enters: card instanceof HTMLElement && card.dataset['enters'] === '1',
 }));
 
 test('J313: with Developer off, the three unlocked shards enter with their labels, Mossgate shows, no open plot or Thin Ice card', () => {

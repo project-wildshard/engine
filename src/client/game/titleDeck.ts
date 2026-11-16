@@ -203,6 +203,18 @@ function dotTag(card: DeckEntry, mode: MenuMode): 'soon' | 'developer' | '' {
   return restricted(card) ? 'developer' : '';
 }
 
+/** STAGING-BUGBASH SB11: a card ENTER WORLD enters never says "Coming soon" under its name. An open plot's own blurb is
+ *  "Open plot · coming soon" (shard-open-plots' manifest), written for a plot with nothing on it yet. */
+export function enterableLabel(label: string): string {
+  return label.replace(/\s*·\s*coming soon\s*$/iu, '');
+}
+
+/** STAGING-BUGBASH SB11: the draft's world is carded as a shard, by its own slug or as an open plot of it */
+function draftCarded(draft: DraftTitle, card: TitleCard): boolean {
+  const tail = card.slug.split('-').slice(-draft.slug.split('-').length).join('-');
+  return new Set([draft.slug]).has(tail);
+}
+
 function hintFor(card: DeckEntry, active: boolean, mode: MenuMode = menuMode()): string {
   if (card.draft) return mode.developer || mode.devserver ? card.draft.stageName : GAME_STRINGS.drafts.notPlayable;
   if (card.upgrade !== undefined || card.unavailable !== undefined) return GAME_STRINGS.upgrade.saveKept;
@@ -218,7 +230,9 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   const { cards } = opts;
   // J313: a draft's card (Thin Ice, off the grid by J305) never loads, so only Developer sees it
   // SA36: the slug page holds exactly its one card, Developer or not
-  const drafts = opts.single === undefined && (mode().developer || mode().devserver) ? DRAFT_TITLES : [];
+  // STAGING-BUGBASH SB11: a draft whose world is now a carded shard (Thin Ice's open plot, `open-plot-thin-ice`) has one card,
+  // the shard's, never a second DRAFT MODE card beside it
+  const drafts = opts.single === undefined && (mode().developer || mode().devserver) ? DRAFT_TITLES.filter(d => !cards.some(c => draftCarded(d, c))) : [];
   const entries: readonly DeckEntry[] = [...cards.map(fromShard), ...drafts.map(fromDraft)];
   const activeIndex = entries.map((card): string => card.slug).indexOf(opts.active ?? '');
   const root = document.createElement('div');
@@ -242,12 +256,14 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     const image = document.createElement('span'); image.className = 'ws-menu-card-img'; image.style.backgroundImage = `url('${titleAssetURL(card.thumbnail)}')`;
     if (card.upgrade !== undefined) image.append(words('i', 'ws-menu-card-tag ws-menu-card-needs', GAME_STRINGS.upgrade.badge));
     else if (card.unavailable !== undefined) image.append(words('i', 'ws-menu-card-tag ws-menu-card-needs', GAME_STRINGS.unavailable.badge));
-    if (canEnter(card, mode()) && opts.single?.closed === undefined) image.append(words('i', `ws-menu-card-tag${active ? ' ok' : ''}`, active ? 'Loaded' : 'Load'));
+    // STAGING-BUGBASH SB17 (Jake's recommended pick): no LOAD / LOADED tag on the picture; it read as a button that does nothing.
+    // ENTER WORLD's line under it says what a tap loads; the card keeps the fact for tests and styles
+    if (canEnter(card, mode()) && opts.single?.closed === undefined) button.dataset['enters'] = '1';
     // G238: the port badge, Developer on only (the public card is unchanged)
     const ribbon = ribbonFor(card, mode());
     const tone = !canEnter(card, mode()) ? '' : card.badge === 'Early access' ? ' ws-menu-card-ea' : card.badge === 'Partial' ? ' ws-menu-card-partial' : '';
     if (ribbon !== '') image.append(words('i', `ws-menu-card-exp${tone}`, ribbon));
-    const sub = card.upgrade !== undefined ? GAME_STRINGS.upgrade.built(card.upgrade.built) : card.closed === true ? GAME_STRINGS.notInWorld.badge : card.unavailable !== undefined ? refusalReason(card.unavailable) : card.label;
+    const sub = card.upgrade !== undefined ? GAME_STRINGS.upgrade.built(card.upgrade.built) : card.closed === true ? GAME_STRINGS.notInWorld.badge : card.unavailable !== undefined ? refusalReason(card.unavailable) : canEnter(card, mode()) ? enterableLabel(card.label) : card.label;
     button.append(image, words('b', '', card.name), words('small', amber ? 'ws-menu-card-reason' : '', sub)); cardTrack.append(button);
     const dot = document.createElement('i'); dot.dataset['i'] = String(index); dot.dataset['tag'] = dotTag(card, mode()); dot.style.setProperty('--thumb', `url('${titleAssetURL(card.thumbnail)}')`); dotTrack.append(dot);
   });

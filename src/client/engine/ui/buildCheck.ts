@@ -33,6 +33,13 @@ export function buildLabel(id: string = runningBuild(), version: string = engine
   return [version === '' ? '' : `v${version}`, shortBuild(id)].filter(part => part !== '').join(' · ');
 }
 
+/** STAGING-BUGBASH SB15: the phone pill's label. A `git describe` past a tag (`v0.1.28-96-gf8ff9bd9`) shortens to the tag and
+ *  the commit count (`v0.1.28+96`), so the pill fits beside the WILDSHARD logo and SHARD SELECT untruncated; Settings ▸ Build
+ *  keeps the whole describe. A release (`v0.1.31`) and the version · commit label are already short. */
+export function compactBuildLabel(label: string): string {
+  return label.replace(/^(v\d+\.\d+\.\d+)-(\d+)-g[0-9a-f]+$/u, '$1+$2');
+}
+
 /** The live build's id, or null: offline (the PWA plays from its cache), a failed request, or an answer with no build. */
 export async function liveBuild(): Promise<string | null> {
   if (!navigator.onLine) return null; // no request that can only fail
