@@ -6,7 +6,8 @@
 // `git merge-tree --write-tree <old main> T` has the same test/pins tree as the pushed commit, and T's `ci` run is
 // green on GitHub. Land's exact push (the green SHA itself) and its carried push (a clean rebase, which land's
 // verifyReplay already holds to that merge) both pass. A mode-1 push of a pin change has no such T and is refused,
-// offline too. No env var says "this is land": any agent could set one (the MINI-FLOW hook review).
+// offline too. No env var says "this is land": any agent could set one (the MINI-FLOW hook review). When GitHub can't
+// be asked (down, rate-limited), a matching plan tip passes with a warning: no gridlock on an outage (J381).
 // Covers all of test/pins/ (shard pins, ring digests, slices, saves): re-recording any of them goes through a plan
 // branch now.
 // Escape hatch, when truly stuck (main red and the fix cannot wait for branch CI): ALLOW_PIN_PUSH=1. Say so in your
@@ -61,16 +62,21 @@ export function checkPinPush({ cwd, refs, ciState, env = process.env }) {
     if (env.ALLOW_PIN_PUSH === '1') return { ok: true, note: `ALLOW_PIN_PUSH=1: ${changed.length} test/pins file(s) pushed to main without a green plan branch (J375); say so in your receipt` };
     const tips = matchingPlanTips(cwd, old, pushed);
     const states = [];
+    let unasked = '';
     for (const tip of tips) {
       let state;
       try {
         state = ciState(tip.sha);
       } catch (error) {
-        return refuse(changed, [`GitHub could not be asked about ${tip.ref} ${tip.sha.slice(0, 10)} (${String(error?.message ?? error).slice(0, 160)}); with no answer this hook refuses`]);
+        unasked ||= `${tip.ref} ${tip.sha.slice(0, 10)} (${String(error?.message ?? error).slice(0, 120)})`;
+        continue;
       }
       if (state === 'green') return { ok: true, note: `test/pins change carried by ${tip.ref} ${tip.sha.slice(0, 10)}, ci green (J375)` };
       states.push(`${tip.ref} ${tip.sha.slice(0, 10)}: ci ${state}`);
     }
+    // GitHub down or rate-limited: the offline provenance (a plan branch carries exactly these pins) is enough, so no
+    // agent gridlocks on an outage (J381). Only the green-CI half needs GitHub, and that half only warns.
+    if (unasked) return { ok: true, note: `WARNING GitHub could not be asked about ${unasked}; passing on offline provenance (a plan branch carries these pins), CI not checked (J381)` };
     return refuse(changed, tips.length
       ? [`the plan branch(es) carrying these pins are not green: ${states.join('; ')}`]
       : ['no origin/plan/* branch carries these pins: this is a direct push, not a land']);

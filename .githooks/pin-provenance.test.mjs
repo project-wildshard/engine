@@ -110,7 +110,7 @@ describe('pin provenance (J375)', () => {
     assert.equal(checkPinPush({ cwd: w.lane, refs: line(edited, old), ciState: green, env: {} }).ok, false);
   });
 
-  test('the carrying branch must be green: red, pending and GitHub down all refuse', () => {
+  test('the carrying branch must be green: red and pending refuse; GitHub down passes on offline provenance with a warning', () => {
     const w = world();
     const old = w.git(w.lane, 'rev-parse', 'origin/main');
     const tip = w.planBranch('nine-pin', { 'test/pins/shardfiles.json': '{"nine":2}\n' });
@@ -120,8 +120,11 @@ describe('pin provenance (J375)', () => {
       assert.match(verdict.problems.join('\n'), new RegExp(`origin/plan/nine-pin ${tip.slice(0, 10)}: ci ${state}`, 'u'));
     }
     const down = checkPinPush({ cwd: w.lane, refs: line(tip, old), ciState: () => { throw new Error('gh: connection refused'); }, env: {} });
-    assert.equal(down.ok, false);
-    assert.match(down.problems.join('\n'), /GitHub could not be asked .*gh: connection refused.*this hook refuses/u);
+    assert.equal(down.ok, true, 'no gridlock on a GitHub outage (J381)');
+    assert.match(down.note, /^WARNING GitHub could not be asked about origin\/plan\/nine-pin .*gh: connection refused.*passing on offline provenance/u);
+    const direct = w.commit(w.lane, { 'test/pins/shardfiles.json': '{"nine":7}\n' }, 'direct');
+    const offline = checkPinPush({ cwd: w.lane, refs: line(direct, old), ciState: () => { throw new Error('down'); }, env: {} });
+    assert.equal(offline.ok, false, 'GitHub down never lets a direct push through: no plan tip carries it');
   });
 
   test('pushes that are not a main pin change pass without asking GitHub', () => {
@@ -135,7 +138,7 @@ describe('pin provenance (J375)', () => {
     assert.deepEqual(checkPinPush({ cwd: w.lane, refs: `refs/heads/main ${pins} refs/heads/main ${'0'.repeat(40)}`, ciState: never, env: {} }), { ok: true });
   });
 
-  test('the hook script asks GitHub through gh: green passes, gh failing refuses with the way through', () => {
+  test('the hook script asks GitHub through gh: green passes, gh failing warns, a direct push is refused with the way through', () => {
     const w = world();
     const old = w.git(w.lane, 'rev-parse', 'origin/main');
     const tip = w.planBranch('nine-pin', { 'test/pins/shardfiles.json': '{"nine":2}\n' });
@@ -149,9 +152,14 @@ describe('pin provenance (J375)', () => {
     const ok = run(`[[ "$2" == "repos/o/r/actions/runs?head_sha=${tip}&per_page=50" ]] && echo '${runs}'`);
     assert.equal(ok.status, 0, ok.stderr);
     assert.match(ok.stderr, /pin provenance: test\/pins change carried by origin\/plan\/nine-pin/u);
-    const down = run('echo "gh: not logged in" >&2; exit 1');
-    assert.equal(down.status, 1);
-    assert.match(down.stderr, /X push blocked: test\/pins\/ change without a green plan branch \(J375/u);
-    assert.match(down.stderr, /node scripts\/land\.mjs/u);
+    const down = run('echo "gh: API rate limit exceeded" >&2; exit 1');
+    assert.equal(down.status, 0, down.stderr);
+    assert.match(down.stderr, /pin provenance: WARNING GitHub could not be asked .*rate limit exceeded.*offline provenance/u);
+    w.git(w.lane, 'switch', '-q', '--detach', old);
+    const direct = w.commit(w.lane, { 'test/pins/shardfiles.json': '{"nine":5}\n' }, 'direct');
+    const refused = spawnSync(process.execPath, [HOOK], { cwd: w.lane, input: `${line(direct, old)}\n`, encoding: 'utf8', env: { ...ENV, WS_LAND_REPO: 'o/r', PATH: `${bin}:${process.env.PATH}` } });
+    assert.equal(refused.status, 1);
+    assert.match(refused.stderr, /X push blocked: test\/pins\/ change without a green plan branch \(J375/u);
+    assert.match(refused.stderr, /node scripts\/land\.mjs/u);
   });
 });
