@@ -68,6 +68,7 @@ import { createShardfileClientScripts, captureClientScriptPosition } from './cli
 
 import { installClientWater, undrawnWater } from './clientWater';
 import { detailLayerFiles, installClientDetails } from './clientDetails';
+import { installClientSplash } from './clientSplash';
 import { standaloneClientTiles } from './tileContent';
 import { tileRing } from './tileDriver';
 import { buildYield } from '@wildshard/engine/core/workSlice';
@@ -296,6 +297,10 @@ export class ShardfileClient {
     const details = this.source.look.details;
     installClientDetails(details, await detailLayerFiles(details, this.assets.retained, (hash) => this.assets.read(hash)), { root: ctx.root, scope: ctx.scope, materials: presentation.materials, phone: TIER === 'phone',
       viewer: () => runtime.viewer(), frame: (run) => { ctx.system({ id: 'game.shardfile.details', phase: 'late', run }); } });
+    // SHARD-SOURCE SS6: a scene pool splashes and rings when the player walks in, wades or walks out
+    installClientSplash(this.source.water, { root: ctx.root, scope: ctx.scope, phone: TIER === 'phone',
+      movers: () => { const at = world.player.position; return [{ id: 'player', x: at.x, y: at.y, z: at.z }]; },
+      frame: (run) => { ctx.system({ id: 'game.shardfile.splash', phase: 'update', run }); } });
     const nativeWorld = this.nativeFeatures || this.mode === 'presentation';
     const start = nativeWorld ? ctx.manifest.spawn : this.source.spawn;
     const collider = nativeWorld && this.source.terrain !== null ? await this.assets.read(this.source.terrain.collider) : undefined;

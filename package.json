@@ -642,6 +642,7 @@
     "./world/Grass": "./src/client/engine/world/Grass.ts",
     "./world/detailLayer": "./src/client/engine/world/detailLayer.ts",
     "./world/detailRing": "./src/client/engine/world/detailRing.ts",
+    "./world/waterSplash": "./src/client/engine/world/waterSplash.ts",
     "./world/Heightfield": "./src/shared/engine/world/Heightfield.ts",
     "./world/Horizon": "./src/client/engine/world/Horizon.ts",
     "./world/HorizonMatte": "./src/client/engine/world/HorizonMatte.ts",
