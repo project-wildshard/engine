@@ -259,17 +259,17 @@ export const INSTALLED_LOCK='node_modules/.ws-installed-lock';
  * @param {string} canonical @param {{env?:NodeJS.ProcessEnv,install?:(cwd:string)=>void}} [options] @returns {string} */
 export function refreshCanonicalInstall(canonical,{env=process.env,install}={}){
  if(!existsSync(join(canonical,'node_modules')))return '';
- const lock=tryGit(canonical,['rev-parse','--verify','--quiet','HEAD:pnpm-lock.yaml']).stdout.trim();
- if(lock==='')return '';
+ const lockBlob=tryGit(canonical,['rev-parse','--verify','--quiet','HEAD:pnpm-lock.yaml']).stdout.trim();
+ if(lockBlob==='')return '';
  const marker=join(canonical,INSTALLED_LOCK);
  let recorded='';
  try{recorded=readFileSync(marker,'utf8').trim();}catch{/* Never recorded: install once. */}
- if(recorded===lock)return '';
+ if(recorded===lockBlob)return '';
  const doInstall=install??((/** @type {string} */cwd)=>run(cwd,'pnpm',['install','--frozen-lockfile','--offline'],env));
  try{withStoreUse(env,'canonical install',()=>doInstall(canonical));}
  catch(error){return `CANONICAL INSTALL STALE: pnpm install --frozen-lockfile failed (${error instanceof Error?error.message.split('\n')[0]:String(error)}); run it in ${canonical}`;}
- writeFileSync(marker,`${lock}\n`);
- return `canonical install refreshed for pnpm-lock.yaml ${lock.slice(0,10)}`;
+ writeFileSync(marker,`${lockBlob}\n`);
+ return `canonical install refreshed for pnpm-lock.yaml ${lockBlob.slice(0,10)}`;
 }
 
 /** followMain's git half: the fast-forward. @param {string} canonical @param {string} base */
