@@ -14,6 +14,7 @@ const SOURCE = {
   props: { panels: [{ id: 'blender.door', visible: true }] },
   targets: { panels: [{ panel: 'blender.door', scope: 'shared', fieldId: 101, equals: 1, visibleWhenMatched: false, colliders: ['blender.door.collider'], activeWhenMatched: false }] },
   state: { shared: [{ id: 101, name: 'blender.door.open', default: false }], player: [] },
+  movers: [],
 } as unknown as Shardfile;
 
 function doorCell(): { panels: NeighbourPanels; region: { open: number }; admit: () => Promise<void> } {
