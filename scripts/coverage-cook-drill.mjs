@@ -6,7 +6,6 @@ import {mkdirSync,mkdtempSync,readFileSync,realpathSync,rmSync,writeFileSync} fr
 import {join,resolve} from 'node:path';
 import {brotliDecompressSync} from 'node:zlib';
 import {clonePaths} from './apfs-clone.mjs';
-import {linkNodeModules} from './link-node-modules.mjs';
 import {runCommitJobs} from './precommit-jobs.mjs';
 
 assert.equal(process.env.GITHUB_ACTIONS,'true','Cold drill runs only on the hosted Actions worker');
@@ -48,7 +47,11 @@ try{
   const inventory=join(work,'source-files.json');
   writeFileSync(inventory,JSON.stringify({root:realpathSync(tree),files:execFileSync('git',['ls-tree','-r','--name-only','-z',sha],{cwd:root,encoding:'utf8',maxBuffer:16*1024*1024}).split('\0').filter(Boolean)}));
   environment.WS_GENERATION_TREE_FILES=inventory;environment.WS_GENERATION_TREE_ROOT=realpathSync(tree);
-  linkNodeModules(root,tree);rmSync(join(tree,'public'),{recursive:true,force:true});
+  // The permissioned cook needs links wholly inside this private installation;
+  // links through the outer checkout cannot qualify a frozen source export.
+  execFileSync('git',['init','-q'],{cwd:tree});
+  writeFileSync(join(out,'install.log'),execFileSync('pnpm',['install','--offline','--frozen-lockfile','--virtual-store-dir=node_modules/.pnpm'],{cwd:tree,env:environment,timeout:120000,maxBuffer:4*1024*1024}));
+  rmSync(join(tree,'public'),{recursive:true,force:true});
   clonePaths([[join(root,'out'),join(tree,'out')],[join(root,'public'),join(tree,'public')]]);
   const baselineReceipt=await cold('baseline-cold'),baseline=await audit(baselineReceipt,'baseline-audit');assert.equal(baseline.code,0);
   const source=join(tree,'src/cook/game/spawnParts.ts'),original=readFileSync(source,'utf8');

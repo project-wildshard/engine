@@ -12,12 +12,12 @@ const addressOf = (url: string, text: string): Address => ({url, bytes: text.len
 
 /** One Runtime packs download of `slug` against a served packs book; returns the download and every URL read. The
  * build id is the slug's own: the reader keeps one good book per build URL. */
-function run(slug: string, book: (whole: Address, fallback: Address, init?: RequestInit) => Response | Promise<Response>, wholeParts = true) {
-  const fallbackText = manifestOf(slug, false), wholeText = manifestOf(slug, wholeParts);
+function run(slug: string, book: (whole: Address, fallback: Address, init?: RequestInit) => Response | Promise<Response>, wholeParts = true, storedSlug = slug) {
+  const fallbackText = manifestOf(storedSlug, false), wholeText = manifestOf(storedSlug, wholeParts);
   const fallback = addressOf(`/assets/spawn/${slug}-client-phone-0123456789abcdef.json`, fallbackText);
   const whole = addressOf(`/assets/spawn/${slug}-client-phone-fedcba9876543210.json`, wholeText);
   vi.stubGlobal('document', {baseURI: 'http://localhost/', getElementById: () => ({textContent: JSON.stringify({spawnManifests: {
-    cacheName: 'ws-assets-v1', client: {[slug]: {phone: fallback}}}})})});
+    cacheName: 'ws-assets-v1', client: {[storedSlug]: {phone: fallback}}}})})});
   vi.stubGlobal('caches', undefined); vi.stubGlobal('__BUILD_ID__', `build-${slug}`);
   const reads: string[] = [];
   vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -60,11 +60,12 @@ test('a whole-level address whose manifest has no part table is refused', async 
   expect(reads.map(url => new URL(url).pathname)).not.toContain(file.url);
 });
 
-test('this build\'s packs book runs the whole-level manifest to completion', async () => {
-  const {download, reads} = run('book-good', whole => Response.json({book: 'packs', build: 'build-book-good', ...entry('book-good', whole)}));
+test.each(['book-good', '_book-alias'])('this build\'s packs book runs %s to whole-level completion', async slug => {
+  const stored = slug.replace(/^_/u, '');
+  const {download, reads} = run(slug, whole => Response.json({book: 'packs', build: `build-${slug}`, ...entry(stored, whole)}), true, stored);
   await download.ready;
   expect(download.snapshot()).toMatchObject({complete: true, error: null, filesDone: 1});
-  expect(reads.map(url => new URL(url).pathname)).toEqual([expect.stringMatching(BOOK), '/assets/spawn/book-good-client-phone-fedcba9876543210.json', file.url]);
+  expect(reads.map(url => new URL(url).pathname)).toEqual([expect.stringMatching(BOOK), `/assets/spawn/${slug}-client-phone-fedcba9876543210.json`, file.url]);
 });
 
 test('a packs book that stalls is refused by name instead of an endless wait (DL21)', async () => {

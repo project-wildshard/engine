@@ -41,3 +41,17 @@ consume the selected bytes directly, without a new download or producer.
 The real format archive is admitted with an empty tar cache in 0.29 s;
 missing Ring 2 archives and unselected hashes still refuse. No pins.ts,
 consumer pin, cook launch, runtime host, or H1/H4/H5 source changed.
+
+Hosted 43793795141 cooked all three and then caught a real false boot:
+Template reached gameplay but requested only discovery, programs and title
+images. The authored _template route missed the bare template rows in
+both spawn books, falling back to loose files. bookSelection now keeps
+exact rows first, then the product alias. The existing public download
+case gains that authored route: witnessed red before the fix, green
+afterwards. The strengthened proof still requires an actual part.
+
+The cold baseline also stopped at Node file permissions: its private
+export linked packages through the outer checkout. It now installs the
+same frozen dependencies offline into its own virtual store; production
+permissions remain unchanged. These are transport/setup corrections,
+not new graphical work. No cook runs locally.

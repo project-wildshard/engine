@@ -810,7 +810,9 @@ export function prefetchSpawnDownload(slug: string, tier: 'phone' | 'desktop', f
 }
 const get = (value: unknown, key: string): unknown => typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
 function bookSelection(book: unknown, slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): SpawnManifestAddress | null {
-  const roots = flow === 'grid' ? get(get(book, flow), mode) : get(book, flow), pair = get(get(roots, slug), tier);
+  // Stored cooks name the product (`template`); its authored route can be
+  // `_template`. Preserve exact build rows, then use that product's cook row.
+  const roots = flow === 'grid' ? get(get(book, flow), mode) : get(book, flow), pair = get(get(roots, slug) ?? get(roots, bareSlug(slug)), tier);
   return pair === undefined ? null : readSpawnManifestAddress(pair);
 }
 /** The packs book's row, or SA48's whole-level row for a slug placed after the build (`placedSpawn.ts`): the book never has one. */
