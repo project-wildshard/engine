@@ -51,6 +51,9 @@ class StoredCache {
 }
 function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = false) {
   const books = new Map<string, StoredCache>();
+  /** STALESHELL: the build of the worker that already runs the origin (`registration.active`, answering BUILD), so the next
+   *  one loaded is an update; null for none */
+  const origin_: { active: string | null } = { active: null };
   const open = (name: string): Promise<StoredCache> => {
     let cache = books.get(name);
     if (cache === undefined) { cache = new StoredCache(); books.set(name, cache); }
@@ -65,7 +68,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
     const routes = vi.fn<(rules: NativeRoute[]) => Promise<void>>(() => Promise.resolve());
     const live = new Set<string>(), workers = new Set<string>();
     const get = (id: string): Promise<{ id: string; type?: string } | undefined> => Promise.resolve(workers.has(id) ? { id, type: 'worker' } : live.has(id) ? { id } : undefined);
-    const self = { location: new URL(origin), registration: { scope: `${origin}/` }, clients: { claim, get }, skipWaiting,
+    const self = { location: new URL(origin), registration: { scope: `${origin}/`, get active() { const build = origin_.active; return build === null ? null : { postMessage: (_message: unknown, [port]: MessagePort[]) => { port?.postMessage({ type: 'BUILD', build }); } }; } }, clients: { claim, get }, skipWaiting,
       addEventListener: (kind: string, listener: (event: WorkerEvent) => void) => { listeners.set(kind, [...listeners.get(kind) ?? [], listener]); } };
     const source = bundled.replaceAll('__BUILD_ID__', build)
       .replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME).replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(page)).replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
@@ -73,7 +76,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
       .replace(/['"]__CONTENT__['"]/u, () => JSON.stringify(JSON.stringify({ base: content.base ?? '', files: content.files ?? [], versions: content.versions ?? {} })))
       .replace(/['"]__DOCUMENT_HEADERS__['"]/u, () => JSON.stringify(JSON.stringify(documentHeaders)));
     // Deliberately no crypto, scheduler or accounting ports; timers only for the precache's bounded pause.
-    runInNewContext(source, { self, caches, fetch, URL, Request, Response, Headers, Set, JSON, encodeURIComponent, AbortController, setTimeout, clearTimeout, performance });
+    runInNewContext(source, { self, caches, fetch, URL, Request, Response, Headers, Set, JSON, encodeURIComponent, AbortController, MessageChannel, setTimeout, clearTimeout, performance });
     const dispatch = async (kind: string, payload: Pick<WorkerEvent, 'request' | 'data' | 'ports' | 'source' | 'clientId'> = {}): Promise<Response | undefined> => {
       const work: Promise<unknown>[] = []; let response: Response | undefined;
       for (const listener of listeners.get(kind) ?? []) listener({ ...payload, ...(nativeRoutes && kind === 'install' ? {addRoutes: routes} : {}),
@@ -82,7 +85,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
     };
     return { dispatch, claim, skipWaiting, routes, live, workers };
   };
-  return { caches, open, books, fetch, load };
+  return { caches, open, books, fetch, load, origin: origin_ };
 }
 
 const precached = { data: { type: 'PRECACHE' } };
@@ -118,11 +121,11 @@ test('the post-control precache yields to a loading page and resumes at that pag
   await vi.waitFor(() => { expect(f.fetch).toHaveBeenCalledTimes(6); }); // a few lanes, not every file at once
   // A new document loads (its client has not reported control, and `clients.get` lists it, OF6): the precache steps aside and frees the link.
   worker.live.add('page-2');
-  await worker.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-2' });
+  await worker.dispatch('fetch', { request: new Request(url('/version.json')), clientId: 'page-2' });
   holding = false; await new Promise(resolve => { setTimeout(resolve, 0); });
   expect(f.fetch).toHaveBeenCalledTimes(6);
   // The first page's own reads never pause it; page 2 reaching control resumes it to one complete generation.
-  await worker.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-1' });
+  await worker.dispatch('fetch', { request: new Request(url('/version.json')), clientId: 'page-1' });
   await worker.dispatch('message', { ...precached, source: source('page-2') }); await first;
   expect(f.fetch).toHaveBeenCalledTimes(14); // 6 aborted and re-queued, then all 8
   const assets = await f.open(ASSET_CACHE_NAME);
@@ -148,9 +151,9 @@ test('a pause never strands the precache: a gone loader or the time limit resume
   const first = worker.dispatch('message', { ...precached, source: gone.source('page-1') });
   await vi.waitFor(() => { expect(gone.f.fetch).toHaveBeenCalledTimes(6); });
   worker.live.add('page-2');
-  await worker.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-2' });
+  await worker.dispatch('fetch', { request: new Request(url('/version.json')), clientId: 'page-2' });
   gone.release(); worker.live.delete('page-2');
-  await worker.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-1' }); await first;
+  await worker.dispatch('fetch', { request: new Request(url('/version.json')), clientId: 'page-1' }); await first;
   expect(gone.f.fetch).toHaveBeenCalledTimes(14);
   // The loading page lives on but never reports control: the pause ends at its limit.
   vi.useFakeTimers();
@@ -159,7 +162,7 @@ test('a pause never strands the precache: a gone loader or the time limit resume
     await late.dispatch('install'); await late.dispatch('activate');
     const pending = late.dispatch('message', { ...precached, source: stuck.source('page-1') });
     await vi.advanceTimersByTimeAsync(0); expect(stuck.f.fetch).toHaveBeenCalledTimes(6);
-    late.live.add('page-2'); await late.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-2' });
+    late.live.add('page-2'); await late.dispatch('fetch', { request: new Request(url('/version.json')), clientId: 'page-2' });
     stuck.release(); await vi.advanceTimersByTimeAsync(59_999); expect(stuck.f.fetch).toHaveBeenCalledTimes(6);
     await vi.advanceTimersByTimeAsync(1); await pending;
     expect(stuck.f.fetch).toHaveBeenCalledTimes(14);
@@ -182,10 +185,10 @@ test('a worker\'s reads neither pause the precache nor stand as a loader', async
   const run = second.dispatch('message', { ...precached, source: again.source('page-1') });
   await vi.waitFor(() => { expect(again.f.fetch).toHaveBeenCalledTimes(6); });
   second.workers.add('server'); second.live.add('page-2');
-  await second.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-2' });
+  await second.dispatch('fetch', { request: new Request(url('/version.json')), clientId: 'page-2' });
   void second.dispatch('fetch', { request: new Request(url('/shardfiles/nine/server/a.bin')), clientId: 'server' });
   again.release(); second.live.delete('page-2');
-  await second.dispatch('fetch', { request: new Request(url('/')), clientId: 'page-1' }); await run;
+  await second.dispatch('fetch', { request: new Request(url('/version.json')), clientId: 'page-1' }); await run;
   expect(again.f.fetch).toHaveBeenCalledTimes(15);
 });
 
@@ -279,21 +282,96 @@ test('refused native routes cannot publish an installed generation', async () =>
   expect(f.books.size).toBe(0); expect(f.fetch).not.toHaveBeenCalled();
 });
 
-test('navigation fallback serves the exact document without storage or network', async () => {
-  const f = fixture(), open = vi.spyOn(f.caches, 'open').mockRejectedValue(new DOMException('denied', 'SecurityError'));
+test('navigation fallback serves the exact document without storage when the network cannot answer', async () => {
+  const f = fixture(() => Promise.reject(new TypeError('offline'))), open = vi.spyOn(f.caches, 'open').mockRejectedValue(new DOMException('denied', 'SecurityError'));
   const worker = f.load('A', []);
   for (const path of ['/', '/index.html', '/?chunk=fixture']) {
     const response = await worker.dispatch('fetch', {request: new Request(url(path))});
     expect(response?.status).toBe(200); expect(response?.headers.get('content-type')).toBe('text/html;charset=utf-8');
     expect(response?.headers.get('cache-control')).toBe('no-store'); expect(await response?.text()).toBe(document);
   }
-  expect(open).not.toHaveBeenCalled(); expect(f.fetch).not.toHaveBeenCalled();
+  // STALESHELL: storage denied, the worker can't tell its code is held, so each navigation asked the network first
+  expect(open.mock.calls.every(([name]) => name === 'ws-builds-v1')).toBe(true); expect(f.fetch).toHaveBeenCalledTimes(3);
+});
+
+// STALESHELL (QA-FEEDBACK-2026-11-15 row 32, Jake 20:58 Cancún: "Whatever's going on here is really bad"): his phone's worker,
+// v0.1.19-43, had installed its shell but never held its build's code (a title visit never reaches control, DL1). Days later its
+// baked document still answered every navigation, named code the server no longer had, and the title sat on "8 of 8 files"
+// then "still waiting" through every reload, while v0.1.23's worker waited behind it for a moment that never came.
+/** A navigation, as a browser makes it (Node's Request can't be built with mode `navigate`). */
+const nav = (path: string): Request => { const request = new Request(url(path)); Object.defineProperty(request, 'mode', { value: 'navigate' }); return request; };
+const page = (build: string): Response => new Response(`<!doctype html><html><body>network page ${build}</body></html>`, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+test('STALESHELL: a worker that does not hold its code never serves its stale document while the network answers, and keeps the URL', async () => {
+  let online = true;
+  const asked: string[] = [];
+  const f = fixture(request => {
+    if (!online) return Promise.reject(new TypeError('offline'));
+    asked.push(request.url);
+    const path = new URL(request.url).pathname;
+    return Promise.resolve(path === '/' || path.startsWith('/slug/') ? page('B') : path.startsWith('/b/') ? new Response('gone', { status: 404 }) : new Response(`body:${request.url}`));
+  });
+  const old = f.load('A', ['/b/A/entry-aaaaaaaa.js']); await old.dispatch('install'); await old.dispatch('activate');
+  // a title-only device: A's shell is installed, its generation never precached
+  expect(await (await f.open('ws-builds-v1')).keys()).toHaveLength(0);
+  asked.length = 0;
+  for (const path of ['/', '/slug/blender-template', '/slug/blender-template?chunk=x#here']) {
+    const answer = await old.dispatch('fetch', { request: nav(path) });
+    expect(await answer?.text(), path).toBe('<!doctype html><html><body>network page B</body></html>');
+  }
+  expect(asked.map(href => new URL(href).pathname)).toEqual(['/', '/slug/blender-template', '/slug/blender-template']);
+  // offline it still boots what it has: offline play is unchanged
+  online = false;
+  expect(await (await old.dispatch('fetch', { request: nav('/slug/blender-template') }))?.text()).toBe(document);
+});
+
+test('STALESHELL: a worker holding its whole generation boots its own document at once, with no network', async () => {
+  const f = fixture(request => Promise.resolve(new URL(request.url).pathname === '/' ? page('B') : new Response(`body:${request.url}`)));
+  const held = f.load('A', ['/b/A/entry-aaaaaaaa.js']); await held.dispatch('install'); await held.dispatch('activate'); await held.dispatch('message', precached);
+  f.fetch.mockClear();
+  expect(await (await held.dispatch('fetch', { request: nav('/slug/blender-template') }))?.text()).toBe(document);
+  expect(f.fetch).not.toHaveBeenCalled();
+});
+
+test('STALESHELL: over a whole build, an update downloads its whole generation in its install, then takes over without waiting for every tab to close', async () => {
+  let failing = false;
+  const f = fixture(request => Promise.resolve(failing && request.url.endsWith('-bbbbbbbb.js') ? new Response('', { status: 503 }) : new Response(`body:${request.url}`)));
+  const a = f.load('A', ['/b/A/entry-aaaaaaaa.js']); await a.dispatch('install'); await a.dispatch('activate'); await a.dispatch('message', precached);
+  expect(a.skipWaiting, 'a first visit installs shell-only and waits for nothing').not.toHaveBeenCalled();
+  f.origin.active = 'A';
+  // bad Wi-Fi cut the download short: the install fails, the running build stays whole and nothing of B boots
+  failing = true;
+  const cut = f.load('B', ['/b/B/entry-bbbbbbbb.js', '/b/B/shared-cccccccc.js']);
+  await expect(cut.dispatch('install')).rejects.toThrow(/Precache failed/u);
+  expect(cut.skipWaiting).not.toHaveBeenCalled();
+  expect(await (await f.open('ws-builds-v1')).match(url('/__ws_build__/B'))).toBeUndefined();
+  // the browser's next update check resumes from what the shared cache holds, and B takes over once it holds all of it
+  failing = false; f.fetch.mockClear();
+  const b = f.load('B', ['/b/B/entry-bbbbbbbb.js', '/b/B/shared-cccccccc.js']); await b.dispatch('install');
+  expect(f.fetch.mock.calls.map(([request]) => new URL(typeof request === 'string' ? request : request.url).pathname)).toEqual(['/b/B/entry-bbbbbbbb.js']);
+  expect(await (await f.open('ws-builds-v1')).match(url('/__ws_build__/B'))).toBeDefined();
+  expect(b.skipWaiting).toHaveBeenCalledOnce();
+  await b.dispatch('activate');
+  f.fetch.mockClear();
+  expect(await (await b.dispatch('fetch', { request: nav('/slug/blender-template') }))?.text()).toBe(document);
+  expect(f.fetch, 'the next boot is B\'s, from the cache').not.toHaveBeenCalled();
+});
+
+test('STALESHELL: over a build that is not whole (Jake\'s phone), an update takes over after its shell, and the next boot asks the network', async () => {
+  const f = fixture(request => { const path = new URL(request.url).pathname; return Promise.resolve(path.startsWith('/slug/') ? page('B') : new Response(`body:${request.url}`)); });
+  const a = f.load('A', ['/b/A/entry-aaaaaaaa.js']); await a.dispatch('install'); await a.dispatch('activate'); // a title-only device
+  f.origin.active = 'A'; f.fetch.mockClear();
+  const b = f.load('B', ['/b/B/entry-bbbbbbbb.js']); await b.dispatch('install');
+  expect(b.skipWaiting).toHaveBeenCalledOnce();
+  expect(f.fetch.mock.calls.map(([request]) => new URL(typeof request === 'string' ? request : request.url).pathname), 'its shell, not its whole generation').toEqual(['/manifest.webmanifest']);
+  await b.dispatch('activate');
+  expect(await (await b.dispatch('fetch', { request: nav('/slug/blender-template') }))?.text()).toContain('network page B');
 });
 
 test('a worker reuses its installed cache handles across navigation and content reads', async () => {
   const f = fixture(), open = vi.spyOn(f.caches, 'open');
   const file = '/assets/file-0123456789abcdef.bin', worker = f.load('A', [file]);
   await worker.dispatch('install'); await worker.dispatch('activate');
+  await worker.dispatch('fetch', {request: new Request(url('/'))}); // STALESHELL: the first navigation opens the book of held builds once
   const before = open.mock.calls.length;
   for (let visit = 0; visit < 3; visit++) {
     await worker.dispatch('fetch', {request: new Request(url('/'))});

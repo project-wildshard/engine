@@ -105,16 +105,17 @@ test('adoption skips stale workers, fences its controller and retires unavailabl
   expect(await recovery).toBe(true);expect(container.controller).not.toBe(recovered);
   installing.state='installed';installing.dispatchEvent(new Event('statechange'));
   await vi.waitFor(()=>{expect(vi.getTimerCount()).toBe(initial);});
-  expect(installing.messages).toEqual([{type:'BUILD'}]);
+  // STALESHELL: an update installing while this page loads is told to step its download aside, as a waiting one is
+  expect(installing.messages).toEqual([{type:'PAUSE'},{type:'BUILD'}]);
   document.dispatchEvent(new Event('ws:ready'));
-  expect(installing.messages).toEqual([{type:'BUILD'}]);
+  expect(installing.messages).toEqual([{type:'PAUSE'},{type:'BUILD'}]);
   expect(expired.messages).not.toContainEqual({type:'WARM_CODE'});
   document.dispatchEvent(new Event('ws:control-ready'));
   expect(expired.messages).not.toContainEqual({type:'WARM_CODE'});
   expect(expired.messages).not.toContainEqual({type:'GC'});
-  expect(installing.messages).toEqual([{type:'BUILD'}]);
+  expect(installing.messages).toEqual([{type:'PAUSE'},{type:'BUILD'}]);
   window.dispatchEvent(new Event('pagehide'));
-  expect(installing.messages).toEqual([{type:'BUILD'}]);
+  expect(installing.messages).toEqual([{type:'PAUSE'},{type:'BUILD'}]);
   const active=new WorkerHandle();active.state='activated';container.controller=active;
   active.build='held-build';
   expect(await wsSw.version()).toMatchObject({type:'VERSION',build:'held-build'});

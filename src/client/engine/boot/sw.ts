@@ -348,6 +348,8 @@ function askPrecache(): void {
   };
   ask(reg.active);
   if (reg.waiting?.state === 'installed') post(reg.waiting);
+  // STALESHELL: an update installing now downloads its generation in its install (sw.js); this page's control resumes it too
+  if (reg.installing !== null && reg.active !== null) post(reg.installing);
   const installing = reg.installing;
   ask(installing); // it may have activated while the control frames ran
   if (!precacheAsked && installing !== null) pageScope.listen(installing, 'statechange', () => { ask(installing); });
@@ -385,7 +387,7 @@ async function register(s: ServiceWorkerContainer): Promise<void> {
   watch(reg);
   // DL1 (sp-x2): this page is loading. A waiting update (and the active worker, when this page is uncontrolled) sees
   // none of its fetches, so tell them to step their precache aside; this page's control resumes it (PRECACHE).
-  if (!controlReached) for (const w of [reg.waiting, sw?.controller === null ? reg.active : null]) {
+  if (!controlReached) for (const w of [reg.waiting, reg.active === null ? null : reg.installing, sw?.controller === null ? reg.active : null]) {
     // oxlint-disable-next-line unicorn/require-post-message-target-origin -- ServiceWorker.postMessage has no targetOrigin parameter.
     if (w !== null && w !== undefined) try { w.postMessage({ type: 'PAUSE' }); } catch { /* a retired worker has nothing to pause */ }
   }

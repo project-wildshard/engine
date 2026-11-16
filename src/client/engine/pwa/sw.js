@@ -160,8 +160,34 @@ workerScope.listen(self, 'install', event => {
     const namedShell = SHELL_FILES.filter(path => immutable(new URL(abs(path))));
     await Promise.all([precache(shell, SHELL_FILES.filter(path => !namedShell.includes(path))),
       precache(assets, namedShell, true)]);
+    // STALESHELL (QA 11-15 row 32, Jake: "the cache PWA one has to swap out new code"): an update (a worker already runs
+    // this origin) takes over by itself, so the next boot is the new build and nobody waits on a reload that never
+    // activates it. When the running build is whole on this device (its generation is held, so it boots offline), the new
+    // one first downloads its own whole generation here, in the background while the player plays; a download cut short
+    // (bad Wi-Fi) fails the install, the running build stays whole and nothing of the new one boots, and the browser's next
+    // update check resumes from what the shared cache already holds. A running build that is not whole has nothing to keep:
+    // it can't boot offline, and its document names code a newer deploy took off the server (Jake's phone sat on v0.1.19's
+    // title through every reload), so the new worker takes over after its shell. A first visit stays shell-only (DL1).
+    const running = self.registration?.active;
+    if (running === null || running === undefined) return;
+    const runningBuild = await buildOfWorker(running);
+    if (runningBuild !== undefined && await (await caches.open(BOOKS)).match(bookKey(runningBuild)) !== undefined) await precacheGeneration();
+    await self.skipWaiting();
   })());
 });
+
+/** The build a worker serves (its `BUILD` reply, which every worker since the MF1 rewrite answers), or undefined after 3 s. */
+function buildOfWorker(worker) {
+  return new Promise(resolve => {
+    workerScope.timeout(3000, () => { resolve(undefined); }); // the first answer wins
+    const done = build => { resolve(build); };
+    try {
+      const channel = new MessageChannel();
+      channel.port1.onmessage = event => { done(typeof event.data?.build === 'string' && event.data.build !== '' ? event.data.build : undefined); };
+      worker.postMessage({ type: 'BUILD' }, [channel.port2]);
+    } catch { done(undefined); }
+  });
+}
 
 // DL1: the build's hashed code is precached only when a page reports control (PRECACHE), so a cold visit's level
 // download has the link to itself. Chunks that page already loaded come from the HTTP cache (force-cache).
@@ -431,6 +457,33 @@ async function contentRead(request) {
   return response;
 }
 
+/** The document baked into this worker: its build's own page, whatever URL asked (the page reads its route from the URL). */
+const bakedDocument = () => new Response(DOCUMENT, { headers: { ...DOCUMENT_HEADERS, 'content-type': 'text/html;charset=utf-8', 'cache-control': 'no-store' } });
+/** STALESHELL: how long a navigation waits on the network before a worker whose code is not all held answers with its own
+ *  document anyway (offline, or a link that never answers). */
+const NAVIGATION_WAIT_MS = 6000;
+let generationHeld = false;
+/** Whether this build's whole generation is held (its book is written only once every file is). Only a yes is remembered. */
+async function holdsGeneration() {
+  if (generationHeld) return true;
+  try { generationHeld = await (await store(BOOKS)).match(bookKey(BUILD)) !== undefined; } catch { return false; }
+  return generationHeld;
+}
+/** STALESHELL (QA 11-15 row 32: Jake's phone sat on v0.1.19's title for good, "8 of 8 files", then "still waiting"): this
+ *  worker answers a navigation with its own document only when it holds that document's whole generation, so the page boots
+ *  complete from the cache, offline too. A worker that holds less (it never reached control on this build) can't promise the
+ *  code its document names, and a newer deploy has removed it from the server: the network's page answers, and the baked
+ *  document only when the network can't (offline, or no answer in NAVIGATION_WAIT_MS). The request's own URL is kept either
+ *  way: a `/slug/<x>` stays itself.
+ *  @param {Request} request */
+async function navigation(request) {
+  if (await holdsGeneration()) return bakedDocument();
+  const waited = new Promise(resolve => { workerScope.timeout(NAVIGATION_WAIT_MS, () => { resolve(undefined); }); });
+  const online = fetch(request).then(response => response.type === 'opaqueredirect' || response.ok && isHtml(response) ? response : undefined,
+    () => undefined);
+  return await Promise.race([online, waited]) ?? bakedDocument();
+}
+
 workerScope.listen(self, 'fetch', event => {
   const request = event.request, url = new URL(request.url);
   // A diagnostic document must reach its own host route, not the cached game
@@ -447,8 +500,10 @@ workerScope.listen(self, 'fetch', event => {
   if (url.pathname === '/version.json' || url.pathname === '/sw.js' || url.pathname.startsWith('/api/')) return;
   if (request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
     const received=diagnosticNow();
-    event.respondWith(new Response(DOCUMENT, { headers: { ...DOCUMENT_HEADERS, 'content-type': 'text/html;charset=utf-8', 'cache-control': 'no-store' } }));
-    bootPublish(event,[{operation:'sw:navigation-handler-and-delivery',url:request.url,start:received,end:diagnosticNow(),result:'complete'}]);
+    event.respondWith(navigation(request).then(response => {
+      bootPublish(event,[{operation:'sw:navigation-handler-and-delivery',url:request.url,start:received,end:diagnosticNow(),result:'complete'}]);
+      return response;
+    }));
     return;
   }
   if (PAGE_PART.test(url.pathname)) {
