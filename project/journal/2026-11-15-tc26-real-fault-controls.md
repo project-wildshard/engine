@@ -29,3 +29,8 @@ links its declared dependencies to the existing immutable installation.
 No installation or shared package is modified. The CI-only positive
 controls are wired as a non-blocking one-week soak. The manual command
 and its exact evidence limits are documented in docs/nightly.md.
+
+Committed-source receipt `a86e33a1`: host 2383/1819/1780 ms,
+door 1105/1122/1118 ms, export 425/291/423 ms, format 465/444/447 ms
+(baseline/planted/healed, complete child processes). Each expected plant
+fails one case with its own assertion or admission reason; all four heal.
