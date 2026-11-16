@@ -160,6 +160,14 @@ and its own CI; ordinary main CI never advances staging. The build
 must descend from the current staging build (J234). Production is
 selected by its version tag and cannot be aligned by hand.
 
+An abandoned, unmerged staging release may advance to a newer prepared
+release whose source cut is the same or a descendant on published main.
+Both release tips must remain published under their matching version
+branches, with only version/changelog changes from their cuts; a manifest
+change beyond its version, release-only code, an older version or older
+source cut is refused. Exact branch CI and packs-first still apply.
+Production retains the commit-ancestry rule.
+
 Every run signs with main's current publisher, checked out at the root,
 and builds the bundle in the source's own tree under `./source`. So a
 late CI event for an older commit still meets the packs gate and the

@@ -9,10 +9,12 @@ import * as v from 'valibot';
 import { readServerPackBook, serverPackBookPath } from '../../src/shared/game/shardfile/serverPack.ts';
 import { bundleDescriptor, COMMIT, DEFAULT_SERVER_SHARDS, publication, readPublication, releasePublicKey, releaseShards, signRelease } from './sign.mjs';
 import { copyItemCatalogue, itemBytesMatch } from './items.mjs';
+import { preparedReleaseFollows } from './history.mjs';
 
 /** @typedef {import('../../src/shared/host/releaseRows.ts').ReleaseFile} ReleaseFile */
 /** @typedef {{client: S3Client, bucket: string, candidate: ReleaseFile, privateKey: string, publicKey: string, isAncestor: (older: string, newer: string) => boolean,
- *   packsReady: (release: ReleaseFile) => Promise<string | null>, align?: boolean}} PublishOptions */
+ *   packsReady: (release: ReleaseFile) => Promise<string | null>, align?: boolean,
+ *   preparedFollows?: (older: string, newer: string) => boolean}} PublishOptions */
 
 /** @param {unknown} error @returns {boolean} */
 const missing = error => error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.name === 'NotFound' || error.$metadata.httpStatusCode === 404);
@@ -74,7 +76,8 @@ export async function publishChannel(options) {
     } catch (error) { if (!(error instanceof S3ServiceException && (error.name === 'NoSuchKey' || error.$metadata.httpStatusCode === 404))) throw error; }
     const prior = previous?.release;
     if (previous !== null && prior !== undefined) {
-      if (prior.engineBuild !== candidate.engineBuild && !ancestor(prior.engineBuild, candidate.engineBuild)) {
+      if (prior.engineBuild !== candidate.engineBuild && !ancestor(prior.engineBuild, candidate.engineBuild)
+        && (candidate.channel !== 'staging' || options.preparedFollows?.(prior.engineBuild, candidate.engineBuild) !== true)) {
         if (!ancestor(candidate.engineBuild, prior.engineBuild)) throw new Error('A channel cannot move to unrelated history');
         // J234: the one rollback (staging serial 65, 2026-11-10) was allowed once; a person who names an older build is told no.
         if (options.align === true) throw new Error(`Staging alignment is forward-only: ${candidate.engineBuild} is older than the live ${prior.engineBuild}`);
@@ -148,7 +151,8 @@ async function main() {
   try {
     const packsReady = (/** @type {ReleaseFile} */ release) => serverPacksReady(client, bucket, release);
     const items = await copyItemCatalogue(client, bucket);
-    const result = await publishChannel({ client, bucket, candidate: { ...candidate, items }, privateKey, publicKey, isAncestor, align, packsReady });
+    const result = await publishChannel({ client, bucket, candidate: { ...candidate, items }, privateKey, publicKey, isAncestor,
+      preparedFollows: preparedReleaseFollows, align, packsReady });
     writeFileSync(values.out, `${result.signed}\n`);
     console.log(JSON.stringify({ status: result.status, channel: result.release.channel, serial: result.release.serial, engineBuild: result.release.engineBuild, object: `releases/${result.release.channel}.json`,
       ...result.reason === undefined ? {} : { held: candidate.engineBuild, reason: result.reason } }));

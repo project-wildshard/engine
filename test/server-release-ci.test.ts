@@ -18,6 +18,7 @@ import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { worldCells } from '../src/server/host/dedicated/gridCells';
 import { publishChannel, serverPacksReady } from '../scripts/server-release/publish.mjs';
 import { copyItemCatalogue } from '../scripts/server-release/items.mjs';
+import { preparedReleaseFollows } from '../scripts/server-release/history.mjs';
 import { readReleaseFile } from '../src/server/host/dedicated/releaseFile';
 import { readSignedRelease } from '../src/client/host/online/release';
 import type { ReleaseFile } from '../src/shared/host/releaseRows';
@@ -207,6 +208,31 @@ test('J234: both channels sign a build only after its server book and parts are 
     await expect(copyItemCatalogue(client, 'packs', apiRead)).rejects.toThrow('Existing item catalogue hash mismatch');
     objects.set('/api/items.json', JSON.stringify({ version: 1, items: [source.items[0], source.items[0]] }));
     await expect(copyItemCatalogue(client, 'packs', apiRead)).rejects.toThrow('Duplicate platform item');
+    // Abandoning an unmerged staging release must not strand its next prepared release; the packs gate still runs.
+    const prepared = createTempRepo();
+    try {
+      const manifest = (version: string): string => JSON.stringify({ name: 'fixture', version });
+      const cut = prepared.commit({ 'package.json': manifest('0.1.29'), 'runtime.ts': 'old' }, 'Main source');
+      const abandoned = prepared.commit({ 'package.json': manifest('0.1.30') }, 'chore(release): v0.1.30');
+      prepared.git(['update-ref', 'refs/remotes/origin/release/v0.1.30', abandoned]);
+      prepared.git(['switch', '--detach', cut]);
+      const fixed = prepared.commit({ 'runtime.ts': 'fixed' }, 'Fix entry');
+      prepared.git(['update-ref', 'refs/remotes/origin/main', fixed]);
+      const next = prepared.commit({ 'package.json': manifest('0.1.31') }, 'chore(release): v0.1.31');
+      prepared.git(['update-ref', 'refs/remotes/origin/release/v0.1.31', next]);
+      objects.set('releases/staging.json', signRelease(release(abandoned), pem));
+      const rotate = (build: string, nextChannel: 'staging' | 'production' = 'staging'): ReturnType<typeof publishChannel> => publishChannel({
+        client, bucket: 'packs', candidate: { ...release(build), channel: nextChannel }, privateKey: pem, publicKey, isAncestor, align: nextChannel === 'staging',
+        preparedFollows: (a, b) => preparedReleaseFollows(a, b, prepared.dir), packsReady: row => serverPacksReady(client, 'packs', row) });
+      expect(await rotate(next)).toMatchObject({ status: 'held', release: { engineBuild: abandoned, serial: 1 } });
+      shelve(next, 1);
+      expect(await rotate(next)).toMatchObject({ status: 'published', release: { engineBuild: next, serial: 2 } });
+      await expect(rotate(abandoned)).rejects.toThrow(/unrelated history/u);
+      objects.set('releases/production.json', signRelease({ ...release(abandoned), channel: 'production' }, pem));
+      await expect(rotate(next, 'production')).rejects.toThrow(/unrelated history/u);
+      expect(channel()).toMatchObject({ engineBuild: next, serial: 2 });
+      expect(channel('production')).toMatchObject({ engineBuild: abandoned, serial: 1 });
+    } finally { prepared.cleanup(); }
   } finally { client.destroy(); server.closeAllConnections(); await new Promise<void>(resolve => { server.close(() => { resolve(); }); }); }
 });
 

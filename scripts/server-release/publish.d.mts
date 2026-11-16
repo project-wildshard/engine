@@ -2,6 +2,7 @@ import type { S3Client } from '@aws-sdk/client-s3';
 import type { ReleaseFile } from '../../src/shared/host/releaseRows.ts';
 
 export interface PublishOptions {
+  preparedFollows?: (older: string, newer: string) => boolean;
   client: S3Client;
   bucket: string;
   candidate: ReleaseFile;
