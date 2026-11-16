@@ -67,14 +67,19 @@ wrapper = str(repo / 'scripts/heavy-lane.py')
 guard = "import {assertHeavyLease as current} from './scripts/heavy-lane-lease.mjs';import {assertHeavyLease as legacy} from './test/fixtures/legacy-heavy-lane-lease.mjs';current('build');legacy('build')"
 with tempfile.TemporaryDirectory(prefix='capacity-test-', dir=repo / 'tmp') as temporary:
  root = pathlib.Path(temporary)
- env = {k: v for k, v in os.environ.items() if k not in ('WS_HEAVY_TOKEN', 'WS_HEAVY_GATE', 'WS_HEAVY_SCHEDULER_ROOT')}
+ env = {k: v for k, v in os.environ.items() if not k.startswith(('WS_HEAVY_', 'WS_CPU_'))}
  env['WS_HEAVY_ROOT'] = str(root)
+ env['WS_CPU_ROOT'] = str((root/'cpu').resolve())
  worker = root / 'worker.py'
  worker.write_text("import pathlib, subprocess, sys\\nroot=pathlib.Path(sys.argv[1]); name=sys.argv[2]\\nsubprocess.run(['node','--input-type=module','-e',sys.argv[3]],check=True)\\n(root/(name+'.started')).write_text('yes')\\nassert sys.stdin.read(1) == 'r', 'owner closed before release'\\n")
  processes = []
  releases = {}
  def launch(kind, name):
-  process = subprocess.Popen([sys.executable, wrapper, kind, '--', sys.executable, str(worker), str(root), name, guard], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+  # Exercise the shared build-ticket domain with independent private CPU
+  # domains. The actual shared CPU policy has its own competing-work proof;
+  # this fixture must observe all three tickets even on small CI runners.
+  command_env = dict(env, WS_CPU_ROOT=str((root/('cpu-'+name)).resolve()))
+  process = subprocess.Popen([sys.executable, wrapper, kind, '--', sys.executable, str(worker), str(root), name, guard], env=command_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
   processes.append(process)
   releases[name] = process
   return process

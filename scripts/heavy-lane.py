@@ -561,6 +561,87 @@ def launch_command(kind, command, env):
     return launch
 
 
+_build_cpu = None
+
+
+def build_cpu_module():
+    global _build_cpu
+    if _build_cpu is None:
+        spec = importlib.util.spec_from_file_location('build_cpu_admission', Path(__file__).with_name('cpu-admission.py'))
+        _build_cpu = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_build_cpu)
+    return _build_cpu
+
+
+def build_cpu_release(handle):
+    if handle is None:
+        return
+    admission, root, entry = handle
+    deadline = time.monotonic() + admission.owned_command.STOP_GRACE_SECONDS
+    while not admission.release_cpu(root, entry['token']):
+        if time.monotonic() >= deadline:
+            raise RuntimeError('App-build command is not proven stopped; CPU reservation retained')
+        time.sleep(.1)
+
+
+def build_cpu_admit(env, deadline):
+    """Own the actual build command; nested builds register within their parent budget."""
+    admission = build_cpu_module()
+    root = admission.cpu_root(env)
+    root.mkdir(parents=True, exist_ok=True)
+    parent = admission.ancestor_cpu_budget(env)
+    maximum = max(1, (os.cpu_count() or 1) - 2)
+    try:
+        policy = admission._regular_json(root / 'queue.json')
+    except FileNotFoundError:
+        policy = {}
+    capacity = policy.get('cpuCapacity', maximum)
+    if type(capacity) is not int or not 1 <= capacity <= maximum:
+        raise RuntimeError('Invalid app-build CPU policy')
+    slots = min(4, capacity) if parent is None else parent['slots']
+    entry = {'token': uuid.uuid4().hex, 'pid': os.getpid(), 'holder': os.getpid(),
+             'owner': os.getppid(), 'repo': str(Path.cwd().resolve()), 'slots': slots,
+             'ownedCommand': admission.owned_command.ownership()}
+    handle = (admission, root, entry)
+    try:
+        if parent is not None:
+            admission.register_borrowed_cpu(root, entry, env)
+        else:
+            while not admission.acquire_cpu(root, entry, capacity, deadline):
+                if admission.owned_command.stale_reason(entry['ownedCommand'], entry['pid'], entry['repo']) is not None:
+                    raise RuntimeError('App-build caller exited during CPU admission')
+                if time.monotonic() >= deadline:
+                    raise TimeoutError('App-build CPU admission exceeded its queue deadline')
+                time.sleep(.01)
+        return {**env, 'WS_CPU_SLOTS': str(slots),
+                admission.PARENT_CONTEXT: admission.parent_cpu_context({'lease': entry['token']}, env)}, handle, parent
+    except BaseException:
+        build_cpu_release(handle)
+        raise
+
+
+def start_build_child(command, env, pass_fds, handle):
+    admission, root, entry = handle
+    return admission.owned_command.start_command(command, env, pass_fds,
+                lambda child: admission.publish_cpu_child(root, entry['token'], child))
+
+
+def wait_build_child(child, seconds, parent, handle):
+    deadline = time.monotonic() + seconds
+    admission, root, entry = handle
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(child.args, seconds)
+        try:
+            return child.wait(timeout=min(.2, remaining))
+        except subprocess.TimeoutExpired:
+            if parent is not None and admission.ancestor_cpu_budget({**os.environ, 'WS_CPU_ROOT': str(root)}) != parent:
+                raise RuntimeError(admission.PARENT_REFUSAL)
+            if admission.owned_command.stale_reason(entry['ownedCommand'], entry['pid'], entry['repo']) is not None:
+                raise RuntimeError('App-build caller or checkout is gone')
+
+
 def main():
     from quiet_logs import requested, run_logged
     args_before_command = sys.argv[1:sys.argv.index('--')] if '--' in sys.argv else sys.argv[1:]
@@ -600,8 +681,12 @@ def main():
     resources = RESOURCES[args.kind]
     observe_command = 'full-test' in resources
     owns_lane = inherited(root, resources)
+    cpu_env = {**os.environ, 'WS_HEAVY_SCHEDULER_ROOT': str(root)}
+    cpu_parent = build_cpu_module().ancestor_cpu_budget(cpu_env) if args.kind == 'build' else None
     ordered = mirror_first(command, [sys.executable, str(Path(__file__).resolve()), *argv[:separator], '--'])
     if ordered is not None:
+        if cpu_parent is not None:
+            parser.error('mirror admission must precede parent CPU admission; move this command outside that interval')
         if os.environ.get('WS_HEAVY_TOKEN'):
             parser.error('mirror admission must precede the outer heavy lease; move this command outside that lease')
         if args.kind in ('full-test', 'check') and not full_suite_allowed():
@@ -613,13 +698,31 @@ def main():
     if owns_lane:
         env = dict(os.environ)
         if args.kind == 'build':
-            # This is the actual app build inside an existing gate/build lease, not another lease.
             started, load, code = time.time(), load_average(), 127
+            child, cpu_owned = None, None
+            def interrupted_nested(_signal, _frame):
+                raise KeyboardInterrupt
+            signal.signal(signal.SIGTERM, interrupted_nested)
+            signal.signal(signal.SIGINT, interrupted_nested)
             try:
-                code = subprocess.call(launch_command(args.kind, command, env), env=env, pass_fds=inherited_fds())
+                env, cpu_owned, parent = build_cpu_admit({**env, 'WS_HEAVY_SCHEDULER_ROOT': str(root)},
+                                                        time.monotonic() + admission_wait_seconds)
+                child = start_build_child(launch_command(args.kind, command, env), env, inherited_fds(), cpu_owned)
+                code = wait_build_child(child, args.max * 60, parent, cpu_owned)
+                return code if code >= 0 else 128 - code
+            except KeyboardInterrupt:
+                code = 130
+                return code
+            except subprocess.TimeoutExpired:
+                code = 124
+                return code
             finally:
-                record_build(root, started, started, load, code, inherited_lease=True)
-            return code if code >= 0 else 128 - code
+                try:
+                    if child is not None:
+                        build_cpu_module().owned_command.terminate_command(child)
+                    build_cpu_release(cpu_owned)
+                finally:
+                    record_build(root, started, started, load, code, inherited_lease=True)
         os.execvpe(command[0], command, env)
     if args.kind in ('full-test', 'check') and not full_suite_allowed():
         print(FULL_SUITE_REFUSAL, file=sys.stderr)
@@ -638,6 +741,7 @@ def main():
             parser.error('checkout-scoped pushes require CPU admission')
         entry['checkout'] = str(Path.cwd().resolve())
     held, child, started, load, code = None, None, None, None, 130
+    cpu_owned = None
     command_began, command_owner, command_before, command_result = None, None, None, None
     queued_mono, acquired_mono = time.monotonic(), None
     cpu_before = process_resource.getrusage(process_resource.RUSAGE_CHILDREN)
@@ -658,6 +762,8 @@ def main():
                 raise queue_timeout(root, entry)
             held = acquire(root, entry, deadline)
             if held is None:
+                if cpu_parent is not None:
+                    raise RuntimeError('cannot queue for a build ticket while holding a parent CPU budget')
                 time.sleep(min(0.1, max(0, deadline - time.monotonic())))
         started = time.time()
         acquired_mono = time.monotonic()
@@ -670,10 +776,13 @@ def main():
                'WS_HEAVY_SCHEDULER_ROOT': str(root)}
         # Nested wrappers inherit their owner's QoS; CI has no taskpolicy.
         launch = launch_command(args.kind, command, env)
+        if args.kind == 'build':
+            env, cpu_owned, cpu_parent = build_cpu_admit(env, deadline)
         if observe_command:
             command_began = (time.time(), time.monotonic())
-        child = subprocess.Popen(launch, env=env, start_new_session=True,
-                                 pass_fds=tuple(fd.fileno() for fd in held))
+        child = (start_build_child(launch, env, tuple(fd.fileno() for fd in held), cpu_owned)
+                 if args.kind == 'build' else subprocess.Popen(launch, env=env, start_new_session=True,
+                                 pass_fds=tuple(fd.fileno() for fd in held)))
         entry['childPid'] = child.pid
         with scheduler(root):
             write_compat(root, entry)
@@ -686,10 +795,11 @@ def main():
             # helpers, immediately before the sole command wait.
             command_before = child_cpu()
         try:
-            code = child.wait(timeout=args.max * 60)
+            code = (wait_build_child(child, args.max * 60, cpu_parent, cpu_owned)
+                    if args.kind == 'build' else child.wait(timeout=args.max * 60))
         except subprocess.TimeoutExpired:
             print('heavy-lane: owned command timed out', file=sys.stderr)
-            terminate(child)
+            (build_cpu_module().owned_command.terminate_command(child) if args.kind == 'build' else terminate(child))
             code = 124
         if command_began is not None:
             command_result = command_usage(child, command_began, command_owner, command_before)
@@ -697,44 +807,54 @@ def main():
         return code if code >= 0 else 128 - code
     except KeyboardInterrupt:
         code = 130
-        terminate(child)
+        (build_cpu_module().owned_command.terminate_command(child) if args.kind == 'build' else terminate(child))
         if child is not None and command_began is not None:
             command_result = command_usage(child, command_began, command_owner, command_before)
         return 130
-    except TimeoutError as error:
-        code = 124
+    except (TimeoutError, RuntimeError) as error:
+        if isinstance(error, RuntimeError) and args.kind != 'build':
+            code = 1
+            raise
+        code = 124 if isinstance(error, TimeoutError) else 75
         print(str(error), file=sys.stderr, flush=True)
-        return 124
+        return code
     except Exception:
         code = 1
         raise
     finally:
         try:
-            # A failed admission never starts a second wait during cleanup.
-            remove_ticket(root, token, time.monotonic() if held is None else None)
-        except TimeoutError as error:
-            print('heavy-lane: ticket cleanup deferred until process exit; ' + str(error), file=sys.stderr)
-        if held is not None:
-            with scheduler(root):
-                for resource in entry['leases']:
-                    path = root / (resource + '.active.json')
-                    if path.exists() and json.loads(path.read_text()).get('token') == token:
-                        path.unlink()
-                clear_compat(root, entry)
-            for fd in held:
-                fd.close()
-            usage = process_resource.getrusage(process_resource.RUSAGE_CHILDREN)
-            record_full_test(root, entry, 'release', queueSeconds=acquired_mono - queued_mono,
-                heldSeconds=time.monotonic() - acquired_mono, loadEnd=load_average(),
-                exitCode=code if code >= 0 else 128 - code,
-                userSeconds=max(0, usage.ru_utime - cpu_before.ru_utime),
-                systemSeconds=max(0, usage.ru_stime - cpu_before.ru_stime),
-                commandUsage=command_result)
-        else:
-            record_full_test(root, entry, 'not-acquired', queueSeconds=time.monotonic() - queued_mono,
-                exitCode=code, loadEnd=load_average(), commandUsage=None)
-        if args.kind == 'build' and started is not None:
-            record_build(root, entry['queuedAt'], started, load, code)
+            if args.kind == 'build':
+                try:
+                    build_cpu_module().owned_command.terminate_command(child)
+                finally:
+                    build_cpu_release(cpu_owned)
+        finally:
+            try:
+                # A failed admission never starts a second wait during cleanup.
+                remove_ticket(root, token, time.monotonic() if held is None else None)
+            except TimeoutError as error:
+                print('heavy-lane: ticket cleanup deferred until process exit; ' + str(error), file=sys.stderr)
+            if held is not None:
+                with scheduler(root):
+                    for resource in entry['leases']:
+                        path = root / (resource + '.active.json')
+                        if path.exists() and json.loads(path.read_text()).get('token') == token:
+                            path.unlink()
+                    clear_compat(root, entry)
+                for fd in held:
+                    fd.close()
+                usage = process_resource.getrusage(process_resource.RUSAGE_CHILDREN)
+                record_full_test(root, entry, 'release', queueSeconds=acquired_mono - queued_mono,
+                    heldSeconds=time.monotonic() - acquired_mono, loadEnd=load_average(),
+                    exitCode=code if code >= 0 else 128 - code,
+                    userSeconds=max(0, usage.ru_utime - cpu_before.ru_utime),
+                    systemSeconds=max(0, usage.ru_stime - cpu_before.ru_stime),
+                    commandUsage=command_result)
+            else:
+                record_full_test(root, entry, 'not-acquired', queueSeconds=time.monotonic() - queued_mono,
+                    exitCode=code, loadEnd=load_average(), commandUsage=None)
+            if args.kind == 'build' and started is not None:
+                record_build(root, entry['queuedAt'], started, load, code)
 
 
 if __name__ == '__main__':
