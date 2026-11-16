@@ -6,9 +6,9 @@ import type { NetChannel } from './transport';
 // `NET_SCHEMA_HASH` does not move.
 
 /** The prefix byte of every message on a game socket. */
-export const SOCKET_RELIABLE = 0, SOCKET_UNRELIABLE = 1, SOCKET_PING = 2, SOCKET_PONG = 3, SOCKET_RESUME = 4, SOCKET_READY = 5, SOCKET_COUNTDOWN = 6, SOCKET_PLAYTEST=7, SOCKET_VOICE = 8, SOCKET_WORLD = 9, SOCKET_DEVICE = 10, SOCKET_ENTER = 11;
+export const SOCKET_RELIABLE = 0, SOCKET_UNRELIABLE = 1, SOCKET_PING = 2, SOCKET_PONG = 3, SOCKET_RESUME = 4, SOCKET_READY = 5, SOCKET_COUNTDOWN = 6, SOCKET_PLAYTEST=7, SOCKET_VOICE = 8, SOCKET_WORLD = 9, SOCKET_DEVICE = 10, SOCKET_ENTER = 11, SOCKET_ARRIVE = 12;
 /** The messages outside the game protocol: the server's word on where to load, the client's that it has, and the server's that a new build is coming (J174). */
-export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voice' | 'world' | 'device' | 'enter';
+export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voice' | 'world' | 'device' | 'enter' | 'arrive';
 /** GO4: the door's first word on every socket, before any hello: how many grid cells it hosts and, since opus-route2, the shard each
  *  one runs, and nothing else (D7 keeps `/health` off the rooms address, so a page learns this here). A one-shard page joins only a
  *  world that names its shard. A build from before it ignores the prefix. */
@@ -46,7 +46,7 @@ export function closeReason(code: number): string {
 /** The prefix of a game message on `channel`. */
 export const channelPrefix = (channel: NetChannel): number => channel === 'reliable' ? SOCKET_RELIABLE : SOCKET_UNRELIABLE;
 /** The prefix of a control message. */
-export const controlPrefix = (control: SocketControl): number => control === 'resume' ? SOCKET_RESUME : control === 'ready' ? SOCKET_READY : control==='playtest'?SOCKET_PLAYTEST:control === 'voice' ? SOCKET_VOICE : control === 'world' ? SOCKET_WORLD : control === 'device' ? SOCKET_DEVICE : control === 'enter' ? SOCKET_ENTER : SOCKET_COUNTDOWN;
+export const controlPrefix = (control: SocketControl): number => control === 'resume' ? SOCKET_RESUME : control === 'ready' ? SOCKET_READY : control==='playtest'?SOCKET_PLAYTEST:control === 'voice' ? SOCKET_VOICE : control === 'world' ? SOCKET_WORLD : control === 'device' ? SOCKET_DEVICE : control === 'enter' ? SOCKET_ENTER : control === 'arrive' ? SOCKET_ARRIVE : SOCKET_COUNTDOWN;
 /**
  * ZONE-ENTRY ZE9a (J352): the client's word at a gate's 0, `{ cell }`, the cell it goes into. The road takes it only from a seat standing
  * in that cell's buffer, never into its own home, and freezes the body; it answers a word it won't take on the same prefix with the
@@ -64,6 +64,22 @@ export function decodeEnter(bytes: ArrayBuffer): EnterWord | null {
     const said: unknown = JSON.parse(new TextDecoder().decode(bytes));
     if (typeof said !== 'object' || said === null || !('cell' in said) || typeof said.cell !== 'string' || !ENTER_CELL.test(said.cell)) return null;
     return 'refused' in said && typeof said.refused === 'string' ? { cell: said.cell, refused: said.refused.slice(0, 64) } : { cell: said.cell };
+  } catch { return null; }
+}
+/**
+ * ZE9b: the door's answer to an `enter` it took: the cell, and where in its own frame the traveller stands once in (the entryway's
+ * centre line, `ARRIVAL_DEPTH` in, facing into the cell). The page loads the cell, places the traveller there and says `ready`.
+ */
+export interface ArriveWord { readonly cell: string; readonly at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number } }
+/** An `arrive` word. */
+export function encodeArrive(word: ArriveWord): ArrayBuffer { return new TextEncoder().encode(JSON.stringify(word)).buffer; }
+/** What an `arrive` word says, or null for one that makes no sense. */
+export function decodeArrive(bytes: ArrayBuffer): ArriveWord | null {
+  try {
+    const said: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    if (typeof said !== 'object' || said === null || !('cell' in said) || typeof said.cell !== 'string' || !('at' in said) || typeof said.at !== 'object' || said.at === null) return null;
+    const { at } = said, pose = { x: 'x' in at ? at.x : Number.NaN, y: 'y' in at ? at.y : Number.NaN, z: 'z' in at ? at.z : Number.NaN, yaw: 'yaw' in at ? at.yaw : Number.NaN };
+    return Object.values(pose).every(value => typeof value === 'number' && Number.isFinite(value)) ? { cell: said.cell, at: pose as ArriveWord['at'] } : null;
   } catch { return null; }
 }
 /** J174: seconds until everyone moves, and the build they move to, which a client preloads. */

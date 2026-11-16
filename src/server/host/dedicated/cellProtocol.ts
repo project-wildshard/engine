@@ -48,6 +48,8 @@ export type CellOrder =
   | ({ readonly kind: 'arrive'; readonly from: string; readonly to: string; readonly at: ResumeAt; readonly port: MessagePort; readonly hello: ArrayBuffer; readonly motion: MotionSnapshot | null } & SeatEntry)
   /** GC15 (3): cells on other workers a walker can stand in at their entryways: this worker's road drops its walls round them and crosses into them. */
   | { readonly kind: 'open'; readonly cells: readonly string[] }
+  /** ZE9b: the zone entry of a seat frozen at a gate on road `from` is off (no `ready` in time, or the move refused): its body plays on. */
+  | { readonly kind: 'thaw'; readonly from: string; readonly device: string }
   | { readonly kind: 'close' };
 /** One 10 s reading of a worker (E7.8). */
 export interface WorkerReading {
@@ -72,7 +74,9 @@ export type RoomNews =
   /** MP4.1: a `room` line said here, for the rest of the world. */
   | { readonly kind: 'chat'; readonly line: WorldLine }
   /** GC15: this seat's feet left for cell `to`, standing at `at` in its frame: the door reads their save there and orders the `cross`. */
-  | { readonly kind: 'crossing'; readonly device: string; readonly to: string; readonly at: ResumeAt };
+  | { readonly kind: 'crossing'; readonly device: string; readonly to: string; readonly at: ResumeAt }
+  /** ZE9a/b (J352): this road took the seat's `enter` and froze it at `to`'s gate; it arrives at `at` in `to`'s frame, once its page is ready. */
+  | { readonly kind: 'entering'; readonly device: string; readonly to: string; readonly at: ResumeAt };
 /** ROAD-RESIDENT RR2: what a worker holds in memory: its open cells, whether its road is open, and the strips that road stands on. */
 export interface WorkerResident { readonly cells: number; readonly road: boolean; readonly strips: number }
 /** What a worker says to the door. */

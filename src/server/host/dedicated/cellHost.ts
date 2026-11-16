@@ -301,6 +301,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     if (order.kind === 'cross') { cross(order).catch(fail); return; }
     // GC15 (3): crossings between workers, and which cells on the others a walker can stand in
     if (order.kind === 'open') { road?.open(order.cells); return; }
+    if (order.kind === 'thaw') { if (road?.name === order.from) road.thaw(order.device); return; }
     if (order.kind === 'handOut') { const out = road !== undefined && road.name === order.from && road.handOut(order.device, order.to); if (!out) post({ kind: 'handedOut', device: order.device, from: order.from, out }); return; }
     if (order.kind === 'arrive') { arrive(order).catch(fail); return; }
     if (order.kind === 'place') { placing = placing.then(() => place(order)); return; }

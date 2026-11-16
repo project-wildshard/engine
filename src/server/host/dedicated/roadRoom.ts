@@ -20,7 +20,7 @@ import { FallFloor } from '../standalone/fallFloor';
 import { openCellWalls, openHomeFor, placeOnRoad } from '../standalone/roadWorld';
 import { LEFT, SeatTransport } from './socketPump';
 import { cellFrame } from './gridCells';
-import { bufferAt } from '@wildshard/engine/game/grid/zoneWalls';
+import { arrivalPose, bufferAt } from '@wildshard/engine/game/grid/zoneWalls';
 import { decodeEnter, encodeEnter } from '@wildshard/engine/net/socketFrames';
 
 /** How often a seat whose crossing is asked for asks again, and how often holds are looked at, in ticks. */
@@ -35,6 +35,8 @@ const ROAD_FLOOR = -60;
  * lifts the freeze itself (ZE9b); this is the road's own floor under that, so no body is ever held for good.
  */
 export const FREEZE_MS = 150_000;
+/** ZE9b: how far above the gate's ground the traveller is set down past it, so an entry asphalt a touch higher never buries the feet. */
+const ARRIVAL_LIFT = 0.5;
 /** Why the road won't take an `enter` word, as its answer says. */
 export type EnterRefusal = 'malformed' | 'home' | 'not-at-gate' | 'entering';
 
@@ -202,7 +204,12 @@ export class RoadRoom implements CrossTarget {
     const { x, y, z } = player.position;
     player.resetPose({ x, y, z }, player.yaw);
     seat.frozen = { cell: word.cell, until: this.options.now() + (this.options.freezeMs ?? FREEZE_MS) };
+    // ZE9b: the door answers `arrive` with the pose past the gate and moves the seat there once the page is ready
+    const pose = arrivalPose(at, player.position);
+    this.options.post({ kind: 'entering', device: seat.device, to: word.cell, at: { x: pose.x, y: y + ARRIVAL_LIFT, z: pose.z, yaw: pose.yaw } });
   }
+  /** ZE9b: the door called the entry off; the body plays on where it stands. */
+  thaw(device: string): void { const seat = this.seats.get(device); if (seat !== undefined) seat.frozen = null; }
   private closed(seat: RoadSeat, transport: Transport, reason: string): void {
     if (seat.transport !== transport) return;
     seat.transport = null; seat.client = null; seat.closeOff?.(); seat.closeOff = null;

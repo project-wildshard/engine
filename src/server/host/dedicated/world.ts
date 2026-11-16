@@ -15,7 +15,7 @@ import { cleanName } from '@wildshard/engine/net/chatFilter';
 import { NetIdentitySchema } from '@wildshard/engine/net/identity';
 import { decodeFirstMessage } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
-import { encodeCountdown, type WorldWord } from '@wildshard/engine/net/socketFrames';
+import { encodeArrive, encodeCountdown, encodeEnter, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { deviceLine, readDeviceWord, type DeviceSnapshot, type DeviceWho } from '@wildshard/engine/net/deviceWord';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
 import type {PlaytestRow} from './playtest';
@@ -177,6 +177,8 @@ export class World {
   private readonly stands = new Map<WorkerLink, readonly string[]>();
   /** GC15: devices whose source said `left` while their crossing was in flight: applied if the crossing is abandoned before `cross`. */
   private readonly leftCrossing = new Set<string>();
+  /** ZE9b (J352): seats frozen at a gate whose page was told `arrive` and is loading the cell: the road, the cell and the pose past the gate. */
+  private readonly entries = new Map<string, { readonly from: string; readonly to: string; readonly at: ResumeAt }>();
   private asked = 0;
   /** SA33: cells whose late worker is booting, so a second open of the same cell boots nothing. */
   private readonly booting = new Set<string>();
@@ -312,7 +314,8 @@ export class World {
     }
     else if (news.kind === 'drained') { this.drains.get(index)?.(); this.drains.delete(index); }
     else if (news.kind === 'crossing') void this.crossing(news.slug, news.device, news.to, news.at);
-    else if (news.kind === 'handedOut') { if (!news.out && this.outs.get(news.device)?.from === news.from) { this.outs.delete(news.device); this.abandon(news.device, news.from); } }
+    else if (news.kind === 'entering') void this.entering(news.slug, news.device, news.to, news.at);
+    else if (news.kind === 'handedOut') { if (!news.out && this.outs.get(news.device)?.from === news.from) { this.outs.delete(news.device); this.abandon(news.device, news.from); this.thaw(news.from, news.device); } }
     else if (news.kind === 'crossed') {
       const begun = this.crossings.get(news.device);
       if (begun !== undefined) this.options.crossed?.(diagnosticNow() - begun, news.moved);
@@ -321,6 +324,7 @@ export class World {
       if (this.seated.get(news.device) === news.from) {
         if (news.moved) { this.seated.set(news.device, news.to); this.names.set(news.device, news.name); this.voiceBodies.get(news.device)?.(news.body); }
         else if (!news.stays) { this.seated.delete(news.device); this.names.delete(news.device); }
+        else this.thaw(news.from, news.device);
       }
       this.options.log({ at: 'cell.crossed', index, device: news.device, from: news.from, to: news.to, moved: news.moved });
     }
@@ -535,6 +539,44 @@ export class World {
     const { port1, port2 } = new MessageChannel(), hello = kept.hello.slice(0);
     pumpSocket(end, port1, undefined, next => { this.movedOut(device, end, next); });
     link.send({ kind: 'arrive', from: out.from, to: out.to, at: out.at, port: port2, hello, motion: motion as MotionSnapshot | null, ...out.entry }, [port2, hello]);
+  }
+  /**
+   * ZE9b (J352): road `from` froze a seat at the gate of `to` (its `enter`). The door tells the page `arrive` with the pose past the gate
+   * and waits, as for a hello, for its `ready` (the page has disposed the old world and loaded the cell); then the seat moves the way a
+   * crossing does, on the same socket: the road's `handOver` on its own worker, `handOut` and `arrive` onto another. A page that never
+   * says `ready` in time, or a move the door won't make, is answered `enter` {refused} and the road lets the body go.
+   */
+  private async entering(from: string, device: string, to: string, at: ResumeAt): Promise<void> {
+    const kept = this.seatSockets.get(device);
+    if (kept === undefined || this.linkOf(to) === undefined || this.seated.get(device) !== from || roadHome(from) === null || this.draining || this.entries.has(device) || this.crossings.has(device)) {
+      this.thaw(from, device, to, 'busy'); return;
+    }
+    const entry = { from, to, at }, { end } = kept;
+    this.entries.set(device, entry);
+    end.control('arrive', encodeArrive({ cell: to, at }));
+    const readied = await new Promise<boolean>(resolve => {
+      const offs: (() => void)[] = [];
+      const done = (ready: boolean): void => { for (const off of offs.splice(0)) off(); resolve(ready); };
+      const timer = this.scope.timeout(this.options.readyMs ?? READY_MS, () => { done(false); });
+      offs.push(() => { this.scope.cancelTimer(timer); },
+        end.onControl((control, flag) => { if (control === 'ready' && new Uint8Array(flag)[0] !== LEAVE_FLAG) done(true); }),
+        end.onClose(() => { done(false); }));
+    });
+    if (this.entries.get(device) !== entry) return;
+    this.entries.delete(device);
+    if (!readied) { this.refuse('enter-timeout'); this.thaw(from, device, to, end.isOpen ? 'timeout' : null); return; }
+    if (this.seated.get(device) !== from || this.draining) { this.thaw(from, device, to, 'moved'); return; }
+    this.options.log({ at: 'cell.entering', device, from, to });
+    await this.crossing(from, device, to, at);
+    // the move never began (the door would not make it): the body plays on at the gate
+    if (!this.crossings.has(device) && this.seated.get(device) === from && !this.outs.has(device)) this.thaw(from, device, to, 'refused');
+  }
+  /** ZE9b: the zone entry of `device`, frozen on road `from`, is off: the road lets the body go, and the page hears why (if it still listens). */
+  private thaw(from: string, device: string, to?: string, reason: string | null = null): void {
+    if (roadHome(from) === null) return;
+    this.linkOf(from)?.send({ kind: 'thaw', from, device });
+    const end = this.seatSockets.get(device)?.end;
+    if (reason !== null && to !== undefined && end?.isOpen === true) end.control('enter', encodeEnter({ cell: to, refused: reason }));
   }
   /** A crossing that never reached its worker: a `left` the source said meanwhile counts now. */
   private abandon(device: string, from: string): void {
