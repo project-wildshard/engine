@@ -34,3 +34,8 @@ mmo-release-observer's unrelated "Missing durable loss control".
 J381 SKIP_CHECK=1 publishes the prepared fix after this normal gate;
 record the escape and the failure in the receipt. The forward fixer
 owns that observer red. No Nalati assertion or budget is weakened.
+
+Coordinator's 17:50 "main-red deadlock" instruction applies to the
+queued recovery. Fresh local typecheck and both room-frame controls
+pass. The additional statue cases encountered concurrent removal of
+ignored product files (ENOENT); the earlier clean gate passed them.
