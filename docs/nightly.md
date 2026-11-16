@@ -262,3 +262,8 @@ A failed hover phase keeps its original error plus before/after player
 hover/blend, equipment ownership/enabled state, installed board/model,
 input context/permission, frame count and clock state. The mount and
 unmount assertions and their existing deadlines are unchanged.
+
+The full nightly maps the decimal Actions run ID to its low 32 bits for
+`NET_FUZZ_SEEDS`. The network fuzzer keeps its uint32 admission boundary;
+the full run ID remains the report identity. Reproduce the selected seed
+with `node scripts/nightly-seed.ts <run-id>`.

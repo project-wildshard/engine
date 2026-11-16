@@ -27,3 +27,11 @@ file reached the default branch (actual GitHub 404). The diagnostic now
 uses optional inputs and a mutually exclusive job on the existing
 nightly workflow, so it is reviewable and runnable from a plan branch.
 Diagnostic runs skip suites, the full matrix, report and Ring 3.
+
+The real full-night suite-0 receipt also exposed a producer defect:
+workflow run ID 43813104202 was passed directly as NET_FUZZ_SEEDS,
+outside the unchanged uint32 admission boundary. The real hostile-play
+file reproduces that collection failure with zero assertions; mapping
+the decimal ID to its low 32 bits makes both actual pinned-world cases
+pass in 1.38 seconds. Only the workflow seed producer changes. The full
+run ID remains the receipt identity, and the bounded seed is replayable.

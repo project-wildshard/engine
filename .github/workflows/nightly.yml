@@ -93,11 +93,12 @@ jobs:
           path: ~/.cache/wildshard/pins
           key: ${{ steps.pins.outputs.cache-primary-key }}
       - run: pnpm gen:inputs
+      - name: Choose a bounded replayable network fuzz seed
+        run: echo "NET_FUZZ_SEEDS=$(node scripts/nightly-seed.ts "$GITHUB_RUN_ID")" >> "$GITHUB_ENV"
       - run: node scripts/nightly.ts tests
         env:
           NIGHTLY_TEST_GROUP: ${{ matrix.group }}
           WS_FULL_SUITE: '1'
-          NET_FUZZ_SEEDS: ${{ github.run_id }}
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
