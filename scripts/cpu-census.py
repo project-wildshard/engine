@@ -365,13 +365,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pid', required=True, type=int)
     parser.add_argument('--expected-identity', help='refuse if this kernel process identity no longer owns the PID')
-    parser.add_argument('--report', required=True, type=Path)
+    parser.add_argument('--report', type=Path)
+    parser.add_argument('--owner-only', action='store_true', help='read one stable owner identity without sampling or writing a report')
     parser.add_argument('--interval', default=2.0, type=float)
     parser.add_argument('--seconds', default=1200.0, type=float)
     parser.add_argument('--drain-seconds', default=10.0, type=float)
     parser.add_argument('--max-processes', default=65536, type=int)
     parser.add_argument('--max-threads', default=16384, type=int)
     args = parser.parse_args()
+    if (args.report is None) != args.owner_only:
+        parser.error('give a report for observation, or --owner-only without a report')
     if args.pid <= 1 or not .05 <= args.interval <= 10 or not 1 <= args.seconds <= 3600 or not 0 <= args.drain_seconds <= 30:
         parser.error('give a real PID and bounded observation/drain intervals')
     if not 1 <= args.max_processes <= 65536 or not 1 <= args.max_threads <= 16384:
@@ -380,6 +383,14 @@ def main():
         parser.error('census supports the public Darwin libproc or Linux proc APIs only')
     try:
         backend = process_backend(args.max_processes, args.max_threads)
+        if args.owner_only:
+            owner = owned_process(backend, args.pid)
+            after = owned_process(backend, args.pid)
+            if after.identity != owner.identity or (args.expected_identity and owner.identity != args.expected_identity):
+                raise CensusRefused('selected owner identity changed')
+            print(json.dumps({'pid': owner.pid, 'identity': owner.identity,
+                              'bornNs': str(owner.born_ns), 'uid': owner.uid}), flush=True)
+            return 0
         return observe(backend, args.pid,
                        args.report, args.interval, args.seconds, args.drain_seconds, args.expected_identity)
     except (OSError, ValueError, CensusRefused) as error:

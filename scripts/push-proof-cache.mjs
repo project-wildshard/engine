@@ -3,10 +3,12 @@ import {createHash,randomUUID} from 'node:crypto';
 import {existsSync,lstatSync,mkdirSync,readFileSync,renameSync,unlinkSync,writeFileSync} from 'node:fs';
 import {dirname,resolve} from 'node:path';
 import {homedir,hostname} from 'node:os';
+import {fileURLToPath} from 'node:url';
 import * as v from 'valibot';
 import {readLiftPending} from './lift-pending.mjs';
 import {pushDependencyIdentity} from './push-dependencies.mjs';
 import {verifiedPinsOutputs} from './pins-reuse.mjs';
+import {assertHeavyLease} from './heavy-lane-lease.mjs';
 
 /** The scope is the actual publishing repository, never a caller's cache key.
  * @param {string} root @param {NodeJS.ProcessEnv} env @param {string} tree @param {string} runtime */
@@ -21,8 +23,34 @@ function sharedProofFile(root,env,tree,runtime){
 }
 
 const exclusionsSchema=v.object({files:v.array(v.string()),deadline:v.nullable(v.string())});
+const pidSchema=v.pipe(v.number(),v.integer(),v.minValue(2));
+const ownerSchema=v.object({pid:pidSchema,identity:v.string(),bornNs:v.string(),uid:v.pipe(v.number(),v.integer(),v.minValue(0))});
+const leaseSchema=v.object({token:v.string(),runnerPid:pidSchema,childPid:pidSchema,resources:v.array(v.string()),
+  queuedAt:v.number(),startedAt:v.number()});
+const measurementSchema=v.object({profile:v.string(),captured:v.string(),machine:v.string(),platform:v.string(),arch:v.string(),
+  owner:v.nullable(ownerSchema),lease:v.nullable(leaseSchema)});
 const receiptSchema=v.object({version:v.literal(2),tree:v.string(),runtime:v.string(),run:v.string(),commit:v.string(),
-  finished:v.string(),seconds:v.number(),mode:v.picklist(['full','related','docs']),files:v.array(v.string()),exclusions:exclusionsSchema});
+  finished:v.string(),seconds:v.number(),mode:v.picklist(['full','related','docs']),files:v.array(v.string()),exclusions:exclusionsSchema,
+  measurement:v.optional(measurementSchema)});
+
+/** Optional measurement only: an unavailable kernel/lease probe never changes cache admission.
+ * @param {string} profile @param {NodeJS.ProcessEnv} env */
+function producerMeasurement(profile,env){
+  /** @type {v.InferOutput<typeof ownerSchema>|null} */let owner=null;
+  /** @type {v.InferOutput<typeof leaseSchema>|null} */let lease=null;
+  try{
+    const text=execFileSync('python3',[fileURLToPath(new URL('cpu-census.py',import.meta.url)),'--pid',String(process.pid),'--owner-only'],
+      {encoding:'utf8',timeout:3000,maxBuffer:65536,stdio:['ignore','pipe','pipe']});
+    const candidate=v.parse(ownerSchema,JSON.parse(text));
+    if(candidate.pid===process.pid)owner=candidate;
+  }catch{ /* Missing measurement stays explicitly unavailable, never a fabricated owner. */ }
+  if(env.WS_HEAVY_TOKEN){try{
+    assertHeavyLease('full-test',env);
+    const candidate=v.parse(leaseSchema,JSON.parse(readFileSync(resolve(env.WS_HEAVY_ROOT??resolve(homedir(),'.wildshard-heavy-lanes'),'full-test.active.json'),'utf8')));
+    if(candidate.token===env.WS_HEAVY_TOKEN)lease=candidate;
+  }catch{ /* No validated current lease: scope cannot be inferred from a resource name. */ }}
+  return {profile,captured:new Date().toISOString(),machine:hostname(),platform:process.platform,arch:process.arch,owner,lease};
+}
 /** Expired policies with no exclusions are already the complete inventory.
  * @param {v.InferOutput<typeof exclusionsSchema>} scope */
 // Null is a policy with no time-only transition (no exclusions, or J237
@@ -91,7 +119,8 @@ export function capturePushTree(profile,env,cwd=process.cwd()){
   const exclusions=exclusionScope(cwd);
   const dependencies=pushDependencyIdentity(cwd,env);
   const runtime=createHash('sha256').update(JSON.stringify({profile,host:hostname(),node:process.versions,platform:process.platform,arch:process.arch,environment,exclusions,dependencies,pins:pinned.key})).digest('hex');
-  return {tree,commit,runtime,root:resolve(cwd),exclusions,dependencies,sharedFile:dependencies===null?null:sharedProofFile(cwd,env,tree,runtime),file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
+  return {tree,commit,runtime,root:resolve(cwd),exclusions,dependencies,measurement:producerMeasurement(profile,env),
+    sharedFile:dependencies===null?null:sharedProofFile(cwd,env,tree,runtime),file:resolve(cwd,git(['rev-parse','--git-path',`wildshard-push-proofs/${tree}-${runtime}.json`]))};
 }
 
 /** A partial result covers only its own complete selection, never a full fallback.
@@ -119,7 +148,8 @@ export function readPushProof(context,selection){
 export function writePushProof(context,selection,seconds){
   if(JSON.stringify(exclusionScope(context.root))!==JSON.stringify(context.exclusions)||!scopeLive(context.exclusions))throw new Error('Push proof exclusion scope changed while checking; rerun the full gate');
   const proof={version:2,tree:context.tree,runtime:context.runtime,run:randomUUID(),commit:context.commit,
-    finished:new Date().toISOString(),seconds,mode:selection.mode,files:selection.files,exclusions:context.exclusions};
+    finished:new Date().toISOString(),seconds,mode:selection.mode,files:selection.files,exclusions:context.exclusions,
+    measurement:context.measurement};
   mkdirSync(dirname(context.file),{recursive:true});
   const temporary=`${context.file}.${process.pid}`;writeFileSync(temporary,`${JSON.stringify(proof)}\n`,{mode:0o600});renameSync(temporary,context.file);
   if(selection.mode==='full'&&context.sharedFile!==null){
