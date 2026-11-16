@@ -40,6 +40,10 @@ test('enter freezes a walker in Sunscar\'s buffer, and is refused short of it an
   await vi.waitFor(() => { expect(answers).toHaveLength(2); }, { timeout: 5000, interval: 20 });
   expect(answers).toEqual([{ cell: WEST, refused: 'not-at-gate' }, { cell: HOME, refused: 'home' }]);
   expect(road.entering('device:a')).toBeNull();
+  // Placed 4 m short of Sunscar's edge, it runs on into the buffer (the ~70 m of plain road between is road-walk's walk, 10 s here)
+  const walker = road.bodyOf('device:a');
+  if (walker === undefined) throw new Error('the walker stands on the road');
+  walker.resetPose({ x: WEST_EDGE + 4, y: walker.position.y + 1, z: 0 }, Math.PI / 2);
   await vi.waitFor(() => { expect(road.bodyOf('device:a')?.position.x ?? 0, 'walked on into Sunscar\'s buffer').toBeLessThan(WEST_EDGE - 2); }, { timeout: 30_000, interval: 50 });
   expect(road.bodyOf('device:a')?.position.x ?? -Infinity, 'held at Sunscar\'s gate').toBeGreaterThan(WEST_GATE);
   // In the buffer: taken, and the body freezes
@@ -49,9 +53,9 @@ test('enter freezes a walker in Sunscar\'s buffer, and is refused short of it an
   if (frozen === undefined) throw new Error('the frozen body stands on the road');
   await new Promise(resolve => { setTimeout(resolve, 200); });
   const still = { x: frozen.position.x, z: frozen.position.z };
-  // 3 s of every input: back east at a sprint, then west into the gate with a jump; nothing moves it
+  // 1.5 s of every input: back east at a sprint, then west into the gate with a jump; nothing moves it (unfrozen, a sprint leg is ~5 m)
   let drift = 0;
-  for (const [thumb, ms] of [[run(-Math.PI / 2), 1500], [run(Math.PI / 2, NET_BUTTONS.sprint | NET_BUTTONS.jump), 1500]] as const) {
+  for (const [thumb, ms] of [[run(-Math.PI / 2), 750], [run(Math.PI / 2, NET_BUTTONS.sprint | NET_BUTTONS.jump), 750]] as const) {
     a.thumb = thumb;
     for (const ends = Date.now() + ms; Date.now() < ends;) {
       await new Promise(resolve => { setTimeout(resolve, 50); });
@@ -81,8 +85,8 @@ function listen(bot: RoomBot): { readonly answers: EnterWord[]; readonly arrival
   return { answers, arrivals, enter: cell => { bot.transport.control('enter', encodeEnter({ cell })); }, closes: () => closes };
 }
 /** From Driftwood's entryway on `side` (-1 west to Sunscar, +1 east to Nalati) onto the road and into the cell's buffer, held at its
- * gate. The first test walks the whole road; here the walker steps off Driftwood for real, is then placed 4 m short of the cell's edge
- * and runs into its buffer (AMBER 2026-11-16: the ~70 m road walk was 10 s of every case, 103 s for the file on main). */
+ * gate. `dedicated-road-walk` walks the whole road by input; here the walker steps off Driftwood for real, is then placed 4 m short of
+ * the cell's edge and runs into its buffer (AMBER 2026-11-16: the ~70 m road walk was 10 s of every case, 103 s for the file on main). */
 async function toGate(room: RoomBench, bot: RoomBot, side: -1 | 1): Promise<NonNullable<ReturnType<RoomBench['road']>>> {
   const home = room.room(HOME), road = room.road(roadName(HOME)), body = home?.bodyOf('device:a'), edge = 562.5 - CHUNK_HALF;
   if (home === undefined || road === undefined || body === undefined) throw new Error('Driftwood and its road boot');
@@ -128,7 +132,7 @@ for (const [to, side, worker] of [[WEST, -1, 'its own worker'], [EAST, 1, 'the o
 }
 
 test('a page that never says ready in time: the freeze lifts in the buffer and the walker plays on', { timeout: 180_000 }, async () => {
-  bench = await roomBench({ cells: CELLS, workers: 2, crossing: true, readyMs: 4000 });
+  bench = await roomBench({ cells: CELLS, workers: 2, crossing: true, readyMs: 2500 });
   const a = new RoomBot(bench.url, 'bench', 'device:a', 'A'); bots.push(a);
   expect(await a.arrived()).toBe(true);
   const heard = listen(a), road = await toGate(bench, a, -1);

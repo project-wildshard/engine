@@ -56,7 +56,7 @@ test('a seat walks by input out of its home and back in; another cell\'s wall an
   a.thumb = heading(Math.PI / 2, NET_BUTTONS.sprint);
   await vi.waitFor(() => { expect(road.bodyOf('device:a')?.position.x ?? 0, 'A into Sunscar\'s buffer').toBeLessThan(WEST_EDGE - 2); }, { timeout: 30_000, interval: 100 });
   let deepest = Infinity;
-  for (const ends = Date.now() + 2000; Date.now() < ends;) {
+  for (const ends = Date.now() + 1000; Date.now() < ends;) {
     await sleep(50);
     expect(west.holds('device:a'), 'A is never handed into Sunscar').toBe(false);
     deepest = Math.min(deepest, road.bodyOf('device:a')?.position.x ?? Infinity);
@@ -74,15 +74,17 @@ test('a seat walks by input out of its home and back in; another cell\'s wall an
   await vi.waitFor(() => { expect(at().z, 'north along the road').toBeGreaterThan(15); }, { timeout: 30_000, interval: 50 });
   a.thumb = run(Math.PI / 2);
   deepest = Infinity;
-  for (const ends = Date.now() + 2000; Date.now() < ends;) { await sleep(50); deepest = Math.min(deepest, at().x); }
+  for (const ends = Date.now() + 1000; Date.now() < ends;) { await sleep(50); deepest = Math.min(deepest, at().x); }
   expect(deepest, 'held at Sunscar\'s wall off the entryway').toBeGreaterThan(WEST_EDGE);
   expect(deepest, 'it walked up to the wall').toBeLessThan(WEST_EDGE + 2);
   expect(west.holds('device:a'), 'A is never handed into Sunscar').toBe(false);
-  // Back to Driftwood's west entryway by input: its walls stand open for A, and the road hands A back in
-  a.thumb = run(-Math.PI / 2);
-  await vi.waitFor(() => { expect(at().x, 'off the wall').toBeGreaterThan(WEST_EDGE + 4); }, { timeout: 20_000, interval: 50 });
-  a.thumb = run(0);
-  await vi.waitFor(() => { expect(at().z, 'south to the entryways\' line').toBeLessThan(0.5); }, { timeout: 30_000, interval: 50 });
+  // Back into Driftwood's west entryway by input: its walls stand open for A, and the road hands A back in. The ~70 m of plain road
+  // back was walked out already: A stands still, is placed 6 m off Driftwood's edge on the entryways' line, and runs in (main-watch
+  // 2026-11-16: the return legs were 12 s of the file's 41 s locally)
+  a.thumb = still;
+  const back = road.bodyOf('device:a');
+  if (back === undefined) throw new Error('A stands on the road');
+  back.resetPose({ x: -(CHUNK_HALF + 6), y: back.position.y + 1, z: 0 }, -Math.PI / 2);
   a.thumb = run(-Math.PI / 2);
   await vi.waitFor(() => { expect(home.holds('device:a'), `A back into Driftwood from x ${String(road.bodyOf('device:a')?.position.x.toFixed(2))}`).toBe(true); }, { timeout: 30_000, interval: 100 });
   expect(a.closed, 'one socket throughout').toBeNull();
