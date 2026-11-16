@@ -3,6 +3,7 @@ import { withOwner } from '../app/ownership';
 import { CELL_ABOVE, CELL_BELOW, CHUNK_HALF } from '../core/config';
 import type { Physics } from './Physics';
 import { groups, queryGroups } from './groups';
+import { tagCollider } from './surface';
 
 const ORIGIN = { x: 0, y: 0, z: 0 };
 interface Point { x: number; y: number; z: number }
@@ -23,9 +24,11 @@ export function installGridBorders(physics: Physics, scope: Scope, origin: Reado
         const at = collider.translation(), half = collider.halfExtents(), rotation = collider.rotation();
         if (half !== null && near(at.x, origin.x + dx) && near(at.y, y) && near(at.z, origin.z + dz)
           && near(half.x, hx) && near(half.y, halfHeight) && near(half.z, hz)
-          && near(Math.abs(rotation.w), 1) && near(rotation.x, 0) && near(rotation.y, 0) && near(rotation.z, 0)) installed = true;
+          && near(Math.abs(rotation.w), 1) && near(rotation.x, 0) && near(rotation.y, 0) && near(rotation.z, 0)) {
+          installed = true; tagCollider(collider, 'edge', 'grid.home');
+        }
       });
-      if (!installed) world.createCollider(R.ColliderDesc.cuboid(hx, halfHeight, hz).setTranslation(origin.x + dx, y, origin.z + dz).setCollisionGroups(border));
+      if (!installed) tagCollider(world.createCollider(R.ColliderDesc.cuboid(hx, halfHeight, hz).setTranslation(origin.x + dx, y, origin.z + dz).setCollisionGroups(border)), 'edge', 'grid.home');
     }
   });
 }

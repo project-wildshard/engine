@@ -169,7 +169,7 @@ export function sideParityDiff(paged, server, at, allow = {}, { slack = 1, same 
     if (best !== null) { used.add(best); return; }
     const shape = all.find(other => close(row, other));
     const inside = (outer, inner) => [0, 1, 2].every(i => inner[i] >= outer[i] - slack && inner[i + 3] <= outer[i + 3] + slack);
-    if (shape === undefined && side === 'page' && !row.sensor && !row.dynamic && all.some(other => other.material === 'edge' && !other.sensor && inside(other.box, row.box))) return;
+    if (shape === undefined && side === 'page' && !row.sensor && !row.dynamic && all.some(other => other.material === 'edge' && !other.sensor && !Object.hasOwn(allow, allowKey(other)) && inside(other.box, row.box))) return;
     if (shape === undefined) { note(`${side}|${matchKey(row)}|${row.dynamic}`, row.box, (count, box) => side === 'page'
       ? `${describe(row)}: ${count} page collider(s) with no server match, e.g. [${box.join(', ')}]`
       : `${describe(row)}: ${count} server collider(s) near the page's player with no page match, e.g. [${box.join(', ')}]`); return; }

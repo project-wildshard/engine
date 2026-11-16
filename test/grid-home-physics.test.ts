@@ -7,6 +7,7 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { CharacterMotor, PLAYER_BODY, PLAYER_CAPSULE } from '../src/shared/engine/physics/CharacterMotor';
 import { gridCreatureConstraint, installGridBorders } from '../src/shared/engine/physics/gridBorders';
 import { CHUNK_HALF } from '../src/shared/engine/core/config';
+import { groups } from '../src/shared/engine/physics/groups';
 
 let rapier: Rapier;
 beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm')); });
@@ -17,11 +18,19 @@ test('home walls reinstall without duplicating live or restored physics collider
   try {
     installGridBorders(physics, scope); physics.step();
     expect(physics.world.colliders.len()).toBe(4);
+    physics.world.forEachCollider(collider => {
+      expect(physics.colliderTag(collider)).toEqual({ material: 'edge', owner: 'grid.home' });
+      expect(collider.collisionGroups()).toBe(groups('BORDER'));
+    });
     installGridBorders(physics, scope);
     expect(physics.world.colliders.len()).toBe(4);
     restored = new Physics(rapier, physics.snapshot(), otherScope);
     installGridBorders(restored, otherScope);
     expect(restored.world.colliders.len()).toBe(4);
+    restored.world.forEachCollider(collider => {
+      expect(restored?.colliderTag(collider)).toEqual({ material: 'edge', owner: 'grid.home' });
+      expect(collider.collisionGroups()).toBe(groups('BORDER'));
+    });
   } finally { scope.dispose(); otherScope.dispose(); physics.dispose(); restored?.dispose(); }
 });
 

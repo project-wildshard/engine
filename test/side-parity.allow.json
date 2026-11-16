@@ -3,6 +3,7 @@
  "owners": {
   "actor": "players, creatures and people: bodies the wire carries, whose poses NET-LAG checks, not built world",
   "actor.player": "the server's player bodies: the page's own player is an actor object",
+  "grid.home": "MP5.1 creature-only home walls: BORDER excludes players and mounted travellers; grid-home-physics.test.ts proves every edge and restored tags, so these are not part of the shared player deck",
   "platform.grid": "the grid's entry strips and walls: the room's grid server and road world build them (GRID-CROSSING), outside openCellWorld"
  },
  "shards": {

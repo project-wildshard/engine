@@ -55,6 +55,10 @@ test('a server name the shard declares the same as the page\'s still needs its s
   // a deck's sill inside the server's edge wall, and one that pokes out of it
   expect(sideParityDiff([wall, box('deck', 'stone', [249, 0, -4, 250, 3, 4])], [wall], at)).toEqual([]);
   expect(sideParityDiff([wall, box('deck', 'stone', [245, 0, -4, 250, 3, 4])], [wall], at)).not.toEqual([]);
+  // Creature-only home walls are outside this player-deck comparison. They
+  // cannot stand in for a missing page solid inside their box, either.
+  const home = box('grid.home', 'edge', wall.box);
+  expect(sideParityDiff([box('deck', 'stone', [249, 0, -4, 250, 3, 4])], [home], at, { 'grid.home': 'creature-only home wall' })).not.toEqual([]);
 });
 
 describe('side parity: the page and the room build the same gameplay colliders', { concurrent: false }, () => {
