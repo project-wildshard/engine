@@ -47,7 +47,9 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save ${fixture.refu
   const declared=shard.runtime===null&&!product.has('sim/runtime-plan');
   const distance=(x:number,z:number):number=>Math.hypot(x-fixture.position[0],z-fixture.position[2]);
   const walk:HeadlessCommand={kind:'player',moveX:.2,moveZ:-1,yaw:0};
-  const assets=new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(`${directory}/${file.path}`)]));
+  // Native residents consume the server asset class. Ring 1 slices deliberately
+  // omit client GLBs/images; eagerly reading those prevented any save restore.
+  const assets=declared?new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(`${directory}/${file.path}`)])):runtimeAssets(product,directory);
   if(fixture.refused!==undefined) {
     // Only a declared (data) shard has been refused so far; a native one needs its own carry proof before it can be.
     expect(fixture.pin).toBeUndefined();expect(declared).toBe(true);
@@ -84,7 +86,7 @@ for(const fixture of fixtures)test(`released ${fixture.slug} save ${fixture.refu
       expect(result.tick).toBe(fixture.tick+13);expect(distance(last[0]??Infinity,last[2]??Infinity)).toBeGreaterThan(.25);
     } finally {await sim.dispose();}
   } else {
-    const live=await createTrustedHeadlessResident({shard,product,assets:runtimeAssets(product,directory),rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))},saved);
+    const live=await createTrustedHeadlessResident({shard,product,assets,rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))},saved);
     try {
       const player=leadPlayer(live.host);expect(distance(player.position.x,player.position.z)).toBeLessThan(.001);
       expect(live.host.state.tick).toBe(fixture.tick);
