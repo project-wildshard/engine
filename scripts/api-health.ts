@@ -40,7 +40,9 @@ export async function observeApiHealth(lock: string, url: string, timeoutMs = 30
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
-  const [url = 'https://api.wildshard.io/api/health', output = 'tmp/api-health/report.json'] = process.argv.slice(2);
+  const [requestedUrl, output = 'tmp/api-health/report.json'] = process.argv.slice(2);
+  const pinsFile = process.env.WILDSHARD_PIN_CHANNEL === 'staging' ? 'test/pins/staging.json' : 'test/pins/shardfiles.json';
+  const url = requestedUrl ?? new URL('/api/health', (JSON.parse(readFileSync(pinsFile, 'utf8')) as {api: string}).api).href;
   const lock = readFileSync('pnpm-lock.yaml', 'utf8');
   const report = {...await observeApiHealth(lock, url), sha: process.env.GITHUB_SHA ?? null,
     run: process.env.GITHUB_RUN_ID ?? null, lockHash: createHash('sha256').update(lock).digest('hex')};

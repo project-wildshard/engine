@@ -330,12 +330,23 @@ jobs:
         with:
           node-version-file: package.json
       - name: Observe exact lock resolution, HTTP mismatch and failure paths
+        id: health-proof
         run: |
           mkdir -p tmp/api-health
           node --test --test-timeout=10000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=tmp/api-health/proof.xml scripts/api-health.proof.ts
       - name: Compare deployed validator with this engine lock
         if: ${{ !cancelled() }}
         run: node scripts/api-health.ts
+      - name: Summarize the reader proof and live identity separately
+        if: always()
+        run: |
+          echo '### API validator identity' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Reader proof: ${{ steps.health-proof.outcome }}' >> "$GITHUB_STEP_SUMMARY"
+          if test -f tmp/api-health/report.json; then
+            node --input-type=module -e 'import{readFileSync,appendFileSync}from"node:fs";const r=JSON.parse(readFileSync("tmp/api-health/report.json","utf8"));appendFileSync(process.env.GITHUB_STEP_SUMMARY,`\nLive identity: ${r.ok?"MATCH":r.complete?"MISMATCH":"UNAVAILABLE"}; engine ${r.expected}, API ${r.observed??"missing"}.\n`);'
+          else
+            echo 'Live identity: no receipt was produced.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

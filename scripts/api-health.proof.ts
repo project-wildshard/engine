@@ -94,7 +94,7 @@ await test('the deadline also aborts a body stalled after headers', {timeout: 50
       assert.equal(report.complete, false); assert.equal(report.ok, false);
       assert.match(report.error ?? '', /Timeout|Abort/u);
       assert.ok(performance.now() - started < 2000, 'deadline must bound the entire HTTP operation');
-      if (stalledBody) assert.ok(flushed !== undefined && flushed - started < 250, 'body must stall after headers arrived before the deadline');
+      if (stalledBody) assert.ok(flushed !== undefined && flushed - started < 500, 'body must stall after headers arrived before the deadline');
     });
   }
 });
@@ -145,7 +145,7 @@ await test('diagnostic dispatches cannot displace the scheduled nightly used for
   try {
     // The real production reader executes gh. Only scheduled queries get the
     // full-night id; an unfiltered query returns the newer diagnostic id.
-    writeFileSync(gh, `#!/usr/bin/env node\nconst scheduled=process.argv.some(arg=>arg.includes('event=schedule'));console.log(JSON.stringify({id:scheduled?42:43,head_sha:'${expectedNight.sha}',status:'completed',conclusion:'success'}));\n`);
+    writeFileSync(gh, `#!/usr/bin/env node\nconst args=process.argv.slice(2);if(args[0]!=='api'||args[2]!=='--jq'||args[3]!=='.workflow_runs[0]')throw Error('unexpected gh query');const scheduled=args.some(arg=>arg.includes('event=schedule'));console.log(JSON.stringify({id:scheduled?42:43,head_sha:'${expectedNight.sha}',status:'completed',conclusion:'success'}));\n`);
     chmodSync(gh, 0o755);
     process.env.PATH = `${folder}${delimiter}${savedPath ?? ''}`;
     requirePublishedGreen(report, expectedNight);

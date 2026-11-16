@@ -42,3 +42,11 @@ pre-push refused the resulting dirt, so nothing reached origin. After
 pins completed, a second verified install and input generation restored
 all three files byte-for-byte to the pre-generation reader source.
 Keep this corrective commit as the audit trail; no hook was bypassed.
+
+Actual-source review confirmed the reader has no source MUST-FIX. Its
+branch-consistency finding is resolved by the sequential verified
+setup above. Follow-ups add separate proof/live run summaries, use
+the selected pin file's API origin, validate the gh fixture's jq shape,
+and relax the header-flush timing to the existing deadline. A proposed
+static YAML-string assertion was declined: it would mirror the query;
+the real qualification query is executed and workflow syntax checked.
