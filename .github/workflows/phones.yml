@@ -83,31 +83,54 @@ jobs:
           bin="$ANDROID_HOME/cmdline-tools/latest/bin" adb="$ANDROID_HOME/platform-tools/adb"
           # avdmanager and the emulator look in different homes unless told one
           export ANDROID_AVD_HOME="$HOME/.android/avd"
-          mkdir -p "$ANDROID_AVD_HOME"
-          image=$("$bin/sdkmanager" --list 2>/dev/null | grep -oE 'system-images;android-[0-9.]+;google_apis;x86_64' | sort -uV | tail -1)
-          echo "image $image"
-          yes | "$bin/sdkmanager" --install emulator platform-tools "$image" > /dev/null
-          echo no | "$bin/avdmanager" create avd -n xr8 -k "$image" -d pixel_7 --force
-          mkdir -p tmp/staging-phones
-          # The stock data partition fills up before Chrome starts (No space left on device): 8 GB, wiped each boot.
-          # No GPU here: try each software renderer until Chrome draws a page and the emulator outlives it.
-          for gpu in swiftshader_indirect angle_indirect guest; do
-            echo "gpu $gpu"
-            nohup "$ANDROID_HOME/emulator/emulator" -avd xr8 -no-window -no-audio -no-boot-anim -no-snapshot -gpu "$gpu" -memory 4096 -cores 3 -partition-size 8192 -wipe-data > "tmp/staging-phones/emulator-$gpu.log" 2>&1 &
-            timeout 120 "$adb" wait-for-device
+          mkdir -p "$ANDROID_AVD_HOME" tmp/staging-phones
+          list=$("$bin/sdkmanager" --list 2>/dev/null | grep -oE 'system-images;android-[0-9.]+;google_apis;x86_64' | sort -uV)
+          newest=$(echo "$list" | tail -1) api36=$(echo "$list" | grep -m1 'android-36;' || true)
+          echo "images: newest $newest, api 36 ${api36:-none}"
+          yes | "$bin/sdkmanager" --install emulator platform-tools > /dev/null
+          # XR-8 (run 43881038858): the API 37 emulator booted, then its launcher ANRed (input dispatching timed out) and
+          # Chrome had no process 25 s after `am start`, on every software renderer. Each attempt now: 4 cores (all the
+          # runner has), error dialogs hidden and animations off, the launcher disabled (its ANR held input), a 60 s settle
+          # for boot-time package work, Chrome's first-run flags before its first start, `am start -W` and a 3-minute wait
+          # for Chrome's process. API 36 is the last fallback (its Chrome must be 137+ for WebCrypto Ed25519).
+          up=0
+          for attempt in "$newest swiftshader_indirect" "$newest guest" "${api36:-$newest} swiftshader_indirect"; do
+            set -- $attempt; image=$1 gpu=$2 tag="$(echo "$image" | grep -oE 'android-[0-9.]+')-$gpu"
+            echo "::group::attempt $tag"
+            yes | "$bin/sdkmanager" --install "$image" > /dev/null
+            echo no | "$bin/avdmanager" create avd -n xr8 -k "$image" -d pixel_7 --force > /dev/null
+            # The stock data partition fills up before Chrome starts (No space left on device): 8 GB, wiped each boot.
+            nohup "$ANDROID_HOME/emulator/emulator" -avd xr8 -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics \
+              -camera-back none -camera-front none -gpu "$gpu" -memory 4096 -cores 4 -partition-size 8192 -wipe-data \
+              > "tmp/staging-phones/emulator-$tag.log" 2>&1 &
+            timeout 120 "$adb" wait-for-device || true
+            booting=$SECONDS
             timeout 420 bash -c "until [ \"\$('$adb' shell getprop sys.boot_completed | tr -d '\r')\" = 1 ]; do sleep 3; done" || true
-            "$adb" shell am start -a android.intent.action.VIEW -n com.android.chrome/com.google.android.apps.chrome.Main -d https://staging.wildshard.io/version.json || true
-            sleep 25
-            if [ "$("$adb" get-state 2>/dev/null)" = device ] && "$adb" shell pidof com.android.chrome > /dev/null; then echo "gpu $gpu holds Chrome"; break; fi
-            echo "gpu $gpu lost the emulator or Chrome"
+            echo "boot_completed after $((SECONDS - booting)) s"
+            "$adb" shell 'settings put global hide_error_dialogs 1; settings put global window_animation_scale 0;
+              settings put global transition_animation_scale 0; settings put global animator_duration_scale 0;
+              settings put global package_verifier_enable 0; svc power stayon true; wm dismiss-keyguard; input keyevent KEYCODE_WAKEUP' || true
+            "$adb" shell pm disable-user --user 0 com.google.android.apps.nexuslauncher || true
+            "$adb" shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS > /dev/null || true
+            sleep 60
+            "$adb" shell 'echo "chrome --disable-fre --no-default-browser-check --no-first-run --ignore-gpu-blocklist --mute-audio" > /data/local/tmp/chrome-command-line;
+              chmod 644 /data/local/tmp/chrome-command-line; am set-debug-app --persistent com.android.chrome' || true
+            "$adb" shell dumpsys package com.android.chrome | grep -m1 versionName || true
+            timeout 240 "$adb" shell am start -W -a android.intent.action.VIEW -n com.android.chrome/com.google.android.apps.chrome.Main \
+              -d https://staging.wildshard.io/version.json || true
+            timeout 180 bash -c "until '$adb' shell pidof com.android.chrome > /dev/null 2>&1; do sleep 5; done" || true
+            if [ "$("$adb" get-state 2>/dev/null)" = device ] && "$adb" shell pidof com.android.chrome > /dev/null; then
+              echo "attempt $tag holds Chrome"; echo "::endgroup::"; up=1; break
+            fi
+            echo "attempt $tag lost the emulator or Chrome"
             "$adb" shell 'ps -A | grep -i chrom; dumpsys activity activities | grep -i -m3 resumed' || true
-            "$adb" exec-out screencap -p > "tmp/staging-phones/boot-$gpu.png" || true
-            "$adb" logcat -d -t 3000 > "tmp/staging-phones/logcat-$gpu.txt" || true
-            grep -E "FATAL|AndroidRuntime|DEBUG  |chromium.*(error|fatal)|Process com.android.chrome" "tmp/staging-phones/logcat-$gpu.txt" | head -30 || true
+            "$adb" logcat -d -t 4000 > "tmp/staging-phones/logcat-$tag.txt" || true
+            grep -E "ANR in|FATAL|AndroidRuntime|ActivityTaskManager.*chrome|Process com.android.chrome|chromium.*(error|fatal)" "tmp/staging-phones/logcat-$tag.txt" | head -40 || true
             "$adb" emu kill || true; pkill -f qemu-system || true; sleep 5
+            echo "::endgroup::"
           done
+          [ "$up" = 1 ] || { echo "no attempt started Chrome"; exit 1; }
           "$adb" shell am force-stop com.android.chrome
-          "$adb" shell dumpsys package com.android.chrome | grep -m1 versionName
           echo "ANDROID_SERIAL=emulator-5554" >> "$GITHUB_ENV"
       - name: XR-8
         run: node scripts/staging-phones-proof.mjs --device=android --solo --tag="$(printf '%s%s' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" | tail -c 9)" --out=tmp/staging-phones
