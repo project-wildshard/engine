@@ -287,8 +287,9 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
       }
       const swings = hangSwings(part, group, partScope);
       if (part.lamps.length > 0) {
-        // the look's own lamp lights (B2, M4.3): what a baked shard's `look.light.lamps` draws
-        const lamps = lampLights(part.lamps, undefined, swings === null ? undefined : () => swings);
+        // the look's own lamp lights (B2, M4.3): what a baked shard's `look.light.lamps` draws; a part with no swings hangs
+        // its lamps still, never off the built page's swing field
+        const lamps = lampLights(part.lamps, undefined, () => swings);
         group.add(lamps);
         owned.push({ dispose: () => { for (const light of lamps.children) if (light instanceof THREE.Light) light.dispose(); } });
         const { update } = lamps;

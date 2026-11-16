@@ -583,11 +583,12 @@ export class ShardfileClient {
     const flags = new Flags(source.identity.slug, false);
     // A prop's colliders are world data: the page predicts against them, and the server holds its own.
     const colliders = installShardfileColliders(source, this.assets.retained, () => world.physics, ctx.scope);
+    // SHARD-SOURCE SS9c: a touchable crate stands where the server's body is, its panel drawn there (the server installs
+    // the bodies whatever the plan's movers, so the page does too)
+    installDataPageBodies(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map() });
     // TEMPLATE-E2E TC-E5c: a plain data shard's lift and doors stand on its page; a client plan's movers install their own
     if (this.bindings.trustedRuntime !== true && !(this.plan?.features ?? []).some(row => row.kind === 'world.movers' || row.kind === 'motion.channels')) {
       const movers = installDataPageMovers(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map(), prompts: runtime.interactables });
-      // SHARD-SOURCE SS9c: a touchable crate stands where the server's body is, its panel drawn there
-      installDataPageBodies(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map() });
       if (movers !== null) {
         ctx.scope.onDispose(() => { if (movers.riding()) world.player.carried = false; });
         // side parity (SS1) reads the page's colliders beside a room's at tick 0: every mover's collider at its declared rest

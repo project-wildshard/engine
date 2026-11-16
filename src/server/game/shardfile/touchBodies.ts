@@ -53,7 +53,8 @@ function specOf(row: TouchBodyRow): BodySpec {
 export function installTouchBodies(host: SimHost, rows: readonly TouchBodyRow[], restoring = false): TouchBodies | null {
   if (rows.length === 0) return null;
   if (new Set(rows.map(row => row.id)).size !== rows.length) throw new Error('Duplicate touchable body id');
-  const service = new Bodies(host.physics, host.playerFocus, rows.length), slots = new Map<string, Body | null>();
+  let service = new Bodies(host.physics, host.playerFocus, rows.length);
+  const slots = new Map<string, Body | null>();
   for (const row of rows) {
     if (restoring) { slots.set(row.id, null); continue; }
     const half = row.yaw / 2;
@@ -89,6 +90,8 @@ export function installTouchBodies(host: SimHost, rows: readonly TouchBodyRow[],
     },
     physicsRestored: () => {
       if (pending === null) throw new Error('Missing touchable body continuation');
+      // the restore replaced host.physics: the service steps the new world's bodies (as mixedRoster does)
+      service = new Bodies(host.physics, host.playerFocus, rows.length);
       rebind(pending); pending = null;
     },
   });
