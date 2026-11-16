@@ -44,26 +44,26 @@ const rayOf = (physics: Physics): Ray => {
 
 /**
  * The top of the first world surface (terrain, deck, floor, rock) straight below (x, fromY, z), within `maxDrop`;
- * undefined when there is none. `exclude`: a collider the ray passes through (the caller's own body). `solid: false`
- * casts hollow: from inside a solid the floor is that solid's bottom face, never its top (a body in a wall can't climb it).
+ * undefined when there is none. `exclude`: a collider the ray passes through (the caller's own body).
  */
-export function floorBelow(physics: Physics, x: number, z: number, fromY: number, maxDrop: number, exclude?: Collider, only?: (collider: Collider) => boolean, solid = true): number | undefined {
+export function floorBelow(physics: Physics, x: number, z: number, fromY: number, maxDrop: number, exclude?: Collider, only?: (collider: Collider) => boolean): number | undefined {
   const ray = rayOf(physics);
   ray.origin.x = x; ray.origin.y = fromY; ray.origin.z = z;
   ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
-  const hit = physics.castRay(ray, maxDrop, solid, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, queryGroups(WORLD), exclude, undefined, only);
+  const hit = physics.castRay(ray, maxDrop, true, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, queryGroups(WORLD), exclude, undefined, only);
   return hit ? fromY - hit.timeOfImpact : undefined;
 }
 
 /**
  * The first thing along the ray from `origin` in direction `dir` (unit length) within `maxDist`, among the kinds in
- * `sees` (default: the world — terrain, structures, props, trunks). Null when nothing is hit.
+ * `sees` (default: the world — terrain, structures, props, trunks). Null when nothing is hit. `solid: false` casts hollow:
+ * from inside a shape the hit is where the ray leaves it, not its start.
  */
-export function castRay(physics: Physics, origin: Vec3, dir: Vec3, maxDist: number, sees: readonly GroupName[] = WORLD, exclude?: Collider): Hit | null {
+export function castRay(physics: Physics, origin: Vec3, dir: Vec3, maxDist: number, sees: readonly GroupName[] = WORLD, exclude?: Collider, solid = true): Hit | null {
   const ray = rayOf(physics);
   ray.origin.x = origin.x; ray.origin.y = origin.y; ray.origin.z = origin.z;
   ray.dir.x = dir.x; ray.dir.y = dir.y; ray.dir.z = dir.z;
-  const hit = physics.castRayAndGetNormal(ray, maxDist, true, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, queryGroups(sees), exclude);
+  const hit = physics.castRayAndGetNormal(ray, maxDist, solid, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, queryGroups(sees), exclude);
   if (!hit) return null;
   const t = hit.timeOfImpact, tag = tagOf(hit.collider);
   return {

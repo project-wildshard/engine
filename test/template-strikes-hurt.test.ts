@@ -90,10 +90,10 @@ test("Brasscap's ledge marksmen hold their ledge and fire down", async () => {
     const ledge = ['bandit.camp-2.1', 'bandit.camp-2.2', 'bandit.camp-2.3'].map(id => sim.host.entities.get(id));
     const body = ledge[0], player = sim.host.players.get(PLAYER);
     if (body === undefined || ledge.includes(undefined) || player === undefined) throw new Error('Missing a camp 2 body or the player');
-    const ground = sim.host.groundHeightAt(body.position.x, body.position.z);
+    const ground = (at: { x: number; z: number }) => sim.host.groundHeightAt(at.x, at.z);
     for (let tick = 0; tick < 60 * 10; tick++) {
       sim.host.step();
-      for (const other of ledge) expect(other?.position.y, other?.entityId).toBeGreaterThan(ground + 5);
+      for (const other of ledge) if (other !== undefined) expect(other.position.y, other.entityId).toBeGreaterThan(ground(other.position) + 5);
     }
     for (const other of sim.host.entities.values()) {
       if (other === body || !other.alive) continue;
@@ -104,6 +104,6 @@ test("Brasscap's ledge marksmen hold their ledge and fire down", async () => {
     const full = player.health.attributes.health;
     for (let tick = 0; tick < 60 * 20 && player.health.attributes.health >= full; tick++) sim.host.step();
     expect(player.health.attributes.health).toBeLessThan(full);
-    expect(body.position.y).toBeGreaterThan(ground + 5);
+    expect(body.position.y).toBeGreaterThan(ground(body.position) + 5);
   } finally { sim.dispose(); }
 }, 60_000);

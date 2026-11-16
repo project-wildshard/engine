@@ -20,15 +20,17 @@ import { StalkerBrain } from '@wildshard/engine/ai/stalker';
 /**
  * A creature's floor in a renderer-free host (the creature manager's `creatureFloor`; Pine Hollow, Sky Reach): the first
  * WORLD hit under `fromY` at (x, z), else `terrainAt` (also when the hit is the ground's heightfield), and whether it
- * stands on a structure.
+ * stands on a structure. `hollow` (TC-B3b, declared cleanroom solids): the ray starts inside a solid without hitting it and
+ * only an upward face is a floor, so a body that walks or spawns into a solid stays on the ground instead of climbing it.
  */
-export function creatureFloor(host: Pick<SimHost, 'physics'>, terrainAt: (x: number, z: number) => number, heightfield: 'ground' | 'any' = 'ground'): (x: number, z: number, fromY: number) => { y: number; structure: boolean } {
+export function creatureFloor(host: Pick<SimHost, 'physics'>, terrainAt: (x: number, z: number) => number, heightfield: 'ground' | 'any' = 'ground', hollow = false): (x: number, z: number, fromY: number) => { y: number; structure: boolean } {
   const origin = { x: 0, y: 0, z: 0 }, down = { x: 0, y: -1, z: 0 }, sees = ['WORLD'] as const;
   return (x, z, fromY) => {
     const terrain = terrainAt(x, z);
     origin.x = x; origin.y = fromY; origin.z = z;
-    const hit = castRay(host.physics, origin, down, Math.max(201, fromY - terrain + 1), sees);
-    if (hit === null || ((heightfield === 'any' || hit.material === 'ground') && hit.collider.shape.type === host.physics.R.ShapeType.HeightField)) return { y: terrain, structure: false };
+    const hit = castRay(host.physics, origin, down, Math.max(201, fromY - terrain + 1), sees, undefined, !hollow);
+    if (hit === null || (hollow && hit.normal.y <= 0.5)
+      || ((heightfield === 'any' || hit.material === 'ground') && hit.collider.shape.type === host.physics.R.ShapeType.HeightField)) return { y: terrain, structure: false };
     return { y: hit.point.y, structure: true };
   };
 }

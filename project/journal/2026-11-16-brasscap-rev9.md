@@ -17,3 +17,7 @@
 - `staging.json` by `pins.ts refresh --channel staging`; the release pin
   by hand as for rev 8. Local cook proved (`cook-job`, 5.0 s); tarball
   on the `pins` release; `pins.ts install blender-template` admits it.
+- Review (one `claude -p`, no MUST): the declared-solid floor now uses
+  homeKeeper's `creatureFloor` with a hollow cast that takes only an
+  upward face (a body under a low overhang stays on the ground), exact
+  terrain height, and `levelGround` set on a ledge.
