@@ -270,8 +270,9 @@ try {
       await phone.shot('5-after-the-meeting');
     }
   }
-  const lines = faultsOf(phone, socket);
-  note(row, 'no page error', lines.other.length === 0, { other: lines.other.slice(0, 8), health: lines.health.length });
+  // A socket the page closes while it still dials (the title's dial, then the room's) is listed, not failed, as in online-phone-proof.
+  const lines = faultsOf(phone, socket), dial = (/** @type {{text: string}} */ line) => /^WebSocket connection to 'wss:\/\/rooms-staging\.wildshard\.io\/' failed: WebSocket is closed before the connection is established\.$/u.test(line.text);
+  note(row, 'no page error', lines.other.filter(line => !dial(line)).length === 0, { other: lines.other.filter(line => !dial(line)).slice(0, 8), dials: lines.other.filter(dial).length, health: lines.health.length });
   code = steps.every(each => each.ok) ? 0 : 1;
 } catch (error) {
   note(row, 'the proof stopped', false, { error: String(error).slice(0, 500), errors: phone.errors.slice(-8) });
