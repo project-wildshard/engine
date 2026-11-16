@@ -6,7 +6,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, expect, test } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
-import { doctorReport, healthUrl, runDoctor, type DoctorConfig, type DoctorRow } from '../src/client/host/online/doctor';
+import { doctorReport, healthIsPrivate, healthUrl, runDoctor, type DoctorConfig, type DoctorRow } from '../src/client/host/online/doctor';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 
 // E7.5 prep: the Connection doctor against a real door on a real socket, and a real origin for the page, the release file and the packs.
@@ -135,4 +135,13 @@ test('the health address sits beside the socket', () => {
   expect(healthUrl('wss://wildshard.tailb41b20.ts.net')).toBe('https://wildshard.tailb41b20.ts.net/health');
   expect(healthUrl('wss://wildshard.tailb41b20.ts.net:8443/')).toBe('https://wildshard.tailb41b20.ts.net:8443/health');
   expect(healthUrl('ws://127.0.0.1:18797/')).toBe('http://127.0.0.1:18797/health');
+});
+
+test('STAGING-BUGBASH SB20: the hosted rooms address beside the page keeps /health private, so the doctor never reads it with CORS', () => {
+  // D7: rooms-staging.wildshard.io answers /health 404 with no CORS; reading it logged a CORS error and a 404 on every run
+  expect(healthIsPrivate('wss://rooms-staging.wildshard.io', 'https://staging.wildshard.io')).toBe(true);
+  expect(healthIsPrivate('wss://rooms.wildshard.io/', 'https://wildshard.io')).toBe(true);
+  // a tailnet door and a local door answer /health with CORS, and the doctor reads their build and players
+  expect(healthIsPrivate('wss://wildshard.tailb41b20.ts.net', 'https://staging.wildshard.io')).toBe(false);
+  expect(healthIsPrivate('ws://127.0.0.1:18797/', 'http://127.0.0.1:4173')).toBe(false);
 });

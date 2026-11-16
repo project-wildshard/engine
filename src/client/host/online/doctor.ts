@@ -76,6 +76,19 @@ export function healthUrl(socket: string): string {
   return url.href;
 }
 
+/** D7 / STAGING-BUGBASH SB20: a `wss:` rooms address on the page's own site (rooms-staging.wildshard.io beside
+ *  staging.wildshard.io) sits behind Cloudflare, which keeps /health private (404, no CORS). A CORS read there can only fail,
+ *  and it logged a CORS error and a 404 on every doctor run (an opaque read still logs the 404), so the doctor does not ask:
+ *  its Join check opens the door's socket, which is the proof. A tailnet or local door answers
+ *  /health with CORS and is read as before. */
+export function healthIsPrivate(socket: string, pageOrigin: string): boolean {
+  try {
+    const rooms = new URL(socket), page = new URL(pageOrigin);
+    const site = (host: string): string => host.split('.').slice(-2).join('.');
+    return rooms.protocol === 'wss:' && rooms.hostname !== page.hostname && site(rooms.hostname) === site(page.hostname) && rooms.hostname.includes('.');
+  } catch { return false; }
+}
+
 async function checkPage(config: DoctorConfig, learned: Learned, ms: number): Promise<Outcome> {
   try {
     const response = await limited(learned.scope, ms, signal => fetch(new URL('/version.json', config.origin), { cache: 'no-store', signal }));
@@ -148,9 +161,11 @@ async function checkPacks(config: DoctorConfig, learned: Learned, ms: number): P
   }
 }
 
-async function checkServer(learned: Learned, ms: number): Promise<Outcome> {
+async function checkServer(config: DoctorConfig, learned: Learned, ms: number): Promise<Outcome> {
   if (learned.socket === undefined) return skip('needs the release file');
   const url = healthUrl(learned.socket), started = diagnosticNow();
+  // SB20: even an opaque read of a private /health logs its 404 in the console; the join below proves the door instead
+  if (healthIsPrivate(learned.socket, config.origin)) return skip(`${new URL(url).host} · health is private, Join checks the door`);
   try {
     const response = await limited(learned.scope, ms, signal => fetch(url, { cache: 'no-store', signal }));
     const health = await response.json() as { build?: unknown; players?: unknown; uptime?: unknown; now?: unknown };
@@ -307,7 +322,7 @@ export async function runDoctor(config: DoctorConfig, owner: Scope, show: (row: 
   const scope = owner.child('doctor.run'), ms = config.limitMs ?? LIMIT_MS, learned: Learned = { scope, rtt: [], joined: false }, rows: DoctorRow[] = [];
   const work: Readonly<Record<DoctorId, () => Promise<Outcome>>> = {
     page: () => checkPage(config, learned, ms), release: () => checkRelease(config, learned, ms), packs: () => checkPacks(config, learned, ms),
-    server: () => checkServer(learned, ms), join: () => checkJoin(config, learned, ms), latency: () => Promise.resolve(checkLatency(learned)), browser: () => checkBrowser(config, scope, ms),
+    server: () => checkServer(config, learned, ms), join: () => checkJoin(config, learned, ms), latency: () => Promise.resolve(checkLatency(learned)), browser: () => checkBrowser(config, scope, ms),
   };
   for (const { id, label } of DOCTOR_CHECKS) {
     show({ id, label, state: 'run', value: '', hint: '', ms: 0 });
