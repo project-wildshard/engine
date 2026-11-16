@@ -11,7 +11,8 @@ import { SIM_LEVEL } from './fixtures/sim-level/level';
 // TEMPLATE-E2E TC-E6 (Jake, 2026-11-15 QA row 33, "kills drop loot"): only a native runtime paid per-kill loot; a grid data
 // cell paid coins through quest steps alone, so a single Brasscap bandit dropped nothing. A data cell now rolls each
 // meaningful hitter's coins off the shard's `economy` loot tables, as a native room does (J105), and files them in the
-// tick's effects. A one-shard page pays its own lone player, so there the cell pays only once a second player is in.
+// tick's effects. A one-shard page pays its own lone player, so there the cell pays only once a second player is in; a
+// room (a dedicated one-shard room, a CI journey) has no page, so it pays its lone player as a grid cell does.
 const rapier = loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
 function shard(tables: boolean) {
   const source = emptyShardfile({ slug: 'loot-cell', name: 'Loot cell', author: 'Test', seed: 7, revision: 1 });
@@ -23,9 +24,9 @@ function shard(tables: boolean) {
     economy: { tables: [{ id: 'coins', domain: 'coins', table: { mode: 'weighted', rows: [{ item: 'coin', weight: 1, count: 7, match: { kind: 'boar' } }] } }] } }] as never;
   return source;
 }
-async function open(tables: boolean, lone: boolean): Promise<CellWorld> {
+async function open(tables: boolean, lone: boolean, pageless = true): Promise<CellWorld> {
   return openCellWorld({ instance: 'loot-cell' }, { shard: shard(tables), assets: new Map(), sections: new Map(), rapier: await rapier } as never,
-    undefined, { saves: new SaveStore({ local: null, session: null }), lone, pageless: true });
+    undefined, { saves: new SaveStore({ local: null, session: null }), lone, pageless });
 }
 /** The lead shoots the bandit dead, and the tick that hears the death runs. */
 function kill(cell: CellWorld): void {
@@ -55,6 +56,11 @@ test('a data cell with no loot table pays nothing for a kill', async () => {
 });
 
 test('a one-shard page\'s lone player is paid by the page, not the cell', async () => {
-  const cell = await open(true, true);
+  const cell = await open(true, true, false);
   try { kill(cell); expect(coins(cell)).toEqual([]); } finally { cell.dispose(); }
+});
+
+test('a lone one-shard room has no page, so the cell pays its lone killer', async () => {
+  const cell = await open(true, true, true);
+  try { kill(cell); expect(coins(cell)).toEqual([7]); } finally { cell.dispose(); }
 });

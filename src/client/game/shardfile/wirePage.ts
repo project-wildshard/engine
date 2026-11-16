@@ -26,6 +26,8 @@ import { netCreatureCount } from '../population/netCounts';
 import type { MoverView } from '../../../server/game/plugin/mover';
 
 type Live = (client: NetClient) => (() => void) | undefined;
+/** A mover's look in one grid cell, as `WirePage.moverLooks` keys it. */
+export const moverLookKey = (instance: string, id: string): string => `${instance}\n${id}`;
 /** What a page draws of what its player holds. */
 export interface WireHoldings {
   /** The shard these lines are this page's for, on a grid page that holds several: the entered one's reach the page. */
@@ -58,7 +60,8 @@ export class WirePage {
   stop: () => void = () => undefined;
   /** Mover views by id: rows pose them, and no script runs them here. */
   readonly movers: Map<string, MoverView> = new Map<string, MoverView>();
-  /** TEMPLATE-E2E TC-E5b: a mover's drawn look by id (a grid cell's props panel), which a data cell's collider view poses too. */
+  /** TEMPLATE-E2E TC-E5b: a mover's drawn look (a grid cell's props panel) by `moverLookKey`, which its cell's collider view
+   *  poses too. Keyed by cell: two copies of one product share their mover ids. */
   readonly moverLooks: Map<string, MoverView> = new Map<string, MoverView>();
   /** Whether the server is carrying this player's body now. */
   led: () => boolean = () => false;

@@ -14,7 +14,7 @@ import type { ClientTileViews } from '../shardfile/clientViews';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { ProbeAreaTarget } from '@wildshard/engine/debug/probe';
-import { wirePage } from '../shardfile/wirePage';
+import { moverLookKey, wirePage } from '../shardfile/wirePage';
 
 /** What the panels read of a cell the live host has admitted: the solids of its world, and a field's row where this page has one. */
 export interface PanelRegion { readonly colliders: ReadonlyMap<string, { readonly active: () => boolean; readonly setActive: (active: boolean) => void }>; readonly field: (name: string) => number | undefined }
@@ -82,16 +82,16 @@ export class NeighbourPanels {
     });
     const cellPanels: CellPanels = { instance: cell.instance, source, bindings };
     this.cells.set(cell.instance, cellPanels);
-    // TEMPLATE-E2E TC-E5b: a mover's look is the props panel with its id; the wire's pose for it moves that panel. A data cell
-    // the page walks in has its own view for that id (its collider, `dataCellMovers.ts`), which poses this look too.
+    // TEMPLATE-E2E TC-E5b: a mover's look is the props panel with its id; the wire's pose for it moves that panel. The cell the
+    // feet stand in claims the id for its collider view (`dataCellMovers.ts`), which poses this cell's look too.
     for (const row of source.movers) {
       const panel = panels.get(row.id); if (panel === undefined) continue;
-      const view = { pose: moverPanelPose(panel, row) };
+      const view = { pose: moverPanelPose(panel, row) }, key = moverLookKey(cell.instance, row.id);
       panel.visible = row.enabled; // drawn at rest until the wire poses it (review SHOULD)
-      wirePage.moverLooks.set(row.id, view);
+      wirePage.moverLooks.set(key, view);
       if (!wirePage.movers.has(row.id)) wirePage.movers.set(row.id, view);
       this.ports.scope.onDispose(() => {
-        if (wirePage.moverLooks.get(row.id) === view) wirePage.moverLooks.delete(row.id);
+        if (wirePage.moverLooks.get(key) === view) wirePage.moverLooks.delete(key);
         if (wirePage.movers.get(row.id) === view) wirePage.movers.delete(row.id);
       });
     }

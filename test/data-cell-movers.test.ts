@@ -10,7 +10,7 @@ import { Physics } from '../src/shared/engine/physics/Physics';
 import { floorBelow } from '../src/shared/engine/physics/query';
 import type { MoverPose } from '../src/shared/engine/physics/mover';
 import { installDataCellMovers } from '../src/client/game/grid/dataCellMovers';
-import { wirePage } from '../src/client/game/shardfile/wirePage';
+import { moverLookKey, wirePage } from '../src/client/game/shardfile/wirePage';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { builtProduct } from '../src/test/game/builtProduct';
 
@@ -31,8 +31,10 @@ test('a data cell\'s lift stands where the wire poses it, and poses its look', {
     boxes: [{ x: 0, y: 0, z: 0, hx: 1, hy: 0.1, hz: 1, rot: { x: 0, y: 0, z: 0, w: 1 } }], ...lowerMoverMotion(motion, rest), ...motion, execution: 'native' }]);
   const physics = new Physics(await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))), scope = new Scope('cell');
   const looked: number[] = [], look = { pose: (pose: MoverPose) => { looked.push(pose.position.y); } };
-  wirePage.moverLooks.set(LIFT, look); wirePage.movers.set(LIFT, look); // the neighbour panel drew first
-  installDataCellMovers({ movers: [...shard.movers, ...movers] }, { physics, scope });
+  wirePage.moverLooks.set(moverLookKey('cell', LIFT), look); wirePage.movers.set(LIFT, look); // the neighbour panel drew first
+  const cell = installDataCellMovers({ movers: [...shard.movers, ...movers] }, { physics, scope }, 'cell');
+  expect(wirePage.movers.get(LIFT)).toBe(look); // not the wire's until the feet enter
+  cell?.claim();
   physics.step();
   expect(floorBelow(physics, 4, 4, 10, 20)).toBeCloseTo(0.1, 2);
 
@@ -50,4 +52,17 @@ test('a data cell\'s lift stands where the wire poses it, and poses its look', {
   expect(wirePage.movers.get(LIFT)).toBe(look);
   expect(() => { wirePage.movers.get(LIFT)?.pose(at(0), {}); }).not.toThrow();
   physics.dispose();
+
+  // two copies of one product name the same lift: the rows pose the one the feet entered, and its own look
+  const rapier = physics.R, a = { physics: new Physics(rapier), scope: new Scope('a') }, b = { physics: new Physics(rapier), scope: new Scope('b') };
+  const seen: string[] = [];
+  for (const id of ['a', 'b']) wirePage.moverLooks.set(moverLookKey(id, LIFT), { pose: () => { seen.push(id); } });
+  const rows = { movers: [...shard.movers, ...movers] }, cellA = installDataCellMovers(rows, a, 'a'), cellB = installDataCellMovers(rows, b, 'b');
+  cellA?.claim(); // admitted after A, B never takes A's rows
+  wirePage.movers.get(LIFT)?.pose(at(3), {}); a.physics.step(); b.physics.step();
+  expect(floorBelow(a.physics, 4, 4, 10, 20)).toBeCloseTo(3.1, 2);
+  expect(floorBelow(b.physics, 4, 4, 10, 20)).toBeCloseTo(0.1, 2);
+  expect(seen).toEqual(['a']);
+  cellB?.claim(); b.scope.dispose(); // B goes while it holds the id: its look is gone too, so the id leaves the wire
+  a.scope.dispose(); a.physics.dispose(); b.physics.dispose();
 });
