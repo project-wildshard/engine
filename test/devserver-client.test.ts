@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { pruneDevserverClient } from '../scripts/devserver-client.mjs';
+import { discoveryArt, pruneDevserverClient } from '../scripts/devserver-client.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -10,7 +10,7 @@ function client(flags: unknown, files: readonly string[]): string {
   mkdirSync(resolve('tmp'), { recursive: true });
   const root = mkdtempSync(resolve('tmp', 'devserver-client-')); roots.push(root);
   writeFileSync(join(root, 'build-flags.json'), JSON.stringify(flags));
-  for (const file of files) { mkdirSync(dirname(join(root, file)), { recursive: true }); writeFileSync(join(root, file), file); }
+  for (const file of files) { mkdirSync(dirname(join(root, file)), { recursive: true }); writeFileSync(join(root, file), file.endsWith('/discovery.json') ? '{}' : file); }
   return root;
 }
 
@@ -24,6 +24,28 @@ test('the client keeps the engine page and drops first-party shard content', () 
   pruneDevserverClient(root);
   for (const file of kept) expect(existsSync(join(root, file)), file).toBe(true);
   for (const file of dropped) expect(existsSync(join(root, file)), file).toBe(false);
+});
+
+// TC13 (mini QA, 2026-11-16): v0.1.29's archive kept each discovery.json and deleted the card art it names, so a fresh SDK
+// project 404ed on every card image. The art stays in both archives; the rest of the shard's folder still goes.
+const ART = { '/shardfiles/driftwood-isle/blobs/image/aa.jpg': 3, '/shardfiles/driftwood-isle/blobs/image/bb.webp': 4 };
+for (const kind of ['devserver', 'preparation'] as const) test(`TC13: the ${kind} client keeps the card art discovery.json names`, () => {
+  const root = client({ devserver: kind === 'devserver' }, ['index.html', 'shardfiles/driftwood-isle/blobs/image/aa.jpg', 'shardfiles/driftwood-isle/blobs/image/bb.webp',
+    'shardfiles/driftwood-isle/blobs/image/cc.jpg', 'shardfiles/driftwood-isle/shard.json', 'shardfiles/pine-hollow/discovery.json', 'shardfiles/pine-hollow/blobs/image/dd.jpg']);
+  writeFileSync(join(root, 'shardfiles/driftwood-isle/discovery.json'), JSON.stringify({ slug: 'driftwood-isle', art: ART }));
+  if (kind === 'preparation') writeFileSync(join(root, 'version.json'), JSON.stringify({ preparationOnly: true }));
+  expect([...discoveryArt(root)].sort()).toEqual(['shardfiles/driftwood-isle/blobs/image/aa.jpg', 'shardfiles/driftwood-isle/blobs/image/bb.webp']);
+  pruneDevserverClient(root, kind);
+  for (const file of ['shardfiles/driftwood-isle/discovery.json', 'shardfiles/driftwood-isle/blobs/image/aa.jpg', 'shardfiles/driftwood-isle/blobs/image/bb.webp', 'shardfiles/pine-hollow/discovery.json']) expect(existsSync(join(root, file)), file).toBe(true);
+  for (const file of ['shardfiles/driftwood-isle/blobs/image/cc.jpg', 'shardfiles/driftwood-isle/shard.json', 'shardfiles/pine-hollow/blobs/image/dd.jpg']) expect(existsSync(join(root, file)), file).toBe(false);
+});
+
+test('TC13: a card image discovery.json names and the build lacks refuses the archive, naming it', () => {
+  const root = client({ devserver: true }, ['shardfiles/driftwood-isle/blobs/image/aa.jpg']);
+  writeFileSync(join(root, 'shardfiles/driftwood-isle/discovery.json'), JSON.stringify({ slug: 'driftwood-isle', art: ART }));
+  expect(() => { pruneDevserverClient(root); }).toThrow('1 discovery art file(s) the build lacks: shardfiles/driftwood-isle/blobs/image/bb.webp');
+  writeFileSync(join(root, 'shardfiles/driftwood-isle/discovery.json'), JSON.stringify({ art: { '/../escape.jpg': 1 } }));
+  expect(() => { pruneDevserverClient(root); }).toThrow(/outside the client/u);
 });
 
 test('a build not in devserver mode is refused untouched', () => {

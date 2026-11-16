@@ -5,8 +5,10 @@
 // `src/sharddev/devClient.ts` fetches it once per engine pin.
 //
 // The archive is `build-app.mjs --mode devserver`, minus what only a first-party page reads: the pinned shards' folders
-// (their `discovery.json` stays, the title deck reads it), their asset folders and KTX2 and baked textures, spawn sets,
-// programs, drafts, trailers and source maps. The author's own shard comes from `wildshard dev`'s build.
+// (their `discovery.json` stays, the title deck reads it, and so does the card art it names under `art`), their asset
+// folders and KTX2 and baked textures, spawn sets, programs, drafts, trailers and source maps. The author's own shard comes
+// from `wildshard dev`'s build. TC13 (mini QA, 2026-11-16): v0.1.29's archive kept the discovery files but not their art,
+// so every card image 404ed in a fresh SDK project; a named art file the archive lacks now refuses the archive.
 //
 //   python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --out <devserver-client.tar.gz> [--keep <folder>]
 //
@@ -16,7 +18,7 @@
 // release it; it is only ever a release asset beside the devserver client.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -31,6 +33,26 @@ const DROP_ASSETS = ['driftwood-isle', 'far-reach', 'nalati', 'nine-dragon', 'pi
 /** `assets/gpu/` (KTX2 stand-ins): the shards' own folders go; the engine's `tex`, `models` and `horizon` stay. */
 const DROP_GPU = ['baked', 'far-reach', 'nalati', 'nine-dragon', 'pine-hollow'];
 
+/** TC13: the card art each `shardfiles/<slug>/discovery.json` names (`art`: URL -> bytes), as client-relative paths.
+ *  @param {string} client @returns {Set<string>} */
+export function discoveryArt(client) {
+  const shardfiles = join(client, 'shardfiles'), art = new Set();
+  if (!existsSync(shardfiles)) return art;
+  for (const slug of readdirSync(shardfiles)) {
+    const file = join(shardfiles, slug, 'discovery.json');
+    if (!existsSync(file)) continue;
+    const named = JSON.parse(readFileSync(file, 'utf8'))?.art;
+    if (named === undefined || named === null) continue;
+    if (typeof named !== 'object') throw new Error(`devserver-client: ${slug}'s discovery.json has an art that is not a map`);
+    for (const url of Object.keys(named)) {
+      const path = url.replace(/^\//u, '');
+      if (path.split('/').includes('..') || path === '') throw new Error(`devserver-client: ${slug}'s discovery.json names art outside the client: ${url}`);
+      art.add(path);
+    }
+  }
+  return art;
+}
+
 /** Prune a devserver build (or, SA43, a preparation-only production build) in place to the client an author's page reads.
  *  @param {string} client @param {ClientKind} [kind] */
 export function pruneDevserverClient(client, kind = 'devserver') {
@@ -41,19 +63,30 @@ export function pruneDevserverClient(client, kind = 'devserver') {
     const version = existsSync(versionFile) ? JSON.parse(readFileSync(versionFile, 'utf8')) : undefined;
     if (flags?.devserver !== false || version?.preparationOnly !== true) throw new Error('devserver-client: the build is not a preparation-only production build');
   }
-  for (const name of DROP_TOP) rmSync(join(client, name), { recursive: true, force: true });
-  for (const name of DROP_ASSETS) rmSync(join(client, 'assets', name), { recursive: true, force: true });
-  for (const name of DROP_GPU) rmSync(join(client, 'assets', 'gpu', name), { recursive: true, force: true });
+  const art = discoveryArt(client), kept = (/** @type {string} */ file) => art.has(relative(client, file).split(sep).join('/'));
+  /** Everything under `path` but the art a discovery file names. @param {string} path */
+  const drop = path => {
+    if (!existsSync(path)) return;
+    if (!statSync(path).isDirectory()) { if (!kept(path)) rmSync(path, { force: true }); return; }
+    for (const entry of readdirSync(path)) drop(join(path, entry));
+    if (readdirSync(path).length === 0) rmSync(path, { recursive: true, force: true });
+  };
+  for (const name of DROP_TOP) drop(join(client, name));
+  for (const name of DROP_ASSETS) drop(join(client, 'assets', name));
+  for (const name of DROP_GPU) drop(join(client, 'assets', 'gpu', name));
   // baked: only the engine's common bake; spawn: only the in-page server's book (`server-<build>.json`)
   for (const [folder, keep] of /** @type {const} */ ([['assets/baked', name => name === 'common'], ['assets/spawn', name => /^server-.+\.json$/u.test(name)]])) {
     const path = join(client, folder);
-    if (existsSync(path)) for (const name of readdirSync(path)) if (!keep(name)) rmSync(join(path, name), { recursive: true, force: true });
+    if (existsSync(path)) for (const name of readdirSync(path)) if (!keep(name)) drop(join(path, name));
   }
   const shardfiles = join(client, 'shardfiles');
   if (existsSync(shardfiles)) for (const slug of readdirSync(shardfiles)) {
-    for (const name of readdirSync(join(shardfiles, slug))) if (name !== 'discovery.json') rmSync(join(shardfiles, slug, name), { recursive: true, force: true });
+    for (const name of readdirSync(join(shardfiles, slug))) if (name !== 'discovery.json') drop(join(shardfiles, slug, name));
   }
   for (const entry of readdirSync(client, { recursive: true, withFileTypes: true })) if (entry.isFile() && entry.name.endsWith('.map')) rmSync(join(entry.parentPath, entry.name));
+  // A card image the page will ask for and the archive lacks is a 404 in every author's project: refuse to pack it.
+  const missing = [...art].filter(path => !existsSync(join(client, path))).sort();
+  if (missing.length > 0) throw new Error(`devserver-client: ${missing.length} discovery art file(s) the build lacks: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ', ...' : ''}`);
 }
 
 /** @param {string} folder @returns {number} */

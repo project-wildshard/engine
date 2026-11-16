@@ -5,3 +5,5 @@ export declare const DEV_CLIENT_ASSET: string;
 export declare const PREPARATION_CLIENT_ASSET: string;
 /** Prune a devserver build (or a preparation-only production build) in place to the client an author's page reads. */
 export declare function pruneDevserverClient(client: string, kind?: 'devserver' | 'preparation'): void;
+/** TC13: the card art each discovery.json names (`art`), as client-relative paths. */
+export declare function discoveryArt(client: string): Set<string>;
