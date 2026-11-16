@@ -124,11 +124,16 @@ try {
     // the old world goes one of two ways: the same-page entry (ZE10a3) retires its Game in this document (marked from inside the
     // page, the window marker kept), or the reload form's new document (`?chunk=`; the entry first rewrites the old page's own
     // address, a same-document event 0.2 s before the old document went)
-    // the same-page form is timed on the page's own clock: the old Game's dispose and every resource read of the target (a
-    // PerformanceObserver), since the protocol's network and navigation events reach this script in no fixed order under load
+    // the same-page form is timed on the page's own clock: the gate's 0 (the loading screen's navigation shell), the old Game's
+    // dispose and every resource read of the target (a PerformanceObserver), since the protocol's network and navigation events
+    // reach this script in no fixed order under load. A read before the 0 is the road's own view of the cell (its ring tiles and
+    // their admission, drawn while the walker stands at its gate: ZE7's live cell fill), logged but not the target's world; a read
+    // between the 0 and the old Game's dispose is the target's world read under the old one, and fails the run.
     await page.evaluate(slug => {
       const W = /** @type {any} */ (window), game = W.__wildshard.world.game, retire = game.dispose.bind(game);
       W.__zeReads = []; new PerformanceObserver(list => { for (const entry of list.getEntries()) if (entry.name.includes(`/shardfiles/${slug}/`)) W.__zeReads.push({ url: entry.name, start: entry.startTime }); }).observe({ type: 'resource' });
+      const shellUp = () => { if (W.__zeZeroPerf === undefined && document.querySelector('.ws-load[data-navigation]') !== null) { W.__zeZeroPerf = performance.now(); W.__zeZeroAt = Date.now(); } };
+      new MutationObserver(shellUp).observe(document.body, { attributes: true, attributeFilter: ['data-navigation'], childList: true, subtree: true });
       W.__zeMark = 1; game.dispose = (/** @type {unknown[]} */ ...args) => { const done = retire(...args); W.__zeLeftAt = Date.now(); W.__zeLeftPerf = performance.now(); return done; };
     }, targetSlug);
     const departure = await Promise.any([
@@ -186,8 +191,10 @@ try {
         oldHomeLeft = (back.gate?.cell ?? null) === null && await page.evaluate(slug => { const st = /** @type {any} */ (window).__wildshard.shard.grid.state(); return document.querySelector('.ws-load[data-navigation]') === null && (st.live?.live?.home ?? st.home) === slug; }, targetSlug).catch(() => false);
       }
     }
-    /** @type {{ left: number | null, reads: { url: string, start: number }[] } | null} */
-    const pageReads = samePage ? await page.evaluate(() => { const W = /** @type {any} */ (window); return { left: W.__zeLeftPerf ?? null, reads: W.__zeReads ?? [] }; }).catch(() => null) : null;
+    /** @type {{ left: number | null, zero: number | null, zeroAt: number | null, reads: { url: string, start: number }[] } | null} */
+    const pageReads = samePage ? await page.evaluate(() => { const W = /** @type {any} */ (window); return { left: W.__zeLeftPerf ?? null, zero: W.__zeZeroPerf ?? null, zeroAt: W.__zeZeroAt ?? null, reads: W.__zeReads ?? [] }; }).catch(() => null) : null;
+    // no shell seen: every read before the dispose counts
+    const zero = pageReads?.zero ?? Number.NEGATIVE_INFINITY, zeroAt = pageReads?.zeroAt ?? Number.NEGATIVE_INFINITY;
     const enteredMB = ready ? await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null) : null;
     // ZE10c: a fresh Nalati boot (Shard Select, its own new context) stood at the arrival pose and read as long after: the entry's
     // playingMB there is held within 50 MB of it (one world in memory)
@@ -196,9 +203,11 @@ try {
     try { freshMB = await bootCard(freshContext, target.name, arrived ?? { x: dir * (14 - HALF), z: 0, yaw: -dir * Math.PI / 2 }); } catch (error) { result.errors.push(`fresh ${target.name} boot: ${String(error).slice(0, 200)}`); }
     await freshContext.close();
     result.fired = { navigations, departure: departure?.how ?? null, samePage, navigated: left, before, after: page.url(), ready, home, zonePending, arrived, walkedOut, oldHomeGate, oldHomeLeft, enteredMB, controlMB, freshMB,
-      residency: pageReads !== null && pageReads.left !== null ? { clock: 'page', readsBeforeLeaving: pageReads.reads.filter(row => row.start < /** @type {number} */ (pageReads.left)).map(row => row.url.replace(base, '')),
+      residency: pageReads !== null && pageReads.left !== null ? { clock: 'page', zeroToLeftMs: Number.isFinite(zero) ? Math.round(pageReads.left - zero) : null,
+        roadViewReads: pageReads.reads.filter(row => row.start < zero).length,
+        readsBeforeLeaving: pageReads.reads.filter(row => row.start >= zero && row.start < /** @type {number} */ (pageReads.left)).map(row => row.url.replace(base, '')),
         firstReadAfterMs: pageReads.reads.filter(row => row.start >= /** @type {number} */ (pageReads.left)).reduce((first, row) => Math.min(first, Math.round(row.start - /** @type {number} */ (pageReads.left))), Number.POSITIVE_INFINITY),
-        script: { leftAt, readsBefore: reads.filter(row => row.at < leftAt).length } } : { clock: 'script', leftAt, readsBeforeLeaving: reads.filter(row => row.at < leftAt).map(row => row.url), firstReadAfterMs: left ? (reads.find(row => row.at >= leftAt)?.at ?? null) === null ? null : (reads.find(row => row.at >= leftAt)?.at ?? 0) - leftAt : null } };
+        script: { leftAt, readsBefore: reads.filter(row => row.at >= zeroAt && row.at < leftAt).length } } : { clock: 'script', leftAt, readsBeforeLeaving: reads.filter(row => row.at < leftAt).map(row => row.url), firstReadAfterMs: left ? (reads.find(row => row.at >= leftAt)?.at ?? null) === null ? null : (reads.find(row => row.at >= leftAt)?.at ?? 0) - leftAt : null } };
   }
   const named = (/** @type {string} */ name) => /** @type {any} */ (result.shots.find(row => row.name === name))?.gate;
   const [at5, gone, again, at2] = ['gate-5', 'backed-away', 'gate-again', 'gate-2'].map(named);
