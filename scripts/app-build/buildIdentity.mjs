@@ -47,6 +47,30 @@ export function buildLabelOf(build, { version, describe = '' }) {
   return [version === '' ? '' : `v${version}`, short].filter(part => part !== '').join(' · ');
 }
 
+const BUNDLE_TAG = /<script\b[^>]*\btype="module"[^>]*\bsrc="\/b\/[^"]*"[^>]*><\/script>|<link\b[^>]*\brel="(?:modulepreload|stylesheet)"[^>]*\bhref="\/b\/[^"]*"[^>]*>/gu;
+/** FIRST-OPEN-PROGRESS (QA 11-16 row 17): iOS keeps a Home Screen app's still launch image (generate-title-launch.mjs: the
+ * hero and wordmark, no bar) up until the document's `load`, and every bundle tag holds `load` back: the module graph and
+ * the 280 kB stylesheet. Jake's cold open of v0.1.29 showed that still image for 10 s and the live shell's moving bar for
+ * a tenth of a second before the menu. The title document's module, modulepreload and stylesheet tags now sit in one inert
+ * template: a browser tab writes them back in place while it parses (parser-inserted and deferred, as before), and a
+ * Home Screen launch adds them after `load`, so iOS hands over to the shell, its bar and its file count, once the shell
+ * itself has loaded. A document with no title shell, or no bundle tags (a source page), is unchanged.
+ * @param {string} html */
+export function lateBootTags(html) {
+  if (!html.includes('data-title-shell') || html.includes('data-boot-late')) return html;
+  const tags = [...html.matchAll(BUNDLE_TAG)], head = html.search(/<\/head>/iu);
+  const first = tags[0]?.index;
+  if (first === undefined) return html;
+  if (tags.some(tag => tag.index > head)) throw new Error('A bundle tag outside the document head');
+  let rest = '', from = 0;
+  for (const tag of tags) { rest += html.slice(from, tag.index); from = tag.index + tag[0].length; }
+  rest += html.slice(from);
+  const start = '<script data-boot-late-start>(()=>{const late=document.querySelector(\'template[data-boot-late]\');'
+    + 'if(!(navigator.standalone||matchMedia(\'(display-mode: standalone)\').matches)){document.write(late.innerHTML);return;}'
+    + 'addEventListener(\'load\',()=>{document.head.append(document.importNode(late.content,true));},{once:true});})();</script>';
+  return `${rest.slice(0, first)}<template data-boot-late>${tags.map(tag => tag[0]).join('\n')}</template>${start}${rest.slice(first)}`;
+}
+
 /** Stamp before executable module scripts, without changing the bundle's URLs. `label` (QA 11-13) is the build pill's
  * words, which index.html's static title shows before any bundle runs.
  * @param {string} html @param {string} build
@@ -56,8 +80,8 @@ export function stampBuildHtml(html, build, facts) {
   if (html.includes('globalThis.__WS_BUILD_ID__=')) throw new Error('Duplicate document build identity');
   // Vite hoists one extracted sheet back into head. Keep the inline launch /
   // loading shell paintable even if that sheet's response has stalled.
-  const source = html.includes('data-loading-first-paint') ? html.replaceAll(/<link\b[^>]*\brel="stylesheet"[^>]*>/giu,
-    tag => tag.includes('media=') ? tag : tag.replace(/\s*\/?\s*>$/u, ' media="print" onload="this.media=\'all\'">')) : html;
+  const source = lateBootTags(html.includes('data-loading-first-paint') ? html.replaceAll(/<link\b[^>]*\brel="stylesheet"[^>]*>/giu,
+    tag => tag.includes('media=') ? tag : tag.replace(/\s*\/?\s*>$/u, ' media="print" onload="this.media=\'all\'">')) : html);
   const heads = [...source.matchAll(/<head(?:\s[^>]*)?>/giu)];
   if (heads.length !== 1 || heads[0]?.index === undefined) throw new Error('Missing or ambiguous document head');
   const end = heads[0].index + heads[0][0].length;

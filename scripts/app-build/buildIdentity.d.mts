@@ -12,6 +12,9 @@ export function sourceBuildId(sha: string, now?: number): string;
 /** A web build's own folder for code, CSS and wasm (J57, J131). */
 export function codeDirectory(build: string): string;
 export const SHARED_CODE_DIRECTORY: 'b/c';
+/** FIRST-OPEN-PROGRESS: the title document's bundle tags in one inert template, written back in place in a browser tab and
+ * added after `load` on a Home Screen launch, so iOS drops its still launch image for the live shell at once. */
+export function lateBootTags(html: string): string;
 /** Stamp exactly one document head, refusing missing/duplicate/unsafe identities. */
 export function stampBuildHtml(html: string, build: string, facts?: DocumentAdmissionFacts): string;
 /** Stamp all built HTML entries from version.json before service-worker emission. */
