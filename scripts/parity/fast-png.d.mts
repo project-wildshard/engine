@@ -14,5 +14,5 @@ export interface CaptureSession {
   detach:()=>Promise<void>;
 }
 export type OpenCaptureSession = (page:Page)=>Promise<CaptureSession>;
-/** Fast lossless Chromium PNG of the original viewport, within the supplied capture deadline. */
+/** Composited viewport PNG within the deadline: fast CDP on Chromium, public screenshot on WebKit. */
 export function captureViewportPng(page: Page, label: string, deadline: number, openSession?:OpenCaptureSession): Promise<Buffer>;

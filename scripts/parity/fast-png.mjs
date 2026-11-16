@@ -14,8 +14,8 @@ const openProtocolSession = async page => {
     detach: () => session.detach() };
 };
 
-/** Capture the same Chromium viewport PNG, choosing fast lossless encoding.
- * CDP is accessed only through Playwright's supported session API.
+/** Capture the composited viewport PNG within the original deadline.
+ * Chromium uses fast lossless CDP encoding; WebKit uses its supported screenshot API.
  * @param {import('playwright').Page} page @param {string} label @param {number} deadline
  * @param {import('./fast-png.mjs').OpenCaptureSession} [openSession] */
 export async function captureViewportPng(page, label, deadline, openSession = openProtocolSession) {
@@ -36,6 +36,16 @@ export async function captureViewportPng(page, label, deadline, openSession = op
       console.log(`boot-capture ${JSON.stringify({ label, stage: name, state, ms: performance.now() - started })}`);
     }
   };
+  // WebKit has no CDP session. Keep its real composited PNG and the same
+  // readiness/deadline contract through Playwright's public browser port.
+  if (openSession === openProtocolSession && page.context().browser()?.browserType().name() === 'webkit') {
+    await stage('fonts-ready', () => page.evaluate(async () => { await document.fonts.ready; }));
+    await stage('compositor-frame', () => page.evaluate(() => new Promise(resolve => {
+      requestAnimationFrame(() => resolve(true));
+    })));
+    return stage('native-capture', () => page.screenshot({type: 'png', fullPage: false, scale: 'device',
+      timeout: Math.max(1, deadline - Date.now())}));
+  }
   const session = await stage('cdp-session', () => openSession(page));
   try {
     await stage('fonts-ready', () => page.evaluate(async () => { await document.fonts.ready; }));

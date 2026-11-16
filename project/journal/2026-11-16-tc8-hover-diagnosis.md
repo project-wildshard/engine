@@ -44,3 +44,10 @@ that behavior. The nightly now spaces its two intended single taps
 beyond that exported gesture window. It still requires an actual mount,
 a visible owned model and actual unmount, with unchanged deadlines.
 Failure facts also include the real boost latch.
+
+All eight completed full-night head receipts also expose a hard WebKit
+producer bug: the shared boot frame requests Chromium-only CDP on WebKit.
+WebKit now uses its public Playwright viewport PNG API within the same
+original capture deadline. Font/compositor readiness, actual PNG pixel
+analysis, black-frame refusal and ordinary Chromium capture remain.
+Hosted single-head runs verify the actual browser boundary.
