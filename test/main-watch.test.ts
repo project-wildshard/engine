@@ -57,6 +57,10 @@ test('advisories never hide failed, unknown, incomplete or cancelled blocking wo
   }
   expect(blockingRun(red, [{ name: 'timings', conclusion: 'failure' }]).conclusion).toBe('failure');
   expect(blockingRun(red, []).conclusion).toBe('failure');
+  for (const conclusion of [null, 'action_required', 'startup_failure']) {
+    const unknown = run(42970000025, 'aaaa1111', conclusion, 50);
+    expect(blockingRun(unknown, [{ name: 'tests (1)', conclusion: 'success' }, { name: 'timings', conclusion: 'failure' }])).toBe(unknown);
+  }
   const cancelled = run(42970000023, 'aaaa1111', 'cancelled', 51);
   expect(blockingRun(cancelled, [{ name: 'tests (1)', conclusion: 'success' }, { name: 'timings', conclusion: 'failure' }])).toBe(cancelled);
   const pending = run(42970000024, 'aaaa1111', null, 52, 'in_progress');

@@ -41,7 +41,7 @@ const byCreated=(/** @type {Run} */a,/** @type {Run} */b)=>Date.parse(a.created_
  * incomplete and cancelled blocking jobs retain the workflow's verdict.
  * @param {Run} run @param {readonly {name:string,conclusion:string|null}[]} jobs @returns {Run} */
 export function blockingRun(run,jobs){
-  if(!finished(run)||cancelled(run)||run.conclusion==='success')return run;
+  if(!finished(run)||(run.conclusion!=='failure'&&run.conclusion!=='timed_out'))return run;
   const advisory=(/** @type {{name:string}} */job)=>job.name==='timings'||job.name==='quarantine';
   const required=jobs.filter(job=>!advisory(job));
   const clear=required.length>0&&required.every(job=>['success','skipped','neutral'].includes(job.conclusion??''));
