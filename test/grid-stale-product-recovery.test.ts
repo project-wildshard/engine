@@ -146,6 +146,29 @@ test('planned reloads continue at the saved pose; graphics recovery retains RESU
   }
 });
 
+test('menu readiness can inspect a pending recovery without consuming its admission', () => {
+  const f = fixture(), service = gridRecovery(f.store, () => Date.now());
+  expect(service.pending()).toBe(false);
+  const admitted = f.read({ ...previous, mode: 'grid' });
+  if (admitted === null) throw new Error('Missing admitted recovery');
+  service.clearLoop();
+  expect(service.write(assembly, home, admitted.road, 'reload')).toBe(true);
+  expect(service.pending()).toBe(true);
+  expect(service.pending()).toBe(true);
+  expect(service.consume(assembly).kind).toBe('resume');
+  expect(service.pending()).toBe(false);
+});
+
+test.each(['grid.recovery.once', 'grid.reset.pending'])('a future %s record still needs admission before the menu shortcut', key => {
+  const local = new Storage(), session = new Storage();
+  const raw = JSON.stringify({ keys: { [key]: { v: 2, data: { future: true } } } });
+  local.setItem('wildshard.save.v2.device', raw);
+  const service = gridRecovery(new SaveStore({ local, session }));
+  expect(service.pending()).toBe(true);
+  expect(service.pending()).toBe(true);
+  expect(local.getItem('wildshard.save.v2.device')).toBe(raw);
+});
+
 test.each([
   { kind: 'unexpected' as const }, { reason: 'new build adopted' }, { mode: 'shard' },
   { discarded: true }, { at: 3000 }, { at: -60_000 },

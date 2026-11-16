@@ -127,11 +127,16 @@ function learnPlacedCellsOnce(): Promise<void> {
 async function enterPage(): Promise<unknown> {
   // S20: a crash read off another tab's live beat is no crash; asked now, answered (at most 500 ms) before the title reads it
   const settled = settleLastEnd();
-  await placedCells;
   const requested = search.get('chunk');
   // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here.
   // SA37: on every host, a world build too: PLAY's `/?chunk=` page enters the world's grid at the shard's cell (GO7 below)
   const slugged = slugOfPath(location.pathname);
+  const plainTitle = requested === null && slugged === null && document.getElementById('ws-shardfile') === null
+    && bootRoute(search, { line: previousBootLine(), level: previousBootLevel() }).titleOnly;
+  // The live menu's code can arrive while styles and the previous-end query settle.
+  // Placement still gates every route that can admit a world or a public shard card.
+  if (plainTitle) pageTitleImports();
+  if (!plainTitle) await placedCells;
   if (slugged !== null && requested === null) {
     const path = slugPathOf(slugged); // the address bar reads a shard's public name, not its old API slug
     if (location.pathname.replace(/\/$/u, '') !== path) history.replaceState(history.state, '', `${path}${location.search}`);
@@ -145,7 +150,12 @@ async function enterPage(): Promise<unknown> {
   }
   await waitFor('Startup stylesheets', waitForLoadingStyles(entryScope), 'file');
   await settled;
-  const { consumeGridRecovery, gridRecoveryRefused, pageGridRecovery, pendingGridEntry } = await bootTask('app:page-entry-import', () => import('@wildshard/engine/game/grid/pageEntry'));
+  const { consumeGridRecovery, gridRecoveryRefused, gridRecoveryPending, pageGridRecovery, pendingGridEntry } = await bootTask('app:page-entry-import', () => import('@wildshard/engine/game/grid/pageEntry'));
+  if (plainTitle && lastEnd().kind !== 'unexpected' && !gridRecoveryPending()) {
+    document.documentElement.classList.add('title-first');
+    return showPageTitle();
+  }
+  await placedCells;
   // QA row 16 (GO1): an online level seats a body the world sees, so only a tap enters one. Crash resume is the solo build's.
   const online = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined;
   // QA 11-12 row 35 (Jake, 20:04: "I expected reload to go back to main menu"): the player's own browser reload lands on the title,
@@ -252,13 +262,22 @@ async function enterPage(): Promise<unknown> {
     return bootTask('app:main-import', () => import('./main'));
   })();
 }
+function preparePageTitleImports() {
+  return prepareBootImports(Promise.all([import('@wildshard/engine/ui/StartTitle'),
+    import('@wildshard/engine/game/mainMenu'), import('@wildshard/engine/game/travel/travel')]));
+}
+let titleImports: ReturnType<typeof preparePageTitleImports> | undefined;
+function pageTitleImports(): ReturnType<typeof preparePageTitleImports> {
+  titleImports ??= preparePageTitleImports();
+  return titleImports;
+}
 async function showPageTitle(refusal = ''): Promise<void> {
   // S20: the title's ended note reads lastEnd(), settled (the imports take longer than the lock query)
-  const [{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }] = await Promise.all([import('@wildshard/engine/ui/StartTitle'), import('@wildshard/engine/game/mainMenu'), import('@wildshard/engine/game/travel/travel'), settleLastEnd()]);
+  const [[{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }]] = await Promise.all([pageTitleImports().ready(), settleLastEnd()]);
   // SF21a: a tap or validated recovery selects a grid; unrecorded process loss returns to title
   const grid = installGridTitle();
   // the composition root wires the game's main menu (over its shard deck) into the engine's title (E405)
-  showStartTitle(({ settings, notice }) => {
+  const title = showStartTitle(({ settings, notice }) => {
     const lines = [refusal, notice ?? '', grid.note].filter((line) => line !== '').join('\n');
     return buildTitleMenu({
       active: null,
@@ -271,6 +290,9 @@ async function showPageTitle(refusal = ''): Promise<void> {
       ...(lines === '' ? {} : { notice: lines }),
     });
   });
+  // Published cards can arrive after the first menu. Rebuild through the same
+  // owner as Developer changes, preserving its selected card and menu screen.
+  void placedCells.then(title.refresh);
   // DL10 (Debug 'Early shader compile', default off): after the title's first frames, one trivial shader link starts the
   // GPU process's compiler, so a cold entry's first program does not pay its 1-1.4 s start-up
   showDropOnTitle();

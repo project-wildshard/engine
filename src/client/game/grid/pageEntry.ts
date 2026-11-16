@@ -274,6 +274,9 @@ export function consumeGridRecovery(options: { assembly?: GridAssembly; saves?: 
 /** Same-document handoff to ordinary admission and the live road placement; progress is read from real saves. */
 export function pageGridRecovery(): NonNullable<GridRecoveryRecord> | null { return selected; }
 
+/** A plain menu needs no placement read unless recovery metadata still needs catalogue validation. */
+export function gridRecoveryPending(): boolean { return gridRecovery(saves).pending(); }
+
 /** The compiler ledger may inspect a fresh tap without consuming its authority. */
 export function pendingGridEntry(slug: string): boolean { return pageGridIntents().pending(slug); }
 /** A failed recovery boot returns to the title and must not supply a selection to another boot. */

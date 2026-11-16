@@ -78,6 +78,8 @@ export interface GridRecoveryService {
   /** A pending reset never boots until the target namespace proves its atomic generation advance. */
   prepareReset: (assembly: GridAssembly, current: { instance: string; slug: string }, road: RoadPoint, target: LocalSaveInstance) => boolean;
   completeReset: (assembly: GridAssembly) => boolean;
+  /** Whether routing must validate recovery/reset metadata against the current catalogue. Does not consume it. */
+  pending: () => boolean;
   consume: (assembly: GridAssembly, unexpected?: boolean) => GridRecoveryRead;
 }
 /** Recovery-only metadata is mirrored for a replaced WebContent process and consumed before any boot allocation. */
@@ -101,6 +103,8 @@ export function gridRecovery(store: SaveStore, now: () => number = Date.now): Gr
     return JSON.stringify(local.peek()) === JSON.stringify(saved);
   };
   const service: GridRecoveryService = {
+    pending: () => [session, device, pendingReset].some(slot => slot.peek() !== null
+      || slot.status?.() === 'future' || slot.status?.() === 'invalid'),
     save: (assembly, home, road, location) => {
       const saved = v.parse(savedSchema, { instance: home.instance, slug: home.slug, road: { ...road }, location, catalogue: recoveryCatalogue(assembly), at: now() });
       const cell = assembly.cells.find(row => row.instance === home.instance && [home.slug].includes(row.slug));

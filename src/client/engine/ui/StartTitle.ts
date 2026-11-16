@@ -11,7 +11,7 @@ import type { TitleDeckView } from './HUD';
 export type StartTitleDeck = (opts: { settings: () => void; notice?: string }) => TitleDeckView;
 
 /** Present the supplied title deck while the entry prepares. */
-export function showStartTitle(buildDeck: StartTitleDeck): void {
+export function showStartTitle(buildDeck: StartTitleDeck): { readonly refresh: () => void; readonly dispose: () => void } {
   const scope = pageScope.child('ui.StartTitle'), slots = new HudSlots();
   const hud = document.getElementById('hud');
   if (hud === null) throw new Error('Start title: missing #hud');
@@ -19,6 +19,7 @@ export function showStartTitle(buildDeck: StartTitleDeck): void {
   const interrupted = previousBootLine();
   let deck: TitleDeckView | undefined;
   const refresh = (): void => {
+    if (scope.disposed || scope.disposing) return;
     const selected = deck?.cards[deck.index]?.slug;
     deck?.root.remove(); deck?.dispose();
     deck = buildDeck({
@@ -36,4 +37,5 @@ export function showStartTitle(buildDeck: StartTitleDeck): void {
   scope.onDispose(onDev(refresh));
   scope.onDispose(() => { deck?.dispose(); });
   document.dispatchEvent(new Event('ws:ready'));
+  return { refresh, dispose: () => { scope.dispose(); } };
 }

@@ -174,6 +174,25 @@ test('the standalone launch image matches the declared phone pixel dimensions', 
   expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1206, 2622]);
 });
 
+test('late catalogue refresh preserves the selected card and retires with the title owner', () => {
+  document.body.innerHTML = '<div id="hud"></div>';
+  let selected = 1, starts = 0;
+  const shown = showStartTitle(() => {
+    const root = document.createElement('div');
+    return { root, cards: [{ slug: 'first' }, { slug: 'selected' }], index: selected,
+      select: index => { selected = index; }, activate: () => undefined,
+      dispose: () => root.remove(), start: () => { starts++; } };
+  });
+  shown.refresh();
+  expect(selected).toBe(1);
+  expect(starts).toBe(2);
+  expect(document.querySelector('#hud')?.children.length).toBe(1);
+  shown.dispose();
+  shown.refresh();
+  expect(starts).toBe(2);
+  expect(document.querySelector('#hud')?.children.length).toBe(0);
+});
+
 const startedOf = (window: Window): string | undefined => { const card = window.document.querySelector('.ws-load'); return card instanceof window.HTMLElement ? card.dataset['clockStartedAt'] : undefined; };
 test('DL21: a world page\'s first-paint card runs its clock from the title tap before any module, until Loading adopts it', async () => {
   // The title tapped 1.5 s before this document started (the fixture's stored arrival); no module script runs here.
