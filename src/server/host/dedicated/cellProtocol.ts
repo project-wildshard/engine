@@ -22,6 +22,8 @@ export interface SeatEntry {
   readonly previous?: SavedCheckpoint;
   /** The door found this device's seat held, so read no save for it: if the hold has run out since, this client must dial again. */
   readonly held?: boolean;
+  /** ZE6: the cell a seat walks onto the road from (the worker sets it on the road's crossing): the road's walls stand open for it there. */
+  readonly home?: string;
 }
 /** What the door says to a worker. */
 export type CellOrder =

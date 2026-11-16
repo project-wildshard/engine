@@ -61,6 +61,31 @@ export function addZoneWalls(road: SimHost, cells: readonly GridCell[], home: st
   // after a reload on the road a walker who reaches the home before it loads stops there, never walking on under its hills
   addCellWalls(road, cells.filter(cell => cell.instance === home));
 }
+/** ZE6: each dedicated road's zone walls, by the cell they stand round, so a seat's motor can pass its own home's. */
+const zoneWalls = new WeakMap<SimHost, Map<string, readonly number[]>>();
+/**
+ * ZONE-ENTRY ZE6 (J352): a dedicated worker's road walls every cell on the page's own lines (`zoneWallEdges`: the edge line, open
+ * only at each entryway's buffer, the gate 10 m in) and floors each buffer with its entry socket. One road world holds every seat
+ * on the worker and seats have different homes, so no cell is left open in the world: each seat's motor passes its own home's
+ * walls (`openHomeFor`), and meets every other cell's at its edge and its gate, as the page does.
+ */
+export function addSeatZoneWalls(road: SimHost, cells: readonly GridCell[]): void {
+  if (cells.length === 0) return;
+  const kept = zoneWalls.get(road) ?? new Map<string, readonly number[]>();
+  zoneWalls.set(road, kept);
+  withOwner(road.scope, () => {
+    installEntrySockets(road.physics, road.scope, cells.map(cell => cell.origin));
+    const zone = new ReadinessWalls(road.physics, cells.flatMap(cell => zoneWallEdges(cell, { origin: { x: 0, z: 0 } })), road.scope);
+    for (const cell of cells) kept.set(cell.instance, zone.handles(cell.instance));
+  });
+}
+/** ZE6: `motor` (a seat's on this road) passes the walls round `home`, its own cell, and no other. False when `home` has none here. */
+export function openHomeFor(road: SimHost, motor: { readonly phased: Set<number> }, home: string): boolean {
+  const handles = zoneWalls.get(road)?.get(home);
+  if (handles === undefined) return false;
+  for (const handle of handles) motor.phased.add(handle);
+  return true;
+}
 /** ZE11: take out the 2 m plain walls (`addCellWalls`) a road saved by an older build holds: the only cuboids of that size. */
 export function dropCellWalls(road: SimHost): number {
   const { world } = road.physics, found: Collider[] = [];
@@ -89,12 +114,12 @@ export function addVoidFloor(road: SimHost, cells: readonly Pick<GridCell, 'cell
  * new cell's square; the new strips go in; and a new cell this worker can't hand a seat to gets the walls every other worker's cell has.
  * The rim stays: it stands on the 7 × 7's rail whatever is placed.
  */
-export function placeOnRoad(road: SimHost, cells: readonly Pick<GridCell, 'cell'>[], strips: readonly GridCollisionStrip[], walled: readonly Pick<GridCell, 'origin'>[]): void {
+export function placeOnRoad(road: SimHost, cells: readonly Pick<GridCell, 'cell'>[], strips: readonly GridCollisionStrip[], walled: readonly GridCell[]): void {
   const { world } = road.physics;
   for (const collider of floors.get(road) ?? []) world.removeCollider(collider, false);
   addVoidFloor(road, cells, false);
   buildStrips(road, strips.map(strip => strip.mesh));
-  addCellWalls(road, walled);
+  addSeatZoneWalls(road, walled);
 }
 /**
  * SA34: a restored road's save holds the void floor and rim the saving build made (strips are held as data and out of every save,
@@ -121,13 +146,14 @@ export function installRoadCombat(road: SimHost): void {
   road.events.answer('damage.admit', () => null, road.scope);
 }
 /**
- * GC15: a dedicated worker's road, with nobody on it yet: every strip built, the void's floor round `placed` (SA34), and walls only round `walled`, the cells it can't hand a
- * seat to (those on another worker: GC7's one line). Its lead seat is the room's to park.
+ * GC15: a dedicated worker's road, with nobody on it yet: every strip built, the void's floor round `placed` (SA34), and since ZE6 the
+ * zone walls round every cell in `walled` (all of them: each seat passes only its own home's, `openHomeFor`). Its lead seat is the
+ * room's to park.
  */
-export function openRoad(rapier: Rapier, walled: readonly Pick<GridCell, 'origin'>[], strips: readonly GridCollisionStrip[], placed: readonly Pick<GridCell, 'cell'>[]): SimHost {
+export function openRoad(rapier: Rapier, walled: readonly GridCell[], strips: readonly GridCollisionStrip[], placed: readonly Pick<GridCell, 'cell'>[]): SimHost {
   const road = createSimHost(ROAD, { rapier });
   installRoadCombat(road);
-  addCellWalls(road, walled);
+  addSeatZoneWalls(road, walled);
   addVoidFloor(road, placed);
   buildStrips(road, strips.map(strip => strip.mesh));
   return road;

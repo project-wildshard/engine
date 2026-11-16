@@ -240,7 +240,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
       if (crossing !== undefined && was !== undefined && was !== grown) {
         const { strips, seams: more } = placedStrips(grown, was), fresh = grown.cells.slice(was.cells.length);
         crossing = { name: crossing.name, assembly: grown, strips: [...crossing.strips, ...strips], seams: [...crossing.seams, ...more] };
-        laid = () => { road?.place(grown, strips, fresh.filter(cell => !enterable(cell.instance))); };
+        laid = () => { road?.place(grown, strips, fresh); };
       }
       for (const slug of order.open) {
         if (cells.has(slug)) continue;
@@ -260,7 +260,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     // Both settled in one look, then read and moved with no await between: a start-over can't begin under the seat (J320).
     if (!await settled(...[from, to].filter((cell): cell is Cell => !(cell instanceof RoadRoom)))) return;
     const source = from instanceof RoadRoom ? from : from.room, target = to instanceof RoadRoom ? to : to.room;
-    const moved = source.handOver(entry.device, target, entry, at);
+    // ZE6: onto the road from a cell, that cell is the seat's home there (its walls open for it, the only cell it walks back into)
+    const moved = source.handOver(entry.device, target, target instanceof RoadRoom && !(from instanceof RoadRoom) ? { ...entry, home: fromSlug } : entry, at);
     post({ kind: 'crossed', device: entry.device, name: entry.name, from: fromSlug, to: toSlug, moved, stays: source.holds(entry.device), body: moved ? target.bodyId(entry.device) ?? entry.body : entry.body });
   };
   /**
@@ -324,7 +325,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     for (const slug of options.slugs) { const room = await open(slug); if (disposed) return; cells.set(slug, { slug, room, emptySince: diagnosticNow(), used: false, waking: null }); }
     if (crossing !== undefined && rapier !== undefined) {
       const { name, assembly, strips } = crossing, begun = diagnosticNow();
-      road = new RoadRoom({ name, build: options.build, assembly, host: openRoad(rapier, assembly.cells.filter(cell => !enterable(cell.instance)), strips, assembly.cells), hosts: instance => cells.has(instance),
+      road = new RoadRoom({ name, build: options.build, assembly, host: openRoad(rapier, assembly.cells, strips, assembly.cells), hosts: instance => cells.has(instance),
         now: options.roomNow ?? diagnosticNow, post: news => { post({ ...news, slug: name }); }, reports: { file: report => { post({ kind: 'report', slug: name, report }); } },
         ...(options.holdMs === undefined ? {} : { holdMs: options.holdMs }) });
       post({ kind: 'cell', slug: name, ms: diagnosticNow() - begun });

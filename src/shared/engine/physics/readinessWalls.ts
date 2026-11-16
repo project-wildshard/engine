@@ -39,6 +39,9 @@ export class ReadinessWalls {
     for (const { edge, collider } of this.walls) collider.setEnabled(!readiness.isReady(edge.instance));
   }
 
+  /** ZONE-ENTRY ZE6: the wall colliders' handles standing for `instance` (a dedicated road's seat passes its own home's). */
+  handles(instance: string): number[] { return this.walls.filter(({ edge }) => edge.instance === instance).map(({ collider }) => collider.handle); }
+
   /** Removes only soft walls; highway, strip and proxy floors survive this scope. */
   dispose(): void {
     if (this.closed) return;

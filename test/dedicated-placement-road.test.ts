@@ -3,16 +3,17 @@ import { CHUNK_HALF, CONTENT_CAPS } from '../src/shared/engine/core/config';
 import type { SimHost } from '../src/server/engine/sim';
 import { PLATFORM_COLLIDER_OWNER } from '../src/shared/engine/physics/stripColliders';
 import { tagOf } from '../src/shared/engine/physics/surface';
-import { cellFrame, forgetPlacedCells, placeCell, roadName, type PlacedCell } from '../src/server/host/dedicated/gridCells';
+import { BUFFER_DEPTH } from '../src/shared/game/grid/zoneWalls';
+import { forgetPlacedCells, placeCell, roadName, type PlacedCell } from '../src/server/host/dedicated/gridCells';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
 
 // SA34a (meta SHARD-AUTHORING, after SA33 and SA34): a cell placed on a running world with roads (`WORLD_CROSSING=worker`) is laid out on
 // every worker's road. Staging's 2-worker table: Nalati alone on worker 0, Driftwood on worker 1. Thin Ice is placed at (0, 3), the
-// spiral's first ring-3 spot (SA30): it opens on Driftwood's worker (the nearest open cell's), whose road hands a seat into it, and
-// Nalati's road walls it as it walls every cell it can't hand a seat to. On both roads its square has no void floor and the grown grid's
-// strips run round it.
+// spiral's first ring-3 spot (SA30): it opens on Driftwood's worker (the nearest open cell's). On both roads its square has no void floor
+// and the grown grid's strips run round it. Since ZONE-ENTRY ZE6 (J352) every road walls it as the page does, its gate 10 m in, and a
+// seat from Driftwood walks into its buffer and is held at the gate: a cell other than a seat's home is entered by its gate, never walked into.
 const HOME = 'driftwood-isle', EAST = 'nalati-grasslands', HOME_ROAD = roadName(HOME), EAST_ROAD = roadName(EAST);
 const PLACED: PlacedCell = { instance: 'open-plot-thin-ice', slug: 'open-plot-thin-ice', cell: [0, 3] };
 const P = CONTENT_CAPS.pitch, NORTH = PLACED.cell[1] * P;
@@ -38,7 +39,7 @@ const north = (road: SimHost): number | null => {
   return hit === null ? null : hit.timeOfImpact;
 };
 
-test('a placed cell is laid out on every road: no void floor on its square, strips round it, walled where it is not hosted, and a walk in from the road', { timeout: 180_000 }, async () => {
+test('a placed cell is laid out on every road: no void floor on its square, strips round it, walled with its gate, and a walk from the road held there', { timeout: 180_000 }, async () => {
   bench = await roomBench({ cells: [HOME, EAST], saves: memoryPlayerSaves(), workers: 2, crossing: true });
   const a = new RoomBot(bench.url, 'bench', 'device:a', 'A'); bots.push(a);
   expect(await a.arrived()).toBe(true);
@@ -61,10 +62,10 @@ test('a placed cell is laid out on every road: no void floor on its square, stri
     expect(down(road.host, P / 2, NORTH), 'the strip east of it').toBeCloseTo(0, 1);
     expect(down(road.host, P, NORTH), 'its empty neighbour is still floor').toBeCloseTo(0, 2);
   }
-  expect(north(other.host), 'Nalati\'s road walls it, 2 m out from its edge').toBeCloseTo(10 - 2 - 0.5, 1);
+  // through its south entryway a ray meets its gate, BUFFER_DEPTH in from the edge, on both roads
+  for (const road of [mine, other]) expect(north(road.host), 'its gate, through the buffer').toBeCloseTo(10 + BUFFER_DEPTH, 1);
   // Its own world has the road past each edge: the pack's outer strip south of it (its copy) and a new strip north.
   for (const z of [-(CHUNK_HALF + 3), CHUNK_HALF + 3]) expect(road(placed.host, 0, z), `the road at z ${String(z)} in its frame`).toBe(true);
-  expect(north(mine.host), 'Driftwood\'s road hands a seat in: no wall').toBeNull();
 
   // Off Driftwood's north edge onto its road, then set down on the outer road just south of Thin Ice and walk north by input.
   const body = home.bodyOf('device:a');
@@ -75,10 +76,13 @@ test('a placed cell is laid out on every road: no void floor on its square, stri
   if (onRoad === undefined) throw new Error('A stands on the road');
   onRoad.resetPose({ x: 0, y: 0.5, z: NORTH - CHUNK_HALF - 6 }, Math.PI);
   a.thumb = (): ReturnType<RoomBot['thumb']> => ({ viewTick: 0, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, yaw: Math.PI, pitch: 0, buttons: 0 });
-  await vi.waitFor(() => { expect(a.client.latest?.cell).toBe(cellFrame(PLACED.instance)); }, { timeout: 20_000 });
-  expect(mine.holds('device:a'), 'the road let the seat go').toBe(false);
-  expect(placed.holds('device:a'), 'Thin Ice holds it').toBe(true);
+  await vi.waitFor(() => { expect(mine.bodyOf('device:a')?.position.z ?? 0, 'into Thin Ice\'s buffer').toBeGreaterThan(NORTH - CHUNK_HALF + 2); }, { timeout: 20_000 });
+  let deepest = -Infinity;
+  for (const ends = Date.now() + 3000; Date.now() < ends;) { await new Promise(resolve => { setTimeout(resolve, 50); }); deepest = Math.max(deepest, mine.bodyOf('device:a')?.position.z ?? -Infinity); }
+  expect(deepest, 'held at its gate').toBeLessThan(NORTH - CHUNK_HALF + BUFFER_DEPTH);
+  expect(mine.holds('device:a'), 'still on the road').toBe(true);
+  expect(placed.holds('device:a'), 'never handed into Thin Ice').toBe(false);
   expect(a.closed, 'the socket never closed').toBeNull();
-  expect(bench.lines.filter(line => line['at'] === 'cell.crossed').map(line => [line['from'], line['to'], line['moved']])).toEqual([[HOME, HOME_ROAD, true], [HOME_ROAD, PLACED.instance, true]]);
+  expect(bench.lines.filter(line => line['at'] === 'cell.crossed').map(line => [line['from'], line['to'], line['moved']])).toEqual([[HOME, HOME_ROAD, true]]);
   expect([bench.restarts, bench.crashes]).toEqual([0, []]);
 });

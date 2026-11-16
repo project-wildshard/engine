@@ -7,3 +7,11 @@
   reads it (`GraphShaderMaterial.readsVertexColour`) and a family variant of one that does not keeps `vertexColors` off.
   Graphs that read it (Nine's facade, the open plots' paving) keep today's multiply: on the family path they are multiplied
   twice (the graph's own read and three's), which is a look change to make on purpose, not here.
+- **ZE6, the worker road's walls.** A dedicated worker's road (`openRoad`, `placeOnRoad`) now lays the page's zone walls round every
+  cell (`addSeatZoneWalls`: edge line, buffer sides, the gate 10 m in, an entry socket floor in each buffer) in place of the 2 m
+  `addCellWalls` round other workers' cells. One road world holds every seat and seats have different homes, so each seat's motor
+  passes its own home's wall colliders (`openHomeFor`, the motor's `phased` handles; the worker stamps `home` on the seat entry when it
+  hands a seat from a cell onto its road), and the road's trigger crosses a seat only into that home. Walking into another cell from
+  the road is gone (GC15 (3)'s between-worker walk, GC30b's walk into Far Reach, a walk into a placed cell): the walker reaches the
+  buffer and is held at the gate; those tests now say so. Through an entryway the home's own walls never bite (its crossing fires 6 m
+  in, the gate stands at 10), so the filter's red test is the mechanism one in `grid-zone-server-road.test.ts`.

@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { afterEach, expect, test, vi } from 'vitest';
 import { CHUNK_HALF } from '../src/shared/engine/core/config';
 import { NET_BUTTONS } from '../src/shared/engine/input/netButtons';
+import { BUFFER_DEPTH } from '../src/shared/game/grid/zoneWalls';
 import { DedicatedRoom } from '../src/server/host/dedicated/dedicatedRoom';
 import { roadName } from '../src/server/host/dedicated/gridCells';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
@@ -14,8 +15,9 @@ import { RoomBot } from './fixtures/dedicated/roomBot';
 // directly: a fall along the wall from a ledge's height and from its top (60 m: `roadWorld.ts` addCellWalls), and a run along it
 // at sprint both ways. A case holds when the body is never handed into the walled cell
 // and ends on the road, on the walker's side of the wall.
-// Since GC30b (Sky Reach rev 3) Far Reach's docks stand at its entryways, so its road wall is gone; the bench walls it as a bare cell
-// would be (its entryway probe answers no), and the wall it stands up is the one every walled cell gets.
+// Since ZONE-ENTRY ZE6 (J352) every cell but a seat's home is walled on the page's lines: the edge, open only at each entryway's
+// 10 m buffer, and the gate across its inner end. The run east starts in Far Reach's north entryway, so it reaches the buffer and is
+// held at the gate; every other case is held at the edge.
 const HOME = 'driftwood-isle', SOUTH = 'far-reach', CELLS = [HOME, SOUTH, 'sunscar-dunes', 'nalati-grasslands'];
 /** Far Reach's north edge, south of Driftwood's origin on staging's pitch; its road wall stands 2 m further north. */
 const FAR_EDGE = -(562.5 - CHUNK_HALF), WALL_FACE = FAR_EDGE + 2;
@@ -63,7 +65,7 @@ test('the road wall in front of a walled cell holds a fall along it, a fall from
     const end = road.bodyOf(device)?.position;
     expect(handed, `${name}: never handed into Far Reach`).toBe(false);
     expect(road.holds(device), `${name}: still on the road`).toBe(true);
-    expect(deepest, `${name}: never past the wall's face`).toBeGreaterThan(FAR_EDGE);
+    expect(deepest, `${name}: never past the wall (the gate, through the entryway)`).toBeGreaterThan(Math.abs(x) <= 4 ? FAR_EDGE - BUFFER_DEPTH : FAR_EDGE);
     return { name, handed, deepest: Number(deepest.toFixed(2)), lowest: Number(lowest.toFixed(2)), end: end === undefined ? null : { x: Number(end.x.toFixed(2)), y: Number(end.y.toFixed(2)), z: Number(end.z.toFixed(2)) } };
   };
   const rows = await Promise.all([

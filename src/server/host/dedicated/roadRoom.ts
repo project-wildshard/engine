@@ -17,7 +17,7 @@ import { LEAD_SEAT } from '../standalone/cellWorld';
 import { HOLD_MS, type ResumeAt, type RoomNews, type SeatEntry } from './cellProtocol';
 import { crossedTo, finite, type CrossArrival, type CrossTarget } from './crossing';
 import { FallFloor } from '../standalone/fallFloor';
-import { openCellWalls, placeOnRoad } from '../standalone/roadWorld';
+import { openCellWalls, openHomeFor, placeOnRoad } from '../standalone/roadWorld';
 import { LEFT, SeatTransport } from './socketPump';
 import { cellFrame } from './gridCells';
 
@@ -34,6 +34,8 @@ interface RoadSeat {
   transport: Transport | null; client: number | null; closeOff: (() => void) | null; holdEnds: number | null;
   /** The cell this seat last asked to cross into, and on which tick. */
   asked: string | null; askedAt: number;
+  /** ZE6: the cell this seat walked onto the road from, the one whose walls its motor passes and the only one the road crosses it into. */
+  readonly home: string | null;
   readonly fall: FallFloor;
 }
 export interface RoadRoomOptions {
@@ -92,7 +94,9 @@ export class RoadRoom implements CrossTarget {
     player.hoverSpeedLimit = () => gridBoardLimitAt(this.assembly, player.position);
     player.resetPose(at, at.yaw);
     if (motion !== undefined) carryMotion(motion, player);
-    const seat: RoadSeat = { device: entry.device, name: entry.name, body: entry.body, transport, client: null, closeOff: null, holdEnds: null, asked: null, askedAt: 0, fall: new FallFloor(ROAD_FLOOR, true, at) };
+    const home = entry.home ?? null;
+    if (home !== null) openHomeFor(this.host, player.motor, home);
+    const seat: RoadSeat = { device: entry.device, name: entry.name, body: entry.body, transport, client: null, closeOff: null, holdEnds: null, asked: null, askedAt: 0, home, fall: new FallFloor(ROAD_FLOOR, true, at) };
     this.seats.set(entry.device, seat);
     return { body: seat.body, land: client => {
       if (client === null) this.closed(seat, transport, 'crossed'); else this.bind(seat, transport, client);
@@ -152,7 +156,7 @@ export class RoadRoom implements CrossTarget {
    * to cross into it; the void floor is laid again without their squares, their strips go in, and `walled` (placed cells on other workers)
    * get the walls every other worker's cell has.
    */
-  place(assembly: GridAssembly, strips: readonly GridCollisionStrip[], walled: readonly Pick<GridCell, 'origin'>[]): void {
+  place(assembly: GridAssembly, strips: readonly GridCollisionStrip[], walled: readonly GridCell[]): void {
     this.assembly = assembly;
     placeOnRoad(this.host, assembly.cells, strips, walled);
   }
@@ -188,7 +192,8 @@ export class RoadRoom implements CrossTarget {
       if (seat.transport === null || player === undefined || !finite(player.position)) continue;
       const crossed = crossedTo(this.assembly, null, player.position);
       const to = crossed?.cell?.instance ?? null;
-      if (crossed === undefined || to === null || (!this.options.hosts(to) && !this.opened.has(to))) { seat.asked = null; continue; }
+      // ZE6 (J352): the road crosses a seat into its own home only; every other cell's buffer leads to its gate (zone entry), not in
+      if (crossed === undefined || to === null || to !== seat.home || !this.options.hosts(to)) { seat.asked = null; continue; }
       if (seat.asked === to && this.host.state.tick - seat.askedAt < ASK_TICKS) continue;
       seat.asked = to; seat.askedAt = this.host.state.tick;
       this.options.post({ kind: 'crossing', device: seat.device, to, at: { ...crossed.at, yaw: player.yaw } });

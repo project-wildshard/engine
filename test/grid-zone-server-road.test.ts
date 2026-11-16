@@ -7,7 +7,7 @@ import { castRay } from '../src/shared/engine/physics/query';
 import { createSimHost, type SimHost } from '../src/server/engine/sim';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { GridSimulation, type GridResident } from '../src/server/game/grid/simulation';
-import { addZoneWalls, ROAD } from '../src/server/host/standalone/roadWorld';
+import { addZoneWalls, openHomeFor, openRoad, ROAD } from '../src/server/host/standalone/roadWorld';
 import { BUFFER_DEPTH } from '../src/shared/game/grid/zoneWalls';
 
 // ZONE-ENTRY ZE11 (J352): the in-page server is walled as the page is. On 2026-11-15 the laptop's road-memory probe slid a board
@@ -54,5 +54,25 @@ test('the server road walls every cell but the home: its edge stands, its buffer
     expect(hits(outsideOf(home, 40), east(home, 40, -3))).toBe(false);
     expect(hits(outsideOf(home, 40), east(home, 40, 20))).toBe(true);
     expect(hits(outsideOf(home, 0), east(home, 0, 20))).toBe(true);
+  } finally { road.dispose(); }
+});
+
+test('ZE6: a worker\'s road walls every cell; each seat\'s motor passes its own home\'s wall and meets every other cell\'s', () => {
+  const assembly = new GridAssembly({ developer: false, devserver: false }), [home, other] = assembly.cells;
+  if (home === undefined || other === undefined) throw new Error('Missing cells');
+  const road = openRoad(rapier, assembly.cells, [], assembly.cells);
+  try {
+    road.physics.world.step();
+    /** a body 6 m outside `cell`'s east edge, 40 m off its entryway, walked 12 m west into it: how far in it got */
+    const walkIn = (id: string, cell: typeof home, opens: string | null): number => {
+      const start = { x: cell.origin.x + CHUNK_HALF + 6, y: 1, z: cell.origin.z + 40 }, body = road.addPlayer(id, start, 0);
+      if (opens !== null) expect(openHomeFor(road, body.motor, opens)).toBe(true);
+      const feet = { ...start };
+      for (let i = 0; i < 60; i++) body.motor.move(feet, { x: -0.2, y: 0, z: 0 }, true);
+      return cell.origin.x + CHUNK_HALF - feet.x;
+    };
+    expect(walkIn('seat:a', home, home.instance), 'its own home: walked 6 m in').toBeGreaterThan(5);
+    expect(walkIn('seat:b', other, home.instance), 'another cell: held at its edge').toBeLessThan(0);
+    expect(walkIn('seat:c', home, null), 'no pass: held at the edge (red without the per-seat filter)').toBeLessThan(0);
   } finally { road.dispose(); }
 });
