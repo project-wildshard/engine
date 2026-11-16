@@ -115,6 +115,9 @@ test('policy preparation preserves admitted rows and refuses competing ownership
   row.temperament.brain = declared.id; delete row.temperament.tuning;
   creatures.brains = [declared]; creatures.spawns = [{ ...spawn(), brain: declared.id }];
   expect(prepareCreaturePolicies(rows, creatures).brains).toEqual([declared]);
+  row.temperament.brain = 'none';
+  creatures.spawns.push(spawn());
+  expect(prepareCreaturePolicies(rows, creatures).spawns).toEqual(creatures.spawns);
   expect(prepareCreaturePolicies(fixture(false), creatures).spawns[0]).toBe(creatures.spawns[0]);
 });
 

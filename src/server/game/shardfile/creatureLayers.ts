@@ -117,9 +117,10 @@ export function prepareCreaturePolicies(rows: ShardRows, creatures: ShardCreatur
   const spawns = creatures.spawns.map(spawn => {
     const layer = layers.get(spawn.species);
     if (layer === undefined) return spawn;
+    // No layer controller competes with an explicit per-spawn policy (or a deliberately idle body).
+    if (layer.brain.kind === 'none') return spawn;
     if (spawn.brain !== null && groups.has(spawn.brain)) {
-      if (layer.brain.kind !== 'none') throw new Error(`species \`${spawn.species}\`: group and temperament both own the brain`);
-      return spawn;
+      throw new Error(`species \`${spawn.species}\`: group and temperament both own the brain`);
     }
     const brain = layer.brain.kind === 'declared' ? layer.brain.declaration.id : null;
     if (spawn.brain !== null && spawn.brain !== brain) throw new Error(`species \`${spawn.species}\`: spawn and temperament name different brains`);
