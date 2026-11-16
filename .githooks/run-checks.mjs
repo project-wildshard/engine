@@ -23,16 +23,35 @@ if (process.env.SKIP_CHECK === '1') {
   console.error(`  - SKIP_CHECK=1: ${lane} lane skipped (CI still runs it)`);
   process.exit(0);
 }
-// A push that only deletes plan/* branches (`git push --delete origin plan/<slug>`
-// after a landing, J240) sends no commit, so there is nothing to check. Any
+// A push that only deletes managed plan/release branches sends no commit,
+// so there is nothing to check. Any
 // other deleted ref, or any update pushed alongside, keeps the gate.
 if (lane === 'push') {
   const lines = (process.env.WS_PUSH_REFS ?? '').split('\n').map((line) => line.trim().split(/\s+/u)).filter((row) => row[0] !== '');
-  if (lines.length > 0 && lines.every(([, local = '', remote = '']) => /^0+$/u.test(local) && /^refs\/heads\/plan\/[a-z0-9][a-z0-9._-]*$/u.test(remote))) {
+  if (lines.length > 0 && lines.every(([, local = '', remote = '']) => /^0+$/u.test(local) && /^refs\/heads\/(?:plan\/[a-z0-9][a-z0-9._-]*|release\/(?:dryrun-)?v\d+\.\d+\.\d+)$/u.test(remote))) {
     console.error(`  - delete-only push of ${lines.map(([, , remote]) => remote).join(', ')}: no commit leaves this machine; push lane skipped`);
     process.exit(0);
   }
 }
+// A merge-back only carries the version and notes already tested on the tagged release branch.
+// The outgoing main tip must be its first parent; unrelated outgoing commits keep the normal gate.
+if (lane === 'push') {
+  const { releaseMerge } = await import('./release-merge.mjs');
+  const tag = releaseMerge(process.env.WS_PUSH_REFS ?? '', root);
+  if (tag !== null) {
+    console.error(`  - release merge-back ${tag}: version and changelog only; release CI already passed`);
+    const sha = (process.env.WS_PUSH_REFS ?? '').trim().split(/\s+/u)[1];
+    if (process.env.WS_MAIN_WATCH !== '0' && existsSync(join(root, 'scripts/main-watch.mjs'))) {
+      const laneName = process.env.WS_LANE_NAME ?? '', pane = process.env.HERDR_PANE_ID ?? '';
+      const watchEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+      spawn(process.execPath, [join(root, 'scripts/main-watch.mjs'), `--follow=${sha}`, '--after-push=300',
+        ...(laneName === '' ? [] : [`--lane=${laneName}`]), ...(pane === '' ? [] : [`--pane=${pane}`])],
+      { cwd: root, env: watchEnv, detached: true, stdio: 'ignore' }).unref();
+    }
+    process.exit(0);
+  }
+}
+
 // The package is at the repo root; its configs live in src/.
 const pkgDir = root;
 const pkgPath = join(pkgDir, 'package.json');

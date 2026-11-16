@@ -20,3 +20,9 @@
   publication rule is unchanged.
 - The v0.1.23 engine-main hold is in force while these rows build locally;
   do not start RB4 until its required receipt clears that restriction.
+
+- RB3: only a tagged release merge on the advertised main tip can reuse
+  release CI, and only when its tree changes version and notes. Code or
+  other manifest edits keep the normal gate. Managed release-branch
+  deletion sends no commit and needs no suite; main-watch still follows
+  the merge-back's main CI with a clean Git environment.

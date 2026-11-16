@@ -2,6 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ENV, ok, roots, sandbox } from './test-helpers.mjs';
@@ -71,19 +72,54 @@ describe('pre-push hook', () => {
     const box = withRemote();
     box.commit({ 'a.txt': 'a\n' }, MSG);
     assert.equal(box.push().status, 0);
-    for (const branch of ['plan/foo', 'plan/bar', 'feature']) {
+    for (const branch of ['plan/foo', 'plan/bar', 'release/v1.2.3', 'release/dryrun-v1.2.4', 'feature']) {
       assert.equal(box.git(['push', '-q', 'origin', `main:refs/heads/${branch}`]).status, 0);
     }
     // From here on the push gate always fails, so only a skipped gate lets a push out.
     box.write('package.json', JSON.stringify({ scripts: { check: 'exit 1' } }));
     mkdirSync(join(box.root, 'node_modules'), { recursive: true });
-    const gone = box.git(['push', '-q', 'origin', '--delete', 'plan/foo', 'plan/bar']);
+    const gone = box.git(['push', '-q', 'origin', '--delete', 'plan/foo', 'plan/bar', 'release/v1.2.3', 'release/dryrun-v1.2.4']);
     assert.equal(gone.status, 0, gone.stderr);
-    assert.match(gone.stderr, /delete-only push of refs\/heads\/plan\/bar, refs\/heads\/plan\/foo: no commit leaves this machine/);
+    assert.match(gone.stderr, /delete-only push of .*refs\/heads\/release\/v1\.2\.3: no commit leaves this machine/);
     assert.notEqual(box.git(['push', '-q', 'origin', '--delete', 'feature']).status, 0, 'a non-plan deletion keeps the gate');
     box.commit({ 'b.txt': 'b\n' }, MSG);
     const mixed = box.git(['push', '-q', 'origin', 'main', ':refs/heads/feature']);
     assert.notEqual(mixed.status, 0, 'a deletion pushed alongside an update keeps the gate');
     assert.doesNotMatch(mixed.stderr, /delete-only push/);
+  });
+});
+
+
+describe('release merge-back gate', () => {
+  const prepared = () => {
+    const box = sandbox();
+    const manifest = { version: '1.2.2', scripts: { check: 'exit 1' } };
+    assert.equal(box.commit({ 'package.json': JSON.stringify(manifest), 'CHANGELOG.md': 'old notes\n' }, ok('feat: base')).status, 0);
+    const base = box.git(['rev-parse', 'HEAD']).stdout.trim();
+    assert.equal(box.commit({ 'package.json': JSON.stringify({ ...manifest, version: '1.2.3' }), 'CHANGELOG.md': 'release notes\n' }, ok('chore(release): v1.2.3')).status, 0);
+    const release = box.git(['rev-parse', 'HEAD']).stdout.trim();
+    box.git(['tag', 'v1.2.3', release]);
+    mkdirSync(join(box.root, 'node_modules'));
+    const merge = () => box.git(['commit-tree', 'HEAD^{tree}', '-p', base, '-p', release, '-m', 'Merge release']).stdout.trim();
+    const check = (sha) => spawnSync(process.execPath, [fileURLToPath(new URL('./run-checks.mjs', import.meta.url)), 'push'], {
+      cwd: box.root, encoding: 'utf8', env: { ...ENV, WS_PUSH_REFS: `refs/heads/main ${sha} refs/heads/main ${base}\n` },
+    });
+    return { ...box, manifest, base, release, merge, check };
+  };
+  test('a version-and-notes merge-back reuses release CI', () => {
+    const box = prepared();
+    const result = box.check(box.merge());
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /release merge-back v1\.2\.3/);
+  });
+  test('code and manifest edits keep the failing full check', () => {
+    for (const files of [{ 'code.txt': 'untested code\n' }, { 'package.json': JSON.stringify({ version: '1.2.3', scripts: { check: 'exit 1' }, extra: true }) }]) {
+      const box = prepared();
+      assert.equal(box.commit(files, ok('fix: change content')).status, 0);
+      const result = box.check(box.merge());
+      assert.notEqual(result.status, 0, result.stderr);
+      assert.doesNotMatch(result.stderr, /release merge-back/);
+      assert.match(result.stderr, /pnpm check failed/);
+    }
   });
 });
