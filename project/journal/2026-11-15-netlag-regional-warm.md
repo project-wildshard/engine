@@ -119,3 +119,19 @@ is explicit rather than claimed as exact replay collision.
 
 The interrupted land never pushed. Static-world windmill experiments
 remain scratch diagnostics; no nudge or predictor tolerance changed.
+
+
+## Landing: limit partial floor retries to actual stalls
+
+The full related run passed 1,764 cases and stopped on six failures.
+The 0.1% loss threshold retried healthy floor motion, perturbing the
+road-rebind walk's path until one frame fell below its 90% speed bar.
+The old-controller control passes that same case. Retrying only losses
+over 10% keeps the captured 35.6% freedom fix and restores the road bar.
+
+With that narrower change, every version-1 save continuation is exactly
+unchanged, so its saved wire and expected states need no edits. J280's
+intentional floor-stall fix changes the recorded page motion and two
+Nalati room hashes. Re-record those traces with all mode/coverage and
+determinism checks intact; keep the road bar and snapshot compatibility
+assertions unchanged. No predictor tolerance or nudge is changed.

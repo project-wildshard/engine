@@ -289,7 +289,7 @@ export class CharacterMotor {
     // straight up, time of impact 0), and a dash ended on that "wall" (~1 dodge in 5). Such a stall is retried flat;
     // the snap still keeps the feet on the ground, and anything that really blocks the way blocks the retry too.
     const movedH = Math.hypot(m.x, m.z);
-    if (wantH > 1e-6 && want.y <= 0 && movedH < wantH * 0.999
+    if (wantH > 1e-6 && want.y <= 0 && movedH < wantH * 0.9
         && this.stalledOnFloor(movedH < wantH * 0.3 ? Math.cos(this.kcc.maxSlopeClimbAngle()) : 0.9999)) {
       this.flat.x = want.x; this.flat.y = 0; this.flat.z = want.z;
       this.kcc.computeColliderMovement(this.collider, this.flat, R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, pred);

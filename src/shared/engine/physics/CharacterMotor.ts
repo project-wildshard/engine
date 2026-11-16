@@ -340,10 +340,10 @@ export class CharacterMotor {
     // straight up, time of impact 0), and a dash ended on that "wall" (~1 dodge in 5). Such a stall is retried flat;
     // the snap still keeps the feet on the ground, and anything that really blocks the way blocks the retry too.
     // NL13: a flat-floor hit can also eat only part of the move (35% freedom
-    // on Far Reach). Retry those too, only for nearly vertical contact normals;
+    // on Far Reach). Retry losses over 10%, only for nearly vertical contact normals;
     // slopes retain the original severe-stall threshold and walls never qualify.
     const movedH = Math.hypot(m.x, m.z);
-    if (wantH > 1e-6 && want.y <= 0 && movedH < wantH * 0.999
+    if (wantH > 1e-6 && want.y <= 0 && movedH < wantH * 0.9
         && this.stalledOnFloor(movedH < wantH * 0.3 ? Math.cos(this.kcc.maxSlopeClimbAngle()) : 0.9999)) {
       this.flat.x = want.x; this.flat.y = 0; this.flat.z = want.z;
       this.kcc.computeColliderMovement(this.collider, this.flat, R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, pred);

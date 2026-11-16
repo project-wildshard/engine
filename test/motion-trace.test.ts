@@ -22,6 +22,7 @@ import { Player } from '../src/client/engine/player/Player';
 // run through the real Player, on its real device path (input, fixed step, update), with the camera in every hash, at the
 // phone's two frame rates. No A row may change a hash; A14's swell phase is the one allowed exception. A red here means the
 // page's feel moved. Re-record (MOTION_TRACE_RECORD=1) only for a change Jake ruled on, in the commit that makes it.
+// NET-LAG NL13 re-recorded for J280's approved fix: partial flat-floor stalls no longer eat a walk or sprint.
 
 const TICKS = 40_000, HASH_EVERY = 500, SEGMENT = 900;
 const BASELINE = 'test/fixtures/motion-trace/page-law.json';
