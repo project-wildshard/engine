@@ -11,7 +11,7 @@ valid section, and a `vX.Y.Z` tag whose commit has none.
 
 ## v0.1.24 (2026-11-15)
 
-- A phone that kept an old version in its cache no longer sits on the title saying "still waiting": the new version takes over by itself, even on bad Wi-Fi.
+- A phone holding an old version no longer sits on "still waiting": the new version takes over by itself, even on bad Wi-Fi.
 - New versions download in the background while you play and switch in on your next visit, never as a reload in the middle of a game.
 - Reloading keeps you on the page you were on, such as a shard's own link, instead of going back to the main menu.
 - When the title's loading bar stalls, it says what it is waiting for, and tapping reload fetches a fresh copy past the cache.
