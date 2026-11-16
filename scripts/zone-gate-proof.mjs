@@ -114,7 +114,9 @@ try {
     /** @type {any} */ (result).navigations = navigations;
     const consoleRows = /** @type {string[]} */ ([]); /** @type {any} */ (result).console = consoleRows;
     page.on('console', message => { if (message.type() === 'error' || /reload|recover/iu.test(message.text())) consoleRows.push(message.text().slice(0, 200)); });
-    const left = await page.waitForEvent('framenavigated', { timeout: 6000 }).then(() => true).catch(() => false), leftAt = Date.now();
+    // the new document (the reload form's `?chunk=`): the entry first rewrites the old page's own address, a same-document event
+    // that came 0.2 s before the old document went (and a control read then answered from the old page)
+    const left = await page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() && frame.url().includes('chunk='), timeout: 8000 }).then(() => true).catch(() => false), leftAt = Date.now();
     await page.screenshot({ path: join(out, `${tag}-gate-0-loading.png`) }).catch(() => undefined);
     const ready = await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 180_000, polling: 250 }).then(() => true).catch(() => false);
     const home = await page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard?.shard?.grid?.state?.(); return { home: st?.live?.live?.home ?? st?.home ?? null, current: st?.live?.live?.current ?? null, slug: W.__wildshard?.shard?.slug ?? null }; }).catch(() => null);
