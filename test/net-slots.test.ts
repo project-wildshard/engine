@@ -10,7 +10,7 @@ import { shardRows } from '../src/shared/engine/sim/shardRows';
 import { serializeSimSnapshot, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { slotsOf } from '../src/server/game/boss/slotsNative';
 import { slotAwakeRows } from '../src/shared/game/boss/slotLaw';
-import { installServerChapters } from '../src/server/game/quest/serverChapters';
+import { prepareServerChapters } from '../src/server/game/quest/serverChapters';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
@@ -20,8 +20,10 @@ async function nalati(snapshot?: Parameters<typeof createTrustedHeadlessResident
   const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
-  const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, snapshot, { room: true });
-  await installServerChapters(live.host, product, product.shardfile, live.fact);
+  const chapters = await prepareServerChapters(product, product.shardfile);
+  const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, snapshot, {
+    room: true, install: (host, fact) => { chapters?.(host, fact); },
+  });
   return live;
 }
 const awakeRows = (host: Parameters<typeof shardRows>[0]): number => (shardRows(host).world.get('slots')?.() ?? []).reduce((sum, row) => sum + row.value, 0);
