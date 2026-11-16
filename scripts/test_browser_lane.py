@@ -84,10 +84,17 @@ class BrowserAdmissionTests(unittest.TestCase):
 
     def entered(self, child):
         self.assertTrue(select.select([child.stdout], [], [], 3)[0], 'owned child did not enter')
-        self.assertEqual(child.stdout.readline().strip(), 'entered')
+        line = child.stdout.readline().strip()
+        error = ''
+        if line != 'entered' and select.select([child.stderr], [], [], 0)[0]:
+            error = os.read(child.stderr.fileno(), 4096).decode(errors='replace')
+        self.assertEqual(line, 'entered', f'child exit={child.poll()}; stderr={error}')
 
     def test_portable_slots_admit_four_exclude_a_fifth_and_release_for_reuse(self):
-        env = self.portable_environment()
+        # Free-slot probes retain entered()'s three-second bound. Only the
+        # saturated fifth probe needs the one-second admission wait: Bash's
+        # coarse SECONDS tick can otherwise expire a free probe before it tries.
+        env = {**self.portable_environment(), 'BROWSER_LANE_WAIT_SECONDS': '300'}
         command = [sys.executable, '-u', '-c', '''import os,sys
 assert 'BROWSER_SLOT_LOCK_FD' not in os.environ
 try: os.fstat(8)
@@ -102,7 +109,8 @@ print('entered',flush=True);sys.stdin.read(1);sys.exit(7)
             self.entered(child)
         refused = subprocess.run(['/bin/bash', str(ROOT/'scripts/browser-lane.sh'),
                                   'touch', str(self.root/'fifth-entered')],
-                                 env=env, capture_output=True, text=True, timeout=4, check=False)
+                                 env={**env, 'BROWSER_LANE_WAIT_SECONDS': '1'},
+                                 capture_output=True, text=True, timeout=4, check=False)
         self.assertEqual(refused.returncode, 75, refused.stderr)
         self.assertFalse((self.root/'fifth-entered').exists())
         children[0].communicate(input='x', timeout=3)
