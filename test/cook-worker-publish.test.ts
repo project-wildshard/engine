@@ -1,9 +1,9 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The budget leaves no index behind.
-import {existsSync} from 'node:fs';
+import {existsSync, mkdirSync, openSync, closeSync, ftruncateSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- A stub of api-server's notify call.
 import {type Server} from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in folders of its own.
-import {join} from 'node:path';
+import {dirname, join} from 'node:path';
 import {describe, expect, it} from 'vitest';
 import {createCookWorker, notifyServer} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
@@ -44,6 +44,34 @@ describe('the cook worker', () => {
     expect(row.detail).toContain('Over the pack budget');
     expect(existsSync(join(h.scratch, 'small', 'index'))).toBe(false);
     expect(downloads, 'a permanent publication refusal cannot download and cook the same shard again').toBe(1);
+  }, 120_000);
+
+  // From 2026-11-14 06:12 UTC the box failed every job "Over the pack budget": 4 GB against the whole bucket, which
+  // PAGE-SIZE's content/ sets (32.7 of 33.53 GB) filled alone. The budget is the cook's: content/ is the page's, and the
+  // cook never collects it. Sparse files stand in for the big objects, so no disk is used.
+  const sparse = (root: string, key: string, bytes: number): void => {
+    const file = join(root, key);
+    mkdirSync(dirname(file), {recursive: true});
+    const fd = openSync(file, 'w');
+    try { ftruncateSync(fd, bytes); } finally { closeSync(fd); }
+  };
+  const cookInto = (store: string) => createCookWorker({build: 'b6', store: folderStore(store), source: h.source(new Map([[hashOf(h.real), h.real]])),
+    launcher: h.launcher(), serverPacks: join(h.scratch, 'server'), scratch: join(h.scratch, 'work')});
+
+  it('counts only its own keys against the default budget: the page\'s content/ sets are not the cook\'s', async () => {
+    const store = join(h.scratch, 'with-content');
+    sparse(store, 'content/set-a/blob.bin', 8_000_000_000);
+    const row = await cookInto(store).cook({slug, hash: hashOf(h.real)});
+    expect(row.detail ?? '').not.toContain('Over the pack budget');
+    expect(row).toMatchObject({state: 'cooked'});
+  }, 120_000);
+
+  it('still refuses when its own keys are over the default budget', async () => {
+    const store = join(h.scratch, 'full');
+    sparse(store, 'assets/spawn/old-part.bin', 5_000_000_000);
+    const row = await cookInto(store).cook({slug, hash: hashOf(h.real)});
+    expect(row).toMatchObject({state: 'failed'});
+    expect(row.detail).toContain('Over the pack budget: 5000000000 + ');
   }, 120_000);
 
 });

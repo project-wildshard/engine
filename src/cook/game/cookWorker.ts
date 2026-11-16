@@ -236,22 +236,25 @@ export interface GcReport {readonly kept: number; readonly deleted: number; read
 export const PACK_BUDGET_BYTES = 4_000_000_000;
 /** A part younger than this may belong to a cook that hasn't written its index yet. */
 const GC_GRACE_MS = 3_600_000;
+/** PAGE-SIZE PZ2's content sets (`content/<set>/…`, page-release content.mjs). They are content-named and name no build,
+ * so garbage collection never takes one; a set's own retention waits for a build-to-set record. */
+const CONTENT_SETS = 'content/';
 
+/** The cook's usage: `objects`, `bytes` and `share` count only its own keys, never the page's content sets (`CONTENT_SETS`),
+ * which it neither writes nor collects. From 2026-11-14 they filled the 4 GB budget alone (32.7 of 33.53 GB) and every
+ * job failed "Over the pack budget". `byPrefix` still lists every prefix, content sets included, so a report shows them. */
 function usageOf(rows: readonly StoredObject[], budget: number): StoreUsage {
   const byPrefix: Record<string, {count: number; bytes: number}> = {};
   let objects = 0, bytes = 0;
   for (const row of rows) {
     const path = row.key.split('/'), name = path.slice(0, path.length > 3 ? 3 : Math.min(2, path.length - 1)).join('/'), kept = byPrefix[name] ?? {count: 0, bytes: 0};
-    kept.count++; kept.bytes += row.bytes; byPrefix[name] = kept; objects++; bytes += row.bytes;
+    kept.count++; kept.bytes += row.bytes; byPrefix[name] = kept;
+    if (!row.key.startsWith(CONTENT_SETS)) { objects++; bytes += row.bytes; }
   }
   return {objects, bytes, share: bytes / budget, byPrefix};
 }
 
 export async function storeUsage(store: PackStore, budget: number): Promise<StoreUsage> { return usageOf(await store.list(''), budget); }
-
-/** PAGE-SIZE PZ2's content sets (`content/<set>/…`, page-release content.mjs). They are content-named and name no build,
- * so garbage collection never takes one; a set's own retention waits for a build-to-set record. */
-const CONTENT_SETS = 'content/';
 
 /** J83: keep what a kept build's index names, and delete the rest, indexes of other builds included.
  * PAGE-SIZE PZ5: a kept build's server book (`assets/spawn/server-<build>.json`, page-release packs.mjs) and every part it
