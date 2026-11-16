@@ -12937,5 +12937,141 @@
         "target": "test/nalati-original-species.test.ts"
       }
     ]
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-original-place-binary.test.ts",
+    "outcome": "migrated",
+    "target": "test/nalati-original-place-binary.test.ts",
+    "decision": "CI21 verified destination landing: complete original cases and assertions run in the owning blocking suite; no cases retired.",
+    "originalTests": [
+      "cold and warm originals retain every byte without a warm producer call",
+      "corrupt originals refuse without invoking a replacement producer",
+      "concurrent first readers publish only the complete original bank"
+    ],
+    "sourceRevision": "ed510f99ccd8dcd4d2dc45bd8cc5b63935d61827",
+    "sourceBlob": "0ecca6401607c661c49ebf400bc51582af2a82cf",
+    "destinationRevision": "c66fb786d17cc9aab832d194f8d9cf3fdb70a13c",
+    "retirementProof": "All source/destination/oracle/helper blobs pinned in destination test/ci21-wire-ports.json. Exact hosted CI43875441724 green; normal carried land c66fb786d1. No cases retired.",
+    "assertionDestinations": [
+      {
+        "sourcePath": "test/nalati-original-place-binary.test.ts",
+        "sourceBlob": "0ecca6401607c661c49ebf400bc51582af2a82cf",
+        "targetPath": "test/nalati-original-place-binary.test.ts",
+        "targetBlob": "38d187e2ca27641fd7f5a108b3005bef78766da8",
+        "originalTests": [
+          "cold and warm originals retain every byte without a warm producer call",
+          "corrupt originals refuse without invoking a replacement producer",
+          "concurrent first readers publish only the complete original bank"
+        ],
+        "fixturePath": "test/fixtures/nalati-place-wires.json",
+        "fixtureBlob": "78726c5d158da04249ccc95495c7d9c8af711474",
+        "observationHelper": {
+          "sourcePath": "test/fixtures/nalati-native-place-files.ts",
+          "sourceRepository": "project-wildshard/shard-nalati",
+          "sourceRevision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+          "sourceBlob": "4624d9be45fdde06ad4aa31c0c5d0b5653aaca2e",
+          "targetPath": "test/fixtures/nalati-native-place-files.ts",
+          "targetBlob": "ff87ebf608a57bcb2d980868fb3fb67888c7a6a6",
+          "changes": "Missing monorepo native-program dependency replaced with one fresh actual source build at module load, public bake-loader/native realm,14s child fence, complete8file inventory and unchanged full places/specimens pins. V8 transports exact bytes, private disk output removed in finally, caller always receives slice loans. No cache fallback, synthetic fixture or producer changes. Shared nativePlaceFile consumers pay the same cold source cost once per importing realm; no persistent source cache remains."
+        },
+        "preparationHelper": {
+          "targetPath": "test/fixtures/nalati-native-places-compile.mjs",
+          "targetBlob": "cb1704278644cb1cfb71833765f4d40499676728"
+        },
+        "compilerSupport": [
+          "test/fixtures/nalati-native-place-files.ts",
+          "test/fixtures/nalati-original-place-binary.ts"
+        ],
+        "changes": "Every original assertion/title retained. Source fixture prepares once cold per test realm and checks complete original binary pins (11,547,006places bytes +2,342,425specimens). Source construction is independent of the three original cold/warm/corrupt/concurrent cache admissions. No producer call occurs on warm or corrupt original-cache reads. Actual3cases/file4.20s; existing30s case cap retained,14s child. No original engine removal before verified destination land. J186 Ring2 fixture reason: fresh full14MB native geography/placement source at collection time, which is outside case timeout. Prior species9s hosted failure makes a9s new fence unqualified. Use the already proven14s original-source child fence; no production or existing case budget changes, no faster source cache or fallback.",
+        "cacheHelper": {
+          "targetPath": "test/fixtures/nalati-original-place-binary.ts",
+          "targetBlob": "cf147154c229ff619c2f9c6180b3b2ae8e92118d",
+          "sourceBlob": "cf147154c229ff619c2f9c6180b3b2ae8e92118d",
+          "changes": "Unchanged actual original-cache implementation. Retention now binds its exact Git blob as well as compiler admission."
+        },
+        "repository": "project-wildshard/shard-nalati",
+        "revision": "c66fb786d17cc9aab832d194f8d9cf3fdb70a13c"
+      }
+    ]
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-decorative-native.test.ts",
+    "outcome": "migrated",
+    "target": "test/nalati-decorative-native.test.ts",
+    "decision": "CI21 verified destination landing: complete original cases and assertions run in the owning blocking suite; no cases retired.",
+    "originalTests": [
+      "native ground and byte adapters retain both complete original decorative wires",
+      "separate placement calls own their nested results and reject malformed terrain"
+    ],
+    "sourceRevision": "ed510f99ccd8dcd4d2dc45bd8cc5b63935d61827",
+    "sourceBlob": "8545b3e37f31d80cf32175947bb7455b3e268023",
+    "destinationRevision": "c66fb786d17cc9aab832d194f8d9cf3fdb70a13c",
+    "retirementProof": "All source/destination/oracle/helper blobs pinned in destination test/ci21-wire-ports.json. Exact hosted CI43875441724 green; normal carried land c66fb786d1. No cases retired.",
+    "assertionDestinations": [
+      {
+        "sourcePath": "test/nalati-decorative-native.test.ts",
+        "sourceBlob": "8545b3e37f31d80cf32175947bb7455b3e268023",
+        "targetPath": "test/nalati-decorative-native.test.ts",
+        "targetBlob": "ab249680d1282faee6ea9ec6eb8baedd6d1de649",
+        "originalTests": [
+          "native ground and byte adapters retain both complete original decorative wires",
+          "separate placement calls own their nested results and reject malformed terrain"
+        ],
+        "fixturePath": "test/fixtures/nalati-decorative.json",
+        "fixtureBlob": "4a19fa3532a876b4d3a388401663090b0744e62e",
+        "changes": "Only defining owner imports rewritten: local src/generators, public SDK terrain/portableMath, format immutable, public engine scripts/bake-output.mjs. All original assertions and complete original wire pin unchanged. Direct actual source generator and terrain adapter cross-compare, full original length/hash, untouched input bytes, separate/nested result ownership, post-mutation repeat and malformed terrain refusal remain. Actual source closure now admitted to real compiler via explicit pinned @types/three0.186.0 dev dependency; no copied producer, fake type/any/ignore or new helper. Whole2case file758ms locally. No original engine removal before verified destination land.",
+        "repository": "project-wildshard/shard-nalati",
+        "revision": "c66fb786d17cc9aab832d194f8d9cf3fdb70a13c"
+      }
+    ]
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-place-runtime-source.test.ts",
+    "outcome": "migrated",
+    "target": "test/nalati-place-runtime-source.test.ts",
+    "decision": "CI21 verified destination landing: complete original cases and assertions run in the owning blocking suite; no cases retired.",
+    "originalTests": [
+      "pure runtime preparation preserves all seven complete output pins and input records",
+      "structured preparation keeps metadata and independent owned floor bytes",
+      "original asset and binary coverage refusals remain",
+      "the preparation source bundles as one config-safe chunk"
+    ],
+    "sourceRevision": "ed510f99ccd8dcd4d2dc45bd8cc5b63935d61827",
+    "sourceBlob": "b1ede5e371f8a9cfb2a11ca0a55f7e8547b13856",
+    "destinationRevision": "c66fb786d17cc9aab832d194f8d9cf3fdb70a13c",
+    "retirementProof": "All source/destination/oracle/helper blobs pinned in destination test/ci21-wire-ports.json. Exact hosted CI43875441724 green; normal carried land c66fb786d1. No cases retired.",
+    "assertionDestinations": [
+      {
+        "sourcePath": "test/nalati-place-runtime-source.test.ts",
+        "sourceBlob": "b1ede5e371f8a9cfb2a11ca0a55f7e8547b13856",
+        "targetPath": "test/nalati-place-runtime-source.test.ts",
+        "targetBlob": "c92ee7aa2d3e62f70017cb0e07a35d5a3ffcd180",
+        "originalTests": [
+          "pure runtime preparation preserves all seven complete output pins and input records",
+          "structured preparation keeps metadata and independent owned floor bytes",
+          "original asset and binary coverage refusals remain",
+          "the preparation source bundles as one config-safe chunk"
+        ],
+        "fixturePath": "test/fixtures/nalati-place-runtime-files.json",
+        "fixtureBlob": "44a10e909c74f0bdaae109cb22e555bd75c2b2a9",
+        "observationHelper": {
+          "sourceRepository": "project-wildshard/shard-nalati",
+          "sourceRevision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+          "sourcePath": "test/fixtures/nalati-runtime-wire.ts",
+          "sourceBlob": "5513d18d56e8a2b79b5bf1beee85438251b163ee",
+          "targetPath": "test/fixtures/nalati-runtime-wire.ts",
+          "targetBlob": "63d5d0e55c418064c91776d3634b5f620fd7dab6",
+          "changes": "One import rewritten from local untyped reexport shim to its defining public typed engine bake-output module; same function and full seven-output envelope. All other bytes unchanged from approved020c7a7. Engine original currently imports a missing lifted helper; no runnable current engine baseline claimed."
+        },
+        "changes": "All four original cases/assertions and seven exact full output pins retained. Owner imports, physical source input/bundle paths relocated. Historical publication prefix remains in inventory keys and pinned fixture JSON; no hash/path key normalized. Both original full floor binary loans retained byte for byte, complete shapeBook and input immutability, independent mutation/rebuild, original refusal checks and actual single config-safe chunk remain.",
+        "fixtureSourceRepository": "project-wildshard/shard-nalati",
+        "fixtureSourceRevision": "3ce897a77e401bf2dd5c3f74bc6a84dc7eb67872",
+        "repository": "project-wildshard/shard-nalati",
+        "revision": "c66fb786d17cc9aab832d194f8d9cf3fdb70a13c"
+      }
+    ]
   }
 ]
