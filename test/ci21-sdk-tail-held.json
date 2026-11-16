@@ -6,9 +6,9 @@
   "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
   "destinationManifest": {
     "repository": "project-wildshard/sharddev",
-    "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+    "revision": "808a021010bb28bf689688bc1d14468da00b847b",
     "path": "test/ci21-sdk-tail.json",
-    "blob": "1f9bd0d790721af73d351576bcd53df56c8d1a90"
+    "blob": "18d65df74632902687c6fce650d72e0cf9b99cb9"
   },
   "sources": [
     {
@@ -23,7 +23,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/defined-sections.test.ts",
         "targetBlob": "0d9ed35506b7a9af38e1e560cd849b73047b7741",
         "tests": [
@@ -48,7 +48,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/named-json-admission.test.ts",
         "targetBlob": "c025464cdf3975da68991a70821698f28039c1af",
         "tests": [
@@ -76,7 +76,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/registered-json.test.ts",
         "targetBlob": "354e71e3098726fdaf86bb8107b14f656fdc30bd",
         "tests": [
@@ -103,7 +103,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/world-assembly-schema.test.ts",
         "targetBlob": "bbdb30a71b5945406516853a64f4383f04846589",
         "tests": [
@@ -125,7 +125,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/carried-terrain-ports.test.ts",
         "targetBlob": "52f29401f1cc134e61197f95056e0682a932f12b",
         "tests": [
@@ -151,7 +151,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/output-runtime.test.ts",
         "targetBlob": "0fde9f3ab5bab203cfe19d0bc68ac1e957697169",
         "tests": [
@@ -176,7 +176,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "src/sharddev/bake/script-v2-radial.test.ts",
         "targetBlob": "ea3063772987cd827db07375b69bac8e2c454478",
         "tests": [
@@ -197,7 +197,7 @@
       "originalStillPending": false,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/schema-code-memory.test.ts",
         "targetBlob": "7e2f7bea9448f94df6260c40a4c9ec90d7a40b2e",
         "tests": [
@@ -236,7 +236,7 @@
       "originalStillPending": false,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/world-scene-graph-pages.test.ts",
         "targetBlob": "8deb39a2d436749ac349a0380f6aad0c9a45e5d2",
         "tests": [
@@ -273,7 +273,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/return-projection-inventory.test.ts",
         "targetBlob": "98c4c6cfa5aee9737b6265a09e903f84168b554a",
         "tests": [
@@ -300,7 +300,7 @@
       "originalStillPending": false,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/return-program-group-v2.test.ts",
         "targetBlob": "111f64f3634fe450d96b9c14eaaf0434ab93fb95",
         "tests": [
@@ -344,7 +344,7 @@
       "originalStillPending": false,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/tile-bakes.test.ts",
         "targetBlob": "a3937af6551e9e3c491d979fa38b67cb1486bed1",
         "tests": [
@@ -370,7 +370,8 @@
           "targetBlob": "3a596044c98528a2a7f3c37e5c1f5569a729ff7b"
         }
       ],
-      "shardCompanions": []
+      "shardCompanions": [],
+      "caseSplit": true
     },
     {
       "sourcePath": "test/species-barrel-author-ports.test.ts",
@@ -383,7 +384,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/species-barrel-author-ports.test.ts",
         "targetBlob": "d898960a2aa7b9c8b53841cc91e38f71db0b3b3b",
         "tests": [
@@ -444,7 +445,7 @@
       "originalStillPending": true,
       "sdkDestination": {
         "repository": "project-wildshard/sharddev",
-        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
         "targetPath": "test/view-author-metadata.test.ts",
         "targetBlob": "788be41fba3c836b5e6ea5ab8fad44e1848b76fd",
         "tests": [
@@ -493,6 +494,180 @@
         "fixtureSourcePath": "test/fixtures/view-author-original.json",
         "fixtureBlob": "723fd5778f4428b752956b6fe12be0b77cd3ffd0"
       }
+    },
+    {
+      "sourcePath": "test/nalati-field-author-ports.test.ts",
+      "sourceBlob": "b5c5e58bfb85e8b232102843819f853700acea16",
+      "originalTests": [
+        "native field and planting metadata retain complete signatures, mandatory dimensions and identity",
+        "all twenty original spruce geometries retain every channel bit, group and bound"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "targetPath": "test/terrain-field-author-port.test.ts",
+        "targetBlob": "85ec5ba9e392465170eafdefca3392d99566d6ad",
+        "tests": [
+          "native field and planting metadata retain complete signatures, mandatory dimensions and identity"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": [
+        {
+          "repository": "project-wildshard/shard-nalati",
+          "targetPath": "test/nalati-field-author-ports.test.ts",
+          "branch": "plan/ci21sdk-tail",
+          "revision": "e977329c400f733200de4f8083b823d6a6edad23",
+          "targetBlob": "79cc35d19ac69d154e911d4df92c6b7707064a13",
+          "originalTests": [
+            "all twenty original spruce geometries retain every channel bit, group and bound"
+          ],
+          "scope": "Full original twenty-spruce geometry/channel/index/group/bound golden, exact original fixture/helper and disposal; default suite/compiler/typed lint/retention admission."
+        }
+      ],
+      "caseSplit": true
+    },
+    {
+      "sourcePath": "test/scripts/_template-boss.test.ts",
+      "sourceBlob": "0d2bc0982bc672b6579698e64310b6e2da70f55c",
+      "originalTests": [
+        "Template boss runs published Wasm decisions and resumes a logical save"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "808a021010bb28bf689688bc1d14468da00b847b",
+        "targetPath": "test/scripts/_template-boss.test.ts",
+        "targetBlob": "9f5607d9cdde62042ed06168aa1c7c880a06c750",
+        "tests": [
+          "Template boss runs published Wasm decisions and resumes a logical save"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": [],
+      "authorization": {
+        "by": "Jake",
+        "date": "2026-11-16",
+        "words": "Test today’s Warden (Recommended)",
+        "scope": "CI21 Template boss current-product oracle update"
+      },
+      "legacyExpectationsReplaced": [
+        "approach/bump and1s/0.5s beats: replaced by current slam/sweep/stone and1.6s/0.9s guard-window cadence",
+        "silent repeat start and stop-reset-to-phase0: replaced by current health-derived rearm/retry and retained authored phase/beat state",
+        "restart after death: replaced by terminal phase3 refusal to restart, as current source requires"
+      ]
+    },
+    {
+      "sourcePath": "test/nalati-loft-author.test.ts",
+      "sourceBlob": "eb86b560e89c2e0498b7213457c4b8ebbeec9ec9",
+      "originalTests": [
+        "the owned loft compiler retains every original ambient channel, bound and topology bit"
+      ],
+      "originalStillPending": true,
+      "nativeCompanions": [],
+      "shardCompanions": [
+        {
+          "repository": "project-wildshard/shard-nalati",
+          "revision": "2dc30cc0aea8e07f5e3d69307e0ec6dede9a5233",
+          "targetPath": "test/nalati-loft-author.test.ts",
+          "originalTests": [
+            "the owned loft compiler retains every original ambient channel, bound and topology bit"
+          ],
+          "fixturePath": "test/fixtures/nalati-ambient-original.json",
+          "fixtureBlob": "4de13fb18556107c236d01eb8614076da5da560a",
+          "observationHelper": {
+            "sourcePath": "test/fixtures/nalati-ambient-observation.ts",
+            "sourceBlob": "8e6f7ca0bf50765eb0ce59ce1642bee9124e0bfe",
+            "targetPath": "test/fixtures/nalati-ambient-observation.ts",
+            "changes": "Only owner imports rewritten; original observation/byte/hash/bound/topology/disposal logic unchanged. Actual module runner executes offline author code without a simulation-closure claim.",
+            "targetBlob": "190f8de06f5659bbebf346acc81687a2c2b6ed1b"
+          },
+          "targetBlob": "82fbd4bee7cce7a823070038d9e14b2aa2c939e4",
+          "changes": "Original complete toEqual(original) assertion; actual helper executes through the normal module runner or native V8 process boundary. Test compiler/lint checks the boundary; legacy producer/helper closure stays row36/H4. New cap10s replaces original engine default30s; geometry child cap9s. No oracle or result field normalized."
+        }
+      ]
+    },
+    {
+      "sourcePath": "test/nalati-geometry-cache-ports.test.ts",
+      "sourceBlob": "4adac6a1b4d4cc8dd94addc59298018d4252d90f",
+      "originalTests": [
+        "granite and ordinary/scrambled blobs retain all original geometry bits and stream state"
+      ],
+      "originalStillPending": true,
+      "nativeCompanions": [],
+      "shardCompanions": [
+        {
+          "repository": "project-wildshard/shard-nalati",
+          "revision": "2dc30cc0aea8e07f5e3d69307e0ec6dede9a5233",
+          "targetPath": "test/nalati-geometry-cache-ports.test.ts",
+          "originalTests": [
+            "granite and ordinary/scrambled blobs retain all original geometry bits and stream state"
+          ],
+          "fixturePath": "test/fixtures/geometry-cache-author-original.json",
+          "fixtureBlob": "091fea54db11679ebdc852c0a241033bca4fc752",
+          "observationHelper": {
+            "sourcePath": "test/fixtures/geometry-cache-author-observation.ts",
+            "sourceBlob": "701c2b37b486ef87ce8f2396400511457b7ca457",
+            "targetPath": "test/fixtures/geometry-cache-author-observation.ts",
+            "changes": "Only owner imports rewritten. Original observation/byte/hash/bound/topology/stream/disposal logic unchanged; native V8 transport preserves signed zero and typed arrays.",
+            "targetBlob": "73419896a3b706aba683b2a36f07d5ff3883bf8f"
+          },
+          "targetBlob": "a50234ba9a9eecd72d68062901833df7b088164c",
+          "changes": "Original complete toEqual(original) assertion; actual helper executes through the normal module runner or native V8 process boundary. Test compiler/lint checks the boundary; legacy producer/helper closure stays row36/H4. New cap10s replaces original engine default30s; geometry child cap9s. No oracle or result field normalized."
+        }
+      ]
+    },
+    {
+      "sourcePath": "test/nalati-original-species.test.ts",
+      "sourceBlob": "eff8a3c90a44c586236a903dbe2ac4f70e64cc7d",
+      "originalTests": [
+        "cold source oracle and every detached warm loan retain all five complete original files",
+        "individual original file loans are detached and unknown names refuse"
+      ],
+      "originalStillPending": true,
+      "nativeCompanions": [],
+      "shardCompanions": [
+        {
+          "repository": "project-wildshard/shard-nalati",
+          "revision": "2dc30cc0aea8e07f5e3d69307e0ec6dede9a5233",
+          "targetPath": "test/nalati-original-species.test.ts",
+          "targetBlob": "3b4d2157d0d840416dbdbd21186942a351b02a04",
+          "originalTests": [
+            "cold source oracle and every detached warm loan retain all five complete original files",
+            "individual original file loans are detached and unknown names refuse"
+          ],
+          "fixturePath": "test/fixtures/nalati-species-files.json",
+          "fixtureBlob": "17924d4f6b5bb91a750ddd69699b1745dffa61a0",
+          "fixtureSourceRepository": "project-wildshard/shard-nalati",
+          "fixtureSourceRevision": "aa2a7d1153588897c87d4bad724f6f47e6909972",
+          "observationHelper": {
+            "sourcePath": "test/fixtures/nalati-original-species.ts",
+            "sourceRepository": "project-wildshard/shard-nalati",
+            "sourceRevision": "aa2a7d1153588897c87d4bad724f6f47e6909972",
+            "sourceBlob": "a37da4cc06128e9815126edfc9ea51a70f5067a6",
+            "targetPath": "test/fixtures/nalati-original-species.ts",
+            "targetBlob": "6e0df649e0107ecb9fd3b041566394e17cbb63b4",
+            "changes": "Public installed bake-loader and9s caps; optional private directory memoizes one full checked map per absolute root. Both default/private paths use the same bytes.slice loan. Caller explicitly releases private memo and disk root afterAll. No fallback or pin changes."
+          },
+          "preparationHelper": {
+            "targetPath": "test/fixtures/prepare-nalati-original-species.ts",
+            "targetBlob": "78ade7c29e8a0081d7333e46ea7bdb112b80fb96"
+          },
+          "changes": "Every original assertion retained in Happy DOM20.14.5. Cold source cache and loan source cache are independently constructed. Both tests loan from one memoized private map; removing slice fails case2. Cold cache cleans in finally, shared loan cache/memo clean afterAll. Caps10s/child9s, original30s. Existing Ring2 only.",
+          "compilerSupport": [
+            "test/fixtures/nalati-original-species.ts"
+          ]
+        }
+      ]
+    }
+  ],
+  "additionalDestinationManifests": [
+    {
+      "repository": "project-wildshard/shard-nalati",
+      "revision": "2dc30cc0aea8e07f5e3d69307e0ec6dede9a5233",
+      "path": "test/ci21-wire-ports.json",
+      "blob": "28506d60dbb7c8fa0a6111498126110c033741e5"
     }
   ]
 }
