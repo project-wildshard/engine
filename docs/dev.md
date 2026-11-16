@@ -474,3 +474,25 @@ solids and a pageless fresh world. It covers neither near-solid streaming
 nor progress seeded from a prior page. TC33 needs the hosted artifact to
 say WebKit, completeRing/ok true, dirty false, eight products and a real
 browser version/user agent; the Chromium control cannot close it.
+
+## Earned declared journeys (TC7)
+
+Run `node scripts/pins.ts install template`, then
+`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types
+--test test/ci/declared-journeys.proof.mjs` as one command.
+CI invokes it explicitly; hooks and Vitest discovery do not add it.
+The pinned Template walks the hut door, kills the blob and earns its quest.
+The frozen format hall rejects remote USE, physically blocks its shut
+door, opens to nearby USE, earns its quest and takes guardian damage.
+Both fresh restores repeat a real suffix with the same full simulation snapshot, persisted player documents
+and completed-tick effects. Real ledger filings grant five coins and one
+quest receipt; replaying the actual fact after restore grants nothing.
+Each complete case has a 9.5-second timeout and elapsed assertion. The
+whole two-case process measured about one second locally. Every world
+retires and removes its temporary player document; no socket, browser
+or cook runs.
+The hall's combat witness is guardian contact damage; it has no weapon.
+The restored suffix is 60 idle ticks after earning, not re-earning from
+an earlier checkpoint. Coin-effect replay deduplication belongs to the
+room LedgerBook/bootId path and is outside these fact-receipt assertions.
+Dunes' complete story and the per-slice host-wake bar remain separate.
