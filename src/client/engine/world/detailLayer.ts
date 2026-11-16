@@ -7,13 +7,34 @@
  *   game.onUpdate(() => layer.update(camera.position));
  *
  * The material is the layer's look material; it is cloned with its shader patches, so the ring's fade and sway patch never
- * reach the shard's other draws.
+ * reach the shard's other draws. With a `trample` field (meta SHARD-SOURCE SS7: the engine's `systems/looks/trample.ts`, its
+ * live movers and recovering trample map) each card lies over away from a mover, after the sway, and springs back as the
+ * map recovers.
  */
 import * as THREE from 'three';
 import { DetailRing, RING_CELL, detailField, ringShape, type DetailLayerFiles, type DetailLayerSource } from './detailRing';
 import { patchWindField } from './wind';
 import { windUniforms } from './TreeFactory';
 import { PATCH_ORDER, copyShaderPatches, patchShader } from '../render/shaderPatches';
+
+/** A trample field a layer bends on: its uniforms (shared, so the field's updates reach the layer) and GLSL that defines
+ * `vec2 trampleBend(vec2 xz)` over them (Grass.ts's `GrassTrampleField`, without the field's own methods). */
+export interface DetailTrample { readonly uniforms: Readonly<Record<string, THREE.IUniform>>; readonly glsl: string }
+
+/** SS7: the card lies over by the bend's angle (at most 1.35 rad) the way it points, its top dropping as it goes (Grass.ts's
+ * TRAMPLE_APPLY), in the patch's block where `im` and `ipos` are in scope. */
+const TRAMPLE_BEND = /* glsl */`
+          {
+            vec2 tb = trampleBend( ipos.xz );
+            float tl = length( tb );
+            if ( tl > 1e-3 ) {
+              float ts2 = max( dot( im[0], im[0] ), 1e-6 );
+              float ta = min( tl, 1.35 );
+              vec2 td = tb / tl;
+              vec3 tw = vec3( td.x * sin( ta ), cos( ta ) - 1.0, td.y * sin( ta ) ) * transformed.y * sqrt( ts2 );
+              transformed += ( tw * im ) / ts2;
+            }
+          }`;
 
 /** Cells a frame may reseed once the ring is full (Grass.ts's budget). */
 const CELL_BUDGET = 6;
@@ -42,7 +63,7 @@ export function ringFade(radius: number): number { return Math.min(RING_CELL * 1
 /** The layer's own vertex patch: the edge fade always, and with `sway` the card's top (uv.y) leans downwind by `amount`,
  * pulsing at `rate` cycles a second on the shared wind field. The wind field's GLSL goes in only when no earlier patch on
  * the look material put it there, so a wind-patched look still compiles. */
-function ringMaterial(material: THREE.Material, radius: number, sway: DetailLayerSource['sway']): void {
+function ringMaterial(material: THREE.Material, radius: number, sway: DetailLayerSource['sway'], trample: DetailTrample | undefined): void {
   patchShader(material, 'engine.detail-ring', PATCH_ORDER.decorate, (shader) => {
     shader.uniforms['uDetailRadius'] = { value: radius };
     shader.uniforms['uDetailFade'] = { value: ringFade(radius) };
@@ -64,6 +85,11 @@ function ringMaterial(material: THREE.Material, radius: number, sway: DetailLaye
           off.y = - length( off.xz ) * 0.3;
           transformed += ( off * im ) / s2 * sqrt( s2 );`;
     }
+    if (trample !== undefined) {
+      declare += trample.glsl;
+      Object.assign(shader.uniforms, trample.uniforms);
+      bend += TRAMPLE_BEND;
+    }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n        ${declare}`)
       .replace('#include <begin_vertex>', /* glsl */`#include <begin_vertex>
@@ -73,7 +99,7 @@ function ringMaterial(material: THREE.Material, radius: number, sway: DetailLaye
           float ringDist = distance( ipos.xz, cameraPosition.xz );
           transformed *= 1.0 - smoothstep( uDetailRadius - uDetailFade, uDetailRadius, ringDist );
         }`);
-  }, { key: sway === undefined ? 'detail-ring' : 'detail-ring-sway' });
+  }, { key: `detail-ring${sway === undefined ? '' : '-sway'}${trample === undefined ? '' : '-trample'}` });
 }
 
 /** One detail layer: an InstancedMesh fed by a camera ring. */
@@ -84,12 +110,12 @@ export class DetailLayer {
   private readonly colourAttribute: THREE.InstancedBufferAttribute;
   private filled = false;
 
-  constructor(source: DetailLayerSource, files: DetailLayerFiles, material: THREE.Material, options: { phone: boolean }) {
+  constructor(source: DetailLayerSource, files: DetailLayerFiles, material: THREE.Material, options: { phone: boolean; trample?: DetailTrample }) {
     const field = detailField(source, files);
     this.ring = new DetailRing(field, ringShape(field, source.radius, options.phone));
     const look = material.clone();
     copyShaderPatches(material, look);
-    ringMaterial(look, this.ring.shape.radius, source.sway);
+    ringMaterial(look, this.ring.shape.radius, source.sway, options.trample);
     const count = this.ring.matrices.length / 16;
     this.mesh = new THREE.InstancedMesh(detailGeometry(source.mesh, files.mesh), look, count);
     this.matrixAttribute = new THREE.InstancedBufferAttribute(this.ring.matrices, 16);

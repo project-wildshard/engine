@@ -132,3 +132,27 @@ test("the layer's material keeps the look's patches, declares the wind once and 
   expect(shader.uniforms['uDetailFade']?.value).toBe(ringFade(layer.ring.shape.radius));
   layer.dispose();
 });
+
+// Meta SHARD-SOURCE SS7: a layer on a trample field lies its cards over away from a mover, on the field's own uniforms
+test("a layer on a trample field compiles the bend over the field's own uniforms; one without it does not", () => {
+  const field = { uniforms: { uMovers: { value: [new THREE.Vector4(1, 2, 0.5, 1)] }, uMoverCount: { value: 1 } },
+    glsl: '\nuniform vec4 uMovers[16];\nuniform int uMoverCount;\nvec2 trampleBend( vec2 p ) { return vec2( 0.0 ); }\n' };
+  const compile = (layer: DetailLayer): { shader: { uniforms: Record<string, THREE.IUniform>; vertexShader: string }; key: string } => {
+    const look = layer.mesh.material as THREE.Material;
+    const shader = { uniforms: {} as Record<string, THREE.IUniform>, vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader };
+    look.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, undefined as unknown as THREE.WebGLRenderer);
+    return { shader, key: look.customProgramCacheKey() };
+  };
+  const bent = new DetailLayer(meadow({ sway: { amount: 0.3, rate: 0.8 } }), meadowFiles(), new THREE.MeshStandardMaterial(), { phone: false, trample: field });
+  const plain = new DetailLayer(meadow({ sway: { amount: 0.3, rate: 0.8 } }), meadowFiles(), new THREE.MeshStandardMaterial(), { phone: false });
+  const a = compile(bent), b = compile(plain);
+  expect(a.shader.vertexShader).toContain('vec2 tb = trampleBend( ipos.xz );');
+  expect(a.shader.vertexShader).toContain('vec2 trampleBend( vec2 p )');
+  // after the sway, before the ring's fade
+  expect(a.shader.vertexShader.indexOf('trampleBend( ipos.xz )')).toBeGreaterThan(a.shader.vertexShader.indexOf('windDirXZ()'));
+  expect(a.shader.vertexShader.indexOf('trampleBend( ipos.xz )')).toBeLessThan(a.shader.vertexShader.indexOf('float ringDist'));
+  expect(a.shader.uniforms['uMovers']).toBe(field.uniforms.uMovers);
+  expect(b.shader.vertexShader).not.toContain('trampleBend');
+  expect(a.key).not.toBe(b.key);
+  bent.dispose(); plain.dispose();
+});
