@@ -3,16 +3,16 @@ name: server-release
 on:
   workflow_run:
     workflows: [ci]
-    branches: [main]
+    branches: ['release/**']
     types: [completed]
   push:
-    tags: ['v[0-9]*']
-  # Staging alignment: sign a named green main build whose packs are already on R2. Forward only (J234): the
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  # Staging alignment: sign a named green release-branch build whose packs are already on R2. Forward only (J234): the
   # build must descend from the one staging names. This is how a held build goes live once its packs land.
   workflow_dispatch:
     inputs:
       build:
-        description: Full 40-character green main SHA whose server book and parts are published
+        description: Full 40-character green release-branch SHA whose server book and parts are published
         type: string
         required: true
 
@@ -60,7 +60,7 @@ jobs:
             pnpm-workspace.yaml
       - uses: ./.github/actions/org-deps
       - run: pnpm install --frozen-lockfile --config.ci=false
-      - name: Admit exact green main source
+      - name: Admit exact green release source
         id: source
         env:
           GH_TOKEN: ${{ github.token }}
@@ -134,7 +134,7 @@ jobs:
         run: >-
           node scripts/server-release/publish.mjs --check
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
-          --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" $ALIGN_FLAG
+          --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" ${ALIGN_FLAG:+"$ALIGN_FLAG"}
       - name: Upload immutable bundle to its tag release
         working-directory: source
         env:
@@ -156,7 +156,7 @@ jobs:
         run: >-
           node scripts/server-release/publish.mjs
           --channel "$RELEASE_CHANNEL" --build "$SOURCE_SHA" --tag "$RELEASE_TAG"
-          --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" $ALIGN_FLAG
+          --bundle "$RUNNER_TEMP/engine-server-$SOURCE_SHA.tar.gz" --out "$RUNNER_TEMP/release.json" ${ALIGN_FLAG:+"$ALIGN_FLAG"}
 
   # HOW-WE-BUILD ENG-16 (SHARD-AUTHORING SA15, J314): the devserver client an installed `wildshard dev` serves, on the same
   # release as the dedicated bundle (`server-staging-<sha>` or `vX.Y.Z`), so sharddev fetches it at its engine pin

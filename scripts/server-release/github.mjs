@@ -1,4 +1,4 @@
-// Privileged workflow entry: only trusted main-push CI and main-history version tags.
+// Privileged workflow entry: release-branch CI and reachable version tags only.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -8,7 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import * as v from 'valibot';
 import { COMMIT } from './sign.mjs';
 
-const REPOSITORY = 'project-wildshard/engine', VERSION = /^v\d+\.\d+\.\d+$/u;
+const REPOSITORY = 'project-wildshard/engine', VERSION = /^v\d+\.\d+\.\d+$/u, RELEASE_BRANCH = /^release\/v\d+\.\d+\.\d+$/u;
 const Run = v.object({ id: v.number(), head_sha: v.string(), head_branch: v.nullable(v.string()), event: v.string(), status: v.string(), conclusion: v.nullable(v.string()) });
 const Release = v.object({ id: v.number(), upload_url: v.string(), assets: v.array(v.object({ name: v.string(), browser_download_url: v.string() })) });
 class GitHubError extends Error {
@@ -27,7 +27,7 @@ async function api(path, options = {}) {
 /** @param {string[]} args @returns {string} */
 const git = args => execFileSync('git', args, { encoding: 'utf8' }).trim();
 
-/** No fork or PR event is allowed to reach a signing job. @returns {{sha: string, channel: string, tag: string, align?: true} | null} */
+/** No fork or PR event is allowed to reach a signing job. @returns {{sha: string, channel: string, tag: string, branches: string[], align?: true} | null} */
 function candidate() {
   if (process.env.GITHUB_REPOSITORY !== REPOSITORY) return null;
   const eventName = process.env.GITHUB_EVENT_NAME;
@@ -36,53 +36,69 @@ function candidate() {
     const sha = process.env.ALIGN_BUILD ?? '';
     if (process.env.GITHUB_REF !== 'refs/heads/main') throw new Error('Staging alignment runs from main only');
     if (!COMMIT.test(sha)) throw new Error('Staging alignment needs a full 40-character build SHA');
-    return { sha, channel: 'staging', tag: `server-staging-${sha}`, align: true };
+    const branches = git(['for-each-ref', '--format=%(refname:short)', '--contains', sha, 'refs/remotes/origin/release/']).split('\n')
+      .map(ref => ref.replace(/^origin\//u, '')).filter(ref => RELEASE_BRANCH.test(ref));
+    if (branches.length === 0) throw new Error('Staging alignment needs a published release-branch build');
+    return { sha, channel: 'staging', tag: `server-staging-${sha}`, branches, align: true };
   }
   if (eventName === 'workflow_run') {
     const event = v.parse(v.object({ workflow_run: v.object({ ...Run.entries, head_repository: v.object({ full_name: v.string() }) }) }), JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH ?? '', 'utf8'))).workflow_run;
-    if (event.event !== 'push' || event.head_branch !== 'main' || event.head_repository.full_name !== REPOSITORY || event.conclusion !== 'success') return null;
+    if (event.event !== 'push' || !RELEASE_BRANCH.test(event.head_branch ?? '') || event.head_repository.full_name !== REPOSITORY || event.conclusion !== 'success') return null;
     if (!COMMIT.test(event.head_sha)) throw new Error('Invalid green source SHA');
-    return { sha: event.head_sha, channel: 'staging', tag: `server-staging-${event.head_sha}` };
+    return { sha: event.head_sha, channel: 'staging', tag: `server-staging-${event.head_sha}`, branches: [event.head_branch ?? ''] };
   }
   if (eventName === 'push') {
     const tag = process.env.GITHUB_REF_NAME ?? '';
     if (process.env.GITHUB_REF_TYPE !== 'tag' || !VERSION.test(tag)) return null;
     const sha = git(['rev-parse', '--verify', `refs/tags/${tag}^{commit}`]);
     if (!COMMIT.test(sha)) throw new Error('Invalid tagged source SHA');
-    return { sha, channel: 'production', tag };
+    return { sha, channel: 'production', tag, branches: [`release/${tag}`, 'main'] };
   }
   return null;
 }
 
-/** Exact-SHA success of both normal push workflows; a PR result cannot stand in.
- * @param {string} sha @returns {Promise<'green' | 'pending' | 'red'>} */
-async function checks(sha) {
-  let pending = false;
-  for (const workflow of ['ci.yml']) {
-    const value = await api(`actions/workflows/${workflow}/runs?head_sha=${sha}&event=push&branch=main&per_page=100`);
-    const rows = v.parse(v.object({ workflow_runs: v.array(Run) }), value).workflow_runs
-      .filter(run => run.head_sha === sha && run.head_branch === 'main' && run.event === 'push').sort((a, b) => b.id - a.id);
-    const run = rows[0];
-    if (run === undefined || run.status !== 'completed') pending = true;
-    else if (run.conclusion !== 'success') return 'red';
-  }
-  return pending ? 'pending' : 'green';
+/** Whether this published ref contains the source. Missing release refs are expected after merge-back.
+ * @param {string} sha @param {string} branch */
+function reachable(sha, branch) {
+  try { git(['merge-base', '--is-ancestor', sha, `refs/remotes/origin/${branch}`]); return true; }
+  catch { return false; }
+}
+
+/** Exact-SHA push CI on an admitted branch; PRs and plan branches cannot authorize a release.
+ * @param {string} sha @param {string[]} branches @returns {Promise<'green' | 'pending' | 'red'>} */
+async function checks(sha, branches) {
+  const value = await api(`actions/workflows/ci.yml/runs?head_sha=${sha}&event=push&per_page=100`);
+  const rows = v.parse(v.object({ workflow_runs: v.array(Run) }), value).workflow_runs
+    .filter(run => run.head_sha === sha && branches.includes(run.head_branch ?? '') && run.event === 'push').sort((a, b) => b.id - a.id);
+  const latest = branches.flatMap(branch => { const row = rows.find(run => run.head_branch === branch); return row === undefined ? [] : [row]; });
+  if (latest.some(run => run.status === 'completed' && run.conclusion === 'success')) return 'green';
+  if (latest.length === 0 || latest.some(run => run.status !== 'completed')) return 'pending';
+  return 'red';
 }
 
 /** @returns {Promise<void>} */
 async function select() {
   const source = candidate(); if (source === null) return;
-  git(['merge-base', '--is-ancestor', source.sha, 'origin/main']);
+  if (source.channel === 'staging' && !source.branches.some(branch => {
+    try { return git(['rev-parse', '--verify', `refs/remotes/origin/${branch}^{commit}`]) === source.sha; } catch { return false; }
+  })) {
+    if (source.align === true) throw new Error('Staging alignment needs the current release-branch head');
+    return; // A delayed CI event must not publish an older release-branch head.
+  }
+  const published = source.branches.some(branch => reachable(source.sha, branch));
+  if (!published) throw new Error('Release source is unreachable from its published release branch or main');
+  // A completed release keeps its exact-SHA branch proof after merge-back deletes the branch.
+  const proofBranches = source.channel === 'production' ? source.branches : source.branches.filter(branch => reachable(source.sha, branch));
   // A late workflow_run from before this producer existed is not a release candidate.
   if (execFileSync('git', ['ls-tree', '--name-only', source.sha, 'scripts/server-release/publish.mjs'], { encoding: 'utf8' }).trim() === '') return;
   const deadline = Date.now() + 40 * 60_000;
   for (;;) {
-    const state = await checks(source.sha);
+    const state = await checks(source.sha, proofBranches);
     if (state === 'green') break;
-    if (source.align === true) throw new Error(`Build ${source.sha} is not green on main CI and Ring 1`);
-    if (state === 'red') { if (source.channel === 'staging') return; throw new Error('Tagged commit has a failed main CI workflow'); }
+    if (source.align === true) throw new Error(`Build ${source.sha} is not green on release-branch CI and Ring 1`);
+    if (state === 'red') { if (source.channel === 'staging') return; throw new Error('Tagged commit has a failed release CI workflow'); }
     if (source.channel === 'staging') return; // The other workflow's completion will trigger again.
-    if (Date.now() >= deadline) throw new Error('Timed out waiting for tagged main CI');
+    if (Date.now() >= deadline) throw new Error('Timed out waiting for tagged release CI');
     await sleep(20_000);
   }
   const output = process.env.GITHUB_OUTPUT; if (output === undefined) throw new Error('Missing GITHUB_OUTPUT');
@@ -102,7 +118,9 @@ async function verifyReleaseTag(tag, sha) {
 async function asset(tag, sha, archive, channel) {
   if (!COMMIT.test(sha) || !(VERSION.test(tag) && channel === 'production' || tag === `server-staging-${sha}` && channel === 'staging')) throw new Error('Invalid server release tag');
   if (git(['rev-parse', 'HEAD']) !== sha) throw new Error('Bundle checkout differs from release source');
-  git(['merge-base', '--is-ancestor', sha, 'origin/main']);
+  const releaseBranches = channel === 'production' ? [`release/${tag}`] : git(['for-each-ref', '--format=%(refname:short)', '--contains', sha, 'refs/remotes/origin/release/']).split('\n').map(ref => ref.replace(/^origin\//u, '')).filter(ref => RELEASE_BRANCH.test(ref));
+  if ((channel === 'production' ? [...releaseBranches, 'main'] : releaseBranches).every(branch => !reachable(sha, branch))) throw new Error('Server asset source is unreachable from release history');
+  if (channel === 'staging' && !releaseBranches.some(branch => git(['rev-parse', `refs/remotes/origin/${branch}^{commit}`]) === sha)) throw new Error('Staging asset must name the current release-branch head');
   /** @type {v.InferOutput<typeof Release>} */
   let release;
   try { release = v.parse(Release, await api(`releases/tags/${encodeURIComponent(tag)}`)); }

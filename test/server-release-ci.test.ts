@@ -234,6 +234,7 @@ test('production release creation needs only the already-pushed tag and cannot c
   try {
     const build = repo.commit({ 'entry.txt': 'published source' }, 'Tagged source');
     repo.git(['update-ref', 'refs/remotes/origin/main', build]);
+    repo.git(['update-ref', 'refs/remotes/origin/release/v1.2.3', build]);
     const archive = join(repo.dir, `engine-server-${build}.tar.gz`), transport = join(repo.dir, 'github-fixture.mjs');
     writeFileSync(archive, 'immutable bundle');
     writeFileSync(transport, `
@@ -295,5 +296,56 @@ globalThis.fetch = async (input, request = {}) => {
         expect(JSON.parse(result.stdout)).toMatchObject({ tag, asset: `engine-server-${build}.tar.gz` });
       }
     }
+  } finally { repo.cleanup(); }
+});
+
+test('release refs admit staged and tagged sources while main, dry runs and unreachable tags cannot ship', () => {
+  const repo = createTempRepo();
+  try {
+    const base = repo.commit({ 'base.txt': 'main source' }, 'Base source');
+    const sha = repo.commit({ 'scripts/server-release/publish.mjs': '// publisher exists' }, 'Release source');
+    repo.git(['tag', 'v1.2.3', sha]);
+    const later = repo.commit({ 'later.txt': 'newer release head' }, 'Later release source');
+    const eventPath = join(repo.dir, 'event.json'), output = join(repo.dir, 'outputs'), transport = join(repo.dir, 'transport.mjs');
+    writeFileSync(transport, `
+import assert from 'node:assert/strict';
+globalThis.fetch = async (input) => {
+  const url = new URL(input);
+  assert.equal(url.hostname, 'api.github.com');
+  assert.equal(url.searchParams.get('head_sha'), process.env.FIXTURE_SHA);
+  assert.equal(url.searchParams.get('event'), 'push');
+  return Response.json({ workflow_runs: [{ id: 1, head_sha: process.env.FIXTURE_SHA, head_branch: 'release/v1.2.3', event: 'push', status: 'completed', conclusion: 'success' }] });
+};
+`);
+    const run = (mode: string): { status: number | null; stderr: string; output: string } => {
+      repo.git(['update-ref', 'refs/remotes/origin/main', mode === 'merged' ? sha : base]);
+      repo.git(['update-ref', '-d', 'refs/remotes/origin/release/v1.2.3']);
+      if (!['merged', 'unreachable'].includes(mode)) repo.git(['update-ref', 'refs/remotes/origin/release/v1.2.3', sha]);
+      if (mode === 'stale') repo.git(['update-ref', 'refs/remotes/origin/release/v1.2.3', later]);
+      const eventName = ['tag', 'merged', 'unreachable'].includes(mode) ? 'push' : mode === 'align' ? 'workflow_dispatch' : 'workflow_run';
+      const branch = mode === 'main' ? 'main' : mode === 'dryrun' ? 'release/dryrun-v1.2.3' : 'release/v1.2.3';
+      writeFileSync(eventPath, JSON.stringify({ workflow_run: { id: 1, head_sha: sha, head_branch: branch, event: 'push', status: 'completed', conclusion: 'success', head_repository: { full_name: 'project-wildshard/engine' } } }));
+      writeFileSync(output, '');
+      const result = spawnSync(process.execPath, ['--import', transport, resolve(import.meta.dirname, '../scripts/server-release/github.mjs'), 'select'], { cwd: repo.dir, encoding: 'utf8', timeout: 5000,
+        env: { PATH: process.env['PATH'], GH_TOKEN: 'fixture', FIXTURE_SHA: sha, GITHUB_REPOSITORY: 'project-wildshard/engine', GITHUB_EVENT_NAME: eventName,
+          GITHUB_REF: 'refs/heads/main', GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v1.2.3', GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: output, ALIGN_BUILD: sha } });
+      expect(result.error).toBeUndefined();
+      return { status: result.status, stderr: result.stderr, output: readFileSync(output, 'utf8') };
+    };
+    for (const mode of ['staging', 'tag', 'merged', 'align']) {
+      const result = run(mode);
+      expect(result.status, `${mode}: ${result.stderr}`).toBe(0);
+      expect(result.output, mode).toContain('ready=true');
+      expect(result.output, mode).toContain(`sha=${sha}`);
+    }
+    for (const mode of ['main', 'dryrun', 'stale']) {
+      const result = run(mode);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.output).toBe('');
+    }
+    const refused = run('unreachable');
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toMatch(/unreachable/u);
+    expect(refused.output).toBe('');
   } finally { repo.cleanup(); }
 });
