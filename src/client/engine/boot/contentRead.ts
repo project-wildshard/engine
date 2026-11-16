@@ -163,6 +163,8 @@ async function retryFromCard(error: ContentReadError, signal?: AbortSignal, read
         owner: timeline?.waitOwner ?? null, step: timeline?.snapshot().current ?? null,
         retry: () => {for (const retry of pending) retry();}, retryNavigation: false, ...contentFailure(error) });
       shellRetry(scope, error, () => {for (const retry of pending) retry();});
+      // STAGING-BUGBASH SB28 (OFFLINE: "we'll connect again by ourselves"): the device coming back online is the RETRY tap
+      if (typeof window !== 'undefined') scope.listen(window, 'online', () => {for (const retry of pending) retry();});
       // FM6 mode 36: the download gave up (before or while this read waits), so nothing more arrives by itself: the page says so
       const page = (given: DownloadGiveUp): void => { void (async () => {
         const { downloadFailedPage } = await import('../ui/downloadFailed');

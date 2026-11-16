@@ -97,6 +97,14 @@ const PART_READS = 3;
 const PART_PAUSE_MS = 1000;
 /** The wait before a part's last read. A cancelled job's next read refuses at once, and its `ready` never waited for this. */
 const partPause = (): Promise<void> => new Promise(resolve => { AbortSignal.timeout(PART_PAUSE_MS).onabort = () => { resolve(); }; });
+/** SB28: the device says it has no network (a page with no `navigator` is never offline). */
+const deviceOffline = (): boolean => typeof navigator !== 'undefined' && !navigator.onLine;
+/** SB28: settles when the device is back online or the job is cancelled. */
+const backOnline = (signal: AbortSignal): Promise<void> => new Promise(resolve => {
+  if (!deviceOffline() || signal.aborted || typeof window === 'undefined') { resolve(); return; }
+  const scope = new Scope('spawn-part-offline'), done = (): void => { scope.dispose(); resolve(); };
+  scope.listen(window, 'online', done); scope.listen(signal, 'abort', done);
+});
 /** While the entry's download runs, a level read it does not list (a loader reading a file its set lacks) waits for the
  *  whole set, as every read did before DL11. Level reads: `/shardfiles/` and `/assets/` content, not spawn files, boot
  *  tables or code. The shell's art loads through `<img>`, which no fetch layer sees. */
@@ -655,6 +663,9 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
           for (let attempt = 1; ; attempt++) {
             try { await read(attempt === 1 ? undefined : {cache: 'reload'}); break; } catch (failure) {
               counts.failed++;
+              // STAGING-BUGBASH SB28: a read that fails while the device is offline spends none of DL20's reads; the part waits
+              // for the network (the loading card says the download paused) and reads again, never "could not load" at finish
+              if (deviceOffline() && !controller.signal.aborted) { await backOnline(controller.signal); controller.signal.throwIfAborted(); attempt--; continue; }
               // a retry keeps its members' arriving share (arrive never lowers it); only the last failure drops it
               const last = attempt >= PART_READS || controller.signal.aborted;
               if (last) for (const [index] of order) { const file = files[index]; if (file !== undefined) landed(file.url); }

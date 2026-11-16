@@ -5,6 +5,7 @@ import type { keyedSkyRender } from '../looks/keyedSky';
 import type { postGraphLook } from '../looks/postGraphLook';
 import type { heldArmsGear } from '../models/heldGear';
 import type { declaredClientPlanEntry } from './declaredEntry';
+import { readContent } from '@wildshard/engine/boot/contentRead';
 import { addShardArt } from './list';
 import { pageModeBoot, pageModeKtx2 } from './pageBoot';
 import type { TitleManifest } from './titleList';
@@ -70,15 +71,19 @@ export function shardFromDiscovery(input: unknown, home?: string): ShardManifest
   } as Parameters<typeof defineAuthoredShard>[3], images);
 }
 
+/** A discovery document is tens of KB; anything near this is not one. */
+const DISCOVERY_BYTES = 8_000_000;
+
 /** The manifest of a title row, read from its product. */
 export async function readDiscovery(row: Pick<TitleManifest, 'slug' | 'discovery'>, read: typeof fetch = fetch): Promise<ShardManifest> {
   if (row.discovery === undefined) throw new Error(`${row.slug} has no discovery document`);
   // STAGING-BUGBASH SB27: since PAGE-SIZE the document is shard content on the page's content base; the page's own
   // `/shardfiles/` answers 404 there. Its home stays the row's own (a page path has none): its art keys keep their page
   // URLs, so the explore compare images it names are still page paths (not yet read from the base; review note).
-  const response = await read(contentURL(row.discovery));
-  if (!response.ok) throw new Error(`Discovery of ${row.slug} answered ${response.status}`);
-  const manifest = shardFromDiscovery(JSON.parse(await response.text()), /^https?:\/\/[^/]+/u.exec(row.discovery)?.[0]);
+  // SB28: a read the network can't answer waits on the loading card's RETRY (QA 11-12 row 36) and goes again when the
+  // device is back online, never SOMETHING BROKE at `app:selected-discovery`; a missing document still throws
+  const bytes = await readContent(contentURL(row.discovery), DISCOVERY_BYTES, { fetch: (url, init) => read(url, init), missingThrows: true });
+  const manifest = shardFromDiscovery(JSON.parse(new TextDecoder().decode(bytes)), /^https?:\/\/[^/]+/u.exec(row.discovery)?.[0]);
   if (!new Set([row.slug]).has(manifest.slug)) throw new Error('Selected discovery identity differs');
   return manifest;
 }
