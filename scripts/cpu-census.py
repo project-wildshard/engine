@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import errno
 import json
 import os
+import socket
 from pathlib import Path
 import sys
 import time
@@ -248,7 +249,7 @@ def observe(backend, pid, report, interval, seconds, drain, expected_identity=No
         raise ValueError('census root identity changed before observation')
     known, previous = {initial.identity: initial}, {}
     last_time, root_ended = began, None
-    samples, incomplete, peak = 0, 0, {'processes': 0, 'threads': 0, 'activeThreads': 0,
+    samples, incomplete, identity_incomplete, counter_incomplete, peak = 0, 0, 0, 0, {'processes': 0, 'threads': 0, 'activeThreads': 0,
                                      'summedRssBytes': 0, 'intervalCpuCoresLowerBound': 0.0}
     writer = report.open('x', encoding='utf8')
     with writer:
@@ -259,6 +260,7 @@ def observe(backend, pid, report, interval, seconds, drain, expected_identity=No
             writer.write(text)
             writer.flush()
         emit({'schema': 'engine-cpu-census/1', 'type': 'start', 'platform': sys.platform,
+              'machine': socket.gethostname(),
               'root': initial.__dict__, 'expectedRootIdentity': expected_identity,
               'startedAtMs': time.time_ns() / 1e6,
               'intervalSeconds': interval, 'processQuantumNs': backend.quantum_ns,
@@ -315,11 +317,13 @@ def observe(backend, pid, report, interval, seconds, drain, expected_identity=No
                     delta += observed
                     active += len(active_threads)
                     incomplete += missing + resets + int(reset)
+                    counter_incomplete += missing + resets + int(reset)
                 except (OSError, ValueError, IndexError) as error:
                     if not isinstance(error, OSError) or error.errno not in (errno.ESRCH, errno.ENOENT):
                         raise CensusRefused('required live process counters unavailable') from error
                     errors.append({'pid': current, 'error': type(error).__name__})
                     incomplete += 1
+                    counter_incomplete += 1
             # Each per-process interval lies within this wider read window.
             # Dividing its incomplete CPU sum by that whole window is a lower bound,
             # not an inferred simultaneous core count.
@@ -341,6 +345,7 @@ def observe(backend, pid, report, interval, seconds, drain, expected_identity=No
             remaining = [inventory[current].__dict__ for current in live]
             remaining += [{**row.__dict__, 'status': 'identity currently unreadable'} for row in unknown]
             incomplete += len(unknown)
+            identity_incomplete += len(unknown)
             if not root_live and not remaining:
                 ended = 'observed tree drained'
                 break
@@ -352,8 +357,10 @@ def observe(backend, pid, report, interval, seconds, drain, expected_identity=No
             last_time = now
             time.sleep(interval)
         result = {'type': 'end', 'reason': ended, 'seconds': time.monotonic() - began,
+                  'endedAtMs': time.time_ns() / 1e6,
                   'observerCpuNs': time.process_time_ns() - observer_cpu,
                   'samples': samples, 'incompleteReads': incomplete, 'peak': peak,
+                  'identityReadsIncomplete': identity_incomplete, 'counterReadsIncomplete': counter_incomplete,
                   'observedProcesses': [row.__dict__ for row in known.values()], 'remaining': remaining}
         result['rootMeasured'] = initial.identity in previous
         emit(result)
