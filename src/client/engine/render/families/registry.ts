@@ -16,6 +16,7 @@ import { parseFamilyMaterial, type FamilyMaterialParams } from '@wildshard/forma
 import { compileEmissive, type EmissiveLook } from './emissive';
 import { compilePainterly, type PainterlyLook } from './painterly';
 import { compilePbr, type TextureResolver } from './pbr';
+import type { SwingUniforms } from '../../world/swings';
 import { applySceneEmissive, applySceneSurface } from './sceneSurface';
 import { updateGround } from './ground';
 import { compileToon, type ToonLook } from './toon';
@@ -32,6 +33,8 @@ export interface FamilyContext {
   readonly emissive?: EmissiveLook;
   /** texture references → textures */
   readonly textures: TextureResolver;
+  /** SS8c: the shard's swing uniforms its swinging surfaces bind; left out, they draw at rest */
+  readonly swings?: SwingUniforms;
   /** owns the materials: they stop being tracked for the shader step when it is disposed */
   readonly scope: Scope;
 }
@@ -43,7 +46,7 @@ function compile(params: FamilyMaterialParams, ctx: FamilyContext): THREE.Materi
   if (params.family === 'pbr') {
     // SHARD-SOURCE AP10, AP12: a scene's alpha, decal offset, sway and uv scroll, on the emissive look's clock
     const m = compilePbr(params, ctx.textures, ctx.emitterPools);
-    applySceneSurface(m, params, ctx.emissive?.uniforms.famEmitTime);
+    applySceneSurface(m, params, ctx.emissive?.uniforms.famEmitTime, ctx.swings);
     return m;
   }
   if (params.family === 'painterly') {
@@ -53,7 +56,7 @@ function compile(params: FamilyMaterialParams, ctx: FamilyContext): THREE.Materi
   if (ctx.emissive === undefined) throw new Error('material family: an emissive entry needs an emissive look in its family context');
   const m = compileEmissive(params, ctx.emissive, ctx.textures);
   // SHARD-SOURCE AP11, AP12: alpha cards, camera-facing cards and their declared motion
-  applySceneEmissive(m, params, ctx.emissive.uniforms.famEmitTime);
+  applySceneEmissive(m, params, ctx.emissive.uniforms.famEmitTime, ctx.swings);
   return m;
 }
 

@@ -58,24 +58,44 @@ export function swingQuaternion(ax: number, az: number, out: THREE.Quaternion): 
   return out.copy(qz).multiply(qx);
 }
 
-/** The one set of swing uniforms every swinging surface and card binds (one scene page draws at a time); a page's
- *  `SwingField` writes them and `dispose` stills them. */
-export const swingUniforms: { readonly wsSwingPivot: { readonly value: THREE.Vector4[] }; readonly wsSwingTilt: { readonly value: THREE.Vector4[] } } = {
-  wsSwingPivot: { value: Array.from({ length: SWINGS_MAX }, () => new THREE.Vector4()) },
-  wsSwingTilt: { value: Array.from({ length: SWINGS_MAX }, () => new THREE.Vector4(0, 0, 0, 1)) },
-};
+/** One shard's swing uniforms: its swinging surfaces and cards bind them (through their material family context) and its
+ *  page's `SwingField` writes them, pivots in world space. A neighbour cell's set is its own, so it never turns round
+ *  another page's pivots (review of SS8c). */
+export interface SwingUniforms { readonly wsSwingPivot: { readonly value: THREE.Vector4[] }; readonly wsSwingTilt: { readonly value: THREE.Vector4[] } }
+export function createSwingUniforms(): SwingUniforms {
+  return { wsSwingPivot: { value: Array.from({ length: SWINGS_MAX }, () => new THREE.Vector4()) },
+    wsSwingTilt: { value: Array.from({ length: SWINGS_MAX }, () => new THREE.Vector4(0, 0, 0, 1)) } };
+}
+/** The set a surface binds when its shard's context lends none: every swing at rest. */
+export const STILL_SWINGS: SwingUniforms = createSwingUniforms();
 
 export class SwingField {
-  readonly uniforms: typeof swingUniforms = swingUniforms;
+  readonly uniforms: SwingUniforms;
+  private readonly origin: THREE.Object3D | null;
   private readonly swings: Swing[];
+  /** each swing's pivot in its page's own space; `swing.pivot` is it in world space, where the movers are */
+  private readonly local: THREE.Vector3[];
   private readonly last = new Map<string, { x: number; z: number; seen: boolean }>();
   private readonly q = new THREE.Quaternion();
   private time = 0;
 
-  constructor(rows: readonly SwingRow[]) {
+  /** `origin` is the page's root: a grid cell's page sits off the world origin, and its pivots move with it */
+  constructor(rows: readonly SwingRow[], uniforms: SwingUniforms = createSwingUniforms(), origin: THREE.Object3D | null = null) {
+    this.uniforms = uniforms; this.origin = origin;
     if (rows.length > SWINGS_MAX) throw new Error(`A look declares ${rows.length} swings; at most ${SWINGS_MAX}`);
     this.swings = rows.map((row, i) => ({ row, pivot: new THREE.Vector3(...row.pivot), omega: row.rate * Math.PI * 2, ax: 0, az: 0, vx: 0, vz: 0, phase: i * 2.399 }));
-    this.swings.forEach((swing, i) => { this.uniforms.wsSwingPivot.value[i]?.set(swing.pivot.x, swing.pivot.y, swing.pivot.z, 1); });
+    this.local = this.swings.map((swing) => swing.pivot.clone());
+    this.placePivots();
+  }
+
+  /** the pivots in world space, into the uniforms */
+  private placePivots(): void {
+    if (this.origin !== null) this.origin.updateWorldMatrix(true, false);
+    this.swings.forEach((swing, i) => {
+      const local = this.local[i]; if (local === undefined) return;
+      swing.pivot.copy(local); if (this.origin !== null) swing.pivot.applyMatrix4(this.origin.matrixWorld);
+      this.uniforms.wsSwingPivot.value[i]?.set(swing.pivot.x, swing.pivot.y, swing.pivot.z, 1);
+    });
   }
 
   get count(): number { return this.swings.length; }
@@ -108,6 +128,7 @@ export class SwingField {
   update(dt: number, movers: Iterable<SwingMover> = []): void {
     if (dt <= 0) return;
     this.time += dt;
+    this.placePivots();
     const touches = this.touches(dt, movers);
     for (const [i, swing] of this.swings.entries()) {
       const { row } = swing, bobX = swing.pivot.x, bobZ = swing.pivot.z;

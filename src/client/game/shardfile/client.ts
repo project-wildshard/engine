@@ -333,7 +333,7 @@ export class ShardfileClient {
     // surfaces, glow cards and lamps turn round the same pivots
     const swingRows = this.source.look.light?.swings ?? [];
     if (swingRows.length > 0) {
-      const swings = new SwingField(swingRows);
+      const swings = new SwingField(swingRows, presentation.swings, ctx.root);
       ctx.scope.onDispose(setLampSwings(swings)); ctx.scope.onDispose(() => { swings.dispose(); });
       const clock = windClockFallback(), player = { id: 'player', x: 0, y: 0, z: 0, radius: 0.45 }, live: (typeof player)[] = [];
       const rows = this.source.creatures.spawns.map((spawn) => ({ spawn: spawn.id, row: { id: `creature:${spawn.id}`, x: 0, y: 0, z: 0, radius: 0.6 } }));

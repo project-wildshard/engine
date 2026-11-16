@@ -20,7 +20,7 @@
 import * as THREE from 'three';
 import type { EmissiveMaterialParams, PbrMaterialParams } from '@wildshard/format/materialFamilies';
 import { patchShader, PATCH_ORDER } from '../shaderPatches';
-import { SWING_GLSL, swingUniforms } from '../../world/swings';
+import { STILL_SWINGS, SWING_GLSL, type SwingUniforms } from '../../world/swings';
 
 /** the attribute a swaying surface reads (GLTFLoader's `_sway`, renamed by its binding's channels) */
 export const SWAY_ATTRIBUTE = 'wsSway';
@@ -80,13 +80,13 @@ const SWING_VERTEX = /* glsl */`
 }
 `;
 /** SS8c: bind the shared swing uniforms; returns the attribute and helper declarations */
-function swingHeader(uniforms: Record<string, THREE.IUniform>): string {
-  Object.assign(uniforms, swingUniforms);
+function swingHeader(uniforms: Record<string, THREE.IUniform>, swings: SwingUniforms): string {
+  Object.assign(uniforms, swings);
   return `${SWING_GLSL}\nattribute float ${SWING_ATTRIBUTE};`;
 }
 
 /** PBR: alpha, depth offset, sway, uv scroll and swing (a no-op for a surface with none of them). */
-export function applySceneSurface(m: THREE.MeshStandardMaterial, params: PbrMaterialParams, clock: THREE.IUniform<number> = STILL): void {
+export function applySceneSurface(m: THREE.MeshStandardMaterial, params: PbrMaterialParams, clock: THREE.IUniform<number> = STILL, swings: SwingUniforms = STILL_SWINGS): void {
   if (params.blend === 'alpha') { m.transparent = true; m.depthWrite = false; m.opacity = params.opacity ?? 1; m.userData['sceneAlpha'] = true; }
   const offset = params.depthOffset ?? 0;
   if (offset !== 0) { m.polygonOffset = true; m.polygonOffsetFactor = offset; m.polygonOffsetUnits = offset; }
@@ -97,7 +97,7 @@ export function applySceneSurface(m: THREE.MeshStandardMaterial, params: PbrMate
     wsSwayWind: { value: new THREE.Vector3(sway?.direction[0] ?? 0, sway?.direction[1] ?? 0, sway?.rate ?? 0) },
     wsUvScroll: { value: new THREE.Vector2(scroll?.[0] ?? 0, scroll?.[1] ?? 0) },
   };
-  const swingDecl = swing ? swingHeader(uniforms) : '';
+  const swingDecl = swing ? swingHeader(uniforms, swings) : '';
   patchShader(m, 'engine.family.sceneSurface', PATCH_ORDER.material, (shader) => {
     Object.assign(shader.uniforms, uniforms);
     let vs = shader.vertexShader.replace('#include <common>', `#include <common>\nuniform float wsSceneTime;\nuniform vec3 wsSwayWind;\nuniform vec2 wsUvScroll;\n${sway === undefined ? '' : `attribute float ${SWAY_ATTRIBUTE};`}\n${swingDecl}`);
@@ -145,13 +145,13 @@ const CARD_VERTEX = /* glsl */`
 const MOTION_KIND: Readonly<Record<string, number>> = { pulse: 1, drift: 2, rise: 3 };
 
 /** Emissive: alpha blend, cards and their motion (a no-op for a plain surface). `clock` is the emissive look's. */
-export function applySceneEmissive(m: THREE.MeshBasicMaterial, params: EmissiveMaterialParams, clock: THREE.IUniform<number>): void {
+export function applySceneEmissive(m: THREE.MeshBasicMaterial, params: EmissiveMaterialParams, clock: THREE.IUniform<number>, swings: SwingUniforms = STILL_SWINGS): void {
   if (params.blend === 'alpha') { m.transparent = true; m.depthWrite = false; m.alphaTest = Math.max(m.alphaTest, 0.01); m.userData['sceneAlpha'] = true; }
   const swing = params.swing === true;
   if (params.card !== true) {
     // SS8c: a swinging unlit surface turns round its pivot like a lit one
     if (!swing) return;
-    const own: Record<string, THREE.IUniform> = {}, decl = swingHeader(own);
+    const own: Record<string, THREE.IUniform> = {}, decl = swingHeader(own, swings);
     patchShader(m, 'engine.family.sceneSwing', PATCH_ORDER.material, (shader) => {
       Object.assign(shader.uniforms, own);
       shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>\n${decl}`).replace('#include <begin_vertex>', SWING_VERTEX);
@@ -163,7 +163,7 @@ export function applySceneEmissive(m: THREE.MeshBasicMaterial, params: EmissiveM
     motion === undefined ? 0 : motion.kind === 'pulse' ? motion.amount : motion.kind === 'drift' ? motion.radius : motion.height,
     motion?.kind === 'rise' ? motion.spread : 0);
   const uniforms: Record<string, THREE.IUniform> = { wsCardTime: clock, wsCardMotion: { value: vector } };
-  const swingDecl = swing ? swingHeader(uniforms) : '';
+  const swingDecl = swing ? swingHeader(uniforms, swings) : '';
   m.userData['sceneCard'] = true;
   patchShader(m, 'engine.family.sceneCard', PATCH_ORDER.material, (shader) => {
     Object.assign(shader.uniforms, uniforms);

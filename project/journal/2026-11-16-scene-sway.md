@@ -9,3 +9,7 @@
   leans downwind with the gust and is kicked by a body brushing its bob; swinging surfaces, glass and glow cards turn
   round the pivot in the vertex shader from `_SWING`, and a lamp on a swing carries its light. Its pbr test needs the
   format pin on 0.10 or later.
+- opus-ss16n, review of SS8c: each shard's swinging surfaces bind their own swing uniforms (the family context's
+  `swings`, made by `clientMaterials`), so a neighbour cell never turns round another page's pivots; one with no page
+  of its own binds the still set. A `SwingField` writes its pivots in world space off its page root, so a grid cell's
+  lanterns swing where the cell draws them and the player brushing them kicks them.

@@ -12,6 +12,7 @@ import { markGpuOnly } from '@wildshard/engine/core/gpuOnly';
 import { ToonLook } from '@wildshard/engine/render/families/toon';
 import { PainterlyLook } from '@wildshard/engine/render/families/painterly';
 import { EmissiveLook } from '@wildshard/engine/render/families/emissive';
+import { createSwingUniforms, type SwingUniforms } from '@wildshard/engine/world/swings';
 import { familyMaterial, moveFamilyMaterial } from '@wildshard/engine/render/families/registry';
 import { bindStandardLightmap, setStandardLightmap } from '@wildshard/engine/render/lightmaps';
 import { parseFamilyMaterial } from '@wildshard/format/materialFamilies';
@@ -129,6 +130,8 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   /** LS8 (J204): counted completions for the caller's loading step, given the unit total */ units?: (total: number) => (done: number, detail?: string) => void } = {}): Promise<{
   /** Live toon family shared by classic and graph materials; a day clock may update it in place. */
   readonly toon: ToonLook;
+  /** SS8c: this shard's swing uniforms, which its swinging surfaces bind and its page's `SwingField` writes */
+  readonly swings?: SwingUniforms;
   /** Set a named graph uniform through its declared type/range; no shader rebuild. */
   setParam: (id: string, name: string, value: GraphLiteral) => void;
   /** lend a compiled graph's `role: 'lent'` texture param its texture, by catalogue id (no program change) */
@@ -193,7 +196,7 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
   const toon = new ToonLook(shard.look.familyLooks.toon ?? {}), painterly = new PainterlyLook(shard.look.familyLooks.painterly ?? {}), emissive = new EmissiveLook(shard.look.familyLooks.emissive ?? {});
   // Entered trees borrow these materials; their first capture must not claim them.
   const ownMaterial = (material: Material): Material => { ownSceneResource(material, scope); return material; };
-  const context = { toon, painterly, emissive, textures: resolveTexture, scope, emitterPools: (id: string) => sceneVectors(shard.identity.slug, id, 4) }, materials = new MaterialCatalogue();
+  const swings = createSwingUniforms(), context = { toon, painterly, emissive, swings, textures: resolveTexture, scope, emitterPools: (id: string) => sceneVectors(shard.identity.slug, id, 4) }, materials = new MaterialCatalogue();
   const defaults = new Set([...shard.look.families, ...(shard.terrain === null || shard.terrain.form === 'query' ? [] : [shard.terrain.family]), ...(shard.props === null ? [] : [shard.props.family])]);
   // a family's implicit surface is plain and vertex-coloured; PBR's metalness default is a map multiplier, so the plain one is dielectric
   for (const id of defaults) if (!Object.hasOwn(shard.look.materials, id)) materials.set(id, ownMaterial(familyMaterial({ family: id, vertexColours: true, ...(id === 'pbr' ? { metalness: 0 } : {}) }, context)));
@@ -290,7 +293,7 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
     graphs.setTexture(material, name, texture);
   }, prepare: async ids => {
     for (const id of new Set(ids)) { if (!materials.pending(id)) continue; await buildYield(scope); materials.get(id); }
-  }, materials, textures, compile, bindMeshMap, instance, outline: graphOutlineHook(graphs.outline), tick: (dt) => { toon.tick(dt); painterly.tick(dt); emissive.tick(dt); graphs.tick(dt); moveCurves(); },
+  }, swings, materials, textures, compile, bindMeshMap, instance, outline: graphOutlineHook(graphs.outline), tick: (dt) => { toon.tick(dt); painterly.tick(dt); emissive.tick(dt); graphs.tick(dt); moveCurves(); },
     graphs: { bind: (sources) => { if (sources.state !== undefined) stateOf = sources.state; graphs.bind(sources); moveCurves(); }, readout: graphs.readout }, surfaces,
     ground: splatDrawn !== null && 'material' in splatDrawn ? splatDrawn.material : null };
 }

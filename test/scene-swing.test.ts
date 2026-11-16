@@ -5,7 +5,7 @@ import { EmissiveLook } from '../src/client/engine/render/families/emissive';
 import { ToonLook } from '../src/client/engine/render/families/toon';
 import { sceneSurfaceChannels } from '../src/client/engine/render/families/sceneSurface';
 import { lampLights } from '../src/client/engine/render/lookLight';
-import { SWING_TILT_MAX, SwingField, setLampSwings, swingQuaternion, swingUniforms, type SwingRow } from '../src/client/engine/world/swings';
+import { SWING_TILT_MAX, SwingField, setLampSwings, swingQuaternion, STILL_SWINGS, createSwingUniforms, type SwingRow } from '../src/client/engine/world/swings';
 import { WIND_DIR, windUniforms } from '../src/client/engine/world/wind';
 import { Scope } from '../src/shared/engine/app/scope';
 
@@ -62,7 +62,7 @@ test('a body brushing a lantern kicks it along its stride; it rocks and settles 
 
 test('the uniforms carry each pivot and tilt; dispose stills them', () => {
   windUniforms.uGust.value = 1;
-  const field = new SwingField([lantern]);
+  const swingUniforms = createSwingUniforms(), field = new SwingField([lantern], swingUniforms);
   for (let i = 0; i < 120; i++) field.update(1 / 60);
   expect(swingUniforms.wsSwingPivot.value[0]?.toArray()).toEqual([2, 3, -1, 1]);
   expect(swingUniforms.wsSwingTilt.value[0]?.w).toBeLessThan(1);
@@ -74,13 +74,16 @@ test('the uniforms carry each pivot and tilt; dispose stills them', () => {
   expect(swingUniforms.wsSwingTilt.value[0]?.toArray()).toEqual([0, 0, 0, 1]);
 });
 
-test('a swinging pbr surface, glass and glow card read _SWING and bind the shared swing uniforms', () => {
-  const surface = compiled(familyMaterial({ family: 'pbr', swing: true }, ctx()), 'standard');
+test('a swinging pbr surface, glass and glow card read _SWING and bind their shard\'s swing uniforms', () => {
+  const swingUniforms = createSwingUniforms();
+  const surface = compiled(familyMaterial({ family: 'pbr', swing: true }, { ...ctx(), swings: swingUniforms }), 'standard');
   expect(surface.vertex).toContain('attribute float wsSwing;');
   expect(surface.vertex).toContain('objectNormal = inverse( wsSwingL )');
   expect(surface.vertex).toContain('wsSwingAt( ( modelMatrix * vec4( transformed, 1.0 ) ).xyz, wsSwingN )');
   expect(surface.uniforms['wsSwingTilt']).toBe(swingUniforms.wsSwingTilt);
   expect(surface.key).toContain('w');
+  // a shard whose context lends no swings (a neighbour drawn by no page of its own) binds the still set
+  expect(compiled(familyMaterial({ family: 'pbr', swing: true }, ctx()), 'standard').uniforms['wsSwingTilt']).toBe(STILL_SWINGS.wsSwingTilt);
   const glass = compiled(familyMaterial({ family: 'emissive', swing: true }, ctx()), 'basic');
   expect(glass.vertex).toContain('wsSwingAt(');
   const card = compiled(familyMaterial({ family: 'emissive', card: true, swing: true }, ctx()), 'basic');
@@ -93,6 +96,19 @@ test('a swinging pbr surface, glass and glow card read _SWING and bind the share
   expect(sceneSurfaceChannels({ family: 'pbr', swing: true })).toEqual({ _swing: { attribute: 'wsSwing', itemSize: 1 } });
   expect(sceneSurfaceChannels({ family: 'emissive', card: true, swing: true })).toEqual({ _corner: { attribute: 'wsCorner', itemSize: 2 }, _swing: { attribute: 'wsSwing', itemSize: 1 } });
   expect(compiled(familyMaterial({ family: 'pbr' }, ctx()), 'standard').vertex).not.toContain('wsSwing');
+});
+
+test('a page off the world origin swings round its pivots where the page is (a grid cell, review of SS8c)', () => {
+  windUniforms.uGust.value = 0;
+  const root = new THREE.Group(); root.position.set(100, 0, -50);
+  const swingUniforms = createSwingUniforms(), field = new SwingField([{ ...lantern, amount: 0 }], swingUniforms, root);
+  expect(swingUniforms.wsSwingPivot.value[0]?.toArray()).toEqual([102, 3, -51, 1]);
+  // a body brushing the bob where the page draws it kicks it; one at the page-local spot does not
+  field.update(1 / 60, [{ id: 'far', x: 2.3, y: 2.2, z: -1, radius: 0.45 }]); field.update(1 / 60, [{ id: 'far', x: 2.0, y: 2.2, z: -1, radius: 0.45 }]);
+  expect(Math.hypot(field.tilt(0).x, field.tilt(0).z)).toBe(0);
+  field.update(1 / 60, [{ id: 'near', x: 102.3, y: 2.2, z: -51, radius: 0.45 }]); field.update(1 / 60, [{ id: 'near', x: 102.0, y: 2.2, z: -51, radius: 0.45 }]);
+  expect(Math.hypot(field.tilt(0).x, field.tilt(0).z)).toBeGreaterThan(0);
+  field.dispose();
 });
 
 test("a lamp on a swing moves with its lantern; a lamp off it stays put", () => {
