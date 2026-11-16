@@ -1,5 +1,7 @@
 /** C4 (J28, J29, J30): the cook worker, a process of its own from the same engine build. It answers `api-server`'s notify
- * call, lists the catalogue at boot to catch what it missed, and re-cooks every head a new build hasn't cooked.
+ * call, lists the catalogue at boot to catch what it missed, and re-cooks every head a new build hasn't cooked. SHARD-COMPAT
+ * SP6 (J175: "the cook worker polls outbound, no API call into the VPS"): it also reads the catalogue every POLL_EVERY_MS and
+ * cooks each upload it has not settled (`pollCatalogue`), so a new upload cooks with no notice and no restart.
  *
  * This process holds the credentials and the network and never parses a shardfile. Each cook is a child (`cookJob.ts`)
  * with no credentials in its environment, Node's permission model over files, a heap cap, a resident-memory watch, a
@@ -18,6 +20,8 @@ import {cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, r
 import {createServer, type IncomingMessage, type Server} from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {dirname, join, relative, sep} from 'node:path';
+// oxlint-disable-next-line import/no-nodejs-modules -- SP6: the poll waits between sweeps, and stop() cuts the wait short.
+import {setTimeout as delay} from 'node:timers/promises';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {promisify} from 'node:util';
 import * as v from 'valibot';
@@ -308,6 +312,9 @@ export interface CookRow {
   readonly preparation?: CookJobReport['cook']['preparation'];
 }
 const TRANSIENT_TRIES = 3;
+/** SP6: a failed upload is tried again after this, doubling per failure up to FAILED_RETRY_MAX_MS. A failure past its retries
+ *  is a real one (a broken file, a full store), so retrying each poll would only cook it again and again. */
+const FAILED_RETRY_MS = 10 * 60_000, FAILED_RETRY_MAX_MS = 6 * 3_600_000;
 /** A retry can't change these: another clock runs out the same way, and a store stays full. */
 const FINAL = /^(?:past |Over the pack budget)/u;
 
@@ -319,6 +326,9 @@ export interface CookWorker {
   readonly enqueue: (notice: CookNotice) => void;
   readonly idle: () => Promise<void>;
   readonly rows: () => readonly CookRow[];
+  /** SP6: read the catalogue once and cook, in line, each upload this process has not settled (cooked, present or refused); a
+   *  failed one waits out its backoff. Answers the rows it cooked. Throws only when the catalogue can't be read. */
+  readonly sweep: (stages: readonly CookStage[]) => Promise<readonly CookRow[]>;
 }
 
 export function createCookWorker(options: CookWorkerOptions): CookWorker {
@@ -327,6 +337,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   if (!/^[\w.-]{1,64}$/u.test(build)) throw new Error('A build id names a store folder');
   /** One verdict per hash for this process: hostile bytes get one child, however many notices name them. */
   const verdicts = new Map<string, CookRow>();
+  /** SP6: how often each upload has failed in a row, and when it last did. */
+  const failures = new Map<string, {readonly count: number; readonly at: number}>();
   const publish = async (work: string, report: CookJobReport, hash: string): Promise<void> => {
     const client = join(work, 'out/client'), keys = filesUnder(client);
     // SA48: the loose files again under this upload's own folder (`looseFolder`)
@@ -403,7 +415,60 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     enqueue: notice => { void inLine(() => cook({slug: notice.shard, hash: notice.hash})); },
     idle: async () => { await queue; },
     rows: () => [...verdicts.values()],
+    sweep: async stages => {
+      const seen = new Map<string, {readonly slug: string; readonly hash: string}>();
+      for (const stage of stages) for (const row of await source.heads(stage)) seen.set(row.hash, {slug: row.slug, hash: row.hash});
+      const due = (hash: string): boolean => {
+        const known = verdicts.get(hash);
+        if (known === undefined) return true;
+        if (known.state !== 'failed') return false;
+        const failed = failures.get(hash);
+        return failed === undefined || clock() - failed.at >= Math.min(FAILED_RETRY_MS * 2 ** (failed.count - 1), FAILED_RETRY_MAX_MS);
+      };
+      const fresh = [...seen.values()].filter(head => due(head.hash)), rows: CookRow[] = [];
+      if (fresh.length > 0) log(`poll ${build}: ${fresh.length} upload(s) to cook: ${fresh.map(head => `${head.slug} ${head.hash.slice(0, 12)}`).join(', ')}`);
+      for (const head of fresh) {
+        const row = await inLine(() => cook(head));
+        if (row.state === 'failed') failures.set(head.hash, {count: (failures.get(head.hash)?.count ?? 0) + 1, at: clock()});
+        else failures.delete(head.hash);
+        rows.push(row);
+      }
+      return rows;
+    },
   };
+}
+
+/** SP6: between sweeps, inside J175's 30 to 60 s. */
+export const POLL_EVERY_MS = 45_000;
+/** SP6: the longest wait after catalogue errors in a row (each doubles it). */
+export const POLL_MAX_BACKOFF_MS = 600_000;
+export interface PollOptions {
+  readonly everyMs?: number;
+  readonly maxBackoffMs?: number;
+  readonly stages?: readonly CookStage[];
+  readonly log?: (line: string) => void;
+  /** The wait between sweeps; a test's stands in for the clock. It rejects when `signal` aborts. */
+  readonly wait?: (ms: number, signal: AbortSignal) => Promise<void>;
+}
+
+/** SP6 (J175): the cook's outbound poll. Sweeps the catalogue, waits POLL_EVERY_MS, and again; n catalogue errors in a row
+ *  wait 2^n times as long, up to POLL_MAX_BACKOFF_MS. `stop` ends it after the sweep in hand. */
+export function pollCatalogue(worker: Pick<CookWorker, 'sweep'>, options: PollOptions = {}): {readonly stop: () => void; readonly done: Promise<void>} {
+  const every = options.everyMs ?? POLL_EVERY_MS, cap = options.maxBackoffMs ?? POLL_MAX_BACKOFF_MS, stages = options.stages ?? ['live', 'preview', 'staging'];
+  const log = options.log ?? ((): void => undefined), wait = options.wait ?? ((ms: number, signal: AbortSignal) => delay(ms, undefined, {signal}));
+  const scope = new AbortController();
+  const done = (async (): Promise<void> => {
+    let errors = 0;
+    while (!scope.signal.aborted) {
+      try { await worker.sweep(stages); errors = 0; } catch (error) {
+        errors++;
+        log(`poll: catalogue read failed ${errors} time(s) in a row, next in ${Math.round(Math.min(every * 2 ** errors, cap) / 1000)} s: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (scope.signal.aborted) break;
+      try { await wait(errors === 0 ? every : Math.min(every * 2 ** errors, cap), scope.signal); } catch { break; }
+    }
+  })();
+  return {stop: () => { scope.abort(); }, done};
 }
 
 const NOTICE_BYTES = 4096;

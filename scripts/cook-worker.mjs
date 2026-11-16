@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // C4 (J28, J29, J30): the cook worker.
-//   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs serve     notify endpoint; lists the catalogue at boot
+//   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs serve     notify endpoint; lists the catalogue at boot, then
+//     polls it every COOK_POLL_SECONDS (45; 30 to 60) and cooks each new upload (SHARD-COMPAT SP6, J175)
 //     (production, preview and staging heads: MS2.4, a new author's `upload --channel staging` is a staging head only)
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs recook    every live and preview head, then exit; a deploy's step
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs bake <dist> <origin>   the live heads this build cooked, onto its built client
@@ -15,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const { apiSource, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, PACK_BUDGET_BYTES, storeUsage } = await import('../src/cook/game/cookWorker.ts');
+const { apiSource, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, PACK_BUDGET_BYTES, pollCatalogue, POLL_EVERY_MS, storeUsage } = await import('../src/cook/game/cookWorker.ts');
 const { MAX_SHARDFILE_BYTES } = await import('../src/cook/game/cookJob.ts');
 const { addStoredShards } = await import('./app-build/catalogue.ts');
 const { refreshServiceWorker } = await import('./app-build/serviceWorker.ts');
@@ -53,8 +54,13 @@ const [command, ...rest] = process.argv.slice(2);
 if (command === 'serve') {
   const cook = worker(), port = Number(env.COOK_PORT ?? 8792), host = env.COOK_HOST ?? '127.0.0.1';
   notifyServer(cook, need('COOK_NOTIFY_TOKEN')).listen(port, host, () => { console.log(`cook worker on ${host}:${port}`); });
-  // J30: what a missed notice left behind. A catalogue that can't be read waits for the next notice.
+  // J30: what a missed notice left behind. A catalogue that can't be read is the poll's to retry.
   try { await cook.recook(['live', 'preview', 'staging']); } catch (error) { console.error(`boot list failed: ${String(error)}`); }
+  // SP6 (J175): the API sends this box no notice, so the cook reads the catalogue on a clock, outbound.
+  const seconds = Number(env.COOK_POLL_SECONDS ?? POLL_EVERY_MS / 1000);
+  const everyMs = Math.min(60, Math.max(30, Number.isFinite(seconds) ? seconds : POLL_EVERY_MS / 1000)) * 1000;
+  console.log(`cook worker polls the catalogue every ${everyMs / 1000} s`);
+  pollCatalogue(cook, { everyMs, log: line => { console.log(line); } });
 } else if (command === 'recook') {
   const cook = worker(), rows = await cook.recook(['live']), preview = await cook.recook(['preview', 'staging']);
   console.log(JSON.stringify([...rows, ...preview]));
