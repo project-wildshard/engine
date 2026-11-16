@@ -464,6 +464,14 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       host.setHeightQuery(clientGround(shard, assets).heightAt);
       host.setFloorQuery((x, z, fromY, maxDrop) => floorBelow(host.physics, x, z, fromY, maxDrop));
       for (const actor of host.entities.values()) actor.groundHeight = (x, z, fromY) => floorBelow(host.physics, x, z, fromY, 500) ?? -250;
+    } else if (ids.length > 0) {
+      // TC-B3b: declared solids hold creatures as they hold players. A body stands on the first solid below its feet,
+      // or on the heightfield where none is higher, so a ledge marksman keeps its ledge instead of walking the terrain.
+      // The cast is hollow: a body that walks (or spawns) into a solid stays at its foot rather than climbing its top.
+      const floor = (x: number, z: number, fromY: number, maxDrop: number) => Math.max(host.heightAt(x, z),
+        floorBelow(host.physics, x, z, fromY, maxDrop, undefined, undefined, false) ?? -Infinity);
+      host.setFloorQuery(floor);
+      for (const actor of host.entities.values()) actor.groundHeight = (x, z, fromY) => floor(x, z, fromY, 500);
     }
     let pendingColliders: ReadonlyMap<string, PropColliderState> | undefined;
     if (ids.length > 0) host.onStep('props.declared', () => undefined, {

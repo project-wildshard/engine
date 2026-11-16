@@ -44,13 +44,14 @@ const rayOf = (physics: Physics): Ray => {
 
 /**
  * The top of the first world surface (terrain, deck, floor, rock) straight below (x, fromY, z), within `maxDrop`;
- * undefined when there is none. `exclude`: a collider the ray passes through (the caller's own body).
+ * undefined when there is none. `exclude`: a collider the ray passes through (the caller's own body). `solid: false`
+ * casts hollow: from inside a solid the floor is that solid's bottom face, never its top (a body in a wall can't climb it).
  */
-export function floorBelow(physics: Physics, x: number, z: number, fromY: number, maxDrop: number, exclude?: Collider, only?: (collider: Collider) => boolean): number | undefined {
+export function floorBelow(physics: Physics, x: number, z: number, fromY: number, maxDrop: number, exclude?: Collider, only?: (collider: Collider) => boolean, solid = true): number | undefined {
   const ray = rayOf(physics);
   ray.origin.x = x; ray.origin.y = fromY; ray.origin.z = z;
   ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
-  const hit = physics.castRay(ray, maxDrop, true, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, queryGroups(WORLD), exclude, undefined, only);
+  const hit = physics.castRay(ray, maxDrop, solid, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, queryGroups(WORLD), exclude, undefined, only);
   return hit ? fromY - hit.timeOfImpact : undefined;
 }
 
