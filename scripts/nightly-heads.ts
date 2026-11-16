@@ -16,6 +16,7 @@ import type {StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 await import('./bake-loader.mjs');
+const {BOOST_TAP_MS} = await import('../src/client/engine/ui/hoverBoost.ts');
 const {folderStore} = await import('../src/cook/game/packStore.ts');
 const {objectHeaders, DEFAULT_LIMITS} = await import('../src/cook/game/cookWorker.ts');
 const {addStoredShards} = await import('./app-build/catalogue.ts');
@@ -122,7 +123,7 @@ try {
               const world = window.__wildshard?.world;
               if (world === undefined) return null;
               const board = world.weapons.tools.find(tool => tool.id === 'tool.hoverboard');
-              return {hover: world.player.hover, blend: world.player.hoverBlend,
+              return {hover: world.player.hover, boost: world.player.hoverBoost, blend: world.player.hoverBlend,
                 equipmentEnabled: world.weapons.enabled, owned: world.weapons.has('tool.hoverboard'),
                 toolInstalled: board !== undefined, toolEnabled: board?.enabled ?? null,
                 modelVisible: board !== undefined && 'model' in board && typeof board.model === 'object' && board.model !== null && 'visible' in board.model ? board.model.visible : null,
@@ -134,12 +135,17 @@ try {
             let action = 'mount';
             try {
             await control.tap({timeout: 5000});
+            const tappedAt = await page.evaluate(() => performance.now());
             await page.waitForFunction(() => {
               const world = window.__wildshard?.world;
               return world?.player.hover === true && world.player.hoverBlend > 0.5 &&
                 world.weapons.tools.some(tool => tool.id === 'tool.hoverboard' && tool.enabled && 'model' in tool && tool.model instanceof Object && 'visible' in tool.model && tool.model.visible === true);
             }, undefined, {timeout: 10000});
             action = 'unmount';
+            // Developer mode makes a second tap within the production gesture
+            // window BOOST. This journey intends two separate single taps.
+            await page.waitForFunction(({since, windowMs}) => performance.now() - since > windowMs,
+              {since: tappedAt, windowMs: BOOST_TAP_MS}, {timeout: 5000});
             await control.tap({timeout: 5000});
             await page.waitForFunction(() => window.__wildshard?.world?.player.hover === false, undefined, {timeout: 10000});
             } catch (error) {
