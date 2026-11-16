@@ -3,7 +3,7 @@ import '@wildshard/engine/core/portableMathFirst';
 // oxlint-disable-next-line import/no-unassigned-import -- evaluated for its effect: the app identity is installed before any other module body runs (E414)
 import './identity';
 import { findTitleManifest, installTitleManifests, readTitleRows, titleManifests, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
-import { installedCatalogue, installInlineCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
+import { bareSlug, installedCatalogue, installInlineCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { installOfflineDownload } from '@wildshard/engine/ui/offlineDownload';
 import { startPageServices } from './pageServices';
 import { persistHomeScreen, saves } from '@wildshard/engine/saves/runtime';
@@ -137,7 +137,9 @@ async function enterPage(): Promise<unknown> {
     try { saves.mergeShardEntries(retired, now); } catch (error) { console.warn(`[saves] ${retired} not carried to ${now}:`, error); }
   }
   // TC-SHIP-a: an old `?chunk=` link (a bookmark, a tab reloaded after the deploy) names its retired slug's replacement
-  const asked = search.get('chunk'), requested = asked === null ? null : currentSlug(asked);
+  // a retired slug the build's catalogue still lists stays itself (Ring 1's blender-template is the format's Template 2)
+  const catalogue = installedCatalogue(), listed = new Set([...catalogue?.placements ?? [], ...catalogue?.grid.cells ?? []].map(row => bareSlug(row.slug)));
+  const asked = search.get('chunk'), requested = asked === null ? null : currentSlug(asked, name => listed.has(name));
   if (asked !== null && requested !== null && requested !== asked) {
     search.set('chunk', requested);
     history.replaceState(history.state, '', `${location.pathname}?${search.toString()}${location.hash}`);

@@ -16,9 +16,10 @@ export function slugOfPath(pathname: string): string | null {
 /** Each retired slug and the slug that replaced it, for the save namespaces a rename carries (TC-SHIP-a). */
 export function retiredSlugs(): readonly (readonly [string, string])[] { return retired(); }
 
-/** The slug a `?chunk=` link names today: a retired slug's replacement, else the slug itself (TC-SHIP-a). */
-export function currentSlug(slug: string): string {
-  return API[slug] ?? slug;
+/** The slug a `?chunk=` link names today: a retired slug's replacement, else the slug itself (TC-SHIP-a). A slug the build's
+ *  catalogue still `listed` stays itself: Ring 1's blender-template is the format's own Template 2, not Brasscap Mesa. */
+export function currentSlug(slug: string, listed: (slug: string) => boolean = () => false): string {
+  return listed(slug) ? slug : API[slug] ?? slug;
 }
 
 /** The `/slug/` path a shard's link reads: its public name, else its API slug. */

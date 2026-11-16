@@ -51,3 +51,10 @@ is the reviewed first pin.
   `stalePinProducts` named it stale because no pin names it. It is now current
   while its index is the installed format package's, and stale once the format
   moves past it. An earned achievement carries full under a raised threshold.
+- Branch CI found Ring 1 broken by the rename: its catalogue is cut from
+  test/pins/catalogue.json, which now names Brasscap's row brasscap-mesa, so
+  Ring 1's blender-template (the format's Template 2) lost its row, and the page
+  rewrote `?chunk=blender-template` to a slug Ring 1 doesn't list. pins.ts's
+  ring catalogue now names a renamed row by the retired slug the ring installs,
+  the page keeps a retired slug its catalogue still lists, and
+  pinned-restore-play walks brasscap-mesa outside Ring 1 (a plain pins tree).

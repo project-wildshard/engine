@@ -389,8 +389,17 @@ async function slice(check = false): Promise<void> {
  *  cell becomes a road, as the live grid's template cell is, so the grid keeps its shape (G972) and the crossing stays real. */
 function ringCatalogue(pins: readonly Pin[]): void {
   interface Cell { slug: string; instance: string; cell: readonly [number, number] }
-  const catalogue = readJson(CATALOGUE) as { shards: readonly { slug: string }[]; placements: readonly { slug: string }[]; grid: { cells: readonly Cell[] } };
+  const catalogue = readJson(CATALOGUE) as { shards: { slug: string }[]; placements: { slug: string }[]; grid: { cells: Cell[] } };
   const kept = new Set(pins.flatMap(({slug}) => [slug, `_${slug}`]));
+  // Ring 1's blender-template is the format's own Template 2, while the catalogue names that row by the slug that replaced
+  // it (brasscap-mesa, TC-SHIP-a, src/shared/game/slugNames.json): the ring's catalogue names the product it installs.
+  const formerly = new Map(Object.entries((readJson('src/shared/game/slugNames.json') as { names: Record<string, string> }).names).map(([old, now]) => [now, old]));
+  const ringSlug = <T extends { slug: string }>(row: T): T => {
+    const bare = row.slug.replace(/^_/u, ''), old = formerly.get(bare);
+    return old === undefined || kept.has(bare) || !kept.has(old) ? row : { ...row, slug: row.slug.startsWith('_') ? `_${old}` : old };
+  };
+  catalogue.shards = catalogue.shards.map(ringSlug); catalogue.placements = catalogue.placements.map(ringSlug);
+  catalogue.grid.cells = catalogue.grid.cells.map(ringSlug);
   const shards = catalogue.shards.filter(row => kept.has(row.slug));
   for (const row of shards) {
     const pin = pins.find(candidate => candidate.slug === row.slug);

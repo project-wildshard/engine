@@ -24,8 +24,12 @@ const rapier=():ReturnType<typeof loadRapier>=>rapierModule??=loadRapier(readFil
 // of 60 (72 busy workers on 18 cores): template 12.8-14.0 s (the file's first case also pays its warm-up), Nalati
 // 14.6-14.9, Blender Template 9.5-9.9, Pine 4.8-10.0, Driftwood 3.6-4.8, the rest under 3 s. Each budget is about
 // 1.5x its worst; alone they take 0.1-3.3 s.
-const budgets:Readonly<Record<string,number>>={template:25_000,'nalati-grasslands':25_000,'blender-template':15_000,'pine-hollow':15_000};
-for(const slug of [...ring['1'].products,...ring['1'].slices])test(`a saved ${slug} continues the same real walk`,async()=>{
+const budgets:Readonly<Record<string,number>>={template:25_000,'nalati-grasslands':25_000,'blender-template':15_000,'brasscap-mesa':15_000,'pine-hollow':15_000};
+// Ring 1's blender-template is the format's own Template 2 (`pins.ts install --ring 1`); a plain `pnpm pins` tree holds
+// the API's Brasscap Mesa under the slug that replaced it (TC-SHIP-a), so outside Ring 1 that product walks instead.
+const RETIRED=(JSON.parse(readFileSync('src/shared/game/slugNames.json','utf8')) as {names:Record<string,string>}).names;
+const walked=(slug:string):string=>process.env['WILDSHARD_RING']==='1'?slug:RETIRED[slug]??slug;
+for(const slug of [...ring['1'].products,...ring['1'].slices].map(walked))test(`a saved ${slug} continues the same real walk`,async()=>{
   const directory=builtProduct(slug==='template'?'_template':slug),product=await loadHeadlessProduct(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);if(descriptor===undefined)throw new Error('No admitted product');
   const declared=shard.runtime===null&&!product.has('sim/runtime-plan');
