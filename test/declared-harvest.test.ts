@@ -27,15 +27,15 @@ beforeAll(async () => { rapier = await loadRapier(Uint8Array.from(readFileSync('
 const drops = parse(HarvestDropsSchema, [{ item: 'moon.trophy', count: 2, variants: ['elite'] }, { item: 'sun.trophy', count: 1 }]);
 const owners: (() => void)[] = [];
 afterEach(() => { for (const dispose of owners.splice(0)) dispose(); });
-function fixture(slots = 2, species: NonNullable<Parameters<typeof installNativeHarvest>[1]> = []) {
+function fixture(slots = 2, species: NonNullable<Parameters<typeof installNativeHarvest>[1]> = [], kinds = ['moon.trophy', 'sun.trophy']) {
   const host = createSimHost({ ...SIM_LEVEL, entities: [] }, { rapier });
-  const profile = { kinds: ['moon.trophy', 'sun.trophy'], slots,
+  const profile = { kinds, slots,
     counts: { min: 1, max: 1000, integer: true, complete: true }, quantity: 'positive-safe-integer', snapshot: 'order', restoreError: 'Bad pack' } satisfies NativeInventoryProfile<string>;
   const pack = new NativeInventory(profile, host, 'pack'); installNativeHarvest(host, species);
   const recipe = SIM_LEVEL.entities[0]; if (recipe === undefined) throw new Error('Missing body recipe');
-  const kill = (): void => {
+  const kill = (harvest: typeof drops | null = drops): void => {
     const body = host.spawn({ ...recipe, id: 'custom.carcass', spec: { ...recipe.spec, kind: 'boar', variant: 'elite', hp: 1 }, at: { x: 0, y: 0, z: 0 } });
-    body.harvest = drops; body.species = 'own.creature';
+    body.harvest = harvest === null ? undefined : harvest; body.species = 'own.creature';
     host.combat.hit({ source: 'env', sourceTags: ['cover.checked'], target: body.combatActor(), amount: 100, point: body.position.clone(), dir: new Vector3() });
     host.step();
     body.harvest = [];
@@ -179,4 +179,28 @@ test('ambiguous old pending harvest refuses before changing any live pending cla
     expect(f.saved.snapshot()).toEqual(before);
     f.claim(); expect(f.pack.count('moon.trophy')).toBe(2); expect(f.pack.count('sun.trophy')).toBe(1);
   } finally { f.host.dispose(); }
+});
+
+test('new undeclared pending payouts survive restore when same-kind owners differ', () => {
+  const legacy = ['boar-meat', 'boar-hide', 'boar-tusk'];
+  const first = fixture(3, [], legacy), second = fixture(3, [{ kind: 'boar' }, { kind: 'boar', harvest: drops }], legacy);
+  try {
+    first.kill(null); const saved = first.saved.snapshot();
+    expect(saved).toMatchObject([{ drops: legacy }]);
+    second.saved.restore(saved); second.claim();
+    expect(second.pack.snapshot()).toEqual({ counts: { 'boar-meat': 1, 'boar-hide': 1, 'boar-tusk': 1 }, order: legacy });
+    second.claim(); expect(second.pack.count('boar-meat')).toBe(1);
+  } finally { first.host.dispose(); second.host.dispose(); }
+});
+test('old dropless saves refuse a mix of absent and declared owners before clearing claims', () => {
+  const mixed = [{ kind: 'boar' }, { kind: 'boar', harvest: drops }];
+  for (const species of [mixed, [...mixed].reverse()]) {
+    const f = fixture(2, species);
+    try {
+      f.kill(); const before = f.saved.snapshot();
+      expect(() => f.saved.restore([oldPending])).toThrow('Ambiguous admitted harvest');
+      expect(f.saved.snapshot()).toEqual(before); f.claim();
+      expect(f.pack.count('moon.trophy')).toBe(2); expect(f.pack.count('sun.trophy')).toBe(1);
+    } finally { f.host.dispose(); }
+  }
 });

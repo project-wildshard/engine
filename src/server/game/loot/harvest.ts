@@ -16,8 +16,9 @@ export function installNativeHarvest(host: SimHost, species: readonly Pick<Speci
   if(!hasNativeInventory(host,'pack'))return;
   registerInstalled(host, 'harvest'); // SS3: the page's ambient life drops carcasses the server pays out
   publishOwned(host,'harvest',(_player,out)=>{out.set('harvest.enabled',1);});
-  const declarations = new Map<string, NonNullable<SpeciesRow['harvest']>[]>();
-  for (const row of species) if (row.harvest !== undefined) {
+  const declarations = new Map<string, NonNullable<SpeciesRow['harvest']>[]>(), undeclared = new Set<string>();
+  for (const row of species) {
+    if (row.harvest === undefined) { undeclared.add(row.kind); continue; }
     const rows = declarations.get(row.kind) ?? []; rows.push(row.harvest); declarations.set(row.kind, rows);
   }
   const restoreDrops = (row: v.InferOutput<typeof corpse>): v.InferOutput<typeof corpse> => {
@@ -29,6 +30,7 @@ export function installNativeHarvest(host: SimHost, species: readonly Pick<Speci
         throw new Error('Ambiguous admitted harvest for pending corpse');
       drops = next;
     }
+    if (drops !== undefined && undeclared.has(row.kind)) throw new Error('Ambiguous admitted harvest for pending corpse');
     return drops === undefined ? row : { ...row, drops };
   };
   const pending = new Map<string, v.InferOutput<typeof corpse>>(), routes = actRoutes(host);
@@ -48,9 +50,9 @@ export function installNativeHarvest(host: SimHost, species: readonly Pick<Speci
   host.events.on('actor.died', ({ actor }) => {
     const body=host.entities.get(actor.id);if(body===undefined||pending.has(body.entityId))return;
     const {x,y,z}=body.position;
-    const drops = body.harvest === undefined ? undefined : declaredHarvestDrops(body.harvest, body.variant);
-    if((drops ?? harvestDrops(body.kind,body.variant)).some(item=>nativeInventoryKeeps(host,'pack',item)))
-      bind({id:body.entityId,kind:body.kind,variant:body.variant,x,y,z,...(drops === undefined ? {} : { drops })});
+    const drops = body.harvest === undefined ? harvestDrops(body.kind, body.variant) : declaredHarvestDrops(body.harvest, body.variant);
+    if(drops.some(item=>nativeInventoryKeeps(host,'pack',item)))
+      bind({id:body.entityId,kind:body.kind,variant:body.variant,x,y,z,drops});
   },host.scope);
   host.onStep('owned.harvest',()=>undefined,{
     joined:true,
