@@ -95,7 +95,12 @@ jobs:
             "$adb" shell am start -a android.intent.action.VIEW -n com.android.chrome/com.google.android.apps.chrome.Main -d https://staging.wildshard.io/version.json || true
             sleep 25
             if [ "$("$adb" get-state 2>/dev/null)" = device ] && "$adb" shell pidof com.android.chrome > /dev/null; then echo "gpu $gpu holds Chrome"; break; fi
-            echo "gpu $gpu lost the emulator or Chrome"; "$adb" emu kill || true; pkill -f qemu-system || true; sleep 5
+            echo "gpu $gpu lost the emulator or Chrome"
+            "$adb" shell 'ps -A | grep -i chrom; dumpsys activity activities | grep -i -m3 resumed' || true
+            "$adb" exec-out screencap -p > "tmp/staging-phones/boot-$gpu.png" || true
+            "$adb" logcat -d -t 3000 > "tmp/staging-phones/logcat-$gpu.txt" || true
+            grep -E "FATAL|AndroidRuntime|DEBUG  |chromium.*(error|fatal)|Process com.android.chrome" "tmp/staging-phones/logcat-$gpu.txt" | head -30 || true
+            "$adb" emu kill || true; pkill -f qemu-system || true; sleep 5
           done
           "$adb" shell am force-stop com.android.chrome
           "$adb" shell dumpsys package com.android.chrome | grep -m1 versionName
