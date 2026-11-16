@@ -14,10 +14,9 @@ import { SkyRig } from '../src/client/engine/world/skyRig';
 import { WorldRegistry } from '../src/client/engine/world/registry';
 import { modelContext } from '../src/client/engine/models/model';
 import { bindFlatTerrain } from '@wildshard/engine/test/terrain';
-import { staticGlb } from '../src/sharddev/bake/glb';
-import { bakeRawColourPixels } from '../src/sharddev/bake/rawTexture';
+import { frozenAsset } from './fixtures/frozen/assets';
 import { emptyShardfile } from '../src/shared/host/author';
-import { emitNamedBlobs, nameBlob } from '../src/sharddev/blobs';
+import { fixtureNamedBlobs as emitNamedBlobs, fixtureBlob as nameBlob } from './fixtures/namedBlobs';
 import { parseExplorerCatalogue } from '@wildshard/format/explorerCatalogue';
 import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
 import { SceneDressing } from '../src/client/game/shardfile/sceneDressing';
@@ -40,12 +39,12 @@ afterEach(() => { initializeTier(originalTier); });
 afterAll(() => { decoder?.dispose(); vi.restoreAllMocks(); });
 
 function glb(width: number): Uint8Array {
-  const geometry = new THREE.BoxGeometry(width, 2, 3), material = new THREE.MeshStandardMaterial();
-  try { return staticGlb([{ name: 'crate', geometry, material }]); } finally { geometry.dispose(); material.dispose(); }
+  if (width !== 2 && width !== 8) throw new Error('Unknown original specimen width');
+  return frozenAsset(`product-crate-${width}.glb`);
 }
 function fixture() {
   const model = glb(2), phone = glb(8), pixels = Uint8ClampedArray.from({ length: 4 * 2 * 4 }, (_, index) => (index * 37 + 19) % 256);
-  const atlas = bakeRawColourPixels({ width: 4, height: 2, pixels }), phonePixels = Uint8ClampedArray.from(pixels, value => 255 - value), phoneAtlas = bakeRawColourPixels({ width: 4, height: 2, pixels: phonePixels });
+  const atlas = frozenAsset('product-crate.ktx2'), phonePixels = Uint8ClampedArray.from(pixels, value => 255 - value), phoneAtlas = frozenAsset('product-crate-phone.ktx2');
   const sampler = { wrapS: 10497, wrapT: 33071, minFilter: 9987, magFilter: 9729, anisotropy: 4, colourSpace: 'srgb' } as const;
   const asset = { url: { file: 'models/crate.glb', bytes: model.length }, phoneUrl: { file: 'models/crate-phone.glb', bytes: phone.length },
     atlas: { file: 'textures/crate.ktx2', bytes: atlas.length, ...sampler }, phoneAtlas: { file: 'textures/crate-phone.ktx2', bytes: phoneAtlas.length, ...sampler }, material: { id: 'crate-atlas', family: 'painterly' } as const };

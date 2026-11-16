@@ -11899,7 +11899,7 @@
     "originalTests": [
       "a reload choice answers pointerup without applying or navigating until the explicit button",
       "undoing a staged choice clears it and keyboard clicks remain available",
-      "SR11: the title panel is the in-game tabs, and a quality pick reloads once from Graphics ▸ Reload now",
+      "SR11: the title panel is the in-game tabs, and a quality pick reloads once from Graphics \u25b8 Reload now",
       "retired diagnostics are absent while Clear downloads remains in Developer",
       "storage lives under Clear downloads rather than a diagnostic row"
     ],
@@ -11936,5 +11936,160 @@
     "sourceRevision": "c4387bd420f92a08c50ffa9040ffac9e62b5e7be",
     "sourceBlob": "3b48d1c36f53658a1dd41069c9f29927f80bade6",
     "retirementProof": "No cases retired. Original riding Wasm/witness and exact same-owner module loan; original Nalati pack brain fields parsed by nativeGroupBrain; full frozen species catalogue. Preserve all original replay words, capsule and riding continuation assertions."
+  },
+  {
+    "repo": "engine",
+    "file": "test/carried-quest-host.test.ts",
+    "outcome": "restored",
+    "target": "test/carried-quest-host.test.ts",
+    "decision": "CI21 engine-tail: Full pinned carried quest envelope, exact named prop geometry and original ABI1 Kokpar Wasm lent to its original scope; player carrier, cadence/effects, owner replacement/retirement and hostile admission controls unchanged.",
+    "originalTests": [
+      "delivers a player-carried crate without a riding owner and keeps the AS cadence/effect order",
+      "uses declared player movement eligibility and never reads a rendered pose as a law coordinate",
+      "refuses replaced concrete owners before guest state, pose or effects change",
+      "keeps construction and entered lifetime independent, refusing sliced retirement of either ancestor",
+      "refuses getters and unknown carrier fields before reading data or allocating a prop"
+    ],
+    "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
+    "sourceBlob": "f7c203ee2c508cee95932bc4d1ae19f9101ad4b6",
+    "retirementProof": "No cases retired. Full pinned carried quest envelope, exact named prop geometry and original ABI1 Kokpar Wasm lent to its original scope; player carrier, cadence/effects, owner replacement/retirement and hostile admission controls unchanged."
+  },
+  {
+    "repo": "engine",
+    "file": "test/held-arms-platform.test.ts",
+    "outcome": "restored",
+    "target": "test/held-arms-platform.test.ts",
+    "decision": "CI21 engine-tail: Both original texture-free GLBs frozen byte-for-byte; native Three GLTFLoader/MeshoptDecoder replaces SDK readSourceModel, which used that same parser after removing texture declarations (these sources have none). All rig, materials, glow, socket, clone and swimming assertions unchanged.",
+    "originalTests": [
+      "second-shard rows drive held materials, sword glow, sockets and independent loans",
+      "second-shard swimming uses its material and plane; submerged hands clip below water",
+      "held arms refuse malformed rows and missing catalogue bindings before dressing",
+      "shared rig player preserves the multi-mesh Jian and held grapple clips",
+      "graph held arms list finite Explorer cards from rows and refuse malformed ones"
+    ],
+    "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
+    "sourceBlob": "0b8832171486f3d701bd6d60d69fa129e43088b3",
+    "retirementProof": "No cases retired. Both original texture-free GLBs frozen byte-for-byte; native Three GLTFLoader/MeshoptDecoder replaces SDK readSourceModel, which used that same parser after removing texture declarations (these sources have none). All rig, materials, glow, socket, clone and swimming assertions unchanged."
+  },
+  {
+    "repo": "engine",
+    "file": "test/held-slot-entered.test.ts",
+    "outcome": "restored",
+    "target": "test/held-slot-entered.test.ts",
+    "decision": "CI21 engine-tail: Original helper admitted in engine; real pinned Nine product supplies trusted runtime/native item profiles, exact frozen full Jian presentation and original grapple profile/hooks. Original Sword/EquipmentService/GrappleTool and duplicate entry assertions unchanged.",
+    "originalTests": [
+      "starter and tool slots lend the actual native sword and original entered grapple once"
+    ],
+    "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
+    "sourceBlob": "293263cd62c127074128044de00f79f3aa220366",
+    "retirementProof": "No cases retired. Original helper admitted in engine; real pinned Nine product supplies trusted runtime/native item profiles, exact frozen full Jian presentation and original grapple profile/hooks. Original Sword/EquipmentService/GrappleTool and duplicate entry assertions unchanged."
+  },
+  {
+    "repo": "engine",
+    "file": "test/loot-continuation-ports.test.ts",
+    "outcome": "restored",
+    "target": "test/loot-continuation-ports.test.ts",
+    "decision": "CI21 engine-tail: All six cases unchanged. Original economy preparation helper now reads server/quest-policy.json through the real product instead of the removed author generator; existing native coin preparation/renderer guard remains unchanged.",
+    "originalTests": [
+      "a native cosmetic stream matches every page burst word, draw and callback through pool overflow",
+      "owned continuation storage preserves page filtering, writes and notifications",
+      "bounty continuation storage keeps the original paid slots and late-kind cap",
+      "an in-flight pool restores every word and award group silently before an exact suffix",
+      "purse restore retains unflushed earned coins without a write or listener call",
+      "the actual native economy and coin preparation import under the unchanged renderer guard"
+    ],
+    "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
+    "sourceBlob": "1c219b4dcea131d41ff544bb3952679dd39ab09b",
+    "retirementProof": "No cases retired. All six cases unchanged. Original economy preparation helper now reads server/quest-policy.json through the real product instead of the removed author generator; existing native coin preparation/renderer guard remains unchanged."
+  },
+  {
+    "repo": "engine",
+    "file": "test/pickup-catalogue.test.ts",
+    "outcome": "restored",
+    "target": "test/pickup-catalogue.test.ts",
+    "decision": "CI21 engine-tail: All eight cases unchanged apart from replacing full unrelated world setup with actual shared props plus pickup preparation. Original offline bake replay is retained as a read-only witness against the full frozen authored Driftwood/Pine interaction tables; it checks every geometry/catalogue/bank byte and the original 23-variant trace/size values. No author implementation imports or output writes.",
+    "originalTests": [
+      "covers every reachable seed in real table order without importing frozen callers",
+      "restores every prepared geometry byte and gives each owner independent arrays",
+      "preserves visible specimen heights, lit/glow order, shadows and animation rows",
+      "refuses undeclared seeds and malformed declarations without a live fallback",
+      "addresses every current raw payload by its content hash",
+      "preflights the complete file bank before changing any existing pickup factory",
+      "retiring an ancestor drains the raw-read window without later reads or installation",
+      "offset pickup loans retain the original words and fresh native geometry"
+    ],
+    "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
+    "sourceBlob": "741566c190ec26013657c6c352aff75017632fed",
+    "retirementProof": "No cases retired. All eight cases unchanged apart from replacing full unrelated world setup with actual shared props plus pickup preparation. Original offline bake replay is retained as a read-only witness against the full frozen authored Driftwood/Pine interaction tables; it checks every geometry/catalogue/bank byte and the original 23-variant trace/size values. No author implementation imports or output writes."
+  },
+  {
+    "repo": "engine",
+    "file": "test/scene-instances.test.ts",
+    "outcome": "restored",
+    "target": "test/scene-instances.test.ts",
+    "decision": "CI21 engine-tail: Full original pinned Kokpar rider row admitted by SceneInstancesSchema; independent predecessor oval formula and original layout values preserved. Cadence, pose/height, buffer retirement, copied-input and culling assertions unchanged.",
+    "originalTests": [
+      "an orchard fixture projects copied numeric rows on the declared cadence and retires its buffers",
+      "declared Kokpar poses keep the original oval and gallop height"
+    ],
+    "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
+    "sourceBlob": "340c3071d7801067389c2103d01b79c6ec6bda07",
+    "retirementProof": "No cases retired. Full original pinned Kokpar rider row admitted by SceneInstancesSchema; independent predecessor oval formula and original layout values preserved. Cadence, pose/height, buffer retirement, copied-input and culling assertions unchanged."
+  },
+  {
+    "repo": "engine",
+    "file": "test/spawn-script-v2-queries.test.ts",
+    "outcome": "restored",
+    "target": "test/spawn-script-v2-queries.test.ts",
+    "decision": "CI21 engine-tail: Original exact compiler sources/options keyed to frozen Wasm, plus full original bakeSpecies(BOAR, fixture.boar) declaration. All six real PAGE/native Rapier query, restore, rights/ownership and atomic publication cases unchanged.",
+    "originalTests": [
+      "PAGE production runner resolves actual ordered actors after bodies and stores replies in its original envelope",
+      "native installation uses one original afterBodies callback and no second save adapter",
+      "admission rejects missing rights, duplicate operations and incomplete fixed-memory banks",
+      "an original v1 continuation imports with an empty query ring and no guest or query replay",
+      "idle query phases leave borrowed native rosters unread",
+      "a foreign requested roster suffix leaves the complete module reply batch unpublished"
+    ],
+    "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
+    "sourceBlob": "cbdf2294061a57afa6a1da4524689c4744088c26",
+    "retirementProof": "No cases retired. Original exact compiler sources/options keyed to frozen Wasm, plus full original bakeSpecies(BOAR, fixture.boar) declaration. All six real PAGE/native Rapier query, restore, rights/ownership and atomic publication cases unchanged."
+  },
+  {
+    "repo": "engine",
+    "file": "test/specimen-product-atlas.test.ts",
+    "outcome": "restored",
+    "target": "test/specimen-product-atlas.test.ts",
+    "decision": "CI21 engine-tail: Exact original crate GLBs/raw atlas pixels produced once by SDK da2a4ddb; owned bytes remain fresh each read including real GC. Product fixture names/hashes retain actual strict JSON admission; every pixel/sampler, retry, lifetime, adapter and invalid binding control unchanged.",
+    "originalTests": [
+      "selected %s geometry and atlas preserve every pixel and the complete sampler without asset fetches",
+      "missing, conflicting, legacy and ambiguous atlas bindings refuse before any product read",
+      "wrong or malformed atlas bytes and unprepared definitions cannot publish a catalogue",
+      "equal model bytes with separate atlas identities do not alias materials, while a live hit shares its resources",
+      "a rejected atlas parse can retry the same prepared source",
+      "retiring an atlas invalidates the bound result and reparses that source with a fresh material",
+      "an owner retired during the atlas read cannot admit late bytes",
+      "Explorer, direct dressing and generated encounter adapters prepare the same admitted atlas",
+      "live atlas geometry and materials release borrowed files and loader declarations"
+    ],
+    "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
+    "sourceBlob": "c5958b01058a848ac89a964b65f63c783f62ddb0",
+    "retirementProof": "No cases retired. Exact original crate GLBs/raw atlas pixels produced once by SDK da2a4ddb; owned bytes remain fresh each read including real GC. Product fixture names/hashes retain actual strict JSON admission; every pixel/sampler, retry, lifetime, adapter and invalid binding control unchanged."
+  },
+  {
+    "repo": "engine",
+    "file": "test/specimen-product-glb.test.ts",
+    "outcome": "restored",
+    "target": "test/specimen-product-glb.test.ts",
+    "decision": "CI21 engine-tail: Exact original width2/8 GLBs produced once by SDK da2a4ddb; actual product names/hashes and strict JSON admission retained. Selected tier, complete channels/bounds, hostile/in-flight reader and actual Explorer/dressing/encounter controls unchanged.",
+    "originalTests": [
+      "both tiers preflight only their selected GLB and preserve the complete primitive through catalogue builds",
+      "missing, ambiguous, conflicting and hostile GLB declarations refuse before any product read",
+      "wrong lengths and invalid GLBs refuse before model publication without URL fallback",
+      "retired owners and replaced readers cannot admit an in-flight GLB",
+      "Explorer and live dressing geometry, material and encounter adapters use verified GLBs"
+    ],
+    "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
+    "sourceBlob": "eb9e87f289bcee106599813c2915eae7c041170e",
+    "retirementProof": "No cases retired. Exact original width2/8 GLBs produced once by SDK da2a4ddb; actual product names/hashes and strict JSON admission retained. Selected tier, complete channels/bounds, hostile/in-flight reader and actual Explorer/dressing/encounter controls unchanged."
   }
 ]

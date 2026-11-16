@@ -13,9 +13,9 @@ import {Rng} from '../src/shared/engine/core/rng';
 import {modelContext} from '../src/client/engine/models/model';
 import {SkyRig} from '../src/client/engine/world/skyRig';
 import {WorldRegistry} from '../src/client/engine/world/registry';
-import {staticGlb} from '../src/sharddev/bake/glb';
+import {frozenAsset} from './fixtures/frozen/assets';
 import {emptyShardfile} from '../src/shared/host/author';
-import {emitNamedBlobs,nameBlob} from '../src/sharddev/blobs';
+import {fixtureNamedBlobs as emitNamedBlobs,fixtureBlob as nameBlob} from './fixtures/namedBlobs';
 import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
 import {SceneDressing} from '../src/client/game/shardfile/sceneDressing';
 import type {ShardContext} from '../src/client/game/plugin/context';
@@ -24,9 +24,9 @@ import {awaitSpecimenAssets,defineSpecimenCatalogue,loadSpecimenAsset,prepareSpe
 
 const originalTier=TIER;
 afterEach(()=>{initializeTier(originalTier);vi.restoreAllMocks();});
-function glb(width:number):Uint8Array{
-  const geometry=new THREE.BoxGeometry(width,2,3),material=new THREE.MeshStandardMaterial();
-  try{return staticGlb([{name:'crate',geometry,material}]);}finally{geometry.dispose();material.dispose();}
+function glb(width: number): Uint8Array {
+  if (width !== 2 && width !== 8) throw new Error('Unknown original specimen width');
+  return frozenAsset(`product-crate-${width}.glb`);
 }
 const material={id:'product-crate',family:'painterly'}as const;
 const metadata={id:'orchard/product-crate',name:'Crate',file:'fixture.json',category:'props',pipeline:'code',defaults:{}}as const;

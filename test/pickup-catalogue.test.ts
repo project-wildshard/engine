@@ -18,9 +18,10 @@ import { coinModel } from '../src/client/game/loot/coinModel';
 import { installPickupCatalogue, preparePickupCatalogue } from '../src/client/game/models/specimenCatalogue';
 import { authoredPickups } from '../src/client/game/generators/pickups';
 import data from '../src/client/game/data/pickupCatalogue.json' with { type: 'json' };
-import { installWorldFixture } from './fixtures/worldSetup';
+import { installKitProps } from '../src/client/game/models/interact';
 
-await installWorldFixture();
+installKitProps();
+installPickupCatalogue(data,await preparePickupCatalogue({file:name=>Promise.resolve(new Uint8Array(readFileSync(`public${name}`)))},data));
 
 function sameGeometry(actual: THREE.BufferGeometry, expected: THREE.BufferGeometry): void {
   expect(Object.keys(actual.attributes)).toEqual(Object.keys(expected.attributes));
@@ -41,7 +42,7 @@ function sameGeometry(actual: THREE.BufferGeometry, expected: THREE.BufferGeomet
 it('covers every reachable seed in real table order without importing frozen callers', () => {
   const program = `import {registerHooks} from 'node:module';
 registerHooks({resolve(specifier,context,next){if(specifier.includes('-legacy/'))throw new Error('Legacy pickup dependency: '+specifier);return next(specifier,context);}});
-await import('./scripts/bake-pickups.mjs');`;
+await import('./test/fixtures/pickupBakeWitness.mjs');`;
   const output = execFileSync(execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs',
     '--input-type=module', '--eval', program, '--', '--check'], { encoding: 'utf8' });
   // The producer traces Interactables.parts and its real cache, then compares every encoded output byte.

@@ -8,7 +8,7 @@ const manifest = parse(object({files: record(string(), object({bytes: number(), 
 /** Fresh transport ownership on every read, including real-GC witnesses. */
 export function frozenAsset(name: string): Uint8Array<ArrayBuffer> {
   const pin = manifest.files[name];
-  if (pin === undefined || !/^[a-z0-9-]+\.(?:glb|ktx2|bin)$/u.test(name)) throw new Error(`Unknown frozen asset: ${name}`);
+  if (pin === undefined || !/^[a-z0-9-]+\.(?:glb|ktx2|bin|wasm)$/u.test(name)) throw new Error(`Unknown frozen asset: ${name}`);
   const bytes = new Uint8Array(readFileSync(new URL(name,assetRoot)));
   if (bytes.length !== pin.bytes || sha256(bytes) !== pin.sha256) throw new Error(`Frozen asset differs: ${name}`);
   return bytes;

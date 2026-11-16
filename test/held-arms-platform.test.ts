@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-// oxlint-disable-next-line import/no-nodejs-modules -- Exercise the native loader on the shipped rig bytes.
-import { readFileSync } from 'node:fs';
-import { readSourceModel } from '../src/sharddev/bake/skinned';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { frozenAsset } from './fixtures/frozen/assets';
 import * as rigLoader from '../src/client/engine/anim/rig';
 import * as lookCompiler from '../src/client/game/shardfile/runtimeProduct';
 import { ToonLook } from '../src/client/engine/render/families/toon';
@@ -48,7 +48,7 @@ let queuedLooks: Looks[] = [];
 
 beforeEach(() => {
   vi.spyOn(rigLoader, 'loadRigFile').mockImplementation(async () => {
-    const source = await readSourceModel(readFileSync('public/assets/models/driftwood-fp/fp-arms.glb'));
+    const source = { gltf: await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(frozenAsset('driftwood-arms.glb').buffer, '') };
     const root = source.gltf.scene.getObjectByName('vm_root');
     if (root === undefined) throw new Error('Missing fixture rig root');
     root.userData['rig'] = row.skeleton;
@@ -133,8 +133,8 @@ test('held arms refuse malformed rows and missing catalogue bindings before dres
 });
 
 test('shared rig player preserves the multi-mesh Jian and held grapple clips', async () => {
-  vi.mocked(rigLoader.loadRigFile).mockImplementation(async () =>
-    (await readSourceModel(readFileSync('public/assets/nine-dragon/viewmodel/fp-rig.glb'))).gltf);
+  vi.mocked(rigLoader.loadRigFile).mockImplementation(() =>
+    new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(frozenAsset('nine-arms.glb').buffer, ''));
   const contract = { skeleton: 'nine-dragon-fp', clips: armClipNames(ARM_CLIPS), sockets: ['R_weapon', 'L_claw'] };
   const bake = { skeleton: contract.skeleton, clips: ARM_CLIPS,
     joints: ['R', 'L'].map(side => ['shoulder', 'upperarm', 'forearm', 'twist1', 'twist2', 'twist3', 'hand'].map(joint => `${side}_${joint}`)) };

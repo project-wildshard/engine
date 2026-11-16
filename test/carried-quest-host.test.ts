@@ -1,5 +1,4 @@
-import {carriedPropFiles} from './fixtures/carriedPropFiles';
-import {lendNalatiKokpar} from './fixtures/nalati-return-modules';
+import {carriedPropFiles,carriedQuestRows,lendFrozenKokpar as lendNalatiKokpar} from './fixtures/frozen/carriedQuest';
 import {expect,it,vi} from 'vitest';
 import * as THREE from 'three';
 import {Scope} from '../src/shared/engine/app/scope';
@@ -14,7 +13,6 @@ import {parseDecisionScripts} from '@wildshard/format/decisionScripts';
 import * as terrain from '../src/shared/engine/world/terrainHeight';
 import * as riding from '../src/client/game/riding/client';
 import type {ShardContext} from '../src/client/game/plugin/context';
-import {carriedQuestRows} from './fixtures/nalati-carried-quest';
 
 function fixture(){
   const construction=new Scope('delivery construction'),scope=new Scope('delivery entered'),sky:unknown=Object.create(SkyRig.prototype),quest:unknown=Object.create(QuestState.prototype);

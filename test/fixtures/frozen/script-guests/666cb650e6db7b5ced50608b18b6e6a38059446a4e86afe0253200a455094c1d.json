@@ -1,0 +1,1 @@
+{"method":"compileScript","arguments":["export function ws_abi():i32{return 1;}export function ws_io():i32{return 16384;}\nexport function ws_init(lo:i32,hi:i32):void{}export function ws_handle():i32{return 0;}",{"abi":1}],"file":"c0d1ec0229472b746c7e5c1775f59749f368a6a8322a039661c1220a34a22278.wasm","sha256":"c0d1ec0229472b746c7e5c1775f59749f368a6a8322a039661c1220a34a22278"}
