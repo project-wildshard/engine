@@ -117,3 +117,8 @@ A skipped Actions step may have null timestamps. Its failed qualification
 now uses the actual workflow timestamps for ordering, so an undated skip
 cannot sit out of chronology between two green observations. No time is
 invented and the nine-case suite body is unchanged.
+
+J206 caught a fail-closed collector gap: every matrix job declares the
+soak step, though only tests (1) executes it. Collection now selects that
+actual owning job before requiring exactly one step. Failed/skipped or
+cancelled observations in that owner remain visible and reset the span.

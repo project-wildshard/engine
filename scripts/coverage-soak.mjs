@@ -30,9 +30,9 @@ for(const run of page.workflow_runs.filter(row=>row.status==='completed')){
     catch{completeHistory=false;continue;}
   }
   if(hash(committed)!==sourceHash)continue;
-  /** @type {{id:number,steps?:{name:string,conclusion:string,started_at?:string|null,completed_at?:string|null}[]}[]} */
+  /** @type {{id:number,name:string,steps?:{name:string,conclusion:string,started_at?:string|null,completed_at?:string|null}[]}[]} */
   const jobs=api(`repos/project-wildshard/engine/actions/runs/${run.id}/jobs?per_page=100`).jobs;
-  const matches=jobs.flatMap(job=>(job.steps??[]).filter(step=>step.name==='Soak actual host, door, format and outside-author contracts').map(step=>({job,step})));
+  const matches=jobs.filter(job=>job.name==='tests (1)').flatMap(job=>(job.steps??[]).filter(step=>step.name==='Soak actual host, door, format and outside-author contracts').map(step=>({job,step})));
   if(matches.length!==1){observations.push({run:run.id,sha:run.head_sha,started:run.run_started_at??run.created_at,completed:run.updated_at,ok:false,error:'Expected exactly one soak step'});continue;}
   const {job,step}=matches[0];
   const log=stripVTControlCharacters(execFileSync('gh',['api','--allow-escape-sequences',`repos/project-wildshard/engine/actions/jobs/${job.id}/logs`],{encoding:'utf8',timeout:30000,maxBuffer:32*1024*1024}));
