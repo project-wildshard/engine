@@ -90,3 +90,13 @@ player before creatures, so command N meets the creature's N-1 pose.
 The first implementation read N. A red-first half-metre difference
 in the linear-motion case pins N-1 for both live steps and replay.
 The existing sample remains unchanged for rendering after projection.
+
+NL14 also has a small boot-acquisition hole: the first frame can be
+the oldest in a backlog below the 250 ms snap threshold, yet it did
+not open the existing acquisition window. Five queued frames leave
+the old clock at tick 0.073 after hearing tick 8; a 230 ms boot stall
+leaves 147 ms interpolation after ten clean seconds. Both native
+cases fail first. Open the same window on first arrival, so the burst
+acquires its newest tick. Thirty-two focused clock/buffer/link cases
+pass, with the delay cap, fall rate and jitter estimator unchanged.
+This reproduces a possible cause; new runtime qualification is owed.

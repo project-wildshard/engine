@@ -12,6 +12,14 @@ const seeded = (seed: number): (() => number) => { let a = seed; return () => { 
 
 test('a session starts on 100 ms', () => { expect(new NetClock().delayMs).toBe(INTERP_START_MS); });
 
+test('a sub-snap first backlog acquires the newest heard frame', () => {
+  const clock = new NetClock();
+  // The first five 30 Hz messages wait behind a 150 ms page boot task.
+  // None is 250 ms from the first anchor, so this never takes the snap path.
+  for (let frame = 0; frame < 5; frame++) clock.arrival(frame * 2, 5230 + frame * .3);
+  expect(clock.serverTick(5231.2)).toBeCloseTo(8, 6);
+});
+
 test('at 24.3 frames/s on loopback the delay settles under 90 ms', () => {
   // The worker's timer lands a frame within a few ms of due. The stamp is onmessage's, so the render rate adds nothing to it:
   // the same run stamped at the next 41 ms render frame is what the row warns of, and it cannot settle under 90.

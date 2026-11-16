@@ -47,6 +47,14 @@ test('the buffer is deep enough for the deepest delay and two frames more', () =
   expect((INTERP_SAMPLES - 1) * FRAME_MS).toBeGreaterThanOrEqual(INTERP_MAX_MS + 2 * FRAME_MS);
 });
 
+test('a first backlog below the snap threshold does not inflate clean-link interpolation', () => {
+  const run = play(12, [{ at: 0, ms: 230 }], () => 0);
+  expect(run.delayAt(10_000)).toBeLessThanOrEqual(120);
+  expect(run.clock.targetMs).toBeLessThan(90);
+  expect(run.lerp.held).toBe(0);
+  expect(run.starvedAfter(1000)).toBe(0);
+});
+
 test('after a 1 s boot stall and a 325 ms stall burst, 10 s of clean 30 Hz settles the delay at 120 ms or under', () => {
   const rng = seeded(3), run = play(15, [{ at: 600, ms: 1000 }, { at: 3200, ms: 325 }], sent => sent < 5000 ? rng() * 20 : rng() * 4);
   console.info(`NL2 stalls: delay peak ${Math.max(...run.delays).toFixed(0)} ms, after 10 s clean ${run.clock.delayMs.toFixed(0)} ms, jitter ${run.clock.jitterMs.toFixed(1)} ms, interpHeld ${run.lerp.held}, starved after ${run.starvedAfter(5000)}`);

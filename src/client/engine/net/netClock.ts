@@ -43,7 +43,7 @@ export class NetClock {
   private newest = -1;
   private filled = 0;
   private next = 0;
-  /** When the clock last snapped. */
+  /** When the clock last began acquiring, initially or after a snap. */
   private snapMs = -Infinity;
   private readonly lateness = new Float64Array(JITTER_FRAMES);
   private readonly sorted = new Float64Array(JITTER_FRAMES);
@@ -54,7 +54,10 @@ export class NetClock {
   /** Stamp a frame as it arrives. Only a new frame moves the clock: a late one says nothing about now. */
   arrival(tick: number, nowMs: number): void {
     if (tick <= this.newest) return;
-    if (this.newest === -1) { this.newest = tick; this.anchorMs = nowMs; this.anchorTick = tick; return; }
+    // The first heard frame can be the oldest of a boot backlog smaller than
+    // SNAP_MS. Acquire through its newest frame as after a later snap, rather
+    // than spending seconds correcting a false phase error at the PLL's 1%.
+    if (this.newest === -1) { this.newest = tick; this.anchorMs = nowMs; this.anchorTick = tick; this.snapMs = nowMs; return; }
     this.newest = tick;
     const estimate = this.serverTick(nowMs), errorMs = (tick - estimate) * TICK_MS, waitedMs = nowMs - this.anchorMs;
     // A stall's backlog arrives as one burst, oldest first: the oldest snaps the clock back, and every frame ahead of the clock
