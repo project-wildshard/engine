@@ -19,6 +19,21 @@ import type { FarBand } from '../../../shared/game/grid/farProxy';
  */
 export const BAND_OUTSET = 18;
 
+/**
+ * ZONE-ENTRY ZE7: the band clears around the camera, fully within `BAND_CLEAR_FROM` m and thick again from
+ * `BAND_CLEAR_TO` m. The road's centre line runs 31.25 m off the cell edge, so the band stands 13.25 m from a traveller
+ * at a turn-in: at the old 2 to 12 m fade it hung full across the entryway and the see-through wall, and Nine Dragon read
+ * as flat grey fog towers from every turn-in, live and placeholder alike (J352's "It looks continuous", the wall's
+ * "enticed to enter"). Along the road the stretch beside the traveller is clear and the band ahead still reads (G95).
+ */
+export const BAND_CLEAR_FROM = 16, BAND_CLEAR_TO = 70;
+
+/** The share of the band drawn at `distance` m from the camera (the fragment shader's `near`, GLSL smoothstep). */
+export function bandNearShare(distance: number): number {
+  const t = Math.min(1, Math.max(0, (distance - BAND_CLEAR_FROM) / (BAND_CLEAR_TO - BAND_CLEAR_FROM)));
+  return t * t * (3 - 2 * t);
+}
+
 const vertex = /* glsl */ `
 varying vec2 vUv;
 varying vec3 vWorld;
@@ -37,7 +52,7 @@ void main() {
   float h = clamp(vUv.y, 0.0, 1.0);
   float rise = pow(1.0 - h, 1.5);
   float wisp = 0.72 + 0.28 * sin(vUv.x * 0.041 + 3.0 * sin(vUv.x * 0.011) + h * 2.3) * (0.6 + 0.4 * sin(vUv.x * 0.13 + h * 5.0));
-  float near = smoothstep(2.0, 12.0, length(vWorld.xz - cameraPosition.xz));
+  float near = smoothstep(${BAND_CLEAR_FROM.toFixed(1)}, ${BAND_CLEAR_TO.toFixed(1)}, length(vWorld.xz - cameraPosition.xz));
   float a = uOpacity * rise * wisp * near;
   if (a < 0.004) discard;
   gl_FragColor = vec4(uColour * (1.0 + 0.25 * (1.0 - h)), a);
