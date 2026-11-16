@@ -1,6 +1,6 @@
 {
-  "cells": 24,
-  "countToControlMs": 60000,
-  "loadingMs": 55000,
+  "cells": 25,
+  "countToControlMs": 45000,
+  "loadingMs": 40000,
   "mb": 1200
 }
