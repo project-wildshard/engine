@@ -7,7 +7,9 @@ The platform `pursue` brain kept `pursue`/`attack`/`return` in its own
 `mode`, and the `wander-ram` and `circle-challenge` grazer patterns kept
 `threat`/`ram`/`notice`/`fight` in `phase`. Nothing wrote the body's
 `state`, so the wire and the page read `idle` for a wyrmling ramming the
-player: no chase music, no hot minimap dot, no lock-on tie-break.
+player: no chase count for the music, no lock-on tie-break. (The minimap's
+hot dot and the page's fighting check also need the species' `aggressive`,
+which Brasscap's wyrmling and brawler do not set: that is shard data.)
 
 - `PlatformBrain.step` writes the body's state after each step: `pursue` is
   `stalk`, `attack` is `attack`, `wander` and `return` are `wander`, else
@@ -22,7 +24,12 @@ player: no chase music, no hot minimap dot, no lock-on tie-break.
   pass unchanged.
 - `test/grazer-frame-input.test.ts` compared the body against the original
   grazer fixture field for field; it now compares every field but `state`
-  and checks the state is one a brain may write.
+  and checks the state is the one the original brain's phase and strike
+  name.
+- Mossgate's ring digest (`test/pins/ring-digests.json`, darwin-arm64)
+  moves: the grey blob now reads `wander` while it wanders. Re-recorded
+  with `scripts/ring-step.ts --only template --update`; blender-template's
+  stays the same.
 - `test/brain-state-published.test.ts`: Mossgate's grey blob, Brasscap's
   wyrmling and its brawler each read `stalk` or `attack` with the player
   6 m off, and never `charge`. Without this change all three read `idle`.
