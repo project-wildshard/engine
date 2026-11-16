@@ -58,3 +58,10 @@ descriptor-ordered. Run focused item continuation and ordinary fast
 commit/push checks; do no local cook. Final actual cold18plots plus
 3templates must qualify the accepted API head before SH-ALL-5 closes.
 Released pins and an engine release remain separate from this row.
+
+M1/J381: the API passed normal commit checks and the focused item case.
+Its clean-copy push gate then spent over four minutes at full CPU,
+exceeding the three-minute close-out cap. Stop that unfinished gate,
+retain the source commit, and push through main-push with SKIP_CHECK=1.
+This is no full-suite green claim; main CI and codex-tc48 cover fixes
+forward under M2. Final actual cold21 receipts still gate row credit.
