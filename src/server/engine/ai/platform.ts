@@ -55,6 +55,15 @@ export class PlatformBrain {
   step(tick: number): void {
     if (!Number.isSafeInteger(tick) || tick <= this.state.tick) throw new Error('Non-monotonic brain tick');
     this.state.tick = tick; this.state.cooldown = Math.max(0, this.state.cooldown - 1);
+    this.decide(tick); this.publishState();
+  }
+  /** TEMPLATE-E2E TC-NE24c: the body's state names the brain's mode (never `charge`, which the hunt's contact reads). */
+  private publishState(): void {
+    if (!this.actor.alive) return;
+    const now = this.state.mode;
+    this.actor.state = now === 'pursue' ? 'stalk' : now === 'attack' ? 'attack' : now === 'wander' || now === 'return' ? 'wander' : 'idle';
+  }
+  private decide(tick: number): void {
     if (!this.actor.alive) { this.state.mode = 'dead'; this.state.target = null; this.actor.setMotion(this.actor.yaw, 0, this.spec.turnRate); return; }
     if (tick % this.spec.thinkDivisor !== 0) return;
     const at = this.actor.position, homeDistance = distance(at, this.home), targets = this.ports.targets();

@@ -310,6 +310,17 @@ export class GrazerBrain<A extends AnimalSim> extends GroupBrain<A> {
     const p = this.profile;
     if (p.pattern === 'wander-ram' && c.pattern === 'wander-ram') this.actWander(c, p);
     else if (p.pattern === 'circle-challenge' && c.pattern === 'circle-challenge') this.actCircle(c, p);
+    else return;
+    this.publishState();
+  }
+  /** TEMPLATE-E2E TC-NE24c: the body's state says what the pattern is doing, so the wire and the page read a creature
+   *  going for the player as one. Never `charge` (the hunt's charge contact reads it); `stalk` while it closes or faces
+   *  the player, `attack` while a strike runs, `idle` otherwise. */
+  private publishState(): void {
+    const a = this.actor; if (!a.alive) return;
+    const striking = this.strikes.busy && this.strikes.state !== 'cooldown';
+    a.state = this.phase === 'ram' || (this.phase === 'fight' && striking) ? 'attack'
+      : this.phase === 'threat' || this.phase === 'notice' || this.phase === 'fight' ? 'stalk' : 'idle';
   }
   private thinkWander(c: WanderGrazerPorts<A>, p: Extract<GrazerProfile, { pattern: 'wander-ram' }>): void {
     const a = this.actor; if (!a.alive) return;

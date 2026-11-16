@@ -31,6 +31,13 @@ function fixture(kind: 'wander-ram' | 'circle-challenge') {
   return {actor, profile, context, rng, events};
 }
 
+// TC-NE24c: the brain now publishes its pattern's state on the body (the original fixture never did); every other body
+// field still matches the original exactly, and the published state is one a brain may write.
+function sameBody(actor: AnimalSim, original: AnimalSim): void {
+  const {state, ...body} = actor.snapshot(), {state: _before, ...was} = original.snapshot();
+  expect(body).toEqual(was); expect(['idle', 'stalk', 'attack']).toContain(state);
+}
+
 test.each(['wander-ram', 'circle-challenge'] as const)('%s skips bad clocks without state, strike or RNG changes and keeps later work alive', kind => {
   const f = fixture(kind), reference = fixture(kind), brain = new GrazerBrain(f.actor, f.profile);
   const old = new OriginalGrazerBrain(reference.actor, reference.profile), faults: Fault[] = [];
@@ -44,7 +51,7 @@ test.each(['wander-ram', 'circle-challenge'] as const)('%s skips bad clocks with
     }
     expect(faults).toHaveLength(1); expect(faults[0]).toMatchObject({system: 'ai.grazer', verdict: 'retry'});
     f.context.dt = .1; brain.think(f.context); brain.act(f.context); old.think(reference.context); old.act(reference.context);
-    expect(brain.snapshot()).toEqual(old.snapshot()); expect(f.actor.snapshot()).toEqual(reference.actor.snapshot());
+    expect(brain.snapshot()).toEqual(old.snapshot()); sameBody(f.actor, reference.actor);
     expect(f.rng.snapshot()).toEqual(reference.rng.snapshot()); expect(f.events).toEqual(reference.events);
   } finally {off();}
 });
@@ -83,7 +90,7 @@ test.each(['wander-ram', 'circle-challenge'] as const)('%s preserves 120 indepen
     }
     brain.think(f.context); brain.act(f.context); old.think(reference.context); old.act(reference.context);
     f.actor.step(f.context.dt); reference.actor.step(reference.context.dt);
-    expect(brain.snapshot()).toEqual(old.snapshot()); expect(f.actor.snapshot()).toEqual(reference.actor.snapshot());
+    expect(brain.snapshot()).toEqual(old.snapshot()); sameBody(f.actor, reference.actor);
     expect(f.rng.snapshot()).toEqual(reference.rng.snapshot()); expect(f.events).toEqual(reference.events);
   }
 });
