@@ -318,6 +318,43 @@ def mutations(actual):
     return count + 1
 
 
+def directory_controls(actual):
+    directory = actual['root'] / 'receipt-directory'
+    directory.mkdir()
+    matching = directory / 'matching.json'
+    matching.write_bytes(actual['proofFile'].read_bytes())
+    (directory / 'malformed.json').write_text('{broken')
+    (directory / 'link.json').symlink_to(actual['proofFile'])
+    unsafe = directory / 'writable.json'
+    unsafe.write_text('{}')
+    unsafe.chmod(0o666)
+    unrelated = copy.deepcopy(actual['proof'])
+    unrelated['measurement']['owner']['identity'] = 'unrelated-owner'
+    (directory / 'unrelated.json').write_text(json.dumps(unrelated))
+    result = qualify_files(actual['raw'], directory, actual['log'])
+    assert result['qualified'], result
+    diagnostics = result['evidence']['proofDiscovery']
+    assert diagnostics['entries'] == 5 and diagnostics['malformed'] == 1, diagnostics
+    assert diagnostics['unsafe'] == 2 and diagnostics['unrelated'] == 1, diagnostics
+    malformed = copy.deepcopy(actual['proof'])
+    malformed['measurement']['profile'] = 'split-v1'
+    matching.write_text(json.dumps(malformed))
+    assert not qualify_files(actual['raw'], directory, actual['log'])['qualified']
+    matching.write_text('{broken own receipt')
+    assert not qualify_files(actual['raw'], directory, actual['log'])['qualified']
+    matching.write_bytes(actual['proofFile'].read_bytes())
+    duplicate = directory / 'duplicate.json'
+    duplicate.write_bytes(matching.read_bytes())
+    assert not qualify_files(actual['raw'], directory, actual['log'])['qualified']
+    duplicate.unlink()
+    directory.chmod(0o777)
+    assert not qualify_files(actual['raw'], directory, actual['log'])['qualified']
+    directory.chmod(0o755)
+    return {'validOwnerWithUnrelatedInvalidEntries': True, 'diagnostics': diagnostics,
+            'malformedMatchedRefused': True, 'ambiguousMatchedRefused': True,
+            'unsafeDirectoryRefused': True}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--scratch', required=True, type=Path)
@@ -357,6 +394,7 @@ def main():
         assert not qualify_files(actual['raw'], deep, actual['log'])['qualified']
         assert actual['raw'].exists() and actual['proofFile'].exists() and actual['log'].exists()
         print(json.dumps({'realProducerJoins': 2, 'metadataRefusals': count, 'foreignOwnerRefused': True,
+                          'proofDirectory': directory_controls(actual),
                           'unreapedRoot': unreaped_root(root), 'unreapedDeadline': unreaped_root(root, deadline=True),
                           'actualDelayedParentQualified': True, 'parentEndStampAfterCensusMs': delay_ms,
                           'additionalProofWindowRefusals': 2, 'commandCpuPreserved': True,

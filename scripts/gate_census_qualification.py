@@ -127,6 +127,60 @@ def owned_bytes(path, limit):
         os.close(fd)
 
 
+def discover_proof(source, root):
+    """Bound directory work; invalid unrelated entries do not own this census."""
+    directory = source.is_dir()
+    diagnostics = {'entries': 0, 'bytes': 0, 'malformed': 0, 'unsafe': 0, 'unrelated': 0}
+    if directory:
+        info = source.lstat()
+        need(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid() and not info.st_mode & 0o022,
+             'proof directory is not privately owned')
+        paths = []
+        for path in source.glob('*.json'):
+            paths.append(path)
+            need(len(paths) <= 4096, 'proof directory exceeds its entry budget')
+    else:
+        paths = [source]
+    candidates = []
+    for path in paths:
+        diagnostics['entries'] += 1
+        # Charge even unreadable/oversized entries against the directory bound.
+        try:
+            info = path.lstat()
+        except OSError:
+            if not directory:
+                raise
+            diagnostics['unsafe'] += 1
+            continue
+        diagnostics['bytes'] += info.st_size
+        need(diagnostics['bytes'] <= 32 * 1024**2,
+             'proof directory exceeds its byte budget; select one receipt')
+        try:
+            body = owned_bytes(path, 2 * 1024**2)
+        except (OSError, ValueError):
+            if not directory:
+                raise
+            diagnostics['unsafe'] += 1
+            continue
+        try:
+            proof = json.loads(body)
+            need(isinstance(proof, dict), 'proof is not an object')
+        except (ValueError, RecursionError):
+            if not directory:
+                raise
+            diagnostics['malformed'] += 1
+            continue
+        measurement = proof.get('measurement')
+        owner = measurement.get('owner') if isinstance(measurement, dict) else None
+        if isinstance(owner, dict) and owner.get('identity') == root['identity'] and owner.get('pid') == root['pid']:
+            # Once matched, every remaining field is mandatory in join_census.
+            candidates.append((path, proof))
+        else:
+            diagnostics['unrelated'] += 1
+    need(len(candidates) == 1, 'missing or ambiguous owner-bound proof')
+    return (*candidates[0], diagnostics)
+
+
 def qualify_files(raw_report, proof_source, command_log, used=()):
     """A receipt file or one bounded cache directory; shared logs may append after this snapshot."""
     evidence = {'rawReport': str(raw_report), 'proofSource': str(proof_source), 'commandLog': str(command_log)}
@@ -138,31 +192,8 @@ def qualify_files(raw_report, proof_source, command_log, used=()):
              and sum(row.get('type') == 'end' for row in rows) == 1, 'ambiguous raw census')
         start, end = rows[0], rows[-1]
         root = start['root']
-        source = Path(proof_source)
-        if source.is_dir():
-            info = source.lstat()
-            need(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid() and not info.st_mode & 0o022,
-                 'proof directory is not privately owned')
-            paths = []
-            for path in source.glob('*.json'):
-                paths.append(path)
-                need(len(paths) <= 4096, 'proof directory exceeds its entry budget')
-        else:
-            paths = [source]
-        candidates, byte_count = [], 0
-        for path in paths:
-            body = owned_bytes(path, 2 * 1024**2)
-            byte_count += len(body)
-            need(byte_count <= 32 * 1024**2, 'proof directory exceeds its byte budget; select one receipt')
-            proof = json.loads(body)
-            measurement = proof.get('measurement')
-            if not isinstance(measurement, dict) or not isinstance(measurement.get('owner'), dict):
-                continue
-            owner = measurement['owner']
-            if owner.get('identity') == root['identity'] and owner.get('pid') == root['pid']:
-                candidates.append((path, proof))
-        need(len(candidates) == 1, 'missing or ambiguous owner-bound proof')
-        path, proof = candidates[0]
+        path, proof, diagnostics = discover_proof(Path(proof_source), root)
+        evidence['proofDiscovery'] = diagnostics
         lease = proof['measurement']['lease']
         need(isinstance(lease, dict) and isinstance(lease.get('token'), str), 'producer lease missing')
         releases = []
