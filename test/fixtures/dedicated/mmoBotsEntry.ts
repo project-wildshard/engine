@@ -16,8 +16,9 @@ import { botCells, botTarget } from './mmoBotsGuard';
 import { interArrival } from './mmoBotsStats';
 import { RoomBot } from './roomBot';
 
-const [url = '', build = '', botsArg = '0', secondsArg = '0', tag = 'mp0', result = '', addresses = 'own', cells = ''] = process.argv.slice(2);
-const bots = Number(botsArg), seconds = Number(secondsArg), { url: parsed, loopback } = botTarget(url, addresses, bots);
+const [url = '', build = '', botsArg = '0', secondsArg = '0', tag = 'mp0', result = '', addresses = 'own', cells = '', route = 'public'] = process.argv.slice(2);
+assert.ok(route === 'public' || route === 'tailnet');
+const bots = Number(botsArg), seconds = Number(secondsArg), { url: parsed, loopback } = botTarget(url, addresses, bots, route === 'tailnet');
 const destinations = botCells(url, bots, cells);
 assert.ok(seconds >= 5 && seconds <= 3600 && /^[a-z0-9-]{1,16}$/u.test(tag) && result !== '');
 /** The door's leave: `ready` with this flag lets a seat go now rather than holding the body 30 s (J114). */
@@ -118,7 +119,7 @@ const rows = walkers.map((walker, index) => ({
 for (const walker of walkers) walker.bot.client.dispose();
 const seated = rows.filter(row => row.seated).length, steady = rows.filter(row => row.seated && row.droppedDuringPlay === null).length;
 const report = {
-  proof: 'mp0.4-real-socket-bots', url: parsed.origin, addresses, build, bots, seconds, tag, platform: process.platform, node: process.version,
+  proof: 'mp0.4-real-socket-bots', url: parsed.origin, addresses, route, build, bots, seconds, tag, platform: process.platform, node: process.version,
   seated, steady, walked: rows.filter(row => row.moved >= 5).length, sawEveryone: rows.filter(row => row.othersSeenMax >= row.expectedPeers).length,
   targeted: rows.filter(row => row.targetCell === null || row.joinedCell === row.targetCell).length,
   movedMean: Math.round(rows.reduce((sum, row) => sum + row.moved, 0) / bots), downKBps: Math.round(rows.reduce((sum, row) => sum + row.downKB, 0) / bots / (seconds + 5) * 10) / 10,

@@ -5,8 +5,10 @@
 
 /** The staging channel's socket, as its signed release names it: `rooms-staging` on 443 through Cloudflare (MMO-SERVER MS7). */
 export const STAGING_SOCKET = 'wss://rooms-staging.wildshard.io';
-/** MS7.3: the Funnel's staging socket stays staging for the one release that moves the address; MS8 retires it. */
-export const STAGING_SOCKETS: readonly string[] = [STAGING_SOCKET, 'wss://wildshard.tailb41b20.ts.net:8443'];
+/** MS7.3: the one-release Funnel socket fallback has retired. */
+export const STAGING_SOCKETS: readonly string[] = [STAGING_SOCKET];
+/** NL3's explicit private-route control; never a signed-release fallback. */
+export const TAILNET_SOCKET = 'wss://wildshard.tailb41b20.ts.net:8443';
 /** The door's SOCKETS_PER_IP (src/server/host/dedicated/world.ts). */
 export const SOCKETS_PER_ADDRESS = 4;
 
@@ -27,14 +29,16 @@ export function botCells(url: string, bots: number, cells: string): readonly { u
 }
 
 /** Throws unless bots may dial `url` with these addresses, this many of them. */
-export function botTarget(url: string, addresses: string, bots: number): BotTarget {
+export function botTarget(url: string, addresses: string, bots: number, privateControl = false): BotTarget {
   const parsed = new URL(url);
   const loopback = parsed.protocol === 'ws:' && ['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname);
   const staging = STAGING_SOCKETS.includes(parsed.origin) && (parsed.pathname === '/' || parsed.pathname === '') && parsed.search === '' && parsed.hash === '';
-  if (!loopback && !staging) throw new Error(`J205: bots join loopback or staging only, never ${url}`);
+  const tailnet = privateControl && parsed.origin === TAILNET_SOCKET && parsed.pathname === '/' && parsed.search === '' && parsed.hash === '';
+  if (!loopback && !staging && !tailnet) throw new Error(`J205: bots join loopback or staging only, never ${url}`);
   if (addresses !== 'own' && addresses !== 'forwarded') throw new Error(`Unknown address mode ${addresses}`);
+  if (privateControl && !tailnet) throw new Error('Private staging control needs its exact tailnet socket');
   if (addresses === 'forwarded' && !loopback) throw new Error('Forwarded addresses are for a loopback replica only');
   if (!Number.isInteger(bots) || bots < 1 || bots > 64) throw new Error('Between 1 and 64 bots');
-  if (addresses === 'own' && bots > SOCKETS_PER_ADDRESS) throw new Error(`The door seats at most ${String(SOCKETS_PER_ADDRESS)} sockets from one address`);
+  if (addresses !== 'forwarded' && bots > SOCKETS_PER_ADDRESS) throw new Error(`The door seats at most ${String(SOCKETS_PER_ADDRESS)} sockets from one address`);
   return { url: parsed, loopback };
 }

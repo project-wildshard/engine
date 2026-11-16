@@ -5,10 +5,11 @@ import { readFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the driver's argument check only.
 import { spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
-import { botCells, botTarget, SOCKETS_PER_ADDRESS, STAGING_SOCKET, STAGING_SOCKETS } from './fixtures/dedicated/mmoBotsGuard';
+import { botCells, botTarget, SOCKETS_PER_ADDRESS, STAGING_SOCKET, STAGING_SOCKETS, TAILNET_SOCKET } from './fixtures/dedicated/mmoBotsGuard';
 import { interArrival } from './fixtures/dedicated/mmoBotsStats';
 
 const entry = readFileSync('test/fixtures/dedicated/mmoBotsEntry.ts', 'utf8'), driver = readFileSync('scripts/mmo-bots.mjs', 'utf8');
+const proofDrivers = ['scripts/e7-doctor-proof.mjs', 'scripts/e7-live-staging-proof.mjs', 'scripts/e7-voice-staging-proof.mjs'].map(file => readFileSync(file, 'utf8'));
 
 test('replica cells distribute uneven counts with cell-local peers and refuse unsafe targets', () => {
   const targets = botCells('ws://127.0.0.1:18796/', 5, 'driftwood-isle,nalati-grasslands');
@@ -19,29 +20,45 @@ test('replica cells distribute uneven counts with cell-local peers and refuse un
   expect(() => botCells(STAGING_SOCKET,2,'a,b')).toThrow(/loopback replica only/u);
 });
 
-test('the bots accept loopback and the staging socket only', () => {
+test('the default route accepts loopback and rooms-staging only', () => {
   expect(STAGING_SOCKET).toBe('wss://rooms-staging.wildshard.io');
-  expect(STAGING_SOCKETS).toEqual(['wss://rooms-staging.wildshard.io', 'wss://wildshard.tailb41b20.ts.net:8443']);
-  for (const url of ['ws://127.0.0.1:18796/', 'ws://localhost:18796/', 'ws://[::1]:18796/', 'wss://rooms-staging.wildshard.io', 'wss://rooms-staging.wildshard.io/',
-    'wss://wildshard.tailb41b20.ts.net:8443', 'wss://wildshard.tailb41b20.ts.net:8443/']) {
+  expect(STAGING_SOCKETS).toEqual(['wss://rooms-staging.wildshard.io']);
+  for (const url of ['ws://127.0.0.1:18796/', 'ws://localhost:18796/', 'ws://[::1]:18796/', 'wss://rooms-staging.wildshard.io', 'wss://rooms-staging.wildshard.io/']) {
     expect(() => botTarget(url, 'own', 2), url).not.toThrow();
   }
-  // Production's Funnel (443, with or without the port), the future address, other paths and hosts, plain ws to the tailnet.
-  for (const url of ['wss://wildshard.tailb41b20.ts.net', 'wss://wildshard.tailb41b20.ts.net:443/', 'wss://rooms.wildshard.io/', 'wss://rooms.wildshard.io',
+  // Retired public sockets, production, other paths/hosts and plaintext all refuse.
+  for (const url of ['wss://wildshard.tailb41b20.ts.net:8443', 'wss://wildshard.tailb41b20.ts.net:8443/', 'wss://wildshard.tailb41b20.ts.net', 'wss://wildshard.tailb41b20.ts.net:443/', 'wss://rooms.wildshard.io/', 'wss://rooms.wildshard.io',
     'ws://rooms-staging.wildshard.io/', 'wss://rooms-staging.wildshard.io:8443/', 'wss://rooms-staging.wildshard.io/other', 'ws://wildshard.tailb41b20.ts.net:8443/',
     'wss://wildshard.tailb41b20.ts.net:8443/other', 'wss://wildshard.tailb41b20.ts.net:8443/?x=1', 'ws://10.0.0.5:18796/', 'wss://127.0.0.1:18796/', 'ws://127.0.0.1.example.com/']) {
     expect(() => botTarget(url, 'own', 1), url).toThrow(/J205/u);
   }
   // The guard runs before any bot is made, and the driver copies it beside the entry it builds.
-  expect(entry.indexOf('botTarget(url, addresses, bots)')).toBeGreaterThan(0);
-  expect(entry.indexOf('botTarget(url, addresses, bots)')).toBeLessThan(entry.indexOf('new RoomBot('));
+  expect(entry.indexOf("botTarget(url, addresses, bots, route === 'tailnet')")).toBeGreaterThan(0);
+  expect(entry.indexOf("botTarget(url, addresses, bots, route === 'tailnet')")).toBeLessThan(entry.indexOf('new RoomBot('));
   expect(driver).toContain("['mmoBotsEntry.ts', 'mmoBotsGuard.ts', 'mmoBotsStats.ts']");
-  // Production's Funnel port (443, no port in the URL), the future address, and the human release file appear nowhere.
+  // Bot sources must never choose a production socket or human release file.
   for (const text of [entry, driver]) {
-    expect(text).not.toMatch(/wss:\/\/wildshard\.tailb41b20\.ts\.net(?!:8443)/u);
+    expect(text).not.toMatch(/wss:\/\/wildshard\.tailb41b20\.ts\.net/u);
     expect(text).not.toContain('rooms.wildshard.io');
     expect(text).not.toContain('releases/production.json');
   }
+  // This browser-source rail denies retired socket literals. Origin, CORS and
+  // private-health assertions remain in the actual proof drivers.
+  for (const text of proofDrivers) expect(text).not.toMatch(/wss:\/\/wildshard\.tailb41b20\.ts\.net/u);
+});
+
+test('private-route diagnostic is explicit, exact and keeps the one-address seat bound', () => {
+  expect(() => botTarget(TAILNET_SOCKET, 'own', 2)).toThrow(/J205/u);
+  expect(() => botTarget(TAILNET_SOCKET, 'own', 2, true)).not.toThrow();
+  expect(() => botTarget(TAILNET_SOCKET, 'own', SOCKETS_PER_ADDRESS + 1, true)).toThrow(/at most 4 sockets/u);
+  expect(() => botTarget(TAILNET_SOCKET, 'forwarded', 2, true)).toThrow(/loopback replica only/u);
+  for (const url of [STAGING_SOCKET, 'ws://127.0.0.1:18796/', `${TAILNET_SOCKET}/other`, `${TAILNET_SOCKET}/?x=1`, 'wss://rooms.wildshard.io/']) {
+    expect(() => botTarget(url, 'own', 2, true), url).toThrow();
+  }
+  const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'replica', '--tailnet'], { encoding: 'utf8', timeout: 10_000 });
+  expect(run.status).not.toBe(0);
+  expect(run.stderr).toContain('--tailnet is for staging');
+  expect(run.stdout).not.toContain('release');
 });
 
 test('the driver has two modes, neither of them production, and refuses anything else before the network', () => {
@@ -60,10 +77,10 @@ test('the driver can keep a run in a lane-owned scratch folder', () => {
 });
 
 test('forwarded addresses belong to a loopback replica alone; staging gets the one Mac address and the 4-socket door limit', () => {
-  expect(() => botTarget('wss://wildshard.tailb41b20.ts.net:8443/', 'forwarded', 2)).toThrow(/loopback replica only/u);
+  expect(() => botTarget(STAGING_SOCKET, 'forwarded', 2)).toThrow(/loopback replica only/u);
   expect(() => botTarget('ws://127.0.0.1:18796/', 'forwarded', 32)).not.toThrow();
   expect(() => botTarget('ws://127.0.0.1:18796/', 'own', SOCKETS_PER_ADDRESS + 1)).toThrow(/at most 4 sockets/u);
-  expect(() => botTarget('wss://wildshard.tailb41b20.ts.net:8443/', 'own', SOCKETS_PER_ADDRESS + 1)).toThrow(/at most 4 sockets/u);
+  expect(() => botTarget(STAGING_SOCKET, 'own', SOCKETS_PER_ADDRESS + 1)).toThrow(/at most 4 sockets/u);
   expect(() => botTarget('ws://127.0.0.1:18796/', 'spoof', 2)).toThrow(/Unknown address mode/u);
   expect(() => botTarget('ws://127.0.0.1:18796/', 'forwarded', 65)).toThrow(/Between 1 and 64/u);
   expect(SOCKETS_PER_ADDRESS).toBe(4);

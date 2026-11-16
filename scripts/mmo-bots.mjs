@@ -38,9 +38,8 @@ import { parseArgs } from 'node:util';
 
 const ROOT = absolute(import.meta.dirname, '..');
 const ORIGIN = 'https://packs.wildshard.io', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
-// MS7: staging's socket is whichever of these its signed release names (rooms-staging, or the Funnel for the one release that moves
-// it); its /health stays tailnet-only (MMO-SERVER D7).
-const STAGING_SOCKETS = ['wss://rooms-staging.wildshard.io', 'wss://wildshard.tailb41b20.ts.net:8443'], STAGING_HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health';
+// MS7.3: only rooms-staging is a live socket. D7 keeps the health read private on the tailnet.
+const STAGING_SOCKETS = ['wss://rooms-staging.wildshard.io'], STAGING_HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health';
 const STAGING_SEATS = 16, STAGING_HEADROOM = 4, REPLICA_PORT = 18796;
 // `--remote`'s ssh links keep themselves alive, so a quiet half hour doesn't end a run early with every bot 'lost'.
 const ALIVE = ['-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8', '-o', 'TCPKeepAlive=yes'];
@@ -65,6 +64,7 @@ if (remote !== undefined && (mode !== 'replica' || !/^[\w.@-]+$/u.test(remote) |
 if (!/^[\d,-]+$/u.test(values.cpus) || !/^[\d,-]+$/u.test(values['bot-cpus'])) throw new Error('--cpus and --bot-cpus are taskset lists');
 const botsOnHost = values['bots-on-host'];
 if (botsOnHost && remote === undefined) throw new Error('--bots-on-host needs --remote');
+if (values.tailnet && mode !== 'staging') throw new Error('--tailnet is for staging');
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
 const bots = Number(values.bots ?? (outsideProof ? 1 : mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
 if (!Number.isInteger(bots) || bots < 1 || bots > 64 || !Number.isFinite(seconds) || seconds < 5 || seconds > 3600) throw new Error('--bots 1..64, --seconds 5..3600');
@@ -176,12 +176,10 @@ process.once('exit', () => { for (const child of [botsChild, room]) if (child !=
 try {
 /** @type {{ players: number, p95: number, max: number, drops: number, ticksPerSecond: number, rss: number }[]} */
 const readings = [];
-// NET-LAG NL3: `staging --tailnet` dials staging's tailnet Serve address (the other door on the staging list) instead of the one
-// the release names, so the same bots measure the wire without Cloudflare
-if (values.tailnet && mode !== 'staging') throw new Error('--tailnet is for staging');
-const tailnetDoor = STAGING_SOCKETS[1];
-if (values.tailnet && tailnetDoor === undefined) throw new Error('No tailnet door on the staging list');
-let url = values.tailnet && tailnetDoor !== undefined ? tailnetDoor : release.socket.replace(/\/$/u, '');
+// NL3 is an explicit private-route control after the signed public socket and matching health checks.
+// It is separate from the public allowlist and never selected after a public connection failure.
+const tailnetDoor = STAGING_HEALTH.replace(/^https:/u, 'wss:').replace(/\/health$/u, '');
+let url = values.tailnet ? tailnetDoor : release.socket.replace(/\/$/u, '');
 if (mode === 'replica') {
   const tarball = join(work, 'server.tar.gz'), served = join(work, 'server');
   const bytes = serverBundle !== null ? readFileSync(serverBundle) : Buffer.from(await (await fetch(`${BUNDLES}/${release.bundle.name}`, { signal: AbortSignal.timeout(300_000) })).arrayBuffer());
@@ -247,7 +245,7 @@ if (botsOnHost && hostSsh !== null) {
 const code = await new Promise(resolve => {
   const child = botsOnHost && remote !== undefined
     ? spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, `cd ${away}/bots && exec taskset -c ${values['bot-cpus']} node "$HOME/${away}/bots/mmoBots.mjs" ${botArgs.join(' ')} "$HOME/${away}/bots.json" forwarded`], { stdio: ['ignore', 'pipe', 'inherit'] })
-    : spawn(process.execPath, [join(out, 'mmoBots.mjs'), ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own', values.spread ? values.cells : ''], { stdio: ['ignore', 'pipe', 'inherit'] });
+    : spawn(process.execPath, [join(out, 'mmoBots.mjs'), ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own', values.spread ? values.cells : '', values.tailnet ? 'tailnet' : 'public'], { stdio: ['ignore', 'pipe', 'inherit'] });
   botsChild = child;
   child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
   /** @type {ReturnType<typeof setTimeout> | null} */let force = null;
