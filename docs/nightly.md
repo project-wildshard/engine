@@ -242,3 +242,22 @@ It uses three independent cold stores, a real byte-producer edit, production
 part-diff reporting, healed byte equality and rejection of a stale result.
 The runner refuses a local invocation. These scripts retain receipts/logs
 in their requested repo tmp directory and clean their private exports.
+
+## Single-head diagnosis
+
+Dispatch `nightly-head-diagnostic.yml` on the candidate branch with a
+committed `head` slug and `browser` (`chromium` or `webkit`). It validates
+the actual pin, uses its normal nightly partition, then runs the same
+cold-pack and phone path for only that head. Build encodes may be reused;
+the head's cook store remains cold on the hosted worker. It adds no
+scheduled or ordinary push job.
+
+The `nightly-head-diagnostic` artifact holds raw phase receipts. This
+workflow has no verdict, report, Ring 3 dispatch, tag or release step;
+it cannot qualify a full night. Full qualification still requires every
+head/browser and both complete suite partitions in `nightly.yml`.
+
+A failed hover phase keeps its original error plus before/after player
+hover/blend, equipment ownership/enabled state, installed board/model,
+input context/permission, frame count and clock state. The mount and
+unmount assertions and their existing deadlines are unchanged.

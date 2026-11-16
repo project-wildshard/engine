@@ -118,15 +118,34 @@ try {
               return player.hoverSpeedLimit?.() ?? 14;
             });
             if (actualCap !== expectedCap) throw new Error(`${head.slug}: admitted hover cap ${actualCap} differs from ${expectedCap}`);
+            const observeHover = () => page.evaluate(() => {
+              const world = window.__wildshard?.world;
+              if (world === undefined) return null;
+              const board = world.weapons.tools.find(tool => tool.id === 'tool.hoverboard');
+              return {hover: world.player.hover, blend: world.player.hoverBlend,
+                equipmentEnabled: world.weapons.enabled, owned: world.weapons.has('tool.hoverboard'),
+                toolInstalled: board !== undefined, toolEnabled: board?.enabled ?? null,
+                modelVisible: board !== undefined && 'model' in board && typeof board.model === 'object' && board.model !== null && 'visible' in board.model ? board.model.visible : null,
+                inputAllowed: world.game.app.input.allowed('hover'), inputContext: world.game.app.input.top,
+                frame: world.game.frameCount, paused: world.game.app.clock.paused};
+            });
+            const before = await observeHover();
             const control = page.locator('.ws-touch-hover');
+            let action = 'mount';
+            try {
             await control.tap({timeout: 5000});
             await page.waitForFunction(() => {
               const world = window.__wildshard?.world;
               return world?.player.hover === true && world.player.hoverBlend > 0.5 &&
                 world.weapons.tools.some(tool => tool.id === 'tool.hoverboard' && tool.enabled && 'model' in tool && tool.model instanceof Object && 'visible' in tool.model && tool.model.visible === true);
             }, undefined, {timeout: 10000});
+            action = 'unmount';
             await control.tap({timeout: 5000});
             await page.waitForFunction(() => window.__wildshard?.world?.player.hover === false, undefined, {timeout: 10000});
+            } catch (error) {
+              const after = await observeHover().catch(() => null);
+              throw new Error(`${head.slug}: hover ${action} failed: ${String(error)}; ${JSON.stringify({before, after})}`, {cause: error});
+            }
             return {mounted: true, unmounted: true, input: 'real touch', actualCap, expectedCap};
           });
           await phase('draw', async () => {
