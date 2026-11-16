@@ -18,6 +18,23 @@
         "ef5fdeae0eb23c2c7e5217102b7b4aee6a34b648ebe2bdb2cbe5a7c446d7f667.json"
       ],
       "capture": "Use the original E-GAME group-step test compileScriptV2 arguments and v2CoreSource. Execute only the named SDK compiler once under Node with format and relative .ts resolution. Hash-key and pin emitted bytes using the unchanged recipe; subsequent engine tests use frozenV2Guest/frozenV2CoreSource only."
+    },
+    {
+      "sourceRepository": "project-wildshard/sharddev",
+      "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+      "originalEngineRevision": "aeb86d13",
+      "compiler": "assemblyscript 0.28.20; AS binaryen @pre-bundled/binaryen@131.0.0-nightly.20260721-patch-1; instrumentation @pre-bundled/binaryen@132.0.0-patch-1",
+      "files": [
+        "3883cbfdc68f50814ae8d51f3e28a04f443f5ba3c93c1b6326058b7c8536466c.json",
+        "39fea69d53474dfcaf98fd62ecbc303475c874ad8c3b549f33a3f796c2ddef0c.json",
+        "3f5a6b846cad771aacfb2e308e47d8ff05aa31af784e6693ced42a7e7464eea0.json",
+        "5bbabae20d1db99dfc1d323ed8513a72dcba2f4360b71ac4cb223d3747a84f7a.json",
+        "72a07da6057e7e31f7772f02e11269dc2cba2be941ec45443e8e7b20f0129a65.json",
+        "88b264fc1a1030e910cdaea7f297327e23d250754c56565dcd9ccec4f2a9d0b1.json",
+        "a017a16ca426f966fc9c6080f472d9d456362ee94c296501e32a1cdc76056f54.json",
+        "b74adcc9cde401dd4c2c151046e3211d28c786acfea52b9073ec30f36170b7d9.json"
+      ],
+      "capture": "Execute the original decision-simulation and quest-spawn-capability compileScript/compileDecisionScripts arguments once in the pinned SDK, with Maps and typed arrays preserved over native v8 I/O. Freeze the source-keyed results. Worker product and cosmetic-zero/one author outputs are separately pinned in runtime-manifest.json; only fixture setup changes, never the engine worker or refusal assertions."
     }
   ]
 }

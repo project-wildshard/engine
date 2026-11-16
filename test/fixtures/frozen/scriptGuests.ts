@@ -31,7 +31,10 @@ export async function frozenSimGuest(source: string, options: Readonly<Record<st
 export async function frozenDecisionGuest(...args: readonly unknown[]) {
   const pin = entry('compileDecisionScripts', args);
   if (pin.blobs === undefined) throw new Error('Missing frozen decision guest');
-  return {rows: parseDecisionScripts(pin.rows), blobs: pin.blobs.map(blob => ({bytes: Uint8Array.from(Buffer.from(blob.bytes, 'base64'))}))};
+  const rows = parseDecisionScripts(pin.rows), blobs = pin.blobs.map(blob => ({bytes: Uint8Array.from(Buffer.from(blob.bytes, 'base64'))}));
+  const hashes = new Set(blobs.map(blob => `blobs/wasm/${sha256(blob.bytes)}.wasm`));
+  if (rows.some(row => !hashes.has(row.module))) throw new Error('Frozen decision guest module differs');
+  return {rows, blobs};
 }
 function text(method: string, args: readonly number[]): string {
   const value = entry(method, args).text;

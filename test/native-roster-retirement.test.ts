@@ -1,6 +1,5 @@
-import {admissionPage,lendNalatiPasture} from './fixtures/nalati-return-modules';
+import {admissionPage,lendNalatiPasture,pasture} from './fixtures/frozen/nativeRoster';
 import {Scope} from '../src/shared/engine/app/scope';
-import { NALATI_PASTURE as pasture } from './fixtures/nalati-titan';
 import { fixtureNativeRoster } from './fixtures/native-roster';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native ownership tests use the actual shipped Rapier binary.
 import { readFileSync } from 'node:fs';

@@ -68,3 +68,32 @@ keys distinguish signed zero, non-finite values and literal tag-shaped
 objects. Direct key checks pass; all50 original cases pass again with
 normal GC. The default merged-props floor/caster/shadow boundary remains
 a named row48 follow-up rather than changing these restored assertions.
+
+The final two E-SCRIPT-O files and native-roster-retirement now pass all40
+original cases in blocking discovery,135 becomes132 pending. Guest
+compilation is replaced by source-keyed frozen outputs, not stubs. Every
+compiled decision row also checks the decoded blob's module hash.
+
+The native worker case still executes HeadlessSimulation.create and
+checks real staged/committed fuel, checkpoint field and move/strike
+publication. Only its author fixture generation changes: freeze the exact
+SDK mergeProjectBlobs result once, bind source JSON and Wasm hashes, then
+parse the same shard and copy/verify every asset before real admission.
+The cosmetic channel zero and legacy-one producer outputs are separately
+hash-pinned and parsed through the defining format schema. Restoring a
+changed mechanical declaration still refuses.
+
+Native roster uses the same original optional-owner admission helper,
+afterEach disposal and full pasture/shepherd program, through the existing
+H2 bank. No source assertion, target, fuel allowance or failure control
+changes. Remaining full-world fixtures stay pending.
+
+Script/runtime J206 is clear; its capture-recipe SHOULD is fixed in
+runtime-manifest.exportRecipes with checkout placeholders and source
+revisions. All38 original declaration titles/40 cases are accounted for.
+The exporter checkout had stale dependencies, so its frozen offline
+install refreshed engine0.1.19/format0.5.7 to locked engine0.1.22 and
+format0.5.10. Every new guest, all16 GLBs, both cosmetic rows and the full
+worker product reproduced exactly; no fixture/oracle bytes changed.
+SDK main's tracked tree remains clean. Root/layer types and typed lint
+pass; the worker still executes normally without any export alias.

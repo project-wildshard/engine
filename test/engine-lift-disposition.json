@@ -11752,5 +11752,79 @@
     "sourceRevision": "b21fed3d6877e30f22a62d588836d2e0d73fc410",
     "sourceBlob": "da6f807ebbacf2a8875bd756d8a0d5cd62fdbabc",
     "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/decision-simulation.test.ts",
+    "outcome": "restored",
+    "target": "test/decision-simulation.test.ts",
+    "decision": "CI21 E-SCRIPT-O: Restore all original native decisions, staged effects, shared memory and continuation controls. Source-keyed immutable guests replace compilation. The one real worker case uses the exact SDK-emitted original fixture, bound to input-source/module hashes; cosmetic zero/one channel outputs are independently frozen. Original assertions retained.",
+    "originalTests": [
+      "region observations retain ordered enter/leave events and exact continuation membership",
+      "region key reuse preserves renamed trigger order and exact silent continuation",
+      "achievement display rows preserve a pre-catalogue decision continuation silently",
+      "source provenance preserves native continuation while executable row changes still refuse",
+      "two actors execute rows on the real fixed-step move, strike, field and flag owners",
+      "spawnGroupAlive counts the whole declared pack across death and return",
+      "a guest relocates its retained body once from admitted fields without replay on restore",
+      "a bad last command refuses motion and world fields together with proposed script state",
+      "fresh-host restore retains a staged strike catalogue and logical decision without Wasm during restore",
+      "SDK worker executes the declared v1 section and reports its real fuel rather than admitting it as v0",
+      "encounter bindings sleep until the real fight starts and retain inactive checkpoint state",
+      "forged auxiliary restore refuses before changing the logical decision or public fields",
+      "ground queries use the authoritative height and failure reset uses the existing encounter owner",
+      "a v1 boss does not consume an unrelated legacy interaction prompt",
+      "stop cancels movement and windup without cutting an already active strike",
+      "a staged orbit samples its starting pose at commit, including fresh-host continuation",
+      "activation delivers the real player handle even without a start subscription",
+      "retained actors lend their actual body, public memory and strike owner without another simulation",
+      "native strike sections reach the existing runner with their world-space geometry",
+      "multi-strike readiness uses its named strike and takeoff resolves the admitted perch",
+      "a refused asynchronous strike acknowledges completion instead of stranding its guest",
+      "retained pose and eased depth read one admitted body and refuse a bad frame atomically",
+      "a yielded spawn-group build publishes its step only after every declared body binds",
+      "a region re-entered after a revision keeps its decision clock in step",
+      "an unpublished installed decision owner restores without rebinding or rerunning author work"
+    ],
+    "sourceRevision": "aeb86d1388e11bc4533aa1c8d5d7f4de6eddaa2e",
+    "sourceBlob": "146bba8fa76e98fa11d8142ced59337891fd4946",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/quest-spawn-capability.test.ts",
+    "outcome": "restored",
+    "target": "test/quest-spawn-capability.test.ts",
+    "decision": "CI21 E-SCRIPT-O: A quest's declared spawn script shows its cues and finish once on the wire, a restored save's flag is no news, and leaving or a product change during runtime admission constructs no spawn guest or owner. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "`declared spawn capability refuses a missing ${kind} loan before guest admission`",
+      "on the wire a script's cues and its finish show once, and a save's flag is no news",
+      "restored quest flags and v1 envelope stay quiet during capability construction",
+      "leaving during complete runtime admission constructs no spawn guest",
+      "a changed product during runtime admission publishes no spawn owner"
+    ],
+    "sourceRevision": "aeb86d1388e11bc4533aa1c8d5d7f4de6eddaa2e",
+    "sourceBlob": "0fd7e3c20bd17ba66e6ac5cb50e9892aa9242489",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/native-roster-retirement.test.ts",
+    "outcome": "restored",
+    "target": "test/native-roster-retirement.test.ts",
+    "decision": "CI21 E-RUNTIME-O: Restore native body phase, ordered replacement, identity retirement, deterministic admission/sheepdog draws and bounded shepherd fuel. Preserve original optional-owner admission helper and per-case disposal, using existing verified admission/pasture banks; original assertions unchanged.",
+    "originalTests": [
+      "orchard roster phases keep native charge order and reject dead, stunned or foreign movement",
+      "native replacement retains the recipe slot, herd/identity order and six spawn draws",
+      "native continuation resolves real identities and preserves detached ordered state",
+      "native admission attaches existing actors and preserves release ordering",
+      "AS admission preserves placement draws and ordered herd recipes",
+      "native roster rows refuse fabricated, foreign and disposed services before effects",
+      "AS sheepdog retains guard, fetch and rest behaviour on the 10 Hz decision step",
+      "pasture shepherd patrol stays within its unchanged decision fuel on the first native tick"
+    ],
+    "sourceRevision": "aeb86d1388e11bc4533aa1c8d5d7f4de6eddaa2e",
+    "sourceBlob": "ed9eb8deab75947ea286f9a5355ed494935e6d54",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
   }
 ]

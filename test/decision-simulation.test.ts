@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test, vi } from 'vitest';
 import { emptyShardfile } from '../src/shared/host/author';
-import { compileScript } from '@wildshard/sharddev/compileScript';
+import {frozenLegacyGuest as compileScript} from './fixtures/frozen/scriptGuests';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import { buildDecisionRegistries } from '@wildshard/format/decisionBindings';
@@ -18,7 +18,9 @@ import { borrowedDecisionAuthority } from '../src/server/game/shardfile/borrowed
 import { ShardDecisions, type DecisionRuntime } from '../src/server/game/shardfile/decisions';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import * as v from 'valibot';
-import { ClientChannels } from '../src/sharddev/clientChannels';
+import {parseClientChannels} from '@wildshard/format/clientChannels';
+import {frozenRuntimeJson} from './fixtures/frozen/snapshots';
+import {frozenDecisionWorkerProduct} from './fixtures/frozen/workerProduct';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { GridRegionDurability } from '../src/server/game/grid/durability';
 import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';
@@ -282,11 +284,8 @@ test('fresh-host restore retains a staged strike catalogue and logical decision 
 
 test('SDK worker executes the declared v1 section and reports its real fuel rather than admitting it as v0', async () => {
   const { HeadlessSimulation } = await import('../src/server/host/headless');
-  const { nameBlob } = await import('../src/sharddev/blobs');
-  const { mergeProjectBlobs } = await import('../src/sharddev/projectOutput');
   const f = fixture(); f.source.budgets.sim.resident = 1_000_000;
-  const blob = nameBlob('behaviour/controller.wasm', 'wasm', bytes, { script: { abi: 1, pages: 1 }, critical: true });
-  const product = mergeProjectBlobs(f.source, new Map(), [blob]);
+  const product = frozenDecisionWorkerProduct(f.source,bytes);
   const session = await HeadlessSimulation.create(product.shard, product.assets, undefined, { deadline: 'advisory', sections: f.sections });
   try {
     for (let i = 0; i < 5; i++) await session.step();
@@ -395,7 +394,7 @@ test('retained actors lend their actual body, public memory and strike owner wit
     const actor = sim.host.entities.get('actor.a'); if (actor === undefined) throw new Error('Missing retained actor');
     actor.mem['phase'] = 2;
     const source = structuredClone(f.source);
-    const cosmetic = new ClientChannels('cosmetic'); cosmetic.output('y', cosmetic.constant(0)); source.clientChannels = [cosmetic.build()];
+    source.clientChannels = parseClientChannels(frozenRuntimeJson('cosmetic-zero-channel.json'));
     source.runtime = { kind: 'client-plan', cost: FIXTURE_RUNTIME_COST, binds: ['spawns'], spawns: { homes: [], bosses: [], actors: source.creatures.spawns.map(row => ({
       id: `retained.${row.id}`, kind: row.species, look: row.variant, at: [row.at[0], row.at[2]], yaw: row.yaw,
     })) } };
@@ -436,8 +435,7 @@ test('retained actors lend their actual body, public memory and strike owner wit
       expect(actor.mem['phase']).toBe(3); expect(decisions.snapshot()).toBe(saved); expect(invoke).not.toHaveBeenCalled();
       const legacy = v.parse(v.record(v.string(), v.unknown()), JSON.parse(saved));
       const declaration = v.parse(v.record(v.string(), v.unknown()), JSON.parse(v.parse(v.string(), legacy['contract'])));
-      const olderView = new ClientChannels('cosmetic'); olderView.output('y', olderView.constant(1));
-      declaration['channels'] = [olderView.build()]; declaration['movers'] = [];
+      declaration['channels'] = parseClientChannels(frozenRuntimeJson('cosmetic-one-channel.json')); declaration['movers'] = [];
       legacy['contract'] = JSON.stringify(declaration);
       decisions.restore(JSON.stringify(legacy)); expect(decisions.snapshot()).toBe(saved); expect(invoke).not.toHaveBeenCalled();
       declaration['state'] = {}; legacy['contract'] = JSON.stringify(declaration);
