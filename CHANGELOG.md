@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.30 (2026-11-16)
+
+- Restore Brasscap conversations and quest prompts in the shared grid.
+- Show water splashes when declared creatures wade through water.
+
 ## v0.1.29 (2026-11-16)
 
 - Enter neighboring zones through their gates without a page reload.
