@@ -90,7 +90,7 @@ const sha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8
 /** @typedef {{ ids: string, ms: number, copy: string, leak: string | null }} Seen */
 
 const { openRig } = await import('./online-rig.mjs');
-const rig = await openRig({ dist, work: join(absolute(work), 'rig'), keyFile, pgBin, pgData, shard: SHARD, socket: SOCKET, origins: [PAGE_ORIGIN] });
+const rig = await openRig({ dist, work: join(absolute(work), 'rig'), keyFile, pgBin, pgData, shard: SHARD, socket: SOCKET, origins: [PAGE_ORIGIN], isolated: true });
 let proxy = /** @type {Awaited<ReturnType<typeof openChaosProxy>> | null} */ (null), launched = /** @type {import('playwright').Browser | null} */ (null);
 const rows = /** @type {(Result & { mode: string, id: string, owner: string, screen: string, inject: string, ms: number })[]} */ ([]);
 let harnessFault = /** @type {string | null} */ (null);

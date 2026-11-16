@@ -9,6 +9,7 @@ import { Client } from 'pg';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { rigOptions } from './online-rig-options.mjs';
+import { claimFixture, fixtureKey, freeFixturePorts, ownedPostgres, confirmPostgres } from './online-rig-owned.mjs';
 
 const ROOT = absolute(import.meta.dirname, '..');
 /** The rig's four loopback ports, from 18796 (a lane beside another rig names its own: WS_RIG_PORTS=18856; its dist is stamped
@@ -51,13 +52,25 @@ export async function intoWorld(page) {
  * J353 removed the continuous-crossing switch. `workers` sets `WORLD_WORKERS` (the rig's release is production's,
  * 4 by default; staging runs 2). FM3: `origins` are loopback page origins the server also lets in, and `channel`
  * is the release file's channel (`production`).
- * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string }} options */
-export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production' }) {
+ * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string, isolated?: boolean }} options */
+export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false }) {
   if (origins.some(origin => new URL(origin).origin !== origin || new URL(origin).hostname !== '127.0.0.1')) throw new Error('A rig lets in loopback page origins only');
   const { memory } = rigOptions({ saves, pgBin, pgData, socket });
-  const key = JSON.parse(readFileSync(keyFile, 'utf8')), build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist), DATABASE = memory ? 'memory:' : database('saves_online');
+  const key = isolated ? fixtureKey(keyFile) : JSON.parse(readFileSync(keyFile, 'utf8'));
+  if (isolated) { await freeFixturePorts([PG_PORT, WORLD_PORT, PAGE_PORT, RELEASE_PORT]); claimFixture(work); }
+  /** @type {(()=>unknown)[]} */
+  const resources = [];
+  const close = async () => {
+    const errors = [];
+    for (const release of resources.splice(0).reverse()) { try { await release(); } catch (error) { errors.push(error); } }
+    if (errors.length > 0) throw new AggregateError(errors, 'Online rig cleanup failed');
+  };
+  try {
+  const build = buildOf(dist), nextBuild = nextDist === '' ? '' : buildOf(nextDist), DATABASE = memory ? 'memory:' : database('saves_online');
   mkdirSync(work, { recursive: true });
-  const slugs = [shard, ...more], books = slugs.map(slug => `${slug}=${run(['--input-type=module', '-e', `console.log((await import('./scripts/built-product.mjs')).readBuiltShardfile(process.cwd(), '${slug}'))`], 'the product read').trim()}`);
+  const slugs = [shard, ...more];
+  if (slugs.some(slug => !/^[a-z0-9_-]+$/u.test(slug))) throw new Error('A rig shard must be a slug');
+  const books = slugs.map(slug => `${slug}=${run(['--input-type=module', '-e', `console.log((await import('./scripts/built-product.mjs')).readBuiltShardfile(process.cwd(), '${slug}'))`], 'the product read').trim()}`);
   const origin = join(work, 'origin'), server = join(work, 'server');
   rmSync(join(work, 'packs'), { recursive: true, force: true });
   run(['scripts/server-origin.mjs', origin, build, ...books], 'the server book');
@@ -72,14 +85,24 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   };
   publish(1, build);
   const release = createServer((_request, response) => { response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(signed); });
-  await new Promise(resolve => { release.listen(RELEASE_PORT, '127.0.0.1', () => { resolve(null); }); });
+  await new Promise((resolve, reject) => { release.once('error', reject); release.listen(RELEASE_PORT, '127.0.0.1', () => { resolve(null); }); });
+  resources.push(() => new Promise((resolve, reject) => { release.closeAllConnections(); release.close(error => { if (error) reject(error); else resolve(undefined); }); }));
 
   const pgCtl = join(pgBin, 'pg_ctl'), log = createWriteStream(join(work, 'server.log'));
+  resources.push(() => { log.end(); });
   if (!memory) {
-    spawnSync(pgCtl, ['-D', pgData, '-o', `-p ${String(PG_PORT)} -k /tmp -c listen_addresses=127.0.0.1`, '-w', '-l', join(work, 'pg.log'), 'start'], { stdio: 'inherit' });
+    if (isolated) { const pg = ownedPostgres({ bin: pgBin, data: pgData, port: PG_PORT }); resources.push(pg.close); }
+    else {
+      const result = spawnSync(pgCtl, ['-D', pgData, '-o', `-p ${String(PG_PORT)} -k /tmp -c listen_addresses=127.0.0.1`, '-w', '-l', join(work, 'pg.log'), 'start'], { stdio: 'inherit' });
+      if (result.status !== 0) throw new Error('The rig could not start Postgres; no database was changed');
+      resources.push(() => { if (spawnSync(pgCtl, ['-D', pgData, '-m', 'fast', '-w', 'stop'], { stdio: 'ignore' }).status !== 0) throw new Error('The rig could not stop its Postgres'); });
+    }
     const admin = new Client({ connectionString: database('postgres') });
-    await admin.connect();
-    await admin.query('drop database if exists saves_online'); await admin.query('create database saves_online'); await admin.end();
+    try {
+      await admin.connect();
+      if (isolated) await confirmPostgres(admin, pgData);
+      await admin.query('drop database if exists saves_online'); await admin.query('create database saves_online');
+    } finally { await admin.end(); }
   }
 
   const world = (running = build) => {
@@ -89,10 +112,12 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
     return room;
   };
   /** @param {import('node:child_process').ChildProcess} room */
-  const stopped = room => new Promise(resolve => {
+  const stopped = room => new Promise((resolve, reject) => {
     if (room.exitCode !== null || room.signalCode !== null) { resolve(undefined); return; }
-    const deadline = setTimeout(() => { room.kill('SIGKILL'); }, 8000);
-    room.once('exit', () => { clearTimeout(deadline); resolve(undefined); });
+    let forced = false;
+    const deadline = setTimeout(() => { forced = true; room.kill('SIGKILL'); }, 8000);
+    room.once('exit', () => { clearTimeout(deadline); if (forced) reject(new Error('An owned rig child required SIGKILL')); else resolve(undefined); });
+    room.once('error', error => { clearTimeout(deadline); reject(error); });
     room.kill('SIGTERM');
   });
   /** @param {import('node:child_process').ChildProcess} room */
@@ -100,27 +125,30 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   /** The page host's half of a deploy: the page's origin serves this build from now on. @param {string} built */
   const serve = async built => {
     const pageServer = spawn(process.execPath, ['scripts/preview-server.mjs', '--outDir', absolute(built), '--port', String(PAGE_PORT), '--telemetry-dir', join(work, 'telemetry')], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
-    for (let tries = 0; tries < 100 && !(await fetch(`http://127.0.0.1:${String(PAGE_PORT)}/version.json`).then(found => found.ok).catch(() => false)); tries++) await sleep(100);
-    return pageServer;
+    resources.push(() => stopped(pageServer));
+    for (let tries = 0; tries < 100; tries++) {
+      if (pageServer.exitCode !== null || pageServer.signalCode !== null) throw new Error('The owned page server exited before readiness');
+      const ready = await fetch(`http://127.0.0.1:${String(PAGE_PORT)}/version.json`, { signal: AbortSignal.timeout(1000) }).then(async found => found.ok && (await found.json()).build === buildOf(built)).catch(() => false);
+      if (ready) return pageServer;
+      await sleep(100);
+    }
+    throw new Error('The owned page server did not serve its build');
   };
   let main = world();
-  /** @type {import('node:child_process').ChildProcess} */
-  let pages;
-  try { pages = await serve(dist); }
-  catch (error) { await stopped(main); await new Promise(resolve => { release.close(resolve); }); log.end(); throw error; }
+  resources.push(() => stopped(main));
+  let pages = await serve(dist);
   return { shard, build, nextBuild, publish, DATABASE, base: `http://127.0.0.1:${String(PAGE_PORT)}`, Client,
     /** The server goes down, for a test of its coming back. */
     stop: () => stopped(main),
     /** The server up on this build. @param {string} [running] */
-    start: running => { main = world(running); },
+    start: running => { if (main.exitCode === null && main.signalCode === null) throw new Error('Stop the current rig world before starting another'); main = world(running); },
     /** A draining server's own exit. */
     drained: () => exited(main),
     /** The page's origin moves to this build. @param {string} built */
-    pagesServe: async built => { pages.kill('SIGTERM'); await sleep(200); pages = await serve(built); },
-    close: async () => {
-      await Promise.all([stopped(pages), stopped(main)]);
-      await new Promise(resolve => { release.close(resolve); });
-      log.end();
-      if (!memory) spawnSync(pgCtl, ['-D', pgData, '-m', 'fast', '-w', 'stop'], { stdio: 'ignore' });
-    } };
+    pagesServe: async built => { await stopped(pages); pages = await serve(built); },
+    close };
+  } catch (error) {
+    try { await close(); } catch (cleanup) { throw new AggregateError([error, cleanup], 'Online rig setup and cleanup failed', { cause: error }); }
+    throw error;
+  }
 }
