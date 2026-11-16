@@ -19,3 +19,7 @@ ZE7, the grey stand-ins seen from the turn-ins:
   chosen cell where its save stood and the server wins over the page's handoff `arrive`. The grid intent now carries the arrival
   pose to `chosenArrival()`, `startStandalone` posts it as `enter`, and `gridServer.ts` seats the body there after `grid.enter`.
   The dedicated world's half is ZE9's `enter` control (Codex), not a URL param: a `?gate=` dial needs Jake's OK (no-url-switch).
+- ZE3a: the drive's one real long frame at the step-out (67 to 83 ms, every run) was the page's first gesture building its
+  AudioContext (`unlock.ts` `newContext`, G325/SF67: kept out of the boot on purpose): the harness pose skips every press a player
+  makes before the road, so `KeyW` was the first. The proof now presses ScrollLock (no binding) first; a 1-segment run at load 25
+  then has 0 frames over 50 ms, worst 16.8 ms. Everything from segment 37 on in the quiet-start drive had the page thread idle.

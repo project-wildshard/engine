@@ -123,6 +123,10 @@ try {
   // out of the home's east entryway onto its east road, then down to the first segment's start
   const exitAt = { x: grid.origin.x + HALF + GAP_HALF - LANE, z: grid.origin.z };
   await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [HALF - 20, 0]);
+  // the page's first gesture builds its AudioContext (G325, SF67: `unlock.ts`, a ~70 to 130 ms native constructor kept out of the
+  // boot). A player has touched and pressed many times before they reach the road; the harness pose skipped all of that, so one
+  // gesture here (a key that does nothing in play) keeps that once-per-page cost out of the drive's frames.
+  await page.keyboard.press('ScrollLock');
   await sleep(4000);
   const route = [{ ...exitAt, seg: -2 }, ...waypoints];
   // the board and its boost through the player's own toggles (what H and a double tap of H call)
