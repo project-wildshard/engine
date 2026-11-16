@@ -39,6 +39,8 @@ try {
     : await browser.newContext({ viewport: { width: Number(desktop[1]), height: Number(desktop[2]) }, deviceScaleFactor: Number(desktop[3]) });
   await developerSettings(context, { tier: desktop === null ? 'phone' : 'desktop', volume: 0 });
   await saveFixture(context, { scope: 'global', key: 'gfx', data: { dpr: values.dpr ?? '2', aa: 'auto' } });
+  // MOBILE-GRAPHICS MG8: the phone's pixel density is Settings ▸ Graphics' device knob now; the old `gfx` pick alone left --dpr 1 drawing at 2
+  await saveFixture(context, { scope: 'device', key: 'gfx.knob.density', data: Number(values.dpr ?? '2') });
   for (const fixture of levelDownloadFixtures('packs')) await saveFixture(context, fixture);
   // a phone's first PLAY goes straight to Driftwood's first-play card (MOBILE-GRAPHICS MG5): this device has done it
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
