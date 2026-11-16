@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as v from 'valibot';
 import { saveFixtureCode } from './debug-settings.mjs';
+import { decodeProtocolPng } from './parity/fast-png.mjs';
 import { soakInspector } from './soak/inspector.mjs';
 import { chatLinePattern, playerNameSource, roomsHealthURL, splitRoomsHealthLines } from './staging-proof-lines.mjs';
 
@@ -157,7 +158,7 @@ function android(serial) {
       const png = execFileSync(tool, ['-s', serial, 'exec-out', 'screencap', '-p'], { maxBuffer: 64 << 20, timeout: 60_000 });
       if (png.length > 1000) { writeFileSync(join(shots, `${name}.png`), png); return; }
       const said = v.parse(v.looseObject({ data: v.string() }), await Promise.race([page.send('Page.captureScreenshot', { format: 'png' }), sleep(20_000).then(() => { throw new Error('Page.captureScreenshot timed out'); })]));
-      writeFileSync(join(shots, `${name}.png`), Buffer.from(said.data, 'base64'));
+      writeFileSync(join(shots, `${name}.png`), decodeProtocolPng(said.data));
     },
     close: async () => {
       page.close();
