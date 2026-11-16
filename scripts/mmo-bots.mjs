@@ -10,7 +10,7 @@
 //   node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60   (TC45: public Tunnel, no private health)
 //   node scripts/mmo-bots.mjs staging --tailnet ...   (NET-LAG NL3: the same, over staging's tailnet Serve address, no Cloudflare)
 // Both read the signed staging release file and check it against the public key setup.sh pins. The bots are built from that
-// release's own commit (its tree, an offline install, build-server's `--entry`), so their build and wire are the server's.
+// release's own commit (its tree, an offline install, build-server's `--entry`), so their source and wire match the signed release's claim.
 // `replica` runs that release's exact server bundle (downloaded, SHA-256 checked) on loopback, with production's shape: its
 // channel settings, 4 workers, 32 seats, Driftwood, packs read from R2, memory saves unless --database names a disposable one,
 // and nothing sent off the Mac; each bot says its own address, as the door reads a proxy's. Its worker readings (tick p95, drops, RSS) join the bots' facts. `staging` joins the staging

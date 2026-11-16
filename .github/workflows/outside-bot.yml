@@ -23,7 +23,7 @@ jobs:
           pins-cache-scope: full
       - run: node scripts/pins.ts install
       # J186: separate actual proof observations; a green job alone is not evidence.
-      # Review no earlier than November23 after an actual green week.
+      # Review no earlier than November 23 after an actual green week.
       - name: Observe real gateway walk, fight, reconnect and missing-witness refusal
         run: |
           mkdir -p tmp/tc45-outside

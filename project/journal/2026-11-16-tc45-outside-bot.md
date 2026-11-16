@@ -24,7 +24,7 @@ Abort/error paths release their active link and stop the local client.
 A failed redial may leave the original body held until normal server
 grace expires; such a run cannot complete.
 
-Four explicit real-gateway cases run in 3.37s: CLI routing refusals,
+Four explicit real-gateway cases run in 3.91s: CLI routing refusals,
 the complete journey, actual damage with a named dropped-confirmation
 fault, and cancellation after actual player admission. Fixture placement happens
 before the measured player exists; the journey has no host mutation.
@@ -34,7 +34,7 @@ earlier than November 23. Its live receipt is separate from the fast
 proof XML; green workflow colour alone is insufficient evidence.
 
 The driver also treats a signalled child exit as failure instead of
-turning null into exit0. Existing replica/performance paths retain
+turning null into exit 0. Existing replica/performance paths retain
 their health checks and address rules. No local cook, staging play,
 release, deployment or box action was run on the mini.
 
@@ -50,3 +50,7 @@ the parent checks complete/left and writes a failed report on late
 candidate/witness errors. Only report.json is authoritative. Child
 exit and a parent watchdog bound runtime. The lost-confirmation
 control also checks actual server HP loss.
+
+Final immutable J206 review at c142c63d is CLEAR with no MUST or SHOULD
+remaining. Optional wording is tightened; live hosted report and exact
+normal CI remain owed before any row credit.
