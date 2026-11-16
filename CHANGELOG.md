@@ -13,6 +13,13 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.29 (2026-11-16)
+
+- Enter neighboring zones through their gates without a page reload.
+- Restore detail layers and solid Mossgate lifts.
+- Show the sword rack prompt in the shared world.
+- Improve movement smoothing and release build speed.
+
 ## v0.1.28 (2026-11-16)
 
 - Worlds prepare from the title screen without a full-screen loading card.
