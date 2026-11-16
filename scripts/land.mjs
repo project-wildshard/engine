@@ -24,6 +24,7 @@ import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readF
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {stalePinProducts} from './pins-reuse.mjs';
 import {checkedTreeDirt} from './push-proof-cache.mjs';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
@@ -146,6 +147,15 @@ export function preflightSteps(files){
  /** @type {[string,string[]][]} */const steps=[['lint:game',['pnpm','lint:game']],['check-css',['node',CHECK_CSS]],['typecheck',['pnpm','typecheck']]];
  if(code.length>0)steps.push(['vitest',['pnpm','exec','vitest','related','--run','--passWithNoTests',...code]]);
  return steps;
+}
+
+/** The line that says why a child failed: its last thrown `Error:` line (a stack's tail names only Node's internals, as two
+ * gen:inputs stops did on 2026-11-16), else its last three lines, else the spawn error.
+ * @param {string} output @param {Error} [error] */
+export function failureLine(output,error){
+ const lines=output.trim().split('\n').map(line=>line.trim()).filter(Boolean);
+ const thrown=lines.findLast(line=>/^(?:\w*Error|StopError)(?:\s\[\w+\])?: /u.test(line));
+ return thrown??(lines.length>0?lines.slice(-3).join(' '):error?.message??'no output');
 }
 
 /** `owner/name` of a GitHub remote URL, or null.
@@ -450,7 +460,7 @@ class Landing{
    throw new StopError(`${GEN.join(' ')} made a commit (${short(before)} -> ${short(head)}): land runs it only to rewrite the boot stamps. Fix the generator, reset ${this.branch} to ${short(before)} if that commit is unwanted, and run land again.`);
   }
   if(ran.status!==0){
-   const why=`${ran.stderr}${ran.stdout}${ran.error?.message??''}`.trim().split('\n').slice(-3).join(' ');
+   const why=failureLine(`${ran.stderr}${ran.stdout}`,ran.error);
    this.receipt(`STOP ${GEN.join(' ')} failed: ${why}`);
    throw new StopError(`${GEN.join(' ')} failed before the gate (the pre-push would fail on it too): ${why}\nFix it and run land again.`);
   }
@@ -778,13 +788,18 @@ class Landing{
   }
  }
 
- /** A worktree that never ran `pnpm pins` has no PINS_LEDGER, and gen:inputs fails on it (opus-gcm11, 2026-11-15). Run it
-  * once, before gen:inputs; with or without --no-preflight, since gen:inputs needs it either way. */
+ /** gen:inputs refuses a tree whose `out/` lacks the pins' outputs: a worktree that never ran `pnpm pins` has no PINS_LEDGER
+  * (opus-gcm11, 2026-11-15), and one rebased past a pin bump holds the old revision (`stalePinProducts`; codex-netlag and
+  * opus-publish1, 2026-11-16). Either way `pnpm pins` runs before gen:inputs; with or without --no-preflight, since
+  * gen:inputs needs it either way. */
  pinsOnce(){
   /** @type {{pins?:string}} */let scripts={};
   try{scripts=JSON.parse(readFileSync(join(this.root,'package.json'),'utf8')).scripts??{};}catch{return;}
-  if(scripts.pins===undefined||existsSync(join(this.root,PINS_LEDGER)))return;
-  this.say('pins',`no ${PINS_LEDGER}: this worktree never ran pnpm pins; running it before gen:inputs`);
+  if(scripts.pins===undefined)return;
+  const stale=stalePinProducts(this.root);
+  if(existsSync(join(this.root,PINS_LEDGER))&&stale.length===0)return;
+  this.say('pins',stale.length===0?`no ${PINS_LEDGER}: this worktree never ran pnpm pins; running it before gen:inputs`
+   :`out/ holds pins main no longer names (${stale.map(row=>`${row.folder} revision ${String(row.revision)}`).join(', ')}); running pnpm pins before gen:inputs`);
   const ran=spawnSync('pnpm',['--silent','pins'],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:256<<20});
   if(ran.status!==0){
    const why=`${ran.stderr??''}${ran.stdout??''}`.trim().split('\n').slice(-3).join(' | ')||String(ran.error??`exit ${String(ran.status)}`);

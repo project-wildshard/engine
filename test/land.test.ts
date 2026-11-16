@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
 import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
-import { CHECK_CSS, failedJobs, flakyFiles, mainPushArgs, parseArgs, PINS_LEDGER, preflightSteps, prePushCause, quarantineFile, REF_LOCK, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
+import { CHECK_CSS, failedJobs, failureLine, flakyFiles, mainPushArgs, parseArgs, PINS_LEDGER, preflightSteps, prePushCause, quarantineFile, REF_LOCK, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
 const LAND = resolve('scripts/land.mjs');
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -532,6 +532,35 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(readFileSync(/Log: (\S+)/u.exec(result.stdout)?.[1] ?? '', 'utf8')).toMatch(/^\$ node scripts\/check-css\.mjs\nplanted css violation/u);
     expect(calls()).toEqual(['lint:game']);
     expect(f.read(f.files.prepush)).toBe('');
+  }, 60_000);
+
+  // 2026-11-16 (codex-netlag, opus-publish1): a worktree rebased past a pin bump holds the old revision under out/, and
+  // gen:inputs refuses it; the stop showed only the stack's tail. Land runs pins first, and a stop names the thrown error.
+  test('a worktree whose out/ holds a pin main no longer names runs pnpm pins before gen:inputs', () => {
+    const f = fixture(), calls = plantPnpm(f, null);
+    const wt = f.worktree('foo');
+    f.commit(wt, 'package.json', '{"scripts":{"pins":"node scripts/pins.ts"}}\n', 'chore: a pins script');
+    f.commit(wt, 'test/pins/shardfiles.json', `${JSON.stringify({ shards: [{ slug: 'dunes', revision: 2, hash: 'b'.repeat(64) }] })}\n`, 'test(pins): dunes rev 2');
+    writeFileSync(join(f.repo, '.git/info/exclude'), 'out/\n');
+    mkdirSync(join(wt, 'out/dunes'), { recursive: true });
+    writeFileSync(join(wt, PINS_LEDGER), '{}\n');
+    writeFileSync(join(wt, 'out/dunes/validation.json'), `${JSON.stringify({ pin: { hash: 'a'.repeat(64), revision: 1 } })}\n`);
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(0);
+    expect(calls()[0]).toBe('--silent pins');
+    expect(result.stdout).toContain('out/ holds pins main no longer names (dunes revision 1); running pnpm pins before gen:inputs');
+  }, 60_000);
+
+  test('a gen:inputs stop names the thrown error, not the stack\'s tail', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'scripts/gen.mjs', "function inner(){throw new Error('planted: out/ holds pinned products the pins no longer name');}\ninner();\n", 'build: a failing generator');
+    const result = f.land(wt);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('failed before the gate (the pre-push would fail on it too): Error: planted: out/ holds pinned products the pins no longer name');
+    expect(failureLine('a\nError: real cause\n    at x (y:1:2)\n    at process.processTicksAndRejections (node:internal)\n\nNode.js v24')).toBe('Error: real cause');
+    expect(failureLine('one\ntwo\nthree\nfour')).toBe('two three four');
+    expect(failureLine('', new Error('spawn ENOENT'))).toBe('spawn ENOENT');
   }, 60_000);
 
   // opus-gcm11: a worktree that never ran `pnpm pins` has no out/.pins.json, and gen:inputs fails on it.
