@@ -338,8 +338,10 @@ describe('the hooks, in sandbox repos', () => {
   });
   test('push: a new branch whose tip deleted AGENTS.md is refused; a tag of a good tip goes out', () => {
     const box = withRemote();
-    box.git(['tag', '-a', 'v0.0.1', '-m', 'release']);
-    const tagged = box.git(['push', '-q', 'origin', 'v0.0.1']);
+    // This proves AGENTS shape on arbitrary annotated tags; version-tag
+    // admission belongs to the separate nightly release proof.
+    box.git(['tag', '-a', 'agents-fixture', '-m', 'fixture']);
+    const tagged = box.git(['push', '-q', 'origin', 'agents-fixture']);
     assert.equal(tagged.status, 0, tagged.stderr);
     box.git(['rm', '-q', 'AGENTS.md']);
     assert.equal(box.git(['commit', '-q', '--no-verify', '-m', HUMAN]).status, 0);

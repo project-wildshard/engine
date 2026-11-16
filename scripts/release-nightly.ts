@@ -3,6 +3,7 @@
 import {execFileSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
 import {join, resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
 
 interface Latest {id: number; head_sha: string; status: string; conclusion: string; event: string}
 interface Report {version: number; run: string; sha: string; pins: string; testList: string;
@@ -38,4 +39,16 @@ export function checkReleaseNightly(): void {
     requireNoNewFailures(JSON.parse(readFileSync(join(folder, 'verdict.json'), 'utf8')), latest);
     console.log(`TC22: nightly ${latest.id} has no new failures; J167 any-red qualification still requires the manual check`);
   } finally {rmSync(folder, {recursive: true, force: true});}
+}
+
+export function releaseTagPush(refs: string): boolean {
+  return refs.split('\n').some(line => {
+    const [, local = '', remote = ''] = line.trim().split(/\s+/u);
+    return /^[a-f0-9]{40}$/u.test(local) && !/^0+$/u.test(local) && /^refs\/tags\/v\d+\.\d+\.\d+$/u.test(remote);
+  });
+}
+
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  if (process.argv.length !== 3 || process.argv[2] !== 'refs') throw new Error('Use release-nightly.ts refs (Git push ref lines on stdin)');
+  if (releaseTagPush(readFileSync(0, 'utf8'))) checkReleaseNightly();
 }

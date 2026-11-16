@@ -4,9 +4,8 @@
 
 > **State:** built, 2026-11-16; TEST-COVERAGE TC22 (J370).
 
-The optional nightly tag helper already requires full green, but the
-actual release helper calls release-check.mjs without that nightly read.
-The real release entry now downloads the latest completed scheduled main verdict
+The optional nightly tag helper already requires full green. The legacy
+release-check entry now downloads the latest scheduled main verdict
 and refuses newFailures before either cached or fresh local checks.
 Run/source identity and artifact failures close the gate too.
 
@@ -22,3 +21,11 @@ replace production evidence. Selection now filters event=schedule and
 validates that event; a manual run is a refusal control. The fresh-gate
 test explicitly disables local cache use, while the separate cache proof
 checks actual cached-full refusal and reuse.
+
+Reading current repo-kit main90b84cb's release-branch.mjs revealed that
+its finish path no longer calls release-check at all. The initial land
+waiter was stopped before landing. Engine's actual pre-push now reads
+version tag updates through the same nightly guard before the full gate.
+A real Git push to a test-owned bare origin proves a planted failure
+leaves no tag and never reaches the full check. Ordinary pushes do not
+read the nightly. No shared repo-kit source or release operation changes.
