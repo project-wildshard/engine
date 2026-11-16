@@ -27,3 +27,5 @@
   backdrop-filter when the same element has a filter; `place` reads layout before writing; `apply` uses `light`.
 - SB7 follow-up: staging v0.1.31 pill read v0.1.31 but its /version.json said `v0.1.29-153-g5e0fb5efb`; version.json took
   the raw `git describe`. `versionJson` now takes the pill's label (`engineRelease`); a temp-repo test was red on the old call.
+- SB30: the J383 forced update reloaded onto the title behind "Unexpectedly back at the title"; its reason
+  (`FORCE_UPDATE_RELOAD`) is now a player-side exit, so the title is quiet. Test in reload-title.test.ts, red first.

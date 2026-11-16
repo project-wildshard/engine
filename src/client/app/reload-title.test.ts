@@ -143,3 +143,12 @@ test('a crash that Safari reloads by itself is no player reload: the modal stays
   expect(end.player).toBeUndefined();
   expect(next.notes.take(end)).toMatchObject({ kind: 'restart', what: 'The game restarted unexpectedly' });
 });
+
+test('STAGING-BUGBASH SB30: the forced update of a too-old client (J383) reloads to a quiet title, no drop modal', async () => {
+  const { FORCE_UPDATE_RELOAD } = await import('@wildshard/engine/boot/dropNotice');
+  const t = tab(), world = loadNalati(t);
+  world.life.markReload(FORCE_UPDATE_RELOAD); // forceUpdate.ts ClientUpdater.force, just before location.reload()
+  const next = t.page('reload'), end = next.life.lastEnd();
+  expect(end.kind).toBe('intentional');
+  expect(next.notes.take(end)).toBeNull();
+});

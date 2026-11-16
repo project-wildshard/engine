@@ -3,6 +3,7 @@ import { Scope } from '../../../shared/engine/app/scope';
 import type { SaveStorage } from '../../../shared/engine/saves/store';
 import { saveStorage } from '../saves/slots';
 import { markReload } from './lastEnd';
+import { FORCE_UPDATE_RELOAD } from './dropNotice';
 import { forceCacheState, setForceCacheState, wipeDownloadedCaches } from '../pwa/forceCache';
 
 /** Compare declared versions, never hashes or a possibly stale git-describe label. */
@@ -31,7 +32,7 @@ export class ClientUpdater {
   force(): Promise<void> {
   if (this.resetting !== null) return this.resetting;
   updating();
-  try { markReload('required client cache update'); } catch { /* An unavailable diagnostic store cannot block recovery. */ }
+  try { markReload(FORCE_UPDATE_RELOAD); } catch { /* An unavailable diagnostic store cannot block recovery. */ }
   this.resetting = (async () => {
     const owner = new Scope('boot.force-update');
     const deadline = new Promise<void>(resolve => { owner.timeout(4000, resolve); });

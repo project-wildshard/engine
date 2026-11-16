@@ -78,7 +78,9 @@ export const PLAYING = 'Playing';
  * lastEnd reasons that are the player's own choice (the call sites' markUnload / markReload words): the token's backstop, for a
  * call site that says so only in words. Everything else that reaches the title from a world page is a drop.
  */
-export const PLAYER_EXITS: readonly string[] = ['exit to main menu', 'exit to title', 'error modal:', 'update at title', 'update tapped',
+/** forceUpdate.ts's reload of a client older than the server's minClient (J383): the game's own, never a drop (STAGING-BUGBASH SB30) */
+export const FORCE_UPDATE_RELOAD = 'required client cache update';
+export const PLAYER_EXITS: readonly string[] = [FORCE_UPDATE_RELOAD, 'exit to main menu', 'exit to title', 'error modal:', 'update at title', 'update tapped',
   'new game', 'save import', 'debug:', 'tier pick', 'doctor', 'load failure reload', 'pause settings', 'settings', 'reload prompt', 'loading wait retry'];
 const TRAIL_MAX = 4;
 
