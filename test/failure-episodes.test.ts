@@ -72,6 +72,16 @@ test('held acknowledgement cannot remove an episode or another document addition
   expect(new FailureOutbox(device).pending().map(value => value.data.id)).toEqual(['episode-other']);
 });
 
+test('another document cannot resurrect an outcome already acknowledged and removed', async () => {
+  const device = storage(), first = new FailureOutbox(device);
+  first.add('build', 'install', episode());
+  const second = new FailureOutbox(device);
+  expect(second.pending()).toHaveLength(1);
+  await first.flush(async () => true);
+  second.add('build', 'install', episode('episode-new'));
+  expect(new FailureOutbox(device).pending().map(value => value.data.id)).toEqual(['episode-new']);
+});
+
 test('storage refusal is explicit and retains the live document copy; malformed outcomes are refused', async () => {
   const memory = new FailureOutbox(null);
   expect(memory.add('build', 'install', episode())).toBe(false);

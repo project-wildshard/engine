@@ -23,7 +23,7 @@ export class FailureOutbox {
   private memory: readonly Record[] = [];
   private readonly sending = new Set<string>();
   private readonly storage: Pick<SaveStorage, 'getItem' | 'setItem' | 'removeItem'> | null;
-  constructor(storage: Pick<SaveStorage, 'getItem' | 'setItem' | 'removeItem'> | null) { this.storage = storage; this.memory = this.read(); }
+  constructor(storage: Pick<SaveStorage, 'getItem' | 'setItem' | 'removeItem'> | null) { this.storage = storage; }
   private read(): readonly Record[] {
     try {
       const raw = this.storage?.getItem(KEY);
@@ -44,6 +44,8 @@ export class FailureOutbox {
       if (this.storage === null) return false;
       if (this.memory.length === 0) this.storage.removeItem(KEY);
       else this.storage.setItem(KEY, JSON.stringify(this.memory));
+      // Persisted records are re-read, never held as an old snapshot that can resurrect another tab's acknowledgements.
+      this.memory = [];
       return true;
     } catch { return false; }
   }

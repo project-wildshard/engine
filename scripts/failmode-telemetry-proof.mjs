@@ -40,6 +40,18 @@ async function enter(targetPage) {
 try {
 browser = await (engine === 'chromium' ? chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS] }) : webkit.launch({ headless: true }));
 context = await browser.newContext({ ...devices['iPhone 17 Pro'], viewport: { width: 402, height: 874 } });
+await context.addInitScript(() => {
+  const documentId = crypto.randomUUID(), native = globalThis.fetch.bind(globalThis);
+  Reflect.set(globalThis, '__fmTelemetryDocument', documentId);
+  globalThis.fetch = (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
+    if (url.origin !== location.origin || url.pathname !== '/api/telemetry') return native(input, init);
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+    headers.set('x-fm-proof-document', documentId);
+    return native(input, { ...init, headers });
+  };
+});
+await context.routeWebSocket('**/*', async socket => { foreign.push(new URL(socket.url()).origin); await socket.close({ code: 1008, reason: 'HTTP-only owned proof' }); });
 await context.route('**/*', async route => {
   const url = new URL(route.request().url());
   if (url.origin === api.origin) await route.continue();
@@ -48,6 +60,7 @@ await context.route('**/*', async route => {
   page = await context.newPage();
   api.arm('refuse');
   await enter(page);
+  const firstDocument = await page.evaluate(() => Reflect.get(globalThis, '__fmTelemetryDocument'));
   const build = await page.evaluate(() => Reflect.get(globalThis, '__WS_BUILD_ID__'));
   const previewVersion = await (await fetch(new URL('/version.json', preview))).json();
   assert.equal(build, previewVersion.build);
@@ -64,6 +77,7 @@ await context.route('**/*', async route => {
   await card.getByRole('button', { name: 'Back to the game', exact: true }).click();
   await refusal;
   await api.waitForAttempts(1); await api.waitForStored(0);
+  assert.equal(api.attempts[0].document, firstDocument);
   const first = api.attempts[0].payload.events[0].data;
   assert.equal(first.screen, 'doctor-http'); assert.equal(first.clear, 'dismissed'); assert.ok(first.durationMs > 0);
   assert.equal(api.attempts[0].status, 500);
@@ -73,20 +87,26 @@ await context.route('**/*', async route => {
 
   api.arm('hold');
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 120_000 });
-  await api.waitForAttempts(2);
-  assert.deepEqual(api.attempts[1].payload.events[0].data, first);
-  assert.equal(api.attempts[1].status, undefined, 'a held PUT has no API acknowledgement');
+  const secondDocument = await page.evaluate(() => Reflect.get(globalThis, '__fmTelemetryDocument'));
+  assert.notEqual(secondDocument, firstDocument);
+  await api.waitForDocument(secondDocument);
+  const heldAttempt = api.attempts.find((/** @type {{document?:string}} */ attempt) => attempt.document === secondDocument);
+  assert.ok(heldAttempt);
+  assert.deepEqual(heldAttempt.payload.events[0].data, first);
+  assert.equal(heldAttempt.status, undefined, 'a held PUT has no API acknowledgement');
   assert.equal((await page.evaluate(pending)).filter(item => item.data.id === first.id).length, 1);
   assert.equal((await api.digest()).failureScreens?.['doctor-http'], undefined);
-  api.releasePut(); await api.waitForStored(1);
-  assert.equal(api.attempts[1].status, 200, 'real records PUT completed before the API answered');
+  api.releasePut(); await api.waitForDocument(secondDocument, 200);
+  assert.equal(heldAttempt.status, 200, 'real records PUT completed before the API answered');
   assert.equal((await page.evaluate(pending)).filter(item => item.data.id === first.id).length, 1, 'network-held acknowledgement keeps the outcome');
   // Close the actual document before its successful acknowledgement arrives; its device outbox must replay unchanged.
   await page.close(); api.release();
   page = await context.newPage();
-  await enter(page); await api.waitForAttempts(3); await api.waitForStored(2);
-  assert.deepEqual(api.attempts[2].payload.events[0].data, first);
-  assert.equal(api.attempts[2].status, 200);
+  await enter(page);
+  const thirdDocument = await page.evaluate(() => Reflect.get(globalThis, '__fmTelemetryDocument'));
+  assert.notEqual(thirdDocument, firstDocument); assert.notEqual(thirdDocument, secondDocument);
+  await api.waitForDocument(thirdDocument, 200);
+  for (const attempt of api.attempts) assert.deepEqual(attempt.payload.events[0].data, first);
   await page.waitForFunction(id => {
     for (const key of Object.keys(localStorage)) {
       try { const entry = JSON.parse(localStorage.getItem(key) ?? 'null')?.keys?.['telemetry.failureOutcomes']; if (typeof entry?.data === 'string' && JSON.parse(entry.data).some((/** @type {{data:{id:string}}} */ item) => item.data.id === id)) return false; } catch { /* Other save. */ }
@@ -98,7 +118,7 @@ await context.route('**/*', async route => {
   assert.deepEqual(errors, []); assert.deepEqual(foreign, []);
   const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const receiver = execFileSync('git', ['-C', dirname(absolute(helper)), 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  writeFileSync(join(work, 'receipt.json'), `${JSON.stringify({ schema: 'failure-producer-proof/1', at: new Date().toISOString(), source, receiver, build, engine, browser: browser.version(), viewport: '402x874', copy, outcome: first, attempts: api.attempts, digest: digest.failureScreens, refusedWrite: true, heldPutUnacknowledged: true, lostAcknowledgementReplayed: true, sameIdAcrossDocuments: true, acknowledgedOutcomeRemoved: true, errors, foreign, pass: true }, null, 2)}\n`);
+  writeFileSync(join(work, 'receipt.json'), `${JSON.stringify({ schema: 'failure-producer-proof/1', at: new Date().toISOString(), source, receiver, build, engine, browser: browser.version(), viewport: '402x874', documents: [firstDocument, secondDocument, thirdDocument], copy, outcome: first, attempts: api.attempts, digest: digest.failureScreens, refusedWrite: true, heldPutUnacknowledged: true, lostAcknowledgementReplayed: true, sameIdAcrossDocuments: true, acknowledgedOutcomeRemoved: true, errors, foreign, pass: true }, null, 2)}\n`);
   console.log(`PASS FM10c2 ${engine}: native presenter, registered outbox, real refused/held PUT, lost-ack document replay; one digest episode`);
 } catch (error) {
   if (page !== undefined && !page.isClosed()) writeFileSync(join(work, 'failed-ui.txt'), (await page.locator('body').textContent() ?? '').slice(-12000));
