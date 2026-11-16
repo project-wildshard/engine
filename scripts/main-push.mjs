@@ -365,6 +365,40 @@ export function parseArgs(argv) {
   return out;
 }
 
+/**
+ * Run the pre-push on local main's outgoing commits now, outside the lock, and mark them gated (scripts/main-push-gated.mjs):
+ * the push under the lock then skips its gate when nothing but these commits goes out. Exit 0 or a StopError with the
+ * gate's RED lines. WS_MAIN_PUSH_PREGATE=0 turns it off (the gate runs under the lock, as before).
+ * @param {string} cwd @param {(line: string) => void} log @param {string} [remote]
+ */
+export async function pregate(cwd, log, remote = 'origin') {
+  const head = git(cwd, ['rev-parse', 'HEAD']), base = git(cwd, ['rev-parse', `refs/remotes/${remote}/main`]);
+  if (run(cwd, ['merge-base', '--is-ancestor', head, base]).status === 0) return 'nothing to gate';
+  const hook = join(cwd, '.githooks/pre-push');
+  if (!existsSync(hook)) return 'no pre-push to run early';
+  const url = git(cwd, ['remote', 'get-url', '--push', remote]);
+  const logFile = resolve(cwd, git(cwd, ['rev-parse', '--git-path', `main-push-gate-${process.pid}.log`]));
+  const fd = openSync(logFile, 'w');
+  const began = Date.now();
+  let gated;
+  try {
+    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_MAIN_WATCH: '0' };
+    gated = spawnSync('bash', [hook, remote, url], { cwd, env, input: `refs/heads/main ${head} refs/heads/main ${base}\n`, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['pipe', fd, fd] });
+  } finally {
+    closeSync(fd);
+  }
+  if (gated.status !== 0) {
+    // oxlint-disable-next-line no-control-regex -- strips terminal colour codes.
+    const lines = readFileSync(logFile, 'utf8').split('\n').map((line) => line.replaceAll(/\u001B\[[0-9;]*m/gu, '').trim()).filter(Boolean);
+    const red = lines.filter((line) => /(?:^|\s)(?:RED|X)\s|NEW red|blocked|refused|Error: |error TS\d|: error /u.test(line)).slice(0, 8);
+    throw new StopError(`the gate (run before the lock) refused: ${(red.length > 0 ? red : lines.slice(-8)).join(' | ')}. Whole output: ${logFile}`);
+  }
+  rmSync(logFile, { force: true });
+  const { markGated } = await import('./main-push-gated.mjs');
+  const marked = markGated(cwd, `${base}..${head}`);
+  return `gate green before the lock in ${Math.round((Date.now() - began) / 1000)} s; ${marked} commit(s) marked`;
+}
+
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const options = parseArgs(process.argv.slice(2));
   if ('error' in options) {
@@ -374,11 +408,16 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   const cwd = git(process.cwd(), ['rev-parse', '--show-toplevel']);
   const log = (/** @type {string} */ line) => console.log(`main-push ${line}`);
   let release = () => { /* No lock acquired yet. */ };
+  // Five lanes' pushes can queue for the lock: wait up to about 30 min for it unless --tries says otherwise.
+  const lockTries = process.argv.includes('--tries') ? options.tries : 120;
+  const lock = () => { release = takeLock(cwd, { tries: lockTries, wait: options.wait, log }); };
+  const unlock = () => { release(); release = () => { /* Released. */ }; };
+  // A retry's wait never holds the lock: other lanes push meanwhile (a held lock once slept 5 min on another lane's edit).
+  const sleepUnlocked = (/** @type {number} */ seconds) => { unlock(); sleepSeconds(seconds); lock(); };
   let made = '';
   try {
     checkState(cwd);
-    // Five lanes' gates can queue for the lock: wait up to about 30 min for it unless --tries says otherwise.
-    release = takeLock(cwd, { tries: process.argv.includes('--tries') ? options.tries : 120, wait: options.wait, log });
+    lock();
     const commit = () => {
       made = commitFiles(cwd, options.files, options.messages);
       log(`committed ${made}`);
@@ -386,14 +425,27 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
     if (options.onto) {
       prepareOnto(cwd, options.onto, options.files);
       try {
-        log(syncAndPush(cwd, { tries: options.tries, wait: options.wait, log, afterSync: commit }));
+        log(syncAndPush(cwd, { tries: options.tries, wait: options.wait, log, afterSync: commit, sleep: sleepUnlocked }));
       } catch (error) {
         if (!made) run(cwd, ['reset', '--quiet', 'HEAD', '--', ...options.files]);
         throw error;
       }
     } else {
       if (options.files.length > 0) commit();
-      log(syncAndPush(cwd, { tries: options.tries, wait: options.wait, log }));
+      if (process.env.WS_MAIN_PUSH_PREGATE !== '0') {
+        // Sync once under the lock, so the gate sees the commits on today's main; then gate with the lock free.
+        try {
+          log(syncMain(cwd));
+        } catch (error) {
+          if (!(error instanceof StopError) || !error.retry) throw error;
+          log(`sync before the gate: ${error.message}; the gate runs on local main as it is`);
+        }
+        unlock();
+        log(await pregate(cwd, log));
+        process.env.WS_MAIN_PUSH_GATED = '1';
+        lock();
+      }
+      log(syncAndPush(cwd, { tries: options.tries, wait: options.wait, log, sleep: sleepUnlocked }));
     }
   } catch (error) {
     if (!(error instanceof StopError)) throw error;

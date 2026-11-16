@@ -1,6 +1,7 @@
 import {execFileSync,spawn} from 'node:child_process';
 import {availableParallelism,constants,getPriority,homedir,loadavg} from 'node:os';
-import {resolve,delimiter} from 'node:path';
+import {mkdirSync,rmSync} from 'node:fs';
+import {dirname,resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../scripts/push-budget.mjs';
@@ -178,19 +179,47 @@ async function main(){
     logHostedOnly(plan.hosted,{sha:context?.commit??'unknown',lane:process.env.WS_LANE_NAME});
     console.error(`  - split gate: ${local.length} local Vitest file(s), ${plan.hosted.length} sent to hosted CI`);
   }
-  const reporters=env.WS_PUSH_TIMINGS===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${env.WS_PUSH_TIMINGS}`];
+  // Known reds (scripts/push-known-red.mjs): a split gate keeps a JSON report, so a red that origin/main has too never
+  // refuses the push. WS_KNOWN_RED=0 refuses on every red again.
+  const knownRed=split&&env.WS_KNOWN_RED!=='0'&&(local?.length??0)>0;
+  const report=env.WS_PUSH_TIMINGS??(knownRed?resolve('tmp',`push-known-red-${process.pid}.json`):undefined);
+  if(report!==undefined&&env.WS_PUSH_TIMINGS===undefined)mkdirSync(dirname(report),{recursive:true});
+  const reporters=report===undefined?[]:['--reporter=default','--reporter=json',`--outputFile=${report}`];
   const vitest=local===null
     ?[{name:`vitest (${selection.mode})`,commands:[[process.execPath,'scripts/vitest-tmp.ts',...(selection.mode==='related'?['related','--run','--passWithNoTests=false',...selection.files]:['run']),...reporters]]}]
     :local.length===0?[]:[{name:`vitest (split ${selection.mode}: ${local.length} local)`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...local,...reporters]]}];
-  const result=await parallelChecks([
-    ...staticChecks(),
-    {name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},
-    ...vitest,
-  ],{env});
+  // With known reds on, Vitest runs beside the static lane, not inside it: a Vitest red must not stop the static checks,
+  // since a known red still lets the push go when everything else is green.
+  const [rest,tests]=await Promise.all([
+    parallelChecks([...staticChecks(),{name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},...(knownRed?[]:vitest)],{env}),
+    knownRed?parallelChecks(vitest,{env}):Promise.resolve({ok:true,seconds:0,results:[],timedOut:false}),
+  ]);
+  let result={...rest,ok:rest.ok&&tests.ok,results:[...rest.results,...tests.results]},tolerated=false;
+  if(knownRed&&rest.ok&&!tests.ok&&report!==undefined){
+    const {failingIds,mainReds,newReds}=await import('../scripts/push-known-red.mjs');
+    const pushed=failingIds(report,process.cwd());
+    if(pushed===null||pushed.size===0)console.error('  !! known-red: the Vitest report names no failing test; the red stands');
+    else{
+      try{
+        const {sha,main:known}=await mainReds(process.cwd(),[...pushed.keys()],{env});
+        const fresh=newReds(pushed,known),old=[...pushed.values()].reduce((sum,ids)=>sum+ids.size,0)-fresh.length;
+        if(fresh.length===0){
+          console.error(`  - known-red: all ${old} failing test(s) fail on origin/main ${sha.slice(0,10)} too; not this push's red (main's CI and the forward fixer own them):`);
+          for(const ids of pushed.values())for(const id of ids)console.error(`     known red: ${id}`);
+          result={...result,ok:true};tolerated=true;
+        }else{
+          console.error(`  X known-red: ${fresh.length} NEW red(s) not on origin/main ${sha.slice(0,10)} (${old} known red(s) ignored):`);
+          for(const id of fresh.slice(0,20))console.error(`     NEW red: ${id}`);
+        }
+      }catch(error){console.error(`  !! known-red: could not read origin/main's reds (${error instanceof Error?error.message:String(error)}); the red stands`);}
+    }
+  }
+  if(report!==undefined&&env.WS_PUSH_TIMINGS===undefined)rmSync(report,{force:true});
   const seconds=(Date.now()-began)/1000;
   if(seconds>PUSH_BUDGET.warnSeconds)console.error(`  !! full pre-push ${seconds.toFixed(1)} s exceeds ${PUSH_BUDGET.warnSeconds} s target (warning; all proofs retained)`);
   console.error(`  - ${split?'split ':''}push lane ${result.ok?'green':'RED'} in ${seconds.toFixed(1)} s; load ${loadavg().map(v=>v.toFixed(1)).join('/')}`);
-  if(result.ok)record(seconds);
+  // A push that passed on known reds proves no green tree.
+  if(result.ok&&!tolerated)record(seconds);
   process.exitCode=result.ok?0:1;
 }
 if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)await main();

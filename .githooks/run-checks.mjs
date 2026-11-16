@@ -86,18 +86,24 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   for(const key of Object.keys(process.env))if(key.startsWith('GIT_'))Reflect.deleteProperty(process.env,key);
   const {copyReason,makeGateCopy,pushedCommit}=await import('../scripts/push-gate-copy.mjs');
   const sha=pushedCommit(root,env.WS_PUSH_REFS),why=copyReason(root,sha,env);
+  // main-push gated these commits before it took the lock (scripts/main-push-gated.mjs): the push under the lock
+  // skips the gate when every outgoing commit carries its mark. Read from the hook's own environment.
+  const pregated=process.env.WS_MAIN_PUSH_GATED==='1'?(await import('../scripts/main-push-gated.mjs')).pregated(root,env.WS_PUSH_REFS):null;
   let copy=null;
-  if(why!==null&&sha!==null){
+  if(pregated===null&&why!==null&&sha!==null){
     console.error(`  - gate in a clean copy of ${sha.slice(0,10)}: ${why}`);
     copy=makeGateCopy(root,sha,{env});
   }
   const gateRoot=copy?.path??pkgDir;
   let code=1;
   try{
-    const context=capturePushTree(split?SPLIT_PROFILE:PUSH_PROFILE,env,gateRoot),proof=context===null?null:readPushProof(context,pushSelection(split?planBaseRefs(env.WS_PUSH_REFS,gateRoot):env.WS_PUSH_REFS,gateRoot));
+    const context=pregated!==null?null:capturePushTree(split?SPLIT_PROFILE:PUSH_PROFILE,env,gateRoot),proof=context===null?null:readPushProof(context,pushSelection(split?planBaseRefs(env.WS_PUSH_REFS,gateRoot):env.WS_PUSH_REFS,gateRoot));
     // Outgoing history/secrets have already passed in pre-push. Reusing a proved
     // tree starts no heavy work, so it must not wait behind a later full suite.
-    if(proof!==null){
+    if(pregated!==null){
+      console.error(`  - pre-gated by main-push: all ${pregated} outgoing commit(s) passed this gate before the lock (patch ids match); no gate under the lock`);
+      code=0;
+    }else if(proof!==null){
       console.error(`  - exact-tree green reuse before lease: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
       code=0;
     }else{
