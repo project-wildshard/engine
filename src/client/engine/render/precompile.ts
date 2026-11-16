@@ -1538,8 +1538,13 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
   // op-hitch32: with an upload budget, live preparation batches image uploads per frame under it: several instead of one
   // when isolated, and a predicted overshoot waits for the next frame instead of the 12 ms check after the fact.
   const batch = uploadBudget !== undefined ? newUploadBatch(uploadBudget) : undefined;
-  let imageBytes = 0, slowestUpload = 0;
-  for (const [i, tex] of uploadTextures.entries()) {
+  let imageBytes = 0, slowestUpload = 0, credited = 0;
+  const credit = (): void => { credited++; onProgress?.(base + credited, base + uploadTextures.length, `${credited} / ${uploadTextures.length} textures uploaded`); };
+  // SB32b: under the loader the compressed uploads go to their queue together, which batches them per painted frame
+  // (compressedUpload LOADING_UPLOAD_SLICE_MS); awaited one by one, each still cost a frame of its own
+  const overlap = !isolateImageUploads && uploadBudget === undefined && !presenting();
+  const inflight: Promise<void>[] = [];
+  for (const tex of uploadTextures) {
     if (nativeBudgetSpent(sliceMs)) { await pause(); tSlice = performance.now(); batch?.reset(); }
     checkCurrent();
     const compressed = tex instanceof THREE.CompressedTexture;
@@ -1548,7 +1553,16 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     if (batch !== undefined && imageUpload && batch.full(bytes)) { await pause(); checkCurrent(); batch.reset(); }
     const tUpload = performance.now();
     if (!retired.has(tex)) {
-      if (compressed) {
+      if (compressed && overlap) {
+        const upload = (async (): Promise<void> => {
+          try { await uploadCompressedTexture(renderer, tex, () => current() && !retired.has(tex), true); }
+          catch (error) { if (!retired.has(tex)) throw error; }
+          credit();
+        })();
+        // observed now (the boot's unhandled-rejection guard), rethrown by the Promise.all after the loop
+        upload.catch(() => undefined); inflight.push(upload);
+        continue;
+      } else if (compressed) {
         try { await uploadCompressedTexture(renderer, tex, () => current() && !retired.has(tex), true); }
         catch (error) { if (!retired.has(tex)) throw error; }
       } else {
@@ -1557,7 +1571,7 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     }
     // LS11: a serial GPU's image upload is credited only once its settled pause says the GPU finished it
     const settles = linkPerJob && imageUpload && !compressed && batch === undefined;
-    if (!settles) onProgress?.(base + i + 1, base + uploadTextures.length, `${i + 1} / ${uploadTextures.length} textures uploaded`);
+    if (!settles) credit();
     if (imageUpload) { imageBytes += bytes; slowestUpload = Math.max(slowestUpload, performance.now() - tUpload); }
     // DL21: name an upload that held a loading frame (Nine's Shardfile cold card sat 1.0 s on '30 / 33 textures uploaded')
     if (isDev() && performance.now() - tUpload >= SLOW_UPLOAD_MS) slowUpload(tex, tUpload, compressed ? 0 : bytes);
@@ -1566,10 +1580,11 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     // LS11: one image upload a settled pause, so its GPU copy and mips land before the next and none queue behind a paint
     else if (settles) {
       await settledPause(); checkCurrent(); tSlice = performance.now();
-      onProgress?.(base + i + 1, base + uploadTextures.length, `${i + 1} / ${uploadTextures.length} textures uploaded`);
+      credit();
     }
     else if (isolateImageUploads ? imageUpload : performance.now() - tSlice > heldBudget(sliceMs)) { await pause(); checkCurrent(); tSlice = performance.now(); }
   }
+  await Promise.all(inflight);
   // The batch's last uploads keep their own drawn frame before whatever follows warm-up, as isolation did.
   if (batch?.pending() === true) await pause();
   checkCurrent();

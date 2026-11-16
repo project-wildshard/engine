@@ -894,6 +894,7 @@
     "src/client/game/session/readyFrame.ts": "client",
     "src/client/game/session/session.ts": "client",
     "src/client/game/session/settlePrograms.ts": "client",
+    "src/client/game/session/slowGpu.ts": "client",
     "src/client/game/session/titlePreparation.ts": "client",
     "src/client/game/session/world.ts": "client",
     "src/client/game/shard/declaredEntry.ts": "client",

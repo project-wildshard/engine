@@ -42,6 +42,7 @@ import { GAME_STRINGS } from '../../../shared/game/strings';
 import { currentSpawnDownload } from '../boot/spawnDownload';
 import { waitEntryWork } from './entryReadiness';
 import { spawnViewThenNamed } from './readyFrame';
+import { slowShaderGpu } from './slowGpu';
 
 /** What a grid page lends the worker client (J130). */
 function workerGrid({ grid, gridLive }: Pick<Awaited<ReturnType<typeof playStage>>, 'grid' | 'gridLive'>): WorkerClientGrid | null {
@@ -57,10 +58,6 @@ const EXPLORER_POLL_MS = 1000, EXPLORER_OPEN_MS = 30_000;
  *  it moved nothing (warm step 2.10 -> 2.17 s, f040ca2936): one material's job overruns any such slice there, and the step
  *  is its program builds' CPU, not its painted frames. */
 const BOOT_SHADER_SLICE_MS = 48;
-/** LS8 (J204): a shaders step slower than this per program it built marks a GPU that builds pipelines on the CPU, whose first
- *  frame starts with narrow slices (Game FIRST_DRAW_NARROW). Measured on Driftwood at 4x CPU, 2026-11-09: SwiftShader 34 ms,
- *  this Mac's Metal GPU 7 ms, WebKit 2.4 ms a program. */
-const SLOW_SHADER_MS_PER_PROGRAM = 15;
 /** PINE-FLASH: the spawn ground hold, named on the loading card while it waits; its outcome and time go in a boot mark. */
 async function holdSpawnGround(grid: Awaited<ReturnType<typeof playStage>>['grid']): Promise<void> {
   if (grid === null) return;
@@ -157,6 +154,8 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   try {
     // LS8 (J204): the shaders step's measured cost per program decides how the first frame slices its draws
     const shadersAt = diagnosticNow(), programsBefore = game.renderer.info.programs?.length ?? 0;
+    // SB32b: the step's texture uploads, which say nothing of how the GPU builds programs (slowGpu.ts)
+    let uploadMs = 0;
     await step('shaders', async (p) => {
       // Until the first systems step the camera stands at the origin (Nine: 127 m below the spawn's eye, at 72° not the
       // held 93°) and placed copies hold none until their first cull: one step without its draw poses the spawn view,
@@ -175,12 +174,12 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       await precompileLevel(game, (d, n, what) => {
         bootMark('app:shader-work-count', { done: d, total: n, detail: what });
         p.set(d, n, `${what} · ${programs()}`);
-      }, { sliceMs: BOOT_SHADER_SLICE_MS, warmPost: true, drawnOnly: true, firstFrame });
+      }, { sliceMs: BOOT_SHADER_SLICE_MS, warmPost: true, drawnOnly: true, firstFrame, onStage: (phase, ms) => { if (phase === 'upload') uploadMs += ms; } });
     });
     if (fragileBoot && game.renderer.getContext().isContextLost()) throw new Error('WebGL context lost during shader compile');
     const shaderMs = diagnosticNow() - shadersAt, built = (game.renderer.info.programs?.length ?? 0) - programsBefore;
-    const slowGpu = built > 0 && shaderMs / built > SLOW_SHADER_MS_PER_PROGRAM;
-    bootMark('app:first-frame-plan', { shaderMs: Math.round(shaderMs), programs: built, narrow: slowGpu });
+    const slowGpu = slowShaderGpu({ stepMs: shaderMs, uploadMs, programs: built });
+    bootMark('app:first-frame-plan', { shaderMs: Math.round(shaderMs), uploadMs: Math.round(uploadMs), programs: built, narrow: slowGpu });
     // LS11 (J204): a GPU this slow composites the page in software; the card covers the world until it fades
     if (slowGpu) loading.coverCanvas(game.canvas);
     // RT3: and, on a software rasterizer only (never a real GPU: the phone stays at 2x), its frames in play are paced so

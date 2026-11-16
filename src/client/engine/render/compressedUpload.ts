@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { pageScope } from '../../../shared/engine/app/resources';
 import { recordBootCheckpoint } from '../boot/bootTrace';
 import { presenting } from '../../../shared/engine/core/framePacing';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
 import type { Renderer } from './renderer';
 import { retainCompressedMipmaps, assertCompressedMipmapsUnchanged, compressedTextureKey } from './compressedMipmaps';
 import { installCompressedTextureRetirement } from './compressedTextureRetirement';
@@ -11,6 +12,10 @@ import { clearCreationErrors } from './contextErrors';
 type UploadTarget = Pick<Renderer, 'initTexture' | 'getContext' | 'properties' | 'renderBufferDirect'>;
 interface UploadState {
   tail: Promise<void>;
+  /** SB32b: under the loader, when the current unpainted batch of uploads began (null: none open) */
+  sliceAt: number | null;
+  /** SB32b: the one painted frame the current loading batch resolves on */
+  paint: Promise<void> | null;
   pending: WeakMap<THREE.Texture, { version: number; signature: string; promise: Promise<void> }>;
   final: WeakSet<THREE.Texture>;
   failed: WeakMap<THREE.Texture, { allocation: unknown; error: Error }>;
@@ -21,8 +26,21 @@ const OUT_OF_MEMORY = 0x0505, CONTEXT_LOST_WEBGL = 0x9242;
 const frame = (): Promise<void> => new Promise(resolve => {
   pageScope.raf(() => { pageScope.timeout(0, resolve); });
 });
+/** STAGING-BUGBASH SB32b (opus-pineload, 2026-11-16): under the loader (nothing presenting, no game frame on show) consecutive
+ *  uploads share one painted frame until this long has passed since the batch's first, then the batch paints before the
+ *  next upload. Each upload's error round trip still waits for the GPU (WebKit drains its queue there), so the clock sees
+ *  the real cost. One upload a painted frame on each side cost Pine's arrival two frames for each of ~180 textures: 6 of
+ *  its 16 s in a headless preview, its shaders step 2.4 s for 63 programs (Driftwood 0.29 s for 57). In play every upload
+ *  keeps its own paint on each side. */
+export const LOADING_UPLOAD_SLICE_MS = 32;
+/** The current loading batch's painted frame, shared by every upload in it; it opens the next batch. */
+function batchPaint(queue: UploadState): Promise<void> {
+  queue.paint ??= (async (): Promise<void> => { await frame(); queue.paint = null; queue.sliceAt = diagnosticNow(); })();
+  return queue.paint;
+}
 
-/** Upload one compressed 2D/array texture outside a draw, with a real paint on each side and, while loading, an error round trip.
+/** Upload one compressed 2D/array texture outside a draw, with a real paint on each side (under the loader, a batch's: SB32b)
+ * and, while loading, an error round trip.
  * Concurrent warm-up and late-load callers share one queue. A consumer may bind the texture only after this resolves.
  * Already resident versions reuse the result; cancellation and graphics faults never publish readiness.
  * Loader fences retain mips through final sampler configuration and the first successful real draw. */
@@ -32,7 +50,7 @@ export function uploadCompressedTexture(renderer: UploadTarget, texture: THREE.T
   try { assertCompressedMipmapsUnchanged(texture); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error(String(error))); }
   let state = states.get(renderer);
   if (state === undefined) {
-    state = { tail: Promise.resolve(), pending: new WeakMap(), failed: new WeakMap(), final: installCompressedTextureRetirement(renderer) };
+    state = { tail: Promise.resolve(), sliceAt: null, paint: null, pending: new WeakMap(), failed: new WeakMap(), final: installCompressedTextureRetirement(renderer) };
     states.set(renderer, state);
   }
   const queue = state, version = texture.version, signature = compressedTextureKey(texture);
@@ -64,10 +82,15 @@ export function uploadCompressedTexture(renderer: UploadTarget, texture: THREE.T
   if (failure !== undefined && allocation() === failure.allocation) return Promise.reject(failure.error);
   try { if (resident()) { publish(); return Promise.resolve(); } }
   catch (error) { return Promise.reject(error instanceof Error ? error : new Error(String(error))); }
-  const promise = queue.tail.then(async () => {
-    check(); await frame(); check();
+  // `true`: uploaded under the loader, its painted frame still owed (the batch's, after the queue moves on)
+  const uploaded = queue.tail.then(async (): Promise<boolean> => {
+    check();
+    const loading = !presenting();
+    if (!loading) { queue.sliceAt = null; await frame(); }
+    else if (queue.sliceAt === null || diagnosticNow() - queue.sliceAt >= LOADING_UPLOAD_SLICE_MS) await batchPaint(queue);
+    check();
     // Another caller or a draw may have uploaded this version while it waited in the queue.
-    if (resident()) return undefined;
+    if (resident()) return false;
     if (texture.mipmaps.length === 0) throw new Error(`Compressed texture ${texture.name || texture.id} has no mipmaps and is not resident on this renderer`);
     retainCompressedMipmaps(texture);
     recordBootCheckpoint('texture:upload', { id: texture.id, version, name: texture.name, format: texture.format,
@@ -96,12 +119,14 @@ export function uploadCompressedTexture(renderer: UploadTarget, texture: THREE.T
     const error = checked ? gl.getError() : gl.NO_ERROR;
     if (error !== gl.NO_ERROR) throw fail(error, 'after');
     queue.failed.delete(texture);
+    if (loading) return true;
     await frame(); check();
-    return undefined;
+    return false;
   });
+  const promise = (async (): Promise<void> => { if (await uploaded) { await batchPaint(queue); check(); } })();
   queue.pending.set(texture, { version, signature, promise });
   const clear = (): void => { if (queue.pending.get(texture)?.promise === promise) queue.pending.delete(texture); };
   void promise.then(clear, clear);
-  queue.tail = promise.catch(() => undefined);
+  queue.tail = uploaded.then(() => undefined, () => undefined);
   return promise.then(publish);
 }
