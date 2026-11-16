@@ -7,6 +7,7 @@ import { ANIMAL_STATES } from '@wildshard/engine/entities/animalStates';
 import { CreatureRefill, syncRefillState } from '@wildshard/engine/entities/creatureRefill';
 import type { AnimalSim, AnimalSimSpec } from '@wildshard/engine/entities/AnimalSim';
 import { spawnRolls, type HuntBody, type HuntNav } from '@wildshard/engine/ai/hunt';
+import { speciesHealth, variantMods } from '@wildshard/engine/entities/species/registry';
 import { createNativeHunt } from '../plugin/brain';
 import { NativeManager } from './nativeManager';
 import { admitNativeRosterServices, createNativeCreatureRoster, type NativeCreatureSlot, type NativeRosterSaved } from '../shardfile/homeKeeper';
@@ -77,10 +78,25 @@ export function installPopulationRoster(host: SimHost, ports: PopulationRosterPo
   const environment = populationEnvironment(host, rows.environment);
   const { hunt, reach } = createNativeHunt(host, settings, { rng, ground: environment, nav: ports.nav, species,
     wanderGoal: (herd: number) => environment.wanderGoals[herd] ?? null, present: body => !('hidden' in body) || body.hidden !== true });
+  // Boot rolls cover only the variants that happened to appear. A refill can
+  // draw any admitted variant of that kind. The native declaration supplies
+  // its exact label, HP, rarity and mods; geometry belongs to the kind's bake.
+  // Existing baked variants keep first priority, including their original specs.
+  const specs = [...bake.actors, ...bake.parked].map(row => row.spec);
+  for (const family of ports.population.native) {
+    const known = specs.filter(spec => spec.kind === family.kind), base = known[0];
+    if (base === undefined) continue;
+    const missing = family.variants.filter(variant => !known.some(spec => spec.variant === variant.id));
+    if (missing.length === 0) continue;
+    const geometry = JSON.stringify(base.dims);
+    if (known.some(spec => JSON.stringify(spec.dims) !== geometry)) throw new Error(`Missing native variant needs one kind geometry: ${family.kind}`);
+    for (const variant of missing) specs.push({ ...base, variant: variant.id, label: variant.label,
+      hp: speciesHealth(family.id, variant.hp, family.tuning?.hp), rarity: variant.rarity, mods: variantMods(family, variant) });
+  }
   // the shared native roster (G454 rows): the bake's first spec per kind.variant, the manager's spawn ray and creature floor
   // over the page's terrain grid (the host's ground), every kind adopted by the hunting brain, no turn cap, a restoring
   // host's saved floor flags
-  const intake = createNativeCreatureRoster<NativeCreatureSlot>(host, { specs: [...bake.actors, ...bake.parked].map(row => row.spec), duplicates: 'first',
+  const intake = createNativeCreatureRoster<NativeCreatureSlot>(host, { specs, duplicates: 'first',
     species: ports.population.native,
     variants: new Map(), rng, spawnY: ports.spawnY, services: admitNativeRosterServices(host, rows.step, hunt), hunted: 'every', ...(ports.saved === undefined ? {} : { saved: ports.saved }) });
   /** Every body this roster made, listed or kept out of the list by a fight, by entity id. */
