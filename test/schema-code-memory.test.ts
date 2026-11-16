@@ -1,23 +1,19 @@
-import { nalatiSpecimens } from './fixtures/nalati-specimens';
-import { nalatiBalbal } from './fixtures/nalati-balbal';
-import { nalatiRuntime } from './fixtures/nalati-runtime';
-import { nalatiDecorative } from './fixtures/nalati-decorative';
+import { parse } from 'valibot';
+import { frozenRuntimeJson } from './fixtures/frozen/snapshots';
 import { expect, test } from 'vitest';
 import conditionalSchema from './fixtures/schema-conditionals.json' with { type: 'json' };
 import { schemaReferences } from '../src/shared/game/shardfile/schemaReferences';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
-import { validateDefinedJson } from '../src/sharddev/sections';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
 import { SceneDressingSchema } from '@wildshard/format/sceneDressing';
-import { dressingScene } from './fixtures/nalati-dressing-scene';
 
 const encode = (value: unknown): Uint8Array => new TextEncoder().encode(encodeCanonicalJson(value));
 const accepts = (work: () => unknown): boolean => { try { work(); return true; } catch { return false; } };
 
 test('real dressing retains author/runtime acceptance and nested refusal without schema mutation', () => {
-  const schema = namedJsonSchema(SceneDressingSchema), original = encodeCanonicalJson(schema), schemaBytes = encode(schema);
-  const rows = dressingScene('phone',nalatiDecorative,nalatiRuntime,nalatiBalbal,nalatiSpecimens), layer = rows.layers[0], first = rows.statics[0];
+  const schema = namedJsonSchema(SceneDressingSchema), original = encodeCanonicalJson(schema);
+  const rows = parse(SceneDressingSchema, frozenRuntimeJson('nalati-dressing-phone.json')), layer = rows.layers[0], first = rows.statics[0];
   if (layer === undefined || first === undefined) throw new Error('Missing actual dressing rows');
   const candidates = [rows,
     { ...rows, layers: [{ ...layer, far: 'distant' }] },
@@ -26,9 +22,8 @@ test('real dressing retains author/runtime acceptance and nested refusal without
   ];
   for (const [index, value] of candidates.entries()) {
     const bytes = encode(value);
-    const author = accepts(() => validateDefinedJson(schemaBytes, bytes));
-    expect(author).toBe(index === 0);
-    expect(accepts(() => validateNamedJsonSchema(schema, bytes))).toBe(author);
+    const native = accepts(() => validateNamedJsonSchema(schema, bytes));
+    expect(native).toBe(index === 0);
   }
   expect(encodeCanonicalJson(schema)).toBe(original);
   const factored = schemaReferences(schema, original);
@@ -57,8 +52,7 @@ test('factored tuple, dependency, conditional and disjunction rules match the au
     { mode: 'strict', options: ['x', 2, 3] }, { mode: 'loose', values: [0] },
   ];
   for (const [index, value] of samples.entries()) {
-    const bytes = encode(value), author = accepts(() => validateDefinedJson(encode(schema), bytes));
-    expect(author).toBe(index < 2);
-    expect(accepts(() => validateNamedJsonSchema(schema, bytes))).toBe(author);
+    const bytes = encode(value);
+    expect(accepts(() => validateNamedJsonSchema(schema, bytes))).toBe(index < 2);
   }
 });

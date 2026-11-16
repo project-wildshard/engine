@@ -11899,7 +11899,7 @@
     "originalTests": [
       "a reload choice answers pointerup without applying or navigating until the explicit button",
       "undoing a staged choice clears it and keyboard clicks remain available",
-      "SR11: the title panel is the in-game tabs, and a quality pick reloads once from Graphics ▸ Reload now",
+      "SR11: the title panel is the in-game tabs, and a quality pick reloads once from Graphics \u25b8 Reload now",
       "retired diagnostics are absent while Clear downloads remains in Developer",
       "storage lives under Clear downloads rather than a diagnostic row"
     ],
@@ -12091,5 +12091,34 @@
     "sourceRevision": "b3d31d608f9cad04407e066416b80e670de19471",
     "sourceBlob": "eb9e87f289bcee106599813c2915eae7c041170e",
     "retirementProof": "No cases retired. Exact original width2/8 GLBs produced once by SDK da2a4ddb; actual product names/hashes and strict JSON admission retained. Selected tier, complete channels/bounds, hostile/in-flight reader and actual Explorer/dressing/encounter controls unchanged."
+  },
+  {
+    "repo": "engine",
+    "file": "test/schema-code-memory.test.ts",
+    "outcome": "restored",
+    "target": "test/schema-code-memory.test.ts",
+    "decision": "CI21 SDK-tail assertion split: restore all private native synchronous-driver/factoring checks using the complete verified frozen dressing bank, with no SDK or shard source imports. SDK author/native public admission comparisons are retained at sharddev d45e8c62507d96c104968eb8040377bcb37cc688 test/schema-code-memory.test.ts, same three original names and source blob.",
+    "originalTests": [
+      "real dressing retains author/runtime acceptance and nested refusal without schema mutation",
+      "data-valued keywords and existing reference bases retain their original meanings",
+      "factored tuple, dependency, conditional and disjunction rules match the author validator"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "6739968bb23c8c30c267d0bc049187c280bbb148",
+    "retirementProof": "No cases or assertions retired. Engine retains native strict/refusal/full-value/schema-immutability checks, factoring-size reduction, data const reference identity and all reserved-reference passthrough guards; SDK retains every author comparison/candidate plus real public native admission.",
+    "assertionDestinations": [
+      {
+        "repo": "sharddev",
+        "revision": "d45e8c62507d96c104968eb8040377bcb37cc688",
+        "target": "test/schema-code-memory.test.ts",
+        "assertions": "Complete author/public-native acceptance/refusal comparisons, full frozen wire and schema immutability; all original candidates and conditional samples."
+      },
+      {
+        "repo": "engine",
+        "branch": "plan/ci21sdk-tail",
+        "target": "test/schema-code-memory.test.ts",
+        "assertions": "All three original native cases, including direct private synchronous factoring size/identity/reference assertions; default blocking discovery and compiler/typed lint."
+      }
+    ]
   }
 ]

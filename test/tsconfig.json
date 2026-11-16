@@ -318,7 +318,6 @@
     "registered-json.test.ts",
     "return-program-group-v2.test.ts",
     "return-projection-inventory.test.ts",
-    "schema-code-memory.test.ts",
     "script-seats.test.ts",
     "script-v2-radial.test.ts",
     "scripts/_template-boss.test.ts",
@@ -396,6 +395,7 @@
     "../pages/worker.ts",
     "../pages/placed-slug.ts",
     "../pages/slug-meta.ts",
-    "../pages/slug-names.ts"
+    "../pages/slug-names.ts",
+    "schema-code-memory.test.ts"
   ]
 }

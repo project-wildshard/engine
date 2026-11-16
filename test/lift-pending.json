@@ -94,7 +94,6 @@
   "test/registered-json.test.ts",
   "test/return-program-group-v2.test.ts",
   "test/return-projection-inventory.test.ts",
-  "test/schema-code-memory.test.ts",
   "test/script-v2-radial.test.ts",
   "test/scripts/_template-boss.test.ts",
   "test/scripts/far-reach-roc.test.ts",
