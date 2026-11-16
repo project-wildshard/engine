@@ -10,3 +10,6 @@
 - `world/detailLayer.ts` hands the ring's tables to one InstancedMesh (one draw per layer), builds the card from the
   format's binary mesh file and adds an optional sway on the shared wind field to a clone of the look material.
 - No base64 anywhere (G649): the format moved the mesh, mask and heights to binary files for this.
+- Review fixes (opus-ss16i): the clone keeps the look's shader patches (`copyShaderPatches`; three's `clone` drops
+  them), the wind field goes in only when the look has none (twice would not compile), and every layer shrinks its clumps
+  to nothing over the last few metres of its radius, as `Grass.ts` does, so a square ring's cells never pop at full size.

@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { expect, test } from 'vitest';
 import { DetailRing, RING_CELL, detailField, layerSeed, ringShape, type DetailLayerFiles, type DetailLayerSource } from './detailRing';
-import { DetailLayer } from './detailLayer';
+import { DetailLayer, ringFade } from './detailLayer';
+import { PATCH_ORDER, patchShader } from '../render/shaderPatches';
+import { patchWindField } from './wind';
 
 // Meta SHARD-SOURCE AP32b: a shard's detail layer scattered in a camera ring (Grass.ts's toroidal cells, made general).
 
@@ -105,5 +107,26 @@ test('a layer draws in one call: one InstancedMesh over the ring tables', () => 
   expect(layer.mesh.count).toBe(layer.ring.shape.side ** 2 * layer.ring.shape.slots);
   expect(layer.mesh.geometry.getIndex()?.count).toBe(3);
   expect(layer.mesh.material).not.toBe(material); // the sway patch stays on the layer's clone
+  layer.dispose();
+});
+
+// review MUSTs: the clone keeps the look's own patches, a wind-patched look gets the wind field once, and every layer fades
+// to nothing at the ring's edge
+test("the layer's material keeps the look's patches, declares the wind once and fades at the ring's edge", () => {
+  const material = new THREE.MeshStandardMaterial();
+  patchShader(material, 'test.look-wind', PATCH_ORDER.decorate - 1, (shader) => {
+    patchWindField(shader);
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\n// look-mark');
+  }, { key: 'look-wind' });
+  const layer = new DetailLayer(meadow({ sway: { amount: 0.3, rate: 0.8 } }), meadowFiles(), material, { phone: false });
+  const look = layer.mesh.material as THREE.Material;
+  const shader = { uniforms: {} as Record<string, THREE.IUniform>, vertexShader: THREE.ShaderLib.standard.vertexShader,
+    fragmentShader: THREE.ShaderLib.standard.fragmentShader };
+  look.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, undefined as unknown as THREE.WebGLRenderer);
+  expect(shader.vertexShader).toContain('// look-mark');
+  expect(shader.vertexShader.split('uniform float uWindTime').length - 1).toBe(1);
+  expect(shader.vertexShader).toContain('smoothstep( uDetailRadius - uDetailFade, uDetailRadius, ringDist )');
+  expect(shader.uniforms['uDetailRadius']?.value).toBe(layer.ring.shape.radius);
+  expect(shader.uniforms['uDetailFade']?.value).toBe(ringFade(layer.ring.shape.radius));
   layer.dispose();
 });

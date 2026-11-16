@@ -6,13 +6,14 @@
  *   scene.add(layer.mesh);
  *   game.onUpdate(() => layer.update(camera.position));
  *
- * The material is the layer's look material; it is cloned, so the sway patch never reaches the shard's other draws.
+ * The material is the layer's look material; it is cloned with its shader patches, so the ring's fade and sway patch never
+ * reach the shard's other draws.
  */
 import * as THREE from 'three';
-import { DetailRing, detailField, ringShape, type DetailLayerFiles, type DetailLayerSource } from './detailRing';
+import { DetailRing, RING_CELL, detailField, ringShape, type DetailLayerFiles, type DetailLayerSource } from './detailRing';
 import { patchWindField } from './wind';
 import { windUniforms } from './TreeFactory';
-import { PATCH_ORDER, patchShader } from '../render/shaderPatches';
+import { PATCH_ORDER, copyShaderPatches, patchShader } from '../render/shaderPatches';
 
 /** Cells a frame may reseed once the ring is full (Grass.ts's budget). */
 const CELL_BUDGET = 6;
@@ -34,30 +35,45 @@ export function detailGeometry(mesh: DetailLayerSource['mesh'], bytes: Uint8Arra
   return geometry;
 }
 
-/** Sway the cards on the shared wind: the card's top (uv.y) leans downwind by `amount`, pulsing at `rate` cycles a second. */
-function swayMaterial(material: THREE.Material, sway: NonNullable<DetailLayerSource['sway']>): void {
-  patchShader(material, 'engine.detail-sway', PATCH_ORDER.decorate, (shader) => {
-    patchWindField(shader);
-    shader.uniforms['uWindStrength'] = windUniforms.uWindStrength;
-    shader.uniforms['uDetailSway'] = { value: sway.amount };
-    shader.uniforms['uDetailRate'] = { value: sway.rate };
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', /* glsl */`#include <common>
-        uniform float uWindStrength; uniform float uDetailSway; uniform float uDetailRate;`)
-      .replace('#include <begin_vertex>', /* glsl */`#include <begin_vertex>
-        {
-          mat3 im = mat3( instanceMatrix );
+/** The fade at the ring's edge: clumps shrink to nothing over this many metres inside the ring's radius (Grass.ts's
+ * trick), so the square ring's cells never pop in or out at full size as the camera crosses a cell. */
+export function ringFade(radius: number): number { return Math.min(RING_CELL * 1.5, radius * 0.3); }
+
+/** The layer's own vertex patch: the edge fade always, and with `sway` the card's top (uv.y) leans downwind by `amount`,
+ * pulsing at `rate` cycles a second on the shared wind field. The wind field's GLSL goes in only when no earlier patch on
+ * the look material put it there, so a wind-patched look still compiles. */
+function ringMaterial(material: THREE.Material, radius: number, sway: DetailLayerSource['sway']): void {
+  patchShader(material, 'engine.detail-ring', PATCH_ORDER.decorate, (shader) => {
+    shader.uniforms['uDetailRadius'] = { value: radius };
+    shader.uniforms['uDetailFade'] = { value: ringFade(radius) };
+    let declare = 'uniform float uDetailRadius; uniform float uDetailFade;', bend = '';
+    if (sway !== undefined) {
+      if (!shader.vertexShader.includes('uniform float uWindTime')) patchWindField(shader);
+      if (!shader.vertexShader.includes('uniform float uWindStrength')) declare += ' uniform float uWindStrength;';
+      declare += ' uniform float uDetailSway; uniform float uDetailRate;';
+      shader.uniforms['uWindStrength'] = windUniforms.uWindStrength;
+      shader.uniforms['uDetailSway'] = { value: sway.amount };
+      shader.uniforms['uDetailRate'] = { value: sway.rate };
+      bend = /* glsl */`
           float s2 = max( dot( im[0], im[0] ), 1e-6 );
-          vec3 ipos = ( modelMatrix * vec4( instanceMatrix[3].xyz, 1.0 ) ).xyz;
           vec2 dir = windDirXZ();
           float pulse = sin( uWindTime * uDetailRate * 6.2832 - dot( ipos.xz, dir ) * 0.3 ) * 0.5 + 0.5;
           float push = uDetailSway * uWindStrength * ( 0.3 + 0.7 * pulse ) * ( 0.6 + 0.4 * min( windGustAt( ipos.xz ), 1.3 ) );
           float h = uv.y * uv.y;
           vec3 off = vec3( dir.x, 0.0, dir.y ) * push * h;
           off.y = - length( off.xz ) * 0.3;
-          transformed += ( off * im ) / s2 * sqrt( s2 );
+          transformed += ( off * im ) / s2 * sqrt( s2 );`;
+    }
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\n        ${declare}`)
+      .replace('#include <begin_vertex>', /* glsl */`#include <begin_vertex>
+        {
+          mat3 im = mat3( instanceMatrix );
+          vec3 ipos = ( modelMatrix * vec4( instanceMatrix[3].xyz, 1.0 ) ).xyz;${bend}
+          float ringDist = distance( ipos.xz, cameraPosition.xz );
+          transformed *= 1.0 - smoothstep( uDetailRadius - uDetailFade, uDetailRadius, ringDist );
         }`);
-  }, { key: 'detail-sway' });
+  }, { key: sway === undefined ? 'detail-ring' : 'detail-ring-sway' });
 }
 
 /** One detail layer: an InstancedMesh fed by a camera ring. */
@@ -72,7 +88,8 @@ export class DetailLayer {
     const field = detailField(source, files);
     this.ring = new DetailRing(field, ringShape(field, source.radius, options.phone));
     const look = material.clone();
-    if (source.sway !== undefined) swayMaterial(look, source.sway);
+    copyShaderPatches(material, look);
+    ringMaterial(look, this.ring.shape.radius, source.sway);
     const count = this.ring.matrices.length / 16;
     this.mesh = new THREE.InstancedMesh(detailGeometry(source.mesh, files.mesh), look, count);
     this.matrixAttribute = new THREE.InstancedBufferAttribute(this.ring.matrices, 16);
