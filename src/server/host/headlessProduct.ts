@@ -9,10 +9,12 @@ import { pathToFileURL } from 'node:url';
 import { SHARDFILE_ADMISSION_LIMITS } from '@wildshard/format/admissionLimits';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { parseShardfile } from '@wildshard/format/shardSchema';
-import { carryOutputDescriptor, resolveOutputDescriptor, outputDescriptor } from '@wildshard/engine/game/shardfile/outputDescriptor';
+import { carryOutputDescriptor, resolveOutputDescriptor, outputDescriptor, serverReadsFile } from '@wildshard/engine/game/shardfile/outputDescriptor';
 import { nodeOutputDescriptorChecks, nodeNamedJsonCheck } from '@wildshard/engine/game/shardfile/outputChecksNode';
 import { shardProductData } from '@wildshard/engine/game/shardfile/productData';
-import type { ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import { productClosureFile, type ShardProduct } from '@wildshard/engine/game/shardfile/shardProduct';
+import type { Rapier } from '@wildshard/engine/physics/rapier';
+import type { HeadlessRuntimeInput } from './headlessRuntime';
 
 /** Read a local format-2 output for native proofs, including checked custom sections. No runtime code is imported. */
 export async function loadHeadlessProduct(outDir: string): Promise<ShardProduct> {
@@ -49,4 +51,17 @@ export async function loadHeadlessProduct(outDir: string): Promise<ShardProduct>
     if (bytes.length !== file.compressed || await hash(bytes) !== file.hash) throw new Error('Native product blob hash or size mismatch');
     return bytes;
   }, true, false, nodeNamedJsonCheck, { files: true });
+}
+
+/** Admit an extracted cooked server product through the production reader.
+ * Only server assets are read; the caller owns physics and world lifetime. */
+export async function loadCookedProduct(directory: string, rapier: Rapier): Promise<HeadlessRuntimeInput> {
+  const product = await loadHeadlessProduct(directory), shard = product.shardfile;
+  const descriptor = outputDescriptor(shard);
+  if (descriptor === undefined) throw new Error('Cooked world requires a verified output descriptor');
+  const entries = await Promise.all(descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider)).map(async file => {
+    const ref = file.commons === true ? `commons:${file.hash}` : file.hash;
+    return [ref, await productClosureFile(product, ref)] as const;
+  }));
+  return { shard, assets: new Map(entries), product, rapier };
 }
