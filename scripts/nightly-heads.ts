@@ -143,8 +143,16 @@ try {
             });
             const before = await observeHover();
             const control = page.locator('.ws-touch-hover');
-            let action = 'mount';
+            let action = 'equipment readiness';
             try {
+            // Live world frames can precede its asynchronous equipment entry.
+            // Wait for the real board's input owner before sending a single tap.
+            await page.waitForFunction(() => {
+              const world = window.__wildshard?.world;
+              return world?.weapons.enabled === true && world.weapons.has('tool.hoverboard') &&
+                world.game.app.input.allowed('hover') && world.weapons.tools.some(tool => tool.id === 'tool.hoverboard' && tool.enabled);
+            }, undefined, {timeout: 10000});
+            action = 'mount';
             await control.tap({timeout: 5000});
             const tappedAt = await page.evaluate(() => performance.now());
             await page.waitForFunction(() => {

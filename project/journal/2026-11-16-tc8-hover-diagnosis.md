@@ -75,3 +75,11 @@ own subdirectory; failed heads retain their actual JSON observations in
 the uploaded artifact before large packs/captures are retired. Successful
 heads keep the existing compact receipt. No screenshot or trace archive
 is added to the artifact, and admission does not change.
+
+Template diagnostic43823462430 now passes cold cook, actual boot, draw
+and Explorer: the old manifest404 is healed. Its next hover failure
+exposes an early tap while EquipmentService.enabled is false; it becomes
+true before the failure receipt. Live gameplay frames can precede the
+async equipment entry owner. The hover journey now waits at most10s for
+the actual owned/enabled board and allowed input before tapping. The
+mount/model/unmount checks keep their10s deadlines; no state is assigned.
