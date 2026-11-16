@@ -11,7 +11,7 @@ import {StandaloneCatalogueSchema, type StandaloneCatalogue} from '@wildshard/fo
 import {readTar} from '@wildshard/format/tar';
 import type {CookIndex} from '../../src/cook/game/cookWorker';
 import type {PackStore} from '../../src/cook/game/packStore';
-import {bareSlug} from '../../src/shared/game/grid/catalogueSlot';
+import {bareSlug, installCatalogue, playerHidden, selectTitleRows} from '../../src/shared/game/grid/catalogueSlot';
 import {serverPackBookPath} from '../../src/shared/game/shardfile/serverPack';
 import {productTarball} from '../../src/cook/game/productTarball';
 import {titleMetadata, type TitleManifest} from '../../src/client/game/shard/titleList';
@@ -31,7 +31,13 @@ export function writeTitleRows(outDir: string, rows: readonly TitleManifest[]): 
   const element = `<script type="application/json" id="ws-title-rows">${JSON.stringify(rows).replaceAll('<', String.raw`\u003c`)}</script>`;
   const file = join(outDir, 'index.html'), html = readFileSync(file, 'utf8');
   if (!html.includes('</head>')) throw new Error('No document head for the title rows');
-  writeFileSync(file, ROWS.test(html) ? html.replace(ROWS, () => element) : html.replace('</head>', () => `${element}</head>`));
+  const catalogue = /<script type="application\/json" id="ws-catalogue">([^<]*)<\/script>/u.exec(html)?.[1];
+  if (catalogue !== undefined) installCatalogue(JSON.parse(catalogue));
+  const escape = (value: string): string => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+  const links = selectTitleRows(rows, true).map(row => `<a class="ws-launch-shard" href="/slug/${encodeURIComponent(bareSlug(row.slug))}"${playerHidden(row) ? ' data-developer' : ''}><b>${escape(row.name)}</b><span>${escape(row.biome)}</span></a>`).join('');
+  const titled = ROWS.test(html) ? html.replace(ROWS, () => element) : html.replace('</head>', () => `${element}</head>`);
+  writeFileSync(file, titled.replace(/<!-- first-menu-cards -->[\s\S]*?<!-- \/first-menu-cards -->/u,
+    () => `<!-- first-menu-cards -->${links}<!-- /first-menu-cards -->`));
 }
 const readTitleRows = (outDir: string): readonly TitleManifest[] => {
   const text = /<script type="application\/json" id="ws-title-rows">([^<]*)<\/script>/u.exec(readFileSync(join(outDir, 'index.html'), 'utf8'))?.[1];

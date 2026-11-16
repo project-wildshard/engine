@@ -69,3 +69,10 @@ export function autoPlaced(row: {readonly slug: string}): boolean {
 export function placedByFile(row: {readonly slug: string}): boolean {
   return installedCatalogue()?.placed?.some(slug => bareSlug(slug) === bareSlug(row.slug)) === true;
 }
+
+/** The same catalogue policy for the first HTML menu and the runtime shard deck. */
+export function selectTitleRows<T extends {readonly slug: string; readonly status?: string; readonly shardSelect?: boolean}>(rows: readonly T[], showHidden: boolean): readonly T[] {
+  const ordinary = rows.filter(row => (row.shardSelect !== false && !autoPlaced(row)) || placedByFile(row));
+  const visible = ordinary.filter(row => !playerHidden(row));
+  return showHidden ? [...visible, ...ordinary.filter(playerHidden)] : visible;
+}

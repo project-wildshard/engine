@@ -8,7 +8,7 @@ import {afterEach, describe, expect, it} from 'vitest';
 import * as v from 'valibot';
 import {packsBookPath} from '../src/shared/game/shardfile/spawnManifest';
 import {StandaloneCatalogueSchema} from '@wildshard/format/standaloneCatalogue';
-import {addCookedShards, appendValidationVerdicts, catalogueWithAdded, writeCatalogueDocument} from '../scripts/app-build/catalogue';
+import {addCookedShards, appendValidationVerdicts, catalogueWithAdded, writeCatalogueDocument, writeTitleRows} from '../scripts/app-build/catalogue';
 import {stampBuildHtml} from '../scripts/app-build/buildIdentity.mjs';
 import {refreshServiceWorker, workerScripts} from '../scripts/app-build/serviceWorker';
 import {installTitleManifests, titleManifests, withCatalogueHeads, type TitleManifest} from '../src/client/game/shard/titleList';
@@ -84,6 +84,22 @@ describe('the bake', () => {
   const document_ = {version: 0, stage: 'live', placements: [{instance: 'a-solo', slug: 'a', cell: [0, 0], size: [500, 500, 500]}],
     grid: shipped.grid, shards: [{...fresh, name: '</script><b>'}], missing: []};
   const folder = (): string => mkdtempSync(join(tmpdir(), 'catalogue-'));
+
+  it('bakes native menu links with the runtime catalogue policy and escaped prose', () => {
+    const out = folder();
+    try {
+      writeFileSync(join(out, 'index.html'), '<html><head></head><body><!-- first-menu-cards --><!-- /first-menu-cards --></body></html>');
+      writeCatalogueDocument(out, document_);
+      const row: TitleManifest = { slug: 'a', name: '<A & B>', biome: '"A biome"', status: 'live', card: { thumb: '', portrait: '', landscape: '' } };
+      writeTitleRows(out, [row, { ...row, slug: 'secret', status: 'hidden' }, { ...row, slug: 'open-plot', shardSelect: false }]);
+      const html = readFileSync(join(out, 'index.html'), 'utf8');
+      expect(html).toContain('href="/slug/a"');
+      expect(html).toContain('&lt;A &amp; B&gt;');
+      expect(html).toContain('&quot;A biome&quot;');
+      expect(html).toContain('href="/slug/secret" data-developer');
+      expect(html).not.toContain('href="/slug/open-plot"');
+    } finally { rmSync(out, {recursive: true, force: true}); }
+  });
 
   it('writes the file and inlines it, once, and no `<` closes the element', () => {
     const out = folder();

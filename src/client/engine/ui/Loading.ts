@@ -170,6 +170,9 @@ export class Loading {
     bootMark('app:loading-adopt', {scoped: mode.scoped === true || mode.inset === true, chunk: chunk.id});
     if (mode.inset !== true) { app.ui.bindPresentation(this.scope); app.ui.holdCovered(this.scope); }
     this.scoped = mode.scoped === true || mode.inset === true;
+    if (!this.scoped && document.documentElement.classList.contains('boot-menu')) {
+      this.scope.onDispose(() => { document.documentElement.classList.remove('boot-menu'); });
+    }
     if (!this.scoped) startBoot({ id: chunk.id, name: chunk.name }, TIER === 'phone' && chunk.trace === true);
     // LS4: a fatal load screen covers this card; it copies the same report through this source.
     if (!this.scoped) setDiagnosticsSource(() => this.diagnosticsText());

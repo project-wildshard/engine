@@ -271,28 +271,36 @@ function pageTitleImports(): ReturnType<typeof preparePageTitleImports> {
   titleImports ??= preparePageTitleImports();
   return titleImports;
 }
-async function showPageTitle(refusal = ''): Promise<void> {
+async function showPageTitle(refusal = '', preparation?: Scope): Promise<void> {
   // S20: the title's ended note reads lastEnd(), settled (the imports take longer than the lock query)
   const [[{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }]] = await Promise.all([pageTitleImports().ready(), settleLastEnd()]);
   // SF21a: a tap or validated recovery selects a grid; unrecorded process loss returns to title
-  const grid = installGridTitle();
+  const grid = installGridTitle({ preserveIntent: preparation !== undefined });
+  let earlySelect = document.querySelector<HTMLDetailsElement>('[data-launch-menu]')?.open === true;
+  let menu: ReturnType<typeof buildTitleMenu> | undefined;
   // the composition root wires the game's main menu (over its shard deck) into the engine's title (E405)
   const title = showStartTitle(({ settings, notice }) => {
     const lines = [refusal, notice ?? '', grid.note].filter((line) => line !== '').join('\n');
-    return buildTitleMenu({
+    const screen = earlySelect ? 'select' : menu?.screen ?? grid.screen;
+    earlySelect = false;
+    menu = buildTitleMenu({
       active: null,
+      ...(preparation === undefined ? {} : { readAhead: false }),
       onEnter: (card) => { travel({ to: card.slug, mode: 'enter' }); },
       onExplore: (card) => { travel({ to: card.slug, mode: 'explore' }); },
       onGrid: grid.onGrid,
-      ...(grid.screen === undefined ? {} : { screen: grid.screen }),
+      ...(screen === undefined ? {} : { screen }),
       // Settings needs common inventory and level predicates, without booting a renderer.
       onSettings: () => { void (async () => { const { openTitleSettings } = await import('./titleSettings'); await openTitleSettings(settings); })(); },
       ...(lines === '' ? {} : { notice: lines }),
     });
-  });
+    return menu;
+  }, { preparing: preparation !== undefined });
+  preparation?.onDispose(title.dispose);
   // Published cards can arrive after the first menu. Rebuild through the same
   // owner as Developer changes, preserving its selected card and menu screen.
   void placedCells.then(title.refresh);
+  if (preparation !== undefined) return;
   // DL10 (Debug 'Early shader compile', default off): after the title's first frames, one trivial shader link starts the
   // GPU process's compiler, so a cold entry's first program does not pay its 1-1.4 s start-up
   showDropOnTitle();
@@ -404,6 +412,7 @@ async function startSelected(): Promise<void> {
   const listed = unloadedTitleRow(search.get('chunk'), game.shard);
   const arrival = listed?.shardfile === undefined ? game.shard : { ...game.shard, slug: listed.slug, name: listed.name, shardfile: listed.shardfile };
   const loading = beginLoading({ id: arrival.slug, name: arrival.name, trace: game.shard.boot?.phone?.trace === true });
+  if (document.documentElement.classList.contains('boot-menu')) await showPageTitle('', loading.scope);
   const moduleText = document.getElementById('boot-module-files')?.textContent;
   const moduleRows: unknown = moduleText === undefined ? undefined : JSON.parse(moduleText);
   const gridEntryModule = import('@wildshard/engine/game/grid/pageEntry');

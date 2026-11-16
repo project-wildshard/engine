@@ -63,6 +63,8 @@ export interface TitleMenuOptions extends Omit<TitleDeckOptions, 'cards'> {
   readonly onGrid: () => void;
   /** which screen to open on (default: the one this page was last on, the main menu at first) */
   readonly screen?: MainMenuScreen;
+  /** A world already preparing owns its own mandatory reads; do not start optional title read-ahead beside them. */
+  readonly readAhead?: false;
   /** SF60 / G214: the WHAT'S NEW banner's lines (default: today's, src/client/game/whatsNew.ts) and its hide store (tests) */
   readonly whatsNew?: WhatsNew;
   readonly whatsNewStore?: HiddenStore;
@@ -96,6 +98,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const leaveTitle = (): void => { leavingTitle = true; stopReadAhead?.(); };
   const mode = opts.mode ?? menuMode;
   const { notice, onGrid, screen: first, cards = titleCards(), whatsNew = WHATS_NEW, whatsNewStore, ...deckOpts } = opts;
+  let viewScreen = first ?? screen;
   // leaving the title for a world resets it: pause ▸ EXIT TO MAIN opens on the main menu again
   // MG4 / MG5: a phone, by the rule the tier uses (core/tier.ts), read here without the tier's render tables (the title's graph)
   const phone = mobileDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
@@ -170,7 +173,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
 
   const selectCard = required(main, '.ws-main-select', HTMLButtonElement);
   const show = (next: MainMenuScreen): void => {
-    screen = next;
+    screen = next; viewScreen = next;
     root.dataset['screen'] = next;
     main.classList.toggle('hide', next !== 'main');
     deck.root.classList.toggle('hide', next !== 'select');
@@ -206,7 +209,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   // disk prefetch, never world construction or a hidden offline-size scan. It shows nothing (QB2).
   let started = false;
   const startPrefetch = (): void => {
-    if (started || opts.active !== null) return;
+    if (started || opts.active !== null || opts.readAhead === false) return;
     started = true;
     // OFFLINE OF5a: a title that stays 10 s asks the worker to hold this build's code, so an update seen only here still
     // launches offline; the worker does it only on a device that held an older build (a first visit reads nothing, S2)
@@ -239,18 +242,18 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   // INFINITE WILDSHARD card and SHARD SELECT's locked cards follow it at once.
   deck.onTap(required(main, '.ws-main-dev', HTMLButtonElement), () => { setDev(!dev); });
   deck.onTap(back, () => { show('main'); });
-  show(first ?? screen);
+  show(viewScreen);
 
   return {
     root, cards: deck.cards,
     get index() { return deck.index; },
-    get screen() { return screen; },
+    get screen() { return viewScreen; },
     show,
     // the HUD's arrow keys move the deck; on the main menu they wait for SHARD SELECT
     select: (i, smooth) => { deck.select(i, smooth); },
     // the HUD's confirm / any key: the main menu's first card opens the deck, the deck enters its card
-    activate: () => { if (screen === 'main') play(); else deck.activate(); },
-    start: () => { deck.start(); startPrefetch(); if (screen === 'main') selectCard.focus({ preventScroll: true }); },
+    activate: () => { if (viewScreen === 'main') play(); else deck.activate(); },
+    start: () => { deck.start(); startPrefetch(); if (viewScreen === 'main') selectCard.focus({ preventScroll: true }); },
     dispose: () => { owner.dispose(); deck.dispose(); },
   };
 }
@@ -263,8 +266,8 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
  */
 export interface GridTitle { readonly onGrid: () => void; readonly note: string; readonly screen?: MainMenuScreen }
 /** Return the installed title action and note for the grid entry. */
-export function installGridTitle(): GridTitle {
-  dropGridIntent();
+export function installGridTitle(options: { readonly preserveIntent?: boolean } = {}): GridTitle {
+  if (options.preserveIntent !== true) dropGridIntent();
   const loop = gridRecoveryLoop();
   return { onGrid: enterGrid, note: endedNote(lastEnd(), loop), ...(loop ? { screen: 'select' } : {}) };
 }

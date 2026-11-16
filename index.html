@@ -221,6 +221,7 @@
       // The environment flags select no level (src/client/app/bootRoute.ts keeps the same list): a launch with only them is the title.
       for (const key of ['v', 'tier', 'touch', 'mute', 'nolock', 'sw']) homeParams.delete(key);
       if (homeParams.size === 0) document.documentElement.classList.add('title-first');
+      if (document.getElementById('ws-shardfile') === null) document.documentElement.classList.add('boot-menu');
       if (document.documentElement.classList.contains('title-first')) {
         const hero = document.createElement('link');
         hero.rel = 'preload'; hero.as = 'image'; hero.setAttribute('fetchpriority', 'low');
@@ -341,6 +342,22 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
 /* A fresh-page handoff also covers a running page's title/menu layer. */
 .ws-load[data-navigation] { z-index: calc(var(--ws-layer-menu) + 1); opacity: 1; transition: none; pointer-events: auto; }
 .ws-load.hide { opacity: 0; pointer-events: none; }
+/* PZ27: the live menu owns the screen during player boot. Keep Loading's real
+   phase/bar and diagnostics owners; only its active bar occupies the screen.
+   An explicitly held Debug load retains its diagnostic controls. */
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) { inset: auto 24px calc(12px + env(safe-area-inset-bottom, 0px)); height: 3px; z-index: calc(var(--ws-layer-menu) + 1); display: block; background: none; pointer-events: none; overflow: hidden; }
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-head,
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-foot,
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-title,
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-meta,
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-track-row,
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-log,
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-hold { display: none; }
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-body,
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-panel { display: contents; }
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-phase { display: none; padding: 0; border: 0; margin: 0; background: none; }
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-phase[data-state="on"] { display: block; }
+html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-bar { height: 3px; margin: 0; }
 .ws-load .ws-load-play { display: block; width: 100%; min-height: 48px; margin-top: 18px; border: 1px solid var(--ws-cyan); background: rgba(9, 22, 36, 0.88); color: var(--ws-cyan); font: 700 18px var(--ws-display); letter-spacing: 0.18em; cursor: pointer; touch-action: manipulation; }
 .ws-load .ws-load-play:focus-visible { outline: 2px solid var(--ws-cyan); outline-offset: 3px; }
 .ws-load[data-hold] .ws-load-head, .ws-load[data-hold] .ws-load-foot { flex-shrink: 0; }
@@ -484,7 +501,7 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       #ws-top-edge { display: none; }
       html.standalone #ws-top-edge { display: block; position: fixed; top: 0; left: 0; right: 0; height: 12px; z-index: 2147483647; background: rgba(5, 8, 16, 0.004); pointer-events: none; }
       .ws-launch { display: none; }
-      html.title-first .ws-launch { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; background: #0b1622; color: #eaf8ff; font-family: Rajdhani, system-ui, sans-serif; }
+      html.title-first .ws-launch, html.boot-menu .ws-launch { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; background: #0b1622; color: #eaf8ff; font-family: Rajdhani, system-ui, sans-serif; }
       .ws-launch-hero { position: absolute; inset: 0; background: url('/assets/title/main-crossroads-landscape-first-f3f196486b3476a0.jpg') center / cover no-repeat; }
       .ws-launch-brand { position: relative; margin: calc(24px + env(safe-area-inset-top, 0px)) 24px 0; font-size: 44px; font-weight: 700; line-height: 1; letter-spacing: .16em; text-shadow: 0 0 18px #8fe3ff73; }
       @media (orientation: portrait) { .ws-launch-hero { top: 50%; bottom: auto; width: 100%; aspect-ratio: 1; transform: translateY(-50%); background-image: url('/assets/title/main-crossroads-square-first-98ef65b2b3433656.jpg'); } }
@@ -500,6 +517,12 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       .ws-launch[data-stalled] .ws-launch-load, .ws-launch[data-stalled] .ws-launch-pill { color: var(--ws-amber); border-color: var(--ws-amber); }
       .ws-launch-bar { position: relative; height: 3px; margin-bottom: 10px; background: var(--ws-cyan-faint); overflow: hidden; }
       .ws-launch-bar i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--ws-cyan); box-shadow: 0 0 10px rgba(143, 227, 255, .6); transition: width .25s ease-out; }
+      .ws-launch-menu { position: relative; margin: auto 24px 20px; max-height: 46vh; overflow: auto; padding-top: 16px; }
+      .ws-launch-select, .ws-launch-back { display: block; box-sizing: border-box; width: 100%; min-height: 64px; padding: 16px; border: 1px solid #8fe3ff; background: #091624ee; color: #8fe3ff; font: 700 24px Rajdhani, system-ui, sans-serif; letter-spacing: .16em; cursor: pointer; touch-action: manipulation; }
+      .ws-launch-back { min-height: 44px; font-size: 14px; }
+      .ws-launch-worlds[hidden], .ws-launch-select[hidden], html:not([data-dev]) .ws-launch-shard[data-developer] { display: none; }
+      .ws-launch-shard { display: flex; flex-direction: column; gap: 4px; min-height: 44px; padding: 12px 16px; border: 1px solid #8fe3ff66; background: #091624ee; color: #eaf8ff; text-decoration: none; font: 18px Rajdhani, system-ui, sans-serif; }
+      .ws-launch-shard span { color: #bdced7; font-size: 14px; }
       .ws-launch-bar::after { content: ''; position: absolute; top: 0; bottom: 0; left: -30%; width: 30%; background: linear-gradient(90deg, transparent, rgba(143, 227, 255, .6), transparent); animation: ws-launch-sweep 1.2s linear infinite; }
       @keyframes ws-launch-sweep { to { left: 100%; } }
       @media (prefers-reduced-motion: reduce) { .ws-launch-bar::after { animation: none; } }
@@ -621,6 +644,10 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       <div class="ws-launch-brand">WILDSHARD</div>
       <!-- plain HTML: a reload that works when every bundle failed; pointerup too, as iOS drops a jittered tap's click (Update.ts) -->
       <button type="button" class="ws-launch-pill" data-launch-reload onclick="this.dataset.reloading='';(globalThis.__wsShellReload||location.reload.bind(location))()" onpointerup="this.dataset.reloading='';(globalThis.__wsShellReload||location.reload.bind(location))()"><i></i><span data-launch-version>reload</span></button>
+      <details class="ws-launch-menu" data-launch-menu>
+        <summary class="ws-launch-select" data-launch-select>SHARD SELECT</summary>
+        <nav class="ws-launch-worlds" aria-label="Shard select" data-launch-worlds><button type="button" class="ws-launch-back" data-launch-back onclick="this.closest('details').open=false;this.closest('details').querySelector('summary').focus()">BACK</button><!-- first-menu-cards --><!-- /first-menu-cards --></nav>
+      </details>
       <div class="ws-launch-load" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" data-launch-load><div class="ws-launch-bar"><i data-launch-fill></i></div><span data-launch-step>Loading</span></div>
     </div><!-- /title-shell -->
     <script data-launch-progress>

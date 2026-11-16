@@ -3,7 +3,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { finishFirstPlay, firstPlayPending, resetFirstPlay, dropFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
 import { markNameAsked } from '@wildshard/engine/ui/namePrompt';
 import { installShards } from './shard/list';
-import { buildTitleMenu } from './mainMenu';
+import { buildTitleMenu, installGridTitle } from './mainMenu';
+import { pageGridIntents } from './grid/intent';
 import type { TitleCard } from './titleDeck';
 
 /** Jake, 2026-11-12 09:03 Cancún ("That shard select insta loads driftwood bug is still here"): on a phone, SHARD SELECT
@@ -42,6 +43,24 @@ const menu = (onEnter: (c: TitleCard) => void) => {
   document.body.append(view.root); views.push(view);
   return view;
 };
+
+test('a preparation menu preserves the admitted grid tap; an ordinary title retires it', () => {
+  const intents = pageGridIntents();
+  intents.set({ instance: 'driftwood-isle', slug: 'driftwood-isle' });
+  installGridTitle({ preserveIntent: true });
+  expect(intents.pending('driftwood-isle')).toBe(true);
+  installGridTitle();
+  expect(intents.pending('driftwood-isle')).toBe(false);
+});
+
+test('a preparation menu keeps its own screen while the world creates another menu', () => {
+  const first = menu(() => undefined);
+  first.show('select');
+  const second = menu(() => undefined);
+  second.show('main');
+  expect(first.screen).toBe('select');
+  expect(second.screen).toBe('main');
+});
 
 for (const visit of ['a fresh phone (no first-play mark)', 'a return visit (first play done)'] as const) {
   test(`${visit}: SHARD SELECT opens the deck and nothing loads until a card is picked`, async () => {
