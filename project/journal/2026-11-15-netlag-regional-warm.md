@@ -26,3 +26,9 @@ course for twenty seconds at thirty/sixty fps over a fixed 180 ms link.
 Both have zero corrections and drain every sent command. Constant
 latency alone does not reproduce Sky Reach's misses in that course;
 the browser/world integration still needs a cause and runtime proof.
+
+The same controls also exercise bootstrap's live device-input path,
+not only capture pacing. The wire fixture can bind that driver and
+pause it before draining, and counts commands at the actual send.
+Both live thirty/sixty-fps cases also have zero corrections. These
+controls narrow the investigation without changing predictor tolerance.

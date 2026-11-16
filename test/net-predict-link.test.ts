@@ -44,3 +44,13 @@ test.each([30, 60])('a fixed 180 ms link at %i fps introduces no clear-ground co
   expect(run.corrections).toBe(0);
   expect(run.feetGap).toBeLessThan(.02);
 });
+
+test.each([30, 60])('live device input at %i fps stays aligned across a fixed 180 ms link', fps => {
+  const clear: MotionScenario = {id: 'fixed-link-live', start: {x: 20, z: 0, yaw: 0}, ticks: 0, intent: () => ({})};
+  const run = wirePlay(R, clear, {seconds: 20, frameMs: () => 1000 / fps, liveDevice: true,
+    link: {latencyMs: 90, jitterMs: 0, lossPct: 0, reorderPct: 0, random: () => 0.5},
+    press: (frame, page) => {if (frame === 0) page.player.keys.add('KeyW');}});
+  expect(run.steps).toBe(run.sent);
+  expect(run.corrections).toBe(0);
+  expect(run.feetGap).toBeLessThan(.02);
+});

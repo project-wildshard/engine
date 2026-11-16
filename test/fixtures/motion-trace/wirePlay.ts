@@ -24,6 +24,8 @@ export interface WirePlayOptions {
   readonly press?: (frame: number, page: PageSide, host: HostSide) => void;
   /** One way, on each end. Absent: the wire is direct. */
   readonly link?: LinkConditions;
+  /** Bootstrap's server-clock held-input path, instead of capture's render-driven input. */
+  readonly liveDevice?: boolean;
 }
 
 export function wirePlay(R: Rapier, scenario: MotionScenario, options: WirePlayOptions): WirePlay {
@@ -45,6 +47,8 @@ export function wirePlay(R: Rapier, scenario: MotionScenario, options: WirePlayO
   const net = new NetPlayer(client, player, page.physics), seen = new Set<'air' | 'swim' | 'board' | 'dodge'>();
   player.link = net; player.locked = true;
   let due = 0, acc = 0, sent = 0, nextTick = 0, last = 0, frame = 0, glide = 0, glideTicks = 0;
+  const command = client.command.bind(client);
+  client.command = input => { sent++; return command(input); };
   const batch = 2 * FIXED_STEP * 1000 * 60 / 59.9;
   while (clock < seconds * 1000) {
     if (nextTick <= due) { room.tick(); room.tick(); nextTick += batch; pump(batch); clock = Math.max(clock, nextTick - batch); continue; }
@@ -57,7 +61,8 @@ export function wirePlay(R: Rapier, scenario: MotionScenario, options: WirePlayO
     let ran = 0;
     while (acc >= FIXED_STEP && ran < MAX_FIXED_STEPS) {
       page.stepWorld(); player.setBodyEnabled(true);
-      const before = net.predictor.pending; player.stepDevice(FIXED_STEP); if (net.predictor.pending > before) sent++;
+      if (options.liveDevice === true) net.driveDevice(() => 'live', () => player.sampleHeldCommand());
+      player.stepDevice(FIXED_STEP);
       if (!player.onGround) seen.add('air');
       if (player.swimming) seen.add('swim');
       if (player.hover) seen.add('board');
@@ -70,6 +75,7 @@ export function wirePlay(R: Rapier, scenario: MotionScenario, options: WirePlayO
     glide = player.renderOffset.lengthSq() > 0 ? glide + ran : 0; glideTicks = Math.max(glideTicks, glide);
     frame++; due += frameMs(frame);
   }
+  if (options.liveDevice === true) net.driveDevice(() => 'paused', () => player.sampleHeldCommand());
   for (let settle = 0; settle < 7; settle++) { room.tick(); room.tick(); pump(batch); } // inside STALL_TICKS: past it the server takes a step no client took
   net.reconcile();
   const { x, y, z } = player.position;
