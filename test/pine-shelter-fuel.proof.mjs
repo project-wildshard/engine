@@ -14,6 +14,7 @@ const {outputDescriptor,serverReadsFile}=await import('../src/shared/game/shardf
 const {loadRapier}=await import('../src/shared/engine/physics/rapier.ts');
 const {ReturnProgram}=await import('../src/shared/game/population/returnProgram.ts');
 const {HerdShelter}=await import('../src/server/game/population/shelter.ts');
+const {populationRoster}=await import('../src/server/game/population/roster.ts');
 const require=createRequire(import.meta.url),directory=resolve('out/pine-hollow');
 const product=await loadHeadlessProduct(directory),shard=product.shardfile,descriptor=outputDescriptor(shard);
 assert.ok(descriptor,'The real pinned product must admit');
@@ -21,7 +22,7 @@ const shelterRows=await product.json('actors/shelter.json');
 const target=resolve(process.env.PINE_PROOF_DIR??'tmp/pine-shelter-contract');
 assert.ok(target.startsWith(`${resolve('tmp')}/`));mkdirSync(target,{recursive:true});
 const result={complete:false,pin:JSON.parse(readFileSync('test/pins/shardfiles.json','utf8')).shards.find(row=>row.slug==='pine-hollow'),criteria:{}};
-const retain=()=>{result.complete=Object.keys(result.criteria).length===2&&Object.values(result.criteria).every(row=>row.pass);writeFileSync(join(target,'receipt.json'),`${JSON.stringify(result,null,2)}\n`);};
+const retain=()=>{result.complete=Object.keys(result.criteria).length===3&&Object.values(result.criteria).every(row=>row.pass);writeFileSync(join(target,'receipt.json'),`${JSON.stringify(result,null,2)}\n`);};
 retain();
 async function criterion(name,run){
   await test(name,async()=>{
@@ -77,4 +78,23 @@ await criterion('actual shelter guest selects later batches and keeps first ties
   trees[2]={x:-6,z:8,r:1,height:50,cover:1};
   const tied=select();assert.ok(Math.abs(tied.x+6*offset)<1e-12);assert.equal(tied.z,later.z);
   return {sites:trees.length,laterWinner:8,firstTiedWinner:2,later,tied};
+});
+
+await criterion('native roster admits authored variants absent from its initial draw',async()=>{
+  const assets=new Map(descriptor.index.files.filter(file=>serverReadsFile(file,shard.terrain?.collider)&&(file.name===undefined||file.kind==='wasm'||file.kind==='tile'))
+    .map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(join(directory,file.path))]));
+  const rapier=await loadRapier(readFileSync(require.resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm')));
+  const world=await openWorld({shard,assets,product,rapier},{room:true});
+  try{
+    const host=world.resident.host,roster=populationRoster(host,shelterRows.roster);
+    const before=[...host.entities.keys()];
+    assert.ok([...host.entities.values()].every(body=>body.kind!=='bear'||body.variant!=='black-blaze'),'The regression must exercise a variant absent at boot');
+    const body=roster.spawn('bear',100,100,0,'black-blaze');
+    assert.equal(body.kind,'bear');assert.equal(body.variant,'black-blaze');assert.ok(body.alive&&body.hp>0);
+    assert.equal(body.maxHp,220);assert.equal(body.label,'Black bear');assert.equal(body.rarity,'common');
+    assert.equal(body.mods.speed,1);assert.equal(body.mods.chargeDamage,35);assert.equal(body.mods.relentless,false);
+    assert.equal(host.entities.size,before.length+1);
+    assert.deepEqual([...host.entities.keys()].slice(0,before.length),before,'A new draw preserves existing actor identities');
+    return {kind:body.kind,variant:body.variant,entity:body.entityId,hp:body.hp};
+  }finally{world.dispose();}
 });

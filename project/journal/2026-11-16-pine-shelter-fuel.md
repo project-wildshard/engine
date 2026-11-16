@@ -35,3 +35,19 @@ The first normal push completed its checks (86.0 seconds) but refused
 publication because I edited the proof while it ran. No commit reached
 origin. This second commit freezes that final proof before retrying the
 normal gate; no escape hatch is needed or used.
+
+The complete shard journey found a second real engine failure after a
+bear refill: black-blaze was declared but absent from the initial bake
+roll, so the native recipe lookup refused it. The actual pinned-world
+spawn regression fails before this fix and passes afterward. Keep every
+existing baked spec first; append only missing declared variants using
+the kind's consistent baked geometry, exact variant data and existing
+speciesHealth/variantMods defaults. This adds no RNG or identity draw.
+Different baked geometry is refused rather than guessed. New bodies
+assert ordinary HP/mods rather than inheriting an elite's modifiers.
+
+The additional J206 read-only review is CLEAR (pine-roster-20261116-0907).
+Compiler, focused typed lint and all three proof cases pass (6.013s).
+The earlier hosted fuel proof is complete at50341a4e; its fresh-world
+case took11.196s on Linux, so the explicit Ring2/report-only isolation
+is retained. This is never a hook or an ordinary-suite test.
