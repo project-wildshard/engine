@@ -718,6 +718,19 @@ function routeLifts(host: SimHost, shard: Pick<Shardfile, 'entryways' | 'clientC
   });
 }
 
+/** Where two continuations first differ, as a path (`entities.3.1.position`), for a refusal an author can act on. */
+function continuationDiff(a: string, b: string): string {
+  const walk = (x: unknown, y: unknown, path: string): string | null => {
+    if (JSON.stringify(x) === JSON.stringify(y)) return null;
+    if (typeof x !== 'object' || x === null || typeof y !== 'object' || y === null) return `${path || '(root)'}: ${JSON.stringify(x)?.slice(0, 120) ?? 'undefined'} vs ${JSON.stringify(y)?.slice(0, 120) ?? 'undefined'}`;
+    for (const key of new Set([...Object.keys(x), ...Object.keys(y)])) {
+      const found = walk(Reflect.get(x, key), Reflect.get(y, key), path === '' ? key : `${path}.${key}`);
+      if (found !== null) return found;
+    }
+    return path;
+  };
+  return walk(JSON.parse(a), JSON.parse(b), '') ?? '(none)';
+}
 /** Native host evidence for the author-only grid and ledger workflow. */
 export interface AuthoredGridProof {
   version: 1; ticks: number; checkpointTick: number;
@@ -779,19 +792,24 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     insist(!grid.checkpoint(instance), 'failed durable save admitted'); durable = true;
     insist(grid.checkpoint(instance), 'durable checkpoint refused');
     insist(loads === 1, 'first residency loaded more than once');
-    const continuation = regionalContinuation(resident.host), player = leadSnapshot(snapshotSimHost(resident.host));
+    const continuation = regionalContinuation(resident.host);
     const tick = resident.host.state.tick;
     (await grid.prepare(instance, null)).commit(); for (let i = 0; i < 5; i++) grid.step();
     insist(resident.host.state.tick === tick, 'inactive region advanced');
     insist(grid.unload(instance) && !allocator.has(`sim:${instance}`), 'unload retained physics lease');
+    // The traveler is the highway's while the region is out, and the highway's five ticks move it as any tick does (a body
+    // walking, or standing on a slope, goes on moving: meta MU6, opus-ssne1's meadow knoll). The restore must carry it in
+    // exactly as the highway left it.
+    const player = leadSnapshot(snapshotSimHost(highway.host));
     (await grid.prepare(null, instance)).commit();
     insist(regionalContinuation(resident.host) === continuation, 'regional continuation changed on restore');
     insist(loads === 2, 'restore did not create a fresh residency');
     const restoredPlayer = leadSnapshot(snapshotSimHost(resident.host));
-    insist(JSON.stringify(restoredPlayer.position) === JSON.stringify(player.position) && restoredPlayer.yaw === player.yaw, 'traveler pose changed on restore');
+    insist(JSON.stringify(restoredPlayer.position) === JSON.stringify(player.position) && restoredPlayer.yaw === player.yaw, `traveler pose changed on restore: ${JSON.stringify({ highway: { position: player.position, yaw: player.yaw }, restored: { position: restoredPlayer.position, yaw: restoredPlayer.yaw } })}`);
     for (let next = plan.checkpointTick; next < plan.ticks; next++) { grid.step(inputAt(next, resident)); healthy(resident); }
     for (let next = 0; next < plan.ticks; next++) { baseline.host.step(leadCommands(baseline.host, inputAt(next, baseline))); healthy(baseline); }
-    insist(regionalContinuation(resident.host) === regionalContinuation(baseline.host), 'restored regional suffix diverged');
+    const restoredSuffix = regionalContinuation(resident.host), baselineSuffix = regionalContinuation(baseline.host);
+    insist(restoredSuffix === baselineSuffix, `restored regional suffix diverged in ${continuationDiff(restoredSuffix, baselineSuffix)}`);
     insist(JSON.stringify(facts) === JSON.stringify(baselineFacts), 'restored facts diverged or repeated');
     const values = new Map<string, string>();
     const storage = { get length() { return values.size; }, key: (index: number) => [...values.keys()][index] ?? null,
@@ -799,14 +817,18 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     const ledger = () => new Ledger(new SaveStore({ local: storage, session: null }), [{ id: instance, shard: source.identity.slug }],
       [{ shard: source.identity.slug, revision: source.identity.revision, rules: source.ledger }], []);
     const owner = ledger(); let granted = 0;
-    const filed = facts.map((fact, ordinal) => {
+    // A fact is filed as the game files it (grid/durability.ts): under its ledger rule's own origin, and only when a rule maps it
+    // (a fact no rule rewards is still a fact the tape may require). MU6: the proof filed every fact as `quest:<id>`, which no
+    // shard's rule names, so any shard with a ledger rule, or a quest fact and none, refused.
+    const filed = facts.flatMap((fact, ordinal) => {
       const quest = source.quests.quests.find(row => row.id === fact.actorId && row.onComplete?.fact === fact.name);
       if (quest === undefined) throw new Error('Missing native quest fact provenance');
-      return { instance, shard: source.identity.slug, revision: source.identity.revision, entity: fact.actorId, tick: fact.tick, ordinal,
-        name: fact.name, origin: { kind: 'engine' as const, source: `quest:${quest.id}` } };
+      const rule = source.ledger.find(row => row.fact === fact.name);
+      return rule === undefined ? [] : [{ instance, shard: source.identity.slug, revision: source.identity.revision, entity: fact.actorId, tick: fact.tick, ordinal,
+        name: fact.name, origin: rule.origin }];
     });
     for (const fact of filed) { const receipt = owner.record(fact); insist(receipt.status !== 'pending', 'ledger write pending'); if (receipt.status === 'granted') granted++; }
-    for (const name of plan.requiredFacts) insist(filed.some(fact => fact.name === name), `native fact missing: ${name}`);
+    for (const name of plan.requiredFacts) insist(facts.some(fact => fact.name === name), `native fact missing: ${name}`);
     // F27: the packs as the tape left them; a required stack short of its count names what the packs hold
     const inventory = nativeInventories(resident.host);
     for (const [item, count] of Object.entries(plan.requiredItems ?? {})) {

@@ -17,3 +17,18 @@ the report had no inventory to check the quest's loot against.
   optional `requiredItems` (item to at least this many, summed over packs) fails the proof with what the packs hold.
 
 Tests: `test/tape-talk.test.ts` (TE-ENG3's keeper fixture, by name), `test/author-proof-inventory.test.ts`.
+
+## Later the same morning: the proof itself refused every real shard
+
+opus-ssne1's minimal scene shard (`meadow`, one quest fact) failed `prove` on a two-tick stand-still tape. Two engine
+faults, both in `proveAuthoredGrid`:
+
+- **"traveler pose changed on restore".** The check compared the pose after re-entry with the pose at the checkpoint, but
+  the traveler spends the five frozen ticks on the highway, which moves it as any tick does: a body on a slope creeps
+  (0.05 mm a tick on meadow's knoll), a walking one walks. It now compares with the pose the highway hands back, exactly.
+- **"Fact identity or provenance is not admitted".** The proof filed every quest fact under origin `quest:<id>`; every
+  shard's ledger rule says `quest.complete`, and a fact with no rule has no mapping at all. It now files a fact under its
+  rule's own origin, as `grid/durability.ts` does, files none for a fact no rule rewards, and checks `requiredFacts`
+  against the facts the quests raised.
+
+A diverged restored suffix now names the first differing path. Proof: the meadow tape and a walk to its hut pass.
