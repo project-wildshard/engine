@@ -8,7 +8,7 @@ export interface PersistenceWord {
   readonly scope: string;
 }
 /** Other optional version-one status branches can be ignored independently. */
-export interface PersistenceEnvelope { readonly v: 1; readonly persistence: PersistenceWord }
+export interface PersistenceEnvelope extends Readonly<Record<string, unknown>> { readonly v: 1; readonly persistence: PersistenceWord }
 export const WORLD_STATUS_MAX_BYTES = 512;
 const Fact = v.strictObject({ code: v.picklist(['save-confirmed', 'save-failed']),
   sequence: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),

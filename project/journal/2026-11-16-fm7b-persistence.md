@@ -31,3 +31,9 @@ current socket hears an observation. Later words preserve cells/shards
 and omit device:1, avoiding a new device snapshot. Unknown versions,
 codes or invalid numbers are ignored. Account/session facts remain
 FM7b3c, and graphical save presentation remains FM8s.
+
+Netlag's parallel checkpoint witness (plan/mmo-sockets 29f6c4114) uses
+status:{v:1,checkpoint}. Keep the common WorldWord extension generic;
+each branch validates its own bounded fact. The persistence reader ignores
+other branches, and the two server emitters use separate messages. This
+avoids making a checkpoint require a persistence observation on rebase.

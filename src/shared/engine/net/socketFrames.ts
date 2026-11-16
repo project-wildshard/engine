@@ -1,5 +1,4 @@
 import type { NetChannel } from './transport';
-import type { PersistenceEnvelope } from './persistenceWord';
 
 // E7.1: what one WebSocket carries. `WebSocket` keeps message boundaries, so a frame is one prefix byte and its payload. Both
 // channels share TCP, so nothing is lost on the wire: "unreliable" only means the sender may skip it. Keepalive lives here
@@ -18,7 +17,7 @@ export interface WorldWord { readonly cells: number; readonly shards: readonly s
    *  `refused` on a prefix it does not know, so a client sends the word only after hearing this. */
   readonly device?: 1;
   /** Bounded optional per-client observations; each extension has its own decoder. Later words omit device. */
-  readonly status?: PersistenceEnvelope | Readonly<Record<string, unknown>> }
+  readonly status?: Readonly<Record<string, unknown>> }
 /** J218: a voice word is JSON in a few hundred bytes; an SDP travels in pieces of this many characters, under the room's 1024-byte cap. */
 export const VOICE_PIECE_CHARS = 400;
 /** The server sends no frame while this much is waiting (E7.1). Delta-against-ack heals, and the next frame is just bigger. */
