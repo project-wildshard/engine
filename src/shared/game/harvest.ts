@@ -1,4 +1,11 @@
 import { WeightedTable, type WeightedRow } from '@wildshard/engine/ai/weighted';
+import type { HarvestDrop } from '@wildshard/format/harvestRows';
+
+/** Every admitted matching row pays its declared units, in source order, without a random draw. */
+export function declaredHarvestDrops(rows: readonly HarvestDrop[], variant: string): string[] {
+  return rows.filter(row => row.variants === undefined || row.variants.includes(variant))
+    .flatMap(row => Array.from({ length: row.count }, () => row.item));
+}
 
 /** Every eligible row drops once. The receiving pack applies its own policy. */
 const HARVEST: Readonly<Record<string, readonly WeightedRow<string, string>[]>> = {

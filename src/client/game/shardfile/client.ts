@@ -436,7 +436,7 @@ export class ShardfileClient {
     // TE-ENG7: two declared species on one native kind each register under a page kind of their own; rows find it by species id
     const kinds = speciesViewKinds(source.rows), pageKind = (species: string, kind: string): string => kinds.get(species) ?? kind;
     wirePage.declareSpecies(kinds, ctx.scope);
-    ctx.rows.species(pageSpecies(source.rows.species.map((row) => ({ ...row, variants: row.variants.map((variant) => ({ ...variant, scale: [...variant.scale] })) })), kinds));
+    ctx.rows.species(pageSpecies(source.rows.species.map((row) => ({ ...row, harvest: row.harvest ?? [], variants: row.variants.map((variant) => ({ ...variant, scale: [...variant.scale] })) })), kinds));
     ctx.rows.speciesLook(pageSpecies(clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins), kinds));
     const sketches = compendiumSketches(source.rows, this.assets.retained);
     for (const row of source.rows.compendiums) ctx.rows.compendium({ id: row.id, ...declaredProductCompendium(ctx.product, row.id, sketches) });

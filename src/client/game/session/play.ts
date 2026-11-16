@@ -681,7 +681,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     else if (carcass && boot.runtime.hooks.harvestBusy?.() !== true) {
       const selectedCarcass = carcass;
       harvested.add(selectedCarcass);
-      const drops = inventory.harvest(carcass.kind, carcass.variant); // Pine Hollow: only what Mott takes (E314 C)
+      const drops = inventory.harvest(carcass.kind, carcass.variant, carcass.harvest); // the active pack applies its own policy
       const show = (got: readonly ItemId[]): void => {
         const entries = got.flatMap(id => { const row = ITEMS[id]; return row === undefined ? [] : [row]; });
         const name = entries.map(row => row.label).join(' + '), said = `${name || 'Nothing'} harvested · ${inventory.total} in the pack`, first = entries[0];
@@ -692,7 +692,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
       const give = (): void => {
         if(wirePage.client !== null && wirePage.line('harvest.enabled') > 0) {
           wirePage.harvest(game.levelScope, selectedCarcass.entityId, selectedCarcass.kind, selectedCarcass.variant,
-            got => { show(got.filter(isItemId)); });
+            got => { show(got.filter(isItemId)); }, selectedCarcass.harvest);
         } else show(drops.filter(id => inventory.add(id)));
       };
       if (boot.runtime.hooks.harvest) boot.runtime.hooks.harvest(selectedCarcass, give, () => { harvested.delete(selectedCarcass); }); // PH-F2: the skinning beat, then the drops; the carcass stays for the ravens
@@ -770,7 +770,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     carcass = undefined;
     if (!nearest && homeActive) for (const a of animals.animals) {
       if (a.alive || harvested.has(a) || a.position.distanceTo(player.position) >= 2.6) continue;
-      if (inventory.harvest(a.kind, a.variant).length === 0) continue; // nothing to take (Pine Hollow's elk: E314 C) (the drowned sailor / captain fade): no [E] Harvest (E318 row 17)
+      if (inventory.harvest(a.kind, a.variant, a.harvest).length === 0) continue;
       if (physics && !lineOfSight(physics, game.camera.position, carcassAt.copy(a.position).setY(a.position.y + 0.4), 0.6)) continue; // not through a wall (animals aren't physics yet: their body blocks nothing)
       carcass = a; break;
     }
