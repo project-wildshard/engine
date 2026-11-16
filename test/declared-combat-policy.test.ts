@@ -27,6 +27,7 @@ test('real creature targets with one label retain distinct row tags even after t
     east.species = 'fixture.east'; west.species = 'fixture.west'; east.mods.damageTaken = .5; west.mods.damageTaken = .5;
     expect(east.combatActor()).toBe(original); expect(original.tags).toBe(tags);
     expect(original.tags).toContain('creature.fixture.east'); expect(west.combatActor().tags).toContain('creature.fixture.west');
+    expect(original.tags).toContain('creature.same.label'); expect(west.combatActor().tags).toContain('creature.same.label');
     f.combat.rule({ id: 'east.multiplier', order: 60, when: { targetTags: ['creature.fixture.east'] }, op: 'mul', value: 2 }, f.scope);
     const hit = (target: AnimalSim) => f.combat.hit({ source: 'env', sourceTags: ['weapon.fixture'], target: target.combatActor(),
       amount: 20, point: new Vector3(), dir: new Vector3(), headshot: false });

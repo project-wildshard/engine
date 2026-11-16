@@ -269,12 +269,17 @@ export class AnimalSim {
   combatActor(): Actor {
     const cached = actors.get(this); if (cached !== undefined) return cached;
     const read = (): AnimalSim => this;
-    let identity = this.species || this.kind;
+    let identity = this.species || this.kind, kind = this.kind;
     const tags: Actor['tags'][number][] = ['actor.creature', `creature.${identity}`];
+    if (identity !== kind) tags.push(`creature.${kind}`);
     const actor: Actor = {
       id: this.entityId, get tags() {
-        const current = read().species || read().kind;
-        if (current !== identity) { identity = current; tags[1] = `creature.${current}`; }
+        const current = read().species || read().kind, currentKind = read().kind;
+        if (current !== identity || currentKind !== kind) {
+          identity = current; kind = currentKind; tags[1] = `creature.${current}`; tags.length = 2;
+          // Older admitted death triggers select the kind; new rules can select its exact row.
+          if (identity !== kind) tags.push(`creature.${kind}`);
+        }
         return tags;
       }, state: [],
       get capExempt() { return read().capExempt; },
