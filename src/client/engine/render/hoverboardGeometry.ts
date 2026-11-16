@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const CYAN = 0x8fe3ff;
 const LEN = 0.9, WID = 0.28, THICK = 0.032;
@@ -18,6 +19,8 @@ function roundedRect(w: number, h: number, r: number): THREE.Shape {
  * The board, built into `g` (the viewmodel's model, or the Model Explorer's specimen: src/client/engine/models/hoverboard.ts, E348): the
  * deck, its grip, the edge strip, the nose lamp and the inlay, the two repulsor discs and their glow halos, in that order.
  * `pulse` (the strip, the lamp, the inlay) and `glow` (the halos) are the materials the viewmodel animates.
+ * NINE-DRAGON-BENCHMAX NB8: parts that share a material are one mesh (the strip, lamp and inlay; both discs; both halos),
+ * and the additive halos draw both faces in one pass: 5 draws, not 11 (the board under you added 12 to the phone's walk).
  */
 export function buildHoverboard(g: THREE.Group): { pulse: THREE.MeshStandardMaterial; glow: THREE.MeshBasicMaterial } {
   // deck: rounded plank, extruded in XY then laid flat (length along −z = camera forward)
@@ -37,18 +40,26 @@ export function buildHoverboard(g: THREE.Group): { pulse: THREE.MeshStandardMate
   const stripGeo = new THREE.ExtrudeGeometry(ring, { depth: 0.016, bevelEnabled: false, curveSegments: 10 });
   stripGeo.rotateX(-Math.PI / 2); stripGeo.translate(0, THICK / 2 - 0.008, 0);
   const pulse = new THREE.MeshStandardMaterial({ color: 0x0a1a22, emissive: CYAN, emissiveIntensity: 2.2, roughness: 0.4, metalness: 0 });
-  g.add(new THREE.Mesh(stripGeo, pulse));
-  // nose lamp across the front tip + a centre inlay line down the deck (same pulsing material)
-  const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.01, 0.028), pulse); lamp.position.set(0, THICK / 2 + 0.006, -LEN / 2 + 0.075); g.add(lamp);
-  const inlay = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.006, LEN * 0.66), pulse); inlay.position.set(0, THICK / 2 + 0.006, 0.02); g.add(inlay);
+  // nose lamp across the front tip + a centre inlay line down the deck (same pulsing material): one mesh with the strip
+  const lampGeo = new THREE.BoxGeometry(0.15, 0.01, 0.028).toNonIndexed(); lampGeo.translate(0, THICK / 2 + 0.006, -LEN / 2 + 0.075);
+  const inlayGeo = new THREE.BoxGeometry(0.014, 0.006, LEN * 0.66).toNonIndexed(); inlayGeo.translate(0, THICK / 2 + 0.006, 0.02);
+  g.add(new THREE.Mesh(joined([stripGeo, lampGeo, inlayGeo]), pulse));
   // repulsor discs underneath, front and back, plus a soft additive glow halo under each
-  const discGeo = new THREE.CylinderGeometry(0.075, 0.095, 0.022, 24);
   const discMat = new THREE.MeshStandardMaterial({ color: 0x0d2a36, emissive: CYAN, emissiveIntensity: 3, roughness: 0.3, metalness: 0.2 });
-  const haloGeo = new THREE.CircleGeometry(0.15, 24); haloGeo.rotateX(-Math.PI / 2);
-  const glow = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }); // fogless (a metre from the eye fog is nil): the weapon tracer glow's two programs instead of two of its own
-  for (const z of [-LEN * 0.3, LEN * 0.3]) {
-    const d = new THREE.Mesh(discGeo, discMat); d.position.set(0, -THICK / 2 - 0.02, z); g.add(d);
-    const h = new THREE.Mesh(haloGeo, glow); h.position.set(0, -THICK / 2 - 0.045, z); g.add(h);
-  }
+  // fogless (a metre from the eye fog is nil): the weapon tracer glow's two programs instead of two of its own. Additive with
+  // no depth write, so one pass over both faces draws what three's back-then-front pair drew.
+  const glow = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  glow.forceSinglePass = true;
+  const ends = [-LEN * 0.3, LEN * 0.3];
+  g.add(new THREE.Mesh(joined(ends.map(z => new THREE.CylinderGeometry(0.075, 0.095, 0.022, 24).translate(0, -THICK / 2 - 0.02, z))), discMat));
+  g.add(new THREE.Mesh(joined(ends.map(z => new THREE.CircleGeometry(0.15, 24).rotateX(-Math.PI / 2).translate(0, -THICK / 2 - 0.045, z))), glow));
   return { pulse, glow };
+}
+
+/** parts baked in place into one geometry (the sources are disposed) */
+function joined(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const merged = mergeGeometries(parts);
+  if (merged === null) throw new Error('hoverboard: parts do not merge');
+  for (const part of parts) part.dispose();
+  return merged;
 }

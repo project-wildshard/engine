@@ -160,7 +160,7 @@ try {
     const w = window.__wildshard.world, rows = window.__benchRows, cap = 1000 / 30;
     const pct = (list, q) => { const s = [...list].sort((a, b) => a - b); return s.length === 0 ? 0 : s[Math.min(s.length - 1, Math.floor(s.length * q))]; };
     const sum = (list, from, to) => { const rs = list.filter(r => r[0] >= from && r[0] < to), gpu = rs.map(r => Math.max(0, r[1] - Math.max(r[2], cap)));
-      return { fps: rs.length / ((to - from) / 1000), p50: pct(rs.map(r => r[1]), 0.5), p95: pct(rs.map(r => r[1]), 0.95), gpu50: pct(gpu, 0.5), gpu95: pct(gpu, 0.95) }; };
+      return { fps: rs.length / ((to - from) / 1000), p50: pct(rs.map(r => r[1]), 0.5), p95: pct(rs.map(r => r[1]), 0.95), gpu50: pct(gpu, 0.5), gpu95: pct(gpu, 0.95), draws95: pct(rs.map(r => r[3]), 0.95), tris95: pct(rs.map(r => r[4]), 0.95) }; };
     const span = rows.at(-1)?.[0] ?? 0, tens = [], minutes = [];
     for (let from = 0; from + 1000 <= span; from += 10_000) tens.push(sum(rows, from, Math.min(span, from + 10_000)));
     // NB5: per minute, with the draws and triangles the frames submitted (p95)
@@ -244,7 +244,7 @@ try {
   console.log('triangles by material (visible, in view):'); for (const row of where) console.log(`  ${row.name.padEnd(48)} ${(row.tris / 1e6).toFixed(3)} M · ${row.draws} draws`);
   console.log(`shadow pass: ${shadow.draws} of ${shadow.allDraws} draws · ${(shadow.triangles / 1e6).toFixed(2)} of ${(shadow.allTriangles / 1e6).toFixed(2)} M tris`);
   play.minutes.forEach((/** @type {{ fps: number, p95: number, gpu95: number, draws95: number, tris95: number }} */ m, /** @type {number} */ i) => { console.log(`  minute ${String(i + 1).padStart(2)}: ${f(m.fps)} fps · p95 ${f(m.p95)} ms · gpu~ p95 ${f(m.gpu95)} ms · draws p95 ${m.draws95} · tris p95 ${(m.tris95 / 1e6).toFixed(2)} M`); });
-  if (seconds <= 120) play.tens.forEach((/** @type {{ fps: number, p95: number, gpu95: number }} */ t, /** @type {number} */ i) => { console.log(`  ${String(i * 10).padStart(3)}-${String(i * 10 + 10).padEnd(3)} s: ${f(t.fps)} fps · p95 ${f(t.p95)} ms · gpu~ p95 ${f(t.gpu95)} ms`); });
+  if (seconds <= 120) play.tens.forEach((/** @type {{ fps: number, p95: number, gpu95: number, draws95: number, tris95: number }} */ t, /** @type {number} */ i) => { console.log(`  ${String(i * 10).padStart(3)}-${String(i * 10 + 10).padEnd(3)} s: ${f(t.fps)} fps · p95 ${f(t.p95)} ms · gpu~ p95 ${f(t.gpu95)} ms · draws p95 ${t.draws95} · tris p95 ${(t.tris95 / 1e6).toFixed(2)} M`); });
   cdp.off('Network.responseReceived', resource);
   context.off('request', workerRequest);
   const resources = await page.evaluate(() => performance.getEntriesByType('resource').map(r => ({url: r.name, start: r.startTime, bytes: /** @type {PerformanceResourceTiming} */ (r).decodedBodySize})));
