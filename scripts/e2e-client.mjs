@@ -17,6 +17,8 @@ import { shardfileValidationRevision } from './shardfile-validation-revision.mjs
 
 const root = resolvePath(import.meta.dirname, '..');
 const SLUG = 'blender-template';
+/** The pinned catalogue row the e2e catalogue borrows: Brasscap Mesa's, at the cell Template 2 held (TC-SHIP-a). */
+const PINNED = 'brasscap-mesa';
 const FORMAT_INDEX = 'node_modules/@wildshard/format/corpus/handwritten/shard.json';
 // A cold watcher can queue up to heavy-lane's 5 minute admission wait, then build.
 const START_TIMEOUT_MS = 8 * 60_000;
@@ -52,15 +54,15 @@ function template() {
 /** Template 2 in every cell, so a build needs no other product (it is the only one installed). */
 function catalogue() {
   const receipt = readJson(`${TEMPLATE}/validation.json`), full = readJson('test/pins/catalogue.json');
-  const shard = full.shards.find((/** @type {{slug:string}} */ row) => row.slug === SLUG);
-  const placement = full.placements.find((/** @type {{slug:string}} */ row) => row.slug === SLUG);
+  const shard = full.shards.find((/** @type {{slug:string}} */ row) => row.slug === PINNED);
+  const placement = full.placements.find((/** @type {{slug:string}} */ row) => row.slug === PINNED);
   if (shard === undefined || placement === undefined) throw new Error('e2e-client: the pinned catalogue has no Template 2');
   const text = `${JSON.stringify({
     ...full,
-    // The pinned row is the API's blender-template (Brasscap Mesa since ENG-3b); the product here is the format's own
-    // Template 2, so its name comes from that product's index, or the smoke loses its "Blender Template" card.
-    shards: [{ ...shard, name: readJson(`${TEMPLATE}/shard.json`).identity.name, hash: receipt.pin.hash, revision: receipt.pin.revision }],
-    placements: [{ ...placement, cell: [0, 0] }],
+    // The pinned row is the API's brasscap-mesa (blender-template until TC-SHIP-a); the product here is the format's own
+    // Template 2, so its slug and name come from that product, or the smoke loses its "Blender Template" card.
+    shards: [{ ...shard, slug: SLUG, name: readJson(`${TEMPLATE}/shard.json`).identity.name, hash: receipt.pin.hash, revision: receipt.pin.revision }],
+    placements: [{ ...placement, slug: SLUG, cell: [0, 0] }],
     missing: [],
     grid: { ...full.grid, cells: full.grid.cells.map((/** @type {{instance:string,cell:number[]}} */ row) => ({ slug: SLUG, instance: row.instance, cell: row.cell })) },
   })}\n`;

@@ -94,7 +94,7 @@
     },
     {
       "instance": "blender-template-solo",
-      "slug": "blender-template",
+      "slug": "brasscap-mesa",
       "cell": [
         -1,
         -1
@@ -503,7 +503,7 @@
       },
       {
         "instance": "blender-template",
-        "slug": "blender-template",
+        "slug": "brasscap-mesa",
         "cell": [
           -1,
           -1

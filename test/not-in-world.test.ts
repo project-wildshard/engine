@@ -27,7 +27,7 @@ const ART = { thumb: '', portrait: '', landscape: '' };
 const row = (slug: string, name: string, status: TitleManifest['status']): TitleManifest => ({ slug, name, biome: name, status, card: ART });
 const ROWS: readonly TitleManifest[] = [
   row('driftwood-isle', 'Driftwood Isle', 'live'), row('pine-hollow', 'Pine Hollow', 'earlyAccess'),
-  row('nalati-grasslands', 'Nalati Grasslands', 'earlyAccess'), row('blender-template', 'Brasscap Mesa', 'hidden'),
+  row('nalati-grasslands', 'Nalati Grasslands', 'earlyAccess'), row('brasscap-mesa', 'Brasscap Mesa', 'hidden'),
   row('_template', 'Template shard', 'hidden'), row('open-plot-thin-ice', 'Open Plot · Thin Ice', 'earlyAccess'),
 ];
 const DEVELOPER: MenuMode = { developer: true, devserver: false };
@@ -49,8 +49,8 @@ const view = (deck: TitleDeck): Record<string, string> => Object.fromEntries(Arr
 test('the card rule: the catalogue must place the shard, and a word (heard or kept) that names shards must name it', () => {
   expect(inThisWorld('open-plot-thin-ice', null), 'Thin Ice: the grid does not place it (J305), word or no word').toBe(false);
   expect(inThisWorld('open-plot-thin-ice', ['open-plot-thin-ice']), 'even a word naming it: there is no cell to seat it in').toBe(false);
-  expect([inThisWorld('blender-template', PROD_WORD), inThisWorld('_template', PROD_WORD)], 'Brasscap and Template are placed, but prod\'s word leaves them out').toEqual([false, false]);
-  expect([inThisWorld('blender-template', null), inThisWorld('_template', null)], 'no word, nothing kept: a placed shard enters (J300)').toEqual([true, true]);
+  expect([inThisWorld('brasscap-mesa', PROD_WORD), inThisWorld('_template', PROD_WORD)], 'Brasscap and Template are placed, but prod\'s word leaves them out').toEqual([false, false]);
+  expect([inThisWorld('brasscap-mesa', null), inThisWorld('_template', null)], 'no word, nothing kept: a placed shard enters (J300)').toEqual([true, true]);
   expect([inThisWorld('driftwood-isle', PROD_WORD), inThisWorld('nalati-grasslands', PROD_WORD)]).toEqual([true, true]);
   expect(worldOpens(undefined, memory())('open-plot-thin-ice'), 'a build with no world (preview) opens every card').toBe(true);
 });
@@ -60,14 +60,14 @@ test('with the word missing, the kept answer decides; with it present, the word 
   // missing: the door never answers, so the device's kept word (prod's two shards) decides
   expect(await worldHosted(WORLD, 10, kept, silent)).toBe(true);
   const missing = worldOpens(WORLD, kept);
-  expect(['driftwood-isle', 'nalati-grasslands', 'pine-hollow', '_template', 'blender-template'].map(missing)).toEqual([true, true, false, false, false]);
+  expect(['driftwood-isle', 'nalati-grasslands', 'pine-hollow', '_template', 'brasscap-mesa'].map(missing)).toEqual([true, true, false, false, false]);
   // present: a word that opens the whole grid replaces the kept one, and is kept for the next launch
   expect(await worldHosted(WORLD, 1000, kept, async () => ({ grid: true, shards: [...PROD_WORD, 'pine-hollow', '_template'] }))).toBe(true);
   const present = worldOpens(WORLD, kept);
-  expect(['pine-hollow', '_template', 'blender-template'].map(present)).toEqual([true, true, false]);
+  expect(['pine-hollow', '_template', 'brasscap-mesa'].map(present)).toEqual([true, true, false]);
   expect(kept.kept[WORLD.release]?.shards).toContain('pine-hollow');
   // nothing kept and no word: only the catalogue rule
-  expect(['pine-hollow', '_template', 'blender-template', 'open-plot-thin-ice'].map(worldOpens(WORLD, memory()))).toEqual([true, true, true, false]);
+  expect(['pine-hollow', '_template', 'brasscap-mesa', 'open-plot-thin-ice'].map(worldOpens(WORLD, memory()))).toEqual([true, true, true, false]);
 });
 
 test('Developer on, prod\'s kept word: Brasscap and Template read "Not in this world yet" and ENTER WORLD is off; Driftwood enters', () => {

@@ -109,7 +109,7 @@
     },
     {
       "instance": "blender-template-solo",
-      "slug": "blender-template",
+      "slug": "brasscap-mesa",
       "cell": [
         -1,
         -1
@@ -558,7 +558,7 @@
       },
       {
         "instance": "blender-template",
-        "slug": "blender-template",
+        "slug": "brasscap-mesa",
         "cell": [
           -1,
           -1
@@ -742,10 +742,10 @@
   },
   "shards": [
     {
-      "slug": "blender-template",
+      "slug": "brasscap-mesa",
       "name": "Brasscap Mesa",
-      "revision": 9,
-      "hash": "1a8dad51ad26237bcf6f3c8cd737f7698ac279b38a8fc510159e0ff7933759d9"
+      "revision": 3,
+      "hash": "79d71535ef84351dcca74abd7322049a779127f59d82d4afa74cbad526458dbd"
     },
     {
       "slug": "driftwood-isle",

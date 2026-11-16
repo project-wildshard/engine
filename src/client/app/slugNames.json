@@ -1,5 +1,5 @@
 {
-  "about": "A shard's public /slug/ name where it differs from its API slug (src/client/app/slugPath.ts; pages/slug-names.ts keeps the same map for the page's Worker).",
+  "about": "A retired /slug/ name and the slug that replaced it (src/client/app/slugPath.ts; pages/slug-names.ts keeps the same map for the page's Worker).",
   "names": {
     "blender-template": "brasscap-mesa"
   }

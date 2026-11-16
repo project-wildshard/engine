@@ -31,7 +31,7 @@ export const coreMemoryTargets = Object.freeze([
   Object.freeze({shard: 'menu', name: 'Menu', limitBytes: webKitCoreMemoryFloorBytes + 50 * 1048576}),
   Object.freeze({shard: 'select', name: 'SHARD SELECT', limitBytes: webKitCoreMemoryFloorBytes + 50 * 1048576}),
   Object.freeze({shard: '_template', name: 'Template 1', limitBytes: 274_538_200}),
-  Object.freeze({shard: 'blender-template', name: 'Template 2', limitBytes: 261_512_872}),
+  Object.freeze({shard: 'brasscap-mesa', name: 'Template 2', limitBytes: 261_512_872}),
 ]);
 /** G682 calibration is a separate visit, never a fifth app floor or a budget gate. */
 export const helloWorldMemoryTarget = Object.freeze({shard: 'hello', name: 'Hello, world', limitBytes: null});
@@ -126,7 +126,7 @@ export function scriptResourceURLs(entries = performance.getEntriesByType('resou
  * @param {typeof fetch} [read]
  */
 export async function coreMemoryProductIdentity(base, shard, version, read = fetch) {
-  if (shard !== '_template' && shard !== 'blender-template') return null;
+  if (shard !== '_template' && shard !== 'brasscap-mesa') return null;
   try {
     const buildSchema = v.object({build: v.pipe(v.string(), v.minLength(1))});
     const expected = v.parse(buildSchema, JSON.parse(version)).build;
@@ -480,17 +480,17 @@ async function main() {
   }
   if (process.argv[3] === '--heap') {
     const [base, , target, label, out, flag] = process.argv.slice(2);
-    if (!base || !target || !label || !out?.endsWith('.json') || !['_template','blender-template','templates'].includes(target)
+    if (!base || !target || !label || !out?.endsWith('.json') || !['_template','brasscap-mesa','templates'].includes(target)
       || (flag !== undefined && flag !== '--rebase') || process.argv.length > 8)
-      throw new Error('Expected <preview URL> --heap <_template|blender-template|templates> <label> <out.json> [--rebase]');
+      throw new Error('Expected <preview URL> --heap <_template|brasscap-mesa|templates> <label> <out.json> [--rebase]');
     const {measureCleanHeap} = await import('./memory/heapReader.mjs');
     const {checkHeapRatchet} = await import('./memory/jsHeap.mjs');
     const ratchetFile=new URL('memory/js-heap-ratchet.json',import.meta.url);
     const baseline=JSON.parse(readFileSync(ratchetFile,'utf8'));
-    const targets=target==='templates'?['_template','blender-template']:[target];
+    const targets=target==='templates'?['_template','brasscap-mesa']:[target];
     const readings=[];
     for(const shard of targets) {
-      if(shard!=='_template'&&shard!=='blender-template')throw new Error('Unsupported heap target');
+      if(shard!=='_template'&&shard!=='brasscap-mesa')throw new Error('Unsupported heap target');
       const row=await measureCleanHeap(base,shard);readings.push(row);
       const m=row.metrics;
       console.info(`${shard}: boot ${(m.bootAllocatedBytes/1048576).toFixed(2)} MiB; settled post-GC ${(m.settledUsedBytes/1048576).toFixed(2)} MiB; idle ${(m.idleBytesPerSecond/1048576).toFixed(3)} MiB/s; major GC ${m.majorGCsPer30Seconds.toFixed(2)}/30s`);

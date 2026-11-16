@@ -59,7 +59,7 @@ export const CI_NATIVE_GROUPS = {
   'open-plots-headless': ['test/physics-open-plots-headless.test.ts'],
   'open-plots-headless-2': ['test/physics-open-plots-headless-2.test.ts'],
   'open-plots-headless-3': ['test/physics-open-plots-headless-3.test.ts'],
-  'blender-template-routes': ['test/physics-blender-template-headless.test.ts'],
+  'brasscap-mesa-routes': ['test/physics-brasscap-mesa-headless.test.ts'],
   'native-observation-sunscar': ['test/native-runtime-observation-sunscar.test.ts'],
   'standalone-grid': ['test/standalone-grid.test.ts', 'test/standalone-grid-lone.test.ts', 'test/standalone-grid-restore.test.ts'],
   'native-routes': [

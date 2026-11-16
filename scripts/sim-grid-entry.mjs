@@ -6,7 +6,7 @@
 //     --startup-trace=1 appends passive Resource Timing/measures and LS1 collector state after the original controls/frame window.
 //     [--shard=sunscar-dunes] selects the explicit compiled card, never legacy, and samples eight seconds after controls.
 //     [--upgrade-from=<old-origin>] installs the old worker, switches this same origin to the new build, then taps grid.
-//     [--core-memory=menu|select|_template|blender-template|templates|all] reads independent Developer-on floors at 10/60/120s, no Network capture or GC.
+//     [--core-memory=menu|select|_template|brasscap-mesa|templates|all] reads independent Developer-on floors at 10/60/120s, no Network capture or GC.
 //     --core-memory=hello serves its own plain hello-world fixture (no --base/--rev), using the same native floor sampler.
 //     --core-memory=contexts visits hello then one empty WebGL2 context, each cold at 10/60/120s; diagnostic only.
 //     --core-memory=three visits only the installed Three.js modules and one empty renderer; diagnostic only.

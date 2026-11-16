@@ -1,9 +1,10 @@
 {
   "release": "0d9e2381904a398721c36d94d25b8ed9b1f0707d",
   "saveEpoch": 1,
-  "slug": "blender-template",
+  "slug": "brasscap-mesa",
+  "formerSlug": "blender-template",
   "shardfile": "fbd3aba57d66811ef4bc2ecda1b6c4bfd23e6d55a2f54eb85c6a7cbb28316f02",
-  "refused": "1a8dad51ad26237bcf6f3c8cd737f7698ac279b38a8fc510159e0ff7933759d9",
+  "refused": "79d71535ef84351dcca74abd7322049a779127f59d82d4afa74cbad526458dbd",
   "carry": "flags",
   "tick": 30,
   "position": [
@@ -11,7 +12,7 @@
     0.020000001853622967,
     7.205067848786712
   ],
-  "file": "blender-template-v0.1.1.save.br",
+  "file": "brasscap-mesa-v0.1.1.save.br",
   "sha256": "c8dd264b667175d67cca91981c730cac3f020d739e4121968a820c36853e505a",
   "bytes": 211238
 }

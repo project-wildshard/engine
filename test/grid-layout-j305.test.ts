@@ -6,7 +6,7 @@ import catalogue from '../src/shared/game/grid/singleplayer.json' with { type: '
 // Pastel Plain; the outer ring holds the other one, then unique open plots, then copies of the two new templates. The
 // legacy grey template (`open-plot-showcase-template`) is on no cell.
 const MAIN = ['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack', 'sunscar-dunes', 'far-reach'];
-const TEMPLATES = ['_template', 'blender-template'];
+const TEMPLATES = ['_template', 'brasscap-mesa'];
 const PICK = ['ink-cel-valley', 'pastel-plain'];
 const LEGACY = ['open-plot-showcase-template'];
 type Cell = { readonly slug: string; readonly cell: readonly number[] };

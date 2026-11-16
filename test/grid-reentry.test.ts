@@ -16,7 +16,7 @@ import { createNativeProofResident, prepareProductPlan } from '../src/test/game/
 import { prepareHeadlessRuntime as ninePlan } from './fixtures/nine-headless';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
-const shards = ['_template', 'blender-template', 'ink-cel-valley', 'pastel-plain', 'driftwood-isle', 'pine-hollow', 'nalati-grasslands',
+const shards = ['_template', 'brasscap-mesa', 'ink-cel-valley', 'pastel-plain', 'driftwood-isle', 'pine-hollow', 'nalati-grasslands',
   'nine-dragon-stack', 'sunscar-dunes', 'far-reach'] as const;
 const directPlans = new Map<string, PrepareHeadlessRuntime>([['driftwood-isle', prepareProductPlan], ['pine-hollow', prepareProductPlan], ['nine-dragon-stack', ninePlan]]);
 

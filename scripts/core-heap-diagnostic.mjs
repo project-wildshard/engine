@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { summarizeHeap } from './soak/boundary.mjs';
 
 export const coreHeapProtocol = 'webkit-core-heap-diagnostic/1';
-const templates = new Set(['_template', 'blender-template']);
+const templates = new Set(['_template', 'brasscap-mesa']);
 /** Refuse mixed or broad captures before preview/Simulator work. */
 export function coreHeapRequested(args) {
   if (args['core-heap'] === undefined) return false;

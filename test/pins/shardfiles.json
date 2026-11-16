@@ -2,10 +2,10 @@
   "api": "https://api.wildshard.io",
   "shards": [
     {
-      "slug": "blender-template",
-      "revision": 9,
-      "hash": "1a8dad51ad26237bcf6f3c8cd737f7698ac279b38a8fc510159e0ff7933759d9",
-      "bytes": 20504064
+      "slug": "brasscap-mesa",
+      "revision": 3,
+      "hash": "79d71535ef84351dcca74abd7322049a779127f59d82d4afa74cbad526458dbd",
+      "bytes": 21882880
     },
     {
       "slug": "driftwood-isle",

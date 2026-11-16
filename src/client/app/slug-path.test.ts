@@ -7,9 +7,10 @@ test('only /slug/<slug> names a slug', () => {
   expect(['/', '/slug/', '/slug/a/b', '/slugs/x', '/doctor/', '/slug/a%20b'].map(slugOfPath)).toEqual([null, null, null, null, null, null]);
 });
 
-test('Brasscap Mesa reads as brasscap-mesa: its old API slug stays the catalogue key', () => {
-  expect(slugOfPath('/slug/brasscap-mesa')).toBe('blender-template');
-  expect(slugOfPath('/slug/blender-template')).toBe('blender-template');
+test('Brasscap Mesa is brasscap-mesa: its retired slug blender-template reads as the new one (TC-SHIP-a)', () => {
+  expect(slugOfPath('/slug/brasscap-mesa')).toBe('brasscap-mesa');
+  expect(slugOfPath('/slug/blender-template')).toBe('brasscap-mesa');
+  expect(slugPathOf('brasscap-mesa')).toBe('/slug/brasscap-mesa');
   expect(slugPathOf('blender-template')).toBe('/slug/brasscap-mesa');
   expect(slugPathOf('driftwood-isle')).toBe('/slug/driftwood-isle');
 });

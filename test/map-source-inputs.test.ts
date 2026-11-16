@@ -63,7 +63,7 @@ test.each(['_template', 'pastel-plain'])('%s map names exactly the SDK files its
 
 test('source-owned maps declare their program and its defining raster inputs', () => {
   // Open Plots paints each output inside its product; other maps have a named map program.
-  for (const slug of ['blender-template', 'driftwood-isle', 'far-reach', 'ink-cel-valley', 'nalati-grasslands',
+  for (const slug of ['brasscap-mesa', 'driftwood-isle', 'far-reach', 'ink-cel-valley', 'nalati-grasslands',
     'nine-dragon-stack', 'open-plots', 'pine-hollow', 'sunscar-dunes']) {
     const dir = resolve('src/shards', slug), roots = mapInputRoots(dir);
     const program = resolve(dir, 'generators', slug === 'open-plots' ? 'product.ts' : 'mapProgram.ts');

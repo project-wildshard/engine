@@ -17,7 +17,7 @@ const row = (slug: string, name: string, status: TitleManifest['status'], shardS
 const ROWS: readonly TitleManifest[] = [
   row('driftwood-isle', 'Driftwood Isle', 'live'), row('pine-hollow', 'Pine Hollow', 'earlyAccess'),
   row('nalati-grasslands', 'Nalati Grasslands', 'earlyAccess'), row('nine-dragon-stack', 'Nine Dragon Stack', 'experimental'),
-  row('blender-template', 'Brasscap Mesa', 'hidden'), row('pastel-plain', 'Pastel Plain', 'hidden', false),
+  row('brasscap-mesa', 'Brasscap Mesa', 'hidden'), row('pastel-plain', 'Pastel Plain', 'hidden', false),
   row('ink-cel-valley', 'Ink & Cel Valley', 'hidden', false), row('open-plot-night-market', 'Open Plot · Night Market', 'experimental', false),
   row('open-plot-thin-ice', 'Open Plot · Thin Ice', 'earlyAccess', false), row('open-plot-desert-ruin', 'Open Plot · Desert Ruin', 'hidden', false),
   row('open-plot-coral-drift', 'Open Plot · Coral Drift', 'earlyAccess', false),
@@ -78,5 +78,5 @@ test('J313: the title summary counts Mossgate for a player, since its catalogue 
   const view = summaryView({ v: 1, shards: { _template: { earned: 2, total: null, playS: 10, at: 0 } } }, ROWS);
   expect(view.lines.map(({ slug }) => slug)).toContain('_template');
   expect(view.earned).toBe(2);
-  expect(view.lines.some(({ slug }) => slug === 'blender-template')).toBe(false);
+  expect(view.lines.some(({ slug }) => slug === 'brasscap-mesa')).toBe(false);
 });

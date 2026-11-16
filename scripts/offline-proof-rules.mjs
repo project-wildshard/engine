@@ -6,7 +6,7 @@ export const DECK_SHARDS = Object.freeze([
   { slug: 'driftwood-isle', card: 'Driftwood Isle' }, { slug: 'nalati-grasslands', card: 'Nalati Grasslands' },
   { slug: 'pine-hollow', card: 'Pine Hollow' }, { slug: 'far-reach', card: 'Sky Reach' },
   { slug: 'nine-dragon-stack', card: 'Nine Dragon Stack' }, { slug: 'sunscar-dunes', card: 'Signal Dunes' },
-  { slug: 'blender-template', card: 'Brasscap Mesa' }, { slug: '_template', card: 'Template shard' },
+  { slug: 'brasscap-mesa', card: 'Brasscap Mesa' }, { slug: '_template', card: 'Template shard' },
   { slug: 'pastel-plain', card: 'Pastel Plain' }, { slug: 'ink-cel-valley', card: 'Ink & Cel Valley' },
 ]);
 /** Open Plots have no deck card (the open-plots audit): a player reaches them by a deep link with Developer on, or a resume. */

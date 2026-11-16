@@ -1,10 +1,10 @@
 import named from './slugNames.json' with { type: 'json' };
 
-/** A shard's public `/slug/` name where it differs from its API slug (`slugNames.json`): the link and the address bar read
- *  the public name, the catalogue the API slug. Brasscap Mesa is still the API's old corpus slug (Jake, 2026-11-15: "I
- *  don't know why the fuck this slug is called Blender template"); pages/worker.ts sends the old link to the new one. */
+/** A retired `/slug/` name and the slug that replaced it (`slugNames.json`): Brasscap Mesa was the API's old corpus slug
+ *  blender-template (Jake, 2026-11-15: "I don't know why the fuck this slug is called Blender template"); since TC-SHIP-a
+ *  the catalogue names it brasscap-mesa. pages/worker.ts sends the old link to the new one; the page reads it as the new. */
 const PUBLIC: Readonly<Record<string, string | undefined>> = named.names;
-const API: Readonly<Record<string, string | undefined>> = Object.fromEntries(Object.entries(PUBLIC).map(([api, name]) => [name, api]));
+const API = PUBLIC;
 
 /** SA36: the API slug a `/slug/<name>` path names (src/client/game/slugPage.ts is its page), or null for any other path. A
  *  leaf, so the entry reads it before anything loads; pages/worker.ts serves the page for the same paths. */

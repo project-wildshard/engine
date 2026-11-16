@@ -43,7 +43,7 @@ export function nativeWalkTestFiles(slugs){
     :OPEN_PLOTS_2.has(slug)?'test/physics-open-plots-headless-2.test.ts'
     :OPEN_PLOTS_3.has(slug)?'test/physics-open-plots-headless-3.test.ts'
     :slug.startsWith('open-plot-')?'test/physics-open-plots-headless.test.ts'
-    :slug==='blender-template'?'test/physics-blender-template-headless.test.ts'
+    :slug==='brasscap-mesa'?'test/physics-brasscap-mesa-headless.test.ts'
     :slug==='nalati-grasslands'?'test/physics-nalati-headless.test.ts':'test/physics-shards-headless.test.ts'))];
 }
 

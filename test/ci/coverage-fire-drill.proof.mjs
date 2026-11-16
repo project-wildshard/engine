@@ -70,7 +70,7 @@ timed('door',async()=>{
 timed('format',async()=>{
   const {loadHeadlessProduct}=await import('../../src/server/host/headlessProduct.ts');
   // This is the format package's actual handwritten Template 2, rather than
-  // today's unrelated Brasscap head occupying the blender-template API slug.
+  // Brasscap's API head (the blender-template API slug until TC-SHIP-a).
   const product=await loadHeadlessProduct('node_modules/@wildshard/format/corpus/handwritten');
   assert.equal(product.slug,'blender-template');
   assert.ok(product.shardfile.state.shared.some(row=>row.name==='blender.door.open'));
@@ -121,8 +121,8 @@ timed('cook-source',async()=>{
   assert.equal(ring1.heads[0].hash,format.pin.hash,'TC27_FORMAT_INPUT: Ring 1 must cook its installed handwritten Template 2');
   const files=readTar(ring1.read(format.pin.hash)),index=parseOutputIndex(JSON.parse(new TextDecoder().decode(files.get('shard.json'))));
   assert.equal(index.identity.slug,'blender-template');assert.equal(index.identity.revision,format.pin.revision);
-  const ring2=ringCookInputs(['blender-template'],pins,'tmp/absent-cook-cache',true);
-  assert.deepEqual(ring2.heads,[pins.find(row=>row.slug==='blender-template')]);
+  const ring2=ringCookInputs(['brasscap-mesa'],pins,'tmp/absent-cook-cache',true);
+  assert.deepEqual(ring2.heads,[pins.find(row=>row.slug==='brasscap-mesa')]);
   assert.throws(()=>ring2.read(ring2.heads[0].hash),/ENOENT/u,'A missing Ring 2 head cannot be replaced by the format corpus');
   assert.throws(()=>ring1.read('0'.repeat(64)),/unselected input/u);
 });

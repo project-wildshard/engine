@@ -165,7 +165,9 @@ test('a slice comes from the head it was cut from, and Ring 1 names only pinned 
   const rings = JSON.parse(readFileSync('test/pins/rings.json', 'utf8')) as Record<string, { products: string[]; slices: string[] }>;
   const { slices } = JSON.parse(readFileSync('test/pins/slices.json', 'utf8')) as { slices: { slug: string; from: string; hash: string }[] };
   const heads = new Map(pins.shards.map(row => [row.slug, row.hash]));
-  for (const slug of rings['1']?.products ?? []) expect(heads.has(slug)).toBe(true);
+  // Ring 1's blender-template is the format's own handwritten Template 2 (`pins.ts install --ring`), no API head since
+  // TC-SHIP-a moved Brasscap Mesa to brasscap-mesa; every other Ring 1 product is a pinned head.
+  for (const slug of rings['1']?.products ?? []) expect(heads.has(slug) || slug === 'blender-template').toBe(true);
   expect(slices.map(row => row.slug)).toEqual(rings['1']?.slices);
   for (const row of slices) expect(heads.get(row.slug)).toBe(row.from);
 });

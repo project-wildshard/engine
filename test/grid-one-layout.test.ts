@@ -35,7 +35,7 @@ test('G972: no alternate Developer catalogue swaps remain in the shipped grid', 
     // Coral Drift and Lantern Bayou hold the back line (x = -2), Mosslight and Ember Forge their east cells
     ['pine-hollow', [0, 1]], ['nalati-grasslands', [1, 0]], ['pastel-plain', [-1, 1]],
     ['driftwood-isle', [0, 0]], ['sunscar-dunes', [-1, 0]], ['far-reach', [0, -1]], ['nine-dragon-stack', [1, -1]],
-    ['_template', [1, 1]], ['blender-template', [-1, -1]], ['ink-cel-valley', [-1, 2]], ['open-plot-night-market', [1, -2]],
+    ['_template', [1, 1]], ['brasscap-mesa', [-1, -1]], ['ink-cel-valley', [-1, 2]], ['open-plot-night-market', [1, -2]],
     ['open-plot-frostline-peaks', [-2, 1]], ['open-plot-coral-drift', [-2, 0]],
     ['open-plot-mosslight-ruins', [2, 0]], ['open-plot-ember-forge', [2, -1]],
   ]) expect(catalogue.grid.cells.find(row => row.slug === slug)?.cell).toEqual(cell);

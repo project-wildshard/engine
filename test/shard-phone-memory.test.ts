@@ -49,10 +49,10 @@ test('non-product floors make no metadata request', async () => {
 });
 
 test('the second template keeps its own canonical product identity', async () => {
-  const index = metadataIndex.replace('template', 'blender-template');
+  const index = metadataIndex.replace('template', 'brasscap-mesa');
   const read: typeof fetch = input => Promise.resolve(new Response(requestPath(input) === '/version.json' ? metadataVersion : index));
-  const result = await coreMemoryProductIdentity('https://metadata.test/', 'blender-template', metadataVersion, read);
-  expect(result).toMatchObject({status: 'observed', shard: 'blender-template', path: '/shardfiles/blender-template/shard.json',
+  const result = await coreMemoryProductIdentity('https://metadata.test/', 'brasscap-mesa', metadataVersion, read);
+  expect(result).toMatchObject({status: 'observed', shard: 'brasscap-mesa', path: '/shardfiles/brasscap-mesa/shard.json',
     indexHash: createHash('sha256').update(index).digest('hex')});
 });
 
@@ -150,7 +150,7 @@ test('saved Template-pair estimates audit either floor without admitting other c
   const audit = (target: string, input: unknown = summary) => spawnSync('node', [
     'scripts/shard-phone-memory.mjs', 'audit-estimate', target, '208182520',
   ], {encoding: 'utf8', input: JSON.stringify(input)});
-  for (const target of ['_template', 'blender-template']) {
+  for (const target of ['_template', 'brasscap-mesa']) {
     const result = audit(target);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain(`"shard":"${target}"`);
@@ -180,7 +180,7 @@ test('four independent floors use the picked combined process limits', () => {
   expect(webKitCoreMemoryFloorBytes).toBe(87397464 + 15927456);
   expect(coreMemoryTargets.map(target => [target.shard, target.limitBytes])).toEqual([
     ['menu', webKitCoreMemoryFloorBytes + 50 * MiB], ['select', webKitCoreMemoryFloorBytes + 50 * MiB],
-    ['_template', 274_538_200], ['blender-template', 261_512_872],
+    ['_template', 274_538_200], ['brasscap-mesa', 261_512_872],
   ]);
   expect(coreMemorySummary(rows()).every(row => row.passed && row.totalBytes === row.limitBytes)).toBe(true);
 });
@@ -209,7 +209,7 @@ test('single-floor cohorts retain the original target and refuse unknown selecti
 
 test('Template-only cohorts retain both original floors and refuse mixed or missing evidence', () => {
   const targets = selectedCoreMemoryTargets('templates');
-  expect(targets.map(target => target.shard)).toEqual(['_template', 'blender-template']);
+  expect(targets.map(target => target.shard)).toEqual(['_template', 'brasscap-mesa']);
   expect(targets[0]).toBe(coreMemoryTargets[2]); expect(targets[1]).toBe(coreMemoryTargets[3]);
   const input = rows().slice(2);
   expect(coreMemorySummary(input, 'templates')).toEqual(coreMemorySummary(rows()).slice(2));

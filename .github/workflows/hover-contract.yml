@@ -19,7 +19,7 @@ jobs:
         head:
           # These are standalone zone boots (J352); road speed has grid coverage.
           - {slug: template, cap: 14}
-          - {slug: blender-template, cap: 14}
+          - {slug: brasscap-mesa, cap: 14}
           - {slug: pastel-plain, cap: 14}
           - {slug: ink-cel-valley, cap: 14}
           - {slug: open-plot-ember-forge, cap: 14}

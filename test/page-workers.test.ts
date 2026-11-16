@@ -149,7 +149,7 @@ const ROWS = [
   { slug: 'driftwood-isle', name: 'Driftwood Isle', biome: 'Castaway island & reef', card: { thumb: '/shardfiles/driftwood-isle/t.jpg', portrait: '/shardfiles/driftwood-isle/p.jpg', landscape: '/shardfiles/driftwood-isle/blobs/image/land.jpg' } },
   { slug: 'sky-reach', name: 'Far "Reach"', biome: '', card: { thumb: 'x', portrait: 'x', landscape: 'https://packs.wildshard.io/shardfiles/sky-reach/l.jpg' } },
   { slug: '_template', name: 'Template shard', biome: 'Template.', card: { thumb: 'x', portrait: 'x', landscape: '/shardfiles/_template/l.jpg' } },
-  { slug: 'blender-template', name: 'Brasscap Mesa', biome: 'Mesa.', card: { thumb: 'x', portrait: 'x', landscape: '/shardfiles/blender-template/l.jpg' } },
+  { slug: 'brasscap-mesa', name: 'Brasscap Mesa', biome: 'Mesa.', card: { thumb: 'x', portrait: 'x', landscape: '/shardfiles/brasscap-mesa/l.jpg' } },
 ]
 // late-shard: a catalogue head with a placement and no title row (the client's withCatalogueHeads card); auto-placed: SA30's grid
 // cell with no placement, which the client reads as unlisted, so a 404 here too
@@ -282,9 +282,9 @@ test('SA49: a slug placed after the build unfurls with its API name; an unplaced
   expect(asked, 'a slug the page names asks nothing').toEqual([])
 })
 
-// TC-B12 (Jake, 2026-11-15: "I don't know why the fuck this slug is called Blender template"): Brasscap Mesa's link is
-// /slug/brasscap-mesa; the API slug's old link goes there, and the page and the worker share one map
-test('a public slug name serves its API slug, and the old link goes to the new one', async () => {
+// TC-B12 (Jake, 2026-11-15: "I don't know why the fuck this slug is called Blender template"), TC-SHIP-a: Brasscap Mesa's
+// slug is brasscap-mesa; the retired slug's old link goes there, and the page and the worker share one map
+test('a slug serves its page, and a retired slug\'s old link goes to the new one', async () => {
   const response = await worker.fetch(new Request('https://staging.wildshard.io/slug/brasscap-mesa'), { ASSETS: site([]) })
   expect(response.status).toBe(200)
   expect(og(await response.text())).toMatchObject({ title: 'Brasscap Mesa', url: 'https://staging.wildshard.io/slug/brasscap-mesa' })

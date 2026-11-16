@@ -23,7 +23,7 @@ const args = {'core-heap': '1', 'core-memory': target, rev: 'a'.repeat(40)};
 test('heap mode is explicit, pinned and limited to one original cold Template', () => {
   expect(coreHeapRequested({})).toBe(false);
   expect(coreHeapRequested(args)).toBe(true);
-  expect(coreHeapRequested({...args, 'core-memory': 'blender-template'})).toBe(true);
+  expect(coreHeapRequested({...args, 'core-memory': 'brasscap-mesa'})).toBe(true);
   for (const change of [
     {'core-heap': '0'}, {'core-memory': 'templates'}, {'core-memory': 'all'}, {'core-memory': 'menu'},
     {'core-memory': 'hello'}, {rev: undefined}, {rev: 'HEAD'}, {rev: ''}, {base: 'http://127.0.0.1:4400'}, {runs: '2'},

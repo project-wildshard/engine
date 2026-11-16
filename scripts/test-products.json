@@ -46,15 +46,15 @@
   "test/cook-worker.test.ts": ["sunscar-dunes"],
   "test/cook-worker-publish.test.ts": ["sunscar-dunes"],
   "test/cook-worker-limits.test.ts": ["sunscar-dunes"],
-  "test/released-save-play.test.ts": ["_template", "blender-template", "sunscar-dunes", "far-reach", "driftwood-isle", "nalati-grasslands", "pine-hollow", "nine-dragon-stack"],
+  "test/released-save-play.test.ts": ["_template", "brasscap-mesa", "sunscar-dunes", "far-reach", "driftwood-isle", "nalati-grasslands", "pine-hollow", "nine-dragon-stack"],
   "test/cook-refusals.test.ts": ["_template"],
   "test/cook-hostile-pins.test.ts": ["_template"],
   "test/net-hostile-play.test.ts": ["sunscar-dunes", "pine-hollow"],
   "test/pinned-restore-play.test.ts": ["_template", "blender-template", "sunscar-dunes", "far-reach", "driftwood-isle", "nalati-grasslands", "pine-hollow", "nine-dragon-stack"],
-  "test/shard-stands-alone.test.ts": ["_template","blender-template","driftwood-isle","far-reach","ink-cel-valley","nalati-grasslands","nine-dragon-stack","open-plot-alien-plain","open-plot-clockwork-canyon","open-plot-coral-drift","open-plot-desert-ruin","open-plot-ember-forge","open-plot-fossil-badlands","open-plot-frostline-peaks","open-plot-jungle-ziggurat","open-plot-lantern-bayou","open-plot-mosslight-ruins","open-plot-night-market","open-plot-patchwork-fairground","open-plot-saltwind-lighthouse","open-plot-sky-harbor","open-plot-sky-race","open-plot-starfall-observatory","open-plot-thin-ice","pastel-plain","pine-hollow","sunscar-dunes"],
+  "test/shard-stands-alone.test.ts": ["_template","brasscap-mesa","driftwood-isle","far-reach","ink-cel-valley","nalati-grasslands","nine-dragon-stack","open-plot-alien-plain","open-plot-clockwork-canyon","open-plot-coral-drift","open-plot-desert-ruin","open-plot-ember-forge","open-plot-fossil-badlands","open-plot-frostline-peaks","open-plot-jungle-ziggurat","open-plot-lantern-bayou","open-plot-mosslight-ruins","open-plot-night-market","open-plot-patchwork-fairground","open-plot-saltwind-lighthouse","open-plot-sky-harbor","open-plot-sky-race","open-plot-starfall-observatory","open-plot-thin-ice","pastel-plain","pine-hollow","sunscar-dunes"],
   "test/registered-quest-catalogues.test.ts": ["pine-hollow","nalati-grasslands"],
   "test/registered-native-population.test.ts": ["driftwood-isle","pine-hollow"],
-  "test/shipped-graph-cost.test.ts": ["_template","blender-template","driftwood-isle","far-reach","ink-cel-valley","nalati-grasslands","nine-dragon-stack","open-plot-alien-plain","open-plot-clockwork-canyon","open-plot-coral-drift","open-plot-desert-ruin","open-plot-ember-forge","open-plot-fossil-badlands","open-plot-frostline-peaks","open-plot-jungle-ziggurat","open-plot-lantern-bayou","open-plot-mosslight-ruins","open-plot-night-market","open-plot-patchwork-fairground","open-plot-saltwind-lighthouse","open-plot-sky-harbor","open-plot-sky-race","open-plot-starfall-observatory","open-plot-thin-ice","pastel-plain","pine-hollow","sunscar-dunes"],
+  "test/shipped-graph-cost.test.ts": ["_template","brasscap-mesa","driftwood-isle","far-reach","ink-cel-valley","nalati-grasslands","nine-dragon-stack","open-plot-alien-plain","open-plot-clockwork-canyon","open-plot-coral-drift","open-plot-desert-ruin","open-plot-ember-forge","open-plot-fossil-badlands","open-plot-frostline-peaks","open-plot-jungle-ziggurat","open-plot-lantern-bayou","open-plot-mosslight-ruins","open-plot-night-market","open-plot-patchwork-fairground","open-plot-saltwind-lighthouse","open-plot-sky-harbor","open-plot-sky-race","open-plot-starfall-observatory","open-plot-thin-ice","pastel-plain","pine-hollow","sunscar-dunes"],
   "test/nalati-chapter-binding.test.ts": ["nalati-grasslands"],
   "test/nalati-headless-population.test.ts": ["nalati-grasslands"],
   "test/nine-headless-assembly.test.ts": ["nine-dragon-stack"],
@@ -204,7 +204,7 @@
   "test/physics-headless.test.ts": ["driftwood-isle"],
   "test/motion-replay.test.ts": ["driftwood-isle"],
   "test/physics-shards-headless.test.ts": ["pine-hollow", "nine-dragon-stack", "sunscar-dunes", "far-reach"],
-  "test/physics-blender-template-headless.test.ts": ["blender-template"],
+  "test/physics-brasscap-mesa-headless.test.ts": ["brasscap-mesa"],
   "test/physics-nalati-headless.test.ts": ["nalati-grasslands"],
   "test/physics-open-plots-headless.test.ts": ["open-plot-frostline-peaks", "open-plot-lantern-bayou", "open-plot-ember-forge", "open-plot-mosslight-ruins", "open-plot-coral-drift", "open-plot-fossil-badlands"],
   "test/physics-open-plots-headless-2.test.ts": ["open-plot-patchwork-fairground", "open-plot-desert-ruin", "open-plot-sky-harbor", "open-plot-starfall-observatory", "open-plot-thin-ice", "open-plot-clockwork-canyon"],
@@ -221,7 +221,7 @@
   ],
   "test/template-strikes-hurt.test.ts": [
     "_template",
-    "blender-template"
+    "brasscap-mesa"
   ],
   "test/scripts/far-reach-roc.test.ts": [
     "far-reach"
@@ -300,7 +300,7 @@
   "test/look-regressions.test.ts": [],
   "test/grid-reentry.test.ts": [
     "_template",
-    "blender-template",
+    "brasscap-mesa",
     "ink-cel-valley",
     "pastel-plain",
     "driftwood-isle",

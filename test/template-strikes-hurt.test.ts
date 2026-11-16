@@ -57,7 +57,7 @@ test('with every body down, the same 20 s beside the pack hurts no one: the harm
 // TEMPLATE-E2E TC-B3: Brasscap's bandits fight back: the camp pursuer and the rusher pack (`creatures.groups`); the dust
 // wyrmling's ram hurts too. Every other body (but a rusher's pack mates) is down first, so the harm is that one body's strike.
 // TC-B4c: the bandit brawler (`challenge-grazer`: a lane tackle and an arc club) is Brasscap's third brain kind.
-const brasscap = product('blender-template');
+const brasscap = product('brasscap-mesa');
 for (const [id, gap] of [['bandit.camp-1.2', 2], ['bandit.rusher.1', 6], ['wyrmling.2', 2], ['brawler.1', 6]] as const) {
   test(`Brasscap's ${id} strikes the player ${String(gap)} m off`, async () => {
     const input = await brasscap;
