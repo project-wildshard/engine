@@ -1,6 +1,7 @@
 import { Group, InstancedMesh, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshStandardMaterial, type BufferGeometry, type Color, type Material, type Object3D, Texture } from 'three';
 import { prepareRigLoader } from '../anim/rig';
 import { restoreDrawnChannels } from '../models/nativeGeometry';
+import { clusterTile } from './instanceClusters';
 import { Scope } from '../../../shared/engine/app/scope';
 import { bindGraphMeshMap } from '../render/graphBackend';
 import { familyVariant } from '../render/families/registry';
@@ -213,6 +214,8 @@ export async function installDeclaredProps(props: DeclaredProps, ports: {
       if (tile.lod !== (ports.lod ?? 0) || (ports.selectedTiles !== undefined && !ports.selectedTiles.has(key))) continue;
       const root = await parse(tile.file);
       for (const hash of tile.additionalFiles ?? []) root.add(await parse(hash));
+      // SHARD-SOURCE AP33a/b: a tile's instanced scatter culls and thins by cluster, not as one 62.5 m sphere
+      for (const { from, to } of clusterTile(root)) { instanced.delete(from); for (const cluster of to) instanced.add(cluster); }
       tiles.set(key, root); roots.add(root);
     }
     for (const panel of ports.includeLibrary === false || (ports.lod ?? 0) !== 0 ? [] : props.panels) { const root = await parse(panel.file); root.visible = panel.visible ?? true; panels.set(panel.id, root); roots.add(root); }

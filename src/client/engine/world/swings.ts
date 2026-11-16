@@ -156,7 +156,9 @@ export class SwingField {
 }
 
 /** GLSL for a swinging vertex: `wsSwingAt(world, n)` turns a world point round swing n's pivot (n from 0). */
-export const SWING_GLSL: string = /* glsl */`
+/** Shader text (a named type: an inferred template literal would need its annotation under isolated declarations). */
+type GlslSource = string;
+export const SWING_GLSL: GlslSource = /* glsl */`
 uniform vec4 wsSwingPivot[ ${SWINGS_MAX} ];
 uniform vec4 wsSwingTilt[ ${SWINGS_MAX} ];
 vec3 wsSwingRotate( vec4 q, vec3 v ) { return v + 2.0 * cross( q.xyz, cross( q.xyz, v ) + q.w * v ); }
