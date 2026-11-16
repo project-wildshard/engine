@@ -285,7 +285,7 @@ async function showPageTitle(refusal = '', preparation?: Scope): Promise<void> {
     earlySelect = false;
     menu = buildTitleMenu({
       active: null,
-      ...(preparation === undefined ? {} : { readAhead: false }),
+      ...(preparation === undefined ? {} : { readAhead: false, fullHero: false }),
       onEnter: (card) => { travel({ to: card.slug, mode: 'enter' }); },
       onExplore: (card) => { travel({ to: card.slug, mode: 'explore' }); },
       onGrid: grid.onGrid,
@@ -412,7 +412,7 @@ async function startSelected(): Promise<void> {
   const listed = unloadedTitleRow(search.get('chunk'), game.shard);
   const arrival = listed?.shardfile === undefined ? game.shard : { ...game.shard, slug: listed.slug, name: listed.name, shardfile: listed.shardfile };
   const loading = beginLoading({ id: arrival.slug, name: arrival.name, trace: game.shard.boot?.phone?.trace === true });
-  if (document.documentElement.classList.contains('boot-menu')) await showPageTitle('', loading.scope);
+  const preparingTitle = document.documentElement.classList.contains('boot-menu') ? prepareBootImports(showPageTitle('', loading.scope)) : null;
   const moduleText = document.getElementById('boot-module-files')?.textContent;
   const moduleRows: unknown = moduleText === undefined ? undefined : JSON.parse(moduleText);
   const gridEntryModule = import('@wildshard/engine/game/grid/pageEntry');
@@ -482,6 +482,7 @@ async function startSelected(): Promise<void> {
   const imageOwner = entryScope.child('manifest images');
   try {
     imports.check();
+    await preparingTitle?.ready();
     loading.setPrefetchSource(gridPrefetchStatus);
     const source = pageGridRecovery() === null ? await bootTask('app:product-source-and-read', () => configuredShardfile(document, browserShardfileOptions(document.baseURI, inlineOwner))) : null;
     page = preparePageResidency(arrival, source?.identity.slug);
@@ -490,6 +491,7 @@ async function startSelected(): Promise<void> {
     // the loader, a few. NINE-DRAGON-BENCHMAX NB4: Nine's standalone page took 1 of the 45 by control and after play
     // (benchmax census) while the 45 cost Jake's Low Power iPhone 1.1 s of modules. A miss allocates in place, as before.
     const grid = page.mode === 'grid';
+    const packs = (await import('./assetTables')).prepareAssetPackRead(grid || TIER !== 'phone' ? undefined : game.shard.slug);
     const [{ prepareScriptMemoryBank }, { yieldTask }, { diagnosticNow }] = await Promise.all([
       import('@wildshard/engine/script/moduleV2'), import('@wildshard/engine/core/workSlice'),
       import('@wildshard/engine/core/clock'),
@@ -503,7 +505,7 @@ async function startSelected(): Promise<void> {
     }, grid ? [{ initial: 1, maximum: 2, count: 5 }, { initial: 1, maximum: 64, count: 4 }] : [{ initial: 1, maximum: 2, count: 1 }, { initial: 1, maximum: 64, count: 1 }]));
     performance.measure('wildshard.prepare:boot.script-memory-bank', { start: memoryStartedAt, end: diagnosticNow(),
       detail: { memoryTurns, memoryWaitMs, grid } });
-    await (await import('./assetTables')).prepareAssetPacks(page.mode === 'grid' || TIER !== 'phone' ? undefined : game.shard.slug);
+    await packs.ready();
     await completePageCatalogue(page.mode, catalogue?.ready);
     const path = page.mode === 'grid' ? 'grid' : 'shardfile';
     if (path === 'shardfile') modules('client');

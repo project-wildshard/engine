@@ -65,6 +65,8 @@ export interface TitleMenuOptions extends Omit<TitleDeckOptions, 'cards'> {
   readonly screen?: MainMenuScreen;
   /** A world already preparing owns its own mandatory reads; do not start optional title read-ahead beside them. */
   readonly readAhead?: false;
+  /** Retain the already painted small hero while mandatory world bytes use the connection. */
+  readonly fullHero?: false;
   /** SF60 / G214: the WHAT'S NEW banner's lines (default: today's, src/client/game/whatsNew.ts) and its hide store (tests) */
   readonly whatsNew?: WhatsNew;
   readonly whatsNewStore?: HiddenStore;
@@ -132,8 +134,8 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
       ${online ? `<div class="ws-main-row"><button class="ws-main-settings ws-main-doctor" type="button"><i class="ws-main-doctor-dot" aria-hidden="true"></i>${s.checkConnection}</button></div>` : ''}
     </div>`;
   const hero = required(main, '.ws-main-hero', HTMLElement);
-  hero.style.setProperty('--ws-hero-landscape', `url('${MAIN_MENU_HERO}'), url('${FIRST_HERO}')`);
-  hero.style.setProperty('--ws-hero-square', `url('${MAIN_MENU_SQUARE_HERO}'), url('${FIRST_SQUARE_HERO}')`);
+  hero.style.setProperty('--ws-hero-landscape', `url('${opts.fullHero === false ? FIRST_HERO : MAIN_MENU_HERO}'), url('${FIRST_HERO}')`);
+  hero.style.setProperty('--ws-hero-square', `url('${opts.fullHero === false ? FIRST_SQUARE_HERO : MAIN_MENU_SQUARE_HERO}'), url('${FIRST_SQUARE_HERO}')`);
   if (notice !== undefined && notice !== '') {
     const line = document.createElement('div');
     line.className = 'ws-main-notice';

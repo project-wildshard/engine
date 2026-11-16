@@ -62,6 +62,15 @@ test('a preparation menu keeps its own screen while the world creates another me
   expect(second.screen).toBe('main');
 });
 
+test('preparation keeps the small hero off the mandatory world download connection', () => {
+  const view = buildTitleMenu({ cards: CARDS, active: null, fullHero: false, readAhead: false,
+    onEnter: () => undefined, onExplore: () => undefined, onSettings: () => undefined, onGrid: () => undefined });
+  views.push(view);
+  const hero = view.root.querySelector<HTMLElement>('.ws-main-hero');
+  expect(hero?.style.getPropertyValue('--ws-hero-square')).toContain('square-first');
+  expect(hero?.style.getPropertyValue('--ws-hero-landscape')).toContain('landscape-first');
+});
+
 for (const visit of ['a fresh phone (no first-play mark)', 'a return visit (first play done)'] as const) {
   test(`${visit}: SHARD SELECT opens the deck and nothing loads until a card is picked`, async () => {
     if (visit.startsWith('a return')) finishFirstPlay(); else resetFirstPlay();
