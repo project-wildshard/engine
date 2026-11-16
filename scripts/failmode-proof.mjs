@@ -32,7 +32,7 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { qualifyResult } from './failmode-results.mjs';
-import { claimFixture, fixtureKey } from './online-rig-owned.mjs';
+import { claimFixture, fixtureKey, fixtureRequestOrigins } from './online-rig-owned.mjs';
 import { rawLeak, selectCases, verdict } from './failmode-cases.mjs';
 
 process.env.WS_RIG_PORTS ??= '18856';
@@ -125,7 +125,7 @@ try {
   browserVersion = launched.version();
   const { defaultBrowserType: _engine, ...device } = devices['iPhone 16 Pro'];
   const phone = { ...device, viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 } };
-  const allowedOrigins = new Set([PAGE_ORIGIN, new URL(SOCKET).origin]);
+  const allowedOrigins = fixtureRequestOrigins(PAGE_ORIGIN, SOCKET);
   const guardFaults = /** @type {string[]} */ ([]);
   let pageFaults = /** @type {string[]} */ ([]);
   const URL_PLAY = `${PAGE_ORIGIN}/?chunk=${SHARD}&mute=1&nolock=1&skipintro=1`;
@@ -559,6 +559,7 @@ try {
     /** @type {Result} */
     let result;
     pageFaults = [];
+    guardFaults.length = 0;
     if (item.blocked !== undefined) result = { outcome: 'blocked-dependency', reason: item.blocked };
     else if (item.chromiumOnly === true && engine !== 'chromium') result = { outcome: 'unsupported', reason: `${engine} cannot produce this lifecycle fault; a native-Safari Ring 2 proof is owed` };
     else {

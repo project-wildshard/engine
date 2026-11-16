@@ -3,7 +3,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createServer } from 'node:net';
-import { claimFixture, confirmPostgres, fixtureKey, freeFixturePorts, ownedPostgres, plainPath } from '../../scripts/online-rig-owned.mjs';
+import { claimFixture, confirmPostgres, fixtureKey, fixtureRequestOrigins, freeFixturePorts, ownedPostgres, plainPath } from '../../scripts/online-rig-owned.mjs';
 import { openRig, PG_PORT } from '../../scripts/online-rig.mjs';
 
 const base = resolve('tmp/codex-pagesize');
@@ -11,6 +11,13 @@ mkdirSync(base, { recursive: true });
 const root = mkdtempSync(resolve(base, 'rig-guards-'));
 afterAll(() => { rmSync(root, { recursive: true, force: true }); });
 const at = name => resolve(root, name);
+test('fixture admission includes only the owned world door HTTP health sibling', () => {
+  const origins = fixtureRequestOrigins('http://127.0.0.1:18851', 'ws://127.0.0.1:18852/');
+  expect(origins).toEqual(new Set(['http://127.0.0.1:18851', 'ws://127.0.0.1:18852', 'http://127.0.0.1:18852']));
+  expect(origins.has('http://127.0.0.1:18853')).toBe(false);
+  expect(() => fixtureRequestOrigins('https://example.com', 'ws://127.0.0.1:18852/')).toThrow('loopback');
+  expect(() => fixtureRequestOrigins('http://127.0.0.1:18851', 'ws://example.com:18852/')).toThrow('loopback');
+});
 const pair = generateKeyPairSync('ed25519');
 const key = { public: pair.publicKey.export({ type: 'spki', format: 'der' }).toString('hex'), private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }) };
 const keyFile = at('key.json');

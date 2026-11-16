@@ -35,3 +35,12 @@ bounded. The download quota runner now applies/readbacks Chromium's actual
 WebKit's page-realm Cache API injection stays labelled. That browser quota
 change is not yet qualified. The running census was intentionally stopped
 for Jake's 10:17 stale-shell regression; no incomplete census earns a tick.
+# Census health requests use the owned world port
+
+The full Chromium census exposed a harness refusal in mode42: its Doctor
+reads HTTP /health on the owned WebSocket door, but admission included
+only that door's ws origin. Admit that exact HTTP sibling, with the same
+explicit loopback port. No unowned endpoint is admitted. Each fresh case
+also owns its guard-fault list; a prior refused request remains a failed
+row instead of relabelling every later context. The first full census is
+kept red; run42/affected cases again before the WebKit census.

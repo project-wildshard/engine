@@ -48,6 +48,17 @@ export function claimFixture(path) {
   mkdirSync(full, { mode: 0o700 });
   return full;
 }
+/** Only the owned page and world door, including the HTTP health sibling of its WebSocket origin.
+ * @param {string} page @param {string} socket */
+export function fixtureRequestOrigins(page, socket) {
+  const document = new URL(page), world = new URL(socket);
+  if (document.protocol !== 'http:' || world.protocol !== 'ws:' ||
+    [document, world].some(url => url.hostname !== '127.0.0.1' || url.username !== '' || url.password !== '' || url.port === '')) {
+    throw new Error('Fixture request origins must be explicit owned loopback ports');
+  }
+  const health = new URL(world); health.protocol = 'http:';
+  return new Set([document.origin, world.origin, health.origin]);
+}
 /** A fresh native Postgres, with a stop capability returned only after our successful start.
  * @param {{bin: string, data: string, port: number}} options */
 export function ownedPostgres({ bin, data, port }) {
