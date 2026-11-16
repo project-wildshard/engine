@@ -13,6 +13,7 @@ import {browserPool} from './parity/pool.mjs';
 import {serve} from './parity/serve.mjs';
 import {bootCase} from './parity/boot-smoke.mjs';
 import {uncataloguedShardCase} from './uncatalogued-shard-proof.mjs';
+import {levelDownloadFixtures,saveFixture} from './debug-settings.mjs';
 
 await import('./bake-loader.mjs');
 const {folderStore} = await import('../src/cook/game/packStore.ts');
@@ -92,7 +93,9 @@ try {
     const route=titles.find(row=>bareSlug(row.slug)===bareSlug(index.slug))?.slug;
     if(route===undefined)throw new Error(`No public title route for ${index.slug}`);
     fetched.clear();
-    const result=await bootCase(browser,preview.url,'standalone',out,route,true);
+    const result=await bootCase(browser,preview.url,'standalone',out,route,true,null,async context=>{
+      for(const fixture of levelDownloadFixtures('packs'))await saveFixture(context,fixture);
+    });
     const used=[...fetched];
     const parts=used.filter(key=>key.endsWith('.pack.br'));
     if(!parts.some(key=>/^assets\/spawn\/parts\/[a-f0-9]+\.pack\.br$/u.test(key)))throw new Error(`${index.slug}: no client part from this cook reached gameplay`);

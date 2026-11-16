@@ -66,3 +66,8 @@ They are not this gameplay boot's parts. Provenance now requires an own
 manifest, an actual compressed client part, and every fetched .pack.br
 key in the current product's index; all fetched keys remain in the
 receipt. A title image cannot qualify as a cooked gameplay part.
+
+The next hosted boot still demanded the default loose-file mode. The
+proof now selects the existing Runtime packs device fixture through
+bootCase's existing context configurator, so the part assertion measures
+the mode it names. No global default or shared smoke helper changes.
