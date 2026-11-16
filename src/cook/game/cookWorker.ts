@@ -96,6 +96,12 @@ const CONTENT_NAMED = /(?:^|\/)[a-f0-9]{16,64}\.[a-z0-9.]+$|-[a-f0-9]{16}\.json$
 const LOOSE = 'loose/';
 export const looseFolder = (hash: string): string => `${LOOSE}${hash}/`;
 
+/** J370 (4): the index says `proved` only for a proof that walked ticks, lanes and steps. Anything else, a 0-lane walk
+ * included, is `unmeasured`, which passes. The report crosses the job's process boundary as JSON, so this rechecks it. */
+export function indexProof(proof: CookJobReport['proof']): CookIndex['proof'] {
+  return typeof proof === 'object' && proof.ticks > 0 && proof.lanes > 0 && proof.steps > 0 ? 'proved' : 'unmeasured';
+}
+
 /** J84: a part is q11 Brotli once and a browser decodes it; a store must say so. */
 export function objectHeaders(key: string): ObjectHeaders {
   if (key.endsWith('.pack.br')) return {type: 'application/octet-stream', encoding: 'br', cache: IMMUTABLE};
@@ -379,7 +385,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const target = join(serverPacks, report.slug, hash), parked = `${target}.${process.pid}.tmp`;
     rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
-    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys: [...keys, ...loose.map(key => folder + key)], loose: folder, server: report.server, serverPack: report.cook.server, proof: report.proof === 'unmeasured' ? 'unmeasured' : 'proved', check: report.check, seconds: report.seconds,
+    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys: [...keys, ...loose.map(key => folder + key)], loose: folder, server: report.server, serverPack: report.cook.server, proof: indexProof(report.proof), check: report.check, seconds: report.seconds,
       ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
       ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}})};
     await store.put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});
