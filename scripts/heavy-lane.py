@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import fcntl
 import json
 import hashlib
+import importlib.util
 import math
 import os
 import re
@@ -462,6 +463,55 @@ def terminate(child):
     child.wait()
 
 
+def child_cpu():
+    """Only waited children contribute; never change a command verdict for telemetry."""
+    try:
+        return process_resource.getrusage(process_resource.RUSAGE_CHILDREN)
+    except (OSError, ValueError):
+        return None
+
+
+def child_identity(pid):
+    """The direct Popen child cannot reuse its PID before we reap it, even if already a zombie."""
+    try:
+        name = '_heavy_lane_census'
+        if name not in sys.modules:
+            spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name('cpu-census.py'))
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
+            try:
+                exec(compile(spec.loader.get_source(name), str(spec.origin), 'exec'), module.__dict__)
+            except BaseException:
+                del sys.modules[name]
+                raise
+        backend = sys.modules[name].process_backend()
+        before = backend.processes()[0].get(pid)
+        after = backend.processes()[0].get(pid)
+        if before and after and before.identity == after.identity and after.parent == os.getpid() and after.uid == os.getuid():
+            return {'identity': after.identity, 'bornNs': str(after.born_ns), 'uid': after.uid}
+    except Exception:
+        pass  # Missing identity disqualifies the later join, never the owned command.
+    return None
+
+
+def command_usage(child, began, owner, before):
+    """The only child waited in this interval is the owned command; cleanup probes run later."""
+    after = child_cpu()
+    reaped = child.returncode is not None
+    user = after.ru_utime - before.ru_utime if after is not None and before is not None and reaped else None
+    system = after.ru_stime - before.ru_stime if after is not None and before is not None and reaped else None
+    valid = user is not None and system is not None and all(math.isfinite(value) and value >= 0 for value in (user, system))
+    return {'schema': 'command-rusage/1', 'state': 'measured' if valid else 'unavailable',
+            'source': 'RUSAGE_CHILDREN delta around sole owned-child wait',
+            'scope': 'owned-child-and-descendants-reaped-by-it', 'platform': sys.platform,
+            'pid': child.pid, 'identity': owner['identity'] if owner else None,
+            'bornNs': owner['bornNs'] if owner else None, 'uid': owner['uid'] if owner else None,
+            'startedAt': began[0], 'reapedAt': time.time() if reaped else None,
+            'wallSeconds': time.monotonic() - began[1], 'reaped': reaped,
+            'exitCode': (child.returncode if child.returncode >= 0 else 128 - child.returncode) if reaped else None,
+            'userSeconds': user if valid else None, 'systemSeconds': system if valid else None}
+
+
 def status(root):
     with scheduler(root) as state:
         active = []
@@ -548,6 +598,7 @@ def main():
     if not command or not math.isfinite(args.max) or args.max <= 0:
         parser.error('give a command after -- and a positive --max')
     resources = RESOURCES[args.kind]
+    observe_command = 'full-test' in resources
     owns_lane = inherited(root, resources)
     ordered = mirror_first(command, [sys.executable, str(Path(__file__).resolve()), *argv[:separator], '--'])
     if ordered is not None:
@@ -587,6 +638,7 @@ def main():
             parser.error('checkout-scoped pushes require CPU admission')
         entry['checkout'] = str(Path.cwd().resolve())
     held, child, started, load, code = None, None, None, None, 130
+    command_began, command_owner, command_before, command_result = None, None, None, None
     queued_mono, acquired_mono = time.monotonic(), None
     cpu_before = process_resource.getrusage(process_resource.RUSAGE_CHILDREN)
     record_full_test(root, entry, 'request')
@@ -618,6 +670,8 @@ def main():
                'WS_HEAVY_SCHEDULER_ROOT': str(root)}
         # Nested wrappers inherit their owner's QoS; CI has no taskpolicy.
         launch = launch_command(args.kind, command, env)
+        if observe_command:
+            command_began = (time.time(), time.monotonic())
         child = subprocess.Popen(launch, env=env, start_new_session=True,
                                  pass_fds=tuple(fd.fileno() for fd in held))
         entry['childPid'] = child.pid
@@ -625,17 +679,27 @@ def main():
             write_compat(root, entry)
             for resource in entry['leases']:
                 write_active(root, resource, entry)
+        if observe_command:
+            command_owner = child_identity(child.pid)
+            # A live or zombie child is not charged to RUSAGE_CHILDREN until
+            # wait() reaps it. Take the baseline after all admission/identity
+            # helpers, immediately before the sole command wait.
+            command_before = child_cpu()
         try:
             code = child.wait(timeout=args.max * 60)
         except subprocess.TimeoutExpired:
             print('heavy-lane: owned command timed out', file=sys.stderr)
             terminate(child)
             code = 124
+        if command_began is not None:
+            command_result = command_usage(child, command_began, command_owner, command_before)
         print('heavy-lane: finished ' + args.kind + ' in %.2fs' % (time.time() - started), file=sys.stderr, flush=True)
         return code if code >= 0 else 128 - code
     except KeyboardInterrupt:
         code = 130
         terminate(child)
+        if child is not None and command_began is not None:
+            command_result = command_usage(child, command_began, command_owner, command_before)
         return 130
     except TimeoutError as error:
         code = 124
@@ -664,10 +728,11 @@ def main():
                 heldSeconds=time.monotonic() - acquired_mono, loadEnd=load_average(),
                 exitCode=code if code >= 0 else 128 - code,
                 userSeconds=max(0, usage.ru_utime - cpu_before.ru_utime),
-                systemSeconds=max(0, usage.ru_stime - cpu_before.ru_stime))
+                systemSeconds=max(0, usage.ru_stime - cpu_before.ru_stime),
+                commandUsage=command_result)
         else:
             record_full_test(root, entry, 'not-acquired', queueSeconds=time.monotonic() - queued_mono,
-                exitCode=code, loadEnd=load_average())
+                exitCode=code, loadEnd=load_average(), commandUsage=None)
         if args.kind == 'build' and started is not None:
             record_build(root, entry['queuedAt'], started, load, code)
 
