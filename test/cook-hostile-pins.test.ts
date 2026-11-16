@@ -13,7 +13,10 @@ import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {createCookWorker} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
 
-const seeds=(process.env['COOK_FUZZ_SEEDS']??'20261108').split(',').map(Number);
+// The same retained input seed exercises both real tar-body corruption kinds.
+const regressionSeeds=JSON.parse(readFileSync('test/pins/fuzz-seeds.json','utf8')) as {cook:number[]};
+const seeds=[...new Set((process.env['COOK_FUZZ_SEEDS']??[20261108,...regressionSeeds.cook].join(',')).split(',').map(Number))];
+if(seeds.some(seed=>!Number.isSafeInteger(seed)||seed<0||seed>0xffffffff))throw new Error('COOK_FUZZ_SEEDS requires unsigned 32-bit integers');
 for(const seed of seeds)for(const kind of ['section','blob'] as const)test(`damaged real ${kind} publishes nothing, seed ${seed}`,async()=>{
   const scratch=mkdtempSync(join(tmpdir(),'hostile-pin-'));
   try {

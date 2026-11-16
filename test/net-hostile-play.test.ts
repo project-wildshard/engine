@@ -15,7 +15,10 @@ import {directLoopback} from '../src/test/engine/netLoopback';
 import {builtProduct,runtimeAssets} from './fixtures/engine-lift/product';
 import {Fuzz,Hostile} from './fixtures/net-hostile';
 
-const seeds=(process.env['NET_FUZZ_SEEDS']??'20261108').split(',').map(Number);
+// Retained seeds replay by default; the environment selects an exact replay.
+const regressionSeeds=JSON.parse(readFileSync('test/pins/fuzz-seeds.json','utf8')) as {network:number[]};
+const seeds=[...new Set((process.env['NET_FUZZ_SEEDS']??[20261108,...regressionSeeds.network].join(',')).split(',').map(Number))];
+if(seeds.some(seed=>!Number.isSafeInteger(seed)||seed<0||seed>0xffffffff))throw new Error('NET_FUZZ_SEEDS requires unsigned 32-bit integers');
 for(const slug of ['sunscar-dunes','pine-hollow'])for(const seed of seeds)
   test(`hostile traffic leaves another player walking on ${slug}, seed ${seed}`,async()=>{
     const directory=builtProduct(slug),product=await loadHeadlessProduct(directory);
