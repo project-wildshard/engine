@@ -1,0 +1,8 @@
+{
+  "repo": "project-wildshard/leftover",
+  "path": "src/packs/worker.ts",
+  "commit": "f65ad48fd2025de82a0a151d2d356ac4c913a372",
+  "blob": "c9d9dd7454e6ac6f20d08f457c2a93e5dbe9b337",
+  "compatibilityDate": "2026-11-04",
+  "reason": "Frozen deployed Worker input for CF4 actual workerd metadata/encoding proof; current CDN is separately checked read-only."
+}

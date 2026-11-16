@@ -135,6 +135,9 @@ importers:
       happy-dom:
         specifier: 20.14.5
         version: 20.14.5
+      miniflare:
+        specifier: 5.20261110.1-beta
+        version: 5.20261110.1-beta(@types/node@24.13.6)
       npm-bin-deps:
         specifier: 2.1.0
         version: 2.1.0
@@ -796,7 +799,7 @@ packages:
     hasBin: true
 
   '@wildshard/wire@https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226#path:/packages/wire':
-    resolution: {path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
+    resolution: {gitHosted: true, path: /packages/wire, tarball: https://codeload.github.com/project-wildshard/shard-format/tar.gz/669d1fca695a110e6a8cb059b43a0a5caee60226}
     version: 0.0.0
     hasBin: true
 
