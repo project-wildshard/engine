@@ -13,7 +13,8 @@
 //   6. Fast-forward the canonical checkout when it is on main and clean (J247, WL7).
 //   7. A `landed` receipt; main-watch follows main's own `ci` and reports it (LS5).
 //   8. Delete origin's plan branch and remove this worktree (--keep skips it).
-// Before step 2's push, a preflight runs lint:game, typecheck and the Vitest files related to the branch's changed code,
+// Before gen:inputs, a worktree that never ran `pnpm pins` runs it. Before step 2's push, a preflight runs lint:game,
+// check-css, typecheck and the Vitest files related to the branch's changed code,
 // here, and stops on the first red with its log (BUILD-MAX 2026-11-15: 14 of 22 stopped lands failed a check that runs
 // locally, each after a push and a wait). --no-preflight skips it.
 // Main's CI runs after every landing; if it goes red, the lane that landed last fixes it forward or reverts it.
@@ -130,13 +131,19 @@ const isAncestor=(cwd,ancestor,descendant)=>tryGit(cwd,['merge-base','--is-ances
 /** @param {string} cwd @param {string} from @param {string} to */
 const short=(/** @type {string} */ sha)=>sha.slice(0,10);
 
-/** The preflight's checks, in order, for a branch whose diff from main is `files` (BUILD-MAX 2026-11-15). Vitest runs
- * only when code changed, on the tests related to that code (`vitest related`, which includes a changed test itself).
+/** CI's `check css` (scripts/ci-static.sh). A tree without it (a fixture, another repo's land) skips the step. */
+export const CHECK_CSS='scripts/check-css.mjs';
+/** What `pnpm pins` leaves (scripts/pins.ts LEDGER). Without it gen.mjs --inputs-only fails, so land runs pins first. */
+export const PINS_LEDGER='out/.pins.json';
+
+/** The preflight's checks, in order, as [name, argv], for a branch whose diff from main is `files` (BUILD-MAX 2026-11-15).
+ * check-css is a check CI's static job runs and the pre-push does not (it cost opus-gcm11 a 27-minute re-run). Vitest
+ * runs only when code changed, on the tests related to that code (`vitest related`, which includes a changed test itself).
  * @param {string[]} files @returns {[string,string[]][]} */
 export function preflightSteps(files){
  const code=files.filter(file=>/^(?:src|test|scripts)\/.+\.[cm]?[jt]sx?$/u.test(file));
- /** @type {[string,string[]][]} */const steps=[['lint:game',['lint:game']],['typecheck',['typecheck']]];
- if(code.length>0)steps.push(['vitest',['exec','vitest','related','--run','--passWithNoTests',...code]]);
+ /** @type {[string,string[]][]} */const steps=[['lint:game',['pnpm','lint:game']],['check-css',['node',CHECK_CSS]],['typecheck',['pnpm','typecheck']]];
+ if(code.length>0)steps.push(['vitest',['pnpm','exec','vitest','related','--run','--passWithNoTests',...code]]);
  return steps;
 }
 
@@ -756,17 +763,34 @@ class Landing{
   const head=this.head(),files=git(this.root,['diff','--name-only','--no-renames',`${main}...${head}`]).split('\n').filter(Boolean);
   const dir=resolve(this.root,git(this.root,['rev-parse','--git-path','land-preflight']));
   mkdirSync(dir,{recursive:true});
-  for(const [name,args] of preflightSteps(files)){
+  for(const [name,[command,...args]] of preflightSteps(files)){
+   if(command==='node'&&!existsSync(join(this.root,args[0]??''))){this.say('preflight',`${name} skipped: no ${args[0]} here`);continue;}
    const log=join(dir,`${short(head)}-${name.replace(':','-')}.log`),began=Date.now();
    this.say('preflight',`${name} on ${short(head)}`);
-   const ran=spawnSync('pnpm',args,{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:256<<20});
-   writeFileSync(log,`$ pnpm ${args.join(' ')}\n${ran.stdout??''}${ran.stderr??''}${ran.error===undefined?'':`\n${String(ran.error)}\n`}`);
+   const ran=spawnSync(command==='node'?process.execPath:command??'pnpm',args,{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:256<<20});
+   writeFileSync(log,`$ ${command} ${args.join(' ')}\n${ran.stdout??''}${ran.stderr??''}${ran.error===undefined?'':`\n${String(ran.error)}\n`}`);
    if(ran.status!==0){
     this.receipt(`STOP preflight ${name} red on ${short(head)}, nothing pushed: ${log}`);
     throw new StopError(`preflight ${name} is red on ${short(head)}; nothing was pushed. Log: ${log}\nFix it on ${this.branch} and run land again (--no-preflight skips the preflight).`);
    }
    this.say('preflight',`${name} green in ${String(Math.round((Date.now()-began)/1000))} s`);
   }
+ }
+
+ /** A worktree that never ran `pnpm pins` has no PINS_LEDGER, and gen:inputs fails on it (opus-gcm11, 2026-11-15). Run it
+  * once, before gen:inputs; with or without --no-preflight, since gen:inputs needs it either way. */
+ pinsOnce(){
+  /** @type {{pins?:string}} */let scripts={};
+  try{scripts=JSON.parse(readFileSync(join(this.root,'package.json'),'utf8')).scripts??{};}catch{return;}
+  if(scripts.pins===undefined||existsSync(join(this.root,PINS_LEDGER)))return;
+  this.say('pins',`no ${PINS_LEDGER}: this worktree never ran pnpm pins; running it before gen:inputs`);
+  const ran=spawnSync('pnpm',['--silent','pins'],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:256<<20});
+  if(ran.status!==0){
+   const why=`${ran.stderr??''}${ran.stdout??''}`.trim().split('\n').slice(-3).join(' | ')||String(ran.error??`exit ${String(ran.status)}`);
+   this.receipt(`STOP pnpm pins failed before gen:inputs: ${why}`);
+   throw new StopError(`pnpm pins failed in ${this.root} (gen:inputs needs its outputs); nothing was pushed: ${why}`);
+  }
+  this.say('pins',`pnpm pins done; ${PINS_LEDGER} written`);
  }
 
  async run(){
@@ -789,6 +813,7 @@ class Landing{
    this.rebase(main);
    if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return 0;}
   }
+  this.pinsOnce();
   this.regenerate();
   this.localChecks(main);
   /** @type {{sha:string,base:string}|null} */let tested=null;

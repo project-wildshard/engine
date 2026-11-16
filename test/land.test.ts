@@ -15,7 +15,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { exactBranchProof } from '../scripts/ci-exact-reuse.mjs';
 import { packUnits, runUnits } from '../scripts/ci-pack.mjs';
-import { failedJobs, flakyFiles, mainPushArgs, parseArgs, preflightSteps, prePushCause, quarantineFile, REF_LOCK, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
+import { CHECK_CSS, failedJobs, flakyFiles, mainPushArgs, parseArgs, PINS_LEDGER, preflightSteps, prePushCause, quarantineFile, REF_LOCK, shaVerdict, STAMPS, strikePlans } from '../scripts/land.mjs';
 const LAND = resolve('scripts/land.mjs');
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -516,10 +516,41 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(skipped.stdout).toContain('preflight skipped (--no-preflight)');
   }, 60_000);
 
-  test('preflightSteps: Vitest only when code changed, on that code alone', () => {
-    expect(preflightSteps(['docs/a.md', 'package.json']).map(([name]) => name)).toEqual(['lint:game', 'typecheck']);
-    expect(preflightSteps(['docs/a.md', 'src/a.ts', 'test/a.test.ts', 'scripts/b.mjs']).at(-1)).toEqual(['vitest', ['exec', 'vitest', 'related', '--run', '--passWithNoTests', 'src/a.ts', 'test/a.test.ts', 'scripts/b.mjs']]);
+  test('preflightSteps: CI\'s check-css always; Vitest only when code changed, on that code alone', () => {
+    expect(preflightSteps(['docs/a.md', 'package.json'])).toEqual([['lint:game', ['pnpm', 'lint:game']], ['check-css', ['node', CHECK_CSS]], ['typecheck', ['pnpm', 'typecheck']]]);
+    expect(preflightSteps(['docs/a.md', 'src/a.ts', 'test/a.test.ts', 'scripts/b.mjs']).at(-1)).toEqual(['vitest', ['pnpm', 'exec', 'vitest', 'related', '--run', '--passWithNoTests', 'src/a.ts', 'test/a.test.ts', 'scripts/b.mjs']]);
   });
+
+  // opus-gcm11, 2026-11-15: check-css is red only on CI's static job (a 27-minute re-run); the preflight runs it here.
+  test('preflight: the tree\'s own check-css runs after lint:game, and a red one stops land before any push', () => {
+    const f = fixture(), calls = plantPnpm(f, null);
+    const wt = f.worktree('foo');
+    f.commit(wt, CHECK_CSS, "console.log('planted css violation'); process.exit(1);\n", 'chore: a check-css that fails');
+    const result = f.land(wt);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('land STOP preflight check-css is red');
+    expect(readFileSync(/Log: (\S+)/u.exec(result.stdout)?.[1] ?? '', 'utf8')).toMatch(/^\$ node scripts\/check-css\.mjs\nplanted css violation/u);
+    expect(calls()).toEqual(['lint:game']);
+    expect(f.read(f.files.prepush)).toBe('');
+  }, 60_000);
+
+  // opus-gcm11: a worktree that never ran `pnpm pins` has no out/.pins.json, and gen:inputs fails on it.
+  test('a worktree that never ran pnpm pins runs it before gen:inputs; one that has its ledger does not', () => {
+    for (const ran of [false, true]) {
+      const f = fixture(), calls = plantPnpm(f, null);
+      const wt = f.worktree('foo');
+      f.commit(wt, 'package.json', '{"scripts":{"pins":"node scripts/pins.ts"}}\n', 'chore: a pins script');
+      if (ran) {
+        writeFileSync(join(f.repo, '.git/info/exclude'), 'out/\n');
+        mkdirSync(join(wt, 'out'), { recursive: true });
+        writeFileSync(join(wt, PINS_LEDGER), '{}\n');
+      }
+      const result = f.land(wt);
+      expect(result.status, result.stdout).toBe(0);
+      expect(calls()[0], String(ran)).toBe(ran ? 'lint:game' : '--silent pins');
+      expect(result.stdout.includes('never ran pnpm pins'), String(ran)).toBe(!ran);
+    }
+  }, 90_000);
 
   test('a red pre-push on the plan push stops before any CI wait', () => {
     const f = fixture();
