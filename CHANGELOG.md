@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.27 (2026-11-16)
+
+- Creatures in newly uploaded shards drop the coins their loot table specifies.
+- New uploads start cooking while older shards warm, so authors see them sooner.
+
 ## v0.1.26 (2026-11-16)
 
 - Newly uploaded author shards finish loading when you enter the world.
