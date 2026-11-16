@@ -1368,6 +1368,7 @@
     "types",
     "budgets",
     "tsconfig*.json",
+    "kit/tsconfig.json",
     "index.html"
   ]
 }
