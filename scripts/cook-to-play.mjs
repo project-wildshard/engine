@@ -22,6 +22,7 @@ const {addStoredShards} = await import('./app-build/catalogue.ts');
 const {bareSlug} = await import('../src/shared/game/grid/catalogueSlot.ts');
 const {auditCook,reportCook} = await import('./cook-audit.ts');
 const {ringCookInputs} = await import('./ring-cook-inputs.ts');
+const {packsBookPath} = await import('../src/shared/game/shardfile/spawnManifest.ts');
 const root=process.cwd(),arg=process.argv.find(row=>row.startsWith('--out='));
 const out=resolvePath(arg?.slice(6)??'tmp/cook-to-play');
 mkdirSync(out,{recursive:true});
@@ -79,8 +80,13 @@ try {
   const expected=['template','blender-template','sunscar-dunes'];
   const inputs=ringCookInputs(expected,receipt.heads,pinCache);
   for(const head of receipt.heads)if(!inputs.heads.some(row=>row.slug===head.slug&&row.hash===head.hash))throw new Error('Cook differs from the installed Ring 1 inputs');
-  for(const slug of Object.keys(bank.spawnManifests.client))if(expected.includes(bareSlug(slug)))delete bank.spawnManifests.client[slug];
+  for(const rows of [bank.spawnManifests.client,bank.entryPrograms??{}])for(const slug of Object.keys(rows))if(expected.includes(bareSlug(slug)))delete rows[slug];
   writeFileSync(htmlFile,html.replace(expression,(_match,before,_body,after)=>`${before}${JSON.stringify(bank).replaceAll('<',String.raw`\u003c`)}${after}`));
+  // The whole-pack book can retain authored aliases from the build too. Its
+  // exact `_template` row must not shadow the attached cook's `template` row.
+  const bookFile=join(dist,packsBookPath(build)),book=JSON.parse(readFileSync(bookFile,'utf8'));
+  for(const slug of Object.keys(book.client??{}))if(expected.includes(bareSlug(slug)))delete book.client[slug];
+  writeFileSync(bookFile,JSON.stringify(book));
   const added=await addStoredShards(dist,receipt.heads,store,hash=>Promise.resolve(inputs.read(hash)),{base:origin,shards:[]},live);
   if(added.length!==expected.length||expected.some(slug=>!added.includes(slug)))throw new Error(`Store attached ${added}`);
   if(receipt.indexes.length!==expected.length||expected.some(slug=>receipt.indexes.filter(index=>index.slug===slug).length!==1))throw new Error('Cook must name each Ring 1 product exactly once');

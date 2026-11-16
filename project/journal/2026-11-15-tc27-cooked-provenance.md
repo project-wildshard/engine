@@ -71,3 +71,10 @@ The next hosted boot still demanded the default loose-file mode. The
 proof now selects the existing Runtime packs device fixture through
 bootCase's existing context configurator, so the part assertion measures
 the mode it names. No global default or shared smoke helper changes.
+
+The completed second log is a distinct 404, not another absent-part
+assertion: the whole-pack book retained the bundled _template address,
+which exact-row precedence correctly selected on the store origin.
+Retirement now clears both default and whole rows, plus recorded-program
+flags, only for the three selected products. Production attachment alone
+then writes their current rows.
