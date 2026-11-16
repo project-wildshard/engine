@@ -7,6 +7,8 @@ import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
 
 test('complete unprivileged check reports all probes after a conflict and changes no protected settings', () => {
+  const bash = ['bash', '/opt/homebrew/bin/bash', '/usr/local/bin/bash'].find(shell => spawnSync(shell, ['-c', 'test "${BASH_VERSINFO[0]}" -ge 4']).status === 0);
+  if (bash === undefined) throw new Error('VPS fixture requires Bash 4+; install Homebrew bash on macOS');
   mkdirSync('tmp', { recursive: true }); const directory = mkdtempSync(resolve('tmp/vps-check-'));
   const scripts = join(directory, 'scripts'), bin = join(directory, 'bin'), etc = join(directory, 'etc'), calls = join(directory, 'calls');
   for (const path of [scripts, bin, etc]) mkdirSync(path);
@@ -28,8 +30,8 @@ test('complete unprivileged check reports all probes after a conflict and change
   const entry = join(scripts, 'setup.sh'); writeFileSync(entry, script);
   chmodSync(etc, 0o000);
   try {
-    const checked = spawnSync('bash', [entry, '--check'], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, WS_CHECK_SS: ss, WS_CHECK_SERVE: serve, WS_CHECK_CALLS: calls, RELEASE_PUBLIC_KEY: key } });
-    expect(checked.status).not.toBe(0); expect(checked.stdout).toContain('Serve ownership conflict'); expect(checked.stderr).not.toContain('funnel --https');
+    const checked = spawnSync(bash, [entry, '--check'], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, WS_CHECK_SS: ss, WS_CHECK_SERVE: serve, WS_CHECK_CALLS: calls, RELEASE_PUBLIC_KEY: key } });
+    expect(checked.status).not.toBe(0); expect(checked.stdout, checked.stderr).toContain('Serve ownership conflict'); expect(checked.stderr).not.toContain('funnel --https');
     expect(checked.stdout).toContain('no public game or database TCP listener');
     expect(checked.stdout).toContain('trusted release public key');
     expect(checked.stdout).toContain('cannot verify production env'); expect(checked.stdout).toContain('cannot verify staging env');
@@ -38,7 +40,7 @@ test('complete unprivileged check reports all probes after a conflict and change
     expect(checked.stdout).not.toContain('check-only-value'); expect(readFileSync(calls, 'utf8')).not.toContain('MUTATION');
     // MS8.2: the Funnel is retired; a box that still has one reports drift and changes nothing.
     writeFileSync(serve, JSON.stringify({ TCP: { '443': { HTTPS: true } }, Web: { 'wildshard.tailb41b20.ts.net:443': { Handlers: { '/': { Proxy: 'http://127.0.0.1:8790' } } } }, AllowFunnel: { 'wildshard.tailb41b20.ts.net:443': true } }));
-    const drifted = spawnSync('bash', [entry, '--check'], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, WS_CHECK_SS: ss, WS_CHECK_SERVE: serve, WS_CHECK_CALLS: calls, RELEASE_PUBLIC_KEY: key } });
+    const drifted = spawnSync(bash, [entry, '--check'], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env['PATH'] ?? ''}`, WS_CHECK_SS: ss, WS_CHECK_SERVE: serve, WS_CHECK_CALLS: calls, RELEASE_PUBLIC_KEY: key } });
     expect(drifted.status).not.toBe(0); expect(drifted.stdout).toContain('Funnel drift'); expect(drifted.stderr).toContain('tailscale funnel --https=443 off'); expect(readFileSync(calls, 'utf8')).not.toContain('MUTATION');
   } finally {
     chmodSync(etc, 0o700);
