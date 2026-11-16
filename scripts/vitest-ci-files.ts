@@ -90,5 +90,13 @@ export const CI_NATIVE_GROUPS = {
   ],
 } as const;
 export const CI_SERIAL_TESTS = Object.values(CI_NATIVE_GROUPS).flat();
-/** Timing and uncapped encoder proofs hold the whole CPU budget, so they run alone. */
-export const CPU_EXCLUSIVE_TESTS = ['test/net-bots.test.ts', 'test/net-bots-driftwood.test.ts', 'test/cook-cpu-limit.test.ts'] as const;
+/** Timing, uncapped encoding and load-sensitive cold native setup own the full
+ * budget before collection. Split gates leave these files to hosted CI. */
+export const CPU_EXCLUSIVE_TESTS = [
+  'test/net-bots.test.ts', 'test/net-bots-driftwood.test.ts', 'test/cook-cpu-limit.test.ts',
+  // EV6: these original native setup clocks expired beside other admitted work.
+  'test/net-fuzz.test.ts', 'test/physics-nalati-headless.test.ts', 'test/physics-shards-headless.test.ts',
+  // The real-process regression runs the original suites in a private ledger;
+  // its outer grant still accounts for their actual machine CPU work.
+  'test/tooling/native-contention.test.mjs',
+] as const;
