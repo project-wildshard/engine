@@ -10,3 +10,5 @@
 
 - TC-M1 test (`test/template-strikes-hurt.test.ts`): the pinned Template cell, player beside a grey blob, the Greyback
   and a mossling; each strike lowers health within 20 s; a control with every body down keeps full health.
+- TC-B3: the same test on the pinned Brasscap cell (blender-template): camp bandit, rusher (pack mates up) and dust
+  wyrmling each hurt. Found: camp 2 marksmen spawn at y 6 but drop to the canyon floor in the server cell and never fire.

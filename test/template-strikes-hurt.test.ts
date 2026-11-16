@@ -53,3 +53,29 @@ test('with every body down, the same 20 s beside the pack hurts no one: the harm
     expect(player.health.attributes.health).toBe(full);
   } finally { sim.dispose(); }
 }, 60_000);
+
+// TEMPLATE-E2E TC-B3: Brasscap's bandits fight back: the camp pursuer and the rusher pack (`creatures.groups`); the dust
+// wyrmling's ram hurts too. Every other body (but a rusher's pack mates) is down first, so the harm is that one body's strike.
+// Camp 2's ledge marksmen are left out (TC-B3b): in this cell they drop from their ledge to the canyon floor and never fire.
+const brasscap = product('blender-template');
+for (const [id, gap] of [['bandit.camp-1.2', 2], ['bandit.rusher.1', 6], ['wyrmling.2', 2]] as const) {
+  test(`Brasscap's ${id} strikes the player ${String(gap)} m off`, async () => {
+    const input = await brasscap;
+    expect(input.shard.creatures.groups.length).toBeGreaterThan(0);
+    const sim = createShardfileSim(input.shard, input.assets, { rapier: await rapier, quest: { fact: () => undefined, coins: () => undefined } });
+    try {
+      const body = sim.host.entities.get(id), player = sim.host.players.get(PLAYER);
+      if (body === undefined || player === undefined) throw new Error(`Missing ${id} or the player`);
+      for (const other of sim.host.entities.values()) {
+        // a rusher hunts with its pack: its mates stay up
+        if (other === body || !other.alive || (id.startsWith('bandit.rusher.') && other.entityId.startsWith('bandit.rusher.'))) continue;
+        sim.host.combat.hit({ source: 'env', sourceTags: [PLAYER, 'dmg.ranged'], target: other.combatActor(), amount: 100_000, point: other.position.clone(), dir: other.position.clone().setY(0).normalize() });
+      }
+      for (let tick = 0; tick < 120; tick++) sim.host.step(); // the bodies settle on the cell's ground first
+      player.position.set(body.position.x + gap, body.position.y, body.position.z); player.motor.resetAt(player.position);
+      const full = player.health.attributes.health;
+      for (let tick = 0; tick < 60 * 20 && player.health.attributes.health >= full; tick++) sim.host.step();
+      expect(player.health.attributes.health).toBeLessThan(full);
+    } finally { sim.dispose(); }
+  }, 60_000);
+}
