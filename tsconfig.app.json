@@ -28,5 +28,8 @@
   ],
   "exclude": [
     "src/client/app/*.test.ts"
+  ],
+  "files": [
+    "types/public-game.d.ts"
   ]
 }
