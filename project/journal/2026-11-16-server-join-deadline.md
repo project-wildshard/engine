@@ -28,3 +28,14 @@ through Try now; cached verification falls back. Existing signed-file,
 rollback, offline and screen tests remain in the focused23case run.
 No release authenticity rule, seating grace or automated-event filter
 changed. Hosted qualification and staging acceptance remain required.
+
+The next counterexample also failed first: even a normally failed read
+whose real connection page already offered Try now, Check connection and
+Title screen was reported as a fatal server-stage stall at60seconds.
+The generic loader watch read only the loader behind that recovery page.
+The connection page now owns an explicit recovery-wait DOM marker, and
+the composition root lends the page to the watch. Recovery/disposal
+removes that owned node. No bytes, progress or socket state is invented:
+the visible actionable explanation owns the wait, as Developer PLAY
+already does. A staging badge does not suspend the watch; after recovery
+an actual unresponsive boot again fails at the original60second bound.

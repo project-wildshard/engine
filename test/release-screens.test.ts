@@ -4,6 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { Scope } from '../src/shared/engine/app/scope';
 import { releaseScreens, stagingMark } from '../src/client/host/online/releaseScreens';
+import { progressOfCard, watchStuckStep, STUCK_STEP_MS } from '../src/client/engine/boot/stuckStep';
 import { keptRelease, releaseToDial, RELEASE_DEADLINE_MS, type ReleaseFault } from '../src/client/host/online/release';
 
 // FM5 (meta MMO-FAILURE-MODES-PLAN modes 1, 11, 12, 37 to 39, 46): the pages a load shows while it has no release file to dial from.
@@ -127,4 +128,39 @@ test('SB29: a stuck kept-copy signature falls back without keeping the server st
   await vi.advanceTimersByTimeAsync(RELEASE_DEADLINE_MS);
   await expect(kept).resolves.toBeNull();
   expect(vi.getTimerCount()).toBe(0);
+});
+
+test('SB29: an actionable connection page owns the wait; after recovery a genuinely stuck boot still fails', async () => {
+  vi.useFakeTimers();
+  const scope = new Scope('server-recovery-watch'), card = document.createElement('div');
+  card.dataset['step'] = 'server';
+  const stalled = vi.fn(), started = new Promise<void>(() => { /* The server stage is still pending. */ });
+  const stop = watchStuckStep(started, { progress: () => progressOfCard(card, document), now: Date.now, stalled,
+    every: (ms, run) => { const timer = setInterval(run, ms); return () => { clearInterval(timer); }; } });
+  const waiting = releaseScreens(scope, { title: () => undefined, doctor: () => undefined });
+  try {
+    const retry = waiting.after({ kind: 'network' }, 0, 2000, 'Failed to fetch');
+    await vi.advanceTimersByTimeAsync(STUCK_STEP_MS + 5000); await retry;
+    expect(labels()).toEqual(['Try now', 'Check connection', 'Title screen']);
+    expect(stalled).not.toHaveBeenCalled();
+    waiting.done();
+    await vi.advanceTimersByTimeAsync(STUCK_STEP_MS - 1);
+    expect(stalled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(stalled).toHaveBeenCalledExactlyOnceWith('server', STUCK_STEP_MS);
+  } finally { stop(); scope.dispose(); }
+});
+
+test('SB29: the staging badge never suppresses a genuinely stuck server stage', async () => {
+  vi.useFakeTimers();
+  const scope = new Scope('staging-watch'), card = document.createElement('div'), stalled = vi.fn();
+  card.dataset['step'] = 'server'; stagingMark(scope);
+  const stop = watchStuckStep(new Promise<void>(() => { /* A genuine stalled start. */ }), {
+    progress: () => progressOfCard(card, document), now: Date.now, stalled,
+    every: (ms, run) => { const timer = setInterval(run, ms); return () => { clearInterval(timer); }; },
+  });
+  try {
+    await vi.advanceTimersByTimeAsync(STUCK_STEP_MS);
+    expect(stalled).toHaveBeenCalledExactlyOnceWith('server', STUCK_STEP_MS);
+  } finally { stop(); scope.dispose(); }
 });

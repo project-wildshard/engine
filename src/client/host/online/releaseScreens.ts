@@ -60,6 +60,7 @@ export function releaseScreens(scope: Scope, hooks: ReleaseScreenHooks, parent: 
       shown = page;
       const { root, box } = card(page, id, words.tone, words.tag, words.title);
       shownRoot = root;
+      root.dataset['bootWait'] = 'recovery';
       root.classList.add('ws-link-page');
       box.append(make('p', 'ws-link-body', words.body));
       let settled = false;
