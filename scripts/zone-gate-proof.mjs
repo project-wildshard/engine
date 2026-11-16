@@ -113,13 +113,37 @@ try {
     page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations.push({ url: frame.url().replace(base, ''), at: Date.now() }); });
     /** @type {any} */ (result).navigations = navigations;
     const consoleRows = /** @type {string[]} */ ([]); /** @type {any} */ (result).console = consoleRows;
-    page.on('console', message => { if (message.type() === 'error' || /reload|recover/iu.test(message.text())) consoleRows.push(message.text().slice(0, 200)); });
-    // the new document (the reload form's `?chunk=`): the entry first rewrites the old page's own address, a same-document event
-    // that came 0.2 s before the old document went (and a control read then answered from the old page)
-    const left = await page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() && frame.url().includes('chunk='), timeout: 8000 }).then(() => true).catch(() => false), leftAt = Date.now();
+    page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning' || /reload|recover|unload|leav/iu.test(message.text())) consoleRows.push(`${message.type()}: ${message.text().slice(0, 300)}`); });
+    // the old world goes one of two ways: the same-page entry (ZE10a3) retires its Game in this document (marked from inside the
+    // page, the window marker kept), or the reload form's new document (`?chunk=`; the entry first rewrites the old page's own
+    // address, a same-document event 0.2 s before the old document went)
+    await page.evaluate(() => {
+      const W = /** @type {any} */ (window), game = W.__wildshard.world.game, retire = game.dispose.bind(game);
+      W.__zeMark = 1; game.dispose = (/** @type {unknown[]} */ ...args) => { const done = retire(...args); W.__zeLeftAt = Date.now(); return done; };
+    });
+    const departure = await Promise.any([
+      page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() && frame.url().includes('chunk='), timeout: 8000 }).then(() => ({ how: 'navigation', at: Date.now() })),
+      page.waitForFunction(() => /** @type {any} */ (window).__zeLeftAt !== undefined, undefined, { timeout: 8000, polling: 20 })
+        .then(async () => ({ how: 'same page', at: /** @type {number} */ (await page.evaluate(() => /** @type {any} */ (window).__zeLeftAt)) })),
+    ]).catch(() => null);
+    const left = departure !== null, leftAt = departure?.at ?? Date.now();
     await page.screenshot({ path: join(out, `${tag}-gate-0-loading.png`) }).catch(() => undefined);
     const ready = await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 180_000, polling: 250 }).then(() => true).catch(() => false);
     const home = await page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard?.shard?.grid?.state?.(); return { home: st?.live?.live?.home ?? st?.home ?? null, current: st?.live?.live?.current ?? null, slug: W.__wildshard?.shard?.slug ?? null }; }).catch(() => null);
+    if (!ready) {
+      await page.screenshot({ path: join(out, `${tag}-not-ready.png`) }).catch(() => undefined);
+      /** @type {any} */ (result).notReady = await page.evaluate(() => {
+        const W = /** @type {any} */ (window), st = W.__wildshard?.shard?.grid?.state?.();
+        return { error: document.querySelector('.ws-load-error')?.textContent?.slice(0, 600) ?? null, load: document.querySelector('.ws-load')?.className ?? null,
+          step: document.querySelector('.ws-load [data-el="step"]')?.textContent ?? null, stage: st?.cellStage ?? null, cellStep: st?.cellStep ?? null,
+          live: st?.live?.live ?? null, state: W.__wildshard?.world?.game?.app?.state ?? null, dead: W.__wildshard?.world?.game?.dead ?? null, mark: W.__zeMark ?? null };
+      }).catch(String);
+    }
+    // a reload's own reason, as the page wrote it for the next document (lastEnd.ts)
+    /** @type {any} */ (result).lifeRecords = await page.evaluate(() => Object.keys(sessionStorage).concat(Object.keys(localStorage)).filter(key => /life\.|boot\.selfReload/u.test(key))
+      .map(key => `${key}: ${(sessionStorage.getItem(key) ?? localStorage.getItem(key) ?? '').slice(0, 400)}`)).catch(() => []);
+    // ZE10a: no reload, the marker set before the count is still on the window
+    const samePage = ready && await page.evaluate(() => /** @type {any} */ (window).__zeMark === 1).catch(() => false);
     if (ready) await page.screenshot({ path: join(out, `${tag}-entered.png`) });
     // ZE10b: the arrival (the new home's own frame: its west entryway's centre line, 14 m in, facing east into the cell), then a free
     // walk back out of the new home onto the road (no wall: the home has none)
@@ -144,7 +168,7 @@ try {
     let freshMB = /** @type {number | null} */ (null);
     try { freshMB = await bootCard(freshContext, 'Nalati Grasslands', arrived ?? { x: 14 - HALF, z: 0, yaw: -Math.PI / 2 }); } catch (error) { result.errors.push(`fresh Nalati boot: ${String(error).slice(0, 200)}`); }
     await freshContext.close();
-    result.fired = { navigations, navigated: left, before, after: page.url(), ready, home, arrived, walkedOut, enteredMB, controlMB, freshMB,
+    result.fired = { navigations, departure: departure?.how ?? null, samePage, navigated: left, before, after: page.url(), ready, home, arrived, walkedOut, enteredMB, controlMB, freshMB,
       residency: { leftAt, readsBeforeLeaving: reads.filter(row => row.at < leftAt).map(row => row.url), firstReadAfterMs: left ? (reads.find(row => row.at >= leftAt)?.at ?? null) === null ? null : (reads.find(row => row.at >= leftAt)?.at ?? 0) - leftAt : null } };
   }
   const named = (/** @type {string} */ name) => /** @type {any} */ (result.shots.find(row => row.name === name))?.gate;
@@ -154,7 +178,7 @@ try {
   const fired = /** @type {any} */ (result.fired);
   // ZE10c: nothing of the target read before the old document went, and memory at control within 50 MB of a fresh boot
   const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50;
-  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld)) ? 0 : 1;
+  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true)) ? 0 : 1;
 } catch (error) { result.note = String(error).slice(0, 400); console.log(`FAIL ${result.note}`); }
 finally {
   writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);

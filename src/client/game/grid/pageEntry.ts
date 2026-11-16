@@ -15,7 +15,7 @@ import { setPageGoto, setPageMode } from '../../../shared/game/grid/pageMode';
 import { pageGridCells as gridCells } from '../../../shared/game/grid/cellEvents';
 import type { PageMode } from '../plugin/context';
 import { findTitleManifest, type TitleManifest } from '../shard/titleList';
-import { travel, travelSlot } from '../travel/travel';
+import { entersInPage, travel, travelSlot } from '../travel/travel';
 import { startEntryDownload } from '../shardfile/entryTransport';
 import { startGridStripDownload } from './entryDownloads';
 import { titlePrefetchChoice } from './titlePrefetchChoice';
@@ -153,14 +153,18 @@ export function enterZone(instance: string, arrive?: { readonly x: number; reado
   // ZE10c: the target's card art is the target's bytes, so this page never reads it: the card shows plain here, and the fresh page
   // paints the art from the handoff (`shown.art`, index.html's arrival read) once this document and its world are gone
   document.documentElement.style.setProperty('--ws-load-portrait', 'none');
-  startEntryDownload(target.slug, 'grid');
-  startGridStripDownload(gridMode(DEVSERVER), cell.instance, 'metadata');
+  // the same-page entry (ZE10a3) reads nothing of the target until its old world is gone, so no read-ahead here; the reload
+  // form's read-ahead runs across the navigation
+  if (!entersInPage()) { startEntryDownload(target.slug, 'grid'); startGridStripDownload(gridMode(DEVSERVER), cell.instance, 'metadata'); }
   navigating = beginNavigationShell(shown.name, pageScope, () => {
     if (!gridRecovery(saves).clearLoop()) throw new Error('Grid recovery guard could not be cleared');
     clearGridRecovery();
     pageGridIntents().set({ instance: cell.instance, slug: target.slug, goto: true, ...(arrive === undefined ? {} : { arrive }) });
-    // ZE10b: the target's own spawn reads `arrive` (play.ts `arrivalSpawn`): the entryway's centre line past the gate, facing in
-    travel({ to: target.slug, mode: 'enter', shown, ...(arrive === undefined ? {} : { arrive: { x: arrive.x, z: arrive.z, yaw: arrive.yaw } }) });
+    // ZE10b: the target's own spawn reads `arrive` (play.ts `arrivalSpawn`): the entryway's centre line past the gate, facing in.
+    // ZE10a3: the page stays (the app's same-page entry, else a fresh page); the screen is the next session's once it settles.
+    const attempt = navigating;
+    travel({ to: target.slug, mode: 'enter', shown, ...(arrive === undefined ? {} : { arrive: { x: arrive.x, z: arrive.z, yaw: arrive.yaw } }),
+      inPage: () => { attempt?.dispose(); } });
   }, null);
 }
 

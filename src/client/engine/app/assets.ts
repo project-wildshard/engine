@@ -82,6 +82,13 @@ export class AssetService<T extends Disposable3 = Disposable3> {
     this.entries.delete(key); this.managed.delete(entry.resource); this.byResource.delete(entry.resource); entry.residency?.release();
     return true;
   }
+  /** ZONE-ENTRY ZE10a3: a same-page entry leaves nothing a fresh page would not have: every idle module cache goes, as budget
+   *  pressure would take it (leased ones stay). Returns how many went. */
+  evictIdleCaches(): number {
+    let evicted = 0;
+    for (const entry of this.entries.values()) if (entry.cached && entry.refs === 0 && this.evictCached(entry.key)) evicted++;
+    return evicted;
+  }
   /** A renderer cache evicted an already-disposed resource; this does not dispose it a second time. A `native` cache
    *  (three's shadow depth variants, which it disposes with their source material) may be disposed while a resident still
    *  leases it from a draw: it then leaves at its last release. Any other leased asset refuses. */

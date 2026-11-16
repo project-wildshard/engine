@@ -78,7 +78,8 @@ installOfflineDownload({
 });
 persistHomeScreen();
 definePageSaveKeys(saves);
-const search = new URLSearchParams(location.search);
+/** the page's address as the boot reads it; a same-page entry (ZE10a3) reads it again for its next session */
+let search = new URLSearchParams(location.search);
 // Jake (11-10): Low Power Mode for Copy diagnostics, from this document's first visible second of rAF (a busy boot can
 // only rule it out); the title's own idle reading starts once the title shows (boot/lowPower.ts)
 startLowPowerProbe();
@@ -390,7 +391,7 @@ export async function start(): Promise<void> {
     every: (ms, run) => { const timer = entryScope.interval(ms, run); return () => { entryScope.cancelTimer(timer); }; },
     stalled: (step, stuckMs) => { const why = stall(); void (async () => { (await import('@wildshard/engine/ui/ErrorModal')).showError(stuckMessage(step, { stuckMs }), '', why); })(); },
   });
-  try { await started; installReentryHarness(); }
+  try { await started; await installInPageEntry(); }
   catch (error) {
     const { pageGridRecovery, clearGridRecovery } = await import('@wildshard/engine/game/grid/pageEntry');
     if (pageGridRecovery() === null) {
@@ -420,21 +421,39 @@ async function showPreparationTitle(owner: Scope): Promise<void> {
 }
 
 /**
- * ZONE-ENTRY ZE10a2: a harness page (`window.__wildshardHarness`) can enter a grid home again in the same page: the level is
- * unloaded, the grid intent names the home, and the page's start runs again (`window.__wildshardReenter(instance, slug)`).
+ * ZONE-ENTRY ZE10a2 and ZE10a3: the page enters a grid home again without a reload. The level is unloaded, the session's Game
+ * retired (its canvas context kept for the next one), and the page's start runs again, reading the grid intent and the title
+ * arrival the caller wrote. A zone entry's travel uses it (`setInPageEntry`); a harness page can call it as
+ * `window.__wildshardReenter(instance, slug)`.
  */
-function installReentryHarness(): void {
+async function installInPageEntry(): Promise<void> {
+  const [{ app }, { setInPageEntry }] = await Promise.all([import('@wildshard/engine/app/runtime'), import('@wildshard/engine/game/travel/travel')]);
+  const again = async (slug: string, art: string | undefined, url: URL | undefined): Promise<void> => {
+    await app.unloadLevel();
+    app.render?.dispose(true);
+    // the old world's idle caches (its kit, its textures) go as a fresh page would drop them: the next home is charged alone
+    app.assets.evictIdleCaches();
+    if (url !== undefined) history.replaceState(history.state, '', url);
+    search = new URLSearchParams(location.search);
+    // the running manifest is resolved once a page; the next session's is the target, as a fresh page at this address would read
+    (await import('@wildshard/engine/game/shard/registry')).setActiveChunk(slug);
+    // ZE10c: the target's art is read only once the old world is gone
+    if (art !== undefined && art !== '') document.documentElement.style.setProperty('--ws-load-portrait', `url("${art}")`);
+    await start();
+  };
+  // a world build (staging, play) keeps the fresh page until the online seat's same-page handover has its own proof (ZE16's staging
+  // walk): the world's socket and goto are the old session's; preview and solo enter in the page
+  if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ === undefined) setInPageEntry((request, url) => again(request.to, request.shown?.art, url));
   if (harnessPins() === undefined) return;
   Reflect.set(window, '__wildshardReenter', async (instance: string, slug: string): Promise<void> => {
-    const [{ app }, { intendGridHome }] = await Promise.all([import('@wildshard/engine/app/runtime'), import('@wildshard/engine/game/grid/pageEntry')]);
-    await app.unloadLevel();
-    // the session's Game (its engine-scoped systems, composer and renderer) goes too; its canvas context stays for the next one
-    app.render?.dispose(true);
+    const { intendGridHome } = await import('@wildshard/engine/game/grid/pageEntry');
     intendGridHome(instance, slug);
-    // the arrival a travel writes before its navigation: the session enters at once instead of waiting under the title
     setTitleArrival({ slug, mode: 'enter', tier: arrivalTier.current });
-    await start();
+    await again(slug, undefined, undefined);
   });
+  // the zone entry itself, as a gate's 0 calls it, and the pending arrival a boot would read
+  Reflect.set(window, '__wildshardEnterZone', async (instance: string): Promise<void> => { (await import('@wildshard/engine/game/grid/pageEntry')).enterZone(instance); });
+  Reflect.set(window, '__wildshardArrival', (slug: string) => pendingTitleArrival(slug));
 }
 
 async function startSelected(): Promise<void> {

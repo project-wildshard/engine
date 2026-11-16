@@ -11,7 +11,9 @@ import { isItemId, ITEMS } from '../../../shared/game/bag/itemCatalog';
 import type { ItemRow } from '../../../shared/game/bag/items';
 
 /** `shown` (LS6): what the receiving card names and paints when the page loads one place and plays another (the grid). */
-export interface TravelRequest { to: ShardSlug; mode: 'enter' | 'explore' | 'arena'; arrive?: SpawnPose; shown?: { readonly name: string; readonly art: string } }
+/** `inPage` (ZONE-ENTRY ZE10a3): enter in this page, without a navigation, when the app installed a same-page entry
+ *  (`setInPageEntry`); called once that entry settles. Without one the request navigates as before. */
+export interface TravelRequest { to: ShardSlug; mode: 'enter' | 'explore' | 'arena'; arrive?: SpawnPose; shown?: { readonly name: string; readonly art: string }; inPage?: () => void }
 export interface TravelHandoff {
   v: 1; from: ShardSlug | null; to: ShardSlug; mode: TravelRequest['mode'];
   arrive: SpawnPose | null; carry: readonly { id: ItemId; count: number }[]; at: number;
@@ -58,8 +60,23 @@ export function bindTravelInventory(source: TravelSource): () => void {
   running = source;
   return () => { if (running === source) running = null; };
 }
+let inPageEntry: ((request: TravelRequest, url: URL) => Promise<void>) | null = null;
+/** ZE10a3: the app's same-page entry (`app/entry.ts`): the level and its Game go, then the page's start runs again and reads the
+ *  handoff, the title arrival and the address (`url`, the fresh page's) this travel wrote. */
+export function setInPageEntry(enter: (request: TravelRequest, url: URL) => Promise<void>): void { inPageEntry = enter; }
+/** True when an `inPage` request enters without a navigation (a read-ahead then waits for the old world to go). */
+export function entersInPage(): boolean { return inPageEntry !== null; }
+/** An `inPage` request on a page with a same-page entry: the arrival and the address the fresh page would get, then that entry. */
+function enterInPage(request: TravelRequest): boolean {
+  const enter = inPageEntry, settled = request.inPage;
+  if (enter === null || settled === undefined) return false;
+  arriveAt(request);
+  const url = travelAddress(request);
+  leaveSaved(() => { void enter(request, url).finally(settled); });
+  return true;
+}
 const service = travelService({ source: () => running, slot: travelSlot(), now: () => Date.now(), navigate: (request) => {
-  navigate(request);
+  if (!enterInPage(request)) navigate(request);
 } });
 function navigate(request: TravelRequest): void {
   const ready = running === null ? window.__ws_sw?.ready : undefined;
@@ -72,17 +89,24 @@ function navigate(request: TravelRequest): void {
   navigateNow(request);
 }
 function navigateNow(request: TravelRequest): void {
+  arriveAt(request);
+  const url = travelAddress(request);
+  // The destination document owns any update adoption. A running world
+  // neither changes controller nor waits for a worker before leaving (G898).
+  // Replacing releases WebKit's previous page rather than parking its heap in the back/forward cache.
+  leaveSaved(() => { markUnload(`shard switch to ${request.to} (fresh page)`); location.replace(url.toString()); });
+}
+function arriveAt(request: TravelRequest): void {
   setTitleArrival({ slug: request.to, mode: request.mode, name: request.shown?.name ?? findTitleManifest(request.to)?.name ?? request.to, tier: arrivalTier.current,
     ...(request.shown === undefined ? {} : { art: request.shown.art }) });
+}
+function travelAddress(request: TravelRequest): URL {
   const url = new URL(location.href);
   url.searchParams.set('chunk', request.to);
   for (const name of ['at', 'glreload', 'x', 'z', 'yaw', 'pitch', 'explore', 'cam', 'model', 'skipintro', 'tour', 'quest', 'drop']) url.searchParams.delete(name);
   if (request.mode === 'explore') url.searchParams.set('explore', 'hub');
   url.searchParams.delete('v');
-  // The destination document owns any update adoption. A running world
-  // neither changes controller nor waits for a worker before leaving (G898).
-  // Replacing releases WebKit's previous page rather than parking its heap in the back/forward cache.
-  leaveSaved(() => { markUnload(`shard switch to ${request.to} (fresh page)`); location.replace(url.toString()); });
+  return url;
 }
 export function travel(request: TravelRequest): void {
   const manifest = findTitleManifest(request.to);

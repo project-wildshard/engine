@@ -63,6 +63,7 @@ try {
   const navigations = /** @type {{ url: string, at: number }[]} */ ([]);
   page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations.push({ url: frame.url().replace(base, ''), at: Date.now() }); });
   /** @type {any} */ (result).navigations = navigations;
+  await page.evaluate(() => { /** @type {any} */ (window).__zeTourMark = 1; });
   for (const slug of order) {
     // a page that loaded again after the last entry's control (its marker gone) is recorded on that entry, then waited for
     const kept = await page.evaluate(() => /** @type {any} */ (window).__zeTourMark === 1).catch(() => false), last = /** @type {any} */ (result.entries.at(-1));
@@ -78,7 +79,16 @@ try {
     await sleep(3000);
     // the zone entry's navigation is awaited from the walk in on, so a count that runs out during the last steps can't slip past it;
     // the new document is the reload form's `?chunk=` (the entry first rewrites the old page's own address, a same-document event)
-    const navigation = page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() && frame.url().includes('chunk='), timeout: 60_000 }).then(() => Date.now()).catch(() => null);
+    // ZE10a3: or the same-page entry, which retires the old Game in this document (marked from inside the page)
+    await page.evaluate(() => {
+      const W = /** @type {any} */ (window), game = W.__wildshard.world.game, retire = game.dispose.bind(game);
+      W.__zeTourLeftAt = undefined; game.dispose = (/** @type {unknown[]} */ ...args) => { const done = retire(...args); W.__zeTourLeftAt = Date.now(); return done; };
+    });
+    const navigation = Promise.any([
+      page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() && frame.url().includes('chunk='), timeout: 60_000 }).then(() => Date.now()),
+      page.waitForFunction(() => /** @type {any} */ (window).__zeTourLeftAt !== undefined, undefined, { timeout: 60_000, polling: 20 })
+        .then(() => page.evaluate(() => /** @type {number} */ (/** @type {any} */ (window).__zeTourLeftAt))),
+    ]).catch(() => null);
     // walk in until 3 m past the edge line (inside the buffer), then stand
     let depth = -GAP_HALF;
     for (const ends = Date.now() + 30_000; Date.now() < ends && depth < 3;) {
@@ -96,7 +106,7 @@ try {
     const after = await page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard?.shard?.grid?.state?.(); return { home: String(st?.live?.live?.home ?? st?.home ?? ''), mb: st?.playingMB ?? null, slug: W.__wildshard?.shard?.slug ?? null }; }).catch(() => null);
     const entry = { slug, from: g.home, side: sx > 0 ? 'east' : sx < 0 ? 'west' : sz > 0 ? 'north' : 'south', reachedBuffer: depth >= 0, counting,
       countToControlMs: control ? controlAt - countAt : null, loadingMs: control ? controlAt - leftAt : null, mb: after?.mb ?? null,
-      home: after?.home ?? null, ok: control && (after?.slug === slug || after?.home === target.instance || (after?.home ?? '').includes(slug)) };
+      home: after?.home ?? null, samePage: await page.evaluate(() => /** @type {any} */ (window).__zeTourMark === 1).catch(() => false), ok: control && (after?.slug === slug || after?.home === target.instance || (after?.home ?? '').includes(slug)) };
     result.entries.push(entry);
     await page.evaluate(() => { /** @type {any} */ (window).__zeTourMark = 1; }).catch(() => undefined);
     console.log(JSON.stringify(entry));
