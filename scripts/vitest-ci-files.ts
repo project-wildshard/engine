@@ -20,7 +20,7 @@ export const CI_NATIVE_GROUPS = {
   ],
   'native-direct-worker': [
     'test/headless-direct-worker.test.ts',
-    // Six real SDK workers, with a fixed 20 s parent fence: no sibling files.
+    // Six real SDK workers, with a 20 s parent fence that scales with load (test/fixtures/loadBudget.ts): no sibling files.
     'test/headless-verb-tape-worker.test.ts',
   ],
   'native-host-transport': ['test/sim-transport.test.ts'],
