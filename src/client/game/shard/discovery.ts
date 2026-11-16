@@ -5,7 +5,7 @@ import type { keyedSkyRender } from '../looks/keyedSky';
 import type { postGraphLook } from '../looks/postGraphLook';
 import type { heldArmsGear } from '../models/heldGear';
 import type { declaredClientPlanEntry } from './declaredEntry';
-import { readContent } from '@wildshard/engine/boot/contentRead';
+import { ContentReadError, readContent } from '@wildshard/engine/boot/contentRead';
 import { addShardArt } from './list';
 import { pageModeBoot, pageModeKtx2 } from './pageBoot';
 import type { TitleManifest } from './titleList';
@@ -82,7 +82,10 @@ export async function readDiscovery(row: Pick<TitleManifest, 'slug' | 'discovery
   // URLs, so the explore compare images it names are still page paths (not yet read from the base; review note).
   // SB28: a read the network can't answer waits on the loading card's RETRY (QA 11-12 row 36) and goes again when the
   // device is back online, never SOMETHING BROKE at `app:selected-discovery`; a missing document still throws
-  const bytes = await readContent(contentURL(row.discovery), DISCOVERY_BYTES, { fetch: (url, init) => read(url, init), missingThrows: true });
+  const bytes = await readContent(contentURL(row.discovery), DISCOVERY_BYTES, { fetch: (url, init) => read(url, init), missingThrows: true })
+    .catch((error: unknown) => {
+      throw error instanceof ContentReadError && error.status !== null ? new Error(`Discovery of ${row.slug} answered ${String(error.status)}`, { cause: error }) : error;
+    });
   const manifest = shardFromDiscovery(JSON.parse(new TextDecoder().decode(bytes)), /^https?:\/\/[^/]+/u.exec(row.discovery)?.[0]);
   if (!new Set([row.slug]).has(manifest.slug)) throw new Error('Selected discovery identity differs');
   return manifest;
