@@ -9,6 +9,7 @@ import { GroupStepV2 } from '../src/shared/engine/script/groupStepV2';
 import type { V2ColumnOwners } from '../src/shared/engine/script/observationColumnsV2';
 import { parseGroupStepV2, groupStepLayoutV2, GroupStepV2Schema } from '@wildshard/format/scriptGroupStepV2';
 import {frozenV2Guest as compileScriptV2, frozenV2CoreSource as v2CoreSource} from './fixtures/frozen/scriptGuests';
+import { FIXTURE_HUNT_TUNING } from './fixtures/hunt-tuning';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
 
@@ -41,7 +42,7 @@ function fixture(navigation:boolean){
   const paths:unknown[]=[];
   const nav:HuntNav={closestWalkable:point=>new Vector3(point.x,point.y,point.z),randomPointNear:()=>null,clearAhead:()=>({clear:1,normalX:0,normalZ:0}),
     findPath:(from,to,radius,out?:Vector3[])=>{const points=out??[];paths.push([new Vector3(from.x,from.y,from.z),new Vector3(to.x,to.y,to.z),radius]);points.length=0;points.push(new Vector3(45,0,3),new Vector3(to.x,to.y,to.z));return points;}};
-  const hunt=new HuntingStalkerCore([body],{config:{rng:random,fight:{},faunaTuning:()=>undefined,species:()=>({aggressive:false})},
+  const hunt=new HuntingStalkerCore([body],{config:{rng:random,fight:{},faunaTuning:()=>undefined,species:()=>({aggressive:false,tuning:FIXTURE_HUNT_TUNING})},
     ports:{ground,nav:()=>navigation?nav:null,reach:()=>true,wanderGoal:()=>null,unaware:()=>false,now:()=>0,sound:()=>undefined,charge:()=>undefined},
     player,sampleTerrain:()=>undefined});
   if(navigation)hunt.adopt(body,50,0);
