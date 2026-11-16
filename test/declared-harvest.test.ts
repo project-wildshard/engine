@@ -27,11 +27,11 @@ beforeAll(async () => { rapier = await loadRapier(Uint8Array.from(readFileSync('
 const drops = parse(HarvestDropsSchema, [{ item: 'moon.trophy', count: 2, variants: ['elite'] }, { item: 'sun.trophy', count: 1 }]);
 const owners: (() => void)[] = [];
 afterEach(() => { for (const dispose of owners.splice(0)) dispose(); });
-function fixture(slots = 2) {
+function fixture(slots = 2, species: NonNullable<Parameters<typeof installNativeHarvest>[1]> = []) {
   const host = createSimHost({ ...SIM_LEVEL, entities: [] }, { rapier });
   const profile = { kinds: ['moon.trophy', 'sun.trophy'], slots,
     counts: { min: 1, max: 1000, integer: true, complete: true }, quantity: 'positive-safe-integer', snapshot: 'order', restoreError: 'Bad pack' } satisfies NativeInventoryProfile<string>;
-  const pack = new NativeInventory(profile, host, 'pack'); installNativeHarvest(host);
+  const pack = new NativeInventory(profile, host, 'pack'); installNativeHarvest(host, species);
   const recipe = SIM_LEVEL.entities[0]; if (recipe === undefined) throw new Error('Missing body recipe');
   const kill = (): void => {
     const body = host.spawn({ ...recipe, id: 'custom.carcass', spec: { ...recipe.spec, kind: 'boar', variant: 'elite', hp: 1 }, at: { x: 0, y: 0, z: 0 } });
@@ -145,5 +145,38 @@ test('species homes bind admitted harvest before their existing policy and prese
         return { decide: () => undefined, move: () => undefined, snapshot: () => null, restore: () => undefined };
       } });
     expect(homes.homes()[0]?.actor?.harvest).toBe(drops);
+  } finally { f.host.dispose(); }
+});
+
+const oldPending = { id: 'old.pending', kind: 'boar', variant: 'elite', x: 0, y: 0, z: 0 };
+test('body-free old pending saves resolve admitted variant drops and pay once', () => {
+  const f = fixture(2, [{ kind: 'boar', harvest: drops }, { kind: 'boar', harvest: drops }]);
+  try {
+    expect(f.host.entities.size).toBe(0);
+    f.saved.restore([oldPending]);
+    expect(f.saved.snapshot()).toEqual([{ ...oldPending, drops: ['moon.trophy', 'moon.trophy', 'sun.trophy'] }]);
+    const claim = (): void => { actRoutes(f.host).claims.get('harvest.old.pending')?.(leadPlayer(f.host).id); };
+    claim(); expect(f.pack.count('moon.trophy')).toBe(2); expect(f.pack.count('sun.trophy')).toBe(1);
+    claim(); expect(f.pack.count('moon.trophy')).toBe(2); expect(f.saved.snapshot()).toEqual([]);
+  } finally { f.host.dispose(); }
+});
+test('saved drops win and admitted empty harvest differs from an absent declaration', () => {
+  const empty = fixture(2, [{ kind: 'boar', harvest: [] }]), absent = fixture();
+  try {
+    empty.saved.restore([{ ...oldPending, drops: ['moon.trophy'] }]);
+    expect(empty.saved.snapshot()).toEqual([{ ...oldPending, drops: ['moon.trophy'] }]);
+    actRoutes(empty.host).claims.get('harvest.old.pending')?.(leadPlayer(empty.host).id);
+    expect(empty.pack.count('moon.trophy')).toBe(1);
+    empty.saved.restore([oldPending]); expect(empty.saved.snapshot()).toEqual([{ ...oldPending, drops: [] }]);
+    absent.saved.restore([oldPending]); expect(absent.saved.snapshot()).toEqual([oldPending]);
+  } finally { empty.host.dispose(); absent.host.dispose(); }
+});
+test('ambiguous old pending harvest refuses before changing any live pending claims', () => {
+  const f = fixture(2, [{ kind: 'boar', harvest: drops }, { kind: 'boar', harvest: [] }]);
+  try {
+    f.kill(); const before = f.saved.snapshot();
+    expect(() => f.saved.restore([oldPending])).toThrow('Ambiguous admitted harvest');
+    expect(f.saved.snapshot()).toEqual(before);
+    f.claim(); expect(f.pack.count('moon.trophy')).toBe(2); expect(f.pack.count('sun.trophy')).toBe(1);
   } finally { f.host.dispose(); }
 });

@@ -83,6 +83,8 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake), product, assets, ports, plan, bake, nav,
     boot: plan.boot === undefined ? null : await readAssemblyInput(product, plan.boot) };
   const steps = await Promise.all(plan.features.map(feature => prepareAssemblyFeature(feature, prepared)));
+  const species = product.has('actors/species-programs') ? product.section('actors/species-programs') : undefined;
+  const harvest = species === undefined ? [] : [...species.native, ...species.program?.species ?? []];
   const heightAt = ground.heightAt, speed = plan.level.authorCap === true ? clamp(shard.authorCaps.speed, 0, plan.level.speed) : plan.level.speed;
   const level = trustedLevel(shard, { at: { x: shard.spawn.x, y: Math.max(shard.spawn.y, plan.level.stand ?? heightAt(shard.spawn.x, shard.spawn.z) + 0.1), z: shard.spawn.z }, yaw: shard.spawn.yaw, speed }, plan.level.ground);
   const levelPorts = { ground: false as const, heightAt };
@@ -97,6 +99,6 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     lendReturns(host);
     const run: AssemblyRun<C> = { host, context, input: null, day: null };
     for (const step of steps) step(run);
-    installNativeHarvest(host);
+    installNativeHarvest(host, harvest);
   } };
 }
