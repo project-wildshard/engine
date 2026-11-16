@@ -112,6 +112,7 @@ jobs:
             echo 'cd ~/projects/games/wildshard/engine'
             echo "node scripts/worktree.mjs new $slug_dir"
             echo "cd .worktrees/$slug_dir && git fetch origin $BRANCH && git merge --ff-only FETCH_HEAD"
+            echo 'pnpm pins   # gen:inputs refuses the old revision still in out/'
             echo 'WS_LANE_NAME=<lane> node scripts/land.mjs'
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -130,6 +131,7 @@ jobs:
           cd ~/projects/games/wildshard/engine
           node scripts/worktree.mjs new $slug_dir
           cd .worktrees/$slug_dir && git fetch origin $BRANCH && git merge --ff-only FETCH_HEAD
+          pnpm pins
           WS_LANE_NAME=<lane> node scripts/land.mjs
           \`\`\`
 
