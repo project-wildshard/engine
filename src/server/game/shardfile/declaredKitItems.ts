@@ -23,6 +23,7 @@ import { declaredKitSlots, LEVER_FAMILY, leverLines, leverProfile, rackMeleeRows
 import { playerSeats, type PlayerSeat } from '../plugin/playerSeats';
 import { nativeRangedHit } from '../plugin/nativeItems';
 import { installStatusEffects } from './statusEffects';
+import { questBooks } from '@wildshard/engine/quest/players';
 
 /** The page's canonical eye above the feet (`Player.sampleAimCommand`). */
 const EYE = 1.68;
@@ -82,6 +83,13 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
   // A scene a prompt runs is taken only near that prompt: a page may name the scene, but the server judges where its player stands.
   const prompts = new Map<string, { readonly at: readonly [number, number, number]; readonly radius: number }[]>();
   for (const row of shard.targets.interactions) prompts.set(row.scene, [...(prompts.get(row.scene) ?? []), row]);
+  // TEMPLATE-E2E TC-E7: an item action may raise a declared quest flag for the player whose use it accepts (Mossgate's
+  // chest refills the lantern and opens the chest's quest step). The kit takes the prompt, so quests never see it.
+  const flagged = (shard.targets.itemActions ?? []).flatMap(row => row.setsFlag === undefined ? [] : [row.setsFlag]);
+  if (flagged.length > 0) questBooks(host).claim(flagged);
+  const raise = (player: string, row: { readonly setsFlag?: string }): void => {
+    if (row.setsFlag !== undefined) questBooks(host).of(player).flags.set(row.setsFlag);
+  };
   // A rack's prompt names its lever's scene: the page sends the prompt's own id, and this kit runs it, not a script (a shard may have none).
   const slots = declaredKitSlots(shard.items.rows), weapons = [...slots.keys()];
   // TEMPLATE-E2E TC-E1c: the loadout's primary lever is in hand from the start; any other waits for its rack
@@ -243,11 +251,12 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         // 3 takes the lever off its rack and into hand; 4 reloads it.
         if (row.action === 3) {
           // TC-E1d: a rack is a restock once its lever is in hand: its row's reserve again, up to the cap
-          if (lever.taken) { const profile = levers.get(row.item)?.profile; if (profile !== undefined) lever.store.reserve = Math.min(RESTOCK_CAP, lever.store.reserve + profile.reserve); return true; }
+          if (lever.taken) { const profile = levers.get(row.item)?.profile; if (profile !== undefined) lever.store.reserve = Math.min(RESTOCK_CAP, lever.store.reserve + profile.reserve); raise(id, row); return true; }
           const slot = weapons.indexOf(row.item), before = held(taker);
           if (before !== undefined) safely(() => { before.hold(false, eye(taker, 0), false); });
           lever.taken = true; if (slot !== -1) taker.held = slot;
         } else if (lever.taken) lever.act.beginReload();
+        raise(id, row);
         return true;
       }
       // TC-E4: 3 takes a racked melee weapon into hand; once taken, its rack is spent
@@ -257,10 +266,15 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
         const slot = weapons.indexOf(row.item), before = held(taker);
         if (before !== undefined) safely(() => { before.hold(false, eye(taker, 0), false); });
         own.delete(row.item); if (slot !== -1) taker.held = slot;
+        raise(id, row);
         return true;
       }
       const player = taker, runtime = player === undefined ? undefined : seats.of(player).runtimes.get(row.item);
-      if (runtime !== undefined) safely(() => { runtime.queue(row.action); });
+      if (player === undefined || runtime === undefined) return true;
+      let queued = false;
+      safely(() => { runtime.queue(row.action); queued = true; });
+      // a flag is the prompt's: the player stands at it, and the item took the use
+      if (queued && near(player, scene)) raise(id, row);
       return true;
     },
     reload: (id, slot) => {
