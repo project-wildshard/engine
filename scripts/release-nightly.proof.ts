@@ -81,7 +81,7 @@ else if(args.slice(0,3).join(' ')==='run download 42'&&args.includes('nightly-ve
     git('config', 'core.hooksPath', '.githooks');
     copyFileSync(resolve('.githooks/pre-push'), join(root, '.githooks/pre-push'));
     chmodSync(join(root, '.githooks/pre-push'), 0o755);
-    // Unrelated blob/AGENTS checks pass; the real release gate must still
+    // Unrelated blob/AGENTS/pin checks pass; the real release gate must still
     // refuse before the downstream full check or a byte reaches origin.
     for (const name of ['check-push', 'agents-md', 'pin-provenance']) writeFileSync(join(root, `.githooks/${name}.mjs`), '');
     mkdirSync(join(root, 'scripts'));

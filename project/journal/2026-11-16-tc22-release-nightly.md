@@ -36,3 +36,12 @@ the packed share's wall verdict. Its time could therefore fail the
 blocking share despite continue-on-error. Move it after that verdict
 and bound the explicit tests to ten seconds. No admission change.
 The exact branch CI and actual cook receipts must be repeated.
+
+The next rebase retains main's MF4 pin-provenance hook alongside the
+actual tag's nightly gate. Its isolated tag fixture supplies the new
+unrelated pin-check stub; the production check is unchanged. Both
+release cases pass again in1.47s with format0.11. The old84cd CI's sole
+red was J383's inherited no-cache expectation, already corrected on
+main2f7b035d. Its actual release2/2 and reader8/8 logs are retained as
+baseline. Normal land's automatic TS10 retry was stopped/cancelled
+because this was a deterministic contract failure, not a flake.
