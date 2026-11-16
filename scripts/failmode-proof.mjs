@@ -519,7 +519,20 @@ try {
         }
         const started = Date.now(); await page.goto(URL_PLAY, { waitUntil: 'domcontentloaded' });
         // The line exists while downloading. Waiting for control before observing it misses a truthful transient screen.
-        const seen = await screen(page, item.screen, 60_000, started), shot = await shoot(page, item.id, seen === null ? 'missing' : 'line');
+        const seen = await (async () => {
+          const until = Date.now() + 60_000;
+          while (Date.now() < until) {
+            // Native quota also refuses the fresh profile's name save. Submit the real first-open form before
+            // observing the download, as the other fresh-loading cases do; never seed storage past the fault.
+            if (await page.locator('#ws-name-box input').isVisible().catch(() => false)) {
+              await page.locator('#ws-name-box input').fill('fmquota');
+              await page.locator('#ws-name-box button[type=submit]').click();
+            }
+            const found = await screen(page, item.screen, 500, started);
+            if (found !== null) return found;
+          }
+          return null;
+        })(), shot = await shoot(page, item.id, seen === null ? 'missing' : 'line');
         const result = await judged(seen, item, page);
         await intoWorld(entered, 90_000).catch(() => undefined);
         const playing = await recovered(page, 15_000);
