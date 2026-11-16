@@ -57,9 +57,11 @@
       "migrations": []
     },
     "device/gridIntent.once": {
-      "version": 1,
-      "shape": "1cd3a34ea807cff8",
-      "migrations": []
+      "version": 2,
+      "shape": "e70ac88e205a02b5",
+      "migrations": [
+        1
+      ]
     },
     "device/ktx2set": {
       "version": 1,
@@ -234,9 +236,11 @@
       "migrations": []
     },
     "session/gridIntent": {
-      "version": 1,
-      "shape": "1cd3a34ea807cff8",
-      "migrations": []
+      "version": 2,
+      "shape": "e70ac88e205a02b5",
+      "migrations": [
+        1
+      ]
     },
     "session/life.alive": {
       "version": 1,

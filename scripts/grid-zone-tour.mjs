@@ -75,9 +75,12 @@ try {
       await page.keyboard.down('KeyW'); await sleep(Math.min(400, Math.max(60, (3 - depth) * 150))); await page.keyboard.up('KeyW');
       depth = await page.evaluate(([tx, tz, half]) => { const p = /** @type {any} */ (window).__wildshard.world.player.position; return half - Math.max(Math.abs(p.x - tx), Math.abs(p.z - tz)); }, [cx, cz, HALF]);
     }
-    const counting = await page.waitForFunction(() => /** @type {any} */ (window).__wildshard.shard.grid.state().gate?.count === 5, undefined, { timeout: 5000, polling: 50 }).then(() => true).catch(() => false);
+    // the zone entry's navigation is awaited from now, so a count that already ran on during the last steps can't slip past it
+    const navigation = page.waitForEvent('framenavigated', { timeout: 15_000 }).then(() => Date.now()).catch(() => null);
+    // the count runs only with the feet in this cell's buffer: a gate with no cell reads 5 too
+    const counting = await page.waitForFunction(instance => { const gate = /** @type {any} */ (window).__wildshard.shard.grid.state().gate; return gate?.cell === instance && gate.count >= 4; }, target.instance, { timeout: 5000, polling: 50 }).then(() => true).catch(() => false);
     const countAt = Date.now();
-    const navigated = await page.waitForEvent('framenavigated', { timeout: 8000 }).then(() => true).catch(() => false), leftAt = Date.now();
+    const navigatedAt = await navigation, navigated = navigatedAt !== null, leftAt = navigatedAt ?? Date.now();
     const control = navigated && await ready(180_000), controlAt = Date.now();
     await sleep(1500);
     const after = await page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard?.shard?.grid?.state?.(); return { home: String(st?.live?.live?.home ?? st?.home ?? ''), mb: st?.playingMB ?? null, slug: W.__wildshard?.shard?.slug ?? null }; }).catch(() => null);

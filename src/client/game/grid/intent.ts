@@ -36,8 +36,12 @@ export interface GridIntents {
 /** the app's save store (src/shared/engine/saves/store.ts) */
 type Store = typeof saves;
 export function gridIntents(store: Store, now: () => number = Date.now): GridIntents {
-  const session = store.define({ key: 'gridIntent', scope: 'session', version: 1, schema, initial: () => null });
-  const device = store.define({ key: 'gridIntent.once', scope: 'device', version: 1, schema, initial: () => null });
+  const session = store.define({ key: 'gridIntent', scope: 'session', version: 2, schema,
+    // ZE10b: v2 adds the optional `arrive`; a v1 intent is a v2 one without it
+    migrate: { 1: (old: unknown) => old }, initial: () => null });
+  const device = store.define({ key: 'gridIntent.once', scope: 'device', version: 2, schema,
+    // ZE10b: v2 adds the optional `arrive`; a v1 intent is a v2 one without it
+    migrate: { 1: (old: unknown) => old }, initial: () => null });
   const fresh = (intent: GridIntent | null, slug: string): GridIntent | null => {
     if (intent === null || ![slug].includes(intent.slug)) return null; // the same page's shard only
     return freshPageArrival(intent.at, now()) ? intent : null;

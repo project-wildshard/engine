@@ -23,3 +23,6 @@ ZE7, the grey stand-ins seen from the turn-ins:
   AudioContext (`unlock.ts` `newContext`, G325/SF67: kept out of the boot on purpose): the harness pose skips every press a player
   makes before the road, so `KeyW` was the first. The proof now presses ScrollLock (no binding) first; a 1-segment run at load 25
   then has 0 frames over 50 ms, worst 16.8 ms. Everything from segment 37 on in the quiet-start drive had the page thread idle.
+- Land review (claude -p, 2026-11-16): MUST, the grid intent's optional `arrive` changed a saved shape at version 1
+  (`saves-lock.test.ts`): both keys are version 2 with a pass-through migrate. SHOULDs: the zone tour now waits for the count
+  in the target's own buffer and awaits the navigation before polling; the gate proof's no-read residency is null, not 0.
