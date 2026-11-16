@@ -12136,7 +12136,7 @@
     ],
     "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
     "sourceBlob": "a07c98048c6362d11573a9661d6a4f789edee3ca",
-    "retirementProof": "No case or assertion retired. SDK retains all original packing/member identity, malformed transport, byte-owner, full wire order, schema size/provenance and aggregate cap assertions. Engine retains native catalogue admission of both graph members and adds a corrupt-byte refusal. Exact snapshot hash/producer/module blob/full recipe are in frozen runtime-manifest.json.",
+    "retirementProof": "No case or assertion retired. SDK retains all original packing/member identity, malformed transport, byte-owner, full wire order, schema size/provenance and aggregate cap assertions. Engine retains native catalogue admission of both graph members and adds a specific missing-blob refusal; independent original graph literals bind the captured expected rows. Exact snapshot hash/producer/module blob/full recipe are in frozen runtime-manifest.json.",
     "assertionDestinations": [
       {
         "repo": "sharddev",
@@ -12157,7 +12157,7 @@
         "originalTests": [
           "native variants reconstruct from shared nodes with independent member identities"
         ],
-        "assertions": "Actual native catalogue consumer admits original two graph members; frozen expected rows retain complete defining wire, corrupt bytes refuse."
+        "assertions": "Actual native catalogue consumer admits the original two independently rebuilt graph literals; captured expected rows retain full defining wire, missing named blobs refuse specifically."
       }
     ]
   }
