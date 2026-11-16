@@ -6,6 +6,8 @@
 // the arrival 14 m in on the entryway's centre line facing in and a free walk back out onto the road (ZE10b).
 //   scripts/browser-lane.sh node scripts/zone-gate-proof.mjs --base=<preview or loopback url> --out=<dir> [--device='iPhone 15 Pro'] [--viewport=2992x1434@2]
 // The walker is set 20 m inside Driftwood's east entryway by the in-page harness pose, so preview or a loopback page only (J205).
+// `--target=sunscar-dunes` (ZE10d) runs the same west of Driftwood, through Sunscar's east gate. After the walk back out the walker
+// steps into Driftwood's own buffer and reads its gate (the old home is walled now), then steps out again before the count ends.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from 'playwright';
@@ -19,9 +21,14 @@ if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base
 const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '2992x1434@2')) ?? [0, '2992', '1434', '2']).slice(1).map(Number);
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 const HALF = 250;
-/** ZE10b: control in the new home on its west entryway's centre line 14 m in (within 1.5 m), facing in, then out onto the road. */
+/** the gate's cell: Driftwood's east (Nalati) or west (Sunscar) neighbour; `dir` is its side, +1 east, -1 west */
+const TARGETS = /** @type {Record<string, { name: string, dir: number }>} */ ({ 'nalati-grasslands': { name: 'Nalati Grasslands', dir: 1 }, 'sunscar-dunes': { name: 'Sunscar Dunes', dir: -1 } });
+const targetSlug = flag('target', 'nalati-grasslands'), target = TARGETS[targetSlug];
+if (target === undefined) throw new Error(`--target is one of ${Object.keys(TARGETS).join(', ')}`);
+const dir = target.dir;
+/** ZE10b: control in the new home on its Driftwood-side entryway's centre line 14 m in (within 1.5 m), facing in, then out onto the road. */
 const arrivedPastGate = (/** @type {any} */ fired) => fired?.ready === true && fired.walkedOut === true && fired.arrived !== null
-  && Math.abs(fired.arrived.x + HALF - 14) < 1.5 && Math.abs(fired.arrived.z) < 1.5 && Math.abs(Math.abs(fired.arrived.yaw) - Math.PI / 2) < 0.2;
+  && Math.abs(dir * fired.arrived.x + HALF - 14) < 1.5 && Math.abs(fired.arrived.z) < 1.5 && Math.abs(Math.abs(fired.arrived.yaw) - Math.PI / 2) < 0.2;
 mkdirSync(out, { recursive: true });
 /** ZE10c: how long the arrival and the fresh boot each stand at the arrival pose before playingMB is read */
 const SETTLE_MS = 10_000;
@@ -49,7 +56,7 @@ async function bootCard(context, card, pose) {
   await sleep(SETTLE_MS);
   return page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
 }
-const tag = `${engineName}${device === '' ? '' : '-phone'}`;
+const tag = `${engineName}${device === '' ? '' : '-phone'}${targetSlug === 'nalati-grasslands' ? '' : `-${targetSlug}`}`;
 const result = { base, engine: engineName, viewport: '', at: new Date().toISOString(), build: '', shots: /** @type {Record<string, unknown>[]} */ ([]), fired: /** @type {unknown} */ (null), errors: /** @type {string[]} */ ([]), note: '' };
 const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
 let code = 1;
@@ -76,7 +83,7 @@ try {
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
   const state = () => page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard.shard.grid.state(), wf = st.live?.live?.worldFeet ?? W.__wildshard.world.player.position; return { x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), gate: st.gate ?? null, walls: st.softWalls ?? null, inside: st.inside, cur: st.live?.live?.current ?? null }; });
   const origin = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
-  const pitch = 562.5, nalatiEdge = origin.x + pitch - HALF;
+  const pitch = 562.5, nalatiEdge = origin.x + dir * (pitch - HALF);
   const face = (/** @type {number} */ yaw) => page.evaluate(wanted => { /** @type {any} */ (window).__wildshard.world.player.yaw = wanted; }, yaw);
   /** Walk with W held toward x (along z = origin.z) until within 0.4 m. */
   const walkTo = async (/** @type {number} */ x) => {
@@ -87,19 +94,19 @@ try {
   };
   // the state is read first: a full-size shot can take longer than a count's second on a loaded laptop (the count then read one on)
   const shoot = async (/** @type {string} */ name) => { const seen = await state(); await page.screenshot({ path: join(out, `${tag}-${name}.png`) }); result.shots.push({ name, ...seen }); };
-  await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [HALF - 20, 0]);
+  await page.evaluate(([px, pz]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.spawn(px, pz, p.yaw, 1.5); p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); }, [dir * (HALF - 20), 0]);
   await sleep(4000);
-  await walkTo(origin.x + HALF + 31.25); await face(-Math.PI / 2); await sleep(1500);
+  await walkTo(origin.x + dir * (HALF + 31.25)); await face(-dir * Math.PI / 2); await sleep(1500);
   await shoot('road-wall');
   /** Poll the gate until `test` holds (or 8 s). */
   const until = async (/** @type {(gate: any) => boolean} */ test) => { for (const ends = Date.now() + 8000; Date.now() < ends; await sleep(50)) if (test((await state()).gate)) return true; return false; };
   // in, 2 m past the edge line: the card at 5; back out of the buffer at 3 (so the count can't reach 0 on the way out)
-  await walkTo(nalatiEdge + 2); await until(gate => gate?.count === 5); await shoot('gate-5');
+  await walkTo(nalatiEdge + dir * 2); await until(gate => gate?.count === 5); await shoot('gate-5');
   await until(gate => gate?.count === 3);
-  await walkTo(nalatiEdge - 6); await face(-Math.PI / 2); await sleep(600);
+  await walkTo(nalatiEdge - dir * 6); await face(-dir * Math.PI / 2); await sleep(600);
   await shoot('backed-away');
   // in again: 5 (the reset), then 2
-  await walkTo(nalatiEdge + 2); await until(gate => gate?.count === 5); await shoot('gate-again');
+  await walkTo(nalatiEdge + dir * 2); await until(gate => gate?.count === 5); await shoot('gate-again');
   await until(gate => gate?.count === 2); await shoot('gate-2');
   if (fire) {
     // stand on: 0 opens the loading screen and the page enters the cell as its home
@@ -107,7 +114,7 @@ try {
     // ZE10c: the target's world reads (its shardfile bytes) against the moment the old document went (the reload form)
     /** @type {{ url: string, at: number }[]} */
     const reads = [];
-    page.on('request', request => { if (/\/shardfiles\/nalati-grasslands\//u.test(request.url())) reads.push({ url: request.url().replace(base, ''), at: Date.now() }); });
+    page.on('request', request => { if (request.url().includes(`/shardfiles/${targetSlug}/`)) reads.push({ url: request.url().replace(base, ''), at: Date.now() }); });
     /** every main-frame navigation from the fire on (a second one is a reload after the entry) */
     const navigations = /** @type {{ url: string, at: number }[]} */ ([]);
     page.on('framenavigated', frame => { if (frame === page.mainFrame()) navigations.push({ url: frame.url().replace(base, ''), at: Date.now() }); });
@@ -117,10 +124,13 @@ try {
     // the old world goes one of two ways: the same-page entry (ZE10a3) retires its Game in this document (marked from inside the
     // page, the window marker kept), or the reload form's new document (`?chunk=`; the entry first rewrites the old page's own
     // address, a same-document event 0.2 s before the old document went)
-    await page.evaluate(() => {
+    // the same-page form is timed on the page's own clock: the old Game's dispose and every resource read of the target (a
+    // PerformanceObserver), since the protocol's network and navigation events reach this script in no fixed order under load
+    await page.evaluate(slug => {
       const W = /** @type {any} */ (window), game = W.__wildshard.world.game, retire = game.dispose.bind(game);
-      W.__zeMark = 1; game.dispose = (/** @type {unknown[]} */ ...args) => { const done = retire(...args); W.__zeLeftAt = Date.now(); return done; };
-    });
+      W.__zeReads = []; new PerformanceObserver(list => { for (const entry of list.getEntries()) if (entry.name.includes(`/shardfiles/${slug}/`)) W.__zeReads.push({ url: entry.name, start: entry.startTime }); }).observe({ type: 'resource' });
+      W.__zeMark = 1; game.dispose = (/** @type {unknown[]} */ ...args) => { const done = retire(...args); W.__zeLeftAt = Date.now(); W.__zeLeftPerf = performance.now(); return done; };
+    }, targetSlug);
     const departure = await Promise.any([
       page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() && frame.url().includes('chunk='), timeout: 8000 }).then(() => ({ how: 'navigation', at: Date.now() })),
       page.waitForFunction(() => /** @type {any} */ (window).__zeLeftAt !== undefined, undefined, { timeout: 8000, polling: 20 })
@@ -148,28 +158,42 @@ try {
     // ZE10b: the arrival (the new home's own frame: its west entryway's centre line, 14 m in, facing east into the cell), then a free
     // walk back out of the new home onto the road (no wall: the home has none)
     /** @type {{ x: number, z: number, yaw: number } | null} */
-    let arrived = null, walkedOut = false, /** @type {number | null} */ controlMB = null;
+    let arrived = null, walkedOut = false, /** @type {any} */ oldHomeGate = null, /** @type {boolean | null} */ zonePending = null, /** @type {number | null} */ controlMB = null;
     if (ready) {
       await sleep(1500);
+      // ZE10d: the loading screen is gone at control (a second gate's 0 is refused while it is up)
+      zonePending = await page.evaluate(() => /** @type {any} */ (window).__wildshardZonePending?.() ?? null).catch(() => null);
       arrived = await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; return { x: Number(p.position.x.toFixed(2)), z: Number(p.position.z.toFixed(2)), yaw: Number(p.yaw.toFixed(3)) }; });
       // settled where it arrived (the fresh boot below stands at the same pose for as long)
       await sleep(SETTLE_MS); controlMB = await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
       for (const ends = Date.now() + 20_000; Date.now() < ends;) {
         const x = await page.evaluate(() => /** @type {any} */ (window).__wildshard.world.player.position.x);
-        if (x < -HALF - 5) { walkedOut = true; break; }
-        await face(Math.PI / 2); await page.keyboard.down('KeyW'); await sleep(400); await page.keyboard.up('KeyW');
+        if (dir * x < -HALF - 5) { walkedOut = true; break; }
+        await face(dir * Math.PI / 2); await page.keyboard.down('KeyW'); await sleep(400); await page.keyboard.up('KeyW');
       }
       await page.screenshot({ path: join(out, `${tag}-walked-out.png`) });
+      // ZE10d: the old home is walled now: 2 m into Driftwood's buffer its gate counts 5 (then straight back out, so it never reaches 0)
+      if (walkedOut) {
+        const home = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
+        const driftwoodEdge = home.x - dir * (pitch - HALF);
+        await walkTo(driftwoodEdge - dir * 2); await until(gate => gate?.cell === 'driftwood-isle' && gate?.count === 5);
+        oldHomeGate = (await state()).gate; await page.screenshot({ path: join(out, `${tag}-old-home-gate.png`) });
+        await walkTo(driftwoodEdge + dir * 8);
+      }
     }
+    /** @type {{ left: number | null, reads: { url: string, start: number }[] } | null} */
+    const pageReads = samePage ? await page.evaluate(() => { const W = /** @type {any} */ (window); return { left: W.__zeLeftPerf ?? null, reads: W.__zeReads ?? [] }; }).catch(() => null) : null;
     const enteredMB = ready ? await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null) : null;
     // ZE10c: a fresh Nalati boot (Shard Select, its own new context) stood at the arrival pose and read as long after: the entry's
     // playingMB there is held within 50 MB of it (one world in memory)
     const freshContext = await browser.newContext(phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 });
     let freshMB = /** @type {number | null} */ (null);
-    try { freshMB = await bootCard(freshContext, 'Nalati Grasslands', arrived ?? { x: 14 - HALF, z: 0, yaw: -Math.PI / 2 }); } catch (error) { result.errors.push(`fresh Nalati boot: ${String(error).slice(0, 200)}`); }
+    try { freshMB = await bootCard(freshContext, target.name, arrived ?? { x: dir * (14 - HALF), z: 0, yaw: -dir * Math.PI / 2 }); } catch (error) { result.errors.push(`fresh ${target.name} boot: ${String(error).slice(0, 200)}`); }
     await freshContext.close();
-    result.fired = { navigations, departure: departure?.how ?? null, samePage, navigated: left, before, after: page.url(), ready, home, arrived, walkedOut, enteredMB, controlMB, freshMB,
-      residency: { leftAt, readsBeforeLeaving: reads.filter(row => row.at < leftAt).map(row => row.url), firstReadAfterMs: left ? (reads.find(row => row.at >= leftAt)?.at ?? null) === null ? null : (reads.find(row => row.at >= leftAt)?.at ?? 0) - leftAt : null } };
+    result.fired = { navigations, departure: departure?.how ?? null, samePage, navigated: left, before, after: page.url(), ready, home, zonePending, arrived, walkedOut, oldHomeGate, enteredMB, controlMB, freshMB,
+      residency: pageReads !== null && pageReads.left !== null ? { clock: 'page', readsBeforeLeaving: pageReads.reads.filter(row => row.start < /** @type {number} */ (pageReads.left)).map(row => row.url.replace(base, '')),
+        firstReadAfterMs: pageReads.reads.filter(row => row.start >= /** @type {number} */ (pageReads.left)).reduce((first, row) => Math.min(first, Math.round(row.start - /** @type {number} */ (pageReads.left))), Number.POSITIVE_INFINITY),
+        script: { leftAt, readsBefore: reads.filter(row => row.at < leftAt).length } } : { clock: 'script', leftAt, readsBeforeLeaving: reads.filter(row => row.at < leftAt).map(row => row.url), firstReadAfterMs: left ? (reads.find(row => row.at >= leftAt)?.at ?? null) === null ? null : (reads.find(row => row.at >= leftAt)?.at ?? 0) - leftAt : null } };
   }
   const named = (/** @type {string} */ name) => /** @type {any} */ (result.shots.find(row => row.name === name))?.gate;
   const [at5, gone, again, at2] = ['gate-5', 'backed-away', 'gate-again', 'gate-2'].map(named);
@@ -178,7 +202,7 @@ try {
   const fired = /** @type {any} */ (result.fired);
   // ZE10c: nothing of the target read before the old document went, and memory at control within 50 MB of a fresh boot
   const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50;
-  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true)) ? 0 : 1;
+  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.zonePending === false)) ? 0 : 1;
 } catch (error) { result.note = String(error).slice(0, 400); console.log(`FAIL ${result.note}`); }
 finally {
   writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);
