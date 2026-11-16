@@ -661,5 +661,9 @@
  "test/safari-page-target.test.ts",
  "src/client/game/grid/spawnGround.test.ts",
  "test/product-json-checked-once.test.ts",
- "test/home-icons.test.ts"
+ "test/home-icons.test.ts",
+ "test/agent-time.test.ts",
+ "test/commit-lane.test.ts",
+ "test/ci-bisect.test.ts",
+ "test/player-command-retired.test.ts"
 ]
