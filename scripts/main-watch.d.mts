@@ -5,7 +5,7 @@ export interface Pane {pane_id:string;label?:string;cwd?:string;foreground_cwd?:
 export interface Io {
   repo:string;state:string;runs:()=>Run[];failed:(id:number)=>string[];annotations:(id:number)=>string;tip:()=>string;
   commits:(from:string|null,to:string)=>string[];contains:(ancestor:string,descendant:string)=>boolean;
-  receipts:()=>string;receipt:(line:string)=>void;panes:()=>Pane[];send:(pane:string,text:string)=>boolean;dispatch:()=>void;
+  receipts:()=>string;receipt:(line:string)=>void;panes:()=>Pane[];send:(pane:string,text:string)=>boolean;prompt:(agent:string,text:string)=>boolean;fixers:()=>string[];dispatch:()=>void;
   quotaReset?:()=>number;
 }
 export const REPO: string;

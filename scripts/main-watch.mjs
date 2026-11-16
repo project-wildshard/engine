@@ -172,8 +172,13 @@ export function liveIo(env=process.env){
     // A lane that is a herdr agent by name (the Codex lanes) has no pane main-watch can find: prompt it by name.
     prompt:(/** @type {string} */agent,/** @type {string} */text)=>{try{run('herdr',['agent','prompt',agent,text]);return true;}catch{return false;}},
     // Mini M2 (meta MINI-DECISIONS): every engine main red also goes straight to the forward fixer(s), herdr agents by
-    // name, from WS_FORWARD_FIXER (comma-separated; set on the Mac mini only).
-    fixers:()=>(process.env.WS_FORWARD_FIXER??'').split(',').map(name=>name.trim()).filter(name=>/^[\w.-]+$/u.test(name)),
+    // name, from WS_FORWARD_FIXER (comma-separated), else the machine's ~/.config/wildshard/forward-fixer file (the Mac
+    // mini has one; a lane's environment need not carry it).
+    fixers:()=>{
+      let names=process.env.WS_FORWARD_FIXER;
+      if(names===undefined){try{names=readFileSync(join(homedir(),'.config/wildshard/forward-fixer'),'utf8');}catch{names='';}}
+      return names.split(/[,\s]+/u).filter(name=>/^[\w.-]+$/u.test(name));
+    },
     dispatch:()=>{run('gh',['workflow','run','ci.yml','--ref','main','-R',repo]);},
   };
 }
