@@ -53,6 +53,9 @@ export const TIER_TABLE = {
     // portrait camera (vertical FOV ~100°, 874 px at 1×) draws a copy at 0.36× the desktop window's pixels per metre
     // (1496x717 @2, ~70°), 0.72× at 2×: at 0.6 every level still switches at about the projected size the desktop switches at
     placedLodScale: 0.6,
+    // NINE-DRAGON-BENCHMAX NB8 (mini-ninetris, 2026-11-15): a resident slab chunk's triangles in k-d order, drawn as the run
+    // its camera can see (`slabRanges.ts`): Nine's phone spawn view 0.56 to ~0.47 M slab triangles, other views ~half
+    slabRanges: true,
   },
   desktop: {
     maxTexture: 4096, layerSize: 1024, dpr: 1.5, ao: true,
@@ -79,6 +82,7 @@ export const TIER_TABLE = {
     godRaysSamples: 60, godRaysScale: 0.5, volumetricSteps: 14, volumetricScale: 1, smaa: 'high' as 'off' | 'low' | 'high', bloomLevels: 8,
     pmremCube: 0,
     placedLodScale: 1,
+    slabRanges: false,
   },
 };
 

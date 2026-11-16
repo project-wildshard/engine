@@ -13,12 +13,16 @@ import { runtimeProduct } from './runtimeProduct';
 import { SharedTileBuilds, type TileContent } from './tileContent';
 import type { ControlRefinement } from './controlRefinement';
 import { tilesSettling } from './tileDriver';
+import { TIER_CONFIG } from '@wildshard/engine/core/tier';
+import { cullSlabRanges, spatialSlabRanges, type SlabRanges } from './slabRanges';
 
 type WholeLibrary = Extract<WorldScenesSection['libraries'][number], { kind: 'whole' }>;
 type SlabTile = WorldSceneSlabLibrary['tiles'][number];
 /** the bake's tag on each slab mesh (`sharddev/bake/slabs.ts`): its key, tile and place in its file */
 const SlabTag = v.object({ key: v.string(), tile: v.number(), chunk: v.number() });
 const EMPTY: ReadonlySet<number> = new Set();
+/** NB8: each phone chunk geometry's k-d leaf tree (`slabRanges.ts`), built on read before its first upload */
+const RANGES = new WeakMap<BufferGeometry, SlabRanges>();
 
 function slabMesh(node: Object3D): node is Mesh { return node instanceof Mesh; }
 function materialList(mesh: Mesh): Material[] { return Array.isArray(mesh.material) ? mesh.material : [mesh.material]; }
@@ -59,6 +63,7 @@ async function readSlabChunks(owner: Scope, product: ShardProduct, tile: number,
       const row = file.chunks[index];
       if (row === undefined || tag.chunk !== index || tag.tile !== tile || tag.key !== row.key) throw new Error('Slab chunk differs from its row');
       const geometry = nativeWholeGeometry(mesh, 'take');
+      if (TIER_CONFIG.slabRanges) { const ranges = spatialSlabRanges(geometry); if (ranges !== null) RANGES.set(geometry, ranges); }
       const [x0, y0, z0, x1, y1, z1] = row.box, [sx, sy, sz, radius] = row.sphere;
       geometry.boundingBox = new Box3(new Vector3(x0, y0, z0), new Vector3(x1, y1, z1));
       geometry.boundingSphere = new Sphere(new Vector3(sx, sy, sz), radius);
@@ -236,6 +241,7 @@ export class SlabLibrary {
         part.name = `${mesh.name}:slab:${String(tile)}:${String(index)}`; part.matrixAutoUpdate = false;
         part.castShadow = key.castShadow; part.receiveShadow = key.receiveShadow; part.renderOrder = key.renderOrder;
         part.layers.mask = key.layers; part.frustumCulled = key.frustumCulled;
+        const ranges = RANGES.get(geometry); if (ranges !== undefined && key.frustumCulled) cullSlabRanges(part, ranges);
         drawn.push(part); parts.push({ part, anchor: mesh, scope });
       }
       // All keys share one publication cursor. A CPU-budget yield alone can
