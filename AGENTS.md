@@ -29,6 +29,10 @@ Git hygiene
    unstaged edit here). It replays your commits onto origin/main and moves only the paths main changes; if one of
    those is another lane's uncommitted edit it stops and names it: wait and run it again, never stash, restore or
    commit its files (BUILD-MAX EV1, meta WL11).
+ - **Nothing under `test/pins/` goes to main by mode 1 (J375, meta MINI-FLOW MF4).** Shard pins, ring digests, slices
+   and saves alike: the pre-push (`.githooks/pin-provenance.mjs`) passes a main push that changes them only when it
+   is what land pushes for a green `origin/plan/*` tip (exact or carried). Put the change on a plan branch and land
+   it. Escape hatch when truly stuck (main red, the fix can't wait for CI): `ALLOW_PIN_PUSH=1`, said in your receipt.
  - Mode 1's pre-push gates the pushed commit in a clean copy (`tmp/push-gate/<sha>-<pid>`, about 5 s,
    `scripts/push-gate-copy.mjs`), so other lanes' dirty and untracked files neither refuse your push nor reach the
    checks (EV1). It runs the split gate (EV2, J288): static checks plus the related Vitest files, browser, timing
