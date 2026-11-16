@@ -80,13 +80,18 @@ function listen(bot: RoomBot): { readonly answers: EnterWord[]; readonly arrival
   bot.transport.onClose(() => { closes++; });
   return { answers, arrivals, enter: cell => { bot.transport.control('enter', encodeEnter({ cell })); }, closes: () => closes };
 }
-/** From Driftwood's entryway on `side` (-1 west to Sunscar, +1 east to Nalati) out along the road and into the cell's buffer, held at its gate. */
+/** From Driftwood's entryway on `side` (-1 west to Sunscar, +1 east to Nalati) onto the road and into the cell's buffer, held at its
+ * gate. The first test walks the whole road; here the walker steps off Driftwood for real, is then placed 4 m short of the cell's edge
+ * and runs into its buffer (AMBER 2026-11-16: the ~70 m road walk was 10 s of every case, 103 s for the file on main). */
 async function toGate(room: RoomBench, bot: RoomBot, side: -1 | 1): Promise<NonNullable<ReturnType<RoomBench['road']>>> {
   const home = room.room(HOME), road = room.road(roadName(HOME)), body = home?.bodyOf('device:a'), edge = 562.5 - CHUNK_HALF;
   if (home === undefined || road === undefined || body === undefined) throw new Error('Driftwood and its road boot');
   body.resetPose({ x: side * (CHUNK_HALF - 5), y: 1, z: 0 }, -side * Math.PI / 2);
   bot.thumb = run(-side * Math.PI / 2);
   await vi.waitFor(() => { expect(road.holds('device:a'), 'onto the road').toBe(true); }, { timeout: 20_000, interval: 50 });
+  const walker = road.bodyOf('device:a');
+  if (walker === undefined) throw new Error('the walker stands on the road');
+  walker.resetPose({ x: side * (edge - 4), y: walker.position.y + 1, z: 0 }, -side * Math.PI / 2);
   await vi.waitFor(() => { expect(side * (road.bodyOf('device:a')?.position.x ?? 0), 'into the buffer').toBeGreaterThan(edge + 2); }, { timeout: 30_000, interval: 50 });
   return road;
 }
