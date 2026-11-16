@@ -583,30 +583,77 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
   } finally { await context.close(); }
 }
 
+/** Read the renderer that drew the successful game, rather than a new capability canvas. */
+export function gameplayRenderer() {
+  const gl = window.__wildshard.requireWorld().game.renderer.getContext();
+  const extension = gl.getExtension('WEBGL_debug_renderer_info');
+  return { renderer: String(gl.getParameter(gl.RENDERER)), vendor: String(gl.getParameter(gl.VENDOR)),
+    unmaskedRenderer: extension === null ? null : String(gl.getParameter(extension.UNMASKED_RENDERER_WEBGL)),
+    unmaskedVendor: extension === null ? null : String(gl.getParameter(extension.UNMASKED_VENDOR_WEBGL)),
+    version: String(gl.getParameter(gl.VERSION)), lost: gl.isContextLost() };
+}
+
 async function main() {
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const option = (/** @type {string} */ name) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
   const out = resolvePath(option('out') ?? 'boot-smoke-results'); mkdirSync(out, { recursive: true });
-  const external = option('url');
+  const external = option('url'), rendererReport = option('renderer-report');
   const jobs = bootJobs(option('jobs'));
   if (external === undefined && !existsSync(join(root, 'dist/index.html'))) throw new Error('Build dist before running boot smoke');
-  const preview = external === undefined ? await serve(root, '', true) : null;
-  const base = external ?? preview?.url;
-  if (!base) throw new Error('No built preview');
   const pool = browserPool(root, jobs, option('angle') ?? (process.platform === 'darwin' ? 'metal' : 'swiftshader'), true);
+  const controller = new AbortController();
+  /** @type {Awaited<ReturnType<typeof serve>> | null} */ let preview = null;
+  /** @type {Promise<void> | null} */ let stopping = null;
+  /** @type {Error|null} */ let primary = null;
+  /** @type {{schema:string,cases:unknown[],expected:unknown[],cancelled:string|null,error:string|null}} */
+  const diagnostics = { schema: 'macos-smoke-renderers/1', cases: [], expected: [], cancelled: null, error: null };
+  const active = () => { controller.signal.throwIfAborted(); };
+  function closePool() { return (stopping ??= pool.close()); }
+  const stop = (/** @type {string} */ signal) => {
+    diagnostics.cancelled = signal;
+    controller.abort(new Error(`Boot smoke cancelled: ${signal}`));
+    // Serve listens from spawn onward, including readiness; pool.close closes
+    // the actual browser owners so in-flight page work rejects into finally.
+    // Cancellation is delivered synchronously; the finally path awaits cleanup.
+    void (async () => { try { await closePool(); } catch (error) { primary ??= error instanceof Error ? error : new Error(String(error)); } })();
+  };
+  const interrupt = () => stop('SIGINT'), terminate = () => stop('SIGTERM');
+  if (rendererReport !== undefined) { process.on('SIGINT', interrupt); process.on('SIGTERM', terminate); }
   try {
-    const browser = await pool.browser(0);
+    preview = external === undefined ? await serve(root, '', true, { signal: controller.signal, telemetryDir: join(out, 'telemetry') }) : null;
+    active();
+    const base = external ?? preview?.url;
+    if (!base) throw new Error('No built preview');
+    const browser = await pool.browser(0); active();
     const group = option('case-group') ?? 'all';
     if (group !== 'all' && group !== 'public' && group !== 'developer' && group !== 'grid') throw new Error('usage: --case-group=all|public|developer|grid');
-    const catalogue = await discoverCatalogue(browser, base);
-    const cases = bootCases(catalogue, group);
+    const catalogue = await discoverCatalogue(browser, base); active();
+    const cases = bootCases(catalogue, group); diagnostics.expected = [...cases];
     writeFileSync(join(out, 'cases.json'), `${JSON.stringify({ group, jobs, catalogue, cases }, null, 2)}\n`);
-    // Every started case finishes and keeps its receipt before the first failure is thrown (pool.mjs `parallel`).
+    // Every started case retains the stock assertions and its original receipt.
     await parallel([...cases], jobs, async ([mode, shard, developer], _index, slot) => {
-      const isolated = await bootCaseBrowser(pool, mode, slot);
-      const result = await bootCase(isolated, base, mode, out, shard, developer);
+      active();
+      const isolated = await bootCaseBrowser(pool, mode, slot); active();
+      /** @type {ReturnType<typeof gameplayRenderer> | null} */ let renderer = null;
+      const capture = rendererReport === undefined ? null : async (/** @type {import('playwright').Page} */ page) => { renderer = await page.evaluate(gameplayRenderer); };
+      const result = await bootCase(isolated, base, mode, out, shard, developer, capture); active();
+      if (rendererReport !== undefined) diagnostics.cases.push({ mode, shard, developer, renderer,
+        elapsedMs: result.elapsedMs, gameplayFrames: result.gameplayFrames, faults: result.faults, fatal: result.fatal });
       console.log(`${mode}: ${mode === 'public-policy' ? 'public-policy admission' : 'gameplay'} PASS in ${result.elapsedMs}ms, frame=${result.frame}, faults=${result.faults.length}`);
     });
-  } finally { try { await pool.close(); } finally { preview?.close(); } }
+    active();
+  } catch (error) { primary = error instanceof Error ? error : new Error(String(error)); }
+  finally {
+    try { await closePool(); } catch (error) { primary ??= error instanceof Error ? error : new Error(String(error)); }
+    try { preview?.close(); await preview?.closed; } catch (error) { primary ??= error instanceof Error ? error : new Error(String(error)); }
+    process.off('SIGINT', interrupt); process.off('SIGTERM', terminate);
+    diagnostics.error = primary === null ? null : String(primary);
+    if (rendererReport !== undefined) {
+      try { writeFileSync(rendererReport, `${JSON.stringify(diagnostics, null, 2)}\n`); }
+      catch (error) { primary ??= error instanceof Error ? error : new Error(String(error)); }
+    }
+  }
+  if (primary !== null) throw primary;
+  active();
 }
 if (process.argv[1] && pathToFileURL(resolvePath(process.argv[1])).href === import.meta.url) await main();

@@ -1,0 +1,85 @@
+name: macos-smoke-probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: macos-smoke-probe-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  WS_SMOKE_RUNNER: ubuntu-latest
+  WS_LANE_NAME: macos-smoke-probe
+  WS_SMOKE_VISIBILITY: ${{ github.event.repository.visibility }}
+jobs:
+  products:
+    if: github.repository == 'project-wildshard/engine' && github.event.repository.visibility == 'public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Start the setup clock
+        run: echo "WS_SMOKE_SETUP_STARTED_MS=$(python3 -c 'import time; print(int(time.time()*1000))')" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - name: Own this probe output
+        run: node scripts/scratch-dir.mjs macos-smoke-probe 'TS19 shared product producer'
+      - name: Build and record the actual Ring 1 products
+        run: node scripts/macos-smoke-probe.mjs prepare
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: macos-smoke-products
+          path: |
+            tmp/macos-smoke-probe/products.tar
+            tmp/macos-smoke-probe/producer.json
+          retention-days: 1
+      - name: Keep preparation failure evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: macos-smoke-prepare-failure
+          path: |
+            tmp/macos-smoke-probe/*.json
+            tmp/macos-smoke-probe/*.log
+          retention-days: 1
+  smoke:
+    needs: products
+    if: github.repository == 'project-wildshard/engine' && github.event.repository.visibility == 'public'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        runner: [macos-15, ubuntu-latest]
+        sample: [1, 2, 3, 4, 5]
+    env:
+      WS_SMOKE_SAMPLE: ${{ matrix.sample }}
+      WS_SMOKE_RUNNER: ${{ matrix.runner }}
+    steps:
+      - name: Start the setup clock
+        run: echo "WS_SMOKE_SETUP_STARTED_MS=$(python3 -c 'import time; print(int(time.time()*1000))')" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - name: Own this independent observation
+        run: node scripts/scratch-dir.mjs macos-smoke-probe 'TS19 standard hosted observation'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: macos-smoke-products
+          path: tmp/macos-smoke-probe
+      - name: Install the actual platform browser
+        run: bash scripts/ci-playwright-install.sh --only-shell chromium
+      - name: Observe the stock smoke without changing its assertions
+        run: node scripts/macos-smoke-probe.mjs observe
+      - name: Preserve every actual outcome
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: macos-smoke-${{ matrix.runner }}-${{ matrix.sample }}
+          path: |
+            tmp/macos-smoke-probe/*.json
+            tmp/macos-smoke-probe/*.log
+            tmp/macos-smoke-probe/boot/**/*.json
+          retention-days: 1

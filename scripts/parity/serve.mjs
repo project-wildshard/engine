@@ -38,19 +38,34 @@ export function previewReady(url, timeoutMs=1000) {
     request.setTimeout(timeoutMs,()=>{request.destroy(new Error('Preview readiness timed out'));});
   });
 }
-/** @param {string} tree @param {string} sha @param {boolean} [built] */
-export async function serve(tree,sha,built=false) {
+/** @param {string} tree @param {string} sha @param {boolean} [built]
+ * @param {{signal?:AbortSignal,telemetryDir?:string}} [options] */
+export async function serve(tree,sha,built=false,{signal,telemetryDir}={}) {
+  signal?.throwIfAborted();
   if(!built)buildTree(tree,sha);
   const port=await freePort();
   // the host's plain preview server serves any tree's built bytes with that tree's _headers (D24)
   const server=fileURLToPath(new URL('../preview-server.mjs',import.meta.url));
-  const child=spawn(process.execPath,[server,'--root',tree,'--host','127.0.0.1','--port',String(port)],{cwd:tree,stdio:['ignore','pipe','pipe'],detached:true});
+  const child=spawn(process.execPath,[server,'--root',tree,'--host','127.0.0.1','--port',String(port),...(telemetryDir === undefined ? [] : ['--telemetry-dir',telemetryDir])],{cwd:tree,stdio:['ignore','pipe','pipe'],detached:true});
   let startup='';child.stdout.on('data',(chunk)=>{startup+=String(chunk);});child.stderr.on('data',(chunk)=>{startup+=String(chunk);});
   const url=`http://127.0.0.1:${port}`;
-  const close=()=> {if(child.pid) {try {process.kill(-child.pid,'SIGTERM');} catch { /* already stopped */ }}};
+  /** @type {Promise<void>} */
+  const exited = new Promise(resolve => { child.once('close', () => { resolve(); }); });
+  /** @type {Promise<void>|null} */ let closing = null;
+  function close() { return (closing ??= (async () => {
+    if (child.pid && child.exitCode === null && child.signalCode === null) {
+      try { process.kill(-child.pid, 'SIGTERM'); } catch { /* already stopped */ }
+      const timer = setTimeout(() => { try { if (child.pid) process.kill(-child.pid, 'SIGKILL'); } catch { /* reaped */ } }, 2000);
+      try { await exited; } finally { clearTimeout(timer); }
+    } else { await exited; }
+    signal?.removeEventListener('abort', abort);
+  })()); }
+  function abort() { void close(); }
+  signal?.addEventListener('abort', abort, {once:true});
+  if (signal?.aborted) abort();
   // Serve the completed bytes with production headers, without importing the build's generation plugins again.
   const deadline=Date.now()+120000;
-  try {while(Date.now()<deadline){if(child.exitCode!==null) throw new Error(`preview exited: ${startup}`);if(await previewReady(`${url}/version.json`,Math.min(1000,Math.max(1,deadline-Date.now())))) return {url,close};await new Promise((resolve)=>{setTimeout(resolve,100);});} throw new Error(`preview never served: ${startup}`);}catch(e){close();throw e;}
+  try {while(Date.now()<deadline){signal?.throwIfAborted();if(child.exitCode!==null) throw new Error(`preview exited: ${startup}`);if(await previewReady(`${url}/version.json`,Math.min(1000,Math.max(1,deadline-Date.now())))) return {url,close:()=>{void close();},closed:exited};await new Promise((resolve)=>{setTimeout(resolve,100);});} throw new Error(`preview never served: ${startup}`);}catch(e){await close();throw e;}
 }
 /** @param {string} path @returns {unknown} */
 export function readJson(path) {return existsSync(path) ? JSON.parse(readFileSync(path,'utf8')) : undefined;}
