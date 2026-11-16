@@ -155,8 +155,8 @@ checks. Ordinary generation and --check now work in the engine checkout.
 Land preflight stopped at eight restored motion-trace digests after rebasing
 onto a650b20724e485bb2dc8732ba96d6d83599fa5cc. Main's NL13 law commits
 836097ab/a650b207 retry partial flat-floor stalls while preserving walls
-and slopes. The active shorter page-law hashes were already updated on
-main; the newly restored 40,000-tick traces still held the former law.
+and slopes. The page-law.json hashes were already re-recorded on main; the newly
+restored seven-traces.json still held the former law.
 
 Causal before-control: read CharacterMotor.ts from approved965fce4d, return
 only that source from a Vite pre-load plugin at the original module id
@@ -173,3 +173,7 @@ plus motion-trace.test.ts, net-predict-flat-floor.test.ts and
 character-motor-values.test.ts passes4 files/14 cases, including floor
 progress, wall refusal and allocating-motor parity. No production code or
 test bodies changed. The original approved branch CI43810155741 is green.
+
+J206 motion-law review0052: no MUST-FIX. Correct both SHOULD text notes:
+name page-law.json accurately (it also runs40,000 ticks) and update the
+disposition's historical unchanged-golden claim to record the NL13 refresh.

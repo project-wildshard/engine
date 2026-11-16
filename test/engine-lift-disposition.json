@@ -10520,7 +10520,7 @@
     "file": "test/motion-traces.test.ts",
     "outcome": "restored",
     "target": "test/motion-traces.test.ts",
-    "decision": "Restored in place (CI21 E-RUNTIME-O): original motion trace parity over native and page movement uses verified frozen riding modules. The seven-traces.json golden (8 traces) is unchanged.",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): original motion trace parity over native and page movement uses verified frozen riding modules. The seven-traces.json golden (8 traces) was unchanged by the lift; it was re-recorded during landing for main's NL13 floor law (836097ab/a650b207), with an old-motor-only control reproducing every original digest.",
     "originalTests": [
       "the page trace: state, callbacks and camera",
       "the riding trace: a real Mount through the step",
