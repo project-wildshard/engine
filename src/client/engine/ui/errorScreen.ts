@@ -8,6 +8,8 @@ import { uiScope, mountUi } from './ownership';
 import { listenTap } from '../input/dom';
 import { copyText, diagnosticsSource, DOCTOR_EARLIER_KEY } from './diagnosticsCopy';
 import { Scope } from '../../../shared/engine/app/scope';
+import { showFailure, clearFailure } from '../telemetry/runtime';
+import type { FailureClear } from '../telemetry/model';
 
 const scope = uiScope('loadFailure', app.engineScope);
 
@@ -41,11 +43,11 @@ export async function doctorPreflight(url: string, read: typeof fetch = fetch, d
   finally { clearTimeout(timer); }
 }
 /** The doctor-http card on screen, if any: a new one (or a repeated `ws:doctor`) closes it, scope and all. */
-let doctorCardClose: (() => void) | null = null;
+let doctorCardClose: ((cause: FailureClear) => void) | null = null;
 /** FM8 mode 14's card: the doctor didn't open, and this page stays as it was. Try again re-checks with the card up (a failure
  *  replaces it, a pass leaves the page); Back closes the card. */
 function doctorHttpCard(measured: string, again: () => Promise<boolean>): void {
-  doctorCardClose?.();
+  doctorCardClose?.('replaced');
   const card = document.createElement('div'), box = document.createElement('div'), title = document.createElement('h1'), body = document.createElement('p');
   const retry = document.createElement('button'), back = document.createElement('button'), details = document.createElement('details'), summary = document.createElement('summary'), fact = document.createElement('p');
   card.dataset['failmode'] = 'doctor-http'; card.dataset['tone'] = 'warn'; card.setAttribute('role', 'alertdialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', engineString('s_doctor_http_title'));
@@ -58,10 +60,11 @@ function doctorHttpCard(measured: string, again: () => Promise<boolean>): void {
   back.type = 'button'; back.textContent = engineString('s_doctor_http_back'); back.style.cssText = button;
   summary.textContent = engineString('s_doctor_http_details'); fact.textContent = engineString('s_doctor_http_fact', [measured]); fact.style.cssText = 'margin:8px 0 0;opacity:.6';
   details.append(summary, fact);
-  const owner = new Scope('doctor-http', scope), close = (): void => { if (doctorCardClose === close) doctorCardClose = null; owner.dispose(); card.remove(); };
+  const owner = new Scope('doctor-http', scope), close = (cause: FailureClear): void => { clearFailure(card, cause, owner); if (doctorCardClose === close) doctorCardClose = null; owner.dispose(); card.remove(); };
+  showFailure(owner, card, 'doctor-http');
   doctorCardClose = close;
   owner.listen(retry, 'click', () => { retry.disabled = true; retry.textContent = engineString('s_doctor_http_checking'); void again(); });
-  owner.listen(back, 'click', close);
+  owner.listen(back, 'click', () => { close('dismissed'); });
   box.append(title, body, retry, back, details); card.append(box);
   mountUi(card, owner, document.body);
   retry.focus();

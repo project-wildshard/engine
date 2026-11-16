@@ -4,6 +4,7 @@ import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot
 import { currentLoadingTimeline } from '../../../shared/engine/boot/timeline';
 import { bootProgress } from '../../../shared/engine/boot/timing';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
+import { showFailure, clearFailure } from '../telemetry/runtime';
 import { clearDownloadGiveUp, downloadGiveUp, onDownloadGiveUp, type DownloadGiveUp } from './downloadGiveUp';
 
 /** A missing or interrupted transport, never a parsed-content or admission refusal. */
@@ -127,7 +128,8 @@ function shellRetry(scope: Scope, error: ContentReadError, retry: () => void): v
   if (foot !== null) {
     const failure = contentFailure(error);
     foot.textContent = failure.line; foot.dataset['failmode'] = failure.failmode;
-    scope.onDispose(() => { if (foot.dataset['failmode'] === failure.failmode) delete foot.dataset['failmode']; });
+    showFailure(scope, foot, failure.failmode);
+    scope.onDispose(() => { clearFailure(foot, 'disposed', scope); if (foot.dataset['failmode'] === failure.failmode) delete foot.dataset['failmode']; });
   }
   button.hidden = false;
   scope.listen(button, 'click', retry);

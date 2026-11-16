@@ -5,6 +5,7 @@ import { bootMark,bootProgress,bootTiming,downloadShown } from '@wildshard/engin
 import { beginLoadingWait, finishLoadingWait } from '@wildshard/engine/boot/loadingWaits';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { Scope } from '@wildshard/engine/app/scope';
+import { clearFailure, showFailure } from '@wildshard/engine/telemetry/runtime';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import { clearDownloadGiveUp, noteDownloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
@@ -875,11 +876,13 @@ const BOOK_LINE = 'The world\'s book didn\'t arrive';
 const BOOK_TRIES = 6, BOOK_LADDER_MS: readonly number[] = [2000, 4000, 8000, 16_000, 30_000];
 async function bookResponse(url: string, fresh: () => AbortSignal, stalled: (error: unknown) => never): Promise<Response> {
   let wait: number | undefined, shellFoot: HTMLElement | null = null;
+  const observation = new Scope('packs-book-observation');
+  let recovered = false;
   try {
     for (let attempt = 0; ; attempt++) {
       // each read has its own 20 s limit (DL21), body included; the waits between reads are the ladder's, not a stall
       const response = await fetch(url, {signal: fresh()}).catch(stalled);
-      if (response.ok) return response;
+      if (response.ok) { recovered = true; return response; }
       const busy = response.status === 429 || response.status >= 500;
       if (!busy || attempt + 1 >= BOOK_TRIES) throw new Error(`Packs book unavailable (${response.status})`);
       void response.body?.cancel().catch(() => undefined);
@@ -887,7 +890,7 @@ async function bookResponse(url: string, fresh: () => AbortSignal, stalled: (err
       const ms = Math.max(2000, response.status === 429 && Number.isFinite(told) && told > 0 ? Math.min(told, 60) * 1000 : BOOK_LADDER_MS[attempt] ?? 30_000);
       // at START, before Loading owns the card, only the shell's foot is on screen: it says so too (Loading repaints it later)
       const foot = document.querySelector?.<HTMLElement>('.ws-load [data-el="foot"]') ?? null;
-      if (foot !== null) { foot.textContent = BOOK_LINE; foot.dataset['failmode'] = 'book-5xx'; shellFoot = foot; }
+      if (foot !== null) { foot.textContent = BOOK_LINE; foot.dataset['failmode'] = 'book-5xx'; shellFoot = foot; showFailure(observation, foot, 'book-5xx'); }
       if (wait === undefined) wait = beginLoadingWait('Packs book', {kind: 'file', resource: url, failmode: 'book-5xx', line: BOOK_LINE, dueAt: diagnosticNow() + ms});
       else { finishLoadingWait(wait); wait = beginLoadingWait('Packs book', {kind: 'file', resource: url, failmode: 'book-5xx', line: BOOK_LINE, dueAt: diagnosticNow() + ms}); }
       const pause = new Scope('packs-book-retry');
@@ -895,6 +898,8 @@ async function bookResponse(url: string, fresh: () => AbortSignal, stalled: (err
     }
   } finally {
     if (wait !== undefined) finishLoadingWait(wait);
+    if (shellFoot !== null) clearFailure(shellFoot, recovered ? 'recovered' : 'replaced', observation);
+    observation.dispose();
     if (shellFoot?.dataset['failmode'] === 'book-5xx') { delete shellFoot.dataset['failmode']; shellFoot.textContent = ''; }
   }
 }

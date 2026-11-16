@@ -4,8 +4,10 @@ import { apiUrl } from '../core/apiOrigin';
 import { Scope } from '../../../shared/engine/app/scope';
 import { saves } from '../../../shared/engine/saves/runtime';
 import { SessionHealth } from './health';
-import { AnalyticsSink } from './model';
+import { AnalyticsSink, type FailureClear } from './model';
 import { flushCrossroads } from './crossroads';
+import { FailureOutbox, failureOutcomeSave } from './failureEpisodes';
+import { FailureTelemetry } from './failureTelemetry';
 
 declare const __BUILD_ID__: string;
 let health: SessionHealth | null = null;
@@ -13,6 +15,10 @@ let analytics: AnalyticsSink | null = null;
 let bound: App | null = null;
 let scope: Scope | null = null;
 let level = '';
+let failures: FailureTelemetry | null = null;
+/** Presentation observation is inert until the page composition root explicitly starts telemetry. */
+export function showFailure(owner: Scope, root: HTMLElement, ids: string): void { failures?.show(owner, root, ids); }
+export function clearFailure(root: HTMLElement, cause: FailureClear, owner?: Scope): void { failures?.clear(root, cause, owner); }
 const send = (body: object): void => {
   // Capture/parity previews do not host API functions; their observations must stay deterministic.
   if (typeof window === 'undefined' || harnessPins() !== undefined) return;
@@ -28,6 +34,14 @@ export function startTelemetry(): void {
   analytics = new AnalyticsSink(build, health.install, send);
   scope = new Scope('telemetry');
   if (harnessPins() === undefined) {
+    const slot = saves.define(failureOutcomeSave);
+    const outbox = new FailureOutbox({ getItem: () => slot.read(),
+      setItem: (_key, value) => { if (!slot.write(value)) throw new Error('Failure outcome storage refused'); },
+      removeItem: () => { if (!slot.write(null)) throw new Error('Failure outcome acknowledgement storage refused'); } });
+    failures = new FailureTelemetry(scope, outbox, build, health.install, () => level || 'boot', async batch => {
+      const response = await fetch(apiUrl('telemetry'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(batch), keepalive: true });
+      return response.ok;
+    });
     void flushCrossroads();
     scope.listen(window, 'online', () => { void flushCrossroads(); });
   }

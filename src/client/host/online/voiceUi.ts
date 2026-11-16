@@ -6,6 +6,7 @@ import type { ChatBox } from './chatLines';
 import { cornerShown } from './chatCorner';
 import { voicePrefs, type VoiceChat, type VoicePeer, type VoiceState } from './voice';
 import { voiceTalkKey, voiceTalkKeys } from '@wildshard/engine/ui/voiceSettings';
+import { showFailure, clearFailure } from '@wildshard/engine/telemetry/runtime';
 
 // J218: voice's controls live in the chat row, so the one mic button is both the phone's HUD toggle and the prompt "near the
 // chat". On a keyboard `B` toggles it (no binding uses B: `src/client/game/inputContexts.ts`). Over the row, one tip says
@@ -193,7 +194,8 @@ export function voiceUi(scope: Scope, voice: VoiceChat, chat: ChatBox): void {
         }
       }
       const failmode = shown?.key.split(':')[0];
-      if (failmode === 'voice-failed' || failmode === 'voice-failed-blocked') tip.dataset['failmode'] = failmode; else delete tip.dataset['failmode'];
+      if (failmode === 'voice-failed' || failmode === 'voice-failed-blocked') { tip.dataset['failmode'] = failmode; showFailure(scope, tip, failmode); }
+      else { clearFailure(tip, said?.key === dismissed ? 'dismissed' : 'recovered'); delete tip.dataset['failmode']; }
     }
     for (const id of chips.keys()) if (!voice.roster.has(id)) { chips.get(id)?.chip.remove(); chips.delete(id); }
     peers.hidden = voice.state !== 'on' || voice.roster.size === 0;

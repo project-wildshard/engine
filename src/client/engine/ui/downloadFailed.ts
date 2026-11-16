@@ -7,6 +7,7 @@ import type { DownloadGiveUp } from '../boot/downloadGiveUp';
 import { copyText, diagnosticsSource } from './diagnosticsCopy';
 import { mountUi } from './ownership';
 import { engineString } from '../../../shared/engine/strings';
+import { showFailure } from '../telemetry/runtime';
 
 const PAGE = 'position:fixed;inset:0;z-index:2147482600;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(4,9,14,.86);color:#e6f2f8;font:12px/1.5 "JetBrains Mono",Menlo,monospace';
 const BOX = 'width:min(440px,100%);padding:22px 18px 16px;background:rgba(13,27,38,.92);border:1px solid rgba(255,120,120,.45);border-top:2px solid #ff7878;display:flex;flex-direction:column;gap:10px';
@@ -30,6 +31,7 @@ export function downloadFailedPage(owner: Scope, given: DownloadGiveUp, measured
   const again = document.createElement('button'), check = document.createElement('button'), copy = document.createElement('button');
   const details = document.createElement('details'), summary = document.createElement('summary'), fact = document.createElement('p');
   root.dataset['failmode'] = 'download-failed'; root.dataset['tone'] = 'bad'; root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-modal', 'true');
+  showFailure(page, root, 'download-failed');
   root.setAttribute('aria-label', engineString('s_download_failed_title')); root.style.cssText = PAGE; box.style.cssText = BOX;
   tag.textContent = engineString('s_download_failed_tag'); tag.style.cssText = 'margin:0;font-size:10.5px;letter-spacing:.3em;text-transform:uppercase;color:#ff9a9a';
   title.textContent = engineString('s_download_failed_title'); title.style.cssText = 'margin:0;font:700 24px/1.1 Rajdhani,Bahnschrift,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#fff';

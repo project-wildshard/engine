@@ -34,7 +34,7 @@ const READ = new Set(['src/server/host/standalone/continuation.ts', 'src/server/
   'src/shared/engine/world/interact/flags.ts', 'src/client/host/online/voice.ts', 'src/client/game/summary.ts', 'src/client/game/travel/travel.ts',
   'src/client/game/grid/pageEntry.ts', 'src/client/game/grid/refusal.ts', 'src/client/game/session/crashResume.ts',
   'src/client/game/grid/titlePrefetchChoice.ts', 'src/client/game/grid/intent.ts', 'src/client/engine/ui/voiceSettings.ts',
-  'src/client/engine/input/bindings.ts', 'src/client/engine/telemetry/health.ts', 'src/client/engine/saves/slots.ts']);
+  'src/client/engine/input/bindings.ts', 'src/client/engine/telemetry/health.ts', 'src/client/engine/telemetry/failureEpisodes.ts', 'src/client/engine/saves/slots.ts']);
 
 interface LockKey { readonly version: number; readonly shape: string; readonly migrations: readonly number[] }
 interface Lock { readonly format: 1; readonly keys: Readonly<Record<string, LockKey>>; readonly retired: Readonly<Record<string, number>> }

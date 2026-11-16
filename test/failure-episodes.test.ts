@@ -16,7 +16,7 @@ test('repaint preserves the episode; replacement and independent hold cards end 
   let time = 100, id = 0;
   const tracker = new FailureEpisodes(value => { outcomes.push(value); }, () => time, () => `episode-${String(++id)}`);
   tracker.show(banner, 'drop', 'fixture');
-  time = 500; tracker.show(banner, 'drop', 'fixture'); tracker.show(hold, 'drop-blocked', 'fixture');
+  time = 500; tracker.show(banner, 'drop', 'another-fixture'); tracker.show(hold, 'drop-blocked', 'fixture');
   time = 900; tracker.clear(hold, 'dismissed'); tracker.show(banner, 'lost', 'fixture');
   time = 1100; tracker.clear(banner, 'recovered'); tracker.clear(banner, 'disposed');
   expect(outcomes).toEqual([

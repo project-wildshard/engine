@@ -108,6 +108,11 @@
       "shape": "7cb541e84f226754",
       "migrations": []
     },
+    "device/telemetry.failureOutcomes": {
+      "version": 1,
+      "shape": "7181a5d63b175dd1",
+      "migrations": []
+    },
     "device/telemetry.heartbeat": {
       "version": 1,
       "shape": "58aa2bf25f19d23c",

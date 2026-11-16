@@ -5,6 +5,8 @@
 import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { captureBrowserError } from '@wildshard/engine/telemetry/browserErrors';
+import { showFailure, clearFailure } from '@wildshard/engine/telemetry/runtime';
+import type { FailureClear } from '@wildshard/engine/telemetry/model';
 import { buttons, card, linkStyle, make, ring } from './linkScreens';
 import { releaseScreen, type ReleaseFault, type ReleaseScreen, type ReleaseWait } from './release';
 
@@ -46,23 +48,24 @@ export interface ReleaseScreenHooks {
  */
 export function releaseScreens(scope: Scope, hooks: ReleaseScreenHooks, parent: HTMLElement = document.body): ReleaseWait {
   const report = hooks.report ?? captureBrowserError;
-  let shown: Scope | null = null, reported = false;
-  const close = (): void => { shown?.dispose(); shown = null; };
-  scope.onDispose(close);
+  let shown: Scope | null = null, shownRoot: HTMLElement | null = null, reported = false;
+  const close = (cause: FailureClear): void => { if (shownRoot !== null) clearFailure(shownRoot, cause); shown?.dispose(); shown = null; shownRoot = null; };
+  scope.onDispose(() => { close('disposed'); });
   return {
-    done: close,
+    done: () => { close('recovered'); },
     after: (fault, attempt, retryMs, detail) => new Promise<void>((resolve, reject) => {
-      close();
+      close('replaced');
       linkStyle();
       const id = releaseScreen(fault), words = WORDS[id], page = new Scope(`online.release-${id}`, scope);
       shown = page;
       const { root, box } = card(page, id, words.tone, words.tag, words.title);
+      shownRoot = root;
       root.classList.add('ws-link-page');
       box.append(make('p', 'ws-link-body', words.body));
       let settled = false;
       let trying = (): void => undefined;
       const go = (): void => { if (settled) return; settled = true; trying(); resolve(); };
-      const leave = (): void => { if (settled) return; settled = true; reject(new Error('The player left the release wait for the title')); hooks.title(); };
+      const leave = (): void => { if (settled) return; settled = true; clearFailure(root, 'dismissed'); reject(new Error('The player left the release wait for the title')); hooks.title(); };
       page.onDispose(() => { if (!settled) { settled = true; resolve(); } });
       // the next read, counted from what is actually scheduled: never a made-up clock
       const status = make('p', 'ws-link-auto');
@@ -109,6 +112,7 @@ export function stagingMark(scope: Scope, parent: HTMLElement = document.body): 
   const mark = scope.ownNode(make('div', 'ws-link ws-link-mark', 'Staging'));
   mark.dataset['failmode'] = 'staging'; mark.dataset['tone'] = 'warn'; mark.setAttribute('role', 'status');
   mark.setAttribute('aria-label', STAGING_SENTENCE); mark.title = STAGING_SENTENCE;
+  showFailure(scope, mark, 'staging');
   parent.append(mark);
   return mark;
 }

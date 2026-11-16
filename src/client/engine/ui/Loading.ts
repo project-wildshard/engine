@@ -28,6 +28,7 @@ import { withOwner } from '../../../shared/engine/app/ownership';
 import { holdLoadingSwitch } from './devSwitch';
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
 import { leftByPlayer } from '../boot/dropNotice';
+import { showFailure, clearFailure } from '../telemetry/runtime';
 import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
 import './loading.css';
 
@@ -623,7 +624,7 @@ export class Loading {
 
   private paintWaiting(timeline: TimelineSnapshot): void {
     if (this.view?.error || this.failedReason !== null) return;
-    if (this.finished) { set(this.els.foot, ''); delete this.els.foot.dataset['failmode']; this.els.retry.hidden = true; setData(this.root, 'stalled', 'false'); return; }
+    if (this.finished) { clearFailure(this.els.foot, 'recovered', this.scope); set(this.els.foot, ''); delete this.els.foot.dataset['failmode']; this.els.retry.hidden = true; setData(this.root, 'stalled', 'false'); return; }
     const pending = this.scoped ? [] : loadingStepWaits(bootWaits(), timeline.display, timeline.current, this.timeline.waitOwner).filter(wait => wait.id !== this.waitId);
     const files = pending.filter(wait => wait.kind === 'file');
     // The outer admission promise has no file identity. Let the current
@@ -667,10 +668,12 @@ export class Loading {
     if (fault?.failmode !== undefined && fault.line !== undefined) {
       const due = fault.dueAt === undefined ? '' : ` · next try in ${String(Math.max(0, Math.ceil((fault.dueAt - now) / 1000)))} s`;
       this.els.foot.dataset['failmode'] = fault.failmode;
+      showFailure(this.scope, this.els.foot, fault.failmode);
       set(this.els.foot, `${fault.line} · ${String(Math.floor(Math.max(0, now - fault.startedAt) / 1000))} s${due}`);
       return;
     }
     delete this.els.foot.dataset['failmode'];
+    clearFailure(this.els.foot, 'recovered', this.scope);
     set(this.els.foot, stalled ? `Waiting for ${label} · ${(quietMs / 1000).toFixed(1)} s` : !this.finished && quietMs >= 500
       ? `No reported progress for ${(quietMs / 1000).toFixed(1)} s · ${detail}` : detail);
   }

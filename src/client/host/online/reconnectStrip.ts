@@ -1,4 +1,5 @@
 import type { Scope } from '@wildshard/engine/app/scope';
+import { showFailure } from '@wildshard/engine/telemetry/runtime';
 
 // FM4: the plain strip that lived here is linkScreens.ts's banner and cards now (meta MMO-FAILURE-MODES-PLAN).
 
@@ -18,6 +19,7 @@ export function newBuildPanel(scope: Scope, again: () => Promise<boolean>, reloa
   // RL3: the panel is already full-page; the tap's own turn turns it and its button into RELOADING
   scope.listen(go, 'click', () => { go.disabled = true; go.setAttribute('aria-busy', 'true'); go.textContent = 'Reloading…'; words.textContent = 'Reloading'; reload(); });
   panel.append(words, go); parent.append(panel);
+  showFailure(scope, panel, 'version-skew');
   let asking = false;
   scope.interval(NEW_BUILD_RETRY_MS, () => {
     if (asking) return;

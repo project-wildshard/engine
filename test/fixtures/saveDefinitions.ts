@@ -26,6 +26,7 @@ import '../../src/client/engine/ui/voiceSettings';
 import '../../src/client/engine/input/bindings';
 import '../../src/client/engine/saves/slots';
 import { SessionHealth } from '../../src/client/engine/telemetry/health';
+import { failureOutcomeSave } from '../../src/client/engine/telemetry/failureEpisodes';
 
 const isDefinition = (value: unknown): value is SaveKeyDef<unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
   && typeof (value as Record<string, unknown>)['key'] === 'string' && typeof (value as Record<string, unknown>)['version'] === 'number'
@@ -38,6 +39,7 @@ export function definitions(): Map<string, SaveKeyDef<unknown>> {
   for (const definition of exported) store.define(definition);
   summaryStore(store, () => null); shardRefusals(store); titlePrefetchChoice(store); gridIntents(store);
   new SessionHealth(store, '', () => undefined, 0, () => 'lock');
+  store.define(failureOutcomeSave);
   // Families: one schema under many keys. The lock names each by its family.
   legacyRewardSlot(store, '(quest reward)'); legacyAdventureNames('(legacy names)'); legacyAdventureCosmetics('(legacy cosmetics)'); legacyAdventureBond('(legacy bond)');
   return new Map([...definedSaveKeys()].sort(([a], [b]) => a.localeCompare(b)));

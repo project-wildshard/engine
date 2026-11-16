@@ -10,6 +10,8 @@ import type { Countdown } from '@wildshard/engine/net/socketFrames';
 import type { TransportStats } from '@wildshard/engine/net/transport';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { captureBrowserError } from '@wildshard/engine/telemetry/browserErrors';
+import { showFailure, clearFailure } from '@wildshard/engine/telemetry/runtime';
+import type { FailureClear } from '@wildshard/engine/telemetry/model';
 
 declare const __BUILD_ID__: string;
 /** SENTRY-TRIAGE S13: a stop card that means the link failed (`link-lost`, `link-refused`) sends one event as it opens */
@@ -141,6 +143,7 @@ const blockedIds = (ids: string): string => ids.split(' ').map(id => `${id}-bloc
 export function card(scope: Scope, ids: string, tone: 'info' | 'warn' | 'bad', tag: string, title: string): { root: HTMLElement; box: HTMLElement } {
   const root = scope.ownNode(make('div', 'ws-link ws-link-scrim')), box = make('div', 'ws-link-box');
   root.dataset['failmode'] = ids; root.dataset['tone'] = tone; root.setAttribute('role', 'alertdialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', title);
+  showFailure(scope, root, ids);
   box.append(make('p', 'ws-link-tag', tag), make('h1', '', title)); root.append(box);
   // aria-modal: Tab and Shift+Tab go round the card's own buttons (InputService leaves Tab to an alertdialog)
   scope.listen(root, 'keydown', event => {
@@ -193,7 +196,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
 
   // focus goes back where it was before the first card opened (the chat box, the canvas) when the last one closes
   let returnTo: HTMLElement | null = null;
-  const close = (): void => { open?.scope.dispose(); open = null; if (returnTo?.isConnected === true) returnTo.focus(); returnTo = null; };
+  const disposeOpen = (cause: FailureClear): void => { if (open !== null) { clearFailure(open.root, cause); open.scope.dispose(); } open = null; };
+  const close = (cause: FailureClear = 'dismissed'): void => { disposeOpen(cause); if (returnTo?.isConnected === true) returnTo.focus(); returnTo = null; };
   const remember = (): void => { if (open === null && document.activeElement instanceof HTMLElement && document.activeElement !== document.body) returnTo = document.activeElement; };
   // a card takes the pointer back from the game (desktop pointer lock), so its buttons can be clicked
   const freePointer = (): void => { if ('exitPointerLock' in document && document.pointerLockElement instanceof Element) document.exitPointerLock(); };
@@ -203,9 +207,13 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     banner.hidden = !shown;
     // a link that is down takes the top band from the deploy countdown; the countdown comes back with the link
     deploy.hidden = down() || deployLeft <= 0;
+    if (!shown) clearFailure(banner, state === 'live' ? 'recovered' : 'replaced');
+    if (!deploy.hidden) showFailure(scope, deploy, 'deploy');
+    else clearFailure(deploy, down() ? 'replaced' : 'recovered');
     if (!shown) return;
     const said = bannerFor(state, hooks.why(), hooks.progress().dials);
     banner.dataset['failmode'] = said.ids; banner.dataset['tone'] = said.tone; banner.dataset['state'] = state;
+    showFailure(scope, banner, said.ids);
     head.replaceChildren(ring(), said.title); line.textContent = said.line;
   };
   let noticeScope: Scope | null = null;
@@ -216,13 +224,14 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     chip.dataset['failmode'] = 'reconnected'; chip.dataset['tone'] = 'good'; chip.setAttribute('role', 'status');
     chip.append(make('b', '', 'Reconnected'), make('span', '', 'you\'re back online'));
     parent.append(chip);
+    showFailure(own, chip, 'reconnected');
     own.timeout(NOTICE_MS, unnotice);
   };
   /** The hold card: the banner opened up, on a tap it can't carry. It repaints each second from the dial's progress. */
   const hold = (what: string, chat: boolean): void => {
     // the offline card already says why nothing goes out; a held chat line still waits for the link
     if (open?.kind === 'stop' || open?.kind === 'offline' || open?.kind === 'away') return;
-    remember(); open?.scope.dispose(); open = null;
+    remember(); disposeOpen('replaced');
     const own = scope.child('online.hold'), said = bannerFor(state, hooks.why(), hooks.progress().dials);
     const title = chat ? 'Your message will send when you\'re back' : state === 'resuming' ? 'Still reconnecting' : hooks.why() === 'restart' ? 'The world is restarting' : 'Not connected yet';
     const { root, box } = card(own, blockedIds(chat ? 'reset' : said.ids), said.tone, said.title, title);
@@ -257,7 +266,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   };
   /** A card that stops play: the link gave up, the world is full, another tab, turned away. */
   const stop = (ids: string, tone: 'info' | 'warn' | 'bad', tag: string, title: string, body: string, actions: Parameters<typeof buttons>[1], detail?: string, live?: (node: HTMLElement) => void): void => {
-    remember(); open?.scope.dispose(); open = null;
+    remember(); disposeOpen('replaced');
     const own = scope.child('online.card'), { root, box } = card(own, ids, tone, tag, title);
     box.append(make('p', 'ws-link-body', body));
     if (live !== undefined) { const status = make('p', 'ws-link-facts'); status.setAttribute('role', 'status'); live(status); own.interval(1000, () => { live(status); }); box.append(status); }
@@ -275,7 +284,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
    */
   const offlineCard = (): void => {
     if (open?.kind === 'offline') return;
-    remember(); open?.scope.dispose(); open = null;
+    remember(); disposeOpen('replaced');
     const own = scope.child('online.offline'), { root, box } = card(own, 'offline-play', 'warn', 'Connection dropped', 'You\'re offline');
     box.append(make('p', 'ws-link-body', 'This device lost its internet connection. The world needs it to carry on.'));
     const status = make('ul', 'ws-link-facts'), waiting = make('li');
@@ -298,7 +307,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
    */
   const awayCard = (away: LinkAway): void => {
     if (open?.kind === 'away') { open.paint(); return; }
-    remember(); open?.scope.dispose(); open = null;
+    remember(); disposeOpen('replaced');
     const asleep = away.how === 'asleep', own = scope.child('online.away');
     const { root, box } = card(own, asleep ? 'background-long sleep-wake' : 'background-long', 'info', 'Away', 'Welcome back');
     box.append(make('p', 'ws-link-body', `You were away for ${awayFor(away.ms)}, and the link to the world went quiet. We're checking your connection now.`));
@@ -326,16 +335,17 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
    * percentage. A chip waits while a banner is up (it is the bottom layer) and comes back, if still due, with the link.
    */
   const rtts: number[] = [];
-  let slowRun = 0, unstableRun = 0, goodRun = 0, sinceChip = QUALITY_GAP_S, qualityScope: Scope | null = null, qualityKind: 'slow' | 'lossy' | null = null, qualityLine: HTMLElement | null = null;
-  const hideQuality = (): void => { qualityScope?.dispose(); qualityScope = null; qualityKind = null; qualityLine = null; };
+  let slowRun = 0, unstableRun = 0, goodRun = 0, sinceChip = QUALITY_GAP_S, qualityScope: Scope | null = null, qualityKind: 'slow' | 'lossy' | null = null, qualityLine: HTMLElement | null = null, qualityRoot: HTMLElement | null = null;
+  const hideQuality = (cause: FailureClear = 'recovered'): void => { if (qualityRoot !== null) clearFailure(qualityRoot, cause); qualityScope?.dispose(); qualityScope = null; qualityKind = null; qualityLine = null; qualityRoot = null; };
   const showQuality = (kind: 'slow' | 'lossy', rtt: number): void => {
     if (qualityKind !== kind) {
-      hideQuality(); unnotice();
+      hideQuality('replaced'); unnotice();
       const own = qualityScope = scope.child('online.quality'), chip = own.ownNode(make('div', 'ws-link ws-link-notice'));
       chip.dataset['failmode'] = kind; chip.dataset['tone'] = 'warn'; chip.setAttribute('role', 'status');
       qualityLine = make('span');
       chip.append(make('b', '', kind === 'slow' ? 'Slow connection' : 'Unstable connection'), qualityLine);
       parent.append(chip);
+      qualityRoot = chip; showFailure(own, chip, kind);
       qualityKind = kind; sinceChip = 0;
     }
     if (qualityLine !== null) qualityLine.textContent = kind === 'slow' ? `${String(Math.round(rtt))} ms` : 'others may jump';
@@ -343,7 +353,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   const sampleQuality = (): void => {
     sinceChip++;
     const stats = hooks.stats?.();
-    if (stats === undefined || state !== 'live') { hideQuality(); slowRun = unstableRun = goodRun = 0; rtts.length = 0; return; }
+    if (stats === undefined || state !== 'live') { hideQuality('replaced'); slowRun = unstableRun = goodRun = 0; rtts.length = 0; return; }
     const rtt = stats.rttMs;
     if (Number.isFinite(rtt) && rtt > 0) { rtts.push(rtt); if (rtts.length > 5) rtts.shift(); }
     const slow = Number.isFinite(rtt) && rtt > SLOW_RTT_MS;
@@ -356,23 +366,23 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   scope.interval(1000, sampleQuality);
   const link = (next: LinkState, why?: string): void => {
     state = next; reason = why;
-    if (state !== 'live') hideQuality();
+    if (state !== 'live') hideQuality('replaced');
     paintBanner();
     // down again: the notice goes, and a stop card (lost, after Try again) gives way to the banner
     if (down()) {
       wasDown = true; unnotice();
-      if (open?.kind === 'stop') close();
+      if (open?.kind === 'stop') close('replaced');
       if (hooks.why() === 'offline') { offlineCard(); return; }
-      if (open?.kind === 'offline') close();
+      if (open?.kind === 'offline') close('recovered');
       const away = hooks.progress().away;
       if (away !== undefined) { awayCard(away); return; }
-      if (open?.kind === 'away') close();
+      if (open?.kind === 'away') close('recovered');
       // a hold card follows its banner: a new cause (silent to restart) or 35 s down redraws it, else it just ticks
       if (open?.kind === 'hold' && open.key !== `${state}:${hooks.why()}` && open.what !== undefined) hold(open.what, open.chat === true); else open?.paint();
       return;
     }
     if (state === 'live') {
-      close();
+      close('recovered');
       if (wasDown) notice();
       wasDown = false;
       for (const kept of held.splice(0)) kept.send(kept.text);
@@ -399,7 +409,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     link,
     countdown: said => {
       deployLeft = said.seconds;
-      const paint = (): void => { deployLine.textContent = `in ${String(deployLeft)} s · preparing to move`; deploy.hidden = down() || deployLeft <= 0; };
+      const paint = (): void => { deployLine.textContent = `in ${String(deployLeft)} s · preparing to move`; deploy.hidden = down() || deployLeft <= 0; if (!deploy.hidden) showFailure(scope, deploy, 'deploy'); else clearFailure(deploy, down() ? 'replaced' : 'recovered'); };
       paint();
       if (deployTicking) return;
       deployTicking = true;

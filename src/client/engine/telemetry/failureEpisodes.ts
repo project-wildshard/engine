@@ -1,12 +1,15 @@
 import * as v from 'valibot';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
-import type { SaveStorage } from '../../../shared/engine/saves/store';
+import type { SaveKeyDef, SaveStorage } from '../../../shared/engine/saves/store';
 import type { AnalyticsBatch, AnalyticsMap, FailureClear } from './model';
 
 type Outcome = AnalyticsMap['failure.screen'];
 interface Record { readonly build: string; readonly install: string; readonly data: Outcome }
 interface Active { readonly id: string; readonly screen: string; readonly level: string; readonly since: number }
 const KEY = 'failure-screen.pending', MAX = 32, MAX_BYTES = 65_536;
+/** Registered device storage for pending immutable outcomes; unrelated settings remain separate. */
+export const failureOutcomeSave: SaveKeyDef<string | null> = { key: 'telemetry.failureOutcomes', scope: 'device', version: 1,
+  schema: v.nullable(v.pipe(v.string(), v.maxLength(MAX_BYTES))), initial: () => null };
 const Code = v.pipe(v.string(), v.regex(/^[a-z][a-z0-9-]{0,63}$/u));
 const Id = v.pipe(v.string(), v.regex(/^[\w-]{8,64}$/u));
 const Text = v.pipe(v.string(), v.maxLength(128));
@@ -19,8 +22,8 @@ const Records = v.pipe(v.array(v.strictObject({ build: Text, install: Text, data
 export class FailureOutbox {
   private memory: readonly Record[] = [];
   private readonly sending = new Set<string>();
-  private readonly storage: SaveStorage | null;
-  constructor(storage: SaveStorage | null) { this.storage = storage; this.memory = this.read(); }
+  private readonly storage: Pick<SaveStorage, 'getItem' | 'setItem' | 'removeItem'> | null;
+  constructor(storage: Pick<SaveStorage, 'getItem' | 'setItem' | 'removeItem'> | null) { this.storage = storage; this.memory = this.read(); }
   private read(): readonly Record[] {
     try {
       const raw = this.storage?.getItem(KEY);
@@ -77,7 +80,7 @@ export class FailureEpisodes {
     id: () => string = crypto.randomUUID.bind(crypto)) { this.emit = emit; this.now = now; this.id = id; }
   show(root: object, screen: string, level: string): void {
     const before = this.active.get(root);
-    if (before?.screen === screen && before.level === level) return;
+    if (before?.screen === screen) return;
     this.clear(root, 'replaced');
     if (!v.safeParse(Code, screen).success || !v.safeParse(Text, level).success) return;
     const since = this.now(), id = this.id();
