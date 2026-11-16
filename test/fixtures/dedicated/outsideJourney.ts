@@ -99,7 +99,7 @@ export async function outsideJourney(connect: () => RoomBot, timeoutMs = 60_000,
     if (resumed.player !== beforeDrop.player || resumed.handle !== beforeDrop.handle || resumed.cell !== beforeDrop.cell ||
       Math.hypot(resumed.x - beforeDrop.x, resumed.y - beforeDrop.y, resumed.z - beforeDrop.z) > 1 ||
       sameFoe === null || sameFoe.hp > hurt.hp)
-      throw new Error('Redial did not preserve the fighting body and creature health');
+      throw new Error(`Redial did not preserve the fighting body and creature health: ${JSON.stringify({beforeDrop, resumed, hurt, sameFoe})}`);
     result = {version: 1, complete: true, walkedMeters,
       fight: {id: target.id, beforeHp: target.hp, afterHp: hurt.hp, amount: hit.amount, confirmedSeq: hit.confirmFor}, beforeDrop, resumed};
   } finally {

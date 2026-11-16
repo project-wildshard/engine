@@ -92,3 +92,11 @@ no async journey starts after partial fixture preparation. Format0.12
 frozen installation resolves stale-worktree lint types after mainc7.
 All four rows consolidate on this branch for one exact admission; old
 a8 CI is superseded rather than carried across the moving base.
+
+The rebased f7ea source proof passed all four hosted cases, but its live
+run43936489130 failed the existing strict redial/body/foe check. The
+receipt said only which combined check failed, so it cannot distinguish
+a lost body from a dead/missing/healed creature or displaced position.
+Include the actual authoritative before/after witnesses in that error;
+keep every success condition. Preserve this failed observation and
+repeat exact qualification after the diagnostic change.
