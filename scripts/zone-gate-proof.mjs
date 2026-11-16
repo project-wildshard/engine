@@ -22,7 +22,7 @@ const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '2992x1434@2')) ??
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 const HALF = 250;
 /** the gate's cell: Driftwood's east (Nalati) or west (Sunscar) neighbour; `dir` is its side, +1 east, -1 west */
-const TARGETS = /** @type {Record<string, { name: string, dir: number }>} */ ({ 'nalati-grasslands': { name: 'Nalati Grasslands', dir: 1 }, 'sunscar-dunes': { name: 'Sunscar Dunes', dir: -1 } });
+const TARGETS = /** @type {Record<string, { name: string, dir: number }>} */ ({ 'nalati-grasslands': { name: 'Nalati Grasslands', dir: 1 }, 'sunscar-dunes': { name: 'Signal Dunes', dir: -1 } });
 const targetSlug = flag('target', 'nalati-grasslands'), target = TARGETS[targetSlug];
 if (target === undefined) throw new Error(`--target is one of ${Object.keys(TARGETS).join(', ')}`);
 const dir = target.dir;
@@ -158,11 +158,11 @@ try {
     // ZE10b: the arrival (the new home's own frame: its west entryway's centre line, 14 m in, facing east into the cell), then a free
     // walk back out of the new home onto the road (no wall: the home has none)
     /** @type {{ x: number, z: number, yaw: number } | null} */
-    let arrived = null, walkedOut = false, /** @type {any} */ oldHomeGate = null, /** @type {boolean | null} */ zonePending = null, /** @type {number | null} */ controlMB = null;
+    let arrived = null, walkedOut = false, /** @type {any} */ oldHomeGate = null, /** @type {boolean | null} */ zonePending = null, oldHomeLeft = false, /** @type {number | null} */ controlMB = null;
     if (ready) {
       await sleep(1500);
       // ZE10d: the loading screen is gone at control (a second gate's 0 is refused while it is up)
-      zonePending = await page.evaluate(() => /** @type {any} */ (window).__wildshardZonePending?.() ?? null).catch(() => null);
+      zonePending = await page.evaluate(() => document.querySelector('.ws-load[data-navigation]') !== null).catch(() => null);
       arrived = await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; return { x: Number(p.position.x.toFixed(2)), z: Number(p.position.z.toFixed(2)), yaw: Number(p.yaw.toFixed(3)) }; });
       // settled where it arrived (the fresh boot below stands at the same pose for as long)
       await sleep(SETTLE_MS); controlMB = await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
@@ -176,9 +176,14 @@ try {
       if (walkedOut) {
         const home = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
         const driftwoodEdge = home.x - dir * (pitch - HALF);
-        await walkTo(driftwoodEdge - dir * 2); await until(gate => gate?.cell === 'driftwood-isle' && gate?.count === 5);
-        oldHomeGate = (await state()).gate; await page.screenshot({ path: join(out, `${tag}-old-home-gate.png`) });
+        await walkTo(driftwoodEdge - dir * 2);
+        // the gate's state is read before the shot (a full-size shot can outlast a count's second), and the walker steps straight back
+        // out: the count must never reach 0 here (a second entry would overlap the memory reads below)
+        if (await until(gate => gate?.cell === 'driftwood-isle' && gate?.count === 5)) oldHomeGate = (await state()).gate;
         await walkTo(driftwoodEdge + dir * 8);
+        await page.screenshot({ path: join(out, `${tag}-old-home-gate.png`) });
+        const back = await state();
+        oldHomeLeft = back.gate?.cell == null && await page.evaluate(slug => { const st = /** @type {any} */ (window).__wildshard.shard.grid.state(); return document.querySelector('.ws-load[data-navigation]') === null && (st.live?.live?.home ?? st.home) === slug; }, targetSlug).catch(() => false);
       }
     }
     /** @type {{ left: number | null, reads: { url: string, start: number }[] } | null} */
@@ -190,7 +195,7 @@ try {
     let freshMB = /** @type {number | null} */ (null);
     try { freshMB = await bootCard(freshContext, target.name, arrived ?? { x: dir * (14 - HALF), z: 0, yaw: -dir * Math.PI / 2 }); } catch (error) { result.errors.push(`fresh ${target.name} boot: ${String(error).slice(0, 200)}`); }
     await freshContext.close();
-    result.fired = { navigations, departure: departure?.how ?? null, samePage, navigated: left, before, after: page.url(), ready, home, zonePending, arrived, walkedOut, oldHomeGate, enteredMB, controlMB, freshMB,
+    result.fired = { navigations, departure: departure?.how ?? null, samePage, navigated: left, before, after: page.url(), ready, home, zonePending, arrived, walkedOut, oldHomeGate, oldHomeLeft, enteredMB, controlMB, freshMB,
       residency: pageReads !== null && pageReads.left !== null ? { clock: 'page', readsBeforeLeaving: pageReads.reads.filter(row => row.start < /** @type {number} */ (pageReads.left)).map(row => row.url.replace(base, '')),
         firstReadAfterMs: pageReads.reads.filter(row => row.start >= /** @type {number} */ (pageReads.left)).reduce((first, row) => Math.min(first, Math.round(row.start - /** @type {number} */ (pageReads.left))), Number.POSITIVE_INFINITY),
         script: { leftAt, readsBefore: reads.filter(row => row.at < leftAt).length } } : { clock: 'script', leftAt, readsBeforeLeaving: reads.filter(row => row.at < leftAt).map(row => row.url), firstReadAfterMs: left ? (reads.find(row => row.at >= leftAt)?.at ?? null) === null ? null : (reads.find(row => row.at >= leftAt)?.at ?? 0) - leftAt : null } };
@@ -201,8 +206,10 @@ try {
   await context.close();
   const fired = /** @type {any} */ (result.fired);
   // ZE10c: nothing of the target read before the old document went, and memory at control within 50 MB of a fresh boot
-  const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50;
-  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.zonePending === false)) ? 0 : 1;
+  // both clocks: the page's resource timing (exact order, the window's reads only) and the script's request log (the in-page server
+  // worker's reads too)
+  const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && (fired.residency.script?.readsBefore ?? 0) === 0 && typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50;
+  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.oldHomeLeft === true && fired.zonePending === false)) ? 0 : 1;
 } catch (error) { result.note = String(error).slice(0, 400); console.log(`FAIL ${result.note}`); }
 finally {
   writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);
