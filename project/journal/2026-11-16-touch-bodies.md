@@ -12,3 +12,4 @@
   grid cell's, posed off the wire's `script:<id>` row, and draws its named panel there (`moverPanelPose` with the row's
   rest); a cell takes the wire once the feet enter it and its drawn panel (`neighbourPanels.ts`) keeps the id after.
   Test: `test/touch-views.test.ts`.
+- opus-ss16n: `test/touch-bodies-room.test.ts`: two seats in one room, one pushes the crate, both clients' frames carry it at the server's pose (SS9e's engine half; the devserver page runs one player a page).
