@@ -71,3 +71,23 @@ The final hosted native and shard journeys must qualify this SHA;
 all prior83ea receipts remain historical. Frozen install/pins pass.
 Normal land uses --no-preflight to avoid a local cook, preserving
 normal hooks and exact hosted CI. Main stays held behind TC40.
+
+## Health API refresh,2026-11-16
+
+Main9ad13112 adds a fourth speciesHealth argument and restores a
+legacy page fallback for already-baked bodies. Pass declared
+aggression while retaining this repair's strict guard for an unseen
+variant with no variant/tuning health. A new actual-roster refusal
+case proves that legacy defaults do not invent an unbaked recipe.
+Existing baked variants and their admitted harvest/cap metadata stay
+unchanged. Full compiler/focused lint and4cases1.36s pass. The prior
+1a engine and5a shard reports are complete, but final qualification
+must follow this new exact head. No assertion or budget changes.
+Normal land stays main-held behind TC40 and uses --no-preflight to
+avoid local cook while keeping normal hooks and exact hosted CI.
+
+The bounded read-only J206 review of the health guard and refusal
+case is CLEAR, no MUST or SHOULD. Claude quota remains unverified;
+the documented read-only Codex fallback uses Python's timeout
+because the standard helper's timeout binary is absent. No hook
+escape hatch is used.

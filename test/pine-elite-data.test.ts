@@ -109,3 +109,25 @@ test('ending a concealed encounter restores visibility before saving', async () 
     const saved = ghost.program.snapshot(); ghost.program.prepareRestore(saved)(); expect(body.hidden).toBe(false);
   } finally { host.dispose(); }
 }, 10_000);
+
+
+test('an unseen native variant refuses missing health before using a legacy default', async () => {
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const host = createSimHost({ ...SIM_LEVEL, entities: [] }, { rapier });
+  try {
+    flatPopulationEnvironment(host);
+    const population = readSpeciesPrograms(PINE_SPECIES_PROGRAMS), family = structuredClone(population.native.find(row => row.kind === 'bear'));
+    const sample = SIM_LEVEL.entities[0], variant = family?.variants[0];
+    if (sample === undefined || family === undefined || variant === undefined) throw new Error('Missing native bear fixture');
+    const missing = { ...variant, id: 'unbaked-without-health' };
+    Reflect.deleteProperty(missing, 'hp');
+    if (family.tuning !== undefined) Reflect.deleteProperty(family.tuning, 'hp');
+    family.variants = [variant, missing];
+    const parked = [{ id: 'known-bear', kind: family.kind, variant: variant.id, seed: sample.seed, scale: sample.scale,
+      spec: { ...sample.spec, kind: family.kind, variant: variant.id } }];
+    expect(() => installPopulationRoster(host, { population: { ...population, native: [family] }, nav: null, spawnY: 20,
+      bake: { actors: [], parked, herds: [] } }, { version: 1, environment: 'fixture.habitat', step: 'health.roster', seed: 1368, bodyCount: 0, limit: 512,
+      scripted: 'sidestep', encounter: 'test', poseKinds: [], spawn: { x: 0, z: 0 }, fauna: [], identities: [], ordinary: {}, reserves: [], homes: [] }))
+      .toThrow('Missing native variant health');
+  } finally { host.dispose(); }
+});

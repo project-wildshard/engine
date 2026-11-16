@@ -90,8 +90,13 @@ export function installPopulationRoster(host: SimHost, ports: PopulationRosterPo
     if (missing.length === 0) continue;
     const geometry = JSON.stringify(base.dims);
     if (known.some(spec => JSON.stringify(spec.dims) !== geometry)) throw new Error(`Missing native variant needs one kind geometry: ${family.kind}`);
-    for (const variant of missing) specs.push({ ...base, variant: variant.id, label: variant.label,
-      hp: speciesHealth(family.id, variant.hp, family.tuning?.hp), rarity: variant.rarity, mods: variantMods(family, variant) });
+    for (const variant of missing) {
+      // A legacy default may load a baked body; it cannot invent the health
+      // of a variant for which this bake contains no simulation recipe.
+      if (variant.hp === undefined && family.tuning?.hp === undefined) throw new Error(`Missing native variant health: ${family.id}.${variant.id}`);
+      specs.push({ ...base, variant: variant.id, label: variant.label,
+        hp: speciesHealth(family.id, variant.hp, family.tuning?.hp, family.aggressive), rarity: variant.rarity, mods: variantMods(family, variant) });
+    }
   }
   // the shared native roster (G454 rows): the bake's first spec per kind.variant, the manager's spawn ray and creature floor
   // over the page's terrain grid (the host's ground), every kind adopted by the hunting brain, no turn cap, a restoring
