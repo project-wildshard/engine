@@ -29,3 +29,6 @@
   the raw `git describe`. `versionJson` now takes the pill's label (`engineRelease`); a temp-repo test was red on the old call.
 - SB30: the J383 forced update reloaded onto the title behind "Unexpectedly back at the title"; its reason
   (`FORCE_UPDATE_RELOAD`) is now a player-side exit, so the title is quiet. Test in reload-title.test.ts, red first.
+- SB31: staging Pine Hollow froze the page 11.5 s and 4.1 s on arrival; no ping went out, the server closed `stalled`
+  (4004) and the strip showed twice. The redial no longer counts its own freeze as silence and redials a `stalled` close
+  that a freeze caused before telling the player. Server SILENCE_MS (3 s) is unchanged.

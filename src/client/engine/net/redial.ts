@@ -90,6 +90,10 @@ export class Redial {
   /** The watch's last tick: a gap after it is time the page did nothing at all (FM4b mode 45). */
   private tickAt: number;
   private awayFor: LinkAway | null = null;
+  /** STAGING-BUGBASH SB31: when the page last came back from a freeze of its own (a long task, no tick for a second or more). */
+  private thawedAt = -Infinity;
+  /** A link lost to the page's own freeze is dialled before the player is told: the strip waits until then. */
+  private quietUntil = 0;
   constructor(options: RedialOptions) {
     this.options = options; this.transport = options.transport; this.now = options.now ?? diagnosticNow; this.random = options.random ?? jitterFrom(this.now()); this.online = options.online ?? browserOnline;
     this.tickAt = this.now();
@@ -142,7 +146,7 @@ export class Redial {
       const silent = now - this.heardAt;
       if (silent >= STRIP_MS && this.state === 'live') this.because(this.online() ? 'silent' : 'offline');
       if (silent >= DROP_MS) this.lose(now); else if (silent >= STRIP_MS) this.show('reconnecting');
-    } else if (this.phase === 'down') this.redial(now);
+    } else if (this.phase === 'down') { if (this.state === 'live' && now >= this.quietUntil) this.show('reconnecting'); this.redial(now); }
   }
   private redial(now: number): void {
     if (this.waitingForSeat) { if (this.dialled === null && now >= this.dialAt) this.dial(now); else if (this.dialled !== null && now - this.dialled >= DROP_MS) { this.failedDial(now); this.drop(); } return; }
@@ -184,6 +188,11 @@ export class Redial {
   }
   private closed(reason: string): void {
     const now = this.now();
+    // SB31: the server closes a client it heard no byte from for 3 s (SILENCE_MS); a page frozen that long sent no ping. That is
+    // the page, not the link: dial at once, and say nothing unless the link is still down a second later.
+    if (reason === 'stalled' && this.phase === 'up' && (now - this.tickAt >= STRIP_MS || now - this.thawedAt < STRIP_MS)) {
+      this.quietUntil = now + STRIP_MS; this.lose(now, false); this.dialAt = now; return;
+    }
     // 5.5: `retry` is a newer client at an older server: back off and dial again, never reload. A refusal before the first
     // frame may be the cut (an old server); the page decides from version.json, and until then the server is updating.
     const cut = (reason === 'reload' || reason === 'refused') && this.heardAt === null;
@@ -203,7 +212,12 @@ export class Redial {
   private woke(now: number, hiddenMs: number): void {
     const gap = now - this.tickAt;
     this.tickAt = now;
-    if (gap < AWAY_MS && hiddenMs < AWAY_MS) return;
+    if (gap < AWAY_MS && hiddenMs < AWAY_MS) {
+      // SB31: a freeze of the page's own (a long task on arrival: 11.5 s on staging Pine Hollow) is not the link's silence: frames
+      // that came in it are queued behind it, so the watch counts only the time the page could have read them
+      if (gap >= STRIP_MS) { this.thawedAt = now; if (this.phase === 'up' && this.heardAt !== null) this.heardAt += gap - WATCH_MS; }
+      return;
+    }
     const how = hiddenMs >= AWAY_MS || this.awayFor?.how === 'hidden' ? 'hidden' : 'asleep', ms = Math.max(gap, hiddenMs, this.awayFor?.ms ?? 0);
     if (this.phase === 'up') {
       if (this.heardAt === null || now - this.heardAt < STRIP_MS) return;
@@ -218,7 +232,7 @@ export class Redial {
   /** The link is gone or no use: from now it is dialled, and a player's 35 s count from the last frame. */
   private lose(now: number, close = true): void {
     this.phase = 'down'; this.lostAt = this.heardAt ?? now; this.dialled = null; this.dialAt = now + (DIAL_WAITS_MS[0] ?? 0) * (1 + (this.random() * 2 - 1) * DIAL_JITTER);
-    this.show(now - this.lostAt >= RESUMING_MS ? 'resuming' : 'reconnecting');
+    if (now >= this.quietUntil) this.show(now - this.lostAt >= RESUMING_MS ? 'resuming' : 'reconnecting');
     if (close) this.drop();
   }
   private drop(): void { this.offClose(); this.transport.close('stalled'); }

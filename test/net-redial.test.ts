@@ -318,3 +318,39 @@ test('FM4b mode 45: a link already dialling when the page slept moves its give-u
   expect(redial.progress.away?.how).toBe('asleep');
   redial.dispose();
 });
+
+// STAGING-BUGBASH SB31: on staging v0.1.31 a cold Pine Hollow entry froze the page 11.5 s and then 4.1 s (long tasks); no ping went
+// out, the server closed the socket `stalled` (4004) after its 3 s, and the strip said Reconnecting / one moment twice while the
+// redial came straight back. Time the page itself was frozen is not the link's silence, and a `stalled` close that the page's own
+// freeze caused is dialled at once, quietly: the strip shows only if the link is not back within a second.
+test('SB31: a page frozen for 11.5 s, which the server closes `stalled`, redials with no strip', () => {
+  const { heard, run, away, states, links, redial } = harness();
+  heard(); run(500);
+  away(11_500); // a long task: no timer ran
+  links[0]?.fail('stalled'); // the server's close, queued during the freeze, runs first
+  run(100);
+  expect(links, 'dialled at once').toHaveLength(2);
+  heard(); run(800); heard(); run(800);
+  expect(states).toEqual([]);
+  redial.dispose();
+});
+
+test('SB31: a page frozen for 4 s whose frames were queued behind the freeze keeps its link', () => {
+  const { heard, run, away, states, links, redial } = harness();
+  heard(); run(500);
+  away(4000);
+  run(100); heard(); run(800); // the watch ticks once before the queued frames run
+  expect(links).toHaveLength(1);
+  expect(states).toEqual([]);
+  redial.dispose();
+});
+
+test('SB31: after a freeze, a link that does not come back still shows the strip within a second', () => {
+  const { heard, run, away, states, links, failDials, redial } = harness();
+  heard(); run(500);
+  away(4000);
+  failDials('lost'); links[0]?.fail('stalled');
+  run(1100);
+  expect(states).toEqual(['reconnecting']);
+  redial.dispose();
+});
