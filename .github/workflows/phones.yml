@@ -130,6 +130,17 @@ jobs:
             echo "::endgroup::"
           done
           [ "$up" = 1 ] || { echo "no attempt started Chrome"; exit 1; }
+          # Run 43967117784: Chrome 145 drew its tab, but its DevTools socket refused every connect for 90 s. Chrome opens
+          # `chrome_devtools_remote` only with USB debugging and developer options both on; restart it to read them.
+          "$adb" shell 'settings put global development_settings_enabled 1; settings put global adb_enabled 1' || true
+          "$adb" shell 'getprop ro.debuggable; settings get global adb_enabled; settings get global development_settings_enabled' || true
+          "$adb" shell am force-stop com.android.chrome
+          "$adb" shell am start -W -a android.intent.action.VIEW -n com.android.chrome/com.google.android.apps.chrome.Main -d about:blank || true
+          if timeout 60 bash -c "until '$adb' shell cat /proc/net/unix | grep -q chrome_devtools_remote; do sleep 3; done"; then
+            echo "Chrome's DevTools socket is open"
+          else
+            echo "Chrome's DevTools socket never opened"; "$adb" shell 'cat /proc/net/unix | grep -i devtools' || true
+          fi
           "$adb" shell am force-stop com.android.chrome
           echo "ANDROID_SERIAL=emulator-5554" >> "$GITHUB_ENV"
       - name: XR-8
