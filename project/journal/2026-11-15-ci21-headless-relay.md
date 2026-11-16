@@ -8,3 +8,8 @@ The main-side cell-home test arrived after H1 moved simState into the
 public test harness. Point it at the same implementation in its new home
 so the combined tree still types and exercises exact save continuation.
 No helper body or assertion changes.
+
+Hosted CI caught a clean-rebase duplicate export: main had independently
+added game/ledger at its existing sorted position. H1 also added the same
+key at the tail. Preserve the original public mapping once; Wrangler's
+real dry-run warning must stay absent. No dry-run assertion is weakened.

@@ -1310,7 +1310,6 @@
     "./test/simState": "./src/test/engine/simState.ts",
     "./test/headless-worker": "./src/test/game/headlessWorker.ts",
     "./test/headless/productSession": "./src/test/game/headless/productSession.ts",
-    "./game/ledger": "./src/shared/game/ledger.ts",
     "./game/boss/headlessCloudBody": "./src/server/game/boss/headlessCloudBody.ts",
     "./game/riding/companions": "./src/shared/game/riding/companions.ts",
     "./game/boss/patrolNative": "./src/server/game/boss/patrolNative.ts",
