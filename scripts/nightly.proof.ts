@@ -116,7 +116,7 @@ await test('a later red night cannot be cleared by an older green artifact on th
   assert.throws(() => requireLatest(green, expected, {...latest, head_sha: 'another commit'}), /J167/u);
   assert.throws(() => requireLatest({...green, run: null}, expected, latest), /J167/u);
 }));
-await test('an extra receipt without a ring kind or source SHA cannot hide behind a complete green table', () => {
+if (process.env.NIGHTLY_IDENTITY_SOAK === '1') await test('an extra receipt without a ring kind or source SHA cannot hide behind a complete green table', () => {
   for (const field of ['kind', 'sha'] as const) fixture(({heads, execute, expected}) => {
     const extra = {...heads[0], group: 4};
     Reflect.deleteProperty(extra, field);

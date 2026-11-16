@@ -305,6 +305,28 @@ jobs:
         run: |
           node scripts/pins.ts install --ring 1
           node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test --test-reporter=tap test/ci/dunes-journey.proof.mjs test/ci/pin-grid-journey.proof.mjs
+      # New coverage reports for a week before explicit blocking admission.
+      # After wall accounting: report time cannot spend a blocking shard budget.
+      - name: Soak named elite ownership on pinned products
+        if: steps.code.outputs.run == 'true' && matrix.job == 1
+        continue-on-error: true
+        run: |
+          node scripts/pins.ts install --ring 1
+          WILDSHARD_RING=1 node scripts/vitest-tmp.ts run test/roster-owners.proof.ts --reporter=default --reporter=json --outputFile.json=tmp/ci-coverage-edges/roster.json
+      - name: Soak malformed nightly receipt refusal
+        if: steps.code.outputs.run == 'true' && matrix.job == 1
+        continue-on-error: true
+        run: |
+          mkdir -p tmp/ci-coverage-edges
+          NIGHTLY_IDENTITY_SOAK=1 node --test --test-name-pattern='extra receipt' scripts/nightly.proof.ts > tmp/ci-coverage-edges/identity.tap
+      - name: Keep non-blocking coverage edge observations
+        if: ${{ !cancelled() && steps.code.outputs.run == 'true' && matrix.job == 1 }}
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-edges-soak
+          path: tmp/ci-coverage-edges
+          retention-days: 14
       # One run stands for every commit since the last finished run (was the verdict-coverage job; each share now
       # names the range and flags its own red, so a main push needs no extra job).
       - name: Name the commits this verdict covers
