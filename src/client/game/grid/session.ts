@@ -1143,9 +1143,15 @@ export class GridSession {
     const buffer = bufferAt(this.assembly.cells, this.home, at);
     if (buffer === null) this.gateHeld.clear();
     this.gateState = this.gate.step(buffer?.instance ?? null, diagnosticNow());
-    // ZE14: offline, a cell this device never downloaded is never entered: its card says so and the 0 does nothing
-    if (this.gateState.fire !== null && buffer !== null && this.gateOpen(buffer.instance)) this.host.enterZone?.(this.gateState.fire, arrivalPose(buffer, at));
+    if (this.gateEntered !== null && this.gateEntered !== buffer?.instance) this.gateEntered = null;
+    // ZE14: offline, a cell this device never downloaded is never entered: its card says so and the 0 does nothing. One whose
+    // cache check answers yes after the 0 (a phone's check can take seconds) enters then, while the feet still stand at 0
+    if (buffer !== null && this.gateState.count === 0 && this.gateEntered === null && this.gateOpen(buffer.instance)) {
+      this.gateEntered = buffer.instance; this.host.enterZone?.(buffer.instance, arrivalPose(buffer, at));
+    }
   }
+  /** ZE14: the buffer whose 0 has entered its cell this visit (the count stays at 0 while the feet stand there) */
+  private gateEntered: string | null = null;
   /** ZE14: the gate's cell can be entered from here: online, or downloaded (a cell still being asked about is not, yet) */
   private gateOpen(instance: string): boolean { const held = this.gateHeldNow(instance); return held === undefined || held === true; }
   /** ZE14: why the gate's cell can't be entered: offline and not downloaded; a cell still being asked about keeps its count */

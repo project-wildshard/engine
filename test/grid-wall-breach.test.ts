@@ -72,8 +72,8 @@ test('the road wall in front of a walled cell holds a fall along it, a fall from
     // A fall along it: from 12 m up (a ledge's height; the road has none here), sprinting into the wall and jumping on landing.
     run(0, 'fall into it from 12 m', -200, 12, 0, 1, NET_BUTTONS.sprint | NET_BUTTONS.jump, 4000),
     run(1, 'fall along it from 12 m', -100, 12, 1, 1, NET_BUTTONS.sprint | NET_BUTTONS.jump, 4000),
-    // A run along it at sprint, pressed into it, both ways.
-    run(2, 'run along it, east', 0, 1, 1, 1, NET_BUTTONS.sprint, 5000),
+    // A run along it at sprint, pressed into it, both ways (east starts off the entryway: from x 0 it ran into the buffer, review SHOULD).
+    run(2, 'run along it, east', -120, 1, 1, 1, NET_BUTTONS.sprint, 5000),
     run(3, 'run along it, west', 100, 1, -1, 1, NET_BUTTONS.sprint, 5000),
     // The highest a page can stand a player on the road: 60 m (the wall's top). A body set above it is the only way over.
     run(4, 'fall into it from the wall top', 200, 58, 0, 1, NET_BUTTONS.sprint, 6000),
