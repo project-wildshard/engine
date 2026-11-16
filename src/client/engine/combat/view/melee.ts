@@ -4,6 +4,7 @@ import type { Game } from '../../core/Game';
 import type { SkyRig as Sky } from '../../world/skyRig';
 import type { Player } from '../../player/Player';
 import type { Forest } from '../../world/forest/Forest';
+import type { StrikeDebrisPolicy } from '@wildshard/format/strikeDebris';
 
 export interface Key { t: number; pos: THREE.Vector3; q: THREE.Quaternion }
 export interface Trail {
@@ -13,6 +14,7 @@ export interface Trail {
   color: THREE.Color; alpha: number; inner: number; life: number;
 }
 export interface Move {
+  debris?: StrikeDebrisPolicy;
   name: 'slash' | 'backhand' | 'finisher' | 'heavy' | 'pass-left' | 'pass-right';
   keys: [Key, Key, Key];
   windup: number; slashEnd: number; total: number;
