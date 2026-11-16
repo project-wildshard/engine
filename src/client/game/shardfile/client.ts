@@ -69,6 +69,7 @@ import { createShardfileClientScripts, captureClientScriptPosition } from './cli
 import { installClientWater, undrawnWater } from './clientWater';
 import { detailLayerFiles, installClientDetails } from './clientDetails';
 import { windClockFallback } from '@wildshard/engine/world/wind';
+import { SwingField, setLampSwings } from '@wildshard/engine/world/swings';
 import { trample, TRAMPLE_GLSL } from '../systems/looks/trample';
 import { practiceRoom } from '@wildshard/engine/core/practiceRoom';
 import { installClientSplash } from './clientSplash';
@@ -327,6 +328,29 @@ export class ShardfileClient {
     // SHARD-SOURCE SS8a: the layers sway on the wind clock; a page with no `wind` row, forest or painterly grass to drive
     // it would leave it at 0 and the meadow frozen, so the page drives it whenever nothing else did since its last frame
     if ((details?.length ?? 0) > 0) ctx.system({ id: 'game.shardfile.wind', phase: 'update', run: windClockFallback() });
+    // SHARD-SOURCE SS8c: the look's hanging lanterns and signs lean in the wind and swing when a body brushes them; their
+    // surfaces, glow cards and lamps turn round the same pivots
+    const swingRows = this.source.look.light?.swings ?? [];
+    if (swingRows.length > 0) {
+      const swings = new SwingField(swingRows);
+      ctx.scope.onDispose(setLampSwings(swings)); ctx.scope.onDispose(() => { swings.dispose(); });
+      const clock = windClockFallback(), player = { id: 'player', x: 0, y: 0, z: 0, radius: 0.45 }, live: (typeof player)[] = [];
+      const rows = this.source.creatures.spawns.map((spawn) => ({ spawn: spawn.id, row: { id: `creature:${spawn.id}`, x: 0, y: 0, z: 0, radius: 0.6 } }));
+      ctx.system({ id: 'game.shardfile.swings', phase: 'update', run: (dt) => {
+        clock(dt);
+        live.length = 0;
+        if (!practiceRoom.open) {
+          const at = world.player.position;
+          player.x = at.x; player.y = at.y; player.z = at.z; live.push(player);
+          for (const { spawn, row } of rows) {
+            const body = wirePage.namedBody(spawn);
+            if (body === null || body.mesh.parent === null) continue;
+            row.x = body.mesh.position.x; row.y = body.mesh.position.y; row.z = body.mesh.position.z; live.push(row);
+          }
+        }
+        swings.update(dt, live);
+      } });
+    }
     // SHARD-SOURCE SS6: a scene pool splashes and rings when the player walks in, wades or walks out
     installClientSplash(this.source.water, { root: ctx.root, scope: ctx.scope, phone: TIER === 'phone',
       // the player and every declared creature with a body (SS6c): a creature wading the pond splashes as the player does

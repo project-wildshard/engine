@@ -9,6 +9,9 @@
  * - **Emissive** `blend: 'alpha'`: an unlit card blended over what is behind it; `card`: every vertex is a camera-facing
  *   card corner, `position` its seat and `wsCorner` (the GLB's `_CORNER` channel) the corner's view-space offset;
  *   `motion`: the card's `pulse`, `drift` or `rise`, phased by its seat.
+ * - **PBR and emissive** `swing` (SS8c): each vertex (a card: its seat) turns round the pivot of the look swing its `wsSwing`
+ *   attribute names (the GLB's `_SWING` channel: swing number + 1, 0 still), by that swing's tilt this frame
+ *   (`world/swings.ts`), so a lantern swings whole on its rope; a surface's normals turn with it.
  *
  * A see-through surface is marked `userData.sceneAlpha`, so a prop's GLB (opaque by default) never turns it opaque
  * (`declaredProps.ts`). Every number is a uniform; the program changes only with which of these a surface uses. The clock is the emissive
@@ -17,19 +20,26 @@
 import * as THREE from 'three';
 import type { EmissiveMaterialParams, PbrMaterialParams } from '@wildshard/format/materialFamilies';
 import { patchShader, PATCH_ORDER } from '../shaderPatches';
+import { SWING_GLSL, swingUniforms } from '../../world/swings';
 
 /** the attribute a swaying surface reads (GLTFLoader's `_sway`, renamed by its binding's channels) */
 export const SWAY_ATTRIBUTE = 'wsSway';
 /** the attribute a card reads (GLTFLoader's `_corner`) */
 export const CORNER_ATTRIBUTE = 'wsCorner';
+/** the attribute a swinging surface or card reads (GLTFLoader's `_swing`): its swing number + 1, 0 still */
+export const SWING_ATTRIBUTE = 'wsSwing';
+
+type Channels = Record<string, { readonly attribute: string; readonly itemSize: number }>;
 
 /** The vertex channels a surface reads, as `PropSurfaceBinding.channels`; null when it reads none. */
 export function sceneSurfaceChannels(entry: unknown): Readonly<Record<string, { readonly attribute: string; readonly itemSize: number }>> | null {
   if (typeof entry !== 'object' || entry === null) return null;
-  const row = entry as { readonly family?: unknown; readonly sway?: unknown; readonly card?: unknown };
-  if (row.family === 'pbr' && row.sway !== undefined) return { _sway: { attribute: SWAY_ATTRIBUTE, itemSize: 1 } };
-  if (row.family === 'emissive' && row.card === true) return { _corner: { attribute: CORNER_ATTRIBUTE, itemSize: 2 } };
-  return null;
+  const row = entry as { readonly family?: unknown; readonly sway?: unknown; readonly card?: unknown; readonly swing?: unknown };
+  const channels: Channels = {};
+  if (row.family === 'pbr' && row.sway !== undefined) channels['_sway'] = { attribute: SWAY_ATTRIBUTE, itemSize: 1 };
+  if (row.family === 'emissive' && row.card === true) channels['_corner'] = { attribute: CORNER_ATTRIBUTE, itemSize: 2 };
+  if ((row.family === 'pbr' || row.family === 'emissive') && row.swing === true) channels['_swing'] = { attribute: SWING_ATTRIBUTE, itemSize: 1 };
+  return Object.keys(channels).length === 0 ? null : channels;
 }
 
 const STILL: THREE.IUniform<number> = { value: 0 };
@@ -48,27 +58,66 @@ const SWAY_VERTEX = /* glsl */`
 }
 `;
 
-/** PBR: alpha, depth offset, sway and uv scroll (a no-op for a surface with none of them). */
+/** SS8c: the swing's number from the attribute (-1: still) */
+const SWING_INDEX = /* glsl */`int wsSwingN = int( ${SWING_ATTRIBUTE} + 0.5 ) - 1;`;
+/** SS8c: turn the normal round its swing (the linear part, world and back) */
+const SWING_NORMAL = /* glsl */`
+#include <beginnormal_vertex>
+{
+	${SWING_INDEX}
+	if ( wsSwingN >= 0 ) {
+		mat3 wsSwingL = mat3( modelMatrix );
+		objectNormal = inverse( wsSwingL ) * wsSwingRotate( wsSwingTilt[ wsSwingN ], wsSwingL * objectNormal );
+	}
+}
+`;
+/** SS8c: turn the vertex round its swing's pivot, in world space and back */
+const SWING_VERTEX = /* glsl */`
+#include <begin_vertex>
+{
+	${SWING_INDEX}
+	if ( wsSwingN >= 0 ) transformed = ( inverse( modelMatrix ) * vec4( wsSwingAt( ( modelMatrix * vec4( transformed, 1.0 ) ).xyz, wsSwingN ), 1.0 ) ).xyz;
+}
+`;
+/** SS8c: bind the shared swing uniforms; returns the attribute and helper declarations */
+function swingHeader(uniforms: Record<string, THREE.IUniform>): string {
+  Object.assign(uniforms, swingUniforms);
+  return `${SWING_GLSL}\nattribute float ${SWING_ATTRIBUTE};`;
+}
+
+/** PBR: alpha, depth offset, sway, uv scroll and swing (a no-op for a surface with none of them). */
 export function applySceneSurface(m: THREE.MeshStandardMaterial, params: PbrMaterialParams, clock: THREE.IUniform<number> = STILL): void {
   if (params.blend === 'alpha') { m.transparent = true; m.depthWrite = false; m.opacity = params.opacity ?? 1; m.userData['sceneAlpha'] = true; }
   const offset = params.depthOffset ?? 0;
   if (offset !== 0) { m.polygonOffset = true; m.polygonOffsetFactor = offset; m.polygonOffsetUnits = offset; }
-  const sway = params.sway, scroll = params.uvScroll;
-  if (sway === undefined && scroll === undefined) return;
+  const sway = params.sway, scroll = params.uvScroll, swing = params.swing === true;
+  if (sway === undefined && scroll === undefined && !swing) return;
   const uniforms: Record<string, THREE.IUniform> = {
     wsSceneTime: clock,
     wsSwayWind: { value: new THREE.Vector3(sway?.direction[0] ?? 0, sway?.direction[1] ?? 0, sway?.rate ?? 0) },
     wsUvScroll: { value: new THREE.Vector2(scroll?.[0] ?? 0, scroll?.[1] ?? 0) },
   };
+  const swingDecl = swing ? swingHeader(uniforms) : '';
   patchShader(m, 'engine.family.sceneSurface', PATCH_ORDER.material, (shader) => {
     Object.assign(shader.uniforms, uniforms);
-    let vs = shader.vertexShader.replace('#include <common>', `#include <common>\nuniform float wsSceneTime;\nuniform vec3 wsSwayWind;\nuniform vec2 wsUvScroll;\n${sway === undefined ? '' : `attribute float ${SWAY_ATTRIBUTE};`}`);
+    let vs = shader.vertexShader.replace('#include <common>', `#include <common>\nuniform float wsSceneTime;\nuniform vec3 wsSwayWind;\nuniform vec2 wsUvScroll;\n${sway === undefined ? '' : `attribute float ${SWAY_ATTRIBUTE};`}\n${swingDecl}`);
+    // the swing goes in first, so the sway's block lands before it: a swinging banner may flutter too, then turns whole
+    if (swing) {
+      if (!vs.includes('#include <beginnormal_vertex>')) throw new Error('scene surface: the vertex source has no <beginnormal_vertex> to swing');
+      vs = vs.replace('#include <beginnormal_vertex>', SWING_NORMAL).replace('#include <begin_vertex>', SWING_VERTEX);
+    }
     if (sway !== undefined) vs = vs.replace('#include <begin_vertex>', SWAY_VERTEX);
     if (scroll !== undefined) vs = vs.replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_MAP\n\tvMapUv += wsUvScroll * wsSceneTime;\n#endif');
     shader.vertexShader = vs;
-  }, { key: (before) => `${before}|scene-surface|${sway === undefined ? '' : 's'}${scroll === undefined ? '' : 'u'}` });
+  }, { key: (before) => `${before}|scene-surface|${sway === undefined ? '' : 's'}${scroll === undefined ? '' : 'u'}${swing ? 'w' : ''}` });
 }
 
+/** the card's seat line; SS8c's swing turns the seat right after it */
+const CARD_SEAT = '\tvec3 wsSeat = transformed;';
+const CARD_SWING = /* glsl */`	{
+		${SWING_INDEX}
+		if ( wsSwingN >= 0 ) wsSeat = ( inverse( modelMatrix ) * vec4( wsSwingAt( ( modelMatrix * vec4( wsSeat, 1.0 ) ).xyz, wsSwingN ), 1.0 ) ).xyz;
+	}`;
 const CARD_VERTEX = /* glsl */`
 	vec3 wsSeat = transformed;
 	float wsPh = fract( sin( dot( wsSeat, vec3( 127.1, 311.7, 74.7 ) ) ) * 43758.5453 );
@@ -98,21 +147,32 @@ const MOTION_KIND: Readonly<Record<string, number>> = { pulse: 1, drift: 2, rise
 /** Emissive: alpha blend, cards and their motion (a no-op for a plain surface). `clock` is the emissive look's. */
 export function applySceneEmissive(m: THREE.MeshBasicMaterial, params: EmissiveMaterialParams, clock: THREE.IUniform<number>): void {
   if (params.blend === 'alpha') { m.transparent = true; m.depthWrite = false; m.alphaTest = Math.max(m.alphaTest, 0.01); m.userData['sceneAlpha'] = true; }
-  if (params.card !== true) return;
+  const swing = params.swing === true;
+  if (params.card !== true) {
+    // SS8c: a swinging unlit surface turns round its pivot like a lit one
+    if (!swing) return;
+    const own: Record<string, THREE.IUniform> = {}, decl = swingHeader(own);
+    patchShader(m, 'engine.family.sceneSwing', PATCH_ORDER.material, (shader) => {
+      Object.assign(shader.uniforms, own);
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>\n${decl}`).replace('#include <begin_vertex>', SWING_VERTEX);
+    }, { key: (before) => `${before}|scene-swing` });
+    return;
+  }
   const motion = params.motion;
   const vector = new THREE.Vector4(motion === undefined ? 0 : MOTION_KIND[motion.kind] ?? 0, motion?.rate ?? 0,
     motion === undefined ? 0 : motion.kind === 'pulse' ? motion.amount : motion.kind === 'drift' ? motion.radius : motion.height,
     motion?.kind === 'rise' ? motion.spread : 0);
   const uniforms: Record<string, THREE.IUniform> = { wsCardTime: clock, wsCardMotion: { value: vector } };
+  const swingDecl = swing ? swingHeader(uniforms) : '';
   m.userData['sceneCard'] = true;
   patchShader(m, 'engine.family.sceneCard', PATCH_ORDER.material, (shader) => {
     Object.assign(shader.uniforms, uniforms);
     if (!shader.vertexShader.includes('#include <project_vertex>')) throw new Error('scene card: the basic vertex source has no <project_vertex>');
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\nuniform float wsCardTime;\nuniform vec4 wsCardMotion;\nattribute vec2 ${CORNER_ATTRIBUTE};\nvarying float wsCardFade;`)
-      .replace('#include <project_vertex>', CARD_VERTEX);
+      .replace('#include <common>', `#include <common>\nuniform float wsCardTime;\nuniform vec4 wsCardMotion;\nattribute vec2 ${CORNER_ATTRIBUTE};\nvarying float wsCardFade;\n${swingDecl}`)
+      .replace('#include <project_vertex>', swing ? CARD_VERTEX.replace(CARD_SEAT, `${CARD_SEAT}\n${CARD_SWING}`) : CARD_VERTEX);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float wsCardFade;')
       .replace('#include <opaque_fragment>', 'outgoingLight *= wsCardFade;\ndiffuseColor.a *= wsCardFade;\n#include <opaque_fragment>');
-  }, { key: (before) => `${before}|scene-card` });
+  }, { key: (before) => `${before}|scene-card${swing ? '|w' : ''}` });
 }

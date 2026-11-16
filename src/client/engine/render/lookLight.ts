@@ -24,6 +24,7 @@
  * `PHONE_LAMPS` lamps lit, the nearest (AP28), half the motes, and no bloom or AO.
  */
 import * as THREE from 'three';
+import { currentLampSwings } from '../world/swings';
 import type { LookBounce, LookEnvironment, LookLamp, LookLight, LookPools, LookRim } from '@wildshard/format/look-light';
 import type { LookMotes, LookShadow } from '@wildshard/format/look-render';
 import type { ShaderSource } from './shaderPatches';
@@ -195,9 +196,19 @@ export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAM
   });
   const following = rows.filter((row) => row.lamp.follow !== undefined), crowded = rows.length > pool.length;
   const flickers = rows.some((row) => (row.lamp.flicker?.amount ?? 0) > 0);
-  if (following.length === 0 && !crowded && !flickers) return group;
-  const eyeLocal = new THREE.Vector3(), chosen: typeof rows = [];
+  // SHARD-SOURCE SS8c: a lamp on a swing goes where its lantern swings, round the page's swing pivot
+  const swinging = rows.filter((row) => row.lamp.follow === undefined && row.lamp.swing !== undefined);
+  if (following.length === 0 && !crowded && !flickers && swinging.length === 0) return group;
+  const eyeLocal = new THREE.Vector3(), chosen: typeof rows = [], swung = new THREE.Vector3();
   group.update = (time, eye) => {
+    if (swinging.length > 0) {
+      const swings = currentLampSwings();
+      if (swings !== null) group.updateWorldMatrix(true, false);
+      for (const row of swinging) {
+        if (swings === null || row.lamp.swing === undefined) { row.place.copy(row.at); continue; }
+        group.worldToLocal(swings.place(row.lamp.swing, group.localToWorld(swung.copy(row.at)), row.place));
+      }
+    }
     if (following.length > 0) {
       const resolve = lampFollows.get(rootOf(group));
       for (const row of following) {
