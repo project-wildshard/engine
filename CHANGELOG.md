@@ -9,6 +9,10 @@ run `../repo-kit/release.sh vX.Y.Z --prepare` and `--finish` as before (the help
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.26 (2026-11-16)
+
+- Newly uploaded author shards finish loading when you enter the world.
+
 ## v0.1.25 (2026-11-16)
 
 - Forced updates explain why the browser needs to reload.
