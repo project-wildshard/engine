@@ -15,9 +15,10 @@ the span. Missing telemetry, unexercised reconciliation, no rendered
 slow frames, a fall or a missed route cannot qualify B4.
 
 Review caught a vacuous dependency on natural corrections. The proof
-now captures the main NetClient via the existing bot debug surface,
-ends that temporary bot immediately, and restores its one-shot public
-render-observer hook. Public frame observers replace only the latest
+now reads the main NetClient via a developer-only accessor, removed
+with the page's scope. The real online shell refuses a second bot;
+the failed attempt is retained and no bot is created by this proof.
+Public frame observers replace only the latest
 owner block with a copied block 0.3 m lower outbound and 1 m lower on
 return. Saved wire frames stay intact. Each injection counts only
 after the predictor's correction observer confirms that exact tick.

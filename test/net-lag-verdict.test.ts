@@ -42,12 +42,10 @@ test('bridge faults replace only selected owner frames and require observed repl
     onCorrection(fn: (row: { tick: number; offset: number }) => void): () => void { this.corrections.add(fn); return () => { this.corrections.delete(fn); }; }
     receive(frame: Frame): void { this.latest = frame; for (const fn of this.frames) fn(frame); }
   }
-  const original = Client.prototype.rendered, main = new Client(), bot = new Client(), end = vi.fn();
+  const main = new Client(), unavailableBot = vi.fn(() => { throw new Error('A second client belongs to a server in this page'); });
   const state = { slowMs: 60, bridgeFault: undefined as undefined | { ready: boolean; armed: number; confirmed: { sink: number }[]; cleanup: () => void } };
-  runInNewContext(`(${installBridgeCorrections.toString()})()`, { window: { __netLag: state, __wildshard: { world: { player: { position: { x: 25, y: 6, z: 23 } } } }, __workerClientBot: () => ({ client: bot, end }) } });
-  expect(end).toHaveBeenCalledOnce();
-  bot.rendered(); expect(state.bridgeFault?.ready).toBe(false);
-  main.rendered(); expect(Client.prototype.rendered).toBe(original);
+  runInNewContext(`(${installBridgeCorrections.toString()})()`, { window: { __netLag: state, __wildshard: { world: { player: { position: { x: 25, y: 6, z: 23 } } } }, __workerClientNet: () => main, __workerClientBot: unavailableBot } });
+  expect(unavailableBot).not.toHaveBeenCalled();
   const fault = state.bridgeFault; expect(fault?.ready).toBe(true);
   if (fault === undefined) throw new Error('Missing hook');
   try {

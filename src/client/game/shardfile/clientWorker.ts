@@ -188,7 +188,7 @@ function inScene(object: Object3D): boolean {
   for (let at: Object3D | null = object; at !== null; at = at.parent) { if (!at.visible) return false; if (at instanceof Scene) return true; }
   return false;
 }
-declare global { interface Window { __onlinePlayers?: () => OtherPlayers['shown']; __workerClientFights?: () => readonly WorkerClientFight[]; __workerClientHits?: (by: number) => void; __workerClientStill?: () => void; __workerClientTravel?: (to: ShardSlug) => void;__workerClientSky?: (name: string) => void; __workerClientTime?: (pick: OptionValue<'time'>) => void; __workerClientRow?: (name: string) => number | undefined; __workerClientFlag?: (flag: string) => void; __workerClientDevColliders?: (name: string, boxes: readonly DevBox[]) => void; __workerClientRows?: (kind: string) => readonly { readonly x: number; readonly y: number; readonly z: number }[]; __workerClientGate?: (flag: string) => boolean; __workerClientBot?: (id: string, x: number, y: number, z: number) => { readonly move: (x: number, y: number, z: number) => void; readonly press: (id: string) => void; readonly end: () => void }; __workerClient?: () => WorkerClientReport; __workerClientSave?: () => Promise<void> } }
+declare global { interface Window { __workerClientNet?: () => NetClient; __onlinePlayers?: () => OtherPlayers['shown']; __workerClientFights?: () => readonly WorkerClientFight[]; __workerClientHits?: (by: number) => void; __workerClientStill?: () => void; __workerClientTravel?: (to: ShardSlug) => void;__workerClientSky?: (name: string) => void; __workerClientTime?: (pick: OptionValue<'time'>) => void; __workerClientRow?: (name: string) => number | undefined; __workerClientFlag?: (flag: string) => void; __workerClientDevColliders?: (name: string, boxes: readonly DevBox[]) => void; __workerClientRows?: (kind: string) => readonly { readonly x: number; readonly y: number; readonly z: number }[]; __workerClientGate?: (flag: string) => boolean; __workerClientBot?: (id: string, x: number, y: number, z: number) => { readonly move: (x: number, y: number, z: number) => void; readonly press: (id: string) => void; readonly end: () => void }; __workerClient?: () => WorkerClientReport; __workerClientSave?: () => Promise<void> } }
 
 /** The page's pose inputs, as acts short enough to go. */
 function poseActs(names: ReadonlySet<string>): readonly string[] {
@@ -606,6 +606,12 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     sample(now);
   });
   window.__workerClient = () => ({ ...report });
+  // NET-LAG: observe the real external-room client without creating a second player.
+  if (isDev()) {
+    const observed = (): NetClient => client;
+    window.__workerClientNet = observed;
+    scope.onDispose(() => { if (window.__workerClientNet === observed) delete window.__workerClientNet; });
+  }
   window.__onlinePlayers = () => others?.shown ?? [];
   window.__workerClientHits = by => { shell.hardHits(by); };
   window.__workerClientStill = () => { shell.still(); };
