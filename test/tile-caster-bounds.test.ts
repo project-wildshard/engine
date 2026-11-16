@@ -2,7 +2,7 @@
 import { expect, test, vi } from 'vitest';
 import { Box3, BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
-import { staticGlb } from '../src/sharddev/bake/glb';
+import { staticGlb } from './fixtures/frozen/glb';
 import { emptyShardfile } from '../src/shared/host/author';
 import { clientTileViews } from '../src/client/game/shardfile/clientViews';
 
@@ -20,7 +20,7 @@ test('sliced tile bounds retain native boxes and the original floor/caster decis
   let clock = 0;
   const time = vi.spyOn(performance, 'now').mockImplementation(() => { clock += 9; return clock; });
   try {
-    const views = clientTileViews({ terrain: null, materials: new Map([['pbr', family]]), textures: new Map() });
+    const views = clientTileViews({ terrain: null, mergeProps: false, materials: new Map([['pbr', family]]), textures: new Map() });
     const resident = await views.props(source.props, '0/0/0', bytes, root, scope);
     if (resident === null) throw new Error('Missing caster tile');
     const meshes: Mesh[] = []; root.traverse(object => { if (isMesh(object)) meshes.push(object); });

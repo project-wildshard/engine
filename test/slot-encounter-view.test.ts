@@ -10,7 +10,7 @@ import { bindFlatTerrain } from '@wildshard/engine/test/terrain';
 import { CueDirector } from '../src/client/game/audio/cueDirector';
 import { SlotEncounterView } from '../src/client/game/boss/encounterView';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { NALATI_NIGHT as nightInput } from './fixtures/nalati-night';
+import {frozenNight as nightInput} from './fixtures/frozen/runtimeBehavior';
 import {withWeatherWitness} from './fixtures/weatherInlineWitness';
 
 const night=withWeatherWitness(nightInput);

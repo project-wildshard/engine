@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest';
 import { BufferAttribute, BufferGeometry, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, type Object3D } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
 import { emptyShardfile } from '../src/shared/host/author';
-import { staticGlb } from '../src/sharddev/bake/glb';
+import { staticGlb } from './fixtures/frozen/glb';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
 import { parseWorldScenes } from '@wildshard/format/worldScenes';
 import { provideRuntimeProduct, runtimeProduct } from '../src/client/game/shardfile/runtimeProduct';

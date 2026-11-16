@@ -39,3 +39,32 @@ Its SHOULDs are fixed: the riding map/declarations are shared across
 loans, preserving repeated same-owner lending; provenance includes AS's
 Binaryen131 and instrumentation Binaryen132 pins; unchanged native files
 have precise disposition wording. Root/layer types and typed lint pass.
+
+Eight E-RENDER-O files follow: original specimen ownership/selection,
+splat props, tile caster, world slabs/batch and slot/patrol views. Their
+50 cases pass in blocking discovery, including the actual real-GC child
+and native bound/caster/shadow controls. Inventory143 becomes135.
+
+Source-keyed GLBs were baked once by SDKda2a4ddb. The frozen key binds
+ordinary typed geometry bytes/flags, indices, every primitive option,
+matrices, colours and the producer-read material fields. The largest
+original is2,098,560 bytes, under engine's5MiB cap; no chunking or cap
+change. The reader pins exact hashes and fresh byte ownership. Existing
+borrowed-buffer, WeakRef and lifetime assertions remain unchanged.
+
+A one-time large export needed streamed stdin, and capture-only GC runs
+used real exposed GC. The committed tests use their normal real-GC child;
+no capture aliases, compiler or SDK source run there. The tile-bound case
+selects the supported mergeProps:false path to preserve its original
+per-mesh census after AP8 added an unrelated merge container. Every floor,
+box, caster and resident-shadow assertion is unchanged. Night view
+fixtures use the existing verified frozen night. Types and typed lint pass.
+
+Render J206 is clear. Its follow-ups are applied: the variable-named GC
+case is explicitly in disposition; the GLB reader uses its shared
+manifest as sole pin and module-relative native URLs (without Vite's
+browser asset rewrite), and reports unknown input clearly. Type-tagged
+keys distinguish signed zero, non-finite values and literal tag-shaped
+objects. Direct key checks pass; all50 original cases pass again with
+normal GC. The default merged-props floor/caster/shadow boundary remains
+a named row48 follow-up rather than changing these restored assertions.

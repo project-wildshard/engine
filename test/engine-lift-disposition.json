@@ -11606,5 +11606,151 @@
     "sourceRevision": "d4f6a18e76571aae5391ec8cf31dcec10a2a6f11",
     "sourceBlob": "cf03bde7af6db6c3c477815e0f260d48ca926842",
     "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/specimen-owned-glb.test.ts",
+    "outcome": "restored",
+    "target": "test/specimen-owned-glb.test.ts",
+    "decision": "CI21 E-RENDER-O: Owned offset GLBs go through the existing parser and keep every primitive channel (including a custom paint-clone attribute) and bound; byte identities keep same-name products apart; bound variants share their source; invalid headers and external resources refuse before any read; a rejected parse can retry; a cached owned specimen releases its inputs (real GC). Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "owned offset GLBs use the existing parser and preserve every primitive channel and bound",
+      "byte identities keep same-name products separate and disposal permits a fresh decode",
+      "owned bound variants share their source and retain the original transform and material cache",
+      "owned GLBs refuse invalid headers and external resources before any parser or URL read",
+      "a rejected owned parse preserves its error and the same input can retry",
+      "a cached owned specimen releases its consumed declaration and input bank"
+    ],
+    "sourceRevision": "b21fed3d6877e30f22a62d588836d2e0d73fc410",
+    "sourceBlob": "7cb644cd689969616891bfc90f780a3257ddea6f",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/specimen-selection.test.ts",
+    "outcome": "restored",
+    "target": "test/specimen-selection.test.ts",
+    "decision": "CI21 E-RENDER-O: Parameter rows select both carved balbal copies and refuse unauthored shapes; fitted assets share the source loan without leaking transforms; both carving variants place through the real native instanced path and build the same parts as their raw witness; file admission refuses ambiguous rows before any read. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "parameter rows select both carved copies and refuse unauthored shapes",
+      "fitted assets share the source loan without mutating it or leaking transforms into other variants",
+      "both carving variants place through the actual native instanced path",
+      "both raw carving variants build the same native parts as their raw witness",
+      "specimen file admission refuses ambiguous rows and getters before any file read"
+    ],
+    "sourceRevision": "b21fed3d6877e30f22a62d588836d2e0d73fc410",
+    "sourceBlob": "13714217a5c815aa5b1ba3e94621fb60397dd796",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/splat-family-props.test.ts",
+    "outcome": "restored",
+    "target": "test/splat-family-props.test.ts",
+    "decision": "CI21 E-RENDER-O: Splat ground and family-drawn timber share one props tile; a phone layer set draws on phone while desktop draws layers; a trusted runtime streams only primary splat files; a GLSL graph look draws as itself, never as a vertex-coloured family variant; cell merges keep layer loans. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "the splat ground and family-drawn timber share one props tile",
+      "a phone layer set draws on the phone; desktop draws layers; admission sees both",
+      "a trusted runtime streams its bound splat ground: primary files only",
+      "a GLSL graph look draws as itself, never as a vertex-coloured family variant",
+      "splat terrain admits an explicit cell merge without changing layer loans"
+    ],
+    "sourceRevision": "b21fed3d6877e30f22a62d588836d2e0d73fc410",
+    "sourceBlob": "bee80dc2f6f8ecd09c00f43bc851d8ed6e041c22",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/tile-caster-bounds.test.ts",
+    "outcome": "restored",
+    "target": "test/tile-caster-bounds.test.ts",
+    "decision": "CI21 E-RENDER-O: Preserve sliced native boxes, original floor/caster decisions and shadow toggles. The fixture selects the supported mergeProps:false path so the new AP8 merge container does not enter its original per-mesh census. All original assertions retained.",
+    "originalTests": [
+      "sliced tile bounds retain native boxes and the original floor/caster decisions"
+    ],
+    "sourceRevision": "b21fed3d6877e30f22a62d588836d2e0d73fc410",
+    "sourceBlob": "9be5312cc1fb22234f885006aa36d263d16ed68c",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/world-scene-slabs.test.ts",
+    "outcome": "restored",
+    "target": "test/world-scene-slabs.test.ts",
+    "decision": "CI21 E-RENDER-O: Slab keys draw their tiles' chunks under their anchor as one instanced mesh each; a retirement removes only its own triangles; retiring tiles drain late reads; missing coverage refuses before reading; overlapping logical tiles share one bank until the final hold; preparation fences prevent exposing or leaking instances. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "a key draws its tiles' chunks under its anchor, one instanced mesh each, and a retire takes only its own",
+      "an indexed retirement removes only its own original triangles and a reattach restores them",
+      "a retiring tile drains its started verified read without publishing a late chunk",
+      "missing fine coverage and undeclared GLBs refuse before any read or publication",
+      "retirement during a chunk yield drains and removes every partial publication",
+      "concurrent arrivals retain both readiness promises until verified source reads settle",
+      "overlapping logical tiles share one real bank publication until its final hold retires",
+      "one canceled logical hold cannot retire a pending bank retained by another tile",
+      "fine identities require complete explicit coverage and refuse cold reconstruction",
+      "different keys await one shared preparation fence before exposing their native chunks",
+      "retirement during native preparation leaves no exposed or leaked instance"
+    ],
+    "sourceRevision": "b21fed3d6877e30f22a62d588836d2e0d73fc410",
+    "sourceBlob": "d0a76319278fcc55d3ca866d4d3c411a5173865d",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/slot-encounter-view.test.ts",
+    "outcome": "restored",
+    "target": "test/slot-encounter-view.test.ts",
+    "decision": "CI21 E-RENDER-O: An alternate-data slot encounter wakes its own sites with its own cues and plays hits, weak points, heavy blows, trails, rubble once and plinth return. It refuses unknown keys and out-of-namespace cues, rejects duplicate wakes, and restores a site after a dawn corpse retirement. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "an orchard wakes its own sites with its own cues and hands their show and hide back as data",
+      "hits, weak points, heavy blows, trails and the blow play their rows; the wedge shows through the wind-up",
+      "a broken guard plays its rubble once and its plinth stands again when the roster releases it",
+      "view rows refuse unknown keys and a cue outside the cue namespace",
+      "one body roster rejects duplicate wakes and retires each returned actor once",
+      "a corpse retiring after dawn restores its site on the next day step"
+    ],
+    "sourceRevision": "b21fed3d6877e30f22a62d588836d2e0d73fc410",
+    "sourceBlob": "a5d357cc847c77b7a63d09a7764ba4fb854c751b",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/patrol-encounter-view.test.ts",
+    "outcome": "restored",
+    "target": "test/patrol-encounter-view.test.ts",
+    "decision": "CI21 E-RENDER-O: An alternate-data patrol view forms its own line with its own looks, figures and cues, aims targets by ray, hands hits back as data, draws gallops on the wire and refuses a look without its figure. The real native roster admits, holds, dissolves at dawn and resets; borrowed route memory keeps steering; forming preserves AI draw order; and firing rejects teleport samples. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "an orchard watch forms its own line in its own looks and figures, and a quiet one grows",
+      "its targets meet a ray first; its arrows hand their hits back as data and play its cues",
+      "the member's fade drives its looks, and a dying one tears into its own mist until it retires",
+      "on the wire a page draws a gallop behind a body that is up, and tears only what the server says",
+      "view rows refuse a look without its figure",
+      "the real native roster admits once, holds, dissolves at dawn and resets next night",
+      "borrowed route and memory rows keep native steering and freeze independent of drawing",
+      "forming a native line preserves borrowed AI draw order and each first firing clock",
+      "actual firing borrows ten-Hz player motion and rejects teleport samples"
+    ],
+    "sourceRevision": "b21fed3d6877e30f22a62d588836d2e0d73fc410",
+    "sourceBlob": "158cc8146b1b26a7d0a4250cab92e68d0f43585a",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
+  },
+  {
+    "repo": "engine",
+    "file": "test/world-scene-batch.test.ts",
+    "outcome": "restored",
+    "target": "test/world-scene-batch.test.ts",
+    "decision": "CI21 E-RENDER-O: World-scene batches draw fixed instances instanced without multi-draw and batched with it, keep authored range and LOD boundaries, draw merge copies as one static copy, own only their instance buffers, reject executable or unbounded rows, and share one native batch across a named model and a fixed tail. Engine-owned frozen inputs retain the original assertion bodies and negative controls.",
+    "originalTests": [
+      "without multi-draw fixed instances draw instanced, one InstancedMesh per geometry slot (E271 / E272)",
+      "PF2: supported multi-draw batches fixed copies; unsupported renderers keep the instanced path",
+      "fixed instances keep authored range and LOD boundaries, moving between their geometry meshes",
+      "merge copies draw as one static copy of their near geometries, the rest keep their LOD (G639)",
+      "a batch owns only its instance buffers and refuses use after its lifetime ends",
+      "batch rows reject executable values, missing fixed geometry and unbounded capacity",
+      "resident rows share one native batch across a named model and fixed tail"
+    ],
+    "sourceRevision": "b21fed3d6877e30f22a62d588836d2e0d73fc410",
+    "sourceBlob": "da6f807ebbacf2a8875bd756d8a0d5cd62fdbabc",
+    "retirementProof": "No cases retired. Replaced moved shard/SDK fixture imports with source-keyed, hash-verified frozen bytes; unchanged native ownership and continuation controls."
   }
 ]
