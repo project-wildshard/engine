@@ -196,6 +196,25 @@ export interface EntryPreparation {
   stalled?: string;
 }
 
+/**
+ * The frame loop's wall clock: what the loop used of three's `Clock`, which is deprecated since r183 and warns on
+ * construction (SHARD-SOURCE SS-NE16: the deprecation line on every dev page). The first `getDelta` starts it.
+ */
+export class FrameClock {
+  /** seconds since `start`, summed from the deltas read */
+  elapsedTime = 0;
+  private readonly timer = new THREE.Timer();
+  private running = false;
+  start(): void { this.timer.reset(); this.elapsedTime = 0; this.running = true; }
+  /** seconds since the last read (Clock's: reading it moves it on; the first read starts it and is 0) */
+  getDelta(): number {
+    if (!this.running) { this.start(); return 0; }
+    const dt = this.timer.update().getDelta();
+    this.elapsedTime += dt;
+    return dt;
+  }
+}
+
 export class Game {
   private readonly frameDrawRanges: FrameDrawRanges = new FrameDrawRanges();
   /** D178: whether this frame draws a held view (an enabled frame draw range): the post chain's offscreen work pauses. */
@@ -265,8 +284,7 @@ export class Game {
     return rows;
   }
   private _sky: Sky | null = null;
-  // oxlint-disable-next-line typescript/no-deprecated -- Clock→Timer changes getDelta semantics; migrate separately
-  clock: THREE.Clock = new THREE.Clock();
+  clock: FrameClock = new FrameClock();
   // Frame phases (PHYSICS P2 / ENGINE-FIT E2): input → fixed steps (pre → step → post, × 0‥3) → update (`onUpdate`) → late → render.
   // Every entry is a GameSystem (src/shared/engine/core/faults.ts, E133): called inside its own try/catch, switched off if it keeps throwing.
   readonly engineScope: Scope = app.engineScope.child('game');
@@ -1516,13 +1534,16 @@ export class Game {
     checkpoint('post:completed');
   }
 
-  /** The visible shadow-casting lights the next draw from `cam` would render maps for. */
-  private shadowCasters(cam: THREE.Camera): { readonly light: THREE.Light; readonly shadow: THREE.LightShadow }[] {
+  /**
+   * The visible shadow-casting lights the next draw from `cam` would render maps for; with `due` false, every one a lit
+   * program samples, drawn this frame or held (a cascade on the every-other cadence).
+   */
+  private shadowCasters(cam: THREE.Camera, due = true): { readonly light: THREE.Light; readonly shadow: THREE.LightShadow }[] {
     const lights: { readonly light: THREE.Light; readonly shadow: THREE.LightShadow }[] = [], map = this.renderer.shadowMap;
-    if (!map.enabled || (!map.autoUpdate && !map.needsUpdate)) return lights;
+    if (!map.enabled || (due && !map.autoUpdate && !map.needsUpdate)) return lights;
     this.rootScene.traverseVisible(object => {
       const shadow: unknown = object instanceof THREE.Light && object.castShadow && object.layers.test(cam.layers) ? Reflect.get(object, 'shadow') : null;
-      if (object instanceof THREE.Light && shadow instanceof THREE.LightShadow && (shadow.autoUpdate || shadow.needsUpdate)) lights.push({ light: object, shadow });
+      if (object instanceof THREE.Light && shadow instanceof THREE.LightShadow && (!due || shadow.autoUpdate || shadow.needsUpdate)) lights.push({ light: object, shadow });
     });
     return lights;
   }
@@ -1532,7 +1553,9 @@ export class Game {
    *  depth pipelines into, and every lit draw was dropped on its unbound shadow sampler (E153), leaving all of it to
    *  the first full draw (1.6 s of one GPU flush on Sunscar Dunes, headless Chromium). The flags are put back. */
   private allocateShadowMaps(cam: THREE.Camera): number {
-    const casters = this.shadowCasters(cam), missing = casters.filter(({ shadow }) => shadow.map === null);
+    // SHARD-SOURCE SS-NE16: a held cascade too (autoUpdate off, not due): three binds its sampler all the same, and an
+    // unallocated map's stand-in is an RGBA texture, so every lit slice logged GL_INVALID_OPERATION and was dropped
+    const casters = this.shadowCasters(cam, false), missing = casters.filter(({ shadow }) => shadow.map === null);
     if (missing.length === 0) return 0;
     const map = this.renderer.shadowMap, mapNeeds = map.needsUpdate;
     const flags = casters.map(({ shadow }) => ({ shadow, auto: shadow.autoUpdate, needs: shadow.needsUpdate }));
