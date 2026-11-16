@@ -25,6 +25,11 @@ Git hygiene
       `plan/<slug>` as often as you like. Land with `scripts/land.mjs` (below) only when the plan is complete, at a
       major milestone, or once a day for a multi-day plan. Never land per row. `node scripts/worktree.mjs reap`
       removes worktrees whose branch has landed (never unlanded, dirty or busy ones).
+ - **Many lanes in one checkout (meta MINI-DECISIONS M1, J389):** commit and push with one command,
+   `WS_LANE_NAME=<lane> node scripts/main-push.mjs -m "<subject>" -m "<body + Assisted-by>" <file>...` (or no
+   arguments to push commits already made). It commits by pathspec, syncs main the `main-pull.mjs` way (never a
+   rebase or stash), pushes through the normal pre-push and retries a race, under one lock per checkout. On a
+   conflict it uncommits your files and prints the `--onto` command that finishes the merge.
  - Mode 1's pull is `node scripts/main-pull.mjs`, not `git pull --rebase` (which refuses while any lane has an
    unstaged edit here). It replays your commits onto origin/main and moves only the paths main changes; if one of
    those is another lane's uncommitted edit it stops and names it: wait and run it again, never stash, restore or
