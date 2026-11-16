@@ -91,6 +91,24 @@ function gitTee(cwd,args,env){
 const git=(cwd,args,env=process.env)=>execFileSync('git',args,{cwd,env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:64<<20}).trim();
 /** @param {string} cwd @param {string[]} args @param {NodeJS.ProcessEnv} [env] */
 const tryGit=(cwd,args,env=process.env)=>spawnSync('git',args,{cwd,env,encoding:'utf8',maxBuffer:64<<20});
+
+/** WL12: a recent small branch merits a mode reminder, never a refusal.
+ * Reflog selectors carry branch-event time; commit time can predate branch creation.
+ * Missing/expired local reflogs cannot establish age and produce no warning.
+ * @param {string} root @param {string} branch @param {number} [now] @returns {string|null} */
+export function smallPlanWarning(root,branch,now=Date.now()){
+ if(!PLAN_BRANCH.test(branch))return null;
+ const count=tryGit(root,['rev-list','--count',`origin/main..${branch}`]);
+ if(count.status!==0)return null;
+ const commits=Number(count.stdout.trim());
+ if(!Number.isSafeInteger(commits)||commits<1||commits>3)return null;
+ const history=tryGit(root,['reflog','show','--date=unix','--format=%gD%x09%gs',`refs/heads/${branch}`]);
+ if(history.status!==0)return null;
+ const first=history.stdout.trim().split('\n').at(-1)??'';
+ const created=Number(/@\{(\d+)\}\tbranch: Created from .+$/u.exec(first)?.[1])*1000,age=now-created;
+ if(!Number.isFinite(created)||!Number.isFinite(age)||age<0||age>=3*60*60*1000)return null;
+ return `WARNING one-row land (J290): commit on main next time (${commits} commit${commits===1?'':'s'}, ${Math.floor(age/60_000)} min old; J336: land a whole plan once)`;
+}
 /** A ref lock another git process holds or just moved: worktrees share refs, so two lands fetching main at once race
  * for refs/remotes/origin/main ("cannot lock ref ...: is at X but expected Y", engine run 43332891983), and any git
  * may hold packed-refs.lock for a moment. Only these are retried; every other git failure stops as before. */
@@ -324,6 +342,7 @@ class Landing{
   /** @type {string|null} */this.planTip=null;
   this.expected='';
   /** @type {string|null} */this.landedSha=null;
+  /** @type {string|null} */this.sizeWarning=null;
  }
 
  /** @type {(why:string)=>void} */
@@ -756,6 +775,8 @@ class Landing{
   let main=this.fetchMain();
   if(start===main||isAncestor(this.root,start,main)){this.say('nothing',`${this.branch} ${short(start)} has nothing main lacks`);return 0;}
   this.say('start',`${this.branch} ${short(start)} -> main ${short(main)} (repo ${this.repo})`);
+  this.sizeWarning=smallPlanWarning(this.root,this.branch);
+  if(this.sizeWarning!==null){this.say('warning',this.sizeWarning);this.receipt(`small-plan warning: ${this.sizeWarning}`);}
   // An install a stopped land owed (its rebase had already moved HEAD) runs before anything else (J206 review).
   if(existsSync(this.installMarker()))this.install(['an earlier land\'s rebase']);
   // DS22: gen:inputs rewrites the stamps from the tree after the rebase, so their stale bytes never block it.
@@ -920,7 +941,7 @@ class Landing{
   this.startWatcher(head);
   this.say('rule',`main's own CI runs on ${short(head)} now. If it goes red, the lane that landed last fixes it forward or reverts it, at once (J249)`);
   const seconds=Math.round((Date.now()-this.started)/1000);
-  this.receipt(`landed ${short(head)} on main (${short(before)}..${short(head)}); ${rule}; rounds ${round}; branch ci ${this.runs.join(', ')||'none'}; main ci ${rule==='carried'?'followed by main-watch':'reuses the branch run'}; ${seconds} s`);
+  this.receipt(`landed ${short(head)} on main (${short(before)}..${short(head)}); ${rule}; rounds ${round}; branch ci ${this.runs.join(', ')||'none'}; main ci ${rule==='carried'?'followed by main-watch':'reuses the branch run'}${this.sizeWarning===null?'':'; one-row'}; ${seconds} s`);
   return 0;
  }
 }

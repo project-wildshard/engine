@@ -202,6 +202,8 @@ describe('land (J240): fast-forward main from a plan worktree after its branch C
     expect(rest).toEqual([]);
     expect(f.read(f.files.gh)).toContain(`head_sha=${tip}`);
     expect(f.read(f.files.receipts)).toMatch(new RegExp(`^\\d\\d:\\d\\d UTC fixture-lane land plan/foo landed ${tip.slice(0, 10)} on main .*; exact; rounds 1;`, 'mu'));
+    expect(result.stdout).toContain('WARNING one-row land (J290): commit on main next time');
+    expect(f.read(f.files.receipts)).toMatch(/land plan\/foo landed .*; one-row; \d+ s$/mu);
   }, 60_000);
 
   test('after landing, land starts main-watch to follow the SHA from the canonical checkout (LS5)', async () => {
