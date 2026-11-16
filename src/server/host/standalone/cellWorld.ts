@@ -8,6 +8,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { questBooks } from '@wildshard/engine/quest/players';
+import { Rng, fnv1a32 } from '@wildshard/engine/core/rng';
 import { decodeSimSnapshot, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 import type { SaveStore } from '@wildshard/engine/saves/store';
@@ -103,7 +104,9 @@ function fallFloorOf(input: HeadlessRuntimeInput, host: SimHost, lone: boolean):
 function installDataCellLoot(host: SimHost, shard: HeadlessRuntimeInput['shard'], effects: HeadlessEffect[], alone: boolean): void {
   const economy = { rows: { loot: shard.rows.loot } }, coins = personalCoinTable(economy), items = personalItemTable(economy);
   if (coins === null && items === null) return;
-  installPersonalLoot(host, { coins, alone, ...(items === null ? {} : { items }),
+  // A cell's save names only the engine's random streams (sim.snapshot v3), so its rolls keep no stream of their own.
+  const seed = host.rng.seedValue, draws = (roll: string): (() => number) => { const rng = new Rng(fnv1a32(`${String(seed)}:${roll}`)); return () => rng.next(); };
+  installPersonalLoot(host, { coins, alone, draws, ...(items === null ? {} : { items }),
     grant: (player, amount) => { effects.push({ kind: 'coins', amount, actorId: player }); },
     grantItem: (player, item, count) => { effects.push({ kind: 'item', item, count, actorId: player }); } });
 }

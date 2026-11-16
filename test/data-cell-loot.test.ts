@@ -7,6 +7,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { openCellWorld, type CellWorld } from '../src/server/host/standalone/cellWorld';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
+import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 
 // TEMPLATE-E2E TC-E6 (Jake, 2026-11-15 QA row 33, "kills drop loot"): only a native runtime paid per-kill loot; a grid data
 // cell paid coins through quest steps alone, so a single Brasscap bandit dropped nothing. A data cell now rolls each
@@ -63,4 +64,19 @@ test('a one-shard page\'s lone player is paid by the page, not the cell', async 
 test('a lone one-shard room has no page, so the cell pays its lone killer', async () => {
   const cell = await open(true, true, true);
   try { kill(cell); expect(coins(cell)).toEqual([7]); } finally { cell.dispose(); }
+});
+
+test('a cell that has rolled loot still saves and restores (its rolls keep no stream of their own)', async () => {
+  // Brasscap rev 8 on engine df879dc0, WebKit phone: the first bandit kill paid 4 coins, then the page's server stopped,
+  // "Invalid type: Expected ("gameplay" | "ai" | "spawn" | "cosmetic") but received "loot"", at the next save.
+  const cell = await open(true, false);
+  try {
+    kill(cell);
+    expect(coins(cell)).toEqual([7]);
+    const saved = serializeSimSnapshot(snapshotSimHost(cell.host));
+    expect(decodeSimSnapshot(saved).rng.streams.map(stream => stream.name)).not.toContain('loot');
+    const back = await openCellWorld({ instance: 'loot-cell' }, { shard: shard(true), assets: new Map(), sections: new Map(), rapier: await rapier } as never,
+      saved, { saves: new SaveStore({ local: null, session: null }), lone: false, pageless: true });
+    back.dispose();
+  } finally { cell.dispose(); }
 });

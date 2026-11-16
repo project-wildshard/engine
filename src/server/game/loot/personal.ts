@@ -17,6 +17,10 @@ export interface PersonalLootPorts {
   readonly grantItem?: ((player: string, item: string, count: number) => void) | undefined;
   /** A room pays a lone player too: nothing else will once the page's feed goes. Off a room, the page pays one player. */
   readonly alone?: boolean | undefined;
+  /** One roll's draws, keyed by the player, the body's bounty and how many times it has paid them. Left out, every roll
+   *  draws off the host's `loot` stream; a host whose saves can't hold that stream (a data cell's, whose snapshot names
+   *  only the engine's streams) rolls each one from its own key instead, the same on a replay and after a restore. */
+  readonly draws?: ((roll: string) => () => number) | undefined;
 }
 const Economy: v.GenericSchema<unknown, { rows: { loot: { economy?: { tables?: unknown } | undefined }[] } }> = v.object({ rows: v.object({ loot: v.array(v.object({ economy: v.optional(v.object({ tables: v.optional(v.unknown()) })) })) }) });
 /** A shard's coin roll, from its `economy/loot` rows: the table the page pays from. Null on a shard whose kills pay nothing. */
@@ -58,9 +62,11 @@ export function installPersonalLoot(host: SimHost, ports: PersonalLootPorts): vo
     const key = bountyKey(body), cap = caps.get(key) ?? 1;
     for (const player of rollers) {
       const paid = paidKey(player, key);
-      if (ledgerDedupe.filter(row => row === paid).length >= cap) continue;
-      const coins = ports.coins?.(body.kind, next) ?? 0;
-      const items = ports.items?.({ kind: body.kind, variant: body.variant, owned: item => ledgerDedupe.includes(itemKey(player, item)) }, next) ?? [];
+      const times = ledgerDedupe.filter(row => row === paid).length;
+      if (times >= cap) continue;
+      const draw = ports.draws?.(`${paid}#${String(times)}`) ?? next;
+      const coins = ports.coins?.(body.kind, draw) ?? 0;
+      const items = ports.items?.({ kind: body.kind, variant: body.variant, owned: item => ledgerDedupe.includes(itemKey(player, item)) }, draw) ?? [];
       if (coins <= 0 && items.length === 0) continue;
       ledgerDedupe.push(paid);
       if (coins > 0) { ports.grant(player, coins); host.events.emit('reward.granted', { player, coins, body: actor.id }); }
