@@ -22,6 +22,11 @@
           },
           {
             "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/gh-poll-guard.mjs\"",
+            "statusMessage": "Checking for a GitHub poll faster than once a minute"
+          },
+          {
+            "type": "command",
             "command": "bash \"$(git rev-parse --show-toplevel)/.agents/hooks/guard-herdr-prompt.sh\"",
             "statusMessage": "Checking herdr targets for an open question"
           },

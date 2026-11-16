@@ -27,6 +27,7 @@ import {pathToFileURL} from 'node:url';
 import {stalePinProducts} from './pins-reuse.mjs';
 import {checkedTreeDirt} from './push-proof-cache.mjs';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
+import {GitHubLimitError,backoffMs,ghFailure,readerEnv} from './gh-limit.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
 
 /** The hosted workflows a landing needs green, by workflow name (J195, J240). */
@@ -168,7 +169,7 @@ export function githubSlug(remote){
 /** Refuse anything but the known options. Any spelling of force is refused by name.
  * @param {string[]} argv */
 export function parseArgs(argv){
- const options={pollSeconds:30,timeoutMinutes:60,appearMinutes:5,rounds:5,keep:false,preflight:true};
+ const options={pollSeconds:60,timeoutMinutes:60,appearMinutes:5,rounds:5,keep:false,preflight:true};
  for(const arg of argv){
   if(/^-f$|force/iu.test(arg))throw new StopError(`refused ${arg}: land never force-pushes main (J240: fast-forward only). If main moved, land rebases and retries by itself`);
   const [name,value]=arg.split('=',2);
@@ -204,8 +205,8 @@ export function shaVerdict(data,sha){
 
 /** @param {string} repo @param {string} path */
 function ghApi(repo,path){
- const result=spawnSync('gh',['api',`repos/${repo}/${path}`],{encoding:'utf8',timeout:30_000,maxBuffer:64<<20});
- if(result.error!==undefined||result.status!==0)throw new Error(`gh api ${path} failed: ${`${result.stderr}${result.error?.message??''}`.trim().slice(0,300)}`);
+ const result=spawnSync('gh',['api',`repos/${repo}/${path}`],{encoding:'utf8',env:readerEnv(),timeout:30_000,maxBuffer:64<<20});
+ if(result.error!==undefined||result.status!==0)throw ghFailure(`gh api ${path}`,`${result.stderr}${result.error?.message??''}`);
  return /** @type {unknown} */(JSON.parse(result.stdout));
 }
 
@@ -614,7 +615,7 @@ class Landing{
   const scratch=mkdtempSync(join(this.root,'tmp','land-flaky-'));
   /** @type {string[]|null} */let files=null;
   try{
-   const fetched=spawnSync('gh',['run','download',String(run.id),'-R',this.repo,'-p','engine-ci-*','-D',scratch],{encoding:'utf8',timeout:120_000});
+   const fetched=spawnSync('gh',['run','download',String(run.id),'-R',this.repo,'-p','engine-ci-*','-D',scratch],{encoding:'utf8',env:readerEnv(this.env),timeout:120_000});
    if(fetched.status===0&&jobs.blocking.length>0)files=flakyFiles(scratch,jobs.blocking);
   }finally{rmSync(scratch,{recursive:true,force:true});}
   if(files===null)return null;
@@ -622,10 +623,11 @@ class Landing{
   const rerun=spawnSync('gh',['run','rerun',String(run.id),'-R',this.repo,'--failed'],{encoding:'utf8',timeout:60_000});
   if(rerun.status!==0){this.say('flaky',`re-run refused (${rerun.stderr.trim().split('\n').at(-1)??''}); stopping as red`);return null;}
   // Wait for this run's own second attempt: never attempt one's stale verdict, never another run of the SHA.
-  const deadline=Date.now()+this.options.timeoutMinutes*60_000;
+  let deadline=Date.now()+this.options.timeoutMinutes*60_000;
   for(;;){
    /** @type {unknown} */let data=null;
-   try{data=ghApi(this.repo,`actions/runs/${run.id}`);}catch{/* retried below */}
+   try{data=ghApi(this.repo,`actions/runs/${run.id}`);}
+   catch(error){if(error instanceof GitHubLimitError){const wait=this.quotaWait(error,`ci run ${run.id} re-run`);deadline+=wait;await sleep(wait);continue;}/* retried below */}
    const field=(/** @type {string} */key)=>data!==null&&typeof data==='object'&&key in data?String(/** @type {Record<string,unknown>} */(data)[key]):'';
    if(Number(field('run_attempt'))>2){this.say('flaky',`ci run ${run.id} is past its second attempt; stopping as red`);return null;}
    if(Number(field('run_attempt'))===2&&field('status')==='completed'){
@@ -724,12 +726,18 @@ class Landing{
  /** Poll the exact SHA until both landing workflows are complete.
   * @param {string} sha @param {string} what */
  async waitCI(sha,what){
-  const deadline=Date.now()+this.options.timeoutMinutes*60_000,appear=Date.now()+this.options.appearMinutes*60_000;
+  // MF12: only an answered lookup counts toward `appear`; a quota stop moves both deadlines by its wait.
+  let deadline=Date.now()+this.options.timeoutMinutes*60_000,appear=Date.now()+this.options.appearMinutes*60_000;
   let last='';
+  const pollMs=this.options.pollSeconds*1000;
   for(;;){
    /** @type {ReturnType<typeof shaVerdict>} */let verdict;
    try{verdict=shaVerdict(ghApi(this.repo,`actions/runs?head_sha=${sha}&event=push&per_page=100`),sha);}
-   catch(error){verdict={state:'pending',runs:{},summary:`lookup failed (${error instanceof Error?error.message:String(error)}); retrying`};}
+   catch(error){
+    if(error instanceof GitHubLimitError){const wait=this.quotaWait(error,`${what} ${short(sha)}`);deadline+=wait;appear+=wait;last='';await sleep(wait);continue;}
+    appear+=pollMs;
+    verdict={state:'pending',runs:{},summary:`lookup failed (${error instanceof Error?error.message:String(error)}); retrying`};
+   }
    if(verdict.summary!==last){this.say('ci',`${what} ${short(sha)}: ${verdict.summary}`);last=verdict.summary;}
    if(verdict.state==='green'){for(const run of Object.values(verdict.runs))this.runs.push(run.id);return verdict;}
    if(verdict.state==='red'){
@@ -742,8 +750,16 @@ class Landing{
    }
    if(Object.keys(verdict.runs).length===0&&Date.now()>appear)throw new StopError(`no hosted ci run for ${short(sha)} after ${this.options.appearMinutes} min; is ci.yml triggered on plan/** pushes?`);
    if(Date.now()>deadline)throw new StopError(`hosted CI for ${short(sha)} not finished after ${this.options.timeoutMinutes} min (${verdict.summary}); run land again to keep waiting`);
-   await sleep(this.options.pollSeconds*1000);
+   await sleep(pollMs);
   }
+ }
+
+ /** MF12: say that GitHub's quota is spent (not that CI is missing) and how long land waits for it.
+  * @param {GitHubLimitError} error @param {string} what @returns {number} the wait in ms */
+ quotaWait(error,what){
+  const wait=backoffMs(error,this.options.pollSeconds*1000),span=wait<120_000?`${String(Math.ceil(wait/1000))} s`:`${String(Math.ceil(wait/60_000))} min`;
+  this.say('ci',`${what}: GitHub API quota spent (${error.message.split('\n')[0].slice(0,120)}); waiting ${span} for it to reset, then resuming. Not a CI failure; the CI deadlines move by the wait`);
+  return wait;
  }
 
  /** Fast-forward main to HEAD. Refuses before pushing unless origin/main is
@@ -884,7 +900,7 @@ class Landing{
    if(fetched.status!==0)throw new Error(`git fetch origin main failed: ${fetched.stderr.trim()}`);
    outcome=followMain(canonical,git(canonical,['rev-parse','origin/main']).trim());
   }catch(error){outcome=`could not check it (${error instanceof Error?error.message.split('\n')[0]:String(error)})`;}
-  if(/fast-forwarded|current$/u.test(outcome)){this.say('canonical',outcome);return;}
+  if(/fast-forwarded|main current/u.test(outcome)&&!/CANONICAL INSTALL STALE/u.test(outcome)){this.say('canonical',outcome);return;}
   this.say('canonical',`WARNING ${outcome}; canonical ${canonical||'checkout'} was not updated`);
   this.receipt(`canonical checkout not fast-forwarded after landing: ${outcome}`);
  }

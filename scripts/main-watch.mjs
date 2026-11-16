@@ -23,6 +23,7 @@ import {dirname,join,resolve} from 'node:path';
 import {setTimeout} from 'node:timers/promises';
 import {pathToFileURL} from 'node:url';
 import {AMBER,parseAmber,parseAudioAmber} from './test-amber.mjs';
+import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
@@ -119,6 +120,20 @@ function lock(file){
   }
 }
 
+/** MF12: main's run list, fetched at most once per `freshMs` across every main-watch on this machine. The cache file is
+ * replaced whole (write, then rename), so a reader never sees half of it; a stale or unreadable cache fetches.
+ * @param {string} cache @param {() => Run[]} fetch @param {number} [now] @param {number} [freshMs] @returns {Run[]} */
+export function sharedRuns(cache,fetch,now=Date.now(),freshMs=45_000){
+  try{
+    const kept=/** @type {{at:number,runs:Run[]}} */(JSON.parse(readFileSync(cache,'utf8')));
+    if(typeof kept.at==='number'&&now-kept.at>=0&&now-kept.at<freshMs&&Array.isArray(kept.runs))return kept.runs;
+  }catch{/* No cache yet. */}
+  const runs=fetch();
+  try{mkdirSync(dirname(cache),{recursive:true});const draft=`${cache}.${process.pid}`;writeFileSync(draft,JSON.stringify({at:now,runs}));renameSync(draft,cache);}
+  catch{/* A cache that cannot be written only costs the next fetch. */}
+  return runs;
+}
+
 /** The real world: GitHub through gh, git, the receipts log and herdr. Tests pass their own.
  * @param {NodeJS.ProcessEnv} env */
 export function liveIo(env=process.env){
@@ -128,17 +143,22 @@ export function liveIo(env=process.env){
   const repo=env.WS_MAIN_WATCH_REPO??REPO;
   const receipts=resolve(env.WS_LANE_RECEIPTS??join(homedir(),'.cache/wildshard/lane-receipts.log'));
   const run=(/** @type {string} */command,/** @type {string[]} */args)=>execFileSync(command,args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:32<<20});
+  // MF12 (4): reads go through the reader App when this machine has it; the dispatch stays on the user's login.
+  const read=(/** @type {string[]} */args)=>execFileSync('gh',args,{cwd:root,encoding:'utf8',env:readerEnv(env),stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:32<<20});
   return {
     repo,
+    quotaReset:()=>quotaReset(),
     state:resolve(env.WS_MAIN_WATCH_STATE??join(homedir(),'.cache/wildshard/main-watch.json')),
-    runs:()=>/** @type {Run[]} */(JSON.parse(run('gh',['api',`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&per_page=50`])).workflow_runs
-      .filter((/** @type {Run} */row)=>row.event==='push'||row.event==='workflow_dispatch')),
-    failed:(/** @type {number} */id)=>/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(run('gh',['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
+    // MF12: every land leaves a follow running for up to 90 min, so one machine can hold several; they share one fetch.
+    runs:()=>sharedRuns(resolve(env.WS_MAIN_WATCH_RUNS_CACHE??join(homedir(),'.cache/wildshard/main-watch-runs.json')),
+      ()=>/** @type {Run[]} */(JSON.parse(read(['api',`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&per_page=50`])).workflow_runs
+        .filter((/** @type {Run} */row)=>row.event==='push'||row.event==='workflow_dispatch'))),
+    failed:(/** @type {number} */id)=>/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
       .filter(job=>job.conclusion==='failure'||job.conclusion==='timed_out').map(job=>job.name),
     // The annotations (their AMBER lines) on a run's blocking tests and its timings job; quarantine's are its own (J193).
-    annotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(run('gh',['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
+    annotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
       .filter(job=>job.name.startsWith('tests')||job.name==='timings')
-      .map(job=>/** @type {{message:string}[]} */(JSON.parse(run('gh',['api',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`]))).map(row=>row.message).join('\n')).join('\n'),
+      .map(job=>/** @type {{message:string}[]} */(JSON.parse(read(['api',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`]))).map(row=>row.message).join('\n')).join('\n'),
     tip:()=>{run('git',['fetch','--quiet','origin','main']);return run('git',['rev-parse','origin/main']).trim();},
     commits:(/** @type {string|null} */from,/** @type {string} */to)=>{
       try{return run('git',['rev-list','--max-count=200',from===null?to:`${from}..${to}`]).trim().split('\n').filter(Boolean);}catch{return [to];}
@@ -215,15 +235,28 @@ export function sweep(io,hint={}){
  * is seen, and a cancelled tip with nothing newer gets its one dispatch. @param {ReturnType<typeof liveIo>} io
  * @param {{sha:string,lane?:string,pane?:string,pollMs?:number,timeoutMs?:number}} options */
 export async function follow(io,options){
-  const deadline=Date.now()+(options.timeoutMs??90*60_000),seen=/** @type {Verdict[]} */([]);
+  const pollMs=options.pollMs??60_000,seen=/** @type {Verdict[]} */([]);
+  let deadline=Date.now()+(options.timeoutMs??90*60_000);
   while(Date.now()<deadline){
     try{
       // Judged from the runs seen before the sweep, which sees them too: a verdict is never returned unreported.
-      const done=verdictFor(io.runs(),options.sha,io.contains)!==null;
-      seen.push(...sweep(io,options));
+      // One fetch per pass: the sweep judges the same list (MF12).
+      const runs=io.runs(),done=verdictFor(runs,options.sha,io.contains)!==null;
+      seen.push(...sweep({...io,runs:()=>runs},options));
       if(done)return seen;
-    }catch(error){process.stderr.write(`main-watch: ${error instanceof Error?error.message:String(error)}; retrying\n`);}
-    await setTimeout(options.pollMs??30_000);
+    }catch(error){
+      // MF12: a spent GitHub quota is a wait until it resets, not a missing verdict; the deadline moves by the wait.
+      const detail=`${error instanceof Error?error.message:String(error)} ${error!==null&&typeof error==='object'&&'stderr'in error?String(error.stderr):''}`;
+      if(RATE_LIMITED.test(detail)){
+        const wait=Math.max(pollMs,(io.quotaReset?.()??Date.now()+60_000)-Date.now()+1000);
+        process.stderr.write(`main-watch: GitHub API quota spent; waiting ${Math.ceil(wait/60_000)} min for it to reset\n`);
+        deadline+=wait;
+        await setTimeout(wait);
+        continue;
+      }
+      process.stderr.write(`main-watch: ${detail.trim()}; retrying\n`);
+    }
+    await setTimeout(pollMs);
   }
   io.receipt(`main ${short(options.sha)} has no verdict after ${Math.round((options.timeoutMs??90*60_000)/60_000)} min; the next sweep judges it`);
   return [];

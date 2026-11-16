@@ -47,6 +47,15 @@ if (args[0] === 'run' && args[1] === 'rerun') {
   fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(state));
   process.exit(0);
 }
+// MF12: \`limitedUntil\` (epoch ms) makes every Actions query a quota stop until then; rate_limit says when it resets.
+if (args[0] === 'api' && args[1] === 'rate_limit') {
+  process.stdout.write(JSON.stringify({ resources: { core: { limit: 5000, remaining: Date.now() < (state.limitedUntil ?? 0) ? 0 : 4999, reset: Math.ceil((state.limitedUntil ?? Date.now()) / 1000) } } }));
+  process.exit(0);
+}
+if (args[0] === 'api' && Date.now() < (state.limitedUntil ?? 0)) {
+  process.stderr.write('gh: API rate limit exceeded for user ID 1. (HTTP 403)\\n');
+  process.exit(1);
+}
 const path = process.argv[3] ?? '';
 const pushed = fs.existsSync(state.pushed) ? fs.readFileSync(state.pushed, 'utf8').trim().split('\\n').filter(Boolean).map(line => line.split(' ')) : [];
 const runId = (sha, name) => parseInt(sha.slice(0, 6), 16) * 10 + (name === 'ci' ? 1 : 2);
@@ -120,6 +129,8 @@ function fixture() {
     PREPUSH_FAIL: files.fail, PREPUSH_RACE: files.race, RACE_SCRIPT: files.raceScript,
     WS_LAND_REPO: 'project-wildshard/fixture', WS_FLAKE_STRIKES: join(root, 'strikes.jsonl'), WS_LANE_RECEIPTS: files.receipts, WS_LANE_NAME: 'fixture-lane', HERDR_PANE_ID: 'w0:p9',
     WS_SESSION_KEEP_ROOT: join(root, 'session-keep'),
+    // MF12: never mint a real reader App token from a fixture, even on a machine that has the App's key.
+    WS_GH_READER: '0',
     WS_STORE_USERS: join(root, 'store-users'), WS_STORE_RESERVATION: join(root, 'store-maintenance.lock'),
   };
   for (const key of Object.keys(env)) if (key.startsWith('GIT_') && !['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL'].includes(key)) Reflect.deleteProperty(env, key);
@@ -186,6 +197,19 @@ const GEN_STAMPS = "import {mkdirSync,readdirSync,statSync,writeFileSync} from '
 const prepushLines = (f: Fixture) => f.read(f.files.prepush).trim().split('\n').filter(Boolean);
 
 describe('land (J240): fast-forward main from a plan worktree after its branch CI is green', () => {
+  test('MF12: a spent GitHub quota is waited out, not read as "no hosted ci run", and the plan lands', () => {
+    const f = fixture(), wt = f.worktree('quota');
+    const head = f.commit(wt, 'src/quota.ts', 'export const quota = 1;\n', 'quota');
+    // Spent for longer than --appear (3 s): before MF12 land stopped with "no hosted ci run".
+    f.state({ limitedUntil: Date.now() + 4_000 });
+    const result = f.land(wt);
+    expect(result.stdout).toMatch(/GitHub API quota spent .*waiting \d+ s for it to reset, then resuming/u);
+    expect(result.stdout).not.toMatch(/no hosted ci run/u);
+    expect(result.status).toBe(0);
+    expect(f.remoteMain()).toBe(head);
+    expect(f.read(f.files.gh)).toMatch(/^api rate_limit$/mu);
+  });
+
   test('main has not moved: the exact hosted-green SHA fast-forwards main', () => {
     const f = fixture();
     const wt = f.worktree('foo');

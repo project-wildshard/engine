@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { follow, judge, landers, liveIo, paneFor, reached, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { follow, judge, landers, liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
 
 mkdirSync(resolve('tmp'), { recursive: true });
@@ -31,6 +31,7 @@ const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
   contains, receipts: () => world.log, receipt: line => { world.receipts.push(line); },
   panes: () => [{ pane_id: 'w1:p2', label: 'engine plan/red-plan' }, { pane_id: 'w1:p3', cwd: '/x/engine/.worktrees/other' }],
   send: (pane, text) => { world.sent.push([pane, text]); return true; }, dispatch: () => { world.dispatched += 1; },
+  quotaReset: () => Date.now(),
 });
 const world = (runs: ReturnType<typeof run>[], log = ''): World => ({ runs, receipts: [], sent: [], dispatched: 0, log, tip: runs.at(-1)?.head_sha ?? '' });
 
@@ -184,4 +185,34 @@ test('AU6 (J303): a green run whose cook report has a shard over 6 MB gives a ma
   expect(w.receipts.find(line => line.includes('audio huge'))).toContain('over the 10.00 MB red line');
   expect(w.receipts.filter(line => line.startsWith('MAIN RED'))).toEqual([]);
   expect(w.receipts.filter(line => line.startsWith('main green'))).toHaveLength(1);
+});
+
+// MF12: a spent GitHub quota is waited out until its reset, past the deadline it would otherwise have hit.
+test('a rate-limited sweep waits for the quota reset and still finds the verdict', async () => {
+  const w = world([...replay, run(42970000007, 'aaaa1111', 'failure', 60)]), io = fake('rate-limit', w);
+  w.tip = sha('aaaa1111');
+  let calls = 0, resets = 0;
+  const limited = Object.assign(new Error('Command failed: gh api'), { stderr: 'gh: API rate limit exceeded for user ID 1. (HTTP 403)' });
+  const started = Date.now();
+  await follow({ ...io, runs: () => { calls += 1; if (calls <= 2) throw limited; return w.runs; }, quotaReset: () => { resets += 1; return Date.now() + 300; } },
+    { sha: sha('aaaa1111'), lane: 'opus-new', pollMs: 1, timeoutMs: 500 });
+  expect(resets).toBe(2);
+  expect(Date.now() - started).toBeGreaterThanOrEqual(2000);
+  expect(w.receipts).toContain('MAIN RED 652afa6c00..aaaa111100 run 42970000007: landers opus-new; failed: tests (3)');
+});
+
+test('MF12: main-watches on one machine share one runs fetch for 45 s', () => {
+  const cache = join(scratch, 'runs-cache.json');
+  let fetches = 0;
+  const fetch = () => { fetches += 1; return replay; };
+  expect(sharedRuns(cache, fetch, 1_000)).toEqual(replay);
+  expect(sharedRuns(cache, fetch, 40_000)).toEqual(replay);
+  expect(fetches).toBe(1);
+  sharedRuns(cache, fetch, 46_000);
+  expect(fetches).toBe(2);
+  // A clock that went backwards, or a cache someone broke, fetches again.
+  sharedRuns(cache, fetch, 10_000);
+  writeFileSync(cache, 'not json');
+  sharedRuns(cache, fetch, 47_000);
+  expect(fetches).toBe(4);
 });

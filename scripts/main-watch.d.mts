@@ -6,6 +6,7 @@ export interface Io {
   repo:string;state:string;runs:()=>Run[];failed:(id:number)=>string[];annotations:(id:number)=>string;tip:()=>string;
   commits:(from:string|null,to:string)=>string[];contains:(ancestor:string,descendant:string)=>boolean;
   receipts:()=>string;receipt:(line:string)=>void;panes:()=>Pane[];send:(pane:string,text:string)=>boolean;dispatch:()=>void;
+  quotaReset?:()=>number;
 }
 export const REPO: string;
 export function judge(runs:readonly Run[],state:State,tip:string|null):Verdict[];
@@ -13,6 +14,7 @@ export function verdictFor(runs:readonly Run[],sha:string,contains:(ancestor:str
 export function landers(text:string):Map<string,{lane:string;slug:string;pane?:string}>;
 export function paneFor(panes:readonly Pane[],slug:string):string|undefined;
 export function readState(file:string):State|null;
+export function sharedRuns(cache:string,fetch:()=>Run[],now?:number,freshMs?:number):Run[];
 export function liveIo(env?:NodeJS.ProcessEnv):Io;
 export function sweep(io:Io,hint?:{sha?:string;lane?:string;pane?:string}):Verdict[];
 export function reached(io:{tip:()=>string;contains:(ancestor:string,descendant:string)=>boolean},sha:string,waitMs:number,pollMs?:number):Promise<boolean>;
