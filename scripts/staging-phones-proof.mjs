@@ -154,8 +154,8 @@ function android(serial) {
     // emulator's software GPU (1 to 2 fps) the stick read 0.08 (local API 37, 2026-11-16). The thumb goes down, moves to
     // the end in five steps, holds there for `ms`, then lifts.
     swipe: async (from, to, ms) => {
-      const steps = [1, 2, 3, 4, 5].map(step => `input touchscreen motionevent MOVE ${r(from.x + (to.x - from.x) * step / 5)} ${r(from.y + (to.y - from.y) * step / 5)}`);
-      adb('shell', [`input touchscreen motionevent DOWN ${r(from.x)} ${r(from.y)}`, ...steps, `sleep ${String(ms / 1000)}`, `input touchscreen motionevent UP ${r(to.x)} ${r(to.y)}`].join('; '));
+      const moves = [1, 2, 3, 4, 5].map(step => `input touchscreen motionevent MOVE ${r(from.x + (to.x - from.x) * step / 5)} ${r(from.y + (to.y - from.y) * step / 5)}`);
+      adb('shell', [`input touchscreen motionevent DOWN ${r(from.x)} ${r(from.y)}`, ...moves, `sleep ${String(ms / 1000)}`, `input touchscreen motionevent UP ${r(to.x)} ${r(to.y)}`].join('; '));
       await Promise.resolve();
     },
     tap: async at => { adb('shell', 'input', 'touchscreen', 'tap', r(at.x), r(at.y)); await Promise.resolve(); },
@@ -294,7 +294,7 @@ try {
   // Chrome also logs every 404 it fetches ("Failed to load resource", Safari's console does not): listed with its address,
   // not failed, as in online-phone-proof.
   const lines = faultsOf(phone, socket), dial = (/** @type {{text: string}} */ line) => /^WebSocket connection to 'wss:\/\/rooms-staging\.wildshard\.io\/' failed: WebSocket is closed before the connection is established\.$/u.test(line.text);
-  const load = (/** @type {{text: string}} */ line) => /^Failed to load resource: /u.test(line.text), other = lines.other.filter(line => !dial(line) && !load(line));
+  const load = (/** @type {{text: string}} */ line) => line.text.startsWith('Failed to load resource: '), other = lines.other.filter(line => !dial(line) && !load(line));
   note(row, 'no page error', other.length === 0, { other: other.slice(0, 8), dials: lines.other.filter(dial).length, loads: lines.other.filter(load).slice(0, 8), health: lines.health.length });
   code = steps.every(each => each.ok) ? 0 : 1;
 } catch (error) {
