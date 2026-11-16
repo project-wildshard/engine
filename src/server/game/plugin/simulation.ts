@@ -62,6 +62,7 @@ import { createQuestScriptPorts, DeclaredQuests, type QuestDataPorts, type Quest
 import { installDeclaredEncounters } from "../shard/declaredEncounters";
 import type { Shardfile } from "@wildshard/format/shardSchema";
 import { speciesResolver, simStrikes } from "./brain";
+import { prepareCreaturePolicies } from "../shardfile/creatureLayers";
 import { createShardfileScriptLane, verifiedScriptModules, type ScriptModuleAssets, type ShardScriptPorts } from "../shardfile/scripts";
 import { installDeclaredBrains, type DeclaredBrainPorts } from "../shardfile/brainRuntime";
 import { installDataRespawns } from "../shardfile/dataRespawn";
@@ -430,6 +431,7 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
   const levelId = shard.identity.slug;
   if (host.level.id !== levelId || host.level.seed !== shard.identity.seed || host.entities.size !== shard.creatures.spawns.length || shard.creatures.spawns.some((row) => !host.entities.has(row.id))) throw new Error('Shardfile simulation host mismatch');
   try {
+    const creatures = prepareCreaturePolicies(shard.rows, shard.creatures);
     installLadders(host, shard.modes?.traverse.filter(row => row.kind === 'ladder') ?? [], ports.ladders);
     const portals = portalLinkEntries(shard.entryways), portalErrors = portalLinkRules(portals, shard);
     if (portalErrors.length > 0) throw new Error(portalErrors.join('; '));
@@ -493,16 +495,16 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
       const handle = numericScriptEntityId(id); if (reverse.has(handle)) throw new Error('Script actor handle collision');
       actors.set(id, handle); reverse.set(handle, id);
     }
-    const custom = new Map(shard.creatures.brains.filter((brain) => brain.kind === 'script').map((brain) => [brain.id, brain]));
-    const brainBindings = shard.creatures.spawns.flatMap((spawn) => {
+    const custom = new Map(creatures.brains.filter((brain) => brain.kind === 'script').map((brain) => [brain.id, brain]));
+    const brainBindings = creatures.spawns.flatMap((spawn) => {
       const brain = spawn.brain === null ? undefined : custom.get(spawn.brain);
       return brain === undefined ? [] : [{ actorId: spawn.id, entity: numericScriptEntityId(`brain:${spawn.id}`), brain }];
     });
     if (brainBindings.length > 0 && ports.scriptBrains === undefined) throw new Error('Missing custom brain port');
-    const dataPorts = shard.runtime === null ? dataCreaturePorts(host, shard.rows, shard.creatures.spawns, ports.creatureImpulse) : undefined;
-    const groupIds = new Set(shard.creatures.groups.map((group) => group.id));
-    const preparedGroups = prepareDeclaredGroupBrains(host, shard.creatures.groups, shard.creatures.spawns, ports.groups ?? dataPorts?.groups ?? {},
-      shard.creatures.brains.map((brain) => brain.id), shard.encounters.map((row) => row.entity));
+    const dataPorts = shard.runtime === null ? dataCreaturePorts(host, shard.rows, creatures.spawns, ports.creatureImpulse) : undefined;
+    const groupIds = new Set(creatures.groups.map((group) => group.id));
+    const preparedGroups = prepareDeclaredGroupBrains(host, creatures.groups, creatures.spawns, ports.groups ?? dataPorts?.groups ?? {},
+      creatures.brains.map((brain) => brain.id), shard.encounters.map((row) => row.entity));
     if (shard.crowds.length > 0 && ports.crowds === undefined) throw new Error('Missing declared crowd ports');
     const preparedCrowds = prepareDeclaredCrowds(shard.crowds, ports.crowds?.(host) ?? { flock: () => { throw new Error('Missing declared crowd recipe'); } });
     let lane: ScriptLanePort | undefined;
@@ -644,8 +646,8 @@ export function bindShardfileSim(host: SimHost, shard: Shardfile, assets: Readon
         if (typeof state !== 'string') throw new Error('Invalid director row continuation'); director.restore(state);
       } });
     }
-    installDeclaredBrains(host, shard.creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), shard.creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataPorts?.brains);
-    installDataRespawns(host, shard.creatures.spawns);
+    installDeclaredBrains(host, creatures.spawns.filter((spawn) => spawn.brain === null || (!custom.has(spawn.brain) && !groupIds.has(spawn.brain))), creatures.brains.filter((brain) => brain.kind !== 'script'), ports.brains ?? dataPorts?.brains);
+    installDataRespawns(host, creatures.spawns);
     dataPorts?.install();
     const decisionRows = decisionScriptsFromSections(ports.sections);
     const decisionActors = new Set(decisionRows.flatMap(row => Object.values(row.actors)));

@@ -19,3 +19,16 @@ The separate candidate format exposed an inferred declaration in the Nalati
 geography fixture that named a dependency's nested Valibot installation. Its
 explicit data interface preserves every validator and output field while
 keeping the declaration portable across the defining package boundary.
+
+## Declared policy installation, 2026-11-16
+
+CC4b2a projects resolved layer declarations onto the existing simulation
+installers. Inline policies receive their generated id on each spawn; named
+policies retain their original numbers. Script bindings and group preparation
+read the same projection. Admitted source rows and the level fingerprint stay
+unchanged, and competing policy owners refuse with the species id.
+
+The real simulation now moves an inline pursuit actor and restores its body
+and policy state exactly after another second of stepping. Semantic controls
+cover named references, flat rows, group ownership and input immutability.
+Hunting installation and removal of health/tuning guesses remain CC4b2b.

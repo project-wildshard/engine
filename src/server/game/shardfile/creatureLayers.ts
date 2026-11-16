@@ -96,3 +96,27 @@ export function resolveCreatureLayers(rows: ShardRows, brains: readonly BrainRow
   }
   return result;
 }
+
+/** Bind layer declarations to the existing policy installers without mutating admitted rows. */
+export function prepareCreaturePolicies(rows: ShardRows, creatures: ShardCreatures): ShardCreatures {
+  const layers = resolveCreatureLayers(rows, creatures.brains);
+  const brains = [...creatures.brains], groups = new Set(creatures.groups.map(row => row.id));
+  for (const layer of layers.values()) {
+    if (layer.brain.kind === 'declared' && !layer.brain.referenced) {
+      if (groups.has(layer.brain.declaration.id)) throw new Error(`species \`${layer.species}\`: brain id collides with a group`);
+      brains.push(layer.brain.declaration);
+    }
+  }
+  const spawns = creatures.spawns.map(spawn => {
+    const layer = layers.get(spawn.species);
+    if (layer === undefined) return spawn;
+    if (spawn.brain !== null && groups.has(spawn.brain)) {
+      if (layer.brain.kind !== 'none') throw new Error(`species \`${spawn.species}\`: group and temperament both own the brain`);
+      return spawn;
+    }
+    const brain = layer.brain.kind === 'declared' ? layer.brain.declaration.id : null;
+    if (spawn.brain !== null && spawn.brain !== brain) throw new Error(`species \`${spawn.species}\`: spawn and temperament name different brains`);
+    return { ...spawn, brain };
+  });
+  return { ...creatures, brains, spawns };
+}

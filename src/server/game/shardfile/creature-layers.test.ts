@@ -1,9 +1,10 @@
 import { expect, test } from 'vitest';
+import { parse } from 'valibot';
 import { parseRows, type ShardRows } from '@wildshard/format/rows';
-import type { ShardCreatures } from '@wildshard/format/creatures';
+import { CreaturesSchema, type ShardCreatures } from '@wildshard/format/creatures';
 import { CREATURE_SKELETONS } from '@wildshard/format/creatureSkeletons';
 import { speciesResolver } from '../plugin/brain';
-import { resolveCreatureLayers } from './creatureLayers';
+import { prepareCreaturePolicies, resolveCreatureLayers } from './creatureLayers';
 
 function fixture(layered = true): ShardRows {
   return parseRows({ weather: [], days: [], compendiums: [], loot: [],
@@ -88,4 +89,39 @@ test('hunting requires complete authored numbers and never selects a preset from
   expect(resolveCreatureLayers(rows).get(row.id)?.brain).toEqual({ kind: 'hunt', tuning: row.temperament.tuning });
   Reflect.deleteProperty(row.temperament.tuning, 'hp');
   expect(() => speciesResolver(rows)).toThrow('species `fixture.creature`');
+});
+
+function spawn(): ShardCreatures['spawns'][number] {
+  return { id: 'fixture.actor', species: 'fixture.creature', variant: 'plain', brain: null, strike: null,
+    at: [6, 0, 6], seed: 9, scale: 1, yaw: 0 };
+}
+
+test('policy preparation preserves admitted rows and refuses competing ownership', () => {
+  const rows = fixture(), creatures: ShardCreatures = { brains: [], groups: [], spawns: [spawn()] };
+  const before = JSON.stringify({ rows, creatures }), ready = prepareCreaturePolicies(rows, creatures);
+  expect(ready.spawns[0]?.brain).toBe('layers.0');
+  expect(ready.brains[0]).toMatchObject({ id: 'layers.0', kind: 'pursue', speed: 1.2 });
+  expect(JSON.stringify({ rows, creatures })).toBe(before);
+  creatures.spawns[0] = { ...spawn(), brain: 'different' };
+  expect(() => prepareCreaturePolicies(rows, creatures)).toThrow('species `fixture.creature`: spawn and temperament name different brains');
+  const declared = ready.brains[0], row = rows.species[0];
+  if (declared === undefined || row?.temperament === undefined) throw new Error('Missing fixture layers');
+  row.temperament.brain = declared.id; delete row.temperament.tuning;
+  creatures.brains = [declared]; creatures.spawns = [{ ...spawn(), brain: declared.id }];
+  expect(prepareCreaturePolicies(rows, creatures).brains).toEqual([declared]);
+  expect(prepareCreaturePolicies(fixture(false), creatures).spawns[0]).toBe(creatures.spawns[0]);
+});
+
+test('a group retains its controller and refuses a second layer policy', () => {
+  const rows = fixture(), row = rows.species[0];
+  if (row?.temperament === undefined) throw new Error('Missing fixture temperament');
+  const creatures = parse(CreaturesSchema, { brains: [], spawns: [{ ...spawn(), brain: 'fixture.herd' }], groups: [{
+    id: 'fixture.herd', kind: 'herd', members: ['fixture.actor'], thinkDivisor: 6,
+    walkSpeed: 1, trotSpeed: 3, gallopSpeed: 7, chargeSpeed: 6, sightRadius: 30, grazingSightRadius: 12,
+    coneAngle: 1, hearing: [1, 2, 4, 8], alertThreshold: 0.4, flightMinDistance: 20, flightMaxDistance: 35,
+    stallionVariant: 'buck', foalPrefix: 'kid', snortCue: 'bleat', neighCue: 'bleat', squealCue: 'bleat',
+  }] });
+  expect(() => prepareCreaturePolicies(rows, creatures)).toThrow('species `fixture.creature`: group and temperament both own the brain');
+  row.temperament.brain = 'none'; delete row.temperament.tuning;
+  expect(prepareCreaturePolicies(rows, creatures).spawns[0]).toBe(creatures.spawns[0]);
 });
