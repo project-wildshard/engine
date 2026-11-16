@@ -87,6 +87,7 @@ export const DONE = {
     // TEST-COVERAGE row 11: draws the lift imported (1a9fdc62) or added since, declared at their current counts so the
     // real tree holds and the next one fails
     'src/client/engine/player/firstPersonArms.ts': { why: "the player's own first-person arms, merged into one geometry: the player, not a thing in the world", counts: { mergeGeometries: 1 } },
+    'src/client/engine/render/hoverboardGeometry.ts': { why: "NINE-DRAGON-BENCHMAX NB8: the board under you (and its Explorer specimen, models/hoverboard.ts) merged from its primitives, two draws: held gear, not a thing in the world", counts: { mergeGeometries: 1 } },
     'src/client/engine/render/graph/glslMaterial.ts': { why: "an instanced mesh's outline hull, mirroring the mesh it outlines: a material effect, never a new world thing", counts: { InstancedMesh: 1 } },
     'src/client/engine/render/lookLight.ts': { why: 'look.light pools of light (85944cce, behind Debug): an effect', counts: { InstancedMesh: 1 } },
     'src/client/engine/render/lookRender.ts': { why: 'meta SHARD-SOURCE M4.8 lamp halos: one additive billboard per declared lamp, an effect', counts: { InstancedMesh: 1 } },
