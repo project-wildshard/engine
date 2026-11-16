@@ -40,3 +40,48 @@ remains TC40, Pine engine, Pine shard, ALL5, then this group.
 All source publication uses normal land with main held; engine
 --no-preflight avoids forbidden local cooks while normal hooks and
 exact hosted CI remain required by J384.
+
+## Exact native and chapter continuation, second checkpoint
+
+Wind elite height easing now resumes from the actual saved body height
+and the consumed snap marker. Re-enabling twelve unchanged statue
+colliders during physics reconnect changed Rapier's pending-update
+bytes; reconnect now changes enabled state only when it differs. The
+actual earned mounted Titan intro has identical immediate physics and
+all five suffix snapshots/effects. A second actual earned checkpoint,
+while the kokpar goat is carried, also repeats five exact suffixes.
+The complete existing tame/kokpar/mounted-intro route still passes all
+five checks; recording both checkpoints takes 47.643 seconds locally.
+No pose, health, flag or encounter progress is granted by the rider.
+
+The server story previously discarded its carried round, cadence,
+spoken channels and pending facts. Prepare the story asynchronously,
+then install its joined native continuation before restore. Preserve
+each player's chapter state and round, and retain pending facts in
+order. Current snapshots never re-witness already-earned facts. Legacy
+snapshots reconcile through their existing durable ledger keys on the
+first live tick; a saved recovery marker survives another immediate
+save/restore. Imported books use a separate restore generation, which
+ordinary flag changes cannot acknowledge. Capture rebinds the derived
+line without changing flags; reconciliation stays pending until a live
+tick. A late join's idle native mount seat is captured before its first
+tick, matching the seat restore already reinstalls.
+
+Three chapter files pass seven cases in 9.52 seconds. The regression
+covers pending facts, a join before its first tick, immediate and
+65-tick two-player continuation, a second restore without duplicate
+facts, an imported document followed by an unrelated flag change and
+immediate full capture, legacy recovery through an intervening save,
+leave/rejoin, malformed-state refusal and retired-owner refusal.
+Full compiler and focused normal lint are required before publication.
+The first two J206 passes found real lifecycle gaps; their corrections
+above have final follow-up CLEAR, with no MUSTs. Its direct capture
+purity SHOULD is now asserted in the regression. Claude quota is
+unverified; the documented bounded read-only Codex fallback is used.
+The helper's timeout binary is absent, so Python bounds that same
+review process. No hook bypass occurs.
+
+This remains partial source work. Full King/Titan victories and rewards,
+hosted candidate acceptance, and prior TC40/Pine/ALL5 lands are owed.
+Normal land publication stays main-held. Engine --no-preflight avoids
+a forbidden local cook; normal hooks and exact CI remain required.

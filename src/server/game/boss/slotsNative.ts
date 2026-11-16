@@ -152,7 +152,7 @@ export async function prepareSlots(product: Pick<ShardProduct, 'json' | 'section
         law.restore(saved.law, id => population.bodies.find(body => body.entityId === id && body.kind === declared.kind) ?? null);
         saved.sites.forEach((awake, index) => { standing[index] = awake; });
         if (saved.heights !== undefined) heights.restore(saved.heights);
-      }, physicsRestored: () => { solids.clear(); standing.forEach((awake, index) => { solidAt(index).setEnabled(!awake); }); } });
+      }, physicsRestored: () => { solids.clear(); standing.forEach((awake, index) => { const solid = solidAt(index); if (solid.isEnabled() !== !awake) solid.setEnabled(!awake); }); } });
       host.onStep(`${files.step}.slot-poses`, dt => {
         heights.frame(dt);
         for (const [id, pose] of presented) {

@@ -328,6 +328,9 @@ export function installMountedPlayer(host: SimHost, profile: unknown, pondBlock?
     }
   }, {
     snapshot: (): SimValue => {
+      // A room may save between a join and its first simulation tick.
+      // Restore eagerly reconnects that player, so capture its idle seat too.
+      for (const player of host.players.values()) seatFor(player);
       const rest = others();
       return { version: 1, ...firstSeat.save(), poses: [...poses].map(([id, pose]) => [id, pose.snapshot()]),
         ...(rest.length === 0 ? {} : { others: Object.fromEntries(rest.map(seat => [seat.player.id, seat.save()])) }) };

@@ -127,7 +127,13 @@ export function prepareWindElite(product: Pick<ShardProduct, 'section' | 'has'>,
         if (actor === null && saved.body !== null) throw new Error('Wind elite continuation lost its body');
         if (body !== null) release(body);
         policy.restore(saved.policy); phase2 = saved.phase2;
-        if (actor !== null) { bind(actor); if (saved.pinned) pinned.add(actor); }
+        if (actor !== null) {
+          bind(actor);
+          // The body already keeps the last smoothed height. Resume the
+          // easing there, with the snap marker consumed on that same tick.
+          seen = { height: actor.position.y, snap: actor.mem[fields.smoothed] ?? 0 };
+          if (saved.pinned) pinned.add(actor);
+        }
         commit();
       },
     });
