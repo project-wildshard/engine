@@ -530,6 +530,8 @@
     "src/client/engine/world/geometryBake.ts": "client",
     "src/client/engine/world/geometryBounds.ts": "client",
     "src/client/engine/world/geometryKit.ts": "client",
+    "src/client/engine/world/detailLayer.ts": "client",
+    "src/client/engine/world/detailRing.ts": "client",
     "src/client/engine/world/Grass.ts": "client",
     "src/client/engine/world/hiddenFaces.ts": "client",
     "src/client/engine/world/Horizon.ts": "client",
