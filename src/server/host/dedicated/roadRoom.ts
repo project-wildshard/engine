@@ -20,6 +20,8 @@ import { FallFloor } from '../standalone/fallFloor';
 import { openCellWalls, openHomeFor, placeOnRoad } from '../standalone/roadWorld';
 import { LEFT, SeatTransport } from './socketPump';
 import { cellFrame } from './gridCells';
+import { bufferAt } from '@wildshard/engine/game/grid/zoneWalls';
+import { decodeEnter, encodeEnter } from '@wildshard/engine/net/socketFrames';
 
 /** How often a seat whose crossing is asked for asks again, and how often holds are looked at, in ticks. */
 const ASK_TICKS = 30;
@@ -28,6 +30,13 @@ const ASK_TICKS = 30;
  * the walls round other workers' cells stand from 0 m up, so a body down there could walk under them.
  */
 const ROAD_FLOOR = -60;
+/**
+ * ZE9a: the longest a body stands frozen at a gate. The door answers an entry within the page's own load wait (`READY_MS`, 120 s) and
+ * lifts the freeze itself (ZE9b); this is the road's own floor under that, so no body is ever held for good.
+ */
+export const FREEZE_MS = 150_000;
+/** Why the road won't take an `enter` word, as its answer says. */
+export type EnterRefusal = 'malformed' | 'home' | 'not-at-gate' | 'entering';
 
 interface RoadSeat {
   readonly device: string; readonly name: string; readonly body: string;
@@ -37,6 +46,10 @@ interface RoadSeat {
   /** ZE6: the cell this seat walked onto the road from, the one whose walls its motor passes and the only one the road crosses it into. */
   readonly home: string | null;
   readonly fall: FallFloor;
+  /** ZE9a: the cell this seat is entering by its gate, and when the road lets it go anyway; its body stands still, its inputs dropped. */
+  frozen: { readonly cell: string; readonly until: number } | null;
+  /** The listener on its link's controls (its `enter` word). */
+  controlOff: (() => void) | null;
 }
 export interface RoadRoomOptions {
   /** `roadName(first cell on this worker)`. */
@@ -50,6 +63,8 @@ export interface RoadRoomOptions {
   readonly post: (news: RoomNews) => void;
   readonly reports?: ChatReports;
   readonly holdMs?: number;
+  /** ZE9a: `FREEZE_MS` unless a test says otherwise. */
+  readonly freezeMs?: number;
 }
 
 export class RoadRoom implements CrossTarget {
@@ -67,6 +82,8 @@ export class RoadRoom implements CrossTarget {
     // The road's level has a lead seat of its own, which nobody takes: every crossing seat is a body of its own.
     const lead = this.host.players.get(LEAD_SEAT);
     if (lead !== undefined) { lead.motor.setEnabled(false); this.host.parked.add(lead.id); }
+    // ZE9a: a frozen body is led (it goes on the wire), so its client predicts no step of its own while it stands at the gate
+    this.host.leading.push(player => { for (const seat of this.seats.values()) if (seat.frozen !== null && seat.body === player.id) return true; return false; });
     this.sim = new SimNetWorld(this.host, 0);
     this.sim.nameOf = body => [...this.seats.values()].find(seat => seat.body === body)?.name;
     this.net = new NetRoom({ world: this.sim, build: options.build, step: inputs => { this.step(inputs); }, shout: line => { options.post({ kind: 'chat', line }); }, ...(options.reports === undefined ? {} : { reports: options.reports }) });
@@ -84,6 +101,8 @@ export class RoadRoom implements CrossTarget {
     for (const seat of this.seats.values()) { const at = this.host.players.get(seat.body)?.position; if (at !== undefined && Math.abs(at.x - origin.x) <= reach && Math.abs(at.z - origin.z) <= reach) return true; }
     return false;
   }
+  /** ZE9a: the cell this seat is entering by its gate, its body frozen, or null. */
+  entering(device: string): string | null { return this.seats.get(device)?.frozen?.cell ?? null; }
   bodyOf(device: string): PlayerSim | undefined { const seat = this.seats.get(device); return seat === undefined ? undefined : this.host.players.get(seat.body); }
 
   admit(entry: SeatEntry, transport: Transport, at: ResumeAt, motion?: PlayerSim): CrossArrival | string {
@@ -96,7 +115,7 @@ export class RoadRoom implements CrossTarget {
     if (motion !== undefined) carryMotion(motion, player);
     const home = entry.home ?? null;
     if (home !== null) openHomeFor(this.host, player.motor, home);
-    const seat: RoadSeat = { device: entry.device, name: entry.name, body: entry.body, transport, client: null, closeOff: null, holdEnds: null, asked: null, askedAt: 0, home, fall: new FallFloor(ROAD_FLOOR, true, at) };
+    const seat: RoadSeat = { device: entry.device, name: entry.name, body: entry.body, transport, client: null, closeOff: null, holdEnds: null, asked: null, askedAt: 0, home, fall: new FallFloor(ROAD_FLOOR, true, at), frozen: null, controlOff: null };
     this.seats.set(entry.device, seat);
     return { body: seat.body, land: client => {
       if (client === null) this.closed(seat, transport, 'crossed'); else this.bind(seat, transport, client);
@@ -161,9 +180,28 @@ export class RoadRoom implements CrossTarget {
     placeOnRoad(this.host, assembly.cells, strips, walled);
   }
   private bind(seat: RoadSeat, transport: Transport, client: number): void {
-    seat.closeOff?.();
+    seat.closeOff?.(); seat.controlOff?.(); seat.controlOff = null;
     seat.transport = transport; seat.client = client;
-    seat.closeOff = transport.onClose(reason => { this.closed(seat, transport, reason); });
+    seat.closeOff = transport.onClose(reason => { seat.controlOff?.(); seat.controlOff = null; this.closed(seat, transport, reason); });
+    if (transport instanceof SeatTransport) seat.controlOff = transport.onControl((control, bytes) => { if (control === 'enter') this.enter(seat, transport, bytes); });
+  }
+  /**
+   * ZE9a (J352): the seat's client reached a gate's 0 and says `enter` {cell}. Taken only while its feet stand in that cell's buffer on
+   * this road, never into its home: the body stops where it stands, its inputs are dropped and nothing moves it until the freeze lifts.
+   * Riders get off. Anything else is answered `refused` with the reason, and the body plays on.
+   */
+  private enter(seat: RoadSeat, transport: SeatTransport, bytes: ArrayBuffer): void {
+    const word = decodeEnter(bytes), player = this.host.players.get(seat.body);
+    const refuse = (refused: EnterRefusal): void => { transport.control('enter', encodeEnter({ cell: word?.cell ?? '', refused })); };
+    if (word === null || word.refused !== undefined || player === undefined || !finite(player.position)) { refuse('malformed'); return; }
+    if (seat.frozen !== null) { refuse('entering'); return; }
+    if (word.cell === seat.home) { refuse('home'); return; }
+    const at = bufferAt(this.assembly.cells, { instance: seat.home ?? '' }, player.position);
+    if (at?.instance !== word.cell) { refuse('not-at-gate'); return; }
+    mountedPlayerOf(this.host, seat.body)?.dismount();
+    const { x, y, z } = player.position;
+    player.resetPose({ x, y, z }, player.yaw);
+    seat.frozen = { cell: word.cell, until: this.options.now() + (this.options.freezeMs ?? FREEZE_MS) };
   }
   private closed(seat: RoadSeat, transport: Transport, reason: string): void {
     if (seat.transport !== transport) return;
@@ -174,22 +212,28 @@ export class RoadRoom implements CrossTarget {
   }
   private release(seat: RoadSeat): void {
     if (this.seats.get(seat.device) !== seat) return;
+    seat.controlOff?.(); seat.controlOff = null; seat.frozen = null;
     this.seats.delete(seat.device);
     this.host.removePlayer(seat.body);
     this.options.post({ kind: 'left', device: seat.device, seats: this.seats.size });
   }
   private step(inputs: readonly NetTickInput[]): void {
-    this.host.step(commandsOf(inputs));
+    const frozen = new Set<string>();
+    for (const seat of this.seats.values()) if (seat.frozen !== null) frozen.add(seat.body);
+    this.host.step(commandsOf(frozen.size === 0 ? inputs : inputs.filter(input => !frozen.has(input.player))));
     for (const seat of this.seats.values()) { const player = this.host.players.get(seat.body); if (player !== undefined) seat.fall.step(player, () => undefined); }
   }
   /** One fixed tick: holds that ran out, the world, then each linked seat's feet. */
   tick(): void {
     const { tick } = this.host.state, now = this.options.now();
-    if (tick % ASK_TICKS === 0) for (const seat of this.seats.values()) if (seat.holdEnds !== null && now >= seat.holdEnds) this.release(seat);
+    if (tick % ASK_TICKS === 0) for (const seat of this.seats.values()) {
+      if (seat.holdEnds !== null && now >= seat.holdEnds) this.release(seat);
+      else if (seat.frozen !== null && now >= seat.frozen.until) seat.frozen = null;
+    }
     this.net.tick();
     for (const seat of this.seats.values()) {
       const player = this.host.players.get(seat.body);
-      if (seat.transport === null || player === undefined || !finite(player.position)) continue;
+      if (seat.transport === null || seat.frozen !== null || player === undefined || !finite(player.position)) continue;
       const crossed = crossedTo(this.assembly, null, player.position);
       const to = crossed?.cell?.instance ?? null;
       // ZE6 (J352): the road crosses a seat into its own home only; every other cell's buffer leads to its gate (zone entry), not in

@@ -6,9 +6,9 @@ import type { NetChannel } from './transport';
 // `NET_SCHEMA_HASH` does not move.
 
 /** The prefix byte of every message on a game socket. */
-export const SOCKET_RELIABLE = 0, SOCKET_UNRELIABLE = 1, SOCKET_PING = 2, SOCKET_PONG = 3, SOCKET_RESUME = 4, SOCKET_READY = 5, SOCKET_COUNTDOWN = 6, SOCKET_PLAYTEST=7, SOCKET_VOICE = 8, SOCKET_WORLD = 9, SOCKET_DEVICE = 10;
+export const SOCKET_RELIABLE = 0, SOCKET_UNRELIABLE = 1, SOCKET_PING = 2, SOCKET_PONG = 3, SOCKET_RESUME = 4, SOCKET_READY = 5, SOCKET_COUNTDOWN = 6, SOCKET_PLAYTEST=7, SOCKET_VOICE = 8, SOCKET_WORLD = 9, SOCKET_DEVICE = 10, SOCKET_ENTER = 11;
 /** The messages outside the game protocol: the server's word on where to load, the client's that it has, and the server's that a new build is coming (J174). */
-export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voice' | 'world' | 'device';
+export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voice' | 'world' | 'device' | 'enter';
 /** GO4: the door's first word on every socket, before any hello: how many grid cells it hosts and, since opus-route2, the shard each
  *  one runs, and nothing else (D7 keeps `/health` off the rooms address, so a page learns this here). A one-shard page joins only a
  *  world that names its shard. A build from before it ignores the prefix. */
@@ -46,7 +46,26 @@ export function closeReason(code: number): string {
 /** The prefix of a game message on `channel`. */
 export const channelPrefix = (channel: NetChannel): number => channel === 'reliable' ? SOCKET_RELIABLE : SOCKET_UNRELIABLE;
 /** The prefix of a control message. */
-export const controlPrefix = (control: SocketControl): number => control === 'resume' ? SOCKET_RESUME : control === 'ready' ? SOCKET_READY : control==='playtest'?SOCKET_PLAYTEST:control === 'voice' ? SOCKET_VOICE : control === 'world' ? SOCKET_WORLD : control === 'device' ? SOCKET_DEVICE : SOCKET_COUNTDOWN;
+export const controlPrefix = (control: SocketControl): number => control === 'resume' ? SOCKET_RESUME : control === 'ready' ? SOCKET_READY : control==='playtest'?SOCKET_PLAYTEST:control === 'voice' ? SOCKET_VOICE : control === 'world' ? SOCKET_WORLD : control === 'device' ? SOCKET_DEVICE : control === 'enter' ? SOCKET_ENTER : SOCKET_COUNTDOWN;
+/**
+ * ZONE-ENTRY ZE9a (J352): the client's word at a gate's 0, `{ cell }`, the cell it goes into. The road takes it only from a seat standing
+ * in that cell's buffer, never into its own home, and freezes the body; it answers a word it won't take on the same prefix with the
+ * cell and `refused`, and leaves the body free.
+ */
+export interface EnterWord { readonly cell: string; readonly refused?: string }
+/** A cell instance as the grid names it: lower-case words joined by hyphens. */
+const ENTER_CELL = /^[a-z0-9][a-z0-9-]{0,63}$/u, ENTER_BYTES = 256;
+/** An `enter` word. */
+export function encodeEnter(word: EnterWord): ArrayBuffer { return new TextEncoder().encode(JSON.stringify(word)).buffer; }
+/** What an `enter` word says, or null for one that makes no sense (untrusted: bounded, and the cell must look like a cell's name). */
+export function decodeEnter(bytes: ArrayBuffer): EnterWord | null {
+  if (bytes.byteLength > ENTER_BYTES) return null;
+  try {
+    const said: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    if (typeof said !== 'object' || said === null || !('cell' in said) || typeof said.cell !== 'string' || !ENTER_CELL.test(said.cell)) return null;
+    return 'refused' in said && typeof said.refused === 'string' ? { cell: said.cell, refused: said.refused.slice(0, 64) } : { cell: said.cell };
+  } catch { return null; }
+}
 /** J174: seconds until everyone moves, and the build they move to, which a client preloads. */
 export interface Countdown { readonly seconds: number; readonly build: string }
 /** A `countdown` word. */

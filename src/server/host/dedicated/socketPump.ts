@@ -9,8 +9,13 @@ export const LEAVE_FLAG = 1;
 /** What crosses between a socket's thread and its room's. */
 // GC15 (3): `out`, from the room's end: this seat left for a cell on another worker. Everything the room said before it went first, on
 // this same port, so the door moves the socket to the target's port only once the `travel` is on its way to the client.
-type Pumped = { readonly channel: NetChannel; readonly bytes: ArrayBuffer } | { readonly close: string; readonly silentMs: number } | { readonly out: true; readonly motion: unknown };
-const pumped = (value: unknown): Pumped | null => typeof value === 'object' && value !== null && ('close' in value || 'bytes' in value || 'out' in value) ? value as Pumped : null;
+// ZE9a: `control`, either way: the client's `enter` word to the room, and the room's answer back to the client.
+type Pumped = { readonly channel: NetChannel; readonly bytes: ArrayBuffer } | { readonly close: string; readonly silentMs: number } | { readonly out: true; readonly motion: unknown }
+  | { readonly control: PumpedControl; readonly bytes: ArrayBuffer };
+/** The controls a room hears and says through the pump (ZE9a). */
+type PumpedControl = 'enter';
+const pumpedControl = (control: unknown): control is PumpedControl => control === 'enter';
+const pumped = (value: unknown): Pumped | null => typeof value === 'object' && value !== null && ('close' in value || 'bytes' in value || 'out' in value) && (!('control' in value) || pumpedControl(value.control)) ? value as Pumped : null;
 
 /**
  * J182: the socket lives on the main thread and its cell in a worker, and this is all that joins them. `end` keeps backpressure, the
@@ -20,7 +25,11 @@ const pumped = (value: unknown): Pumped | null => typeof value === 'object' && v
 export function pumpSocket(end: SocketTransport, port: MessagePort, now: () => number = diagnosticNow, out?: (motion: unknown) => void): void {
   const off = end.onMessage((channel, bytes) => { port.postMessage({ channel, bytes }, [bytes]); });
   // E7.3: a clean quit from the menu: `ready` again, with a flag. The body goes at once.
-  const quit = end.onControl((control, bytes) => { if (control === 'ready' && new Uint8Array(bytes)[0] === LEAVE_FLAG) end.close(LEFT); });
+  const quit = end.onControl((control, bytes) => {
+    if (control === 'ready' && new Uint8Array(bytes)[0] === LEAVE_FLAG) end.close(LEFT);
+    // a copy: the door's own listeners read the same bytes
+    else if (pumpedControl(control)) { const copy = bytes.slice(0); port.postMessage({ control, bytes: copy }, [copy]); }
+  });
   const closed = end.onClose(reason => { off(); quit(); port.postMessage({ close: reason, silentMs: now() - end.heardAt }); port.close(); });
   port.onmessage = (event: MessageEvent<unknown>): void => {
     const message = pumped(event.data);
@@ -29,7 +38,9 @@ export function pumpSocket(end: SocketTransport, port: MessagePort, now: () => n
       // GC15 (3): the room let this seat go to another worker: the socket stays open and the door points it at the target's port
       off(); quit(); closed(); port.close();
       if (out === undefined) end.close('retry'); else out(message.motion);
-    } else if ('close' in message) { off(); quit(); closed(); end.close(message.close); port.close(); } else end.send(message.channel, message.bytes);
+    } else if ('close' in message) { off(); quit(); closed(); end.close(message.close); port.close(); }
+    else if ('control' in message) end.control(message.control, message.bytes);
+    else end.send(message.channel, message.bytes);
   };
 }
 
@@ -40,6 +51,7 @@ export class SeatTransport implements Transport {
   private readonly port: MessagePort;
   private readonly messages = new Set<(channel: NetChannel, bytes: ArrayBuffer) => void>();
   private readonly closes = new Set<(reason: string) => void>();
+  private readonly controls = new Set<(control: PumpedControl, bytes: ArrayBuffer) => void>();
   private sentBytes = 0;
   private recvBytes = 0;
   private open = true;
@@ -49,7 +61,9 @@ export class SeatTransport implements Transport {
       const message = pumped(event.data);
       if (message === null) return;
       if ('out' in message) return;
-      if ('close' in message) { this.silentMs = message.silentMs; this.ended(message.close); } else this.deliver(message.channel, message.bytes);
+      if ('close' in message) { this.silentMs = message.silentMs; this.ended(message.close); }
+      else if ('control' in message) { for (const listener of this.controls) listener(message.control, message.bytes); }
+      else this.deliver(message.channel, message.bytes);
     };
   }
   get stats(): TransportStats { return { rttMs: 0, lossPct: 0, sentBytes: this.sentBytes, recvBytes: this.recvBytes }; }
@@ -64,6 +78,13 @@ export class SeatTransport implements Transport {
     this.port.postMessage({ channel, bytes }, [bytes]);
   }
   onMessage(listener: (channel: NetChannel, bytes: ArrayBuffer) => void): () => void { this.messages.add(listener); return () => { this.messages.delete(listener); }; }
+  /** ZE9a: a control the client said on the socket (its `enter` word). */
+  onControl(listener: (control: PumpedControl, bytes: ArrayBuffer) => void): () => void { this.controls.add(listener); return () => { this.controls.delete(listener); }; }
+  /** ZE9a: a control to the client, after everything already sent. */
+  control(control: PumpedControl, bytes: ArrayBuffer): void {
+    if (!this.open) return;
+    this.port.postMessage({ control, bytes }, [bytes]);
+  }
   /**
    * GC15 (3): this seat walks on to a cell on another worker. After everything already sent (the `travel`), the door hears `out` and
    * moves the socket; this end is done, and its close listeners never hear of it: nothing closed.
@@ -72,7 +93,7 @@ export class SeatTransport implements Transport {
     if (!this.open) return;
     // oxlint-disable-next-line unicorn/require-post-message-target-origin -- A MessagePort has no origin.
     this.port.postMessage({ out: true, motion });
-    this.open = false; this.closes.clear(); this.messages.clear();
+    this.open = false; this.closes.clear(); this.messages.clear(); this.controls.clear();
   }
   onClose(listener: (reason: string) => void): () => void { this.closes.add(listener); return () => { this.closes.delete(listener); }; }
   close(reason = 'closed'): void {
@@ -86,6 +107,6 @@ export class SeatTransport implements Transport {
     this.open = false;
     this.port.close();
     for (const listener of this.closes) listener(reason);
-    this.closes.clear();
+    this.closes.clear(); this.controls.clear();
   }
 }
