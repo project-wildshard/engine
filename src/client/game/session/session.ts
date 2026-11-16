@@ -25,7 +25,6 @@ import { finishStage } from './finish';
 import { currentOwner, enterOwner } from '@wildshard/engine/app/ownership';
 import { app } from '@wildshard/engine/app/runtime';
 import { reportSpawnOutcomes } from '../boot/spawnDownload';
-import { pageScope } from '@wildshard/engine/app/resources';
 import { Scope } from '@wildshard/engine/app/scope';
 import { markBootHandledError } from '@wildshard/engine/boot/bootTrace';
 import { setBootCatalog } from '@wildshard/engine/boot/catalog';
@@ -65,8 +64,6 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
   // DL20: every boot's level download outcome (cached, downloaded, failed or cancelled) reaches telemetry once, including
   // one that settled before this session and one whose failure stops the boot
   const confirmOutcomes = reportSpawnOutcomes(outcome => { app.events.emit('download.parts', outcome); });
-  // they leave the device save only once this session's events have reached telemetry (sp-x6's review of b28a44a5e6)
-  app.events.on('level.loaded', () => { confirmOutcomes(); }, pageScope);
   // the boot and the background download read the registry through the engine's catalog (E405: no engine → game import)
   const levels=catalogueManifests(),byId=new Map<string,(typeof levels)[number]>(levels.map(row=>[row.slug,row]));
   setBootCatalog({ levels, playable: levels.filter(playable), find:id=>byId.get(id), artBytes: shardArt() });
@@ -94,6 +91,9 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
       }
     }
     const scope = new Scope('level');
+    // they leave the device save only once this session's events have reached telemetry (sp-x6's review of b28a44a5e6); the
+    // session's own scope holds the listener, so a same-page re-entry (ZE10a2) does not stack one per session on the page
+    app.events.on('level.loaded', () => { confirmOutcomes(); }, scope);
     if (session.ownedGridHome) scope.onDispose(selectGridPageShell(pageManifest));
     // Register first: the scope's later consumer cleanup runs before the final early boot reference is released.
     if (options.residency !== undefined) scope.onDispose(() => { options.residency?.dispose(); });

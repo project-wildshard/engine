@@ -1891,8 +1891,9 @@ export class Game {
     driver.wake();
   }
 
-  /** Stop the page engine and release its renderer and scopes. */
-  dispose(): void {
+  /** Stop the page engine and release its renderer and scopes. `keepContext` (ZONE-ENTRY ZE10a2, a same-page re-entry) leaves
+   *  the canvas's WebGL context alive for the next session's Game, which builds its renderer on the same context. */
+  dispose(keepContext = false): void {
     this.dead = true;
     this.levelScope.dispose();
     this.engineScope.dispose();
@@ -1901,7 +1902,7 @@ export class Game {
     try { this.lookStrategy?.dispose?.(); } catch (e) { console.warn('[level] the render strategy did not dispose', e); }
     this.renderer.renderLists.dispose();
     this.renderer.dispose();
-    this.renderer.forceContextLoss();
+    if (!keepContext) this.renderer.forceContextLoss();
     this.rootScene.clear();
   }
 }

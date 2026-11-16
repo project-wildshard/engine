@@ -77,6 +77,8 @@ export function installClassicShadowDepth(resolve: ClassicShadowDepth): void { c
 export function installShadowMaterialOwnership(renderer: ShadowRenderer, assets: AssetService, scope: Scope): void {
   let drawing = false;
   const kinds = new Map<string, MeshDepthMaterial>();
+  // ZE10a2: the kinds are this renderer's own cache, so they go with it (a same-page re-entry's next renderer registers its own)
+  scope.onDispose(() => { for (const [key, kind] of kinds) { assets.forgetDisposed(`renderer:shadow-kind:${key}`); kind.dispose(); } kinds.clear(); });
   const kindOf = (key: string): MeshDepthMaterial => {
     let kind = kinds.get(key);
     if (kind === undefined) {

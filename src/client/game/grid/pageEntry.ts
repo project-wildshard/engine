@@ -164,6 +164,9 @@ export function enterZone(instance: string, arrive?: { readonly x: number; reado
   }, null);
 }
 
+/** ZE10a2: the grid intent a same-page re-entry boots from (the harness's `__wildshardReenter`), as a tap writes it. */
+export function intendGridHome(instance: string, slug: string): void { pageGridIntents().set({ instance, slug }); }
+
 /** The grid page's address: its path, and only the harness flags skipintro, mute and nolock, none of which selects a level, and `skipintro` dropped here sent a
  *  `?chunk=<slug>&skipintro` link on a world build back under the title (OFFLINE OF18: every Open Plot in the offline proof). */
 export function gridPageUrl(href: string): URL {

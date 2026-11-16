@@ -151,7 +151,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   const minimap = new Minimap(); // circular minimap (Heightfield is installed by now)
   if (chunk.hud?.dayBadge === true) minimap.showDayBadge(); // the sun / moon on its rim (Nalati)
   const fullMap = new FullMap(minimap); // the menu's MAP tab (Menu.ts mounts it); tap the minimap / M to open
-  const keepAlive = new KeepAlive();
+  const keepAlive = new KeepAlive(game.engineScope); // the session's Game: a same-page re-entry (ZE10a2) retires it with the Game
   let gridBackgroundReady = false;
   let gridControlReady = false;
   let viewPrograms: ReturnType<typeof createViewProgramKeeper> | undefined;

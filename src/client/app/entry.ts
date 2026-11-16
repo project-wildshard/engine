@@ -31,8 +31,9 @@ import { progressOfCard, reportCardOf, stuckContext, stuckMessage, watchStuckSte
 import { startShellClock, waitForLoadingStyles } from '@wildshard/engine/boot/shell';
 import { inspectPreviousBoot, previousBootLine, previousBootLevel } from '@wildshard/engine/boot/bootTrace';
 import { Scope } from '@wildshard/engine/app/scope';
+import { harnessPins } from '@wildshard/engine/app/identity';
 import { bootRoute, onlineTitleFirst } from './bootRoute';
-import { consumeTitleArrival, pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
+import { arrivalTier, consumeTitleArrival, pendingTitleArrival, setTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import { lastEnd, settleLastEnd } from '@wildshard/engine/boot/lastEnd';
 import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
@@ -389,7 +390,7 @@ export async function start(): Promise<void> {
     every: (ms, run) => { const timer = entryScope.interval(ms, run); return () => { entryScope.cancelTimer(timer); }; },
     stalled: (step, stuckMs) => { const why = stall(); void (async () => { (await import('@wildshard/engine/ui/ErrorModal')).showError(stuckMessage(step, { stuckMs }), '', why); })(); },
   });
-  try { await started; }
+  try { await started; installReentryHarness(); }
   catch (error) {
     const { pageGridRecovery, clearGridRecovery } = await import('@wildshard/engine/game/grid/pageEntry');
     if (pageGridRecovery() === null) {
@@ -417,6 +418,25 @@ async function showPreparationTitle(owner: Scope): Promise<void> {
     if (!owner.disposed && !owner.disposing) console.warn('[title] preparation menu unavailable', error);
   }
 }
+
+/**
+ * ZONE-ENTRY ZE10a2: a harness page (`window.__wildshardHarness`) can enter a grid home again in the same page: the level is
+ * unloaded, the grid intent names the home, and the page's start runs again (`window.__wildshardReenter(instance, slug)`).
+ */
+function installReentryHarness(): void {
+  if (harnessPins() === undefined) return;
+  Reflect.set(window, '__wildshardReenter', async (instance: string, slug: string): Promise<void> => {
+    const [{ app }, { intendGridHome }] = await Promise.all([import('@wildshard/engine/app/runtime'), import('@wildshard/engine/game/grid/pageEntry')]);
+    await app.unloadLevel();
+    // the session's Game (its engine-scoped systems, composer and renderer) goes too; its canvas context stays for the next one
+    app.render?.dispose(true);
+    intendGridHome(instance, slug);
+    // the arrival a travel writes before its navigation: the session enters at once instead of waiting under the title
+    setTitleArrival({ slug, mode: 'enter', tier: arrivalTier.current });
+    await start();
+  });
+}
+
 async function startSelected(): Promise<void> {
   const selected = bootAwait('app:selected-discovery', import('./shardSelection').then(async selection => {
     await selection.prepareSelectedShard();
