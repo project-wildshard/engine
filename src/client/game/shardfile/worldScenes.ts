@@ -11,7 +11,7 @@ import { WorldScenePlacementPages } from './worldScenePlacementPages';
 import { prepareSceneSources, sceneModelSource, sceneBakeSource, sceneSourceDeclares } from './sceneSources';
 import { drawSceneRows, prepareSceneDrawRows } from './sceneDraws';
 import { admitWorldSceneStepSources, worldSceneStepSources } from './worldSceneStepSources';
-import { TIER } from '@wildshard/engine/core/tier';
+import { TIER, TIER_CONFIG } from '@wildshard/engine/core/tier';
 import { SceneHandles } from './sceneHandles';
 import { assertSceneProfile } from './sceneProfile';
 import { BufferAttribute, BufferGeometry, InstancedBufferAttribute, InstancedMesh, type Material, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, type Object3D, Sphere, Vector3 } from 'three';
@@ -439,7 +439,7 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
                 game.rootScene.add(root);
                 try { await game.warmSceneRoots([root], live, undefined, { drawGeometry: true }); }
                 finally { for (const { part, stage, forget } of staged) { forget(); part.removeFromParent(); stage.removeFromParent(); } root.removeFromParent(); }
-              });
+              }, TIER_CONFIG.slabMerge && TIER_CONFIG.slabLodAngle > 0 && multiDrawOf(ctx.game.runtime?.world?.game?.renderer));
               refining.set(row.id, whole);
               libraries.set(row.id, { geometry: id => whole.geometry(id) }); return;
             }

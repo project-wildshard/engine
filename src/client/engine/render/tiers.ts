@@ -59,6 +59,9 @@ export const TIER_TABLE = {
     // NB8 (mini-nb8d): with WEBGL_multi_draw, each slab chunk draws only its visible k-d leaves, each leaf cut to its
     // triangles at least this angle × its distance thick (`visibleSlabDraws`): under ~0.7 device pixels at DPR 2. 0 = the run
     slabLodAngle: 0.001,
+    // NB8 (mini-nb8e): with WEBGL_multi_draw, a frustum-culled slab key's chunks in a bank draw as one merged geometry
+    // (`slabMerge.ts`): Nine's 12 plain chunks are 1 draw; the leaf cut keeps its triangles where they were
+    slabMerge: true,
   },
   desktop: {
     maxTexture: 4096, layerSize: 1024, dpr: 1.5, ao: true,
@@ -87,6 +90,7 @@ export const TIER_TABLE = {
     placedLodScale: 1,
     slabRanges: false,
     slabLodAngle: 0,
+    slabMerge: false,
   },
 };
 

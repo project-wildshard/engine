@@ -1033,6 +1033,7 @@
     "src/client/game/shardfile/skinLayerPlayback.ts": "client",
     "src/client/game/shardfile/skinPlayback.ts": "client",
     "src/client/game/shardfile/slabLibrary.ts": "client",
+    "src/client/game/shardfile/slabMerge.ts": "client",
     "src/client/game/shardfile/slabRanges.ts": "client",
     "src/client/game/shardfile/stillImage.ts": "client",
     "src/client/game/shardfile/streamingView.ts": "client",

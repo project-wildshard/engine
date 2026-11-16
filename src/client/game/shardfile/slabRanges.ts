@@ -30,29 +30,48 @@ export const SLAB_LEAF_TRIANGLES = 256;
  * (nothing below the object's own test) or has no index or positions. Each level is one linear partition pass.
  */
 export function spatialSlabRanges(geometry: BufferGeometry, leaf: number = SLAB_LEAF_TRIANGLES): SlabRanges | null {
+  const job = slabRangesJob(geometry, leaf);
+  for (;;) { const step = job.next(); if (step.done === true) return step.value; }
+}
+
+/** triangles of partition or pass work between two yields of `slabRangesJob` (~2-4 ms on a throttled phone) */
+const SLAB_JOB_STEP = 32_768;
+
+/**
+ * `spatialSlabRanges` as a job that yields between bounded steps (NB8, mini-nb8e: a phone's merged key is ~0.5 M
+ * triangles, ~0.1 s on the mini in one go), for a caller that spreads it over work slices. The geometry's index is only
+ * rewritten in the last step, in one pass, so a draw between steps reads the index as it was.
+ */
+export function* slabRangesJob(geometry: BufferGeometry, leaf: number = SLAB_LEAF_TRIANGLES): Generator<void, SlabRanges | null, void> {
   const index = geometry.index, position = geometry.getAttribute('position');
   if (index === null || position === undefined || index.count % 3 !== 0) return null;
   const triangles = index.count / 3;
   if (triangles <= leaf) return null;
-  const source = index.array, corners = new Uint32Array(source);
+  const corners = new Uint32Array(index.array);
   // the bake's positions are plain float32 xyz; any other layout is read through the attribute
   const plain = position instanceof BufferAttribute && position.itemSize === 3 && !position.normalized && position.array instanceof Float32Array;
   const xyz = plain ? position.array : new Float32Array(position.count * 3);
   if (!plain) for (let v = 0; v < position.count; v++) { xyz[v * 3] = position.getX(v); xyz[v * 3 + 1] = position.getY(v); xyz[v * 3 + 2] = position.getZ(v); }
   // centroids (times three) and triangle ids, permuted together so every pass reads front to back
   const cx = new Float32Array(triangles), cy = new Float32Array(triangles), cz = new Float32Array(triangles), order = new Uint32Array(triangles);
+  const thick = new Float32Array(triangles);
+  let work = 0;
   for (let t = 0; t < triangles; t++) {
     const a = (corners[t * 3] ?? 0) * 3, b = (corners[t * 3 + 1] ?? 0) * 3, c = (corners[t * 3 + 2] ?? 0) * 3;
     cx[t] = (xyz[a] ?? 0) + (xyz[b] ?? 0) + (xyz[c] ?? 0); cy[t] = (xyz[a + 1] ?? 0) + (xyz[b + 1] ?? 0) + (xyz[c + 1] ?? 0); cz[t] = (xyz[a + 2] ?? 0) + (xyz[b + 2] ?? 0) + (xyz[c + 2] ?? 0);
     order[t] = t;
+    thick[t] = thicknessOf(xyz, corners[t * 3] ?? 0, corners[t * 3 + 1] ?? 0, corners[t * 3 + 2] ?? 0);
+    if (++work >= SLAB_JOB_STEP) { work = 0; yield; }
   }
-  const thick = new Float32Array(triangles);
-  for (let t = 0; t < triangles; t++) thick[t] = thicknessOf(xyz, corners[t * 3] ?? 0, corners[t * 3 + 1] ?? 0, corners[t * 3 + 2] ?? 0);
   const rows: number[] = [];
-  // top-down: a node's row is [left, right, first triangle, end triangle]; the root is node 0, children follow it
-  const build = (lo: number, hi: number): number => {
+  // top-down, depth first, left before right: a node's row is [left, right, first triangle, end triangle]; the root is
+  // node 0 and children follow their parent (the numbering of a recursive build). Each entry: [first, end, parent, side]
+  const stack: number[] = [0, triangles, -1, 0];
+  while (stack.length > 0) {
+    const side = stack.pop() ?? 0, parent = stack.pop() ?? -1, hi = stack.pop() ?? 0, lo = stack.pop() ?? 0;
     const node = rows.length / 4; rows.push(-1, -1, lo, hi);
-    if (hi - lo <= leaf) return node;
+    if (parent >= 0) rows[parent * 4 + side] = node;
+    if (hi - lo <= leaf) continue;
     let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
     for (let i = lo; i < hi; i++) {
       const x = cx[i] ?? 0, y = cy[i] ?? 0, z = cz[i] ?? 0;
@@ -70,19 +89,23 @@ export function spatialSlabRanges(geometry: BufferGeometry, leaf: number = SLAB_
     }
     // every centroid on one side of the middle (all equal along the axis): split the run in half as it stands
     const mid = i === lo || i === hi ? (lo + hi) >> 1 : i;
-    const left = build(lo, mid), right = build(mid, hi);
-    rows[node * 4] = left; rows[node * 4 + 1] = right;
-    return node;
-  };
-  build(0, triangles);
+    // the right half waits under the left, so the left subtree is numbered first
+    stack.push(mid, hi, node, 1, lo, mid, node, 0);
+    work += 2 * (hi - lo);
+    if (work >= SLAB_JOB_STEP) { work = 0; yield; }
+  }
   const nodes = Int32Array.from(rows), count = nodes.length / 4, boxes = new Float32Array(count * 6);
   // NB8 (mini-nb8d): each leaf's triangles thickest first, so the phone's size cut (`visibleSlabDraws`) is a prefix of it
   for (let node = 0; node < count; node++) {
     if ((nodes[node * 4] ?? -1) >= 0) continue;
-    order.subarray(nodes[node * 4 + 2] ?? 0, nodes[node * 4 + 3] ?? 0).sort((a, b) => (thick[b] ?? 0) - (thick[a] ?? 0));
+    const from = nodes[node * 4 + 2] ?? 0, to = nodes[node * 4 + 3] ?? 0;
+    order.subarray(from, to).sort((a, b) => (thick[b] ?? 0) - (thick[a] ?? 0));
+    work += to - from;
+    if (work >= SLAB_JOB_STEP) { work = 0; yield; }
   }
-  // the index in its new order, then each leaf's box read front to back, then every parent's (children follow parents)
-  const thickness = new Float32Array(triangles);
+  // the index in its new order (one pass: no draw sees it half done), then each leaf's box read front to back, then
+  // every parent's (children follow parents)
+  const source = index.array, thickness = new Float32Array(triangles);
   for (let t = 0; t < triangles; t++) {
     const was = order[t] ?? 0, from = was * 3;
     source[t * 3] = corners[from] ?? 0; source[t * 3 + 1] = corners[from + 1] ?? 0; source[t * 3 + 2] = corners[from + 2] ?? 0;
@@ -215,50 +238,77 @@ export function visibleSlabDraws(ranges: SlabRanges, world: Matrix4, camera: Cam
 }
 
 /** the slice of a WebGL 2 context and of `WEBGL_multi_draw` the slab draw uses */
-interface MultiDrawGl { drawElementsInstanced: (mode: number, count: number, type: number, offset: number, instances: number) => void; readonly UNSIGNED_INT: number; readonly UNSIGNED_SHORT: number }
+type DrawElementsInstanced = (mode: number, count: number, type: number, offset: number, instances: number) => void;
+interface MultiDrawGl { drawElementsInstanced: DrawElementsInstanced; readonly UNSIGNED_INT: number; readonly UNSIGNED_SHORT: number }
 interface MultiDrawExtension { readonly multiDrawElementsInstancedWEBGL: (mode: number, counts: Int32Array, countsOffset: number, type: number, offsets: Int32Array, offsetsOffset: number, instances: Int32Array, instancesOffset: number, drawCount: number) => void }
-interface SlabRenderer { readonly getContext: () => unknown; readonly extensions: { readonly has: (name: string) => boolean; readonly get: (name: string) => unknown } }
+interface SlabRenderer {
+  readonly getContext: () => unknown;
+  readonly extensions: { readonly has: (name: string) => boolean; readonly get: (name: string) => unknown };
+  readonly info?: { readonly render: { readonly frame: number } };
+}
+/** NB8 (mini-nb8e): keyed by the renderer's extensions object, not the renderer: three builds a new one on a restored
+ *  context (`initGLContext`), and an extension object from before the loss draws nothing */
 const multiDraws = new WeakMap<object, MultiDrawExtension | null>();
 function multiDrawOf(renderer: unknown): MultiDrawExtension | null {
   if (typeof renderer !== 'object' || renderer === null) return null;
-  const known = multiDraws.get(renderer);
-  if (known !== undefined) return known;
   const extensions = Reflect.get(renderer, 'extensions') as SlabRenderer['extensions'] | undefined;
-  const extension = extensions !== undefined && extensions.has('WEBGL_multi_draw') ? extensions.get('WEBGL_multi_draw') as MultiDrawExtension : null;
-  multiDraws.set(renderer, extension);
-  return extension;
+  if (typeof extensions !== 'object' || extensions === null) return null;
+  const known = multiDraws.get(extensions);
+  if (known !== undefined) return known;
+  const extension = extensions.has('WEBGL_multi_draw') ? extensions.get('WEBGL_multi_draw') as MultiDrawExtension | null : null;
+  const usable = extension !== null && typeof extension.multiDrawElementsInstancedWEBGL === 'function' ? extension : null;
+  multiDraws.set(extensions, usable);
+  return usable;
 }
 
 const draws: SlabDraws = { starts: new Int32Array(256), counts: new Int32Array(256), n: 0, total: 0 };
 let offsets = new Int32Array(256), elements = new Int32Array(256), instances = new Int32Array(256);
+/** the one draw armed on a context: its element count, the extension, and the renderer frame it was armed in */
+interface Armed { readonly count: number; readonly extension: MultiDrawExtension; readonly info: { readonly frame: number } | undefined; readonly frame: number }
+interface DrawHook { armed: Armed | null; readonly wrapper: DrawElementsInstanced }
+const hooks = new WeakMap<object, DrawHook>();
 /**
- * Swap the context's next `drawElementsInstanced` of `count` elements from offset 0 (the draw three issues for the
- * part, its draw range set to [0, `count`)) for one multi-draw of `draws`, under three's own mode, index type, instance
- * count, program, vertex array and uniforms; three counts it as the one call it issued, `count` elements. Any other
- * draw passes through; the returned function puts the context's own method back.
+ * The context's draw hook (mini-nb8e, replacing mini-nb8d's per-draw swap): one wrapper over the context's
+ * `drawElementsInstanced`, installed once per context and left in place, that turns a draw of exactly the armed size from
+ * offset 0 into the multi-draw of `draws` and passes every other call through. It is armed in a part's `onBeforeRender`
+ * and disarmed in its `onAfterRender`, and an arm only fires in the renderer frame it was made in, so a draw that throws
+ * between the two (three never reaches `onAfterRender`) leaves no stale swap for the next frame's draws. A context lost and
+ * restored keeps its JS object and the hook. Another wrapper laid over ours later is wrapped in turn.
  */
-function swapNextDraw(gl: MultiDrawGl, extension: MultiDrawExtension, count: number): () => void {
-  const own = Object.getOwnPropertyDescriptor(gl, 'drawElementsInstanced'), plain = gl.drawElementsInstanced;
-  gl.drawElementsInstanced = function drawElementsInstanced(this: unknown, mode: number, elementCount: number, type: number, offset: number, instanceCount: number): void {
-    if (elementCount !== count || offset !== 0) { Reflect.apply(plain, this, [mode, elementCount, type, offset, instanceCount]); return; }
-    const n = draws.n, bytes = type === gl.UNSIGNED_INT ? 4 : type === gl.UNSIGNED_SHORT ? 2 : 1;
-    if (offsets.length < n) { offsets = new Int32Array(n * 2); elements = new Int32Array(n * 2); instances = new Int32Array(n * 2); }
-    for (let i = 0; i < n; i++) { offsets[i] = (draws.starts[i] ?? 0) * 3 * bytes; elements[i] = (draws.counts[i] ?? 0) * 3; instances[i] = instanceCount; }
-    extension.multiDrawElementsInstancedWEBGL(mode, elements, 0, type, offsets, 0, instances, 0, n);
+function hookOf(gl: MultiDrawGl): DrawHook {
+  const held = hooks.get(gl);
+  if (held !== undefined && gl.drawElementsInstanced === held.wrapper) return held;
+  const plain = gl.drawElementsInstanced;
+  const hook: DrawHook = {
+    armed: null,
+    wrapper: function wrapper(this: unknown, mode: number, elementCount: number, type: number, offset: number, instanceCount: number): void {
+      const armed = hook.armed;
+      if (armed === null || elementCount !== armed.count || offset !== 0 || (armed.info !== undefined && armed.info.frame !== armed.frame)) {
+        Reflect.apply(plain, this, [mode, elementCount, type, offset, instanceCount]); return;
+      }
+      const n = draws.n, bytes = type === gl.UNSIGNED_INT ? 4 : type === gl.UNSIGNED_SHORT ? 2 : 1;
+      if (offsets.length < n) { offsets = new Int32Array(n * 2); elements = new Int32Array(n * 2); instances = new Int32Array(n * 2); }
+      for (let i = 0; i < n; i++) { offsets[i] = (draws.starts[i] ?? 0) * 3 * bytes; elements[i] = (draws.counts[i] ?? 0) * 3; instances[i] = instanceCount; }
+      armed.extension.multiDrawElementsInstancedWEBGL(mode, elements, 0, type, offsets, 0, instances, 0, n);
+    },
   };
-  return () => { if (own === undefined) Reflect.deleteProperty(gl, 'drawElementsInstanced'); else Object.defineProperty(gl, 'drawElementsInstanced', own); };
+  gl.drawElementsInstanced = hook.wrapper;
+  hooks.set(gl, hook);
+  return hook;
 }
 
 /** Draw `part` (whose geometry `ranges` was built on) as its visible run for each camera that renders it; the full
  *  range is restored after every draw, so shadow passes, warms, raycasts and bounds read the whole chunk. With an
- *  `angle` (the phone tier's `slabLodAngle`) and `WEBGL_multi_draw`, the draw is instead its visible leaves cut to
- *  their triangles at least `angle` × distance thick (`visibleSlabDraws`), in one multi-draw; without the extension it
- *  stays the run. */
+ *  `angle` (the phone tier's `slabLodAngle`), `WEBGL_multi_draw` and an instanced part (three draws it with
+ *  `drawElementsInstanced`), the draw is instead its visible leaves cut to their triangles at least `angle` × distance
+ *  thick (`visibleSlabDraws`), in one multi-draw; otherwise it stays the run. */
 export function cullSlabRanges(part: Object3D & { geometry: BufferGeometry }, ranges: SlabRanges, angle = 0): void {
   const geometry = part.geometry, { start, count } = geometry.drawRange;
-  let restore: (() => void) | null = null;
+  const instanced = (part as Object3D & { isInstancedMesh?: boolean }).isInstancedMesh === true;
+  let hook: DrawHook | null = null;
   part.onBeforeRender = drawNeutral((renderer: unknown, _scene: unknown, camera: Camera): void => {
-    const extension = angle > 0 && geometry.groups.length === 0 ? multiDrawOf(renderer) : null;
+    if (hook !== null) { hook.armed = null; hook = null; }
+    const extension = angle > 0 && instanced && geometry.groups.length === 0 ? multiDrawOf(renderer) : null;
     if (extension === null) {
       const [from, to] = visibleSlabRun(ranges, part.matrixWorld, camera);
       geometry.setDrawRange(from * 3, (to - from) * 3);
@@ -267,10 +317,12 @@ export function cullSlabRanges(part: Object3D & { geometry: BufferGeometry }, ra
     const out = visibleSlabDraws(ranges, part.matrixWorld, camera, angle, draws);
     if (out.n === 1) { geometry.setDrawRange((out.starts[0] ?? 0) * 3, (out.counts[0] ?? 0) * 3); return; }
     geometry.setDrawRange(0, out.total * 3);
-    restore = swapNextDraw((renderer as SlabRenderer).getContext() as MultiDrawGl, extension, out.total * 3);
+    const info = (renderer as SlabRenderer).info?.render;
+    hook = hookOf((renderer as SlabRenderer).getContext() as MultiDrawGl);
+    hook.armed = { count: out.total * 3, extension, info, frame: info?.frame ?? 0 };
   });
   part.onAfterRender = drawNeutral((): void => {
-    if (restore !== null) { restore(); restore = null; }
+    if (hook !== null) { hook.armed = null; hook = null; }
     geometry.setDrawRange(start, count);
   });
 }

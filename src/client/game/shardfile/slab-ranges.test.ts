@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { Box3, BufferAttribute, BufferGeometry, Frustum, InstancedMesh, Matrix4, MeshBasicMaterial, PerspectiveCamera, Scene, Vector3, WebGLCoordinateSystem } from 'three';
+import { Box3, BufferAttribute, BufferGeometry, Frustum, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, Vector3, WebGLCoordinateSystem } from 'three';
 import { cullSlabRanges, spatialSlabRanges, visibleSlabDraws, visibleSlabRun, SLAB_LEAF_TRIANGLES, type SlabDraws } from './slabRanges';
 
 // NINE-DRAGON-BENCHMAX NB8: a made-up resident slab chunk, a 400 m street of small wall quads whose index is in a
@@ -167,7 +167,8 @@ function fakeRenderer(multi: boolean) {
     let elements = 0; for (let i = 0; i < n; i++) elements += counts[i] ?? 0;
     calls.push({ kind: 'multi', triangles: elements / 3, ranges: n });
   } };
-  const renderer = { getContext: () => gl, extensions: { has: (name: string) => multi && name === 'WEBGL_multi_draw', get: () => extension } };
+  const info = { render: { frame: 0 } };
+  const renderer = { getContext: () => gl, info, extensions: { has: (name: string) => multi && name === 'WEBGL_multi_draw', get: () => extension } };
   // three's draw of an instanced mesh: its draw range, one drawElementsInstanced, then onAfterRender
   const draw = (part: InstancedMesh, view: PerspectiveCamera): void => {
     const scene = new Scene(), { geometry } = part;
@@ -176,7 +177,7 @@ function fakeRenderer(multi: boolean) {
     gl.drawElementsInstanced(4, count, gl.UNSIGNED_INT, geometry.drawRange.start * 4, 1);
     part.onAfterRender(renderer as never, scene, view, geometry, part.material as never, undefined as never);
   };
-  return { gl, calls, draw };
+  return { gl, calls, draw, renderer, info, extension };
 }
 
 test('with multi-draw the phone angle draws fewer triangles in one call, and the context and range come back', () => {
@@ -191,7 +192,9 @@ test('with multi-draw the phone angle draws fewer triangles in one call, and the
   const [start, end] = visibleSlabRun(ranges, phone.matrixWorld, view);
   expect(calls[0]?.triangles ?? Infinity).toBeLessThan(end - start);
   expect(calls[0]?.ranges ?? 0).toBeGreaterThan(1);
-  expect(Object.hasOwn(gl, 'drawElementsInstanced')).toBe(false);
+  // disarmed after the draw: the same size again is a plain draw
+  gl.drawElementsInstanced(4, (calls[0]?.triangles ?? 0) * 3, gl.UNSIGNED_INT, 0, 1);
+  expect(calls[1]?.kind).toBe('plain');
   expect(geometry.drawRange.start).toBe(0);
   expect(geometry.drawRange.count).toBe(Infinity);
 });
@@ -221,5 +224,66 @@ test('a draw of another size while the swap waits passes through to the context'
   gl.drawElementsInstanced(4, 6, gl.UNSIGNED_INT, 0, 1);
   part.onAfterRender(renderer as never, new Scene(), view, geometry, part.material, undefined as never);
   expect(calls).toEqual([{ kind: 'plain', triangles: 2, ranges: 1 }]);
-  expect(Object.hasOwn(gl, 'drawElementsInstanced')).toBe(false);
+});
+
+// mini-nb8e: the review of mini-nb8d's context patch
+test('a draw that throws before onAfterRender leaves no swap for the next frame, and the next draw still multi-draws', () => {
+  const geometry = ledgedStreet(), ranges = spatialSlabRanges(geometry);
+  if (ranges === null) throw new Error('expected ranges');
+  const part = new InstancedMesh(geometry, new MeshBasicMaterial(), 1), view = camera(-190, 0.1), { gl, calls, draw, renderer, info } = fakeRenderer(true);
+  part.updateMatrixWorld(true);
+  cullSlabRanges(part, ranges, PHONE_ANGLE);
+  // three throws between the part's onBeforeRender and its draw: no draw, no onAfterRender
+  part.onBeforeRender(renderer as never, new Scene(), view, geometry, part.material, undefined as never);
+  const armed = geometry.drawRange.count;
+  // the next frame: another object's draw of exactly the armed size from offset 0 is its own plain draw
+  info.render.frame++;
+  gl.drawElementsInstanced(4, armed, gl.UNSIGNED_INT, 0, 1);
+  expect(calls).toEqual([{ kind: 'plain', triangles: armed / 3, ranges: 1 }]);
+  // and the part's own next draw multi-draws as before
+  draw(part, view);
+  expect(calls[1]?.kind).toBe('multi');
+  gl.drawElementsInstanced(4, armed, gl.UNSIGNED_INT, 0, 1);
+  expect(calls[2]?.kind).toBe('plain');
+});
+
+test('a restored context\'s new extensions object is read again, never the lost one', () => {
+  const geometry = ledgedStreet(), ranges = spatialSlabRanges(geometry);
+  if (ranges === null) throw new Error('expected ranges');
+  const part = new InstancedMesh(geometry, new MeshBasicMaterial(), 1), view = camera(-190, 0.1), { calls, draw, renderer } = fakeRenderer(true);
+  part.updateMatrixWorld(true);
+  cullSlabRanges(part, ranges, PHONE_ANGLE);
+  draw(part, view);
+  expect(calls[0]?.kind).toBe('multi');
+  // three's initGLContext on a restore builds a new WebGLExtensions; this one has no multi-draw
+  (renderer as { extensions: unknown }).extensions = { has: () => false, get: () => null };
+  draw(part, view);
+  const [start, end] = visibleSlabRun(ranges, part.matrixWorld, view);
+  expect(calls[1]).toEqual({ kind: 'plain', triangles: end - start, ranges: 1 });
+});
+
+test('a plain mesh (drawn with drawElements) keeps the run, and a wrapper laid over the hook is wrapped in turn', () => {
+  const geometry = ledgedStreet(), ranges = spatialSlabRanges(geometry);
+  if (ranges === null) throw new Error('expected ranges');
+  const view = camera(-190, 0.1), { gl, calls, draw } = fakeRenderer(true);
+  const mesh = new Mesh(geometry, new MeshBasicMaterial());
+  mesh.updateMatrixWorld(true);
+  cullSlabRanges(mesh, ranges, PHONE_ANGLE);
+  mesh.onBeforeRender({ getContext: () => gl, extensions: { has: () => true, get: () => ({ multiDrawElementsInstancedWEBGL: () => { throw new Error('no multi-draw for a plain mesh'); } }) } } as never, new Scene(), view, geometry, mesh.material, undefined as never);
+  const [start, end] = visibleSlabRun(ranges, mesh.matrixWorld, view);
+  expect([geometry.drawRange.start / 3, geometry.drawRange.count / 3]).toEqual([start, end - start]);
+  mesh.onAfterRender({} as never, new Scene(), view, geometry, mesh.material, undefined as never);
+  const part = new InstancedMesh(geometry, new MeshBasicMaterial(), 1);
+  part.updateMatrixWorld(true);
+  cullSlabRanges(part, ranges, PHONE_ANGLE);
+  draw(part, view);
+  // a probe wraps the context's method after the hook: the next draw wraps the probe and still multi-draws
+  const hooked: unknown = Reflect.get(gl, 'drawElementsInstanced'), seen: number[] = [];
+  if (typeof hooked !== 'function') throw new Error('expected the hook');
+  Reflect.set(gl, 'drawElementsInstanced', function drawElementsInstanced(this: unknown, ...args: number[]) { seen.push(args[1] ?? -1); Reflect.apply(hooked, this, args); });
+  draw(part, view);
+  // the armed draw became the multi-draw; any other draw reaches the probe, then the context
+  gl.drawElementsInstanced(4, 6, gl.UNSIGNED_INT, 0, 1);
+  expect(calls.map(call => call.kind)).toEqual(['multi', 'multi', 'plain']);
+  expect(seen).toEqual([6]);
 });

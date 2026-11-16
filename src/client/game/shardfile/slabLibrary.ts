@@ -14,13 +14,15 @@ import { SharedTileBuilds, type TileContent } from './tileContent';
 import type { ControlRefinement } from './controlRefinement';
 import { tilesSettling } from './tileDriver';
 import { TIER_CONFIG } from '@wildshard/engine/core/tier';
-import { cullSlabRanges, spatialSlabRanges, type SlabRanges } from './slabRanges';
+import { cullSlabRanges, slabRangesJob, spatialSlabRanges, type SlabRanges } from './slabRanges';
+import { mergedSlabBounds, mergeSlabChunks } from './slabMerge';
 
 type WholeLibrary = Extract<WorldScenesSection['libraries'][number], { kind: 'whole' }>;
 type SlabTile = WorldSceneSlabLibrary['tiles'][number];
 /** the bake's tag on each slab mesh (`sharddev/bake/slabs.ts`): its key, tile and place in its file */
 const SlabTag = v.object({ key: v.string(), tile: v.number(), chunk: v.number() });
 const EMPTY: ReadonlySet<number> = new Set();
+const EMPTY_KEYS: ReadonlySet<string> = new Set();
 /** NB8: each phone chunk geometry's leaf tree (`slabRanges.ts`): built on a read in play before its first upload; a read
  *  under the loader's settle (Nine's whole resident bank, ~0.2 s at CPU x4 on NB1's readyFrame) waits in LATE and is
  *  built after the settle, a few chunks a work slice, its reordered index uploaded again */
@@ -43,8 +45,17 @@ async function drainLate(): Promise<void> {
     if (scope.disposed || scope.disposing) continue;
     let ranges = RANGES.get(geometry);
     if (ranges === undefined && LATE.has(geometry)) {
+      // a sliced job (mini-nb8e): a phone's merged key is ~0.5 M triangles, one long task in one go
+      const job = slabRangesJob(geometry);
+      // the index is only rewritten in the job's last step, so a holder retired part way leaves the geometry as it was
+      let built: SlabRanges | null | undefined;
+      for (let step = job.next(); ; step = job.next()) {
+        if (step.done === true) { built = step.value; break; }
+        if (slice.due()) await slice.yield();
+        if (scope.disposed || scope.disposing) break;
+      }
+      if (built === undefined) continue;
       LATE.delete(geometry);
-      const built = spatialSlabRanges(geometry);
       if (built !== null) { RANGES.set(geometry, built); ranges = built; }
     }
     if (ranges !== undefined) cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle);
@@ -69,7 +80,7 @@ const chunksOf = (entry: SlabTile): readonly WorldSceneSlabChunk[] => entry.file
  * key, tile and place), taken with its native channels exactly as baked and its frozen bounds from the row. Parser
  * staging never outlives the read.
  */
-async function readSlabChunks(owner: Scope, product: ShardProduct, tile: number, file: WorldSceneSlabFile): Promise<BufferGeometry[]> {
+async function readSlabChunks(owner: Scope, product: ShardProduct, tile: number, file: WorldSceneSlabFile, merged: ReadonlySet<string> = EMPTY_KEYS): Promise<BufferGeometry[]> {
   const live = (): void => { if (owner.disposed || owner.disposing) throw new Error('Slab owner is retired'); };
   live();
   if (product.shardfile.files.find(row => row.hash === file.file)?.kind !== 'glb') throw new Error('Slab file needs a declared GLB');
@@ -91,7 +102,8 @@ async function readSlabChunks(owner: Scope, product: ShardProduct, tile: number,
       const row = file.chunks[index];
       if (row === undefined || tag.chunk !== index || tag.tile !== tile || tag.key !== row.key) throw new Error('Slab chunk differs from its row');
       const geometry = nativeWholeGeometry(mesh, 'take');
-      if (TIER_CONFIG.slabRanges) {
+      // a chunk of a key the bank merges (`SlabLibrary.read`) gets its leaf tree on the merged geometry instead
+      if (TIER_CONFIG.slabRanges && !merged.has(row.key)) {
         if (tilesSettling()) LATE.add(geometry);
         else { const ranges = spatialSlabRanges(geometry); if (ranges !== null) RANGES.set(geometry, ranges); }
       }
@@ -116,7 +128,7 @@ async function readSlabChunks(owner: Scope, product: ShardProduct, tile: number,
  * key draws nothing at all.
  */
 export class SlabLibrary {
-  private readonly builds: SharedTileBuilds<readonly BufferGeometry[]>;
+  private readonly builds: SharedTileBuilds<readonly (BufferGeometry | null)[]>;
   private readonly entries = new Map<number, SlabTile>();
   private readonly keys = new Map<string, WorldSceneSlabKey>();
   private serial = 0;
@@ -130,7 +142,7 @@ export class SlabLibrary {
   private readonly readDone: (() => void)[] = [];
   constructor(owner: Scope, product: ShardProduct, private readonly whole: WholeLibrary, private readonly row: WorldSceneSlabLibrary,
     private readonly queue: ControlRefinement, private readonly cover: (tile: number) => Promise<void>,
-    private readonly prepare?: (parts: readonly SlabPart[]) => Promise<void>) {
+    private readonly prepare?: (parts: readonly SlabPart[]) => Promise<void>, private readonly merge = false) {
     if (row.of !== whole.id) throw new Error('Slab library covers another library');
     for (const key of row.keys) {
       if (key.castFrom !== undefined) throw new Error('Slab key casting from a band has no run-time draw');
@@ -151,11 +163,44 @@ export class SlabLibrary {
       finally { this.reads--; for (const wake of this.readDone.splice(0)) wake(); }
     });
   }
+  /** NB8 (mini-nb8e): the keys whose chunks `read` merges in a bank: with `merge` (the phone tier's `slabMerge`, given
+   *  only with `WEBGL_multi_draw`), each frustum-culled key with two or more chunks there. A key drawn whole (not
+   *  frustum culled) gets no leaf cut, so a merged copy would only draw more of it */
+  private mergedKeys(entry: SlabTile): ReadonlySet<string> {
+    if (!this.merge) return EMPTY_KEYS;
+    const counts = new Map<string, number>();
+    for (const chunk of chunksOf(entry)) counts.set(chunk.key, (counts.get(chunk.key) ?? 0) + 1);
+    const culled = new Set(this.row.keys.filter(key => key.frustumCulled).map(key => key.id));
+    return new Set([...counts].filter(([key, count]) => count > 1 && culled.has(key)).map(([key]) => key));
+  }
   /** One storage bank's chunk geometries: read and decoded in the refinement queue, its covered tiles first covered. */
-  private async read(tile: number, scope: Scope): Promise<BufferGeometry[]> {
+  private async read(tile: number, scope: Scope): Promise<(BufferGeometry | null)[]> {
     const { row, queue, bounds, product } = this;
     const entry = this.entries.get(tile); if (entry === undefined) throw new Error('Missing slab tile');
-    const chunks: BufferGeometry[] = [];
+    const chunks: (BufferGeometry | null)[] = [];
+    // NB8 (mini-nb8e): on the phone with multi-draw, each frustum-culled key with two or more chunks in this bank is
+    // drawn as one merged geometry, laid at its first chunk's place (the others are null). A key's chunks are merged as
+    // soon as its last one is read, so the bank holds at most one key's copy at a time beside what it has read
+    const rows = chunksOf(entry), merged = this.mergedKeys(entry), lastOf = new Map<string, number>();
+    for (const [index, chunk] of rows.entries()) if (merged.has(chunk.key)) lastOf.set(chunk.key, index);
+    const mergeKey = (key: string): void => {
+      const at: number[] = [];
+      for (const [index, chunk] of rows.entries()) if (chunk.key === key) at.push(index);
+      const parts = at.map(index => chunks[index] ?? null).filter(part => part !== null);
+      const geometry = parts.length === at.length ? mergeSlabChunks(parts) : null;
+      if (geometry === null) {
+        // channels that differ: the key keeps its chunks, each with its own leaf tree
+        for (const part of parts) { ownSceneResource(part, scope); if (TIER_CONFIG.slabRanges) LATE.add(part); }
+        return;
+      }
+      const { box, sphere } = mergedSlabBounds(at.map(index => rows[index] ?? { box: [], sphere: [] }));
+      geometry.boundingBox = box; geometry.boundingSphere = sphere;
+      ownSceneResource(geometry, scope);
+      // its leaf tree is a sliced job after the loader's settle (`drainLate`), never a long task on the read
+      if (TIER_CONFIG.slabRanges) LATE.add(geometry);
+      for (const [order, index] of at.entries()) chunks[index] = order === 0 ? geometry : null;
+      for (const part of parts) part.dispose();
+    };
     let box = bounds.get(tile);
     if (entry.covers !== undefined) {
       const min: [number, number, number] = [Infinity, Infinity, Infinity], max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
@@ -177,10 +222,15 @@ export class SlabLibrary {
       for (const file of entry.files) {
         if (scope.disposed || scope.disposing) return;
         let read: readonly BufferGeometry[];
-        try { read = await readSlabChunks(scope, product, tile, file); }
-        catch (error) { if (scope.disposed || scope.disposing) return; throw error; }
-        for (const geometry of read) ownSceneResource(geometry, scope);
+        try { read = await readSlabChunks(scope, product, tile, file, merged); }
+        catch (error) {
+          for (const [index, part] of chunks.entries()) if (part !== null && merged.has(rows[index]?.key ?? '')) part.dispose();
+          if (scope.disposed || scope.disposing) return; throw error;
+        }
+        const from = chunks.length;
         chunks.push(...read);
+        for (const [offset, geometry] of read.entries()) if (!merged.has(rows[from + offset]?.key ?? '')) ownSceneResource(geometry, scope);
+        for (const [key, last] of lastOf) if (last >= from && last < chunks.length) mergeKey(key);
       }
     });
     if (!scope.disposed && !scope.disposing && chunks.length !== chunksOf(entry).length) throw new Error('Slab tile chunk count differs from its row');
@@ -265,6 +315,8 @@ export class SlabLibrary {
         if (chunk.key !== key.id) continue;
         if (lifetime.disposed || lifetime.disposing || scope.disposed || scope.disposing) return drawn;
         const geometry = geometries[index]; if (geometry === undefined) throw new Error('Missing slab chunk');
+        // a chunk merged into its key's first (`read`, mini-nb8e) draws there
+        if (geometry === null) continue;
         // Keep the same one-instance channel layout, identity matrix, white
         // colours and draw flags as the admitted storage chunk.
         const part = new InstancedMesh(geometry, mesh.material, 1);

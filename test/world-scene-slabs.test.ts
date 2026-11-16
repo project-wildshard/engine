@@ -25,7 +25,7 @@ function geometryOf(part: unknown): BufferGeometry {
   return geometry;
 }
 
-function fixture(indexed = false, covers?: number[], prepare?: (parts: readonly SlabPart[]) => Promise<void>, separateKeys = false) {
+function fixture(indexed = false, covers?: number[], prepare?: (parts: readonly SlabPart[]) => Promise<void>, separateKeys = false, merge = false) {
   const owner = new Scope('slab-resident'), source = emptyShardfile({ slug: 'slab-fixture', name: 'Slabs', author: 'Fixture', revision: 1, seed: 1 });
   const bakeMaterial = new MeshBasicMaterial(), assets = new Map<string, Uint8Array>(), shapes = [triangle(0), triangle(5), triangle(40)];
   if (indexed) for (const shape of shapes) shape.setIndex([0, 1, 2]);
@@ -54,7 +54,7 @@ function fixture(indexed = false, covers?: number[], prepare?: (parts: readonly 
     tiles: covered }] }).libraries;
   if (whole?.kind !== 'whole' || slabs?.kind !== 'slabs') throw new Error('Missing fixture libraries');
   const queue = new ControlRefinement(owner, undefined, () => ({ x: -230, z: -230 }), () => Promise.resolve()), cover = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-  const library = new SlabLibrary(owner, product, whole, slabs, queue, cover, prepare), material = new MeshBasicMaterial();
+  const library = new SlabLibrary(owner, product, whole, slabs, queue, cover, prepare, merge), material = new MeshBasicMaterial();
   const anchor = new Mesh(library.geometry('fabric') ?? new BufferGeometry(), material), alias = new Mesh(library.geometry('alias') ?? new BufferGeometry(), material);
   const read = vi.spyOn(runtimeProduct(source).assets, 'read');
   const content = library.bind('fabric', anchor, owner), aliasContent = library.bind('alias', alias, owner);
@@ -99,6 +99,24 @@ test('a key draws its tiles\' chunks under its anchor, one instanced mesh each, 
     second.dispose(); expect(f.anchor.children).toHaveLength(0);
     // a later attach reads the retired tile again
     const again = f.owner.child('again'); await f.content.attach(0, again); expect(f.read).toHaveBeenCalledTimes(3); expect(f.anchor.children).toHaveLength(2);
+  } finally { f.close(); }
+});
+
+// NINE-DRAGON-BENCHMAX NB8 (mini-nb8e): the phone with multi-draw draws a key's chunks in one bank as one merged chunk
+test('with merge, a key\'s chunks in a bank draw as one chunk holding every triangle, and a retire takes it', async () => {
+  const f = fixture(true, undefined, undefined, false, true), first = f.owner.child('first'), second = f.owner.child('second');
+  try {
+    await f.content.attach(0, first);
+    expect(f.anchor.children).toHaveLength(1);
+    const merged = geometryOf(f.anchor.children[0]);
+    expect(Array.from(merged.getAttribute('position').array)).toEqual([...f.shapes[0]?.getAttribute('position').array ?? [], ...f.shapes[1]?.getAttribute('position').array ?? []]);
+    expect(Array.from(merged.index?.array ?? [])).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(merged.boundingBox?.max.x).toBe(1); expect(merged.boundingSphere?.radius).toBeGreaterThanOrEqual(1);
+    // a bank with one chunk of the key keeps it as it is
+    await f.content.attach(1, second);
+    expect(f.anchor.children).toHaveLength(2);
+    first.dispose(); expect(f.anchor.children).toHaveLength(1);
+    second.dispose(); expect(f.anchor.children).toHaveLength(0);
   } finally { f.close(); }
 });
 

@@ -8,4 +8,7 @@ test('only the phone tier cuts slab chunks', () => {
   expect(TIER_TABLE.phone.slabRanges).toBe(true);
   // the phone's angle is the one slab-ranges.test.ts drives: ~0.7 device pixels at DPR 2
   expect(TIER_TABLE.phone.slabLodAngle).toBe(0.001);
+  // mini-nb8e: a key's chunks merge on the phone only (and there only with multi-draw, `worldScenes.ts`)
+  expect(TIER_TABLE.desktop.slabMerge).toBe(false);
+  expect(TIER_TABLE.phone.slabMerge).toBe(true);
 });
