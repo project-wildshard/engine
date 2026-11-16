@@ -92,7 +92,6 @@
   "test/quest-step-native-parity.test.ts",
   "test/quest-step-pine-native-parity.test.ts",
   "test/registered-json.test.ts",
-  "test/return-program-group-v2.test.ts",
   "test/return-projection-inventory.test.ts",
   "test/script-v2-radial.test.ts",
   "test/scripts/_template-boss.test.ts",

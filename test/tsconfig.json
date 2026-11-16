@@ -316,7 +316,6 @@
     "quest-step-native-parity.test.ts",
     "ranged-cycle.test.ts",
     "registered-json.test.ts",
-    "return-program-group-v2.test.ts",
     "return-projection-inventory.test.ts",
     "script-seats.test.ts",
     "script-v2-radial.test.ts",

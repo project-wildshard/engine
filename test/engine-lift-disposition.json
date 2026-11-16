@@ -12160,5 +12160,39 @@
         "assertions": "Actual native catalogue consumer admits the original two independently rebuilt graph literals; captured expected rows retain full defining wire, missing named blobs refuse specifically."
       }
     ]
+  },
+  {
+    "repo": "engine",
+    "file": "test/return-program-group-v2.test.ts",
+    "outcome": "restored",
+    "target": "test/return-program-group-v2.test.ts",
+    "decision": "CI21 SDK-tail assertion split: SDK retains all seven original public/native cases, engine retains the full metadata/cache identity case with its private unscoped ReturnProjectionV2 refusal against the exact SDK-compiled descriptor. No source import from SDK or shards.",
+    "originalTests": [
+      "numeric and distinct group profiles use one entered programme and exactly one Wasm instance",
+      "full group metadata participates in cache identity before any second instance can be constructed",
+      "ancestor sliced retirement refuses group capture and acceptance without publishing the bank or RNG",
+      "the shared engine loan rejects a different executable or IO reservation",
+      "the full admitted named descriptor retains group rows without changing legacy witness bytes",
+      "shared capacity never broadens the numeric or group publication rights",
+      "native capture cannot reenter the other side of the shared programme"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "4c76f2f4553c75b37823415eabe09d82583e94a6",
+    "retirementProof": "No case or assertion retired. Full seven cases in SDK; engine companion retains all cache identity/parser/public unowned execution assertions plus the original private entered-scope refusal. SDK destination 9b3a2509a69b3009cc2bbb23c7a6864941d376d6.",
+    "assertionDestinations": [
+      {
+        "repo": "sharddev",
+        "branch": "plan/ci21sdk-tail",
+        "target": "test/return-program-group-v2.test.ts",
+        "assertions": "All seven original cases, every public assertion and exact original group/V2 compiler sources.",
+        "revision": "9b3a2509a69b3009cc2bbb23c7a6864941d376d6"
+      },
+      {
+        "repo": "engine",
+        "branch": "plan/ci21sdk-tail",
+        "target": "test/return-program-group-v2.test.ts",
+        "assertions": "Complete original second case, including private unscoped ReturnProjectionV2.prepareGroup refusal."
+      }
+    ]
   }
 ]
