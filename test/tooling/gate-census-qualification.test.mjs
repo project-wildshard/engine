@@ -8,6 +8,7 @@ test('TS12e1 joins real owners and refuses stale, partial, foreign or incomplete
  const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.startsWith('GIT_')));
  const report=JSON.parse(execFileSync('python3',['scripts/gate-census-proof.py','--scratch',resolve(process.env.VITEST_TMP_ROOT??'tmp/vitest')],{env,encoding:'utf8',timeout:30000}));
  expect(report).toMatchObject({realProducerJoins:2,metadataRefusals:25,foreignOwnerRefused:true,unsafeAndIncompleteRefused:true,evidenceRetained:true,sampledCounterCensoringSeparate:true,actualDelayedParentQualified:true,additionalProofWindowRefusals:2,commandCpuPreserved:true});
+ expect(report.tailReader).toEqual({unrelatedAppends:8,partialTailStayedPending:true,actualReleaseQualified:true,cachedBytesReadExactlyOnce:true,finalValidationPasses:1,lateFinalAppendControls:['foreign-append','duplicate-release'],metadataOnlyChangeAccepted:true,changedInputsRefused:['truncate','rotate','rewrite','rewrite-append','proof-change','raw-change']});
  expect(report.proofDirectory).toMatchObject({validOwnerWithUnrelatedInvalidEntries:true,malformedMatchedRefused:true,ambiguousMatchedRefused:true,unsafeDirectoryRefused:true,diagnostics:{entries:5,malformed:1,unsafe:2,unrelated:1}});
  expect(report.parentEndStampAfterCensusMs).toBeGreaterThan(0);
  expect(report.unreapedDeadline).toMatchObject({unreapedDeadlineRefused:true,rootCpuMeasured:true,observerNeverSignalledOwner:true});

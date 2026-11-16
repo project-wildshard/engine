@@ -816,9 +816,9 @@ def qualify_observation(args, report, used):
             sys.modules[name] = module
         except (OSError, ValueError, ImportError, AttributeError, TypeError, SyntaxError) as error:
             return {'qualified': False, 'reason': f'qualifier unavailable: {error}'}
-    qualify = sys.modules[name].qualify_files
+    reader = sys.modules[name].QualificationReader(report, args.proof_root, args.command_log, used)
     until = time.monotonic() + args.drain_seconds
-    result = qualify(report, args.proof_root, args.command_log, used)
+    result = reader.poll()
     while result.get('pending') and time.monotonic() < until:
         try:
             size = args.command_log.stat().st_size
@@ -831,7 +831,7 @@ def qualify_observation(args, report, used):
                     break
             except OSError:
                 break
-        result = qualify(report, args.proof_root, args.command_log, used)
+        result = reader.poll()
     return result
 
 

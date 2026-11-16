@@ -16,7 +16,8 @@ import threading
 import time
 
 sys.dont_write_bytecode = True
-from gate_census_qualification import join_census, qualify_files, timestamp
+import gate_census_qualification as qualification
+from gate_census_qualification import QualificationReader, join_census, qualify_files, timestamp
 
 ENGINE = Path(__file__).resolve().parent.parent
 
@@ -355,6 +356,99 @@ def directory_controls(actual):
             'unsafeDirectoryRefused': True}
 
 
+def tail_controls(actual, foreign):
+    root = actual['root'] / 'tail-controls'
+    root.mkdir()
+    token = actual['release']['token']
+    initial = b''.join(line + b'\n' for line in actual['log'].read_bytes().splitlines()
+                       if json.loads(line).get('token') != token or json.loads(line).get('event') != 'release')
+    release = json.dumps(actual['release']).encode() + b'\n'
+    unrelated = json.dumps(foreign['release']).encode() + b'\n'
+
+    def reader(name):
+        log = root / name
+        log.write_bytes(initial)
+        value = QualificationReader(actual['raw'], actual['proofFile'], log)
+        assert value.poll().get('pending') is True
+        return value, log
+
+    value, log = reader('appends.log')
+    for _ in range(8):
+        with log.open('ab') as stream:
+            stream.write(unrelated)
+        result = value.poll()
+        assert result.get('pending') is True, result
+        assert result['settling']['receiptDiscoveries'] == 1
+        assert result['settling']['commandLogBytesRead'] == log.stat().st_size
+    halfway = len(release) // 2
+    with log.open('ab') as stream:
+        stream.write(release[:halfway])
+    partial = value.poll()
+    assert partial.get('pending') and 'incomplete tail' in partial['reason'], partial
+    with log.open('ab') as stream:
+        stream.write(release[halfway:])
+    result = value.poll()
+    assert result['qualified'], result
+    assert result['settling'] == {'receiptDiscoveries': 2, 'commandLogBytesRead': log.stat().st_size,
+                                  'finalValidationPasses': 1}, result
+    value, log = reader('metadata.log')
+    log.chmod(0o600)
+    assert value.poll().get('pending') is True
+    with log.open('ab') as stream:
+        stream.write(release)
+    assert value.poll()['qualified']
+    late_results = []
+    for name, row, expected in (('foreign-append', unrelated, True), ('duplicate-release', release, False)):
+        value, log = reader(name + '.log')
+        with log.open('ab') as stream:
+            stream.write(release)
+        native_read, appended = qualification.owned_bytes, []
+
+        def append_during_final(path, limit, **options):
+            if path == log and options.get('prefix') is not None and not appended:
+                with log.open('ab') as stream:
+                    stream.write(row)
+                appended.append(True)
+            return native_read(path, limit, **options)
+
+        qualification.owned_bytes = append_during_final
+        try:
+            result = value.poll()
+        finally:
+            qualification.owned_bytes = native_read
+        assert appended and result['qualified'] is expected, (name, result)
+        assert result['settling']['finalValidationPasses'] == 1, result
+        late_results.append(name)
+    refused = []
+    for name in ('truncate', 'rotate', 'rewrite', 'rewrite-append', 'proof-change', 'raw-change'):
+        value, log = reader(name + '.log')
+        old_raw, old_proof = actual['raw'].read_bytes(), actual['proofFile'].read_bytes()
+        try:
+            if name == 'truncate':
+                log.write_bytes(b'')
+            elif name == 'rotate':
+                log.rename(log.with_suffix('.old'))
+                log.write_bytes(initial + release)
+            elif name in ('rewrite', 'rewrite-append'):
+                changed = initial.replace(b'acquire', b'changed', 1)
+                assert changed != initial
+                log.write_bytes(changed + (release if name.endswith('append') else b''))
+            else:
+                path = actual['proofFile'] if name == 'proof-change' else actual['raw']
+                path.write_bytes(path.read_bytes() + b' ')
+                with log.open('ab') as stream:
+                    stream.write(release)
+            result = value.poll()
+            assert not result['qualified'] and not result.get('pending'), (name, result)
+            refused.append(name)
+        finally:
+            actual['raw'].write_bytes(old_raw)
+            actual['proofFile'].write_bytes(old_proof)
+    return {'unrelatedAppends': 8, 'partialTailStayedPending': True, 'actualReleaseQualified': True,
+            'cachedBytesReadExactlyOnce': True, 'finalValidationPasses': 1,
+            'lateFinalAppendControls': late_results, 'metadataOnlyChangeAccepted': True, 'changedInputsRefused': refused}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--scratch', required=True, type=Path)
@@ -394,7 +488,7 @@ def main():
         assert not qualify_files(actual['raw'], deep, actual['log'])['qualified']
         assert actual['raw'].exists() and actual['proofFile'].exists() and actual['log'].exists()
         print(json.dumps({'realProducerJoins': 2, 'metadataRefusals': count, 'foreignOwnerRefused': True,
-                          'proofDirectory': directory_controls(actual),
+                          'proofDirectory': directory_controls(actual), 'tailReader': tail_controls(actual, foreign),
                           'unreapedRoot': unreaped_root(root), 'unreapedDeadline': unreaped_root(root, deadline=True),
                           'actualDelayedParentQualified': True, 'parentEndStampAfterCensusMs': delay_ms,
                           'additionalProofWindowRefusals': 2, 'commandCpuPreserved': True,
