@@ -27,3 +27,6 @@ The rebased Template has two authored ram policies and an idle Greyback on one
 species. A layer with brain `none` supplies no controller, so it now preserves
 these explicit per-spawn declarations. A nonempty layer policy still refuses a
 second owner. The SDK bridge records no species-wide controller for mixed owners.
+
+Format 0.6.0 is now the frozen npm dependency. Full types and game lint pass
+against the released package. Native product rebuilds remain the land gate.
