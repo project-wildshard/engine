@@ -1,3 +1,4 @@
+import {importedCheckpoint,type DurableCheckpoint} from './checkpointWitness';
 // E7.3: one cell of the world (J178). C5: no road yet; GC15's `handOver` moves a seat to a cell on the same worker. C3: the first human takes the host's own seat, and a vacant lead
 // seat is refilled first. C6: every solid stays in memory. It holds no socket: a seat's `Transport` comes from the world's door.
 import type { ChatReports } from '@wildshard/engine/net/chat';
@@ -45,6 +46,7 @@ const DEBOUNCE_MS = 1000, EVERY_MS = 60_000;
 
 /** A player who holds a seat, with or without a live link. */
 interface Seat {
+  checkpoint?:DurableCheckpoint;
   readonly device: string; readonly name: string; readonly body: string; readonly store: PlayerStore; readonly fall: FallFloor;
   /** SC10: this device's own body id (`entry.body`), which `body` is unless it holds the lead seat: what it was paid here is kept under it. */
   readonly own: string;
@@ -203,7 +205,7 @@ export class DedicatedRoom implements CrossTarget {
     this.settle(placed);
     this.link(placed, transport, hello);
     this.flushRefusals();
-    if (this.seats.get(entry.device) === placed) this.options.post({ kind: 'seated', device: entry.device, body: placed.body, seats: this.seats.size });
+    if (this.seats.get(entry.device) === placed) this.options.post({ kind: 'seated', device: entry.device, body: placed.body, seats: this.seats.size, ...(entry.admission===undefined?{}:{admission:entry.admission}), ...(placed.checkpoint===undefined?{}:{checkpoint:placed.checkpoint}) });
   }
   /**
    * A body for this entry: its doc checked and recovered, its seat in the maps, its body in the world, at `at` if given (a crossing's
@@ -241,6 +243,8 @@ export class DedicatedRoom implements CrossTarget {
       if (lead) this.clearLead(entry.body, away ?? now); else host.removePlayer(body);
       return `doc: ${String(error)}`;
     }
+    const checkpoint=at===undefined?importedCheckpoint(entry.checkpoint,doc):undefined;
+    if(checkpoint!==undefined)seat.checkpoint=checkpoint;
     return seat;
   }
   /**

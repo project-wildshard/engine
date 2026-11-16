@@ -4,6 +4,7 @@ import type { SaveReceipt, SaveWrite } from './saves/saveStore';
 import type {PlaytestHit} from './playtest';
 import type { PlacedCell } from './gridCells';
 import type { MotionSnapshot } from '@wildshard/engine/game/grid/simulation';
+import type {CheckpointCertificate,DurableCheckpoint} from './checkpointWitness';
 
 // J182: what the door and a cell worker say to each other. Sockets stay with the door, and a seat's bytes go through its own port.
 
@@ -15,6 +16,9 @@ export interface ResumeAt { readonly x: number; readonly y: number; readonly z: 
 export interface SavedCheckpoint { readonly doc: PlayerDoc; readonly recovery: readonly SaveReceipt[] }
 /** A seat the door has cleared: who, and their save. */
 export interface SeatEntry {
+  /** Internal nonce binds the worker's acknowledgement to this socket, not an earlier held/replaced link. */
+  readonly admission?:number;
+  readonly checkpoint?:CheckpointCertificate;
   readonly device: string; readonly name: string; readonly body: string;
   readonly doc: PlayerDoc | null; readonly seq: number;
   /** Durable grants absent from a recovered document; reconcile before seating. */
@@ -69,7 +73,7 @@ export interface WorkerReading {
 export type RoomNews =
   | {readonly kind:'playtest';readonly row:PlaytestHit}
   | { readonly kind: 'left'; readonly device: string; readonly seats: number }
-  | { readonly kind: 'seated'; readonly device: string; readonly body: string; readonly seats: number }
+  | { readonly kind: 'seated'; readonly device: string; readonly body: string; readonly seats: number;readonly admission?:number;readonly checkpoint?:DurableCheckpoint }
   | { readonly kind: 'refused'; readonly device: string; readonly reason: string }
   | { readonly kind: 'recovered'; readonly device: string; readonly seq: number }
   | { readonly kind: 'save'; readonly write: SaveWrite }

@@ -1,3 +1,4 @@
+import {checkpointCertificate} from './checkpointWitness';
 import type { ChatReport } from '@wildshard/engine/net/chat';
 import { migrate } from './saves/migrate';
 import { openPg } from './saves/pgDatabase';
@@ -31,9 +32,7 @@ function namesOver(db: Database): (device: string, name: string) => Promise<stri
 export function playerSavesOver(db: Database, epoch: number, log: (line: Record<string, unknown>) => void, contract?: (issue: string) => void): PlayerSaves & { readonly queue: SaveWriteQueue; readonly reports: ReportWriteQueue } {
   const queue = new SaveWriteQueue({ write: write => writeSave(db, epoch, write), failed: (write, error) => { log({ at: 'save.failed', shard: write.shard, reason: write.reason, error: String(error) }); } });
   const reports = new ReportWriteQueue(row => writeReport(db, row), error => { log({ at: 'report.failed', error: String(error) }); });
-  return { queue, reports, write: write => { queue.post(write); }, drain: async ms => (await Promise.all([queue.drain(ms), reports.drain(ms)])).every(Boolean), stats: () => ({ ...queue.stats, waiting: queue.waiting, p95Ms: Number(queue.p95.toFixed(2)), reportsWaiting: reports.waiting, reportsWritten: reports.stats.written, reportsFailed: reports.stats.failed, reportsRefused: reports.stats.refused }),
-    where: async device => { if (!await queue.drain(3000, device)) throw new Error('Player save is pending'); return await placeOf(db, epoch, device) ?? await lastCell(db, epoch, device); },
-    read: async (device, shard): Promise<SavedPlayer> => {
+  const read = async (device:string, shard:string, witness=false):Promise<SavedPlayer> => {
       if (!await queue.drain(3000, device, shard)) throw new Error('Player save is pending');
       const told = (issue: string): void => { log({ at: 'save.contract', shard, issue }); contract?.(issue); };
       const saved = await readSave(db, epoch, device, shard, (doc, version) => admitDoc(doc, version, shard, told));
@@ -41,8 +40,12 @@ export function playerSavesOver(db: Database, epoch: number, log: (line: Record<
       const doc = saved?.doc ?? null, previous = saved?.previous, receipts = await recoveryReceipts(db, epoch, device, shard, Math.min(doc?.ledger.serial ?? 0, previous?.ledger.serial ?? doc?.ledger.serial ?? 0));
       const recovery = receipts.filter(row => row.serial > (doc?.ledger.serial ?? 0));
       if (doc === null && recovery.length > 0) throw new SaveQuarantinedError('Save is quarantined: receipts without a document');
-      return { doc, seq: saved?.seq ?? 0, recovery, ...(previous === undefined ? {} : { previous: { doc: previous, recovery: receipts.filter(row => row.serial > previous.ledger.serial) } }) };
-    },
+      const certificate=witness && saved?.source === 'doc' && doc !== null && recovery.length === 0 ? checkpointCertificate(doc,saved.seq,shard) : undefined;
+      return { doc, seq: saved?.seq ?? 0, recovery, ...(certificate===undefined?{}:{checkpoint:certificate}), ...(previous === undefined ? {} : { previous: { doc: previous, recovery: receipts.filter(row => row.serial > previous.ledger.serial) } }) };
+    };
+  return { queue, reports, write: write => { queue.post(write); }, drain: async ms => (await Promise.all([queue.drain(ms), reports.drain(ms)])).every(Boolean), stats: () => ({ ...queue.stats, waiting: queue.waiting, p95Ms: Number(queue.p95.toFixed(2)), reportsWaiting: reports.waiting, reportsWritten: reports.stats.written, reportsFailed: reports.stats.failed, reportsRefused: reports.stats.refused }),
+    where: async device => { if (!await queue.drain(3000, device)) throw new Error('Player save is pending'); return await placeOf(db, epoch, device) ?? await lastCell(db, epoch, device); },
+    read:(device,shard)=>read(device,shard), readWitness:(device,shard)=>read(device,shard,true),
     recover: (device, shard, seq) => healSave(db, epoch, device, shard, seq),
     name: namesOver(db),
     report: (report: ChatReport, shard: string) => { const accepted = reports.post(report, shard); if (!accepted) log({ at: 'report.refused', reason: 'backlog' }); return accepted; } };

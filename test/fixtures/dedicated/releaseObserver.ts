@@ -1,10 +1,12 @@
 import {setTimeout as pause} from 'node:timers/promises';
+import type {DurableCheckpoint} from '../../../src/server/host/dedicated/checkpointWitness';
 import type {ReleaseFile} from '../../../src/shared/host/releaseRows';
 import {ObservationRefusedError} from '../../../scripts/mmo-release-observer-inputs.mjs';
 
 export interface Stand {readonly x:number;readonly z:number}
 export interface NativeReading {
  readonly tick:number|null;readonly stand:Stand|null;readonly coins:number|null;
+ readonly checkpoint?:DurableCheckpoint|null;
  readonly closed:string|null;readonly closedAt:number|null;
 }
 export interface NativeObserverBot {read:()=>NativeReading;move:()=>void;close:()=>void}

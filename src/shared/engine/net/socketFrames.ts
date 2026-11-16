@@ -15,7 +15,9 @@ export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voi
 export interface WorldWord { readonly cells: number; readonly shards: readonly string[];
   /** DEVICE-TELEMETRY DT3: 1 when this door reads the client's `device` word (deviceWord.ts). An older door never says it, and closes
    *  `refused` on a prefix it does not know, so a client sends the word only after hearing this. */
-  readonly device?: 1 }
+  readonly device?: 1;
+  /** Optional per-client durable admission proof. Old readers ignore it; later words never repeat device:1. */
+  readonly status?:Readonly<Record<string,unknown>> }
 /** J218: a voice word is JSON in a few hundred bytes; an SDP travels in pieces of this many characters, under the room's 1024-byte cap. */
 export const VOICE_PIECE_CHARS = 400;
 /** The server sends no frame while this much is waiting (E7.1). Delta-against-ack heals, and the next frame is just bigger. */

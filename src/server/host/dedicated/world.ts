@@ -31,6 +31,7 @@ import { workerTable } from './workerTable';
 import { cellName, cellShard, gridAssembly, placedCells, roadHome } from './gridCells';
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
 import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, trustedAddress, type TrustProxy } from './doorTrust';
+import {checkpointWord,type CheckpointCertificate} from './checkpointWitness';
 
 /** J174: what a deploy gives everyone before they move together. */
 export const GRACE_MS = 60_000;
@@ -73,13 +74,15 @@ export interface WorkerLink {
   stop: () => void;
 }
 /** What a read of a player's save answers. */
-export interface SavedPlayer { readonly doc: PlayerDoc | null; readonly seq: number; readonly recovery?: readonly SaveReceipt[]; readonly previous?: SavedCheckpoint }
+export interface SavedPlayer { readonly doc: PlayerDoc | null; readonly seq: number; readonly recovery?: readonly SaveReceipt[]; readonly previous?: SavedCheckpoint;readonly checkpoint?:CheckpointCertificate }
 /** Where a player's save lives. */
 export interface PlayerSaves {
   /** The cell this player last stood in, this epoch: a grid instance (ZS7's place row), or an older save's shard. */
   where: (device: string) => Promise<string | null>;
   /** A player's doc on one shard: a cell's progress is kept under its shard's slug. */
   read: (device: string, shard: string) => Promise<SavedPlayer>;
+  /** Optional database-backed admission read. In-memory/legacy adapters cannot attest durability. */
+  readWitness?: (device:string,shard:string)=>Promise<SavedPlayer>;
   /** Promote a previous copy only after a room imports it, and only while its sequence is unchanged. */
   recover?: (device: string, shard: string, seq: number) => Promise<void>;
   write: (write: SaveWrite) => void;
@@ -170,7 +173,8 @@ export class World {
   /** GC15: devices whose crossing the door is reading a save for, or whose `cross` order a worker has not answered, and when it began (SC1). */
   private readonly crossings = new Map<string, number>();
   /** GC15 (3): each seated device's socket and a copy of the hello it was seated with, so a crossing onto another worker can move both. */
-  private readonly seatSockets = new Map<string, { readonly end: SocketTransport; readonly hello: ArrayBuffer }>();
+  private readonly seatSockets = new Map<string, { readonly end: SocketTransport; readonly hello: ArrayBuffer; readonly admission:number }>();
+  private admission=0;
   /** GC15 (3): a crossing onto another worker, between the source's `handOut` and the socket's `out`: where it arrives and with what save. */
   private readonly outs = new Map<string, { readonly from: string; readonly to: string; readonly at: ResumeAt; readonly entry: SeatEntry }>();
   /** GC15 (3): each worker's grid cells whose entryways stand, as its `booted` said. */
@@ -302,7 +306,17 @@ export class World {
     // GC15: a crossing's source lets the seat go before `crossed` says where it went: the seat stays counted until then.
     else if (news.kind === 'left') { const from = 'slug' in news ? news.slug : undefined; if (from !== undefined && this.crossings.has(news.device)) { if (this.seated.get(news.device) === from) this.leftCrossing.add(news.device); return; } if (from === undefined || this.seated.get(news.device) === from) { this.seated.delete(news.device); this.names.delete(news.device); } }
     // A voice is named for the body its cell seated (a room's first seat is its lead body), from the cell they now stand in.
-    else if (news.kind === 'seated') { const { device, body, slug: from } = news; if (this.seated.get(device) === from) this.voiceBodies.get(device)?.(body); }
+    else if (news.kind === 'seated') {
+      const {device,body,slug:from}=news;
+      if(this.seated.get(device)===from){
+        this.voiceBodies.get(device)?.(body);
+        const socket=this.seatSockets.get(device);
+        if(news.checkpoint!==undefined&&socket!==undefined&&socket.admission===news.admission){
+          const bytes=checkpointWord(this.discovery(),news.checkpoint);
+          if(bytes!==undefined)socket.end.control('world',bytes);
+        }
+      }
+    }
     else if (news.kind === 'refused') this.refuse(news.reason);
     else if (news.kind === 'recovered') void this.recover(news.device, cellShard(news.slug), news.seq);
     else if (news.kind === 'save') this.options.saves.write(news.write);
@@ -387,7 +401,7 @@ export class World {
     // page joins only a world that opens its shard. D7 keeps `/health` private on the rooms address, and a
     // grid page asks this on a socket of its own (`worldWord`). No build, serial or player data.
     // DEVICE-TELEMETRY DT3: `device: 1` says this door reads the client's device word; a client sends it only then.
-    end.control('world', new TextEncoder().encode(JSON.stringify({ cells: this.links.size, shards: [...new Set([...this.links.keys()].map(cellShard))], device: 1 } satisfies WorldWord)).buffer);
+    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1} satisfies WorldWord)).buffer);
     end.onControl((control, bytes) => { if (control === 'device') this.deviceWord(end, bytes); });
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { this.refuse('hello-timeout'); end.close('refused'); });
     const off = end.onMessage((_channel, bytes) => { off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto); });
@@ -494,7 +508,7 @@ export class World {
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const last = await saves.where(device);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
-    const slug = this.cellFor(last, aim), saved = await saves.read(device, cellShard(slug)), at = arrival?.at; // the cell it was entering: `aim`, which this world opens
+    const slug = this.cellFor(last, aim), saved = await (saves.readWitness?.(device,cellShard(slug)) ?? saves.read(device,cellShard(slug))), at = arrival?.at; // preserve ZE9's entry continuation
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const { spawn } = await this.ask(slug, device, end);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
@@ -508,7 +522,7 @@ export class World {
     });
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     this.pending.delete(device);
-    this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }), ...(at === undefined ? {} : { arrival: at }) }, bytes);
+    this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.checkpoint===undefined?{}:{checkpoint:saved.checkpoint}), ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }), ...(at === undefined ? {} : { arrival: at }) }, bytes);
   }
   /**
    * GC15: a seat's feet left cell `from` for `to`. On the same worker the door reads their save on `to`'s shard and orders the move, which
@@ -610,6 +624,7 @@ export class World {
     const cell = last === null ? null : cellName(last);
     return cell !== null && this.links.has(cell) ? cell : first;
   }
+  private discovery():Pick<WorldWord,'cells'|'shards'>{return {cells:this.links.size,shards:[...new Set([...this.links.keys()].map(cellShard))]};}
   private seat(slug: string, end: SocketTransport, entry: SeatEntry, hello: ArrayBuffer): void {
     if (!end.isOpen || this.draining) return;
     const { port1, port2 } = new MessageChannel();
@@ -622,7 +637,8 @@ export class World {
       });
       end.onClose(off);end.control('playtest');
     }
-    this.seatSockets.set(entry.device, { end, hello: hello.slice(0) });
+    const admission=++this.admission;
+    this.seatSockets.set(entry.device, { end, hello: hello.slice(0),admission });
     end.onClose(() => {
       if (this.seatSockets.get(entry.device)?.end !== end) return;
       this.seatSockets.delete(entry.device);
@@ -635,7 +651,7 @@ export class World {
     const rebody = this.voice.attach(end, slug, entry.name, entry.body);
     this.voiceBodies.set(entry.device, rebody);
     end.onClose(() => { if (this.voiceBodies.get(entry.device) === rebody) this.voiceBodies.delete(entry.device); });
-    this.link(slug).send({ kind: 'seat', slug, port: port2, hello, ...entry }, [port2, hello]);
+    this.link(slug).send({ kind: 'seat', slug, port: port2, hello, ...entry,admission }, [port2, hello]);
   }
   /** A held body whose player quit on the link that came back for it: the cell takes it as a seat whose link has already left. */
   private leaveHeld(slug: string, entry: SeatEntry, hello: ArrayBuffer): void {
