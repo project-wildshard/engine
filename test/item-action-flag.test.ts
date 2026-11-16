@@ -13,8 +13,8 @@ import { builtProduct } from '../src/test/game/builtProduct';
 // TEMPLATE-E2E TC-E7: an item scene's use can raise a quest flag. Mossgate's chest prompt is an item action (it refills the
 // lantern), so the kit takes it and quests never saw it: the chest paid on walk-up through a region trigger instead. With
 // `setsFlag` on its item action (shard-format 0.8), the use the kit accepts raises that flag for the player who used it,
-// and only for that player, and only at the prompt.
-const PLAYER = 'actor.player', BOT = 'actor.bot', CHEST = 'template.chest.open', FLAG = 'template.chest.opened';
+// and only for that player, and only at the prompt; a use the item turns away (a dead player's) raises nothing.
+const PLAYER = 'actor.player', BOT = 'actor.bot', GHOST = 'actor.ghost', CHEST = 'template.chest.open', FLAG = 'template.chest.opened';
 async function mossgate(): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array> }> {
   const directory = builtProduct('_template'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
@@ -48,5 +48,20 @@ test("a use of Mossgate's chest prompt raises its flag for that player only, and
     put(prompt.at[0], prompt.at[2]); sim.host.step();
     expect(kit.scene(PLAYER, prompt.scene)).toBe(true); sim.host.step();
     expect([has(PLAYER), has(BOT)]).toEqual([true, false]);
+    // the second player's own press raises it in that player's book (not the lead's, which holds it already)
+    const bot = sim.host.players.get(BOT); if (bot === undefined) throw new Error('Missing the second player');
+    expect(kit.scene(BOT, prompt.scene)).toBe(true); sim.host.step();
+    expect(has(BOT)).toBe(true);
+    // a use the item turns away raises nothing: a dead player's press at the chest queues, and the item drops it
+    sim.host.addPlayer(GHOST, { x: prompt.at[0], y: prompt.at[1], z: prompt.at[2] - 1 });
+    const ghost = sim.host.players.get(GHOST); if (ghost === undefined) throw new Error('Missing the third player');
+    sim.host.step(); ghost.health.attributes.health = 0;
+    kit.command(GHOST, { seq: 1, viewTick: 0, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw: 0, pitch: 0, buttons: 0 });
+    expect(kit.scene(GHOST, prompt.scene)).toBe(true); sim.host.step();
+    expect(has(GHOST)).toBe(false);
+    // revived, the dropped use stays dropped: nothing is owed to a later lantern toggle
+    ghost.health.attributes.health = 100;
+    kit.command(GHOST, { seq: 2, viewTick: 0, steer: { keyX: 0, keyY: 0, stickX: 0, stickY: 0 }, yaw: 0, pitch: 0, buttons: 0 }); sim.host.step();
+    expect(has(GHOST)).toBe(false);
   } finally { sim.dispose(); }
 }, 60_000);
