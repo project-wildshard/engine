@@ -258,6 +258,22 @@ export class CharacterMotor {
     return true;
   }
 
+  /** Begin grounded downward moves on a ray-measured float32 skin plane above nearly flat static support.
+   * Tiny height differences otherwise choose different coplanar contacts and change a later wall slide. */
+  private restOnFlatFloor(feet: Vec3): void {
+    if (!this.result.grounded || this.result.groundNormalY < 0.9999) return;
+    this.ray.origin.x = feet.x; this.ray.origin.y = feet.y + GROUND_PROBE_UP; this.ray.origin.z = feet.z;
+    const hit = this.physics.castRayAndGetNormal(this.ray, GROUND_PROBE_UP + GROUND_PROBE_DOWN, true,
+      this.physics.R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, this.collider, undefined,
+      this.phased.size > 0 ? this.notPhased : undefined, this.groundHit);
+    if (hit === null) return;
+    const parent = hit.collider.parent(), flat = hit.normal.y >= 0.9999
+      && ((hit.collider.collisionGroups() >>> 16) & GROUP.WORLD) !== 0 && (parent === null || parent.isFixed());
+    const plane = Math.fround(this.ray.origin.y - hit.timeOfImpact), skin = this.kcc.offset(), y = plane + skin;
+    hit.collider = this.collider; this.groundHit = hit;
+    if (flat && Math.abs(y - feet.y) <= skin) feet.y = y;
+  }
+
   /**
    * The capsule at `feet` is within reach of a kinematic body (SF49 / SF51). Rapier's controller runs a
    * platform pass for such a body after every hit of a move: it resets the move's normal part to the platform's own
@@ -322,6 +338,7 @@ export class CharacterMotor {
   move(feet: Vec3, want: Vec3, ignoreGround = false): MoveResult {
     const r = this.result;
     if (!this.enabled) { feet.x += want.x; feet.y += want.y; feet.z += want.z; r.grounded = false; r.groundNormalY = 1; r.horizontalFreedom = 1; r.groundCollider = null; this.anchorBody = null; return r; }
+    if (!ignoreGround && want.y <= 0) this.restOnFlatFloor(feet);
     const { R } = this.physics, translation = this.translation;
     translation.x = feet.x; translation.y = feet.y + this.lift; translation.z = feet.z;
     this.collider.setTranslation(translation);

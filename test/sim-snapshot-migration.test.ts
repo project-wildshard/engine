@@ -14,6 +14,7 @@ import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 // law, so the digests and end states are where each tape reaches on the one law, re-recorded at P1-E5.3-A2, at A6 for the
 // capsule (J127: only walk-strike's end moved, 1.4 mm) and at A9 for the coyote clock (the jump's digest, no end). A pass
 // means the save still loads on the page's capsule and nothing about the continuation moved since.
+// NL13b2 re-recorded only walk-strike's end/digest for flat-rest support; every saved wire remains untouched.
 const target = SIM_LEVEL.entities[0]?.id ?? '';
 const tapes: Record<string, (tick: number) => SimCommand> = {
   'walk-strike': tick => ({ moveX: Math.sin(tick / 40), moveZ: Math.cos(tick / 55), yaw: tick / 90, ...(tick % 50 === 7 ? { attack: { targetId: target } } : {}) }),
