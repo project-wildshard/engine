@@ -13,7 +13,7 @@ function answerOf(n: number): Record<string, number> {
 }
 const defined = (a: Record<string, number>): Record<string, number> => Object.fromEntries(Object.entries(a).filter(([, value]) => !Number.isNaN(value)));
 
-test('the tie and boundary answers apply as the encounter did', () => {
+test('tie and boundary effect order stays exact through a collision correction', () => {
   for (let n = 0; n < 3000; n++) {
     const answer = defined(answerOf(n)), observed: ArenaTieObservation = { engaged: n % 2 === 0, victory: n % 9 === 0, hit: n % 4 === 1, mounted: n % 3 === 2, storm: n % 5 > 1 };
     const run = (split: boolean): string[] => {
@@ -22,10 +22,17 @@ test('the tie and boundary answers apply as the encounter did', () => {
       const toast = (line: string): void => { log.push(`toast ${line}`); };
       const life = { event: (event: string, frame: Readonly<Record<string, number>> = {}): Readonly<Record<string, number>> => { log.push(`event ${event} ${JSON.stringify(frame)}`); return answer; } };
       const persistence = { kill: (kind: string, variant: string) => { log.push(`kill ${kind} ${variant}`); }, feat: (kind: string) => { log.push(`feat ${kind}`); } };
+      const motor = { move: (feet: typeof player, want: typeof player) => {
+        expect(feet).toBe(player);
+        expect(want).toEqual({ x: (answer['x'] ?? feet.x) - feet.x, y: 0, z: (answer['z'] ?? feet.z) - feet.z });
+        // The identity control accepts the requested target; native collision is tested on terrain and walls separately.
+        feet.x = answer['x'] ?? feet.x; feet.z = answer['z'] ?? feet.z;
+        return { grounded: false, groundNormalY: 1, downhillX: 0, downhillZ: 0, horizontalFreedom: 1, groundCollider: null };
+      } };
       const wall = (): void => { log.push(`wall ${player.x},${player.z}`); }, clear = (): void => { log.push('clear'); };
       if (split) {
         arenaTie(life, observed, tieLines, { boss, fight, toast });
-        arenaBoundary(answer, lines, record, { boss, fight, toast, prompt, player, motor: { move: (feet, want) => { feet.x += want.x; feet.z += want.z; return { grounded: false, groundNormalY: 1, downhillX: 0, downhillZ: 0, horizontalFreedom: 1, groundCollider: null }; } }, wall, clear, get persistence() { log.push('persistence'); return persistence; } });
+        arenaBoundary(answer, lines, record, { boss, fight, toast, prompt, player, motor, wall, clear, get persistence() { log.push('persistence'); return persistence; } });
       } else {
         // ArenaRoomEncounter.tie and the boundary half of update before the split (arenaRoom.ts, before CI12)
         const a = life.event('tie', { engaged: Number(observed.engaged), victory: Number(observed.victory), hit: Number(observed.hit), mounted: Number(observed.mounted), storm: Number(observed.storm) });

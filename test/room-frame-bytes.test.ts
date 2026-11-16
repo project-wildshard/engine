@@ -80,5 +80,7 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
 const EXPECTED = '53c0f3a2b381ad9a28c1bac7627e659664d6af1ef1963eee752e70f7d418f380';
 /** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. Re-taken for SS4 (75a5d6ae):
  *  each seat now has a stealth seat whose state the digest hashes, and an arrow loosed from Hidden hits for x2. Re-taken
- *  for RP6 as above. Re-taken for GC36 and NL13 as above. */
-const EXPECTED_ROOM = 'b891e9d2451520250c7540b96103e86fea17bf710418e784519058e4ea2c829a';
+ *  for RP6 as above. Re-taken for GC36 and NL13 as above. Re-taken for Nalati continuation af0adf3f:
+ *  the King now owns its native contact pose, and adapter state retains it and the view guest clocks/globals.
+ *  The unarmed wire/body oracle above remains unchanged. Previous armed digest: b891e9d2451520250c7540b96103e86fea17bf710418e784519058e4ea2c829a. */
+const EXPECTED_ROOM = 'cd2d9048389c714bfe8c2902ee42a2f6ddd15b627cd34abd96bcd44137d5c248';

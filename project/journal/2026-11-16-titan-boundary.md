@@ -19,3 +19,11 @@ batches. A native slope/wall regression and two related continuation
 files pass all 11 cases. Focused game lint passes. Shared-tree typecheck
 was blocked only by another lane's unfinished main-watch Io change;
 the clean-copy push gate validates the committed tree.
+
+The full clean push gate found two stale tests from af0adf3f and an
+old boundary identity control that assumed exact X/Z assignment. The
+control now asserts the requested motor delta and exact side-effect
+order; the native slope/wall test owns collision results. The statue
+restore helper now prepares chapters before restore, as openWorld does.
+The armed-room digest now includes the King's new native contact pose
+and complete view continuation; its unarmed wire/body oracle is intact.
