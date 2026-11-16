@@ -51,16 +51,21 @@ function span(): RopeChainSpec {
   return { segments, hx: 1.4 / 2 + 0.15, hy: HALF_Y, mass: 14 };
 }
 
-interface Crossing { readonly under: number; readonly corrections: number; readonly endX: number }
+interface Crossing { readonly under: number; readonly corrections: number; readonly endX: number; readonly maxBatch: number }
 /** One crossing, page and server `delay` ticks apart each way; `sink`: metres off the server's feet in one frame mid-span. */
-function cross(delay: number, sprint: boolean, sink: number): Crossing {
+function cross(delay: number, sprint: boolean, sink: number, frameMs = 1000 / 60): Crossing {
   const scenario: MotionScenario = { id: 'rope-deck', start: { x: A.x + 0.6, z: A.z, y: ANCHOR_Y + 0.03, yaw: EAST }, ticks: 0, intent: () => ({}) };
   const page = new PageSide(R, scenario), host = new HostSide(R, scenario), { player } = page, world = new PredictionWorld(page.physics);
   const chains = [new RopeChain(page.physics, span()), new RopeChain(host.host.physics, span())];
   const predictor = new Predictor(predictedPlayer(player, world), PLAYER_CLASS.owner);
   const up: NetCommand[][] = [], down: { seq: number; tick: number; owner: Float64Array }[][] = [];
   for (let at = 0; at < delay; at++) { up.push([]); down.push([]); }
-  let seq = 0, under = 0, sunk = false;
+  let seq = 0, under = 0, sunk = false, nextDelivery = frameMs, maxBatch = 0;
+  const waiting: { seq: number; tick: number; owner: Float64Array }[] = [];
+  const watchFloor = (): void => {
+    const top = deckTop(chains[0] as RopeChain, player.position.x, player.position.z);
+    if (top !== null && player.position.x > A.x + 1 && player.position.x < B.x - 1 && top - player.position.y > UNDER) under++;
+  };
   try {
     for (let tick = 0; tick < 600 && player.position.x < B.x - 0.6; tick++) {
       seq++;
@@ -76,15 +81,21 @@ function cross(delay: number, sprint: boolean, sink: number): Crossing {
         arrived.push({ seq: held.seq, tick: host.host.state.tick, owner });
       }
       down.push(arrived);
-      for (const frame of down.shift() ?? []) {
-        if (sink !== 0 && !sunk && player.position.x > (A.x + B.x) / 2 - 3) { frame.owner[PY] = (frame.owner[PY] ?? 0) - sink; sunk = true; }
-        world.frame(frame.tick, frame.seq);
-        predictor.reconcile(frame.seq, frame.owner);
+      waiting.push(...(down.shift() ?? []));
+      // Fixed simulation stays at 60 Hz; owner messages are delivered only at drawn-frame boundaries.
+      if (tick + 1 >= Math.floor(nextDelivery * 60 / 1000 + 1e-6)) {
+        maxBatch = Math.max(maxBatch, waiting.length);
+        for (const frame of waiting.splice(0)) {
+          if (sink !== 0 && !sunk && player.position.x > (A.x + B.x) / 2 - 3) { frame.owner[PY] = (frame.owner[PY] ?? 0) - sink; sunk = true; }
+          world.frame(frame.tick, frame.seq);
+          predictor.reconcile(frame.seq, frame.owner);
+          watchFloor();
+        }
+        nextDelivery += frameMs;
       }
-      const top = deckTop(chains[0] as RopeChain, player.position.x, player.position.z);
-      if (top !== null && player.position.x > A.x + 1 && player.position.x < B.x - 1 && top - player.position.y > UNDER) under++;
+      watchFloor();
     }
-    return { under, corrections: predictor.corrections, endX: player.position.x };
+    return { under, corrections: predictor.corrections, endX: player.position.x, maxBatch };
   } finally {
     for (const chain of chains) chain.dispose();
     world.dispose(); page.dispose(); host.dispose();
@@ -103,6 +114,16 @@ test('with a chain on both sides a crossing needs no correction, walking or spri
 test('a correction from a server up to 1 m lower replays onto the planks, never under them', () => {
   for (const sink of [0.3, 1]) for (const sprint of [false, true]) for (const delay of [3, 6, 9]) {
     const run = cross(delay, sprint, sink), label = `sink ${sink} delay ${delay} sprint ${sprint}`;
+    expect(run.corrections, label).toBeGreaterThan(0);
+    expect(run.under, label).toBe(0);
+    expect(run.endX, label).toBeGreaterThan(B.x - 1);
+  }
+});
+
+test.each([false, true])('60 ms owner-frame batches stay above the live deck, sprint=%s', sprint => {
+  for (const sink of [.3, 1]) for (const delay of [3, 6, 9]) {
+    const run = cross(delay, sprint, sink, 60), label = `sink ${sink} delay ${delay} sprint ${sprint}`;
+    expect(run.maxBatch, label).toBeGreaterThanOrEqual(3);
     expect(run.corrections, label).toBeGreaterThan(0);
     expect(run.under, label).toBe(0);
     expect(run.endX, label).toBeGreaterThan(B.x - 1);
