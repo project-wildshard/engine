@@ -15,6 +15,7 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { pageMemoryAttributionExpression } from './memory-report-snapshot.mjs';
 import { openRig, WORLD_PORT } from './online-rig.mjs';
+import { gridCrossingTiming } from './grid-crossing-timing.mjs';
 
 const [dist = '', relativeWork = '', keyFile = ''] = process.argv.slice(2).filter(arg => !arg.startsWith('--')), work = relativeWork === '' ? '' : absolute(relativeWork);
 if (dist === '' || work === '' || keyFile === '') throw new Error('usage: grid-crossing-walk-proof.mjs <dist> <work> <key.json> [--engine=chromium|webkit] [--to=sunscar|pine|farreach|nalati] [--out=<dir>]');
@@ -205,6 +206,7 @@ try {
   for (const leg of LEGS) {
     const yaw = leg.sign > 0 ? north : north + Math.PI, start = await sample(), from = start.inside;
     await page.screenshot({ path: join(out, `${engineName}-${leg.name}-before.png`) });
+    const timingFrom = await page.evaluate(() => performance.now());
     /** @type {Record<string, unknown>[]} */
     const events = [];
     let stuckSince = 0, stuckMs = 0, worstStuck = 0, last = start, enteredAt = 0, controlAt = 0, roadAt = 0, jumps = 0;
@@ -248,7 +250,11 @@ try {
     /** @type {Record<string, number>} */
     const stages = {};
     for (const [at, entry] of legSamples.entries()) { const next = legSamples[at + 1]; if (next !== undefined && typeof entry.stage === 'string') stages[entry.stage] = (stages[entry.stage] ?? 0) + next.t - entry.t; }
-    const deltas = frames.map(row => row[1] ?? 0), row = { name: leg.name, borderToReadyMs: border === undefined || ready === undefined ? null : Math.max(0, ready.t - border.t), stages, programLinks, from, target: leg.target, boost: leg.boost, roadAtMs: roadAt, enteredAtMs: enteredAt, controlAtMs: controlAt,
+    const liveTiming = gridCrossingTiming(await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().live), timingFrom);
+    if (controlAt !== 0 && liveTiming.crossings.length === 0) throw new Error('Completed crossing has no retained timing');
+    const deltas = frames.map(row => row[1] ?? 0), row = { name: leg.name, borderToReadyMs: border === undefined || ready === undefined ? null : Math.max(0, ready.t - border.t), stages,
+      stageTelemetry: Object.keys(stages).length === 0 ? 'legacy card stages unavailable; live phases reported separately' : 'legacy card samples', liveTiming,
+      programLinks, from, target: leg.target, boost: leg.boost, roadAtMs: roadAt, enteredAtMs: enteredAt, controlAtMs: controlAt,
       borderToControlMs: enteredAt === 0 || controlAt === 0 ? null : controlAt - enteredAt, worstStopMs: worstStuck, stoppedMs: stuckMs, jumps, frames: deltas.length,
       over50: deltas.filter(ms => ms > 50).length, over100: deltas.filter(ms => ms > 100).length, worstFrameMs: Math.max(0, ...deltas), events, end };
     legs.push(row);

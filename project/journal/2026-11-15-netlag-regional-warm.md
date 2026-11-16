@@ -77,3 +77,10 @@ command. Clear that scratch on travel. Native cases cover a moving
 blocker, replay, a stationary blocker, bounded/held rows and removal.
 Static windmill contacts remain a separate open issue; neither this
 change nor the floor fix claims the complete B2 runtime bar yet.
+
+NL7's crossing script sampled retired cellStage fields, now always
+null, and silently wrote empty stage maps. Keep that absence explicit
+and read the live grid's retained crossing phases and runtime hooks
+on their own performance clock. Missing/reversed telemetry fails;
+a completed leg without a retained transition also fails. Four pure
+reader cases pass. A new crossing replay is still owed.
