@@ -28,7 +28,7 @@ def wait_for(predicate, processes, seconds=10):
         time.sleep(.01)
 
 
-def fixture(parent, name):
+def fixture(parent, name, observer=False):
     root = parent / name
     repo = root / 'repo'
     repo.mkdir(parents=True)
@@ -49,19 +49,40 @@ def fixture(parent, name):
     gate.write_text('''import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 import {setTimeout} from 'node:timers/promises';
-import {capturePushTree,writePushProof} from ''' + json.dumps(cache) + ''';
-const root=process.argv[2],env={...process.env},began=performance.now();
-const before=capturePushTree('full-v1',env);assert.ok(before);
+import {spawn} from 'node:child_process';
+import {capturePushTree,readPushProof,writePushProof} from ''' + json.dumps(cache) + ''';
+const root=process.argv[2],mode=process.argv[3],env={...process.env},began=performance.now();
+const profile=mode==='split'?'split-v1':'full-v1';
+const selection={mode:['docs','related'].includes(mode)?mode:'full',files:['value.json']};
+const before=capturePushTree(profile,env);assert.ok(before);
+let proof;
+if(mode==='reused'){
+ assert.equal(JSON.parse(readFileSync('value.json','utf8')).value,1);
+ const checked=capturePushTree(profile,env);assert.ok(checked);assert.equal(checked.tree,before.tree);assert.equal(checked.runtime,before.runtime);
+ proof=writePushProof(before,selection,(performance.now()-began)/1000);
+}
 writeFileSync(root+'/ready.json',JSON.stringify({pid:process.pid}));
 while(!existsSync(root+'/go'))await setTimeout(5);
+if(mode==='orphan'){
+ const program="const fs=require('node:fs'),root=process.argv[1];fs.writeFileSync(root+'/orphan-ready',String(process.pid));const timer=setInterval(()=>{if(fs.existsSync(root+'/orphan-release')){clearInterval(timer);fs.writeFileSync(root+'/orphan-finished','natural completion');}},10);";
+ const writer=spawn(process.execPath,['-e',program,root],{detached:true,stdio:'ignore'});writer.unref();
+ while(!existsSync(root+'/orphan-ready'))await setTimeout(5);
+ await setTimeout(150);
+}
 assert.equal(JSON.parse(readFileSync('value.json','utf8')).value,1);
 const until=performance.now()+200;while(performance.now()<until){}
-const after=capturePushTree('full-v1',env);assert.ok(after);assert.equal(after.tree,before.tree);assert.equal(after.runtime,before.runtime);
-const proof=writePushProof(before,{mode:'full',files:['value.json']},(performance.now()-began)/1000);
+const after=capturePushTree(profile,env);assert.ok(after);assert.equal(after.tree,before.tree);assert.equal(after.runtime,before.runtime);
+if(mode==='reused'){assert.equal(readPushProof(after,selection)?.run,proof.run);}
+else proof=writePushProof(before,selection,(performance.now()-began)/1000);
 writeFileSync(root+'/producer.json',JSON.stringify({file:before.file,proof}));
+if(mode==='failed')process.exitCode=7;
 ''')
-    wrapper = subprocess.Popen([sys.executable, str(ENGINE / 'scripts/heavy-lane.py'), 'full-test', '--max', '.3',
-                                '--', 'node', str(gate), str(root)], cwd=repo, env=env,
+    launch = [sys.executable, str(ENGINE / 'scripts/heavy-lane.py'), 'full-test', '--max', '.3',
+              '--', 'node', str(gate), str(root), name]
+    if name == 'tail-delay':
+        harness = "import importlib.util,sys,time;from pathlib import Path; p=Path(sys.argv[1]);sys.path.insert(0,str(p.parent));s=importlib.util.spec_from_file_location('tail_fixture',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);old=m.remove_ticket\ndef delayed(*a,**k): time.sleep(.2);return old(*a,**k)\nm.remove_ticket=delayed;sys.argv=sys.argv[1:];sys.exit(m.main())"
+        launch = [sys.executable, '-c', harness, *launch[1:]]
+    wrapper = subprocess.Popen(launch, cwd=repo, env=env,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     recorder = None
     try:
@@ -70,16 +91,43 @@ writeFileSync(root+'/producer.json',JSON.stringify({file:before.file,proof}));
         owner = json.loads(subprocess.check_output([sys.executable, str(ENGINE / 'scripts/cpu-census.py'),
                                                    '--pid', str(ready['pid']), '--owner-only'], env=env, text=True))
         raw = root / 'raw.jsonl'
-        recorder = subprocess.Popen([sys.executable, str(ENGINE / 'scripts/cpu-census.py'), '--pid', str(owner['pid']),
-                                     '--expected-identity', owner['identity'], '--report', str(raw),
-                                     '--interval', '.05', '--seconds', '10', '--drain-seconds', '.3'],
+        if observer:
+            command = [sys.executable, str(ENGINE / 'scripts/vitest-bench.py'), 'observe', '--pid', str(owner['pid']),
+                       '--out', str(root / 'summary.json'), '--interval', '.05', '--seconds', '10',
+                       '--drain-seconds', '.1' if name == 'orphan' else '.5',
+                       '--proof-root', str(repo / '.git/wildshard-push-proofs'), '--command-log', str(root / 'leases/full-test-day.log')]
+        else:
+            command = [sys.executable, str(ENGINE / 'scripts/cpu-census.py'), '--pid', str(owner['pid']),
+                       '--expected-identity', owner['identity'], '--report', str(raw),
+                       '--interval', '.05', '--seconds', '10', '--drain-seconds', '.3']
+        if observer and name == 'missing':
+            command = command[:-2]  # Deliberately omit the command-log input.
+        recorder = subprocess.Popen(command,
                                     cwd=repo, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        wait_for(lambda: raw.exists() and raw.stat().st_size > 0, [wrapper, recorder])
+        wait_for(lambda: any(root.glob('summary.*.jsonl')) if observer else raw.exists() and raw.stat().st_size > 0,
+                 [wrapper, recorder])
         (root / 'go').touch()
         out, err = wrapper.communicate(timeout=15)
-        assert wrapper.returncode == 0, (out, err)
+        assert wrapper.returncode == (7 if name == 'failed' else 0), (out, err)
         out, err = recorder.communicate(timeout=12)
-        assert recorder.returncode == 0, (out, err)
+        expected = 2 if observer and name in ('docs', 'related', 'split', 'reused', 'failed', 'missing', 'orphan') else 0
+        assert recorder.returncode == expected, (name, out, err)
+        if observer:
+            summary = json.loads((root / 'summary.json').read_text())['observations'][0]
+            assert summary['producerQualification']['qualified'] == (expected == 0), summary
+            assert (summary['exactGateCpu'] is not None) == (expected == 0), summary
+            assert summary['gateKind'] == ('full' if expected == 0 else 'unverified')
+            assert summary['qualificationWallSeconds'] >= 0 and summary['qualificationCpuSeconds'] >= 0
+            assert summary['allObservedChildrenDrained'] is (name != 'orphan')
+            assert (ENGINE / summary['rawReport']).exists()
+            if name == 'orphan':
+                assert summary['remaining'] and not (root / 'orphan-finished').exists()
+                (root / 'orphan-release').touch()
+                wait_for(lambda: (root / 'orphan-finished').exists(), [], seconds=5)
+            outcome = {'mode': name, 'qualified': expected == 0, 'exitCode': expected, 'rawRetained': True}
+            if name == 'orphan':
+                outcome['writerFinishedNaturally'] = True
+            return outcome
         producer = json.loads((root / 'producer.json').read_text())
         log = root / 'leases/full-test-day.log'
         result = qualify_files(raw, Path(producer['file']), log)
@@ -95,10 +143,14 @@ writeFileSync(root+'/producer.json',JSON.stringify({file:before.file,proof}));
         return {'root': root, 'raw': raw, 'proofFile': Path(producer['file']), 'proof': producer['proof'],
                 'log': log, 'start': records[0], 'end': records[-1], 'release': release, 'qualified': result}
     finally:
+        if name == 'orphan':
+            (root / 'orphan-release').touch()
         for process in (recorder, wrapper):
             if process is not None and process.poll() is None:
                 process.terminate()
                 process.wait(timeout=5)
+        if name == 'orphan' and (root / 'orphan-ready').exists():
+            wait_for(lambda: (root / 'orphan-finished').exists(), [], seconds=5)
 
 
 def mutations(actual):
@@ -107,7 +159,7 @@ def mutations(actual):
             (('start', 'machine'), 'foreign-machine'),
             (('start', 'expectedRootIdentity'), 'wrong-owner'),
             (('end', 'remaining'), [{'pid': 999999}]),
-            (('end', 'identityReadsIncomplete'), 1),
+            (('end', 'unresolvedIdentityReads'), 1),
             (('proof', 'measurement', 'owner', 'identity'), 'wrong-owner'),
             (('proof', 'measurement', 'owner', 'uid'), -1),
             (('proof', 'measurement', 'lease', 'token'), 'wrong-lease'),
@@ -149,16 +201,26 @@ def mutations(actual):
     same = join_census(actual['start'], censored, actual['proof'], actual['release'])
     assert same['qualified'] and same['cpuSeconds'] == actual['qualified']['cpuSeconds']
     assert same['sampledCounterReadMisses'] == censored['counterReadsIncomplete']
+    censored['identityReadsIncomplete'] += 1
+    censored['incompleteReads'] += 1
+    resolved = join_census(actual['start'], censored, actual['proof'], actual['release'])
+    assert resolved['qualified'] and resolved['cpuSeconds'] == actual['qualified']['cpuSeconds']
+    assert resolved['sampledIdentityReadMisses'] == censored['identityReadsIncomplete']
     return count + 1
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--scratch', required=True, type=Path)
+    parser.add_argument('--case', choices=['join', 'observer'], default='join')
     args = parser.parse_args()
     args.scratch.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='gate-census-proof-', dir=args.scratch) as directory:
         root = Path(directory)
+        if args.case == 'observer':
+            cases = [fixture(root, mode, observer=True) for mode in ('full', 'tail-delay', 'docs', 'related', 'split', 'reused', 'failed', 'missing', 'orphan')]
+            print(json.dumps({'observerCases': cases, 'fixtureOnly': True}))
+            return
         actual = fixture(root, 'actual')
         foreign = fixture(root, 'foreign')
         assert not qualify_files(actual['raw'], foreign['proofFile'], foreign['log'])['qualified']
@@ -169,6 +231,9 @@ def main():
         truncated = actual['root'] / 'truncated.jsonl'
         truncated.write_text(actual['raw'].read_text().rsplit('\n', 2)[0] + '\n')
         assert not qualify_files(truncated, actual['proofFile'], actual['log'])['qualified']
+        deep = actual['root'] / 'deep-proof.json'
+        deep.write_text('[' * 2000 + '0' + ']' * 2000)
+        assert not qualify_files(actual['raw'], deep, actual['log'])['qualified']
         assert actual['raw'].exists() and actual['proofFile'].exists() and actual['log'].exists()
         print(json.dumps({'realProducerJoins': 2, 'metadataRefusals': count, 'foreignOwnerRefused': True,
                           'unsafeAndIncompleteRefused': True, 'evidenceRetained': True,

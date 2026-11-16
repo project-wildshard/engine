@@ -361,6 +361,7 @@ def observe(backend, pid, report, interval, seconds, drain, expected_identity=No
                   'observerCpuNs': time.process_time_ns() - observer_cpu,
                   'samples': samples, 'incompleteReads': incomplete, 'peak': peak,
                   'identityReadsIncomplete': identity_incomplete, 'counterReadsIncomplete': counter_incomplete,
+                  'unresolvedIdentityReads': len(unknown),
                   'observedProcesses': [row.__dict__ for row in known.values()], 'remaining': remaining}
         result['rootMeasured'] = initial.identity in previous
         emit(result)

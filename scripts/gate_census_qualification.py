@@ -40,7 +40,8 @@ def join_census(start, end, proof, release, used=()):
         identity_misses, counter_misses, misses = end['identityReadsIncomplete'], end['counterReadsIncomplete'], end['incompleteReads']
         need(all(type(value) is int and value >= 0 for value in (identity_misses, counter_misses, misses))
              and misses == identity_misses + counter_misses, 'incomplete census read classification')
-        need(identity_misses == 0, 'census owner identities were incomplete')
+        need(type(end['unresolvedIdentityReads']) is int and end['unresolvedIdentityReads'] == 0,
+             'census owner identities remain unresolved')
         root = start['root']
         need(pid(root['pid']) and root['identity'] == start['expectedRootIdentity'], 'selected kernel owner changed')
         need(type(root['uid']) is int and root['uid'] >= 0 and root['zombie'] is False, 'invalid census owner')
@@ -102,6 +103,7 @@ def join_census(start, end, proof, release, used=()):
                 'machine': machine, 'userSeconds': user, 'systemSeconds': system,
                 'cpuSeconds': user + system, 'commandWallSeconds': usage['wallSeconds'],
                 'scope': usage['scope'], 'sampledCounterReadMisses': counter_misses,
+                'sampledIdentityReadMisses': identity_misses,
                 'sampling': 'Observed CPU/parallelism remain sampled lower bounds; censored counters never supply command CPU.'}
     except (KeyError, TypeError, ValueError, OverflowError) as error:
         return {'qualified': False, 'reason': str(error) or type(error).__name__}
@@ -138,8 +140,10 @@ def qualify_files(raw_report, proof_source, command_log, used=()):
             info = source.lstat()
             need(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid() and not info.st_mode & 0o022,
                  'proof directory is not privately owned')
-            paths = list(source.glob('*.json'))
-            need(len(paths) <= 4096, 'proof directory exceeds its entry budget')
+            paths = []
+            for path in source.glob('*.json'):
+                paths.append(path)
+                need(len(paths) <= 4096, 'proof directory exceeds its entry budget')
         else:
             paths = [source]
         candidates, byte_count = [], 0
@@ -163,9 +167,12 @@ def qualify_files(raw_report, proof_source, command_log, used=()):
             row = json.loads(line)
             if row.get('event') == 'release' and row.get('token') == lease['token']:
                 releases.append(row)
+        if not releases:
+            return {'qualified': False, 'pending': True, 'reason': 'owned command release has not been published',
+                    'evidence': {**evidence, 'proofFile': str(path)}}
         need(len(releases) == 1, 'missing or ambiguous lease release')
         result = join_census(start, end, proof, releases[0], used)
         result['evidence'] = {**evidence, 'proofFile': str(path)}
         return result
-    except (OSError, KeyError, TypeError, ValueError, OverflowError, AttributeError) as error:
+    except (OSError, KeyError, TypeError, ValueError, OverflowError, AttributeError, RecursionError) as error:
         return {'qualified': False, 'reason': str(error) or type(error).__name__, 'evidence': evidence}

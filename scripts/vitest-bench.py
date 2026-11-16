@@ -11,6 +11,7 @@ macOS and Linux includes every reaped descendant), the largest single-process ma
     python3 scripts/vitest-bench.py pack [--in ...] [--workers 4,5,6,10]
     python3 scripts/vitest-bench.py observe --out tmp/YOUR-LANE/census.json [--pid PID | --count 3]
     (passive identity-aware census; sampled CPU lower bounds, not exact full-gate totals)
+    Add --proof-root RECEIPT_OR_DIRECTORY --command-log FULL_TEST_DAY_LOG to request a strict producer join.
 
 `run` resumes: files already in the results JSON at the same commit are skipped. The bench is the machine's
 lowest-priority caller. It starts a file only while no full-test lease is held or queued, nobody else waits for
@@ -775,6 +776,7 @@ def census_summary(report, status):
         raise SystemExit(f'incomplete census; raw observation retained at {report}')
     kinds = collections.Counter(kind_of(process['name']) for process in end['observedProcesses'])
     return {'root': start['root'], 'startedAtMs': start['startedAtMs'],
+            'machine': start.get('machine'), 'platform': start['platform'], 'endedAtMs': end.get('endedAtMs'),
             'gateKind': 'unverified', 'rawReport': os.path.relpath(report, ROOT),
             'observationWallSeconds': end['seconds'], 'sampledCpuSecondsLowerBound': cpu,
             'averageObservedCpuCoresLowerBound': cpu / end['seconds'] if end['seconds'] else None,
@@ -783,6 +785,9 @@ def census_summary(report, status):
             'peakProcesses': end['peak']['processes'], 'processes': len(end['observedProcesses']),
             'processesByKind': dict(kinds), 'sampledCpuSecondsByKindLowerBound': dict(cpu_by_kind),
             'remaining': end['remaining'], 'reason': end['reason'], 'incompleteReads': end['incompleteReads'],
+            'identityReadsIncomplete': end.get('identityReadsIncomplete'),
+            'counterReadsIncomplete': end.get('counterReadsIncomplete'),
+            'unresolvedIdentityReads': end.get('unresolvedIdentityReads'),
             'allObservedChildrenDrained': status == 0 and end['rootMeasured'] and not end['remaining']
                                           and end['reason'] == 'observed tree drained',
             'samples': samples, 'observerCpuSeconds': end['observerCpuNs'] / 1e9,
@@ -791,6 +796,38 @@ def census_summary(report, status):
             'qualification': 'Not an exact full-gate total: attach full/split provenance and reaped-tree '
                              'user/system rusage separately. A sampled empty tree does not prove '
                              'that every short-lived descendant was observed.'}
+
+
+def qualify_observation(args, report, used):
+    """Read-only producer tail settling, bounded by the existing drain budget; never signal an owner."""
+    if args.proof_root is None or args.command_log is None:
+        return {'qualified': False, 'reason': 'qualification requires both --proof-root and --command-log'}
+    name = '_gate_census_qualification'
+    if name not in sys.modules:
+        try:
+            spec = importlib.util.spec_from_file_location(name, ROOT / 'scripts/gate_census_qualification.py')
+            module = importlib.util.module_from_spec(spec)
+            exec(compile(spec.loader.get_source(name), str(spec.origin), 'exec'), module.__dict__)
+            sys.modules[name] = module
+        except (OSError, ValueError, ImportError, AttributeError, TypeError, SyntaxError) as error:
+            return {'qualified': False, 'reason': f'qualifier unavailable: {error}'}
+    qualify = sys.modules[name].qualify_files
+    until = time.monotonic() + args.drain_seconds
+    result = qualify(report, args.proof_root, args.command_log, used)
+    while result.get('pending') and time.monotonic() < until:
+        try:
+            size = args.command_log.stat().st_size
+        except OSError:
+            break
+        while time.monotonic() < until:
+            time.sleep(min(.05, max(0, until - time.monotonic())))
+            try:
+                if args.command_log.stat().st_size != size:
+                    break
+            except OSError:
+                break
+        result = qualify(report, args.proof_root, args.command_log, used)
+    return result
 
 
 def command_observe(args):
@@ -803,6 +840,17 @@ def command_observe(args):
     else:
         data = {'schema': schema, 'observations': []}
     args.out.parent.mkdir(parents=True, exist_ok=True)
+    used = set()
+    for observation in data['observations']:
+        if not isinstance(observation, dict):
+            raise SystemExit('incompatible census observation; retain it and use a new --out')
+        qualification = observation.get('producerQualification', {})
+        if not isinstance(qualification, dict):
+            raise SystemExit('incompatible census producer history; retain it and use a new --out')
+        if qualification.get('qualified') is True:
+            if not all(isinstance(qualification.get(key), str) and qualification[key] for key in ('proofKey', 'commandKey')):
+                raise SystemExit('qualified census history is missing producer keys; retain it and use a new --out')
+            used.update(qualification[key] for key in ('proofKey', 'commandKey'))
     for _ in range(args.count):
         owner = observe_root(args)
         root = owner.pid
@@ -821,13 +869,34 @@ def command_observe(args):
             raise SystemExit(result.stderr.strip() or 'census refused before observation')
         row = census_summary(report, result.returncode)
         row['selectedRootIdentity'] = owner.identity
+        requested = args.proof_root is not None or args.command_log is not None
+        if requested:
+            qualification_began, qualification_cpu = time.monotonic(), time.process_time()
+            qualification = qualify_observation(args, report, used)
+            row['qualificationWallSeconds'] = time.monotonic() - qualification_began
+            row['qualificationCpuSeconds'] = time.process_time() - qualification_cpu
+            row['producerQualification'] = qualification
+            if qualification['qualified']:
+                row['gateKind'] = 'full'
+                row['exactGateCpu'] = {key: qualification[key] for key in
+                                       ('userSeconds', 'systemSeconds', 'cpuSeconds', 'commandWallSeconds', 'scope')}
+                row['qualification'] = 'Qualified owned-command rusage; observed CPU/parallelism stay sampled lower bounds.'
+                used.update(qualification[key] for key in ('proofKey', 'commandKey'))
+            else:
+                row['qualification'] = f"Unqualified: {qualification['reason']}; raw evidence retained."
         data['observations'].append(row)
         save(args.out, data)
-        print(json.dumps({'root': root, 'sampledCpuSecondsLowerBound': row['sampledCpuSecondsLowerBound'],
-                          'allObservedChildrenDrained': row['allObservedChildrenDrained'],
-                          'reason': row['reason']}), flush=True)
+        message = {'root': root, 'sampledCpuSecondsLowerBound': row['sampledCpuSecondsLowerBound'],
+                   'allObservedChildrenDrained': row['allObservedChildrenDrained'], 'reason': row['reason']}
+        if requested:
+            message.update(qualifiedCommandCpu=row['producerQualification']['qualified'],
+                           commandCpuSeconds=row['exactGateCpu']['cpuSeconds'] if row['exactGateCpu'] else None,
+                           qualification=row['qualification'])
+        print(json.dumps(message), flush=True)
         if result.returncode != 0:
             raise SystemExit(result.returncode)
+        if requested and not row['producerQualification']['qualified']:
+            raise SystemExit(2)
 
 
 def main():
@@ -865,6 +934,8 @@ def main():
     observe.add_argument('--drain-seconds', type=float, default=10)
     observe.add_argument('--interval', type=float, default=0.5)
     observe.add_argument('--count', type=int, default=1)
+    observe.add_argument('--proof-root', type=Path, help='one producer receipt or bounded receipt directory; optional strict qualification')
+    observe.add_argument('--command-log', type=Path, help='matching full-test-day.log; required with --proof-root')
     args = parser.parse_args()
     if args.command == 'observe':
         if not .05 <= args.interval <= 10 or not 0 <= args.wait_seconds <= 120 or not 1 <= args.seconds <= 3600 or not 0 <= args.drain_seconds <= 30 or args.count < 1:
