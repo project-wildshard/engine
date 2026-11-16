@@ -1,0 +1,96 @@
+# TEST-COVERAGE row 46, XR-7 to XR-9 (meta docs/plans/test-coverage/END-TO-END.md): a phone without a phone. Mobile Safari
+# in an iOS Simulator (hosted macOS) and Chrome in an Android emulator (hosted Linux, KVM) each go title to play on
+# staging.wildshard.io, walk on a real touch, then meet in one Driftwood room and draw each other. A proof against the live
+# staging page (J186, J205): it reports, never gates, and holds no secret, so it runs on a schedule and never on a fork.
+# Changing the proof or this file re-runs it on that push, any branch.
+name: phones
+on:
+  schedule:
+    - cron: '41 8 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/staging-phones-proof.mjs
+      - .github/workflows/phones.yml
+permissions:
+  contents: read
+concurrency:
+  group: phones-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  WS_LANE_NAME: phones
+jobs:
+  safari:
+    if: github.repository == 'project-wildshard/engine'
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - name: Install the Web Inspector proxy and idb
+        run: |
+          brew install ios-webkit-debug-proxy facebook/fb/idb-companion
+          pipx install fb-idb
+          idb --help > /dev/null
+      - name: Boot an iPhone Simulator
+        run: |
+          udid=$(xcrun simctl list devices available -j | node -e '
+            const rows = Object.entries(JSON.parse(require("fs").readFileSync(0, "utf8")).devices)
+              .filter(([runtime]) => runtime.includes("SimRuntime.iOS"))
+              .flatMap(([runtime, list]) => list.map(each => ({ ...each, version: runtime.split("iOS-")[1].split("-").map(Number) })))
+              .filter(each => /^iPhone \d+ Pro$/u.test(each.name))
+              .sort((a, b) => b.version[0] - a.version[0] || (b.version[1] ?? 0) - (a.version[1] ?? 0) || b.name.localeCompare(a.name));
+            if (rows.length === 0) process.exit(1);
+            console.error(`${rows[0].name} iOS ${rows[0].version.join(".")}`); console.log(rows[0].udid);')
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b > /dev/null
+          echo "SIM_UDID=$udid" >> "$GITHUB_ENV"
+      - name: XR-7, and XR-9 with the Android emulator
+        run: node scripts/staging-phones-proof.mjs --device=safari --tag="$(printf '%s%s' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" | tail -c 9)" --out=tmp/staging-phones
+      - name: Keep the report and screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phones-safari
+          path: tmp/staging-phones/**
+          if-no-files-found: warn
+          retention-days: 14
+  android:
+    if: github.repository == 'project-wildshard/engine'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - name: Give the emulator KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Boot an Android emulator with Chrome
+        run: |
+          bin="$ANDROID_HOME/cmdline-tools/latest/bin" adb="$ANDROID_HOME/platform-tools/adb"
+          image=$("$bin/sdkmanager" --list 2>/dev/null | grep -oE 'system-images;android-[0-9.]+;google_apis;x86_64' | sort -uV | tail -1)
+          echo "image $image"
+          yes | "$bin/sdkmanager" --install emulator platform-tools "$image" > /dev/null
+          echo no | "$bin/avdmanager" create avd -n xr8 -k "$image" -d pixel_7 --force
+          mkdir -p tmp/staging-phones
+          nohup "$ANDROID_HOME/emulator/emulator" -avd xr8 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -memory 4096 -cores 3 > tmp/staging-phones/emulator.log 2>&1 &
+          timeout 120 "$adb" wait-for-device
+          timeout 420 bash -c "until [ \"\$('$adb' shell getprop sys.boot_completed | tr -d '\r')\" = 1 ]; do sleep 3; done"
+          "$adb" shell dumpsys package com.android.chrome | grep -m1 versionName
+          echo "ANDROID_SERIAL=emulator-5554" >> "$GITHUB_ENV"
+      - name: XR-8, and XR-9 with the iOS Simulator
+        run: node scripts/staging-phones-proof.mjs --device=android --tag="$(printf '%s%s' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" | tail -c 9)" --out=tmp/staging-phones
+      - name: Keep the report and screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phones-android
+          path: tmp/staging-phones/**
+          if-no-files-found: warn
+          retention-days: 14
