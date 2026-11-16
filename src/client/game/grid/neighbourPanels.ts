@@ -86,6 +86,7 @@ export class NeighbourPanels {
     for (const row of source.movers) {
       const panel = panels.get(row.id); if (panel === undefined) continue;
       const view = { pose: moverPanelPose(panel, row) };
+      panel.visible = row.enabled; // drawn at rest until the wire poses it (review SHOULD)
       wirePage.movers.set(row.id, view);
       this.ports.scope.onDispose(() => { if (wirePage.movers.get(row.id) === view) wirePage.movers.delete(row.id); });
     }

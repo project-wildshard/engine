@@ -27,3 +27,9 @@ look is the props panel with its id: `NeighbourPanels.admit` registers a `wirePa
 `moverPanelPose` sets the panel to pose x rest^-1 x its baked transform, so a hinge turns about the mover's origin
 (`src/client/game/grid/neighbour-mover-panel.test.ts`). Open: the browser proof on a cell whose shard carries one
 (Mossgate's lift, TC-M4b), and the page-side collider for prediction.
+
+Review (claude -p, before the land): MUST, a revived body lost its capsule. A data cell runs no body bands, so a dead
+body keeps its motor and nothing makes a new one; revive disposed it. It now stands the kept capsule at the spawn
+(`AnimalMotor.resetAt`, which `CharacterMotor` has). SHOULD, a mover panel was hidden until its first pose: it is drawn
+at rest. Left open: mover views are keyed by mover id, so two cells declaring the same id share one view; a product's
+published places are not filtered by `respawn: false` (only map POIs are).

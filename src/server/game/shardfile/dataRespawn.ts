@@ -24,8 +24,9 @@ export function installDataRespawns(host: SimHost, rows: readonly RespawnRow[]):
     const body = host.entities.get(row.id); if (body === undefined) return;
     body.place(row.at[0], row.at[2], row.yaw, row.at[1]);
     body.revive();
-    // A dead body has no motor (syncBodies drops it); if one is left, drop it so the next sync makes one at the spawn.
-    if (body.motor !== null) { body.motor.dispose(); body.motor = null; }
+    // A data cell keeps a dead body's motor (no body bands drop it): stand its capsule at the spawn, no sweep. Under body
+    // bands a dead body has none, and the next sync makes one where it now stands.
+    body.motor?.resetAt?.(body.position);
   };
   host.onStep(DATA_RESPAWN_STEP, (dt) => {
     for (const [id, left] of waits) {

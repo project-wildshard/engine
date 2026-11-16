@@ -17,6 +17,8 @@ export interface AnimalSimSpec {
 export interface AnimalMotor {
   move: (feet: Vector3, want: { x: number; y: number; z: number }, ignoreGround: boolean) => void;
   dispose: () => void;
+  /** Stand the capsule at `feet` without a sweep (a revived body back at its spawn, TEMPLATE-E2E TC-E2). */
+  resetAt?: (feet: Vector3) => void;
 }
 /** Trusted collision-pose owner. It reads only the last published joints, never advances a body or pose.
  * The installer snapshots/restores its publication history through the host adapter alongside this actor. */

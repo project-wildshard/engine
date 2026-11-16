@@ -40,6 +40,7 @@ test('a spawn with respawn stands again at its spawn, whole, after its seconds; 
     steps(sim.host, 4);
     expect(back.alive).toBe(true); expect(back.hp).toBe(back.maxHp);
     expect([back.position.x, back.position.z, back.yaw]).toEqual([4, 6, 0.5]);
+    expect(back.motor).not.toBeNull(); // still solid: a revived body keeps its capsule (review MUST)
     expect(gone.alive).toBe(false);
     steps(sim.host, 60 * 10);
     expect(gone.alive).toBe(false);
