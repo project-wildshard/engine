@@ -398,26 +398,62 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     log(`cook ${head.slug} ${head.hash.slice(0, 12)}: ${row.state}${row.seconds === undefined ? '' : ` in ${row.seconds.toFixed(1)} s`}${row.preparation === undefined ? '' : `, ${row.preparation === 'stale' ? stalePreparationLine(head.slug) : `${row.preparation} preparation`}`}${row.detail === undefined ? '' : `: ${row.detail}`}`);
     return row;
   };
-  let queue: Promise<unknown> = Promise.resolve();
-  const inLine = <T>(work: () => Promise<T>): Promise<T> => { const next = queue.then(work, work); queue = next.catch(() => undefined); return next; };
+  // One cook at a time (a cook takes every core it is given, and J29's clock is the deploy's), in two lines: an upload no build
+  // has indexed goes before a known head this build has yet to recook (opus-ss16g: a release's 33 recooks held a new upload
+  // for 2 h). A hash already waiting is never queued twice; asked again as new, it moves up.
+  interface Job {readonly head: {readonly slug: string; readonly hash: string}; fresh: boolean; readonly done: Promise<CookRow>; readonly settle: (row: CookRow) => void}
+  const waiting: Job[] = [], pending = new Map<string, Job>();
+  let running = false;
+  const drain = async (): Promise<void> => {
+    if (running) return;
+    running = true;
+    try {
+      for (;;) {
+        const at = waiting.findIndex(job => job.fresh), job = waiting.splice(Math.max(at, 0), 1)[0];
+        if (job === undefined) break;
+        const row = await cook(job.head);
+        if (row.state === 'failed') failures.set(job.head.hash, {count: (failures.get(job.head.hash)?.count ?? 0) + 1, at: clock()});
+        else failures.delete(job.head.hash);
+        pending.delete(job.head.hash);
+        job.settle(row);
+      }
+    } finally { running = false; }
+  };
+  const schedule = (head: {readonly slug: string; readonly hash: string}, fresh: boolean): Promise<CookRow> => {
+    const known = pending.get(head.hash);
+    if (known !== undefined) { known.fresh ||= fresh; return known.done; }
+    let settle: (row: CookRow) => void = () => undefined;
+    const done = new Promise<CookRow>(resolve => { settle = resolve; }), job: Job = {head, fresh, done, settle};
+    pending.set(head.hash, job); waiting.push(job);
+    if (fresh && running && waiting.length > 1) log(`cook ${head.slug} ${head.hash.slice(0, 12)}: a new upload, ahead of ${waiting.length - 1} waiting`);
+    // A microtask later, so a batch queued together (a recook, a sweep) is ordered before its first cook starts.
+    queueMicrotask(() => { void drain(); });
+    return done;
+  };
+  /** The hashes some build has indexed (`index/<build>/<hash>.json`): a hash in none is a new upload. A store that can't list
+   *  makes every hash new, which is the old first-come order. */
+  const indexed = async (): Promise<ReadonlySet<string>> => {
+    try { return new Set((await store.list('index/')).flatMap(row => /\/([a-f0-9]{64})\.json$/u.exec(row.key)?.[1] ?? [])); } catch { return new Set(); }
+  };
+  const headsOf = async (stages: readonly CookStage[]): Promise<{readonly slug: string; readonly hash: string}[]> => {
+    const seen = new Map<string, {readonly slug: string; readonly hash: string}>();
+    for (const stage of stages) for (const row of await source.heads(stage)) seen.set(row.hash, {slug: row.slug, hash: row.hash});
+    return [...seen.values()];
+  };
   const started = clock();
   return {
-    cook: head => inLine(() => cook(head)),
+    cook: head => schedule(head, true),
     recook: async stages => {
-      const seen = new Map<string, {readonly slug: string; readonly hash: string}>();
-      for (const stage of stages) for (const row of await source.heads(stage)) seen.set(row.hash, {slug: row.slug, hash: row.hash});
-      const rows: CookRow[] = [];
-      // One at a time: a cook takes every core it is given, and J29's clock is the deploy's.
-      for (const head of seen.values()) rows.push(await inLine(() => cook(head)));
+      const heads = await headsOf(stages), cooked = await indexed();
+      const rows = await Promise.all(heads.map(head => schedule(head, !cooked.has(head.hash))));
       log(`recook ${build}: ${rows.length} heads in ${((clock() - started) / 1000).toFixed(1)} s`);
       return rows;
     },
-    enqueue: notice => { void inLine(() => cook({slug: notice.shard, hash: notice.hash})); },
-    idle: async () => { await queue; },
+    enqueue: notice => { void schedule({slug: notice.shard, hash: notice.hash}, true); },
+    idle: async () => { while (pending.size > 0) await Promise.all([...pending.values()].map(job => job.done)); },
     rows: () => [...verdicts.values()],
     sweep: async stages => {
-      const seen = new Map<string, {readonly slug: string; readonly hash: string}>();
-      for (const stage of stages) for (const row of await source.heads(stage)) seen.set(row.hash, {slug: row.slug, hash: row.hash});
+      const heads = await headsOf(stages);
       const due = (hash: string): boolean => {
         const known = verdicts.get(hash);
         if (known === undefined) return true;
@@ -425,15 +461,13 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
         const failed = failures.get(hash);
         return failed === undefined || clock() - failed.at >= Math.min(FAILED_RETRY_MS * 2 ** (failed.count - 1), FAILED_RETRY_MAX_MS);
       };
-      const fresh = [...seen.values()].filter(head => due(head.hash)), rows: CookRow[] = [];
-      if (fresh.length > 0) log(`poll ${build}: ${fresh.length} upload(s) to cook: ${fresh.map(head => `${head.slug} ${head.hash.slice(0, 12)}`).join(', ')}`);
-      for (const head of fresh) {
-        const row = await inLine(() => cook(head));
-        if (row.state === 'failed') failures.set(head.hash, {count: (failures.get(head.hash)?.count ?? 0) + 1, at: clock()});
-        else failures.delete(head.hash);
-        rows.push(row);
-      }
-      return rows;
+      const owed = heads.filter(head => !pending.has(head.hash) && due(head.hash));
+      if (owed.length === 0) return [];
+      const cooked = await indexed(), fresh = owed.filter(head => !cooked.has(head.hash));
+      log(`poll ${build}: ${owed.length} head(s) to cook, ${fresh.length} new: ${owed.map(head => `${head.slug} ${head.hash.slice(0, 12)}`).join(', ')}`);
+      // A known head cooks in the background, so a poll that finds a release's recooks never waits hours for its next look.
+      for (const head of owed) if (cooked.has(head.hash)) void schedule(head, false);
+      return Promise.all(fresh.map(head => schedule(head, true)));
     },
   };
 }
@@ -449,6 +483,16 @@ export interface PollOptions {
   readonly log?: (line: string) => void;
   /** The wait between sweeps; a test's stands in for the clock. It rejects when `signal` aborts. */
   readonly wait?: (ms: number, signal: AbortSignal) => Promise<void>;
+}
+
+/** opus-ss16g: `serve`'s start. The poll starts at once, beside the boot recook (J30: what a missed notice left behind), so a
+ *  restart never holds a new upload behind the recook of every known head. A catalogue that can't be read is the poll's to retry. */
+export function bootCook(worker: Pick<CookWorker, 'recook' | 'sweep'>, options: PollOptions = {}): {readonly poll: ReturnType<typeof pollCatalogue>; readonly recooked: Promise<void>} {
+  const log = options.log ?? ((): void => undefined);
+  const recooked = (async (): Promise<void> => {
+    try { await worker.recook(options.stages ?? ['live', 'preview', 'staging']); } catch (error) { log(`boot list failed: ${String(error)}`); }
+  })();
+  return {poll: pollCatalogue(worker, options), recooked};
 }
 
 /** SP6 (J175): the cook's outbound poll. Sweeps the catalogue, waits POLL_EVERY_MS, and again; n catalogue errors in a row

@@ -1,7 +1,11 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in folders of its own.
+import {mkdtempSync, rmSync} from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in folders of its own.
+import {tmpdir} from 'node:os';
+// oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in folders of its own.
 import {join} from 'node:path';
-import {describe, expect, it} from 'vitest';
-import {createCookWorker, pollCatalogue, POLL_EVERY_MS, type CatalogueRow, type CookStage, type ShardfileSource} from '../src/cook/game/cookWorker';
+import {afterAll, describe, expect, it} from 'vitest';
+import {bootCook, createCookWorker, indexKey, pollCatalogue, POLL_EVERY_MS, type CatalogueRow, type CookStage, type ShardfileSource} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
 import {hashOf, slug, useCookHarness} from './fixtures/cookWorkerHarness';
 
@@ -65,5 +69,60 @@ describe('pollCatalogue', () => {
     expect(waits).toEqual([1, 2, 4, 4, 4, 4, 1, 1].map(times => times * POLL_EVERY_MS));
     expect(sweeps[0]).toEqual(['live', 'preview', 'staging']);
     expect(lines.filter(line => line.includes('Catalogue answered 502'))).toHaveLength(5);
+  });
+});
+
+/** opus-ss16g, 2026-11-16: `serve` awaited the boot recook of all 33 heads (about 2 h) before its first poll, so after every
+ * release's cook restart a new upload waited 2 h. The poll now starts with the recook, and an upload no build has indexed
+ * cooks ahead of the known heads the recook still has to do. A download that fails at once stands in for a cook; the order
+ * of the downloads is the order of the cooks. */
+describe('a new upload cooks ahead of the boot recook', () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'cook-poll-first-'));
+  afterAll(() => { rmSync(scratch, {recursive: true, force: true}); });
+  const hash = (letter: string): string => letter.repeat(64), KNOWN = ['b', 'c', 'd'].map(hash), FRESH = hash('e');
+  const launcher = {root: scratch, execPath: process.execPath, loader: '', script: '', wrap: [], limits: {seconds: 1, memoryMB: 64, heapMB: 64}};
+  async function setup(name: string): Promise<{cook: ReturnType<typeof createCookWorker>; heads: CatalogueRow[]; order: string[]; hold: () => () => void}> {
+    const store = folderStore(join(scratch, name));
+    // Last release's build indexed every known head; this build has none, so each is a recook.
+    for (const known of KNOWN) await store.put(indexKey('last', known), new TextEncoder().encode('{}'), {type: 'application/json', cache: ''});
+    const heads: CatalogueRow[] = KNOWN.map((known, row) => ({slug: `shard-${row}`, hash: known})), order: string[] = [];
+    let gate: Promise<void> | null = null;
+    const source: ShardfileSource = {
+      heads: () => Promise.resolve([...heads]),
+      download: async wanted => { order.push(wanted[0] ?? ''); const held = gate; gate = null; if (held !== null) await held; throw new Error('past its test'); },
+    };
+    const cook = createCookWorker({build: 'next', store, source, launcher, serverPacks: join(scratch, name, 'server'), scratch: join(scratch, name, 'work')});
+    return {cook, heads, order, hold: () => { let open = (): void => undefined; gate = new Promise(resolve => { open = resolve; }); return open; }};
+  }
+
+  it('a recook takes the upload no build has indexed first', async () => {
+    const {cook, heads, order} = await setup('recook');
+    heads.push({slug: 'new-shard', hash: FRESH});
+    await cook.recook(['staging']);
+    expect(order.join('')).toBe('ebcd');
+  });
+
+  it('a sweep during a recook cooks a new upload next, and answers once that one is done', async () => {
+    const {cook, heads, order, hold} = await setup('sweep');
+    const open = hold(), recook = cook.recook(['staging']);
+    await expect.poll(() => order.length).toBe(1); // the recook is inside its first known head
+    heads.push({slug: 'new-shard', hash: FRESH});
+    const swept = cook.sweep(['staging']);
+    open();
+    expect((await swept).map(row => row.hash)).toEqual([FRESH]);
+    expect(order.join('').startsWith('be'), order.join('')).toBe(true);
+    await recook;
+    expect(order.join('')).toBe('becd');
+  });
+
+  it('serve polls at once, with the boot recook still running', async () => {
+    const sweeps: (readonly CookStage[])[] = [], waits: number[] = [];
+    let poll: ReturnType<typeof bootCook>['poll'] | undefined;
+    const booted = bootCook({recook: () => new Promise(() => undefined), sweep: stages => { sweeps.push(stages); poll?.stop(); return Promise.resolve([]); }},
+      {wait: ms => { waits.push(ms); return Promise.resolve(); }});
+    poll = booted.poll;
+    poll.stop();
+    await booted.poll.done;
+    expect(sweeps).toEqual([['live', 'preview', 'staging']]);
   });
 });

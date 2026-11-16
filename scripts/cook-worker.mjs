@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const { apiSource, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, PACK_BUDGET_BYTES, pollCatalogue, POLL_EVERY_MS, storeUsage } = await import('../src/cook/game/cookWorker.ts');
+const { apiSource, bootCook, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, PACK_BUDGET_BYTES, POLL_EVERY_MS, storeUsage } = await import('../src/cook/game/cookWorker.ts');
 const { MAX_SHARDFILE_BYTES } = await import('../src/cook/game/cookJob.ts');
 const { addStoredShards } = await import('./app-build/catalogue.ts');
 const { refreshServiceWorker } = await import('./app-build/serviceWorker.ts');
@@ -54,13 +54,12 @@ const [command, ...rest] = process.argv.slice(2);
 if (command === 'serve') {
   const cook = worker(), port = Number(env.COOK_PORT ?? 8792), host = env.COOK_HOST ?? '127.0.0.1';
   notifyServer(cook, need('COOK_NOTIFY_TOKEN')).listen(port, host, () => { console.log(`cook worker on ${host}:${port}`); });
-  // J30: what a missed notice left behind. A catalogue that can't be read is the poll's to retry.
-  try { await cook.recook(['live', 'preview', 'staging']); } catch (error) { console.error(`boot list failed: ${String(error)}`); }
-  // SP6 (J175): the API sends this box no notice, so the cook reads the catalogue on a clock, outbound.
+  // SP6 (J175): the API sends this box no notice, so the cook reads the catalogue on a clock, outbound. opus-ss16g: from the
+  // start, beside the boot recook (J30), and a new upload cooks ahead of the known heads that recook still owes.
   const seconds = Number(env.COOK_POLL_SECONDS ?? POLL_EVERY_MS / 1000);
   const everyMs = Math.min(60, Math.max(30, Number.isFinite(seconds) ? seconds : POLL_EVERY_MS / 1000)) * 1000;
   console.log(`cook worker polls the catalogue every ${everyMs / 1000} s`);
-  pollCatalogue(cook, { everyMs, log: line => { console.log(line); } });
+  bootCook(cook, { everyMs, log: line => { console.log(line); } });
 } else if (command === 'recook') {
   const cook = worker(), rows = await cook.recook(['live']), preview = await cook.recook(['preview', 'staging']);
   console.log(JSON.stringify([...rows, ...preview]));
