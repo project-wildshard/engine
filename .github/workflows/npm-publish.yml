@@ -60,6 +60,8 @@ jobs:
           const targets = [];
           const walk = (value) => typeof value === "string" ? targets.push(value) : Object.values(value ?? {}).forEach(walk);
           walk(pkg.exports); walk(pkg.bin);
+          // Native author imports follow src/tsconfig.json into this compiler input.
+          targets.push("./kit/tsconfig.json");
           const missing = [...new Set(targets)].filter((target) => !target.includes("*")).map((target) => target.replace(/^\.\//, "")).filter((target) => !files.has(target));
           if (missing.length > 0) throw new Error(`not in the tarball: ${missing.join(", ")}`);
           console.log(`${pkg.name}@${pkg.version}: ${files.size} files, ${packed.size} bytes packed, every bin and export inside`);
