@@ -430,6 +430,7 @@
     "src/client/engine/telemetry/screenOutbox.ts": "client",
     "src/client/engine/telemetry/staleBuildReport.ts": "client",
     "src/client/engine/telemetry/crossroads.ts": "client",
+    "src/client/engine/telemetry/failureEpisodes.ts": "client",
     "src/client/engine/telemetry/health.ts": "client",
     "src/client/engine/telemetry/model.ts": "client",
     "src/client/engine/telemetry/runtime.ts": "client",

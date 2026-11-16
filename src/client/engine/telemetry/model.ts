@@ -16,7 +16,10 @@ export interface AnalyticsMap {
   'level.time': { level: string; seconds: number };
   'boss.attempt': { level: string; boss: string; outcome: 'started' | 'won' | 'died' | 'lost' | 'left' };
   'download.parts': { id: string; level: string; outcome: 'complete' | 'failed' | 'cancelled'; packs: 'on' | 'off'; parts: number; failed: number; fallback: number; fetched: number };
+  'failure.screen': { id: string; level: string; screen: string; durationMs: number; clear: FailureClear };
 }
+/** An observed reason a visible failure episode ended; unknown duration is never reported as zero. */
+export type FailureClear = 'recovered' | 'dismissed' | 'replaced' | 'hidden' | 'pagehide' | 'disposed';
 export type AnalyticsEvent = { [K in keyof AnalyticsMap]: { name: K; data: AnalyticsMap[K] } }[keyof AnalyticsMap];
 export interface AnalyticsBatch { kind: 'analytics'; build: string; install: string; events: AnalyticsEvent[] }
 export class AnalyticsSink {
