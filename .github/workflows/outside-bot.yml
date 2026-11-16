@@ -11,6 +11,9 @@ on:
       - test/fixtures/dedicated/outsideJourney.ts
       - test/fixtures/dedicated/outsideBotEntry.ts
       - test/outside-journey.proof.mjs
+      - test/fixtures/dedicated/roomBench.ts
+      - test/fixtures/dedicated/roomBot.ts
+      - vite/rapier.ts
 permissions:
   contents: read
 concurrency:
@@ -31,6 +34,8 @@ jobs:
         with:
           pins-cache-scope: full
       - run: node scripts/pins.ts install
+      - name: Prepare the installed physics asset without a cook
+        run: node --input-type=module -e 'import {copyRapierWasm} from "./vite/rapier.ts"; copyRapierWasm();'
       # J186: separate actual proof observations; a green job alone is not evidence.
       # Review no earlier than November 23 after an actual green week.
       - name: Observe real gateway walk, fight, reconnect and missing-witness refusal

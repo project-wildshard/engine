@@ -57,6 +57,7 @@ await test('ordinary inputs walk, damage, drop, resume the same real body and re
 });
 
 await test('real damage without a delivered hit confirmation cannot complete and still releases', {timeout: 5000}, async () => {
+  assert.ok(room, 'real gateway fixture must have opened');
   let suppressed = 0;
   const healthBefore = new Map([...room.host.entities].map(([id, row]) => [id, row.hp]));
   const connect = () => {
@@ -79,6 +80,7 @@ await test('real damage without a delivered hit confirmation cannot complete and
 });
 
 await test('cancelling an admitted player releases its actual body and local client', {timeout: 5000}, async () => {
+  assert.ok(bench, 'real gateway fixture must have opened');
   const abort = new AbortController();
   const connect = () => {
     const bot = new RoomBot(bench.url, 'bench', 'device:tc45-abort'); bots.push(bot);

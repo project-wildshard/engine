@@ -63,3 +63,24 @@ ports open; Linux also bounds the whole proof command10s and kills an
 unresponsive child5s later. The independent live step still runs after
 an ordinary proof failure. No timeout or skipped case is green. Local
 4cases pass4.49s, focused lint and actionlint pass.
+
+Bounded hosted43930406973 exposes the actual fixture failure: missing
+public/assets/physics/rapier.wasm. Its4case XML is1pass/3fail; no
+proof admission. Call the existing copyRapierWasm helper after pins,
+preparing the installed binary without a cook. Dependent cases assert
+fixture admission before starting async work, preventing a secondary
+unhandled rejection when setup fails. Shared fixture/helper changes
+now trigger the workflow too.
+
+The independent hosted live receipt at4b80d2b0 IS complete:true/exit0/
+left:true on public rooms-staging: walk1.056m, owned12damage70to58HP,
+same player/handle/cell resumed with advancing tick, signed release
+f8ff9bd9/serial94. This observes the signed release claim, not server
+build identity. Fresh candidate proof and normalCI remain owed.
+
+J206 correction review has no MUST/3SHOULD: the10s command cap is
+deliberate under J186, and a slow or incomplete observation cannot
+qualify; raw spec remains diagnostic when XML cannot finish. Root cause
+is now observed, not hypothesized. Failed raw logs are retained in meta
+docs/plans/test-coverage/evidence/tc45-outside-bot/, including run/attempt
+from43927709988 and current43930406973. No expiry-only evidence claim.
