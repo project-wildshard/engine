@@ -7,3 +7,6 @@
 - Fix: `grid/dataCellTalks.ts` installs the copy's talks into its prompts while the feet are in the cell (beside the data kit),
   reading the cell's owned lines and pressing answers on its wire; `talkStandIns` draws figure-less talkers in the cell's
   render root at tile admission. Test: `grid/data-cell-talks.test.ts`.
+
+- TC-M1 test (`test/template-strikes-hurt.test.ts`): the pinned Template cell, player beside a grey blob, the Greyback
+  and a mossling; each strike lowers health within 20 s; a control with every body down keeps full health.
