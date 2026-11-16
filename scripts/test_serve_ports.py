@@ -449,6 +449,7 @@ class SharedReleaseTests(unittest.TestCase):
         self.registry = Path(self.temp.name)
         self.out = self.registry / 'out'; self.out.mkdir()
         self.port = '24001'; self.sha = 'a' * 40
+        self.foreign_pid = os.getpid() + 1
         self.row = f'{os.getpid()} 9999999999 {self.out} lane-a fixture\n'
         (self.registry / self.port).write_text(self.row)
         (self.registry / '.shared').mkdir()
@@ -471,7 +472,7 @@ class SharedReleaseTests(unittest.TestCase):
 
     def test_stop_is_bound_to_the_row_bash_observed_even_for_the_same_lane(self):
         self.shared()
-        with patch.dict(os.environ, {'SERVE_STOP_OBSERVED_PID': '12345', 'SERVE_STOP_OBSERVED_OUT': str(self.out)}), patch.object(self.module.subprocess, 'run') as child:
+        with patch.dict(os.environ, {'SERVE_STOP_OBSERVED_PID': str(self.foreign_pid), 'SERVE_STOP_OBSERVED_OUT': str(self.out)}), patch.object(self.module.subprocess, 'run') as child:
             self.assertEqual(self.module.release(self.registry, self.port, 'lane-a', False, ['unused']), 0)
             child.assert_not_called()
         self.assertEqual((self.registry / self.port).read_text(), self.row)
@@ -479,7 +480,7 @@ class SharedReleaseTests(unittest.TestCase):
 
     def test_reaper_preserves_replaced_rows_and_active_build_leases(self):
         with patch.object(self.module.subprocess, 'run') as child:
-            self.assertEqual(self.module.reap_entry(self.registry, self.port, '12345', str(self.out), ['unused']), 0)
+            self.assertEqual(self.module.reap_entry(self.registry, self.port, str(self.foreign_pid), str(self.out), ['unused']), 0)
             with (self.registry / ('.port-' + self.port + '.lock')).open('a+') as lease:
                 self.module.fcntl.flock(lease, self.module.fcntl.LOCK_EX)
                 self.assertEqual(self.module.reap_entry(self.registry, self.port, str(os.getpid()), str(self.out), ['unused']), 0)
@@ -544,7 +545,7 @@ class SharedReleaseTests(unittest.TestCase):
     def test_missing_output_ignores_old_shared_records_for_the_same_port(self):
         stale = self.registry / '.shared' / ('b' * 40 + '.json')
         old = dict(status='ready', port=int(self.port), owners=['foreign-lane'],
-            owner='foreign-lane', pid=12345, out=str(self.registry / 'old-output'))
+            owner='foreign-lane', pid=self.foreign_pid, out=str(self.registry / 'old-output'))
         self.module.write(stale, old)
         self.shared()
         (self.out / '.shared-preview').unlink()
@@ -561,7 +562,7 @@ class SharedReleaseTests(unittest.TestCase):
         self.shared()
         (self.out / '.shared-preview').unlink()
         state = self.module.read(self.path)
-        state['pid'] = 12345
+        state['pid'] = self.foreign_pid
         self.module.write(self.path, state)
         with patch.object(self.module.subprocess, 'run') as child:
             with self.assertRaisesRegex(ValueError, 'No matching shared preview identity'):
@@ -572,7 +573,7 @@ class SharedReleaseTests(unittest.TestCase):
 
     def test_owned_ordinary_preview_releases_a_reused_shared_port(self):
         state = dict(status='ready', port=int(self.port), owners=['foreign-lane'],
-            owner='foreign-lane', pid=12345, out=str(self.registry / 'old-output'))
+            owner='foreign-lane', pid=self.foreign_pid, out=str(self.registry / 'old-output'))
         self.module.write(self.path, state)
         observed = {'SERVE_STOP_OBSERVED_PID': str(os.getpid()), 'SERVE_STOP_OBSERVED_OUT': str(self.out)}
         with patch.dict(os.environ, observed), patch.object(self.module.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)) as child:
@@ -582,7 +583,7 @@ class SharedReleaseTests(unittest.TestCase):
 
     def test_reused_port_does_not_allow_a_foreign_ordinary_owner(self):
         state = dict(status='ready', port=int(self.port), owners=['old-lane'],
-            owner='old-lane', pid=12345, out=str(self.registry / 'old-output'))
+            owner='old-lane', pid=self.foreign_pid, out=str(self.registry / 'old-output'))
         self.module.write(self.path, state)
         observed = {'SERVE_STOP_OBSERVED_PID': str(os.getpid()), 'SERVE_STOP_OBSERVED_OUT': str(self.out)}
         with patch.dict(os.environ, observed), patch.object(self.module.subprocess, 'run') as child:
@@ -632,7 +633,7 @@ class SharedReleaseTests(unittest.TestCase):
         with patch.object(self.module.subprocess, 'run') as child:
             with self.assertRaisesRegex(ValueError, 'Caller lane-b.*borrowers=lane-a'):
                 self.module.release(self.registry, self.port, 'lane-b', False, ['unused'])
-            (self.registry / self.port).write_text(self.row.replace(str(os.getpid()), '12345', 1))
+            (self.registry / self.port).write_text(self.row.replace(str(os.getpid()), str(self.foreign_pid), 1))
             with self.assertRaisesRegex(ValueError, 'replaced shared preview'):
                 self.module.release(self.registry, self.port, 'lane-a', False, ['unused'])
             child.assert_not_called()
