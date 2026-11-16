@@ -31,6 +31,10 @@ jobs:
       - uses: ./.github/actions/ring-setup
       - name: Install the Web Inspector proxy and idb
         run: |
+          # idb-companion has no bottle here and builds only with a full Xcode 26: select the newest one the image carries.
+          xcode=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          echo "xcode $xcode"
+          sudo xcode-select -s "$xcode"
           brew install ios-webkit-debug-proxy facebook/fb/idb-companion
           pipx install fb-idb
           idb --help > /dev/null
