@@ -54,3 +54,12 @@ control also checks actual server HP loss.
 Final immutable J206 review at c142c63d is CLEAR with no MUST or SHOULD
 remaining. Optional wording is tightened; live hosted report and exact
 normal CI remain owed before any row credit.
+
+Hosted43927709988 did not reach staging: preparation between registered
+tests hung after the routing case, outside per-test timeout, until the
+10minute job cap. Preserve this failed observation. Preparation now runs
+inside the8second journey test, with real product admission before worker
+ports open; Linux also bounds the whole proof command10s and kills an
+unresponsive child5s later. The independent live step still runs after
+an ordinary proof failure. No timeout or skipped case is green. Local
+4cases pass4.49s, focused lint and actionlint pass.

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {spawnSync} from 'node:child_process';
-import {roomBench} from './fixtures/dedicated/roomBench.ts';
+import {roomBench, serverInput} from './fixtures/dedicated/roomBench.ts';
 import {RoomBot} from './fixtures/dedicated/roomBot.ts';
 import {outsideJourney} from './fixtures/dedicated/outsideJourney.ts';
 
@@ -15,7 +15,10 @@ async function until(ready, ms = 1000) {
   while (!ready()) {if (performance.now() > end) throw new Error('fixture deadline'); await sleep(5);}
 }
 async function prepare() {
-  bench = await roomBench({workers: 1, holdMs: 30000});
+  // Admit the real pinned product before creating worker ports. A bad product
+  // must reject here rather than leave an unfinished World.open behind.
+  const input = await serverInput('driftwood-isle');
+  bench = await roomBench({workers: 1, holdMs: 30000, load: () => Promise.resolve(input)});
   const warm = new RoomBot(bench.url, 'bench', 'device:tc45-warm'); bots.push(warm);
   assert.equal(await warm.arrived(4000), true);
   room = bench.room('driftwood-isle'); assert.ok(room);
@@ -37,9 +40,8 @@ await test('outside mode refuses replica, private routing and extra clients befo
     assert.notEqual(child.status, 0); assert.match(child.stderr, /outside-proof/u);
   }
 });
-await prepare();
-
 await test('ordinary inputs walk, damage, drop, resume the same real body and release its seat', {timeout: 8000}, async () => {
+  await prepare();
   const connect = () => {const bot = new RoomBot(bench.url, 'bench', 'device:tc45-positive'); bots.push(bot); return bot;};
   const report = await outsideJourney(connect, 5000);
   assert.equal(report.complete, true); assert.equal(report.left, true);
