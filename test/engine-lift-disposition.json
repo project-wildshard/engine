@@ -13073,5 +13073,96 @@
         "revision": "c66fb786d17cc9aab832d194f8d9cf3fdb70a13c"
       }
     ]
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/mounted-specimen-admission.test.ts",
+    "outcome": "migrated",
+    "target": "test/nalati-mounted-specimen-admission.test.ts",
+    "decision": "CI21 verified full original destination in its blocking suite. No cases retired.",
+    "originalTests": [
+      "the actual mounted figure keeps every clip and rejects invalid seats before native construction"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "ea8312c7f4a81fe1f94ec60e3c8808e15cae4f06",
+    "destinationRevision": "6a35c57f9c0c7d4003e4041ac38689eb3335ed5b",
+    "retirementProof": "Exact Nalati CI43902426556 all three jobs green, after POI exact43893082387 green. Complete original cases in default40files95cases; strict compiler/type-lint and pinned source/fixture/helper retention pass. No source-only candidate used for this removal.",
+    "assertionDestinations": [
+      {
+        "sourcePath": "test/mounted-specimen-admission.test.ts",
+        "sourceBlob": "ea8312c7f4a81fe1f94ec60e3c8808e15cae4f06",
+        "targetPath": "test/nalati-mounted-specimen-admission.test.ts",
+        "targetBlob": "ea1ac0784298f893a72e08587de80ee66505df19",
+        "originalTests": [
+          "the actual mounted figure keeps every clip and rejects invalid seats before native construction"
+        ],
+        "fixturePath": "test/fixtures/nalati-poi-paint-original.json",
+        "fixtureBlob": "b7d2b9828941c94af4353f06502b04402160887f",
+        "changes": "Whole original cases and every assertion retained. Public package imports only; helpers and original immutable inputs unchanged. Real compiler/lint and default owner suite admission required before source removal.",
+        "compilerSupport": [
+          "test/nalati-weapon-grammar.test.ts",
+          "test/fixtures/nalati-weapon-observation.ts"
+        ],
+        "additionalFixtures": [
+          {
+            "targetPath": "test/nalati-weapon-grammar.test.ts",
+            "targetBlob": "2a156e95036492dbfe777216dd519c71a5a7d84b"
+          },
+          {
+            "targetPath": "test/fixtures/nalati-weapon-observation.ts",
+            "targetBlob": "0928e9ce0042954fa9381e924d1419e99c04e64e"
+          }
+        ],
+        "repository": "project-wildshard/shard-nalati",
+        "revision": "6a35c57f9c0c7d4003e4041ac38689eb3335ed5b"
+      }
+    ]
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-poi-scenes.test.ts",
+    "outcome": "migrated",
+    "target": "test/nalati-poi-scenes.test.ts",
+    "decision": "CI21 verified full original destination in its blocking suite. No cases retired.",
+    "originalTests": [
+      "owned places.json metadata retains every original POI scene wire byte",
+      "owned native runtime metadata retains every original POI scene wire byte",
+      "scene nodes preserve actor omissions, slot order and detached material/child arrays",
+      "the POI scene source is one config-safe author chunk"
+    ],
+    "sourceRevision": "ed510f99ccd8dcd4d2dc45bd8cc5b63935d61827",
+    "sourceBlob": "076231c8462c331b4d1bd11c0aaa464bdc660005",
+    "destinationRevision": "6a35c57f9c0c7d4003e4041ac38689eb3335ed5b",
+    "retirementProof": "Exact Nalati CI43902426556 all three jobs green, after POI exact43893082387 green. Complete original cases in default40files95cases; strict compiler/type-lint and pinned source/fixture/helper retention pass. No source-only candidate used for this removal.",
+    "assertionDestinations": [
+      {
+        "sourcePath": "test/nalati-poi-scenes.test.ts",
+        "sourceBlob": "076231c8462c331b4d1bd11c0aaa464bdc660005",
+        "targetPath": "test/nalati-poi-scenes.test.ts",
+        "targetBlob": "936f6a75bbbc75448c85c3e8b233b2239371e101",
+        "originalTests": [
+          "owned places.json metadata retains every original POI scene wire byte",
+          "owned native runtime metadata retains every original POI scene wire byte",
+          "scene nodes preserve actor omissions, slot order and detached material/child arrays",
+          "the POI scene source is one config-safe author chunk"
+        ],
+        "fixturePath": "test/fixtures/nalati-poi-scenes.json",
+        "fixtureBlob": "bef28f5274b891faff7884e4cc69b9480e55c03a",
+        "changes": "Complete original assertions and both metadata inputs retained; two loop registrations expanded to direct test calls through the unchanged assertion body. Owner source imports and physical bundle entry rewritten only. Real source compiler/lint admission. Equivalent property-access spelling changed for typed lint; no assertion or oracle changed. Root verifies actual engine main source and fixture Git blobs after reviewer Git access refusal.",
+        "sourceRepository": "project-wildshard/engine",
+        "sourceRevision": "ed510f99ccd8dcd4d2dc45bd8cc5b63935d61827",
+        "fixtureSourceRepository": "project-wildshard/engine",
+        "fixtureSourceRevision": "ed510f99ccd8dcd4d2dc45bd8cc5b63935d61827",
+        "preparationHelper": {
+          "targetPath": "test/fixtures/nalati-runtime.ts",
+          "targetBlob": "979aab8989aa495a9e944d5e91f4fc2043c4da09"
+        },
+        "compilerSupport": [
+          "test/fixtures/nalati-runtime.ts"
+        ],
+        "repository": "project-wildshard/shard-nalati",
+        "revision": "6a35c57f9c0c7d4003e4041ac38689eb3335ed5b"
+      }
+    ]
   }
 ]

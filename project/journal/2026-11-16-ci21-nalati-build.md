@@ -29,3 +29,19 @@ shared inflater from the page byte entry, avoid duplicate zlib input
 copy, remove dead length check, prove input-block checkpoints with a
 full incompressible offset fixture, and name inflateDeflatedBytes.
 The fetch stream keeps its reader cancellation path. No gate bypass.
+
+Final C3 audit pairs the other two already verified default ports: mounted
+figure admission (one original case) and POI scenes (four original cases).
+Nalati6a35c57f9c exact43902426556 is green in all three jobs. Actual source
+and destination Git blobs match the retained case ledger. Remove only
+those originals and their compiler/lint exclusions; pending94to92 on this
+branch. The sixteen source-only candidates remain pending until C11.
+
+J384: stopped own old-head land waiter after main moved, rebased cleanly
+after retaining both independently appended exports, then refreshed frozen
+dependencies and pins. Qualify the resulting SHA freshly; no carried push.
+
+Final pair J206 review has no MUST/SHOULD; root recomputed the policy hash
+and checked exact landed destination blobs before deletion. Remove the
+two remaining inert scripts compiler excludes as the review notes. Full
+engine compiler, game lint and side checks pass after the rebase.
