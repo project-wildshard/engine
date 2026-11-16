@@ -1,0 +1,44 @@
+# TC40: explicit report-only Ring 2. Repeated real cold cooks and publisher
+# SIGKILL/recovery exceed J186's ten seconds; never a hook or push gate.
+name: packs-contract
+on:
+  push:
+    branches: ['plan/**']
+    paths:
+      - scripts/packs-contract.mjs
+      - test/fixtures/packs-worker/**
+      - .github/workflows/packs-contract.yml
+  workflow_dispatch:
+  schedule:
+    - cron: '29 8 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: packs-contract-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - run: node scripts/pins.ts install --ring 1
+      - name: Real pack reads, cold publication and interruption recovery
+        run: node scripts/packs-contract.mjs tmp/packs-contract
+      - name: Keep actual criteria and incomplete failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: packs-contract
+          path: |
+            tmp/packs-contract/receipt.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove owned stores and raw output
+        if: always()
+        run: node -e "require('node:fs').rmSync('tmp/packs-contract', {recursive:true,force:true})"

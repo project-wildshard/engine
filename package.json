@@ -122,6 +122,7 @@
     "@wildshard/wire-released": "github:project-wildshard/shard-format#669d1fca695a110e6a8cb059b43a0a5caee60226&path:/packages/wire",
     "assemblyscript": "0.28.20",
     "happy-dom": "20.14.5",
+    "miniflare": "5.20261110.1-beta",
     "npm-bin-deps": "2.1.0",
     "oxlint": "1.89.0",
     "playwright": "1.65.0",
