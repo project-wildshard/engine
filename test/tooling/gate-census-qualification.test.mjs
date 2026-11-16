@@ -9,4 +9,6 @@ test('TS12e1 joins real owners and refuses stale, partial, foreign or incomplete
  const report=JSON.parse(execFileSync('python3',['scripts/gate-census-proof.py','--scratch',resolve(process.env.VITEST_TMP_ROOT??'tmp/vitest')],{env,encoding:'utf8',timeout:30000}));
  expect(report).toMatchObject({realProducerJoins:2,metadataRefusals:25,foreignOwnerRefused:true,unsafeAndIncompleteRefused:true,evidenceRetained:true,sampledCounterCensoringSeparate:true});
  expect(report.commandCpuSeconds).toBeGreaterThan(0);
+ expect(report.unreapedRoot).toMatchObject({drainedOnlyAfterReap:true,rootCpuMeasured:true,observerNeverSignalledOwner:true});
+ expect(report.unreapedRoot.actualZombieSamples).toBeGreaterThanOrEqual(3);
 },30000);

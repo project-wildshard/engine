@@ -128,6 +128,7 @@ def main():
     parser.add_argument('--wrapper', required=True, type=Path)
     parser.add_argument('--scratch', required=True, type=Path)
     args = parser.parse_args()
+    args.scratch = args.scratch.resolve()
     args.scratch.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='command-proof-', dir=args.scratch) as temporary:
         rows = [run_case(args.wrapper.resolve(), Path(temporary), mode)

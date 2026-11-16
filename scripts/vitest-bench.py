@@ -749,6 +749,7 @@ def select_owner(args, census, backend):
             if root not in before:
                 if time.monotonic() >= until:
                     raise SystemExit('no matching gate before discovery deadline; give --pid or retry later')
+                time.sleep(min(args.interval, max(0, until - time.monotonic())))
                 continue  # A newly born candidate needs its own before/after identity snapshots.
             after = backend.processes()[0]
             first = census.owned_process(backend, root, before)
@@ -884,7 +885,9 @@ def command_observe(args):
                 row['gateKind'] = 'full'
                 row['exactGateCpu'] = {key: qualification[key] for key in
                                        ('userSeconds', 'systemSeconds', 'cpuSeconds', 'commandWallSeconds', 'scope')}
-                row['qualification'] = 'Qualified owned-command rusage; observed CPU/parallelism stay sampled lower bounds.'
+                row['qualification'] = ('Qualified owned-command rusage, including descendants reaped by that command. '
+                                        'Pre-attach or short-lived reparented children may escape counters and orphan detection; '
+                                        'observed CPU/parallelism stay sampled lower bounds.')
                 used.update(qualification[key] for key in ('proofKey', 'commandKey'))
             else:
                 row['qualification'] = f"Unqualified: {qualification['reason']}; raw evidence retained."

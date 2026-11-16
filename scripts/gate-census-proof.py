@@ -1,19 +1,96 @@
 #!/usr/bin/env python3
 """Actual Git/lease/producer/recorder fixtures, never an engine full-suite census."""
 import argparse
+import contextlib
 import copy
+from dataclasses import replace
+import importlib.util
+import io
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 sys.dont_write_bytecode = True
 from gate_census_qualification import join_census, qualify_files
 
 ENGINE = Path(__file__).resolve().parent.parent
+
+
+def unreaped_root(parent):
+    """Keep a real zombie across samples, exposing Linux's readable state on Darwin too."""
+    root = parent / 'unreaped-root'
+    root.mkdir()
+    go = root / 'go'
+    actor = subprocess.Popen([sys.executable, '-c',
+        'import pathlib,sys,time;p=pathlib.Path(sys.argv[1])\nwhile not p.exists(): time.sleep(.005)', str(go)])
+    spec = importlib.util.spec_from_file_location('_census_reap_control', ENGINE / 'scripts/cpu-census.py')
+    census = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = census
+    spec.loader.exec_module(census)
+    native = census.process_backend()
+    selected = census.owned_process(native, actor.pid)
+    zombies, errors, reaped = [], [], []
+    sampled = threading.Event()
+
+    class LinuxShape:
+        def __getattr__(self, name):
+            return getattr(native, name)
+
+        def processes(self):
+            inventory, present = native.processes()
+            if actor.pid in present:
+                state = subprocess.run(['ps', '-o', 'stat=', '-p', str(actor.pid)],
+                                       capture_output=True, text=True, timeout=1).stdout.strip()
+                if state.startswith('Z'):
+                    # Linux already returns this record. Darwin cannot read a
+                    # zombie's BSD info; retain only our known, unreaped child.
+                    current = inventory.get(actor.pid)
+                    assert current is None or current.identity == selected.identity
+                    inventory[actor.pid] = replace(selected, zombie=True)
+                    zombies.append(time.monotonic())
+                    if len(zombies) >= 3:
+                        sampled.set()
+            return inventory, present
+
+        def usage(self, process):
+            value = native.usage(process)
+            if process.identity == selected.identity:
+                go.touch()  # Root first has a real CPU baseline, then exits.
+            return value
+
+    def reap():
+        if not sampled.wait(timeout=2):
+            errors.append('census ended before three actual zombie samples')
+        reaped.append(time.time_ns() / 1e6)
+        if actor.wait(timeout=2) != 0:
+            errors.append('observer changed the owned command exit')
+
+    reaper = threading.Thread(target=reap)
+    reaper.start()
+    report = root / 'raw.jsonl'
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = census.observe(LinuxShape(), actor.pid, report, .01, 3, .1, selected.identity)
+        reaper.join(timeout=3)
+        assert not reaper.is_alive() and not errors, errors
+        rows = [json.loads(line) for line in report.read_text().splitlines()]
+        end = rows[-1]
+        assert code == 0 and end['reason'] == 'observed tree drained', end
+        assert len(zombies) >= 3 and end['endedAtMs'] >= reaped[0], end
+        assert end['remaining'] == [] and end['rootMeasured'] is True, end
+        return {'actualZombieSamples': len(zombies), 'drainedOnlyAfterReap': True,
+                'rootCpuMeasured': True, 'observerNeverSignalledOwner': True}
+    finally:
+        go.touch()
+        reaper.join(timeout=3)
+        if actor.poll() is None:
+            actor.terminate()
+        actor.wait(timeout=2)
 
 
 def wait_for(predicate, processes, seconds=10):
@@ -214,6 +291,7 @@ def main():
     parser.add_argument('--scratch', required=True, type=Path)
     parser.add_argument('--case', choices=['join', 'observer'], default='join')
     args = parser.parse_args()
+    args.scratch = args.scratch.resolve()
     args.scratch.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='gate-census-proof-', dir=args.scratch) as directory:
         root = Path(directory)
@@ -236,6 +314,7 @@ def main():
         assert not qualify_files(actual['raw'], deep, actual['log'])['qualified']
         assert actual['raw'].exists() and actual['proofFile'].exists() and actual['log'].exists()
         print(json.dumps({'realProducerJoins': 2, 'metadataRefusals': count, 'foreignOwnerRefused': True,
+                          'unreapedRoot': unreaped_root(root),
                           'unsafeAndIncompleteRefused': True, 'evidenceRetained': True,
                           'sampledCounterCensoringSeparate': True,
                           'commandCpuSeconds': actual['qualified']['cpuSeconds'],

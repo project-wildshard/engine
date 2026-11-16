@@ -339,7 +339,10 @@ def observe(backend, pid, report, interval, seconds, drain, expected_identity=No
                   'readSeconds': time.monotonic() - now, 'metrics': metrics, 'processes': rows, 'errors': errors})
             samples += 1
             root_unknown = any(row.identity == initial.identity for row in unknown)
-            root_live = root_unknown or (pid in inventory and inventory[pid].identity == initial.identity and not inventory[pid].zombie)
+            # A zombie still belongs to its waiting parent. Linux can read it,
+            # while Darwin reports an unreadable identity until the same reap.
+            # Neither state proves the owned command has been reaped yet.
+            root_live = root_unknown or (pid in inventory and inventory[pid].identity == initial.identity)
             if not root_live and root_ended is None:
                 root_ended = now
             remaining = [inventory[current].__dict__ for current in live]
