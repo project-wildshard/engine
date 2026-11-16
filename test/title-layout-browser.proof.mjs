@@ -74,7 +74,9 @@ test('the title keeps a big hero, a short build label clear of the logo, and the
           // the short commit and the engine version, never the 40-character id, and clear of the logo
           // WL19c: a build that knows its git describe is named by it alone; else the version and the short commit
           const label = release.describe === '' ? `v${release.version} · ${BUILD.slice(0, 7)}` : release.describe;
-          assert.match(layout.pillText, new RegExp(`^${label.replaceAll('.', '\\.')}( · reload)?$`, 'u'), where);
+          // STAGING-BUGBASH SB15: a phone-width pill (700 px or less) shows the describe compact, `v0.1.28+96`; the box keeps it whole
+          const pillLabel = width <= 700 ? label.replace(/^(v\d+\.\d+\.\d+)-(\d+)-g[0-9a-f]+(?:-dirty)?$/u, '$1+$2') : label;
+          assert.match(layout.pillText, new RegExp(`^${pillLabel.replace(/[.+]/gu, '\\$&')}( · reload)?$`, 'u'), where);
           assert.equal(layout.boxBuild, label.toUpperCase(), where);
           assert.notEqual(layout.pill, null, where);
           if (layout.pill !== null) assert.equal(overlaps(layout.pill, layout.logo), false, `${where}: the pill runs onto the logo`);
