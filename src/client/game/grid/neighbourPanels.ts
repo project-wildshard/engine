@@ -82,13 +82,18 @@ export class NeighbourPanels {
     });
     const cellPanels: CellPanels = { instance: cell.instance, source, bindings };
     this.cells.set(cell.instance, cellPanels);
-    // TEMPLATE-E2E TC-E5b: a mover's look is the props panel with its id; the wire's pose for it moves that panel
+    // TEMPLATE-E2E TC-E5b: a mover's look is the props panel with its id; the wire's pose for it moves that panel. A data cell
+    // the page walks in has its own view for that id (its collider, `dataCellMovers.ts`), which poses this look too.
     for (const row of source.movers) {
       const panel = panels.get(row.id); if (panel === undefined) continue;
       const view = { pose: moverPanelPose(panel, row) };
       panel.visible = row.enabled; // drawn at rest until the wire poses it (review SHOULD)
-      wirePage.movers.set(row.id, view);
-      this.ports.scope.onDispose(() => { if (wirePage.movers.get(row.id) === view) wirePage.movers.delete(row.id); });
+      wirePage.moverLooks.set(row.id, view);
+      if (!wirePage.movers.has(row.id)) wirePage.movers.set(row.id, view);
+      this.ports.scope.onDispose(() => {
+        if (wirePage.moverLooks.get(row.id) === view) wirePage.moverLooks.delete(row.id);
+        if (wirePage.movers.get(row.id) === view) wirePage.movers.delete(row.id);
+      });
     }
     this.sync(cellPanels);
   }

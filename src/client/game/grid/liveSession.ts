@@ -67,6 +67,7 @@ import { RoadRecovery, onRoad, type RoadPoint, type RoadRecoveryCell } from '../
 import { GridCellWaitingError } from './refusal';
 import { withCopyLayout } from './copyLayout';
 import { dataCellWorld, type RegionShell } from './regionShell';
+import { installDataCellMovers } from './dataCellMovers';
 import type { PanelRegion } from './neighbourPanels';
 import { wirePage } from '../shardfile/wirePage';
 import type { CollisionStrip } from '../../../shared/game/grid/collisionStrips';
@@ -718,6 +719,7 @@ export class LiveGridSession {
         // Admission proves real, clear, dry ground first. A 5mm backstop avoids coplanar ghost contacts.
         installEntrySockets(shell.physics, shell.scope, [{ x: 0, z: 0 }], 'backstop');
         installGridBorders(shell.physics, shell.scope);
+        installDataCellMovers(copySource, shell); // TC-E5b: its lift and doors stand on this page, posed off the wire
         const transfer = regionTransferWalls(shell, this.page.traveller.motor.opts.radius), start = shell.level.player;
         shell.physics.step();
         transfer.sync(); this.transferWalls.set(cell.instance, transfer);

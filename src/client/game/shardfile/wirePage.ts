@@ -58,6 +58,8 @@ export class WirePage {
   stop: () => void = () => undefined;
   /** Mover views by id: rows pose them, and no script runs them here. */
   readonly movers: Map<string, MoverView> = new Map<string, MoverView>();
+  /** TEMPLATE-E2E TC-E5b: a mover's drawn look by id (a grid cell's props panel), which a data cell's collider view poses too. */
+  readonly moverLooks: Map<string, MoverView> = new Map<string, MoverView>();
   /** Whether the server is carrying this player's body now. */
   led: () => boolean = () => false;
   /** A row's body on this page, by its handle. */
