@@ -488,6 +488,8 @@ have_cook_source() {
     && [ "$(cook_commit)" = "$COOK_BUILD" ] \
     && [ "$(git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" rev-parse "$COOK_REF^{commit}" 2>/dev/null)" = "$COOK_BUILD" ]
 }
+# pnpm 10 versions the store (`<store-dir>/v10`) and keeps the global virtual store at `<that>/links`, which
+# scripts/assert-store-layout.mjs checks; `$COOK_PNPM_STORE/links` failed it, so v0.1.23's cook move rolled back.
 make_cook_source() {
   install -d -m 755 -o root -g root "$(dirname "$COOK_SRC")"
   if [ ! -d "$COOK_SRC/.git" ]; then
@@ -498,7 +500,7 @@ make_cook_source() {
   if [ "$(git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" rev-parse "$COOK_REF^{commit}" 2>/dev/null)" != "$COOK_BUILD" ]; then say stop "The signed release's $COOK_REF does not resolve to $COOK_BUILD"; exit 1; fi
   rm -f "$COOK_SRC/.wildshard-installed"
   git -c safe.directory="$COOK_SRC" -C "$COOK_SRC" checkout --quiet --force --detach "$COOK_BUILD"
-  (cd "$COOK_SRC" && org_git env CI=1 HOME=/root COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack "$PNPM" install --frozen-lockfile --ignore-scripts --config.confirmModulesPurge=false --config.ci=false --store-dir "$COOK_PNPM_STORE" --virtual-store-dir "$COOK_PNPM_STORE/links")
+  (cd "$COOK_SRC" && org_git env CI=1 HOME=/root COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack "$PNPM" install --frozen-lockfile --ignore-scripts --config.confirmModulesPurge=false --config.ci=false --store-dir "$COOK_PNPM_STORE" --virtual-store-dir "$COOK_PNPM_STORE/v10/links")
   (cd "$COOK_SRC" && "$NODE" scripts/assert-store-layout.mjs)
   printf '%s %s\n' "$COOK_REF" "$COOK_BUILD" > "$COOK_SRC/.wildshard-installed"
   chmod -R go-w "$COOK_SRC"

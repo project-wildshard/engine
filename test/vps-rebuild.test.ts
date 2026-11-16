@@ -309,7 +309,7 @@ test('MS2.4b: pnpm uses a root-owned store outside protected homes', () => {
   expect(source).toContain('! -user root -o ! -group "$COOK_GROUP"')
   expect(source).toContain('chown root:"$COOK_GROUP"')
   expect(source).toContain(
-    '--config.ci=false --store-dir "$COOK_PNPM_STORE" --virtual-store-dir "$COOK_PNPM_STORE/links"',
+    '--config.ci=false --store-dir "$COOK_PNPM_STORE" --virtual-store-dir "$COOK_PNPM_STORE/v10/links"',
   )
   expect(source).toContain('"$NODE" scripts/assert-store-layout.mjs')
   expect(source).toContain('ProtectHome=yes')
