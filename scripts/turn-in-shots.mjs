@@ -3,7 +3,7 @@
 // walker on the road's centre line at each other cell's four entryways (north, east, south, west), facing into the cell, and takes
 // one shot: what a player on the road sees of the 24 placeholders (no grey or snow-white stand-in within sight of the road).
 //   scripts/browser-lane.sh node scripts/turn-in-shots.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood]
-//     [--engine=chromium|webkit] [--device='iPhone 15 Pro'] [--viewport=2992x1434@2] [--cells=slug,slug] [--settle=3000]
+//     [--card='<Shard Select card>' --self] [--engine=chromium|webkit] [--device='iPhone 15 Pro'] [--viewport=2992x1434@2] [--cells=slug,slug] [--settle=3000]
 // Writes <out>/<engine>[-phone]-<slug>-<side>.jpg and turn-ins.json. Preview or a loopback page only (the harness pose).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
@@ -17,7 +17,10 @@ const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', ''
 const settle = Number(flag('settle', '3000')), only = flag('cells', '').split(',').filter(Boolean);
 if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: turn-in-shots.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood] [--engine=chromium|webkit] [--device=...]');
 const HOMES = /** @type {Record<string, { slug: string, card: string }>} */ ({ driftwood: { slug: 'driftwood-isle', card: 'Driftwood Isle' }, nalati: { slug: 'nalati-grasslands', card: 'Nalati Grasslands' } });
-const homeName = flag('home', 'driftwood'), home = HOMES[homeName];
+// --card names any other home by its Shard Select card (--home=<slug> --card='Pastel Plain'); --self also shoots the home's own
+// four turn-ins, its live world from the same poses: the target its placeholder is held to
+const homeName = flag('home', 'driftwood'), homeCard = flag('card', ''), self = process.argv.includes('--self');
+const home = homeCard === '' ? HOMES[homeName] : { slug: homeName, card: homeCard };
 if (home === undefined) throw new Error(`No home ${homeName}: ${Object.keys(HOMES).join(', ')}`);
 const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '2992x1434@2')) ?? [0, '2992', '1434', '2']).slice(1).map(Number);
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
@@ -26,7 +29,7 @@ const HALF = 250, GAP_HALF = 31.25;
 const SIDES = /** @type {const} */ ([['north', 0, 1], ['east', 1, 0], ['south', 0, -1], ['west', -1, 0]]);
 mkdirSync(out, { recursive: true });
 
-const tag = `${engineName}${device === '' ? '' : '-phone'}`;
+const tag = `${engineName}${device === '' ? '' : '-phone'}${self ? `-from-${home.slug}` : ''}`;
 const result = { base, home: home.slug, engine: engineName, device, at: new Date().toISOString(), build: '', shots: /** @type {Record<string, unknown>[]} */ ([]), errors: /** @type {string[]} */ ([]), note: '' };
 const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
 let code = 1;
@@ -58,7 +61,7 @@ try {
   if (own === undefined) throw new Error(`${home.slug} is not on the grid`);
   const pitch = own.cell[0] !== 0 ? grid.origin.x / own.cell[0] : own.cell[1] !== 0 ? grid.origin.z / own.cell[1] : 562.5;
   for (const cell of grid.cells) {
-    if (cell.slug === home.slug || (only.length > 0 && !only.includes(cell.slug))) continue;
+    if ((cell.slug === home.slug && !self) || (only.length > 0 && !only.includes(cell.slug))) continue;
     for (const [side, sx, sz] of SIDES) {
       // home-frame feet on the road's centre line in front of this entryway, facing the cell's centre
       const cx = cell.cell[0] * pitch - grid.origin.x, cz = cell.cell[1] * pitch - grid.origin.z;
