@@ -30,7 +30,7 @@ const waiting: { readonly part: InstancedMesh; readonly geometry: BufferGeometry
 let draining = false;
 function slabRuns(part: InstancedMesh, geometry: BufferGeometry, scope: Scope): void {
   const ranges = RANGES.get(geometry);
-  if (ranges !== undefined) { cullSlabRanges(part, ranges); return; }
+  if (ranges !== undefined) { cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle); return; }
   if (!LATE.has(geometry)) return;
   waiting.push({ part, geometry, scope });
   if (!draining) { draining = true; void drainLate().finally(() => { draining = false; }); }
@@ -47,7 +47,7 @@ async function drainLate(): Promise<void> {
       const built = spatialSlabRanges(geometry);
       if (built !== null) { RANGES.set(geometry, built); ranges = built; }
     }
-    if (ranges !== undefined) cullSlabRanges(part, ranges);
+    if (ranges !== undefined) cullSlabRanges(part, ranges, TIER_CONFIG.slabLodAngle);
     if (slice.due()) await slice.yield();
   }
 }

@@ -56,6 +56,9 @@ export const TIER_TABLE = {
     // NINE-DRAGON-BENCHMAX NB8 (mini-ninetris, 2026-11-15): a resident slab chunk's triangles in k-d order, drawn as the run
     // its camera can see (`slabRanges.ts`): Nine's phone spawn view 0.56 to ~0.47 M slab triangles, other views ~half
     slabRanges: true,
+    // NB8 (mini-nb8d): with WEBGL_multi_draw, each slab chunk draws only its visible k-d leaves, each leaf cut to its
+    // triangles at least this angle × its distance thick (`visibleSlabDraws`): under ~0.7 device pixels at DPR 2. 0 = the run
+    slabLodAngle: 0.001,
   },
   desktop: {
     maxTexture: 4096, layerSize: 1024, dpr: 1.5, ao: true,
@@ -83,6 +86,7 @@ export const TIER_TABLE = {
     pmremCube: 0,
     placedLodScale: 1,
     slabRanges: false,
+    slabLodAngle: 0,
   },
 };
 
