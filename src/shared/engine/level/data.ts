@@ -3,47 +3,17 @@ import type { MinimapPalette } from '../../../client/engine/ui/Minimap';
 import type { LookReplaceContext } from '../../../client/engine/render/look';
 import type { SkyRig as Sky } from '../../../client/engine/world/skyRig';
 import type { TreeFactory } from '../../../client/engine/world/TreeFactory';
-import type { Noise2D } from '../core/noise';
 import type { SpeciesWeights, TreeSpeciesTraits, TreeSetVariant } from '../../../client/engine/world/forest/treeSpecies';
-// Engine-owned level data; structurally compatible with the transitional manifests.
-export type Vec2 = [number, number];
+import type { Vec2 as TerrainVec2, CabinSite as TerrainCabinSite, PondDef as TerrainPondDef, TerrainNoise as FieldNoise, TerrainField as CompiledTerrain, TerrainSpec as TerrainInput } from '../world/terrainField';
+
+// Keep the public level-data names while the compiler owns their definitions.
+export type Vec2 = TerrainVec2;
+export type CabinSite = TerrainCabinSite;
+export type PondDef = TerrainPondDef;
+export type TerrainNoise = FieldNoise;
+export type TerrainField = CompiledTerrain;
+export type TerrainSpec = TerrainInput;
 export type RGB = [number, number, number];
-export interface CabinSite { x: number; z: number; rot: number }
-export interface PondDef { x: number; z: number; r: number }
-export interface TerrainNoise { n: Noise2D; n2: Noise2D }
-/** a level's terrain as functions: height, normal, ground-layer weights, trails, pads, pond and water */
-export interface TerrainField {
-  heightAt: (x: number, z: number) => number;
-  normalAt: (x: number, z: number, eps?: number) => [number, number, number];
-  splatAt: (x: number, z: number) => [number, number, number, number];
-  trailDistance: (x: number, z: number) => number;
-  cabinMask: (x: number, z: number) => number;
-  pondMask: (x: number, z: number) => number;
-  waterLevel: () => number;
-  streamAt?: (x: number, z: number) => number | null;
-  trails: Vec2[][];
-  cabinSites: CabinSite[];
-  pond: PondDef | null;
-  /**
-   * Metres this field's `heightAt` (and `waterLevel`) sit from the heights its offline bake was made from: a level that
-   * shifts its whole world vertically at runtime (a Debug variant) applies the shift in its own functions, and the baked
-   * grid (public/assets/baked/<slug>/terrain.bin) is installed shifted by the same amount. Read once, when the bake is
-   * installed; absent or 0, the bake installs exactly as baked.
-   */
-  readonly datum?: number;
-}
-export interface TerrainSpec {
-  landscape: (x: number, z: number, noise: TerrainNoise) => number;
-  trails: Vec2[][];
-  cabinSites: CabinSite[];
-  pond?: PondDef;
-  pondFill?: number;
-  oceanLevel?: number;
-  graded?: { paths: Vec2[][]; maxGrade: number; bench?: boolean };
-  finish?: (x: number, z: number, h: number) => number;
-  streamAt?: (x: number, z: number) => number | null;
-  splat?: (x: number, z: number, t: TerrainField, noise: TerrainNoise) => [number, number, number, number];
-}
 export interface LevelAssets {
   groundLayers: [string, string, string, string];
   groundTints: [RGB, RGB, RGB, RGB];

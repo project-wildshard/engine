@@ -14,7 +14,44 @@
  */
 import { Noise2D, smoothstep, clamp, lerp } from '../core/noise';
 import { CHUNK_HALF, ROAD_WIDTH, ROAD_LENGTH } from '../core/config';
-import type { TerrainField, TerrainSpec, TerrainNoise, Vec2, CabinSite } from '../level/data';
+// Engine-owned level data; structurally compatible with the transitional manifests.
+export type Vec2 = [number, number];
+export interface CabinSite { x: number; z: number; rot: number }
+export interface PondDef { x: number; z: number; r: number }
+export interface TerrainNoise { n: Noise2D; n2: Noise2D }
+/** a level's terrain as functions: height, normal, ground-layer weights, trails, pads, pond and water */
+export interface TerrainField {
+  heightAt: (x: number, z: number) => number;
+  normalAt: (x: number, z: number, eps?: number) => [number, number, number];
+  splatAt: (x: number, z: number) => [number, number, number, number];
+  trailDistance: (x: number, z: number) => number;
+  cabinMask: (x: number, z: number) => number;
+  pondMask: (x: number, z: number) => number;
+  waterLevel: () => number;
+  streamAt?: (x: number, z: number) => number | null;
+  trails: Vec2[][];
+  cabinSites: CabinSite[];
+  pond: PondDef | null;
+  /**
+   * Metres this field's `heightAt` (and `waterLevel`) sit from the heights its offline bake was made from: a level that
+   * shifts its whole world vertically at runtime (a Debug variant) applies the shift in its own functions, and the baked
+   * grid (public/assets/baked/<slug>/terrain.bin) is installed shifted by the same amount. Read once, when the bake is
+   * installed; absent or 0, the bake installs exactly as baked.
+   */
+  readonly datum?: number;
+}
+export interface TerrainSpec {
+  landscape: (x: number, z: number, noise: TerrainNoise) => number;
+  trails: Vec2[][];
+  cabinSites: CabinSite[];
+  pond?: PondDef;
+  pondFill?: number;
+  oceanLevel?: number;
+  graded?: { paths: Vec2[][]; maxGrade: number; bench?: boolean };
+  finish?: (x: number, z: number, h: number) => number;
+  streamAt?: (x: number, z: number) => number | null;
+  splat?: (x: number, z: number, t: TerrainField, noise: TerrainNoise) => [number, number, number, number];
+}
 
 function distToSegmentSquared(px: number, pz: number, ax: number, az: number, bx: number, bz: number) {
   const vx = bx - ax, vz = bz - az;

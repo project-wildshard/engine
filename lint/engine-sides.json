@@ -1864,6 +1864,7 @@
     "src/shared/host/standalone/heldReads.ts": "shared",
     "src/shared/host/standalone/netInput.ts": "shared",
     "src/shared/host/standalone/workerLoopback.ts": "shared",
-    "src/shared/host/tickProtocol.ts": "shared"
+    "src/shared/host/tickProtocol.ts": "shared",
+    "src/server/engine/sim/stateAdapter.ts": "server"
   }
 }
