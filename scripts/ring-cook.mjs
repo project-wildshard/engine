@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 await import('./bake-loader.mjs');
-const { createCookWorker, indexKey } = await import('../src/cook/game/cookWorker.ts');
+const { createCookWorker, indexKey, DEFAULT_LIMITS } = await import('../src/cook/game/cookWorker.ts');
 const { folderStore } = await import('../src/cook/game/packStore.ts');
 const { cookRevision } = await import('./cook-revision.ts');
 const { ringCookInputs } = await import('./ring-cook-inputs.ts');
@@ -30,11 +30,15 @@ const selected = values.only === undefined ? allowed : values.only.split(',');
 if (selected.length === 0 || new Set(selected).size !== selected.length || selected.some(slug => !allowed.includes(slug))) throw new Error('Cook selection must name distinct pinned products in this ring');
 const inputs=ringCookInputs(selected,shards,cache,values.ring2),heads=inputs.heads;
 const store = folderStore(join(out,'store'));
+// Ring 2 qualifies the production worker, including its heap/resident limits.
+// Keep Ring 1's established smaller envelope; neither path extends its clock.
+const limits = values.ring2 ? {...DEFAULT_LIMITS, seconds: timeout / 1000} : {seconds:timeout/1000,memoryMB:4096,heapMB:2048};
+console.log(`cook limits: ${JSON.stringify(limits)}`);
 // A fresh run owns its empty cache. At least its first product always encodes cold.
 const worker = createCookWorker({ build: values.build, store, serverPacks: join(out,'server'), scratch: join(out,'jobs'), validator: shardfileValidationRevision(root),
   source: { heads: () => Promise.resolve(heads.map(row => ({...row, revision:1}))), download: hash => Promise.resolve(inputs.read(hash)) },
   launcher: { root, execPath: process.execPath, loader:join(root,'scripts/bake-loader.mjs'), script:join(root,'scripts/cook-job.mjs'),
-    wrap:[], limits:{seconds:timeout/1000,memoryMB:4096,heapMB:2048}, renderer: rendererRevision(root) } });
+    wrap:[], limits, renderer: rendererRevision(root) } });
 const recipe = cookRevision(), indexes = [];
 for (const head of heads) {
   const started = performance.now(), row = await worker.cook(head);

@@ -59,3 +59,11 @@ The diagnostic now detaches both entry and whole rows (and optional
 program inventory) before the production installer attaches the cold
 product. Each head starts from the original book, restored on cleanup.
 The production installer's rule to keep a build's own product is unchanged.
+
+Pine's cold cook exceeds 600 seconds in both browsers. Ring 2's launcher
+also used a private 2 GiB heap / 4 GiB resident cap, below production's
+4 GiB / 6 GiB. Ring 2 now reads DEFAULT_LIMITS for all three limits and
+prints them. Its 600-second deadline stays; Ring 1's smaller envelope
+stays. This corrects the qualification envelope; it does not establish
+the cause of Pine's timeout. A targeted hosted run will check the cook
+under production limits.
