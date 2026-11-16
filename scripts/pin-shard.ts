@@ -19,7 +19,7 @@ interface PinnedDocument {shards: DocumentRow[]}
 
 const {WILDSHARD_API: API = 'https://api.wildshard.io'} = process.env;
 const PINS = 'test/pins/shardfiles.json', CATALOGUE = 'test/pins/catalogue.json';
-const HASH = /^[a-f0-9]{64}$/u, SLUG = /^[a-z0-9-]+$/u;
+const HASH = /^[a-f0-9]{64}$/u, SLUG = /^[a-z0-9-]+$/u, REVISION = /^[1-9][0-9]*$/u;
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
 /** The pins and the pinned document with `slug` moved to `pin`; throws for a slug neither names. */
@@ -42,9 +42,10 @@ async function getJson(path: string): Promise<unknown> {
 
 async function main([slug = '', revisionText = '', hash = '', channel = 'staging']: readonly string[]): Promise<void> {
   const revision = Number(revisionText);
-  if (!SLUG.test(slug) || !Number.isSafeInteger(revision) || revision < 1 || !HASH.test(hash) || !['staging', 'prod'].includes(channel)) {
+  if (!SLUG.test(slug) || !REVISION.test(revisionText) || !Number.isSafeInteger(revision) || revision < 1 || !HASH.test(hash) || !['staging', 'prod'].includes(channel)) {
     throw new Error('usage: pin-shard.ts <slug> <revision> <sha256> [staging|prod]');
   }
+  // A prod upload moves staging too (J301), so staging names the revision either way.
   const [document, listing] = await Promise.all([getJson('/api/catalogue.json?channel=staging'), getJson('/api/shardfiles')]);
   const row = (document as PinnedDocument).shards.find(shard => shard.slug === slug);
   if (row?.revision !== revision || row.hash !== hash) {

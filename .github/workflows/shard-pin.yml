@@ -86,6 +86,11 @@ jobs:
           branch="plan/pin-$SLUG-r$REVISION"
           git config user.name 'shard-pin'
           git config user.email 'shard-pin@users.noreply.github.com'
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "$branch exists already: nothing to push"
+            echo "branch=$branch" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git switch -c "$branch"
           git commit -q -m "test(pins): pin $SLUG rev $REVISION" -m "Meta SHARD-PUBLISH-ACTIONS SP6: $SLUG rev $REVISION (${HASH:0:8}),
           published to $CHANNEL from Actions; shardfiles.json and the pinned
@@ -93,7 +98,27 @@ jobs:
             -m 'Assisted-by: shard-pin:workflow' -- test/pins/shardfiles.json test/pins/catalogue.json test/pins/staging.json
           git push "https://x-access-token:${TOKEN}@github.com/project-wildshard/engine.git" "HEAD:refs/heads/$branch"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
+      - name: Name the land steps
+        env:
+          BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          slug_dir="pin-$SLUG-r$REVISION"
+          {
+            echo "### $BRANCH"
+            echo
+            echo "Land it from either machine:"
+            echo
+            echo '~~~sh'
+            echo 'cd ~/projects/games/wildshard/engine'
+            echo "node scripts/worktree.mjs new $slug_dir"
+            echo "cd .worktrees/$slug_dir && git fetch origin $BRANCH && git merge --ff-only FETCH_HEAD"
+            echo 'WS_LANE_NAME=<lane> node scripts/land.mjs'
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+      # Needs the repo's "Allow GitHub Actions to create pull requests";
+      # without it the branch stands and the summary names the land steps.
       - name: Open the PR
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ steps.branch.outputs.branch }}
