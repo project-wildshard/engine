@@ -11,12 +11,12 @@ import { installServerChapters } from '../src/server/game/quest/serverChapters';
 import { installedKeys } from '../src/server/game/shardfile/installedSides';
 import { featOutcome, type FeatCounterRows } from '../src/shared/game/quest/featCounters';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 async function nalati() {
-  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = runtimeAssets(product, directory);
   const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) }, undefined, { room: true });
@@ -117,7 +117,7 @@ test('a room keeps each player\'s adventure records by the page\'s law, and inst
     routes.bonded?.(other, '1');
     host.step();
     // the page: one device's counts, advanced by the same kills and the bond's event
-    const rows = (await (await loadHeadlessProduct(builtProduct('nalati-grasslands'))).json<{ counters: FeatCounterRows }>('quests/persistence.json')).counters, page: Record<string, number> = {}, ports = { read: () => page, write: () => undefined, fact: () => undefined };
+    const rows = (await (await loadHeadlessFolder(builtFolder('nalati-grasslands'))).json<{ counters: FeatCounterRows }>('quests/persistence.json')).counters, page: Record<string, number> = {}, ports = { read: () => page, write: () => undefined, fact: () => undefined };
     for (let i = 0; i < 6; i++) featOutcome(rows, ports, 'kill', 'wolf');
     featOutcome(rows, ports, 'event', 'tame');
     expect(page, 'six wolves and a bond, on the page').toMatchObject({ wolf5: 5, wolf25: 6, tame: 1 });

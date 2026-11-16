@@ -11,7 +11,7 @@ import type {ShardContext} from '../src/client/game/plugin/context';
 import type {ShardWorld} from '../src/server/game/shard/world';
 import type {ShardRuntime} from '../src/shared/game/shard/runtime';
 import {admitClientPlan} from '../src/client/game/shardfile/clientPlan';
-import {createShardProduct,type ShardProduct} from '../src/shared/game/shardfile/shardProduct';
+import {createShardFolder,type ShardFolder} from '../src/shared/game/shardfile/shardFolder';
 import {emptyShardfile} from '../src/shared/host/author';
 import {installWorldUpdates} from '../src/client/game/shardfile/worldUpdates';
 import {publishEntryOwner,type EliteEntryConstruction} from '../src/shared/game/shardfile/entryOwners';
@@ -27,7 +27,7 @@ const rows=[
 function fixture(){
  const scope=new Scope('encounter-updates'),systems:SystemSpec[]=[],events=new Events(),calls:string[]=[],frames:unknown[]=[],receivers:unknown[]=[];
  const world=legacyDouble<ShardWorld>({game:legacyDouble<ShardWorld['game']>({})}),runtime=legacyDouble<ShardRuntime>({world});
- const ctx=legacyDouble<ShardContext>({scope,product:legacyDouble<ShardProduct>({}),game:legacyDouble<ShardContext['game']>({runtime}),
+ const ctx=legacyDouble<ShardContext>({scope,product:legacyDouble<ShardFolder>({}),game:legacyDouble<ShardContext['game']>({runtime}),
   system:spec=>{systems.push(spec);},answer:(key,run)=>{events.answer(key,run,scope);}});
  const titanState={engaged:false,riders:null as ArenaRoomEncounter['riders'],update(dt:number,t:number){receivers.push(this);calls.push(`titan:${dt}:${t}`);}},titan=legacyDouble<ArenaRoomEncounter>(titanState);
  const room=legacyDouble<ArenaRoomEncounter>({inside:true,update(dt,t){expect(this).toBe(room);calls.push(`room:${dt}:${t}`);}});
@@ -71,7 +71,7 @@ test('retirement and method replacement refuse before another native frame',()=>
 
 test('non-toon update rows need no toon section while toon rows still require it',()=>{
  const source=emptyShardfile({slug:'orchard',name:'Orchard',author:'Fixture',revision:1,seed:1});
- const product=createShardProduct({slug:'orchard',revision:1,shardfile:source,sections:new Map(),files:new Map(),read:()=>Promise.reject(new Error('No reads'))});
+ const product=createShardFolder({slug:'orchard',revision:1,shardfile:source,sections:new Map(),files:new Map(),read:()=>Promise.reject(new Error('No reads'))});
  const plain={version:1,features:[{kind:'world.updates',rows:[{kind:'wind',system:'orchard.wind',before:[]}]}]};
  expect(admitClientPlan(plain,product).features).toEqual(plain.features);
  expect(()=>admitClientPlan({version:1,features:[{kind:'world.updates',rows:[{kind:'toon-look',system:'orchard.toon',look:'missing',before:[]}]}]},product)).toThrow('look/toon');

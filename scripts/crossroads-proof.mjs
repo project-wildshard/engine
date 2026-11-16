@@ -15,7 +15,7 @@ export const CROSSROADS = ['driftwood-isle', 'nalati-grasslands', 'pine-hollow',
 const out = resolve(option('out', join(ROOT, 'tmp/crossroads/site'))), products = resolve(option('products', join(ROOT, 'out')));
 
 /** Copy what a server can read of one product: the index, its sections, and its bin, json, wasm and tiles. */
-export function copyServerProduct(from, to) {
+export function copyServerFolder(from, to) {
   const index = JSON.parse(readFileSync(join(from, 'shard.json'), 'utf8')), server = index.files.filter(file => ['bin', 'json', 'wasm', 'tile'].includes(file.kind));
   for (const path of ['shard.json', 'sections', 'server', ...server.map(file => file.path)]) {
     try { mkdirSync(dirname(join(to, path)), { recursive: true }); cpSync(join(from, path), join(to, path), { recursive: true }); } catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -25,7 +25,7 @@ export function copyServerProduct(from, to) {
 rmSync(out, { recursive: true, force: true });
 await build({ configFile: false, root: join(ROOT, 'test/crossroads'), base: '/', logLevel: 'warn', publicDir: false, resolve: { alias: rapierAlias }, assetsInclude: ['**/*.bin', '**/*.wasm'],
   define: { __TITLE_ASSET_URLS__: '{}', __BUILD_ID__: '"crossroads"' }, worker: { format: 'es' }, build: { outDir: out, emptyOutDir: true, target: 'es2022', minify: true, sourcemap: false } });
-for (const slug of CROSSROADS) copyServerProduct(join(products, slug), join(out, 'shards', slug));
+for (const slug of CROSSROADS) copyServerFolder(join(products, slug), join(out, 'shards', slug));
 mkdirSync(join(out, 'assets/physics'), { recursive: true });
 cpSync(join(ROOT, 'public/assets/physics/rapier.wasm'), join(out, 'assets/physics/rapier.wasm'));
 writeFileSync(join(out, '_headers'), '/*\n  Cache-Control: no-store\n');

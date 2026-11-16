@@ -18,7 +18,7 @@ import { parseExternalElite } from '@wildshard/format/eliteFeature';
 import { SpeciesActorsFileSchema } from '@wildshard/format/speciesBookRows';
 import type { EliteCore, EliteCoreRecord, EliteCoreScript } from '../../../shared/game/eliteSystem';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { SpawnScript, readSpawnScript } from '../population/spawnScript';
 import { nativePopulationOf } from '../riding/nativePopulation';
 import { patrolOf } from './patrolNative';
@@ -39,13 +39,13 @@ export interface NativeCaptain {
 type Core = EliteCore<EliteCoreScript<AnimalSim>>;
 
 /** Read his rows now; nothing here touches a host. No script-mode elite in `external`: no captain. */
-export async function prepareCaptain(product: Pick<ShardProduct, 'json' | 'section' | 'file' | 'shardfile'>, external: readonly unknown[], actorsFile: string, knock: CaptainKnock):
+export async function prepareCaptain(product: Pick<ShardFolder, 'json' | 'section' | 'file' | 'shardfile'>, external: readonly unknown[], actorsFile: string, knock: CaptainKnock):
   Promise<((host: SimHost, makeCore: (decisions: ReturnProgram) => Core, step: string) => NativeCaptain) | null> {
   const row = external.map(parseExternalElite).find(candidate => candidate.mode === 'script');
   if (row === undefined) return null;
   const listed = v.parse(ListedScripts, product.section('actors/spawn-scripts')).find(script => script.species.some(species => species.variant === row.spawn.variant));
   if (listed === undefined) throw new Error('Missing captain fight');
-  const modules = new Map<string, Uint8Array>(), [actors, rows] = await Promise.all([product.json<unknown>(actorsFile).then(input => v.parse(SpeciesActorsFileSchema, input)), readSpawnScript(product as ShardProduct, listed.step, modules)]);
+  const modules = new Map<string, Uint8Array>(), [actors, rows] = await Promise.all([product.json<unknown>(actorsFile).then(input => v.parse(SpeciesActorsFileSchema, input)), readSpawnScript(product as ShardFolder, listed.step, modules)]);
   const program = actors.species.lookBook.program, module = modules.get(rows.script.module.split('/').at(-1)?.replace('.wasm', '') ?? ''), strikes = rows.strikes?.map(strike => ({ amount: strike.row.damage, strike: strikeFromData(strike.row) }));
   if (program === undefined || module === undefined || strikes === undefined) throw new Error('Missing captain module, program or contacts');
   return (host, makeCore, step) => {

@@ -250,10 +250,10 @@ export function serverRootsFrom(product, table = nativeAssemblyRoots()) {
 }
 
 /** Read a built product dir: shard.json's `admission.server` row named `server/native-assembly.json` (as the engine's
- * product readers do, `productData.ts`), then its features' host ids.
+ * product readers do, `folderData.ts`), then its features' host ids.
  * A product without one reaches no server roots.
  * @param {string} dir @param {ReturnType<typeof nativeAssemblyRoots>} [table] */
-export function productServerRoots(dir, table = nativeAssemblyRoots()) {
+export function folderServerRoots(dir, table = nativeAssemblyRoots()) {
   const shard = JSON.parse(readFileSync(join(dir, 'shard.json'), 'utf8'));
   const slug = typeof shard.identity?.slug === 'string' ? shard.identity.slug : basename(resolve(dir));
   const row = (Array.isArray(shard.admission?.server) ? shard.admission.server : []).find((/** @type {any} */ file) => file.name === NATIVE_ASSEMBLY_FILE);
@@ -268,5 +268,5 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.fi
   const dirs = process.argv.slice(2);
   if (dirs.length === 0) { console.error('usage: node scripts/host-ruler/server-roots.mjs <product-dir>...'); process.exit(2); }
   const table = nativeAssemblyRoots();
-  console.log(JSON.stringify(dirs.map(dir => productServerRoots(dir, table)), null, 2));
+  console.log(JSON.stringify(dirs.map(dir => folderServerRoots(dir, table)), null, 2));
 }

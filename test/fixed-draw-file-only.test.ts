@@ -1,6 +1,6 @@
 import {expect,test,vi} from 'vitest';
 import {Scope} from '../src/shared/engine/app/scope';
-import {fixedDraws,coldFixedDraws,productFixedDraws} from '../src/client/game/models/fixedDraws';
+import {fixedDraws,coldFixedDraws,folderFixedDraws} from '../src/client/game/models/fixedDraws';
 import {createOwnedGeometry} from '../src/client/engine/models/ownedGeometry';
 
 const baked={attrs:[['position','f32',3,false]],count:3,index:null,indexCount:0,box:true,expand:false};
@@ -17,7 +17,7 @@ test('product metadata and cold cards reject inline rows before readers or templ
   const file=vi.fn(()=>Promise.resolve(new Uint8Array(36))),intake=vi.fn(createOwnedGeometry),scope=new Scope('file-only.card');
   try{
     const book={slug:'files',file,json:()=>Promise.resolve([named,inline])};
-    await expect(productFixedDraws(book,'models/book.json')).rejects.toThrow('Fixed draws require binary sources');
+    await expect(folderFixedDraws(book,'models/book.json')).rejects.toThrow('Fixed draws require binary sources');
     await expect(coldFixedDraws(book,[named,inline],scope,['named'],intake)).rejects.toThrow('Fixed draws require binary sources');
     expect(file).not.toHaveBeenCalled();expect(intake).not.toHaveBeenCalled();
   }finally{scope.dispose();}

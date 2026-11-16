@@ -3,18 +3,18 @@ import { Mesh, type BufferGeometry, type Object3D, type Material, type Group } f
 import * as v from 'valibot';
 import { SceneDrawsSchema } from '@wildshard/format/sceneDraws';
 import type { Scope } from '@wildshard/engine/app/scope';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { sceneModelSource } from './sceneSources';
 import { admitSceneBuffers, prepareSceneBufferDraws, type SceneBufferReuse, type SceneBufferDrawer } from './sceneBuffers';
 import { parseSceneBuffers, type SceneBuffers } from '@wildshard/format/sceneBuffers';
 import { TIER } from '@wildshard/engine/core/tier';
 
-const books = new WeakMap<Scope, WeakMap<ShardProduct, Map<string, BufferGeometry>>>();
-const drawBooks = new WeakMap<Scope, WeakMap<ShardProduct, Map<string, SceneBufferDrawer>>>();
-const buffers = new WeakMap<ShardProduct, Map<string, { row: SceneBuffers; files: ReadonlyMap<string, Uint8Array>; content: string }>>();
+const books = new WeakMap<Scope, WeakMap<ShardFolder, Map<string, BufferGeometry>>>();
+const drawBooks = new WeakMap<Scope, WeakMap<ShardFolder, Map<string, SceneBufferDrawer>>>();
+const buffers = new WeakMap<ShardFolder, Map<string, { row: SceneBuffers; files: ReadonlyMap<string, Uint8Array>; content: string }>>();
 
 /** Admit named draw bytes before any material or geometry allocation. Missing files refuse, with no runtime fallback. */
-export async function prepareSceneDrawRows(product: ShardProduct, input: unknown): Promise<void> {
+export async function prepareSceneDrawRows(product: ShardFolder, input: unknown): Promise<void> {
   const rows = v.parse(SceneDrawsSchema, input);
   let prepared = buffers.get(product); if (prepared === undefined) { prepared = new Map(); buffers.set(product, prepared); }
   for (const row of rows) {
@@ -48,7 +48,7 @@ export async function prepareSceneDrawRows(product: ShardProduct, input: unknown
 /** Client-only draw construction shared by specimen and resident emitters.
  * The lifetime and already-compiled material book belong to the caller. Fixed buffer builds are shared only
  * within that scope and admitted product. Draw objects and material bindings remain private. */
-export function drawSceneRows(product: ShardProduct, input: unknown, parent: Object3D, scope: Scope, materials: ReadonlyMap<string, Material>, onBuffered?: (root: Group, rows: SceneBuffers) => void, assets?: SceneBufferReuse['assets']): void {
+export function drawSceneRows(product: ShardFolder, input: unknown, parent: Object3D, scope: Scope, materials: ReadonlyMap<string, Material>, onBuffered?: (root: Group, rows: SceneBuffers) => void, assets?: SceneBufferReuse['assets']): void {
   const rows = v.parse(SceneDrawsSchema, input);
   let products = books.get(scope); if (products === undefined) { products = new WeakMap(); books.set(scope, products); }
   let geometries = products.get(product); if (geometries === undefined) { geometries = new Map(); products.set(product, geometries); }

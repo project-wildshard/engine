@@ -9,7 +9,7 @@ import type { AudioData } from '@wildshard/format/audio';
 import type { SpawnManifestBook } from '../src/cook/game/entryTotals';
 import { readBuiltSpawnManifest } from '../src/cook/game/engineHalf';
 import { openShardfile, shardHalf } from '../src/cook/game/shardCook';
-import { productTarball } from '../src/cook/game/productTarball';
+import { folderTarball } from '../src/cook/game/folderTarball';
 import { DEFAULT_SFX_SET, defaultBootAudio, ENGINE_MUSIC_STYLE, engineMusicFiles, musicDir, sfxDir } from '../src/shared/engine/audio/bootAudio';
 import { withAssetTables, type AssetTables } from '../src/shared/engine/boot/tables';
 import { cookFilesOnly } from './filesOnlyCook';
@@ -33,7 +33,7 @@ const clean = { extra: [], missing: [], twice: [] };
 
 // The shard's own words, read without the cook: AU18's engine music, the default set's boot effects, its own mounts.
 function expected(shard: string, common: AssetTables): { want: string[]; engineMusic: string[] } {
-  const half = shardHalf(openShardfile(productTarball(`out/${shard}`)), (_url, bytes) => bytes.length);
+  const half = shardHalf(openShardfile(folderTarball(`out/${shard}`)), (_url, bytes) => bytes.length);
   const row = half.shard.sections.get('audio/audio') as { audio: AudioData } | undefined, data = row?.audio;
   const shipped = (url: string): boolean => Object.hasOwn(common.bytes, url);
   const engineMusic = data === undefined ? [] : withAssetTables(common, () => engineMusicFiles(data));

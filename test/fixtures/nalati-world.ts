@@ -4,9 +4,9 @@ import type { BakedGrid } from '@wildshard/format/bakedTerrainBytes';
 import type { SimHost } from '../../src/server/engine/sim';
 import { NativePopulationField } from '@wildshard/engine/game/population/environment';
 import { installMountedPlayer } from '@wildshard/engine/game/riding/native';
-import { prepareProductRuntimePlan } from '../../src/server/game/shardfile/nativePlan';
+import { prepareFolderRuntimePlan } from '../../src/server/game/shardfile/nativePlan';
 import type { NativeAssemblyPorts } from '../../src/server/game/shardfile/nativeAssemblyInput';
-import type { ShardProduct } from '../../src/shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../src/shared/game/shardfile/shardFolder';
 import { headlessAssemblyPorts, type HeadlessRuntimeInstallation, type HeadlessRuntimePlan, type PrepareHeadlessRuntime } from '../../src/server/host/headlessRuntime';
 import { withEncounters, type EncounterIntake } from '../../src/server/game/population/encounterIntake';
 
@@ -17,11 +17,11 @@ export type NalatiWorldLoans = Pick<NativeAssemblyPorts<HeadlessRuntimeInstallat
 export type NalatiEncounterIntake = EncounterIntake;
 export async function prepareNalatiWorld(preparation: Parameters<PrepareHeadlessRuntime>[0], encounters?: EncounterIntake, loans: NalatiWorldLoans = {}): Promise<HeadlessRuntimePlan> {
   const product = encounters === undefined ? preparation.product : await withEncounters(preparation.product, encounters);
-  return prepareProductRuntimePlan(product, preparation.assets, { ...headlessAssemblyPorts(preparation.rapier), ...loans });
+  return prepareFolderRuntimePlan(product, preparation.assets, { ...headlessAssemblyPorts(preparation.rapier), ...loans });
 }
 
 /** Read the original named masks once before either direct native owner consumes them. */
-export async function prepareNalatiPopulation(product: Pick<ShardProduct, 'file'>, grid: BakedGrid,
+export async function prepareNalatiPopulation(product: Pick<ShardFolder, 'file'>, grid: BakedGrid,
   constants: { readonly nativeField: unknown }, bake: { readonly trees: readonly (readonly [number, number, number])[]; readonly tops: readonly number[] }) {
   const pond = { file: 'data/geography-pond.bin', bytes: await product.file('data/geography-pond.bin') };
   const input = constants.nativeField, rows = v.parse(PopulationFieldSchema, input), wet = rows.world.wet;

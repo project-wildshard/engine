@@ -6,12 +6,12 @@ import type { ShardContext } from '../src/client/game/plugin/context';
 import type { ShardRuntime } from '../src/shared/game/shard/runtime';
 import type { QuestPageComposition } from '../src/client/game/quest/pageComposition';
 import { QuestPageReference } from '../src/client/game/quest/pageReference';
-import { ProductFigureCatalogue } from '../src/client/game/models/figureCatalogue';
+import { FolderFigureCatalogue } from '../src/client/game/models/figureCatalogue';
 import { fixedDraws } from '../src/client/game/models/fixedDraws';
 import { SceneHandles } from '../src/client/game/shardfile/sceneHandles';
 import { publishEntryOwner, lendEntryOwner, entryOwner } from '../src/shared/game/shardfile/entryOwners';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
-import { fixtureProductFile, fixtureJsonCheck } from './fixtures/productFile';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { fixtureFolderFile, fixtureJsonCheck } from './fixtures/folderFile';
 import { installEntryQuestComposition, installEntryQuestReference } from '../src/client/game/shardfile/clientQuestComposition';
 import * as composition from '../src/client/game/quest/pageComposition';
 import * as enteredFigures from '../src/client/game/quest/figures';
@@ -31,8 +31,8 @@ function deferred<T>() {
 function fixture(readOverride?: (name: string) => Promise<Uint8Array>) {
   const resident = new Scope('orchard-resident'), scope = resident.child('orchard-entered'), reads: string[] = [];
   const shardfile = emptyShardfile({ slug: 'orchard', name: 'Orchard', author: 'Fixture', revision: 1, seed: 1 });
-  const files = new Map(['quest.json', 'figures.json', 'people/catalogue.json', 'models/world-scenes.json'].map(name => [name, fixtureProductFile(name, { hash: name, url: name })]));
-  const product = createShardProduct({ slug: 'orchard', revision: 1, shardfile, sections: new Map([['world/scenes', {}]]), files, jsonCheck: fixtureJsonCheck,
+  const files = new Map(['quest.json', 'figures.json', 'people/catalogue.json', 'models/world-scenes.json'].map(name => [name, fixtureFolderFile(name, { hash: name, url: name })]));
+  const product = createShardFolder({ slug: 'orchard', revision: 1, shardfile, sections: new Map([['world/scenes', {}]]), files, jsonCheck: fixtureJsonCheck,
     read: name => { reads.push(name); if (readOverride !== undefined) return readOverride(name);
       return Promise.resolve(bytes(name === 'quest.json' ? { id: row.id } : name === 'models/world-scenes.json' ? { product: 'orchard', models: [] } : { figures: [] })); } });
   // These two composition projections feed mocked host builders below;
@@ -59,12 +59,12 @@ function quest(): QuestPageComposition {
 }
 
 test('the compiled figures step uses one preparation and original loans before publishing the quest', async () => {
-  const f = fixture(), order: string[] = [], adventure = quest(), catalogue = new ProductFigureCatalogue('orchard', 'people/catalogue.json');
+  const f = fixture(), order: string[] = [], adventure = quest(), catalogue = new FolderFigureCatalogue('orchard', 'people/catalogue.json');
   lendEntryOwner(f.scope, f.resident, 'fixed-draws', 'orchard.draws');
   const prepare = vi.spyOn(composition, 'prepareQuestPageComposition').mockImplementation(() => { order.push('prepare');
     return Promise.resolve({ place: p => ({ x: p.x, z: p.z, y: p.y ?? 0, yaw: p.yaw ?? 0 }), floorAt: () => 0, setAnchor: () => undefined }); });
   const install = vi.spyOn(composition, 'installQuestPageComposition').mockImplementation(() => { order.push('install'); return Promise.resolve(adventure); });
-  const book = vi.spyOn(ProductFigureCatalogue, 'fromProduct').mockResolvedValue(catalogue);
+  const book = vi.spyOn(FolderFigureCatalogue, 'fromFolder').mockResolvedValue(catalogue);
   const scenes = vi.spyOn(worldScenes, 'installWorldScenes').mockResolvedValue(new SceneHandles());
   const figures = vi.spyOn(enteredFigures, 'installQuestFigures').mockImplementation((_ctx, _input, ports) => {
     order.push('figures'); expect(ports?.draws).toBe(f.draws); expect(ports?.catalogue).toBe(catalogue); return [];

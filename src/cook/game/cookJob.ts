@@ -12,7 +12,7 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {dirname, join} from 'node:path';
 import {prepareAssetDecoders} from '@wildshard/format/shardfileAssets';
-import {validateShardfileFolder, type ValidatedShardfile as ValidatedProduct} from '@wildshard/format/shardfileValidation';
+import {validateShardfileFolder, type ValidatedShardfile} from '@wildshard/format/shardfileValidation';
 import type {Shardfile} from '@wildshard/format/shardSchema';
 import type {ShardfileCheckReport, ShardfileEntryProof} from '@wildshard/engine/game/shardfile/checkReport';
 import {readTar} from '@wildshard/format/tar';
@@ -57,14 +57,14 @@ export interface CookJobReport {
   /** SA48: what a page's admission row needs of these bytes, from the receipt the validator just held (`cookReceipt`). */
   readonly receipt?: CookReceipt;
 }
-/** SHARD-AUTHORING SA48: the facts a bake's `productVerdict` stamps on a page, read here from a product the format's validator has
+/** SHARD-AUTHORING SA48: the facts a bake's `folderVerdict` stamps on a page, read here from a product the format's validator has
  *  just admitted, so a page whose build never saw the shard can admit it from the cook's index. The worker stamps its validator
  *  revision beside them (`CookIndex.verdict`), and a page believes them only under its own. */
 export interface CookReceipt {readonly sourceHash: string; readonly indexHash: string; readonly residentBytes: number; readonly postCost: unknown; readonly worst?: unknown}
 
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
-function admit(tarball: Uint8Array, cap: number): {readonly product: ValidatedProduct; readonly receipt?: CookReceipt} {
+function admit(tarball: Uint8Array, cap: number): {readonly product: ValidatedShardfile; readonly receipt?: CookReceipt} {
   if (tarball.length > cap) throw new ShardfileRefusedError(`Shardfile is ${tarball.length} bytes, past the ${cap} cap`);
   try {
     const files = readTar(tarball);
@@ -93,7 +93,7 @@ export function cookReceipt(files: ReadonlyMap<string, Uint8Array>): CookReceipt
 }
 
 /** Only a complete shared check can admit new bytes. Infrastructure errors remain retryable. */
-async function checked(product: ValidatedProduct, ports: CookJobPorts): Promise<ShardfileCheckReport> {
+async function checked(product: ValidatedShardfile, ports: CookJobPorts): Promise<ShardfileCheckReport> {
   const report = await ports.check(product.shard, product.assets, product.sections);
   if (!new Set([product.index.identity.slug]).has(report.slug)) throw new Error('The check reported another shard');
   if (report.failures.some(row => row.code === 'check-infrastructure')) throw new Error(report.failures.map(row => row.message).join('\n'));

@@ -3,14 +3,14 @@ import { parseItems } from '@wildshard/format/items';
 import { readFileSync } from 'node:fs';
 import { Euler,Quaternion,Vector3 } from 'three';
 import { expect,test } from 'vitest';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { Rng } from '../src/shared/engine/core/rng';
 import { Bodies,Drop,RowBodySlots } from '../src/shared/engine/physics/bodies';
 import { Physics } from '../src/shared/engine/physics/Physics';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import coconutSlots from './fixtures/engine-lift/coconut.json' with { type: 'json' };
-import { builtProduct } from './fixtures/engine-lift/product';
-const DRIFTWOOD_SWORDS = (await loadHeadlessProduct(builtProduct('driftwood-isle'))).section('combat/items').items;
+import { builtFolder } from './fixtures/engine-lift/folder';
+const DRIFTWOOD_SWORDS = (await loadHeadlessFolder(builtFolder('driftwood-isle'))).section('combat/items').items;
 
 function launchRow(): NonNullable<ReturnType<typeof parseItems>['launches']>[string] {
   const row = parseItems(DRIFTWOOD_SWORDS).launches?.['coconut'];

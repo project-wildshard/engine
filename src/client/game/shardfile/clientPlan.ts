@@ -6,7 +6,7 @@ import { prepareClientReturnModules } from './clientReturnModules';
 import { preflightIslandBook } from './islandBook';
 import { enteredAdventurePersistence } from '../../../shared/game/quest/chapterBindings';
 import { timeClientPreparation } from './preparationTiming';
-import { runtimeLookMaterials } from './runtimeProduct';
+import { runtimeLookMaterials } from './runtimeFolder';
 import { hasLentLook, lendLooks } from './lentLooks';
 import { TIER } from '@wildshard/engine/core/tier';
 import { Color } from 'three';
@@ -22,7 +22,7 @@ import { parseClientPlan, type ClientFeatureKind, type ClientFeatureRow } from '
 import { clientOwnershipRules } from '@wildshard/format/clientOwnership';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import type { ShardContext } from '../plugin/context';
-import { ProductError, type ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { FolderError, type ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { clientSceneHandles, publishClientSceneHandles } from './clientSceneHandles';
 import { installEnteredRuntimeService, retainsRuntimeServices } from '../shard/retainedHooks';
 
@@ -208,9 +208,9 @@ export const CLIENT_FEATURES: Readonly<Record<ClientFeatureKind, ClientFeature>>
     await prepareDeclaredHullBookKit(ctx);
   } },
   'population.product-creatures': { phase: 'kit', rank: -20, lifetime: 'entered', sections: ['actors/species-programs'], install: async ctx => {
-    const { installProductCreatures } = await import('../population/productCreatures');
+    const { installFolderCreatures } = await import('../population/folderCreatures');
     if (ctx.scope.disposed || ctx.scope.disposing) throw new Error('Client feature owner is disposed');
-    await installProductCreatures(ctx);
+    await installFolderCreatures(ctx);
   } },
   'held.claims.install': { phase: 'kit', rank: -10, lifetime: 'entered', sections: [], install: async (ctx, row) => {
     if (row.kind !== 'held.claims.install') throw new Error('Invalid claims installation feature');
@@ -281,7 +281,7 @@ export const CLIENT_FEATURES: Readonly<Record<ClientFeatureKind, ClientFeature>>
   })},
   'world.scenes': { phase: 'world', rank: 20, lifetime: 'resident', sections: ['world/scenes'],
     install: loadFeature(async () => {
-      const [{ installWorldScenes }, { noteTileBytes, residentTiles, followResidentTiles, productTileRing, cameraCone }, { StreamingCamera }] = await Promise.all([import('./worldScenes'), import('./tileDriver'), import('./streamingView')]);
+      const [{ installWorldScenes }, { noteTileBytes, residentTiles, followResidentTiles, folderTileRing, cameraCone }, { StreamingCamera }] = await Promise.all([import('./worldScenes'), import('./tileDriver'), import('./streamingView')]);
       return async (ctx, _row, resident) => {
         const value = await installWorldScenes(ctx, ctx.product.section('world/scenes'), resident);
         publishClientSceneHandles(ctx.product, resident, value);
@@ -292,7 +292,7 @@ export const CLIENT_FEATURES: Readonly<Record<ClientFeatureKind, ClientFeature>>
         const source = ctx.product.shardfile, world = ctx.game.runtime?.world;
         if (value.tiled().length === 0) return;
         if (world === undefined || world === null) throw new Error('Tiled world scenes require a world');
-        noteTileBytes(resident, source.tiles); await residentTiles(resident, value.tiled(), source.spawn, source.entryways, productTileRing(source));
+        noteTileBytes(resident, source.tiles); await residentTiles(resident, value.tiled(), source.spawn, source.entryways, folderTileRing(source));
         const camera = new StreamingCamera(ctx.root, () => world.game.camera);
         const follow = followResidentTiles(resident, () => world.player.position, () => cameraCone(world.game.camera), () => camera.read());
         if (follow !== null) ctx.system({ id: 'client.world.scene-tiles', phase: 'update', run: () => { follow(); } });
@@ -370,7 +370,7 @@ export const CLIENT_FEATURES: Readonly<Record<ClientFeatureKind, ClientFeature>>
 };
 export interface AdmittedClientPlan { readonly features: readonly ClientFeatureRow[] }
 /** Validate the whole plan and all required sections before the first feature can mutate the page. */
-export function admitClientPlan(input: unknown, product: ShardProduct): AdmittedClientPlan {
+export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedClientPlan {
   try {
     const plan = parseClientPlan(input);
     if(plan.features.some(row=>row.kind==='held.claims.install')&&plan.features.some(row=>row.kind==='held.melee'||row.kind==='held.ranged-page'))throw new Error('Held claims require their sole native equipment builder');
@@ -478,17 +478,17 @@ export function admitClientPlan(input: unknown, product: ShardProduct): Admitted
     }
     checkClientPlanModules(plan);
     return { features: plan.features };
-  } catch (error) { throw new ProductError(product.slug, 'client/plan', 'schema', error instanceof Error ? error.message : 'Invalid client plan'); }
+  } catch (error) { throw new FolderError(product.slug, 'client/plan', 'schema', error instanceof Error ? error.message : 'Invalid client plan'); }
 }
-const productPlans = new WeakMap<ShardProduct, AdmittedClientPlan>();
+const folderPlans = new WeakMap<ShardFolder, AdmittedClientPlan>();
 /** Capture one fully checked, detached immutable plan for this admitted product.
  * Runtime phases share this authority; arbitrary inputs still use admitClientPlan.
  * A replacement product owns a fresh admission even when its slug is unchanged. */
-export function admittedProductClientPlan(product: ShardProduct): AdmittedClientPlan {
-  const known = productPlans.get(product);
+export function admittedFolderClientPlan(product: ShardFolder): AdmittedClientPlan {
+  const known = folderPlans.get(product);
   if (known !== undefined) return known;
   const admitted = Object.freeze(admitClientPlan(product.section('client/plan'), product));
-  productPlans.set(product, admitted);
+  folderPlans.set(product, admitted);
   return admitted;
 }
 // Open arenas bind before rooms, independent of the product's feature order.

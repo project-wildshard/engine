@@ -8,7 +8,7 @@ import {hrtime} from 'node:process';
 import {resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Node imports the loader by file URL.
 import {pathToFileURL} from 'node:url';
-import {compileProductWorker} from './compileProductWorker.ts';
+import {compileFolderWorker} from './compileFolderWorker.ts';
 const cancellation=new AbortController();
 let prepared,preparing;
 // The outer20s bound cancels preparation as well as the already-running worlds.
@@ -16,7 +16,7 @@ process.once('SIGTERM',()=>{cancellation.abort();void(async()=>{
   await preparing?.catch(()=>undefined);prepared?.dispose();process.exit(143);
 })();});
 process.once('exit',()=>prepared?.dispose());
-preparing=compileProductWorker(undefined,cancellation.signal);
+preparing=compileFolderWorker(undefined,cancellation.signal);
 prepared=await preparing;
 const createSimulation=prepared.create;
 console.info('tape worker preparation complete');

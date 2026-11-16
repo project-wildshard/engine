@@ -9,7 +9,7 @@ import { decodeSimSnapshot } from '../../../src/shared/engine/sim/snapshot.ts';
 import { installAppIdentity } from '../../../src/shared/engine/app/identity.ts';
 import { WILDSHARD_IDENTITY } from '../../../src/client/game/identity.ts';
 import { createTrustedHeadlessAdapter } from '../../../src/server/host/headlessRuntime.ts';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct.ts';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder.ts';
 
 assert.equal(typeof document, 'undefined'); assert.equal(typeof window, 'undefined');
 installAppIdentity(WILDSHARD_IDENTITY);
@@ -17,7 +17,7 @@ const root = new URL('../../../', import.meta.url);
 const rapier = await loadRapier(readFileSync(new URL('public/assets/physics/rapier.wasm', root)));
 const assets = sourceAssets;
 // The same verified built runtime plan as the shipping worker, without a shard module URL.
-const adapter = await createTrustedHeadlessAdapter({ shard: source, assets, rapier, product: await loadHeadlessProduct('out/sunscar-dunes') });
+const adapter = await createTrustedHeadlessAdapter({ shard: source, assets, rapier, product: await loadHeadlessFolder('out/sunscar-dunes') });
 try {
   adapter.step([]);
   const commit = adapter.commit(), snapshot = decodeSimSnapshot(commit.snapshot);

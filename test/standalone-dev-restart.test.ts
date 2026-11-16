@@ -1,7 +1,7 @@
-import { runtimeAssets, builtProduct } from './fixtures/engine-lift/product';
+import { runtimeAssets, builtFolder } from './fixtures/engine-lift/folder';
 // oxlint-disable-next-line import/no-nodejs-modules -- The server half runs the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
-import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
+import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '@wildshard/engine/host/headlessRuntime';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -30,9 +30,9 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 test('AP19: the in-page server restarts on new quest rows, keeps the player where the page has it, and the client rejoins', async () => {
   vi.stubGlobal('__DEVSERVER__', true);
-  const directory = builtProduct('sunscar-dunes'), product = await loadHeadlessProduct(directory);
+  const directory = builtFolder('sunscar-dunes'), product = await loadHeadlessFolder(directory);
   const input: HeadlessRuntimeInput = { shard: product.shardfile, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product };
-  // the worker's reader makes its product of the patched shardfile (serverProduct.ts); here the fixture's product takes it
+  // the worker's reader makes its product of the patched shardfile (serverFolder.ts); here the fixture's product takes it
   const read: Shardfile[] = [];
   const load = (_boot: unknown, _slug: string, patch?: (shard: Shardfile) => Shardfile): Promise<HeadlessRuntimeInput> => {
     if (patch === undefined) return Promise.resolve(input);

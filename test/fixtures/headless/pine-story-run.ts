@@ -6,8 +6,8 @@ import {readFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Assertions concern actual execution in the bounded Node runner.
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {beginProductSession} from './productSession';
-import {productHeadlessSections} from '../../../src/shared/host/headlessSections';
+import {beginFolderSession} from './folderSession';
+import {folderHeadlessSections} from '../../../src/shared/host/headlessSections';
 import type {HeadlessRuntimePlan} from '../../../src/server/host/headlessRuntime';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import type {HeadlessTapeObservation,HeadlessTapeSegment} from '../../../src/shared/host/headlessTape';
@@ -24,7 +24,7 @@ import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 const started=performance.now();let phaseStart=started;
 const measured=(phase:string)=>{const now=performance.now();console.info(JSON.stringify({phase:'timing',stage:phase,milliseconds:now-phaseStart}));phaseStart=now;};
 installAppIdentity(WILDSHARD_IDENTITY);
-const slug='pine-hollow',session=await beginProductSession(slug,'pine-verbs'),{product}=session;
+const slug='pine-hollow',session=await beginFolderSession(slug,'pine-verbs'),{product}=session;
 measured('product-session');
 let resident:Awaited<ReturnType<typeof createNativeProofResident>>|undefined,retireRopes=()=>{ /* Nothing is installed until the resident is ready. */ };
 try{
@@ -32,7 +32,7 @@ try{
   const rapier=await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   // Retain the actual plan once so the controller reads its real nav/ground ports.
   let plan:HeadlessRuntimePlan|undefined;
-  resident=await createNativeProofResident({shard:product.shardfile,assets,product,rapier,sections:productHeadlessSections(product)},async preparation=>{
+  resident=await createNativeProofResident({shard:product.shardfile,assets,product,rapier,sections:folderHeadlessSections(product)},async preparation=>{
     plan=await prepareHeadlessRuntime(preparation);return plan;
   });
   assert.ok(plan);const active=resident;measured('resident');

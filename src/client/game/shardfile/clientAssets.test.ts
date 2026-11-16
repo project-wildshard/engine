@@ -79,7 +79,7 @@ test('verified rereads are labelled without introducing a transport memo or anot
   setDev(true);
   const f = fixture(), verifiedAsset = vi.fn(() => Promise.resolve(f.bytes));
   const assets = new ClientAssets(f.source, new Map(), { ...f.options, cache: {
-    product: () => Promise.resolve(null), putProduct: () => Promise.resolve(),
+    product: () => Promise.resolve(null), putFolder: () => Promise.resolve(),
     asset: () => Promise.reject(new Error('Unexpected unverified read')),
     putAsset: () => Promise.resolve(true), verifiedAsset,
   } });
@@ -97,7 +97,7 @@ test('ordinary reads add no diagnostic rows and invalid verified bytes still ref
   expect(f.rows()).toHaveLength(0);
   setDev(true);
   const invalid = new ClientAssets(f.source, new Map(), { ...f.options, cache: {
-    product: () => Promise.resolve(null), putProduct: () => Promise.resolve(),
+    product: () => Promise.resolve(null), putFolder: () => Promise.resolve(),
     asset: () => Promise.resolve(null), putAsset: () => Promise.resolve(true),
     verifiedAsset: () => Promise.resolve(new Uint8Array([1])),
   } });
@@ -111,7 +111,7 @@ test('concurrent released reads borrow one verified backing only until the wave 
   const wave = new Promise<Uint8Array>(resolve => { complete = resolve; });
   const verifiedAsset = vi.fn(() => wave);
   const assets = new ClientAssets(f.source, new Map(), { ...f.options, cache: {
-    product: () => Promise.resolve(null), putProduct: () => Promise.resolve(),
+    product: () => Promise.resolve(null), putFolder: () => Promise.resolve(),
     asset: () => Promise.reject(new Error('Unexpected unverified read')),
     putAsset: () => Promise.resolve(true), verifiedAsset,
   } });
@@ -128,7 +128,7 @@ test('concurrent released reads borrow one verified backing only until the wave 
 test('a refused concurrent wave keeps its exact guard and a later read retries', async () => {
   const f = fixture(), verifiedAsset = vi.fn(() => Promise.resolve(new Uint8Array([1])));
   const assets = new ClientAssets(f.source, new Map(), { ...f.options, cache: {
-    product: () => Promise.resolve(null), putProduct: () => Promise.resolve(),
+    product: () => Promise.resolve(null), putFolder: () => Promise.resolve(),
     asset: () => Promise.resolve(null), putAsset: () => Promise.resolve(true), verifiedAsset,
   } });
   const refused = await Promise.allSettled([assets.read(f.ref), assets.read(f.ref)]);
@@ -151,7 +151,7 @@ test('distinct declared reads stay parallel and do not share byte owners', async
   const completed = new Map<string, (bytes: Uint8Array) => void>();
   const verifiedAsset = vi.fn((hash: string) => new Promise<Uint8Array>(resolve => { completed.set(hash, resolve); }));
   const assets = new ClientAssets(f.source, new Map(), { ...f.options, cache: {
-    product: () => Promise.resolve(null), putProduct: () => Promise.resolve(),
+    product: () => Promise.resolve(null), putFolder: () => Promise.resolve(),
     asset: () => Promise.resolve(null), putAsset: () => Promise.resolve(true), verifiedAsset,
   } });
   const first = assets.read(f.ref), second = assets.read(other), bytes = new Uint8Array([4, 5, 6]);
@@ -168,7 +168,7 @@ test(flightGc, async () => {
     if (row === undefined) throw new Error('Missing fixture file');
     row.compressed = 1024 * 1024;
     const assets = new ClientAssets(f.source, new Map(), { ...f.options, cache: {
-      product: () => Promise.resolve(null), putProduct: () => Promise.resolve(),
+      product: () => Promise.resolve(null), putFolder: () => Promise.resolve(),
       asset: () => Promise.resolve(null), putAsset: () => Promise.resolve(true),
       verifiedAsset: () => Promise.resolve(new Uint8Array(1024 * 1024)),
     } });

@@ -1,7 +1,7 @@
 import type { QuestPageRows } from '@wildshard/format/questPageComposition';
 import type { AdventureContent } from '@wildshard/format/questStory';
 import type { InteractTable } from '@wildshard/engine/world/interact/types';
-import type { ShardProduct } from '../shardfile/shardProduct';
+import type { ShardFolder } from '../shardfile/shardFolder';
 
 interface AssemblyRows { readonly constants: { readonly interact: InteractTable; readonly interactSpots: unknown } }
 interface QuestPageReads {
@@ -27,7 +27,7 @@ function deferredRead<T>(read: Promise<T>): () => Promise<T> {
 
 /** Start only the page's three declared immutable inputs. Consumption, parsing
  * and scene/service publication remain at the existing ordered call sites. */
-export function startQuestPageReads(product: Pick<ShardProduct, 'file' | 'json'>, files: QuestPageRows['files']): QuestPageReads {
+export function startQuestPageReads(product: Pick<ShardFolder, 'file' | 'json'>, files: QuestPageRows['files']): QuestPageReads {
   const discovery = deferredRead(files.discovery === undefined ? Promise.resolve(null) : product.json<AdventureContent>(files.discovery));
   const stall = deferredRead(product.file(files.stall));
   const assembly = deferredRead(files.assembly === undefined ? Promise.resolve(null) : product.json<AssemblyRows>(files.assembly));

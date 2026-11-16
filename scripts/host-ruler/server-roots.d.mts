@@ -1,4 +1,4 @@
-import type { ModuleRoot, ProductRoot } from './roots.mjs';
+import type { ModuleRoot, FolderRoot } from './roots.mjs';
 
 export declare const NATIVE_HOSTS: string;
 export declare const NATIVE_ASSEMBLY: string;
@@ -14,10 +14,10 @@ export interface NativeAssemblyRoots {
 export interface ServerRoots {
   readonly slug: string;
   readonly hosts: readonly string[];
-  readonly roots: readonly ProductRoot[];
+  readonly roots: readonly FolderRoot[];
   readonly unmeasured: readonly { readonly host: string; readonly reason: string }[];
   readonly modules: readonly ModuleRoot[];
 }
 export function nativeAssemblyRoots(input?: { readonly root?: string; readonly hosts?: { readonly path: string; readonly source: string }; readonly assembly?: { readonly path: string; readonly source: string } }): NativeAssemblyRoots;
 export function serverRootsFrom(product: { readonly slug: string; readonly hosts: readonly string[] | null }, table?: NativeAssemblyRoots): ServerRoots;
-export function productServerRoots(dir: string, table?: NativeAssemblyRoots): ServerRoots;
+export function folderServerRoots(dir: string, table?: NativeAssemblyRoots): ServerRoots;

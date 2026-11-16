@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { frozenAsset } from './fixtures/frozen/assets';
 import * as rigLoader from '../src/client/engine/anim/rig';
-import * as lookCompiler from '../src/client/game/shardfile/runtimeProduct';
+import * as lookCompiler from '../src/client/game/shardfile/runtimeFolder';
 import { ToonLook } from '../src/client/engine/render/families/toon';
 import { BufferGeometry, InterleavedBufferAttribute, Color, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector2, Vector3, Vector4 } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';

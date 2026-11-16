@@ -42,7 +42,7 @@ import { equipmentActorOwner } from './actors';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { ProjectedTrail } from '@wildshard/engine/combat/view/projectedTrail';
 import type { ArcWeaponPower } from '../weapons/arcPower';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { SpecimenBookSchema } from '@wildshard/format/specimenCatalogue';
 import { defineSpecimenCatalogue,prepareSpecimenCatalogue } from '../models/specimenCatalogue';
 import { createModelLibrary } from '../plugin/geometry';
@@ -263,15 +263,15 @@ class HeldClaim extends ItemPickup {
 
 type SlotCatalogue=ReturnType<typeof defineSpecimenCatalogue<Record<string,object>>>;
 interface SlotMetadata {
-  readonly product:ShardProduct;
-  readonly source:ShardProduct['shardfile'];
-  readonly items:ShardProduct['shardfile']['items'];
+  readonly product:ShardFolder;
+  readonly source:ShardFolder['shardfile'];
+  readonly items:ShardFolder['shardfile']['items'];
   readonly files:readonly {readonly name:string;readonly url:string}[];
   readonly file:string;
   readonly declaration:string;
-  readonly readFile:ShardProduct['file'];
-  readonly readJson:ShardProduct['json'];
-  readonly resolveUrl:ShardProduct['url'];
+  readonly readFile:ShardFolder['file'];
+  readonly readJson:ShardFolder['json'];
+  readonly resolveUrl:ShardFolder['url'];
   catalogue:SlotCatalogue|null;
   readonly bows:Map<string,Promise<ReturnType<typeof bindHeldBow>>>;
   loaded:boolean;
@@ -286,7 +286,7 @@ function freezeSlotRows(value:unknown):void {
   for(const child of children)freezeSlotRows(child);
   Object.freeze(value);
 }
-const productSlots=new WeakMap<ShardProduct,Map<string,HeldClaims>>();
+const folderSlots=new WeakMap<ShardFolder,Map<string,HeldClaims>>();
 const catalogues = new Map<string, HeldClaims>();
 /** Client-only held melee families, world claims and Explorer cards. The shard supplies rows and platform contexts. */
 export class HeldClaims {
@@ -328,13 +328,13 @@ export class HeldClaims {
   static fromSlots(input:unknown):HeldClaims {return new HeldClaims(null,input);}
   /** Product/id-pinned metadata only. Cold admission never prepares native
    * equipment, decodes packed geometry or installs an entered factory. */
-  static fromProductSlots(product:ShardProduct,input:unknown,file:string):HeldClaims {
+  static fromFolderSlots(product:ShardFolder,input:unknown,file:string):HeldClaims {
     const rows=parseHeldSlots(input),declaration=JSON.stringify(rows);
     const names=[file,...rows.slots.flatMap(row=>row.kind==='blade'?(row.source.kind==='passes'?[row.source.file]:row.source.framing===undefined?[]:[row.source.framing])
       :row.kind==='tool'?[row.source,row.presentation]:[row.file])];
     if(names.some(name=>!product.hasFile(name)))throw new Error('Missing held source file');
     const files=[...new Set(names)].map(name=>({name,url:product.url(name)}));
-    let owners=productSlots.get(product);
+    let owners=folderSlots.get(product);
     const previous=owners?.get(rows.id);
     if(previous!==undefined){
       const kept=previous.metadata;
@@ -343,7 +343,7 @@ export class HeldClaims {
     }
     const held=HeldClaims.fromSlots(rows);freezeSlotRows(held.slots);
     held.metadata={product,source:product.shardfile,items:product.shardfile.items,files,file,declaration,readFile:product.file,readJson:product.json,resolveUrl:product.url,catalogue:null,bows:new Map(),loaded:false,preparing:false,ready:null,sources:null};
-    if(owners===undefined){owners=new Map();productSlots.set(product,owners);}
+    if(owners===undefined){owners=new Map();folderSlots.set(product,owners);}
     owners.set(rows.id,held);return held;
   }
   private checkSlotMetadata(metadata:SlotMetadata):void {
@@ -399,7 +399,7 @@ export class HeldClaims {
 
   /** Original pool/profile memo belongs to the pinned product metadata, not an
    * entered body. A retired consumer still refuses before native allocation. */
-  private loadBow(product:ShardProduct,file:string):Promise<ReturnType<typeof bindHeldBow>> {
+  private loadBow(product:ShardFolder,file:string):Promise<ReturnType<typeof bindHeldBow>> {
     const known=this.metadata?.bows.get(file);if(known!==undefined)return known;
     const read=(async()=>{
       const url=product.url(file),{pool,...definition}=await product.json<HeldBowFileRows>(file);

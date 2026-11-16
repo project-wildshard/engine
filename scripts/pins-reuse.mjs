@@ -207,7 +207,7 @@ function pinHashes(root){
  * product (installed from the frozen format package, named by no pin) is never stale.
  * @param {string} root @returns {{folder:string,revision:unknown}[]}
  */
-export function stalePinProducts(root){
+export function stalePinFolders(root){
  let want;
  try{want=new Set(pinHashes(root));}catch{return [];}
  let folders;
@@ -220,7 +220,7 @@ export function stalePinProducts(root){
   // named by no pin on purpose, so it is current while its index is the installed format package's (TEMPLATE-E2E, 2026-11-16)
   // and stale once the dependency moves past it.
   if(typeof source==='object'&&source!==null&&'kind'in source&&source.kind==='format-dependency'){
-   if(!currentFormatProduct(root,source))stale.push({folder,revision:typeof pin==='object'&&pin!==null&&'revision'in pin?pin.revision:undefined});
+   if(!currentFormatFolder(root,source))stale.push({folder,revision:typeof pin==='object'&&pin!==null&&'revision'in pin?pin.revision:undefined});
    continue;
   }
   if(typeof pin!=='object'||pin===null||!('hash'in pin)||typeof pin.hash!=='string')continue;
@@ -229,12 +229,12 @@ export function stalePinProducts(root){
  return stale;
 }
 
-/** A full `pnpm pins` removes every out/ product `stalePinProducts` names, so land's gen:inputs never refuses a tree the pins
+/** A full `pnpm pins` removes every out/ product `stalePinFolders` names, so land's gen:inputs never refuses a tree the pins
  * just installed (opus-bugfix2, 2026-11-16: the Brasscap rename left a worktree's out/blender-template behind until a hand
  * rm -rf). Only folders under out/ with a pin receipt; anything else in out/ stays. Their public/ mounts went with the ledger.
  * @param {string} root @returns {{folder:string,revision:unknown}[]} the products removed */
 export function pruneStalePinProducts(root){
- const stale=stalePinProducts(root).filter(row=>folderName(row.folder));
+ const stale=stalePinFolders(root).filter(row=>folderName(row.folder));
  for(const {folder} of stale){
   insideTree(root,join('out',folder));
   rmSync(join(root,'out',folder),{recursive:true,force:true});
@@ -245,7 +245,7 @@ export function pruneStalePinProducts(root){
 /** Whether a format-dependency receipt's `source` (`{path:'@wildshard/format/<folder>', indexHash}`, scripts/pin-format.ts)
  * names the `shard.json` the tree's installed format package holds today.
  * @param {string} root @param {object} source @returns {boolean} */
-function currentFormatProduct(root,source){
+function currentFormatFolder(root,source){
  const path='path'in source&&typeof source.path==='string'?source.path:'',indexHash='indexHash'in source?source.indexHash:undefined;
  const folder=path.startsWith('@wildshard/format/')?path.slice('@wildshard/format/'.length):'';
  if(folder===''||folder.split('/').includes('..'))return false;

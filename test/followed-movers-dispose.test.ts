@@ -7,8 +7,8 @@ import { Physics } from '../src/shared/engine/physics/Physics';
 import type { MoverPose } from '../src/shared/engine/physics/mover';
 import { installFollowedMovers } from '../src/client/game/plugin/followedMovers';
 import { wirePage } from '../src/client/game/shardfile/wirePage';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from '../src/test/game/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from '../src/test/game/builtFolder';
 
 // GRID-CROSSING GC30b (preview 1b2f1ac8, Driftwood to Far Reach): "proof.worker.present: null pointer passed to rust". A cell's
 // movers lend the wire their views (`wirePage.movers`), and the cell's scope frees their bodies when it goes, but the views
@@ -20,7 +20,7 @@ const BOAT = 'driftwood.boat';
 afterEach(() => { wirePage.movers.clear(); });
 
 async function cell(physics: Physics, name: string): Promise<{ scope: Scope; install: () => void }> {
-  const shard = (await loadHeadlessProduct(builtProduct('driftwood-isle'))).shardfile, row = shard.movers.find(mover => mover.id === BOAT);
+  const shard = (await loadHeadlessFolder(builtFolder('driftwood-isle'))).shardfile, row = shard.movers.find(mover => mover.id === BOAT);
   if (row === undefined) throw new Error('Driftwood\'s boat is no longer a mover');
   const scope = new Scope(name), ctx = { scope, debug: { expose: () => undefined } } as unknown as Install[0];
   const world = { physics, player: { carried: false } } as unknown as Install[1];

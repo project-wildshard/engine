@@ -9,12 +9,12 @@ import type { AnimalRigContext } from '@wildshard/engine/entities/animalRig';
 import { numericCreaturePoseFromBook } from '../../../shared/game/plugin/channelPrograms';
 import { creatureFrame } from '../../../shared/game/plugin/creatureFrame';
 import type { NativeCreaturePoseRecipe } from '../../../shared/game/plugin/animation';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { EncounterIntake } from './encounterIntake';
 
 /** Additional encounter recipes come from the page's complete admitted book.
  * This only preflights metadata: no actor, entropy or outcome is created. */
-export async function readEncounterIntake(product:Pick<ShardProduct,'json'>,kinds:readonly string[],file='actors/sheep.json'):Promise<EncounterIntake> {
+export async function readEncounterIntake(product:Pick<ShardFolder,'json'>,kinds:readonly string[],file='actors/sheep.json'):Promise<EncounterIntake> {
   if(kinds.length>16||new Set(kinds).size!==kinds.length)throw new Error('Duplicate native arena species');
   const actors=v.parse(SpeciesActorsFileSchema,await product.json(file));
   const rows=kinds.map(kind=>{const row=actors.species.lookBook.rows.find(candidate=>candidate.metadata.kind===kind);
@@ -38,7 +38,7 @@ const finite=v.pipe(v.number(),v.finite());
 const Bones=v.pipe(v.array(v.object({name:v.string(),parent:v.nullable(v.string()),pos:v.tuple([finite,finite,finite])})),v.maxLength(32));
 /** Native contact joints and exact custom animations from the admitted page
  * body and look books, never approximate target capsules. */
-export async function readEncounterPoses(product:Pick<ShardProduct,'json'>,kinds:readonly string[],files:{readonly actors:string;readonly looks:string}=ACTOR_BOOKS):Promise<{
+export async function readEncounterPoses(product:Pick<ShardFolder,'json'>,kinds:readonly string[],files:{readonly actors:string;readonly looks:string}=ACTOR_BOOKS):Promise<{
   rows:readonly {kind:string;variant:string;pose:NativeCreaturePoseRecipe}[];
   animations:(ground:(x:number,z:number)=>number)=>ReadonlyMap<string,(context:AnimalRigContext)=>void>;
 }> {

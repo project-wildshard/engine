@@ -5,7 +5,7 @@ import { installCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { RAPIER_WASM_URL } from '@wildshard/engine/physics/wasmUrl';
 import { askHeldReads, type HeldRead } from '../../../shared/host/standalone/heldReads';
 import { runStandaloneServer } from './serverHost';
-import { fetchGridCollision, fetchServerProduct } from './serverProduct';
+import { fetchGridCollision, fetchServerFolder } from './serverFolder';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 
 /** What a page hands its server's worker: what its document holds and a worker's realm has no way to read. */
@@ -44,7 +44,7 @@ export function runServerWorker(event: MessageEvent<unknown>): void {
   const [control, game, harness, reads] = event.ports;
   if (control === undefined || game === undefined) return;
   const held = reads === undefined ? undefined : askHeldReads(reads);
-  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, ...typeof start.goto === 'string' && start.enter !== undefined && start.enter !== null ? { enter: start.enter } : {}, load: async (boot, slug, patch) => fetchServerProduct(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held), held, patch, ownsServer(start, slug)),
+  runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, ...typeof start.goto === 'string' && start.enter !== undefined && start.enter !== null ? { enter: start.enter } : {}, load: async (boot, slug, patch) => fetchServerFolder(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held), held, patch, ownsServer(start, slug)),
     strips: boot => fetchGridCollision(boot.base),
     onSaveRefused: error => { console.warn('Standalone save refused, falling back', error); } });
 }

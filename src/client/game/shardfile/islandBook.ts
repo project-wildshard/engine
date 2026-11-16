@@ -8,16 +8,16 @@ import { resourceScope } from '@wildshard/engine/app/resources';
 import type { IslandLibrary } from '../models/islandLibrary';
 import { ResolvedIslandLibrarySchema } from '@wildshard/format/islandLibrary';
 import type { defineWorldSceneCatalogue } from '../models/worldSceneCatalogue';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 type AssemblyRow = Extract<ClientFeatureRow, { kind: 'world.assembly' }>;
-const books = new WeakMap<ShardProduct, Map<string, {
+const books = new WeakMap<ShardFolder, Map<string, {
   readonly root: unknown; readonly row: string;
   readonly pending: Promise<{ readonly library: IslandLibrary<unknown>; readonly sites: ReturnType<typeof defineWorldSceneCatalogue> }>;
 }>>();
 
 /** Whole-plan preflight; only already-admitted section values and file names. */
-export function preflightIslandBook(product: ShardProduct, row: AssemblyRow): void {
+export function preflightIslandBook(product: ShardFolder, row: AssemblyRow): void {
   const assembly = v.parse(WorldAssemblySchema, row.rows), construction = assembly.construction;
   if (row.native !== undefined) {
     if (construction?.prelude === undefined || construction.progress.kind !== 'checkpoints' || construction.root !== undefined || construction.cells !== undefined || construction.publish !== undefined) throw new Error('Native assembly requires its original prelude and checkpoints');
@@ -53,7 +53,7 @@ export function preflightIslandBook(product: ShardProduct, row: AssemblyRow): vo
 
 /** Resolve the same declared product/id record for either entry order. This
  * uses only the pure plan parser, never recursive whole-plan admission. */
-export async function admittedIslandBook(product: ShardProduct, id: string): Promise<{
+export async function admittedIslandBook(product: ShardFolder, id: string): Promise<{
   readonly library: IslandLibrary<unknown>; readonly sites: ReturnType<typeof defineWorldSceneCatalogue>;
 }> {
   const owner = resourceScope();

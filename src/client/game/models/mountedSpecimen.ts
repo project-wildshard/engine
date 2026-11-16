@@ -4,7 +4,7 @@ import type { BufferGeometry, Material, Object3D } from 'three';
 import { creatureFactory } from '@wildshard/engine/models/creature';
 import { defineModel, type ModelContext, type ModelDef } from '@wildshard/engine/models/model';
 import { MountedSpecimenSchema, MountedSpecimenSeatSchema, type MountedSpecimenSeatRows } from '@wildshard/format/mountedSpecimenRows';
-import { loadFirstPartyProduct } from '../shardfile/runtimeProduct';
+import { loadFirstPartyFolder } from '../shardfile/runtimeFolder';
 import { seatedFigureView,prepareSeatedFigure } from '../riding/seatedFigure';
 
 /** The factory's ports (a test seam; `defineMountedSpecimen` is the real ones): the named product's JSON read, the
@@ -15,7 +15,7 @@ export interface MountedSpecimenPorts {
   readonly figure: (rows: MountedSpecimenSeatRows, own: (resource: BufferGeometry | Material) => void, files?:ReadonlyMap<string,Uint8Array>) => { readonly root: Object3D };
 }
 const PORTS: MountedSpecimenPorts = {
-  product: slug => loadFirstPartyProduct(slug),
+  product: slug => loadFirstPartyFolder(slug),
   rig: (ctx, species, variant, tint) => { const factory = creatureFactory(ctx); return factory.instantiate(factory.model(species, variant), tint); },
   figure: (rows, own,files) => seatedFigureView(rows, own,files),
 };

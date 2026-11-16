@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { applyRegister, codeLines, createTreeReader, formatInventory, formatTable, inventory, layerOf, OPTIONS, optionCharges, shardTotals, measure, oneUserLines, productRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
+import { applyRegister, codeLines, createTreeReader, formatInventory, formatTable, inventory, layerOf, OPTIONS, optionCharges, shardTotals, measure, oneUserLines, folderRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
 import { CLIENT_PLAN, clientPlanRoots } from '../scripts/host-ruler/roots.mjs';
 import { NATIVE_ASSEMBLY, NATIVE_HOSTS } from '../scripts/host-ruler/server-roots.mjs';
 
@@ -41,8 +41,8 @@ describe('tables are not users (HA0 a, b)', () => {
 });
 
 describe('a product is charged exactly its declared kind', () => {
-  const a = productRootModules('test/fixtures/host-ruler/closure-a', { plan });
-  const b = productRootModules('test/fixtures/host-ruler/closure-b', { plan });
+  const a = folderRootModules('test/fixtures/host-ruler/closure-a', { plan });
+  const b = folderRootModules('test/fixtures/host-ruler/closure-b', { plan });
   const modules = measure([a, b], reader);
   const only = (slug: string) => [...modules].filter(([, row]) => row.users.length === 1 && row.users[0] === slug).map(([module]) => module).sort();
 
@@ -173,8 +173,8 @@ describe('the platform rule and the register\'s gates (HR6, HA0 f)', () => {
 });
 
 describe('optional sub-rows (HR7, HA0 c)', () => {
-  const c = productRootModules('test/fixtures/host-ruler/option-c', { plan });
-  const d = productRootModules('test/fixtures/host-ruler/option-d', { plan });
+  const c = folderRootModules('test/fixtures/host-ruler/option-c', { plan });
+  const d = folderRootModules('test/fixtures/host-ruler/option-d', { plan });
   const modules = measure([c, d], reader);
   const charges = optionCharges(modules, [c, d], reader);
 

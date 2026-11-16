@@ -17,7 +17,7 @@ import type { LoadStage } from '../shard/load';
 import type { GridRecoveryRecord } from '../../../shared/game/grid/recovery';
 import type { PageResidency } from '../grid/pageResidency';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { CrashResume } from './crashResume';
 
 export interface KitPorts {
@@ -57,5 +57,5 @@ export interface SessionContext {
   manifest: ShardManifest; slug: string; stage: LoadStage;
   boot: StagedBoot; session: SessionState; kit: KitPorts;
   /** the shard's built output, loaded before the first hook; bound into its look and roster loaders (`toLevelSpec`) */
-  product: ShardProduct;
+  product: ShardFolder;
 }

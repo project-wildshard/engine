@@ -1,12 +1,12 @@
 import { expect, test, vi } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import type { ShardContext } from '../src/client/game/plugin/context';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { emptyShardfile } from '../src/shared/host/author';
 import { CLIENT_FEATURES, admitClientPlan, installClientPhase } from '../src/client/game/shardfile/clientPlan';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import * as claims from '../src/client/game/shardfile/heldClaimsEntry';
-import * as creatures from '../src/client/game/population/productCreatures';
+import * as creatures from '../src/client/game/population/folderCreatures';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
 
@@ -16,7 +16,7 @@ function fixture(namedFile = true, omitLegacy?: 'economy/loot' | 'look/hull-book
   if (omitLegacy !== undefined) sections.delete(omitLegacy);
   const files = new Map<string, { hash: string; url: string }>();
   if (namedFile) files.set('actors/creature-install.json', { hash: '0'.repeat(64), url: 'https://example.invalid/creature-install.json' });
-  const product = createShardProduct({ slug: source.identity.slug, revision: 1, shardfile: source, sections, files,
+  const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections, files,
     read: () => Promise.reject(new Error('No fixture read permitted')) });
   const scope = new Scope('kit-orchard'), ctx = legacyDouble<ShardContext>({ scope, product });
   return { scope, ctx };
@@ -27,7 +27,7 @@ test('unordered kit rows retain prepare, creatures, install, paths and catalogue
   const f = fixture(), order: string[] = [];
   const prepare = vi.spyOn(claims, 'prepareHeldClaimsEntry').mockImplementation((_ctx, id) => { order.push(`prepare:${id}`); return Promise.resolve(); });
   const install = vi.spyOn(claims, 'installHeldClaimsEntry').mockImplementation((_ctx, id) => { order.push(`install:${id}`); });
-  const populate = vi.spyOn(creatures, 'installProductCreatures').mockImplementation(() => { order.push('creatures'); return Promise.resolve(); });
+  const populate = vi.spyOn(creatures, 'installFolderCreatures').mockImplementation(() => { order.push('creatures'); return Promise.resolve(); });
   const path = vi.spyOn(CLIENT_FEATURES['world.paths'], 'install').mockImplementation(() => { order.push('paths'); });
   const items = vi.spyOn(CLIENT_FEATURES['content.catalogue'], 'install').mockImplementation(() => { order.push('catalogue'); });
   try {
@@ -64,7 +64,7 @@ test('leaving during claims preparation constructs no product creatures', async 
   const f = fixture();
   const prepare = vi.spyOn(claims, 'prepareHeldClaimsEntry').mockImplementation(() => { f.scope.dispose(); return Promise.resolve(); });
   const install = vi.spyOn(claims, 'installHeldClaimsEntry');
-  const populate = vi.spyOn(creatures, 'installProductCreatures');
+  const populate = vi.spyOn(creatures, 'installFolderCreatures');
   try {
     const plan = admitClientPlan({ version: 1, features: [...pair, { kind: 'population.product-creatures' }] }, f.ctx.product);
     await expect(installClientPhase(f.ctx, plan, 'kit', f.scope)).rejects.toThrow();

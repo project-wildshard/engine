@@ -5,11 +5,11 @@ import { dirname, resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare bank bytes without relying on assertion-library typed-array formatting.
 import { createHash } from 'node:crypto';
 import { expect, test, vi } from 'vitest';
-import { createAdmittedProductCache } from '../src/test/game/headless/admittedProductCache';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { createAdmittedFolderCache } from '../src/test/game/headless/admittedFolderCache';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
-import { productClosureFile } from '../src/shared/game/shardfile/shardProduct';
-import { shardProductData } from '../src/shared/game/shardfile/productData';
+import { folderClosureFile } from '../src/shared/game/shardfile/shardFolder';
+import { shardFolderData } from '../src/shared/game/shardfile/folderData';
 import { emptyShardfile } from '../src/shared/host/author';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
@@ -19,7 +19,7 @@ const digest = (bytes: Uint8Array): string => createHash('sha256').update(bytes)
 
 /** Real disk admission and blob verification, with one server and one page file.
  * Integration journeys separately exercise complete shipped products. */
-async function fixture(): Promise<{ directory: string; admitted: Awaited<ReturnType<typeof loadHeadlessProduct>> }> {
+async function fixture(): Promise<{ directory: string; admitted: Awaited<ReturnType<typeof loadHeadlessFolder>> }> {
   const root = resolve('tmp/codex-wire'); mkdirSync(root, { recursive: true });
   const directory = mkdtempSync(`${root}/product-cache-`);
   try {
@@ -46,16 +46,16 @@ async function fixture(): Promise<{ directory: string; admitted: Awaited<ReturnT
       admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps,
         critical: source.critical, library: source.library }, sections, schemas: [], files, runtime: null });
     put('shard.json', encode(index));
-    return { directory, admitted: await loadHeadlessProduct(directory) };
+    return { directory, admitted: await loadHeadlessFolder(directory) };
   } catch (error) { rmSync(directory, { recursive: true, force: true }); throw error; }
 }
 
 test('TS7: repeated borrowers share one admission and disk read, with independent complete worker banks', async () => {
   const { directory, admitted } = await fixture();
   try {
-    const reads = vi.fn((ref: string) => productClosureFile(admitted, ref));
-    const load = vi.fn(async () => shardProductData(admitted.shardfile, 'file:///fixture/', reads));
-    const cached = createAdmittedProductCache(load);
+    const reads = vi.fn((ref: string) => folderClosureFile(admitted, ref));
+    const load = vi.fn(async () => shardFolderData(admitted.shardfile, 'file:///fixture/', reads));
+    const cached = createAdmittedFolderCache(load);
     const [first, second] = await Promise.all([cached(directory, 'full'), cached(directory, 'full')]);
     expect(load).toHaveBeenCalledTimes(1);
     const inventory = outputDescriptor(admitted.shardfile)?.index.files ?? [];
@@ -90,7 +90,7 @@ test('TS7: repeated borrowers share one admission and disk read, with independen
 test('TS7: changed identity and failed admission cannot reuse the previous bank', async () => {
   const { directory: scratch, admitted } = await fixture();
   const header = readFileSync(`${scratch}/shard.json`, 'utf8');
-  const load = vi.fn(async () => admitted), cached = createAdmittedProductCache(load);
+  const load = vi.fn(async () => admitted), cached = createAdmittedFolderCache(load);
   try {
     writeFileSync(`${scratch}/shard.json`, header);
     await cached(scratch, 'full');

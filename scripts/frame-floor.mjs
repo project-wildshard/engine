@@ -989,12 +989,12 @@ async function worker() {
     if (progress.sampledAt !== lastRoute?.sampledAt && progress.memory?.cost && progress.stop?.leg) {
       const { cost } = progress.memory, key = `${progress.documentOrigin}:${progress.stop.leg}`;
       const row = memoryJourney.get(key) ?? { leg: progress.stop.leg, samples: 0, playingPeakMB: 0, loadingPeakMB: 0,
-        productsMinBytes: cost.input.products, productsMaxBytes: 0 };
+        foldersMinBytes: cost.input.products, foldersMaxBytes: 0 };
       row.samples++;
       row.playingPeakMB = Math.max(row.playingPeakMB, cost.playing / 1e6);
       row.loadingPeakMB = Math.max(row.loadingPeakMB, cost.loading / 1e6);
-      row.productsMinBytes = Math.min(row.productsMinBytes, cost.input.products);
-      row.productsMaxBytes = Math.max(row.productsMaxBytes, cost.input.products);
+      row.foldersMinBytes = Math.min(row.foldersMinBytes, cost.input.products);
+      row.foldersMaxBytes = Math.max(row.foldersMaxBytes, cost.input.products);
       memoryJourney.set(key, row);
     }
     lastRoute = progress;

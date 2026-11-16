@@ -5,14 +5,14 @@ import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {createSimSnapshotSerializer,snapshotSimHostBytes} from '../src/shared/engine/sim/snapshot';
 import {questBooks} from '../src/shared/engine/quest/players';
 import {actRoutes} from '../src/shared/engine/sim/actRoutes';
-import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {openWorld} from '../src/server/host/openWorld';
-import {builtProduct,runtimeAssets} from './fixtures/engine-lift/product';
+import {builtFolder,runtimeAssets} from './fixtures/engine-lift/folder';
 
 // The room composition must install story continuation before native restore.
 // Two books, queued facts and a non-cadence tick must keep their exact suffix.
 test('a room resumes both chapter books without re-filing earned facts',async()=>{
-  const directory=builtProduct('nalati-grasslands'),product=await loadHeadlessProduct(directory);
+  const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory);
   const input={product,shard:product.shardfile,assets:runtimeAssets(product,directory),rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))};
   const live=await openWorld(input,{room:true}),writer=createSimSnapshotSerializer();
   let back:Awaited<ReturnType<typeof openWorld>>|undefined,legacy:Awaited<ReturnType<typeof openWorld>>|undefined;

@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { GridViewAdmissions } from './viewAdmissions';
-import { ApproachInputsDeferredError } from './productInputs';
+import { ApproachInputsDeferredError } from './folderInputs';
 
 const cell = { instance: 'cell' };
 test('headroom deferral retries only on cost change or actual demand', async () => {

@@ -8,7 +8,7 @@ import { resolve, join } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import { test } from "node:test";
 import { StandaloneGrid } from "../../src/server/host/standalone/gridServer.ts";
-import { loadHeadlessProduct } from "../../src/server/host/headlessProduct.ts";
+import { loadHeadlessFolder } from "../../src/server/host/headlessFolder.ts";
 import { ForwardedStorage } from "../../src/server/engine/saves/forwardedStorage.ts";
 import { LedgerBook } from "../../src/server/engine/net/ledgerBook.ts";
 import { NetClient } from "../../src/client/engine/net/client.ts";
@@ -21,7 +21,7 @@ import { WILDSHARD_IDENTITY } from "../../src/client/game/identity.ts";
 import { installCatalogue } from "../../src/shared/game/grid/catalogueSlot.ts";
 import { readGridCollision } from "../../src/shared/game/grid/gridCollision.ts";
 import { directLoopback } from "../../src/test/engine/netLoopback.ts";
-import { runtimeAssets } from "../fixtures/engine-lift/product.ts";
+import { runtimeAssets } from "../fixtures/engine-lift/folder.ts";
 
 const limit = 9500;
 void test(
@@ -49,7 +49,7 @@ void test(
     const load = async (slug) => {
       loaded.push(slug);
       const directory = `out/${slug}`,
-        product = await loadHeadlessProduct(directory);
+        product = await loadHeadlessFolder(directory);
       return {
         product,
         shard: product.shardfile,

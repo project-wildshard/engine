@@ -1,5 +1,5 @@
 import { flatPopulationEnvironment } from './fixtures/population-environment';
-import { builtProduct } from './fixtures/engine-lift/product';
+import { builtFolder } from './fixtures/engine-lift/folder';
 // oxlint-disable-next-line import/no-nodejs-modules -- Scenario uses the shipped Rapier binary.
 import { parseSpawnScript } from '@wildshard/format/spawnScripts';
 import { readSpeciesPrograms } from '@wildshard/format/speciesPrograms';
@@ -156,13 +156,13 @@ test('bad spawn recipes and forged saves refuse atomically without draws or gues
 
 
 test('published spawn catalogue admits v1 bytes without installing a second generic decision owner', async () => {
-  const { loadHeadlessProduct } = await import('@wildshard/engine/host/headlessProduct');
+  const { loadHeadlessFolder } = await import('@wildshard/engine/host/headlessFolder');
   const { readSpawnScript } = await import('../src/server/game/population/spawnScript');
   const { scriptAdmissionRows, decisionScriptsFromSections } = await import('@wildshard/format/scriptContract');
   const { SpawnScriptsSchema } = await import('@wildshard/format/spawnScripts');
   const { SECTION_HOSTS } = await import('../scripts/host-ruler/roots.mjs');
   expect(SECTION_HOSTS['actors/spawn-scripts']).toContain('src/server/game/population/spawnScript.ts#SpawnScript');
-  const product = await loadHeadlessProduct(builtProduct('pine-hollow'));
+  const product = await loadHeadlessFolder(builtFolder('pine-hollow'));
   const catalogue = product.section('actors/spawn-scripts');
   const rows = new Map<string, unknown>([['actors/spawn-scripts', catalogue], ['sim/scripts', product.section('sim/scripts')]]);
   expect(scriptAdmissionRows(rows).some(row => row.id === 'pine.night')).toBe(true);

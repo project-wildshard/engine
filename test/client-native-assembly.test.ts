@@ -9,7 +9,7 @@ import {parseClientPlan} from '@wildshard/format/clientPlan';
 import type {ShardContext} from '../src/client/game/plugin/context';
 import type {ShardWorld} from '../src/server/game/shard/world';
 import type {ShardRuntime} from '../src/shared/game/shard/runtime';
-import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
+import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
 import {installClientWorldAssembly} from '../src/client/game/shardfile/clientWorldAssembly';
 import {preflightIslandBook} from '../src/client/game/shardfile/islandBook';
 import {WorldAssembly} from '../src/client/game/shardfile/worldAssembly';
@@ -22,7 +22,7 @@ const rows={construction:{prelude:{draws:'models/book.json'},seed:1,progress:{ki
 function fixture(){
   const parent=new Scope('native-assembly'),scope=parent.child('entered'),construction=parent.child('world');
   const source=emptyShardfile({slug:'orchard',name:'Orchard',author:'Fixture',revision:1,seed:1});
-  const product=createShardProduct({slug:'orchard',revision:1,shardfile:source,sections:new Map(),files:new Map([['models/book.json',{hash:'book',url:'/book'}]]),read:()=>Promise.reject(new Error('Unexpected read'))});
+  const product=createShardFolder({slug:'orchard',revision:1,shardfile:source,sections:new Map(),files:new Map([['models/book.json',{hash:'book',url:'/book'}]]),read:()=>Promise.reject(new Error('Unexpected read'))});
   const steps:string[]=[],progress={set:vi.fn(),detail:vi.fn()};
   const step:StepRunner=(key,work)=>{steps.push(key);return Promise.resolve(work(progress));};
   const game=legacyDouble<Game>({levelScope:construction,scene:new Scene()});

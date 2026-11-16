@@ -1,5 +1,5 @@
 import {expect, test} from 'vitest';
-import {boundedResponse} from './product';
+import {boundedResponse} from './folder';
 
 function response(status: number): Response {
   const value = new Response(new Uint8Array([1, 2, 3]), {status});

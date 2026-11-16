@@ -1,9 +1,9 @@
-import { prepareProductPlan as prepareHeadlessRuntime } from '../src/test/game/headlessNative';
+import { prepareFolderPlan as prepareHeadlessRuntime } from '../src/test/game/headlessNative';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native checkpoint regression uses the shipped physics module.
 import { readFileSync } from 'node:fs';
 import { expect,test } from 'vitest';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from '../src/test/game/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from '../src/test/game/builtFolder';
 import { decodeTerrainTile } from '@wildshard/format/terrainTileBytes';
 import type { BakedGrid } from '@wildshard/format/bakedTerrainBytes';
 import { createSimHost,type SimHost } from '../src/server/engine/sim';
@@ -11,7 +11,7 @@ import { snapshotSimHost, serializeSimSnapshot, decodeSimSnapshot } from '../src
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { canonicalSimDigest } from '../src/test/engine/simState';
-import { productClosureFile } from '../src/shared/game/shardfile/shardProduct';
+import { folderClosureFile } from '../src/shared/game/shardfile/shardFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { leadCommands } from '@wildshard/engine/sim/leadPlayer';
 
@@ -23,12 +23,12 @@ function originalTerrain(bytes: Uint8Array | undefined,seed: number,row: { resol
   return { res: tile.resolution,size: tile.size,seed,landscapeHash: 0,heights: tile.heights,splat: tile.splat,undergrowth: null };
 }
 test('declared sampling rows retain the original native checkpoint and restore suffix',async () => {
-  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing pinned native output descriptor');
   const nativeFiles = new Set([product.shardfile.navigation?.file, product.shardfile.terrain?.sampling?.file]);
   const assets = new Map(await Promise.all(descriptor.index.files.filter(file => nativeFiles.has(file.hash)).map(async file => {
     const key = file.commons === true ? `commons:${file.hash}` : file.hash;
-    return [key, await productClosureFile(product, key)] as const;
+    return [key, await folderClosureFile(product, key)] as const;
   })));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const context={shard:product.shardfile,assets,rapier,product};

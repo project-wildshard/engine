@@ -14,16 +14,16 @@ import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { readWitnessManifest } from '../../../scripts/witness-checkpoints.mjs';
 import * as v from 'valibot';
-import type { ShardProduct } from '../../../src/shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../src/shared/game/shardfile/shardFolder';
 import { createSimHost, type SimHost } from '../../../src/server/engine/sim';
 import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost, type SimSnapshot } from '../../../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../../../src/server/engine/sim/restore';
 import { loadRapier, type Rapier } from '../../../src/shared/engine/physics/rapier';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 import { fillNativeCombatFrame, headlessAssemblyPorts, type HeadlessRuntimeInstallation, type HeadlessRuntimePlan } from '../../../src/server/host/headlessRuntime';
 import type { HeadlessCommand, HeadlessEffect } from '../../../src/shared/host/tickProtocol';
 import PINE_TERRAIN from '../../../src/shards/pine-hollow/data/terrainBindings.json' with { type: 'json' };
-import { prepareProductRuntimePlan } from '../../../src/server/game/shardfile/nativePlan';
+import { prepareFolderRuntimePlan } from '../../../src/server/game/shardfile/nativePlan';
 import { QUEST_STEP } from '../../../src/shards/pine-hollow/generators/questPrompts';
 import { nativeInventorySchema } from '../../../src/shared/game/inventoryLaw';
 import wardens from '../../../src/shards/pine-hollow/data/wardensHollow.json' with { type: 'json' };
@@ -46,14 +46,14 @@ import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
  */
 export const ENTRY = 'server/native-assembly.json';
 const ROOT = new URL('../../../', import.meta.url);
-let productDirectory: string | undefined;
+let folderDirectory: string | undefined;
 /** One pinned actual product for record, restored sessions and replay. */
-export function witnessProductDirectory(): string {
-  productDirectory ??= realpathSync(new URL('out/pine-hollow', ROOT));
-  return productDirectory;
+export function witnessFolderDirectory(): string {
+  folderDirectory ??= realpathSync(new URL('out/pine-hollow', ROOT));
+  return folderDirectory;
 }
-const witnessProduct = await loadHeadlessProduct(witnessProductDirectory());
-const source = witnessProduct.shardfile;
+const witnessFolder = await loadHeadlessFolder(witnessFolderDirectory());
+const source = witnessFolder.shardfile;
 const assets = new Map([PINE_TERRAIN.terrain, PINE_TERRAIN.navmesh].map(path => [path, new Uint8Array(readFileSync(new URL(path, ROOT)))] as const));
 
 /** One authoritative session: the host, the tick's lent commands and its committed effects. */
@@ -63,19 +63,19 @@ const requireValue = <T>(value: T | undefined | null, message: string): T => { i
 const digest = (host: SimHost): string => canonicalSimDigest(snapshotSimHost(host));
 
 export function pineRapier(): Promise<Rapier> { return loadRapier(readFileSync(new URL('public/assets/physics/rapier.wasm', ROOT))); }
-function nativeFiles(product: ShardProduct): NonNullable<ReturnType<typeof outputDescriptor>>['index']['files'] {
+function nativeFiles(product: ShardFolder): NonNullable<ReturnType<typeof outputDescriptor>>['index']['files'] {
   const descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing admitted native output');
   const required = new Set(product.shardfile.files.map(file => file.hash));
   return descriptor.index.files.filter(file => file.kind === 'wasm' || required.has(file.commons === true ? `commons:${file.hash}` : file.hash));
 }
 /** Fingerprint the same native header and byte closure the recorder/replay use. */
-export function witnessProductInputFiles(): readonly string[] {
-  const root = pathToFileURL(`${witnessProductDirectory()}/`);
-  return ['shard.json', ...nativeFiles(witnessProduct).map(file => file.path)].map(path => new URL(path, root).href);
+export function witnessFolderInputFiles(): readonly string[] {
+  const root = pathToFileURL(`${witnessFolderDirectory()}/`);
+  return ['shard.json', ...nativeFiles(witnessFolder).map(file => file.path)].map(path => new URL(path, root).href);
 }
-function nativeAssets(product: ShardProduct): Map<string, Uint8Array> {
-  const result = new Map(assets), root = pathToFileURL(`${witnessProductDirectory()}/`);
+function nativeAssets(product: ShardFolder): Map<string, Uint8Array> {
+  const result = new Map(assets), root = pathToFileURL(`${witnessFolderDirectory()}/`);
   for (const file of nativeFiles(product)) {
     const bytes = Uint8Array.from(readFileSync(new URL(file.path, root)));
     if (bytes.byteLength !== file.compressed || createHash('sha256').update(bytes).digest('hex') !== file.hash) throw new Error(`Native witness product blob differs: ${file.path}`);
@@ -84,8 +84,8 @@ function nativeAssets(product: ShardProduct): Map<string, Uint8Array> {
   return result;
 }
 export async function pinePlan(rapier: Rapier): Promise<HeadlessRuntimePlan> {
-  const product = await loadHeadlessProduct(witnessProductDirectory());
-  const plan: HeadlessRuntimePlan = await prepareProductRuntimePlan(product, nativeAssets(product), headlessAssemblyPorts(rapier));
+  const product = await loadHeadlessFolder(witnessFolderDirectory());
+  const plan: HeadlessRuntimePlan = await prepareFolderRuntimePlan(product, nativeAssets(product), headlessAssemblyPorts(rapier));
   return { ...plan, install: (host, installation) => {
     installCableModes(host.scope, product.shardfile.modes?.traverse ?? [], host.flags).bindNative(host);
     plan.install(host, installation);

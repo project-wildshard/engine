@@ -8,7 +8,7 @@ import { prepareQuestPageComposition, installQuestPageComposition } from '../que
 import { QuestPageReference } from '../quest/pageReference';
 import { installQuestFigures } from '../quest/figures';
 import { parseQuestFiguresDocument } from '@wildshard/format/questFigures';
-import { ProductFigureCatalogue } from '../models/figureCatalogue';
+import { FolderFigureCatalogue } from '../models/figureCatalogue';
 import { defineWorldSceneCatalogue } from '../models/worldSceneCatalogue';
 import type { ShardContext } from '../plugin/context';
 import { entryOwner, publishEntryOwner } from '../../../shared/game/shardfile/entryOwners';
@@ -52,7 +52,7 @@ export async function installEntryQuestComposition(ctx: ShardContext, row: Extra
   })();
   const figures = figureRow === undefined ? null : await (async () => {
     const input = figureRow.file === row.file ? rows : await ctx.product.json(figureRow.file); check();
-    const catalogue = await ProductFigureCatalogue.fromProduct(ctx.product, 'people/catalogue.json', residentWorldScope(ctx)); check();
+    const catalogue = await FolderFigureCatalogue.fromFolder(ctx.product, 'people/catalogue.json', residentWorldScope(ctx)); check();
     const modelRows = await ctx.product.json('models/world-scenes.json'); check();
     return { input: parseQuestFiguresDocument(input), catalogue, models: defineWorldSceneCatalogue(modelRows) };
   })();

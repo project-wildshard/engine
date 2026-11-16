@@ -1,18 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
+import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { encounterRows } from '../src/shared/engine/sim/encounterRows';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 // SERVER-PARITY HS3: the Storm Roc is a held boss, a home body. Far Reach's home kill plane (killY 6) killed it when it fell
 // off the crown, and its fight paid the victory, the Ledger fact and 25 coins for a death no player dealt (shard-sky-reach
 // 636d12e, SKY-2). A held boss under the plane goes back to its anchor, alive, and the fight carries on unpaid.
 const KILL_Y = 6;
 async function resident(slug: string): Promise<TrustedHeadlessResident> {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory);
   return createTrustedHeadlessResident({ product, shard: product.shardfile, assets: runtimeAssets(product, directory),
     rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) });
 }

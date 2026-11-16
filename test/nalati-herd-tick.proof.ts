@@ -7,13 +7,13 @@ import assert from 'node:assert/strict';
 // oxlint-disable-next-line import/no-nodejs-modules -- Load the ordinary pinned server physics asset.
 import { readFileSync } from 'node:fs';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../src/server/host/headlessRuntime.ts';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct.ts';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder.ts';
 import { loadRapier } from '../src/shared/engine/physics/rapier.ts';
 import type { AnimalSim } from '../src/shared/engine/entities/AnimalSim.ts';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer.ts';
 import { populationCensus } from '../src/shared/game/population/census.ts';
 import type { HeadlessCommand } from '../src/shared/host/tickProtocol.ts';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product.ts';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder.ts';
 
 /** Real steering follows the nearest living horse; no controller, body or clock is held. */
 function follow(live: TrustedHeadlessResident): { readonly distance: number; readonly commands: readonly HeadlessCommand[] } {
@@ -33,7 +33,7 @@ function follow(live: TrustedHeadlessResident): { readonly distance: number; rea
 // Run explicitly, never from pre-commit/pre-push:
 // node --experimental-transform-types --import ./scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts
 test('the full Nalati server keeps 60 Hz beside a reacting herd', { timeout: 9500 }, async (): Promise<void> => {
-  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory);
+  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory);
   const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets: runtimeAssets(product, directory),
     rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) });
   try {

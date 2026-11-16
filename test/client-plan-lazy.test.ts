@@ -2,7 +2,7 @@ import {expect,test,vi} from 'vitest';
 import {Scope} from '../src/shared/engine/app/scope';
 import type {ShardContext} from '../src/client/game/plugin/context';
 import {CLIENT_FEATURES,installClientPhase} from '../src/client/game/shardfile/clientPlan';
-import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
+import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
 import {emptyShardfile} from '../src/shared/host/author';
 import * as meadow from '../src/client/game/shardfile/clientMeadow';
 import * as scenes from '../src/client/game/shardfile/worldScenes';
@@ -10,7 +10,7 @@ import * as scenes from '../src/client/game/shardfile/worldScenes';
 function fixture(){
   const root=new Scope('feature.root'),scope=root.child('entered'),resident=new Scope('feature.resident');
   const source=emptyShardfile({slug:'cold-feature',name:'Cold feature',author:'Fixture',revision:1,seed:357});
-  const product=createShardProduct({slug:source.identity.slug,revision:1,shardfile:source,sections:new Map(),files:new Map(),read:()=>Promise.reject(new Error('No file expected'))});
+  const product=createShardFolder({slug:source.identity.slug,revision:1,shardfile:source,sections:new Map(),files:new Map(),read:()=>Promise.reject(new Error('No file expected'))});
   const ctx={scope,product} as ShardContext;
   return {root,scope,resident,ctx};
 }

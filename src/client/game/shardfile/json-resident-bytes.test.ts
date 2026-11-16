@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { isJsonData, jsonDataHeapBytes } from '@wildshard/format/json';
-import { jsonResidentBytes } from './productCost';
+import { jsonResidentBytes } from './folderCost';
 
 /** Retain the prior independent accounting pass for admitted ordinary data. */
 function original(input: unknown): number {

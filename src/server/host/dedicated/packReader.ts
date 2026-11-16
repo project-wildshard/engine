@@ -9,7 +9,7 @@ import { brotliDecompressSync } from 'node:zlib';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
-import { readGridCollisionPack, readServerProduct, type ServerRead } from '../standalone/serverProduct';
+import { readGridCollisionPack, readServerFolder, type ServerRead } from '../standalone/serverFolder';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { readPlatformItemCatalogue, type PlatformItemCatalogue } from '@wildshard/engine/game/loot/platformCatalogue';
 import { admitLedgerRewards, type LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
@@ -66,8 +66,8 @@ export function readPackGrid(build: string, options: PackReaderOptions, reads: P
   return readGridCollisionPack(new URL('shards/', options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, build, packRead(options, reads));
 }
 /** One shard's server inputs, through its build's book, or for a placed slug the book lacks, the cook's index of `hash` (SA47). */
-export async function readPackProduct(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads, hash?: string, catalogue: readonly LedgerCatalogueItem[] = [], exactHash?: boolean): Promise<HeadlessRuntimeInput> {
-  const input = await readServerProduct(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, () => build, packRead(options, reads), rapier, undefined, hash, undefined, false, exactHash);
+export async function readPackFolder(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads, hash?: string, catalogue: readonly LedgerCatalogueItem[] = [], exactHash?: boolean): Promise<HeadlessRuntimeInput> {
+  const input = await readServerFolder(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, () => build, packRead(options, reads), rapier, undefined, hash, undefined, false, exactHash);
   admitLedgerRewards(input.shard.ledger, catalogue);
   return { ...input, catalogue };
 }

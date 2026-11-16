@@ -22,7 +22,7 @@ export function shardManifestPath(root, slug) {
   return existsSync(resolve(root, `src/shards/${slug}/manifest.json`)) ? discoveryPath(root, slug, 'discovery.generated.ts') : `src/shards/${slug}/manifest.ts`;
 }
 /** A product's discovery module: its folder's, or one per declared output (SF88g, scripts/shard-outputs.mjs). */
-export function productManifestPath(root, product) {
+export function folderManifestPath(root, product) {
   return product.output === null ? shardManifestPath(root, product.slug) : discoveryPath(root, product.folder, `discovery.${product.slug}.generated.ts`);
 }
 /** Literal imports keep authored image strings inside the bundler's asset graph. An output of a source folder (SF88g) passes
@@ -140,7 +140,7 @@ export function authoredManifestSource(root, slug, { generation = false, metadat
   if (b.navigation) { const id = value(b.navigation, 'navigation'), ref = b.navigation.program === true ? `(${id})` : id;rows.push(`navigation: { row: ${ref}.navigation, url: ${ref}.url }`); }
   if (b.audioCues || b.audioPreload) rows.push(`audioBindings: { ${[...(b.audioCues ? [`cues: ${value(b.audioCues, 'audioCues')}`] : []), ...(b.audioPreload ? [`preload: async () => ${lazy(b.audioPreload, true)}`] : [])].join(', ')} }`);
   if (b.sword?.platform === 'graph') {
-    rows.push(`sword: async () => (await (await import('@wildshard/engine/game/systems/viewmodel/heldView')).HeldView.fromProduct(${JSON.stringify(slug)}, ${JSON.stringify(b.sword.file)})).sword()`);
+    rows.push(`sword: async () => (await (await import('@wildshard/engine/game/systems/viewmodel/heldView')).HeldView.fromFolder(${JSON.stringify(slug)}, ${JSON.stringify(b.sword.file)})).sword()`);
   } else if (b.sword?.rows) {
     const heldRows = value({ module: b.sword.rows, export: 'default' });
     rows.push(`sword: async () => (await import('@wildshard/engine/game/systems/viewmodel/heldView')).HeldView.admit({ kind: 'toon', ...${heldRows}.look }).sword()`);
@@ -153,14 +153,14 @@ export function authoredManifestSource(root, slug, { generation = false, metadat
   if (b.render?.platform === 'toon') native.push("render: async (product) => (await import('@wildshard/engine/game/looks/toonLook')).toonLook(product)");
   if (declared.includes('ground')) native.push(`ground: { ...${built('ground')}, ...${JSON.stringify(data.ground ?? {})} }`);
   else if (b.ground) native.push(`ground: ${value(b.ground)}`);
-  if (b.render?.platform === 'painted') native.push("render: async (product) => (await import('@wildshard/engine/game/looks/paintedLook')).productPaintedLook(product)");
+  if (b.render?.platform === 'painted') native.push("render: async (product) => (await import('@wildshard/engine/game/looks/paintedLook')).folderPaintedLook(product)");
   if (b.render?.platform === 'keyed') native.push(`render: async (product) => (await import('@wildshard/engine/game/looks/keyedSky')).keyedSkyRender(product, { channels: ${JSON.stringify(b.render.channels)}, looks: ${value(b.render.looks)}, trim: ${value(b.render.trim)}[${JSON.stringify(b.render.trimRow)}] })`);
   if (b.render?.platform === 'post') native.push(`render: async (product) => (await import('@wildshard/engine/game/looks/postGraphLook')).postGraphLook(product, { file: ${JSON.stringify(b.render.file)}, field: ${JSON.stringify(b.render.field)} })`);
   if (b.roster?.platform === 'held') native.push(`roster: async () => (await import('@wildshard/engine/game/models/heldGear')).heldArmsGear(${value({ module: b.roster.rows, export: 'default' })})`);
   for (const key of ['render', 'roster']) if (b[key] && b[key].platform === undefined) {
     if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/u.test(b[key].export)) throw new Error(`${file}: invalid lazy binding export`);
     // a called look or roster factory gets the shard's product (toLevelSpec binds it; product-in-look-o272)
-    native.push(key === 'render' || b[key].call === true ? `${key}: async (product) => callWithProduct(${lazy(b[key], false)}, product)` : `${key}: async () => ${lazy(b[key], false)}`);
+    native.push(key === 'render' || b[key].call === true ? `${key}: async (product) => callWithFolder(${lazy(b[key], false)}, product)` : `${key}: async () => ${lazy(b[key], false)}`);
   }
   if (b.entry) {
     if (b.load) throw new Error(`${file}: entry and load are mutually exclusive`);
@@ -190,7 +190,7 @@ export function authoredManifestSource(root, slug, { generation = false, metadat
   if (b.posesLoader) native.push(`dev: {poses: async () => ${lazy(b.posesLoader, true)}}`);
   // The helper lives in the generated file behind a type-only import, so a build of an older revision that meets this file
   // in a mirror (its generators import it before gen-shards rewrites it) still loads.
-  const forwards = native.some(row => row.includes('callWithProduct('));
+  const forwards = native.some(row => row.includes('callWithFolder('));
   // The committed dependency table describes this exact runtime import graph,
   // without needing any program values or previously emitted discovery file.
   const actualImports = ['../../game/client/shard/manifest', ...(composed === null ? ['./manifest.json'] : []),
@@ -203,11 +203,11 @@ export function authoredManifestSource(root, slug, { generation = false, metadat
   return `// Generated by scripts/gen-shards.mjs — do not edit or commit.
 import { ${['defineAuthoredShard', ...declared.map(key => DECLARED[key])].join(', ')} } from '../../game/client/shard/manifest';
 ${composed === null ? "import data from './manifest.json' with { type: 'json' };" : `const data = ${JSON.stringify(data)};`}${forwards ? `
-import type { ShardProduct } from '../../game/shared/shardfile/shardProduct';` : ''}
+import type { ShardFolder } from '../../game/shared/shardfile/shardFolder';` : ''}
 ${imports.join('\n')}
 ${paths.map((path, i) => `import image${i} from ${JSON.stringify(`./${relative(resolve(root, `src/shards/${folder}`), resolve(root, path.slice(1))).replaceAll('\\', '/')}`)};`).join('\n')}
 ${forwards ? `/** A look or roster factory called with the shard's product; a factory that takes none is accepted as it is. */
-const callWithProduct = <T>(make: (product: ShardProduct) => T, product: ShardProduct): T => make(product);
+const callWithFolder = <T>(make: (product: ShardFolder) => T, product: ShardFolder): T => make(product);
 ` : ''}const rows: Parameters<typeof defineAuthoredShard>[2] = { ${rows.join(', ')} };
 const native: Parameters<typeof defineAuthoredShard>[3] = { ${native.join(', ')} };
 export const MANIFEST: ReturnType<typeof defineAuthoredShard> = defineAuthoredShard(data, ${JSON.stringify(slug)}, rows, native, {${paths.map((path, i) => `${JSON.stringify(path)}: image${i}`).join(', ')}});

@@ -5,7 +5,7 @@ import { fixedDrawModel as driftwoodFixedModel } from './fixtures/fixed-draw-mod
 import { expect, test, vi } from 'vitest';
 import { BufferAttribute, BufferGeometry } from 'three';
 import { zlibSync } from 'fflate';
-import { coldFixedDraws, fixedDraws, productFixedDraws } from '../src/client/game/models/fixedDraws';
+import { coldFixedDraws, fixedDraws, folderFixedDraws } from '../src/client/game/models/fixedDraws';
 import { Scope } from '../src/shared/engine/app/scope';
 import { createOwnedGeometry } from '../src/client/engine/models/ownedGeometry';
 
@@ -163,10 +163,10 @@ test('a lane block past its bake, two sources or a lane without its baked layout
 
 test('metadata-only libraries retain binary URL lanes and refuse undeclared product readers',async()=>{
   const row={slot:'lane',lane:{url:'/assets/fixture.bin',offset:0},channels:[],baked};
-  const library=await productFixedDraws({json:()=>Promise.resolve([row])},'draws');
+  const library=await folderFixedDraws({json:()=>Promise.resolve([row])},'draws');
   await library.load(new Map([['/assets/fixture.bin',block(5)]]));
   expect(library.handle('lane').copy().getAttribute('position').getX(0)).toBe(5);
-  await expect(productFixedDraws({json:()=>Promise.resolve([{slot:'glb',file:'models/a.glb',channels:[]}])},'draws')).rejects.toThrow('file reader required');
+  await expect(folderFixedDraws({json:()=>Promise.resolve([{slot:'glb',file:'models/a.glb',channels:[]}])},'draws')).rejects.toThrow('file reader required');
 });
 
 test('fixed-draw data refuses accessors, cycles and extra channel operands before decoding', () => {
@@ -196,15 +196,15 @@ test('a product file of baked rows is one library per product and file; a failur
   const row = { slot: 'inline',file:'models/block.bin',channels:[],baked };
   let reads = 0;
   const book = { slug:'memo-fixture',file:()=>Promise.resolve(block(5)),json: (name: string) => { reads++; return name === 'models/book.json' ? Promise.resolve([row]) : Promise.reject(new Error(`unread ${name}`)); } };
-  const first = await productFixedDraws(book, 'models/book.json');
-  expect(await productFixedDraws(book, 'models/book.json')).toBe(first); expect(reads).toBe(1);
+  const first = await folderFixedDraws(book, 'models/book.json');
+  expect(await folderFixedDraws(book, 'models/book.json')).toBe(first); expect(reads).toBe(1);
   await first.load(); expect(first.handle('inline').copy().getAttribute('position').getX(0)).toBe(5);
   const other = { slug:'memo-fixture',file:book.file,json: book.json };
-  expect(await productFixedDraws(other, 'models/book.json')).not.toBe(first);
-  await expect(productFixedDraws(book, 'models/absent.json')).rejects.toThrow('unread');
-  await expect(productFixedDraws(book, 'models/absent.json')).rejects.toThrow('unread'); expect(reads).toBe(3);
+  expect(await folderFixedDraws(other, 'models/book.json')).not.toBe(first);
+  await expect(folderFixedDraws(book, 'models/absent.json')).rejects.toThrow('unread');
+  await expect(folderFixedDraws(book, 'models/absent.json')).rejects.toThrow('unread'); expect(reads).toBe(3);
   const swapped: { json: (name: string) => Promise<unknown> } = { json: () => { swapped.json = () => Promise.resolve([row]); return Promise.resolve([row]); } };
-  await expect(productFixedDraws(swapped, 'models/book.json')).rejects.toThrow('reader changed');
+  await expect(folderFixedDraws(swapped, 'models/book.json')).rejects.toThrow('reader changed');
 });
 
 test('product fixed draws read baked files through the same concrete product receiver', async () => {
@@ -212,11 +212,11 @@ test('product fixed draws read baked files through the same concrete product rec
   const book = {slug:'binary-book',json:():Promise<unknown>=>Promise.resolve([row]),file(name:string):Promise<Uint8Array>{
     expect(this).toBe(book);expect(name).toBe(row.file);return Promise.resolve(block(11));
   }};
-  const draws = await productFixedDraws(book,'models/book.json');
-  expect(await productFixedDraws(book,'models/book.json')).toBe(draws);
+  const draws = await folderFixedDraws(book,'models/book.json');
+  expect(await folderFixedDraws(book,'models/book.json')).toBe(draws);
   await draws.load();expect(draws.ready).toBe(true);
   const geometry = draws.handle(row.slot).copy();expect(geometry.getAttribute('position').getX(0)).toBe(11);geometry.dispose();
-  await expect(productFixedDraws({json:()=>Promise.resolve([row])},'models/book.json')).rejects.toThrow('file reader required');
+  await expect(folderFixedDraws({json:()=>Promise.resolve([row])},'models/book.json')).rejects.toThrow('file reader required');
 });
 
 test.each(['json','file'] as const)('product fixed draws refuse replaced %s while binary intake is pending', async key => {
@@ -224,7 +224,7 @@ test.each(['json','file'] as const)('product fixed draws refuse replaced %s whil
   const pending = new Promise<Uint8Array>(resolve=>{finish=resolve;});
   const row = {slot:'binary',file:'models/block.bin',channels:[],baked};
   const book = {slug:'binary-book',json:():Promise<unknown>=>Promise.resolve([row]),file:():Promise<Uint8Array>=>pending};
-  const draws = await productFixedDraws(book,'models/book.json'),loading = draws.load();
+  const draws = await folderFixedDraws(book,'models/book.json'),loading = draws.load();
   if(key==='json')book.json=()=>Promise.resolve([row]);
   else book.file=()=>Promise.resolve(block(99));
   finish(block(11));
@@ -235,7 +235,7 @@ test('product fixed draws pin the binary reader before awaiting metadata', async
   let finish:(rows:unknown)=>void=()=>{throw new Error('Missing pending metadata reader');};
   const pending=new Promise<unknown>(resolve=>{finish=resolve;});
   const book={slug:'binary-book',json:()=>pending,file:()=>Promise.resolve(block(11))};
-  const loading=productFixedDraws(book,'models/book.json');
+  const loading=folderFixedDraws(book,'models/book.json');
   book.file=()=>Promise.resolve(block(99));
   finish([{slot:'binary',file:'models/block.bin',channels:[],baked}]);
   await expect(loading).rejects.toThrow('reader changed');

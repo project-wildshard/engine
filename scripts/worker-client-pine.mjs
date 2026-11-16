@@ -7,15 +7,15 @@ import { execFileSync } from 'node:child_process';
 export const paidSave = (variant = 'ghost') => JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', '--input-type=module', '-e', `
   import { readFileSync } from 'node:fs';
   import { resolve } from 'node:path';
-  import { readBuiltShardfile } from './scripts/built-product.mjs';
-  import { loadHeadlessProduct } from './src/server/host/headlessProduct.ts';
+  import { readBuiltShardfile } from './scripts/built-folder.mjs';
+  import { loadHeadlessFolder } from './src/server/host/headlessFolder.ts';
   import { createTrustedHeadlessResident } from './src/server/host/headlessRuntime.ts';
   import { outputDescriptor } from './src/shared/game/shardfile/outputDescriptor.ts';
   import { creditNativeInventory } from './src/shared/game/inventoryLaw.ts';
   import { populationRoster } from './src/server/game/population/roster.ts';
   import { loadRapier } from './src/shared/engine/physics/rapier.ts';
   import { serializeSimSnapshot, snapshotSimHostBytes } from './src/shared/engine/sim/snapshot.ts';
-  const directory = process.env.PINE_PROOF_PRODUCT || readBuiltShardfile(resolve('.'), 'pine-hollow'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = process.env.PINE_PROOF_PRODUCT || readBuiltShardfile(resolve('.'), 'pine-hollow'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? 'commons:' + file.hash : file.hash, Uint8Array.from(readFileSync(directory + '/' + file.path))]));
   const live = await createTrustedHeadlessResident({ product, shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) }, undefined, { room: true });
   creditNativeInventory(live.host, 'pack', { item: 'amber-resin', count: 30 });

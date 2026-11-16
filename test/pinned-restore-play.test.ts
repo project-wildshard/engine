@@ -7,12 +7,12 @@ import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
 import {HeadlessSimulation} from '../src/server/host/headless';
 import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime';
-import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {serializeSimSnapshot,snapshotSimHostBytes} from '../src/shared/engine/sim/snapshot';
 import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
 import type {HeadlessCommand} from '../src/shared/host/tickProtocol';
-import {builtProduct,runtimeAssets} from './fixtures/engine-lift/product';
+import {builtFolder,runtimeAssets} from './fixtures/engine-lift/folder';
 
 const ring=JSON.parse(readFileSync('test/pins/rings.json','utf8')) as {'1':{products:string[];slices:string[]}};
 const digest=(text:string):string=>createHash('sha256').update(text).digest('hex');
@@ -30,7 +30,7 @@ const budgets:Readonly<Record<string,number>>={template:25_000,'nalati-grassland
 const RETIRED=(JSON.parse(readFileSync('src/shared/game/slugNames.json','utf8')) as {names:Record<string,string>}).names;
 const walked=(slug:string):string=>process.env['WILDSHARD_RING']==='1'?slug:RETIRED[slug]??slug;
 for(const slug of [...ring['1'].products,...ring['1'].slices].map(walked))test(`a saved ${slug} continues the same real walk`,async()=>{
-  const directory=builtProduct(slug==='template'?'_template':slug),product=await loadHeadlessProduct(directory),shard=product.shardfile;
+  const directory=builtFolder(slug==='template'?'_template':slug),product=await loadHeadlessFolder(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);if(descriptor===undefined)throw new Error('No admitted product');
   const declared=shard.runtime===null&&!product.has('sim/runtime-plan');
   const assets=declared?new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(`${directory}/${file.path}`)])):runtimeAssets(product,directory);

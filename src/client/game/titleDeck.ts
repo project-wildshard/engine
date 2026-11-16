@@ -68,7 +68,7 @@ export interface TitleCard {
 
 /** Which shards need an upgrade before this client can enter them (G86): the shardfile version each was built for. Every
  *  first-party shard reads at the current format today, so the default is none; the shardfile loader's cached-product
- *  admission (src/client/game/shardfile/product.ts, previous versions) is where an outside author's older shard will report one. */
+ *  admission (src/client/game/shardfile/folder.ts, previous versions) is where an outside author's older shard will report one. */
 export type UpgradeNeeded = (slug: string) => number | null;
 const noUpgrades: UpgradeNeeded = () => null;
 /** Which shards this session refused (G167; `src/client/game/grid/refusal.ts`), default: the page's session record. */

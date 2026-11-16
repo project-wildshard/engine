@@ -3,7 +3,7 @@
 // MS2.4): for this build and the bytes the signed placement file names (`hash`, SA47 (1)) it writes `index/<build>/<hash>.json` beside
 // its manifests, parts and header in the packs store. This reads that index and each manifest it names, and gives the rows a bake's
 // `addCookedShards` would have written (the entry and whole-level addresses, the store as their home, whether it recorded programs),
-// with the page's admission row for its header (`productVerdict`'s, believed only under this page's own validator revision). Any
+// with the page's admission row for its header (`folderVerdict`'s, believed only under this page's own validator revision). Any
 // failure (no index yet, a 404, junk, another build's or slug's index, another validator) gives nothing, and the slug stays out.
 import * as v from 'valibot';
 import { bareSlug } from '../../../shared/game/grid/catalogueSlot';

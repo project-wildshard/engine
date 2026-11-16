@@ -2,13 +2,13 @@
 import '../../../src/shared/engine/core/portableMathFirst.ts';
 import assert from 'node:assert/strict';
 import * as v from 'valibot';
-import {openProductSession} from './productSession.ts';
+import {openFolderSession} from './folderSession.ts';
 import {driftwoodQuestIntroTape} from '../../proof/driftwood-isle/verbTape.ts';
 import {skyKeeperTape} from '../../proof/far-reach/verbTape.ts';
 import {nalatiCampTalkTape} from '../../proof/nalati-grasslands/verbTape.ts';
 const slug=process.argv[2];
 if(slug!=='driftwood-isle'&&slug!=='far-reach'&&slug!=='nalati-grasslands')throw new Error('Unknown native quest tape');
-const {sim,product}=await openProductSession(slug,slug==='nalati-grasslands'?'nalati-verbs':undefined);
+const {sim,product}=await openFolderSession(slug,slug==='nalati-grasslands'?'nalati-verbs':undefined);
 try {
   const report=await sim.verbTape(slug==='driftwood-isle'?driftwoodQuestIntroTape():slug==='far-reach'?skyKeeperTape():nalatiCampTalkTape(product.shardfile.spawn));
   const at=id=>{const row=report.observations.find(row=>row.id===id);assert.ok(row,`Missing actual observation ${id}`);return row;};

@@ -1,6 +1,6 @@
 import { object, parse, pick } from 'valibot';
 import { SpeciesPresentationSchema } from '@wildshard/format/speciesBookRows';
-import { productSpeciesCatalogueSliced } from '../looks/speciesBook';
+import { folderSpeciesCatalogueSliced } from '../looks/speciesBook';
 import { buildYield } from '@wildshard/engine/core/workSlice';
 import { entryOwner, presentEntryOwner, publishEntryOwner } from '../../../shared/game/shardfile/entryOwners';
 import { ClientSpeciesProgramSchema } from '@wildshard/format/clientNative';
@@ -22,7 +22,7 @@ export async function prepareClientSpeciesCatalogue(ctx: ShardContext, input: un
   if (presentEntryOwner(scope, 'species', source.owner) !== null) throw new Error('Species catalogue is already prepared');
   const actors = parse(object({species: pick(SpeciesPresentationSchema, ['lookBook'])}), await product.json<unknown>(source.actors)); live();
   const looks = await product.json<unknown>(source.looks); live();
-  const catalogue = await productSpeciesCatalogueSliced(product, actors.species, looks, () => buildYield(scope)); live();
+  const catalogue = await folderSpeciesCatalogueSliced(product, actors.species, looks, () => buildYield(scope)); live();
   publishEntryOwner(scope, 'species', source.owner, catalogue);
 }
 

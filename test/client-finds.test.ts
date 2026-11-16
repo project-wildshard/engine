@@ -10,10 +10,10 @@ import { CLIENT_FEATURES } from '../src/client/game/shardfile/clientPlan';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import type { ShardRuntime } from '../src/shared/game/shard/runtime';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { emptyShardfile } from '../src/shared/host/author';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
-import {fixtureJsonCheck,fixtureProductFile} from './fixtures/productFile';
+import {fixtureJsonCheck,fixtureFolderFile} from './fixtures/folderFile';
 
 test('orchard finds render the native quest flags without authored view/read hooks',async()=>{
   const scope=new Scope('orchard.finds'),flags=new Flags('orchard.finds'),fragment=vi.fn<ShardContext['bag']['fragment']>();
@@ -21,9 +21,9 @@ test('orchard finds render the native quest flags without authored view/read hoo
   const quest=new QuestState({id:'orchard.quest',title:'Seeds',completeFlag:'orchard.done',steps:[{id:'pick',objective:'Pick',done:{all:['orchard.apple']}}]},flags,undefined,scope);
   publishBoundQuest(scope,quest);
   const runtime=legacyDouble<ShardRuntime>({play:legacyDouble<NonNullable<ShardRuntime['play']>>({owned:new Owned('orchard')}),hooks:{}});
-  const product=createShardProduct({slug:'orchard',revision:1,jsonCheck:fixtureJsonCheck,
+  const product=createShardFolder({slug:'orchard',revision:1,jsonCheck:fixtureJsonCheck,
     shardfile:emptyShardfile({slug:'orchard',name:'Orchard',author:'Fixture',revision:1,seed:1}),sections:new Map(),
-    files:new Map([['quests/finds.json',fixtureProductFile('quests/finds.json',{hash:'finds',url:'/finds.json'})]]),
+    files:new Map([['quests/finds.json',fixtureFolderFile('quests/finds.json',{hash:'finds',url:'/finds.json'})]]),
     read:()=>Promise.resolve(new TextEncoder().encode(JSON.stringify(rows))),check:true});
   const ctx=legacyDouble<ShardContext>({scope,product,game:legacyDouble<ShardContext['game']>({runtime}),bag:legacyDouble<ShardContext['bag']>({fragment})}),feature={kind:'bag.finds',id:'orchard.finds',quest:'orchard.quest',file:'quests/finds.json'};
   try{

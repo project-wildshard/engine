@@ -8,13 +8,13 @@ import {dirname, resolve} from 'node:path';
 import {homedir} from 'node:os';
 import {readTar} from '@wildshard/format/tar';
 import {expect, test} from 'vitest';
-import {readBuiltShardfile} from '../scripts/built-product.mjs';
+import {readBuiltShardfile} from '../scripts/built-folder.mjs';
 import {openShardfile, serverRows} from '../src/cook/game/shardCook';
-import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {leadPlayer} from '../src/shared/engine/sim/leadPlayer';
-import {runtimeAssets} from './fixtures/engine-lift/product';
+import {runtimeAssets} from './fixtures/engine-lift/folder';
 
 test('a Ring 1 consumer walks the actual slice and refuses its loss despite a complete product beside it', async () => {
   mkdirSync('tmp', {recursive: true});
@@ -39,7 +39,7 @@ test('a Ring 1 consumer walks the actual slice and refuses its loss despite a co
     const sha = 'a'.repeat(40), env = {WILDSHARD_RING: '1', WS_TEST_PRODUCTS_SHA: sha, GITHUB_SHA: sha};
     const directory = readBuiltShardfile(root, slug, {env});
     expect(directory).toBe(slice);
-    const product = await loadHeadlessProduct(directory);
+    const product = await loadHeadlessFolder(directory);
     resident = await createTrustedHeadlessResident({product, shard: product.shardfile, assets: runtimeAssets(product, directory),
       rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))});
     const player = leadPlayer(resident.host), start = player.position.clone();

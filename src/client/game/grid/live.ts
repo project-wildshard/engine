@@ -12,8 +12,8 @@ import type { GridAssembly, GridCell, GridPoint } from '../../../shared/game/gri
 import type { ResidencyAllocator, ResidencyLease, ResidencyEviction } from '../../../shared/game/grid/allocator';
 import type { PreparedGridCrossing } from '../../../shared/game/grid/crossing';
 import type { HomeResidencyClaim } from './pageResidency';
-import { ApproachInputsDeferredError } from './productInputs';
-import { PRODUCT_DEFERRED } from './productLeases';
+import { ApproachInputsDeferredError } from './folderInputs';
+import { PRODUCT_DEFERRED } from './folderLeases';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
 import type { RegionShell } from './regionShell';
 
@@ -124,9 +124,9 @@ export class LiveGridHost {
   private readonly products = new Map<string, LiveGridAdmission>();
   /** Verified render capability only; runtime import completion still gates products/readiness. */
   private readonly tileMetadata = new Set<string>();
-  private readonly productRequests = new Map<string, { work: Promise<LiveGridAdmission>; required: boolean;
+  private readonly folderRequests = new Map<string, { work: Promise<LiveGridAdmission>; required: boolean;
     trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' }>();
-  private readonly deferredProducts = new Map<string, number>();
+  private readonly deferredFolders = new Map<string, number>();
   /** GC6: a demand read (the neighbour ahead) the budget refused, by allocator revision: kept apart from the radial reads'
    *  deferrals, since a radial read deferred for want of headroom must not stop the demand read that may make room */
   private readonly deferredDemand = new Map<string, number>();
@@ -203,22 +203,22 @@ export class LiveGridHost {
     return resident !== undefined && !resident.evicting && !resident.disposalFailed && this.readiness.isReady(instance);
   }
   /** Submit whole-shard requests in stable order. Failed attempts remain closed until an explicit retry. */
-  prefetch(instances: readonly string[], trigger: 'explicit' | 'radial' | 'boulevard' = 'explicit'): Promise<void> { return Promise.all([...new Set(instances)].sort().map((id) => this.residents.has(id) || (!this.disposed && this.constructing.has(id)) || this.deferredProducts.get(id) === this.ports.allocator.revision ? Promise.resolve() : this.prefetchProduct(id, false, trigger))).then(() => undefined); }
-  private async requireProduct(instance: string, pending: Promise<LiveGridAdmission>, trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' = 'entry', speculative = false): Promise<LiveGridAdmission> {
+  prefetch(instances: readonly string[], trigger: 'explicit' | 'radial' | 'boulevard' = 'explicit'): Promise<void> { return Promise.all([...new Set(instances)].sort().map((id) => this.residents.has(id) || (!this.disposed && this.constructing.has(id)) || this.deferredFolders.get(id) === this.ports.allocator.revision ? Promise.resolve() : this.prefetchFolder(id, false, trigger))).then(() => undefined); }
+  private async requireFolder(instance: string, pending: Promise<LiveGridAdmission>, trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' = 'entry', speculative = false): Promise<LiveGridAdmission> {
     try { return await pending; }
     catch (error) {
       // the optional read's budget deferral says nothing of a required one: read it again as required
       if (!(error instanceof ApproachInputsDeferredError) && !(error instanceof Error && error.message.includes(PRODUCT_DEFERRED))) throw error;
-      return this.prefetchProduct(instance, true, trigger, speculative);
+      return this.prefetchFolder(instance, true, trigger, speculative);
     }
   }
   /** `speculative`: a demand read nobody waits on yet (GC5's near neighbour and pre-warm). Its budget refusal is deferred
    *  until the budget changes, as a radial read's is, not a failed cell that closes the radial read, the pre-warm and the road. */
-  private prefetchProduct(instance: string, required = false, trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' = 'entry', speculative = false): Promise<LiveGridAdmission> {
+  private prefetchFolder(instance: string, required = false, trigger: 'entry' | 'explicit' | 'radial' | 'boulevard' = 'entry', speculative = false): Promise<LiveGridAdmission> {
     this.assertAlive(); const cell = this.assembly.cell(instance);
     const product = this.products.get(instance); if (product !== undefined) return Promise.resolve(product);
-    const pending = this.productRequests.get(instance);
-    if (pending !== undefined) return !required || pending.required ? pending.work : this.requireProduct(instance, pending.work, trigger, speculative);
+    const pending = this.folderRequests.get(instance);
+    if (pending !== undefined) return !required || pending.required ? pending.work : this.requireFolder(instance, pending.work, trigger, speculative);
     const issue = this.issues.get(instance); if (issue !== undefined) return Promise.reject(new Error(issue));
     const timing = clientPreparationBatch(cell.slug, `grid.product:${instance}`, ['admission', 'runtime']);
     const request = (async (): Promise<LiveGridAdmission> => {
@@ -232,7 +232,7 @@ export class LiveGridHost {
         if ((bundle.hybridWireBytes > 0 || admission.exclusiveRuntime === true) && admission.prepareRuntime === undefined) throw new Error('Hybrid runtime admission is missing');
         await (timing === undefined ? admission.prepareRuntime?.() : timing.run('runtime', async () => { await admitted.prepareRuntime?.(); }));
         this.assertAlive();
-        this.deferredProducts.delete(instance); this.deferredDemand.delete(instance); this.products.set(instance, admission); return admission;
+        this.deferredFolders.delete(instance); this.deferredDemand.delete(instance); this.products.set(instance, admission); return admission;
       } catch (error) {
         this.tileMetadata.delete(instance);
         const refused = error instanceof ApproachInputsDeferredError || (error instanceof Error && error.message.includes(PRODUCT_DEFERRED));
@@ -240,14 +240,14 @@ export class LiveGridHost {
         // while held, so Nalati's demand read was refused the whole approach and its world was built only on the road. A
         // refused demand read lets the speculative products of other cells go, farthest first, and is read again.
         if (required && speculative && refused) { if (this.releaseSpeculative(instance) > 0) this.deferredDemand.delete(instance); else { this.deferredDemand.set(instance, this.ports.allocator.revision); if (this.demanded === instance) this.demanded = null; } }
-        else if (!required && refused) this.deferredProducts.set(instance, this.ports.allocator.revision);
+        else if (!required && refused) this.deferredFolders.set(instance, this.ports.allocator.revision);
         else { this.issues.set(instance, error instanceof Error ? error.message : String(error)); this.refusals.set(instance, error); }
         try { admission?.cancel?.(); }
         catch (cleanup) { throw new AggregateError([error, cleanup], 'Live product admission and cancellation failed', { cause: cleanup }); }
         throw error;
-      } finally { this.productRequests.delete(instance); timing?.finish(); }
+      } finally { this.folderRequests.delete(instance); timing?.finish(); }
     })();
-    this.productRequests.set(instance, { work: request, required, trigger }); return request;
+    this.folderRequests.set(instance, { work: request, required, trigger }); return request;
   }
   /** GC6: let every admitted product nobody builds, enters or reads ahead go except `kept`'s, farthest first (each releases
    *  its claim, so the allocator's revision moves and a deferred demand read is tried again). Returns how many went. */
@@ -302,7 +302,7 @@ export class LiveGridHost {
       await (timing === undefined ? previous : timing.run('queue', () => previous));
       await this.retiredTransport;
       this.assertAlive();
-      const admitted = timing === undefined ? await this.prefetchProduct(instance, true) : await timing.run('metadata', () => this.prefetchProduct(instance, true));
+      const admitted = timing === undefined ? await this.prefetchFolder(instance, true) : await timing.run('metadata', () => this.prefetchFolder(instance, true));
       admission = admitted;
       this.assertAlive();
       // its previous world may still be retiring (`retire`): its claim, under the same id, is released only at its last step,
@@ -437,8 +437,8 @@ export class LiveGridHost {
   building(): boolean { return this.requests.size > 0; }
   /** Retry after a durability/budget change, instead of fetching the same failed request every tick. */
   retry(instance: string): void {
-    if (this.requests.has(instance) || this.productRequests.has(instance)) throw new Error('Live admission is still pending');
-    this.coldUnloadRefused.delete(instance); this.deferredProducts.delete(instance); this.deferredDemand.delete(instance);
+    if (this.requests.has(instance) || this.folderRequests.has(instance)) throw new Error('Live admission is still pending');
+    this.coldUnloadRefused.delete(instance); this.deferredFolders.delete(instance); this.deferredDemand.delete(instance);
     // A quota-refused unload kept a complete native region: retry must not invalidate its valid readiness ticket.
     if (this.residents.has(instance)) return;
     this.issues.delete(instance); this.refusals.delete(instance); this.readiness.invalidate(instance);
@@ -625,9 +625,9 @@ export class LiveGridHost {
       playingBytes: this.ports.allocator.ownerCost(last.instance).playing, capBytes: Math.min(this.ports.allocator.envelope(), policy.playingBytes) };
   }
   /** Read-only crossing evidence and failures for the real grid physics harness. */
-  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.productRequests.keys()])].sort(), pendingWork: [
+  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.folderRequests.keys()])].sort(), pendingWork: [
     ...[...this.requests.keys()].sort().map(instance => ({ instance, kind: 'world' as const, trigger: 'entry' as const })),
-    ...[...this.productRequests].sort(([a], [b]) => a.localeCompare(b)).map(([instance, request]) => ({ instance, kind: request.required ? 'required-metadata' as const : 'optional-metadata' as const, trigger: request.trigger })),
+    ...[...this.folderRequests].sort(([a], [b]) => a.localeCompare(b)).map(([instance, request]) => ({ instance, kind: request.required ? 'required-metadata' as const : 'optional-metadata' as const, trigger: request.trigger })),
   ], issues: Object.fromEntries(this.issues), gameplayReady: this.active === null || this.ports.gameplayReady(this.active), ...(this.ports.lastCell === undefined ? {} : { retainedCell: this.retainedState() }), retirements: this.retirements.map(row => ({ ...row })), retiring: [...this.retiring.keys()], ghosts: { count: this.ghosts.count(), regions: this.ghosts.regions() } }; }
   /** Return the traveller to its page world before retiring regions. Failed disposals keep their full claims
    * and can be retried; the neutral highway disposer never owns the page physics or latest traveller motor. */
@@ -664,7 +664,7 @@ export class LiveGridHost {
       try { this.highway.dispose(); this.highwayDisposed = true; this.highwayLease.release(); }
       catch (error) { failures.push(error); }
     }
-    this.deferredProducts.clear(); this.deferredDemand.clear();
+    this.deferredFolders.clear(); this.deferredDemand.clear();
     if (failures.length > 0) throw new AggregateError(failures, 'Live grid disposal failed');
   }
 }

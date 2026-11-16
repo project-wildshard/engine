@@ -4,8 +4,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve that compiler fixture without changing cwd.
 import { resolve } from 'node:path';
 import { emptyShardfile } from '@wildshard/engine/host/author';
-import { bootProductTotals, productDownloadTotal, homeClientModuleGroups } from '../scripts/app-build/bootProducts';
-import {bootTierProductTotals} from '../scripts/app-build/bootProductTiers';
+import { bootFolderTotals, folderDownloadTotal, homeClientModuleGroups } from '../scripts/app-build/bootFolders';
+import {bootTierFolderTotals} from '../scripts/app-build/bootFolderTiers';
 import {readOutputDownloadIndex} from '@wildshard/format/outputDownload';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
 // oxlint-disable-next-line import/no-nodejs-modules -- Record exact section hashes in the real output fixture.
@@ -71,18 +71,18 @@ test.each(tierCases)('compiler entry totals retain selected/shared files (runtim
       admission:{budgets:row.budgets,serverBudget:row.serverBudget,authorCaps:row.authorCaps,critical:row.critical,library:row.library},
       sections,schemas:[],files};
     const text=JSON.stringify(data);writeFileSync(resolve(product,'shard.json'),text);
-    const full=productDownloadTotal(data,Buffer.byteLength(text));
+    const full=folderDownloadTotal(data,Buffer.byteLength(text));
     const omittedImage=sharedImage?0:13;
-    expect(bootTierProductTotals(root)).toEqual({'/shardfiles/tier-total/':[full[0],full[1],full[1]-2-omittedImage-3-4,full[1]-1-omittedImage-4]});
+    expect(bootTierFolderTotals(root)).toEqual({'/shardfiles/tier-total/':[full[0],full[1],full[1]-2-omittedImage-3-4,full[1]-1-omittedImage-4]});
     writeFileSync(resolve(product,`sections/${selectedSection}.json`),'{}');
-    expect(()=>bootTierProductTotals(root)).toThrow('Boot tier section differs');
+    expect(()=>bootTierFolderTotals(root)).toThrow('Boot tier section differs');
   } finally {rmSync(root,{recursive:true,force:true});}
 });
 
 test('uses index, section, custom-schema and encoded blob bytes, never decoded/GPU budgets', () => {
-  expect(productDownloadTotal(index, 20)).toEqual([20, 105]);
-  expect(() => productDownloadTotal({ ...index, files: [{ ...index.files[0], path: '../foreign.bin' }] }, 20)).toThrow();
-  expect(() => productDownloadTotal(index, -1)).toThrow('Invalid product download total');
+  expect(folderDownloadTotal(index, 20)).toEqual([20, 105]);
+  expect(() => folderDownloadTotal({ ...index, files: [{ ...index.files[0], path: '../foreign.bin' }] }, 20)).toThrow();
+  expect(() => folderDownloadTotal(index, -1)).toThrow('Invalid product download total');
 });
 
 test('home code facts match measured selected rows and refuse changed section bytes', () => {
@@ -110,16 +110,16 @@ test('the shell contains only directory totals; complete file banks stay in thei
   mkdirSync('tmp/vite-boot-products', { recursive: true });
   const root = mkdtempSync(resolve('tmp/vite-boot-products/case-'));
   try {
-    expect(bootProductTotals(root)).toEqual({});
+    expect(bootFolderTotals(root)).toEqual({});
     mkdirSync(resolve(root, 'out/total-test'), { recursive: true });
     const text = JSON.stringify(index);
     writeFileSync(resolve(root, 'out/total-test/shard.json'), text);
-    const rows = bootProductTotals(root);
+    const rows = bootFolderTotals(root);
     expect(rows).toEqual({ '/shardfiles/total-test/': [Buffer.byteLength(text), Buffer.byteLength(text) + 85] });
     expect(JSON.stringify(rows)).not.toContain('custom/first');
     expect(JSON.stringify(rows)).not.toContain(hash);
     const legacy=JSON.stringify({...index,runtime:{entry:'runtime/plugin.ts'}});
     writeFileSync(resolve(root,'out/total-test/shard.json'),legacy);
-    expect(bootTierProductTotals(root)).toEqual({'/shardfiles/total-test/':[Buffer.byteLength(legacy),Buffer.byteLength(legacy)+85]});
+    expect(bootTierFolderTotals(root)).toEqual({'/shardfiles/total-test/':[Buffer.byteLength(legacy),Buffer.byteLength(legacy)+85]});
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

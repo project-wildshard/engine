@@ -12,7 +12,7 @@ import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readF
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {stalePinProducts} from './pins-reuse.mjs';
+import {stalePinFolders} from './pins-reuse.mjs';
 import {checkedTreeDirt} from './push-proof-cache.mjs';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
 import {GitHubLimitError,backoffMs,ghFailure,readerEnv} from './gh-limit.mjs';
@@ -469,7 +469,7 @@ class Landing{
  regenerate(){
   if(!existsSync(join(this.root,GEN[0])))return;
   const before=this.holds('before gen:inputs');
-  // the stamps it writes are committed here, so stale pin output refuses instead of warning (gen.ts, stalePinProducts)
+  // the stamps it writes are committed here, so stale pin output refuses instead of warning (gen.ts, stalePinFolders)
   const ran=spawnSync(process.execPath,[...GEN],{cwd:this.root,env:{...this.env,WS_STALE_PINS:'refuse'},encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:300_000,maxBuffer:64<<20});
   const head=this.head();
   if(head!==before){
@@ -825,14 +825,14 @@ class Landing{
  }
 
  /** gen:inputs refuses a tree whose `out/` lacks the pins' outputs: a worktree that never ran `pnpm pins` has no PINS_LEDGER
-  * (opus-gcm11, 2026-11-15), and one rebased past a pin bump holds the old revision (`stalePinProducts`; codex-netlag and
+  * (opus-gcm11, 2026-11-15), and one rebased past a pin bump holds the old revision (`stalePinFolders`; codex-netlag and
   * opus-publish1, 2026-11-16). Either way `pnpm pins` runs before gen:inputs; with or without --no-preflight, since
   * gen:inputs needs it either way. */
  pinsOnce(){
   /** @type {{pins?:string}} */let scripts={};
   try{scripts=JSON.parse(readFileSync(join(this.root,'package.json'),'utf8')).scripts??{};}catch{return;}
   if(scripts.pins===undefined)return;
-  const stale=stalePinProducts(this.root);
+  const stale=stalePinFolders(this.root);
   if(existsSync(join(this.root,PINS_LEDGER))&&stale.length===0)return;
   this.say('pins',stale.length===0?`no ${PINS_LEDGER}: this worktree never ran pnpm pins; running it before gen:inputs`
    :`out/ holds pins main no longer names (${stale.map(row=>`${row.folder} revision ${String(row.revision)}`).join(', ')}); running pnpm pins before gen:inputs`);

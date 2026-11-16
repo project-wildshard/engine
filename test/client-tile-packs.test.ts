@@ -5,7 +5,7 @@ import { tileOf, tileOrder } from '../src/shared/game/shardfile/tileOrder';
 import { camera, clientTileFixture } from './fixtures/clientTileRegistration';
 import { Scope } from '../src/shared/engine/app/scope';
 import { ControlRefinement, prepareSpawnView } from '../src/client/game/shardfile/controlRefinement';
-import { productTileRing, TileDriver } from '../src/client/game/shardfile/tileDriver';
+import { folderTileRing, TileDriver } from '../src/client/game/shardfile/tileDriver';
 
 test('the shipped packs default holds every fine tile without changing arrival and critical ordering', async () => {
   expect(runtimePacksOn()).toBe(true);
@@ -68,11 +68,11 @@ test('the packs fence includes distant and high jobs before control', async () =
 
 test('a packs scene driver retains distant tiles until its owner retires', async () => {
   expect(runtimePacksOn()).toBe(true);
-  expect(productTileRing({})()).toBe(CELL_RING);
+  expect(folderTileRing({})()).toBe(CELL_RING);
   const owner = new Scope('packs.driver'), live = new Set<number>();
   const driver = new TileDriver(owner, [{ id: 'distant', tiles: () => new Set([0, 63]), attach: (tile, scope) => {
     live.add(tile); scope.onDispose(() => { live.delete(tile); }); return Promise.resolve();
-  } }], productTileRing({}), () => Promise.resolve());
+  } }], folderTileRing({}), () => Promise.resolve());
   try {
     await driver.require(new Set([0, 63]));
     expect(live).toEqual(new Set([0, 63]));

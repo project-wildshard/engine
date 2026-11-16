@@ -9,8 +9,8 @@ import {expect,test} from 'vitest';
 import {emptyShardfile} from '@wildshard/engine/host/author';
 import {createNativeProofWorker} from '@wildshard/engine/test/headless-worker';
 import {canonicalSimDigest} from '@wildshard/engine/test/simState';
-import {builtProduct} from '@wildshard/engine/test/builtProduct';
-import {beginProductSession} from '@wildshard/engine/test/headless/productSession';
+import {builtFolder} from '@wildshard/engine/test/builtFolder';
+import {beginFolderSession} from '@wildshard/engine/test/headless/folderSession';
 
 test('a consumer prepare URL owns an isolated native world and its exact continuation', async()=>{
   await loadRapier(readFileSync(createRequire(import.meta.url).resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm')));
@@ -38,19 +38,19 @@ test('the worker refuses non-file prepare URLs and modules without the prepare e
   await expect(createNativeProofWorker(shard,new Map(),new URL('https://example.invalid/proof.ts'))).rejects.toThrow('file URL');
   await expect(createNativeProofWorker(shard,new Map(),new URL('../src/test/game/headless/checkedReplayPipeline.ts',import.meta.url))).rejects.toThrow('needs prepareHeadlessRuntime');
   await expect(createNativeProofWorker(shard,new Map(),new URL('./fixtures/headless/trustedRuntime.ts',import.meta.url),{snapshot:'not-a-native-save'})).rejects.toThrow();
-  expect(()=>builtProduct('../foreign')).toThrow('Invalid built product name');
+  expect(()=>builtFolder('../foreign')).toThrow('Invalid built product name');
 });
 
 test('the exported session reads a consumer output and refuses corrupt admitted bytes',async()=>{
-  const root=process.cwd(),product=builtProduct('_template'),prepare=new URL('./fixtures/headless/trustedRuntime.ts',import.meta.url);
+  const root=process.cwd(),product=builtFolder('_template'),prepare=new URL('./fixtures/headless/trustedRuntime.ts',import.meta.url);
   mkdirSync('tmp/codex-tc48',{recursive:true});
   const consumer=mkdtempSync(resolve('tmp/codex-tc48/consumer-'));
-  let sim:Awaited<ReturnType<Awaited<ReturnType<typeof beginProductSession>>['ready']>>|undefined;
+  let sim:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;
   try{
     mkdirSync(resolve(consumer,'out'));symlinkSync(product,resolve(consumer,'out/_template'),'dir');
     process.chdir(consumer);
-    expect(builtProduct('_template')).toBe(resolve(consumer,'out/_template'));
-    const session=await beginProductSession('_template',{prepare});
+    expect(builtFolder('_template')).toBe(resolve(consumer,'out/_template'));
+    const session=await beginFolderSession('_template',{prepare});
     sim=await session.ready();
     expect((await sim.step([])).tick).toBe(1);
     const file=session.product.shardfile.files.find(row=>(session.assets.get(row.hash)?.length??0)>0);

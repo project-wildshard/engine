@@ -9,14 +9,14 @@ import { portableMathInstalled } from '../../../src/shared/engine/core/portableM
 import { installAppIdentity } from '../../../src/shared/engine/app/identity';
 import { serializeSimSnapshot, snapshotSimHostBytes } from '../../../src/shared/engine/sim/snapshot';
 import { DedicatedRoom } from '../../../src/server/host/dedicated/dedicatedRoom';
-import { readPackProduct } from '../../../src/server/host/dedicated/packReader';
+import { readPackFolder } from '../../../src/server/host/dedicated/packReader';
 import { directLoopback, type DirectLoopback } from '../../../src/test/engine/netLoopback';
 
 // E7.2a: a fixed tape through the real room: two seats on a fixed thumb, in lockstep with no clock. Every second of it goes in a hash,
 // and at the end the whole world's snapshot does too. The bundle runs on Darwin and on Linux, and the two lines must be the same.
 const [origin = '', cache = '', slug = 'driftwood-isle', build = 'tape', ticksArg = '3600', wasm = ''] = process.argv.slice(2), TICKS = Number(ticksArg);
 installAppIdentity({ name: '', wordmark: '', tagline: '', savePrefix: 'wildshard.room.', saveFormat: '', fileSlug: '', exposeProbe: () => undefined, harness: () => undefined });
-const rapier = await loadRapier(readFileSync(wasm)), reads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 }, input = await readPackProduct(slug, build, rapier, { origin, cache }, reads);
+const rapier = await loadRapier(readFileSync(wasm)), reads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 }, input = await readPackFolder(slug, build, rapier, { origin, cache }, reads);
 let now = 0;
 const room = await DedicatedRoom.boot({ slug, build, bootId: 'tape', input, now: () => now, post: () => undefined });
 interface Phone { readonly client: NetClient; readonly link: DirectLoopback; readonly index: number }

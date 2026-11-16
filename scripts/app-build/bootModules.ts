@@ -3,8 +3,8 @@ import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { readModuleFiles } from '../../src/client/engine/boot/download';
-import { homeClientModuleGroups, bootProductTotals } from './bootProducts';
-import { bootTierProductTotals } from './bootProductTiers';
+import { homeClientModuleGroups, bootFolderTotals } from './bootFolders';
+import { bootTierFolderTotals } from './bootFolderTiers';
 import { homeExtraFiles } from './bootExtras';
 import { createHash } from 'node:crypto';
 import { writtenBundle } from './writtenBundle';
@@ -236,7 +236,7 @@ function selectedHomeRoots(root: string, directory: string, features: Readonly<R
 /** Actual product-selected feature roots, without copying their data into JavaScript. */
 export function homeModuleRoots(root: string): readonly (readonly string[])[] {
   const features = optionalModuleRoots(root);
-  return Object.keys(bootProductTotals(root)).sort().map(prefix => {
+  return Object.keys(bootFolderTotals(root)).sort().map(prefix => {
     const directory = prefix.split('/')[2];
     if (directory === undefined) throw new Error('Missing boot home directory');
     return selectedHomeRoots(root, directory, features);
@@ -252,7 +252,7 @@ export function writeBootModules(outDir: string, root: string): void {
   if (client === null) throw new Error('Missing compiled client module');
   const gridRoots = gridModuleRoots(root);
   const featureRoots = optionalModuleRoots(root);
-  const products = bootTierProductTotals(root), extras: Record<string, readonly [string, number, number, string]> = {};
+  const products = bootTierFolderTotals(root), extras: Record<string, readonly [string, number, number, string]> = {};
   for (const prefix of Object.keys(products)) {
     const directory = prefix.split('/')[2];
     if (directory === undefined) throw new Error('Missing boot home directory');

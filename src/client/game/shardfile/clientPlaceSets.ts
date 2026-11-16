@@ -5,13 +5,13 @@ import type { RegisteredSet } from '@wildshard/engine/world/registry';
 import { buildYield } from '@wildshard/engine/core/workSlice';
 import type { ClientFeatureRow } from '@wildshard/format/clientPlan';
 import type { ShardContext } from '../plugin/context';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { entryOwner } from '../../../shared/game/shardfile/entryOwners';
 
 const ended=(scope:Scope):boolean=>scope.disposed||scope.disposing;
 
 interface PlaceSets { readonly rows:Extract<ClientFeatureRow,{kind:'world.sets'}>['rows']; readonly owned:RegisteredSet[]; bound:boolean; completed:boolean }
-const owners=new WeakMap<Scope,WeakMap<ShardProduct,PlaceSets>>();
+const owners=new WeakMap<Scope,WeakMap<ShardFolder,PlaceSets>>();
 /** Z1 admits named-place membership before native model bindings arrive. */
 export function installClientPlaceSets(ctx:ShardContext,row:ClientFeatureRow):void{
   if(row.kind!=='world.sets'||ended(ctx.scope))throw new Error('Invalid named-place feature');

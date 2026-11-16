@@ -8,7 +8,7 @@ import {createRequire} from 'node:module';
 import {join,resolve} from 'node:path';
 import {test} from 'node:test';
 
-const {loadHeadlessProduct}=await import('../src/server/host/headlessProduct.ts');
+const {loadHeadlessFolder}=await import('../src/server/host/headlessFolder.ts');
 const {openWorld}=await import('../src/server/host/openWorld.ts');
 const {outputDescriptor,serverReadsFile}=await import('../src/shared/game/shardfile/outputDescriptor.ts');
 const {loadRapier}=await import('../src/shared/engine/physics/rapier.ts');
@@ -16,7 +16,7 @@ const {ReturnProgram}=await import('../src/shared/game/population/returnProgram.
 const {HerdShelter}=await import('../src/server/game/population/shelter.ts');
 const {populationRoster}=await import('../src/server/game/population/roster.ts');
 const require=createRequire(import.meta.url),directory=resolve('out/pine-hollow');
-const product=await loadHeadlessProduct(directory),shard=product.shardfile,descriptor=outputDescriptor(shard);
+const product=await loadHeadlessFolder(directory),shard=product.shardfile,descriptor=outputDescriptor(shard);
 assert.ok(descriptor,'The real pinned product must admit');
 const shelterRows=await product.json('actors/shelter.json');
 const target=resolve(process.env.PINE_PROOF_DIR??'tmp/pine-shelter-contract');

@@ -2,7 +2,7 @@ import {vi} from 'vitest';
 import {parse,object,unknown} from 'valibot';
 import {SpeciesPresentationSchema} from '@wildshard/format/speciesBookRows';
 import {HullLookBookSchema} from '@wildshard/format/speciesLooks';
-import {productSpeciesCatalogue} from '../../../src/client/game/looks/speciesBook';
+import {folderSpeciesCatalogue} from '../../../src/client/game/looks/speciesBook';
 import {registerSpecies} from '../../../src/shared/engine/entities/species/registry';
 import {speciesWithLook} from '../../../src/client/engine/entities/species/look';
 import {installKitWorldFixture} from '../kit-world';
@@ -16,7 +16,7 @@ async function prepare():Promise<void>{
  await installKitWorldFixture();
  installFrozenElkFixture();
  const view=parse(object({hullBook:HullLookBookSchema,presentation:SpeciesPresentationSchema,looks:unknown()}),frozenNalatiJson('nalati-species-view.json'));
- const catalogue=productSpeciesCatalogue({section:()=>view.hullBook,file:async name=>{
+ const catalogue=folderSpeciesCatalogue({section:()=>view.hullBook,file:async name=>{
   if(name!=='actors/balbal-cracks.bin')throw new Error(`Unexpected frozen species product file ${name}`);
   return frozenAsset('nalati-balbal-cracks.bin');
  }},view.presentation,view.looks);

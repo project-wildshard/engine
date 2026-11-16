@@ -35,9 +35,9 @@ function bootFacts(module: string, name: string): string {
 }
 
 test('the build computes tier facts in plain Node, with no page runtime state', () => {
-  expect(bootFacts('scripts/app-build/bootProductTiers.ts', 'bootTierProductTotals')).toBe('{}');
+  expect(bootFacts('scripts/app-build/bootFolderTiers.ts', 'bootTierFolderTotals')).toBe('{}');
 });
 
 test('the build reads boot facts in plain Node, with no runtime format graph', () => {
-  expect(bootFacts('scripts/app-build/bootProducts.ts', 'bootProductTotals')).toBe('{}');
+  expect(bootFacts('scripts/app-build/bootFolders.ts', 'bootFolderTotals')).toBe('{}');
 });

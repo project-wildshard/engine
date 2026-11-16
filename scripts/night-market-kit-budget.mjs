@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as v from 'valibot';
-import { readBuiltShardfile } from './built-product.mjs';
+import { readBuiltShardfile } from './built-folder.mjs';
 import { outputFormat } from './node-format.mjs';
 import { tileBakeCensus } from './tile-bakes.mjs';
 

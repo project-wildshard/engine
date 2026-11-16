@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 import {afterEach,expect,test} from 'vitest';
 import {preparationCacheKey} from '../scripts/preparation-cache-key.mjs';
 import {InputHashMemo} from '../scripts/bake-input-hashes.mjs';
-import {captureProductInputs,productInputKey,productToolchainKey,publishProductInputs,recordBundle} from '../scripts/shardfile-inputs.mjs';
+import {captureFolderInputs,folderInputKey,folderToolchainKey,publishFolderInputs,recordBundle} from '../scripts/shardfile-inputs.mjs';
 import {publishSourceSnapshot,sourceSnapshotIdentity} from '../scripts/source-input-proof.mjs';
 import {shardfileValidationRevision} from '../scripts/shardfile-validation-revision.mjs';
 
@@ -42,12 +42,12 @@ async function fixture() {
   };
   const admit=async(slug:string,extraInput?:string)=>{
     const source=`src/shards/${slug}/shard.config.ts`,memo=new InputHashMemo(root);
-    const recipe=[slug,'--copy-runtime',`${productToolchainKey(root,memo)}:${shardfileValidationRevision(root)}`];
+    const recipe=[slug,'--copy-runtime',`${folderToolchainKey(root,memo)}:${shardfileValidationRevision(root)}`];
     const raw=resolve(root,`${slug}.receipt.json`);
-    await captureProductInputs(root,raw,async()=>{readFileSync(resolve(root,source));if(extraInput!==undefined)readFileSync(resolve(root,extraInput));recordBundle({output:[]});await Promise.resolve();});
-    const key=productInputKey(root,raw,recipe,memo);if(key===undefined)throw new Error('Fixture input receipt missing');
+    await captureFolderInputs(root,raw,async()=>{readFileSync(resolve(root,source));if(extraInput!==undefined)readFileSync(resolve(root,extraInput));recordBundle({output:[]});await Promise.resolve();});
+    const key=folderInputKey(root,raw,recipe,memo);if(key===undefined)throw new Error('Fixture input receipt missing');
     const receipts=resolve(cacheRoot,'.inputs-v2',slug,digest(JSON.stringify(recipe)));
-    publishProductInputs(receipts,raw,key);
+    publishFolderInputs(receipts,raw,key);
     for(const directory of [resolve(root,'out',slug),resolve(cacheRoot,slug,key)]) {
       write(directory,'.build-key',key);write(directory,'shard.json','{}');
       write(directory,'validation.json',JSON.stringify({buildKey:key,indexHash:digest('{}')}));

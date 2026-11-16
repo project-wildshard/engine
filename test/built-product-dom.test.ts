@@ -4,11 +4,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- All fixture files remain under repository scratch.
 import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { readBuiltShardfile } from '../scripts/built-product.mjs';
+import { readBuiltShardfile } from '../scripts/built-folder.mjs';
 
 test('DOM suites can select CI products without loading a build CLI', () => {
   mkdirSync('tmp', { recursive: true });
-  const root = mkdtempSync(resolve('tmp/built-product-dom-')), directory = resolve(root, 'out/fixture');
+  const root = mkdtempSync(resolve('tmp/built-folder-dom-')), directory = resolve(root, 'out/fixture');
   try {
     mkdirSync(directory, { recursive: true }); writeFileSync(resolve(directory, 'shard.json'), '{}');
     const sha = 'a'.repeat(40);

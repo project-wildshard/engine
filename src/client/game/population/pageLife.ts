@@ -27,7 +27,7 @@ import { type AmbientFlockDraw, createAmbientFlock, installAmbientFlock } from '
 import { PosedDraw } from '../looks/posedInstances';
 import { PosedBufferPool } from '../looks/posedBufferPool';
 import { lendLooks } from '../shardfile/lentLooks';
-import { runtimeLookMaterials } from '../shardfile/runtimeProduct';
+import { runtimeLookMaterials } from '../shardfile/runtimeFolder';
 
 interface Pose {kind:number;x:number;y:number;z:number;yaw:number;pitch:number;roll:number;scale:number;a0:number;a1:number;a2:number;a3:number;b1:number;b2:number}
 const newPose=(kind:number):Pose=>({kind,x:0,y:-999,z:0,yaw:0,pitch:0,roll:0,scale:1,a0:0,a1:0,a2:0,a3:0,b1:0,b2:0});

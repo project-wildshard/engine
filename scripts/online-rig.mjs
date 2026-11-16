@@ -80,7 +80,7 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   mkdirSync(work, { recursive: true });
   const slugs = [shard, ...more];
   if (slugs.some(slug => !/^[a-z0-9_-]+$/u.test(slug))) throw new Error('A rig shard must be a slug');
-  const books = slugs.map(slug => `${slug}=${run(['--input-type=module', '-e', `console.log((await import('./scripts/built-product.mjs')).readBuiltShardfile(process.cwd(), '${slug}'))`], 'the product read').trim()}`);
+  const books = slugs.map(slug => `${slug}=${run(['--input-type=module', '-e', `console.log((await import('./scripts/built-folder.mjs')).readBuiltShardfile(process.cwd(), '${slug}'))`], 'the product read').trim()}`);
   const origin = join(work, 'origin'), server = join(work, 'server');
   rmSync(join(work, 'packs'), { recursive: true, force: true });
   run(['scripts/server-origin.mjs', origin, build, `--grid=${absolute(gridRoot)}`, ...books], 'the server book');

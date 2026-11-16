@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { SkyBackdropFactory } from '@wildshard/engine/render/look';
 import { TOON_DAY_PRESET, type ToonLookRow } from '@wildshard/format/toonLook';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { dayClock } from '../../../shared/game/looks/dayClock';
 import { driveDayLight, runDayClock } from './daySky';
 import { graphDaySkyBackdrop } from './graphDaySky';
@@ -21,7 +21,7 @@ export function cumulusGeometry(puffs: readonly (readonly number[])[], detail = 
 }
 
 /** Internal client-only graph toon sky. Geometry, clock, palette and graph/channel identities are declared as data. */
-export function toonSkyBackdrop(product: ShardProduct, row: ToonLookRow, rampFog: ColourRampFog): SkyBackdropFactory {
+export function toonSkyBackdrop(product: ShardFolder, row: ToonLookRow, rampFog: ColourRampFog): SkyBackdropFactory {
   const day = dayClock(TOON_DAY_PRESET, row.sky.day, { dusk: 'dusk' });
   const dayLight = toonLighting(row.lighting);
   const style = day.style, mid = row.sky.midday, rgb = (c: readonly [number, number, number]): THREE.Color => new THREE.Color(...c);

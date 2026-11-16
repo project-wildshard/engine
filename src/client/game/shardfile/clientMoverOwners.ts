@@ -5,7 +5,7 @@ import { installFollowedMovers, type FollowedMovers, type MoverView } from '../p
 import { entryOwner } from '../../../shared/game/shardfile/entryOwners';
 import { boundResidentWorldScope } from './hybridPresentation';
 import { hasLentLook, lentLooksOf, setLentParam, type LentLooks } from './lentLooks';
-import { productClosureFile } from '../../../shared/game/shardfile/shardProduct';
+import { folderClosureFile } from '../../../shared/game/shardfile/shardFolder';
 import { materialGraphIr } from '@wildshard/format/materials';
 
 export interface MoverMoorRows {readonly look:string;readonly water:number;readonly cleats:readonly [number,number]}
@@ -43,7 +43,7 @@ export async function installClientMoverOwners(ctx:ShardContext,rows:MoverOwnerR
     const moor=row.moor,look=ctx.product.shardfile.look.materials[moor.look];
     if(!Number.isFinite(moor.water)||moor.cleats.some(value=>!Number.isFinite(value)))throw new Error('Mooring requires finite water and two cleats');
     // D74: the look's graph is its graph file
-    const bytes=look?.family==='graph'&&'file' in look?await productClosureFile(ctx.product,look.file):undefined;
+    const bytes=look?.family==='graph'&&'file' in look?await folderClosureFile(ctx.product,look.file):undefined;
     if(look?.family!=='graph'||'preset' in look||materialGraphIr(look,()=>bytes).params?.['moor']?.type!=='vec2'||!hasLentLook(moor.look))throw new Error('Mooring requires its declared lent vec2 look');
     moors.set(row.id,[0,0]);looks.set(moor.look,lentLooksOf(moor.look));
   }

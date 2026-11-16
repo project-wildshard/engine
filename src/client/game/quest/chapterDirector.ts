@@ -9,7 +9,7 @@ import { presentWakeBoss } from '../boss/presentation';
 import { BossRowBar } from '../boss/barFeed';
 import { wirePage } from '../shardfile/wirePage';
 import type { ShardContext } from '../plugin/context';
-import { readDirectorProduct } from '../../../shared/game/plugin/director';
+import { readDirectorDocument } from '../../../shared/game/plugin/director';
 import { enteredCompletion } from '../complete/declared';
 import { boundQuestChapter } from './chapter';
 import { commitQuestEffects } from '../../../shared/game/quest/effects';
@@ -91,7 +91,7 @@ export async function readChapterDirector(ctx: ShardContext, file: string): Prom
   run: (id: string) => void; takeCues: () => string[];
 }> {
   const rows = parseChapterDirector(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await ctx.product.file(file))));
-  const director = await readDirectorProduct(ctx.product, ctx.scope);
+  const director = await readDirectorDocument(ctx.product, ctx.scope);
   if (ctx.scope.disposed) throw new Error('Chapter left during director admission');
   const chapter = boundQuestChapter(ctx.scope, rows.quest), flags = chapter.quest.flags;
   const world = ctx.game.runtime?.world, play = ctx.game.runtime?.play;

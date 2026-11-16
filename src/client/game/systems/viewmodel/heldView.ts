@@ -25,8 +25,8 @@ import type { SkyRig as Sky } from '@wildshard/engine/world/skyRig';
 import type { GraphLiteral } from '@wildshard/format/materialGraph';
 import { parseHeldView, type HeldViewRow } from '@wildshard/format/heldView';
 import { toonLighting } from '../../looks/toonLighting';
-import { loadFirstPartyProduct, runtimeLookMaterials } from '../../shardfile/runtimeProduct';
-import type { ShardProduct } from '../../../../shared/game/shardfile/shardProduct';
+import { loadFirstPartyFolder, runtimeLookMaterials } from '../../shardfile/runtimeFolder';
+import type { ShardFolder } from '../../../../shared/game/shardfile/shardFolder';
 import { createClientScene } from '../../plugin/scene';
 import { worldScenePool } from '../../shardfile/scenePools';
 import { BLEND_ADD_KEEP_ALPHA } from '../../plugin/shaderFamily';
@@ -66,7 +66,7 @@ function rigidHull(node: Object3D, hulls: ReadonlySet<unknown>): node is Mesh {
 }
 
 /** The looks a row's meshes are dressed in, borrowed for the context's scope; every id must be in the product's catalogue. */
-async function lookMaterials(context: Parameters<typeof runtimeLookMaterials>[0], product: Pick<ShardProduct, 'shardfile'>, ids: readonly string[]): Promise<Looks> {
+async function lookMaterials(context: Parameters<typeof runtimeLookMaterials>[0], product: Pick<ShardFolder, 'shardfile'>, ids: readonly string[]): Promise<Looks> {
   const looks = await runtimeLookMaterials(context, product.shardfile, true, ids);
   if (context.scope.disposed) throw new Error('Held view scope unloaded during preparation');
   const missing = ids.filter(id => !looks.materials.has(id));
@@ -210,14 +210,14 @@ export class HeldView {
   /** Admit a toon row once per id: a manifest's lazy sword provider and the kit stage share its host. */
   static admit(input: unknown): HeldView {
     const host = new HeldView(input);
-    if (host.row.kind !== 'toon') throw new Error('A graph held view is read from its product (HeldView.fromProduct)');
+    if (host.row.kind !== 'toon') throw new Error('A graph held view is read from its product (HeldView.fromFolder)');
     const ready = toonHosts.get(host.row.id); if (ready !== undefined) return ready;
     toonHosts.set(host.row.id, host); return host;
   }
 
   /** Admit a product's graph held view (`file`'s `view`). */
-  static async fromProduct(slug: string, file: string): Promise<HeldView> {
-    const product = await loadFirstPartyProduct(slug);
+  static async fromFolder(slug: string, file: string): Promise<HeldView> {
+    const product = await loadFirstPartyFolder(slug);
     return new HeldView({ kind: 'graph', ...(await product.json<{ readonly view: object }>(file)).view }, slug);
   }
 
@@ -229,7 +229,7 @@ export class HeldView {
   }
 
   /** Cold Explorer preparation uses its standard platform context and the same admitted look ids. */
-  async prepareExplorer(context: ModelContext, product: ShardProduct): Promise<void> {
+  async prepareExplorer(context: ModelContext, product: ShardFolder): Promise<void> {
     if (this.loans.length > 0) return;
     if (context.renderer === null) throw new Error('Held view Explorer needs its renderer');
     const scope = resourceScope().child('held-view-explorer');
@@ -341,10 +341,10 @@ export class HeldView {
 
   /** A graph rig: admitted looks, maps, weave and decal, its meshes dressed and its pendants hung, under a fresh scope. */
   private async graphRig(): Promise<GraphRig> {
-    const row = this.row, render = app.render, productSlug = this.slug ?? '';
-    if (row.kind !== 'graph' || productSlug.length === 0) throw new Error('A graph held view is read from its product (HeldView.fromProduct)');
+    const row = this.row, render = app.render, folderSlug = this.slug ?? '';
+    if (row.kind !== 'graph' || folderSlug.length === 0) throw new Error('A graph held view is read from its product (HeldView.fromFolder)');
     if (render === null) throw new Error('Held graphs require the render service');
-    const owner = resourceScope(), product = await loadFirstPartyProduct(productSlug), tier = render.tier, R = row.rig;
+    const owner = resourceScope(), product = await loadFirstPartyFolder(folderSlug), tier = render.tier, R = row.rig;
     const ids = [...new Set([...row.meshes.map(mesh => mesh.look), ...row.pendants.materials, row.trail.look])];
     const looks = await lookMaterials({ scope: owner, renderer: render.renderer }, product, ids);
     const rig = await RigArms.load(R.url, this.contract, this.bake, false,

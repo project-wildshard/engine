@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { newBuildId } from "./app-build/buildIdentity.mjs";
 import { builtAtOf } from "./app-build/builtAt.mjs";
-import { deferredPublicCopy } from "./app-build/outputProducts.mjs";
+import { deferredPublicCopy } from "./app-build/outputFolders.mjs";
 import { prepareAppBuild, finishAppBuild, AppBuildFailureError } from "./app-build-pipeline.mjs";
 
 const args = process.argv.slice(2);

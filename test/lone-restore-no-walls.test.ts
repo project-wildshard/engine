@@ -7,10 +7,10 @@ import { tagCollider } from '../src/shared/engine/physics/surface';
 import { isChunkEdgeWall } from '../src/shared/engine/physics/terrain';
 import type { Physics } from '../src/shared/engine/physics/Physics';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { SaveStore } from '../src/shared/engine/saves/store';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 // GRID-CROSSING GC36 (J322, no walls): a lone cell saved while lone cells had chunk-edge walls holds them in its saved world. Restored,
 // they are taken out, so no invisible wall stands only on the server (the page builds none) and the next save drops them for good.
@@ -20,7 +20,7 @@ const walls = (physics: Physics): number => {
   return n;
 };
 test.each(['driftwood-isle', '_template'])('a lone %s restored from a save with edge walls stands without them', { timeout: 120_000 }, async slug => {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const input = { shard, product, assets: runtimeAssets(product, directory), rapier }, options = () => ({ saves: new SaveStore({ local: null, session: null }), lone: true, wholeSolids: true, pageless: true });
   const old = await openCellWorld({ instance: slug }, input, undefined, options());

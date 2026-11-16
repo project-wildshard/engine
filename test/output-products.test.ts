@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve the owned fixture and output directories.
 import {dirname, join, resolve} from 'node:path';
-import {checkPublishedMounts, copyDeferredPublic, deferredPublicCopy, copyOutputProducts, pruneLooseCopies} from '../scripts/app-build/outputProducts.mjs';
+import {checkPublishedMounts, copyDeferredPublic, deferredPublicCopy, copyOutputFolders, pruneLooseCopies} from '../scripts/app-build/outputFolders.mjs';
 import {checkBakedTextures} from '../scripts/app-build/bakedTextures.mjs';
 import {pinnedPublicAssets} from '../scripts/pin-assets.ts';
 
@@ -92,7 +92,7 @@ describe('app public copy before final product publication',()=>{
       copyDeferredPublic(root,after);
       expect(existsSync(join(after,'shardfiles'))).toBe(false);
       expect(readFileSync(join(after,'assets/collision.js'),'utf8')).toBe('emitted chunk');
-      for(const directory of [before,after])copyOutputProducts(root,directory);
+      for(const directory of [before,after])copyOutputFolders(root,directory);
       expect(files(after)).toEqual(files(before));
       expect(existsSync(join(after,'shardfiles/current/runtime'))).toBe(false);
       expect(existsSync(join(after,'shardfiles/obsolete'))).toBe(false);

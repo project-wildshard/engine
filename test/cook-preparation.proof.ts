@@ -15,12 +15,12 @@ import {readCookData} from '@wildshard/format/cookData';
 import {cookPreparationBytes} from '@wildshard/format/cookPreparation';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
-import {productTarball} from '../src/cook/game/productTarball.ts';
+import {folderTarball} from '../src/cook/game/folderTarball.ts';
 import {cookShard,openShardfile,shardHalf} from '../src/cook/game/shardCook.ts';
-import {builtProduct} from './fixtures/engine-lift/product.ts';
+import {builtFolder} from './fixtures/engine-lift/folder.ts';
 import {rendererRevision} from '../scripts/renderer-revision.mjs';
 
-const valid = productTarball(builtProduct('_template'));
+const valid = folderTarball(builtFolder('_template'));
 const root = mkdtempSync(join(tmpdir(), 'cook-preparation-'));
 after(() => rmSync(root, {recursive: true, force: true}));
 const renderer = rendererRevision();
@@ -84,7 +84,7 @@ void test('capture-only opening ignores stored lists without relaxing the final 
   const half = shardHalf(opened, (_url, bytes) => bytes.length);
   // D5-4: a phone lists only the default set, so a capture records what the boot reads beyond it; a desktop stays whole.
   assert.equal(half.mountRows('phone', 'whole').length, 0);
-  assert.deepEqual(half.productRows('phone', 'whole').map(row => row.url), half.productRows('phone', 'entry').map(row => row.url));
+  assert.deepEqual(half.folderRows('phone', 'whole').map(row => row.url), half.folderRows('phone', 'entry').map(row => row.url));
   assert.ok(half.mountRows('desktop', 'whole').some(row => row.url.startsWith('/assets/prep-proof.bin')));
 });
 void test('missing preparation bytes name the regeneration command', (): void => {

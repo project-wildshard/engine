@@ -3,10 +3,10 @@ import { Group, MeshBasicMaterial, PlaneGeometry, type BufferGeometry } from 'th
 import { Scope } from '../src/shared/engine/app/scope';
 import { legacyDouble } from '../src/test/engine/FakeGame';
 import * as owned from '../src/client/engine/models/ownedGeometry';
-import * as runtime from '../src/client/game/shardfile/runtimeProduct';
+import * as runtime from '../src/client/game/shardfile/runtimeFolder';
 import { clientWaterSurfaces, installClientWaterSurfaces } from '../src/client/game/shardfile/clientWaterSurfaces';
 import type { ShardContext } from '../src/client/game/plugin/context';
-import type { ShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { emptyShardfile } from '../src/shared/host/author';
 
@@ -23,7 +23,7 @@ function fixture(draw = false) {
   scope.own(material);
   const first = deferred<Uint8Array>(), second = deferred<Uint8Array>(), floor = deferred<Uint8Array>();
   const file = vi.fn((name: string): Promise<Uint8Array> => name === 'first.glb' || name === 'grid.glb' ? first.promise : name === 'floor.bin' ? floor.promise : second.promise);
-  const product = legacyDouble<ShardProduct>({ file, shardfile: emptyShardfile({ slug: 'water-fixture', name: 'Water', author: 'Fixture', revision: 1, seed: 1 }) });
+  const product = legacyDouble<ShardFolder>({ file, shardfile: emptyShardfile({ slug: 'water-fixture', name: 'Water', author: 'Fixture', revision: 1, seed: 1 }) });
   const system = vi.fn((_row: Parameters<ShardContext['system']>[0]): void => undefined), ctx = legacyDouble<ShardContext>({ scope, root, product, game: legacyDouble<ShardContext['game']>({}), system });
   // Promise assimilation probes then; the book is an ordinary non-thenable.
   // Keep strict missing-member failures for every actual material-book read.

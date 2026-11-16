@@ -26,7 +26,7 @@ const keys = ['hut', 'lookout', 'shrine'];
 // from the pinned driftwood-isle shardfile's admitted scene catalogue instead:
 // its cook already merged each layout's origin, colliders, floors and anchors.
 // The product is what `node scripts/pins.ts install` writes, or Ring 1's server
-// slice of the same pin (test/fixtures/engine-lift/product.ts's order); both
+// slice of the same pin (test/fixtures/engine-lift/folder.ts's order); both
 // carry the identical catalogue bytes.
 const full = 'out/driftwood-isle', slice = 'out/.slices/driftwood-isle';
 const product = (process.env['WILDSHARD_RING'] === '1' ? [slice, full] : [full, slice]).find(directory => existsSync(resolvePath(directory, 'shard.json')));

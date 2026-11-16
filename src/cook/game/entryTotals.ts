@@ -16,7 +16,7 @@ import type {ServerPack} from '../../shared/game/shardfile/serverPack';
 import {contentNamed} from './contentNamed';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {homedir} from 'node:os';
-import {productTarball} from './productTarball';
+import {folderTarball} from './folderTarball';
 import {BrotliSizeCache} from './brotliSizeCache.mjs';
 import {defaultBootAudio, ENGINE_MUSIC_STYLE, missingEngineMusic, musicDir} from '@wildshard/engine/audio/bootAudio';
 import {withAssetTables, type AssetTables} from '@wildshard/engine/boot/tables';
@@ -95,7 +95,7 @@ export function phoneOverlay(discovery: Uint8Array | undefined): Readonly<Record
   return table.success ? Object.fromEntries(Object.entries(table.output.native.ktx2.GPU_FILES.phone).filter(([, url]) => PHONE_STAND_IN.test(url))) : {};
 }
 /** S12d: where a build keeps each shard's discovery document as its cook serves it, inside that build's own output, until
- *  `copyOutputProducts` lays it over the product's (and removes the folder); the catalogue hashes it there. */
+ *  `copyOutputFolders` lays it over the product's (and removes the folder); the catalogue hashes it there. */
 export const SERVED_DISCOVERY = '.discovery';
 export function servedDiscoveryPath(outDir: string, directory: string): string { return join(outDir, SERVED_DISCOVERY, directory, 'discovery.json'); }
 /** DL5: a shard's packs set, `src/shards/<slug>/packs-set.json` (`{"version": 1, "set": "fence"}`): 'fence' packs the
@@ -218,7 +218,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     const directory = prefix.split('/')[2]; if (directory === undefined || !/^[a-z0-9_-]+$/u.test(directory)) throw new Error('Invalid spawn shard');
     const product = join(root, 'out', directory), index = parseOutputIndex(JSON.parse(readFileSync(join(product, 'shard.json'), 'utf8')));
     if (index.runtime !== null && (!('kind' in index.runtime) || index.runtime.kind !== 'client-plan')) continue;
-    const reopen = (): Promise<ShardHalf> => preparedShardHalf(openShardfile(productTarball(product), {preparationOnly: build.preparationOnly === true,
+    const reopen = (): Promise<ShardHalf> => preparedShardHalf(openShardfile(folderTarball(product), {preparationOnly: build.preparationOnly === true,
       ...(build.rendererRevision === undefined ? {} : {renderer: build.rendererRevision})}), wireBytes, undefined, directory, tiers);
     const half = await reopen();
     open.set(directory, reopen);
@@ -247,8 +247,8 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     // J262 (SP1a): a preparation from another renderer cooks as it is, and the build says which shards took that path.
     (preparations[half.shard.preparation] ??= []).push(directory);
     if (half.shard.preparation === 'stale') console.warn(stalePreparationLine(directory));
-    const shardRows = {phone: {entry: half.productRows('phone', 'entry'), whole: half.productRows('phone', 'whole')},
-      desktop: {entry: half.productRows('desktop', 'entry'), whole: half.productRows('desktop', 'whole')}};
+    const shardRows = {phone: {entry: half.folderRows('phone', 'entry'), whole: half.folderRows('phone', 'whole')},
+      desktop: {entry: half.folderRows('desktop', 'entry'), whole: half.folderRows('desktop', 'whole')}};
     if (build.filesOnly !== true) {
       for (const [url, member] of await cookParts(output, half, [{tier: 'phone', rows: shardRows.phone.whole}, {tier: 'desktop', rows: shardRows.desktop.whole}], encoder)) cooked.set(url, member);
       serverPacks[directory] = await cookShardServerPack(half.shard, output, encoder);

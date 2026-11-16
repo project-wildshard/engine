@@ -8,10 +8,10 @@ import { BOSS_RETURN_S } from '../src/server/engine/ai/bossContenders';
 import { arenaEntryOf } from '../src/server/game/boss/arenaRoomEntry';
 import { bossFlagRecord } from '../src/shared/game/plugin/bossRecord';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { Flags } from '../src/shared/engine/world/interact/flags';
-import { builtProduct } from '../src/test/game/builtProduct';
+import { builtFolder } from '../src/test/game/builtFolder';
 
 // SERVER-CELLS SC10 item 3 (J328): a grid cell's world is never rebuilt, so when a served world's room boss stands again (SC5) its
 // record's world flags (`boss.<id>.defeated`, `.paid`) must clear with it, as a fresh world's would. Before, they only ever set.
@@ -19,7 +19,7 @@ const KING_ORIGIN = { x: -40, y: 140, z: -95 }, ROOM_REWARD = [-40, 0, -103.3];
 
 test('a served world\'s beaten King stands again and the world forgets his fall and his paid orb', { timeout: 300_000 }, async () => {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const live = await createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, { room: true }), { host } = live, fight = arenaEntryOf(host);

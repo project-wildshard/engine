@@ -14,8 +14,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'vite';
-import { CLIENT_PLAN, CLIENT_PLAN_ROOT, ENGINE_ROOT, SECTION_HOSTS, clientPlanRoots, modulePath, productRoots, resolveModule } from './host-ruler/roots.mjs';
-import { NATIVE_ASSEMBLY, NATIVE_ASSEMBLY_ROOT, NATIVE_HOSTS, nativeAssemblyRoots, productServerRoots } from './host-ruler/server-roots.mjs';
+import { CLIENT_PLAN, CLIENT_PLAN_ROOT, ENGINE_ROOT, SECTION_HOSTS, clientPlanRoots, modulePath, folderRoots, resolveModule } from './host-ruler/roots.mjs';
+import { NATIVE_ASSEMBLY, NATIVE_ASSEMBLY_ROOT, NATIVE_HOSTS, nativeAssemblyRoots, folderServerRoots } from './host-ruler/server-roots.mjs';
 import { REGISTER, namesBinding, readHostRegister } from './host-ruler/register.mjs';
 
 /** Dispatch tables: a module whose entries a product reaches one by one through its declarations. The module itself
@@ -45,7 +45,7 @@ export const SHELL_CONTROL = Object.freeze([
   'src/client/game/grid/assetResidency.ts', 'src/client/game/grid/entryDownloads.ts', 'src/client/game/grid/farImpostorView.ts',
   'src/client/game/grid/farView.ts', 'src/client/game/grid/frameLook.ts', 'src/client/game/grid/intent.ts', 'src/client/game/grid/menu.ts',
   'src/client/game/grid/nearGrain.ts', 'src/client/game/grid/nearPlaceholderPlan.ts', 'src/client/game/grid/nearPlaceholderView.ts',
-  'src/client/game/grid/pageEntry.ts', 'src/client/game/grid/pageResidency.ts', 'src/client/game/grid/productInputs.ts',
+  'src/client/game/grid/pageEntry.ts', 'src/client/game/grid/pageResidency.ts', 'src/client/game/grid/folderInputs.ts',
   'src/client/game/grid/skinEnvelope.ts', 'src/client/game/grid/tileDecoder.ts', 'src/client/game/grid/titlePrefetchChoice.ts',
   'src/client/game/plugin/ui.ts',
   'src/client/game/session/clockSettings.ts', 'src/client/game/session/hudAccent.ts',
@@ -250,7 +250,7 @@ export const OPTIONS = Object.freeze([
   { kind: 'debug.expose', option: 'source', when: (/** @type {any} */ value) => value?.kind === 'dressing', bindings: ['src/client/game/shardfile/sceneDressing.ts#SceneDressing'] },
   // clientQuestComposition.ts: a composition's figures (Pine's and Driftwood's people) load only when `figures` is set.
   { kind: 'quest.composition', option: 'figures', from: 'src/client/game/shardfile/clientQuestComposition.ts', bindings: [
-    'src/client/game/quest/figures.ts#installQuestFigures', 'src/client/game/models/figureCatalogue.ts#ProductFigureCatalogue',
+    'src/client/game/quest/figures.ts#installQuestFigures', 'src/client/game/models/figureCatalogue.ts#FolderFigureCatalogue',
     'src/client/game/models/worldSceneCatalogue.ts#defineWorldSceneCatalogue', '@wildshard/format/src/format/questFigures.ts#parseQuestFiguresDocument',
     'src/client/game/shardfile/worldScenes.ts#installWorldScenes'] },
 ]);
@@ -268,8 +268,8 @@ const sets = (entry, feature) => feature.kind === entry.kind && feature[entry.op
  * its unset options hold back.
  * @param {string} dir @param {{ plan?: ReturnType<typeof clientPlanRoots>, native?: ReturnType<typeof nativeAssemblyRoots> }} [tables]
  * @param {typeof OPTIONS} [options] */
-export function productRootModules(dir, tables = {}, options = OPTIONS) {
-  const page = productRoots(dir, tables.plan), server = productServerRoots(dir, tables.native), features = featureRows(dir);
+export function folderRootModules(dir, tables = {}, options = OPTIONS) {
+  const page = folderRoots(dir, tables.plan), server = folderServerRoots(dir, tables.native), features = featureRows(dir);
   const setOptions = options.filter(entry => features.some(feature => sets(entry, feature)));
   // A kind root binding gated on an unset option roots nothing; a module root keeps any binding left.
   const gated = new Set(options.filter(entry => entry.from === undefined && !setOptions.includes(entry)).flatMap(entry => entry.bindings));
@@ -450,7 +450,7 @@ const cancunToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/
 export function rule(dirs, options = {}) {
   const root = options.root ?? ENGINE_ROOT, today = options.today ?? cancunToday();
   const tables = { plan: clientPlanRoots(root), native: nativeAssemblyRoots({ root }) };
-  const products = dirs.map(dir => productRootModules(dir, tables));
+  const products = dirs.map(dir => folderRootModules(dir, tables));
   const slugs = products.map(product => product.slug);
   if (new Set(slugs).size !== slugs.length) throw new Error(`two products share a slug: ${slugs.join(', ')}`);
   const reader = createTreeReader({ root });

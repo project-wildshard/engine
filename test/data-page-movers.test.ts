@@ -9,8 +9,8 @@ import { Physics } from '../src/shared/engine/physics/Physics';
 import { floorBelow } from '../src/shared/engine/physics/query';
 import { installDataPageMovers } from '../src/client/game/shardfile/dataPageMovers';
 import { wirePage } from '../src/client/game/shardfile/wirePage';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from '../src/test/game/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from '../src/test/game/builtFolder';
 
 // TEMPLATE-E2E TC-E5c: Mossgate's one-shard page (`?chunk=_template`, no client plan) built no collider for its lift, so a
 // player stood under it as it rose; a grid cell had one (TC-E5b). The page's movers now stand in its physics, posed off the wire.
@@ -18,7 +18,7 @@ const LIFT = 'template.lift';
 afterEach(() => { wirePage.movers.clear(); });
 
 test('a one-shard data page\'s lift stands where the wire poses it, and poses its panel', { timeout: 60_000 }, async () => {
-  const shard = (await loadHeadlessProduct(builtProduct('_template'))).shardfile;
+  const shard = (await loadHeadlessFolder(builtFolder('_template'))).shardfile;
   expect(hasDeclaredClientPage(shard)).toBe(false); // the plain data path: no client plan installs its movers
   const lift = shard.movers.find(row => row.id === LIFT);
   if (lift === undefined) throw new Error('Template rev 8 ships its lift');

@@ -4,7 +4,7 @@ import { fetchDeflatedBytes } from '@wildshard/engine/core/deflate';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { loadTexture } from '@wildshard/engine/core/assets';
 import { ResourceMemo } from '@wildshard/engine/app/cachedAssets';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { declarePanel, type PanelView } from '@wildshard/engine/ui/panel';
 import { mountUi, uiScope } from '@wildshard/engine/ui/ownership';
 /**
@@ -211,7 +211,7 @@ export class TrophyWall {
 }
 
 /** Install the existing compendium and save owner with a product-backed display wall. */
-export function installCollectionCompendium(owners: ReadonlyMap<string, CompendiumHost>, rows: { scope: Scope; product: ShardProduct; pack: CollectionMountPack; chalk: CollectionChalk; texture: { url: string; srgb: boolean; repeat: boolean } }): ReturnType<typeof installCompendium> {
+export function installCollectionCompendium(owners: ReadonlyMap<string, CompendiumHost>, rows: { scope: Scope; product: ShardFolder; pack: CollectionMountPack; chalk: CollectionChalk; texture: { url: string; srgb: boolean; repeat: boolean } }): ReturnType<typeof installCompendium> {
   const host = owners.get('compendium');
   if (host === undefined) throw new Error('Missing compendium owners');
   return installCompendium({ ...host, wall: (state, journal) => {

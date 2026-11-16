@@ -3,7 +3,7 @@ import { isJsonData } from '@wildshard/format/json';
 import { parseNativeQuestComposition, type NativeQuestCompositionRows } from '@wildshard/format/nativeQuestComposition';
 import { nativeQuestChannels } from './nativeInputs';
 import { prepareNativeQuestEntry } from './nativeEntry';
-import { nativeStageLane, type readDirectorProduct } from '../../../shared/game/plugin/director';
+import { nativeStageLane, type readDirectorDocument } from '../../../shared/game/plugin/director';
 import { mixedPopulation } from '../population/mixedRoster';
 import * as v from 'valibot';
 import { Vector3 } from 'three';
@@ -103,7 +103,7 @@ export interface NativeQuestCompositionInput {
   readonly lead?: { readonly program: unknown; readonly path: readonly (readonly [number, number])[] };
   /** SS5: the page's quest-view secret (Pine's hollow log), asked here for each player. */
   readonly secret?: NativeQuestSecret;
-  readonly director?: Awaited<ReturnType<typeof readDirectorProduct>>;
+  readonly director?: Awaited<ReturnType<typeof readDirectorDocument>>;
 }
 
 const SeatGearSaved = v.strictObject({ iron: v.boolean(), rewardOwned: v.boolean(), skins: v.array(v.string()) });

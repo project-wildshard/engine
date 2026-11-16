@@ -7,7 +7,7 @@ import { createCatalogueAudio } from '../../src/client/engine/audio/levelAudio';
 import { ENGINE_MUSIC_STYLE } from '@wildshard/engine/audio/bootAudio';
 
 /** One built product's audio declaration, read from `out/` with its section hash checked. */
-function productAudioData(root: string, slug: string): ReturnType<typeof parseAudioData> | undefined {
+function folderAudioData(root: string, slug: string): ReturnType<typeof parseAudioData> | undefined {
   const directory = resolve(root, 'out', slug), path = resolve(directory, 'shard.json');
   if (!existsSync(path)) return undefined;
   const index = readOutputDownloadIndex(JSON.parse(readFileSync(path, 'utf8')));
@@ -22,8 +22,8 @@ function productAudioData(root: string, slug: string): ReturnType<typeof parseAu
 
 /** A catalogue shard's full audio inventory for Node tools: `boot.audio()` loads the
  * product from the page's origin. Same music-then-SFX order. */
-export async function productAudioInventory(root: string, slug: string): Promise<readonly string[]> {
-  const data = productAudioData(root, slug);
+export async function folderAudioInventory(root: string, slug: string): Promise<readonly string[]> {
+  const data = folderAudioData(root, slug);
   if (data === undefined) throw new Error(`${slug}: no built product audio in out/ (run the build)`);
   const files = (await createCatalogueAudio(data)).files();
   return [...files.music, ...files.sfx];
@@ -32,7 +32,7 @@ export async function productAudioInventory(root: string, slug: string): Promise
 /** The same declared after-control files as the native catalogue, without decoding
  * or fetching a recording. Control clips never join these transport parts. */
 export async function lateAudioGroups(root: string, slug: string): Promise<Readonly<Record<string, readonly string[]>>> {
-  const data = productAudioData(root, slug);
+  const data = folderAudioData(root, slug);
   if (data?.music === undefined || data.samples?.catalogue === undefined && data.music.setCatalogue === undefined) return {};
   const profile = await createCatalogueAudio(data);
   const style = ENGINE_MUSIC_STYLE, boot = profile.bootFiles(style), control = new Set(profile.controlFiles?.(style) ?? boot);

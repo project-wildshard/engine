@@ -1,5 +1,5 @@
-import { productManifestPath } from './authored-manifest.mjs';
-import { shardProducts } from './shard-outputs.mjs';
+import { folderManifestPath } from './authored-manifest.mjs';
+import { builtShardFolders } from './shard-outputs.mjs';
 // G14: computed manifest limits are generated separately from lead-approved GL measurements.
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 /** Refresh computed entries only; never touch measured ceilings, captures or approvals. */
 export async function genBudgetDerivations(root = resolve(import.meta.dirname, '..'), check = false, shard = '') {
   const folders = readdirSync(resolve(root, 'src/shards'), { withFileTypes: true }).filter((entry) => entry.isDirectory() && (existsSync(resolve(root, 'src/shards', entry.name, 'manifest.ts')) || existsSync(resolve(root, 'src/shards', entry.name, 'manifest.json')))).map((entry) => entry.name).sort();
-  const products = shardProducts(root, folders), slugs = products.map((row) => row.slug);
+  const products = builtShardFolders(root, folders), slugs = products.map((row) => row.slug);
   if (shard && (!/^[a-z0-9_-]+$/.test(shard) || !slugs.includes(shard))) throw new Error(`gen-budgets: unknown shard ${shard}`);
   const file = resolve(root, 'budgets/ceiling-sources.json');
   if (!existsSync(file)) throw new Error('gen-budgets: missing budgets/ceiling-sources.json; the lead must seed measured provenance first');
@@ -26,7 +26,7 @@ export async function genBudgetDerivations(root = resolve(import.meta.dirname, '
   for (const slug of shard ? [shard] : slugs) {
     const product = products.find((row) => row.slug === slug);
     if (product === undefined) throw new Error(`gen-budgets: unknown shard ${slug}`);
-    const { default: manifest } = await import(pathToFileURL(resolve(root, productManifestPath(root, product))).href);
+    const { default: manifest } = await import(pathToFileURL(resolve(root, folderManifestPath(root, product))).href);
     const inputs = manifest.budgets ?? {};
     derived[slug] = Object.fromEntries(['phone', 'desktop'].map((tier) => [tier, deriveBudget({ phone: inputs.phone, desktop: inputs.desktop, load: inputs.load }, tier === 'phone' ? 'phone' : 'desktop', calibration)]));
   }

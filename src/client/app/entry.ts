@@ -458,10 +458,10 @@ async function installInPageEntry(): Promise<void> {
       if (url !== undefined) history.replaceState(history.state, '', url);
       search = new URLSearchParams(location.search);
       crashResume = null; // the first boot's crash resume, never the next zone's
-      const [{ setActiveChunk }, { retireEntryReloadCapture }, { resetProductControl }] = await Promise.all([import('@wildshard/engine/game/shard/registry'),
-        import('@wildshard/engine/game/grid/pageEntry'), import('@wildshard/engine/game/shardfile/runtimeProduct')]);
+      const [{ setActiveChunk }, { retireEntryReloadCapture }, { resetFolderControl }] = await Promise.all([import('@wildshard/engine/game/shard/registry'),
+        import('@wildshard/engine/game/grid/pageEntry'), import('@wildshard/engine/game/shardfile/runtimeFolder')]);
       retireEntryReloadCapture();
-      resetProductControl();
+      resetFolderControl();
       // the running manifest is resolved once a page; the next session's is the target, as a fresh page at this address would read
       setActiveChunk(slug);
       // ZE10c: the target's art is read only once the old world is gone
@@ -569,7 +569,7 @@ async function startSelected(): Promise<void> {
     import('@wildshard/engine/game/models/interact'), import('@wildshard/engine/game/bag/starter.generated'),
     import('@wildshard/engine/game/systems/tools/hoverboard'), import('@wildshard/engine/game/plugin/audio'),
     import('@wildshard/engine/game/systems/species/view/boar'), import('@wildshard/engine/game/plugin/weaponFamily'),
-    import('@wildshard/engine/game/shardfile/clientSource'), import('@wildshard/engine/game/shardfile/runtimeProduct'),
+    import('@wildshard/engine/game/shardfile/clientSource'), import('@wildshard/engine/game/shardfile/runtimeFolder'),
     import('@wildshard/engine/game/boot/loadingPaths'),
     import('@wildshard/engine/game/grid/prefetch'),
   ] as const;
@@ -577,7 +577,7 @@ async function startSelected(): Promise<void> {
     starterModule, hoverboardModule, voicesModule, boarModule, familiesModule, sourceModule, runtimeModule,
     gridEntryModule, pathsModule, prefetchModule])));
   const [{ sharedWeaponVoices, declaredWeaponVoices }, { BOAR_LOOK }, { declaredKitItemFamilies, declaredItemIcon },
-    { configuredShardfile, installShardfileProduct, installManifestShardfile, preparePageResidency, inlineHybridArrival, selectInlineHybrid }, { browserShardfileOptions },
+    { configuredShardfile, installShardfileFolder, installManifestShardfile, preparePageResidency, inlineHybridArrival, selectInlineHybrid }, { browserShardfileOptions },
     { pageGridRecovery }, { loadingPath }, { gridPrefetchStatus }] = await Promise.all([
     voicesModule, boarModule, familiesModule, sourceModule, runtimeModule, gridEntryModule, pathsModule,
     prefetchModule,
@@ -624,7 +624,7 @@ async function startSelected(): Promise<void> {
     if (path === 'grid') modules('grid');
     // Hybrid shardfile entries retain real TypeScript stages until their page is data-only.
     loading.setPath(loadingPath(path, game.shard.boot?.steps, path === 'shardfile' && source === null && game.shard.shardfile === undefined));
-    const bindings: Parameters<typeof installShardfileProduct>[2] = {
+    const bindings: Parameters<typeof installShardfileFolder>[2] = {
       imageOwner,
       instance: page.instance ?? (source === null ? 'template-solo' : `standalone-${source.identity.slug}`), catalogue: [], items: declaredKitItemFamilies(), voices: declaredWeaponVoices,
       ...(page.residency === undefined ? {} : { residency: page.residency }),
@@ -636,7 +636,7 @@ async function startSelected(): Promise<void> {
     if (spawnJob !== null) await waitFor('Spawn download', spawnJob.listed ?? spawnJob.ready, 'file');
     const manifest = await bootAwait('app:product-admission', source === null
       ? installManifestShardfile(admitted, { ...browserShardfileOptions(document.baseURI, true), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready)
-      : installShardfileProduct(source, { ...browserShardfileOptions(document.baseURI, inlineOwner), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready));
+      : installShardfileFolder(source, { ...browserShardfileOptions(document.baseURI, inlineOwner), memory: page.memory, progress: (progress) => { loading.paintAdmission(progress); } }, bindings, imports.ready));
     // Keep the seam out of code and descriptor admission; world construction
     // can overlap this read and retains its original full-geometry barrier.
     if (page.mode === 'grid') gridSelection.startGridEntryContent(page.instance ?? pageGridRecovery()?.instance ?? gridSelection.gridHome().instance);
@@ -648,7 +648,7 @@ async function startSelected(): Promise<void> {
     if (source !== null || manifest.shardfile !== undefined) document.documentElement.classList.remove('title-first');
     installKitSpecies();
     installKitIcons();
-    const [{boundedResponse,browserContentHash},{publicBytes}] = await Promise.all([import('@wildshard/engine/game/shardfile/product'),import('@wildshard/engine/boot/tables')]);
+    const [{boundedResponse,browserContentHash},{publicBytes}] = await Promise.all([import('@wildshard/engine/game/shardfile/folder'),import('@wildshard/engine/boot/tables')]);
     const pickupAssets=publicBytes(), pickupPath=/^\/assets\/baked\/common\/pickups\/([a-f0-9]{64})\.bin$/u;
     const pickupFiles=await preparePickupCatalogue({hasFile:file=>pickupPath.test(file)&&Object.hasOwn(pickupAssets,file),file:async file=>{
       const hash=pickupPath.exec(file)?.[1],cap=pickupAssets[file];

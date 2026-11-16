@@ -16,8 +16,8 @@
       "history": "f57d494a04cd250ef8a752edbd27c1c5ec9fa1bd488fe5d2eb951b0243cc03f2",
       "seen": 1,
       "moved": 0,
-      "beforeProduct": "74c9c55252164ba63462406941f3cde0b7d194ab915643da348d49a8a68d759c",
-      "afterProduct": "f0d8a239a83fdad46512b308c0827ecd95e52024d707be753cb3b2910c79baa0",
+      "beforeFolder": "74c9c55252164ba63462406941f3cde0b7d194ab915643da348d49a8a68d759c",
+      "afterFolder": "f0d8a239a83fdad46512b308c0827ecd95e52024d707be753cb3b2910c79baa0",
       "immutableAssetHashesEqual": true,
       "frames": [
         {
@@ -112,8 +112,8 @@
       "history": "0792f478f759805f98ed32e08b4232933f10a61a93aeb9eaffe251d1c303e835",
       "seen": 164,
       "moved": 11,
-      "beforeProduct": "c1363d35e8d1e52c31b6b28a2ca22e891eb4bd8322a05f1a0903742b01b20bbd",
-      "afterProduct": "9c5b153db06bfc8ec58c5fdc655b292555de57b552dcbc8af1d39a42f61fe05b",
+      "beforeFolder": "c1363d35e8d1e52c31b6b28a2ca22e891eb4bd8322a05f1a0903742b01b20bbd",
+      "afterFolder": "9c5b153db06bfc8ec58c5fdc655b292555de57b552dcbc8af1d39a42f61fe05b",
       "immutableAssetHashesEqual": true,
       "frames": [
         {
@@ -208,8 +208,8 @@
       "history": "ff53fe72765d7efd02d48fdf24d8ce5abbc69b26285e063fb9ee50716b92f756",
       "seen": 19,
       "moved": 12,
-      "beforeProduct": "5c5adc5c3558e0120d539e527c059e77a3f25ba7ea84c41b6e361cb8faaba778",
-      "afterProduct": "24d9561ddd7005a39a3d267fcb1ec9c25fd8caecc21ccaa306ecd9079d617fe9",
+      "beforeFolder": "5c5adc5c3558e0120d539e527c059e77a3f25ba7ea84c41b6e361cb8faaba778",
+      "afterFolder": "24d9561ddd7005a39a3d267fcb1ec9c25fd8caecc21ccaa306ecd9079d617fe9",
       "immutableAssetHashesEqual": true,
       "frames": [
         {
@@ -304,8 +304,8 @@
       "history": "7402da1ee848d30cdc2e7550026406be2872c386278a0e421b6e785085318715",
       "seen": 12,
       "moved": 0,
-      "beforeProduct": "3c3d7f85b55b0baf38ae895f9c1cce2fef723d3d762efbccf51bd8aa881dadf1",
-      "afterProduct": "627be3c2eb00eb9babfe9db18d4d401edc1847bcc41b42e6f0aa45b363e6500f",
+      "beforeFolder": "3c3d7f85b55b0baf38ae895f9c1cce2fef723d3d762efbccf51bd8aa881dadf1",
+      "afterFolder": "627be3c2eb00eb9babfe9db18d4d401edc1847bcc41b42e6f0aa45b363e6500f",
       "immutableAssetHashesEqual": true,
       "frames": [
         {
@@ -400,8 +400,8 @@
       "history": "e6b086693727c97bfdf57b02d4f860be24ddf4054b26cbd4d2c8659a38813c2a",
       "seen": 1,
       "moved": 1,
-      "beforeProduct": "9edc3fcc89706a741d85360488307b8dc3c39083eca8dc0e3fb1bd9ab31db3a6",
-      "afterProduct": "9edc3fcc89706a741d85360488307b8dc3c39083eca8dc0e3fb1bd9ab31db3a6",
+      "beforeFolder": "9edc3fcc89706a741d85360488307b8dc3c39083eca8dc0e3fb1bd9ab31db3a6",
+      "afterFolder": "9edc3fcc89706a741d85360488307b8dc3c39083eca8dc0e3fb1bd9ab31db3a6",
       "immutableAssetHashesEqual": true,
       "frames": [
         {

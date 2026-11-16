@@ -2,14 +2,14 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import { readModuleGroups, preloadModuleGroups } from '@wildshard/engine/boot/download';
 import { parseClientPlan, clientPlanModuleGroups, type ClientFeatureRow } from '@wildshard/format/clientPlan';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** Use the original parsed rows; a debug reader borrows dressing only when named. */
 export function checkClientPlanModules(plan: {readonly features: readonly ClientFeatureRow[]}): void {
   readModuleGroups(clientPlanModuleGroups(plan));
 }
 /** The same admitted plan is available before the session fixes its loading total. */
-export function checkProductClientModules(product: ShardProduct): void {
+export function checkFolderClientModules(product: ShardFolder): void {
   if (!product.has('client/plan')) return;
   checkClientPlanModules(parseClientPlan(product.section('client/plan')));
 }

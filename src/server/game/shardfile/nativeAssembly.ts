@@ -18,7 +18,7 @@ import { readWindIntake } from '../boss/windEliteNative';
 import { withEncounters, type EncounterIntake } from '../population/encounterIntake';
 import { installNativeHarvest } from '../loot/harvest';
 import { prepareReturns } from './nativeRuntimeLoans';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** One prepared native world: identical to a typed runtime plan, built from data alone. */
 export interface NativeAssemblyRuntime<C extends NativeAssemblyContext> {
@@ -30,7 +30,7 @@ export interface NativeAssemblyRuntime<C extends NativeAssemblyContext> {
 /** A world with no population has no bake: no ground lattice and no solids of its own. */
 const NO_BAKE: NativeCollisionBake & Readonly<Record<string, unknown>> = { ground: { heights: new Float32Array(0), friction: 0, groups: 0, scale: { x: 0, y: 0, z: 0 }, at: { x: 0, y: 0, z: 0 } }, solids: [] };
 /** The bake every population host reads: the reader's rows joined with the plan's owners. Each host admits its fields. */
-async function prepareBake(product: ShardProduct, row: NativeAssemblyBake | undefined): Promise<NativeCollisionBake & Readonly<Record<string, unknown>>> {
+async function prepareBake(product: ShardFolder, row: NativeAssemblyBake | undefined): Promise<NativeCollisionBake & Readonly<Record<string, unknown>>> {
   if (row === undefined) return NO_BAKE;
   const rows = await readAssemblyInput<Record<string, unknown>>(product, row.rows), ground = { file: row.ground, bytes: await product.file(row.ground) };
   const colliders = await Promise.all(row.colliders.map(async file => ({ file, bytes: await product.file(file) })));
@@ -45,7 +45,7 @@ async function prepareBake(product: ShardProduct, row: NativeAssemblyBake | unde
     : nativeArenaSealSolids(rows, read.solids, await readAssemblyInput<ArenaSealDimensions & { sealId: string; origin: { x: number; y: number; z: number } }>(product, row.seal));
   return { ...kept, ...picked, ...read, solids };
 }
-async function prepareGround(product: ShardProduct, assets: ReadonlyMap<string, Uint8Array>, plan: NativeAssemblyPlan, bake: NativeCollisionBake): Promise<AssemblyGround> {
+async function prepareGround(product: ShardFolder, assets: ReadonlyMap<string, Uint8Array>, plan: NativeAssemblyPlan, bake: NativeCollisionBake): Promise<AssemblyGround> {
   const shard = product.shardfile;
   if (plan.terrain.kind === 'flat') { const { height } = plan.level.ground; return { grid: null, samplers: null, heightAt: () => height }; }
   if (plan.terrain.kind === 'bake-ground') {
@@ -58,7 +58,7 @@ async function prepareGround(product: ShardProduct, assets: ReadonlyMap<string, 
   const samplers = bakedSamplers(grid);
   return { grid, samplers, heightAt: samplers.heightAt };
 }
-async function prepareField(product: ShardProduct, plan: NativeAssemblyPlan, grid: AssemblyGround['grid'], bake: NativeCollisionBake & Readonly<Record<string, unknown>>): Promise<Pick<AssemblyPrepared<never>, 'field' | 'world' | 'pond' | 'wet'>> {
+async function prepareField(product: ShardFolder, plan: NativeAssemblyPlan, grid: AssemblyGround['grid'], bake: NativeCollisionBake & Readonly<Record<string, unknown>>): Promise<Pick<AssemblyPrepared<never>, 'field' | 'world' | 'pond' | 'wet'>> {
   if (plan.field === undefined) return { field: null, world: null, pond: null, wet: undefined };
   const rows = await readAssemblyInput<{ world: { wet: string | { data: string | { file: string } } } }>(product, plan.field.rows), pond = { file: plan.field.pond, bytes: await product.file(plan.field.pond) };
   const wet = rows.world.wet, file = typeof wet === 'string' || typeof wet.data === 'string' ? undefined : wet.data.file;
@@ -67,12 +67,12 @@ async function prepareField(product: ShardProduct, plan: NativeAssemblyPlan, gri
 }
 const mergedIntake = (a: EncounterIntake, ...more: readonly EncounterIntake[]): EncounterIntake => more.reduce((all, row) => ({ species: [...all.species, ...row.species], recipes: [...all.recipes, ...row.recipes], motorless: [...all.motorless ?? [], ...row.motorless ?? []] }), a);
 /** True when this product ships a native-assembly plan. */
-export function hasNativeAssembly(product: ShardProduct): boolean { return product.hasFile(NATIVE_ASSEMBLY_FILE); }
+export function hasNativeAssembly(product: ShardFolder): boolean { return product.hasFile(NATIVE_ASSEMBLY_FILE); }
 /**
  * Build one native world from a product's `server/native-assembly.json` (P1-E3.1b). Every read happens here, so a bad
  * plan refuses before a host exists; `install` is synchronous, in the plan's order, and restores like a typed plan.
  */
-export async function prepareNativeAssembly<C extends NativeAssemblyContext>(input: ShardProduct, assets: ReadonlyMap<string, Uint8Array>, ports: NativeAssemblyPorts<C>): Promise<NativeAssemblyRuntime<C>> {
+export async function prepareNativeAssembly<C extends NativeAssemblyContext>(input: ShardFolder, assets: ReadonlyMap<string, Uint8Array>, ports: NativeAssemblyPorts<C>): Promise<NativeAssemblyRuntime<C>> {
   const preparation = { product: input, assets }, lendReturns = await prepareReturns(preparation);
   const plan = parseNativeAssembly(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await input.file(NATIVE_ASSEMBLY_FILE))));
   const patrol = ports.room === true ? plan.features.find(row => row.host === 'encounter.patrol') : undefined;

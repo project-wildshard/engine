@@ -10,16 +10,16 @@ import { loadingSpecimen } from '@wildshard/engine/models/gear';
 import { resourceScope } from '@wildshard/engine/app/resources';
 import { ownSceneResource } from '@wildshard/engine/app/sceneOwnership';
 import { KitFigureCardsSchema, type KitFigureCardsRows } from '@wildshard/format/questFigures';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { SceneHandles } from '../shardfile/sceneHandles';
-import { ProductFigureCatalogue } from './figureCatalogue';
+import { FolderFigureCatalogue } from './figureCatalogue';
 import { ResolvedIslandLibrarySchema } from '@wildshard/format/islandLibrary';
 import { coldFixedDraws } from './fixedDraws';
 import { questFigure } from '../quest/figures';
 
 /** Internal Explorer dispatch. It never falls back to an entered draw loan or
  * installs a world service; its source catalogue retains its original owner. */
-export function kitFigureCard(product: ShardProduct, input: KitFigureCardsRows, key: string): ModelDef<Record<string, never>> {
+export function kitFigureCard(product: ShardFolder, input: KitFigureCardsRows, key: string): ModelDef<Record<string, never>> {
   const book = v.parse(KitFigureCardsSchema, input), card = book.cards[key];
   if (card === undefined || !product.has(book.draws) || !product.hasFile(book.catalogue)) throw new Error('Kit card requires its declared figure, draws and catalogue');
   if (new Set(Object.values(book.cards).map(row => row.model.id)).size !== Object.keys(book.cards).length) throw new Error('Repeated kit card model identity');
@@ -34,7 +34,7 @@ export function kitFigureCard(product: ShardProduct, input: KitFigureCardsRows, 
     };
     check();
     return loadingSpecimen(card.model.id, [1, 1, 1], async () => {
-      const catalogue = await ProductFigureCatalogue.fromProduct(product, book.catalogue, sourceOwner); check();
+      const catalogue = await FolderFigureCatalogue.fromFolder(product, book.catalogue, sourceOwner); check();
       const draws = await coldFixedDraws(product, source.draws, owner, slots); check();
       const resources = new SceneHandles(ctx.sky);
       const figure = owner.run(() => questFigure(row, { sky: ctx.sky, scope: owner, resources, catalogue,

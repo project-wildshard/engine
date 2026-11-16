@@ -4,15 +4,15 @@ import * as v from 'valibot';
 import { ReturnModulesSchema } from '@wildshard/format/scriptContract';
 import { WeatherReactionsSchema } from '@wildshard/format/weatherProgram';
 import { ReturnProgramSchema } from '@wildshard/format/namedJsonContracts';
-import { loadHeadlessProduct } from '../../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 import { ReturnProgram } from '../../../src/shared/game/population/returnProgram';
 import type { Scope } from '../../../src/shared/engine/app/scope';
 import type { SimHost } from '../../../src/server/engine/sim';
-import { builtProduct } from './product';
+import { builtFolder } from './folder';
 
 async function pin(slug: string) {
   const slice = `out/.slices/${slug}`;
-  const product = await loadHeadlessProduct(process.env['WILDSHARD_RING'] === '1' && existsSync(`${slice}/shard.json`) ? slice : builtProduct(slug));
+  const product = await loadHeadlessFolder(process.env['WILDSHARD_RING'] === '1' && existsSync(`${slice}/shard.json`) ? slice : builtFolder(slug));
   const modules = v.parse(ReturnModulesSchema, product.section('actors/return-scripts'));
   const assets = new Map<string, Uint8Array>();
   await ReturnProgram.prepareModules(product, assets, modules);

@@ -6,7 +6,7 @@ import { test } from 'node:test'
 
 import { Vector3 } from 'three'
 
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct.ts'
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder.ts'
 import { createTrustedHeadlessResident } from '../../src/server/host/headlessRuntime.ts'
 import { loadRapier } from '../../src/shared/engine/physics/rapier.ts'
 import { cableModes } from '../../src/shared/engine/player/modes.ts'
@@ -17,7 +17,7 @@ import {
   serializeSimSnapshot,
   snapshotSimHost,
 } from '../../src/shared/engine/sim/snapshot.ts'
-import { runtimeAssets } from '../fixtures/engine-lift/product.ts'
+import { runtimeAssets } from '../fixtures/engine-lift/folder.ts'
 
 const botId = 'sdk-seats:bot'
 function timed(name, work) {
@@ -32,7 +32,7 @@ function timed(name, work) {
 }
 async function fixture(slug, work) {
   const directory = `out/${slug}`,
-    product = await loadHeadlessProduct(directory),
+    product = await loadHeadlessFolder(directory),
     rapier = await loadRapier(
       readFileSync(
         new URL(

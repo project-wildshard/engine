@@ -20,7 +20,7 @@ import { SIM_LEVEL } from './fixtures/sim-level/level';
 import * as v from 'valibot';
 import {parseClientChannels} from '@wildshard/format/clientChannels';
 import {frozenRuntimeJson} from './fixtures/frozen/snapshots';
-import {frozenDecisionWorkerProduct} from './fixtures/frozen/workerProduct';
+import {frozenDecisionWorkerFolder} from './fixtures/frozen/workerFolder';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { GridRegionDurability } from '../src/server/game/grid/durability';
 import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';
@@ -288,7 +288,7 @@ test('SDK worker executes the declared v1 section and reports its real fuel rath
   // This frozen ABI-1 SDK product captured the preceding format, not today's author default.
   f.source.version = '0.1';
   f.source.requires.sdk = '0.1';
-  const product = frozenDecisionWorkerProduct(f.source,bytes);
+  const product = frozenDecisionWorkerFolder(f.source,bytes);
   const session = await HeadlessSimulation.create(product.shard, product.assets, undefined, { deadline: 'advisory', sections: f.sections });
   try {
     for (let i = 0; i < 5; i++) await session.step();
@@ -309,7 +309,7 @@ test('author proof admits the declared v1 section only when given the sections, 
   // The same frozen ABI-1 SDK product retains its captured input versions.
   f.source.version = '0.1';
   f.source.requires.sdk = '0.1';
-  const product = frozenDecisionWorkerProduct(f.source, bytes);
+  const product = frozenDecisionWorkerFolder(f.source, bytes);
   const plan = { version: 1 as const, tape: Array.from({ length: 8 }, () => []), checkpointTick: 4, requiredFacts: ['tc-ne5b.never-filed'] };
   await expect(proveAuthorSimulation(product.shard, product.assets, plan)).rejects.toThrow(/Import signature outside ABI|wrong ABI export/u);
   const reached = await proveAuthorSimulation(product.shard, product.assets, plan, f.sections).then(() => 'passed', (error: unknown) => String(error));

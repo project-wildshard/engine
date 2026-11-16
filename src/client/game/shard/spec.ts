@@ -1,6 +1,6 @@
 import type { EngineMechanism, LevelSpec } from '@wildshard/engine/level/spec';
 import { bakedMapUrl, type ShardManifest } from './manifest';
-import { absentShardProduct, type ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { absentShardFolder, type ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 const ENGINE_MECHANISMS: ReadonlySet<string> = new Set(['weather', 'dayCycle', 'bosses', 'elites', 'spawns', 'quests', 'swim', 'hover', 'explore', 'practice']);
 const engineMechanism = (value: string): value is EngineMechanism => ENGINE_MECHANISMS.has(value);
@@ -11,8 +11,8 @@ const engineMechanism = (value: string): value is EngineMechanism => ENGINE_MECH
  * learns of products (progress/shard-platform/product-in-look-o272/). Without one they get an absent product, whose
  * every read refuses.
  */
-export function toLevelSpec(manifest: ShardManifest, product?: ShardProduct): LevelSpec {
-  const { render, roster } = manifest, bound = (): ShardProduct => product ?? absentShardProduct(manifest.slug);
+export function toLevelSpec(manifest: ShardManifest, product?: ShardFolder): LevelSpec {
+  const { render, roster } = manifest, bound = (): ShardFolder => product ?? absentShardFolder(manifest.slug);
   const { style: creatureStyle, dev } = manifest; // opaque authored metadata, copied without a rendering decision
   return {
     id: manifest.slug,
