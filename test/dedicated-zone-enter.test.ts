@@ -59,6 +59,9 @@ test('enter freezes a walker in Sunscar\'s buffer, and is refused short of it an
   let drift = 0, thawedAt: number | null = null;
   for (const [thumb, ms] of [[run(-Math.PI / 2), 750], [run(Math.PI / 2, NET_BUTTONS.sprint | NET_BUTTONS.jump), 750]] as const) {
     a.thumb = thumb;
+    // A delayed page flush can owe multiple commands: the catch-up step must freeze too.
+    for (let command = 0; command < 6; command++) a.client.command(thumb(0));
+    a.client.flush();
     for (const ends = Date.now() + ms; Date.now() < ends;) {
       await new Promise(resolve => { setTimeout(resolve, 50); });
       const moved = Math.hypot(frozen.position.x - still.x, frozen.position.z - still.z), held = road.entering('device:a') === WEST;
