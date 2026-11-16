@@ -16,7 +16,7 @@ const a = join(work, 'a');
 const b = join(work, 'b');
 after(() => rmSync(work, { recursive: true, force: true }));
 
-const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_MAIN_PUSH_RECEIPT: '0' };
 const ID = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
 const git = (cwd, ...args) => {
   const out = spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...env, ...ID } });
@@ -75,7 +75,7 @@ test('commits only the named files, syncs past another lane, pushes, and leaves 
   assert.equal(out.status, 0, out.stderr);
   assert.match(out.stdout, /main-push committed [0-9a-f]{8}\n/u);
   assert.match(out.stdout, /\(replayed 1 local commit\(s\)\); other lanes' files untouched/u);
-  assert.match(out.stdout, /main-push pushed main [0-9a-f]{8}/u);
+  assert.match(out.stdout, /main-push pushed main [0-9a-f]{10}: \d+ commit\(s\)/u);
   assert.equal(remoteFile('plan.md'), 'A ticks the plan');
   assert.equal(remoteFile('new-row.md'), 'A new file');
   assert.equal(remoteFile('shared.md'), 'B changed shared');
@@ -167,7 +167,7 @@ test('a push race retries; a refusing pre-push stops without retrying', () => {
   const refused = push(a, '-m', 'docs: A again', 'other.md');
   assert.equal(refused.status, 1);
   assert.doesNotMatch(refused.stdout, /try \d/u);
-  assert.match(refused.stderr, /main-push STOP git push refused: .*push blocked: parity/u);
+  assert.match(refused.stderr, /main-push STOP git push refused by the pre-push: .*push blocked: parity/u);
 });
 
 test('refuses a directory, a missing message, and a checkout mid-rebase; a refused commit unstages what it added', () => {
@@ -206,4 +206,14 @@ test('one run at a time: a live lock waits then stops; a dead one is taken over;
   assert.match(stale.stdout, /taking over a stale lock \(pid 999999, gone\)/u);
   assert.equal(existsSync(lock), false);
   assert.equal(remoteFile('plan.md'), 'A ticks');
+});
+
+test('a push names another lane\'s committed commit it carries along (M1)', () => {
+  write(a, 'carried.md', 'x\n');
+  git(a, 'add', 'carried.md');
+  git(a, 'commit', '--quiet', '-m', 'other lane: carried', '--', 'carried.md');
+  write(a, 'mine.md', 'y\n');
+  const out = push(a, '-m', 'docs: mine', 'mine.md');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /2 commit\(s\), 1 of them another lane's, carried along \(M1\): [0-9a-f]+ other lane: carried/u);
 });

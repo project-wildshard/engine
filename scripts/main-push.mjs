@@ -27,8 +27,9 @@
 // shared checkout `git rebase --continue` refuses beside another lane's unstaged edit and `git rebase --abort` wipes it.
 // Exit 0 when pushed; 1 with a `main-push STOP` line; 2 on bad arguments.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export class Stop extends Error {
@@ -67,6 +68,23 @@ export function checkState(cwd) {
   }
 }
 
+/** Short SHAs of the commits this run made (commitFiles), so a push can tell its own from another lane's. */
+const OWN = new Set();
+
+/** One `lane-receipts.log` line, `<HH:MM Cancún> <lane> <text>` (the Mac's clock is Cancún time). WS_MAIN_PUSH_RECEIPT=0
+ * (the tests) writes none. @param {string} text */
+function receipt(text) {
+  if (process.env.WS_MAIN_PUSH_RECEIPT === '0') return;
+  const file = resolve(process.env.WS_LANE_RECEIPTS ?? join(homedir(), '.cache/wildshard/lane-receipts.log'));
+  const lane = /^[a-z][a-z0-9_-]*$/u.test(process.env.WS_LANE_NAME ?? '') ? process.env.WS_LANE_NAME : 'main-push';
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    appendFileSync(file, `${new Date().toTimeString().slice(0, 5)} Cancún ${lane} ${text.replaceAll(/\s+/gu, ' ').slice(0, 1000)}\n`);
+  } catch {
+    /* a receipt is best effort */
+  }
+}
+
 /**
  * Commit exactly these files by pathspec. Untracked ones are added first, one by one.
  * @param {string} cwd @param {string[]} files @param {string[]} messages
@@ -83,7 +101,9 @@ export function commitFiles(cwd, files, messages) {
     if (untracked.length) run(cwd, ['reset', '--quiet', '--', ...untracked]);
     throw new Stop(`git commit refused: ${firstLines(`${commit.stdout}\n${commit.stderr}`, 12)}`);
   }
-  return git(cwd, ['rev-parse', '--short=8', 'HEAD']);
+  const made = git(cwd, ['rev-parse', '--short=8', 'HEAD']);
+  OWN.add(made);
+  return made;
 }
 
 /**
@@ -141,13 +161,36 @@ export function syncMain(cwd, remote = 'origin') {
 
 /** Push main. A push race retries; a refused pre-push stops. */
 export function pushMain(cwd, remote = 'origin') {
-  const pushed = run(cwd, ['push', remote, 'main']);
-  if (pushed.status === 0) return `pushed main ${git(cwd, ['rev-parse', '--short=8', 'HEAD'])}`;
-  const text = `${pushed.stdout}\n${pushed.stderr}`;
+  // What this push sends: every commit local main has over origin/main. In a shared checkout that can include another
+  // lane's commit, made but not yet pushed; it rides along (M1) and the receipt names it.
+  const outgoing = run(cwd, ['log', '--format=%h %s', `refs/remotes/${remote}/main..HEAD`]).stdout.trim().split('\n').filter(Boolean);
+  // The pre-push's own output (the gate) goes to a log in the git dir: its RED line is the cause on a refusal.
+  const log = resolve(cwd, git(cwd, ['rev-parse', '--git-path', `main-push-${process.pid}.log`]));
+  const fd = openSync(log, 'w');
+  let pushed;
+  try {
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+    pushed = spawnSync('git', ['push', remote, 'main'], { cwd, env, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', fd] });
+  } finally {
+    closeSync(fd);
+  }
+  const text = `${pushed.stdout ?? ''}\n${readFileSync(log, 'utf8')}`;
+  if (pushed.status === 0) {
+    rmSync(log, { force: true });
+    const head = git(cwd, ['rev-parse', '--short=10', 'HEAD']);
+    const carried = outgoing.filter((row) => ![...OWN].some((sha) => row.startsWith(sha.slice(0, 7))));
+    const line = `pushed main ${head}: ${outgoing.length} commit(s)${carried.length ? `, ${carried.length} of them another lane's, carried along (M1): ${carried.join('; ')}` : ''}`;
+    receipt(`main-push ${line}`);
+    return line;
+  }
   if (/\[rejected\]|fetch first|non-fast-forward|failed to update ref|cannot lock ref/iu.test(text) && !/pre-push hook/iu.test(text)) {
+    rmSync(log, { force: true });
     throw new Stop('origin/main moved during the push', true);
   }
-  throw new Stop(`git push refused: ${firstLines(text, 20)}`);
+  // oxlint-disable-next-line no-control-regex -- strips terminal colour codes.
+  const lines = text.split('\n').map((line) => line.replaceAll(/\u001B\[[0-9;]*m/gu, '').trim()).filter(Boolean);
+  const red = lines.filter((line) => /(?:^|\s)(?:RED|X)\s|blocked|refused|Error: /u.test(line)).slice(0, 8);
+  throw new Stop(`git push refused by the pre-push: ${(red.length ? red : lines.slice(-8)).join(' | ')}. Whole output: ${log}`);
 }
 
 /**
