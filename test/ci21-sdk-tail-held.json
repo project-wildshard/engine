@@ -1,0 +1,498 @@
+{
+  "schema": "ci21-held-destinations/1",
+  "writtenBy": "Codex",
+  "state": "reviewed/held, 2026-11-16. Destination code exists but no new land GO. Original pending files remain until destination land; this is not a completed engine disposition.",
+  "sourceRepository": "project-wildshard/engine",
+  "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+  "destinationManifest": {
+    "repository": "project-wildshard/sharddev",
+    "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+    "path": "test/ci21-sdk-tail.json",
+    "blob": "1f9bd0d790721af73d351576bcd53df56c8d1a90"
+  },
+  "sources": [
+    {
+      "sourcePath": "test/defined-sections.test.ts",
+      "sourceBlob": "1eaf0996615dc0ab98d3d2e82ebdc03010c8ad22",
+      "originalTests": [
+        "custom definition and emission APIs are absent",
+        "named build and native validators retain strict shape and numeric checks",
+        "paced named validation preserves cancellation and async refusal",
+        "named disk schemas refuse corrupt UTF8, external code and unknown checks"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/defined-sections.test.ts",
+        "targetBlob": "0d9ed35506b7a9af38e1e560cd849b73047b7741",
+        "tests": [
+          "custom definition and emission APIs are absent",
+          "named build and native validators retain strict shape and numeric checks",
+          "paced named validation preserves cancellation and async refusal",
+          "named disk schemas refuse corrupt UTF8, external code and unknown checks"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/named-json-admission.test.ts",
+      "sourceBlob": "1f07c315f69f0d13f716921f01f7d67bfc8fdb70",
+      "originalTests": [
+        "named JSON retains its byte-bound contract above the custom-section node cap",
+        "a paced named read pauses between its steps and compiles each schema once",
+        "each inline schema keeps the existing independent plain-JSON cap",
+        "a first-party build's named JSON parses without its schema; an external product's validates"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/named-json-admission.test.ts",
+        "targetBlob": "c025464cdf3975da68991a70821698f28039c1af",
+        "tests": [
+          "named JSON retains its byte-bound contract above the custom-section node cap",
+          "a paced named read pauses between its steps and compiles each schema once",
+          "each inline schema keeps the existing independent plain-JSON cap",
+          "a first-party build's named JSON parses without its schema; an external product's validates"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/registered-json.test.ts",
+      "sourceBlob": "9a431ded34032e0d1bedf1c766fbf896754543c1",
+      "originalTests": [
+        "registered names use exact defining format schemas without changing the old schema document",
+        "defining validation preserves the owned value and original semantic refusals",
+        "a registered read refuses missing or foreign metadata before reading any bytes",
+        "external reads retain schema admission, defining semantic checks, identity and optional freezing",
+        "trusted built reads keep canonical parsing and do not invoke the external checker",
+        "retired private documents refuse their old checked bridge and keep missing-file refusal",
+        "author and independent output admission enforce the registered semantic contract"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/registered-json.test.ts",
+        "targetBlob": "354e71e3098726fdaf86bb8107b14f656fdc30bd",
+        "tests": [
+          "registered names use exact defining format schemas without changing the old schema document",
+          "defining validation preserves the owned value and original semantic refusals",
+          "a registered read refuses missing or foreign metadata before reading any bytes",
+          "external reads retain schema admission, defining semantic checks, identity and optional freezing",
+          "trusted built reads keep canonical parsing and do not invoke the external checker",
+          "retired private documents refuse their old checked bridge and keep missing-file refusal",
+          "author and independent output admission enforce the registered semantic contract"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/world-assembly-schema.test.ts",
+      "sourceBlob": "c46643aa0cc484736405de1dbc3dfe4ca7a336cc",
+      "originalTests": [
+        "the defining assembly root emits structural rows and retains its explicit admission checks",
+        "assembly emission does not grant a bridge to a foreign custom predicate",
+        "arena room variants retain the original open wire and refuse mixed room resources"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/world-assembly-schema.test.ts",
+        "targetBlob": "bbdb30a71b5945406516853a64f4383f04846589",
+        "tests": [
+          "the defining assembly root emits structural rows and retains its explicit admission checks",
+          "assembly emission does not grant a bridge to a foreign custom predicate",
+          "arena room variants retain the original open wire and refuse mixed room resources"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/nalati-carried-terrain-ports.test.ts",
+      "sourceBlob": "2dbe0713c3a67d3df2c09ba92ed56cf649ecd619",
+      "originalTests": [
+        "carried quest admission retains full native output and continuation refusals",
+        "terrain authors receive the exact native channel layout, sizes and fills"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/carried-terrain-ports.test.ts",
+        "targetBlob": "52f29401f1cc134e61197f95056e0682a932f12b",
+        "tests": [
+          "carried quest admission retains full native output and continuation refusals",
+          "terrain authors receive the exact native channel layout, sizes and fills"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/output-runtime.test.ts",
+      "sourceBlob": "68b47d3049f1a1b0910d720ad2bbf801d3d5176a",
+      "originalTests": [
+        "ships no runtime TypeScript: declarations pass, a stale runtime output is cleared and other outputs stay",
+        "uses the ruler comment law for templates, regexes, strings and multiline comments",
+        "refuses executable source, non-TS and symlinks before changing a previous output (LD9: no copied runtime entry)",
+        "supports data-only projects and refuses overlapping output",
+        "checks copied constants against unchanged mirrors without a custom registry",
+        "admits the compiled Driftwood source without copying retired runtime data",
+        "refuses retired custom registry %s before deleting any output"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/output-runtime.test.ts",
+        "targetBlob": "0fde9f3ab5bab203cfe19d0bc68ac1e957697169",
+        "tests": [
+          "ships no runtime TypeScript: declarations pass, a stale runtime output is cleared and other outputs stay",
+          "uses the ruler comment law for templates, regexes, strings and multiline comments",
+          "refuses executable source, non-TS and symlinks before changing a previous output (LD9: no copied runtime entry)",
+          "supports data-only projects and refuses overlapping output",
+          "checks copied constants against unchanged mirrors without a custom registry",
+          "admits the compiled SDK Template source without copying retired runtime data",
+          "refuses retired custom registry %s before deleting any output"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/script-v2-radial.test.ts",
+      "sourceBlob": "531debf7aa70c4802d1b615a78b4f7f6b92e9cc9",
+      "originalTests": [
+        "admitted project radial math is finite and close to native geometry"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "src/sharddev/bake/script-v2-radial.test.ts",
+        "targetBlob": "ea3063772987cd827db07375b69bac8e2c454478",
+        "tests": [
+          "admitted project radial math is finite and close to native geometry"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/schema-code-memory.test.ts",
+      "sourceBlob": "6739968bb23c8c30c267d0bc049187c280bbb148",
+      "originalTests": [
+        "real dressing retains author/runtime acceptance and nested refusal without schema mutation",
+        "data-valued keywords and existing reference bases retain their original meanings",
+        "factored tuple, dependency, conditional and disjunction rules match the author validator"
+      ],
+      "originalStillPending": false,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/schema-code-memory.test.ts",
+        "targetBlob": "7e2f7bea9448f94df6260c40a4c9ec90d7a40b2e",
+        "tests": [
+          "real dressing retains author/runtime acceptance and nested refusal without schema mutation",
+          "data-valued keywords and existing reference bases retain their original meanings",
+          "factored tuple, dependency, conditional and disjunction rules match the author validator"
+        ]
+      },
+      "nativeCompanions": [
+        {
+          "repository": "project-wildshard/engine",
+          "targetPath": "test/schema-code-memory.test.ts",
+          "branch": "plan/ci21sdk-tail",
+          "originalTests": [
+            "real dressing retains author/runtime acceptance and nested refusal without schema mutation",
+            "data-valued keywords and existing reference bases retain their original meanings",
+            "factored tuple, dependency, conditional and disjunction rules match the author validator"
+          ],
+          "scope": "All native synchronous checks plus factored-size, const-reference identity and reserved-reference passthrough; no SDK imports. Destination source uses the same original blob.",
+          "revision": "34598b14577c8ff8a4ea6eb6e57d7de7c6fde07e",
+          "targetBlob": "4a0c646876998389cb1e16b9152e2f74daa739c8"
+        }
+      ],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/world-scene-graph-pages.test.ts",
+      "sourceBlob": "a07c98048c6362d11573a9661d6a4f789edee3ca",
+      "originalTests": [
+        "native variants reconstruct from shared nodes with independent member identities",
+        "page admission checks unselected native graphs and refuses malformed transport",
+        "packing preserves the authored wire order before native parser defaults",
+        "page metadata fits the product index while local references retain node constraints",
+        "native pages keep the aggregate JSON ceiling and complete defining provenance"
+      ],
+      "originalStillPending": false,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/world-scene-graph-pages.test.ts",
+        "targetBlob": "8deb39a2d436749ac349a0380f6aad0c9a45e5d2",
+        "tests": [
+          "native variants reconstruct from shared nodes with independent member identities",
+          "page admission checks unselected native graphs and refuses malformed transport",
+          "packing preserves the authored wire order before native parser defaults",
+          "page metadata fits the product index while local references retain node constraints",
+          "native pages keep the aggregate JSON ceiling and complete defining provenance"
+        ]
+      },
+      "nativeCompanions": [
+        {
+          "repository": "project-wildshard/engine",
+          "targetPath": "test/world-scene-graph-pages.test.ts",
+          "branch": "plan/ci21sdk-tail",
+          "originalTests": [
+            "native variants reconstruct from shared nodes with independent member identities"
+          ],
+          "scope": "Actual private native catalogue admission of both independent graph members; exact SDK producer snapshot plus malformed-byte negative control.",
+          "revision": "23aa1d14f5f0952d5eceb2731ca87163ab84cc22",
+          "targetBlob": "02f48a1c19e378ee450ad92c73b19ffea65878e4"
+        }
+      ],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/return-projection-inventory.test.ts",
+      "sourceBlob": "c5aacdb98893549e7b71cfe6716db07f5351e947",
+      "originalTests": [
+        "project ABI survives named reconstruction, disk, browser and native without scheduling",
+        "missing or mismatched project contracts refuse without guessing the ABI",
+        "legacy return inventories keep the original parser normalization and refusals"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/return-projection-inventory.test.ts",
+        "targetBlob": "98c4c6cfa5aee9737b6265a09e903f84168b554a",
+        "tests": [
+          "project ABI survives named reconstruction, disk, browser and native without scheduling",
+          "missing or mismatched project contracts refuse without guessing the ABI",
+          "legacy return inventories keep the original parser normalization and refusals"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/return-program-group-v2.test.ts",
+      "sourceBlob": "4c76f2f4553c75b37823415eabe09d82583e94a6",
+      "originalTests": [
+        "numeric and distinct group profiles use one entered programme and exactly one Wasm instance",
+        "full group metadata participates in cache identity before any second instance can be constructed",
+        "ancestor sliced retirement refuses group capture and acceptance without publishing the bank or RNG",
+        "the shared engine loan rejects a different executable or IO reservation",
+        "the full admitted named descriptor retains group rows without changing legacy witness bytes",
+        "shared capacity never broadens the numeric or group publication rights",
+        "native capture cannot reenter the other side of the shared programme"
+      ],
+      "originalStillPending": false,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/return-program-group-v2.test.ts",
+        "targetBlob": "111f64f3634fe450d96b9c14eaaf0434ab93fb95",
+        "tests": [
+          "numeric and distinct group profiles use one entered programme and exactly one Wasm instance",
+          "full group metadata participates in cache identity before any second instance can be constructed",
+          "ancestor sliced retirement refuses group capture and acceptance without publishing the bank or RNG",
+          "the shared engine loan rejects a different executable or IO reservation",
+          "the full admitted named descriptor retains group rows without changing legacy witness bytes",
+          "shared capacity never broadens the numeric or group publication rights",
+          "native capture cannot reenter the other side of the shared programme"
+        ]
+      },
+      "nativeCompanions": [
+        {
+          "repository": "project-wildshard/engine",
+          "targetPath": "test/return-program-group-v2.test.ts",
+          "branch": "plan/ci21sdk-tail",
+          "originalTests": [
+            "full group metadata participates in cache identity before any second instance can be constructed"
+          ],
+          "scope": "Full second case including private new ReturnProjectionV2 unscoped prepareGroup refusal; exact SDK compiler input/output pinned by hash.",
+          "revision": "5fc625cd3ca88e986d9ef4be6f57aa8c0958d5bd",
+          "targetBlob": "4e9688aaa4c58267030bb978c022b0e1b237f87f"
+        }
+      ],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/tile-bakes.test.ts",
+      "sourceBlob": "88a639c19a028068de6e1aaa6b00fc376cd418a7",
+      "originalTests": [
+        "a new product requires all 64+16 coordinates and every full 5x5",
+        "the exact L%s cap is allowed, one extra unit is debt for every metric",
+        "exact coordinate debt permits its current cost but no new or worsened overrun",
+        "5x5 totals include all rows and count shared transitive assets once separately",
+        "full 5x5 cap checks include the corner and permit the exact aggregate cap",
+        "duplicate, out-of-grid and dishonest cell bounds refuse before policy",
+        "corrupt section bytes and a mismatched index receipt cannot borrow debt",
+        "policy rows are strict and increases/identity swaps require exact approval trailers"
+      ],
+      "originalStillPending": false,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/tile-bakes.test.ts",
+        "targetBlob": "a3937af6551e9e3c491d979fa38b67cb1486bed1",
+        "tests": [
+          "a new product requires all 64+16 coordinates and every full 5x5",
+          "the exact L%s cap is allowed, one extra unit is debt for every metric",
+          "exact coordinate debt permits its current cost but no new or worsened overrun",
+          "5x5 totals include all rows and count shared transitive assets once separately",
+          "full 5x5 cap checks include the corner and permit the exact aggregate cap",
+          "duplicate, out-of-grid and dishonest cell bounds refuse before policy",
+          "corrupt section bytes and a mismatched index receipt cannot borrow debt"
+        ]
+      },
+      "nativeCompanions": [
+        {
+          "repository": "project-wildshard/engine",
+          "targetPath": "test/tile-bakes.test.ts",
+          "branch": "plan/ci21sdk-tail",
+          "originalTests": [
+            "policy rows are strict and increases/identity swaps require exact approval trailers"
+          ],
+          "scope": "Entire original strict private policy and ratchet-approval case, unchanged assertions.",
+          "revision": "1d1f8c10d9763632aa191c216576d63f6220794e",
+          "targetBlob": "3a596044c98528a2a7f3c37e5c1f5569a729ff7b"
+        }
+      ],
+      "shardCompanions": []
+    },
+    {
+      "sourcePath": "test/species-barrel-author-ports.test.ts",
+      "sourceBlob": "cfb067d11d760ba117fcefe317803c43253504c8",
+      "originalTests": [
+        "finite species-field readers retain complete defining types, strict grammar and issue order",
+        "barrel metadata preserves native complete identity and stays renderer-free",
+        "complete ecology, barrel bodies/floors and watch decision retain original wires"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/species-barrel-author-ports.test.ts",
+        "targetBlob": "d898960a2aa7b9c8b53841cc91e38f71db0b3b3b",
+        "tests": [
+          "finite species-field readers retain complete defining types, strict grammar and issue order",
+          "barrel metadata preserves native complete identity and stays renderer-free"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": [
+        {
+          "repository": "project-wildshard/shard-nalati",
+          "targetPath": "test/nalati-ecology-wire.test.ts",
+          "revision": "a128751ca56ad289f95f3f7109b8982d4c1f1ff8",
+          "targetBlob": "fc9e4eb70f2663779703b3a78d310d97d6016e5f",
+          "originalTests": [
+            "complete ecology, barrel bodies/floors and watch decision retain original wires"
+          ],
+          "wireKeys": [
+            "ecology"
+          ],
+          "fixturePath": "test/fixtures/species-barrel-author-original.json",
+          "fixtureBlob": "62009c0307777eddf73066575f68f7730e03d67a"
+        },
+        {
+          "repository": "project-wildshard/shard-driftwood",
+          "targetPath": "test/driftwood-barrel-wire.test.ts",
+          "revision": "5b63092793dae46ce2a3d458462ec17a41ee9d5c",
+          "targetBlob": "98f069a391656000b381895d3043b474ba615e10",
+          "originalTests": [
+            "complete ecology, barrel bodies/floors and watch decision retain original wires"
+          ],
+          "wireKeys": [
+            "bodies",
+            "decision"
+          ],
+          "fixturePath": "test/fixtures/species-barrel-author-original.json",
+          "fixtureBlob": "62009c0307777eddf73066575f68f7730e03d67a"
+        }
+      ],
+      "wireSplit": {
+        "originalTest": "complete ecology, barrel bodies/floors and watch decision retain original wires",
+        "requiredKeys": [
+          "ecology",
+          "bodies",
+          "decision"
+        ],
+        "fixtureSourcePath": "test/fixtures/species-barrel-author-original.json",
+        "fixtureBlob": "62009c0307777eddf73066575f68f7730e03d67a"
+      }
+    },
+    {
+      "sourcePath": "test/view-author-metadata.test.ts",
+      "sourceBlob": "515eaa3b4ea66dac2a5dcf15d28b96eec39f3aaf",
+      "originalTests": [
+        "view declarations and fire fields retain complete native contracts and metadata identity",
+        "complete Titan, elite and four fire-profile wires retain every original field and order"
+      ],
+      "originalStillPending": true,
+      "sdkDestination": {
+        "repository": "project-wildshard/sharddev",
+        "revision": "2910fac555be0a5c52a192cd7d157d1d97489c44",
+        "targetPath": "test/view-author-metadata.test.ts",
+        "targetBlob": "788be41fba3c836b5e6ea5ab8fad44e1848b76fd",
+        "tests": [
+          "view declarations and fire fields retain complete native contracts and metadata identity"
+        ]
+      },
+      "nativeCompanions": [],
+      "shardCompanions": [
+        {
+          "repository": "project-wildshard/shard-nalati",
+          "targetPath": "test/nalati-view-wires.test.ts",
+          "revision": "a128751ca56ad289f95f3f7109b8982d4c1f1ff8",
+          "targetBlob": "a0574b944d85f83d2b6389a87caeea8f9fea0b7c",
+          "originalTests": [
+            "complete Titan, elite and four fire-profile wires retain every original field and order"
+          ],
+          "wireKeys": [
+            "titan",
+            "elite"
+          ],
+          "fixturePath": "test/fixtures/view-author-original.json",
+          "fixtureBlob": "723fd5778f4428b752956b6fe12be0b77cd3ffd0"
+        },
+        {
+          "repository": "project-wildshard/shard-dunes",
+          "targetPath": "test/sunscar-fire-wires.test.ts",
+          "revision": "6ca348a9f59b1f304be34bb9fa3c49fa8e95b0fa",
+          "targetBlob": "57c8cfbcf928d3399962cfb06093295bf9bc507d",
+          "originalTests": [
+            "complete Titan, elite and four fire-profile wires retain every original field and order"
+          ],
+          "wireKeys": [
+            "fires"
+          ],
+          "fixturePath": "test/fixtures/view-author-original.json",
+          "fixtureBlob": "723fd5778f4428b752956b6fe12be0b77cd3ffd0"
+        }
+      ],
+      "wireSplit": {
+        "originalTest": "complete Titan, elite and four fire-profile wires retain every original field and order",
+        "requiredKeys": [
+          "titan",
+          "elite",
+          "fires"
+        ],
+        "fixtureSourcePath": "test/fixtures/view-author-original.json",
+        "fixtureBlob": "723fd5778f4428b752956b6fe12be0b77cd3ffd0"
+      }
+    }
+  ]
+}
