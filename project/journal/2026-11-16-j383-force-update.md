@@ -37,3 +37,7 @@ the origin to the candidate. Hosted CI qualification follows.
 
 No hook escape hatch was used. v0.1.30 was already cut; this rides v0.1.31.
 The physical staging playtest is PZ30/PZ11, and asks Jake for no chores.
+
+Final indicator correction: J383 asked for a tiny Updating line. Keep the
+existing screen visible and place the status above the bottom safe area,
+without covering the viewport or taking pointer input.

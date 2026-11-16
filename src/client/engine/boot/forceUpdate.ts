@@ -19,7 +19,7 @@ function updating(): void {
   if (document.getElementById('ws-force-update') !== null) return;
   const line = document.createElement('p'); line.id = 'ws-force-update'; line.textContent = engineString('s_force_updating');
   line.setAttribute('role', 'status');
-  line.style.cssText = 'position:fixed;inset:0;z-index:2147483647;margin:0;display:grid;place-items:center;background:#07131d;color:white;font:16px system-ui';
+  line.style.cssText = 'position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);transform:translateX(-50%);z-index:2147483647;margin:0;padding:6px 10px;border-radius:4px;background:#07131d;color:white;font:14px system-ui;pointer-events:none';
   document.documentElement.append(line);
 }
 /** One page's recovery lifetime. Construction installs no listeners or services. */
