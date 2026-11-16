@@ -13,7 +13,7 @@ import type { AnimalModel, AnimalRig } from '@wildshard/engine/entities/AnimalFa
 const sha = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
 /** A two-joint skinned GLB: a body quad in `Body`, and (with `glow`) a head triangle in its own primitive and material. */
-function skinGlb(glow: boolean, mixed = false): Uint8Array {
+function skinGlb(glow: boolean, mixed = false, size = 1): Uint8Array {
   const chunks: Buffer[] = [], views: object[] = [], accessors: object[] = [];
   let at = 0;
   const add = (data: ArrayBufferView, accessor: Record<string, unknown>): number => {
@@ -23,7 +23,7 @@ function skinGlb(glow: boolean, mixed = false): Uint8Array {
     accessors.push({ bufferView: views.length - 1, ...accessor });
     return accessors.length - 1;
   };
-  const position = add(new Float32Array([-0.5, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0, 0, 1.2, 0]), { componentType: 5126, count: 5, type: 'VEC3', min: [-0.5, 0, 0], max: [0.5, 1.2, 0] });
+  const position = add(new Float32Array([-0.5 * size, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0, 0, 1.2, 0]), { componentType: 5126, count: 5, type: 'VEC3', min: [-0.5, 0, 0], max: [0.5, 1.2, 0] });
   const normal = add(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]), { componentType: 5126, count: 5, type: 'VEC3' });
   const joints = add(new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]), { componentType: 5121, count: 5, type: 'VEC4' });
   const weights = add(new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]), { componentType: 5126, count: 5, type: 'VEC4' });
@@ -31,7 +31,7 @@ function skinGlb(glow: boolean, mixed = false): Uint8Array {
   const head = glow ? add(new Uint16Array([3, 2, 4]), { componentType: 5123, count: 3, type: 'SCALAR' }) : -1;
   const binds = add(new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1]), { componentType: 5126, count: 2, type: 'MAT4' });
   const times = add(new Float32Array([0, 1]), { componentType: 5126, count: 2, type: 'SCALAR', min: [0], max: [1] });
-  const moves = add(new Float32Array([0, 1, 0, 0, 1.1, 0]), { componentType: 5126, count: 2, type: 'VEC3' });
+  const moves = add(new Float32Array([0, 1, 0, 0, 1 + 0.1 * size, 0]), { componentType: 5126, count: 2, type: 'VEC3' });
   const attributes = { POSITION: position, NORMAL: normal, JOINTS_0: joints, WEIGHTS_0: weights };
   // the same channel in another encoding: the part's joints as shorts beside the body's bytes
   const shorts = mixed ? add(new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]), { componentType: 5123, count: 5, type: 'VEC4' }) : joints;
@@ -52,17 +52,18 @@ function skinGlb(glow: boolean, mixed = false): Uint8Array {
   return new Uint8Array(Buffer.concat([header, jh, text, bh, bin]));
 }
 
-async function loaded(glow: boolean, materials?: Record<string, string>, mixed = false) {
+async function loaded(glow: boolean, materials?: Record<string, string>, mixed = false, variants = false) {
   await prepareGlbCost();
   const glb = skinGlb(glow, mixed), cost = parseGlbData(glb), file = sha(glb);
-  const skin = new TextEncoder().encode(JSON.stringify({
+  const metadata = {
     row: { id: 'test.glow', file, family: 'toon', rig: { skeleton: 'test.glow', joints: [['body', 'head']], clips: ['idle'], sockets: ['body', 'head'] },
       cost: { decoded: cost.decoded, gpu: cost.gpu, triangles: cost.triangles, draws: cost.draws } },
     binding: { skin: 'test.glow', material: { family: 'pbr', vertexColours: false }, ...(materials === undefined ? {} : { materials }), loops: ['idle'] },
-  }));
+  };
+  const skin = new TextEncoder().encode(JSON.stringify(metadata));
   const look = { id: 'test.glow.look', species: 'test.glow', recipe: 'platform.skin', material: null, parameters: { skin: sha(skin) },
     animation: { recipe: 'platform.clips', parameters: { attackSpan: 1 } } };
-  const source = { rows: { looks: [look] }, files: [{ hash: sha(skin), kind: 'json', dependencies: [file] }, { hash: file, kind: 'glb', dependencies: [] }],
+  const source = { rows: { looks: [look], species: [{ id: 'test.glow', variants: [{ id: 'plain' }, { id: 'wide' }, { id: 'alias' }] }] }, files: [{ hash: sha(skin), kind: 'json', dependencies: [file] }, { hash: file, kind: 'glb', dependencies: [] }],
     look: { materials: { 'test.eye': { family: 'emissive', colour: [1, 0.8, 0.2], intensity: 3 } } } };
   const compiled: THREE.Material[] = [];
   const compile = (entry: unknown): THREE.Material => {
@@ -70,9 +71,18 @@ async function loaded(glow: boolean, materials?: Record<string, string>, mixed =
     const material = family === 'emissive' ? new THREE.MeshBasicMaterial({ color: 0xffcc33 }) : new THREE.MeshStandardMaterial({ color: 0xb4583a });
     compiled.push(material); return material;
   };
-  const skins = await loadClientSkins(source as never, new Map([[sha(skin), skin], [file, glb]]), compile, new Scope('skin parts'));
+  const assets = new Map([[sha(skin), skin], [file, glb]]), scope = new Scope('skin parts');
+  if (variants) {
+    const secondGlb = skinGlb(glow, mixed, 2), secondFile = sha(secondGlb), secondCost = parseGlbData(secondGlb);
+    const second = new TextEncoder().encode(JSON.stringify({ ...metadata, row: { ...metadata.row, id: 'test.wide', file: secondFile, cost: secondCost }, binding: { ...metadata.binding, skin: 'test.wide' } }));
+    const table = new TextEncoder().encode(JSON.stringify({ version: 1, skins: { plain: sha(skin), wide: sha(second), alias: sha(skin) } }));
+    Object.assign(look.parameters, { variants: sha(table) });
+    source.files.push({ hash: sha(second), kind: 'json', dependencies: [secondFile] }, { hash: secondFile, kind: 'glb', dependencies: [] }, { hash: sha(table), kind: 'json', dependencies: [sha(skin), sha(second)] });
+    assets.set(sha(second), second); assets.set(secondFile, secondGlb); assets.set(sha(table), table);
+  }
+  const skins = await loadClientSkins(source as never, assets, compile, scope);
   const loadedSkin = skins.get('test.glow.look'); if (loadedSkin === undefined) throw new Error('skin not loaded');
-  return { skin: loadedSkin, look, compiled };
+  return { skin: loadedSkin, look, compiled, scope };
 }
 
 test('a skin binding that maps a GLB material draws that part in its own look material, one group each', async () => {
@@ -141,4 +151,40 @@ test('a hit flashes every material of the rig, its glowing parts too, and each r
   const faded = animal.mesh.material as THREE.Material[];
   expect(faded[1]).toBe(eye); expect(faded[2]).toBe(lit); expect(eye.transparent).toBe(true);
   expect(faded[0]).not.toBe(fur);
+});
+
+
+test('variant tables select distinct geometry and animation with shared aliases and scoped disposal', async () => {
+  const { skin, look, scope } = await loaded(false, undefined, false, true);
+  const plain = skin.variants?.get('plain'), wide = skin.variants?.get('wide');
+  expect(plain).toBeDefined(); expect(wide).toBeDefined();
+  if (plain === undefined || wide === undefined) throw new Error('Missing variant skin');
+  expect(skin.variants?.get('alias')).toBe(plain);
+  const species = { id: 'test.glow', kind: 'test.glow', dims: { feet: [] } };
+  const view = skinSpeciesLook(look, species as never, skin);
+  const variant = (id: string) => ({ id } as Parameters<NonNullable<typeof view.skin>>[0]);
+  const plainHull = view.skin?.(variant('plain'), [], []), wideHull = view.skin?.(variant('wide'), [], []);
+  expect(plainHull?.geometry).toBe(plain.geometry); expect(wideHull?.geometry).toBe(wide.geometry);
+  expect(plain.geometry.getAttribute('position').getX(0)).toBe(-0.5);
+  expect(wide.geometry.getAttribute('position').getX(0)).toBe(-1);
+  expect(plainHull?.bones).not.toBe(wideHull?.bones);
+  const make = (id: string) => {
+    const bones = { body: new THREE.Bone(), head: new THREE.Bone() };
+    const ctx = { bones, animal: { variant: id }, alive: true, flinch: 0, attack: -1, speed: 0, strafe: 0, scale: 1, state: 'idle', dt: 1 / 60, t: 0.5 };
+    return { bones, ctx };
+  };
+  const first = make('plain'), second = make('wide');
+  view.animate?.(first.ctx as never); view.animate?.(second.ctx as never);
+  expect(first.bones.head.position.y).toBeCloseTo(1.05);
+  expect(second.bones.head.position.y).toBeCloseTo(1.1);
+  first.ctx.t = 0.75; second.ctx.t = 0.75;
+  view.animate?.(second.ctx as never); view.animate?.(first.ctx as never);
+  expect(first.bones.head.position.y).toBeCloseTo(1.075);
+  expect(second.bones.head.position.y).toBeCloseTo(1.15);
+  expect(() => view.skin?.(variant('missing'), [], [])).toThrow('unknown variant missing');
+  const disposed: THREE.BufferGeometry[] = [];
+  plain.geometry.addEventListener('dispose', () => { disposed.push(plain.geometry); });
+  wide.geometry.addEventListener('dispose', () => { disposed.push(wide.geometry); });
+  scope.dispose();
+  expect(disposed).toHaveLength(2); expect(new Set(disposed).size).toBe(2);
 });

@@ -19,7 +19,7 @@ import type { AnimalSpecies, BoneDef, RigAnimCtx } from '@wildshard/engine/entit
 import { NO_FUR } from '@wildshard/engine/entities/species/rigs';
 import { loadSkin } from './skinPlayback';
 import { compileSkinPoseLayers, bindSkinPoseLayers, type CompiledSkinPoseLayers } from './skinLayerPlayback';
-import { parseSkinFile, skinLookParameters } from '@wildshard/format/skinAssets';
+import { resolveSkinLookFiles, skinLookParameters } from '@wildshard/format/skinAssets';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -39,6 +39,8 @@ export interface ClientSkin {
   readonly skeleton: string;
   readonly sockets: readonly string[];
   readonly attackSpan: number;
+  /** Exact authored variant ids; entries share the admitted rig/material contract. */
+  readonly variants?: ReadonlyMap<string, ClientSkin>;
 }
 
 const PROPERTIES = new Set(['position', 'quaternion', 'scale']);
@@ -81,16 +83,30 @@ export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files' |
   for (const look of source.rows.looks) {
     if (look.recipe !== SKIN_LOOK_RECIPE) continue;
     if (skins.size > 0) await macrotask(); // SF67: a skin a task (the template's two were one 124-132 ms task at 4x CPU)
-    const parameters = skinLookParameters(look), json = assets.get(parameters.skin); if (json === undefined) throw new Error(`skin look ${look.id}: missing admitted skin file`);
-    const { row, binding } = parseSkinFile(json), declared = source.files.find((file) => file.hash === parameters.skin);
-    if (declared?.dependencies.length !== 1 || declared.dependencies[0] !== row.file) throw new Error(`skin look ${look.id}: the skin file must depend on exactly its GLB`);
-    const glb = assets.get(row.file); if (glb === undefined) throw new Error(`skin look ${look.id}: missing admitted skin GLB`);
+    const parameters = skinLookParameters(look), resolved = resolveSkinLookFiles(source, look, assets);
+    const loaded = new Map<string, ClientSkin>();
+    for (const file of [resolved.skin, ...(resolved.variants?.values() ?? [])]) {
+      if (!loaded.has(file.hash)) loaded.set(file.hash, await loadClientSkin(file, { source, assets, compile, scope, lookId: look.id, attackSpan: parameters.attackSpan }));
+    }
+    const skin = loaded.get(resolved.skin.hash); if (skin === undefined) throw new Error(`skin look ${look.id}: unloaded default`);
+    const variants = resolved.variants === undefined ? undefined : new Map([...resolved.variants].map(([id, file]) => {
+      const value = loaded.get(file.hash); if (value === undefined) throw new Error(`skin look ${look.id}: unloaded variant ${id}`);
+      return [id, value] as const;
+    }));
+    skins.set(look.id, variants === undefined ? skin : { ...skin, variants });
+  }
+  return skins;
+}
+
+interface SkinLoadContext { source: Pick<Shardfile, 'look'>; assets: ReadonlyMap<string, Uint8Array>; compile: (entry: unknown) => Material; scope: Scope; lookId: string; attackSpan: number }
+async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLookFiles>['skin'], { source, assets, compile, scope, lookId, attackSpan }: SkinLoadContext): Promise<ClientSkin> {
+    const glb = assets.get(row.file); if (glb === undefined) throw new Error(`skin look ${lookId}: missing admitted skin GLB`);
     const material = materialFactory(compile, binding.material);
     // TE-ENG10: the binding's GLB material name -> look.materials id, as props.materials maps a prop's; each mapped part
     // one more draw per rig (and one more shadow draw where the rig casts)
     const mapped = Object.entries(binding.materials ?? {});
     const parts = mapped.map(([, id]) => {
-      const entry = source.look.materials[id]; if (entry === undefined) throw new Error(`skin look ${look.id}: no look material ${id}`);
+      const entry = source.look.materials[id]; if (entry === undefined) throw new Error(`skin look ${lookId}: no look material ${id}`);
       return (): Material => compile(entry);
     });
     const player = await loadSkin(glb, row, binding, material(), scope, mapped.map(([name]) => name));
@@ -107,9 +123,7 @@ export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files' |
     // Instances use sampled tracks; the temporary player's mixer never plays.
     // Keep its mesh/skeleton scope-owned, but release unused actions/bindings.
     player.machine.dispose();
-    skins.set(look.id, { id: row.id, geometry, bones: restBones(joints, player.mesh.skeleton.boneInverses, row.id), material, parts, clips, skeleton: row.rig.skeleton, sockets: row.rig.sockets, attackSpan: parameters.attackSpan });
-  }
-  return skins;
+    return { id: row.id, geometry, bones: restBones(joints, player.mesh.skeleton.boneInverses, row.id), material, parts, clips, skeleton: row.rig.skeleton, sockets: row.rig.sockets, attackSpan };
 }
 
 /** The part of the engine's per-frame rig context a skin's clip choice reads. */
@@ -169,15 +183,20 @@ export class SkinDriver {
 export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardRows['species'][number], skin: ClientSkin): SpeciesLook {
   const drivers = new WeakMap<Record<string, Bone>, SkinDriver>();
   // fresh joint and dims records per call: the factory owns what it is handed
-  const bones = (): BoneDef[] => skin.bones.map((bone): BoneDef => ({ name: bone.name, parent: bone.parent, pos: [bone.pos[0], bone.pos[1], bone.pos[2]] }));
+  const select = (id: string): ClientSkin => {
+    if (skin.variants === undefined) return skin;
+    const selected = skin.variants.get(id); if (selected === undefined) throw new Error(`skin look ${row.id}: unknown variant ${id}`);
+    return selected;
+  };
+  const bones = (selected: ClientSkin): BoneDef[] => selected.bones.map((bone): BoneDef => ({ name: bone.name, parent: bone.parent, pos: [bone.pos[0], bone.pos[1], bone.pos[2]] }));
   const dims = (): AnimalSpecies['dims'] => ({ ...species.dims, feet: species.dims.feet.map(([x, z]): [number, number] => [x, z]) });
   return { id: row.id, species: species.id, kind: species.kind, rig: 'custom', fur: NO_FUR,
     rigContract: { skeleton: skin.skeleton, sockets: [...skin.sockets], clips: [...skin.clips.keys()] },
     // the procedural stand-in is the hull itself (the factory swaps in `skin`'s shared geometry before any rig is made)
-    build: () => ({ bones: bones(), furParts: [], hardParts: [skin.geometry.clone()], eyeParts: [], dims: dims() }),
+    build: (variant) => { const selected = select(variant.id); return { bones: bones(selected), furParts: [], hardParts: [selected.geometry.clone()], eyeParts: [], dims: dims() }; },
     material: () => skin.material(),
     ...(skin.parts.length === 0 ? {} : { partMaterials: () => skin.parts.map((part) => part()) }),
-    skin: () => ({ geometry: skin.geometry, map: null, normalMap: null, bones: bones(), overgrown: false }),
-    animate: (c) => { let driver = drivers.get(c.bones); if (driver === undefined) { driver = new SkinDriver(skin, c.bones); drivers.set(c.bones, driver); } driver.step(c); },
+    skin: (variant) => { const selected = select(variant.id); return { geometry: selected.geometry, map: null, normalMap: null, bones: bones(selected), overgrown: false }; },
+    animate: (c) => { let driver = drivers.get(c.bones); if (driver === undefined) { driver = new SkinDriver(select(c.animal.variant), c.bones); drivers.set(c.bones, driver); } driver.step(c); },
   };
 }
