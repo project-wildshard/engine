@@ -401,8 +401,9 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
   const images = half.shard.index.files.flatMap(row => row.name?.startsWith('ui/images/') === true ? [row.path] : []);
   // SHARD-SOURCE SA48: a file no whole set holds (a lazy GLB the entry read set never reaches) is still read at its
   // product URL, as an app build serves its whole shard file folder; without it a placed slug's page waits on a 404.
-  const packed = new Set(whole.flatMap(row => row.rows.map(file => file.hash)));
-  const unpacked = half.shard.index.files.flatMap(row => packed.has(row.hash) || row.name?.startsWith('ui/images/') === true ? [] : [row.path]);
+  // Per tier: a file one tier's whole set lacks (a phone fence) is that tier's 404 too, so it goes loose.
+  const packed = whole.map(row => new Set(row.rows.map(file => file.hash)));
+  const unpacked = half.shard.index.files.flatMap(row => packed.every(set => set.has(row.hash)) || row.name?.startsWith('ui/images/') === true ? [] : [row.path]);
   for (const path of [...images, ...unpacked]) {
     const file = join(out, 'shardfiles', half.shard.slug, path);
     mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.shard.read(path));

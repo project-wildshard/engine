@@ -76,13 +76,14 @@ test('a stale preparation cooks to the same bytes as the matching renderer, and 
 
 test('SA48: every file of the shard is in a whole set or loose at its product URL', {timeout: 60_000}, async () => {
   const files = prepared(PREPARED), cooked = await cook(writeTar(files), 'whole-or-loose', PREPARED);
-  const index = parseOutputIndex(json(files.get('shard.json'))), packed = new Set<string>();
-  for (const row of cooked.report.manifests.filter(manifest => manifest.set === 'whole')) {
-    for (const file of (json(readFileSync(join(root, 'whole-or-loose', row.url.slice(1)))) as {files: {hash: string}[]}).files) packed.add(file.hash);
-  }
-  const loose = index.files.filter(row => !packed.has(row.hash));
+  const index = parseOutputIndex(json(files.get('shard.json')));
+  // Each tier's whole set on its own: a file any tier's set lacks must be loose, or that tier reads a 404.
+  const sets = cooked.report.manifests.filter(manifest => manifest.set === 'whole').map(row =>
+    new Set((json(readFileSync(join(root, 'whole-or-loose', row.url.slice(1)))) as {files: {hash: string}[]}).files.map(file => file.hash)));
+  const loose = index.files.filter(row => !sets.every(set => set.has(row.hash)));
+  // The template fixture has lazy GLBs in no read set, so this is not vacuous.
+  expect(loose.length).toBeGreaterThan(0);
   for (const row of loose) expect(cooked.files[join('shardfiles', index.identity.slug, row.path)]).toBe(row.hash);
-  expect(index.files.length).toBeGreaterThan(0);
 });
 
 test('one changed byte of a stale cook.json still refuses before any part is written', async () => {
