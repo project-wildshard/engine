@@ -1108,19 +1108,32 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(existsSync('.github/workflows/ring-1.yml')).toBe(false);
     expect(readFileSync('.github/workflows/engine-boundaries.yml', 'utf8')).not.toMatch(/^ {2}push:/mu);
     const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
-    expect([...jobs.keys()]).toEqual(['tests', 't1-e2e', 'timings', 'boundaries', 'quarantine']);
+    expect([...jobs.keys()]).toEqual(['tests', 'products', 't1-e2e', 'timings', 'boundaries', 'quarantine']);
+    // TS9b uses native YAML aliases: both jobs execute exactly the same
+    // blocking packed-step sequence, retaining the original visible names.
+    const packed = jobs.get('tests') ?? '';
+    const start = packed.indexOf('    steps: &packed-steps\n');
+    expect(start).toBeGreaterThan(0);
+    const steps = packed.slice(start).replace('steps: &packed-steps', 'steps:');
+    const producer = jobs.get('products') ?? '';
+    expect(producer).toContain('steps: *packed-steps');
+    expect(producer).toContain('outputs: *packed-outputs');
+    expect(producer).toContain('env: *packed-env');
+    expect(producer).toContain('name: tests (${{ matrix.job }})');
+    jobs.set('tests', packed.replace('steps: &packed-steps', 'steps:'));
+    jobs.set('products', producer.replace('    steps: *packed-steps\n', steps));
     // T1 consumes the products build and the producer's code/reuse verdict.
     // Packed shares keep their independent start and reuse checks below.
     const template = jobs.get('t1-e2e') ?? '';
     jobs.delete('t1-e2e');
-    expect(template).toMatch(/^ {4}needs: tests$/mu);
-    expect(template).toContain("if: needs.tests.outputs.code-run == 'true'");
+    expect(template).toMatch(/^ {4}needs: products$/mu);
+    expect(template).toContain("if: needs.products.outputs.code-run == 'true'");
     expect(template).toContain('suite: [A, B, C, D]');
     expect(template).toContain('WS_T1_BUILD_DIR: dist');
     // LS2: the one bookkeeping job saves main's measured timings after the tests; it never decides the run's verdict.
     const timings = jobs.get('timings') ?? '';
     jobs.delete('timings');
-    expect(timings).toMatch(/^ {4}needs: tests$/mu);
+    expect(timings).toMatch(/^ {4}needs: \[tests, products\]$/mu);
     expect(timings).toMatch(/^ {4}continue-on-error: true$/mu);
     expect(timings).toContain("github.ref == 'refs/heads/main'");
     expect(timings).not.toMatch(/ci-pack|vitest|test-quarantine/u);
@@ -1131,7 +1144,7 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
       expect(work[0], name).toMatch(/if: steps\.code\.outputs\.run == 'true'/u);
       const code = steps.find(step => step.startsWith('id: code')) ?? '';
       expect(body, name).not.toMatch(/^ {4}needs:/mu);
-      if (name !== 'tests') {
+      if (name !== 'tests' && name !== 'products') {
         // CIQ1: main-only jobs skip plan/** runs by ref and never reuse one (the CIQ1 test above).
         expect(code, name).toContain("if: steps.paths.outputs.docs != 'true'");
         continue;
@@ -1149,7 +1162,10 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(jobs.get('boundaries')).not.toMatch(/^ {4}continue-on-error:/mu);
     expect(jobs.get('boundaries')).toContain('scripts/ci-pack.mjs --jobs=1 --job=1 --units=boundaries');
     // EV3: six shares, the last of them Ring 1's products alone.
-    expect(jobs.get('tests')).toContain('job: [1, 2, 3, 4, 5, 6]');
+    expect(jobs.get('tests')).toContain('job: [1, 2, 3, 4, 5]');
+    expect(jobs.get('products')).toContain('job: [6]');
+    for (const name of ['tests', 'products']) expect(jobs.get(name)).toContain('--jobs=6 --job=${{ matrix.job }}');
+    expect(template).toContain("continue-on-error: ${{ needs.products.outputs.t1-blocking != 'true' }}");
   });
 
   test('products and boundaries start the last packed job; a heavy last job takes nothing else (EV3)', () => {

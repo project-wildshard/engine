@@ -63,21 +63,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # The plan-branch run a main push reused (J240): its reports are this SHA's measurements (LS2's timings job).
-    outputs:
+    outputs: &packed-outputs
       reused-run: ${{ steps.reuse.outputs.run }}
       code-run: ${{ steps.code.outputs.run }}
       t1-blocking: ${{ steps.t1-policy.outputs.blocking }}
     strategy:
       fail-fast: false
       matrix:
-        job: [1, 2, 3, 4, 5, 6]
-    env:
+        job: [1, 2, 3, 4, 5]
+    env: &packed-env
       WS_TEST_QUARANTINE: blocking
       WS_CI_PLAN: tmp/engine-ci/plan.json
       # Ring 1's build here is a test build, never shipped (release.sh builds its own): a paused or failing production
       # (a paused host answers 503) warns instead of failing it. A release build still refuses.
       WS_PREVIOUS_DEPLOY_OPTIONAL: '1'
-    steps:
+    steps: &packed-steps
       - name: Start the job clock (each shard's five-minute budget includes the set-up every job shares, J193)
         run: echo "WS_CI_SHARD_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -219,7 +219,7 @@ jobs:
         if: steps.code.outputs.run == 'true'
         env:
           RING_RECORD: ${{ inputs.record && 'true' || 'false' }}
-        run: node scripts/ci-pack.mjs --jobs=${{ strategy.job-total }} --job=${{ matrix.job }} --concurrency=2 --units=static,e2e,plan-proofs,tests,products
+        run: node scripts/ci-pack.mjs --jobs=6 --job=${{ matrix.job }} --concurrency=2 --units=static,e2e,plan-proofs,tests,products
       - name: Retain actual membership, budget and timing evidence
         if: always() && steps.code.outputs.run == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -366,12 +366,27 @@ jobs:
             echo "::error title=Red run covers $range::$(printf '%s\n' "$commits" | sed '/^$/d' | wc -l | tr -d ' ') commits after the last finished run; see this job's summary"
           fi
 
+  # TS9b: the exact same packed share 6 is a named producer dependency.
+  # Anchors preserve every step, reuse/docs gate, report and failure policy.
+  # T1 can start when its build is published, while shares 1..5 still run.
+  products:
+    name: tests (${{ matrix.job }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs: *packed-outputs
+    strategy:
+      fail-fast: false
+      matrix:
+        job: [6]
+    env: *packed-env
+    steps: *packed-steps
+
   t1-e2e:
     # J244 folded Ring 1 into this workflow. Every shard consumes the one
     # products build; exact-reuse and docs-only runs create no second suite.
-    needs: tests
-    if: needs.tests.outputs.code-run == 'true'
-    continue-on-error: ${{ needs.tests.outputs.t1-blocking != 'true' }}
+    needs: products
+    if: needs.products.outputs.code-run == 'true'
+    continue-on-error: ${{ needs.products.outputs.t1-blocking != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -431,7 +446,7 @@ jobs:
     # table and save it as the newest `timings-<run id>`, which every later run's planner restores. It never fails
     # the run: a missed save only leaves the previous table in place. Node built-ins only, no install.
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: tests
+    needs: [tests, products]
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 5
