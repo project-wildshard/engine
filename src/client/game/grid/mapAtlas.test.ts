@@ -4,7 +4,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { loadGridMapAtlas } from './mapAtlas';
 import { GridAssembly } from '../../../shared/game/grid/assembly';
-import { fullMapOverlay } from './minimapBlend';
+import { fullMapOverlay, minimapOverlay } from './minimapBlend';
 import { GridCellEvents } from '../../../shared/game/grid/cellEvents';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 
@@ -61,4 +61,19 @@ test('a placed cell the atlas has no tile for draws its own map, or a plain plot
   const loaded = fullMapOverlay(host, [], tile);
   expect(loaded.images).toHaveLength(25); expect(loaded.images.find(row => row.image === own)).toMatchObject({ x: placed.origin.x - home.origin.x, alpha: 1 });
   expect(loaded.rects).toEqual([]);
+});
+
+test('the road minimap draws the atlas, not each cell\'s product (ZONE-ENTRY ZE14: offline it read every cell\'s whole product)', () => {
+  const assembly = new GridAssembly({ developer: true, devserver: true }), home = assembly.cells[0], placed = assembly.cells[1];
+  if (home === undefined || placed === undefined) throw new Error('Missing cells');
+  const atlasImage = document.createElement('canvas'), asked: string[] = [];
+  // the feet on the road, past the home's east edge
+  const host = { assembly, home, cells: new GridCellEvents(), worldFeet: () => ({ x: home.origin.x + CHUNK_HALF + 20, z: home.origin.z }), name: (cell: { slug: string }) => cell.slug,
+    image: (instance: string) => { asked.push(instance); return null; } };
+  const tile = (slug: string) => slug === placed.slug ? null : { image: atlasImage, crop: [0, 0, 256, 256] as [number, number, number, number] };
+  const road = minimapOverlay(host, [], tile);
+  // only the home's own layer and the one cell the atlas lacks are asked for; every other cell is its atlas tile, faded
+  expect(asked.filter(instance => instance !== home.instance)).toEqual([placed.instance]);
+  expect(road.images.filter(row => row.image === atlasImage)).toHaveLength(assembly.cells.length - 2);
+  expect(road.images.every(row => row.alpha < 1)).toBe(true);
 });

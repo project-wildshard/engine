@@ -126,17 +126,21 @@ export interface MinimapBlendHost {
   readonly name: (cell: GridCell) => string;
 }
 /** The overlay for the feet now (pure but for the rasters; the home frame's metres). */
-export function minimapOverlay(host: MinimapBlendHost, rects: readonly MapExtraRect[]): MapExtras {
+export function minimapOverlay(host: MinimapBlendHost, rects: readonly MapExtraRect[], atlas?: AtlasTile): MapExtras {
   const { assembly, home } = host, feet = host.worldFeet(), ox = home.origin.x, oz = home.origin.z;
   const inside = host.cells.cell === null ? undefined : assembly.at(feet.x, feet.z);
   const homeImage = host.image(home.instance);
   const images: MapExtraImage[] = [], labels: MapExtraLabel[] = [];
   if (inside === undefined) {
-    // G107 on the road: every cell in view faded, the home's own layer too
+    // G107 on the road: every cell in view faded, the home's own layer too. ZONE-ENTRY ZE14: another cell is its world map
+    // atlas tile; its own map read admits its whole product (24 cells' worth on the first road step, failing offline)
     for (const cell of assembly.cells) {
       if (cell.instance === home.instance && homeImage === null) continue;
+      const at = { x: cell.origin.x - ox, z: cell.origin.z - oz, size: 2 * CHUNK_HALF, alpha: ROAD_TERRAIN_ALPHA };
+      const tile = cell.instance === home.instance ? null : atlas?.(cell.slug) ?? null;
+      if (tile !== null) { images.push({ ...tile, ...at }); continue; }
       const image = host.image(cell.instance);
-      if (image !== null) images.push({ image, x: cell.origin.x - ox, z: cell.origin.z - oz, size: 2 * CHUNK_HALF, alpha: ROAD_TERRAIN_ALPHA });
+      if (image !== null) images.push({ image, ...at });
     }
     return { outside: VOID, baseAlpha: homeImage === null ? ROAD_TERRAIN_ALPHA : 0, rects, images, labels };
   }
@@ -188,7 +192,7 @@ interface ExtrasSink { setExtras: (source: (() => MapExtras | null) | null) => v
 export function installMinimapBlend(minimap: ExtrasSink, host: MinimapBlendHost, scope: Scope, fullMap?: ExtrasSink, atlas?: AtlasTile): () => MapExtras {
   const rects = roadRects(host.assembly, host.home);
   let last: MapExtras = { rects, images: [], labels: [] };
-  minimap.setExtras(() => { last = minimapOverlay(host, rects); return last; });
+  minimap.setExtras(() => { last = minimapOverlay(host, rects, atlas); return last; });
   fullMap?.setExtras(() => fullMapOverlay(host, rects, atlas));
   scope.onDispose(() => { minimap.setExtras(null); fullMap?.setExtras(null); });
   return () => last;
