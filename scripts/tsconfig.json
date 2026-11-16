@@ -389,6 +389,7 @@
     "../test/declared-entry-targets-debug.test.ts",
     "app-build/gen.ts",
     "app-build/versionFiles.ts",
+    "app-build/clientFloor.ts",
     "bench-load.mjs",
     "capture-main-menu-hero.mjs",
     "check-css.mjs",

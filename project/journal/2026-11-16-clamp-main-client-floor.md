@@ -9,3 +9,6 @@ real ClientUpdater boot and foreground path, including main0.1.29.
 
 The active release retains explicit floor31 metadata before normal
 service-worker/output checks. No cache wipe or preservation rule changes.
+
+The clean push copy caught the helper missing from explicit composite
+project file lists. Add it to both builders and tests before retrying.
