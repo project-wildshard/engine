@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { createTempRepo } from '../src/test/helpers/git.ts';
-import { engineRelease, noteProblem, parseChangelog, pushProblems, releaseProblems } from '../scripts/changelog.mjs';
+import { engineRelease, noteProblem, parseChangelog, pushProblems, releaseDescribe, releaseProblems } from '../scripts/changelog.mjs';
 import { buildLabel, shortBuild } from '../src/client/engine/ui/buildCheck';
 import { changelogDate, shortBuild as menuShortBuild, versionLabel } from '../src/client/game/whatsNewBanner';
 
@@ -23,6 +23,25 @@ test('a build names itself by git describe against the version tags (WL19c)', ()
   // '' only where the checkout has no version tag (a shallow clone); preview.yml fetches the whole history
   const { describe } = engineRelease(process.cwd());
   expect(describe).toMatch(/^(?:v\d+\.\d+\.\d+(?:-\d+-g[0-9a-f]{7,40})?)?$/u);
+});
+
+test('a release build names its release before the tag exists (STAGING-BUGBASH SB7)', () => {
+  expect(releaseDescribe('v0.1.28-96-gf8ff9bd9', '0.1.30', ['chore(release): v0.1.30', 'test(ci21): repair'])).toBe('v0.1.30');
+  expect(releaseDescribe('v0.1.30', '0.1.30', [])).toBe('v0.1.30');
+  expect(releaseDescribe('v0.1.30-4-gabcdef1', '0.1.30', ['chore(release): v0.1.30'])).toBe('v0.1.30-4-gabcdef1');
+  // main between releases keeps git describe: no release commit for its version since the last tag
+  expect(releaseDescribe('v0.1.29-60-gf8ff9bd9', '0.1.29', ['fix(sim): x'])).toBe('v0.1.29-60-gf8ff9bd9');
+  const repo = createTempRepo();
+  try {
+    repo.commit({ 'package.json': JSON.stringify({ version: '0.1.28' }), 'CHANGELOG.md': SECTION('0.1.28', [NOTE]) }, 'chore(release): v0.1.28');
+    repo.git(['tag', 'v0.1.28']);
+    repo.commit({ 'a.txt': 'a' }, 'fix(sim): a fix');
+    expect(engineRelease(repo.dir).describe).toMatch(/^v0\.1\.28-1-g[0-9a-f]+$/u);
+    repo.commit({ 'package.json': JSON.stringify({ version: '0.1.30' }), 'CHANGELOG.md': SECTION('0.1.30', [NOTE]) }, 'chore(release): v0.1.30');
+    expect(engineRelease(repo.dir).describe).toBe('v0.1.30');
+    repo.commit({ 'b.txt': 'b' }, 'fix(boot): a release-branch fix');
+    expect(engineRelease(repo.dir).describe).toBe('v0.1.30');
+  } finally { repo.cleanup(); }
 });
 
 test('a section has one to five bullets, newest first, each version once', () => {

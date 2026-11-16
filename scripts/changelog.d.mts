@@ -10,6 +10,8 @@ export function parseChangelog(text: string): { releases: Release[]; problems: s
 export function releaseProblems(text: string, version: string): string[];
 /** `git describe` of the tree's commit against the version tags ("v0.1.13-100-g5a43d1c4"), '' when there is none. */
 export function gitDescribe(root: string): string;
+/** The release label: `v<version>` when the history since the describe's base tag holds its release commit, else `raw`. */
+export function releaseDescribe(raw: string, version: string, subjects: readonly string[]): string;
 /** The section a build of this tree shows (package.json's version), and the tree's `git describe`. */
 export function engineRelease(root: string): Release & { readonly describe: string };
 /** The problems at a commit for its package.json version, or for a tag's version. */

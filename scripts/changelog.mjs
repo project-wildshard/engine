@@ -76,15 +76,37 @@ export function gitDescribe(root) {
   } catch { return ''; }
 }
 
+/** The label a release build shows (meta STAGING-BUGBASH SB7): staging v0.1.30 read `v0.1.28-96-gf8ff9bd9`, because the
+ *  release built before its tag existed, in a checkout that also lacked v0.1.29. A tree whose first-parent history since its
+ *  describe's base tag holds `chore(release): v<version>` (the release commit, or a published descendant on its release
+ *  branch) is that release, tagged yet or not; any other tree keeps `git describe`.
+ * @param {string} raw @param {string} version @param {readonly string[]} subjects @returns {string} */
+export function releaseDescribe(raw, version, subjects) {
+  const tag = `v${version}`;
+  if (raw === tag || raw.startsWith(`${tag}-`)) return raw;
+  return subjects.includes(`chore(release): ${tag}`) ? tag : raw;
+}
+
+/** First-parent commit subjects from HEAD back to `raw`'s base tag (the newest 400 with none), [] with no git.
+ * @param {string} root @param {string} raw @returns {string[]} */
+function subjectsSince(root, raw) {
+  const base = /^(v\d+\.\d+\.\d+)(?:-\d+-g[0-9a-f]+)?$/u.exec(raw)?.[1];
+  try {
+    return execFileSync('git', ['log', '--first-parent', '--format=%s', '-n', '400', ...(base === undefined ? ['HEAD'] : [`${base}..HEAD`])],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\n');
+  } catch { return []; }
+}
+
 /** The section a build of this tree shows: package.json's version and its notes ('' and none when missing; the gates refuse
- *  that before it can ship), and the tree's `git describe`, the label the title shows.
+ *  that before it can ship), and the tree's label: `git describe`, or the release it is (`releaseDescribe`).
  * @param {string} root @returns {Release & { describe: string }} */
 export function engineRelease(root) {
   const { version } = /** @type {{ version: string }} */ (JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')));
   let text = '';
   try { text = readFileSync(join(root, CHANGELOG_PATH), 'utf8'); } catch { /* an old tree: version only */ }
   const found = parseChangelog(text).releases.find(release => release.version === version);
-  return { version, date: found?.date ?? '', notes: found?.notes ?? [], describe: gitDescribe(root) };
+  const raw = gitDescribe(root);
+  return { version, date: found?.date ?? '', notes: found?.notes ?? [], describe: releaseDescribe(raw, version, subjectsSince(root, raw)) };
 }
 
 /** The problems at a commit (a pushed ref) for its package.json version, or for `tag`'s version, which must also be the
