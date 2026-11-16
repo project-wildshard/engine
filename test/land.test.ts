@@ -1108,7 +1108,15 @@ describe('main reuses the exact SHA\'s green plan-branch run (no double run)', (
     expect(existsSync('.github/workflows/ring-1.yml')).toBe(false);
     expect(readFileSync('.github/workflows/engine-boundaries.yml', 'utf8')).not.toMatch(/^ {2}push:/mu);
     const jobs = new Map([...text.slice(text.indexOf('\njobs:')).matchAll(/^ {2}([a-z0-9-]+):\n((?: {4}.*\n|\n)*)/gmu)].map(([, name, body]) => [name, body ?? '']));
-    expect([...jobs.keys()]).toEqual(['tests', 'timings', 'boundaries', 'quarantine']);
+    expect([...jobs.keys()]).toEqual(['tests', 't1-e2e', 'timings', 'boundaries', 'quarantine']);
+    // T1 consumes the products build and the producer's code/reuse verdict.
+    // Packed shares keep their independent start and reuse checks below.
+    const template = jobs.get('t1-e2e') ?? '';
+    jobs.delete('t1-e2e');
+    expect(template).toMatch(/^ {4}needs: tests$/mu);
+    expect(template).toContain("if: needs.tests.outputs.code-run == 'true'");
+    expect(template).toContain('suite: [A, B, C, D]');
+    expect(template).toContain('WS_T1_BUILD_DIR: dist');
     // LS2: the one bookkeeping job saves main's measured timings after the tests; it never decides the run's verdict.
     const timings = jobs.get('timings') ?? '';
     jobs.delete('timings');

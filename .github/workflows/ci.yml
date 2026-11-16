@@ -55,10 +55,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/plan/') }}
 
 jobs:
-  # Every job gates itself, so no job waits on another before it can start: a main push of a SHA its plan
+  # Every packed job gates itself, so its shares start independently: a main push of a SHA its plan
   # branch already proved green reuses that run (J240), and a docs-only push runs only job 1's docs checks.
   # A job that runs its packed share says so in its step "Run this job's packed share"; scripts/ci-proof-jobs.mjs
-  # counts a run as a code proof only when every share ran that step green.
+  # counts a run as a code proof only when every share ran that step green. T1's consumers wait for the shared build.
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 25
