@@ -37,6 +37,12 @@ export const CI_NATIVE_GROUPS = {
   // cook-stale-preparation.test.ts, which passed the 60 s file budget, it keeps the same no-neighbour placement.
   'native-cook-stale': ['test/cook-stale-preparation-worker.test.ts'],
   'native-cook-cpu': ['test/cook-cpu-limit.test.ts'],
+  // EV6 real original-file controls must have the same no-sibling placement.
+  'native-contention': [
+    'test/tooling/native-contention-net.test.mjs',
+    'test/tooling/native-contention-nalati.test.mjs',
+    'test/tooling/native-contention-shards.test.mjs',
+  ],
   'driftwood-population': [
     'test/driftwood-headless-population.test.ts',
   ],
@@ -98,5 +104,5 @@ export const CPU_EXCLUSIVE_TESTS = [
   'test/net-fuzz.test.ts', 'test/physics-nalati-headless.test.ts', 'test/physics-shards-headless.test.ts',
   // The real-process regression runs the original suites in a private ledger;
   // its outer grant still accounts for their actual machine CPU work.
-  'test/tooling/native-contention.test.mjs',
+  ...CI_NATIVE_GROUPS['native-contention'],
 ] as const;

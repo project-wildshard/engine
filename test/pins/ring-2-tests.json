@@ -1,4 +1,7 @@
 [
+ "test/tooling/native-contention-net.test.mjs",
+ "test/tooling/native-contention-nalati.test.mjs",
+ "test/tooling/native-contention-shards.test.mjs",
  "test/engine-rule-successors.test.ts",
  "test/engine-rule-successors-titan.test.ts",
  "src/client/engine/audio/audio-aac-pair.test.ts",
