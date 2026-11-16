@@ -179,15 +179,19 @@ export class SkinDriver {
   }
 }
 
+/** Select once for every creature view owner, including entered grid cells. */
+export function clientVariantSkin(skin: ClientSkin, id: string): ClientSkin {
+  if (skin.variants === undefined) return skin;
+  const selected = skin.variants.get(id);
+  if (selected === undefined) throw new Error(`skin ${skin.id}: unknown variant ${id}`);
+  return selected;
+}
+
 /** A custom-rig engine look over a loaded skin; the platform brain's state drives the clip choice per instance. */
 export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardRows['species'][number], skin: ClientSkin): SpeciesLook {
   const drivers = new WeakMap<Record<string, Bone>, SkinDriver>();
   // fresh joint and dims records per call: the factory owns what it is handed
-  const select = (id: string): ClientSkin => {
-    if (skin.variants === undefined) return skin;
-    const selected = skin.variants.get(id); if (selected === undefined) throw new Error(`skin look ${row.id}: unknown variant ${id}`);
-    return selected;
-  };
+  const select = (id: string): ClientSkin => clientVariantSkin(skin, id);
   const bones = (selected: ClientSkin): BoneDef[] => selected.bones.map((bone): BoneDef => ({ name: bone.name, parent: bone.parent, pos: [bone.pos[0], bone.pos[1], bone.pos[2]] }));
   const dims = (): AnimalSpecies['dims'] => ({ ...species.dims, feet: species.dims.feet.map(([x, z]): [number, number] => [x, z]) });
   return { id: row.id, species: species.id, kind: species.kind, rig: 'custom', fur: NO_FUR,

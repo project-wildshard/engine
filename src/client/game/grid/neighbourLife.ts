@@ -17,7 +17,7 @@ import { addAimTargets, type AimTarget } from '@wildshard/engine/player/AimTarge
 import type { Scope } from '@wildshard/engine/app/scope';
 import { createShardfileClientScripts } from '../shardfile/clientScripts';
 import type { ClientScriptTarget } from '@wildshard/format/clientScripts';
-import { loadClientSkins, SkinDriver, type ClientSkin, type SkinDriveState } from '../shardfile/clientSkins';
+import { loadClientSkins, clientVariantSkin, SkinDriver, type ClientSkin, type SkinDriveState } from '../shardfile/clientSkins';
 import { ClientScriptViews, type ClientScriptViewTarget, type ClientScriptViewState } from "../plugin/ui";
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
@@ -114,7 +114,8 @@ export class NeighbourLife {
       const look = species === undefined ? undefined : source.rows.looks.find((row) => row.species === species.id);
       const skin = look === undefined ? undefined : skins.get(look.id);
       if (spawn === undefined || species === undefined || skin === undefined) continue; // a non-skin look has no neighbour view yet
-      const { mesh, bones } = skinMesh(skin), driver = new SkinDriver(skin, bones);
+      const selected = clientVariantSkin(skin, spawn.variant);
+      const { mesh, bones } = skinMesh(selected), driver = new SkinDriver(selected, bones);
       // a hand-made row (a test's) may carry no variants or head size: the bar then reads the row's own hp as its full
       const variants: readonly { id: string; label: string; hp: number }[] = Array.isArray(species.variants) ? species.variants : [];
       const variant = variants.find((row) => row.id === spawn.variant) ?? variants[0], head = species.dims.headRadius;

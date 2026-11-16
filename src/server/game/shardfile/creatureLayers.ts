@@ -1,4 +1,4 @@
-import { parse, type InferOutput } from 'valibot';
+import { parse, strictObject, pipe, number, finite, minValue, maxValue, type InferOutput, type GenericSchema } from 'valibot';
 import { CreatureBodySchema, CreatureTemperamentSchema, CreatureSensesSchema, CreatureAbilitySchema, CreaturePresentationSchema,
   type CreatureBody, type CreatureTemperament, type CreatureSenses, type CreatureAbility, type CreaturePresentation } from '@wildshard/format/creatureLayers';
 import { CREATURE_SKELETONS, type SkeletonContract } from '@wildshard/format/creatureSkeletons';
@@ -8,9 +8,13 @@ import type { ShardRows, StrikeRows } from '@wildshard/format/rows';
 
 type BrainRow = ShardCreatures['brains'][number];
 type HuntNumbers = InferOutput<typeof HuntTuningSchema>;
+interface HuntMotion { walkSpeed: number; chargeSpeed: number; chargeWindup: number; ringRadius: number; trampleRadius: number }
+const HuntMotionSchema: GenericSchema<HuntMotion> = strictObject({ walkSpeed: pipe(number(), finite(), minValue(0), maxValue(15)),
+  chargeSpeed: pipe(number(), finite(), minValue(0), maxValue(15)), chargeWindup: pipe(number(), finite(), minValue(0), maxValue(3600)),
+  ringRadius: pipe(number(), finite(), minValue(0), maxValue(500)), trampleRadius: pipe(number(), finite(), minValue(0), maxValue(500)) });
 /** The existing policy declaration owns its parameters; hunting retains its complete numeric contract. */
 export type ResolvedCreatureBrain = { readonly kind: 'none' }
-  | { readonly kind: 'hunt'; readonly tuning: HuntNumbers }
+  | { readonly kind: 'hunt'; readonly tuning: HuntNumbers; readonly motion?: HuntMotion }
   | { readonly kind: 'declared'; readonly declaration: BrainRow; readonly referenced: boolean };
 /** Preflighted semantic layers, before any body, callback, view or random stream is created. */
 export interface ResolvedCreatureLayers {
@@ -45,7 +49,10 @@ function resolveBrain(temperament: CreatureTemperament, senses: CreatureSenses |
     if (temperament.tuning !== undefined) throw new Error(`brain reference ${name} keeps its declared tuning: name an engine brain to author new parameters`);
     return { kind: 'declared', declaration: brainRow(declared, name), referenced: true };
   }
-  if (name === 'hunt') return { kind: 'hunt', tuning: parse(HuntTuningSchema, temperament.tuning) };
+  if (name === 'hunt') {
+    const { motion, ...numbers }: Record<string, unknown> = { ...temperament.tuning };
+    return { kind: 'hunt', tuning: parse(HuntTuningSchema, numbers), ...(motion === undefined ? {} : { motion: parse(HuntMotionSchema, motion) }) };
+  }
   const parameters = temperament.tuning;
   if (parameters === undefined) throw new Error(`brain ${name} has no tuning`);
   // The defining brain parser validates its own parameters. Layer-owned perception/home fields win for pursuit.

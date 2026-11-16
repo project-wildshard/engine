@@ -12,3 +12,13 @@ The two-variant binary fixture proves geometry, sampled animation, shared aliase
 unknown-id refusal and exactly-once scope disposal. Existing material controls
 still pass. Full types and game lint also check the earlier simulation receipt
 script, now with explicit JSDoc parameters and checkpoint types.
+
+The land review found the entered-grid owner still using the default skin.
+It now shares the exact selector and refuses an unknown variant. Its real
+admission test proves the selected mesh geometry and scope teardown. Layered
+hunting also carries explicit motion parameters, so copied kit movement and
+charge timings reach the existing controller instead of its older defaults.
+
+The broad related run identified old pinned products without explicit hunting
+numbers. Pine deer and Nalati sheepdogs need producer rebuilds before landing;
+local content links do not resolve that gate. No engine land runs while it is red.

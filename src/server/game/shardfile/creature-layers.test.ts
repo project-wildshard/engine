@@ -87,6 +87,12 @@ test('hunting requires complete authored numbers and never selects a preset from
     runSpeed: 4, trotSpeed: 2, fleeMinTime: 1, fleeUntil: 20, fleeUntilMax: 30, fleeMaxTime: 8, lookBack: 2,
     waryTime: 10, waryBoost: 1.2, herdAlertRadius: 8, herdBoltDelayMin: 0.2, herdBoltDelayMax: 0.5, impactSpook: 6, impactAlert: 12 };
   expect(resolveCreatureLayers(rows).get(row.id)?.brain).toEqual({ kind: 'hunt', tuning: row.temperament.tuning });
+  const numbers = row.temperament.tuning, motion = { walkSpeed: 0.9, chargeSpeed: 6, chargeWindup: 0.8, ringRadius: 8, trampleRadius: 0.6 };
+  row.temperament.tuning = { ...numbers, motion };
+  expect(resolveCreatureLayers(rows).get(row.id)?.brain).toEqual({ kind: 'hunt', tuning: numbers, motion });
+  row.temperament.tuning = { ...numbers, motion: { ...motion, chargeSpeed: Number.NaN } };
+  expect(() => resolveCreatureLayers(rows)).toThrow('fixture.creature');
+  row.temperament.tuning = numbers;
   Reflect.deleteProperty(row.temperament.tuning, 'hp');
   expect(() => speciesResolver(rows)).toThrow('species `fixture.creature`');
 });

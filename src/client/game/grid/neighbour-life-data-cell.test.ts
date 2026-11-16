@@ -2,7 +2,7 @@
 // TEMPLATE-E2E TC-E1a: a grid data cell draws every creature it spawns, not only the ones its client scripts bind. Brasscap
 // binds only particles, and on staging its 12 bodies were on the wire and never drawn.
 import { expect, test } from 'vitest';
-import { BoxGeometry, Group, MeshLambertMaterial } from 'three';
+import { BoxGeometry, Group, MeshLambertMaterial, SkinnedMesh } from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { ClientSkin } from '../shardfile/clientSkins';
@@ -22,9 +22,9 @@ function shard(bindings: readonly object[], runtime: object | null = null): Shar
     rows: { species: [{ id: 'bandit', kind: 'bandit', label: 'Bandit', dims: { bodyY: 0.9, headRadius: 0.2 }, variants: [{ id: 'tin', label: 'Tin bandit', hp: 35 }] }], looks: [{ id: 'look.bandit', species: 'bandit' }] } } as unknown as Shardfile;
 }
 
-async function admitted(source: Shardfile, rows: (id: string) => NeighbourCreature | undefined = () => undefined): Promise<{ life: NeighbourLife; root: Group; scope: Scope }> {
+async function admitted(source: Shardfile, rows: (id: string) => NeighbourCreature | undefined = () => undefined, loadedSkin: ClientSkin = skin): Promise<{ life: NeighbourLife; root: Group; scope: Scope }> {
   const scope = new Scope('neighbour life'), life = new NeighbourLife({ scope, simulation: () => ({ host: { entities: { get: rows } } }), active: () => true }), root = new Group();
-  await life.admit(cell, root, source, new Map(), (() => undefined) as never, new Map([['blender-template', Promise.resolve(new Map([['look.bandit', skin]]))]]));
+  await life.admit(cell, root, source, new Map(), (() => undefined) as never, new Map([['blender-template', Promise.resolve(new Map([['look.bandit', loadedSkin]]))]]));
   return { life, root, scope };
 }
 
@@ -66,4 +66,19 @@ test('a data cell creature carries a health bar that falls with its row (TC-B10)
   expect(combatSourceState().hits).toBe(1);
   scope.dispose();
   expect(bandit()).toBeUndefined();
+});
+
+
+test('entered cells select each spawn variant and refuse unknown variant ids', async () => {
+  const geometry = new BoxGeometry(2, 3, 4), selected: ClientSkin = { ...skin, id: 'look.tin', geometry };
+  const table: ClientSkin = { ...skin, variants: new Map([['tin', selected]]) };
+  const { root, scope } = await admitted(shard([]), () => undefined, table);
+  const meshes = root.children.filter((child): child is SkinnedMesh => child instanceof SkinnedMesh);
+  expect(meshes).toHaveLength(2);
+  for (const mesh of meshes) { expect(mesh.geometry).toBe(geometry); expect(mesh.name).toBe('neighbour-creature:look.tin'); }
+  scope.dispose(); geometry.dispose();
+  const missing = new Scope('unknown neighbour variant'), life = new NeighbourLife({ scope: missing, simulation: () => undefined, active: () => true });
+  try { await expect(life.admit(cell, new Group(), shard([]), new Map(), (() => undefined) as never,
+    new Map([['blender-template', Promise.resolve(new Map([['look.bandit', { ...skin, variants: new Map() }]]))]]))).rejects.toThrow('unknown variant tin'); }
+  finally { missing.dispose(); }
 });
