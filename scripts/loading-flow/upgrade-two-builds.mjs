@@ -40,7 +40,7 @@ const proxy = http.createServer((request, response) => {
   const upstream = http.request({ host: target.hostname, port: target.port, path: request.url, method: request.method,
     headers: { ...request.headers, host: target.host } }, answer => {
     served.push({ at: Date.now() - started, side: from, method: request.method ?? 'GET', url: request.url ?? '', status: answer.statusCode ?? 0,
-      type: String(answer.headers['content-type'] ?? '') });
+      type: answer.headers['content-type'] ?? '' });
     response.writeHead(answer.statusCode ?? 502, answer.headers); answer.pipe(response);
   });
   upstream.on('error', error => { response.writeHead(502); response.end(String(error)); });
@@ -129,7 +129,7 @@ try {
     await sleep(500);
   }
   const endAt = Date.now() - started;
-  const visible = String(await page.evaluate('document.body?.innerText ?? ""').catch(() => '')).replace(/\s+/gu, ' ').slice(0, 400);
+  const visible = String(await page.evaluate('document.body?.innerText ?? ""').catch(() => '')).replaceAll(/\s+/gu, ' ').slice(0, 400);
   Object.assign(report, { outcome: outcome || 'hung', deployAt, reloadedAt, endAt, settleMs: endAt - deployAt, navigations,
     errors: errors.slice(0, 20), visible,
     servedAfterDeploy: served.filter(row => row.at >= deployAt).slice(0, 60).map(row => `${row.side} ${row.status} ${row.url.slice(0, 100)}`) });
@@ -138,7 +138,7 @@ try {
   if (outcome === 'bug15') failure = `BUG-15: the old tab shows "${BUG15}"`;
   else if (outcome === 'mixed') failure = 'the old page reached control on the new build without reloading';
   else if (outcome === '') failure = `the old tab neither reloaded into the new build nor settled within ${limitMs / 1000} s; it shows: ${visible}`;
-  if (failure !== '') { console.log(`errors: ${errors.slice(0, 8).join(' | ')}`); console.log(`served after the deploy: ${report.servedAfterDeploy.slice(0, 20).join(' | ')}`); }
+  if (failure !== '') { console.log(`errors: ${errors.slice(0, 8).join(' | ')}`); console.log(`served after the deploy: ${/** @type {string[]} */ (report.servedAfterDeploy).slice(0, 20).join(' | ')}`); }
 } catch (error) {
   failure = String(error); report.outcome = 'error';
 } finally {

@@ -38,6 +38,8 @@ export class StopError extends Error {
     super(message);
     this.name = 'StopError';
     this.retry = retry;
+    /** @type {{upstream:string,files:string[]}|undefined} a real conflict: what to merge against */
+    this.conflict = undefined;
   }
 }
 
@@ -54,9 +56,10 @@ function git(cwd, args) {
   return result.stdout.trim();
 }
 
+/** @param {string} text @param {number} [n] */
 function firstLines(text, n = 6) { return text.trim().split('\n').slice(0, n).join(' | '); }
 
-/** Refuse anything but main with no rebase, merge, cherry-pick or revert in progress. */
+/** Refuse anything but main with no rebase, merge, cherry-pick or revert in progress. @param {string} cwd */
 export function checkState(cwd) {
   if (run(cwd, ['symbolic-ref', '--quiet', 'HEAD']).stdout.trim() !== 'refs/heads/main') {
     throw new StopError('the checkout is not on main; lanes here work on main only (M1)');
@@ -160,7 +163,7 @@ export function syncMain(cwd, remote = 'origin') {
   return `main ${head.slice(0, 8)} -> ${target.slice(0, 8)} (${how}); other lanes' files untouched`;
 }
 
-/** Push main. A push race retries; a refused pre-push stops. */
+/** Push main. A push race retries; a refused pre-push stops. @param {string} cwd @param {string} [remote] */
 export function pushMain(cwd, remote = 'origin') {
   // What this push sends: every commit local main has over origin/main. In a shared checkout that can include another
   // lane's commit, made but not yet pushed; it rides along (M1) and the receipt names it.
@@ -222,6 +225,7 @@ export function syncAndPush(cwd, { tries = 8, wait = 5, sleep = sleepSeconds, lo
 /**
  * Undo this run's own commit after a conflict: main goes back one commit and the files' index entries with it, so the
  * lane's edits are uncommitted changes again, byte for byte. Only when that commit is still HEAD.
+ * @param {string} cwd @param {string} sha @param {string[]} files
  */
 export function uncommit(cwd, sha, files) {
   const head = git(cwd, ['rev-parse', 'HEAD']);
@@ -236,6 +240,7 @@ export function uncommit(cwd, sha, files) {
  * --onto <sha>: the lane merged its files against origin/main as of <sha>. Refuse when origin/main has changed one of
  * them since; otherwise point their index entries at origin/main's version, so the sync moves past them and the
  * worktree (the lane's merged content) stays as it is.
+ * @param {string} cwd @param {string} onto @param {string[]} files @param {string} [remote]
  */
 export function prepareOnto(cwd, onto, files, remote = 'origin') {
   const fetched = run(cwd, ['fetch', '--quiet', remote, 'main']);
@@ -243,7 +248,7 @@ export function prepareOnto(cwd, onto, files, remote = 'origin') {
   const base = run(cwd, ['rev-parse', '--verify', '--quiet', `${onto}^{commit}`]).stdout.trim();
   if (!base) throw new StopError(`--onto ${onto} is not a commit here`);
   const upstream = git(cwd, ['rev-parse', `refs/remotes/${remote}/main`]);
-  const blob = (commit, file) => run(cwd, ['rev-parse', '--verify', '--quiet', `${commit}:${file}`]).stdout.trim();
+  const blob = (/** @type {string} */ commit, /** @type {string} */ file) => run(cwd, ['rev-parse', '--verify', '--quiet', `${commit}:${file}`]).stdout.trim();
   const moved = files.filter((file) => blob(base, file) !== blob(upstream, file));
   if (moved.length > 0) {
     const error = new StopError(`origin/main changed ${moved.join(', ')} again since ${base.slice(0, 8)}; nothing moved`);
@@ -256,13 +261,15 @@ export function prepareOnto(cwd, onto, files, remote = 'origin') {
   if (fresh.length > 0) run(cwd, ['rm', '--cached', '--quiet', '--ignore-unmatch', '--', ...fresh]);
 }
 
-/** The shell command to run once the lane has merged its files against `upstream`. */
+/** The shell command to run once the lane has merged its files against `upstream`.
+ * @param {string} upstream @param {string[]} messages @param {string[]} files */
 export function ontoCommand(upstream, messages, files) {
-  const quote = (text) => (/^[\w@%+=:,./-]+$/u.test(text) ? text : `'${text.replaceAll("'", `'\\''`)}'`);
+  const quote = (/** @type {string} */ text) => (/^[\w@%+=:,./-]+$/u.test(text) ? text : `'${text.replaceAll("'", `'\\''`)}'`);
   return ['node scripts/main-push.mjs --onto', upstream.slice(0, 12), ...messages.flatMap((message) => ['-m', quote(message)]), ...files.map(quote)].join(' ');
 }
 
-/** The STOP text for a conflict: what to merge and the exact command that finishes it. */
+/** The STOP text for a conflict: what to merge and the exact command that finishes it.
+ * @param {{upstream:string,files:string[]}} conflict @param {string[]} messages @param {string[]} mine @param {boolean} undone */
 export function conflictAdvice({ upstream, files }, messages, mine, undone) {
   const show = files.map((file) => `git show ${upstream.slice(0, 12)}:${file}`).join('; ');
   const where = undone ? `Your commit is undone and your edits are back, uncommitted, in ${mine.join(', ')}.` : 'Your files are as they were.';
@@ -274,6 +281,7 @@ export function conflictAdvice({ upstream, files }, messages, mine, undone) {
 /**
  * Take the checkout's main-push lock (a directory in the git dir), so two runs never move main at once. A lock whose
  * process is gone, or that is over 10 minutes old, is taken over. Waits like a sync does, then stops.
+ * @param {string} cwd @param {{tries?:number,wait?:number,sleep?:(seconds:number)=>void,log?:(line:string)=>void}} [options]
  * @returns {() => void} the release
  */
 export function takeLock(cwd, { tries = 8, wait = 5, sleep = sleepSeconds, log = () => { /* No logging requested. */ } } = {}) {
@@ -285,7 +293,8 @@ export function takeLock(cwd, { tries = 8, wait = 5, sleep = sleepSeconds, log =
       writeFileSync(owner, `${process.pid}\n`);
       return () => rmSync(lock, { recursive: true, force: true });
     } catch (error) {
-      if (error?.code !== 'EEXIST') throw new StopError(`cannot take the lock ${lock}: ${error?.message}`);
+      const failure = /** @type {NodeJS.ErrnoException} */ (error);
+      if (failure.code !== 'EEXIST') throw new StopError(`cannot take the lock ${lock}: ${failure.message}`);
     }
     let pid = 0;
     try {
@@ -298,10 +307,10 @@ export function takeLock(cwd, { tries = 8, wait = 5, sleep = sleepSeconds, log =
       try {
         process.kill(pid, 0);
       } catch (error) {
-        alive = error?.code === 'EPERM';
+        alive = /** @type {NodeJS.ErrnoException} */ (error).code === 'EPERM';
       }
     }
-    const old = Date.now() - statSync(lock, { throwIfNoEntry: false })?.mtimeMs > 30 * 60 * 1000;
+    const old = Date.now() - (statSync(lock, { throwIfNoEntry: false })?.mtimeMs ?? Date.now()) > 30 * 60 * 1000;
     if ((!alive && pid > 0) || old) {
       log(`taking over a stale lock (pid ${pid || '?'}${old ? ', over 30 min old' : ', gone'})`);
       rmSync(lock, { recursive: true, force: true });
@@ -314,22 +323,25 @@ export function takeLock(cwd, { tries = 8, wait = 5, sleep = sleepSeconds, log =
   }
 }
 
-/** After a stop: the checkout must be on main and not mid-rebase or mid-merge. Say so loudly when it is not. */
+/** After a stop: the checkout must be on main and not mid-rebase or mid-merge. Say so loudly when it is not.
+ * @param {string} cwd */
 export function verifyAfterStop(cwd) {
   try {
     checkState(cwd);
     return '';
   } catch (error) {
-    return `!! main-push STOPPED AND THE SHARED CHECKOUT IS NOT CLEAN: ${error.message}. Tell the coordinator now`;
+    return `!! main-push STOPPED AND THE SHARED CHECKOUT IS NOT CLEAN: ${error instanceof Error ? error.message : String(error)}. Tell the coordinator now`;
   }
 }
 
+/** @param {number} seconds */
 function sleepSeconds(seconds) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
 }
 
 /** @param {string[]} argv */
 export function parseArgs(argv) {
+  /** @type {{messages:string[],files:string[],tries:number,wait:number,onto:string}} */
   const out = { messages: [], files: [], tries: 8, wait: 5, onto: '' };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -356,7 +368,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
     process.exit(2);
   }
   const cwd = git(process.cwd(), ['rev-parse', '--show-toplevel']);
-  const log = (line) => console.log(`main-push ${line}`);
+  const log = (/** @type {string} */ line) => console.log(`main-push ${line}`);
   let release = () => { /* No lock acquired yet. */ };
   let made = '';
   try {
