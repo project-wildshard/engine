@@ -214,12 +214,12 @@ export class CharacterMotor {
   /** A grounded capsule meets a flat static floor at the same float32 skin plane on both sides of the wire.
    * Tiny height differences otherwise choose different coplanar contacts and change a later wall slide. */
   private restOnFlatFloor(feet: Vec3): void {
-    if (!this.result.grounded || this.result.groundNormalY < 0.9999) return;
+    if (!this.result.grounded || this.result.groundNormalY < 0.999999) return;
     this.ray.origin.x = feet.x; this.ray.origin.y = feet.y + GROUND_PROBE_UP; this.ray.origin.z = feet.z;
     const hit = this.physics.world.castRayAndGetNormal(this.ray, GROUND_PROBE_UP + GROUND_PROBE_DOWN, true,
       this.physics.R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, this.collider);
     if (hit === null) return;
-    const parent = hit.collider.parent(), flat = hit.normal.y >= 0.9999
+    const parent = hit.collider.parent(), flat = hit.normal.y >= 0.999999 && !isTerrainCollider(hit.collider)
       && ((hit.collider.collisionGroups() >>> 16) & GROUP.WORLD) !== 0 && (parent === null || parent.isFixed());
     const plane = Math.fround(this.ray.origin.y - hit.timeOfImpact), skin = this.kcc.offset(), y = plane + skin;
     if (flat && Math.abs(y - feet.y) <= skin) feet.y = y;

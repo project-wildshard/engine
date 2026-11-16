@@ -26,11 +26,33 @@ are 1.57/2.04 cm. Predictor tolerance and Rapier nudge are unchanged.
 
 The allocating motor control takes the same behavioral fix, retaining
 the raw allocating ray query so it still checks the allocation change.
-Page/room hashes follow the intentional J280 motion fix. Only the
-legacy walk-strike continuation moves (3.4 mm); its expected endpoint
-and digest update, while every recorded saved wire remains identical.
+Page/room hashes follow the intentional J280 motion fix. Every recorded
+saved wire and legacy continuation remains identical.
 Browser and staging qualification remain separate open plan rows.
 
-All 31 targeted cases, lint and typecheck pass. Review found no MUST
+The initial 31 targeted cases, lint and typecheck passed. Review found no MUST
 regression. Captured red-first contact and real-link correction bars
 remain permanent native regressions, separate from browser proof.
+
+The full preflight exposed two scope mistakes at low load. Its 0.9999
+normal guard included gentle grades and altered Driftwood's bridge
+approach. The flat guard now allows only one part per million of
+normal error; the captured windmill cases remain green. Normalizing
+a terrain heightfield to a centre-ray plane also added 5.423 mm of
+off-axis drift to a straight native walk. Terrain heightfields keep their original
+controller contact. A half-degree grade and flat heightfield now have
+explicit unchanged-move regressions. The multiplayer test is unchanged.
+All three failing native files pass with both fixes, and old saves
+again continue exactly. The originally proposed legacy digest update
+has therefore been removed.
+
+After correcting scope, all 35 previously red files pass (188 cases),
+admitted at load 4.97 with two workers. The capture, link, motion law,
+old-save, bridge and allocating-control checks pass too (45 cases in
+nine files). Lint, types and CSS are green. No assertion or timeout
+was loosened.
+
+The scope review has no MUST. Its missing ray-normal coverage is now
+included: a flat prior normal must reject the same new gentle grade.
+The room digests above were captured from the corrected native runs;
+the page-law course keeps its initial flat-box digest values.
