@@ -1,0 +1,112 @@
+name: shard-pin
+
+# Meta SHARD-PUBLISH-ACTIONS SP6 (J369, J371): after a shard repo's
+# publish.yml commits a revision, pin it here on plan/pin-<slug>-r<N>,
+# mirror its tarball on the `pins` release, and open a PR. A machine lands
+# that branch through land.mjs's checks (the PR body names the commands).
+# Engine releases stay the MacBook's (J369); a pin bump is code.
+#   gh workflow run shard-pin.yml -R project-wildshard/engine \
+#     -f slug=<slug> -f revision=<N> -f hash=<sha256> -f channel=staging
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: The published slug
+        type: string
+        required: true
+      revision:
+        description: The catalogue revision publish printed
+        type: string
+        required: true
+      hash:
+        description: The revision's sha256
+        type: string
+        required: true
+      channel:
+        description: The channel publish moved
+        type: choice
+        options: [staging, prod]
+        default: staging
+  repository_dispatch:
+    types: [shard-published]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: shard-pin-${{ inputs.slug || github.event.client_payload.slug }}
+  cancel-in-progress: false
+
+jobs:
+  pin:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SLUG: ${{ inputs.slug || github.event.client_payload.slug }}
+      REVISION: ${{ inputs.revision || github.event.client_payload.revision }}
+      HASH: ${{ inputs.hash || github.event.client_payload.hash }}
+      CHANNEL: ${{ inputs.channel || github.event.client_payload.channel || 'staging' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+      - name: Move the slug's pin and the staging snapshot
+        run: node scripts/pin-shard.ts "$SLUG" "$REVISION" "$HASH" "$CHANNEL"
+      - name: Mirror the tarball on the pins release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view pins --json assets --jq '.assets[].name' | grep -qx "$HASH.tar"; then
+            echo "pins already holds $HASH.tar"
+          else
+            curl -fsSL -o "$RUNNER_TEMP/$HASH.tar" "https://api.wildshard.io/api/shardfiles/$HASH" --compressed
+            echo "$HASH  $RUNNER_TEMP/$HASH.tar" | sha256sum -c -
+            gh release upload pins "$RUNNER_TEMP/$HASH.tar"
+          fi
+      # A push by GITHUB_TOKEN starts no workflow, and land waits on the
+      # branch's own ci run, so the push uses the nightly app's token.
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.NIGHTLY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
+          owner: project-wildshard
+          repositories: engine
+          permission-contents: write
+      - name: Commit on plan/pin-<slug>-r<N> and push
+        id: branch
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          branch="plan/pin-$SLUG-r$REVISION"
+          git config user.name 'shard-pin'
+          git config user.email 'shard-pin@users.noreply.github.com'
+          git switch -c "$branch"
+          git commit -q -m "test(pins): pin $SLUG rev $REVISION" -m "Meta SHARD-PUBLISH-ACTIONS SP6: $SLUG rev $REVISION (${HASH:0:8}),
+          published to $CHANNEL from Actions; shardfiles.json and the pinned
+          document by pin-shard.ts, staging.json by refresh, tarball on pins." \
+            -m 'Assisted-by: shard-pin:workflow' -- test/pins/shardfiles.json test/pins/catalogue.json test/pins/staging.json
+          git push "https://x-access-token:${TOKEN}@github.com/project-wildshard/engine.git" "HEAD:refs/heads/$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+      - name: Open the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          slug_dir="pin-$SLUG-r$REVISION"
+          gh pr create --base main --head "$BRANCH" --title "test(pins): pin $SLUG rev $REVISION" --body "Published to $CHANNEL from Actions (meta SHARD-PUBLISH-ACTIONS SP6). Land it from either machine:
+
+          \`\`\`sh
+          cd ~/projects/games/wildshard/engine
+          node scripts/worktree.mjs new $slug_dir
+          cd .worktrees/$slug_dir && git fetch origin $BRANCH && git merge --ff-only FETCH_HEAD
+          WS_LANE_NAME=<lane> node scripts/land.mjs
+          \`\`\`
+
+          Ring re-records (ring-digests, side parity) are the lander's, as for a hand bump."
+          echo "PR opened for $BRANCH" >> "$GITHUB_STEP_SUMMARY"
