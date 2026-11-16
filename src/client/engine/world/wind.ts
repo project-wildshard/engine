@@ -15,10 +15,28 @@ export const windUniforms = { uWindTime: { value: 0 }, uGust: { value: 0.5 } };
 /** 0 … 1 wind the weather adds (Pine Hollow's rain, PH-L10: src/shards/pine-hollow/world/weather.ts); 0 = the wind exactly as before */
 export const windBoost = { value: 0 };
 
+/** how many times the clock has advanced (SS8a's fallback reads it) */
+let ticks = 0;
+
 /** advance the wind clock and the gust (a few incommensurate sines: long lulls, a stronger puff every half-minute or so) */
 export function updateWind(dt: number): void {
+  ticks++;
   const t = (windUniforms.uWindTime.value += dt);
   windUniforms.uGust.value = clockGust(t, windBoost.value);
+}
+
+/**
+ * The wind clock for a page whose sway needs it but may have no other driver (meta SHARD-SOURCE SS8a: a scene shard's
+ * detail layers with no `wind` row, forest or painterly grass froze on `uWindTime` 0). Call the returned function once a
+ * frame: it advances the clock only when nothing else did since its last call, so a driver that starts (or stops) later
+ * takes over (or hands back) on the next frame and the clock never runs twice a frame. Its first frame only watches.
+ */
+export function windClockFallback(): (dt: number) => void {
+  let seen = -1;
+  return (dt) => {
+    if (seen === ticks) updateWind(dt);
+    seen = ticks;
+  };
 }
 
 /** the prevailing wind (from the sea in the south-east), unit xz */

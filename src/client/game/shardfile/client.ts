@@ -68,6 +68,7 @@ import { createShardfileClientScripts, captureClientScriptPosition } from './cli
 
 import { installClientWater, undrawnWater } from './clientWater';
 import { detailLayerFiles, installClientDetails } from './clientDetails';
+import { windClockFallback } from '@wildshard/engine/world/wind';
 import { trample, TRAMPLE_GLSL } from '../systems/looks/trample';
 import { practiceRoom } from '@wildshard/engine/core/practiceRoom';
 import { installClientSplash } from './clientSplash';
@@ -323,6 +324,9 @@ export class ShardfileClient {
           return live;
         };
       })() } });
+    // SHARD-SOURCE SS8a: the layers sway on the wind clock; a page with no `wind` row, forest or painterly grass to drive
+    // it would leave it at 0 and the meadow frozen, so the page drives it whenever nothing else did since its last frame
+    if ((details?.length ?? 0) > 0) ctx.system({ id: 'game.shardfile.wind', phase: 'update', run: windClockFallback() });
     // SHARD-SOURCE SS6: a scene pool splashes and rings when the player walks in, wades or walks out
     installClientSplash(this.source.water, { root: ctx.root, scope: ctx.scope, phone: TIER === 'phone',
       // the player and every declared creature with a body (SS6c): a creature wading the pond splashes as the player does
