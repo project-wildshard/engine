@@ -174,8 +174,8 @@ try {
       await page.screenshot({ path: join(out, `${tag}-walked-out.png`) });
       // ZE10d: the old home is walled now: 2 m into Driftwood's buffer its gate counts 5 (then straight back out, so it never reaches 0)
       if (walkedOut) {
-        const home = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
-        const driftwoodEdge = home.x - dir * (pitch - HALF);
+        const frame = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
+        const driftwoodEdge = frame.x - dir * (pitch - HALF);
         await walkTo(driftwoodEdge - dir * 2);
         // the gate's state is read before the shot (a full-size shot can outlast a count's second), and the walker steps straight back
         // out: the count must never reach 0 here (a second entry would overlap the memory reads below)
@@ -183,7 +183,7 @@ try {
         await walkTo(driftwoodEdge + dir * 8);
         await page.screenshot({ path: join(out, `${tag}-old-home-gate.png`) });
         const back = await state();
-        oldHomeLeft = back.gate?.cell == null && await page.evaluate(slug => { const st = /** @type {any} */ (window).__wildshard.shard.grid.state(); return document.querySelector('.ws-load[data-navigation]') === null && (st.live?.live?.home ?? st.home) === slug; }, targetSlug).catch(() => false);
+        oldHomeLeft = (back.gate?.cell ?? null) === null && await page.evaluate(slug => { const st = /** @type {any} */ (window).__wildshard.shard.grid.state(); return document.querySelector('.ws-load[data-navigation]') === null && (st.live?.live?.home ?? st.home) === slug; }, targetSlug).catch(() => false);
       }
     }
     /** @type {{ left: number | null, reads: { url: string, start: number }[] } | null} */
