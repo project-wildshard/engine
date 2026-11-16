@@ -72,6 +72,15 @@ function pageProbe(delay) {
 /** @param {number[]} list @param {number} p */
 const at = (list, p) => { const sorted = [...list].sort((a, b) => a - b); return sorted.length === 0 ? 0 : Number((sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0).toFixed(1)); };
 
+/** @param {{sampledAt:number,corrections:number}|null} before @param {{sampledAt:number,corrections:number}|null} after */
+function footRate(before, after) {
+  if (before === null || after === null || !Number.isFinite(before.sampledAt) || !Number.isFinite(after.sampledAt)
+      || !Number.isFinite(before.corrections) || !Number.isFinite(after.corrections)
+      || after.sampledAt <= before.sampledAt || after.corrections < before.corrections) throw new Error('Foot correction telemetry disappeared or reset');
+  const elapsedSeconds = (after.sampledAt - before.sampledAt) / 1000;
+  return { elapsedSeconds, perMinute: (after.corrections - before.corrections) * 60 / elapsedSeconds };
+}
+
 /** One run: enter `slug` on `engineName` at `layout`, walk, sprint, boost (and the bridge on Driftwood). @param {import('playwright').Browser} browser @param {string} engineName @param {string} layout @param {string} slug @param {string} site @param {string} socket */
 async function runOne(browser, engineName, layout, slug, site, socket) {
   const context = await browser.newContext(layout === 'phone' ? { ...IPHONE, isMobile: engineName === 'chromium' } : { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
@@ -111,7 +120,7 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
     if (await page.evaluate(() => /** @type {any} */ (window).__wildshard?.world?.game.app.clock.paused === true)) await page.getByRole('button', { name: /^resume$/iu }).click().catch(() => undefined);
     row.enterMs = Date.now() - t0;
     const entered = Date.now(), delays = /** @type {{ t: number, delay: number }[]} */ ([]), heldFrom = await page.evaluate(() => window.__workerClient?.().interpHeld ?? 0);
-    const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed }, authoritative: { ...w.authoritative } }; });
+    const report = () => page.evaluate(() => { const w = window.__workerClient?.(); return w === undefined ? null : { sampledAt: performance.now(), corrections: w.corrections, worst: w.worstOffset, delay: w.delayMs, held: w.interpHeld, falls: w.falls, missed: { ...w.missed }, authoritative: { ...w.authoritative } }; });
     sampler = setInterval(() => { void report().then(r => { if (r !== null) delays.push({ t: Date.now() - entered, delay: r.delay }); return undefined; }).catch(() => undefined); }, 250);
     await sleep(2000);
     // the budget: the drawn rate standing still, against the display's 60 Hz (headless)
@@ -145,11 +154,11 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
     row.boost = await phase('boost', ['KeyW', 'ShiftLeft']);
     await page.keyboard.press('KeyH'); await sleep(600);
     const after = await report();
-    const footMinutes = (2 * SECONDS) / 60, late = delays.filter(sample => sample.t >= 10_000);
+    const footWindow = footRate(before, foot), late = delays.filter(sample => sample.t >= 10_000);
     row.b1 = { budgetMs: Number(row.budgetMs.toFixed(1)), over2x: row.walk.over2x + row.sprint.over2x + row.boost.over2x, over50: row.walk.over50 + row.sprint.over50 + row.boost.over50, p99: Math.max(row.walk.p99, row.sprint.p99, row.boost.p99) };
     row.b1.ok = row.b1.over2x === 0 && row.b1.over50 === 0 && row.b1.p99 <= 1.25 * row.budgetMs;
-    row.b2 = { perMinute: Number((((foot?.corrections ?? 0) - (before?.corrections ?? 0)) / footMinutes).toFixed(1)), worst: Number(footWorst.toFixed(3)) };
-    row.b2.ok = row.b2.perMinute <= 2 && row.b2.worst <= 0.1;
+    row.b2 = { ...footWindow, perMinute: Number(footWindow.perMinute.toFixed(1)), worst: Number(footWorst.toFixed(3)) };
+    row.b2.ok = footWindow.perMinute <= 2 && footWorst <= 0.1;
     row.b3 = { delayMaxAfter10s: late.length === 0 ? null : Math.max(...late.map(sample => sample.delay)), held: (after?.held ?? 0) - heldFrom };
     row.b3.ok = row.b3.delayMaxAfter10s !== null && row.b3.delayMaxAfter10s <= 120 && row.b3.held === 0;
     if (row.bridge !== undefined) row.b4 = { ok: row.bridge.reached && row.bridge.under === 0 && row.bridge.falls === 0, ...row.bridge };

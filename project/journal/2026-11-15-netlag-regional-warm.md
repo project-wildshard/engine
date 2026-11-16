@@ -32,3 +32,12 @@ not only capture pacing. The wire fixture can bind that driver and
 pause it before draining, and counts commands at the actual send.
 Both live thirty/sixty-fps cases also have zero corrections. These
 controls narrow the investigation without changing predictor tolerance.
+
+The proof now timestamps correction samples in the page and divides
+by their measured interval, including steering and automation waits.
+Missing/reset telemetry fails instead of becoming a zero rate. B2
+judges the unrounded rate and render offset; rounding is display only.
+Four small metric controls run in the ordinary Vitest inventory and
+cover elapsed time, zero corrections, the rounding boundary and reset.
+Existing runtime reports keep their original nominal-duration rates;
+the Sky Reach misses remain open, rather than being relabelled green.
