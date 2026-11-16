@@ -959,6 +959,7 @@
     "./game/complete/declared": "./src/client/game/complete/declared.ts",
     "./game/weather/continuation": "./src/server/game/weather/continuation.ts",
     "./game/weather/reactions": "./src/server/game/weather/reactions.ts",
+    "./game/plugin/moduleHash": "./src/shared/game/plugin/moduleHash.ts",
     "./game/plugin/channelPrograms": "./src/shared/game/plugin/channelPrograms.ts",
     "./game/plugin/creatureFrame": "./src/shared/game/plugin/creatureFrame.ts",
     "./game/shard/declaredRows": "./src/shared/game/shard/declaredRows.ts",
