@@ -8,12 +8,11 @@
  *   menu.setFinds(() => compendiumFinds(state, (id) => journal.open(id)));   // src/client/game/compendium/install.ts
  */
 import type { FindsView } from '../../../client/game/bag/bag';
-import type { IconId } from '@wildshard/engine/ui/icons';
 import type { CompendiumState } from './state';
-import type { EntryDef } from './types';
+import type { CompendiumIcon, EntryDef } from './types';
 
 /** a sticker's glyph: the content's (the skin's `icon`), a pin for a place, a dot otherwise */
-function iconOf(skin: CompendiumState['def']['skin'], e: EntryDef): IconId {
+function iconOf(skin: CompendiumState['def']['skin'], e: EntryDef): CompendiumIcon {
   return skin.icon?.(e) ?? (e.kind === 'place' ? 'pin' : 'poi');
 }
 

@@ -1,4 +1,5 @@
 import type { BagIcons } from './tabs';
+import type { CompendiumIcon } from '../../../shared/game/compendium/types';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { icon, type IconId } from '@wildshard/engine/ui/icons';
 import type { KitEntry, SkinRow } from '@wildshard/engine/ui/Menu';
@@ -49,7 +50,7 @@ export interface FindsView {
   next: string | null;
   /** `dense`: four to a row (Pine Hollow's 18 places); `wide`: two to a row (Nalati's elites); an item with an `id` is a
    *  button when the view has `onPick`; `prize`: lines under the name, shown found or not (what the find pays) */
-  sections: { title: string; dense?: boolean; wide?: boolean; items: { id?: string; label: string; icon: IconId; found: boolean; prize?: string[] }[] }[];
+  sections: { title: string; dense?: boolean; wide?: boolean; items: { id?: string; label: string; icon: CompendiumIcon; found: boolean; prize?: string[] }[] }[];
   /** the beach's sea glass, one chip per piece (none: no SEA GLASS section) */
   glass: { found: boolean; color: string }[];
   /** a row over the stickers that opens the full book (Pine Hollow's hunter's journal) */
@@ -213,8 +214,12 @@ export function renderFinds(p: HTMLElement, v: FindsView, scope: Scope = uiScope
     const grid = el(`ws-gmenu-stickers${s.dense === true ? ' dense' : ''}${s.wide === true ? ' wide' : ''}`);
     for (const it of s.items) {
       const pick = v.onPick, id = it.id;
-      const html = `<i class="ws-gmenu-stickicon">${icon(it.icon)}</i><span></span>`;
+      const html = `<i class="ws-gmenu-stickicon">${typeof it.icon === 'string' ? icon(it.icon) : ''}</i><span></span>`;
       const decorate = (node: HTMLElement): void => {
+        if (typeof it.icon !== 'string') {
+          const image = document.createElement('img'); image.alt = ''; image.draggable = false; image.decoding = 'async'; image.src = it.icon.image;
+          node.querySelector('.ws-gmenu-stickicon')?.append(image);
+        }
         fill(node, 'span', it.found ? it.label : '???'); for (const prize of it.prize ?? []) node.append(words('ws-gmenu-prize', prize, 'em'));
       };
       if (pick !== undefined && id !== undefined) {
