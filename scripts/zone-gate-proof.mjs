@@ -77,7 +77,11 @@ try {
   if (fire) {
     // stand on: 0 opens the loading screen and the page enters the cell as its home
     const before = page.url();
-    const left = await page.waitForEvent('framenavigated', { timeout: 6000 }).then(() => true).catch(() => false);
+    // ZE10c: the target's world reads (its shardfile bytes) against the moment the old document went (the reload form)
+    /** @type {{ url: string, at: number }[]} */
+    const reads = [];
+    page.on('request', request => { if (/\/shardfiles\/nalati-grasslands\//u.test(request.url())) reads.push({ url: request.url().replace(base, ''), at: Date.now() }); });
+    const left = await page.waitForEvent('framenavigated', { timeout: 6000 }).then(() => true).catch(() => false), leftAt = Date.now();
     await page.screenshot({ path: join(out, `${tag}-gate-0-loading.png`) }).catch(() => undefined);
     const ready = await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 180_000, polling: 250 }).then(() => true).catch(() => false);
     const home = await page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard?.shard?.grid?.state?.(); return { home: st?.live?.live?.home ?? st?.home ?? null, current: st?.live?.live?.current ?? null, slug: W.__wildshard?.shard?.slug ?? null }; }).catch(() => null);
@@ -96,7 +100,9 @@ try {
       }
       await page.screenshot({ path: join(out, `${tag}-walked-out.png`) });
     }
-    result.fired = { navigated: left, before, after: page.url(), ready, home, arrived, walkedOut };
+    const enteredMB = ready ? await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null) : null;
+    result.fired = { navigated: left, before, after: page.url(), ready, home, arrived, walkedOut, enteredMB,
+      residency: { leftAt, readsBeforeLeaving: reads.filter(row => row.at < leftAt).map(row => row.url), firstReadAfterMs: (reads.find(row => row.at >= leftAt)?.at ?? leftAt) - leftAt } };
   }
   const named = (/** @type {string} */ name) => /** @type {any} */ (result.shots.find(row => row.name === name))?.gate;
   const [at5, gone, again, at2] = ['gate-5', 'backed-away', 'gate-again', 'gate-2'].map(named);
