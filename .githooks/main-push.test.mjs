@@ -16,7 +16,11 @@ const a = join(work, 'a');
 const b = join(work, 'b');
 after(() => rmSync(work, { recursive: true, force: true }));
 
-const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_MAIN_PUSH_RECEIPT: '0' };
+// main-push strips every GIT_* variable, identity included, so the test's own git config carries `user.*` (main ci 43965567759:
+// "Author identity unknown" on a runner with no global identity). Its own HOME, with useConfigOnly, makes every machine that runner:
+// no global config, and no identity guessed from the host name, as macOS's git does.
+const home = join(work, 'home');
+const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), HOME: home, XDG_CONFIG_HOME: home, WS_MAIN_PUSH_RECEIPT: '0' };
 const ID = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
 const git = (cwd, ...args) => {
   const out = spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...env, ...ID } });
@@ -50,6 +54,7 @@ const notMidRebase = (dir) => {
 beforeEach(() => {
   rmSync(work, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
+  write(home, '.gitconfig', '[user]\n\tuseConfigOnly = true\n\tname = t\n\temail = t@t\n');
   git(work, 'init', '--quiet', '--bare', '--initial-branch=main', remote);
   const seed = join(work, 'seed');
   git(work, 'init', '--quiet', '--initial-branch=main', seed);
