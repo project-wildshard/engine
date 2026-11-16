@@ -85,11 +85,17 @@ test('a whip press strikes with the declared runtime, and the lantern burns and 
   if (again.sim === undefined) throw new Error('Restore did not install');
   expect(again.sim.host).toBe(host);
   expect(lines(again.sim)).toEqual(burning);
+  expect(serializeSimSnapshot(snapshotSimHostBytes(host))).toBe(saved);
 
   // A player's document taken into a younger room (E7.4) brings that room's tick along; the items step on from there.
   const younger = createShardfileSim(input.shard, input.assets, ports), there = installDeclaredKitItems(younger.host, input.shard, younger.itemHooks), arrived = younger.host.players.get(PLAYER);
   if (there === null || arrived === undefined) throw new Error('Missing younger room');
   importSeats(younger.host, arrived, exportSeats(sim.host, player));
+  expect(exportSeats(younger.host, arrived)).toMatchObject([{
+    'weapon.sword-iron': { tick: younger.host.state.tick },
+    'weapon.template-whip': { tick: younger.host.state.tick },
+    'tool.template-lantern': { tick: younger.host.state.tick },
+  }]);
   expect(() => { tick(younger, there); }).not.toThrow();
   expect(lines(younger).get('template.lantern.lit')).toBe(1);
   sim.dispose(); again.sim.dispose(); younger.dispose();
