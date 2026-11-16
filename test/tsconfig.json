@@ -350,6 +350,7 @@
     "../scripts/phone-loading/instrument.ts",
     "../scripts/phone-loading/play.ts",
     "../scripts/app-build/serviceWorker.ts",
+    "../scripts/app-build/versionFiles.ts",
     "../scripts/test-build-tools.ts",
     "../scripts/vitest-shard.ts",
     "../scripts/vitest-ci-files.ts",

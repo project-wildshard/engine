@@ -25,3 +25,5 @@
   and the snap is 0.24 s. T1 journey spec swipes with CDP touch and checks one lit solid card per frame.
 - SB14 review (claude -p, no MUST): the dim moved from a filter on the card to its children, since Safari can drop a
   backdrop-filter when the same element has a filter; `place` reads layout before writing; `apply` uses `light`.
+- SB7 follow-up: staging v0.1.31 pill read v0.1.31 but its /version.json said `v0.1.29-153-g5e0fb5efb`; version.json took
+  the raw `git describe`. `versionJson` now takes the pill's label (`engineRelease`); a temp-repo test was red on the old call.
