@@ -16,14 +16,14 @@ import threading
 import time
 
 sys.dont_write_bytecode = True
-from gate_census_qualification import join_census, qualify_files
+from gate_census_qualification import join_census, qualify_files, timestamp
 
 ENGINE = Path(__file__).resolve().parent.parent
 
 
-def unreaped_root(parent):
+def unreaped_root(parent, deadline=False):
     """Keep a real zombie across samples, exposing Linux's readable state on Darwin too."""
-    root = parent / 'unreaped-root'
+    root = parent / ('unreaped-deadline' if deadline else 'unreaped-root')
     root.mkdir()
     go = root / 'go'
     actor = subprocess.Popen([sys.executable, '-c',
@@ -64,26 +64,35 @@ def unreaped_root(parent):
             return value
 
     def reap():
-        if not sampled.wait(timeout=2):
+        if deadline:
+            def ended():
+                try:
+                    return json.loads(report.read_text().splitlines()[-1]).get('type') == 'end'
+                except (OSError, ValueError, IndexError):
+                    return False
+            wait_for(ended, [], seconds=2)
+        elif not sampled.wait(timeout=2):
             errors.append('census ended before three actual zombie samples')
         reaped.append(time.time_ns() / 1e6)
         if actor.wait(timeout=2) != 0:
             errors.append('observer changed the owned command exit')
 
+    report = root / 'raw.jsonl'
     reaper = threading.Thread(target=reap)
     reaper.start()
-    report = root / 'raw.jsonl'
     try:
         with contextlib.redirect_stdout(io.StringIO()):
-            code = census.observe(LinuxShape(), actor.pid, report, .01, 3, .1, selected.identity)
+            code = census.observe(LinuxShape(), actor.pid, report, .01, .5 if deadline else 3, .1, selected.identity)
         reaper.join(timeout=3)
         assert not reaper.is_alive() and not errors, errors
         rows = [json.loads(line) for line in report.read_text().splitlines()]
         end = rows[-1]
-        assert code == 0 and end['reason'] == 'observed tree drained', end
-        assert len(zombies) >= 3 and end['endedAtMs'] >= reaped[0], end
+        assert code == (2 if deadline else 0), end
+        assert end['reason'] == ('observer deadline' if deadline else 'observed tree drained'), end
+        assert len(zombies) >= 3, end
+        assert (end['endedAtMs'] <= reaped[0]) if deadline else (end['endedAtMs'] >= reaped[0]), end
         assert end['remaining'] == [] and end['rootMeasured'] is True, end
-        return {'actualZombieSamples': len(zombies), 'drainedOnlyAfterReap': True,
+        return {'actualZombieSamples': len(zombies), 'drainedOnlyAfterReap': not deadline, 'unreapedDeadlineRefused': deadline,
                 'rootCpuMeasured': True, 'observerNeverSignalledOwner': True}
     finally:
         go.touch()
@@ -156,7 +165,10 @@ if(mode==='failed')process.exitCode=7;
 ''')
     launch = [sys.executable, str(ENGINE / 'scripts/heavy-lane.py'), 'full-test', '--max', '.3',
               '--', 'node', str(gate), str(root), name]
-    if name == 'tail-delay':
+    if name == 'reap-delay':
+        harness = "import importlib.util,json,sys,time\nfrom pathlib import Path\np=Path(sys.argv[1]);root=Path(sys.argv[2]);sys.path.insert(0,str(p.parent))\ns=importlib.util.spec_from_file_location('delayed_parent',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)\nold=m.command_usage\ndef delayed(*a,**k):\n deadline=time.monotonic()+3\n while True:\n  try:\n   rows=(root/'raw.jsonl').read_text().splitlines()\n   if rows and json.loads(rows[-1]).get('type')=='end':break\n  except (OSError,ValueError):pass\n  if time.monotonic()>deadline:raise AssertionError('recorder did not finish while parent bookkeeping was delayed')\n  time.sleep(.005)\n return old(*a,**k)\nm.command_usage=delayed\nsys.argv=[str(p),*sys.argv[3:]]\nsys.exit(m.main())\n"
+        launch = [sys.executable, '-c', harness, str(ENGINE / 'scripts/heavy-lane.py'), str(root), *launch[2:]]
+    elif name == 'tail-delay':
         harness = "import importlib.util,sys,time;from pathlib import Path; p=Path(sys.argv[1]);sys.path.insert(0,str(p.parent));s=importlib.util.spec_from_file_location('tail_fixture',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);old=m.remove_ticket\ndef delayed(*a,**k): time.sleep(.2);return old(*a,**k)\nm.remove_ticket=delayed;sys.argv=sys.argv[1:];sys.exit(m.main())"
         launch = [sys.executable, '-c', harness, *launch[1:]]
     wrapper = subprocess.Popen(launch, cwd=repo, env=env,
@@ -303,6 +315,17 @@ def main():
         foreign = fixture(root, 'foreign')
         assert not qualify_files(actual['raw'], foreign['proofFile'], foreign['log'])['qualified']
         count = mutations(actual)
+        delayed = fixture(root, 'reap-delay')
+        delay_ms = delayed['release']['commandUsage']['reapedAt'] * 1000 - delayed['end']['endedAtMs']
+        assert delay_ms > 0, delay_ms
+        assert delayed['qualified']['cpuSeconds'] == (delayed['release']['commandUsage']['userSeconds']
+                                                      + delayed['release']['commandUsage']['systemSeconds'])
+        end = copy.deepcopy(actual['end'])
+        end['endedAtMs'] = actual['start']['startedAtMs']
+        assert not join_census(actual['start'], end, actual['proof'], actual['release'])['qualified']
+        release = copy.deepcopy(actual['release'])
+        release['commandUsage']['reapedAt'] = timestamp(actual['proof']['finished']) - .001
+        assert not join_census(actual['start'], actual['end'], actual['proof'], release)['qualified']
         alias = actual['root'] / 'raw-alias.jsonl'
         alias.symlink_to(actual['raw'])
         assert not qualify_files(alias, actual['proofFile'], actual['log'])['qualified']
@@ -314,7 +337,9 @@ def main():
         assert not qualify_files(actual['raw'], deep, actual['log'])['qualified']
         assert actual['raw'].exists() and actual['proofFile'].exists() and actual['log'].exists()
         print(json.dumps({'realProducerJoins': 2, 'metadataRefusals': count, 'foreignOwnerRefused': True,
-                          'unreapedRoot': unreaped_root(root),
+                          'unreapedRoot': unreaped_root(root), 'unreapedDeadline': unreaped_root(root, deadline=True),
+                          'actualDelayedParentQualified': True, 'parentEndStampAfterCensusMs': delay_ms,
+                          'additionalProofWindowRefusals': 2, 'commandCpuPreserved': True,
                           'unsafeAndIncompleteRefused': True, 'evidenceRetained': True,
                           'sampledCounterCensoringSeparate': True,
                           'commandCpuSeconds': actual['qualified']['cpuSeconds'],

@@ -83,12 +83,15 @@ def join_census(start, end, proof, release, used=()):
         census_begin, census_finish = start['startedAtMs'] / 1000, end['endedAtMs'] / 1000
         need(all(number(v) for v in (begin, finish, census_begin, census_finish, usage['wallSeconds'],
                                      lease['queuedAt'], lease['startedAt'])), 'invalid producer lifetime')
-        need(lease['queuedAt'] <= lease['startedAt'] <= begin <= census_begin <= finish <= census_finish,
+        # Drain proves actual reap; the parent's post-wait bookkeeping can be
+        # descheduled until after the observer ends. Neither timestamp is padded.
+        need(lease['queuedAt'] <= lease['startedAt'] <= begin <= census_begin <= finish
+             and census_begin <= census_finish,
              'producer lifetimes do not contain this observation')
         need(usage['wallSeconds'] > 0 and finish > begin > 0, 'invalid command wall interval')
         captured, published = timestamp(measurement['captured']), timestamp(proof['finished'])
-        need(begin <= captured <= published <= finish and census_begin <= published,
-             'proof is stale or outside its command lifetime')
+        need(begin <= captured <= published <= finish and census_begin <= published <= census_finish,
+             'proof is stale or outside its command or observed lifetime')
         need(number(proof['seconds']) and 0 <= proof['seconds'] <= usage['wallSeconds'], 'invalid proof wall')
         user, system = usage['userSeconds'], usage['systemSeconds']
         need(number(user) and number(system) and user >= 0 and system >= 0 and math.isfinite(user + system),
