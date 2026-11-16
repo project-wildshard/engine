@@ -1,6 +1,7 @@
 import type { SpawnSyncReturns } from 'node:child_process';
 
 export const LAND_WORKFLOWS: readonly string[];
+export function smallPlanWarning(root: string, branch: string, now?: number, env?: NodeJS.ProcessEnv): string | null;
 export function githubSlug(remote: string): string | null;
 export function parseArgs(argv: string[]): { pollSeconds: number; timeoutMinutes: number; appearMinutes: number; rounds: number; keep: boolean; preflight: boolean };
 export function preflightSteps(files: string[]): [string, string[]][];

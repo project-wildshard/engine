@@ -7,7 +7,7 @@ import {resolve} from 'node:path';
 const discovery={relativeAndAbsoluteRoots:true,wrapperExcluded:true,ambiguousRefused:true,missingBounded:true,legacySummaryRefused:true,actualCliDiscovery:true,identityMismatchRefused:true,timeoutEvidenceRetained:true};
 
 test('TS12a observes real owners without counting wrappers or hiding orphan writers',()=>{
- const report=JSON.parse(execFileSync('python3',['scripts/vitest-bench-observe-proof.py','--scratch',resolve(process.env.VITEST_TMP_ROOT||'tmp/codex-wire','bench-observe-proof')],{encoding:'utf8',timeout:20000}));
+ const report=JSON.parse(execFileSync('python3',['scripts/vitest-bench-observe-proof.py','--scratch',resolve(process.env.VITEST_TMP_ROOT??'tmp/vitest','bench-observe-proof')],{encoding:'utf8',timeout:20000}));
  expect(report.discovery).toEqual(discovery);
  expect(report.normal.drained).toBe(true);
  expect(report.normal.exactTotalAbsent).toBe(true);
@@ -16,7 +16,7 @@ test('TS12a observes real owners without counting wrappers or hiding orphan writ
 },20000);
 
 test('TS12b binds the recorder to its selected owner and retains timeout evidence',()=>{
- const report=JSON.parse(execFileSync('python3',['scripts/vitest-bench-observe-proof.py','--case','ownership','--scratch',resolve(process.env.VITEST_TMP_ROOT||'tmp/codex-wire','bench-observe-proof')],{encoding:'utf8',timeout:20000}));
+ const report=JSON.parse(execFileSync('python3',['scripts/vitest-bench-observe-proof.py','--case','ownership','--scratch',resolve(process.env.VITEST_TMP_ROOT??'tmp/vitest','bench-observe-proof')],{encoding:'utf8',timeout:20000}));
  expect(report.discovery).toEqual(discovery);
  expect(report.orphan).toEqual({orphanReported:true,writerNotSignalled:true});
 },20000);

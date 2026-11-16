@@ -96,14 +96,15 @@ const tryGit=(cwd,args,env=process.env)=>spawnSync('git',args,{cwd,env,encoding:
 /** WL12: a recent small branch merits a mode reminder, never a refusal.
  * Reflog selectors carry branch-event time; commit time can predate branch creation.
  * Missing/expired local reflogs cannot establish age and produce no warning.
- * @param {string} root @param {string} branch @param {number} [now] @returns {string|null} */
-export function smallPlanWarning(root,branch,now=Date.now()){
+ * @param {string} root @param {string} branch @param {number} [now]
+ * @param {NodeJS.ProcessEnv} [env] @returns {string|null} */
+export function smallPlanWarning(root,branch,now=Date.now(),env=process.env){
  if(!PLAN_BRANCH.test(branch))return null;
- const count=tryGit(root,['rev-list','--count',`origin/main..${branch}`]);
+ const count=tryGit(root,['rev-list','--count',`origin/main..${branch}`],env);
  if(count.status!==0)return null;
  const commits=Number(count.stdout.trim());
  if(!Number.isSafeInteger(commits)||commits<1||commits>3)return null;
- const history=tryGit(root,['reflog','show','--date=unix','--format=%gD%x09%gs',`refs/heads/${branch}`]);
+ const history=tryGit(root,['reflog','show','--date=unix','--format=%gD%x09%gs',`refs/heads/${branch}`],env);
  if(history.status!==0)return null;
  const first=history.stdout.trim().split('\n').at(-1)??'';
  const created=Number(/@\{(\d+)\}\tbranch: Created from .+$/u.exec(first)?.[1])*1000,age=now-created;
