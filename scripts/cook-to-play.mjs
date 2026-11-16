@@ -52,7 +52,7 @@ try {
   node(['scripts/ring-cook.mjs',`--out=${cooked}`,`--build=${build}`]);
   const audit=await auditCook(join(cooked,'receipt.json'));reportCook(audit);
   writeFileSync(join(out,'cook-audit.json'),JSON.stringify(audit));
-  /** @type {{heads:{slug:string,hash:string}[],indexes:{slug:string,header:string,keys:string[]}[]}} */
+  /** @type {{heads:{slug:string,hash:string}[],indexes:{slug:string,header:string,keys:string[],manifests:{url:string}[]}[]}} */
   const receipt=JSON.parse(readFileSync(join(cooked,'receipt.json'),'utf8'));
   const store=folderStore(join(cooked,'store')),fetched=new Set();
   packs=createServer((request,response)=>{
@@ -94,9 +94,13 @@ try {
     fetched.clear();
     const result=await bootCase(browser,preview.url,'standalone',out,route,true);
     const used=[...fetched];
-    if(!used.some(key=>/^assets\/spawn\/parts\/[a-f0-9]+\.pack\.br$/u.test(key)))throw new Error(`${index.slug}: no client part from this cook reached gameplay`);
-    for(const key of used)if(!index.keys.includes(key))throw new Error(`${index.slug}: page fetched outside its cook: ${key}`);
-    results.push({slug:index.slug,route,frames:result.frame,ms:result.elapsedMs,fetched:used});
+    const parts=used.filter(key=>key.endsWith('.pack.br'));
+    if(!parts.some(key=>/^assets\/spawn\/parts\/[a-f0-9]+\.pack\.br$/u.test(key)))throw new Error(`${index.slug}: no client part from this cook reached gameplay`);
+    if(!index.manifests.some(row=>used.includes(row.url.slice(1))))throw new Error(`${index.slug}: no manifest from this cook reached gameplay`);
+    // Title preparation may fetch the other heads' cover images. Every actual
+    // compressed part consumed by this gameplay boot must belong to this cook.
+    for(const key of parts)if(!index.keys.includes(key))throw new Error(`${index.slug}: page fetched a part outside its cook: ${key}`);
+    results.push({slug:index.slug,route,frames:result.frame,ms:result.elapsedMs,fetched:used,parts});
   }
   const refusals=[];
   for(const slug of ['template','not-in-this-catalogue'])refusals.push(await uncataloguedShardCase(browser,preview.url,slug));

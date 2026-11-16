@@ -60,3 +60,9 @@ Review confirms exact-row precedence and the private installation. Its
 collision-case suggestion is now in the same existing download test: a
 distinct bare row cannot override the authored row. The small case checks
 selection/routing; the hosted proof must still witness real part bodies.
+
+The failed run also records title-cover prefetches for the other heads.
+They are not this gameplay boot's parts. Provenance now requires an own
+manifest, an actual compressed client part, and every fetched .pack.br
+key in the current product's index; all fetched keys remain in the
+receipt. A title image cannot qualify as a cooked gameplay part.
