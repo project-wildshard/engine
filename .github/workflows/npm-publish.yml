@@ -60,8 +60,20 @@ jobs:
           const targets = [];
           const walk = (value) => typeof value === "string" ? targets.push(value) : Object.values(value ?? {}).forEach(walk);
           walk(pkg.exports); walk(pkg.bin);
-          // Native author imports follow src/tsconfig.json into this compiler input.
-          targets.push("./kit/tsconfig.json");
+          const { posix } = require("node:path");
+          for (const file of files) {
+            if (!/(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/.test(file)) continue;
+            const config = JSON.parse(require("node:fs").readFileSync(file, "utf8"));
+            const parents = Array.isArray(config.extends) ? config.extends : [config.extends];
+            const inputs = [...parents, ...(config.references ?? []).map(row => row.path)];
+            for (const input of inputs) {
+              if (typeof input !== "string" || !input.startsWith(".")) continue;
+              const target = posix.normalize(posix.join(posix.dirname(file), input));
+              const candidates = [target, target + ".json", posix.join(target, "tsconfig.json")];
+              if (!candidates.some(candidate => files.has(candidate)))
+                throw new Error("not in the tarball: compiler input " + target);
+            }
+          }
           const missing = [...new Set(targets)].filter((target) => !target.includes("*")).map((target) => target.replace(/^\.\//, "")).filter((target) => !files.has(target));
           if (missing.length > 0) throw new Error(`not in the tarball: ${missing.join(", ")}`);
           console.log(`${pkg.name}@${pkg.version}: ${files.size} files, ${packed.size} bytes packed, every bin and export inside`);
