@@ -535,8 +535,11 @@ Dispatch `outside-bot.yml` on the candidate branch for the public staging
 path. It records independent fast proof XML and an actual live report;
 inspect both, rather than the report-only job's colour. The driver checks
 the signed staging release and builds the bot from its own engine commit,
-so its wire identity matches the server. The report names that deployed
-build and the clean candidate source commit separately.
+so its wire bindings come from the signed release. The socket handshake
+proves compatibility; the private room server build is not observed. The
+report names signedReleaseBuild and the clean candidate source commit
+separately. Only report.json with complete:true, exit:0 and left:true
+counts; child output and workflow colour do not.
 
 The one-bot command is:
 

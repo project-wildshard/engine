@@ -38,7 +38,6 @@ jobs:
           path: |
             tmp/tc45-outside/proof.xml
             tmp/tc45-outside/live/**/report.json
-            tmp/tc45-outside/live/**/bots.json
             tmp/tc45-outside/live/**/run.log
             tmp/tc45-outside/live/**/bots.log
           if-no-files-found: error

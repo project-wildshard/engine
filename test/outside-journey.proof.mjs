@@ -31,7 +31,8 @@ async function prepare() {
 }
 try {
 await test('outside mode refuses replica, private routing and extra clients before any network work', () => {
-  for (const args of [['replica', '--outside-proof'], ['staging', '--outside-proof', '--tailnet'], ['staging', '--outside-proof', '--bots', '2']]) {
+  for (const args of [['replica', '--outside-proof'], ['staging', '--outside-proof', '--tailnet'], ['staging', '--outside-proof', '--bots', '2'],
+    ['staging', '--outside-proof', '--remote', 'example.invalid'], ['staging', '--outside-proof', '--bots-on-host']]) {
     const child = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', ...args], {encoding: 'utf8', timeout: 2000});
     assert.notEqual(child.status, 0); assert.match(child.stderr, /outside-proof/u);
   }
@@ -55,6 +56,7 @@ await test('ordinary inputs walk, damage, drop, resume the same real body and re
 
 await test('real damage without a delivered hit confirmation cannot complete and still releases', {timeout: 5000}, async () => {
   let suppressed = 0;
+  const healthBefore = new Map([...room.host.entities].map(([id, row]) => [id, row.hp]));
   const connect = () => {
     const bot = new RoomBot(bench.url, 'bench', 'device:tc45-no-confirmation'); bots.push(bot);
     const subscribe = bot.client.onCombat.bind(bot.client);
@@ -68,18 +70,23 @@ await test('real damage without a delivered hit confirmation cannot complete and
   };
   await assert.rejects(outsideJourney(connect, 1500), /journey deadline/u);
   assert.ok(suppressed > 0, 'the real server settled hits; only their observation was dropped');
+  assert.ok([...room.host.entities].some(([id, row]) => row.hp < (healthBefore.get(id) ?? row.hp)), 'actual server creature health fell');
   await until(() => bench.world.health().players === 0 && room.holding === 0);
   assert.equal(room.bodyOf('device:tc45-no-confirmation'), undefined);
   assert.deepEqual(bench.crashes, []);
 });
 
-await test('cancelling during the initial dial releases the pending seat and local client', {timeout: 5000}, async () => {
+await test('cancelling an admitted player releases its actual body and local client', {timeout: 5000}, async () => {
   const abort = new AbortController();
   const connect = () => {
     const bot = new RoomBot(bench.url, 'bench', 'device:tc45-abort'); bots.push(bot);
-    abort.abort(new Error('tc45 cancelled')); return bot;
+    return bot;
   };
-  await assert.rejects(outsideJourney(connect, 1500, abort.signal), /tc45 cancelled/u);
+  const journey = outsideJourney(connect, 3000, abort.signal);
+  await until(() => bench.world.health().players === 1 && room.bodyOf('device:tc45-abort') !== undefined);
+  assert.equal(bench.world.health().players, 1); assert.ok(room.bodyOf('device:tc45-abort'));
+  abort.abort(new Error('tc45 cancelled'));
+  await assert.rejects(journey, /tc45 cancelled/u);
   await until(() => bench.world.health().players === 0 && room.holding === 0);
   assert.equal(room.bodyOf('device:tc45-abort'), undefined);
   assert.deepEqual(bench.crashes, []);

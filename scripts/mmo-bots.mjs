@@ -89,7 +89,8 @@ if (!verify(null, Buffer.from(signed.body), createPublicKey({ key: Buffer.from(k
 const release = JSON.parse(signed.body);
 if (release.channel !== 'staging' || !/^[0-9a-f]{40}$/u.test(release.engineBuild)) throw new Error('Unexpected staging release');
 if (outsideProof && release.socket.replace(/\/$/u, '') !== STAGING_SOCKETS[0]) throw new Error('Outside proof requires the signed public staging Tunnel socket');
-note({ step: 'release', channel: release.channel, serial: release.serial, build: release.engineBuild, socket: release.socket });
+note({ step: 'release', channel: release.channel, serial: release.serial,
+  ...(outsideProof ? {signedReleaseBuild: release.engineBuild} : {build: release.engineBuild}), socket: release.socket });
 
 // --- Staging's seats, before a single hello: people first.
 const health = async () => /** @type {{ build: string, players: number, cells: number, workers: number }} */ (await (await fetch(STAGING_HEALTH, { signal: AbortSignal.timeout(15_000) })).json());
@@ -249,21 +250,42 @@ const code = await new Promise(resolve => {
     : spawn(process.execPath, [join(out, 'mmoBots.mjs'), ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own', values.spread ? values.cells : ''], { stdio: ['ignore', 'pipe', 'inherit'] });
   botsChild = child;
   child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
-  child.on('exit', resolve);
+  /** @type {ReturnType<typeof setTimeout> | null} */let force = null;
+  const watchdog = outsideProof ? setTimeout(() => {
+    child.kill('SIGTERM'); force = setTimeout(() => {child.kill('SIGKILL');}, 10_000);
+  }, (seconds + 10) * 1000) : null;
+  child.once('exit', status => {if (watchdog !== null) clearTimeout(watchdog); if (force !== null) clearTimeout(force); resolve(status);});
 });
-const exit = typeof code === 'number' ? code : 1;
-requireCandidate();
+let exit = typeof code === 'number' ? code : 1;
 if (botsOnHost && hostSsh !== null) writeFileSync(result, hostSsh(`cat ${away}/bots.json`));
+/** @type {{complete?:unknown,left?:unknown,signedReleaseBuild?:unknown,url?:unknown,error?:unknown,
+ * seated?:unknown,steady?:unknown,walked?:unknown,sawEveryone?:unknown,interArrivalMs?:unknown}} */
+let observed = {};
+/** @type {string | null} */let failure = null;
+try {
+  const raw = JSON.parse(readFileSync(result, 'utf8'));
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Bot report must be an object');
+  observed = raw;
+  requireCandidate();
+  if (outsideProof && (observed?.complete !== true || observed?.left !== true || observed?.signedReleaseBuild !== release.engineBuild || observed?.url !== url))
+    throw new Error(typeof observed.error === 'string' ? observed.error : 'Outside child did not return its complete, released witness');
+} catch (error) {
+  if (!outsideProof) throw error;
+  exit = 1; failure = error instanceof Error ? error.message : String(error);
+}
 const after = mode === 'staging' && !outsideProof ? await health() : null;
 await stopRoom();
 const full = readings.slice(playing).filter(row => values.spread ? row.players > 0 : row.players === bots);
-const report = { ...JSON.parse(readFileSync(result, 'utf8')), mode, exit, ...(outsideProof ? {outsideProof: true, candidate, releaseSerial: release.serial} : {}), ...(serverFrom === undefined ? {} : { serverFrom }), ...(remote === undefined ? {} : { remote, cpus: values.cpus }),
+const report = { ...observed, mode, exit, ...(outsideProof ? {outsideProof: true, candidate, signedReleaseBuild: release.engineBuild, releaseSerial: release.serial, url,
+  complete: exit === 0 && observed?.complete === true, left: observed?.left === true,
+  ...(exit === 0 ? {} : {error: failure ?? (typeof observed.error === 'string' ? observed.error : 'Outside child did not exit successfully')})} : {}), ...(serverFrom === undefined ? {} : { serverFrom }), ...(remote === undefined ? {} : { remote, cpus: values.cpus }),
   ...(botsOnHost ? { botsOnHost, botCpus: values['bot-cpus'] } : {}),
   ...(mode === 'staging' ? { stagingAfter: after } : {}),
   ...(full.length === 0 ? {} : { server: { windows: full.length, worstP95: Math.max(...full.map(row => row.p95)), meanP95: Number((full.reduce((sum, row) => sum + row.p95, 0) / full.length).toFixed(3)),
     max: Math.max(...full.map(row => row.max)), drops: full.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...full.map(row => row.ticksPerSecond)), rssMB: Math.round(Math.max(...full.map(row => row.rss)) / 1048576) } }) };
 writeFileSync(join(work, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
-note({ step: 'done', exit, seated: report.seated, steady: report.steady, walked: report.walked, sawEveryone: report.sawEveryone, interArrivalMs: report.interArrivalMs ?? null, server: report.server ?? null, report: join(work, 'report.json') });
+note({ step: 'done', exit, ...(outsideProof ? {complete: report.complete, left: report.left, candidate} : {
+  seated: report.seated, steady: report.steady, walked: report.walked, sawEveryone: report.sawEveryone, interArrivalMs: report.interArrivalMs ?? null, server: report.server ?? null}), report: join(work, 'report.json') });
 process.exitCode = exit;
 } finally {
   await stopRoom();
