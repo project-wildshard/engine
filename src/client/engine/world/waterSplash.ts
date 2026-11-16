@@ -24,6 +24,18 @@ const BURST = { enter: 18, leave: 10, wade: 4 } as const;
 const RING = { enter: [0.25, 2.2], leave: [0.2, 1.6], wade: [0.15, 1.1] } as const;
 const DROP_COLOUR = new THREE.Color(0.85, 0.92, 1).multiplyScalar(0.9), RING_COLOUR = new THREE.Color(0.75, 0.85, 0.95);
 
+/** A droplet's round, soft-edged sprite (16 px, made here: no file to load). */
+function dropTexture(): THREE.DataTexture {
+  const size = 16, pixels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const d = Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2) / (size / 2), a = Math.max(0, Math.min(1, (1 - d) * 2.5));
+    pixels.set([255, 255, 255, Math.round(a * 255)], (y * size + x) * 4);
+  }
+  const texture = new THREE.DataTexture(pixels, size, size);
+  texture.needsUpdate = true;
+  return texture;
+}
+
 /** Even-odd test of (x, z) against a closed outline. */
 export function insideOutline(outline: readonly (readonly [number, number])[], x: number, z: number): boolean {
   let inside = false;
@@ -50,7 +62,7 @@ interface Wader { pool: SplashPool | null; x: number; z: number; wade: number; s
 
 export class WaterSplash {
   /** every droplet, one draw */
-  readonly drops: THREE.Points;
+  readonly drops: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
   /** every ring, one draw */
   readonly rings: THREE.InstancedMesh;
   private readonly random: () => number;
@@ -83,13 +95,13 @@ export class WaterSplash {
     geometry.setAttribute('position', new THREE.BufferAttribute(this.dropAt, 3).setUsage(THREE.DynamicDrawUsage));
     geometry.setAttribute('color', new THREE.BufferAttribute(this.dropColour, 3).setUsage(THREE.DynamicDrawUsage));
     // additive: a spent droplet is black, so it adds nothing
-    this.drops = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.07, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.drops = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.08, map: dropTexture(), alphaTest: 0.02, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.drops.name = 'water:splash';
     this.drops.frustumCulled = false;
     this.ringAge = new Float32Array(slots.rings).fill(RING_LIFE);
     this.ringSpan = new Float32Array(slots.rings * 2);
     this.ringSeat = new Float32Array(slots.rings * 3);
-    const ring = new THREE.RingGeometry(0.86, 1, 40, 1).rotateX(-Math.PI / 2);
+    const ring = new THREE.RingGeometry(0.93, 1, 48, 1).rotateX(-Math.PI / 2);
     this.rings = new THREE.InstancedMesh(ring, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: true }), slots.rings);
     this.rings.name = 'water:rings';
     this.rings.frustumCulled = false;
@@ -121,7 +133,7 @@ export class WaterSplash {
   }
 
   dispose(): void {
-    this.drops.geometry.dispose(); (this.drops.material as THREE.Material).dispose();
+    this.drops.geometry.dispose(); this.drops.material.map?.dispose(); this.drops.material.dispose();
     this.rings.geometry.dispose(); (this.rings.material as THREE.Material).dispose(); this.rings.dispose();
   }
 
@@ -186,7 +198,7 @@ export class WaterSplash {
       const next = age + dt, t = Math.min(1, next / RING_LIFE);
       this.ringAge[k] = next; moved = true;
       if (t >= 1) { this.rings.setMatrixAt(k, this.matrix.makeScale(0, 0, 0)); this.rings.setColorAt(k, this.colour.setRGB(0, 0, 0)); continue; }
-      const [r0 = 0, r1 = 1] = [this.ringSpan[k * 2], this.ringSpan[k * 2 + 1]], radius = r0 + (r1 - r0) * Math.sqrt(t), fade = (1 - t) * (1 - t) * 0.55;
+      const [r0 = 0, r1 = 1] = [this.ringSpan[k * 2], this.ringSpan[k * 2 + 1]], radius = r0 + (r1 - r0) * Math.sqrt(t), fade = (1 - t) * (1 - t) * 0.6;
       this.matrix.makeScale(radius, 1, radius).setPosition(this.ringSeat[k * 3] ?? 0, this.ringSeat[k * 3 + 1] ?? 0, this.ringSeat[k * 3 + 2] ?? 0);
       this.rings.setMatrixAt(k, this.matrix);
       this.rings.setColorAt(k, this.colour.copy(RING_COLOUR).multiplyScalar(fade));

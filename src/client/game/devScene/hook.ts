@@ -9,6 +9,8 @@ import { ToonLook } from '@wildshard/engine/render/families/toon';
 import type { LookLamp } from '@wildshard/format/look-light';
 import type { ShardWater } from '@wildshard/format/water';
 import { installClientWater } from '../shardfile/clientWater';
+import { TIER } from '@wildshard/engine/core/tier';
+import { installClientSplash } from '../shardfile/clientSplash';
 import { shardfileLiveLook } from './liveLook';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { devGroundHeight, isDevColliders, liftedFeet, swapDevBoxes, type DevBox, type DevGround } from '@wildshard/engine/game/devColliders';
@@ -247,6 +249,9 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
       }
       // the client's own water surfaces, under this part's scope
       installClientWater(part.water, { root: group, scope: partScope, frame: run => { partScope.onDispose(ports.watchFrames(run)); } });
+      // SHARD-SOURCE SS6: and their splash, so a watched pond splashes as the built one does
+      installClientSplash(part.water, { root: group, scope: partScope, phone: TIER === 'phone', frame: run => { partScope.onDispose(ports.watchFrames(run)); },
+        movers: () => { const at = ports.player?.()?.position; return at === undefined ? [] : [{ id: 'player', x: at.x, y: at.y, z: at.z }]; } });
       group.updateMatrixWorld(true);
     } catch (cause) { release(live); throw cause; }
     return { live, group };
