@@ -25,7 +25,8 @@ async function withLift() {
     track: { clip: 'rise', duration: 1, loop: 'once', speed: 1, times: [0, 1], position: [[0, 0, 0], [0, 3, 0]] } };
   const movers = parseMovers([{ id: 'template.lift', entity: 9001, kind: 'platform', ...rest, enabled: true,
     boxes: [{ x: 0, y: 0, z: 0, hx: 1, hy: 0.1, hz: 1, rot: { x: 0, y: 0, z: 0, w: 1 } }], ...lowerMoverMotion(motion, rest), ...motion, execution: 'native' }]);
-  const shard: Shardfile = { ...base, movers: [...base.movers, ...movers] };
+  // Template rev 8 ships its own lift (TC-M4b); this test drives a fixed one of the same id, so it takes the product's place.
+  const shard: Shardfile = { ...base, movers: [...base.movers.filter(mover => mover.id !== 'template.lift'), ...movers] };
   return { shard, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
 }
 
