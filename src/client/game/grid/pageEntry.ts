@@ -156,7 +156,7 @@ export function enterZone(instance: string, arrive?: { readonly x: number; reado
   navigating = beginNavigationShell(shown.name, pageScope, () => {
     if (!gridRecovery(saves).clearLoop()) throw new Error('Grid recovery guard could not be cleared');
     clearGridRecovery();
-    pageGridIntents().set({ instance: cell.instance, slug: target.slug, goto: true });
+    pageGridIntents().set({ instance: cell.instance, slug: target.slug, goto: true, ...(arrive === undefined ? {} : { arrive }) });
     // ZE10b: the target's own spawn reads `arrive` (play.ts `arrivalSpawn`): the entryway's centre line past the gate, facing in
     travel({ to: target.slug, mode: 'enter', shown, ...(arrive === undefined ? {} : { arrive: { x: arrive.x, z: arrive.z, yaw: arrive.yaw } }) });
   }, null);
@@ -192,7 +192,7 @@ export function bootPageMode(slug: string): PageMode {
   // GO7: a goto, or a recovery reload (the cell this page stood in, the goto's cell if it reloaded before the door placed it), asks the
   // world for that cell; a title tap's PLAY takes the seat the world keeps (GO5).
   const chosen = intent !== null && recovery === null && 'goto' in intent && intent.goto;
-  setPageGoto(intent !== null && (recovery !== null || chosen) ? intent.instance : null, chosen);
+  setPageGoto(intent !== null && (recovery !== null || chosen) ? intent.instance : null, chosen, chosen ? intent?.arrive ?? null : null);
   if (intent !== null) gridCells.enter({ instance: intent.instance, slug: intent.slug }); // the home cell: the page starts inside it
   if (intent !== null) {
     const target = intent;

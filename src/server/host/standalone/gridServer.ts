@@ -40,6 +40,8 @@ import { ledgerFilings } from './ledgerFilings';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 
 /** Worlds the worker holds beside the road, and so what a crossroads costs a phone (E5.2b, J68): the one its player stands in. */
+/** ZE10b: how far over the entry asphalt a zone entry's body is set down. */
+const ARRIVAL_LIFT = 0.1;
 export const STANDALONE_RESIDENTS = 1;
 /** A capsule's stand above its ground: one set down touching it cannot leave. */
 const ROAD_SKIN = 0.02;
@@ -66,6 +68,9 @@ export interface GridServerOptions {
   readonly residents?: number;
   /** J311: the cell (instance) a no-world build's Shard select chose. The session starts in it, not where its save stood. */
   readonly goto?: string;
+  /** ZE10b (J352): a gate's zone entry into `goto` arrives here, in the cell's own frame (its entryway's centre line past the gate,
+   *  facing in, `arrivalPose`), over where the cell's save stood. */
+  readonly enter?: { readonly x: number; readonly z: number; readonly yaw: number };
 }
 
 /** What boot hands the session it built. */
@@ -189,6 +194,11 @@ export class StandaloneGrid {
     if (site !== null && place?.location.kind === 'cell') {
       const { x, y, z, yaw } = place.location, seat = sessionPlayer(grid.host());
       seat.position.set(x, y, z); seat.yaw = yaw; seat.motor.resetAt(seat.position);
+    }
+    // ZE10b: on the entry asphalt, whose top is road height (y 0, `entrySockets.ts`)
+    if (site !== null && chosen?.instance === site && options.enter !== undefined) {
+      const { x, z, yaw } = options.enter, seat = sessionPlayer(grid.host());
+      seat.position.set(x, ARRIVAL_LIFT, z); seat.yaw = yaw; seat.motor.resetAt(seat.position);
     }
     const restored = site === null ? candidate?.saved : resumed;
     const server = new StandaloneGrid({ grid, assembly, restored, options, worlds, slots, sites, saved: candidate?.saved.tick ?? 0 });

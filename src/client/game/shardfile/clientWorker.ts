@@ -3,7 +3,7 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { DevBox } from '@wildshard/engine/game/devColliders';
 import type { LiveGridWire } from '../grid/liveSession';
-import { chosenCell, gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
+import { chosenArrival, chosenCell, gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
 import { Scene, Vector3, type Object3D } from 'three';
@@ -302,8 +302,9 @@ async function bootStandalone(slug: string, lone: boolean, held: () => void): Pr
   // MP2.4: the Name the page keeps (the Name prompt) goes with the server's own device id; solo shows it on this page only
   const name = page === null ? null : heldName(page, savePrefix);
   // J311: on a grid page, Shard select's pick is where the in-page grid starts, wherever this device last stood.
-  const goto = lone ? null : chosenCell();
-  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, ...goto === null ? {} : { goto }, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
+  // ZE10b: a gate's zone entry also names where in that cell it arrives (its entryway, past the gate)
+  const goto = lone ? null : chosenCell(), enter = goto === null ? null : chosenArrival();
+  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, ...goto === null ? {} : { goto }, ...enter === null ? {} : { enter }, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
 }
 /** LD5 (J208): a standalone server started while the first frame builds. On Jake's iPhone its boot was the last 5.1 s of
  *  Load, after every frame step; it runs on its own thread, so it can boot beside them. Its reads before the Worker boot

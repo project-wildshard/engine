@@ -10,7 +10,9 @@ let mode: PageMode = 'shard';
 export function currentPageMode(): PageMode { return mode; }
 /** @internal grid/boot.ts bootPageMode only */
 export function setPageMode(next: PageMode): void { mode = next; }
-let goto: string | null = null, hosted = false;
+let goto: string | null = null, hosted = false, arrival: Readonly<{ x: number; z: number; yaw: number }> | null = null;
+/** ZE10b: where this document's chosen cell is entered (a gate's zone entry: its entryway, past the gate, facing in), or null. */
+export function chosenArrival(): Readonly<{ x: number; z: number; yaw: number }> | null { return hosted ? arrival : null; }
 /** GO7: the grid cell (instance) this page asks the world to seat it in (Shard select's goto, or a recovery reload's cell); null otherwise. */
 export function pageGoto(): string | null { return goto; }
 /** GO7: this document's Shard select goto already took the grid (a word in time, a kept answer, or J300's no-word default), so its
@@ -20,7 +22,7 @@ export function gotoHosted(): boolean { return hosted; }
  *  grid starts there. */
 export function chosenCell(): string | null { return hosted ? goto : null; }
 /** @internal grid/pageEntry.ts bootPageMode only */
-export function setPageGoto(cell: string | null, read = false): void { goto = cell; hosted = cell !== null && read; }
+export function setPageGoto(cell: string | null, read = false, arrive: Readonly<{ x: number; z: number; yaw: number }> | null = null): void { goto = cell; hosted = cell !== null && read; arrival = hosted ? arrive : null; }
 /** Whether this page runs the grid (home or neighbour cell): a surface may pick a different texture cap there. Read at
  *  build time, after the boot consumed the page's intent. */
 export function gridPage(): boolean { return mode === 'grid'; }

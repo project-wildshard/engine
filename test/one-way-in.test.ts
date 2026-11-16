@@ -56,7 +56,7 @@ test('J311: a solo build (preview) enters its in-page grid at the shard\'s cell,
   // the page asks only for a title tap, so a bare `?chunk=` link and the harness URLs still open the shard alone
   expect(readFileSync('src/client/app/entry.ts', 'utf8')).toContain("(online || pendingTitleArrival(requested ?? '') !== null) && requested !== null");
   // the in-page server is handed the chosen cell (gridServer.ts starts there: test/standalone-grid-goto.test.ts)
-  expect(readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8')).toContain('const goto = lone ? null : chosenCell();');
+  expect(readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8')).toContain('const goto = lone ? null : chosenCell(), enter = goto === null ? null : chosenArrival();');
 });
 
 test('OF5: the title reads ahead by the route the pick booted: a deck tap that became a grid entry reads the grid manifest next time', async () => {

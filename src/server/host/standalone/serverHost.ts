@@ -44,6 +44,8 @@ export interface StandaloneServerOptions {
   readonly proof?: { readonly arrival?: Readonly<GridPoint>; readonly residents?: number; readonly ticked?: (ms: number) => void; readonly booted?: (server: StandaloneGrid) => void };
   /** J311: the grid cell (instance) a no-world build's Shard select chose; a grid session starts there. */
   readonly goto?: string;
+  /** ZE10b: where in `goto` a gate's zone entry arrives (the cell's own frame) */
+  readonly enter?: { readonly x: number; readonly z: number; readonly yaw: number };
 }
 
 /** A worker has no page, so no app identity: all it needs of one is the save prefix, which the page passes at boot. */
@@ -92,7 +94,7 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
     const { arrival, residents } = options.proof ?? {}, watched = new Set([message.slug]);
     return { slug: message.slug, build: message.build, book, saves, storage: local, savePrefix: message.savePrefix, now: diagnosticNow, ...(message.lone === true ? { lone: true } : {}),
       load: slug => options.load(message, slug, watched.has(slug) ? patch : undefined), strips: () => options.strips?.(message) ?? Promise.resolve([]), stepped, ...(options.onSaveRefused === undefined ? {} : { refused: options.onSaveRefused }), ...(options.reports === undefined ? {} : { reports: options.reports }),
-      ...(arrival === undefined ? {} : { arrival }), ...(residents === undefined ? {} : { residents }), ...(options.goto === undefined ? {} : { goto: options.goto }) };
+      ...(arrival === undefined ? {} : { arrival }), ...(residents === undefined ? {} : { residents }), ...(options.goto === undefined ? {} : { goto: options.goto }), ...(options.enter === undefined ? {} : { enter: options.enter }) };
   };
 
   const boot = async (message: Boot): Promise<void> => {

@@ -7,10 +7,11 @@ import { cell, HOME, NEIGHBOUR, PageStorage, serverInput, until } from './fixtur
 // J311 (Jake 2026-11-12: "every shard select in preview server also needs to be the infinite grid"): on a build with no world, the
 // in-page server hosts the grid, and a Shard select pick starts its session in that shard's cell, wherever the device last stood.
 // The next boot without a pick resumes in the picked cell. Only a server's bytes are read.
-function start(storage: PageStorage, home: string, goto?: string): { shell: StandaloneShell; stop: () => void } {
+type Pose = { readonly x: number; readonly z: number; readonly yaw: number };
+function start(storage: PageStorage, home: string, goto?: string, enter?: Pose): { shell: StandaloneShell; stop: () => void } {
   const control = new MessageChannel(), game = new MessageChannel();
-  const server = runStandaloneServer({ control: control.port1, game: game.port1, load: (_boot, slug) => serverInput(slug), strips: bakedGridCollision, ...(goto === undefined ? {} : { goto }) });
-  const shell = connectStandalone({ slug: home, base: `/shards/${home}/`, build: 'test', savePrefix: 'wildshard.', storage, ...(goto === undefined ? {} : { goto }) }, control.port2, game.port2, () => { server.dispose(); });
+  const server = runStandaloneServer({ control: control.port1, game: game.port1, load: (_boot, slug) => serverInput(slug), strips: bakedGridCollision, ...(goto === undefined ? {} : { goto }), ...(enter === undefined ? {} : { enter }) });
+  const shell = connectStandalone({ slug: home, base: `/shards/${home}/`, build: 'test', savePrefix: 'wildshard.', storage, ...(goto === undefined ? {} : { goto }), ...(enter === undefined ? {} : { enter }) }, control.port2, game.port2, () => { server.dispose(); });
   return { shell, stop: () => { shell.dispose(); } };
 }
 async function standsIn(storage: PageStorage, home: string, goto?: string): Promise<number | undefined> {
@@ -31,4 +32,19 @@ test('a Shard select pick starts the in-page grid in its cell, and the next boot
   expect(await standsIn(storage, NEIGHBOUR, NEIGHBOUR), 'Shard select → Driftwood: Driftwood\'s cell, not the saved one').toBe(cell(NEIGHBOUR));
   expect(await standsIn(storage, HOME), 'a later boot with no pick resumes where the pick left the player').toBe(cell(NEIGHBOUR));
   expect(await standsIn(storage, HOME, 'no-such-cell'), 'a pick the grid does not place keeps the saved site').toBe(cell(NEIGHBOUR));
+});
+
+test('ZE10b: a gate\'s zone entry starts the in-page grid at its arrival, 14 m past the gate, not where the cell\'s save stood', { timeout: 120_000 }, async () => {
+  const storage = new PageStorage();
+  expect(await standsIn(storage, NEIGHBOUR, NEIGHBOUR), 'a first visit leaves a save in the cell').toBe(cell(NEIGHBOUR));
+  const { shell, stop } = start(storage, NEIGHBOUR, NEIGHBOUR, { x: -236, z: 0, yaw: -Math.PI / 2 });
+  await shell.booted;
+  shell.ready();
+  await until(() => shell.client.latest !== null);
+  const latest = shell.client.latest;
+  if (latest === null) throw new Error('no frame');
+  const owner = shell.client.owner(latest) as Record<string, number>;
+  expect(latest.cell).toBe(cell(NEIGHBOUR));
+  expect(owner['px']).toBeCloseTo(-236, 0); expect(owner['pz']).toBeCloseTo(0, 0); expect(owner['grounded']).toBe(true);
+  stop();
 });

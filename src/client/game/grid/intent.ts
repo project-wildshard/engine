@@ -13,13 +13,17 @@ import { saves } from '@wildshard/engine/saves/runtime';
 export interface GridIntent { readonly instance: string; readonly slug: string; readonly at: number;
   /** GO7: a chosen destination (Shard select on a world that hosts the grid). The page asks the world to seat it in this cell,
    *  where a title tap's PLAY takes the seat the world already keeps (GO5). */
-  readonly goto?: boolean }
+  readonly goto?: boolean;
+  /** ZE10b: a gate's zone entry arrives here in the cell's own frame (14 m past the gate, facing in); the in-page server seats it there */
+  readonly arrive?: ZoneArrival }
+/** ZE10b: a zone entry's arrival pose, in the target cell's own frame. */
+export interface ZoneArrival { readonly x: number; readonly z: number; readonly yaw: number }
 const finite = v.pipe(v.number(), v.finite());
-const schema: v.GenericSchema<unknown, GridIntent | null> = v.nullable(v.object({ instance: v.string(), slug: v.string(), at: finite, goto: v.exactOptional(v.boolean()) }));
+const schema: v.GenericSchema<unknown, GridIntent | null> = v.nullable(v.object({ instance: v.string(), slug: v.string(), at: finite, goto: v.exactOptional(v.boolean()), arrive: v.exactOptional(v.object({ x: finite, z: finite, yaw: finite })) }));
 
 export interface GridIntents {
   /** the title's tap on Infinite Wildshard: the home cell the grid boots into; false if neither copy persisted */
-  set: (target: { readonly instance: string; readonly slug: string; readonly goto?: boolean }) => boolean;
+  set: (target: { readonly instance: string; readonly slug: string; readonly goto?: boolean; readonly arrive?: ZoneArrival }) => boolean;
   /** Read-only accounting hint, never entry authority; consumes neither copy. */
   pending: (slug: string) => boolean;
   /** the boot's one read: the intent for this page's shard (fresh at document arrival, at most 60 s old) or null; both copies are removed */
@@ -44,7 +48,7 @@ export function gridIntents(store: Store, now: () => number = Date.now): GridInt
     pending: slug => held(slug) !== null || fresh(session.read(), slug) !== null || fresh(device.read(), slug) !== null,
     admit: (target) => { admitted = { instance: target.instance, slug: target.slug, at: now(), ...(target.goto === true ? { goto: true } : {}) }; },
     set: (target) => {
-      const intent: GridIntent = { instance: target.instance, slug: target.slug, at: now(), ...(target.goto === true ? { goto: true } : {}) };
+      const intent: GridIntent = { instance: target.instance, slug: target.slug, at: now(), ...(target.goto === true ? { goto: true } : {}), ...(target.arrive === undefined ? {} : { arrive: { x: target.arrive.x, z: target.arrive.z, yaw: target.arrive.yaw } }) };
       const inSession = session.write(intent), onDevice = device.write(intent);
       return inSession || onDevice;
     },

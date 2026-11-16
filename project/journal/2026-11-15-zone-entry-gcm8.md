@@ -15,3 +15,7 @@ ZE7, the grey stand-ins seen from the turn-ins:
 - ZE13: `grid-zone-tour.mjs` enters every cell by the gate facing the current home, one after another in one tab, and
   `grid-zone-report.mjs` writes the cells × measures page and exits 1 past `test/grid-zone-ratchet.json` (seeded loose:
   24 cells, 60 s count to control, 55 s loading, 1200 MB; tighten from the first preview tour).
+- ZE10b in-page: the first `--fire` run arrived at Nalati's save (0, 232), not its west entryway: the in-page server opens the
+  chosen cell where its save stood and the server wins over the page's handoff `arrive`. The grid intent now carries the arrival
+  pose to `chosenArrival()`, `startStandalone` posts it as `enter`, and `gridServer.ts` seats the body there after `grid.enter`.
+  The dedicated world's half is ZE9's `enter` control (Codex), not a URL param: a `?gate=` dial needs Jake's OK (no-url-switch).
