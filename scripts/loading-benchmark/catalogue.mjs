@@ -1,7 +1,7 @@
 /** Display names of the seven SF67 benchmark cards; shared by desktop and Safari drivers. */
 const names = new Map([
   ['driftwood-isle', 'Driftwood Isle'], ['nalati-grasslands', 'Nalati'], ['pine-hollow', 'Pine Hollow'],
-  ['_template', 'Template shard'], ['brasscap-mesa', 'Blender Template'], ['far-reach', 'Sky Reach'], ['sunscar-dunes', 'Signal Dunes'],
+  ['_template', 'Template shard'], ['brasscap-mesa', 'Brasscap Mesa'], ['far-reach', 'Sky Reach'], ['sunscar-dunes', 'Signal Dunes'],
   ['nine-dragon-stack', 'Nine Dragon'],
 ]);
 

@@ -123,7 +123,7 @@ async function enter(page: Page): Promise<void> {
   await page.waitForFunction((): boolean => {
     const probe = globalThis.__wildshard
     return (
-      probe?.area()?.slug === 'brasscap-mesa' &&
+      probe?.area()?.slug === 'blender-template' &&
       // The cell's door panels are drawn: its targets are what steps 2, 3 and 7 read
       (probe.area()?.targets.length ?? 0) > 0 &&
       probe.app.state === 'play' &&

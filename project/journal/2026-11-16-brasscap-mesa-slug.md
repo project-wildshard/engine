@@ -13,9 +13,18 @@ is the reviewed first pin.
 - The catalogue key moves: `singleplayer.json`'s grid and solo rows,
   `test/pins/shardfiles.json`, `catalogue.json` and `staging.json` (refresh).
   The instances keep their names (`blender-template`, `blender-template-solo`):
-  the box's rooms, worker weights, crossing ratchets and every save slot are
-  keyed by instance, so a player's saves stay where they are, and staging's
-  grid row matches the baked one.
+  the box's rooms, worker weights, crossing ratchets and the grid's instance
+  save slots stay where they are, and staging's grid row matches the baked one.
+- A page keeps a shard's pack, owned items, coins and achievements under the
+  shard's slug. At page entry each retired slug's namespace merges into its
+  replacement (`SaveStore.mergeShardEntries`: entries already under the new
+  slug win, the old namespace stays). An old `?chunk=blender-template` link
+  (a bookmark, a tab reloaded after the deploy) reads as brasscap-mesa.
+- The cell's saved world was revision 9 of blender-template and is revision 3
+  of brasscap-mesa under the same instance, so its exact continuation reads
+  as a future revision and is refused (`gridServer` reports it); the world
+  opens fresh with the player's flags carried, as for any changed level.
+  Creature health and positions in that cell start over.
 - `slugNames.json` and `pages/slug-names.ts` now map a retired slug to its
   replacement: `/slug/blender-template` still 302s to `/slug/brasscap-mesa`,
   and the page reads the old path as the new slug.

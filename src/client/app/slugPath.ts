@@ -13,6 +13,16 @@ export function slugOfPath(pathname: string): string | null {
   return name === undefined ? null : API[name] ?? name;
 }
 
+/** Each retired slug and the slug that replaced it, for the save namespaces a rename carries (TC-SHIP-a). */
+export function retiredSlugs(): readonly (readonly [string, string])[] {
+  return Object.entries(PUBLIC).flatMap(([old, now]) => now === undefined ? [] : [[old, now] as const]);
+}
+
+/** The slug a `?chunk=` link names today: a retired slug's replacement, else the slug itself (TC-SHIP-a). */
+export function currentSlug(slug: string): string {
+  return API[slug] ?? slug;
+}
+
 /** The `/slug/` path a shard's link reads: its public name, else its API slug. */
 export function slugPathOf(slug: string): string {
   return `/slug/${PUBLIC[slug] ?? slug}`;

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { slugOfPath, slugPathOf } from './slugPath';
+import { currentSlug, retiredSlugs, slugOfPath, slugPathOf } from './slugPath';
 
 /** SA36: the entry opens the slug page for exactly the paths pages/worker.ts serves it on (test/page-workers.test.ts). */
 test('only /slug/<slug> names a slug', () => {
@@ -12,5 +12,7 @@ test('Brasscap Mesa is brasscap-mesa: its retired slug blender-template reads as
   expect(slugOfPath('/slug/blender-template')).toBe('brasscap-mesa');
   expect(slugPathOf('brasscap-mesa')).toBe('/slug/brasscap-mesa');
   expect(slugPathOf('blender-template')).toBe('/slug/brasscap-mesa');
+  expect(retiredSlugs()).toEqual([['blender-template', 'brasscap-mesa']]);
+  expect([currentSlug('blender-template'), currentSlug('brasscap-mesa'), currentSlug('driftwood-isle')]).toEqual(['brasscap-mesa', 'brasscap-mesa', 'driftwood-isle']);
   expect(slugPathOf('driftwood-isle')).toBe('/slug/driftwood-isle');
 });

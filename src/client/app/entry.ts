@@ -38,7 +38,7 @@ import { lastEnd, markUnload, settleLastEnd } from '@wildshard/engine/boot/lastE
 import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
-import { slugOfPath, slugPathOf } from './slugPath';
+import { currentSlug, retiredSlugs, slugOfPath, slugPathOf } from './slugPath';
 
 
 import { installForceUpdate } from '@wildshard/engine/boot/forceUpdate';
@@ -131,7 +131,17 @@ function learnPlacedCellsOnce(): Promise<void> {
 async function enterPage(): Promise<unknown> {
   // S20: a crash read off another tab's live beat is no crash; asked now, answered (at most 500 ms) before the title reads it
   const settled = settleLastEnd();
-  const requested = search.get('chunk');
+  // TC-SHIP-a: progress saved under a retired slug (Brasscap Mesa's blender-template: its pack, owned items, coins and
+  // achievements) reads under its replacement. The old namespace stays; entries already under the new slug win.
+  for (const [retired, now] of retiredSlugs()) {
+    try { saves.mergeShardEntries(retired, now); } catch (error) { console.warn(`[saves] ${retired} not carried to ${now}:`, error); }
+  }
+  // TC-SHIP-a: an old `?chunk=` link (a bookmark, a tab reloaded after the deploy) names its retired slug's replacement
+  const asked = search.get('chunk'), requested = asked === null ? null : currentSlug(asked);
+  if (asked !== null && requested !== null && requested !== asked) {
+    search.set('chunk', requested);
+    history.replaceState(history.state, '', `${location.pathname}?${search.toString()}${location.hash}`);
+  }
   // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here.
   // SA37: on every host, a world build too: PLAY's `/?chunk=` page enters the world's grid at the shard's cell (GO7 below)
   const slugged = slugOfPath(location.pathname);
