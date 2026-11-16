@@ -669,5 +669,10 @@
  "test/push-input-cache.test.ts",
  "test/prebuilt-output.test.ts",
  "test/precommit-vocabulary.test.ts",
- "test/commit-message-preflight.test.ts"
+ "test/commit-message-preflight.test.ts",
+ "src/client/engine/render/allocation-journal.test.ts",
+ "src/client/engine/render/compressed-mipmaps.test.ts",
+ "src/client/engine/render/uniform-vector-buffer.test.ts",
+ "src/client/engine/render/uniform-scalar-buffer.test.ts",
+ "src/client/engine/render/uniform-caches.test.ts"
 ]
