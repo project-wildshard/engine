@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """TS12a outer-edge proof: real gate argv, measured descendants and an unsignalled orphan."""
 import argparse
+import contextlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import re
@@ -10,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.dont_write_bytecode = True
@@ -46,7 +49,10 @@ def finish(observer, work, expected):
     assert row['gateKind'] == 'unverified' and row['exactGateCpu'] is None, row
     assert 'cpuSeconds' not in row and 'userSeconds' not in row and 'systemSeconds' not in row, row
     assert row['samples'] >= 2 and row['peakSummedRssMB'] > 0, row
-    assert (ROOT / row['rawReport']).is_file()
+    raw = ROOT / row['rawReport']
+    assert raw.is_file()
+    first = json.loads(raw.read_text().splitlines()[0])
+    assert row['selectedRootIdentity'] == row['root']['identity'] == first['expectedRootIdentity'], row
     return row
 
 
@@ -92,6 +98,47 @@ def descendants(work, leak):
         root.wait(timeout=2)
 
 
+def observer_faults(work, owner):
+    """Fault only the controller-to-recorder handoff; actual owner/kernel refusal remain real."""
+    args = argparse.Namespace(pid=owner.pid, root=bench.GATE_ROOT, out=work / 'wrong-owner.json',
+                              interval=.05, wait_seconds=.1, seconds=6, drain_seconds=.2, count=1)
+    real_run = subprocess.run
+    def shifted(command, **options):
+        assert Path(command[1]).name == 'cpu-census.py'
+        expected = command.index('--expected-identity') + 1
+        assert command[expected]
+        changed = [*command]
+        changed[expected] = 'wrong-kernel-owner'
+        return real_run(changed, **options)
+    with patch.object(bench.subprocess, 'run', shifted), contextlib.redirect_stdout(io.StringIO()):
+        try:
+            bench.command_observe(args)
+        except SystemExit as error:
+            assert 'identity changed before observation' in str(error), error
+        else:
+            raise AssertionError('wrong recorder identity must refuse')
+    assert owner.poll() is None and not args.out.exists()
+    assert not list(work.glob('wrong-owner.*.jsonl')), 'wrong owner must never be observed'
+
+    args.out = work / 'timeout.json'
+    evidence = []
+    def timed_out(command, **options):
+        assert Path(command[1]).name == 'cpu-census.py'
+        raw = Path(command[command.index('--report') + 1])
+        raw.write_text('owned partial timeout fixture\n')
+        evidence.append(raw)
+        raise subprocess.TimeoutExpired(command, options['timeout'])
+    with patch.object(bench.subprocess, 'run', timed_out), contextlib.redirect_stdout(io.StringIO()):
+        try:
+            bench.command_observe(args)
+        except SystemExit as error:
+            assert 'recorder timed out' in str(error) and str(evidence[0]) in str(error), error
+        else:
+            raise AssertionError('recorder timeout must never publish a green summary')
+    assert owner.poll() is None and not args.out.exists() and evidence[0].is_file()
+    return {'identityMismatchRefused': True, 'timeoutEvidenceRetained': True}
+
+
 def discovery(work):
     (work / '.githooks').mkdir(parents=True)
     script = work / '.githooks/push-checks.mjs'
@@ -127,6 +174,7 @@ def discovery(work):
                                       capture_output=True, text=True, timeout=2)
         assert incompatible.returncode != 0 and 'incompatible census summary' in incompatible.stderr
         legacy.unlink()
+        faults = observer_faults(work, owners[1])
         # Exercise bounded discovery through the CLI on the real absolute Node root.
         pattern = '^' + re.escape(node) + r'\s+' + re.escape(str(script)) + r'(?:\s|$)'
         observer = subprocess.Popen(cli(work, '--root', pattern, '--wait-seconds', '.5'), cwd=ROOT,
@@ -138,7 +186,7 @@ def discovery(work):
         row = finish(observer, work, 0)
         assert row['root']['pid'] == owners[1].pid and row['allObservedChildrenDrained'], row
         return {'relativeAndAbsoluteRoots': True, 'wrapperExcluded': True, 'ambiguousRefused': True,
-                'missingBounded': True, 'legacySummaryRefused': True, 'actualCliDiscovery': True}
+                'missingBounded': True, 'legacySummaryRefused': True, 'actualCliDiscovery': True, **faults}
     finally:
         stop.touch()
         if observer is not None and observer.poll() is None:
@@ -153,14 +201,16 @@ def discovery(work):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--scratch', type=Path, required=True)
+    parser.add_argument('--case', choices=['all', 'ownership'], default='all')
     args = parser.parse_args()
     args.scratch.mkdir(parents=True, exist_ok=True)
     began = time.monotonic()
     with tempfile.TemporaryDirectory(dir=args.scratch) as temporary:
         work = Path(temporary)
-        result = {'discovery': discovery(work / 'discovery'),
-                  'normal': descendants(work / 'normal', False),
-                  'orphan': descendants(work / 'orphan', True)}
+        result = {'discovery': discovery(work / 'discovery')}
+        if args.case == 'all':
+            result['normal'] = descendants(work / 'normal', False)
+        result['orphan'] = descendants(work / 'orphan', True)
     print(json.dumps({**result, 'seconds': time.monotonic() - began}))
 
 

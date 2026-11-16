@@ -216,7 +216,22 @@ class Linux:
         return cpu, rss, threads, names, missing
 
 
-def observe(backend, pid, report, interval, seconds, drain):
+def process_backend(max_processes=65536, max_threads=16384):
+    if sys.platform not in ('darwin', 'linux'):
+        raise CensusRefused('census supports the public Darwin libproc or Linux proc APIs only')
+    return (Darwin if sys.platform == 'darwin' else Linux)(max_processes, max_threads)
+
+
+def owned_process(backend, pid, inventory=None):
+    if inventory is None:
+        inventory = backend.processes()[0]
+    process = inventory.get(pid)
+    if pid <= 1 or pid == os.getpid() or process is None or process.zombie or process.uid != os.getuid():
+        raise ValueError('census root must be an existing live process owned by this UID')
+    return process
+
+
+def observe(backend, pid, report, interval, seconds, drain, expected_identity=None):
     began = time.monotonic()
     observer_cpu = time.process_time_ns()
     inventory = backend.processes()[0]
@@ -228,9 +243,9 @@ def observe(backend, pid, report, interval, seconds, drain):
             raise CensusRefused('required CPU counters unavailable to the observer')
     except OSError as error:
         raise CensusRefused('required CPU counters unavailable to the observer') from error
-    initial = inventory.get(pid)
-    if initial is None or initial.zombie or initial.uid != os.getuid() or pid == os.getpid():
-        raise ValueError('census root must be an existing live process owned by this UID')
+    initial = owned_process(backend, pid, inventory)
+    if expected_identity is not None and initial.identity != expected_identity:
+        raise ValueError('census root identity changed before observation')
     known, previous = {initial.identity: initial}, {}
     last_time, root_ended = began, None
     samples, incomplete, peak = 0, 0, {'processes': 0, 'threads': 0, 'activeThreads': 0,
@@ -244,7 +259,8 @@ def observe(backend, pid, report, interval, seconds, drain):
             writer.write(text)
             writer.flush()
         emit({'schema': 'engine-cpu-census/1', 'type': 'start', 'platform': sys.platform,
-              'root': initial.__dict__, 'startedAtMs': time.time_ns() / 1e6,
+              'root': initial.__dict__, 'expectedRootIdentity': expected_identity,
+              'startedAtMs': time.time_ns() / 1e6,
               'intervalSeconds': interval, 'processQuantumNs': backend.quantum_ns,
               'maxProcesses': backend.max_processes, 'maxThreads': backend.max_threads,
               'clock': backend.clock,
@@ -348,6 +364,7 @@ def observe(backend, pid, report, interval, seconds, drain):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pid', required=True, type=int)
+    parser.add_argument('--expected-identity', help='refuse if this kernel process identity no longer owns the PID')
     parser.add_argument('--report', required=True, type=Path)
     parser.add_argument('--interval', default=2.0, type=float)
     parser.add_argument('--seconds', default=1200.0, type=float)
@@ -362,9 +379,9 @@ def main():
     if sys.platform not in ('darwin', 'linux'):
         parser.error('census supports the public Darwin libproc or Linux proc APIs only')
     try:
-        backend = (Darwin if sys.platform == 'darwin' else Linux)(args.max_processes, args.max_threads)
+        backend = process_backend(args.max_processes, args.max_threads)
         return observe(backend, args.pid,
-                       args.report, args.interval, args.seconds, args.drain_seconds)
+                       args.report, args.interval, args.seconds, args.drain_seconds, args.expected_identity)
     except (OSError, ValueError, CensusRefused) as error:
         print(f'cpu-census refused: {type(error).__name__}: {error}', file=sys.stderr)
         return 2

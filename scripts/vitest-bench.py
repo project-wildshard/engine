@@ -27,6 +27,7 @@ It never edits a test, config, cap or source file.
 import argparse
 import atexit
 import collections
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -705,12 +706,37 @@ def choose_gate(roots):
     return roots[0] if roots else None
 
 
+def cpu_census():
+    name = '_vitest_cpu_census'
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(name, ROOT / 'scripts/cpu-census.py')
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module  # Dataclasses resolve their annotations through the module table.
+        try:
+            # Read the maintained API without writing a bytecode cache beside the source.
+            exec(compile(spec.loader.get_source(name), str(spec.origin), 'exec'), module.__dict__)
+        except BaseException:
+            del sys.modules[name]
+            raise
+    return sys.modules[name]
+
+
 def observe_root(args):
+    census = cpu_census()
+    try:
+        backend = census.process_backend()
+        return select_owner(args, census, backend)
+    except (OSError, ValueError, subprocess.CalledProcessError, census.CensusRefused) as error:
+        raise SystemExit(f'census owner refused: {error}') from error
+
+
+def select_owner(args, census, backend):
     if args.pid is not None:
-        return args.pid
+        return census.owned_process(backend, args.pid)
     pattern = re.compile(args.root)
     until = time.monotonic() + args.wait_seconds
     while True:
+        before = backend.processes()[0]
         try:
             output = subprocess.run(['ps', '-axo', 'pid=,uid=,command='], check=True,
                                     capture_output=True, text=True,
@@ -719,7 +745,12 @@ def observe_root(args):
             raise SystemExit('process inventory exceeded discovery deadline; give --pid or retry later')
         root = choose_gate(gate_candidates(output, pattern))
         if root is not None:
-            return root
+            after = backend.processes()[0]
+            first = census.owned_process(backend, root, before)
+            current = census.owned_process(backend, root, after)
+            if first.identity != current.identity:
+                raise SystemExit('census owner identity changed during discovery; retry explicitly')
+            return current
         if time.monotonic() >= until:
             raise SystemExit('no matching gate before discovery deadline; give --pid or retry later')
         time.sleep(min(args.interval, max(0, until - time.monotonic())))
@@ -773,17 +804,23 @@ def command_observe(args):
         data = {'schema': schema, 'observations': []}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     for _ in range(args.count):
-        root = observe_root(args)
+        owner = observe_root(args)
+        root = owner.pid
         report = args.out.with_name(f'{args.out.stem}.{time.time_ns()}.{root}.jsonl')
         command = [sys.executable, str(ROOT / 'scripts/cpu-census.py'), '--pid', str(root),
                    '--report', str(report), '--interval', str(args.interval), '--seconds', str(args.seconds),
-                   '--drain-seconds', str(args.drain_seconds)]
+                   '--drain-seconds', str(args.drain_seconds), '--expected-identity', owner.identity]
         print(f'observing root pid {root}; raw report {report}', flush=True)
-        result = subprocess.run(command, capture_output=True, text=True,
-                                timeout=args.seconds + args.drain_seconds + 15)
+        try:
+            result = subprocess.run(command, capture_output=True, text=True,
+                                    timeout=args.seconds + args.drain_seconds + args.interval + 15)
+        except subprocess.TimeoutExpired as error:
+            evidence = f'raw observation retained at {report}' if report.exists() else f'no raw observation published at {report}'
+            raise SystemExit(f'census recorder timed out; {evidence}; target was not signalled') from error
         if not report.exists():
             raise SystemExit(result.stderr.strip() or 'census refused before observation')
         row = census_summary(report, result.returncode)
+        row['selectedRootIdentity'] = owner.identity
         data['observations'].append(row)
         save(args.out, data)
         print(json.dumps({'root': root, 'sampledCpuSecondsLowerBound': row['sampledCpuSecondsLowerBound'],
