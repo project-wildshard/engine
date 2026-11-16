@@ -135,8 +135,8 @@ export function installDeclaredKitItems(host: SimHost, shard: Pick<Shardfile, 'i
       restore: value => {
         if (!isStates(value)) throw new Error('Invalid declared kit item continuation');
         // A player's document can come from an older room (E7.4): its tick is that room's. The runtime's tick only orders steps,
-        // so it never stands ahead of this host's.
-        for (const [id, runtime] of runtimes) { const saved = value[id]; if (saved !== undefined) runtime.restore({ ...saved, tick: Math.max(-1, Math.min(saved.tick, host.state.tick - 1)) }); }
+        // so it never stands ahead of this host's. A same-world save keeps its exact tick.
+        for (const [id, runtime] of runtimes) { const saved = value[id]; if (saved !== undefined) runtime.restore({ ...saved, tick: Math.max(-1, Math.min(saved.tick, host.state.tick)) }); }
         // A save made before a lever existed leaves it fresh.
         for (const [id, seat] of seated) { const saved: unknown = value[id]; if (saved !== undefined) restoreLever(seat, saved); if (id === primary) seat.taken = true; }
         // A save from before TC-E4 has no rack list: its weapons stay on their racks, as a fresh player's do.
