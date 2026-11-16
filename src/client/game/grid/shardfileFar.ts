@@ -1,4 +1,4 @@
-import { Matrix4, Mesh, type BufferGeometry, type Object3D } from 'three';
+import { Matrix4, Mesh, BufferGeometry, Float32BufferAttribute, type Object3D } from 'three';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
 import { workSlice } from '@wildshard/engine/core/workSlice';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -26,6 +26,13 @@ export interface ShardfileNearRows {
 /** Authored mesh worlds ship their one-draw proxy inside their product, without a second baked-folder copy. */
 export async function loadShardfileFar(rows: ShardfileFarRows, read: (ref: string) => Promise<Uint8Array>): Promise<{ prepared: FarPrepared; bytes: number }> {
   const { far, farRef: ref } = rows;
+  // A scene upload can declare no distant geometry. It owns no baked far.json;
+  // represent its actual empty view instead of requesting an invented fallback.
+  if (far === null && ref === null) {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new Float32BufferAttribute([], 3));
+    return { prepared: { geometry, positionalMask: true, look: shardfileHaze(rows.fog), impostor: null }, bytes: 0 };
+  }
   if (far === null || ref === null || !far.files.includes(ref)) throw new Error('Authored world has no declared far GLB');
   const gltf = await (await prepareRigLoader()).createRigLoader().parseAsync((await read(ref)).slice().buffer, '');
   gltf.scene.updateMatrixWorld(true);

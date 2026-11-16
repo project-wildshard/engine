@@ -4,6 +4,7 @@ import { emptyShardfile } from '@wildshard/engine/host/author';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import { encodeCanonicalJson, hashImmutableBytes } from '../src/shared/host/immutable';
 import { readGridProductEdges, readGridProductFar, readGridProductNear } from '../src/client/game/grid/products';
+import { loadShardfileFar } from '../src/client/game/grid/shardfileFar';
 import type { ProductCache } from '../src/client/game/shardfile/product';
 
 function fixture(slug = 'edge-fixture') {
@@ -137,13 +138,19 @@ test('O26: a world without mesh collision reads only the index and its collision
   expect(f.fetch.mock.calls.map(([url]) => url)).toEqual([f.url, collision]);
 });
 
-test('TEMPLATE-E2E: with no baked far folder, a world without mesh collision reads its own far row, and none is null', async () => {
+test('an uploaded empty scene keeps its no-far declaration without a baked-folder request', async () => {
   const f = fixture('scene-far-fixture'), names = ['world/collision', 'world/tiles', 'world/props', 'look/look'] as const;
   const urls = names.map((name) => new URL(`sections/${name}.json`, f.url).href);
   names.forEach((name, i) => { const payload = outputSectionPayloads(f.source).get(name), url = urls[i];
     if (payload === undefined || url === undefined) throw new Error(`Missing ${name} fixture`); f.wires.set(url, new TextEncoder().encode(encodeCanonicalJson(payload))); });
-  // the empty source declares no far row, so even read whatever its world it gives the baked folder's way (null)
-  expect(await readGridProductFar(f.url, f.source.identity.slug, f.options, true)).toBeNull();
+  const far = await readGridProductFar(f.url, f.source.identity.slug, f.options, true);
+  expect(far?.rows).toMatchObject({ far: null, farRef: null });
+  if (far === null) throw new Error('Lost authored no-far declaration');
+  const read = vi.fn(far.read), view = await loadShardfileFar(far.rows, read);
+  expect(view.bytes).toBe(0);
+  expect(view.prepared.geometry.getAttribute('position').count).toBe(0);
+  expect(read).not.toHaveBeenCalled();
+  view.prepared.geometry.dispose();
   expect(new Set(f.fetch.mock.calls.map(([url]) => url))).toEqual(new Set([f.url, ...urls]));
 });
 

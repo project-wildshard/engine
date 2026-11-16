@@ -209,7 +209,9 @@ export async function readGridProductFar(url: string, identity: string, options:
   // A mesh-collision world keeps its rows as they are. Any other world (a scene upload) has no props row naming its far GLB,
   // so it is the first far file the index lists as a GLB; with none, its far proxy is the baked folder's after all.
   const farRef = declared ?? (mesh || far === null ? null : far.files.find(isGlb) ?? null);
-  if (!mesh && (far === null || farRef === null)) return null;
+  // An upload with no baked folder may deliberately declare no far view.
+  // Keep that declaration distinct from the legacy baked-folder fallback.
+  if (!mesh && far !== null && farRef === null) return null;
   const rows: ShardfileFarRows = { far, farRef, fog };
   const read = (ref: string): Promise<Uint8Array> => {
     const hash = ref.replace(/^commons:/u, ''), commons = ref.startsWith('commons:');
