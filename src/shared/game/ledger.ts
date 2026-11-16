@@ -23,19 +23,20 @@ export type AchievementRule = (shard: string, id: string) => { readonly title: s
 /** A renamed shard keeps its profile progress (TC-SHIP-g): achievements and catalogue entitlements saved under a retired
  *  slug also count under its replacement (Brasscap Mesa's blender-template). Entries already under the new slug win and
  *  the old entries stay, as the page's shard saves do (TC-SHIP-a). An entitlement carries its grants and repeat window
- *  under the instance as it was and as renamed, so neither key pays twice. With `rule`, an achievement carries only when
- *  the reader declares it, under the declared title and threshold (a renamed shard may retitle one, and the next grant
+ *  under the instance as it was and as renamed, so neither key pays twice. An achievement carries only when `rule` (the
+ *  reader's declared achievements) names it, under the declared title and threshold (a renamed shard may retitle one, and the next grant
  *  refuses a changed identity). Returns whether it added anything. */
-export function carryRetiredLedger(state: LedgerState, retired: readonly (readonly [string, string])[] = retiredSlugs(), rule?: AchievementRule): boolean {
+export function carryRetiredLedger(state: LedgerState, retired: readonly (readonly [string, string])[], rule: AchievementRule): boolean {
   let changed = false;
   for (const [old, now] of retired) {
     for (const row of Object.values(state.achievements)) {
       const key = JSON.stringify([now, row.id]);
       if (row.shard !== old || state.achievements[key] !== undefined) continue;
-      const declared = rule === undefined ? row : rule(now, row.id);
+      const declared = rule(now, row.id);
       if (declared === undefined) continue;
-      const count = Math.min(row.count, declared.threshold);
-      state.achievements[key] = { shard: now, id: row.id, title: declared.title, count, threshold: declared.threshold, earned: row.earned || count === declared.threshold };
+      // once earned, earned (a raised threshold reads full); otherwise the count, capped at the new threshold
+      const count = row.earned ? declared.threshold : Math.min(row.count, declared.threshold);
+      state.achievements[key] = { shard: now, id: row.id, title: declared.title, count, threshold: declared.threshold, earned: count === declared.threshold };
       changed = true;
     }
     for (const [name, grant] of Object.entries(state.entitlements)) {

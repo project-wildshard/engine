@@ -46,3 +46,8 @@ is the reviewed first pin.
   dedicated room named after the old slug, or its -solo twin), and an
   achievement carries only when the reading ledger declares it, under the
   declared title and threshold, so a retitled one never trips the refusal.
+- The land preflight could not pass with Ring 1's blender-template (the format's
+  Template 2, installed by `pins.ts install --from-format`) in out/:
+  `stalePinProducts` named it stale because no pin names it. It is now current
+  while its index is the installed format package's, and stale once the format
+  moves past it. An earned achievement carries full under a raised threshold.

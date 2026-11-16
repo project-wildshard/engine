@@ -38,12 +38,20 @@ test('a new slug keeps its own progress, and a profile with nothing retired is l
     [JSON.stringify([NEW, 'a'])]: { shard: NEW, id: 'a', title: 'A', count: 2, threshold: 3, earned: false },
     [JSON.stringify([OLD, 'b'])]: { shard: OLD, id: 'b', title: 'B', count: 1, threshold: 1, earned: true },
   } };
-  expect(carryRetiredLedger(state, [[OLD, NEW]])).toBe(true);
+  const same = (_shard: string, id: string) => state.achievements[JSON.stringify([OLD, id])] ?? undefined;
+  expect(carryRetiredLedger(state, [[OLD, NEW]], same)).toBe(true);
   expect(state.achievements[JSON.stringify([NEW, 'a'])]?.count, 'the entry under the new slug wins').toBe(2);
   expect(state.achievements[JSON.stringify([NEW, 'b'])]).toEqual({ shard: NEW, id: 'b', title: 'B', count: 1, threshold: 1, earned: true });
-  expect(carryRetiredLedger(state, [[OLD, NEW]]), 'a second pass adds nothing').toBe(false);
+  expect(carryRetiredLedger(state, [[OLD, NEW]], same), 'a second pass adds nothing').toBe(false);
   const other: LedgerState = { facts: {}, entitlements: { 'not json': { grants: 1, lastTick: 0 } }, items: {}, achievements: {} };
-  expect(carryRetiredLedger(other, [[OLD, NEW]])).toBe(false);
+  expect(carryRetiredLedger(other, [[OLD, NEW]], same)).toBe(false);
+  const raised: LedgerState = { facts: {}, entitlements: {}, items: {}, achievements: {
+    [JSON.stringify([OLD, 'c'])]: { shard: OLD, id: 'c', title: 'C', count: 3, threshold: 5, earned: false },
+    [JSON.stringify([OLD, 'd'])]: { shard: OLD, id: 'd', title: 'D', count: 2, threshold: 2, earned: true },
+  } };
+  carryRetiredLedger(raised, [[OLD, NEW]], (_shard, id) => ({ title: id, threshold: id === 'c' ? 2 : 4 }));
+  expect(raised.achievements[JSON.stringify([NEW, 'c'])], 'a lowered threshold caps the count and earns it').toMatchObject({ count: 2, threshold: 2, earned: true });
+  expect(raised.achievements[JSON.stringify([NEW, 'd'])], 'a raised threshold keeps an earned row earned and full').toMatchObject({ count: 4, threshold: 4, earned: true });
 });
 
 test('a dedicated room named after the retired slug pays nothing twice once it carries the new name', () => {
@@ -67,7 +75,7 @@ test('a retitled achievement carries under its new title, and one the reader doe
   const after = new PlayerStore(before.documents(), () => undefined);
   const ledger = new Ledger(after.saves, [{ id: INSTANCE, shard: NEW }], [{ shard: NEW, revision: 3, rules: retitled }], catalogue);
   expect(ledger.record(fact(NEW, 'bounty.wyrm', 5)).status, 'no identity refusal; once earned, earned').toBe('duplicate');
-  expect(ledger.state().achievements[JSON.stringify([NEW, 'wyrm-slayer'])]).toEqual({ shard: NEW, id: 'wyrm-slayer', title: 'Wyrm Hunter', count: 1, threshold: 2, earned: true });
+  expect(ledger.state().achievements[JSON.stringify([NEW, 'wyrm-slayer'])]).toEqual({ shard: NEW, id: 'wyrm-slayer', title: 'Wyrm Hunter', count: 2, threshold: 2, earned: true });
   const other = new Ledger(new PlayerStore(before.documents(), () => undefined).saves, [], [], []);
   expect(other.state().achievements[JSON.stringify([NEW, 'wyrm-slayer'])], 'a reader without the rule carries nothing').toBeUndefined();
 });

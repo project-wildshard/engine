@@ -216,13 +216,28 @@ export function stalePinProducts(root){
  for(const folder of folders.sort()){
   /** @type {unknown} */let pin,source;
   try{({pin,source}=JSON.parse(readFileSync(join(root,'out',folder,'validation.json'),'utf8')));}catch{continue;}
-  // A frozen format-dependency product (`pins.ts install --from-format`, Ring 1's blender-template: the format's own Template
-  // 2) is named by no pin on purpose and `pnpm pins` never replaces it, so it is not stale (TEMPLATE-E2E, 2026-11-16).
-  if(typeof source==='object'&&source!==null&&'kind'in source&&source.kind==='format-dependency')continue;
+  // A format-dependency product (`pins.ts install --from-format`, Ring 1's blender-template: the format's own Template 2) is
+  // named by no pin on purpose, so it is current while its index is the installed format package's (TEMPLATE-E2E, 2026-11-16)
+  // and stale once the dependency moves past it.
+  if(typeof source==='object'&&source!==null&&'kind'in source&&source.kind==='format-dependency'){
+   if(!currentFormatProduct(root,source))stale.push({folder,revision:typeof pin==='object'&&pin!==null&&'revision'in pin?pin.revision:undefined});
+   continue;
+  }
   if(typeof pin!=='object'||pin===null||!('hash'in pin)||typeof pin.hash!=='string')continue;
   if(!want.has(pin.hash))stale.push({folder,revision:'revision'in pin?pin.revision:undefined});
  }
  return stale;
+}
+
+/** Whether a format-dependency receipt's `source` (`{path:'@wildshard/format/<folder>', indexHash}`, scripts/pin-format.ts)
+ * names the `shard.json` the tree's installed format package holds today.
+ * @param {string} root @param {object} source @returns {boolean} */
+function currentFormatProduct(root,source){
+ const path='path'in source&&typeof source.path==='string'?source.path:'',indexHash='indexHash'in source?source.indexHash:undefined;
+ const folder=path.startsWith('@wildshard/format/')?path.slice('@wildshard/format/'.length):'';
+ if(folder===''||folder.split('/').includes('..'))return false;
+ try{return createHash('sha256').update(readFileSync(join(root,'node_modules','@wildshard','format',folder,'shard.json'))).digest('hex')===indexHash;}
+ catch{return false;}
 }
 
 /** Every file under `directory` as a path relative to it with its size, or a refusal: an entry that is neither a

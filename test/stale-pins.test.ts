@@ -1,3 +1,5 @@
+// oxlint-disable-next-line import/no-nodejs-modules -- a format index's hash
+import { createHash } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- a temporary tree with out/ and a pins file
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- the same
@@ -12,7 +14,7 @@ import { stalePinProducts } from '../scripts/pins-reuse.mjs';
 // boot stamps (2026-11-14). stalePinProducts names such products, and gen:inputs refuses to stamp until `pnpm pins` runs.
 let root = '';
 afterEach(() => { if (root !== '') rmSync(root, { recursive: true, force: true }); root = ''; });
-function tree(pins: readonly string[], products: Readonly<Record<string, { hash: string; revision: number; source?: { kind: string } } | 'unreadable'>>): string {
+function tree(pins: readonly string[], products: Readonly<Record<string, { hash: string; revision: number; source?: Readonly<Record<string, string>> } | 'unreadable'>>): string {
   root = mkdtempSync(join(tmpdir(), 'stale-pins-'));
   mkdirSync(join(root, 'test/pins'), { recursive: true });
   writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({ shards: pins.map(hash => ({ slug: hash, hash })) }));
@@ -35,8 +37,15 @@ test('no out/, no pins file, and a folder with no readable receipt are not stale
   expect(stalePinProducts(root)).toEqual([]);
 });
 
-test('a format-dependency product (Ring 1\'s blender-template, the format\'s Template 2) is named by no pin and is not stale', () => {
-  expect(stalePinProducts(tree(['brasscap9'], { 'blender-template': { hash: 'format1', revision: 1, source: { kind: 'format-dependency' } },
-    'brasscap-mesa': { hash: 'brasscap9', revision: 9 }, 'far-reach': { hash: 'far1', revision: 1, source: { kind: 'api' } } })))
-    .toEqual([{ folder: 'far-reach', revision: 1 }]);
+test('a format-dependency product (Ring 1\'s blender-template, the format\'s Template 2) is current while its index is the installed format\'s', () => {
+  const index = '{"identity":{"slug":"blender-template","revision":1}}', indexHash = createHash('sha256').update(index).digest('hex');
+  const source = { kind: 'format-dependency', path: '@wildshard/format/corpus/handwritten', indexHash };
+  tree(['brasscap9'], { 'blender-template': { hash: 'format1', revision: 1, source },
+    'brasscap-mesa': { hash: 'brasscap9', revision: 9 }, 'far-reach': { hash: 'far1', revision: 1, source: { kind: 'api' } } });
+  const installed = join(root, 'node_modules/@wildshard/format/corpus/handwritten');
+  mkdirSync(installed, { recursive: true });
+  writeFileSync(join(installed, 'shard.json'), index);
+  expect(stalePinProducts(root)).toEqual([{ folder: 'far-reach', revision: 1 }]);
+  writeFileSync(join(installed, 'shard.json'), index.replace('"revision":1', '"revision":2'));
+  expect(stalePinProducts(root), 'the format dependency moved past it').toEqual([{ folder: 'blender-template', revision: 1 }, { folder: 'far-reach', revision: 1 }]);
 });
