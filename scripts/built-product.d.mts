@@ -8,7 +8,8 @@ export function productFlags(root:string,output:string|undefined,map:{image?:str
 export function productRecipe(root:string,name:string,flags:string[],toolchain:string,cacheRoot:string):{normalized:string[];recipe:string[];receipts:string};
 /** Retain an original sealed input receipt as unshipped slot metadata; readers still replay its complete freshness proof. */
 export function retainProductInputs(root:string,name:string,receipt:string,key:string,recipe:string[],memo:InputHashMemo):void;
-/** Read an exact-SHA CI product or a matching sealed local product, retaining cache lifetime pins. Never generates or builds. */
+/** Read an exact-SHA CI product or a matching sealed local product, retaining cache lifetime pins.
+ * Ring 1 requires its configured server slice, even beside full output. Never generates or builds. */
 export function readBuiltShardfile(root:string,name:string,options?:{cacheRoot?:string;env?:NodeJS.ProcessEnv}):string;
 /** Partition suites by the same verified product intake, without building or admitting stale products. */
 export function selectBuiltTestProducts(root:string,files:readonly string[],options?:{cacheRoot?:string;env?:NodeJS.ProcessEnv}):{ready:string[];blocked:string[];missing:string[];buildCommand:string|undefined};

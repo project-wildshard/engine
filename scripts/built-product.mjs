@@ -94,6 +94,19 @@ export function retainProductInputs(root, name, receipt, key, recipe, memo) {
 export function readBuiltShardfile(sourceRoot, name, { cacheRoot = shardfileCacheRoot(), env = process.env } = {}) {
   if (!/^[a-z0-9_-]+$/u.test(name)) throw new Error('Invalid built product name');
   const root = resolve(sourceRoot);
+  // Ring 1's server suites must use their reviewed slice even when a prior
+  // full install left the complete product here. Missing slices are a setup
+  // failure, never permission to test against client assets instead.
+  if (env.WILDSHARD_RING === '1' && !hasShardSource(root)) {
+    const rings = resolve(root, 'test/pins/rings.json');
+    /** @type {{'1'?: {slices?: string[]}}} */
+    const ring = existsSync(rings) ? JSON.parse(readFileSync(rings, 'utf8')) : {};
+    if (ring['1']?.slices?.includes(name)) {
+      const slice = resolve(root, 'out/.slices', name);
+      if (!existsSync(resolve(slice, 'shard.json'))) throw new Error(`Missing Ring 1 server slice ${name}; run: node scripts/pins.ts install --ring 1`);
+      return slice;
+    }
+  }
   const destination = resolve(root, 'out', name), built = env.WS_TEST_PRODUCTS_SHA;
   if (built !== undefined && /^[a-f0-9]{40}$/u.test(built) && built === env.GITHUB_SHA
     && existsSync(resolve(destination, 'shard.json'))) return destination;
