@@ -89,8 +89,8 @@ describe('payload adapter', () => {
 describe('guard-git-add.sh: same verdict from both tools', () => {
   const root = sandbox();
   const verdict = (tool, command) => run(root, 'guard-git-add.sh', withCommand(tool, command));
-  const blocked = ['git add -A', 'git add .', 'git add -u', 'git -C /repo add --all', 'git commit -am "fix: x"', 'git commit -m "fix: x"', 'git diff -- a && git commit -m "fix: x"'];
-  const allowed = ['git status --short', 'git add src/new.ts', 'git commit -m "fix: x" -- a.ts', 'git commit --amend --no-edit', 'SKIP_SWEEPGUARD=1 git commit -m "chore: all"', 'echo "git add -A"'];
+  const blocked = ['git add -A', 'git add .', 'git add -u', 'git -C /repo add --all', 'git commit -am "fix: x"', 'git commit -m "fix: x"', 'git diff -- a && git commit -m "fix: x"', 'git commit-tree deadbeef', 'git commit-tree deadbeef --', 'git -C /repo commit-tree deadbeef --'];
+  const allowed = ['git status --short', 'git add src/new.ts', 'git commit -m "fix: x" -- a.ts', 'git commit --amend --no-edit', 'SKIP_SWEEPGUARD=1 git commit -m "chore: all"', 'echo "git add -A"', 'scripts/commit.sh --patch own.patch "fix: own" -- shared.ts'];
   for (const command of blocked) {
     test(`blocks: ${command}`, () => {
       const [claude, codex] = TOOLS.map((tool) => verdict(tool, command));

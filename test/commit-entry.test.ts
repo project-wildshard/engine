@@ -67,6 +67,30 @@ test('a refusing installed hook leaves HEAD and foreign stages intact', () => {
   });
 });
 
+test('the sanctioned patch entry runs commit-msg and leaves the peer hunk unstaged byte-for-byte (WL17)', () => {
+  fixture((root, git) => {
+    writeFileSync(join(root, 'selected'), 'own=base\npeer=base\n');
+    git('commit', '-qm', 'fixture shared base', '--', 'selected');
+    writeFileSync(join(root, 'selected'), 'own=ours\npeer=base\n');
+    const patch = join(root, 'own.patch');
+    writeFileSync(patch, git('diff', 'HEAD', '--', 'selected') + '\n');
+    writeFileSync(join(root, 'selected'), 'own=ours\npeer=foreign\n');
+    const working = readFileSync(join(root, 'selected'));
+    const foreign = git('rev-parse', ':foreign');
+    const hook = join(root, '.git/hooks/commit-msg');
+    writeFileSync(hook, '#!/bin/sh\ncat "$1" > .git/commit-msg-ran\n');
+    chmodSync(hook, 0o755);
+    const result = spawnSync(entry, ['--patch', patch, message, '--', 'selected'], { cwd: root, encoding: 'utf8', timeout: 5000 });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(git('show', 'HEAD:selected')).toBe('own=ours\npeer=base');
+    expect(readFileSync(join(root, 'selected')).equals(working)).toBe(true);
+    expect(git('diff', '--cached', '--name-only')).toBe('foreign');
+    expect(git('rev-parse', ':foreign')).toBe(foreign);
+    expect(git('diff', '--', 'selected')).toContain('+peer=foreign');
+    expect(readFileSync(join(root, '.git/commit-msg-ran'), 'utf8').trim()).toBe(message);
+  });
+});
+
 test('a commit from a plan worktree uses its own index and leaves the canonical index untouched (J240, DS6)', () => {
   fixture((root, git) => {
     git('worktree', 'add', '-q', '-b', 'plan/p', '.worktrees/p', 'main');

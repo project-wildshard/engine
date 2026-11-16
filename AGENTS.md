@@ -15,6 +15,10 @@
 Git hygiene
 
  - Small Commit early & often.
+ - **Own hunks of a shared file (HOW-WE-BUILD WL17):** make a patch against HEAD containing only your hunks, then run
+   `scripts/commit.sh --patch <patch-file> "<message with Assisted-by trailer>" -- <literal-files...>`.
+   The existing command builds its private candidate, runs installed hooks (including commit-msg), commits only
+   declared paths and preserves peer working bytes/stages. Do not hand-roll private indexes or commit-tree calls.
  - Two ways to work, no in-between (J290, Jake 2026-11-12, replaces J240's per-row landing). The lane's brief names
    the mode; a unit with no mode named is mode 1 if it is one row or one fix, else ask the coordinator.
    1. **Small or urgent unit** (one row, one fix, a queue-jumper): work and commit straight on `main` in the canonical
