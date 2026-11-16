@@ -169,6 +169,11 @@ export function liveIo(env=process.env){
     receipt:(/** @type {string} */line)=>{mkdirSync(dirname(receipts),{recursive:true});appendFileSync(receipts,`${new Date().toISOString().slice(11,16)} UTC main-watch ${line}\n`);},
     panes:()=>{try{return JSON.parse(run('herdr',['pane','list'])).result.panes;}catch{return [];}},
     send:(/** @type {string} */pane,/** @type {string} */text)=>{try{run('herdr',['pane','run',pane,text]);return true;}catch{return false;}},
+    // A lane that is a herdr agent by name (the Codex lanes) has no pane main-watch can find: prompt it by name.
+    prompt:(/** @type {string} */agent,/** @type {string} */text)=>{try{run('herdr',['agent','prompt',agent,text]);return true;}catch{return false;}},
+    // Mini M2 (meta MINI-DECISIONS): every engine main red also goes straight to the forward fixer(s), herdr agents by
+    // name, from WS_FORWARD_FIXER (comma-separated; set on the Mac mini only).
+    fixers:()=>(process.env.WS_FORWARD_FIXER??'').split(',').map(name=>name.trim()).filter(name=>/^[\w.-]+$/u.test(name)),
     dispatch:()=>{run('gh',['workflow','run','ci.yml','--ref','main','-R',repo]);},
   };
 }
@@ -218,14 +223,17 @@ export function sweep(io,hint={}){
           lines.push(`MAIN RED ${range} run ${run.id}: landers ${named}; failed: ${failed}`);
           for(const row of found)if(row.lander!==undefined)messages.push({lane:row.lander.lane,pane:row.lander.pane??(row.lander.slug===''?undefined:paneFor(panes,row.lander.slug)),
             text:`main-watch: MAIN RED on engine main ${range} (${url}); failed: ${failed}. You landed ${short(row.sha)}: fix forward now (J249).`});
+          for(const fixer of io.fixers())messages.push({lane:fixer,pane:undefined,
+            text:`main-watch: MAIN RED on engine main ${range} (${url}); landers ${named}; failed: ${failed}. You are the forward fixer (M2): fix forward now, or confirm a lander has it.`});
         }
       }
       state.judged.push(run.id);if(verdict.kind==='dispatch')state.dispatched.push(run.head_sha);writeState(io.state,state);
       if(verdict.kind==='dispatch')io.dispatch();
       for(const line of lines)io.receipt(line);
       for(const message of messages){
-        const sent=message.pane!==undefined&&io.send(message.pane,message.text);
-        io.receipt(`MAIN RED message to ${message.lane} ${sent?`sent to pane ${message.pane}`:'not delivered (no pane): the coordinator assigns the fix'}`);
+        const how=message.pane!==undefined&&io.send(message.pane,message.text)?`sent to pane ${message.pane}`
+          :io.prompt(message.lane,message.text)?`prompted herdr agent ${message.lane}`:'';
+        io.receipt(`MAIN RED message to ${message.lane} ${how===''?'not delivered (no pane, no herdr agent by that name): the coordinator assigns the fix':how}`);
       }
     }
     return verdicts;

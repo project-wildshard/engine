@@ -23,7 +23,7 @@ const replay = [
 const order = ['0f24422e', '7257ca53', '6363b3f3', '652afa6c', 'aaaa1111', 'bbbb2222'].map(sha);
 const contains = (ancestor: string, descendant: string): boolean => order.indexOf(ancestor) <= order.indexOf(descendant);
 
-interface World { runs: ReturnType<typeof run>[]; receipts: string[]; sent: [string, string][]; dispatched: number; log: string; tip: string; ambers?: Record<number, string> }
+interface World { runs: ReturnType<typeof run>[]; receipts: string[]; sent: [string, string][]; dispatched: number; log: string; tip: string; ambers?: Record<number, string>; agents?: string[]; prompted?: [string, string][]; fixers?: string[] }
 const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
   repo: 'project-wildshard/engine', state: join(scratch, `${name}.json`),
   runs: () => world.runs, failed: () => ['tests (3)'], annotations: id => world.ambers?.[id] ?? '', tip: () => world.tip,
@@ -31,6 +31,8 @@ const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
   contains, receipts: () => world.log, receipt: line => { world.receipts.push(line); },
   panes: () => [{ pane_id: 'w1:p2', label: 'engine plan/red-plan' }, { pane_id: 'w1:p3', cwd: '/x/engine/.worktrees/other' }],
   send: (pane, text) => { world.sent.push([pane, text]); return true; }, dispatch: () => { world.dispatched += 1; },
+  prompt: (agent, text) => { if (!(world.agents ?? []).includes(agent)) return false; (world.prompted ??= []).push([agent, text]); return true; },
+  fixers: () => world.fixers ?? [],
   quotaReset: () => Date.now(),
 });
 const world = (runs: ReturnType<typeof run>[], log = ''): World => ({ runs, receipts: [], sent: [], dispatched: 0, log, tip: runs.at(-1)?.head_sha ?? '' });
@@ -215,4 +217,17 @@ test('MF12: main-watches on one machine share one runs fetch for 45 s', () => {
   writeFileSync(cache, 'not json');
   sharedRuns(cache, fetch, 47_000);
   expect(fetches).toBe(4);
+});
+
+test('M2: a red also prompts the forward fixer by herdr agent name; a lander with no pane is prompted by its lane name', () => {
+  const w = world(replay), io = fake('fixer', w);
+  sweep(io);
+  w.agents = ['codex-tc48', 'codex-pins'];w.fixers = ['codex-tc48'];
+  w.runs = [...replay, run(42970000003, 'aaaa1111', 'failure', 50)];w.tip = sha('aaaa1111');
+  sweep(io, { sha: sha('aaaa1111'), lane: 'codex-pins' });
+  expect(w.sent).toEqual([]);
+  expect(w.prompted?.map(([agent]) => agent)).toEqual(['codex-pins', 'codex-tc48']);
+  expect(w.prompted?.[1]?.[1]).toContain('You are the forward fixer (M2)');
+  expect(w.receipts).toContain('MAIN RED message to codex-tc48 prompted herdr agent codex-tc48');
+  expect(w.receipts).toContain('MAIN RED message to codex-pins prompted herdr agent codex-pins');
 });

@@ -71,7 +71,8 @@ export function checkState(cwd) {
   }
 }
 
-/** Short SHAs of the commits this run made (commitFiles), so a push can tell its own from another lane's. */
+/** Subjects of the commits this run made (commitFiles), so a push can tell its own from another lane's. A sync replays
+ * them to new SHAs, so the subject is what survives. */
 const OWN = new Set();
 
 /** One `lane-receipts.log` line, `<HH:MM Cancún> <lane> <text>` (the Mac's clock is Cancún time). WS_MAIN_PUSH_RECEIPT=0
@@ -105,7 +106,7 @@ export function commitFiles(cwd, files, messages) {
     throw new StopError(`git commit refused: ${firstLines(`${commit.stdout}\n${commit.stderr}`, 12)}`);
   }
   const made = git(cwd, ['rev-parse', '--short=8', 'HEAD']);
-  OWN.add(made);
+  OWN.add(git(cwd, ['log', '-1', '--format=%s', 'HEAD']));
   return made;
 }
 
@@ -167,22 +168,24 @@ export function syncMain(cwd, remote = 'origin') {
 export function pushMain(cwd, remote = 'origin') {
   // What this push sends: every commit local main has over origin/main. In a shared checkout that can include another
   // lane's commit, made but not yet pushed; it rides along (M1) and the receipt names it.
-  const outgoing = run(cwd, ['log', '--format=%h %s', `refs/remotes/${remote}/main..HEAD`]).stdout.trim().split('\n').filter(Boolean);
-  // The pre-push's own output (the gate) goes to a log in the git dir: its RED line is the cause on a refusal.
+  const sent = git(cwd, ['rev-parse', 'HEAD']);
+  const outgoing = run(cwd, ['log', '--format=%h %s', `refs/remotes/${remote}/main..${sent}`]).stdout.trim().split('\n').filter(Boolean);
+  // The pre-push's whole output (the gate) goes to a log in the git dir: its RED lines are the cause on a refusal.
   const log = resolve(cwd, git(cwd, ['rev-parse', '--git-path', `main-push-${process.pid}.log`]));
   const fd = openSync(log, 'w');
   let pushed;
   try {
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-    pushed = spawnSync('git', ['push', remote, 'main'], { cwd, env, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', fd] });
+    pushed = spawnSync('git', ['push', remote, `${sent}:refs/heads/main`], { cwd, env, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', fd, fd] });
   } finally {
     closeSync(fd);
   }
-  const text = `${pushed.stdout ?? ''}\n${readFileSync(log, 'utf8')}`;
+  // The gate's lint and type errors go to stdout, its summary to stderr: both are in the log.
+  const text = readFileSync(log, 'utf8');
   if (pushed.status === 0) {
     rmSync(log, { force: true });
-    const head = git(cwd, ['rev-parse', '--short=10', 'HEAD']);
-    const carried = outgoing.filter((row) => ![...OWN].some((sha) => row.startsWith(sha.slice(0, 7))));
+    const head = sent.slice(0, 10);
+    const carried = outgoing.filter((row) => !OWN.has(row.slice(row.indexOf(' ') + 1)));
     const line = `pushed main ${head}: ${outgoing.length} commit(s)${carried.length > 0 ? `, ${carried.length} of them another lane's, carried along (M1): ${carried.join('; ')}` : ''}`;
     receipt(`main-push ${line}`);
     return line;
@@ -193,7 +196,7 @@ export function pushMain(cwd, remote = 'origin') {
   }
   // oxlint-disable-next-line no-control-regex -- strips terminal colour codes.
   const lines = text.split('\n').map((line) => line.replaceAll(/\u001B\[[0-9;]*m/gu, '').trim()).filter(Boolean);
-  const red = lines.filter((line) => /(?:^|\s)(?:RED|X)\s|blocked|refused|Error: /u.test(line)).slice(0, 8);
+  const red = lines.filter((line) => /(?:^|\s)(?:RED|X)\s|blocked|refused|Error: |error TS\d|: error /u.test(line)).slice(0, 8);
   throw new StopError(`git push refused by the pre-push: ${(red.length > 0 ? red : lines.slice(-8)).join(' | ')}. Whole output: ${log}`);
 }
 
@@ -317,7 +320,8 @@ export function takeLock(cwd, { tries = 8, wait = 5, sleep = sleepSeconds, log =
       continue;
     }
     if (attempt >= tries) throw new StopError(`another main-push (pid ${pid || '?'}) holds ${lock}; nothing moved. Run this again when it finishes`);
-    const seconds = wait * 2 ** (attempt - 1);
+    // Another lane's gate holds the lock for a minute or two: poll at most every 15 s, so the lock never sits idle.
+    const seconds = Math.min(wait * 2 ** (attempt - 1), 15);
     log(`try ${attempt} of ${tries}: another main-push (pid ${pid || '?'}) is running; trying again in ${seconds} s`);
     sleep(seconds);
   }
@@ -373,7 +377,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   let made = '';
   try {
     checkState(cwd);
-    release = takeLock(cwd, { tries: options.tries, wait: options.wait, log });
+    // Five lanes' gates can queue for the lock: wait up to about 30 min for it unless --tries says otherwise.
+    release = takeLock(cwd, { tries: process.argv.includes('--tries') ? options.tries : 120, wait: options.wait, log });
     const commit = () => {
       made = commitFiles(cwd, options.files, options.messages);
       log(`committed ${made}`);
