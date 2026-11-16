@@ -101,3 +101,9 @@ MUST/SHOULD finding. Eight core triples and both actual owner triples pass
 on committed source a9a773f0 before clean rebase. The operator guide now
 names every command and the real observation-based soak. No cold cook ran
 on the mini. Hosted execution remains the next proof.
+
+Normal push refused the new JavaScript runners without explicit types.
+Their command, receipt and audit inputs are now declared; full layer types
+pass. The inherited respawn type error was a stale local format install
+after rebase, resolved by offline frozen install of main's existing lock
+(0.5.10), with no source or lock edit.

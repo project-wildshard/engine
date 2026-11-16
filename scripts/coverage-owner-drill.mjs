@@ -14,18 +14,24 @@ assert.ok(out.startsWith(`${root}/tmp/`),'Output must stay in this checkout tmp/
 assert.equal(JSON.parse(readFileSync(join(api,'package.json'),'utf8')).name,'@wildshard/api-server');
 assert.equal(JSON.parse(readFileSync(join(shard,'package.json'),'utf8')).name,'@wildshard/shard-dunes');
 mkdirSync(out,{recursive:true});writeFileSync(join(out,'receipt.json'),JSON.stringify({complete:false,results:[]}));
-const work=mkdtempSync(join(out,'run-')),results=[];
+const work=mkdtempSync(join(out,'run-'));
+/** @type {unknown[]} */const results=[];
+/** @param {string} repo @param {string} name */
 function archive(repo,name){
   const tree=join(work,name);mkdirSync(tree);
   const sha=execFileSync('git',['rev-parse','HEAD'],{cwd:repo,encoding:'utf8'}).trim();
   execFileSync('tar',['-x','-C',tree],{input:execFileSync('git',['archive',sha],{cwd:repo,maxBuffer:256*1024*1024})});
   return {tree,sha};
 }
+/** @param {string[]} command @param {string} cwd */
 function run(command,cwd){
   const began=performance.now(),child=spawnSync(command[0],command.slice(1),{cwd,encoding:'utf8',timeout:10000,maxBuffer:2*1024*1024,env:{...process.env,TMPDIR:work}});
   assert.equal(child.signal,null,'A signal or timeout is not a detected fault');assert.equal(child.error,undefined,'A process error is not a detected fault');
   return {code:child.status,ms:Math.round(performance.now()-began),text:`${child.stdout??''}\n${child.stderr??''}`};
 }
+/** @param {string} id @param {string} file @param {(text:string)=>string} mutate
+ * @param {string[]} command @param {string} cwd @param {RegExp} reason
+ * @param {string} owner @param {string} sha */
 function triple(id,file,mutate,command,cwd,reason,owner,sha){
   const before=run(command,cwd);writeFileSync(join(out,`${id}-baseline.log`),before.text);
   assert.equal(before.code,0,`${id}: owning repository's positive control failed`);
