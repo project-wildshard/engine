@@ -4,6 +4,8 @@ import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { LookKey } from '@wildshard/engine/render/dataLook';
 import type { LookStrategy } from '@wildshard/engine/render/look';
 import { lampLights } from '@wildshard/engine/render/lookLight';
+import { familyMaterial } from '@wildshard/engine/render/families/registry';
+import { ToonLook } from '@wildshard/engine/render/families/toon';
 import type { LookLamp } from '@wildshard/format/look-light';
 import type { ShardWater } from '@wildshard/format/water';
 import { installClientWater } from '../shardfile/clientWater';
@@ -209,7 +211,7 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
       const need = <T>(map: Map<string, T>, key: string, what: string): T => { const value = map.get(key); if (value === undefined) throw new Error(`dev hook: part ${name} names ${what} ${key} it does not carry`); return value; };
       const materials = new Map<string, THREE.Material>();
       for (const row of part.materials) {
-        const material = makeMaterial(row, row.map === null ? null : need(maps, row.map, 'texture'), owned);
+        const material = makeMaterial(row, row.map === null ? null : need(maps, row.map, 'texture'), owned, partScope);
         materials.set(row.key, material); owned.push(material);
       }
       for (const draw of part.draws) {
@@ -389,7 +391,11 @@ function tileSignature(mesh: THREE.Mesh, lattice: TerrainTileData): number | nul
   return hash >>> 0;
 }
 
-function makeMaterial(row: DevMaterial, shared: THREE.DataTexture | null, owned: { dispose: () => void }[]): THREE.Material {
+/** sRGB of a linear channel, as the sdk writes a `pbr` row's colour (shard-format colours are sRGB) */
+const srgb = (rgb: Rgb): [number, number, number] => { const c = new THREE.Color().setRGB(...rgb).convertLinearToSRGB(); return [c.r, c.g, c.b]; };
+let devToon: ToonLook | null = null;
+
+function makeMaterial(row: DevMaterial, shared: THREE.DataTexture | null, owned: { dispose: () => void }[], scope: Scope): THREE.Material {
   let map: THREE.Texture | null = null;
   if (shared !== null) {
     // a clone shares the raster (one upload) and keeps its own repeat and offset, as an author's `clone()` does
@@ -401,8 +407,20 @@ function makeMaterial(row: DevMaterial, shared: THREE.DataTexture | null, owned:
   if (row.kind === 'sprite') return new THREE.SpriteMaterial(common);
   const side = row.side === 'double' ? THREE.DoubleSide : row.side === 'back' ? THREE.BackSide : THREE.FrontSide;
   if (row.kind === 'basic') return new THREE.MeshBasicMaterial({ ...common, side, vertexColors: row.vertexColours });
-  return new THREE.MeshStandardMaterial({ ...common, side, vertexColors: row.vertexColours, roughness: row.roughness, metalness: row.metalness,
-    emissive: new THREE.Color().setRGB(...row.emissive), emissiveIntensity: row.emissiveIntensity });
+  // SHARD-SOURCE AP16x: a lit surface compiles through the engine's `pbr` family, as `build` draws its `look.materials` row
+  // (sdk `scene/shardfile.ts` `materialEntry`), so watch and build share one program: its fillers, its env strength and
+  // the look's patches (rim, pools) that key on the family. The row's map, alpha and blend are the scene's, set after.
+  const glow = row.emissiveIntensity > 0 && (row.emissive[0] > 0 || row.emissive[1] > 0 || row.emissive[2] > 0);
+  const entry = { family: 'pbr', colour: srgb(row.colour), roughness: row.roughness, metalness: row.metalness, vertexColours: row.vertexColours,
+    ...(row.side === 'double' ? { doubleSided: true } : {}), ...(row.alphaTest > 0 ? { alphaCutoff: row.alphaTest } : {}),
+    ...(glow ? { emissive: srgb(row.emissive), emissiveIntensity: row.emissiveIntensity } : {}) };
+  devToon ??= new ToonLook();
+  const material = familyMaterial(entry, { toon: devToon, scope, textures: (ref) => { throw new Error(`dev hook: a watched pbr row names texture ${ref}`); } }) as THREE.MeshStandardMaterial;
+  material.name = row.name;
+  if (map !== null) { material.map = map; material.needsUpdate = true; }
+  material.transparent = common.transparent; material.opacity = common.opacity; material.depthWrite = common.depthWrite; material.fog = common.fog;
+  material.blending = common.blending; material.side = side;
+  return material;
 }
 
 function makeGeometry(source: DevGeometry): THREE.BufferGeometry {
