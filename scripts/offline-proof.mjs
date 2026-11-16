@@ -219,7 +219,10 @@ const readScreen = () => {
   const card = load instanceof HTMLElement && !load.classList.contains('hide') && !load.hidden && getComputedStyle(load).display !== 'none';
   const on = load?.querySelector('.ws-load-phase[data-state="on"]');
   const main = document.querySelector('.ws-main');
-  const title = main instanceof HTMLElement && main.offsetParent !== null;
+  // ZE14: the retained preparation title (PAGE-SIZE's live menu) stays laid out under a see-through stack (opacity 0) from the
+  // card's end to the world's ready, so a title counts only when it and every parent can be seen
+  const seen = (/** @type {Element | null} */ node) => { for (let at = node; at instanceof HTMLElement; at = at.parentElement) { const style = getComputedStyle(at); if (Number(style.opacity) < 0.05 || style.visibility === 'hidden') return false; } return true; };
+  const title = main instanceof HTMLElement && main.offsetParent !== null && seen(main);
   const fail = [...document.querySelectorAll('[class^="ws-fail"],[class*=" ws-fail"]')].find(node => node instanceof HTMLElement && node.offsetParent !== null);
   const world = /** @type {{ __wildshard?: { world?: { player?: unknown } } }} */ (/** @type {unknown} */ (window)).__wildshard?.world;
   /** @type {string | null | undefined} */ let grid;

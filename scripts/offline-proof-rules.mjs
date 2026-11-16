@@ -27,6 +27,8 @@ export const GRID_LAYOUT = /\/assets\/spawn\/[^/]+-grid-[^/]+\.json$|\/assets\/g
 /** Screen text that is a raw failure, never an FM screen. */
 export const RAW_STRINGS = Object.freeze(['Failed to fetch', 'Level load and cleanup failed']);
 /** The card phases that are the critical path: START, DOWNLOAD, LOAD, and a card with no phase lit yet. */
+/** ZE14: how long after a title sample a player sample makes it the reveal's hand-off (PAGE-SIZE's live menu fades out) */
+export const TITLE_FADE_MS = 1000;
 export const CRITICAL_PHASES = Object.freeze(['start', 'download', 'load', 'none']);
 
 /** One request the proof saw: when, which card phase and step, and what served it.
@@ -91,7 +93,10 @@ export function judge(run) {
   }
   // 2. A drop to the title after the card showed.
   const firstCard = samples.findIndex(sample => sample.card);
-  const dropped = firstCard === -1 ? undefined : samples.slice(firstCard).find(sample => sample.title && !sample.card);
+  // ZE14: a title that a player follows within a second is the preparation title's fade at the world's reveal, not a drop
+  const after = samples.slice(firstCard);
+  const dropped = firstCard === -1 ? undefined : after.find(sample => sample.title && !sample.card
+    && !after.some(next => next.player && next.t > sample.t && next.t - sample.t <= TITLE_FADE_MS));
   if (dropped !== undefined || run.outcome === 'title') out.push({ shard, rule: 'title-drop', detail: `at ${String(dropped?.t ?? '?')} ms` });
   // 3. Raw failure strings on screen.
   for (const text of RAW_STRINGS) {

@@ -50,6 +50,12 @@ describe('offline proof rules (OF1)', () => {
     const rules = judge({ ...base, rows: greenLog, samples, outcome: 'title' }).map(failure => failure.rule);
     expect(rules).toEqual(['title-drop', 'raw-string', 'raw-string']);
   });
+  it('passes a title that a player follows within a second (the live menu fading out at the reveal)', () => {
+    const samples = [screen({ t: 0 }), screen({ t: 8049, phase: 'title', card: false, title: true }), screen({ t: 8300, phase: 'page', card: false, player: true })];
+    expect(judge({ ...base, rows: greenLog, samples, outcome: 'play' })).toEqual([]);
+    const late = [screen({ t: 0 }), screen({ t: 8049, phase: 'title', card: false, title: true }), screen({ t: 9300, phase: 'page', card: false, player: true })];
+    expect(judge({ ...base, rows: greenLog, samples: late, outcome: 'play' }).map(failure => failure.rule)).toEqual(['title-drop']);
+  });
   it('fails a world build that reads the solo server or a one-shard manifest the warm visit never read', () => {
     const client = '/assets/spawn/nalati-grasslands-client-phone-0b40f90e23cec8d9.json';
     const rows = [...greenLog, row('/b/abc/standalone/serverWorker-spaczDlR.js', { step: 'gameplay' }), row('/assets/spawn/server/90b50ecb27fbb1fb.pack.br'), row(client, { phase: 'start' })];
