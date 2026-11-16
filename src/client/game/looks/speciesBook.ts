@@ -16,9 +16,10 @@ import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
 import type { EngineRows } from '@wildshard/engine/level/context';
 import type { SpeciesRow } from '@wildshard/engine/ai/species';
 import { painterlyMaterial } from '@wildshard/engine/world/painterly';
-import { hasSpecies, registerSpecies, speciesDef, type BoneDef, type SpeciesDef, type VariantDef } from '@wildshard/engine/entities/species/registry';
+import { speciesDef, type BoneDef, type SpeciesDef, type VariantDef } from '@wildshard/engine/entities/species/registry';
 import { limbAnimation } from '../animation/limbView';
 import { pageAir } from '../population/pageAir';
+import { rowSpecies } from '../population/rowSpecies';
 import type { Scope } from '@wildshard/engine/app/scope';
 
 /** Client-only hull projection on shared fauna or declared skeletons. The data
@@ -27,6 +28,7 @@ export class HullLookBook {
   private readonly book;
   private readonly hulls;
   private readonly bodies;
+  private readonly derivedDefinitions = new Map<string, SpeciesDef>();
   /** `files` reads the book's product files (the packed looks' attachments); absent, a look with attachments refuses */
   constructor(input: unknown, private readonly files: { readonly file: (name: string) => Promise<Uint8Array> } | null = null) {
     this.book = v.parse(HullLookBookSchema, input);
@@ -45,23 +47,33 @@ export class HullLookBook {
     const { body, id: _id, ...definition } = source;
     return { ...definition, build: () => structuredClone(body) };
   }
-  /** G571: register each declared derived species once, on its own custom limb rig; its think is external (its owning
+  /** G571: prepare each derived definition inside this book, on its own custom limb rig; its think is external (its owning
    *  fight drives it) and its damage the server's. */
   registerDerived(): void {
     for (const [kind, row] of Object.entries(this.book.derived)) {
-      if (hasSpecies(kind)) continue;
+      if (this.derivedDefinitions.has(kind)) continue;
       const rig = row.rig, coat: VariantDef = row.coat;
-      registerSpecies({ ...this.definition(row.from), ...row.fields, kind, label: row.label, variants: [coat],
+      this.derivedDefinitions.set(kind, { ...this.definition(row.from), ...row.fields, kind, label: row.label, variants: [coat],
         think: () => undefined, damageMul: () => 1,
         rigContract: { skeleton: rig.skeleton, clips: [], sockets: rig.sockets }, rig: 'custom', animate: limbAnimation(rig.spec, rig.blend, rig.clips),
         build: () => ({ bones: structuredClone(rig.bones), furParts: [], hardParts: [], eyeParts: [], dims: structuredClone(rig.dims) }) });
     }
   }
+  /** Publish complete metadata and looks together; driven rows fill only identities the page did not own. */
+  install(target: Pick<EngineRows, 'species' | 'speciesLook'>, page: readonly SpeciesRow[], driven: readonly SpeciesRow[] = []): void {
+    const rows = [...page], ids = new Set(page.map(row => row.id));
+    for (const row of rowSpecies(driven)) {
+      if (ids.has(row.id) || !this.book.rows.some(look => look.species === row.id && look.kind === row.kind)) continue;
+      rows.push(row); ids.add(row.id);
+    }
+    this.registerDerived();
+    target.species(rows); target.speciesLook(this.looks);
+  }
   /** Resolve registered rigs only when requested, after their native owner installs them. A registered base lends its look
    *  fields only: its think, act and damage stay the species row's (G602: never a look's). */
   look(kind: string): SpeciesLook {
     const row = this.book.rows.find(entry => entry.kind === kind); if (row === undefined) throw new Error('Missing hull look');
-    const base = row.base === 'definition' ? this.definition(kind) : speciesDef(kind);
+    const base = row.base === 'definition' ? this.definition(kind) : this.derivedDefinitions.get(kind) ?? speciesDef(kind);
     // every base is a species definition now (its variants a list): each variant's coat, spawn-only ones too
     const variants = Object.fromEntries([...base.variants, ...(base.spawnOnly ?? [])].map((variant: VariantDef) => [variant.id, {
       ...(variant.tint === undefined ? {} : { tint: variant.tint }), ...(variant.fur === undefined ? {} : { fur: variant.fur }),

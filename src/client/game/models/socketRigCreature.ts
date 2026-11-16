@@ -38,8 +38,7 @@ export async function prepareHullBookKit(ctx: ShardContext, cards: readonly Sock
   const live = (): void => { if (ctx.scope.disposed || ctx.scope.disposing) throw new Error('Hull book kit owner left'); };
   live();
   const book = productHullBook(ctx.product), programs = ctx.product.section('actors/species-programs');
-  book.registerDerived(); ctx.rows.species(programs.page);
-  ctx.rows.speciesLook(book.looks);
+  book.install(ctx.rows, programs.page, programs.program?.species);
   ctx.rows.spawnTable(declaredSpawnTables(programs.spawns));
   const held = await HeldEquipment.prepare(ctx.product); live();
   for (const card of cards) { await card.card.preload(); live(); }
