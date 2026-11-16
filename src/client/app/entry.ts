@@ -373,7 +373,22 @@ export const entered: Promise<unknown> = enterPage();
 guardBoot(entered);
 
 /** Composition root: select authored content and inject reusable kit recipes. */
-export async function start(): Promise<void> {
+/** ZE10d: the page's latest start, its post-control work included: a same-page entry unloads only once it has settled, so two
+ *  entries never overlap (a start's failure path would otherwise send the page to the title in the middle of the next) */
+let latestStart: Promise<void> = Promise.resolve();
+export function start(): Promise<void> {
+  // ZE10d: the same-page entry is in place from control on. A gate can reach 0 before this start's post-control work returns, and
+  // without it the gate took the fresh-page form's read-ahead and read the target under the old world (desktop, 52 to 124 reads)
+  entryScope.listen(document, 'ws:control-ready', () => {
+    void (async () => {
+      try { await installInPageEntry(); } catch (error) { console.warn('[grid] the same-page entry was not installed at control', error); }
+    })();
+  }, { once: true });
+  const run = startPage();
+  latestStart = run.catch(() => undefined);
+  return run;
+}
+async function startPage(): Promise<void> {
   // DL21: a start whose card stops moving (step, setup share, bytes) names its step after a bounded wait instead of
   // leaving a dead card; the fatal modal's RELOAD HERE is the retry (src/client/engine/boot/stuckStep.ts)
   const card = (): HTMLElement | null => document.querySelector<HTMLElement>('.ws-load');
@@ -428,9 +443,13 @@ async function showPreparationTitle(owner: Scope): Promise<void> {
  */
 async function installInPageEntry(): Promise<void> {
   const [{ app }, { setInPageEntry }] = await Promise.all([import('@wildshard/engine/app/runtime'), import('@wildshard/engine/game/travel/travel')]);
-  const again = async (slug: string, art: string | undefined, url: URL | undefined): Promise<void> => {
+  const again = async (slug: string, art: string | undefined, url: URL | undefined, screen?: () => void): Promise<void> => {
+    await latestStart;
     try {
       await app.unloadLevel();
+      // ZE10d: the entry's loading screen goes at the target's control (the old level is gone, so the next control is the target's),
+      // not when the next start returns: its post-control work kept the screen up at Pine's control and refused the next gate's 0
+      if (screen !== undefined) entryScope.listen(document, 'ws:control-ready', screen, { once: true });
       // the old world's idle caches (its kit, its textures) go as a fresh page would drop them, through the renderer that
       // uploaded them (a disposed renderer deletes nothing on the GPU): the next home is charged alone
       app.assets.evictIdleCaches();
@@ -460,7 +479,7 @@ async function installInPageEntry(): Promise<void> {
   };
   // a world build (staging, play) keeps the fresh page until the online seat's same-page handover has its own proof (ZE16's staging
   // walk): the world's socket and goto are the old session's; preview and solo enter in the page
-  if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ === undefined) setInPageEntry((request, url) => again(request.to, request.shown?.art, url));
+  if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ === undefined) setInPageEntry((request, url) => again(request.to, request.shown?.art, url, request.inPage));
   if (harnessPins() === undefined) return;
   Reflect.set(window, '__wildshardReenter', async (instance: string, slug: string): Promise<void> => {
     const { intendGridHome } = await import('@wildshard/engine/game/grid/pageEntry');

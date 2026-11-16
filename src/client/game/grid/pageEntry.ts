@@ -166,10 +166,6 @@ export function enterZone(instance: string, arrive?: { readonly x: number; reado
     travel({ to: target.slug, mode: 'enter', shown, ...(arrive === undefined ? {} : { arrive: { x: arrive.x, z: arrive.z, yaw: arrive.yaw } }),
       inPage: () => { attempt?.dispose(); } });
   }, null);
-  // ZE10d: a same-page entry's screen goes at the next session's control, not when its start returns (post-control work kept it up
-  // at Pine's control, so the next gate's 0 was refused); the old session reached control before this gate, so the event is the target's
-  const shell = navigating;
-  shell.listen(document, 'ws:control-ready', () => { shell.dispose(); }, { once: true });
 }
 
 /** ZE10a3: whether a zone entry's loading screen is still up (a second gate's 0 waits for it), for the harness. */
