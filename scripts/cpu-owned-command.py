@@ -138,6 +138,24 @@ def group_stopped(group):
         return False
 
 
+def group_members(group, previous):
+    authenticated = [record for record in previous
+                     if valid_record(record) and record['group'] == group and same_process(record)]
+    if not authenticated:
+        return []
+    inventory, _present = identity_backend().processes()
+    members = {record['pid']: record for record in authenticated}
+    for process in inventory.values():
+        if process.uid != os.getuid() or process.zombie:
+            continue
+        record = process_record(process.pid)
+        if record is not None and record['group'] == group:
+            members[record['pid']] = record
+            if len(members) > 512:
+                raise RuntimeError('Owned CPU command group exceeds its inventory cap')
+    return list(members.values()) if any(same_process(record) for record in authenticated) else []
+
+
 def reclaim(owned, provider_pid):
     """Advance shutdown without waiting. True only after the group is absent.
 
@@ -160,28 +178,15 @@ def reclaim(owned, provider_pid):
         state['nextCheck'] = now + .1
         if group_stopped(group):
             return True
-        authenticated = [record for record in state['members']
-                         if valid_record(record) and record['group'] == group and same_process(record)]
-        if not authenticated:
-            return False
         # Inventory is from the same census backend. No subprocess waits under
         # the scheduler lock; incomplete inventory never establishes absence.
         try:
-            inventory, _present = identity_backend().processes()
+            members = group_members(group, state['members'])
         except Exception:
             return False
-        members = {record['pid']: record for record in authenticated}
-        for process in inventory.values():
-            if process.uid != os.getuid() or process.zombie:
-                continue
-            record = process_record(process.pid)
-            if record is not None and record['group'] == group:
-                members[record['pid']] = record
-                if len(members) > 512:
-                    return False
-        state['members'] = list(members.values())
+        state['members'] = members
         # Recheck after inventory: a stored PID may have exited or been reused.
-        if not any(same_process(record) for record in authenticated):
+        if not any(same_process(record) for record in members):
             return False
         os.killpg(group, signal.SIGKILL if now - state['started'] >= STOP_GRACE_SECONDS else signal.SIGTERM)
     except (OSError, RuntimeError, ValueError, KeyError, TypeError):
@@ -197,7 +202,17 @@ def terminate_command(child):
         # After reap the PID can be reused. Ledger reclaim authenticates any
         # remaining descendants; this Popen handle no longer authorizes killpg.
         return
+    record = process_record(child.pid)
+    if record is None:
+        child.wait()
+        return
+    if record['parent'] != os.getpid() or record['group'] != child.pid:
+        raise RuntimeError('Owned CPU child group cannot be authenticated for termination')
+    members = group_members(child.pid, [record])
     try:
+        if not same_process(record):
+            child.wait()
+            return
         os.killpg(child.pid, signal.SIGTERM)
     except ProcessLookupError:
         child.wait()
@@ -207,10 +222,11 @@ def terminate_command(child):
     except subprocess.TimeoutExpired:
         pass
     try:
-        os.killpg(child.pid, signal.SIGKILL)
+        if any(same_process(member) for member in members):
+            os.killpg(child.pid, signal.SIGKILL)
     except ProcessLookupError:
         pass
-    child.wait()
+    child.wait(timeout=STOP_GRACE_SECONDS)
 
 
 def start_command(command, env, pass_fds, publish):

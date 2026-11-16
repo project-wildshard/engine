@@ -141,13 +141,17 @@ def _prune(entry, pending, active):
         for pid, (ppid, _cpu) in (table or {}).items():
             children.setdefault(ppid, []).append(pid)
     reclaimed = []
+    active_tokens = {row['token'] for row in active}
     for rows in (pending, active):
         kept = []
         for row in rows:
             why = None if row['token'] == entry['token'] else _stale(row, table, children, now)
+            if row.get('borrowedFrom') is not None and row['borrowedFrom'] not in active_tokens:
+                why = 'owned command ancestor grant is gone'
             if 'ownedCommand' in row and (why is not None or isinstance(row['ownedCommand'], dict) and row['ownedCommand'].get('reclaim') is not None):
                 if owned_command.reclaim(row['ownedCommand'], row['pid']):
                     reclaimed.append((row, why or 'owned command drained'))
+                    active_tokens.discard(row['token'])
                 else:
                     kept.append(row)
                 continue
@@ -155,8 +159,24 @@ def _prune(entry, pending, active):
                 kept.append(row)
             else:
                 reclaimed.append((row, why))
+                active_tokens.discard(row['token'])
         rows[:] = kept
     return reclaimed
+
+
+def reserved_slots(active):
+    """A live ancestor covers its borrowed commands; orphaned commands charge themselves."""
+    tokens = {row['token']: row for row in active}
+    roots = {}
+    for row in active:
+        cursor, seen = row, set()
+        while cursor.get('borrowedFrom') in tokens:
+            if cursor['token'] in seen:
+                raise RuntimeError('CPU admission contains a cyclic borrowed grant')
+            seen.add(cursor['token'])
+            cursor = tokens[cursor['borrowedFrom']]
+        roots[cursor['token']] = cursor['slots']
+    return sum(roots.values())
 
 
 def acquire_cpu(root, entry, capacity, deadline):
@@ -176,7 +196,7 @@ def acquire_cpu(root, entry, capacity, deadline):
             state['cpuNext'] += 1
             pending.append(entry)
         head = min(pending, key=lambda row: row['ticket'])
-        if head['token'] != entry['token'] or sum(row['slots'] for row in active) + entry['slots'] > capacity:
+        if head['token'] != entry['token'] or reserved_slots(active) + entry['slots'] > capacity:
             return False
         pending[:] = [row for row in pending if row['token'] != entry['token']]
         active.append(entry)
@@ -222,7 +242,38 @@ def publish_cpu_child(root, token, child):
                 or not owned_command.valid_record(child) or child['parent'] != os.getpid()
                 or child['group'] != child['pid'] or owned_command.capture(child['pid']) != child):
             raise RuntimeError('Owned CPU command publication is unavailable')
+        if row.get('borrowedFrom') is not None and not any(parent['token'] == row['borrowedFrom'] for parent in state['cpuActive']):
+            raise RuntimeError('Owned CPU ancestor grant is unavailable before publication')
         owned['child'] = child
+
+
+def register_borrowed_cpu(root, entry, env=None):
+    """Track a command lifetime within its verified live ancestor budget.
+
+    Validate ancestry outside the lock. Inside it, join only the same still-live
+    ledger grant. If the ancestor is released later, this row immediately counts
+    its reservation until command reclaim completes; it never enters the FIFO.
+    """
+    env = os.environ if env is None else env
+    budget = ancestor_cpu_budget(env)
+    if budget is None or cpu_root(env) != root:
+        raise RuntimeError(PARENT_REFUSAL)
+    context = json.loads(env[PARENT_CONTEXT])
+    if (not owned_command.valid_ownership(entry.get('ownedCommand'), os.getpid())
+            or entry['pid'] != os.getpid() or entry['slots'] != budget['slots']):
+        raise RuntimeError(PARENT_REFUSAL)
+    with lane.scheduler(root) as state:
+        active = state.setdefault('cpuActive', [])
+        parents = [row for row in active if row['token'] == context['lease']]
+        if (len(parents) != 1 or parents[0].get('holder') != budget['parentPid']
+                or parents[0].get('slots') != budget['slots']
+                or state.get('cpuCapacity') != budget['capacity']
+                or not lane.alive(parents[0]['pid'])
+                or any(row['token'] == entry['token'] for row in active)):
+            raise RuntimeError(PARENT_REFUSAL)
+        entry['borrowedFrom'] = context['lease']
+        active.append(entry)
+    return budget
 
 
 
