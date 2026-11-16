@@ -25,3 +25,8 @@ so Actions skipped cook-to-play entirely. Those cases belong to TC29/33
 and are untouched. The report now lets the stored-product proof run once
 input setup succeeds, even when another report step fails; cancellation
 and failed setup still stop it. No failure is hidden or made green.
+
+J206's workflow review also requires a successful browser-install outcome
+before cook-to-play. That step now has its own id and the proof checks
+both input and browser setup outcomes, plus cancellation. Actionlint is
+clean; the earlier report failure remains unchanged and visible.

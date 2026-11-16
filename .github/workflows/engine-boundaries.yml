@@ -43,10 +43,11 @@ jobs:
           COOK_FUZZ_SEEDS: ${{ github.event_name == 'schedule' && github.run_id || '20261108' }}
       # TC27: an unrelated hostile-peer/restore report must not skip the
       # stored-product proof. A failed setup or cancellation still stops it.
-      - if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+      - id: browser
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
         run: bash scripts/ci-playwright-install.sh chromium
       - name: Cook, attach, and play the same bytes
-        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' && steps.browser.outcome == 'success' }}
         run: node scripts/cook-to-play.mjs --out=tmp/engine-boundaries
       - name: Check the full Nalati server herd tick budget
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
