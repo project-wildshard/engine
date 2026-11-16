@@ -48,9 +48,18 @@ export function requireBuild(build: string, expected: Plan): void {
 
 export function verdict(expected: Plan, reports: Receipt[], previous?: Verdict, jobs: Record<string, string | undefined> = {}): Verdict {
   const failures: Failure[] = [], rows: Row[] = [];
+  // An unidentifiable artifact must hold qualification even if other artifacts
+  // provide every expected witness. Filtering it out would silently bless trash.
+  for (const [index, report] of reports.entries()) {
+    if (report === null || typeof report !== 'object' || !['heads', 'tests'].includes(report.kind) ||
+      report.version !== expected.version || report.sha !== expected.sha || report.pins !== expected.pins || report.testList !== expected.testList) {
+      failures.push({key: `receipt/identity/${index}`, error: 'Nightly receipt requires its ring kind, exact source SHA, version, pins and test list'});
+    }
+  }
+  const usableReports = reports.filter(report => report !== null && typeof report === 'object');
   for (const [job, result] of Object.entries(jobs)) if (result !== undefined && result !== 'success') failures.push({key: `runner/${job}`, error: `Actions job ${result}; a red nightly holds the tag even with complete phase receipts`});
   for (const browser of browsers) for (const head of expected.heads) {
-    const matches = reports.filter((report): report is HeadsReport => report.version === expected.version && report.kind === 'heads' && report.browser === browser &&
+    const matches = usableReports.filter((report): report is HeadsReport => report.version === expected.version && report.kind === 'heads' && report.browser === browser &&
       report.sha === expected.sha && report.pins === expected.pins && report.testList === expected.testList)
       .flatMap(report => report.results ?? []).filter(row => row.slug === head.slug && row.hash === head.hash);
     for (const phase of phases) {
@@ -62,7 +71,7 @@ export function verdict(expected: Plan, reports: Receipt[], previous?: Verdict, 
       if (!ok) failures.push({key, error});
     }
   }
-  const suites = reports.filter((row): row is TestsReport => row.version === expected.version && row.kind === 'tests' && row.sha === expected.sha && row.pins === expected.pins && row.testList === expected.testList);
+  const suites = usableReports.filter((row): row is TestsReport => row.version === expected.version && row.kind === 'tests' && row.sha === expected.sha && row.pins === expected.pins && row.testList === expected.testList);
   if (suites.length !== testGroups || suites.some(suite => suite.groups !== testGroups || !Number.isInteger(suite.group) || suite.group < 0 || suite.group >= testGroups)) failures.push({key: 'shared/tests', error: `Expected exactly ${testGroups} suite partitions, got ${suites.length}`});
   const tests: Verdict['tests'] = [];
   for (let group = 0; group < testGroups; group++) {

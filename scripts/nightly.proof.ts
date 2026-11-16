@@ -116,3 +116,16 @@ await test('a later red night cannot be cleared by an older green artifact on th
   assert.throws(() => requireLatest(green, expected, {...latest, head_sha: 'another commit'}), /J167/u);
   assert.throws(() => requireLatest({...green, run: null}, expected, latest), /J167/u);
 }));
+await test('an extra receipt without a ring kind or source SHA cannot hide behind a complete green table', () => {
+  for (const field of ['kind', 'sha'] as const) fixture(({heads, execute, expected}) => {
+    const extra = {...heads[0], group: 4};
+    Reflect.deleteProperty(extra, field);
+    // A broken artifact may accompany all the valid artifacts. It must not be silently discarded.
+    heads.push(extra);
+    const result = execute();
+    assert.equal(result.status, 1);
+    assert.equal(result.report.tag, 'HOLD');
+    assert.match(result.summary, /receipt\/identity/u);
+    assert.throws(() => requireGreen(result.report, expected), /J167/u);
+  });
+});
