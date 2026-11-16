@@ -11,7 +11,7 @@ import { EncounterPatrolSchema } from '@wildshard/format/encounterRows';
 import { bindFlatTerrain } from '@wildshard/engine/test/terrain';
 import { PatrolLaw } from '../src/shared/game/boss/patrolLaw';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { NALATI_NIGHT as nightInput } from './fixtures/nalati-night';
+import {frozenNight as nightInput} from './fixtures/frozen/runtimeBehavior';
 import { withWeatherWitness } from './fixtures/weatherInlineWitness';
 
 const scopes: Scope[] = [];

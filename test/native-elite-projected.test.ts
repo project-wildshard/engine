@@ -1,5 +1,5 @@
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
-import {admissionNative,admission} from './fixtures/nalati-return-modules';
+import {frozenAdmissionNative as admissionNative,frozenAdmissionProgram as admission} from './fixtures/frozen/nalati';
 import { expect, test, vi } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import type { SimHost } from '../src/server/engine/sim';

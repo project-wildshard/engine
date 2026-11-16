@@ -1,6 +1,6 @@
 
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { parse } from 'valibot';
+import { parse,object,unknown } from 'valibot';
 import { TimedEncountersSchema } from '@wildshard/format/encounterRows';
 import { CueDirector } from '../src/client/game/audio/cueDirector';
 import { expect, test } from 'vitest';
@@ -14,9 +14,10 @@ import { TimedEncounters } from '../src/client/game/boss/timedEncounters';
 import { setTerrainHeight, setTerrainPlacement } from '../src/shared/engine/world/terrainHeight';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import { lendLooks } from '../src/client/game/shardfile/lentLooks';
-import { NALATI_NIGHT as nightInput } from './fixtures/nalati-night';
+import {frozenNight as nightInput} from './fixtures/frozen/runtimeBehavior';
 import {withWeatherWitness} from './fixtures/weatherInlineWitness';
-import strikes from './fixtures/nalati-strikeProfiles-original.json' with { type: 'json' };
+import {frozenNalatiJson} from './fixtures/frozen/nalati';
+const strikes=parse(object({arrow:unknown()}),frozenNalatiJson('nalati-strikeProfiles-original.json'));
 
 // Match the emitted combat wire; CueDirector borrows the separate presentation cues.
 const {cues, ...night}=withWeatherWitness(nightInput);

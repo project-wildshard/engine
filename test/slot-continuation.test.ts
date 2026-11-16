@@ -4,7 +4,7 @@ import {SlotViewSchema} from '@wildshard/format/encounterRows';
 import {Rng} from '../src/shared/engine/core/rng';
 import {ReturnProgram} from '../src/shared/game/population/returnProgram';
 import {SlotEncounterLaw,type SlotActor} from '../src/shared/game/boss/slotLaw';
-import {NALATI_NIGHT as nightInput} from './fixtures/nalati-night';
+import {frozenNight as nightInput} from './fixtures/frozen/runtimeBehavior';
 import {withWeatherWitness} from './fixtures/weatherInlineWitness';
 
 const night=withWeatherWitness(nightInput);

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
-import { lendNalatiHeld } from './fixtures/nalati-return-modules';
+import {lendFrozenPasture as lendNalatiHeld} from './fixtures/frozen/runtimePrograms';
 import { StealthDetection } from '../src/shared/game/stealth/stealthLaw';
-import { originalHeldMetadata } from './fixtures/nalati-held-original';
+import {frozenHeldMetadata as originalHeldMetadata} from './fixtures/frozen/runtimeBehavior';
 import {onFault,type Fault} from '../src/shared/engine/core/faults';
 
 const { stealth: rows } = originalHeldMetadata();

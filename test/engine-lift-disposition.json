@@ -10357,5 +10357,177 @@
     "sourceRevision": "3a1b269a1b34622f871ec67b81ad4ad8092f6646",
     "sourceBlob": "e2ec624a44d1716e7518d1ee31a4f18ff3978d2d",
     "retirementProof": "No cases retired; the donor mesh is not claimed as a byte-equivalent Balbal."
+  },
+  {
+    "repo": "engine",
+    "file": "test/ci12-ghost-owners.test.ts",
+    "outcome": "restored",
+    "target": "test/ci12-ghost-owners.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): The renderer-free patrol law and the elite readiness each continue from a snapshot/restore (with the checkpointed RNG stream) exactly as the uninterrupted run. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "a patrol continues from its checkpoint exactly as the patrol it was taken from",
+      "the elite readiness continues from its checkpoint exactly"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "9078ed59da77c7a128f7e2c637e24fa792b99c49",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/herd-elite-projection.test.ts",
+    "outcome": "restored",
+    "target": "test/herd-elite-projection.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): An orchard herd elite projection keeps the 10 Hz cadence, native commands and historical continuation across snapshot/restore, and refuses accessor rows before invoking them. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "orchard herd encounter rows preserve cadence, native commands and the historical continuation",
+      "native projection refuses accessor rows before invoking their values"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "e89774c7fd8b6aed61b4d2bf97b2119f5d224bdb",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/native-elite-projected.test.ts",
+    "outcome": "restored",
+    "target": "test/native-elite-projected.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): A projected native elite binding matches the frozen original keeper, wire, RNG and effect order, and pins the original programme, group, scope and late bond owner. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "projected native binding matches the frozen original keeper, wire, RNG and effect order",
+      "projected binding pins original programme, group, scope and late bond owner"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "342471a87e667921f8840e65a3155f52b8c75de3",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/native-group-rows.test.ts",
+    "outcome": "restored",
+    "target": "test/native-group-rows.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): Orchard group rows bind native senses, prey, the adopted herd and deferred pack identities. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "orchard rows bind native senses, prey, adopted herd and deferred pack identities"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "f4fb1441872ac8d0ee590ce5e06448678ce90154",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/patrol-law.test.ts",
+    "outcome": "restored",
+    "target": "test/patrol-law.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): The bare patrol law run as a Node simulation matches the drawn patrol view step for step (lines, laws, steering memory, kills, dawn, retirement) over twin bodies and twin RNG streams. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "the bare patrol law runs the drawn patrol exactly: lines, laws, steering, kills, dawn, retire"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "b427cbbe76441373c92e4095846daf5449db0839",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/phased-arena-continuation.test.ts",
+    "outcome": "restored",
+    "target": "test/phased-arena-continuation.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): A fixed arena boss restores every clock, body and add at each phase before an exact suffix, validates the whole continuation before adopting bodies or mutating state, and an unopened arena restores quietly without inventing a body. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "fixed arena phase %i restores every clock, body and add before an exact suffix",
+      "fixed arena restore validates the whole continuation before adopting bodies or mutating state",
+      "an unopened fixed arena restores quietly without manufacturing a body"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "474a9abf2e8e141a9632ea4612dc637111f11ad0",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/polearm-decision.test.ts",
+    "outcome": "restored",
+    "target": "test/polearm-decision.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): The renderer-free polearm decision kernel decides exactly as the inline weapon did, snapshot by snapshot (thrust, lance, javelin, pickups). Stowing ends a wind-up, checkpoints keep pending input, cadence and target history, and a retired target restores as its id. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "the decision kernel decides as the inline weapon did, snapshot by snapshot",
+      "stowing ends a wind-up and a thrust out of hand, as the weapon did",
+      "a polearm checkpoint keeps pending input, cadences and actual target history",
+      "a retired target restores as its id alone, in place: strict by default, exact with the retired predicate"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "c5996b6ce6aa5447347b96e448938ff23388aa40",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/slot-continuation.test.ts",
+    "outcome": "restored",
+    "target": "test/slot-continuation.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): Slot law continuation keeps partial clocks and the exact roster, cue and RNG suffix, and restoration rejects foreign recipes, clocks and owners without effects or partial publication. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "slot %s continuation retains partial clocks and exact roster/cue/RNG suffix",
+      "slot restoration rejects foreign recipes, clocks and owners without effects or partial publication"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "2b84af9875e2e8a3b05f970f1ac446b470f64990",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/stealth-crouch-kernel.test.ts",
+    "outcome": "restored",
+    "target": "test/stealth-crouch-kernel.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): The renderer-free crouch kernel steps exactly as the page controller's original crouch, toggle, shot and hint logic did, and a kernel restored mid-run continues identically. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "steps exactly as the page controller did, through toggles, holds, shots and threats",
+      "a kernel restored mid-run continues the original exactly"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "1f62508fa558ccea80b5aac151f79b3042c26e78",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/stealth-detection.test.ts",
+    "outcome": "restored",
+    "target": "test/stealth-detection.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): Stealth detection runs eligibility only at 10 Hz and observes detection and direction from the existing animal senses. An unrelated marsh fixture tunes cover and hysteresis entirely through rows, the full bounded threat snapshot is admitted, and a refused frame keeps the pending cadence. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "runs eligibility and detection only at 10 Hz",
+      "observes detection and direction from the existing animal senses",
+      "lets an unrelated marsh fixture tune crouch cover and hysteresis entirely through rows",
+      "admits the full bounded threat snapshot",
+      "a refused %s frame keeps pending cadence and recovers without publishing state"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "f1fe94ec177a171b59b8be56c171f5c66f50d2c5",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/timed-encounters.test.ts",
+    "outcome": "restored",
+    "target": "test/timed-encounters.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): The listed night binding keeps its phases, native identities, figures and contact rows in the client timed encounters. Reads only manifest-verified engine fixtures.",
+    "originalTests": [
+      "the listed night binding preserves phases, native identities, figures and contact rows"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "b5043affeed97e8aff9733c0c091c95aa232b9e4",
+    "retirementProof": "No cases retired; complete original runtime assertions retained."
+  },
+  {
+    "repo": "engine",
+    "file": "test/motion-traces.test.ts",
+    "outcome": "restored",
+    "target": "test/motion-traces.test.ts",
+    "decision": "Restored in place (CI21 E-RUNTIME-O): original motion trace parity over native and page movement uses verified frozen riding modules. The seven-traces.json golden (8 traces) is unchanged.",
+    "originalTests": [
+      "the page trace: state, callbacks and camera",
+      "the riding trace: a real Mount through the step",
+      "the %s host trace: state, events and snapshot bytes"
+    ],
+    "sourceRevision": "8481ca0f54ac12412de2b25f5befef0d24346079",
+    "sourceBlob": "04fd8aa57aebbbce65873d5a1aee5ee47a2a593c",
+    "retirementProof": "No cases retired; no trace re-recorded."
   }
 ]
