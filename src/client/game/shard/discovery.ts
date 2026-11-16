@@ -1,3 +1,4 @@
+import { contentURL } from '@wildshard/engine/boot/contentBase';
 import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
 import { declaredForestQueries, declaredGround, declaredPondClip, defineAuthoredShard, type ShardManifest } from './manifest';
 import type { keyedSkyRender } from '../looks/keyedSky';
@@ -72,7 +73,10 @@ export function shardFromDiscovery(input: unknown, home?: string): ShardManifest
 /** The manifest of a title row, read from its product. */
 export async function readDiscovery(row: Pick<TitleManifest, 'slug' | 'discovery'>, read: typeof fetch = fetch): Promise<ShardManifest> {
   if (row.discovery === undefined) throw new Error(`${row.slug} has no discovery document`);
-  const response = await read(row.discovery);
+  // STAGING-BUGBASH SB27: since PAGE-SIZE the document is shard content on the page's content base; the page's own
+  // `/shardfiles/` answers 404 there. Its home stays the row's own (a page path has none): its art keys keep their page
+  // URLs, so the explore compare images it names are still page paths (not yet read from the base; review note).
+  const response = await read(contentURL(row.discovery));
   if (!response.ok) throw new Error(`Discovery of ${row.slug} answered ${response.status}`);
   const manifest = shardFromDiscovery(JSON.parse(await response.text()), /^https?:\/\/[^/]+/u.exec(row.discovery)?.[0]);
   if (!new Set([row.slug]).has(manifest.slug)) throw new Error('Selected discovery identity differs');

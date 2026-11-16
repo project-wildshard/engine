@@ -13,3 +13,7 @@
   same-origin referrer); the game's own unmarked hop still shows the modal. Rests on no Referrer-Policy being set.
 - Review (`claude -p`): MUST was the veil over a title-first page; fixed with the hold's `wanted`. SHOULDs taken: the
   release label past the release commit, the card's cap, comment placement, the referrer note.
+
+- SB27 (opus-ss16p): the title SETTINGS never opened on staging v0.1.30 or prod v0.1.29. `readDiscovery` read each row's
+  `/shardfiles/<slug>/discovery.json` from the page, which 404s since PAGE-SIZE put shard content on the content base, so
+  `completeCatalogue` rejected and `openTitleSettings` never opened. It now reads `contentURL(row.discovery)`.
