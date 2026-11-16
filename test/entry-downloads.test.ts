@@ -140,6 +140,12 @@ test('grid tap selects only its mode/home initial blocks, never outer or another
       expect(read.mock.calls.map(([url])=>url)).toEqual([directory.url,header.url,body.url]);
       for(const [,options]of read.mock.calls)expect(options).toMatchObject({keepalive:true,priority:'low'});
       startGridStripDownload({developer:true,devserver:false,nineDragon:false},'example:outer');expect(read).toHaveBeenCalledTimes(3);
+      // ZE4 review: a home reads several blocks; a body two blocks share is fetched once
+      const second={url:`/assets/grid-strip-page-${digest('header2').slice(0,8)}.json`,bytes:3};
+      vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:{'100':{example:[directory,header,body,second,body]}}})})});
+      expect(gridStripDownloadRows({developer:true,devserver:false,nineDragon:false},'example')).toEqual([directory,header,body,second].map(({url,bytes})=>({url,bytes})));
+      vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:{'100':{example:[directory,header,body,second]}}})})});
+      expect(gridStripDownloadRows({developer:true,devserver:false,nineDragon:false},'example')).toEqual([]);
       vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:{'100':{example:[directory,header,{url:'/outside.bin',bytes:1}]}}})})});
       expect(gridStripDownloadRows({developer:true,devserver:false,nineDragon:false},'example')).toEqual([]);
       startGridStripDownload({developer:true,devserver:false,nineDragon:false},'example');expect(read).toHaveBeenCalledTimes(3);

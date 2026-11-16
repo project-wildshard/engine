@@ -1,6 +1,8 @@
 import type {GridMode} from '../../../shared/game/grid/catalogue';
 
 export interface GridEntryDownload { readonly url: string; readonly bytes: number }
+/** The directory and at most 64 blocks' header and body: a home's ring reads 16 at most today. */
+const MAX_DOWNLOAD_ROWS = 129;
 
 /** Compiler facts only. Callers may declare these exact bytes without
  * starting a fetch; original runtime admission still verifies every body. */
@@ -12,14 +14,15 @@ export function gridStripDownloadRows(mode: GridMode, home: string): readonly Gr
     const bank: unknown = typeof input === 'object' && input !== null ? Reflect.get(input, 'gridEntryDownloads') : undefined;
     const modes: unknown = typeof bank === 'object' && bank !== null ? Reflect.get(bank, key) : undefined;
     const rows: unknown = typeof modes === 'object' && modes !== null ? Reflect.get(modes, home) : undefined;
-    if (!Array.isArray(rows) || rows.length !== 3) return [];
-    const result: GridEntryDownload[] = [];
+    // ZE4: the directory, then each initial block's header and body (bodies shared by content are fetched once)
+    if (!Array.isArray(rows) || rows.length < 3 || rows.length % 2 === 0 || rows.length > MAX_DOWNLOAD_ROWS) return [];
+    const result: GridEntryDownload[] = [], seen = new Set<string>();
     for (const row of rows as unknown[]) {
       if (typeof row !== 'object' || row === null) return [];
       const url: unknown = Reflect.get(row, 'url'), bytes: unknown = Reflect.get(row, 'bytes');
       if (typeof url !== 'string' || !/^\/assets\/grid-strip-(?:(?:book|page)-[a-f0-9]{8}\.json|mesh-[a-f0-9]{8}\.bin)$/u.test(url)
         || typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes <= 0 || bytes > 16 * 1024 * 1024) return [];
-      result.push({url, bytes});
+      if (!seen.has(url)) { seen.add(url); result.push({url, bytes}); }
     }
     return result;
   } catch { return []; }
