@@ -36,3 +36,15 @@ the mini. Normal pre-push and exact hosted CI remain required.
 The published Pine repair branch remains intact. Its clean worktree
 was moved and reused for this branch to keep the six-tree cap;
 recreate Pine's checkout after TC40 lands, before its own land.
+
+## Current-main source preparation,2026-11-16
+
+Rebase the public intake and clock correction onto the current Pine
+repair1a2c8b7c, which includes mainc7a984fa/format0.12. Only this
+API commit is replayed; TC40 and Pine keep their own exact heads and
+landing order. Frozen install/pins and full compiler pass. The
+existing exact item/save/import case passes2.34s. Normal land stays
+main-held for TC40, both Pine lands and all21final consumer cold
+receipts. The previous21receipts ondc0 remain historical.
+No source pins, assertions or budgets are weakened. --no-preflight
+avoids a local cook while normal hooks/exact hosted CI remain required.
