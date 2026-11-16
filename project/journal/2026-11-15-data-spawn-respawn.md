@@ -19,3 +19,11 @@ neither, so their cells run `createShardfileSim`, whose `movers.declared` instal
 `test/data-cell-shared-mover.test.ts` proves it on Template's built product: a native `track` mover on a `shared` trigger
 rises once the door hook sets field 101. Left for TC-E5b: the page drawing such a mover in a grid cell, and the sdk's
 `defineShard` emitting `movers`.
+
+## TC-E5b, first half: a mover's panel follows the wire in a grid cell
+
+A shard with no client plan drew no mover body: the page posed movers only through a `scene.motion` row. Now a mover's
+look is the props panel with its id: `NeighbourPanels.admit` registers a `wirePage.movers` view for each such row, and
+`moverPanelPose` sets the panel to pose x rest^-1 x its baked transform, so a hinge turns about the mover's origin
+(`src/client/game/grid/neighbour-mover-panel.test.ts`). Open: the browser proof on a cell whose shard carries one
+(Mossgate's lift, TC-M4b), and the page-side collider for prediction.

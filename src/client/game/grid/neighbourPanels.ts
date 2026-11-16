@@ -8,11 +8,13 @@
  *
  * Presentation only: nothing here writes a simulation, a field or a collider.
  */
-import type { Group, Object3D } from 'three';
+import { Euler, Matrix4, Quaternion, Vector3, type Group, type Object3D } from 'three';
+import type { MoverPose } from '@wildshard/engine/physics/mover';
 import type { ClientTileViews } from '../shardfile/clientViews';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { ProbeAreaTarget } from '@wildshard/engine/debug/probe';
+import { wirePage } from '../shardfile/wirePage';
 
 /** What the panels read of a cell the live host has admitted: the solids of its world, and a field's row where this page has one. */
 export interface PanelRegion { readonly colliders: ReadonlyMap<string, { readonly active: () => boolean; readonly setActive: (active: boolean) => void }>; readonly field: (name: string) => number | undefined }
@@ -38,6 +40,23 @@ export function targetMatched(row: TargetRow, fallback: number, region: PanelReg
   return ((field === undefined ? undefined : region?.field(field.name)) ?? fallback) === row.equals;
 }
 
+/** TEMPLATE-E2E TC-E5b: pose a mover's panel. The panel was baked where the mover rests (its `at` and `euler`), so each
+ *  pose sets the panel to (pose) x (rest)^-1 x (its baked transform): it turns about the mover's own origin, as the server's
+ *  body does. Presentation only: the mover's collider is the server's. */
+export function moverPanelPose(panel: Object3D, rest: { readonly at: { x: number; y: number; z: number }; readonly euler: { x: number; y: number; z: number } }): (pose: MoverPose) => void {
+  const one = new Vector3(1, 1, 1), euler = new Euler(0, 0, 0, 'YXZ'), q = new Quaternion(), at = new Vector3();
+  panel.updateMatrix();
+  const baked = panel.matrix.clone(), restInverse = new Matrix4().compose(new Vector3(rest.at.x, rest.at.y, rest.at.z),
+    q.setFromEuler(euler.set(rest.euler.x, rest.euler.y, rest.euler.z, 'YXZ')).clone(), one).invert();
+  const now = new Matrix4();
+  return (pose) => {
+    now.compose(at.set(pose.position.x, pose.position.y, pose.position.z), q.setFromEuler(euler.set(pose.euler.x, pose.euler.y, pose.euler.z, 'YXZ')), one)
+      .multiply(restInverse).multiply(baked);
+    now.decompose(panel.position, panel.quaternion, panel.scale); panel.updateMatrix(); // a frame-floored root walks no matrices
+    panel.visible = pose.enabled;
+  };
+}
+
 /** The page's neighbour panels: one set per shardfile neighbour whose targets show or hide a panel; disposed with the scope. */
 export class NeighbourPanels {
   private readonly ports: NeighbourPanelPorts;
@@ -47,7 +66,7 @@ export class NeighbourPanels {
   /** Draw one neighbour's declared panels in its cell root (the session's shared per-slug load supplies views and bytes). */
   async admit(cell: GridCell, root: Group, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, views: ClientTileViews): Promise<void> {
     const props = source.props;
-    if (props === null || props.panels.length === 0 || source.targets.panels.length === 0 || this.cells.has(cell.instance)) return;
+    if (props === null || props.panels.length === 0 || source.targets.panels.length === 0 && source.movers.length === 0 || this.cells.has(cell.instance)) return;
     const panels = await views.panels(props, assets, root, this.ports.scope);
     if (this.ports.scope.disposed) return;
     // a panel's programs compile in the page's warm-up, off the drive's frames: hidden until then, then shown by sync
@@ -63,6 +82,13 @@ export class NeighbourPanels {
     });
     const cellPanels: CellPanels = { instance: cell.instance, source, bindings };
     this.cells.set(cell.instance, cellPanels);
+    // TEMPLATE-E2E TC-E5b: a mover's look is the props panel with its id; the wire's pose for it moves that panel
+    for (const row of source.movers) {
+      const panel = panels.get(row.id); if (panel === undefined) continue;
+      const view = { pose: moverPanelPose(panel, row) };
+      wirePage.movers.set(row.id, view);
+      this.ports.scope.onDispose(() => { if (wirePage.movers.get(row.id) === view) wirePage.movers.delete(row.id); });
+    }
     this.sync(cellPanels);
   }
 
