@@ -28,7 +28,7 @@ import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 export const REPO='project-wildshard/engine';
 const KEEP=500;
 
-/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string}} Run */
+/** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,run_attempt?:number,blockingChecked?:boolean}} Run */
 /** @typedef {{judged:number[],dispatched:string[]}} State */
 /** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
 
@@ -36,6 +36,18 @@ const short=(/** @type {string|null|undefined} */sha)=>(sha??'').slice(0,10);
 const finished=(/** @type {Run} */run)=>run.status==='completed';
 const cancelled=(/** @type {Run} */run)=>run.conclusion==='cancelled'||run.conclusion==='skipped';
 const byCreated=(/** @type {Run} */a,/** @type {Run} */b)=>Date.parse(a.created_at)-Date.parse(b.created_at)||a.id-b.id;
+
+/** Completed advisory failures cannot turn green blocking jobs red. Unknown,
+ * incomplete and cancelled blocking jobs retain the workflow's verdict.
+ * @param {Run} run @param {readonly {name:string,conclusion:string|null}[]} jobs @returns {Run} */
+export function blockingRun(run,jobs){
+  if(!finished(run)||cancelled(run)||run.conclusion==='success')return run;
+  const advisory=(/** @type {{name:string}} */job)=>job.name==='timings'||job.name==='quarantine';
+  const required=jobs.filter(job=>!advisory(job));
+  const clear=required.length>0&&required.every(job=>['success','skipped','neutral'].includes(job.conclusion??''));
+  const advisoryFailure=jobs.some(job=>advisory(job)&&(job.conclusion==='failure'||job.conclusion==='timed_out'));
+  return {...run,conclusion:clear&&advisoryFailure?'success':run.conclusion,blockingChecked:true};
+}
 
 /** What each newly finished run means, oldest first. Pure: `runs` is main's ci runs, newest or oldest first.
  * @param {readonly Run[]} runs @param {State} state @param {string|null} tip origin/main's SHA
@@ -145,14 +157,24 @@ export function liveIo(env=process.env){
   const run=(/** @type {string} */command,/** @type {string[]} */args)=>execFileSync(command,args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:32<<20});
   // MF12 (4): reads go through the reader App when this machine has it; the dispatch stays on the user's login.
   const read=(/** @type {string[]} */args)=>execFileSync('gh',args,{cwd:root,encoding:'utf8',env:readerEnv(env),stdio:['ignore','pipe','pipe'],timeout:60_000,maxBuffer:32<<20});
+  const runsCache=resolve(env.WS_MAIN_WATCH_RUNS_CACHE??join(homedir(),'.cache/wildshard/main-watch-runs.json'));
   return {
     repo,
     quotaReset:()=>quotaReset(),
     state:resolve(env.WS_MAIN_WATCH_STATE??join(homedir(),'.cache/wildshard/main-watch.json')),
     // MF12: every land leaves a follow running for up to 90 min, so one machine can hold several; they share one fetch.
-    runs:()=>sharedRuns(resolve(env.WS_MAIN_WATCH_RUNS_CACHE??join(homedir(),'.cache/wildshard/main-watch-runs.json')),
-      ()=>/** @type {Run[]} */(JSON.parse(read(['api',`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&per_page=50`])).workflow_runs
-        .filter((/** @type {Run} */row)=>row.event==='push'||row.event==='workflow_dispatch'))),
+    runs:()=>sharedRuns(runsCache,()=>{
+      /** @type {Run[]} */let prior=[];
+      try{const kept=JSON.parse(readFileSync(runsCache,'utf8')).runs;if(Array.isArray(kept))prior=kept;}catch{/* First fetch. */}
+      return /** @type {Run[]} */(JSON.parse(read(['api',`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&per_page=50`])).workflow_runs)
+        .filter(row=>row.event==='push'||row.event==='workflow_dispatch').map(row=>{
+          if(!finished(row)||cancelled(row)||row.conclusion==='success')return row;
+          const kept=prior.find(old=>old.id===row.id&&old.blockingChecked===true&&(old.run_attempt??1)===(row.run_attempt??1));
+          if(kept!==undefined)return kept;
+          const jobs=/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${row.id}/jobs?per_page=100`])).jobs);
+          return blockingRun(row,jobs);
+        });
+    }),
     failed:(/** @type {number} */id)=>/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
       .filter(job=>job.name!=='timings'&&job.name!=='quarantine'&&(job.conclusion==='failure'||job.conclusion==='timed_out')).map(job=>job.name),
     // Blocking tests own AMBER evidence. The advisory timings collector only repeats it;

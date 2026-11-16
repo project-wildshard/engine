@@ -1,4 +1,4 @@
-export interface Run {id:number;head_sha:string;status:string;conclusion:string|null;created_at:string;event:string}
+export interface Run {id:number;head_sha:string;status:string;conclusion:string|null;created_at:string;event:string;run_attempt?:number;blockingChecked?:boolean}
 export interface State {judged:number[];dispatched:string[]}
 export interface Verdict {kind:'green'|'red'|'superseded'|'dispatch';run:Run;from?:string|null;by?:string}
 export interface Pane {pane_id:string;label?:string;cwd?:string;foreground_cwd?:string}
@@ -9,6 +9,7 @@ export interface Io {
   quotaReset?:()=>number;
 }
 export const REPO: string;
+export function blockingRun(run:Run,jobs:readonly {name:string;conclusion:string|null}[]):Run;
 export function judge(runs:readonly Run[],state:State,tip:string|null):Verdict[];
 export function verdictFor(runs:readonly Run[],sha:string,contains:(ancestor:string,descendant:string)=>boolean):{state:'green'|'red';run:Run}|null;
 export function landers(text:string):Map<string,{lane:string;slug:string;pane?:string}>;

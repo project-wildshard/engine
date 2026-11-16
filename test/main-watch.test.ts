@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { follow, judge, landers, liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { blockingRun, follow, judge, landers, liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
 
 mkdirSync(resolve('tmp'), { recursive: true });
@@ -36,6 +36,32 @@ const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
   quotaReset: () => Date.now(),
 });
 const world = (runs: ReturnType<typeof run>[], log = ''): World => ({ runs, receipts: [], sent: [], dispatched: 0, log, tip: runs.at(-1)?.head_sha ?? '' });
+
+test('advisory failures preserve green blocking tests in both sweeps and follows', () => {
+  for (const name of ['timings', 'quarantine']) {
+    const red = run(42970000021, 'aaaa1111', 'failure', 50);
+    const normalized = blockingRun(red, [{ name: 'tests (1)', conclusion: 'success' }, { name, conclusion: 'failure' }]);
+    const w = world(replay), io = fake(`advisory-${name}`, w);
+    sweep(io); w.runs = [...replay, normalized]; w.tip = sha('aaaa1111');
+    expect(sweep(io).map(row => row.kind)).toEqual(['green']);
+    expect(w.sent).toEqual([]);
+    expect(verdictFor(w.runs, sha('aaaa1111'), contains)?.state).toBe('green');
+    expect(red.conclusion).toBe('failure');
+  }
+});
+
+test('advisories never hide failed, unknown, incomplete or cancelled blocking work', () => {
+  const red = run(42970000022, 'aaaa1111', 'failure', 50);
+  for (const conclusion of ['failure', 'timed_out', 'cancelled', null]) {
+    expect(blockingRun(red, [{ name: 'tests (1)', conclusion }, { name: 'timings', conclusion: 'failure' }]).conclusion).toBe('failure');
+  }
+  expect(blockingRun(red, [{ name: 'timings', conclusion: 'failure' }]).conclusion).toBe('failure');
+  expect(blockingRun(red, []).conclusion).toBe('failure');
+  const cancelled = run(42970000023, 'aaaa1111', 'cancelled', 51);
+  expect(blockingRun(cancelled, [{ name: 'tests (1)', conclusion: 'success' }, { name: 'timings', conclusion: 'failure' }])).toBe(cancelled);
+  const pending = run(42970000024, 'aaaa1111', null, 52, 'in_progress');
+  expect(blockingRun(pending, [{ name: 'tests (1)', conclusion: 'success' }, { name: 'timings', conclusion: null }])).toBe(pending);
+});
 
 test('replaying runs 42965336189 and 42966114949: cancelled by newer pushes is superseded, never MAIN RED', () => {
   const verdicts = judge(replay, { judged: [42965108264], dispatched: [] }, sha('652afa6c'));
