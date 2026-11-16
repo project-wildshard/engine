@@ -7,6 +7,7 @@ from pathlib import Path
 import signal
 import subprocess
 import sys
+import time
 
 SCHEMA = 'cpu-owned-command/1'
 STOP_GRACE_SECONDS = 3
@@ -78,9 +79,123 @@ def ownership():
             'caller': capture(os.getppid()), 'child': None}
 
 
+def valid_ownership(owned, provider_pid):
+    if not isinstance(owned, dict) or owned.get('schema') != SCHEMA:
+        return False
+    provider, caller, child = (owned.get(key) for key in ('provider', 'caller', 'child'))
+    return (valid_record(provider) and provider['pid'] == provider_pid
+            and valid_record(caller) and provider['parent'] == caller['pid']
+            and (child is None or valid_record(child)
+                 and child['parent'] == provider_pid and child['group'] == child['pid']))
+
+
+def stale_reason(owned, provider_pid, repo):
+    # Malformed evidence cannot free a reservation or authorize a signal.
+    if not valid_ownership(owned, provider_pid):
+        return None
+    try:
+        for key in ('provider', 'caller'):
+            if not same_process(owned[key]):
+                return 'owned command ' + key + ' is gone'
+    except (OSError, RuntimeError, ValueError):
+        return None
+    if isinstance(repo, str) and not os.path.isdir(repo):
+        return 'owned command checkout is gone'
+    return None
+
+
+def group_absent(group):
+    try:
+        os.killpg(group, 0)
+        return False
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+
+
+def group_stopped(group):
+    if group_absent(group):
+        return True
+    # An orphaned zombie can retain a PGID until init reaps it. It cannot do
+    # work. Only a complete PID inventory with every group member readable
+    # can establish this; inaccessible members retain the reservation.
+    try:
+        backend = identity_backend()
+        inventory, present = backend.processes()
+        for pid in present:
+            try:
+                if os.getpgid(pid) != group:
+                    continue
+                before = inventory.get(pid)
+                after = backend.process(pid)
+                if before is None or before.identity != after.identity or not after.zombie:
+                    return False
+            except ProcessLookupError:
+                continue
+        return True
+    except Exception:
+        return False
+
+
+def reclaim(owned, provider_pid):
+    """Advance shutdown without waiting. True only after the group is absent.
+
+    Private ledger rows are trusted local provider publications. Kernel birth
+    checks still precede every signal; an unreadable or reused identity retains
+    capacity. Remember group members before TERM so an exited root cannot hide
+    its still-running descendants. Never signal an unauthenticated group.
+    """
+    if not valid_ownership(owned, provider_pid):
+        return False
+    child = owned['child']
+    if child is None:
+        return True  # No publication means the barrier never ran actual work.
+    try:
+        group = child['group']
+        state = owned.setdefault('reclaim', {'started': time.monotonic(), 'members': [child]})
+        now = time.monotonic()
+        if now < state.get('nextCheck', 0):
+            return False
+        state['nextCheck'] = now + .1
+        if group_stopped(group):
+            return True
+        authenticated = [record for record in state['members']
+                         if valid_record(record) and record['group'] == group and same_process(record)]
+        if not authenticated:
+            return False
+        # Inventory is from the same census backend. No subprocess waits under
+        # the scheduler lock; incomplete inventory never establishes absence.
+        try:
+            inventory, _present = identity_backend().processes()
+        except Exception:
+            return False
+        members = {record['pid']: record for record in authenticated}
+        for process in inventory.values():
+            if process.uid != os.getuid() or process.zombie:
+                continue
+            record = process_record(process.pid)
+            if record is not None and record['group'] == group:
+                members[record['pid']] = record
+                if len(members) > 512:
+                    return False
+        state['members'] = list(members.values())
+        # Recheck after inventory: a stored PID may have exited or been reused.
+        if not any(same_process(record) for record in authenticated):
+            return False
+        os.killpg(group, signal.SIGKILL if now - state['started'] >= STOP_GRACE_SECONDS else signal.SIGTERM)
+    except (OSError, RuntimeError, ValueError, KeyError, TypeError):
+        return False
+    return False
+
+
 def terminate_command(child):
     """The Popen child cannot reuse its PID before this owner reaps it."""
     if child is None:
+        return
+    if child.returncode is not None:
+        # After reap the PID can be reused. Ledger reclaim authenticates any
+        # remaining descendants; this Popen handle no longer authorizes killpg.
         return
     try:
         os.killpg(child.pid, signal.SIGTERM)

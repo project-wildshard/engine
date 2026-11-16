@@ -17,6 +17,10 @@ spec = importlib.util.spec_from_file_location('heavy_lane', Path(__file__).with_
 lane = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(lane)
 
+spec = importlib.util.spec_from_file_location('cpu_owned_command', Path(__file__).with_name('cpu-owned-command.py'))
+owned_command = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(owned_command)
+
 
 # TEST-SPEED FL30: an orphaned run (owner reparented to pid 1) whose whole process tree made no CPU progress for
 # this long has lost its lease. A busy one never does. The proof shortens it; real runs keep 60 s.
@@ -84,6 +88,8 @@ RUN = 'run: '
 
 def _stale(row, table, children, now):
     """Why a row no longer holds its slots, or None. Rows from older clients lack holder/owner and keep the old rule."""
+    if 'ownedCommand' in row:
+        return owned_command.stale_reason(row['ownedCommand'], row['pid'], row.get('repo'))
     if not lane.alive(row['pid']):
         return 'its process is gone'
     if type(row.get('holder')) is int and not lane.alive(row['holder']):
@@ -139,6 +145,12 @@ def _prune(entry, pending, active):
         kept = []
         for row in rows:
             why = None if row['token'] == entry['token'] else _stale(row, table, children, now)
+            if 'ownedCommand' in row and (why is not None or isinstance(row['ownedCommand'], dict) and row['ownedCommand'].get('reclaim') is not None):
+                if owned_command.reclaim(row['ownedCommand'], row['pid']):
+                    reclaimed.append((row, why or 'owned command drained'))
+                else:
+                    kept.append(row)
+                continue
             if why is None:
                 kept.append(row)
             else:
@@ -177,9 +189,40 @@ def acquire_cpu(root, entry, capacity, deadline):
 
 
 def release_cpu(root, token):
+    released = True
     with lane.scheduler(root) as state:
         for key in ('cpuQueue', 'cpuActive'):
-            state[key] = [row for row in state.get(key, []) if row['token'] != token and lane.alive(row['pid'])]
+            kept = []
+            for row in state.get(key, []):
+                if 'ownedCommand' in row:
+                    if row['token'] != token:
+                        kept.append(row)
+                    elif not owned_command.reclaim(row['ownedCommand'], row['pid']):
+                        kept.append(row)
+                        released = False
+                elif row['token'] != token and lane.alive(row['pid']):
+                    kept.append(row)
+            state[key] = kept
+    return released
+
+
+def publish_cpu_child(root, token, child):
+    """Publish while the child is still held behind its execution barrier."""
+    with lane.scheduler(root) as state:
+        rows = [row for row in state.get('cpuActive', []) if row['token'] == token]
+        if len(rows) != 1:
+            raise RuntimeError('Owned CPU grant is unavailable before command publication')
+        row = rows[0]
+        owned = row.get('ownedCommand')
+        if (not owned_command.valid_ownership(owned, os.getpid())
+                or owned['child'] is not None or owned.get('reclaim') is not None
+                or owned_command.stale_reason(owned, row['pid'], row.get('repo')) is not None
+                or not owned_command.same_process(owned['provider'])
+                or not owned_command.same_process(owned['caller'])
+                or not owned_command.valid_record(child) or child['parent'] != os.getpid()
+                or child['group'] != child['pid'] or owned_command.capture(child['pid']) != child):
+            raise RuntimeError('Owned CPU command publication is unavailable')
+        owned['child'] = child
 
 
 
