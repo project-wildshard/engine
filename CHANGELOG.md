@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.28 (2026-11-16)
+
+- Worlds prepare from the title screen without a full-screen loading card.
+- Coin rewards from the updated shards save without crashing.
+
 ## v0.1.27 (2026-11-16)
 
 - Creatures in newly uploaded shards drop the coins their loot table specifies.
