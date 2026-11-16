@@ -69,6 +69,27 @@ The previous completed nightly's verdict, including a red one, supplies
 the new/existing/resolved comparison. An unavailable or expired baseline
 is stated plainly; current failures still hold the tag.
 
+## TC22: the release entry reads the latest nightly
+
+`scripts/release-check.mjs`, called by the release helper before preparing
+or finishing an engine release, downloads the latest completed scheduled
+main nightly's `nightly-verdict` artifact (production pins). It refuses any `newFailures` before
+using a cached full check or starting a fresh one. Missing artifacts,
+malformed reports and mismatched run/source identities also hold release.
+`--probe` only queries the local full-check cache; it cannot release and
+does not contact GitHub.
+
+Under J370, existing failures alone pass this automatic check. J167's
+any-red check below remains manual until the first full green night;
+this change does not qualify a red night. The selected scheduled run must
+have its full verdict; manual staging or diagnostic runs cannot clear release.
+
+The explicit `node --test scripts/release-nightly.proof.ts` plants a new
+failure through the actual release entry, proves refusal before the local
+gate, and checks missing/stale reports, existing failures and cleanup.
+CI observes it without blocking; admission review is no earlier than
+2026-11-23, after a real week, and requires an explicit decision.
+
 ## J167: a red nightly holds the tag
 
 Read the **report job**, not one green matrix leg. Red or incomplete

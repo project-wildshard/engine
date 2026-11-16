@@ -3,9 +3,13 @@ import {spawnSync} from 'node:child_process';
 import {pushEnvironment} from '../.githooks/push-checks.mjs';
 import {PUSH_PROFILE} from './push-budget.mjs';
 import {capturePushTree,readPushProof} from './push-proof-cache.mjs';
+import {checkReleaseNightly} from './release-nightly.ts';
 
 if(process.argv.slice(2).some(arg=>arg!=='--probe'))throw new Error('Usage: node scripts/release-check.mjs [--probe]');
 const probe=process.argv.includes('--probe'),env=pushEnvironment();
+// A cached local full gate never replaces the latest hosted nightly. A
+// --probe only asks whether that local cache exists; it cannot release.
+if(!probe)checkReleaseNightly();
 // A release requires a full check of HEAD, irrespective of a caller's diff.
 Reflect.deleteProperty(env,'WS_PUSH_REFS');Reflect.deleteProperty(env,'WS_PUSH_DESTINATION');
 const context=capturePushTree(PUSH_PROFILE,env),proof=context===null?null:readPushProof(context,{mode:'full',files:[]});

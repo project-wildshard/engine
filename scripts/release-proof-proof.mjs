@@ -22,7 +22,20 @@ try{
  writeFileSync(join(producer,'.gitignore'),'node_modules/\n');
  writeFileSync(join(producer,'value.mjs'),'export const value=1;\n');
  writeFileSync(join(producer,'value-check.mjs'),`import assert from'node:assert/strict';import{existsSync,readFileSync,writeFileSync}from'node:fs';import{parse,number}from'valibot';import{value}from'./value.mjs';import{value as self}from'release-proof-fixture';assert.equal(parse(number(),value),1);assert.equal(self,1);const count=${JSON.stringify(counter)};writeFileSync(count,JSON.stringify((existsSync(count)?JSON.parse(readFileSync(count,'utf8')):0)+1));\n`);
- mkdirSync(join(work,'bin'));const gh=join(work,'bin/gh');writeFileSync(gh,"#!/usr/bin/env node\nconst sha=process.argv.join(' ').match(/head_sha=([a-f0-9]{40})/)[1];console.log(JSON.stringify({workflow_runs:['ci','ring-1'].map((name,index)=>({id:index+1,name,event:'push',head_sha:sha,status:'completed',conclusion:process.env.GH_FIXTURE_RED&&name==='ci'?'failure':'success'}))}));\n");chmodSync(gh,0o755);
+ mkdirSync(join(work,'bin'));const gh=join(work,'bin/gh');writeFileSync(gh,`#!/usr/bin/env node
+import {writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+const args=process.argv.slice(2),sha='a'.repeat(40);
+if(args.includes('nightly-verdict')) {
+ const dir=args[args.indexOf('--dir')+1];
+ const failures=process.env.GH_FIXTURE_NIGHT_RED?[{key:'planted/new-nightly-failure'}]:[];
+ writeFileSync(join(dir,'verdict.json'),JSON.stringify({version:2,run:'42',sha,pins:'b'.repeat(64),testList:'c'.repeat(64),failures,newFailures:failures.map(row=>row.key)}));
+}else if(args.some(arg=>arg.includes('nightly.yml/runs')&&arg.includes('event=schedule')))console.log(JSON.stringify({id:42,head_sha:sha,status:'completed',conclusion:'success',event:'schedule'}));
+else {
+ const head=args.join(' ').match(/head_sha=([a-f0-9]{40})/)[1];
+ console.log(JSON.stringify({workflow_runs:['ci','ring-1'].map((name,index)=>({id:index+1,name,event:'push',head_sha:head,status:'completed',conclusion:process.env.GH_FIXTURE_RED&&name==='ci'?'failure':'success'}))}));
+}
+`);chmodSync(gh,0o755);
  mkdirSync(join(producer,'scripts'));symlinkSync(join(engine,'scripts/release-check.mjs'),join(producer,'scripts/release-check.mjs'));copyFileSync(join(engine,'scripts/push-budget.mjs'),join(producer,'scripts/push-budget.mjs'));
  mkdirSync(join(producer,'.githooks'));const entry=join(engine,'.githooks/run-checks.mjs'),hook=join(producer,'.githooks/pre-push');
  writeFileSync(hook,`#!/usr/bin/env node\nimport{readFileSync}from'node:fs';import{spawnSync}from'node:child_process';const p=spawnSync(process.execPath,[${JSON.stringify(entry)},'push'],{env:{...process.env,WS_PUSH_REFS:readFileSync(0,'utf8')},stdio:'inherit'});process.exitCode=p.status??1;\n`);chmodSync(hook,0o755);
@@ -35,6 +48,12 @@ try{
  rmSync(producer,{recursive:true,force:true});
  let result=probe();assert.equal(result.status,0,`A separately installed clone must reuse the surviving full proof: ${result.stderr}`);
  const proof=JSON.parse(readFileSync(receipt,'utf8'));assert.equal(JSON.parse(result.stdout).run,proof.run);
+ const releaseEntry=join(engine,'scripts/release-check.mjs');
+ const held=spawnSync(process.execPath,[releaseEntry],{cwd:receiver,env:{...env,GH_FIXTURE_NIGHT_RED:'1',PWD:receiver},encoding:'utf8',timeout:10_000});
+ assert.notEqual(held.status,0);assert.match(held.stderr,/new nightly failures.*planted/u,'An actual cached full gate cannot clear a newly red nightly');
+ const reused=spawnSync(process.execPath,[releaseEntry],{cwd:receiver,env:{...env,PWD:receiver},encoding:'utf8',timeout:10_000});
+ assert.equal(reused.status,0,reused.stderr);assert.match(reused.stdout,/exact-tree full proof/u);
+ assert.equal(JSON.parse(readFileSync(counter,'utf8')),1,'The nightly check preserves exact-tree full-gate reuse');
  if(helper!==undefined){
   const peer=join(work,'peer');git(work,['clone','--quiet','--branch=main',remote,peer]);writeFileSync(join(peer,'peer.md'),'peer source advances while release waits');git(peer,['add','peer.md']);git(peer,['commit','--quiet','-m','independent peer']);git(peer,['push','--quiet','origin','main']);
   git(receiver,['config','core.hooksPath','.githooks']);
