@@ -57,6 +57,8 @@ export interface DeclaredItemPorts {
   bindings?: Pick<InputService['bindings'], 'describe'>;
   /** A page on the wire (SR11, C9): an item request goes to the server's runtime, and none queues here. False: no wire, it queues here. */
   relay?: (item: string, action: ItemAction) => boolean;
+  /** TEMPLATE-E2E TC-E4b: melee rows that start on a rack (`rackMeleeRows`): locked in the page's kit until taken, as a lever is. */
+  racked?: ReadonlySet<string>;
 }
 /** Merge a trusted shard's own item families over the kit's, refusing a foreign or shadowing name. */
 export function shardItemFamilies(kit: ReadonlyMap<string, ItemFamily>, shard: NonNullable<DeclaredItemPorts['shardFamilies']>): ReadonlyMap<string, ItemFamily> {
@@ -151,7 +153,7 @@ export function installDeclaredItems(input: unknown, ports: DeclaredItemPorts): 
   });
   const scope = ports.scope.child('declared-items');
   const weapons = new Map<string, Weapon>(), tools = new Map<string, Tool>(), runtimes = new Map<string, ItemRuntime>();
-  const locked = new Set(data.rows.filter((_row, index) => families[index]?.locked === true).map(row => row.id));
+  const locked = new Set(data.rows.filter((row, index) => families[index]?.locked === true || ports.racked?.has(row.id) === true).map(row => row.id));
   try {
     if (ports.contexts !== 'runtime') for (const ctx of data.contexts) {
       ports.input.register(declaredItemContext(ctx, ports.observation), scope);

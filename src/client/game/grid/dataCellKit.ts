@@ -47,7 +47,7 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   };
   const items = installDeclaredItems(source.items, { scope: entry, actorId: actor.id, input: app.input, bindings: app.input.bindings,
     observation: { get mode() { return playerModes(player).current(); }, get item() { return app.equipment?.current.row.id ?? null; }, get flags() { return wirePage.client === null ? [] : [...wirePage.client.flags()]; } },
-    families: declaredKitItemFamilies(), models, icon: declaredItemIcon,
+    families: declaredKitItemFamilies(), models, icon: declaredItemIcon, racked: rackMeleeRows(source),
     aim: () => ({ origin: camera.getWorldPosition(new Vector3()), direction: camera.getWorldDirection(new Vector3()) }),
     // SR11 (C9): on the wire an item request is the scene the server takes it by
     relay: (item, action) => { const scene = itemScene(source, item, action); if (scene === undefined || wirePage.client === null) return false; wirePage.send(scene); return true; },
