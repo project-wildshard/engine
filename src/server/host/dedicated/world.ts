@@ -33,6 +33,7 @@ import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
 import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, trustedAddress, type TrustProxy } from './doorTrust';
 import {checkpointWord,type CheckpointCertificate} from './checkpointWitness';
 import type { PersistenceStatus } from './saves/persistenceStatus';
+import { persistenceEnvelope } from '@wildshard/engine/net/persistenceWord';
 
 /** J174: what a deploy gives everyone before they move together. */
 export const GRACE_MS = 60_000;
@@ -209,6 +210,17 @@ export class World {
     this.now = options.now ?? diagnosticNow;
     this.server = new WebSocketServer({ noServer: true, ...SOCKET_SERVER_OPTIONS });
     this.scope.interval(MINUTE_MS, () => { this.sweepConnects(this.now()); });
+    const offSave = options.saves.onSave?.(status => { this.saved(status); });
+    if (offSave !== undefined) this.scope.onDispose(offSave);
+  }
+  /** Only this player's current live socket hears its actual persistence outcome. No device flag on later words. */
+  private saved(fact: PersistenceStatus): void {
+    const end = this.seatSockets.get(fact.player)?.end;
+    if (end === undefined || !end.isOpen || this.draining) return;
+    const status = persistenceEnvelope({ v: 1, persistence: { code: fact.code, sequence: fact.sequence, scope: fact.shard } });
+    if (status === null) return;
+    end.control('world', new TextEncoder().encode(JSON.stringify({ cells: this.links.size,
+      shards: [...new Set([...this.links.keys()].map(cellShard))], status } satisfies WorldWord)).buffer);
   }
   /** Start every worker on its row and wait for all of them. Nothing changes after this. */
   static async open(options: WorldOptions): Promise<World> {

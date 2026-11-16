@@ -8,6 +8,7 @@ import type { NetIdentity } from '@wildshard/engine/net/identity';
 import { Redial, type LinkCause, type LinkProgress, type LinkState } from '@wildshard/engine/net/redial';
 import { decodeCountdown, type Countdown } from '@wildshard/engine/net/socketFrames';
 import { encodeDeviceWord, worldReadsDevice } from '@wildshard/engine/net/deviceWord';
+import { subscribePersistence, type PersistenceWord } from '@wildshard/engine/net/persistenceWord';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
 import {NetRecords} from '@wildshard/engine/net/netRecord';
 import {onlineTelemetry} from '@wildshard/engine/telemetry/runtime';
@@ -51,6 +52,8 @@ export interface OnlineConfig {
 /** What the link tells the page. */
 export interface OnlineView {
   readonly link: (state: LinkState, reason?: string) => void;
+  /** Actual per-client save observations. An older server or a memory store leaves this unknown. FM8s owns presentation. */
+  readonly persistence?: (fact: PersistenceWord) => void;
   /** WR5 (5.5, the cut): a refusal before any frame; the page reloads only if version.json names another build. */
   readonly cut?: (reason: string) => void;
   /** J174: a deploy is due, and play goes on. */
@@ -114,6 +117,8 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     on: listener => { voices.add(listener); return () => { voices.delete(listener); }; } };
   const hear = (transport: WebSocketTransport): WebSocketTransport => {
     link = transport; down = false;
+    const offPersistence = subscribePersistence(listener => transport.onControl(listener), fact => { view.persistence?.(fact); });
+    transport.onClose(offPersistence);
     transport.onClose(() => { if (link === transport) down = true; });
     transport.onControl((control, bytes) => {
       if(control==='playtest'){playtest=true;return;}

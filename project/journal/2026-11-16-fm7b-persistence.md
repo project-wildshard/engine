@@ -22,3 +22,12 @@ new boundary cases pass again over pg/TCP against fresh native Postgres
 clusters. Each native run verifies its connected data directory and
 removes its cluster after stopping it. Full lint and types are green.
 Hosted qualification and the live carrier remain open; no main push.
+
+FM7b3b carries observations on an optional world9 status.persistence
+branch, version one. The complete extension is bounded to 512 bytes,
+with code, sequence and scope only. Other optional status branches are
+independent; old discovery has no save claim. Only the matching player's
+current socket hears an observation. Later words preserve cells/shards
+and omit device:1, avoiding a new device snapshot. Unknown versions,
+codes or invalid numbers are ignored. Account/session facts remain
+FM7b3c, and graphical save presentation remains FM8s.
