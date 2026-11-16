@@ -140,10 +140,29 @@ try {
                 toolInstalled: board !== undefined, toolEnabled: board?.enabled ?? null,
                 modelVisible: board !== undefined && 'model' in board && typeof board.model === 'object' && board.model !== null && 'visible' in board.model ? board.model.visible : null,
                 inputAllowed: world.game.app.input.allowed('hover'), inputContext: world.game.app.input.top,
-                frame: world.game.frameCount, paused: world.game.app.clock.paused};
+                frame: world.game.frameCount, paused: world.game.app.clock.paused, linked: world.player.link !== null,
+                recent: world.game.app.input.recent.filter(row => row.action === 'hover')};
             });
             const before = await observeHover();
             const control = page.locator('.ws-touch-hover');
+            // Observe browser dispatch and the real input boundary without replacing
+            // a service or changing the player's state. Retain this on failure too.
+            const probe = await page.evaluateHandle(() => {
+              const events: object[] = [], controller = new AbortController();
+              const observe = (event: Event) => {
+                if (events.length >= 40) return;
+                const target = event.target;
+                const world = window.__wildshard?.world;
+                events.push({type: event.type, at: performance.now(), trusted: event.isTrusted,
+                  target: target instanceof Element ? target.className : null,
+                  hover: world?.player.hover, boost: world?.player.hoverBoost,
+                  recent: world?.game.app.input.recent.filter(row => row.action === 'hover')});
+              };
+              for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'touchstart', 'touchend', 'click', 'dblclick']) {
+                document.addEventListener(type, observe, {capture: true, passive: true, signal: controller.signal});
+              }
+              return {events, controller};
+            });
             let action = 'equipment readiness';
             try {
             // Live world frames can precede its asynchronous equipment entry.
@@ -174,6 +193,10 @@ try {
             } catch (error) {
               const after = await observeHover().catch(() => null);
               throw new Error(`${head.slug}: hover ${action} failed: ${String(error)}; ${JSON.stringify({before, after})}`, {cause: error});
+            } finally {
+              const events = await probe.evaluate(value => {value.controller.abort(); return value.events;});
+              writeFileSync(join(evidence, 'hover.json'), JSON.stringify({action, before, after: await observeHover(), events}, null, 2));
+              await probe.dispose();
             }
             return {mounted: true, unmounted: true, input: 'real touch', actualCap, expectedCap};
           });
