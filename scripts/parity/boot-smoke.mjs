@@ -601,8 +601,9 @@ async function main() {
   const option = (/** @type {string} */ name) => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
   const out = resolvePath(option('out') ?? 'boot-smoke-results'); mkdirSync(out, { recursive: true });
   const external = option('url'), rendererReport = option('renderer-report');
+  const buildRoot = resolvePath(option('build-root') ?? root);
   const jobs = bootJobs(option('jobs'));
-  if (external === undefined && !existsSync(join(root, 'dist/index.html'))) throw new Error('Build dist before running boot smoke');
+  if (external === undefined && !existsSync(join(buildRoot, 'dist/index.html'))) throw new Error('Build dist before running boot smoke');
   const pool = browserPool(root, jobs, option('angle') ?? (process.platform === 'darwin' ? 'metal' : 'swiftshader'), true);
   const controller = new AbortController();
   /** @type {Awaited<ReturnType<typeof serve>> | null} */ let preview = null;
@@ -623,7 +624,7 @@ async function main() {
   const interrupt = () => stop('SIGINT'), terminate = () => stop('SIGTERM');
   if (rendererReport !== undefined) { process.on('SIGINT', interrupt); process.on('SIGTERM', terminate); }
   try {
-    preview = external === undefined ? await serve(root, '', true, { signal: controller.signal, ...(rendererReport === undefined ? {} : {telemetryDir: join(out, 'telemetry')}) }) : null;
+    preview = external === undefined ? await serve(buildRoot, '', true, { signal: controller.signal, ...(rendererReport === undefined ? {} : {telemetryDir: join(out, 'telemetry')}) }) : null;
     active();
     const base = external ?? preview?.url;
     if (!base) throw new Error('No built preview');

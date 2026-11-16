@@ -2,20 +2,23 @@
 // TS19: independent observations of the stock Ring 1 proof, never a replacement CI gate.
 import { spawn, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { closeSync, existsSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { scratchDir } from './scratch-dir.mjs';
+import { servedSlug } from './server-release/served-slug.mjs';
 
 /** @typedef {{code:number|null,signal:NodeJS.Signals|null,timedOut:boolean,cancelled:boolean,error:string|null,wallMs:number}} CommandResult */
 /** @typedef {{mode:string,shard:string,developer:unknown,elapsedMs:number,gameplayFrames:{initial:number,final:number},faults:unknown[],fatal:unknown[],renderer:{renderer:string,unmaskedRenderer?:string|null,lost:unknown}}} SmokeCase */
 /** @typedef {{schema:string,error:string|null,cancelled:string|null,expected:unknown[],cases:SmokeCase[]}} RendererReport */
 
-/** @param {string} out @param {string} report @param {string} [platform] */
-export function stockProofCommand(out, report, platform = process.platform) {
-  if (!['darwin', 'linux'].includes(platform)) throw new Error('Unsupported probe platform');
+/** @param {string} out @param {string} report @param {string} [platform] @param {string} [buildRoot] */
+export function stockProofCommand(out, report, platform, buildRoot) {
+  const target = platform ?? process.platform;
+  if (!['darwin', 'linux'].includes(target)) throw new Error('Unsupported probe platform');
   return [process.execPath, 'scripts/parity/boot-smoke.mjs', '--case-group=developer', '--jobs=1',
-    `--out=${out}`, `--angle=${platform === 'darwin' ? 'metal' : 'swiftshader'}`, `--renderer-report=${report}`];
+    `--out=${out}`, `--angle=${target === 'darwin' ? 'metal' : 'swiftshader'}`, `--renderer-report=${report}`,
+    ...(buildRoot === undefined ? [] : [`--build-root=${buildRoot}`])];
 }
 
 /** Hosted admission is duplicated at the workflow boundary; local Mac observations remain possible.
@@ -34,11 +37,13 @@ export function smokeVerdict(exit, report, products) {
   if (exit.code !== 0 || exit.signal !== null || exit.timedOut || exit.cancelled || exit.error !== null) return failed('proof command failed');
   if (!report || report.schema !== 'macos-smoke-renderers/1' || report.error !== null || report.cancelled !== null ||
     !Array.isArray(report.cases) || !Array.isArray(report.expected) || products.length === 0 || new Set(products).size !== products.length) return failed('missing complete original case evidence');
-  const expected = products.map(shard => JSON.stringify(['standalone', shard, true])).sort();
+  const servedProducts = products.map(servedSlug);
+  if (new Set(servedProducts).size !== products.length) return failed('duplicate served product identity');
+  const expected = servedProducts.map(shard => JSON.stringify(['standalone', shard, true])).sort();
   if (JSON.stringify(report.expected.map(row => JSON.stringify(row)).sort()) !== JSON.stringify(expected)) return failed('built catalogue differs from pinned proof identity');
   const seen = new Set();
   for (const row of report.cases) {
-    if (row?.mode !== 'standalone' || !products.includes(row.shard) || seen.has(row.shard) || row.developer !== true ||
+    if (row?.mode !== 'standalone' || !servedProducts.includes(row.shard) || seen.has(row.shard) || row.developer !== true ||
       !Number.isFinite(row.elapsedMs) || row.elapsedMs <= 0 || !Number.isFinite(row.gameplayFrames?.initial) || !Number.isFinite(row.gameplayFrames?.final) ||
       row.gameplayFrames.final < row.gameplayFrames.initial + 10 || !Array.isArray(row.faults) || row.faults.length > 0 || !Array.isArray(row.fatal) || row.fatal.length > 0 ||
       typeof row.renderer?.renderer !== 'string' || !row.renderer.renderer || row.renderer.lost !== false) return failed('invalid original gameplay/renderer evidence');
@@ -86,7 +91,7 @@ export function runCommand(command, { cwd, env = process.env, log, timeoutMs = 6
 function digest(path) { return createHash('sha256').update(readFileSync(path)).digest('hex'); }
 const IDENTITY_FILES = ['scripts/parity/boot-smoke.mjs', 'scripts/parity/pool.mjs', 'scripts/parity/lane-browser.mjs',
   'scripts/parity/serve.mjs', 'scripts/ring1.sh', 'scripts/macos-smoke-probe.mjs', 'pnpm-lock.yaml',
-  'test/pins/shardfiles.json', 'test/pins/rings.json', 'test/pins/slices.json'];
+  'test/pins/shardfiles.json', 'test/pins/rings.json', 'test/pins/slices.json', 'scripts/server-release/served-slug.mjs'];
 /** @param {string} root */
 export function proofIdentity(root) {
   const git = (/** @type {string[]} */ args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
@@ -143,11 +148,14 @@ async function main() {
     const producer = readJson(producerFile);
     if (producer.schema !== 'macos-smoke-products/1' || producer.error !== null || JSON.stringify(producer.identity) !== JSON.stringify(identity) || producer.archiveSha256 !== digest(archive)) throw new Error('Producer/archive provenance does not match this exact source and pins');
     observation.producer = producer;
-    // The artifact is produced in this guarded workflow; do not mix a stale local dist with it.
-    if (existsSync(join(root, 'dist')) || existsSync(join(root, 'dist-content'))) throw new Error('Observation requires an empty build destination');
-    await run('restore', ['tar', '-xf', archive, '-C', root]);
-    if (JSON.stringify(readJson(join(root, 'dist/version.json'))) !== JSON.stringify(producer.version)) throw new Error('Restored build identity differs');
-    const command = stockProofCommand(join(out, 'boot'), rendererFile); observation.command = command;
+    // Pin installation can already publish dist-content. Serve only this
+    // archive's fresh owned tree; leave those existing outputs untouched.
+    const restored = join(out, 'restored');
+    if (existsSync(restored)) throw new Error('Observation requires an empty restored destination');
+    mkdirSync(restored);
+    await run('restore', ['tar', '-xf', archive, '-C', restored]);
+    if (JSON.stringify(readJson(join(restored, 'dist/version.json'))) !== JSON.stringify(producer.version)) throw new Error('Restored build identity differs');
+    const command = stockProofCommand(join(out, 'boot'), rendererFile, process.platform, restored); observation.command = command;
     const proof = await runCommand(command, { cwd: root, env, log: join(out, 'proof.log') }); stages.proof = proof;
     const report = existsSync(rendererFile) ? readJson(rendererFile) : null; observation.renderers = report;
     Object.assign(observation, smokeVerdict(proof, report, identity.products));

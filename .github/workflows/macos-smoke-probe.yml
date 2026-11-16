@@ -70,7 +70,7 @@ jobs:
           name: macos-smoke-products
           path: tmp/macos-smoke-probe
       - name: Install the actual platform browser
-        run: bash scripts/ci-playwright-install.sh --only-shell chromium
+        run: bash scripts/ci-playwright-install.sh chromium
       - name: Observe the stock smoke without changing its assertions
         run: node scripts/macos-smoke-probe.mjs observe
       - name: Preserve every actual outcome

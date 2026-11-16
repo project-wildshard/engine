@@ -20,9 +20,10 @@ afterEach(() => { for (const dir of roots.splice(0)) rmSync(dir, { recursive: tr
 const products = ['template', 'blender-template', 'sunscar-dunes'];
 const exit = { code: 0, signal: null, timedOut: false, cancelled: false, error: null, wallMs: 1000 };
 function report() {
+  const served = ['_template', 'blender-template', 'sunscar-dunes'];
   return { schema: 'macos-smoke-renderers/1', cancelled: null, error: null,
-    expected: products.map(shard => ['standalone', shard, true]),
-    cases: products.map(shard => ({ mode: 'standalone', shard, developer: true, elapsedMs: 1000,
+    expected: served.map(shard => ['standalone', shard, true]),
+    cases: served.map(shard => ({ mode: 'standalone', shard, developer: true, elapsedMs: 1000,
       gameplayFrames: { initial: 5, final: 15 }, faults: [] as string[], fatal: [] as string[],
       renderer: { renderer: 'fixture renderer', unmaskedRenderer: 'fixture backend', lost: false } })) };
 }
@@ -34,6 +35,7 @@ test('the stock proof keeps developer cases, one browser and the measured platfo
     expect(command).toContain(`--angle=${platform === 'darwin' ? 'metal' : 'swiftshader'}`);
   }
   expect(() => stockProofCommand('x', 'y', 'win32')).toThrow();
+  expect(stockProofCommand('x', 'y', 'darwin', 'owned/restored')).toContain('--build-root=owned/restored');
 });
 
 test('hosted admission refuses private, incomplete and nonstandard runner context before launch', () => {
@@ -48,6 +50,8 @@ test('printed success, missing/foreign cases, lost GL and failed process status 
   expect(smokeVerdict({ ...exit, wallMs: 60001 }, report(), products)).toMatchObject({ verdict: 'passed', under60Seconds: false });
   for (const patch of [{ code: 7 }, { signal: 'SIGTERM' as const }, { timedOut: true }, { cancelled: true }, { error: 'spawn failed' }, { wallMs: NaN }]) expect(smokeVerdict({ ...exit, ...patch }, report(), products).verdict).toBe('failed');
   expect(smokeVerdict(exit, null, products).verdict).toBe('failed');
+  expect(smokeVerdict(exit, report(), [...products, '_template']).verdict).toBe('failed');
+  expect(smokeVerdict(exit, { ...report(), expected: products.map(shard => ['standalone', shard, true]) }, products).verdict).toBe('failed');
   const first = report().cases[0], third = report().cases[2];
   if (!first || !third) throw new Error('Missing fixture cases');
   const badReports = [
