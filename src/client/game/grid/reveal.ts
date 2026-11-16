@@ -19,6 +19,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { app } from '@wildshard/engine/app/runtime';
 import { listenPage } from '@wildshard/engine/input/dom';
 import { hudSlots } from '@wildshard/engine/ui/hudSlots';
+import { holdLoadingVeil } from '@wildshard/engine/ui/Loading';
 import { GAME_STRINGS } from '../../../shared/game/strings';
 import './gridHud.css';
 
@@ -91,9 +92,12 @@ export function installGridReveal(host: GridRevealHost): () => boolean {
     publish();
     scope.dispose();
   };
+  // SB5: the loading card's still copy stays up over the hidden canvas until this frame (Loading.ts `holdLoadingVeil`)
+  const releaseVeil = holdLoadingVeil(scope);
   const begin = (at: number): void => {
     started = at;
     host.canvas.style.visibility = ''; // this frame draws the sky pose (the late phase runs before the render)
+    releaseVeil();
     wasEnabled = host.weapons.enabled; wasVisible = host.weapons.visible;
     host.weapons.setEnabled(false); host.weapons.visible = false;
     viewmodelWas = host.viewmodel.visible;

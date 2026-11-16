@@ -1,6 +1,7 @@
 import { lowPowerReading, titleLowPowerReading, type LowPowerReading } from '../boot/lowPower';
 import { sustainedFrames } from '../core/sustainedFrames';
 import { uiScope, mountUi } from './ownership';
+import type { Scope } from '../../../shared/engine/app/scope';
 import { bootMark, bootTiming } from '../../../shared/engine/boot/timing';
 import { serverBootProgress } from '../../../shared/engine/boot/serverProgress';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
@@ -113,6 +114,43 @@ const PAINT_MS = 200;
 const CLOCK_MS = 100;
 let currentLoading: { id: string; loading: Loading } | null = null;
 /** the loading screen: the download and set-up bars, the boot steps' rows, the tier and the diagnostics */
+/** STAGING-BUGBASH SB5: past the card's end the world can still be hidden: grid/reveal.ts keeps the canvas and the HUD out of
+ *  sight until its first gated frame (0.4 s in WebKit, up to 1.6 s in Chromium), and the page showed black. While a part holds
+ *  the veil, the finished card leaves a still copy of itself on screen: it covers nothing for the app (the world steps and
+ *  draws under it, so the frame it waits for can come) and takes no input (a touch reaches the page, the reveal's skip
+ *  among it). The copy fades like the card the moment the last hold lets go, or after VEIL_MS whatever happens. */
+const VEIL_MS = 4000, VEIL_FADE_MS = 250;
+let veilHolds = 0;
+const veilReleases = new Set<() => void>();
+/** Hold the veil while `scope` lives, or until the returned function runs. */
+export function holdLoadingVeil(scope: Scope): () => void {
+  let held = true; veilHolds++;
+  const release = (): void => {
+    if (!held) return;
+    held = false; veilHolds--;
+    if (veilHolds === 0) for (const fade of veilReleases) fade(); // a Set visits each once while its entries delete themselves
+  };
+  scope.onDispose(release);
+  return release;
+}
+function veilCard(card: HTMLElement): void {
+  const scope = uiScope('loading.veil', app.engineScope);
+  const veil = card.cloneNode(true) as HTMLElement;
+  veil.removeAttribute('id'); for (const el of veil.querySelectorAll('[id]')) el.removeAttribute('id');
+  veil.classList.remove('hide'); veil.dataset['veil'] = 'true'; veil.inert = true; veil.style.pointerEvents = 'none';
+  mountUi(veil, scope, document.body);
+  let fading = false;
+  const fade = (): void => {
+    if (fading || scope.disposed) return;
+    fading = true; veilReleases.delete(fade);
+    veil.classList.add('hide');
+    scope.timeout(VEIL_FADE_MS, () => { scope.dispose(); });
+  };
+  veilReleases.add(fade);
+  scope.onDispose(() => { veilReleases.delete(fade); });
+  scope.timeout(VEIL_MS, fade);
+}
+
 export class Loading {
   readonly scope: ReturnType<typeof uiScope> = uiScope('Loading');
   root: HTMLElement;
@@ -850,6 +888,7 @@ export class Loading {
       // Two animation callbacks put a painted completion frame between the
       // final DOM update and the fade, even when done runs inside a frame.
       this.scope.raf(() => { this.scope.raf(() => {
+        if (veilHolds > 0 && !this.scoped) veilCard(this.root);
         this.root.classList.add('hide');
         this.scope.timeout(250, () => { complete = true; this.scope.dispose(); resolve(); });
       }); });

@@ -12,7 +12,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 
 /** @typedef {import('playwright').Page} Page */
-/** @typedef {{ doc: number, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean }} Screen */
+/** @typedef {{ doc: number, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, reveal?: boolean }} Screen */
 /** @typedef {{ t: number, s: Screen | null }} Sample */
 /** @typedef {{ at: number, text: string }} Problem */
 
@@ -45,6 +45,8 @@ export function screenNow() {
     shell: shown('[data-title-shell]'), title: shown('.ws-main:not(.hide)'), select: shown('.ws-menu:not(.hide)'),
     loading: load !== undefined && loadHeight >= innerHeight * 0.8, bar: load !== undefined && loadHeight < innerHeight * 0.8,
     hud: shown('.ws-touch') || shown('.ws-minimap'), modal: shown('#wsdrop, .ws-err, .ws-fail'),
+    // the grid's sky-down arrival (grid/reveal.ts): the world drawn under its ARRIVING caption, the HUD held back for 3 s
+    reveal: shown('.ws-grid-reveal'),
   };
 }
 
@@ -59,14 +61,16 @@ export function label(s) {
   if (s.loading) return 'loading';
   if (s.bar) return 'bar';
   if (s.hud) return 'play';
+  if (s.reveal === true) return 'arrival';
   return 'blank';
 }
 
 /** The verdict on samples taken from the Enter World tap on: every way this journey has broken on a phone.
  * @param {readonly Sample[]} samples @param {{ blankMs?: number, budgetMs?: number }} [options] @returns {Problem[]} */
-// blankMs: the grid reveal holds canvas and HUD hidden from the loader's end to the first gated frame (grid/reveal.ts), 0.4 to
-// 1.6 s here today (meta STAGING-BUGBASH row for closing it); the loops this guards held a blank screen for 5 to 30 s.
-export function judge(samples, { blankMs = 2500, budgetMs = 90_000 } = {}) {
+// blankMs (STAGING-BUGBASH SB5): no blank wait past half a second. The grid's sky-down arrival is its own screen ('arrival');
+// the loading card leaves a still copy over a canvas the reveal still hides (ui/Loading.ts `holdLoadingVeil`). The loops this
+// guards held a blank screen for 5 to 30 s.
+export function judge(samples, { blankMs = 500, budgetMs = 90_000 } = {}) {
   /** @type {Problem[]} */
   const problems = [];
   const tapDoc = samples[0]?.s?.doc;
