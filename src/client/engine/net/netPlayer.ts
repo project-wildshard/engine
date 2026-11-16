@@ -167,11 +167,11 @@ export class NetPlayer implements PlayerLink {
   resumeRespawn(): void { this.respawnHeld = false; this.seen = null; }
 
   /** A fixed step. False, with nothing sent, before the first frame or when a full ring says the server stopped answering. */
-  step(input: PlayerWireInput): boolean {
+  step(input: PlayerWireInput | (() => PlayerWireInput)): boolean {
     if (this.respawnHeld || this.predictor.full) return false;
-    if (this.seen === null) return this.unseated && this.deviceMode !== 'paused' && this.stepUnseated(input);
+    if (this.seen === null) return this.unseated && this.deviceMode !== 'paused' && this.stepUnseated(typeof input === 'function' ? input() : input);
     if (!this.claimInputTick(0)) return false;
-    const armed = this.armed(input);
+    const armed = this.armed(typeof input === 'function' ? input() : input);
     return this.sendCommand(armed, true, this.hooked(armed));
   }
   /** Bind current page activity and controls without consuming a device edge. */

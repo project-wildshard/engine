@@ -40,7 +40,9 @@ import type { Physics } from '../../../shared/engine/physics/Physics';
 export type PlayerWireInput = Pick<NetCommand, 'steer' | 'yaw' | 'pitch' | 'buttons'>;
 /** Where a controls step goes when a server owns this body: `client/net/netPlayer.ts`. False: the step did not run. */
 export interface PlayerLink {
-  readonly step: (input: PlayerWireInput) => boolean;
+  /** A device reader is called only after admission, so a refused tick cannot
+   * consume a queued press. Already sampled commands remain supported. */
+  readonly step: (input: PlayerWireInput | (() => PlayerWireInput)) => boolean;
   /** Optional live device driver. The transport reads current mode and held
    * controls on server frames; capture and presses stay on the page clock. */
   readonly driveDevice?: (mode: () => 'frame' | 'live' | 'paused', held: () => PlayerWireInput) => void;
@@ -243,6 +245,7 @@ export class Player {
   link: PlayerLink | null = null;
   /** A board press waiting for the next command: with a link the server rules on it, so the step toggles it, on both sides. */
   private boardPressed = false;
+  private readonly readDeviceInput = (): PlayerWireInput => this.sampleCommand();
   /** Inside `stepNet`: the step itself toggling the board. */
   private stepping = false;
   /** the feet before the last fixed step: update() interpolates the camera between it and `position` */
@@ -514,9 +517,9 @@ export class Player {
    * taken here and nothing reconciles. With one, it goes to the wire and through the predictor, which steps it back here.
    */
   stepDevice(dt: number): void {
-    const { link } = this, input = this.sampleCommand();
+    const { link } = this;
     this.commandJumpUsed = false; this.commandDodgeUsed = false;
-    if (link === null) this.stepNet(dt, input, false); else link.step(input);
+    if (link === null) this.stepNet(dt, this.sampleCommand(), false); else link.step(this.readDeviceInput);
     const { jump, dodge } = this.commandUse();
     if (jump) this.inputService?.consume('jump');
     if (dodge) this.inputService?.consume('dodge');
