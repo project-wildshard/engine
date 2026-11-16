@@ -132,7 +132,10 @@ async function enterPage(): Promise<unknown> {
   // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here.
   // SA37: on every host, a world build too: PLAY's `/?chunk=` page enters the world's grid at the shard's cell (GO7 below)
   const slugged = slugOfPath(location.pathname);
-  if (slugged !== null && requested === null) return showSlugPage(slugged);
+  if (slugged !== null && requested === null) {
+    if (location.pathname.replace(/\/$/u, '') !== `/slug/${slugged}`) history.replaceState(history.state, '', `/slug/${slugged}${location.search}`); // a retired slug
+    return showSlugPage(slugged);
+  }
   // An embedded author product has its own admission. A game URL must name a
   // listed world before any discovery, tables or renderer can be prepared.
   if (requested !== null && document.getElementById('ws-shardfile') === null && findTitleManifest(requested) === undefined) {

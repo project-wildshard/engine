@@ -6,3 +6,8 @@ test('only /slug/<slug> names a slug', () => {
   expect(['/slug/driftwood-isle', '/slug/open-plot-thin-ice/', '/slug/_template'].map(slugOfPath)).toEqual(['driftwood-isle', 'open-plot-thin-ice', '_template']);
   expect(['/', '/slug/', '/slug/a/b', '/slugs/x', '/doctor/', '/slug/a%20b'].map(slugOfPath)).toEqual([null, null, null, null, null, null]);
 });
+
+test('a retired slug opens its shard under the new one (Brasscap Mesa was staged as blender-template)', () => {
+  expect(slugOfPath('/slug/blender-template')).toBe('brasscap-mesa');
+  expect(slugOfPath('/slug/brasscap-mesa')).toBe('brasscap-mesa');
+});
