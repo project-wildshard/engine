@@ -154,10 +154,11 @@ export function liveIo(env=process.env){
       ()=>/** @type {Run[]} */(JSON.parse(read(['api',`repos/${repo}/actions/workflows/ci.yml/runs?branch=main&per_page=50`])).workflow_runs
         .filter((/** @type {Run} */row)=>row.event==='push'||row.event==='workflow_dispatch'))),
     failed:(/** @type {number} */id)=>/** @type {{name:string,conclusion:string|null}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
-      .filter(job=>job.conclusion==='failure'||job.conclusion==='timed_out').map(job=>job.name),
-    // The annotations (their AMBER lines) on a run's blocking tests and its timings job; quarantine's are its own (J193).
+      .filter(job=>job.name!=='timings'&&job.name!=='quarantine'&&(job.conclusion==='failure'||job.conclusion==='timed_out')).map(job=>job.name),
+    // Blocking tests own AMBER evidence. The advisory timings collector only repeats it;
+    // its annotations cannot change main's verdict. Quarantine reports separately (J193).
     annotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
-      .filter(job=>job.name.startsWith('tests')||job.name==='timings')
+      .filter(job=>job.name.startsWith('tests'))
       .map(job=>/** @type {{message:string}[]} */(JSON.parse(read(['api',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`]))).map(row=>row.message).join('\n')).join('\n'),
     tip:()=>{run('git',['fetch','--quiet','origin','main']);return run('git',['rev-parse','origin/main']).trim();},
     commits:(/** @type {string|null} */from,/** @type {string} */to)=>{

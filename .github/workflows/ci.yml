@@ -581,17 +581,29 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Check for active quarantine files before installing anything
+        id: active
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          import { activeQuarantineFiles } from './scripts/test-quarantine.mjs';
+          const count = activeQuarantineFiles().length;
+          appendFileSync(process.env.GITHUB_OUTPUT, `run=${count > 0}\n`);
+          console.log(`${count} active quarantine files; ${count === 0 ? 'skip setup and pins' : 'run the original cohort'}`);
+          NODE
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        if: steps.active.outputs.run == 'true'
         with:
           node-version-file: package.json
       - name: Classify from an actually green code-proving ancestor
         id: paths
+        if: steps.active.outputs.run == 'true'
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '0000000000000000000000000000000000000000' }}
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-selection.mjs
       - id: code
-        if: steps.paths.outputs.docs != 'true'
+        if: steps.active.outputs.run == 'true' && steps.paths.outputs.docs != 'true'
         run: echo "run=true" >> "$GITHUB_OUTPUT"
       - if: steps.code.outputs.run == 'true'
         uses: ./.github/actions/ring-setup
