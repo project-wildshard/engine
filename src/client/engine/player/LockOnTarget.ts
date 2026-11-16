@@ -27,7 +27,7 @@ import type { InputService } from '../input/InputService';
 import * as THREE from 'three';
 import type { Player } from './Player';
 import type { EquipmentService } from '../combat/EquipmentService';
-import { lockOn, type AimTarget } from './AimTargets';
+import { liveAimTargets, lockOn, type AimTarget } from './AimTargets';
 import { targetRadius } from '../../../shared/engine/combat/lungeTarget';
 import { lineOfSight } from '../../../shared/engine/physics/query';
 import { getNumber, getSetting } from '../ui/Settings';
@@ -283,7 +283,7 @@ export class LockOnSystem {
     const fx = -Math.sin(yaw) * Math.cos(pitch), fy = Math.sin(pitch), fz = -Math.cos(yaw) * Math.cos(pitch);
     this.cands.length = 0;
     this.eye(_eye);
-    for (const t of app.aimTargets) {
+    for (const t of liveAimTargets()) {
       if (!t.alive || t.hidden || !(t.lockable ?? t.flying === true)) continue;
       const dist = this.distance(t);
       if (dist > this.range(t) && t !== lockOn.target) continue;

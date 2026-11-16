@@ -1,4 +1,3 @@
-import { app } from '../app/runtime';
 /**
  * AimAssist — console-style (CoD / GTA pad) aim help for TOUCH play. Mouse users never get it: only TouchControls
  * drives it. Three classic parts, all against alive animals within RANGE m and in front of the camera, all gated by
@@ -28,7 +27,7 @@ import { app } from '../app/runtime';
  */
 import * as THREE from 'three';
 import type { Player } from './Player';
-import type { AimTarget } from './AimTargets';
+import { liveAimTargets, type AimTarget } from './AimTargets';
 import { getSetting } from '../ui/Settings';
 
 const DEG = Math.PI / 180;
@@ -83,7 +82,7 @@ export class AimAssist {
     let best: AimTarget | null = null;
     let bestDist = 0, bestAngle = 0, bestYaw = 0, bestPitch = 0, bestRadius = 0, bestWy = 0, bestWp = 0, bestHasVel = false;
     const margin = adsOn ? FRICTION_MARGIN_ADS : FRICTION_MARGIN_HIP;
-    for (const t of app.aimTargets) {
+    for (const t of liveAimTargets()) {
       if (!t.alive || t.hidden) { this.bearings.delete(t); continue; }
       aimPoint(t, _aim);
       _dir.subVectors(_aim, p);

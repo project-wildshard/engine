@@ -11,7 +11,9 @@
  * no logic or runtime; it replaced G66's "frozen, but alive-looking" neighbours): a frozen cell's lane never steps and its
  * creatures stay hidden, so a neighbour shows only its tiles.
  */
-import { Bone, Skeleton, SkinnedMesh, type Group, type Object3D, type Vector3 } from 'three';
+import { Bone, Skeleton, SkinnedMesh, Vector3, type Group, type Object3D } from 'three';
+import { addCombatTargets, reportCombatHit, type CombatTarget } from '@wildshard/engine/ui/Combat';
+import { addAimTargets, type AimTarget } from '@wildshard/engine/player/AimTargets';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { createShardfileClientScripts } from '../shardfile/clientScripts';
 import type { ClientScriptTarget } from '@wildshard/format/clientScripts';
@@ -26,6 +28,8 @@ export interface NeighbourCreature {
   readonly position: { readonly x: number; readonly y: number; readonly z: number };
   readonly yaw: number; readonly scale: number; readonly speed: number; readonly strafe: number;
   readonly alive: boolean; readonly attackPhase: number; readonly state: SkinDriveState['state'];
+  /** The row's hp and flinch (absent on a source that sends neither): a fall in hp is a blow, whoever landed it. */
+  readonly hp?: number; readonly flinch?: number;
 }
 /** A cell's admitted region, as much of it as a view reads. */
 export interface NeighbourRegion { readonly host: { readonly entities: { get: (id: string) => NeighbourCreature | undefined } } }
@@ -38,7 +42,16 @@ export interface NeighbourLifePorts {
 /** One cell's readout. */
 export interface NeighbourLifeCell { readonly instance: string; readonly creatures: number; readonly frozen: boolean; readonly views: ClientScriptViewState; readonly failed: string | null }
 
-interface CreatureView { readonly id: string; readonly mesh: SkinnedMesh; readonly driver: SkinDriver; readonly spawn: { at: readonly [number, number, number]; yaw: number; scale: number }; readonly bodyY: number; t: number; phase: number }
+/** TEMPLATE-E2E TC-B10: a drawn creature as the page's health bars read it (Combat's `CombatTarget`), in world space. */
+class CreatureTarget implements CombatTarget, AimTarget {
+  hidden = true; lastHitT = -Infinity; hp: number; maxHp: number; alive = true; scale: number; lastHp: number | null = null;
+  readonly mem: Readonly<Record<string, number | undefined>> = {};
+  readonly position = new Vector3();
+  constructor(readonly kind: string, readonly label: string, maxHp: number, scale: number, private readonly head: number,
+    readonly dims: { readonly bodyY: number; readonly bodyRadius: number }, readonly lockable: boolean) { this.hp = maxHp; this.maxHp = maxHp; this.scale = scale; }
+  headWorld(out: Vector3): Vector3 { return out.copy(this.position).setY(this.position.y + this.head * this.scale); }
+}
+interface CreatureView { readonly id: string; readonly mesh: SkinnedMesh; readonly driver: SkinDriver; readonly spawn: { at: readonly [number, number, number]; yaw: number; scale: number }; readonly bodyY: number; readonly target: CreatureTarget; t: number; phase: number }
 interface CellLife {
   readonly cell: GridCell; readonly root: Group; readonly creatures: ReadonlyMap<string, CreatureView>;
   /** null: the cell binds no script (or its lane failed to build, `failed` says why); its creatures still draw */
@@ -69,7 +82,18 @@ export class NeighbourLife {
   private readonly ports: NeighbourLifePorts;
   private readonly cells = new Map<string, CellLife>();
   private tick = 0;
-  constructor(ports: NeighbourLifePorts) { this.ports = ports; }
+  constructor(ports: NeighbourLifePorts) {
+    this.ports = ports;
+    // TC-B10: the entered cell's drawn creatures get the page's health bars and damage numbers (Jake, 2026-11-15)
+    // and the touch aim assist and lock-on: on a phone the thumb lands shots on them as on a page's own creatures
+    ports.scope.onDispose(addCombatTargets(() => this.targets()));
+    ports.scope.onDispose(addAimTargets(() => this.targets()));
+  }
+
+  /** The live, entered cells' creature targets, for the page's health bars. */
+  private *targets(): Generator<CreatureTarget> {
+    for (const life of this.cells.values()) if (this.ports.active(life.cell.instance)) for (const view of life.creatures.values()) yield view.target;
+  }
 
   /** Admit one neighbour's life once its product and materials are ready (the session's shared per-slug load). */
   async admit(cell: GridCell, root: Group, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, compile: Parameters<typeof loadClientSkins>[2], skinsBySlug: Map<string, Promise<ReadonlyMap<string, ClientSkin>>>): Promise<void> {
@@ -91,7 +115,12 @@ export class NeighbourLife {
       const skin = look === undefined ? undefined : skins.get(look.id);
       if (spawn === undefined || species === undefined || skin === undefined) continue; // a non-skin look has no neighbour view yet
       const { mesh, bones } = skinMesh(skin), driver = new SkinDriver(skin, bones);
-      const view: CreatureView = { id, mesh, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale: spawn.scale }, bodyY: species.dims.bodyY * spawn.scale, t: (spawn.seed % 97) / 13, phase: 0 };
+      // a hand-made row (a test's) may carry no variants or head size: the bar then reads the row's own hp as its full
+      const variants: readonly { id: string; label: string; hp: number }[] = Array.isArray(species.variants) ? species.variants : [];
+      const variant = variants.find((row) => row.id === spawn.variant) ?? variants[0], head = species.dims.headRadius;
+      const target = new CreatureTarget(species.kind, variant?.label ?? species.label, Math.max(1, variant?.hp ?? 1), spawn.scale, species.dims.bodyY * 2 + (Number.isFinite(head) ? head : 0.3),
+        { bodyY: species.dims.bodyY, bodyRadius: species.dims.bodyRadius }, species.lockable);
+      const view: CreatureView = { id, mesh, driver, spawn: { at: spawn.at, yaw: spawn.yaw, scale: spawn.scale }, bodyY: species.dims.bodyY * spawn.scale, target, t: (spawn.seed % 97) / 13, phase: 0 };
       mesh.position.set(spawn.at[0], spawn.at[1], spawn.at[2]); mesh.rotation.set(0, spawn.yaw, 0, 'YXZ'); mesh.scale.setScalar(spawn.scale);
       // ZE3a: hidden from birth unless its cell is the active one: an admission that resolves between the late phase (which
       // hides a frozen cell's creatures) and the draw drew them once, and that draw linked their programs on the frame (a
@@ -159,17 +188,29 @@ export class NeighbourLife {
       const region = this.ports.simulation(life.cell.instance), live = this.ports.active(life.cell.instance);
       // G663: a frozen cell draws none of its creatures and composes no lane
       life.lane?.views.show(live);
-      if (!live) { for (const view of life.creatures.values()) view.mesh.visible = false; continue; }
+      if (!live) { for (const view of life.creatures.values()) { view.mesh.visible = false; view.target.hidden = true; } continue; }
       for (const view of life.creatures.values()) {
         const sim = region?.host.entities.get(view.id);
         view.mesh.visible = true;
         if (sim !== undefined) { view.mesh.position.copy(sim.position); view.mesh.rotation.set(0, sim.yaw, 0, 'YXZ'); view.mesh.scale.setScalar(sim.scale); }
         view.t += dt; const speed = sim?.speed ?? 0, strafe = sim?.strafe ?? 0;
         view.phase = (view.phase + dt * Math.hypot(speed, strafe) * 0.6) % 1;
-        view.driver.step({ dt, t: view.t, alive: sim?.alive ?? true, flinch: 0, attack: sim?.attackPhase ?? -1, speed, strafe, scale: sim?.scale ?? view.spawn.scale, phase: view.phase, state: sim?.state ?? 'idle' });
+        this.follow(view, sim);
+        view.driver.step({ dt, t: view.t, alive: sim?.alive ?? true, flinch: sim?.flinch ?? 0, attack: sim?.attackPhase ?? -1, speed, strafe, scale: sim?.scale ?? view.spawn.scale, phase: view.phase, state: sim?.state ?? 'idle' });
       }
       if (life.failed === null) life.lane?.views.apply(dt);
     }
+  }
+
+  /** TC-B10: the bar's read of one creature: where it stands in the world, its hp, and a blow when the row's hp falls. */
+  private follow(view: CreatureView, sim: NeighbourCreature | undefined): void {
+    const target = view.target;
+    view.mesh.updateWorldMatrix(true, false); target.position.setFromMatrixPosition(view.mesh.matrixWorld);
+    target.hidden = false; target.alive = sim?.alive ?? true; target.scale = sim?.scale ?? view.spawn.scale;
+    if (sim?.hp === undefined) return;
+    if (sim.hp > target.maxHp) target.maxHp = sim.hp;
+    if (target.lastHp !== null && sim.hp < target.lastHp) { reportCombatHit(target, target.lastHp - sim.hp, !target.alive || sim.hp <= 0); }
+    target.lastHp = sim.hp; target.hp = sim.hp;
   }
 
   state(): readonly NeighbourLifeCell[] {

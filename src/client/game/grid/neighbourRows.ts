@@ -19,12 +19,13 @@ export function netNeighbourRegion(client: NetClient, renderTick: () => number):
       if (info.id !== id || info.cls.cls !== ANIMAL_CLASS.cls) continue;
       const tick = renderTick(), row = client.interpolator.fields(handle, tick);
       if (row === null) return undefined;
-      const { x, y, z, yaw, attackT, alive } = row, scale = info.initial['scale'], state = ANIMAL_STATES.find(entry => entry === row['state']);
+      const { x, y, z, yaw, attackT, alive, hp, flinch } = row, scale = info.initial['scale'], state = ANIMAL_STATES.find(entry => entry === row['state']);
       if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number' || typeof yaw !== 'number' || state === undefined || typeof scale !== 'number') return undefined;
       const trail = trails.get(id) ?? { tick, x, z, speed: 0 };
       if (tick - trail.tick >= SPEED_SPAN) Object.assign(trail, { speed: Math.hypot(x - trail.x, z - trail.z) / ((tick - trail.tick) * FIXED_STEP), tick, x, z });
       trails.set(id, trail);
-      return { position: { x, y, z }, yaw, scale, speed: trail.speed, strafe: 0, alive: alive === true, attackPhase: attackT === 0 ? -1 : Number(attackT), state };
+      return { position: { x, y, z }, yaw, scale, speed: trail.speed, strafe: 0, alive: alive === true, attackPhase: attackT === 0 ? -1 : Number(attackT), state,
+        ...(typeof hp === 'number' ? { hp } : {}), ...(typeof flinch === 'number' ? { flinch } : {}) };
     }
     return undefined;
   };

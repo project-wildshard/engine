@@ -64,7 +64,45 @@ export function floatLook(own: boolean, head: boolean, died: boolean): { readonl
   return { cls: head ? 'head' : '', label: died ? (head ? engineString('s_9ca42a3b84d2') : engineString('s_448dd87e3774')) : head ? engineString('s_a3de28c1f757') : '', kill: died };
 }
 
-interface BarSlot { el: HTMLElement; fill: HTMLElement; kind: HTMLElement; animal: Animal | null; lastHp: number; shown: boolean; }
+const _t = new THREE.Vector3();
+/** What a health bar reads of a body: a page's own `Animal`, or a grid data cell's server-owned creature (`addCombatTargets`). */
+export interface CombatTarget {
+  readonly hidden: boolean; readonly kind: string; readonly mem: Readonly<Record<string, number | undefined>>; readonly lastHitT: number;
+  readonly position: THREE.Vector3; readonly scale: number; readonly hp: number; readonly maxHp: number; readonly alive: boolean; readonly label: string;
+  readonly headWorld: (out: THREE.Vector3) => THREE.Vector3;
+}
+/** TEMPLATE-E2E TC-B10 (Jake, 2026-11-15: "They have no health bars"): bodies no `RowBodies` holds, such as a grid data
+ *  cell's creatures (`grid/neighbourLife.ts`), get the same bars. A source lists its bodies each frame; the return removes it. */
+const combatSources = new Set<() => Iterable<CombatTarget>>();
+export function addCombatTargets(source: () => Iterable<CombatTarget>): () => void {
+  combatSources.add(source);
+  return () => { combatSources.delete(source); };
+}
+/** A source body's fall in hp, as its row reported it (who struck is not on the row): Combat floats the number over it. */
+const sourceHits: { a: CombatTarget & { lastHitT: number }; amount: number; died: boolean }[] = [];
+export function reportCombatHit(a: CombatTarget & { lastHitT: number }, amount: number, died: boolean): void {
+  if (sourceHits.length < FLOAT_MAX) sourceHits.push({ a, amount, died });
+}
+/** Every source body now, and the blows waiting to float: what a probe or a test reads of the sources. */
+export function combatSourceState(): { readonly targets: readonly CombatTarget[]; readonly hits: number } {
+  const targets: CombatTarget[] = [];
+  for (const source of combatSources) for (const a of source()) targets.push(a);
+  return { targets, hits: sourceHits.length };
+}
+/** The nearest live source body within `tol` m of the aim ray (o, d unit), up to `range` m out, or null. */
+function nearSourceRay(o: THREE.Vector3, d: THREE.Vector3, range: number, tol: number): CombatTarget | null {
+  let best: CombatTarget | null = null, bestDist = Infinity;
+  for (const source of combatSources) for (const a of source()) {
+    if (a.hidden || !a.alive) continue;
+    a.headWorld(_t); _t.sub(o); const along = _t.dot(d);
+    if (along <= 0 || along > range) continue;
+    const off = Math.sqrt(Math.max(0, _t.lengthSq() - along * along));
+    if (off <= tol * Math.max(1, a.scale) && along < bestDist) { best = a; bestDist = along; }
+  }
+  return best;
+}
+
+interface BarSlot { el: HTMLElement; fill: HTMLElement; kind: HTMLElement; animal: CombatTarget | null; lastHp: number; shown: boolean; }
 interface FloatSlot { el: HTMLElement; num: HTMLElement; label: HTMLElement; x: number; y: number; t: number; active: boolean; }
 interface Pending { animal: Animal | null; t: number; deadline: number; active: boolean }
 
@@ -86,7 +124,9 @@ export class Combat {
   private floats: FloatSlot[] = [];
   private pending: Pending[] = [];
   private w = 1; private h = 1;
-  private candidates: Animal[] = [];
+  private candidates: CombatTarget[] = [];
+  /** a source body under the crosshair this frame (`addCombatTargets`), or null */
+  private aimedSource: CombatTarget | null = null;
   private candDist: number[] = [];
   private t = 0;
 
@@ -194,6 +234,7 @@ export class Combat {
     cam.getWorldDirection(_d);
     const aimed = this.animals.nearRay(_o, _d, AIM_RANGE, AIM_TOL);   // not the horse you sit on
     this.aimed = aimed?.mem['owned'] === 1 ? null : aimed;                                  // nor a camp horse / Tulpar
+    this.aimedSource = this.aimed === null && combatSources.size > 0 ? nearSourceRay(_o, _d, AIM_RANGE, AIM_TOL) : null;
 
     // aimed shots that flew past the target without touching it → MISS over the target (don't wait for the bolt to land)
     for (const p of this.pending) {
@@ -202,30 +243,38 @@ export class Combat {
       if (p.animal && p.animal.alive && this.projectAnimal(p.animal)) this.float(engineString('s_e0a896a85299'), '', 'miss', false);
     }
 
-    this.updateBars();
+    const now = performance.now();
+    for (const hit of sourceHits.splice(0)) {
+      hit.a.lastHitT = now; // the bar's hold clock (BAR_HOLD)
+      hit.a.headWorld(_v); _v.y += 0.2;
+      if (!this.project(_v)) continue;
+      const look = floatLook(true, false, hit.died);
+      this.float(String(Math.round(hit.amount)), look.label, look.cls, look.kill);
+    }
+    this.updateBars(now);
     this.updateFloats(dt);
   }
 
-  private updateBars(): void {
-    const now = performance.now();
+  private updateBars(now: number): void {
     const list = this.animals.animals;
     const cand = this.candidates, cd = this.candDist;
     let n = 0;
     _o.setFromMatrixPosition(this.camera.matrixWorld);
-    for (let i = 0; i < list.length; i++) {
-      const a = list[i];
+    const consider = (a: CombatTarget | undefined): void => {
       // a boss / a named elite has its own wide bar (src/client/game/Boss.ts, src/client/game/Elite.ts); the horse you ride has none
-      if (a === undefined || a.hidden || app.encounters.get(a.kind)?.showHeadBar === false || a.mem['noHeadBar'] === 1 || a === app.equipmentHost?.player.mountedOn) continue;
-      const show = now - a.lastHitT < BAR_HOLD || a === this.aimed || (lockOn.state === 'locked' && a === lockOn.target); // the locked enemy keeps its tag (E50, N)
-      if (!show) continue;
+      if (a === undefined || a.hidden || app.encounters.get(a.kind)?.showHeadBar === false || a.mem['noHeadBar'] === 1 || a === app.equipmentHost?.player.mountedOn) return;
+      const show = now - a.lastHitT < BAR_HOLD || a === this.aimed || a === this.aimedSource || (lockOn.state === 'locked' && a === lockOn.target); // the locked enemy keeps its tag (E50, N)
+      if (!show) return;
       const d2 = a.position.distanceToSquared(_o);
-      if (d2 > BAR_DIST * BAR_DIST) continue;
-      // keep the BAR_MAX nearest (insertion into a short sorted list; no allocations once warmed)
+      if (d2 > BAR_DIST * BAR_DIST) return;
+      // keep the BAR_MAX nearest (insertion into a short sorted list)
       let k = n < BAR_MAX ? n : -1;
-      if (k < 0) { if (d2 >= (cd[BAR_MAX - 1] ?? Infinity)) continue; k = BAR_MAX - 1; } else n++;
+      if (k < 0) { if (d2 >= (cd[BAR_MAX - 1] ?? Infinity)) return; k = BAR_MAX - 1; } else n++;
       while (k > 0 && (cd[k - 1] ?? 0) > d2) { const pa = cand[k - 1]; if (pa === undefined) break; cand[k] = pa; cd[k] = cd[k - 1] ?? 0; k--; }
       cand[k] = a; cd[k] = d2;
-    }
+    };
+    for (let i = 0; i < list.length; i++) consider(list[i]);
+    for (const source of combatSources) for (const a of source()) consider(a);
     // free slots whose animal dropped out, then give newcomers a free slot (stable assignment: no bar swapping)
     for (const s of this.bars) if (s.animal) { let keep = false; for (let i = 0; i < n; i++) if (cand[i] === s.animal) { keep = true; break; } if (!keep) { s.animal = null; s.lastHp = -1; } }
     for (let i = 0; i < n; i++) {

@@ -33,6 +33,19 @@ export interface AimTarget {
 
 export function setAimTargets(list: readonly AimTarget[]): void { app.aimTargets = list; }
 
+/** TEMPLATE-E2E TC-B10: targets no `RowBodies` holds (a grid data cell's server-owned creatures, `grid/neighbourLife.ts`) join
+ *  the touch aim assist and the lock-on through a source; the return removes it. */
+const aimSources = new Set<() => Iterable<AimTarget>>();
+export function addAimTargets(source: () => Iterable<AimTarget>): () => void {
+  aimSources.add(source);
+  return () => { aimSources.delete(source); };
+}
+/** The page's own targets, then every source's. */
+export function* liveAimTargets(): Generator<AimTarget> {
+  yield* app.aimTargets;
+  for (const source of aimSources) yield* source();
+}
+
 /**
  * The sword's melee lock (Sword.ts writes it every frame it is held): `target` = the animal a swing would lunge onto right
  * now (in range, in the cone — null when none), `lunging` = a lunge onto it is running. Read by the HUD's lock brackets
