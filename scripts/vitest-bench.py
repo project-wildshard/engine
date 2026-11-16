@@ -746,6 +746,10 @@ def select_owner(args, census, backend):
             raise SystemExit('process inventory exceeded discovery deadline; give --pid or retry later')
         root = choose_gate(gate_candidates(output, pattern))
         if root is not None:
+            if root not in before:
+                if time.monotonic() >= until:
+                    raise SystemExit('no matching gate before discovery deadline; give --pid or retry later')
+                continue  # A newly born candidate needs its own before/after identity snapshots.
             after = backend.processes()[0]
             first = census.owned_process(backend, root, before)
             current = census.owned_process(backend, root, after)

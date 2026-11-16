@@ -27,6 +27,9 @@ def module(name, path):
 
 bench = module('bench', ROOT / 'scripts/vitest-bench.py')
 controls = module('controls', ROOT / 'scripts/cpu-census-proof.py')
+GATE_BODY = ("import {existsSync,writeFileSync} from 'node:fs';\n"
+             "writeFileSync(process.argv[2],'ready');\n"
+             "setInterval(()=>{if(existsSync(process.argv[3]))process.exit(0);},10);\n")
 
 
 def cli(work, *options):
@@ -139,16 +142,62 @@ def observer_faults(work, owner):
     return {'identityMismatchRefused': True, 'timeoutEvidenceRetained': True}
 
 
+def newborn_discovery(work):
+    """Start actual Node owners between the first kernel snapshot and the real ps invocation."""
+    (work / '.githooks').mkdir(parents=True)
+    script = work / '.githooks/push-checks.mjs'
+    script.write_text(GATE_BODY)
+    node = shutil.which('node')
+    pattern = '^' + re.escape(node) + r'\s+' + re.escape(str(script)) + r'(?:\s|$)'
+    real_run = subprocess.run
+    for label, seconds in [('retry', 2), ('deadline', 0)]:
+        ready, stop = work / (label + '.ready'), work / (label + '.stop')
+        owners, calls = [], []
+        def born(command, **options):
+            assert command[:2] == ['ps', '-axo']
+            calls.append(command)
+            if not owners:
+                owners.append(subprocess.Popen([node, str(script), str(ready), str(stop)], cwd=work))
+                controls.wait_for(ready.exists)
+            return real_run(command, **options)
+        args = argparse.Namespace(pid=None, root=pattern, wait_seconds=seconds, interval=.05)
+        began = time.monotonic()
+        try:
+            with patch.object(bench.subprocess, 'run', born):
+                if seconds:
+                    selected = bench.observe_root(args)
+                    assert selected.pid == owners[0].pid and selected.identity
+                    assert len(calls) == 2 and time.monotonic() - began < seconds
+                else:
+                    try:
+                        bench.observe_root(args)
+                    except SystemExit as error:
+                        assert 'discovery deadline' in str(error), error
+                    else:
+                        raise AssertionError('a newborn candidate cannot extend an expired deadline')
+                    assert len(calls) == 1
+            assert owners[0].poll() is None, 'discovery must never signal its candidate'
+        finally:
+            stop.touch()
+            for owner in owners:
+                if owner.poll() is None:
+                    try:
+                        owner.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        owner.terminate()
+                owner.wait(timeout=2)
+    return {'newbornRetried': True, 'newbornDeadlineRetained': True}
+
+
 def discovery(work):
     (work / '.githooks').mkdir(parents=True)
     script = work / '.githooks/push-checks.mjs'
     stop = work / 'stop'
-    script.write_text("import {existsSync,writeFileSync} from 'node:fs';\n"
-                      "writeFileSync(process.argv[2],'ready');\n"
-                      "setInterval(()=>{if(existsSync(process.argv[3]))process.exit(0);},10);\n")
+    script.write_text(GATE_BODY)
     node = shutil.which('node')
     owners, observer = [], None
     try:
+        newborn = newborn_discovery(work / 'newborn')
         # Older than both Node roots, with the old regex embedded in its argv.
         owners.append(subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(10)',
                                         'node', '.githooks/push-checks.mjs'], cwd=work))
@@ -186,7 +235,7 @@ def discovery(work):
         row = finish(observer, work, 0)
         assert row['root']['pid'] == owners[1].pid and row['allObservedChildrenDrained'], row
         return {'relativeAndAbsoluteRoots': True, 'wrapperExcluded': True, 'ambiguousRefused': True,
-                'missingBounded': True, 'legacySummaryRefused': True, 'actualCliDiscovery': True, **faults}
+                'missingBounded': True, 'legacySummaryRefused': True, 'actualCliDiscovery': True, **faults, **newborn}
     finally:
         stop.touch()
         if observer is not None and observer.poll() is None:
