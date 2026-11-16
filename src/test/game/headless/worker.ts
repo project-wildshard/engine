@@ -10,8 +10,8 @@ import { prepareAssetDecoders, offlineMemoryAdmission } from '@wildshard/format/
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { hashImmutableBytes } from '../../../shared/host/immutable';
-import { loadHeadlessProduct } from '../../../server/host/headlessProduct';
-import { createShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { loadHeadlessFolder } from '../../../server/host/headlessFolder';
+import { createShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { createNativeProofAdapter } from '../headlessNative';
 import type { PrepareHeadlessRuntime } from '../../../server/host/headlessRuntime';
 
@@ -27,8 +27,8 @@ await runTickWorker(async raw => {
   const loaded: {prepareHeadlessRuntime?: PrepareHeadlessRuntime} = await import(module.href);
   if (typeof loaded.prepareHeadlessRuntime !== 'function') throw new Error('Native proof module needs prepareHeadlessRuntime');
   const product = payload.directory === undefined
-    ? createShardProduct({ slug: shard.identity.slug, revision: shard.identity.revision, shardfile: shard, sections: payload.sections,
+    ? createShardFolder({ slug: shard.identity.slug, revision: shard.identity.revision, shardfile: shard, sections: payload.sections,
       files: new Map(), read: () => Promise.reject(new Error('Inline native proof has no named files')) })
-    : await loadHeadlessProduct(payload.directory);
+    : await loadHeadlessFolder(payload.directory);
   return createNativeProofAdapter({shard, assets: payload.assets, rapier, product}, loaded.prepareHeadlessRuntime, payload.snapshot);
 });

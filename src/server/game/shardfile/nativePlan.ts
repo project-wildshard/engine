@@ -1,6 +1,6 @@
 import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
 import { prepareRuntimePlan, type NativeRuntimeRecipe } from '../plugin/simulation';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { outputDescriptor, serverReadsFile } from '../../../shared/game/shardfile/outputDescriptor';
 import { hasNativeAssembly, prepareNativeAssembly, type NativeAssemblyRuntime } from './nativeAssembly';
 import type { NativeAssemblyContext, NativeAssemblyPorts } from './nativeAssemblyInput';
@@ -8,7 +8,7 @@ import type { NativeAssemblyContext, NativeAssemblyPorts } from './nativeAssembl
 /** Select the native interpreter from the built product: its server-class native assembly (P1-E3.1b) when it ships
  * one, else `sim/runtime-plan`'s held-melee. No source entry, module URL, shard callback or fallback participates in
  * this boundary. */
-export async function prepareProductRuntimePlan<C extends NativeAssemblyContext>(product: ShardProduct, assets: ReadonlyMap<string, Uint8Array>, ports?: NativeAssemblyPorts<C>): Promise<NativeAssemblyRuntime<C> | Awaited<ReturnType<typeof prepareRuntimePlan>>> {
+export async function prepareFolderRuntimePlan<C extends NativeAssemblyContext>(product: ShardFolder, assets: ReadonlyMap<string, Uint8Array>, ports?: NativeAssemblyPorts<C>): Promise<NativeAssemblyRuntime<C> | Awaited<ReturnType<typeof prepareRuntimePlan>>> {
   if (hasNativeAssembly(product)) {
     if (ports === undefined) throw new Error('A native assembly needs its server ports');
     return prepareNativeAssembly(product, assets, ports);

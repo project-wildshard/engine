@@ -1,5 +1,5 @@
 import { registeredJsonSchema } from '../src/shared/host/formatJsonSchema';
-import { fixtureProductFile, fixtureJsonCheck } from './fixtures/productFile';
+import { fixtureFolderFile, fixtureJsonCheck } from './fixtures/folderFile';
 import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import * as THREE from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
@@ -18,7 +18,7 @@ import { frozenAsset } from './fixtures/frozen/assets';
 import { emptyShardfile } from '../src/shared/host/author';
 import { fixtureNamedBlobs as emitNamedBlobs, fixtureBlob as nameBlob } from './fixtures/namedBlobs';
 import { parseExplorerCatalogue } from '@wildshard/format/explorerCatalogue';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { SceneDressing } from '../src/client/game/shardfile/sceneDressing';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import { explorerRoster } from '../src/client/game/models/explorerCatalogue';
@@ -44,7 +44,7 @@ function glb(width: number): Uint8Array {
 }
 function fixture() {
   const model = glb(2), phone = glb(8), pixels = Uint8ClampedArray.from({ length: 4 * 2 * 4 }, (_, index) => (index * 37 + 19) % 256);
-  const atlas = frozenAsset('product-crate.ktx2'), phonePixels = Uint8ClampedArray.from(pixels, value => 255 - value), phoneAtlas = frozenAsset('product-crate-phone.ktx2');
+  const atlas = frozenAsset('folder-crate.ktx2'), phonePixels = Uint8ClampedArray.from(pixels, value => 255 - value), phoneAtlas = frozenAsset('folder-crate-phone.ktx2');
   const sampler = { wrapS: 10497, wrapT: 33071, minFilter: 9987, magFilter: 9729, anisotropy: 4, colourSpace: 'srgb' } as const;
   const asset = { url: { file: 'models/crate.glb', bytes: model.length }, phoneUrl: { file: 'models/crate-phone.glb', bytes: phone.length },
     atlas: { file: 'textures/crate.ktx2', bytes: atlas.length, ...sampler }, phoneAtlas: { file: 'textures/crate-phone.ktx2', bytes: phoneAtlas.length, ...sampler }, material: { id: 'crate-atlas', family: 'painterly' } as const };
@@ -152,10 +152,10 @@ test('Explorer, direct dressing and generated encounter adapters prepare the sam
   initializeTier('desktop'); const f = fixture(), book = 'models/cover-phone.json';
   const declared = emitNamedBlobs([...f.files].map(([name, bytes]) => nameBlob(name, name.endsWith('.ktx2') ? 'ktx2' : 'glb', bytes))
     .concat(nameBlob(book, 'json', new TextEncoder().encode(JSON.stringify({ rows: f.rows, materials: {} })), {jsonSchema:registeredJsonSchema(book)})));
-  const product = createShardProduct({ slug: 'atlas-fixture', revision: 1,
+  const product = createShardFolder({ slug: 'atlas-fixture', revision: 1,
     shardfile: emptyShardfile({ slug: 'atlas-fixture', name: 'Atlas fixture', author: 'Fixture', revision: 1, seed: 1 }),
     sections: new Map([['explore/catalogue', parseExplorerCatalogue({ version: 1, entries: [{ kind: 'specimen', id: 'atlas-crate', books: { phone: book, desktop: book }, model: 'crate' }] })]]),
-    files: new Map(declared.files.flatMap(row => row.name === undefined ? [] : [[row.name, fixtureProductFile(row.name, { hash: row.hash, url: row.hash })]])),
+    files: new Map(declared.files.flatMap(row => row.name === undefined ? [] : [[row.name, fixtureFolderFile(row.name, { hash: row.hash, url: row.hash })]])),
     jsonCheck:fixtureJsonCheck, read: hash => { const bytes = declared.assets.get(hash); if (bytes === undefined) throw new Error('Missing admitted atlas fixture'); return Promise.resolve(bytes); }, check: true });
   const sky = skyFixture(), registry = new WorldRegistry(), scope = new Scope('atlas-adapters'), root = new THREE.Group(), restore = bindFlatTerrain({ heightAt: () => 0 });
   try {

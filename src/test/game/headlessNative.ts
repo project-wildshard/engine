@@ -6,9 +6,9 @@ import { installWalkRopeBodies } from './headless/ropeBodies';
 import { runHeadlessJourney } from '../../shared/host/headlessJourney';
 import { fillNativeCombatFrame, headlessAssemblyPorts, validateHeadlessCommandOwners, type HeadlessRuntimeInput, type HeadlessRuntimeInstallation, type HeadlessRuntimePreparation, type HeadlessRuntimePlan, type PrepareHeadlessRuntime, type TrustedHeadlessResident } from '../../server/host/headlessRuntime';
 import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
-import { loadHeadlessProduct } from '../../server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../server/host/headlessFolder';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
-import { prepareProductRuntimePlan } from '../../server/game/shardfile/nativePlan';
+import { prepareFolderRuntimePlan } from '../../server/game/shardfile/nativePlan';
 import { MoverScriptDriver, type MoverRuntime } from '../../server/game/plugin/mover';
 import { installCableModes } from '../../shared/engine/player/modes';
 import { createNativeCombatFrame } from '../../server/game/plugin/nativeItems';
@@ -20,13 +20,13 @@ import type { TickWorkerAdapter } from '../../server/host/tickWorkerLoop';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 /** The world a product's own native plan builds: what the tick worker runs, for proofs that wrap or drive it. */
-export const prepareProductPlan: PrepareHeadlessRuntime = ({ product, assets, rapier }) => prepareProductRuntimePlan(product, assets, headlessAssemblyPorts(rapier));
+export const prepareFolderPlan: PrepareHeadlessRuntime = ({ product, assets, rapier }) => prepareFolderRuntimePlan(product, assets, headlessAssemblyPorts(rapier));
 
 /** Direct typed proof composition; no module URL, dynamic code lookup or authored factory selection. */
 export async function prepareNativeProof(provided: HeadlessRuntimeInput, prepare: PrepareHeadlessRuntime): Promise<HeadlessRuntimePlan> {
   if (!/^[a-z0-9][a-z0-9-]*$/u.test(provided.shard.identity.slug)) throw new Error('Invalid native product identity');
   await prepareAssetDecoders();
-  const product=provided.product ?? await loadHeadlessProduct(`out/${provided.shard.identity.slug}`);
+  const product=provided.product ?? await loadHeadlessFolder(`out/${provided.shard.identity.slug}`);
   if(product.slug!==provided.shard.identity.slug || product.revision!==provided.shard.identity.revision) throw new Error('Native product and trusted identity differ');
   const preparation: HeadlessRuntimePreparation={...provided,product};
   const source=product.shardfile,plan=await prepare(preparation);

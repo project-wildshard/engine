@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import type { ShardContext } from '../src/client/game/plugin/context';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { CLIENT_FEATURES, admitClientPlan, installClientPhase } from '../src/client/game/shardfile/clientPlan';
 import * as continuation from '../src/client/game/quest/continuation';
 import { emptyShardfile } from '../src/shared/host/author';
@@ -11,7 +11,7 @@ function fixture(named = true) {
   const shardfile = emptyShardfile({ slug: 'continuation-fixture', name: 'Continuation', author: 'Fixture', revision: 1, seed: 1 });
   const files = new Map<string, { hash: string; url: string }>();
   if (named) files.set('continuation.json', { hash: 'continuation', url: '/continuation.json' });
-  const product = createShardProduct({ slug: shardfile.identity.slug, revision: 1, shardfile, files, sections: new Map(), read: () => Promise.reject(new Error('No direct fixture read')) });
+  const product = createShardFolder({ slug: shardfile.identity.slug, revision: 1, shardfile, files, sections: new Map(), read: () => Promise.reject(new Error('No direct fixture read')) });
   const scope = new Scope('continuation-entry');
   return { scope, product, ctx: legacyDouble<ShardContext>({ scope, product }) };
 }

@@ -6,19 +6,19 @@ import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterEach,expect,test } from 'vitest';
 import { readNightMarketKitBudget } from '../scripts/night-market-kit-budget.mjs';
-import { builtProduct } from './fixtures/engine-lift/product';
+import { builtFolder } from './fixtures/engine-lift/folder';
 
 const owned: string[] = [];
 afterEach(() => { for (const folder of owned.splice(0)) rmSync(folder, { recursive: true }); });
 function fixture(): string {
   mkdirSync('tmp', { recursive: true });
   const folder = resolve(mkdtempSync('tmp/night-market-budget-')); owned.push(folder);
-  cpSync(builtProduct('open-plot-night-market'), folder, { recursive: true });
+  cpSync(builtFolder('open-plot-night-market'), folder, { recursive: true });
   return folder;
 }
 
 test('the Node report reads all 80 sealed tiles and deduplicates their actual payloads', () => {
-  const folder = builtProduct('open-plot-night-market'), report = readNightMarketKitBudget(folder);
+  const folder = builtFolder('open-plot-night-market'), report = readNightMarketKitBudget(folder);
   expect(report.rows).toHaveLength(80);
   expect(report.rows.filter(row => row.lod === 0)).toHaveLength(64);
   expect(report.rows.filter(row => row.lod === 1)).toHaveLength(16);

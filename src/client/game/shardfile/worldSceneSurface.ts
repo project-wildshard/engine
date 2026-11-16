@@ -6,8 +6,8 @@ import { ownSceneResource } from '@wildshard/engine/app/sceneOwnership';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { SkyRig } from '@wildshard/engine/world/skyRig';
 import type { WorldSceneSurface } from '@wildshard/format/worldSceneSurface';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
-import { productCoverAppearance } from '../looks/coverAppearance';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
+import { folderCoverAppearance } from '../looks/coverAppearance';
 import { gridPage } from '../../../shared/game/grid/pageMode';
 import { lentMappedLook, setLentTexture } from './lentLooks';
 import { app } from '@wildshard/engine/app/runtime';
@@ -19,17 +19,17 @@ interface Entry {
 }
 const skies = new WeakMap<SkyRig, WeakMap<object, Map<string, Entry>>>();
 /** Admit the appearance book and named image before scene allocation. */
-export async function admitWorldSceneSurface(row: WorldSceneSurface, product: ShardProduct): Promise<void> {
+export async function admitWorldSceneSurface(row: WorldSceneSurface, product: ShardFolder): Promise<void> {
   if (row.map === undefined) return;
   if (!product.hasFile(row.map.appearance)) throw new Error(`Missing surface appearance: ${row.map.appearance}`);
-  const image = (await productCoverAppearance(product, row.map.appearance)).row.textures[row.map.texture];
+  const image = (await folderCoverAppearance(product, row.map.appearance)).row.textures[row.map.texture];
   if (image === undefined) throw new Error(`Missing surface texture: ${row.map.texture}`);
   if (!product.hasFile(image.url)) throw new Error(`Missing surface image: ${image.url}`);
 }
 function release(lease: Lease): void { lease.scope.dispose(); }
 /** Client-only original surface identity shared by world recipes, living nodes and cold Explorer models.
  * Rows own construction; consumers only borrow the product's named surface. */
-export function worldSceneSurfaceMaterial(row: WorldSceneSurface, sky: SkyRig, product: ShardProduct, owner: Scope = resourceScope()): Promise<Material> {
+export function worldSceneSurfaceMaterial(row: WorldSceneSurface, sky: SkyRig, product: ShardFolder, owner: Scope = resourceScope()): Promise<Material> {
   if (owner.disposed) return Promise.reject(new Error('Scene surface owner is disposed'));
   const entry = surfaceEntry(row, sky, product, owner);
   if (entry.pending === undefined) {
@@ -42,10 +42,10 @@ export function worldSceneSurfaceMaterial(row: WorldSceneSurface, sky: SkyRig, p
   return entry.pending;
 }
 /** Client-only parallel scan intake. Final materials still publish in declared row order. */
-export async function prepareWorldSceneSurfaces(rows: readonly WorldSceneSurface[], sky: SkyRig, product: ShardProduct, owner: Scope): Promise<void> {
+export async function prepareWorldSceneSurfaces(rows: readonly WorldSceneSurface[], sky: SkyRig, product: ShardFolder, owner: Scope): Promise<void> {
   await Promise.all(rows.filter(row => row.scan !== undefined).map(row => surfaceEntry(row, sky, product, owner).base));
 }
-function surfaceEntry(row: WorldSceneSurface, sky: SkyRig, product: ShardProduct, owner: Scope): Entry {
+function surfaceEntry(row: WorldSceneSurface, sky: SkyRig, product: ShardFolder, owner: Scope): Entry {
   if (owner.disposed) throw new Error('Scene surface owner is disposed');
   let products = skies.get(sky);
   if (products === undefined) { products = new WeakMap(); skies.set(sky, products); }
@@ -75,7 +75,7 @@ function surfaceEntry(row: WorldSceneSurface, sky: SkyRig, product: ShardProduct
   return entry;
 }
 
-async function makeBase(row: WorldSceneSurface, product: ShardProduct, lease: Lease): Promise<MeshStandardMaterial> {
+async function makeBase(row: WorldSceneSurface, product: ShardFolder, lease: Lease): Promise<MeshStandardMaterial> {
   if (row.map !== undefined) await admitWorldSceneSurface(row, product);
   const { color, emissive, normalScale, ...plain } = row.properties;
   const properties = { ...plain,
@@ -91,7 +91,7 @@ async function makeBase(row: WorldSceneSurface, product: ShardProduct, lease: Le
   for (const value of new Set(Object.values(base))) if (value instanceof Texture) ownSceneResource(value, lease.scope, app.assets);
   if (lease.owners.size === 0) { release(lease); throw new Error('Scene surface owners are disposed'); }
   if (row.map !== undefined) {
-    base.map = await (await productCoverAppearance(product, row.map.appearance)).texture(product, row.map.texture);
+    base.map = await (await folderCoverAppearance(product, row.map.appearance)).texture(product, row.map.texture);
     ownSceneResource(base.map, lease.scope, app.assets);
   }
   if (lease.owners.size === 0) throw new Error('Scene surface owners are disposed');

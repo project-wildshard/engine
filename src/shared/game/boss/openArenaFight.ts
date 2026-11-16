@@ -15,7 +15,7 @@ import { installChannelPrograms } from '../plugin/channelPrograms';
 import { CellField, type CellFieldSnapshot } from '../systems/cellField';
 import { prepareV2WorldActions, type V2WorldActionLoan } from '../shardfile/worldActionsV2';
 import type { ViewCamera, ViewTell } from '@wildshard/engine/script/viewProgram';
-import type { ShardProduct } from '../shardfile/shardProduct';
+import type { ShardFolder } from '../shardfile/shardFolder';
 import type { Mount } from '../../../client/game/riding/mount';
 import type { ArenaBoundary } from '../../../client/game/riding/client';
 import type { WeatherReactions } from '../../../server/game/weather/reactions';
@@ -25,7 +25,7 @@ import type { ArenaSceneView, CloudBody } from '../../../client/game/boss/encoun
 
 /** The fight's rows: its fight file's arena script, programs and fire with its geometry file (the page's entered
  *  encounter and the Node simulation read the same). */
-export async function readArenaScriptData(product: Pick<ShardProduct,'json'>, files: { fight: string; geometry: string }): Promise<ArenaScriptData> {
+export async function readArenaScriptData(product: Pick<ShardFolder,'json'>, files: { fight: string; geometry: string }): Promise<ArenaScriptData> {
   const [root,geometry]=await Promise.all([product.json<ArenaScriptFightFile>(files.fight),product.json<ArenaScriptData['geometry']>(files.geometry)]);
   // T10: the fight's two programme declarations are read-only; frozen, ReturnProgram admits each once (its frozen-input
   // memo) instead of re-parsing it in projectionBindings, page and prepareMemory (two 8-11 ms parses inside the encounter's

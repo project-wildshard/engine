@@ -12,7 +12,7 @@ import { EliteCore, memoryElitePersistence } from '../../../shared/game/eliteSys
 import { eliteDrops } from './eliteDrops';
 import { EliteDecisions } from '../../../shared/game/quest/eliteDecisions';
 import { SpawnScript, readSpawnScript } from '../population/spawnScript';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { nearestOnGround } from '@wildshard/engine/sim/nearPlayer';
 import { eliteNetView, publishEncounter } from '@wildshard/engine/sim/encounterRows';
 
@@ -23,7 +23,7 @@ const savedScript = v.strictObject({ id: v.string(), program: v.string(), spawn:
 const root = v.strictObject({ t: v.pipe(finite, v.minValue(0)), x: finite, y: finite, z: finite });
 
 /** Read admitted JSON and exact v1 bytes using the same owned-script catalogue as population directors. */
-export async function readEliteFeature(product: ShardProduct, name: string): Promise<EliteFeatureRows> {
+export async function readEliteFeature(product: ShardFolder, name: string): Promise<EliteFeatureRows> {
   const rows = parseEliteFeature(JSON.parse(new TextDecoder().decode(await product.file(name))));
   const fights = await Promise.all(rows.fights.map(async fight => {
     const program = await readSpawnScript(product, fight.program.step);

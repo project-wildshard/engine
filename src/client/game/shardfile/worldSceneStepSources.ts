@@ -1,7 +1,7 @@
 import { PointLight, Mesh, type BufferGeometry, Material, type MeshStandardMaterial, type Texture } from 'three';
 import type { WorldScenesSection } from '@wildshard/format/worldScenes';
 import type { WorldSceneRecipe } from '@wildshard/format/clientChannels';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { applySurfaceLooks } from '../systems/looks/surfaceLooks';
 import type { WorldScenePorts } from '../plugin/scene';
 import { sceneBakeSource, sceneModelSource, sceneSourceDeclares, sceneModelDefinition, sceneSurfaceInputs } from './sceneSources';
@@ -10,7 +10,7 @@ type Step = WorldScenesSection['steps'][number];
 const nativeMaterial = (value: unknown): value is Material => value instanceof Material;
 /** Admit every original model/bake/object/texture import against explicit source
  * identities. Native owner maps and arbitrary methods are never accepted. */
-export function admitWorldSceneStepSources(product: ShardProduct, step: Step, recipe: WorldSceneRecipe): void {
+export function admitWorldSceneStepSources(product: ShardFolder, step: Step, recipe: WorldSceneRecipe): void {
   for (const entry of recipe.imports) {
     const binding = entry.kind === 'model' ? step.models?.[entry.model] : step.baked?.[entry.piece];
     if (binding === undefined || !sceneSourceDeclares(product, binding.library, binding.model, entry.kind)) throw new Error(`Undeclared scene ${entry.kind} import`);
@@ -26,7 +26,7 @@ export function admitWorldSceneStepSources(product: ShardProduct, step: Step, re
 }
 /** Bind the existing private-scene constructor to admitted library identities.
  * Material collections remain explicitly named resources of the constructed step. */
-export function worldSceneStepSources(product: ShardProduct, step: Step, geometry: ReadonlyMap<string, BufferGeometry>, materials: ReadonlyMap<string, Material | undefined>, materialMode: 'resident' | 'declared' = 'resident'): {
+export function worldSceneStepSources(product: ShardFolder, step: Step, geometry: ReadonlyMap<string, BufferGeometry>, materials: ReadonlyMap<string, Material | undefined>, materialMode: 'resident' | 'declared' = 'resident'): {
   readonly ports: WorldScenePorts; readonly collections: ReadonlyMap<string, readonly MeshStandardMaterial[]>;
 } {
   const collections = new Map<string, MeshStandardMaterial[]>(), textures = new Map<string, Texture>();

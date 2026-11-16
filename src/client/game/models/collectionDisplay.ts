@@ -8,8 +8,8 @@ import { SlotGeometry } from '@wildshard/engine/models/slots';
 import { lowPolyLookMaterial } from '@wildshard/engine/world/lowpolyKit';
 import type { OwnedGeometry } from '@wildshard/engine/models/ownedGeometry';
 import { parseCollectionCard, CollectionDisplaysSchema, type CollectionModelRow } from '@wildshard/format/collectionDisplay';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
-import { loadFirstPartyProduct } from '../shardfile/runtimeProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
+import { loadFirstPartyFolder } from '../shardfile/runtimeFolder';
 
 /** Collection model parameters stay data, including future shards' count and trophy names. */
 export type CollectionParams = Record<string, number | boolean>;
@@ -95,8 +95,8 @@ export class CollectionCatalogue {
   private rows: Readonly<Record<string, CollectionModelRow>> | undefined;
   private pending: Promise<void> | undefined;
   private readonly ports: CollectionModelPorts;
-  constructor(private readonly slug: string, private readonly geometry: ReadonlyMap<string, OwnedGeometry>, private readonly pinnedProduct?: ShardProduct) {
-    if (pinnedProduct !== undefined && !Object.is(pinnedProduct.slug, slug)) throw new Error('Collection product identity differs');
+  constructor(private readonly slug: string, private readonly geometry: ReadonlyMap<string, OwnedGeometry>, private readonly pinnedFolder?: ShardFolder) {
+    if (pinnedFolder !== undefined && !Object.is(pinnedFolder.slug, slug)) throw new Error('Collection product identity differs');
     this.ports = { prepare: () => this.prepare(), geometry: key => {
       const handle = this.geometry.get(key); if (handle === undefined) throw new Error(`Missing collection geometry: ${key}`); return handle.copy();
     }, material: (ctx, still) => lowPolyLookMaterial(ctx.sky, still ? 'still' : 'default') };
@@ -107,14 +107,14 @@ export class CollectionCatalogue {
   /** Prepare the shared handles and admitted rows. A resolved book pins its
    * original product; only the compatible legacy path opens a first-party one. */
   prepare(): Promise<void> {
-    const owner = resourceScope(), pinned = this.pinnedProduct;
+    const owner = resourceScope(), pinned = this.pinnedFolder;
     const check = (): void => { if (pinned !== undefined && (owner.disposed || owner.disposing)) throw new Error('Collection owner left during preparation'); };
     check();
     this.pending ??= (async () => {
       try {
         await Promise.all([...this.geometry.values()].map(handle => handle.load()));
         check();
-        const product = pinned ?? await loadFirstPartyProduct(this.slug, owner); check();
+        const product = pinned ?? await loadFirstPartyFolder(this.slug, owner); check();
         const rows = v.parse(CollectionDisplaysSchema, product.section('collections/displays')).models;
         const entries = Object.fromEntries(Object.entries(rows).map(([key, row]) => {
           const { id, name, file, surface, defaults, variants } = row;

@@ -246,11 +246,11 @@
   ],
   "files": [
     "../src/test/helpers/git.ts",
-    "../scripts/app-build/bootProducts.ts",
+    "../scripts/app-build/bootFolders.ts",
     "../scripts/app-build/catalogue.ts",
     "../scripts/pins-staging.ts",
     "../scripts/pin-shard.ts",
-    "../scripts/app-build/bootProductTiers.ts",
+    "../scripts/app-build/bootFolderTiers.ts",
     "../scripts/app-build/bootExtras.ts",
     "../scripts/app-build/appCook.ts",
     "../scripts/app-build/assetHashes.ts",

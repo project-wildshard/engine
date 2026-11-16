@@ -24,8 +24,8 @@ export async function preparePrefetchIndex(request:PrefetchIndexRequest, authorC
   const input:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
   const index=request.indexHashes===null?await readCheckedOutputIndex(input):readOutputDownloadIndex(input);
   if(!request.phone||request.indexHashes===null)return index;
-  const [{isBuildValidatedOutput,resolveOutputDescriptor},{tierProductFilesPaced}]=await Promise.all([
-    import('../../../shared/game/shardfile/outputDescriptor'),import('../shardfile/productCost'),
+  const [{isBuildValidatedOutput,resolveOutputDescriptor},{tierFolderFilesPaced}]=await Promise.all([
+    import('../../../shared/game/shardfile/outputDescriptor'),import('../shardfile/folderCost'),
   ]);
   const base=new URL('.',request.url).href;
   const digest = nativeRead === undefined ? await contentHash(bytes) : known[0]; if (digest === undefined) return null;
@@ -36,6 +36,6 @@ export async function preparePrefetchIndex(request:PrefetchIndexRequest, authorC
     pack:(path,maximum)=>read(new URL(path,base).href,maximum),
     ...(authorCache === undefined ? {} : { cached: (hash: string) => authorCache.get(hash), store: (hash: string, body: Uint8Array) => authorCache.put(hash, body, true) })});
   if(!isBuildValidatedOutput(source))return index;
-  const kept=new Set((await tierProductFilesPaced(source,'phone',yieldTask)).map(file=>file.hash));
+  const kept=new Set((await tierFolderFilesPaced(source,'phone',yieldTask)).map(file=>file.hash));
   return {...index,files:index.files.filter(file=>kept.has(file.hash))};
 }

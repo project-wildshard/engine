@@ -18,7 +18,7 @@ export async function prepareHeldClaimsEntry(ctx: ShardContext, id: string, sour
     const input = await product.json<unknown>(source.slots); live();
     const rows = parseHeldSlots(input);
     if (rows.id !== id) throw new Error('Held slot entry identity differs');
-    const slots = HeldClaims.fromProductSlots(product, rows, source.library);
+    const slots = HeldClaims.fromFolderSlots(product, rows, source.library);
     await slots.prepareSlotSources(ctx); live(); return slots;
   });
   live();

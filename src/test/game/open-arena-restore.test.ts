@@ -3,17 +3,17 @@ import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { expect, test } from 'vitest';
 import { openWorld } from '../../server/host/openWorld';
-import { loadHeadlessProduct } from '../../server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../server/host/headlessFolder';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
 import { createSimSnapshotSerializer, snapshotSimHostBytes } from '@wildshard/engine/sim/snapshot';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
-import { builtProduct } from './builtProduct';
+import { builtFolder } from './builtFolder';
 import { outputDescriptor } from '@wildshard/engine/game/shardfile/outputDescriptor';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 import { openArenaOf } from '@wildshard/engine/game/boss/openArenaNative';
 
 for (const frames of [0,5]) test(`a restored Titan intro after ${frames} frames reads the same previous heart before its next draw`, async () => {
-  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory), shard = product.shardfile;
+  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard); if (descriptor === undefined) throw new Error('Missing admitted output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const input = { product, shard, assets, rapier: await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))) };

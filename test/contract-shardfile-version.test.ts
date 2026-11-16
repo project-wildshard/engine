@@ -9,28 +9,28 @@ import {SHARDFILE_VERSION} from '@wildshard/format/version';
 import {readTar} from '@wildshard/format/tar';
 import {parseOutputIndex,assembleOutputShardfile} from '@wildshard/format/outputIndex';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
-import {productTarball} from '../src/cook/game/productTarball';
+import {folderTarball} from '../src/cook/game/folderTarball';
 import {runCookJob} from '../src/cook/game/cookJob';
 import {checkShardfile} from '../src/server/host/checkShardfile';
-import {admitProduct,type ProductOptions} from '../src/client/game/shardfile/product';
+import {admitFolder,type FolderOptions} from '../src/client/game/shardfile/folder';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
 
 const fixture=resolve('node_modules/@wildshard/format/corpus/handwritten');
 const base='https://example.test/shardfiles/blender-template/';
 
 test('the preceding additive product admits and cooks without rewriting its original',async()=>{
- const tar=productTarball(fixture),files=readTar(tar);
+ const tar=folderTarball(fixture),files=readTar(tar);
  const header=files.get('shard.json');if(header===undefined)throw new Error('Missing fixture header');
  const input:unknown=JSON.parse(new TextDecoder().decode(header)),index=parseOutputIndex(input);
  expect(SHARDFILE_VERSION).toBe('0.1.0.1');
  expect(index.version).toBe('0.1');
  const originalHash=hashImmutableBytes(tar);
- const options:ProductOptions={base,offline:false,firstParty:true,
+ const options:FolderOptions={base,offline:false,firstParty:true,
   hash:bytes=>Promise.resolve(hashImmutableBytes(bytes)),fetch:url=>{
    const bytes=files.get(url.slice(base.length));
    return Promise.resolve(bytes===undefined?new Response(null,{status:404}):new Response(Uint8Array.from(bytes)));
   }};
- const admitted=await admitProduct(index,options);
+ const admitted=await admitFolder(index,options);
  expect(admitted.source.version).toBe('0.1');
  const scratch=mkdtempSync(join(tmpdir(),'format-compat-'));
  try{
@@ -46,15 +46,15 @@ test('the preceding additive product admits and cooks without rewriting its orig
 for(const version of ['0.1.0.2','0.1.1.0'])test(`future or breaking ${version} refuses before transport`,async()=>{
  const bytes=readFileSync(join(fixture,'shard.json')),input:unknown=JSON.parse(bytes.toString('utf8')),index=parseOutputIndex(input);
  let reads=0;
- const options:ProductOptions={base,offline:false,firstParty:true,
+ const options:FolderOptions={base,offline:false,firstParty:true,
   hash:value=>Promise.resolve(hashImmutableBytes(value)),fetch:()=>{reads++;return Promise.reject(new Error('Unexpected transport'));}};
- await expect(admitProduct({...index,version},options)).rejects.toThrow(version);
+ await expect(admitFolder({...index,version},options)).rejects.toThrow(version);
  expect(reads).toBe(0);
 });
 
 
 test('the canonical zero-counter alias admits through the engine reader',async()=>{
- const files=readTar(productTarball(fixture)),header=files.get('shard.json');
+ const files=readTar(folderTarball(fixture)),header=files.get('shard.json');
  if(header===undefined)throw new Error('Missing fixture header');
  const input:unknown=JSON.parse(new TextDecoder().decode(header));
  const index=parseOutputIndex({...parseOutputIndex(input),version:'0.1.0.0'});
@@ -65,10 +65,10 @@ test('the canonical zero-counter alias admits through the engine reader',async()
  }
  const source=assembleOutputShardfile(index,sections);
  const descriptor={...index,build:{...index.build,sourceHash:hashImmutableBytes(validationSourceBytes(source))}};
- const options:ProductOptions={base,offline:false,firstParty:true,
+ const options:FolderOptions={base,offline:false,firstParty:true,
   hash:bytes=>Promise.resolve(hashImmutableBytes(bytes)),fetch:url=>{
    const bytes=files.get(url.slice(base.length));
    return Promise.resolve(bytes===undefined?new Response(null,{status:404}):new Response(Uint8Array.from(bytes)));
   }};
- expect((await admitProduct(descriptor,options)).source.version).toBe('0.1.0.0');
+ expect((await admitFolder(descriptor,options)).source.version).toBe('0.1.0.0');
 });

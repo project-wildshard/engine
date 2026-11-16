@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { leadPlayer } from "../../src/shared/engine/sim/leadPlayer.ts";
-import { journey, timed } from "./product-journey.mjs";
+import { journey, timed } from "./folder-journey.mjs";
 
 timed(
   "pinned Template: walk the hut door, kill the blob, earn the quest and resume the save",

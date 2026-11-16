@@ -2,10 +2,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { installedKeys } from '../src/server/game/shardfile/installedSides';
 import { openWorld, openWorldAdapter } from '../src/server/host/openWorld';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 // SERVER-PARITY HS1 (meta docs/plans/SERVER-PARITY-PLAN.md): one world-build entry. Every pinned product boots as a room
 // (`openWorld(input, { room: true })`, a dedicated room's own call) and, a native world, through the headless tick adapter a
@@ -15,9 +15,9 @@ const pins = (JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as {
 
 describe('open world: the room and the tick adapter step the same owners', { concurrent: false }, () => {
   for (const slug of pins) test(slug, async () => {
-    const directory = builtProduct(slug === 'template' ? '_template' : slug);
+    const directory = builtFolder(slug === 'template' ? '_template' : slug);
     if (!existsSync(directory)) throw new Error(`${slug} is pinned but not installed: pnpm pins`);
-    const product = await loadHeadlessProduct(directory);
+    const product = await loadHeadlessFolder(directory);
     const input = { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
     const room = await openWorld(input, { room: true });
     try {
@@ -39,7 +39,7 @@ describe('open world: the room and the tick adapter step the same owners', { con
 // and every byte of the next steps (the physics included) matches the world that never stopped.
 describe('open world: a saved world continues identically through the tick adapter', { concurrent: false }, () => {
   for (const slug of pins) test(slug, async () => {
-    const directory = builtProduct(slug === 'template' ? '_template' : slug), product = await loadHeadlessProduct(directory);
+    const directory = builtFolder(slug === 'template' ? '_template' : slug), product = await loadHeadlessFolder(directory);
     const input = { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
     const probe = await openWorld(input, { room: true }), native = probe.resident !== undefined; probe.dispose();
     if (!native) return;
@@ -59,7 +59,7 @@ describe('open world: a saved world continues identically through the tick adapt
 });
 
 test('Nalati\'s tick adapter runs its story on the server with no hand-installed chapters', async () => {
-  const directory = builtProduct('nalati-grasslands'), product = await loadHeadlessProduct(directory);
+  const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory);
   const adapter = await openWorldAdapter({ shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) });
   try { expect(installedKeys(adapter.host).has('saves'), 'serverChapters registered its feat counts and bond').toBe(true); } finally { adapter.dispose(); }
 }, 180_000);

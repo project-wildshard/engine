@@ -11,15 +11,15 @@ import { declaredKitSlots, rackMeleeRows, takenLine } from '../src/shared/game/s
 import { bindShardfileSim, createShardfileSim, type ShardfileSimulation } from '../src/server/game/plugin/simulation';
 import { installDeclaredKitItems, type DeclaredKitItems } from '../src/server/game/shardfile/declaredKitItems';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from '../src/test/game/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from '../src/test/game/builtFolder';
 
 // TEMPLATE-E2E TC-E4 (J361, Jake 2026-11-15: "Mossgate's sword is found on a rack"): Template's sword leaves the loadout's
 // hand for a rack. It starts on that rack for each player; the rack's take (an item scene, action 3) puts it in that player's
 // hand, the owned `.taken` line tells the page, and a save keeps it taken.
 const PLAYER = 'actor.player', SCENE = 'fixture.sword-rack.take', AT: [number, number, number] = [20, 0, 20];
 async function withRack(): Promise<{ readonly shard: Shardfile; readonly sim: ShardfileSimulation; readonly ports: Parameters<typeof createShardfileSim>[2]; readonly assets: Map<string, Uint8Array>; readonly sword: string }> {
-  const directory = builtProduct('_template'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

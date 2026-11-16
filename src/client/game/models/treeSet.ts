@@ -15,17 +15,17 @@ import type { TreeSetRows } from '@wildshard/format/treeSetRows';
 import { createModelLibrary } from '../plugin/geometry';
 import { lookGraphMaterials } from '../plugin/shaderFamily';
 import { lendLooks, type LentLooks } from '../shardfile/lentLooks';
-import { firstPartyDescriptor, loadFirstPartyProduct } from '../shardfile/runtimeProduct';
+import { firstPartyDescriptor, loadFirstPartyFolder } from '../shardfile/runtimeFolder';
 
 /** A first-party product's tree set rows (its `world/trees` section). */
-export async function productTreeSet(slug: string): Promise<TreeSetRows> {
-  const product = await loadFirstPartyProduct(slug);
-  return productTreePool(product, product.section('world/trees'));
+export async function folderTreeSet(slug: string): Promise<TreeSetRows> {
+  const product = await loadFirstPartyFolder(slug);
+  return folderTreePool(product, product.section('world/trees'));
 }
 
 /** A set whose rest pool the product names (GR6: a built pool ships as a product file) reads it by its content-addressed
  *  URL; any other pool URL loads as written. */
-export function productTreePool(product: { readonly hasFile: (name: string) => boolean; readonly url: (name: string) => string }, rows: TreeSetRows): TreeSetRows {
+export function folderTreePool(product: { readonly hasFile: (name: string) => boolean; readonly url: (name: string) => string }, rows: TreeSetRows): TreeSetRows {
   return product.hasFile(rows.geometry.url) ? { ...rows, geometry: { ...rows.geometry, url: product.url(rows.geometry.url) } } : rows;
 }
 

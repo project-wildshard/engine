@@ -22,7 +22,7 @@ import {
   createNativeLoadout,
 } from '../../src/server/game/plugin/simulation.ts'
 import { PlayerStore } from '../../src/server/host/dedicated/playerStore.ts'
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct.ts'
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder.ts'
 import { openCellWorld } from '../../src/server/host/standalone/cellWorld.ts'
 import { ledgerFilings } from '../../src/server/host/standalone/ledgerFilings.ts'
 import { NET_BUTTONS } from '../../src/shared/engine/input/netButtons.ts'
@@ -32,7 +32,7 @@ import { actRoutes } from '../../src/shared/engine/sim/actRoutes.ts'
 import { leadPlayer } from '../../src/shared/engine/sim/leadPlayer.ts'
 import { netWorldInput } from '../../src/shared/host/standalone/netInput.ts'
 import { directLoopback } from '../../src/test/engine/netLoopback.ts'
-import { runtimeAssets } from '../fixtures/engine-lift/product.ts'
+import { runtimeAssets } from '../fixtures/engine-lift/folder.ts'
 import { SIM_LEVEL } from '../fixtures/sim-level/level.ts'
 
 // TEST-SPEED TS11: an honest wall budget per case, measured on hosted runners (packed ci, tests (2), where this proof
@@ -63,7 +63,7 @@ async function native(slug, work) {
       ),
     ),
   )
-  const product = await loadHeadlessProduct(directory),
+  const product = await loadHeadlessFolder(directory),
     stores = new Map(),
     rewards = new PlayerStore({}, () => undefined).rewards
   // Real server stores acknowledge their in-process forwarder. This proves transactions, not database durability.
@@ -493,7 +493,7 @@ void test(
       })
       immediate.select(1)
       assert.deepEqual(immediate.snapshot(), { held: 1, swap: null })
-      const pine = (await loadHeadlessProduct('out/pine-hollow')).shardfile
+      const pine = (await loadHeadlessFolder('out/pine-hollow')).shardfile
         .items.loadout.native
       assert.ok(pine?.input)
       const input = pine.input

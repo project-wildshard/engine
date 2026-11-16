@@ -120,7 +120,7 @@ export function lapPops(at, lap, homeRegion) {
 }
 
 /** DL17, after the flip: what only the server worker reads, and so no part of what a page must hold at control: its code and
- *  the server class of a product (`serverProduct.ts`, J91). Listed apart, as the precache is. Any other file a worker
+ *  the server class of a product (`serverFolder.ts`, J91). Listed apart, as the precache is. Any other file a worker
  *  fetches is a file the page could have lent it, and stays level content: `spawnRereads` counts those. */
 export const isServerRead = path => /^\/(?:b\/[^/]+\/standalone\/|assets\/spawn\/server[-/])/u.test(path);
 

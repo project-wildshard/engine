@@ -88,8 +88,8 @@ import { applyLevelLight, holdPageLight, regionLightSwap } from './regionLight';
 import { buildRegionSky, type RegionBackdrop, type RegionSkyOutcome } from './regionSky';
 import { publishSkyClock } from '../session/clockSettings';
 import { imagesFirstPlayingBytes } from './runtimeCost';
-import { provideRuntimeProduct, runtimeProduct, shardProductFromAdmission } from '../shardfile/runtimeProduct';
-import type { AdmittedProduct } from '../shardfile/product';
+import { provideRuntimeFolder, runtimeFolder, shardFolderFromAdmission } from '../shardfile/runtimeFolder';
+import type { AdmittedFolder } from '../shardfile/folder';
 import { clientMaterials } from '../shardfile/clientMaterials';
 import { splatGroundDrawn } from '../shardfile/clientSplatTerrain';
 import { lendLooks, lendSceneMaterials } from '../shardfile/lentLooks';
@@ -148,10 +148,10 @@ type RegionalPresentationInputs = {
 
 /** Verified input and private scope-owned materials need no native frame or
  * heightfield. Their bindings still publish at the original cursor below. */
-async function prepareRegionalPresentation(admitted: AdmittedProduct, renderer: Parameters<typeof clientMaterials>[2], scope: Scope): Promise<RegionalPresentationInputs> {
+async function prepareRegionalPresentation(admitted: AdmittedFolder, renderer: Parameters<typeof clientMaterials>[2], scope: Scope): Promise<RegionalPresentationInputs> {
   const full = admitted.source;
   if (!hasDeclaredClientPage(full)) return null;
-  const assets = runtimeProduct(full).assets, terrain = full.terrain;
+  const assets = runtimeFolder(full).assets, terrain = full.terrain;
   const collider = terrain === null ? undefined : await assets.read(terrain.collider);
   if (scope.disposed || scope.disposing) throw new Error('Regional world left while reading its presentation collider');
   const presentation = await clientMaterials({ ...full, state: full.state }, assets.retained, renderer, scope, { trustedGraphs: true });
@@ -161,9 +161,9 @@ async function prepareRegionalPresentation(admitted: AdmittedProduct, renderer: 
 
 /** Bind prepared data at its original ordered cursor. Curves and tiles advance
  * only while entered; the material reader never publishes a regional frame. */
-async function regionalPresentation(admitted: AdmittedProduct, start: { readonly x: number; readonly z: number }, root: Object3D, renderer: Parameters<typeof clientMaterials>[2], scope: Scope, hour: () => number | null, allocator: ResidencyAllocator, instance: string, sky: ShardWorld['sky'], input: RegionalPresentationInputs, registration?: ClientTileRegistration): Promise<{ ready: Promise<void>; tick: (dt: number) => void; follow: (x: number, z: number) => void } | null> {
+async function regionalPresentation(admitted: AdmittedFolder, start: { readonly x: number; readonly z: number }, root: Object3D, renderer: Parameters<typeof clientMaterials>[2], scope: Scope, hour: () => number | null, allocator: ResidencyAllocator, instance: string, sky: ShardWorld['sky'], input: RegionalPresentationInputs, registration?: ClientTileRegistration): Promise<{ ready: Promise<void>; tick: (dt: number) => void; follow: (x: number, z: number) => void } | null> {
   if (input === null) return null;
-  const full = admitted.source, data = full, terrain = data.terrain, assets = runtimeProduct(full).assets;
+  const full = admitted.source, data = full, terrain = data.terrain, assets = runtimeFolder(full).assets;
   const { collider, presentation } = input, slug = full.identity.slug;
   if (terrain !== null) {
     const material = presentation.materials.get(terrain.family);
@@ -172,7 +172,7 @@ async function regionalPresentation(admitted: AdmittedProduct, start: { readonly
     lendSceneMaterials(scope, full.identity.slug, new Map([[terrain.family, material]]));
   }
   {
-    const product = shardProductFromAdmission(admitted, scope);
+    const product = shardFolderFromAdmission(admitted, scope);
     await timeClientPreparation(slug, 'native.presentation.lease', () => leaseClientLibrary(full, assets.retained, { validatedSource: admitted.source, scope, allocator, owner: instance, textures: ktx2TranscodeSupport(renderer), read: ref => assets.read(ref) }));
     lendLooks(scope, presentation);
     bindPaintedMaterialMaps(product, scope, presentation);
@@ -263,7 +263,7 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
     const { cell, page } = request, app = page.context.app, home = page.world, game = home.game, sky = home.sky;
     // the look and roster loaders read the cell's admitted product (the one its ShardContext gets), never shard.config
     const product=ports.level===undefined||request.manifest.scalarBlocks!==undefined
-      ?shardProductFromAdmission(request.admitted,request.scope):undefined;
+      ?shardFolderFromAdmission(request.admitted,request.scope):undefined;
     // G782: Developer pages time each native foundation wait (`wildshard.prepare:<slug>:native.<step>`) beside its whole span
     if(product!==undefined)await timeClientPreparation(request.manifest.slug,'native.scalar-blocks',()=>prepareManifestScalarBlocks(request.manifest,product,request.scope));
     const level = ports.level === undefined ? toLevelSpec(hasDeclaredClientPage(request.admitted.source) ? { ...request.manifest, ground: clientPageGround(request.admitted.source, request.admitted.assets) } : request.manifest, product) : ports.level(request.manifest);
@@ -293,7 +293,7 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
       // M3 tiles-swap: the admitted product's reader for the resident runtime (a painter that binds its compiled tiles reads
       // it), handed over first: the level's declared navigation and a required manifest ground are that product's own files
       // (the session's readers read them), never downloaded again
-      provideRuntimeProduct(request.admitted, resident);
+      provideRuntimeFolder(request.admitted, resident);
       // Start independent data/material inputs beside nav/look/native setup.
       // Capture rejection now, consume at its former cursor, and drain before
       // teardown on every earlier refusal without changing failure precedence.

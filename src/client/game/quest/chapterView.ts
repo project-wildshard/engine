@@ -15,7 +15,7 @@ import type { Interactables } from '@wildshard/engine/world/interact/Interactabl
 import type { InteractTable, createQuestPlacements } from '@wildshard/engine/world/interact/types';
 import type { QuestPageTalksRows } from '@wildshard/format/npcs';
 import { completionProjection, type CompletionProgress } from '../complete/declared';
-import { ProductFigureCatalogue } from '../models/figureCatalogue';
+import { FolderFigureCatalogue } from '../models/figureCatalogue';
 import type { ShardContext } from '../plugin/context';
 import { QuestViews, type QuestNpcTalkPorts } from '../plugin/ui';
 import { ControlRefinement } from '../shardfile/controlRefinement';
@@ -100,7 +100,7 @@ export async function questTalkFigures(ctx: ShardContext, rows: QuestPageTalksRo
   const figures = new Map<string, TalkFigure>();
   for (const row of rows.models) {
     if (row.source === 'catalogue') {
-      const book = await ProductFigureCatalogue.fromProduct(ctx.product, row.library), audio = runtime.objects[row.bark.audio];
+      const book = await FolderFigureCatalogue.fromFolder(ctx.product, row.library), audio = runtime.objects[row.bark.audio];
       requireLive();
       if (!(audio instanceof DeclaredAmbience)) throw new Error('Quest talk lost its figure or audio owner');
       const scene = new SceneHandles(world.sky);

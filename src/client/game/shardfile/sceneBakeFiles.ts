@@ -1,10 +1,10 @@
 import type { SceneBakeSource } from './sceneSources';
 import type { BakedByteResource } from './bakedKinds';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** Resolve admitted bake names for the existing URL-only mesh and deflate
  * readers. Public URLs and the original source descriptor keep their identity. */
-export function sceneBakeFiles(source: SceneBakeSource, product: Pick<ShardProduct, 'hasFile' | 'url'>): SceneBakeSource {
+export function sceneBakeFiles(source: SceneBakeSource, product: Pick<ShardFolder, 'hasFile' | 'url'>): SceneBakeSource {
   let urls: Record<string, string> | undefined;
   for (const [piece, file] of Object.entries(source.urls)) {
     if (!product.hasFile(file)) continue;

@@ -5,7 +5,7 @@ import { withOwner } from '@wildshard/engine/app/ownership';
 import { forgetWhenDisposed } from '@wildshard/engine/app/cachedAssets';
 import { TIER } from '@wildshard/engine/core/tier';
 import { readWholeGeometry } from '../plugin/geometry';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 type Assets = Pick<App['assets'], 'register' | 'acquireResource' | 'evictCached'>;
 interface Template { readonly geometry: BufferGeometry; readonly matrix: readonly number[] }
@@ -51,7 +51,7 @@ function lease(owner: Scope, assets: Assets, input: ReadonlyMap<string, Template
 
 /** Completed partition reconstructions only: source hashes and tier identify geometry plus detached matrix words.
  * The original admitted decoder runs on a miss; no pending owner or decoder cleanup enters this memo. */
-export async function readReusableWholeLibrary(owner: Scope, product: ShardProduct, files: readonly string[], assets: Assets, pause?: () => Promise<void>): Promise<LibraryLease> {
+export async function readReusableWholeLibrary(owner: Scope, product: ShardFolder, files: readonly string[], assets: Assets, pause?: () => Promise<void>): Promise<LibraryLease> {
   requireLive(owner);
   let memo = libraries.get(assets);
   if (memo === undefined) { memo = new Map(); libraries.set(assets, memo); }
@@ -60,8 +60,8 @@ export async function readReusableWholeLibrary(owner: Scope, product: ShardProdu
     const held = lease(owner, assets, ready);
     try {
       // A decoded hit still releases this admission's transport through its original authority.
-      const { runtimeProduct } = await import('./runtimeProduct');
-      const runtime = runtimeProduct(product.shardfile);
+      const { runtimeFolder } = await import('./runtimeFolder');
+      const runtime = runtimeFolder(product.shardfile);
       await runtime.releaseTransport(files); runtime.assets.releaseTiles();
       requireLive(owner);
       return held;

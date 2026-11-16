@@ -10,7 +10,7 @@ import { AudioMusicSchema } from '@wildshard/format/audioProfiles';
 import { ENGINE_MUSIC_SLOTS } from '@wildshard/format/engineMusic';
 import { engineMusicLine, shardBootAudio } from '../src/cook/game/entryTotals';
 import { openShardfile, shardHalf } from '../src/cook/game/shardCook';
-import { productTarball } from '../src/cook/game/productTarball';
+import { folderTarball } from '../src/cook/game/folderTarball';
 import { ENGINE_MUSIC_STYLE, engineMusicFiles, engineMusicNames, musicManifest } from '../src/shared/engine/audio/bootAudio';
 import { installAssetTables, type AssetTables } from '../src/shared/engine/boot/tables';
 import { PUBLIC_BYTES } from '../src/client/game/boot/bytes.generated';
@@ -73,7 +73,7 @@ const bootTables = 'out/.app/boot-tables.json';
 for (const [shard, slots] of [['driftwood-isle', ['title', 'island']], ['pine-hollow', ['title', 'pine']], ['nalati-grasslands', ['title']], ['nine-dragon-stack', ['title']]] as const) {
   test.skipIf(!existsSync(`out/${shard}/shard.json`) || !existsSync(bootTables))(`${shard}: its rows name engine music the build has`, () => {
     const common = JSON.parse((JSON.parse(readFileSync(bootTables, 'utf8')) as { common: string }).common) as AssetTables;
-    const half = shardHalf(openShardfile(productTarball(`out/${shard}`)), (_url, bytes) => bytes.length);
+    const half = shardHalf(openShardfile(folderTarball(`out/${shard}`)), (_url, bytes) => bytes.length);
     const row = half.shard.sections.get('audio/audio') as { audio: AudioData };
     expect(engineMusicNames(row.audio.music!).slots).toEqual(slots);
     expect(() => shardBootAudio(half.shard.sections, common, [], shard)).not.toThrow();

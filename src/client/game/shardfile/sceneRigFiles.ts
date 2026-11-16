@@ -1,9 +1,9 @@
 import type { ModelLibraryRows } from '../plugin/geometry';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 /** Resolve existing product-owned names for mesh, rig and geometry-pool loaders.
  * Ordinary public URLs and the original descriptor remain untouched. */
-export function sceneRigFiles(rows: ModelLibraryRows<string, string>, product: Pick<ShardProduct, 'hasFile' | 'url'>): ModelLibraryRows<string, string> {
+export function sceneRigFiles(rows: ModelLibraryRows<string, string>, product: Pick<ShardFolder, 'hasFile' | 'url'>): ModelLibraryRows<string, string> {
   let meshes: Record<string, string> | undefined;
   for (const [name, source] of Object.entries(rows.meshUrls)) {
     if (!product.hasFile(source)) continue;

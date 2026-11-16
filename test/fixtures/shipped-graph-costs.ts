@@ -4,7 +4,7 @@ import {readFileSync,realpathSync} from 'node:fs';
 import {resolve,sep} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Join measured programs to actual graph and lowered-code identities.
 import {createHash} from 'node:crypto';
-import {loadHeadlessProduct} from '../../src/server/host/headlessProduct';
+import {loadHeadlessFolder} from '../../src/server/host/headlessFolder';
 import {outputDescriptor} from '../../src/shared/game/shardfile/outputDescriptor';
 import {emitClassicGraph} from '../../src/client/engine/render/graph/glslProgram';
 import {graphFragmentIdentity} from './graph-fragment-identity';
@@ -38,7 +38,7 @@ function graphLike(value:unknown):boolean{
  * plus the engine presets referenced by the material catalogue. No author
  * compilation, browser, renderer, guessed pixels or replaced admission. */
 export async function shippedGraphCosts(directory:string):Promise<readonly ShippedGraphCost[]>{
- const root=realpathSync(directory),product=await loadHeadlessProduct(root),source=product.shardfile;
+ const root=realpathSync(directory),product=await loadHeadlessFolder(root),source=product.shardfile;
  const descriptor=outputDescriptor(source);if(descriptor===undefined)throw new Error('Graph census requires its verified output descriptor');
  const toonLook=new ToonLook(source.look.familyLooks.toon??{}),rows=new Map<string,ShippedGraphCost>(),lowered=new Map<string,GraphGlsl>();
  const aliases=new Map<string,string[]>(),required=new Set<string>();

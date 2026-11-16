@@ -1,4 +1,4 @@
-import type { ShardProduct } from '../../src/shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../src/shared/game/shardfile/shardFolder';
 import type { HeadlessRuntimePlan } from '../../src/server/host/headlessRuntime';
 import { createSimHost, type SimHost } from '../../src/server/engine/sim';
 import type { Rapier } from '../../src/shared/engine/physics/rapier';
@@ -8,7 +8,7 @@ export function need<T>(value: T, message: string): NonNullable<T> {
   return value;
 }
 /** Named product JSON is admitted by the same build schema before this typed proof read. */
-export async function readJson<T>(product: ShardProduct, name: string, fatal = true): Promise<T> {
+export async function readJson<T>(product: ShardFolder, name: string, fatal = true): Promise<T> {
   const value: unknown = JSON.parse(new TextDecoder('utf-8', {fatal}).decode(await product.file(name)));
   return value as T;
 }

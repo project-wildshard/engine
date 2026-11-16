@@ -7,19 +7,19 @@ import { resourceScope } from '@wildshard/engine/app/resources';
 import { ownSceneTree } from '@wildshard/engine/app/sceneOwnership';
 import { parseWorldScene, type WorldSceneRecipe } from '@wildshard/format/clientChannels';
 import type { WorldScenesSection } from '@wildshard/format/worldScenes';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { createWorldScene } from '../plugin/scene';
 import type { SceneDraw } from '@wildshard/format/sceneDraws';
 import { drawSceneRows, prepareSceneDrawRows } from '../shardfile/sceneDraws';
 import { prepareSceneSpecimens, sceneModelSource } from '../shardfile/sceneSources';
 import { admitWorldSceneStepSources, worldSceneStepSources } from '../shardfile/worldSceneStepSources';
 import { hasLentLook, lendLooks, lentLook, lentMappedLook } from '../shardfile/lentLooks';
-import { runtimeLookMaterials } from '../shardfile/runtimeProduct';
+import { runtimeLookMaterials } from '../shardfile/runtimeFolder';
 
 export interface ScenePartSpecimen { readonly part: string; readonly step: string; readonly materialLibrary?: string; readonly definition: SceneModelRow; readonly effects?: readonly { readonly part: string; readonly draws: readonly SceneDraw[] }[] }
 interface Prepared { readonly recipe: WorldSceneRecipe; readonly step: WorldScenesSection['steps'][number] }
-const prepared = new WeakMap<ShardProduct, Map<string, Promise<Prepared>>>();
-function prepare(product: ShardProduct, id: string): Promise<Prepared> {
+const prepared = new WeakMap<ShardFolder, Map<string, Promise<Prepared>>>();
+function prepare(product: ShardFolder, id: string): Promise<Prepared> {
   let entries = prepared.get(product); if (entries === undefined) { entries = new Map(); prepared.set(product, entries); }
   const previous = entries.get(id); if (previous !== undefined) return previous;
   const pending = (async () => {
@@ -33,7 +33,7 @@ function prepare(product: ShardProduct, id: string): Promise<Prepared> {
 }
 /** Original metadata/framing is retained. A neutral kit or lit-fire specimen
  * has its own declared step and never changes a resident quest's visibility. */
-export function scenePartSpecimen(product: ShardProduct, row: ScenePartSpecimen): ModelDef<Record<string, never>> {
+export function scenePartSpecimen(product: ShardFolder, row: ScenePartSpecimen): ModelDef<Record<string, never>> {
   let source: Prepared | undefined;
   const library = () => row.materialLibrary === undefined ? undefined : sceneModelSource(product, row.materialLibrary);
   const look = (id: string): Material | undefined => library()?.look(id);

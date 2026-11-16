@@ -1,16 +1,16 @@
 import {Scope} from '@wildshard/engine/app/scope';
 import {createCatalogueAudio,type LevelAudioProfile} from '@wildshard/engine/audio/levelAudio';
-import {loadFirstPartyProduct} from './runtimeProduct';
-import type {ShardProduct} from '../../../shared/game/shardfile/shardProduct';
+import {loadFirstPartyFolder} from './runtimeFolder';
+import type {ShardFolder} from '../../../shared/game/shardfile/shardFolder';
 
 /** Boot borrows admitted audio rows; the profile retains no product lease or decoded-asset copy. */
-export async function productAudioCatalogue(slug:string,product?:ShardProduct):Promise<LevelAudioProfile>{
+export async function folderAudioCatalogue(slug:string,product?:ShardFolder):Promise<LevelAudioProfile>{
  if(product!==undefined)return createCatalogueAudio(product.section('audio/audio').audio);
  const scope=new Scope(`audio.catalogue:${slug}`);
- try{return await productAudioCatalogue(slug,await loadFirstPartyProduct(slug,scope));}
+ try{return await folderAudioCatalogue(slug,await loadFirstPartyFolder(slug,scope));}
  finally{scope.dispose();}
 }
 /** Full catalogue inventory preserves the music-then-SFX ordering used by counted boot. */
-export async function productAudioFiles(slug:string):Promise<readonly string[]>{
- const files=(await productAudioCatalogue(slug)).files();return [...files.music,...files.sfx];
+export async function folderAudioFiles(slug:string):Promise<readonly string[]>{
+ const files=(await folderAudioCatalogue(slug)).files();return [...files.music,...files.sfx];
 }

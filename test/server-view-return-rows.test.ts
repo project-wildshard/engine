@@ -5,7 +5,7 @@ import {DecisionScriptsSchema} from '@wildshard/format/decisionScripts';
 import {prepareReturns,serverReturnRows} from '../src/server/game/shardfile/nativeRuntimeLoans';
 import {simDecisionRow} from '../src/server/engine/script/decision';
 import {ReturnProgram} from '../src/shared/game/population/returnProgram';
-import {createShardProduct} from '../src/shared/game/shardfile/shardProduct';
+import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
 import {emptyShardfile} from '../src/shared/host/author';
 import type {SimHost} from '@wildshard/engine/sim';
 import {Scope} from '../src/shared/engine/app/scope';
@@ -21,7 +21,7 @@ if(sim===undefined||view===undefined)throw new Error('fixture rows');
 test('a made-up view return row is dropped before the server prepares or lends return modules',async()=>{
   expect(serverReturnRows([sim,view]).map(row=>row.id)).toEqual([sim.id]);
   const source=emptyShardfile({slug:'view-place',name:'View',author:'Fixture',revision:1,seed:7});
-  const product=createShardProduct({slug:'view-place',revision:1,shardfile:source,
+  const product=createShardFolder({slug:'view-place',revision:1,shardfile:source,
     sections:new Map([['actors/return-scripts',[sim,view]]]),files:new Map(),read:()=>Promise.reject(new Error('no read'))});
   const prepare=vi.spyOn(ReturnProgram,'prepareModules').mockResolvedValue();
   const lend=vi.spyOn(ReturnProgram,'lendModules').mockReturnValue();

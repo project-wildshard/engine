@@ -35,7 +35,7 @@ import * as v from 'valibot';
 import type { AccentId } from '@wildshard/format/accent';
 import type { RegionalSimCost, RuntimeCost } from '@wildshard/format/runtimeCost';
 import type { ShardSlug } from '../../../shared/game/shard/slug';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 /**
  * ShardManifest — everything that makes one Wildshard shard different from another.
  *
@@ -185,8 +185,8 @@ export interface ChunkAssets {
 /** A declared tree set's factory: its product's `world/trees` rows built on the game's tree set factory (models/treeSet). */
 export function declaredTreeSet(slug: string): ChunkTrees['factory'] {
   return async () => {
-    const { productTreeSet, TreeSetFactory } = await import('../models/treeSet');
-    return async (renderer, sky) => new TreeSetFactory(renderer, await productTreeSet(slug), sky).build();
+    const { folderTreeSet, TreeSetFactory } = await import('../models/treeSet');
+    return async (renderer, sky) => new TreeSetFactory(renderer, await folderTreeSet(slug), sky).build();
   };
 }
 
@@ -596,7 +596,7 @@ export interface ShardManifest {
    * product (`toLevelSpec(manifest, product)`), so a look reads its built output, never `shard.config`; the engine only
    * ever sees the bound loader (progress/shard-platform/product-in-look-o272/).
    */
-  render?: (product: ShardProduct) => Promise<LookStrategy>;
+  render?: (product: ShardFolder) => Promise<LookStrategy>;
   /**
    * A built fragment's limits (the landscape shards have the terrain's edge walls instead): below `floor` or outside the
    * box, on foot or on the board, the player is put back on the last floor they stood on inside them (a registry floor;
@@ -613,7 +613,7 @@ export interface ShardManifest {
    * Omitted = the models its world places, and a card per species of the animals alive when Explore opens. Like `render`,
    * it gets the shard's loaded product, so a specimen's model can read its built output.
    */
-  roster?: (product: ShardProduct) => Promise<readonly RosterEntry[]>;
+  roster?: (product: ShardFolder) => Promise<readonly RosterEntry[]>;
   /**
    * The core fields' copies drawn as the shard's own models (E315 M2 / E349, Pine Hollow: the forest's trees as its forest
    * tree model, the forest floor's six kinds as theirs — src/shards/pine-hollow/world/drawnModels.ts). Called once, after
@@ -708,11 +708,11 @@ export function defineShard(rows: ShardManifestRows,
   let audio = data.audio,boot = data.boot;
   if (audio?.catalogue !== undefined) {
     const { catalogue,...audioData } = audio,preload = audio.preload ?? (catalogue ? async () => {
-      const { productAudioCatalogue } = await import('../shardfile/audioCatalogue');return productAudioCatalogue(data.slug);
+      const { folderAudioCatalogue } = await import('../shardfile/audioCatalogue');return folderAudioCatalogue(data.slug);
     } : undefined);
     audio = { ...audioData,...(preload === undefined ? {} : { preload }) };
     if (catalogue && boot !== undefined && boot.audio === undefined) boot = { ...boot,audio: async () => {
-      const { productAudioFiles } = await import('../shardfile/audioCatalogue');return productAudioFiles(data.slug);
+      const { folderAudioFiles } = await import('../shardfile/audioCatalogue');return folderAudioFiles(data.slug);
     } };
   }
   const trees: ChunkTrees = data.trees.factory === 'declared' ? { ...data.trees,factory: declaredTreeSet(data.slug) } : data.trees;
@@ -879,13 +879,13 @@ export function declaredMapColour(input: unknown,scalarBlocks?:ScalarLatticeBind
 
 /** Read one definition's bounded named scalar blocks through the SAME product.
  * No IO occurs during declaration; a malformed suffix publishes no sampler. */
-export async function prepareManifestScalarBlocks(manifest: ShardManifest, product: ShardProduct, scope: Scope): Promise<void> {
+export async function prepareManifestScalarBlocks(manifest: ShardManifest, product: ShardFolder, scope: Scope): Promise<void> {
   const intake = manifest.scalarBlocks;
   if (intake === undefined) return;
   const file = product.file, hasFile = product.hasFile, { slug: identity } = manifest;
   const live = (): void => {
-    const { slug: productIdentity } = product, { slug: manifestIdentity } = manifest;
-    if (scope.disposed || scope.disposing || productIdentity !== identity || manifestIdentity !== identity
+    const { slug: folderIdentity } = product, { slug: manifestIdentity } = manifest;
+    if (scope.disposed || scope.disposing || folderIdentity !== identity || manifestIdentity !== identity
       || product.file !== file || product.hasFile !== hasFile || manifest.scalarBlocks !== intake) {
       throw new Error('Retired or replaced scalar source');
     }

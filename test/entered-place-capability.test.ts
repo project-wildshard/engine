@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import type { ShardContext } from '../src/client/game/plugin/context';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { installClientPhase, admitClientPlan } from '../src/client/game/shardfile/clientPlan';
 import * as places from '../src/client/game/shardfile/clientPlaceSets';
 import * as continuation from '../src/client/game/quest/continuation';
@@ -13,7 +13,7 @@ const binding = { kind: 'world.bind-sets', placed: ['orchard.pier'], groups: [{ 
 function fixture() {
   const scope = new Scope('place-capability');
   const source = emptyShardfile({ slug: 'orchard', name: 'Orchard', author: 'Fixture', revision: 1, seed: 7 });
-  const product = createShardProduct({ slug: source.identity.slug, revision: 1, shardfile: source,
+  const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source,
     sections: new Map(), files: new Map(), read: () => Promise.reject(new Error('No fixture reads')) });
   return { scope, product, ctx: legacyDouble<ShardContext>({ scope, product }) };
 }

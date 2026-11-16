@@ -94,8 +94,8 @@ export function scriptScenarioTests(changed, tests) {
 
 /** Disk readers have no import edge to the author modules that publish their bytes.
  * @param {string[]} changed @param {Record<string, string[]>} registry @returns {string[]} */
-export function productReaderTests(changed, registry) {
-  const shared = changed.some(file => /^(?:src\/(?:sdk|sharddev|format)\/|scripts\/(?:build-shardfiles\.mjs|shardfile-cache\.mjs|test-products\.json)$)/u.test(file));
+export function folderReaderTests(changed, registry) {
+  const shared = changed.some(file => /^(?:src\/(?:sdk|sharddev|format)\/|scripts\/(?:build-shardfiles\.mjs|shardfile-cache\.mjs|test-folders\.json)$)/u.test(file));
   return Object.entries(registry).filter(([, slugs]) => shared || changed.some(file => slugs.some(slug =>
     file.startsWith(`src/shards/${slug}/`) || file.startsWith(`public/assets/${slug}/`))))
     .map(([test]) => test).sort((a, b) => a.localeCompare(b));
@@ -154,11 +154,11 @@ if (isMain) {
   }
   const scenarioDir = resolve(ROOT, 'test/scripts');
   const scenarios = existsSync(scenarioDir) ? readdirSync(scenarioDir).filter(file => file.endsWith('.test.ts')).map(file => `test/scripts/${file}`) : [];
-  const registryPath = existsSync(resolve(ROOT, 'scripts/test-products.json')) ? resolve(ROOT, 'scripts/test-products.json') : resolve(import.meta.dirname, 'test-products.json');
+  const registryPath = existsSync(resolve(ROOT, 'scripts/test-folders.json')) ? resolve(ROOT, 'scripts/test-folders.json') : resolve(import.meta.dirname, 'test-folders.json');
   /** @type {Record<string, string[]>} */
   const products = JSON.parse(readFileSync(registryPath, 'utf8'));
   const live = process.argv.includes('--live');
-  const required = live ? [] : [...new Set([...QUICK_TESTS, ...scriptScenarioTests(changed, scenarios), ...productReaderTests(changed, products).filter(test => existsSync(resolve(ROOT, test)))])];
+  const required = live ? [] : [...new Set([...QUICK_TESTS, ...scriptScenarioTests(changed, scenarios), ...folderReaderTests(changed, products).filter(test => existsSync(resolve(ROOT, test)))])];
   const selection = live ? liveTestSelection(ROOT, [...new Set([...related, ...sources.filter(file => INCLUDED.test(file))])], products, changed) : { run: related, deferred: [] };
   for (const row of selection.deferred) console.error(`gate-related-tests: CI only ${row.test} (${row.reason})`);
   const allowed = new Set(selection.run);

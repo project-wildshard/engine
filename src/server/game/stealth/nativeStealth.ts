@@ -8,7 +8,7 @@ import { ClientPlanSchema } from '@wildshard/format/clientPlan';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { StealthCrouch, sampleStealthSources } from '../../../shared/game/stealth/stealthLaw';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { playerSeats, type PlayerSeat, type PlayerSeats } from '../plugin/playerSeats';
 import { mountedPlayerOf } from '../riding/native';
 import { nativeTamingControls, nativeTamingOf } from '../riding/nativeTaming';
@@ -39,7 +39,7 @@ const owners = new WeakMap<SimHost, PlayerSeats<StealthSeat>>();
 export function nativeStealthOf(host: SimHost): PlayerSeats<StealthSeat> | undefined { return owners.get(host); }
 
 /** Read the page's own stealth rows now, when its client plan enters stealth; the returned step installs them on one room host. */
-export function prepareNativeStealth(product: Pick<ShardProduct, 'section'>): ((host: SimHost, context: { readonly tick: StealthTick; readonly groups: NativeGroupCollection | undefined }) => void) | null {
+export function prepareNativeStealth(product: Pick<ShardFolder, 'section'>): ((host: SimHost, context: { readonly tick: StealthTick; readonly groups: NativeGroupCollection | undefined }) => void) | null {
   if (!v.parse(ClientPlanSchema, product.section('client/plan')).features.some(row => row.kind === 'stealth.entry')) return null;
   const rows = v.parse(StealthRowsSchema, product.section('player/stealth')), sources = rows.observations;
   if (sources === undefined) throw new Error('Native stealth requires its admitted observation sources');

@@ -11,7 +11,7 @@ import { createModelLibrary, type ModelLibrary } from '../plugin/geometry';
 import { RoamingCombatSchema } from '@wildshard/format/roamingCombat';
 import type { ModelContext } from '@wildshard/engine/models/model';
 import type { SkyRig } from '@wildshard/engine/world/skyRig';
-import { loadFirstPartyProduct } from '../shardfile/runtimeProduct';
+import { loadFirstPartyFolder } from '../shardfile/runtimeFolder';
 
 function kitOwnerEntered(scope: Scope): boolean { return !scope.disposed; }
 
@@ -115,7 +115,7 @@ export class SocketRigCard {
   constructor(private readonly slug: string, private readonly file: string) {}
   async preload(): Promise<void> {
     const admission = this.admission ??= (async (): Promise<CardKit> => {
-      const product = await loadFirstPartyProduct(this.slug), rows = v.parse(RoamingCombatSchema, await product.json(this.file)).projection.socketRig;
+      const product = await loadFirstPartyFolder(this.slug), rows = v.parse(RoamingCombatSchema, await product.json(this.file)).projection.socketRig;
       return { rows, library: socketLibrary(rows, product.url(rows.pool.url)) };
     })();
     let kit: CardKit;

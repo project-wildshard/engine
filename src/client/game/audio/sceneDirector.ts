@@ -2,7 +2,7 @@ import { entryOwner } from '../../../shared/game/shardfile/entryOwners';
 import { boundResidentWorldScope } from '../shardfile/hybridPresentation';
 import type { Tier } from '@wildshard/engine/core/tier';
 import { runtimeAudio, installRuntimeAudioEntry, installRuntimeGameplayAudio, type RuntimeGameplayAudioEnvironment } from '../plugin/audio';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { Vector3 } from 'three';
 import { parse } from 'valibot';
 import { ScalarLatticeBindings } from '@wildshard/engine/world/scalarChannel';
@@ -122,7 +122,7 @@ export class AudioSceneDirector {
 }
 
 
-const enteredScenes=new WeakMap<Scope,WeakMap<ShardProduct,AudioSceneDirector>>();
+const enteredScenes=new WeakMap<Scope,WeakMap<ShardFolder,AudioSceneDirector>>();
 /** Run an admitted audio entry before the corresponding native lifecycle hook. */
 export async function enterDeclaredAudioPhase(ctx: ShardContext, phase: 'kit' | 'play'): Promise<void> {
  const entry = ctx.product.shardfile.audio.entry?.[phase];

@@ -6,7 +6,7 @@ import { parseStillImage } from '@wildshard/format/stillImage';
 import { Scope } from '../src/shared/engine/app/scope';
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
 import { leaseMapImage } from '../src/client/game/shardfile/mapImage';
-import { ApproachInputsDeferredError } from '../src/client/game/grid/productInputs';
+import { ApproachInputsDeferredError } from '../src/client/game/grid/folderInputs';
 
 test('map admission hands off to only the retained bitmap or canvas pixels', () => {
   const bytes = Uint8Array.from(readFileSync('test/fixtures/world-source/image.png'));

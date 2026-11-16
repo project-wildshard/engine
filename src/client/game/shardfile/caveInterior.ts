@@ -8,7 +8,7 @@ import type { SkyRig } from '@wildshard/engine/world/skyRig';
 import { insidePolygon, yawLocal, yawWorld, type YawFrame } from '@wildshard/engine/world/yawFrame';
 import { CaveFileSchema, CaveInteriorSchema, type CaveFile, type CaveInteriorRows } from '@wildshard/format/caveInterior';
 import { lentLook, setLentParam, setLentTexture } from './lentLooks';
-import { loadFirstPartyProduct } from './runtimeProduct';
+import { loadFirstPartyFolder } from './runtimeFolder';
 import { GeometryPack } from '@wildshard/engine/models/geometryPack';
 import { packedRows } from '@wildshard/format/geometryPack';
 import { fetchDeflated } from '../plugin/geometry';
@@ -40,7 +40,7 @@ export class CaveInterior {
   /** Admit the rows, read the baked cave from its product and lend the rock look its textures (`cap` their size). */
   static async load(input: unknown, cap: number): Promise<CaveInterior> {
     const rows = v.parse(CaveInteriorSchema, input);
-    const [product, rock, map, normalMap, roof] = await Promise.all([loadFirstPartyProduct(rows.product), loadPBR(rows.rock.pbr, 1, cap),
+    const [product, rock, map, normalMap, roof] = await Promise.all([loadFirstPartyFolder(rows.product), loadPBR(rows.rock.pbr, 1, cap),
       loadTexture(texUrl(rows.rock.grit, 'diffuse'), true), loadTexture(texUrl(rows.rock.grit, 'nor_gl')), fetchDeflated(rows.roof.url)]);
     const data = v.parse(CaveFileSchema, await product.json(rows.file));
     const cave = new CaveInterior(rows, data.meta, new GeometryPack(roof, packedRows(rows.roof.rows), 'cave roof').geometry(rows.roof.part));

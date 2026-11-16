@@ -6,7 +6,7 @@ import type { ShardContext } from '../plugin/context';
 import type { RuntimeHomePorts } from '../../../shared/game/plugin/runtimeRows';
 import { bindPageHomes } from '../../../shared/game/population/pageHomes';
 import { pagePopulationRows } from '../../../shared/game/population/pageRows';
-import { productPainterLight } from '../looks/paintedLook';
+import { folderPainterLight } from '../looks/paintedLook';
 import type { Animal } from '@wildshard/engine/entities/AnimalView';
 import { wirePage } from './wirePage';
 import { clientNativeBook } from './clientNativeBook';
@@ -21,12 +21,12 @@ export async function installClientPopulation(ctx: ShardContext, input: unknown)
   const materialScope = ctx.product.section('look/painted').look.lightScope === 'material';
   const addresses = new Set([...declared.homes, ...declared.bosses, ...declared.actors ?? []].map(body => body.id));
   const rowBodies = ctx.game.runtime?.play?.animals; // herdless on the wire: its population spawns nothing, and the rows' bodies take the same light
-  if (materialScope && rowBodies !== undefined) wirePage.dressRows(rowBodies, ctx.scope, body => { productPainterLight(ctx.product, body.mesh, ctx.scope); });
+  if (materialScope && rowBodies !== undefined) wirePage.dressRows(rowBodies, ctx.scope, body => { folderPainterLight(ctx.product, body.mesh, ctx.scope); });
   for (const ids of Object.values(row.groups)) if (ids.some(id => !addresses.has(id))) throw new Error('Population group requires actual native bodies');
   const ports: RuntimeHomePorts = { system: row.system,
     decisionActors: parseDecisionScripts(ctx.product.section('sim/scripts')).filter(script => 'spawnGroup' in script.binding).flatMap(script => Object.values(script.actors)),
     ...(row.held === undefined ? {} : { held: row.held }),
-    spawned: animal => { if (materialScope) productPainterLight(ctx.product, animal.mesh, ctx.scope); },
+    spawned: animal => { if (materialScope) folderPainterLight(ctx.product, animal.mesh, ctx.scope); },
     ...(row.holds === undefined ? {} : { holds: { ...row.holds, flags: book.quest.flags } }),
   };
   book.population = await bindPageHomes(ctx, declared, ports, () => buildYield(ctx.scope, 4));

@@ -1,13 +1,13 @@
 import type { ForestPageRows } from '@wildshard/format/forestPage';
 import type { ShardContext } from '../plugin/context';
 import { readWholeGeometry, type WholeGeometryView } from '../plugin/geometry';
-import { productCoverAppearance, type CoverAppearance } from './coverAppearance';
+import { folderCoverAppearance, type CoverAppearance } from './coverAppearance';
 
 interface ForestGroundInputPorts {
-  readonly appearance: typeof productCoverAppearance;
+  readonly appearance: typeof folderCoverAppearance;
   readonly geometry: typeof readWholeGeometry;
 }
-const INPUT_PORTS: ForestGroundInputPorts = { appearance: productCoverAppearance, geometry: readWholeGeometry };
+const INPUT_PORTS: ForestGroundInputPorts = { appearance: folderCoverAppearance, geometry: readWholeGeometry };
 type GroundInputs = readonly [PromiseSettledResult<CoverAppearance>, PromiseSettledResult<unknown>, PromiseSettledResult<Map<string, WholeGeometryView>>];
 
 /** Independent verified inputs overlap; all started work drains before the caller

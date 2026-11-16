@@ -10,21 +10,21 @@ import {readdirSync} from 'node:fs';
 import {resolve as resolvePath} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Import only the fixed source simulation loader.
 import {pathToFileURL} from 'node:url';
-import {compileProductWorker} from '../fixtures/headless/compileProductWorker.ts';
+import {compileFolderWorker} from '../fixtures/headless/compileFolderWorker.ts';
 
 const pause=ms=>new Promise(resolve=>{setTimeout(resolve,ms);});
 const within=async(pending,ms,message)=>{let timer;try{return await Promise.race([pending,new Promise((_resolve,reject)=>{timer=setTimeout(()=>reject(new Error(message)),ms);})]);}finally{clearTimeout(timer);}};
 const folders=()=>new Set(readdirSync('tmp').filter(name=>name.startsWith('compiled-product-')));
 const alive=pid=>{try{process.kill(pid,0);return true;}catch(error){if(error.code==='ESRCH')return false;throw error;}};
 const until=async predicate=>{const end=performance.now()+4000;for(;;){const value=predicate();if(value)return value;if(performance.now()>end)throw new Error('Owned child never reached preparation boundary');await pause(5);}};
-const children=parent=>execFileSync('ps',['-axo','pid=,ppid=,command='],{encoding:'utf8'}).trim().split('\n').map(line=>/^\s*(\d+)\s+(\d+)\s+(.*)$/u.exec(line)).filter(row=>row&&Number(row[2])===parent&&row[3].includes('buildProductWorker.ts')).map(row=>Number(row[1]));
+const children=parent=>execFileSync('ps',['-axo','pid=,ppid=,command='],{encoding:'utf8'}).trim().split('\n').map(line=>/^\s*(\d+)\s+(\d+)\s+(.*)$/u.exec(line)).filter(row=>row&&Number(row[2])===parent&&row[3].includes('buildFolderWorker.ts')).map(row=>Number(row[1]));
 const clean=before=>assert.deepEqual([...folders()].filter(name=>!before.has(name)),[],'owned preparation folder survived cancellation');
 
 // Stop the actual native producer, not a stand-in: abort must kill and reap it
 // even while it cannot process an ordinary termination event.
 {
  const before=folders(),controller=new AbortController();let pid,live;
- const pending=compileProductWorker(undefined,controller.signal);
+ const pending=compileFolderWorker(undefined,controller.signal);
  void pending.then(value=>{live=value;return undefined;}).catch(()=>undefined);
  try{
   pid=await until(()=>children(process.pid)[0]);process.kill(pid,'SIGSTOP');

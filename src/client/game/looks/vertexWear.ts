@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import * as v from 'valibot';
 import { VertexWearSchema } from '@wildshard/format/vertexWear';
 import { BakedWearSchema } from '@wildshard/format/bakedTiles';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { setLentParam, setLentTexture } from '../shardfile/lentLooks';
 
 /** A declared vertex wear file, read: its texture (when it carries one), the rect that samples it, and `wear`, which
@@ -15,7 +15,7 @@ export interface VertexWear {
 
 /** G571: read a vertex wear row's file through the product's verified reader (`format/vertexWear` VertexWearSchema). A
  *  part whose vertex count differs from its geometry refuses: the file was baked for other geometry. Client-only. */
-export async function loadVertexWear(product: Pick<ShardProduct, 'file'>, input: unknown): Promise<VertexWear> {
+export async function loadVertexWear(product: Pick<ShardFolder, 'file'>, input: unknown): Promise<VertexWear> {
   const row = v.parse(VertexWearSchema, input), bytes = Uint8Array.from(await product.file(row.file)).buffer;
   let texture: THREE.DataTexture | null = null;
   if (row.texture !== null) {
@@ -37,7 +37,7 @@ export async function loadVertexWear(product: Pick<ShardProduct, 'file'>, input:
 /** G571: a baked tile set's declared wear (format/bakedTiles BakedWearSchema): the tier's file worn by the world's ground
  *  (part 0, when declared) and then by each tile in order, its ground map, rect and fade lent to each declared look.
  *  Client-only. */
-export async function wearBakedTiles(product: Pick<ShardProduct, 'file'>, input: unknown, tier: 'phone' | 'desktop',
+export async function wearBakedTiles(product: Pick<ShardFolder, 'file'>, input: unknown, tier: 'phone' | 'desktop',
   ground: THREE.BufferGeometry | null, tiles: readonly THREE.Mesh[]): Promise<void> {
   const wear = v.parse(BakedWearSchema, input), loaded = await loadVertexWear(product, wear.files[tier]), first = wear.ground ? 1 : 0, texture = loaded.texture;
   if (wear.ground) { if (ground === null) throw new Error('Vertex wear needs the world ground'); loaded.wear(ground, 0); }

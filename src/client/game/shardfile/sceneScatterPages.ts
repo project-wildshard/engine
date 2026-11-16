@@ -2,16 +2,16 @@ import { parseSceneScatterPage, type SceneScatterPage } from '@wildshard/format/
 import type { Scope } from '@wildshard/engine/app/scope';
 
 type Result = { readonly ok: true; readonly page: SceneScatterPage } | { readonly ok: false; readonly error: unknown };
-interface PageProduct { readonly json: (name: string) => Promise<unknown>; readonly hasFile: (name: string) => boolean }
-interface Context { readonly scope: Scope; readonly product: PageProduct }
+interface PageFolder { readonly json: (name: string) => Promise<unknown>; readonly hasFile: (name: string) => boolean }
+interface Context { readonly scope: Scope; readonly product: PageFolder }
 
 /** Entered-owner page reads overlap in declared first-use order. Complete
  * parsing happens on arrival; errors surface only at the original cursor. */
 export class SceneScatterPages {
-  private readonly product: PageProduct;
+  private readonly product: PageFolder;
   private readonly scope: Scope;
-  private readonly json: PageProduct['json'];
-  private readonly hasFile: PageProduct['hasFile'];
+  private readonly json: PageFolder['json'];
+  private readonly hasFile: PageFolder['hasFile'];
   private readonly pages = new Map<string, Promise<Result>>();
   constructor(private readonly ctx: Context, names: readonly string[]) {
     this.product = ctx.product; this.scope = ctx.scope; this.json = this.product.json; this.hasFile = this.product.hasFile;

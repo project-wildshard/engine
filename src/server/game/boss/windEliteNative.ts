@@ -16,7 +16,7 @@ import { nearestOnGround } from '@wildshard/engine/sim/nearPlayer';
 import { ELITE_MOMENTS, eliteMomentWord, eliteWindWord, sayFightView } from '@wildshard/engine/sim/shardRows';
 import { EliteFeatureSchema } from '@wildshard/format/eliteFeature';
 import type { EliteCore, EliteCoreRecord, EliteCoreScript } from '../../../shared/game/eliteSystem';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { EncounterIntake } from '../population/encounterIntake';
 import { readEncounterIntake } from '../population/encounterBook';
 import { nativePopulationOf } from '../riding/nativePopulation';
@@ -36,7 +36,7 @@ export interface NativeWindElite {
 }
 type Core = EliteCore<EliteCoreScript<AnimalSim>>;
 
-function planRows(product: Pick<ShardProduct, 'section' | 'has'>) {
+function planRows(product: Pick<ShardFolder, 'section' | 'has'>) {
   if (!product.has('client/plan')) return null;
   const { features } = v.parse(Plan, product.section('client/plan'));
   const rows = features.find(row => row.kind === 'elite.construct'), rock = features.find(row => row.kind === 'elite.entry');
@@ -45,14 +45,14 @@ function planRows(product: Pick<ShardProduct, 'section' | 'has'>) {
   return profile === undefined ? null : { profile, strikes, rock: v.parse(Rock, rock).rock };
 }
 /** The body a world lends it, if it flies at all. It's a grounded body lifted by its law, and a motor would stand at its spawn and stop a player. */
-export async function readWindIntake(product: Pick<ShardProduct, 'section' | 'has' | 'json'>, actors: string): Promise<EncounterIntake> {
+export async function readWindIntake(product: Pick<ShardFolder, 'section' | 'has' | 'json'>, actors: string): Promise<EncounterIntake> {
   const rows = planRows(product);
   if (rows === null) return { species: [], recipes: [] };
   return { ...await readEncounterIntake(product, [rows.profile.kind], actors), motorless: [rows.profile.kind] };
 }
 
 /** Read its rows now; nothing here touches a host. No wind row in the plan: nothing flies. */
-export function prepareWindElite(product: Pick<ShardProduct, 'section' | 'has'>, knock: WindKnock):
+export function prepareWindElite(product: Pick<ShardFolder, 'section' | 'has'>, knock: WindKnock):
   ((host: SimHost, bindings: NativeEliteBindings, makeCore: () => Core, step: string, wind: () => { readonly x: number; readonly z: number }) => NativeWindElite) | null {
   const rows = planRows(product);
   if (rows === null) return null;

@@ -29,8 +29,8 @@ import type { SkyRig } from '@wildshard/engine/world/skyRig';
 import { BakedPlanSchema, BakedTilesSchema, type BakedPlan, type BakedSource, type BakedTilesRow } from '@wildshard/format/bakedTiles';
 import { followToonLook } from '../looks/toonLook';
 import { lendLooks, lentLook, setLentParam, setLentTexture } from './lentLooks';
-import { runtimeLookMaterials } from './runtimeProduct';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { runtimeLookMaterials } from './runtimeFolder';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { wearBakedTiles } from '../looks/vertexWear';
 import { colliderTileKeys, type TileContent } from './tileContent';
 import { tiledMesh } from './tiledMesh';
@@ -39,7 +39,7 @@ import { readContent } from '@wildshard/engine/boot/contentRead';
 
 /** What a row is drawn into: the product its files resolve against, the live world, and the scope its pieces leave with
  *  (absent: the ambient owner, as a resident world's build). */
-export interface BakedTilesOwner { readonly product: ShardProduct; readonly parent: THREE.Object3D; readonly sky: SkyRig; readonly registry: WorldRegistry; readonly scope?: Scope;
+export interface BakedTilesOwner { readonly product: ShardFolder; readonly parent: THREE.Object3D; readonly sky: SkyRig; readonly registry: WorldRegistry; readonly scope?: Scope;
   /** the world's ground mesh geometry a row's `wear` declares as its part 0 */
   readonly ground?: THREE.BufferGeometry }
 /** The drawn set: its group, its tiles in file order, its once-a-frame bounce update, and (registered whole, under its own
@@ -51,30 +51,30 @@ interface BakedUnclaimed { readonly piece: Omit<Parameters<WorldRegistry['add']>
 const owned = <T>(owner: BakedTilesOwner, fn: () => T): T => owner.scope === undefined ? fn() : withOwner(owner.scope, fn);
 const isMesh = (o: THREE.Object3D): o is THREE.Mesh => o instanceof THREE.Mesh;
 
-function bytesOf(product: ShardProduct, source: BakedSource): Promise<Uint8Array> {
+function bytesOf(product: ShardFolder, source: BakedSource): Promise<Uint8Array> {
   if ('file' in source) return product.file(source.file);
   return readContent(source.url, 25_000_000, {fetch: (url, init) => fetch(url, {cache: 'force-cache', ...init})});
 }
 // the page's bounded parser: one decode slot, a product file's wire copy taken only once its slot opens
-async function sceneOf(product: ShardProduct, source: BakedSource): Promise<THREE.Group> {
+async function sceneOf(product: ShardFolder, source: BakedSource): Promise<THREE.Group> {
   return 'url' in source ? (await (await prepareRigLoader()).createRigLoader().loadAsync(source.url)).scene : (await (await prepareRigLoader()).createRigLoader().parseBytesAsync(await product.file(source.file), '')).scene;
 }
 /** A product image decoded off the main thread, as stored (the lightmaps' flipY = false, NoColorSpace raw texels): an
  *  HTMLImageElement decoded and uploaded inside its first draw (G743: Driftwood's lm-ao + lm-bounce, 85 + 117 ms of one
  *  afterPlay frame at phone 4x). Without createImageBitmap it loads as an image, as before. */
-async function productImage(product: ShardProduct, file: string): Promise<THREE.Texture> {
+async function folderImage(product: ShardFolder, file: string): Promise<THREE.Texture> {
   if (typeof createImageBitmap !== 'function') return new THREE.TextureLoader().loadAsync(product.url(file));
   const bitmap = await createImageBitmap(new Blob([Uint8Array.from(await product.file(file))]), { imageOrientation: 'none', premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
   const texture = new THREE.Texture(bitmap); texture.flipY = false; texture.needsUpdate = true;
   return texture;
 }
-async function textureOf(product: ShardProduct, source: BakedSource): Promise<THREE.Texture> {
+async function textureOf(product: ShardFolder, source: BakedSource): Promise<THREE.Texture> {
   // a product's KTX2 file transcodes; any other image file decodes as a bitmap
-  if ('file' in source) return source.file.endsWith('.ktx2') ? ktx2File(product.url(source.file)) : productImage(product, source.file);
+  if ('file' in source) return source.file.endsWith('.ktx2') ? ktx2File(product.url(source.file)) : folderImage(product, source.file);
   return (await ktx2Texture(source.url)) ?? new THREE.TextureLoader().loadAsync(source.url);
 }
 /** A tier's plan: its exact bytes (and, for a public file, the content hash its name carries) before its rows. */
-async function planOf(product: ShardProduct, row: NonNullable<BakedTilesRow['instances']>['plan']['phone'], keys: ReadonlySet<string>): Promise<BakedPlan> {
+async function planOf(product: ShardFolder, row: NonNullable<BakedTilesRow['instances']>['plan']['phone'], keys: ReadonlySet<string>): Promise<BakedPlan> {
   const bytes = await bytesOf(product, row.source), named = 'url' in row.source ? /[0-9a-f]{64}/u.exec(row.source.url)?.[0] : undefined;
   if (named !== undefined && Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', Uint8Array.from(bytes))), b => b.toString(16).padStart(2, '0')).join('') !== named) throw new Error('Required baked plan content differs');
   if (bytes.length !== row.bytes) throw new Error('Required baked plan content differs');

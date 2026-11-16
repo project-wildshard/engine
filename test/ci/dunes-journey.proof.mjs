@@ -3,7 +3,7 @@
 import "../../src/shared/engine/core/portableMathFirst.ts";
 import assert from "node:assert/strict";
 import { leadPlayer } from "../../src/shared/engine/sim/leadPlayer.ts";
-import { journey, timed } from "./product-journey.mjs";
+import { journey, timed } from "./folder-journey.mjs";
 
 timed(
   "pinned Dunes: spawn walk lights the signal, defeats the Matriarch and restores earned rewards",

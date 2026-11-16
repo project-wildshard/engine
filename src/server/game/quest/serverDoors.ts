@@ -7,7 +7,7 @@ import { test } from '@wildshard/engine/world/interact/flags';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { tagOf } from '@wildshard/engine/physics/surface';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { buildingDoor, buildingDoorCollides, buildingDoorFlag, buildingDoorYaw, stepBuildingDoor, toggleBuildingDoor, type BuildingDoorState } from '../../../shared/game/shardfile/buildingDoor';
 import { QuestFlagGates } from '../../../shared/game/quest/flagGates';
 
@@ -43,7 +43,7 @@ function pieceColliders(host: SimHost): ReadonlyMap<string, Collider> {
 
 /** Keep the building doors of a shard that has them. False when it has none. `opened`: what a page's save left open, for a world's first boot.
  *  `restored`: a world restored from its save, whose leaves already stand where the save put them. */
-export async function installServerDoors(host: SimHost, product: ShardProduct | undefined, opened: ReadonlySet<string> = new Set(), restored = false): Promise<boolean> {
+export async function installServerDoors(host: SimHost, product: ShardFolder | undefined, opened: ReadonlySet<string> = new Set(), restored = false): Promise<boolean> {
   if (product === undefined || !product.hasFile(PIECES) || !product.hasFile(FOREST)) return false;
   const [piecesInput, forestInput, compositionInput] = await Promise.all([product.json<unknown>(PIECES), product.json<unknown>(FOREST), product.hasFile(COMPOSITION) ? product.json<unknown>(COMPOSITION) : null]);
   const look = v.parse(Forest, forestInput).buildings?.life.door, composition = compositionInput === null ? undefined : v.parse(Composition, compositionInput).door;

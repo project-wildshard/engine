@@ -14,7 +14,7 @@ function fixture() {
   const cache = new Map([[ref, wire]]), fetch = vi.fn(() => Promise.reject(new Error('Offline fetch refused')));
   const assets = new ClientAssets(source, new Map(), { base: 'https://example.invalid/output/', offline: true, firstParty: true, fetch,
     hash: bytes => Promise.resolve(hashImmutableBytes(bytes)), cache: {
-      product: () => Promise.resolve(null), putProduct: () => Promise.resolve(),
+      product: () => Promise.resolve(null), putFolder: () => Promise.resolve(),
       asset: (_base, hash) => Promise.resolve(cache.get(hash) ?? null), putAsset: () => Promise.resolve(true),
     } });
   const allocator = new ResidencyAllocator(), scope = new Scope('resident');

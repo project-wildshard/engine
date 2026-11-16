@@ -1,10 +1,10 @@
 // HOST-RULER HR2: a built product's server roots, from the host ids its native-assembly.json declares.
 import { describe, expect, test } from 'vitest';
 import { unresolvedRoots } from '../scripts/host-ruler/roots.mjs';
-import { NATIVE_ASSEMBLY_ROOT, nativeAssemblyRoots, productServerRoots, serverRootsFrom } from '../scripts/host-ruler/server-roots.mjs';
+import { NATIVE_ASSEMBLY_ROOT, nativeAssemblyRoots, folderServerRoots, serverRootsFrom } from '../scripts/host-ruler/server-roots.mjs';
 
 const table = nativeAssemblyRoots();
-const hostRoots = (dir: string) => productServerRoots(`test/fixtures/host-ruler/${dir}`, table);
+const hostRoots = (dir: string) => folderServerRoots(`test/fixtures/host-ruler/${dir}`, table);
 const ownModules = (roots: ReturnType<typeof hostRoots>) => new Set(roots.roots.filter(row => row.from !== NATIVE_ASSEMBLY_ROOT).map(row => row.module));
 
 describe('nativeAssemblyHosts.ts read statically', () => {

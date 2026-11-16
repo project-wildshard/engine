@@ -4,7 +4,7 @@ import type { ShardContext } from '../plugin/context';
 import { bindDeclaredFight } from '../plugin/ui';
 import { bindPageBoss } from '../../../shared/game/population/pageHomes';
 import { pagePopulationRows } from '../../../shared/game/population/pageRows';
-import { productPainterLight } from '../looks/paintedLook';
+import { folderPainterLight } from '../looks/paintedLook';
 import { clientNativeBook } from './clientNativeBook';
 import { clientPopulationActor } from './clientPopulation';
 
@@ -32,7 +32,7 @@ export function installClientBossFight(ctx: ShardContext, input: unknown): void 
     if (names === undefined || telegraph?.kind !== 'boss.telegraph' || telegraph.view.kind !== 'marked') throw new Error('Spawned encounter requires its original record and presentation');
     const materialScope = ctx.product.section('look/painted').look.lightScope === 'material';
     const body = bindPageBoss(ctx, pagePopulationRows(plan), owner.actor,
-      animal => { if (materialScope) productPainterLight(ctx.product, animal.mesh, ctx.scope); });
+      animal => { if (materialScope) folderPainterLight(ctx.product, animal.mesh, ctx.scope); });
     book.fight = bindDeclaredFight(ctx, { ...definition, record: { kind: 'flags', actor: owner.actor, names }, presentation: telegraph.view.rows },
       { ...common, kind: 'spawned', source, body, coins: quest.coins });
   }

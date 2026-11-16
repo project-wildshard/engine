@@ -1,7 +1,7 @@
-import { runtimeAssets } from './fixtures/engine-lift/product';
+import { runtimeAssets } from './fixtures/engine-lift/folder';
 // @vitest-environment happy-dom
 // oxlint-disable-next-line import/no-nodejs-modules -- The room runs the shipped product bytes and physics module.
-import { loadHeadlessProduct } from '@wildshard/engine/host/headlessProduct';
+import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
 import { createTrustedHeadlessResident,type TrustedHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
 import { tickCommands } from '@wildshard/engine/host/tickProtocol';
 import type { NetCommand } from '@wildshard/wire/netCommand';
@@ -28,7 +28,7 @@ import { netTickCommands } from '../src/shared/host/standalone/netInput';
 import { legacyDouble } from '../src/test/engine/FakeGame';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import liftInputs from './fixtures/engine-lift/inputs.json' with { type: 'json' };
-import { builtProduct } from './fixtures/engine-lift/product';
+import { builtFolder } from './fixtures/engine-lift/folder';
 import { loadCourseRapier,PageSide,type MotionScenario } from './fixtures/motion-trace/parity';
 const pineSpots = () => structuredClone(liftInputs.pineSpots);
 
@@ -46,7 +46,7 @@ const SLOTS = new Map([['weapon.crossbow', 0], ['weapon.lever', 1], ['weapon.lon
 const scenario: MotionScenario = { id: 'net-held', start: { x: -10, z: 0, yaw: 0 }, ticks: 0, intent: () => ({}), bodyAt: { x: -5, z: 30 } };
 
 async function resident(shard = 'pine-hollow'): Promise<TrustedHeadlessResident> {
-  const directory = builtProduct(shard), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(shard), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = runtimeAssets(product, directory);
   return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier: serverR, product });

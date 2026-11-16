@@ -14,7 +14,7 @@ import { applySurfaceLooks, type SurfaceInputs } from '../systems/looks/surfaceL
 import type { SurfaceLook } from '@wildshard/format/surfaceLooks';
 import { bakedMeshWorld, type BakedMeshKindRow, type BakedMeshWorld, type BakedByteResource, type WorldPieceRow, type BakedColliderInput, type BakedPieceRows } from './bakedKinds';
 import { fetchDeflatedBytes } from '@wildshard/engine/core/deflate';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { sceneRigFiles } from './sceneRigFiles';
 import { sceneBakeFiles } from './sceneBakeFiles';
 
@@ -43,7 +43,7 @@ export interface SceneBakeSource {
 }
 const libraries = new Map<string, Library>(), bakes = new Map<string, Bake>();
 const modelRows = new Map<string, SceneModelSource>(), bakeRows = new Map<string, SceneBakeSource>();
-const pending = new WeakMap<ShardProduct, Promise<void>>();
+const pending = new WeakMap<ShardFolder, Promise<void>>();
 const key = (slug: string, id: string): string => JSON.stringify([slug, id]);
 function inputs(slug: string, rows: SceneModelSource['inputs']): SurfaceInputs {
   return { ...(rows?.dusk === undefined ? {} : { dusk: sceneScalar(slug, rows.dusk) }),
@@ -54,7 +54,7 @@ function need<T>(values: ReadonlyMap<string, T>, slug: string, id: string): T {
 }
 /** Named verified descriptors are prepared before a native view or data scene
  * can use them; no shard module or owner callback is loaded here. */
-export function prepareSceneSources(product: ShardProduct): Promise<void> {
+export function prepareSceneSources(product: ShardFolder): Promise<void> {
   const previous = pending.get(product); if (previous !== undefined) return previous;
   const prepare = (async () => {
     if (!product.has('world/scenes')) throw new Error('Scene sources require world/scenes');
@@ -116,7 +116,7 @@ export function prepareSceneSources(product: ShardProduct): Promise<void> {
 }
 /** Full data clients lend their actual compiled look book to the same model
  * libraries used by world scenes, held models and NPCs. No source recompiles. */
-export async function bindSceneSourceLooks(product: ShardProduct, scope: Scope, looks: LentLooks): Promise<void> {
+export async function bindSceneSourceLooks(product: ShardFolder, scope: Scope, looks: LentLooks): Promise<void> {
   const live = (): void => { if (scope.disposed) throw new Error('Scene source looks require a living resident'); };
   live();
   await prepareSceneSources(product);
@@ -125,17 +125,17 @@ export async function bindSceneSourceLooks(product: ShardProduct, scope: Scope, 
     if (row.kind === 'models') sceneModelSource(product, row.id).bindLooks(scope, looks);
 }
 /** Resolve an admitted data source for the scene host. */
-export function sceneModelSource(product: ShardProduct, id: string): Library { return need(libraries, product.slug, id); }
+export function sceneModelSource(product: ShardFolder, id: string): Library { return need(libraries, product.slug, id); }
 /** Resolve an admitted bake for the scene host. */
-export function sceneBakeSource(product: ShardProduct, id: string): Bake { return need(bakes, product.slug, id); }
+export function sceneBakeSource(product: ShardFolder, id: string): Bake { return need(bakes, product.slug, id); }
 /** Existing library/model definitions shared with catalogue consumers. */
-export function sceneModelDefinition(product: ShardProduct, id: string): SceneModelSource { return need(modelRows, product.slug, id); }
+export function sceneModelDefinition(product: ShardFolder, id: string): SceneModelSource { return need(modelRows, product.slug, id); }
 /** Source identities in authored order, never inferred from a shard name. */
-export function sceneModelDefinitions(product: ShardProduct): readonly { readonly id: string; readonly source: SceneModelSource }[] {
+export function sceneModelDefinitions(product: ShardFolder): readonly { readonly id: string; readonly source: SceneModelSource }[] {
   return product.section('world/scenes').libraries.flatMap(row => row.kind === 'models' ? [{ id: row.id, source: sceneModelDefinition(product, row.id) }] : []);
 }
 /** The same source caches the live world prepares, including original rig timing. */
-export async function prepareSceneSpecimens(product: ShardProduct): Promise<void> {
+export async function prepareSceneSpecimens(product: ShardFolder): Promise<void> {
   await prepareSceneSources(product);
   await Promise.all(product.section('world/scenes').libraries.map(async row => {
     if (row.kind === 'models') { const library = sceneModelSource(product, row.id); await Promise.all([library.preload(), library.preloadRigs()]); }
@@ -143,9 +143,9 @@ export async function prepareSceneSpecimens(product: ShardProduct): Promise<void
   }));
 }
 /** Material inputs resolve by the same ids as the prepared source definition. */
-export function sceneSurfaceInputs(product: ShardProduct, id: string): SurfaceInputs { return inputs(product.slug, sceneModelDefinition(product, id).inputs); }
+export function sceneSurfaceInputs(product: ShardFolder, id: string): SurfaceInputs { return inputs(product.slug, sceneModelDefinition(product, id).inputs); }
 /** Admission reads declarations only, before a source allocates geometry. */
-export function sceneSourceDeclares(product: ShardProduct, library: string, model: string, kind: 'geometry' | 'model' | 'painted' | 'baked'): boolean {
+export function sceneSourceDeclares(product: ShardFolder, library: string, model: string, kind: 'geometry' | 'model' | 'painted' | 'baked'): boolean {
   if (kind === 'baked') return Object.hasOwn(need(bakeRows, product.slug, library).rows, model);
   const rows = need(modelRows, product.slug, library).rows;
   return kind === 'model' ? rows.hd.includes(model) : kind === 'painted' ? rows.paintedModels?.some(row => row.name === model) === true

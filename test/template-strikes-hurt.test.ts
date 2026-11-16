@@ -5,8 +5,8 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from '../src/test/game/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from '../src/test/game/builtFolder';
 
 // TEMPLATE-E2E TC-M1 (J357): each of Mossgate's three brains has a strike that hurts. The pinned Template product's cell runs
 // with the player standing beside one body of each: the grey blob (`pursue`), the Greyback (the patrolling elite) and a
@@ -14,7 +14,7 @@ import { builtProduct } from '../src/test/game/builtProduct';
 const PLAYER = 'actor.player';
 const rapier = loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
 async function product(slug: string): Promise<{ shard: Shardfile; assets: Map<string, Uint8Array> }> {
-  const directory = builtProduct(slug), loaded = await loadHeadlessProduct(directory), descriptor = outputDescriptor(loaded.shardfile);
+  const directory = builtFolder(slug), loaded = await loadHeadlessFolder(directory), descriptor = outputDescriptor(loaded.shardfile);
   if (descriptor === undefined) throw new Error(`Missing ${slug} output`);
   const server = descriptor.index.files.filter(file => serverReadsFile(file, loaded.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   return { shard: loaded.shardfile, assets: new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))])) };

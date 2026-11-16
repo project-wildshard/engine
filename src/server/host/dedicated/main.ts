@@ -14,7 +14,7 @@ import { Worker } from 'node:worker_threads';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
 import type { WorkerNews } from './cellProtocol';
 import type { CellWorkerData } from './cellWorker';
-import { readPackProduct, readReleaseItems, type PackReads } from './packReader';
+import { readPackFolder, readReleaseItems, type PackReads } from './packReader';
 import { openPlayerSaves, memoryPlayerSaves } from './playerSaves';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { fetchReleaseFile, servingRelease, ReleaseWatch } from './releaseFile';
@@ -151,7 +151,7 @@ const watch = new ReleaseWatch({ read: readRelease, serving: release, cells: sha
   changed: async next => {
     if (pullScript !== undefined) await pullBundle(pullScript);
     const nextCatalogue = await readReleaseItems(next.items, { origin, cache }, reads);
-    for (const slug of shards) await readPackProduct(slug, next.engineBuild, await rapier(), { origin, cache }, reads, undefined, nextCatalogue);
+    for (const slug of shards) await readPackFolder(slug, next.engineBuild, await rapier(), { origin, cache }, reads, undefined, nextCatalogue);
     world.beginGrace(next.engineBuild);
   } });
 // SA33: a cell the API placed opens on this running server within a look, on a worker of its own, with no grace and no restart. Its shard's
@@ -164,7 +164,7 @@ placements = placementAt === undefined || placementKey === undefined || listed.t
     const ready: string[] = [];
     for (const row of rows) {
       // SA34a: the pack first, so the door's placed list (and so every worker's frame numbers) holds only cells it opens.
-      try { await readPackProduct(row.slug, build, await rapier(), { origin, cache }, reads, row.hash, catalogue); placeCell(row); ready.push(row.instance); }
+      try { await readPackFolder(row.slug, build, await rapier(), { origin, cache }, reads, row.hash, catalogue); placeCell(row); ready.push(row.instance); }
       catch (error) { log({ at: 'placement.refused', instance: row.instance, slug: row.slug, error: String(error) }); }
     }
     return ready.length === 0 ? [] : world.openCells(ready);
@@ -174,7 +174,7 @@ if (activationToken !== undefined) {
   if (placementAt === undefined || placementKey === undefined || listed.trim() !== WHOLE_GRID) throw new Error('Upload activation needs a whole-grid placement receiver');
   activationReceiver = uploadActivationReceiver(activationToken, uploadActivator({channel: release.channel, build,
     read: () => fetchPlacementFile(placementAt, placementKey),
-    preload: async (slug, hash) => {await readPackProduct(slug, build, await rapier(), {origin, cache}, reads, hash, catalogue, true);},
+    preload: async (slug, hash) => {await readPackFolder(slug, build, await rapier(), {origin, cache}, reads, hash, catalogue, true);},
     place: row => {placeCell(row);}, open: instances => world.activateCells(instances),
     opened: instance => Object.hasOwn(world.health().table, instance),
   }));

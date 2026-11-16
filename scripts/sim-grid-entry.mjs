@@ -33,7 +33,7 @@ import { requireCompiledEntry, downloadEvidence, stepEvidence, stepBoundaryEvide
 import { cachedBodyEvidence } from './loading-benchmark/cache-bodies.mjs';
 import { saveFixtureCode } from './debug-settings.mjs';
 import { readSimulatorCoreFootprint, selectedCoreMemoryTargets, coreMemorySummary, scriptResourceURLs,
-  serveHelloWorldMemory, helloWorldMemoryFloor, contextMemoryDiagnostic, coreMemoryProductIdentity } from './shard-phone-memory.mjs';
+  serveHelloWorldMemory, helloWorldMemoryFloor, contextMemoryDiagnostic, coreMemoryFolderIdentity } from './shard-phone-memory.mjs';
 import { pageMemoryAttributionExpression } from './memory-report-snapshot.mjs';
 import { memoryCategories } from './soak/memory-categories.mjs';
 import { coreHeapRequested, captureCoreHeap, coreHeapProtocol } from './core-heap-diagnostic.mjs';
@@ -255,12 +255,12 @@ async function runCoreMemory(mode, index, target) {
   // Acceptance samples are already sealed. Reuse the passive diagnostic, which
   // never collects or enables Network; unsupported categories stay unknown.
   const postSampleCategories = args['core-attribution'] === '1' ? await memoryCategories(page) : null;
-  const productIdentity = await coreMemoryProductIdentity(BASE, target, version);
+  const folderIdentity = await coreMemoryFolderIdentity(BASE, target, version);
   const heapDiagnostic = coreHeap ? await captureCoreHeap(page, target, out, samples) : null;
   const calibrationDocument = hello ? JSON.parse(await page.evaluate(`JSON.stringify({title:document.title,text:document.body.textContent.trim(),scripts:document.scripts.length,canvases:document.querySelectorAll('canvas').length})`))
     : three ? JSON.parse(await page.evaluate(`JSON.stringify((()=>{const r=window.__ws_coreRenderer,g=r.getContext();return {title:document.title,scripts:document.scripts.length,canvases:document.querySelectorAll('canvas').length,...window.__ws_coreThree,width:g.drawingBufferWidth,height:g.drawingBufferHeight,lost:g.isContextLost(),attributes:g.getContextAttributes(),rendererInfo:{...r.info.memory,programs:r.info.programs.length,calls:r.info.render.calls}};})())`))
     : webgl ? JSON.parse(await page.evaluate(`JSON.stringify({title:document.title,scripts:document.scripts.length,canvases:document.querySelectorAll('canvas').length,...window.__ws_coreWebGL,width:window.__ws_coreContext.drawingBufferWidth,height:window.__ws_coreContext.drawingBufferHeight,currentViewportWidth:innerWidth,currentViewportHeight:innerHeight,lost:window.__ws_coreContext.isContextLost(),attributes:window.__ws_coreContext.getContextAttributes()})`)) : null;
-  const result = {mode, run: index, shard: target, protocol: coreHeap ? coreHeapProtocol : 'webkit-core-floor/1', version, reset, samples, attribution, postSampleCategories, productIdentity,
+  const result = {mode, run: index, shard: target, protocol: coreHeap ? coreHeapProtocol : 'webkit-core-floor/1', version, reset, samples, attribution, postSampleCategories, folderIdentity,
     ...(coreHeap ? {heapDiagnostic} : {}), errors: heapDiagnostic?.errors ?? [], compiledEntryRequired: template, calibrationDocument,
     scriptURLs: JSON.parse(await page.evaluate(`JSON.stringify((${scriptResourceURLs.toString()})())`)),
     ...(three ? {fixtureModules: helloFixture?.modules ?? []} : {}),

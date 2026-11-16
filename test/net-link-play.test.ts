@@ -7,18 +7,18 @@ import {NetClient} from '../src/client/engine/net/client';
 import {Predictor} from '../src/client/engine/net/predictor';
 import {NetRoom} from '../src/server/engine/net/room';
 import {SimNetWorld} from '../src/server/engine/net/simWorld';
-import {loadHeadlessProduct} from '../src/server/host/headlessProduct';
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {createTrustedHeadlessResident} from '../src/server/host/headlessRuntime';
 import {leadPlayer} from '../src/shared/engine/sim/leadPlayer';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {PLAYER_CLASS} from '../src/shared/engine/net/netSchemas';
 import {netPlayerCommand,stepResident} from '../src/shared/host/standalone/netInput';
 import {ConditionedTransport,directLoopback} from '../src/test/engine/netLoopback';
-import {builtProduct,runtimeAssets} from './fixtures/engine-lift/product';
+import {builtFolder,runtimeAssets} from './fixtures/engine-lift/folder';
 
 for(const profile of [{rtt:0,jitter:0,loss:0,reorder:0},{rtt:124,jitter:30,loss:2,reorder:2},{rtt:300,jitter:30,loss:2,reorder:5}])
   test(`a real walk and melee hold over ${profile.rtt} ms RTT`,async()=>{
-    const directory=builtProduct('driftwood-isle'),product=await loadHeadlessProduct(directory);
+    const directory=builtFolder('driftwood-isle'),product=await loadHeadlessFolder(directory);
     const input={product,shard:product.shardfile,assets:runtimeAssets(product,directory),rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))};
     const server=await createTrustedHeadlessResident(input,undefined,{room:true});
     let page:Awaited<ReturnType<typeof createTrustedHeadlessResident>>|undefined;

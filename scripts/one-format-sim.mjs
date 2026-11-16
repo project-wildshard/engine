@@ -13,11 +13,11 @@ const imp = path => import(new URL(path, root).href);
 const { installAppIdentity } = await imp('src/shared/engine/app/identity.ts');
 const { WILDSHARD_IDENTITY } = await imp('src/client/game/identity.ts'); installAppIdentity(WILDSHARD_IDENTITY);
 const { installPortableMath } = await imp('src/shared/engine/core/portableMath.ts'); installPortableMath();
-const { loadHeadlessProduct } = await imp('src/server/host/headlessProduct.ts');
+const { loadHeadlessFolder } = await imp('src/server/host/headlessFolder.ts');
 const { outputDescriptor } = await imp('src/shared/game/shardfile/outputDescriptor.ts');
 const { loadRapier } = await imp('src/shared/engine/physics/rapier.ts');
 const { openWorld } = await imp('src/server/host/openWorld.ts');
-const product = await loadHeadlessProduct(folder), shard = product.shardfile;
+const product = await loadHeadlessFolder(folder), shard = product.shardfile;
 const descriptor = outputDescriptor(shard);
 if (!descriptor) throw new Error('Missing admitted output');
 const assets = new Map(descriptor.index.files.map(/** @param {{ commons?: boolean, hash: string, path: string }} file */ file => [file.commons === true ? `commons:${file.hash}` : file.hash,

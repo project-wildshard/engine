@@ -8,7 +8,7 @@ import { HeldFinishes } from '../loadout/finishes';
 import { heldFinishEffect } from '../loadout/effects';
 import { STARTER_EFFECTS } from '../../../shared/game/systems/effects/starterEffects';
 import { ItemCatalogue } from '../../../shared/game/loadout/itemCatalogue';
-import { declaredProductCompendium } from '../../../shared/game/shard/declaredRows';
+import { declaredFolderCompendium } from '../../../shared/game/shard/declaredRows';
 
 /** Kit-only catalogue registration from admitted ids. Preparation stays with
  * the resident resource owner; this feature registers no frame or save owner. */
@@ -19,7 +19,7 @@ export function installClientCatalogue(ctx: ShardContext, row: ClientFeatureRow)
   const weapons = row.weapons.map(id => items.equipment(id));
   const ammunition = row.ammunition.flatMap(id => [...items.ammunition(id).values()].map(ammo => ammo.row));
   const finishes = row.finishes || row.effects.includes('finishes') ? HeldFinishes.current(ctx.product.slug) : null;
-  const journals = row.compendiums.map(id => Object.assign(declaredProductCompendium(ctx.product, id), { id }));
+  const journals = row.compendiums.map(id => Object.assign(declaredFolderCompendium(ctx.product, id), { id }));
   const economy = row.economy === undefined ? undefined : v.parse(CatalogueEconomySchema, row.economy);
   if (economy?.goods.some(good => !isOwnedId(good.id) || good.needs !== undefined && !isOwnedId(good.needs)) === true) throw new Error('Unknown catalogue economy ownership');
   const effects = row.effects.flatMap(kind => kind === 'starter' ? STARTER_EFFECTS

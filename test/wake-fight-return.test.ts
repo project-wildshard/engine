@@ -5,16 +5,16 @@ import { expect, test } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { BOSS_RETURN_S } from '../src/server/engine/ai/bossContenders';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { mixedPopulation } from '../src/server/game/population/mixedRoster';
-import { builtProduct, runtimeAssets } from './fixtures/engine-lift/product';
+import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
 // SERVER-CELLS SC10 item 1 (J328): a grid cell's world is never rebuilt, so Driftwood's wake fight must stand again on its own. Before:
 // the world's `dead:captain` forced victory forever and the captain spawned once, and in a served world his death was owed as a roster
 // body with no scale row, which threw in the tick five minutes later and failed the worker.
 test('a served world\'s beaten Drowned Captain stands again once the pool has stood empty five minutes', { timeout: 120_000 }, async () => {
-  const directory = builtProduct('driftwood-isle'), product = await loadHeadlessProduct(directory);
+  const directory = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(directory);
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const world = await openCellWorld({ instance: 'driftwood-isle' }, { shard: product.shardfile, product, assets: runtimeAssets(product, directory), rapier }, undefined,
     { saves: new SaveStore({ local: null, session: null }), lone: true, pageless: true });

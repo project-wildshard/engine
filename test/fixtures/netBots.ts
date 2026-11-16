@@ -12,11 +12,11 @@ import { loadRapier, type Rapier } from '../../src/shared/engine/physics/rapier'
 import { directLoopback, type DirectLoopback } from '../../src/test/engine/netLoopback';
 import { leadPlayer } from '../../src/shared/engine/sim/leadPlayer';
 import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident, type TrustedHeadlessResident } from '../../src/server/host/headlessRuntime';
 import { netTickCommands } from '../../src/shared/host/standalone/netInput';
 import { tickCommands } from '../../src/shared/host/tickProtocol';
-import { builtProduct } from '../../src/test/game/builtProduct';
+import { builtFolder } from '../../src/test/game/builtFolder';
 // oxlint-disable-next-line import/no-nodejs-modules -- A real child validates its actual ancestor without weakening the scheduler's strict ancestry rule.
 import { execFileSync } from 'node:child_process';
 
@@ -29,7 +29,7 @@ beforeAll(async () => { rapier = await loadRapier(readFileSync('public/assets/ph
 
 /** `world` as a cell's room opens it (MP1.2: `{ room: true, near }` runs the seats' held arms, as the box does). */
 export async function resident(slug: string, world?: Parameters<typeof createTrustedHeadlessResident>[2]): Promise<TrustedHeadlessResident> {
-  const directory = builtProduct(slug), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder(slug), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   return createTrustedHeadlessResident({ shard: product.shardfile, assets, rapier, product }, undefined, world);

@@ -8,9 +8,9 @@ import { frozenRuntimeJson } from './fixtures/frozen/snapshots';
 import { LEGACY_HEALTH, speciesHealth, variantOf, type SpeciesDef, type VariantTable } from '../src/shared/engine/entities/species/registry';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
-import { builtProduct } from '../src/test/game/builtProduct';
+import { builtFolder } from '../src/test/game/builtFolder';
 
 // SB25 (STAGING-BUGBASH, 2026-11-16): d39d6c1d made the page throw "Species deer has no valid health" for a species
 // with no authored hp, so Pine Hollow could not load at all. A missing number falls back to the old built-in health.
@@ -32,7 +32,7 @@ test('authored health wins; a species with none gets the pre-d39d6c1d built-in f
 type HealthSource = VariantTable & Pick<SpeciesDef, 'kind' | 'aggressive' | 'tuning'>;
 
 test('pinned Pine Hollow: the page gives every creature the health the server gives it, its plain deer 60', async () => {
-  const directory = builtProduct('pine-hollow'), shard = await loadHeadlessProduct(directory), product = shard.shardfile;
+  const directory = builtFolder('pine-hollow'), shard = await loadHeadlessFolder(directory), product = shard.shardfile;
   const descriptor = outputDescriptor(product);
   if (descriptor === undefined) throw new Error('Missing Pine output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

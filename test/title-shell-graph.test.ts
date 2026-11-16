@@ -35,7 +35,7 @@ function titleGraph(entries: readonly string[]): string[] {
 
 test('cold title, recovery, navigation and prefetch stay off the world graph', () => {
   const files = titleGraph(['src/client/app/entry.ts', 'src/client/engine/ui/StartTitle.ts', 'src/client/game/mainMenu.ts', 'src/client/game/grid/pageEntry.ts', 'src/client/game/travel/travel.ts']);
-  expect(files.filter(file => /src\/(?:client|cook|server|shared)\/engine\/(?:app\/(?:app|runtime)\.ts|render\/|world\/|anim\/|physics\/)|src\/(?:client|cook|server|shared)\/game\/(?:looks\/|shardfile\/(?:product|runtimeProduct)\.ts)|src\/shards\/|^three(?:\/|$)/u.test(file))).toEqual([]);
+  expect(files.filter(file => /src\/(?:client|cook|server|shared)\/engine\/(?:app\/(?:app|runtime)\.ts|render\/|world\/|anim\/|physics\/)|src\/(?:client|cook|server|shared)\/game\/(?:looks\/|shardfile\/(?:product|runtimeFolder)\.ts)|src\/shards\/|^three(?:\/|$)/u.test(file))).toEqual([]);
 });
 
 test('standalone session bootstrap leaves grid construction behind its assembly import', () => {

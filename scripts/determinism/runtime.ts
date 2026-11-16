@@ -6,7 +6,7 @@ import { loadRapier } from "../../src/shared/engine/physics/rapier";
 import { SaveStore } from "../../src/shared/engine/saves/store";
 import { leadPlayer } from "../../src/shared/engine/sim/leadPlayer";
 import { serializeSimSnapshot, snapshotSimHostBytes } from "../../src/shared/engine/sim/snapshot";
-import { readServerProduct } from "../../src/server/host/standalone/serverProduct";
+import { readServerFolder } from "../../src/server/host/standalone/serverFolder";
 import { openCellWorld } from "../../src/server/host/standalone/cellWorld";
 import type { NetCommand } from "@wildshard/wire/netCommand";
 
@@ -43,7 +43,7 @@ export async function playTape(request: TapeRequest): Promise<TapeWitness> {
   const rapier = await loadRapier(
     Uint8Array.from(await read(new URL("/rapier.wasm", request.base))),
   );
-  const input = await readServerProduct(request.base, () => request.build, read, rapier);
+  const input = await readServerFolder(request.base, () => request.build, read, rapier);
   const cell = await openCellWorld({ instance: "determinism-proof" }, input, undefined, {
     saves: new SaveStore({ local: null, session: null }),
     lone: true,

@@ -19,7 +19,7 @@ const { installAppIdentity } = await import('../../../src/shared/engine/app/iden
 const { WILDSHARD_IDENTITY } = await import('../../../src/client/game/identity.ts');
 const witness = await import('./witness.ts');
 installAppIdentity(WILDSHARD_IDENTITY);
-function inputFiles() { return [...loaded, ...witness.witnessProductInputFiles(), ...['src/server/game/shardfile/nativeAssembly.ts', 'test/proof/pine-hollow/run.mjs', 'scripts/sim-node-loader.mjs', 'pnpm-lock.yaml', 'public/assets/physics/rapier.wasm', 'public/assets/baked/pine-hollow/terrain.bin', 'public/assets/baked/pine-hollow/navmesh.bin'].map(path => new URL(path, ROOT).href)]; }
+function inputFiles() { return [...loaded, ...witness.witnessFolderInputFiles(), ...['src/server/game/shardfile/nativeAssembly.ts', 'test/proof/pine-hollow/run.mjs', 'scripts/sim-node-loader.mjs', 'pnpm-lock.yaml', 'public/assets/physics/rapier.wasm', 'public/assets/baked/pine-hollow/terrain.bin', 'public/assets/baked/pine-hollow/navmesh.bin'].map(path => new URL(path, ROOT).href)]; }
 function inputs() {
   const files = [...new Set(inputFiles())].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
   const hash = createHash('sha256');

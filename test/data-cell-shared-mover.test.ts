@@ -7,15 +7,15 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
-import { builtProduct } from '../src/test/game/builtProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from '../src/test/game/builtFolder';
 
 // TEMPLATE-E2E TC-E5: a cell's `native` `track` mover with a `shared` trigger turns when a hook sets its field. Template's own
 // door hook (`behaviour/door.as`) toggles shared field 101 (`template.door.open`) from its door prompt; a lift row added here
 // rides on that field, as Mossgate's lever and lift (TC-M4) and Brasscap's side door (TC-B7b) will.
 const PLAYER = 'actor.player', DOOR_FIELD = 101;
 async function withLift() {
-  const directory = builtProduct('_template'), product = await loadHeadlessProduct(directory), descriptor = outputDescriptor(product.shardfile);
+  const directory = builtFolder('_template'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing _template output');
   const server = descriptor.index.files.filter(file => serverReadsFile(file, product.shardfile.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'));
   const assets = new Map(server.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));

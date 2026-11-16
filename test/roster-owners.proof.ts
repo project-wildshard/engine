@@ -5,13 +5,13 @@ import { parseEliteFeature } from '@wildshard/format/eliteFeature';
 import { createTrustedHeadlessResident } from '../src/server/host/headlessRuntime';
 import { readAssemblyInput } from '../src/server/game/shardfile/nativeAssemblyInput';
 import { encounterRows } from '../src/shared/engine/sim/encounterRows';
-import type { ShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { admittedResidents, step } from './fixtures/engine-lift/residents';
 
 const slugs = ['pine-hollow', 'nalati-grasslands'] as const;
 const { input, open } = admittedResidents(slugs);
 const definitions = v.object({ rows: v.array(v.object({ def: v.object({ id: v.string() }) })) });
-function productOf(slug: typeof slugs[number]): ShardProduct {
+function folderOf(slug: typeof slugs[number]): ShardFolder {
   const product = input(slug).product;
   if (product === undefined) throw new Error('Missing admitted roster product');
   return product;
@@ -19,7 +19,7 @@ function productOf(slug: typeof slugs[number]): ShardProduct {
 const external = v.array(v.object({ def: v.object({ id: v.string() }) }));
 
 /** The product names the encounters; the public room wire must have an owner for each. */
-async function namedElites(product: ShardProduct): Promise<string[]> {
+async function namedElites(product: ShardFolder): Promise<string[]> {
   const plan = parseNativeAssembly(await product.json(NATIVE_ASSEMBLY_FILE)), ids = new Set<string>();
   for (const feature of plan.features) {
     if (feature.host === 'population.elites') {
@@ -36,7 +36,7 @@ async function namedElites(product: ShardProduct): Promise<string[]> {
 }
 
 for (const slug of slugs) test(`${slug}: every declared elite has a live server encounter owner`, async () => {
-  const expected = await namedElites(productOf(slug));
+  const expected = await namedElites(folderOf(slug));
   expect(expected.length).toBeGreaterThan(0);
   const live = await open(slug);
   try {
@@ -51,11 +51,11 @@ for (const slug of slugs) test(`${slug}: every declared elite has a live server 
 }, 10_000);
 
 test('removing the Pine elite host leaves its declared lairs unowned on the real room wire', async () => {
-  const preparation = input('pine-hollow'), product = productOf('pine-hollow');
+  const preparation = input('pine-hollow'), product = folderOf('pine-hollow');
   const expected = await namedElites(product), plan = parseNativeAssembly(await product.json(NATIVE_ASSEMBLY_FILE));
   const broken = new TextEncoder().encode(JSON.stringify({ ...plan, features: plan.features.filter(row => row.host !== 'population.elites' && row.host !== 'population.elites-ready') }));
   // In-memory fault on admitted plan bytes only; no shard pin/source file changes.
-  const damaged: ShardProduct = { ...product, file: name => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(broken) : product.file(name) };
+  const damaged: ShardFolder = { ...product, file: name => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(broken) : product.file(name) };
   const live = await createTrustedHeadlessResident({ ...preparation, product: damaged }, undefined, { room: true });
   try {
     step(live);

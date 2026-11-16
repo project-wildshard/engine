@@ -2,7 +2,7 @@ import { loadRapier } from '../../src/shared/engine/physics/rapier';
 import type { GridPoint } from '../../src/shared/game/grid/assembly';
 import type { StandaloneGrid } from '../../src/server/host/standalone/gridServer';
 import { runStandaloneServer } from '../../src/server/host/standalone/serverHost';
-import { fetchServerProduct } from '../../src/server/host/standalone/serverProduct';
+import { fetchServerFolder } from '../../src/server/host/standalone/serverFolder';
 
 // E5.2b: the real server half in a real module worker, as `serverWorker.ts` runs it, with the proof's ways in: boot at a point on
 // the road, hold a chosen number of worlds, and report what the worker holds. It never ships.
@@ -29,7 +29,7 @@ self.onmessage = (event: MessageEvent<ProofStart>): void => {
   if (control === undefined || game === undefined || proof === undefined) return;
   let server: StandaloneGrid | undefined;
   const ticks: number[] = [];
-  runStandaloneServer({ control, game, load: async (boot, slug) => fetchServerProduct(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await loadRapier()),
+  runStandaloneServer({ control, game, load: async (boot, slug) => fetchServerFolder(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await loadRapier()),
     proof: { ...event.data, ticked: ms => { ticks.push(ms); }, booted: running => { server = running; } } });
   const answer = (message: Record<string, unknown>): void => { proof.postMessage(message, []); };
   const admit = async (instances: readonly string[]): Promise<Record<string, unknown>> => {

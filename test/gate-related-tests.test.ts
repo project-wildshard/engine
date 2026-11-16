@@ -7,7 +7,7 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:
 import {join, resolve} from 'node:path';
 import {BROWSER_TESTS, LOCAL_FILE_SECONDS, MAIN_PUSH_SPLIT, NATIVE_TESTS, TIMING_TESTS, hostedOnlyReason, landMainMode, logHostedOnly, mainPushed, planBaseRefs, splitLocalTests, splitRequested} from '../scripts/push-local-split.mjs';
 import {provesCode} from '../scripts/ci-proof-jobs.mjs';
-import { capRelated, productReaderTests, scriptScenarioTests, QUICK_TESTS, pushGuards, forceRerunTriggers } from '../scripts/gate-related-tests.mjs';
+import { capRelated, folderReaderTests, scriptScenarioTests, QUICK_TESTS, pushGuards, forceRerunTriggers } from '../scripts/gate-related-tests.mjs';
 
 const durations = new Map([['test/slow.test.ts', 40], ['test/cheap.test.ts', 1], ['test/mid.test.ts', 8], ['test/cover-grid.test.ts', 30]]);
 const related = [...durations.keys()];
@@ -66,11 +66,11 @@ it('keeps required scenarios once even when the related-test budget is exhausted
 
 it('preserves author-source edges for tests consuming complete disk products', () => {
   const registry = { 'test/npc.test.ts': ['pine-hollow'], 'test/scripts/captain.test.ts': ['driftwood-isle', 'pine-hollow'] };
-  expect(productReaderTests(['src/shards/pine-hollow/generators/sourceOutput.ts'], registry)).toEqual(Object.keys(registry));
-  expect(productReaderTests(['src/shards/driftwood-isle/assets/removed'], registry)).toEqual(['test/scripts/captain.test.ts']);
-  expect(productReaderTests(['src/sharddev/project.ts'], registry)).toEqual(Object.keys(registry));
-  expect(productReaderTests(['scripts/test-products.json'], registry)).toEqual(Object.keys(registry));
-  expect(productReaderTests(['src/shards/far-reach/data/rows.json', 'docs/ENGINE.md'], registry)).toEqual([]);
+  expect(folderReaderTests(['src/shards/pine-hollow/generators/sourceOutput.ts'], registry)).toEqual(Object.keys(registry));
+  expect(folderReaderTests(['src/shards/driftwood-isle/assets/removed'], registry)).toEqual(['test/scripts/captain.test.ts']);
+  expect(folderReaderTests(['src/sharddev/project.ts'], registry)).toEqual(Object.keys(registry));
+  expect(folderReaderTests(['scripts/test-folders.json'], registry)).toEqual(Object.keys(registry));
+  expect(folderReaderTests(['src/shards/far-reach/data/rows.json', 'docs/ENGINE.md'], registry)).toEqual([]);
 });
 
 it('keeps all grid re-entry quick checks on an unrelated push with no budget', () => {

@@ -7,11 +7,11 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- the same
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { pruneStalePinProducts, stalePinProducts } from '../scripts/pins-reuse.mjs';
+import { pruneStalePinProducts, stalePinFolders } from '../scripts/pins-reuse.mjs';
 
 // gen:inputs stamps public/ (scripts/app-build/gen.ts), where the pins publish their products' mounts. A tree installed
 // before a pin bump and rebased past it kept Far Reach revision 1's mounts, and every land from it put 21 rows back in the
-// boot stamps (2026-11-14). stalePinProducts names such products, and gen:inputs refuses to stamp until `pnpm pins` runs.
+// boot stamps (2026-11-14). stalePinFolders names such products, and gen:inputs refuses to stamp until `pnpm pins` runs.
 let root = '';
 afterEach(() => { if (root !== '') rmSync(root, { recursive: true, force: true }); root = ''; });
 function tree(pins: readonly string[], products: Readonly<Record<string, { hash: string; revision: number; source?: Readonly<Record<string, string>> } | 'unreadable'>>): string {
@@ -26,15 +26,15 @@ function tree(pins: readonly string[], products: Readonly<Record<string, { hash:
 }
 
 test('a product whose receipt names a pin the pins file no longer names is stale; current ones are not', () => {
-  expect(stalePinProducts(tree(['far3', 'pine5'], { 'far-reach': { hash: 'far1', revision: 1 }, 'pine-hollow': { hash: 'pine5', revision: 5 } })))
+  expect(stalePinFolders(tree(['far3', 'pine5'], { 'far-reach': { hash: 'far1', revision: 1 }, 'pine-hollow': { hash: 'pine5', revision: 5 } })))
     .toEqual([{ folder: 'far-reach', revision: 1 }]);
 });
 
 test('no out/, no pins file, and a folder with no readable receipt are not stale', () => {
-  expect(stalePinProducts(tree(['far3'], {}))).toEqual([]);
-  expect(stalePinProducts(tree(['far3'], { scratch: 'unreadable' }))).toEqual([]);
+  expect(stalePinFolders(tree(['far3'], {}))).toEqual([]);
+  expect(stalePinFolders(tree(['far3'], { scratch: 'unreadable' }))).toEqual([]);
   rmSync(join(root, 'test/pins/shardfiles.json'));
-  expect(stalePinProducts(root)).toEqual([]);
+  expect(stalePinFolders(root)).toEqual([]);
 });
 
 test('a format-dependency product (Ring 1\'s blender-template, the format\'s Template 2) is current while its index is the installed format\'s', () => {
@@ -45,9 +45,9 @@ test('a format-dependency product (Ring 1\'s blender-template, the format\'s Tem
   const installed = join(root, 'node_modules/@wildshard/format/corpus/handwritten');
   mkdirSync(installed, { recursive: true });
   writeFileSync(join(installed, 'shard.json'), index);
-  expect(stalePinProducts(root)).toEqual([{ folder: 'far-reach', revision: 1 }]);
+  expect(stalePinFolders(root)).toEqual([{ folder: 'far-reach', revision: 1 }]);
   writeFileSync(join(installed, 'shard.json'), index.replace('"revision":1', '"revision":2'));
-  expect(stalePinProducts(root), 'the format dependency moved past it').toEqual([{ folder: 'blender-template', revision: 1 }, { folder: 'far-reach', revision: 1 }]);
+  expect(stalePinFolders(root), 'the format dependency moved past it').toEqual([{ folder: 'blender-template', revision: 1 }, { folder: 'far-reach', revision: 1 }]);
 });
 
 // opus-bugfix2, 2026-11-16 23:04 UTC: after the Brasscap rename a worktree's stale out/blender-template survived `pnpm pins`, so
@@ -61,7 +61,7 @@ test('pnpm pins removes the products gen:inputs calls stale, and only those, onl
   writeFileSync(join(root, 'out/notes.txt'), 'not a product');
   expect(pruneStalePinProducts(root)).toEqual([{ folder: 'blender-template', revision: 1 }, { folder: 'far-reach', revision: 1 }]);
   expect(readdirSync(join(root, 'out')).sort()).toEqual(['brasscap-mesa', 'build-cache', 'notes.txt', 'pine-hollow', 'scratch']);
-  expect(stalePinProducts(root), 'gen:inputs has nothing left to refuse').toEqual([]);
+  expect(stalePinFolders(root), 'gen:inputs has nothing left to refuse').toEqual([]);
   expect(pruneStalePinProducts(root), 'a second run removes nothing').toEqual([]);
   expect(existsSync(join(root, 'test/pins/shardfiles.json'))).toBe(true);
 });

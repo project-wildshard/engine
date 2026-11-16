@@ -358,6 +358,7 @@ const wireRoots: Readonly<Record<string, GenericSchema>> = {
   'ledger.LedgerFact': LedgerFactSchema,
   'ledger.LedgerRules': LedgerRulesSchema,
   'director.Director': DirectorSchema,
+  // The key builds the wire schema id '@wildshard/format/directorProduct#DirectorProductSchema', which stays (SA23).
   'directorProduct.DirectorProduct': DirectorDocumentSchema,
   'directorStages.DirectorStages': DirectorStagesSchema,
   'migrations.LogicalState': LogicalStateSchema,

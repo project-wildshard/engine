@@ -2,7 +2,7 @@ import * as v from 'valibot';
 import {SaveStore,type SaveStorage} from '@wildshard/engine/saves/store';
 import type {SimHost} from '@wildshard/engine/sim';
 import {AdventurePersistenceSchema} from '@wildshard/format/namedJsonContracts';
-import type {ShardProduct} from '../../../shared/game/shardfile/shardProduct';
+import type {ShardFolder} from '../../../shared/game/shardfile/shardFolder';
 import {installRuntimeState,pageStateOf} from '../../../shared/game/shardfile/runtimeState';
 import type {ObservedRecords} from '../../../shared/game/quest/questObservation';
 import {featOutcome,witnessSavedFeats} from '../../../shared/game/quest/featCounters';
@@ -25,7 +25,7 @@ export interface ChapterRecordIds {readonly step:string;readonly elites:string}
 /** Fresh native sessions start from the admitted field default. Checkpoint
  * restore writes that same validated field; it never manufactures a boss,
  * imports a page's global save, or substitutes zero for a missing owner. */
-export async function prepareChapterRecords(product:Pick<ShardProduct,'json'|'shardfile'>,ids:ChapterRecordIds):Promise<InstallChapterRecords> {
+export async function prepareChapterRecords(product:Pick<ShardFolder,'json'|'shardfile'>,ids:ChapterRecordIds):Promise<InstallChapterRecords> {
   const source=product.shardfile,rows=v.parse(AdventurePersistenceSchema,await product.json('quests/persistence.json'));
   const finite=v.pipe(v.number(),v.finite()),number=rows.nonnegative?v.pipe(finite,v.minValue(0)):finite;
   const bosses=v.record(v.string(),v.object({defeated:v.boolean(),rewardTaken:v.boolean(),kills:number}));

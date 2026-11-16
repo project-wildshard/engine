@@ -8,8 +8,8 @@ import { workSlice } from '@wildshard/engine/core/workSlice';
 import { nativeWholeGeometry } from '@wildshard/engine/models/nativeGeometry';
 import type { WorldScenesSection } from '@wildshard/format/worldScenes';
 import type { WorldSceneSlabChunk, WorldSceneSlabFile, WorldSceneSlabKey, WorldSceneSlabLibrary } from '@wildshard/format/worldSceneSlabs';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
-import { runtimeProduct } from './runtimeProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
+import { runtimeFolder } from './runtimeFolder';
 import { SharedTileBuilds, type TileContent } from './tileContent';
 import type { ControlRefinement } from './controlRefinement';
 import { tilesSettling } from './tileDriver';
@@ -172,11 +172,11 @@ const chunksOf = (entry: SlabTile): readonly WorldSceneSlabChunk[] => entry.file
  * key, tile and place), taken with its native channels exactly as baked and its frozen bounds from the row. Parser
  * staging never outlives the read.
  */
-async function readSlabChunks(owner: Scope, product: ShardProduct, tile: number, file: WorldSceneSlabFile, merged: ReadonlySet<string> = EMPTY_KEYS): Promise<BufferGeometry[]> {
+async function readSlabChunks(owner: Scope, product: ShardFolder, tile: number, file: WorldSceneSlabFile, merged: ReadonlySet<string> = EMPTY_KEYS): Promise<BufferGeometry[]> {
   const live = (): void => { if (owner.disposed || owner.disposing) throw new Error('Slab owner is retired'); };
   live();
   if (product.shardfile.files.find(row => row.hash === file.file)?.kind !== 'glb') throw new Error('Slab file needs a declared GLB');
-  const admitted = runtimeProduct(product.shardfile);
+  const admitted = runtimeFolder(product.shardfile);
   if (admitted === null) throw new Error('Slab file needs an admitted product');
   const staging = new Set<BufferGeometry>(), materials = new Set<Material>(), out: BufferGeometry[] = [];
   try {
@@ -228,12 +228,12 @@ export class SlabLibrary {
   /** the parts waiting for the one publication cursor, and whether it is running (`publish`) */
   private readonly waiting: { readonly parts: readonly SlabPart[]; readonly mount: () => Promise<void>; readonly done: () => void; readonly fail: (error: unknown) => void }[] = [];
   private publishing = false;
-  private readonly bounds: ReadonlyMap<number, ShardProduct['shardfile']['tiles'][number]['bounds']>;
-  private readonly product: ShardProduct;
+  private readonly bounds: ReadonlyMap<number, ShardFolder['shardfile']['tiles'][number]['bounds']>;
+  private readonly product: ShardFolder;
   /** bank reads running now, and the publication waiting for one to finish (NB3: the loader's gather) */
   private reads = 0;
   private readonly readDone: (() => void)[] = [];
-  constructor(owner: Scope, product: ShardProduct, private readonly whole: WholeLibrary, private readonly row: WorldSceneSlabLibrary,
+  constructor(owner: Scope, product: ShardFolder, private readonly whole: WholeLibrary, private readonly row: WorldSceneSlabLibrary,
     private readonly queue: ControlRefinement, private readonly cover: (tile: number) => Promise<void>,
     private readonly prepare?: (parts: readonly SlabPart[]) => Promise<void>, private readonly merge = false) {
     if (row.of !== whole.id) throw new Error('Slab library covers another library');

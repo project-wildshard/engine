@@ -14,19 +14,19 @@ function timed(name,work){
   });
 }
 
-async function productInput(slug){
-  const {loadHeadlessProduct}=await import('../../src/server/host/headlessProduct.ts');
+async function folderInput(slug){
+  const {loadHeadlessFolder}=await import('../../src/server/host/headlessFolder.ts');
   const {loadRapier}=await import('../../src/shared/engine/physics/rapier.ts');
-  const {runtimeAssets,builtProduct}=await import('../fixtures/engine-lift/product.ts');
-  const directory=builtProduct(slug),product=await loadHeadlessProduct(directory);
+  const {runtimeAssets,builtFolder}=await import('../fixtures/engine-lift/folder.ts');
+  const directory=builtFolder(slug),product=await loadHeadlessFolder(directory);
   return {product,shard:product.shardfile,assets:runtimeAssets(product,directory),rapier:await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))};
 }
 
 timed('host',async()=>{
-  const {createNativeProofResident,prepareProductPlan}=await import('../../src/test/game/headlessNative.ts');
+  const {createNativeProofResident,prepareFolderPlan}=await import('../../src/test/game/headlessNative.ts');
   const {nativeTamingOf}=await import('../../src/server/game/riding/nativeTaming.ts');
   const {leadPlayer}=await import('../../src/shared/engine/sim/leadPlayer.ts');
-  const resident=await createNativeProofResident(await productInput('nalati-grasslands'),prepareProductPlan);
+  const resident=await createNativeProofResident(await folderInput('nalati-grasslands'),prepareFolderPlan);
   try{
     const {host}=resident,player=leadPlayer(host),taming=nativeTamingOf(host);
     const horse=[...host.entities.values()].find(row=>row.kind==='horse'&&row.variant==='stallion');
@@ -49,7 +49,7 @@ timed('host',async()=>{
 timed('door',async()=>{
   const {createShardfileSim}=await import('../../src/server/game/plugin/simulation.ts');
   const {leadPlayer}=await import('../../src/shared/engine/sim/leadPlayer.ts');
-  const input=await productInput('_template'),facts=[];
+  const input=await folderInput('_template'),facts=[];
   const sim=createShardfileSim(input.shard,input.assets,{rapier:input.rapier,quest:{fact:(...args)=>facts.push(args),coins:(...args)=>facts.push(args)}});
   try{
     const player=leadPlayer(sim.host),target=input.shard.targets.interactions.find(row=>row.scene==='template.door.toggle');
@@ -68,17 +68,17 @@ timed('door',async()=>{
 });
 
 timed('format',async()=>{
-  const {loadHeadlessProduct}=await import('../../src/server/host/headlessProduct.ts');
+  const {loadHeadlessFolder}=await import('../../src/server/host/headlessFolder.ts');
   // This is the format package's actual handwritten Template 2, rather than
   // Brasscap's API head (the blender-template API slug until TC-SHIP-a).
-  const product=await loadHeadlessProduct('node_modules/@wildshard/format/corpus/handwritten');
+  const product=await loadHeadlessFolder('node_modules/@wildshard/format/corpus/handwritten');
   assert.equal(product.slug,'blender-template');
   assert.ok(product.shardfile.state.shared.some(row=>row.name==='blender.door.open'));
 });
 
 timed('dropped-section',async()=>{
-  const {loadHeadlessProduct}=await import('../../src/server/host/headlessProduct.ts');
-  const product=await loadHeadlessProduct('node_modules/@wildshard/format/corpus/handwritten');
+  const {loadHeadlessFolder}=await import('../../src/server/host/headlessFolder.ts');
+  const product=await loadHeadlessFolder('node_modules/@wildshard/format/corpus/handwritten');
   assert.equal(product.slug,'blender-template');
 });
 
@@ -94,7 +94,7 @@ timed('save-field',async()=>{
   const {leadPlayer}=await import('../../src/shared/engine/sim/leadPlayer.ts');
   const {serializeSimSnapshot,snapshotSimHostBytes,decodeSimSnapshot}=await import('../../src/shared/engine/sim/snapshot.ts');
   const {restoreSimHost}=await import('../../src/server/engine/sim/restore.ts');
-  const input=await productInput('_template'),ports={rapier:input.rapier,quest:{fact:()=>undefined,coins:()=>undefined}};
+  const input=await folderInput('_template'),ports={rapier:input.rapier,quest:{fact:()=>undefined,coins:()=>undefined}};
   const sim=createShardfileSim(input.shard,input.assets,ports);
   let restored,again;
   try{

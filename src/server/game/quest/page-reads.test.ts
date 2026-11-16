@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import type { QuestPageRows } from '@wildshard/format/questPageComposition';
-import { createShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { parseShardfile } from '@wildshard/format/shardSchema';
 import { SHARDFILE_VERSION } from '@wildshard/format/version';
 import { startQuestPageReads } from '../../../shared/game/quest/pageReads';
@@ -27,7 +27,7 @@ function fixture() {
     edge: { north: edge, south: edge, east: edge, west: edge }, files: [], tiles: [], library: [], critical: [], far: null });
   const discovery = deferred<Uint8Array>(), assembly = deferred<Uint8Array>(), stall = deferred<Uint8Array>();
   const order: string[] = [];
-  const product = createShardProduct({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(),
+  const product = createShardFolder({ slug: source.identity.slug, revision: 1, shardfile: source, sections: new Map(),
     files: new Map(['discovery.json', 'stall.json', 'assembly.json'].map(name => [name, { hash: name, url: `/${name}` }])),
     read: name => {
       order.push(name);

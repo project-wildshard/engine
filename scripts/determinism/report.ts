@@ -17,7 +17,7 @@ import { homedir } from "node:os";
 import { readTar } from "@wildshard/format/tar";
 import { formatTemplate } from "../pin-format.ts";
 import * as v from "valibot";
-import { loadHeadlessProduct } from "../../src/server/host/headlessProduct.ts";
+import { loadHeadlessFolder } from "../../src/server/host/headlessFolder.ts";
 import {
   serverReadsFile,
   outputDescriptor,
@@ -125,7 +125,7 @@ const report: Report = {
 try {
   assert.equal(dirty, false, "Parity requires committed source and ordinary generated tables");
   // Transport the pin's exact admitted files in a server book. This does not cook/re-encode a product:
-  // book offsets only frame immutable bytes; readServerProduct performs ordinary admission on both sides.
+  // book offsets only frame immutable bytes; readServerFolder performs ordinary admission on both sides.
   for (const slug of slugs) {
     const name = slug === "template" ? "_template" : slug;
     const slice = `out/.slices/${name}`;
@@ -152,7 +152,7 @@ try {
       sha(pinnedHeader),
       "Installed output header differs from its immutable pin",
     );
-    const product = await loadHeadlessProduct(directory);
+    const product = await loadHeadlessFolder(directory);
     const index = outputDescriptor(product.shardfile)?.index;
     if (index === undefined) {
       throw new Error("Missing verified product index");

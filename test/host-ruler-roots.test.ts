@@ -2,7 +2,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Reads the pinned format package's section index.
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { clientPlanRoots, modulePath, productRoots, productRootsFrom, SECTION_HOSTS, sectionHostRows, unresolvedRoots } from '../scripts/host-ruler/roots.mjs';
+import { clientPlanRoots, modulePath, folderRoots, folderRootsFrom, SECTION_HOSTS, sectionHostRows, unresolvedRoots } from '../scripts/host-ruler/roots.mjs';
 
 const plan = clientPlanRoots();
 const rows = (roots: readonly { from: string; module: string; bindings: readonly string[] }[]) =>
@@ -53,7 +53,7 @@ describe('the section-host table', () => {
 
 describe('product roots', () => {
   test('a fixture product lists every root, one per import() shape', () => {
-    const roots = productRoots('test/fixtures/host-ruler/fixture-product', plan);
+    const roots = folderRoots('test/fixtures/host-ruler/fixture-product', plan);
     expect(roots.slug).toBe('host-ruler-fixture');
     expect(rows(roots.roots)).toEqual([
       ['section:world/scenes', 'src/client/game/shardfile/worldScenes.ts', ['installWorldScenes']],
@@ -63,7 +63,7 @@ describe('product roots', () => {
       ['kind:world.meadow', 'src/client/game/shardfile/clientMeadow.ts', ['installClientMeadow']],
       ['kind:world.forest-page', 'src/client/game/shardfile/clientForestPage.ts', ['enterClientForestPage', 'installClientForestPage']],
       ['kind:world.scenes', 'src/client/game/shardfile/streamingView.ts', ['StreamingCamera']],
-      ['kind:world.scenes', 'src/client/game/shardfile/tileDriver.ts', ['cameraCone', 'followResidentTiles', 'noteTileBytes', 'productTileRing', 'residentTiles']],
+      ['kind:world.scenes', 'src/client/game/shardfile/tileDriver.ts', ['cameraCone', 'folderTileRing', 'followResidentTiles', 'noteTileBytes', 'residentTiles']],
       ['kind:world.scenes', 'src/client/game/shardfile/worldScenes.ts', ['installWorldScenes']],
       ['kind:world.dressing', 'src/client/game/shardfile/sceneDressing.ts', ['SceneDressing']],
     ]);
@@ -74,7 +74,7 @@ describe('product roots', () => {
     expect(unresolvedRoots(roots.modules)).toEqual([]);
   });
   test('a copied real product (Pine Hollow: 14 kinds, 58 sections) lists every root, zero unresolved', () => {
-    const roots = productRoots('test/fixtures/host-ruler/pine-hollow', plan);
+    const roots = folderRoots('test/fixtures/host-ruler/pine-hollow', plan);
     expect([roots.slug, roots.kinds.length, roots.sections.length]).toEqual(['pine-hollow', 14, 58]);
     expect(rows(roots.roots).filter(([from]) => (from as string).startsWith('kind:'))).toEqual([
       ['kind:held.ranged-page', 'src/client/game/loadout/rangedPage.ts', ['prepareRangedPage']],
@@ -99,8 +99,8 @@ describe('product roots', () => {
     expect(unresolvedRoots(roots.modules)).toEqual([]);
   });
   test('an unknown kind or section refuses', () => {
-    expect(() => productRootsFrom({ slug: 'x', sections: ['client/plan'], kinds: ['world.nowhere'] }, plan)).toThrow('unknown client/plan kind world.nowhere');
-    expect(() => productRootsFrom({ slug: 'x', sections: ['world/nowhere'], kinds: [] }, plan)).toThrow('unknown section world/nowhere');
-    expect(() => productRootsFrom({ slug: 'x', sections: [], kinds: ['world.meadow'] }, plan)).toThrow('without a client/plan section');
+    expect(() => folderRootsFrom({ slug: 'x', sections: ['client/plan'], kinds: ['world.nowhere'] }, plan)).toThrow('unknown client/plan kind world.nowhere');
+    expect(() => folderRootsFrom({ slug: 'x', sections: ['world/nowhere'], kinds: [] }, plan)).toThrow('unknown section world/nowhere');
+    expect(() => folderRootsFrom({ slug: 'x', sections: [], kinds: ['world.meadow'] }, plan)).toThrow('without a client/plan section');
   });
 });

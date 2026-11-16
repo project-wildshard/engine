@@ -4,11 +4,11 @@ import { readFileSync } from 'node:fs';
 import { expect,test } from 'vitest';
 import { createSimHost } from '../src/server/engine/sim';
 import { installNativeMelee,type NativeMeleeCommand } from '../src/server/game/plugin/simulation';
-import { loadHeadlessProduct } from '../src/server/host/headlessProduct';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { builtProduct } from './fixtures/engine-lift/product';
+import { builtFolder } from './fixtures/engine-lift/folder';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
-const SKY_ITEMS=(await loadHeadlessProduct(builtProduct('far-reach'))).section('combat/items').items;
+const SKY_ITEMS=(await loadHeadlessFolder(builtFolder('far-reach'))).section('combat/items').items;
 
 test('native direct gust keeps its independent clock, landing order and restore', async () => {
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));

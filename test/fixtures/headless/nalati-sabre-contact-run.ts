@@ -8,14 +8,14 @@ import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
 import {snapshotSimHost,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {earnNalatiPasture} from './nalati-pasture-session';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const Weapons=v.object({blade:v.object({contacts:v.number(),struck:v.array(v.string())}),swing:v.object({move:v.nullable(v.number()),swingT:v.number()}),moves:v.array(v.string())});
 const {resident,population,checkpoint,checkpointTick}=await earnNalatiPasture([
   {x:-135,z:214},{x:-157,z:212,jump:true,jumpAt:7},{x:-175,z:206},
 ]);
-let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginProductSession>>['ready']>>|undefined;
+let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;
 try{
   const owner=resident.host.adapters.get('nalati.weapons');assert.ok(owner);
   const read=()=>{const saved=owner.snapshot();assert.equal(typeof saved,'string');if(typeof saved!=='string')throw new Error('Missing actual sabre state');return v.parse(Weapons,JSON.parse(saved));};
@@ -41,7 +41,7 @@ try{
   assert.notEqual(hit.swing.move,null,'capture the actual swing while its struck set is live');
   assert.equal(leadPlayer(resident.host).health.alive,true);
   const middle=serializeSimSnapshot(snapshotSimHost(resident.host)),middleTick=frames.length;
-  const pending=await beginProductSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();
+  const pending=await beginFolderSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();
   const observed=['nalati.predators','nalati.weapons'];
   const mark=()=>runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,
     {version:1,observe:observed,segments:[{id:'after-sabre-contact',ticks:1,commands:[]}]});
@@ -55,7 +55,7 @@ try{
   ]});
   assert.deepEqual(repeated.observations.at(-1),report.observations[0],'fresh input replay matches actual contacts, health and complete blade continuation');
   await replay.dispose();replay=undefined;
-  const restored=await beginProductSession('nalati-grasslands','nalati-predators',middle);replay=await restored.ready();
+  const restored=await beginFolderSession('nalati-grasslands','nalati-predators',middle);replay=await restored.ready();
   const continuation=await replay.verbTape({version:1,observe:observed,segments:[
     {id:'continue-live-swing',ticks:suffix.length,commands:[],frames:suffix},{id:'after-sabre-contact',ticks:1,commands:[]},
   ]});

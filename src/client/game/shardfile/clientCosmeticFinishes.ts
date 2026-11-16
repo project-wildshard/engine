@@ -5,12 +5,12 @@ import { isBowStyle } from '../../../shared/game/weapons/starterBowProfile';
 import { entryOwner, presentEntryOwner } from '../../../shared/game/shardfile/entryOwners';
 import { enteredAdventurePersistence } from '../../../shared/game/quest/chapterBindings';
 import type { ShardContext } from '../plugin/context';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 
 interface ClientCosmeticFinishes { readonly locker: CosmeticFinishLocker; readonly painter: CosmeticFinishPainter;
   /** one frame of the declared bound targets (`bind`), from `owner`'s loans; nothing until its claims have a live kit */
   readonly frame: (owner: ShardContext) => void }
-const owners=new WeakMap<Scope,WeakMap<ShardProduct,ClientCosmeticFinishes>>();
+const owners=new WeakMap<Scope,WeakMap<ShardFolder,ClientCosmeticFinishes>>();
 /** The kit phase binds declared finish rows to the existing entered saved owner. */
 export function installClientCosmeticFinishes(ctx:ShardContext):void{
   if(ctx.scope.disposed)throw new Error('Cosmetic finishes require a living owner');

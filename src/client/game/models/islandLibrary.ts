@@ -11,10 +11,10 @@ import type { BufferGeometry } from 'three';
 import type { OwnedGeometry } from '@wildshard/engine/models/ownedGeometry';
 import { resourceScope } from '@wildshard/engine/app/resources';
 import type { Scope } from '@wildshard/engine/app/scope';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { readWholeGeometry } from '../plugin/geometry';
 import { fixedDraws, type FixedDraws } from './fixedDraws';
-import { ProductFigureCatalogue } from './figureCatalogue';
+import { FolderFigureCatalogue } from './figureCatalogue';
 import { CollectionCatalogue } from './collectionDisplay';
 import { timeClientPreparation } from '../shardfile/preparationTiming';
 
@@ -33,42 +33,42 @@ export const IslandLibrarySchema: v.GenericSchema<BoundedIslandLibraryInput, Bou
 export class IslandLibrary<Groups> {
   private readonly rows: BoundedIslandLibrary;
   private readonly resolved: v.InferOutput<typeof ResolvedIslandLibrarySchema> | undefined;
-  private admitted: ShardProduct | null = null;
+  private admitted: ShardFolder | null = null;
   private intake: Promise<void> | undefined;
   private inventoryRead: Promise<Groups> | undefined;
   private geometryRead: { readonly owner: Parameters<typeof readWholeGeometry>[0]; readonly sourceOwner: Scope; readonly pending: ReturnType<typeof readWholeGeometry> } | undefined;
   private figureAdmission: { readonly owner: Scope; readonly construction: boolean; readonly pending: Promise<void> } | undefined;
   private library: FixedDraws | null = null;
   private inventory: Groups | null = null;
-  readonly figures: ProductFigureCatalogue;
+  readonly figures: FolderFigureCatalogue;
   readonly collections: CollectionCatalogue;
 
-  constructor(input: unknown, product?: ShardProduct) {
+  constructor(input: unknown, product?: ShardFolder) {
     this.resolved = product === undefined ? undefined : v.parse(ResolvedIslandLibrarySchema, input);
     this.rows = this.resolved === undefined ? v.parse(IslandLibrarySchema, input) : {
       product: product?.slug ?? '', draws: { section: 'models/island-library', field: 'draws' },
       groups: this.resolved.groups, figures: this.resolved.figures, collections: this.resolved.collections,
     };
     this.admitted = product ?? null;
-    this.figures = new ProductFigureCatalogue(this.rows.product, this.rows.figures);
+    this.figures = new FolderFigureCatalogue(this.rows.product, this.rows.figures);
     this.collections = new CollectionCatalogue(this.rows.product, new Map(Object.entries(this.rows.collections).map(([key, slot]) => [key, this.draw(slot)])), product);
   }
 
   /** The page's (or a cold view's) product, for the shard's readers that hold none. */
-  admit(product: ShardProduct): void {
+  admit(product: ShardFolder): void {
     if (this.resolved !== undefined && product !== this.admitted) throw new Error('Resolved island product identity differs');
     this.admitted = product;
   }
-  get product(): ShardProduct {
+  get product(): ShardFolder {
     if (this.admitted === null) throw new Error(`${this.rows.product} reads its product before its product is admitted`);
     return this.admitted;
   }
   /** Open and admit the first-party product outside a page (renderer services stay behind this explicit load). */
-  async open(owner: Scope = resourceScope()): Promise<ShardProduct> {
+  async open(owner: Scope = resourceScope()): Promise<ShardFolder> {
     if (owner.disposed || owner.disposing) throw new Error('Island library owner left');
     if (this.resolved !== undefined) return this.product;
-    const { loadFirstPartyProduct } = await import('../shardfile/runtimeProduct');
-    const product = await loadFirstPartyProduct(this.rows.product, owner);
+    const { loadFirstPartyFolder } = await import('../shardfile/runtimeFolder');
+    const product = await loadFirstPartyFolder(this.rows.product, owner);
     this.admit(product); return product;
   }
 

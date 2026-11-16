@@ -23,12 +23,12 @@ import { BuildingLifeDocumentSchema } from '@wildshard/format/buildings';
 import { LivingBuildings } from './livingBuildings';
 import { createBuildingCloud } from './buildingCloud';
 import { hasLentLook, lentLook, lentToon } from './lentLooks';
-import type { ShardProduct } from '../../../shared/game/shardfile/shardProduct';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { RopeDeckSite } from '../models/ropeDeckSite';
 import { RopeChain } from '@wildshard/engine/physics/ropeChain';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { Game } from '@wildshard/engine/core/Game';
-import { productFixedDraws, type FixedDraws } from '../models/fixedDraws';
+import { folderFixedDraws, type FixedDraws } from '../models/fixedDraws';
 import * as v from 'valibot';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { sharedModelContext, type ModelContext } from '@wildshard/engine/models/model';
@@ -53,7 +53,7 @@ export interface WorldAssemblyPorts {
   /** Original already-loaded templates; no stage creates a second intake. */
   readonly draws?: FixedDraws;
   /** The original admitted product reader; site life never creates an intake. */
-  readonly product?: Pick<ShardProduct, 'file'>;
+  readonly product?: Pick<ShardFolder, 'file'>;
   /** The original early-read cells, native viewer and Game registration receiver. */
   readonly cover?: { readonly cells: Uint8Array; readonly viewer: () => Vector3; readonly updates: Pick<Game, 'onUpdate'> };
   /** Original simulation and fixed-post registration authority for rope chains. */
@@ -72,7 +72,7 @@ export interface WorldConstructionPorts {
   readonly native?: ShardContext;
   readonly draws?: FixedDraws;
   readonly runtime: ShardRuntime;
-  readonly product: ShardProduct;
+  readonly product: ShardFolder;
   readonly scope: Scope;
   readonly scenes?: SceneHandles;
   readonly baked: ReadonlyMap<string, BakedTiles>;
@@ -122,7 +122,7 @@ export class WorldAssembly {
         || nativeGame.levelScope !== owner || product.json !== read) throw new Error('World native prelude owner left or changed');
     };
     live();
-    const draws = await productFixedDraws(product, row.draws);
+    const draws = await folderFixedDraws(product, row.draws);
     live();
     return draws;
   }

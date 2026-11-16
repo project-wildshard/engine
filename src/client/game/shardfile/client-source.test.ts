@@ -3,11 +3,11 @@ import { expect, test, vi } from 'vitest';
 import { configuredShardfile, pagePlayingBytes, preparePageResidency } from './clientSource';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { parseShardSlug } from '../../../shared/game/shard/slug';
-import type { ProductOptions } from './product';
+import type { FolderOptions } from './folder';
 import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { SHARDFILE_ADMISSION_LIMITS } from '@wildshard/format/admissionLimits';
 
-function options(): ProductOptions {
+function options(): FolderOptions {
   return { base: 'https://fixture.invalid/', firstParty: true, offline: false,
     fetch: vi.fn(() => Promise.reject(new Error('Unexpected network read'))),
     hash: vi.fn(() => Promise.reject(new Error('Unexpected hash read'))) };

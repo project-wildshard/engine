@@ -5,10 +5,10 @@ import {performance} from 'node:perf_hooks';
 import * as v from 'valibot';
 import {preparationCacheKey} from './preparation-cache-key.mjs';
 import {generationPlan} from './gen-programs.mjs';
-import {shardProducts} from './shard-outputs.mjs';
+import {builtShardFolders} from './shard-outputs.mjs';
 import {InputHashMemo} from './bake-input-hashes.mjs';
-import {productMapInput,productFlags,productRecipe,runtimeCopyIssues} from './built-product.mjs';
-import {productInputKey,productToolchainKey} from './shardfile-inputs.mjs';
+import {folderMapInput,folderFlags,folderRecipe,runtimeCopyIssues} from './built-folder.mjs';
+import {folderInputKey,folderToolchainKey} from './shardfile-inputs.mjs';
 import {shardfileValidationRevision} from './shardfile-validation-revision.mjs';
 import {readBuildKey} from './shardfile-cache.mjs';
 
@@ -23,18 +23,18 @@ function references(root,cacheRoot,fallback,env) {
   const admitted=preparationCacheKey(root,fallback,{cacheRoot,env});
   if(!admitted.qualified)throw new Error(`Incomplete current product identity: ${admitted.reason}`);
   const plan=generationPlan(root),memo=new InputHashMemo(root);
-  const toolchain=`${productToolchainKey(root,memo)}:${shardfileValidationRevision(root)}`;
+  const toolchain=`${folderToolchainKey(root,memo)}:${shardfileValidationRevision(root)}`;
   /** @type {Set<string>} */
   const keys=new Set();
   /** @type {Record<string,string[]>} */
   const products={};
-  for(const product of shardProducts(root,plan.folders)) {
+  for(const product of builtShardFolders(root,plan.folders)) {
     const name=product.slug,folder=product.folder,output=name===folder?undefined:name;
-    const project=resolve(root,'src/shards',folder),map=productMapInput(project,output);
-    const flags=productFlags(root,output,map,runtimeCopyIssues(root,project).length===0);
-    const {recipe,receipts}=productRecipe(root,name,flags,toolchain,cacheRoot),key=readBuildKey(resolve(root,'out',name));
+    const project=resolve(root,'src/shards',folder),map=folderMapInput(project,output);
+    const flags=folderFlags(root,output,map,runtimeCopyIssues(root,project).length===0);
+    const {recipe,receipts}=folderRecipe(root,name,flags,toolchain,cacheRoot),key=readBuildKey(resolve(root,'out',name));
     const file=resolve(receipts,`${key}.json`);
-    if(productInputKey(root,file,recipe,memo)!==key)throw new Error(`Current read receipt differs ${name}`);
+    if(folderInputKey(root,file,recipe,memo)!==key)throw new Error(`Current read receipt differs ${name}`);
     const saved=v.parse(Inputs,JSON.parse(readFileSync(file,'utf8')));
     const current=saved.inputs.filter(entry=>entry.startsWith('G ')).map(entry=>v.parse(hash,entry.slice(2)));
     products[name]=current;for(const value of current)keys.add(value);

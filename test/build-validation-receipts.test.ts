@@ -51,7 +51,7 @@ test.each([undefined,0,-1,1.5,Infinity])('a missing or invalid published residen
   expect(()=>buildValidationReceipts('receipt-test',f.root)).toThrow('Missing build-owned source residency');
 });
 
-// The SDK publisher's half (writeOutputProduct emits residentBytes and postCost) is sharddev's: CI21 E-PRODUCT, 2026-11-15.
+// The SDK publisher's half (writeOutputFolder emits residentBytes and postCost) is sharddev's: CI21 E-PRODUCT, 2026-11-15.
 
 test.each([undefined,{passes:-1,instructions:0,inputs:{colour:false,depth:false,normal:false}},{passes:0,instructions:Number.NaN,inputs:{}},{passes:0,instructions:0,inputs:{colour:'no',depth:false,normal:false}}])('missing or invalid published post cost fails the app build (%j)',postCost=>{
   const f=fixture();writeFileSync(join(f.directory,'validation.json'),JSON.stringify({...f.receipt,postCost}));

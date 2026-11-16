@@ -12,7 +12,7 @@ import {
   createNativeCombatFrame,
   installNativeItems,
 } from '../../src/server/game/plugin/nativeItems.ts'
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct.ts'
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder.ts'
 import { fillNativeCombatFrame } from '../../src/server/host/headlessRuntime.ts'
 import { loadRapier } from '../../src/shared/engine/physics/rapier.ts'
 import { snapshotSimHost } from '../../src/shared/engine/sim/snapshot.ts'
@@ -111,7 +111,7 @@ timed(
     const rapier = await physics()
     const level = fixtureLevel(-8)
     let rain = 0
-    const pine = await loadHeadlessProduct('out/pine-hollow'),
+    const pine = await loadHeadlessFolder('out/pine-hollow'),
       items = parseItems(pine.shardfile.items),
       weatherProgram = await pine.json('world/weather.json')
     const frame = createNativeCombatFrame(),
@@ -273,7 +273,7 @@ timed(
 timed(
   'the second native user keeps swept phases, synchronous reaction order and its saved wire',
   async () => {
-    const driftwood = await loadHeadlessProduct('out/driftwood-isle'),
+    const driftwood = await loadHeadlessFolder('out/driftwood-isle'),
       policy = await driftwood.json('server/swords.json'),
       DRIFTWOOD_SWORDS = driftwood.shardfile.items
     const { installNativeSweptMelee } =

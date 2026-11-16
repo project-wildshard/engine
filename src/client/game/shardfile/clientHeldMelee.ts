@@ -5,7 +5,7 @@ import type { ShardContext } from '../plugin/context';
 import { createDeclaredHeldMelee } from '../plugin/weaponFamily';
 import { runtimeEquipment } from '../../../shared/game/plugin/runtimeRows';
 import { resolveSceneHeld } from '../models/sceneSpecimens';
-import { productPainterLight, productPaintedImage } from '../looks/paintedLook';
+import { folderPainterLight, folderPaintedImage } from '../looks/paintedLook';
 import { sceneModelSource } from './sceneSources';
 import { bindPageMelee, installPageItemContexts } from './pageItems';
 import { clientNativeBook } from './clientNativeBook';
@@ -35,7 +35,7 @@ export function installClientHeldMelee(ctx: ShardContext, input: unknown): void 
     const finish = row.finish;
     if (finish !== undefined) {
       const original = weapon.parts.material(finish.part);
-      const material = sceneModelSource(ctx.product, finish.library).mappedLook(finish.look, productPaintedImage(ctx.product, finish.image));
+      const material = sceneModelSource(ctx.product, finish.library).mappedLook(finish.look, folderPaintedImage(ctx.product, finish.image));
       weapon.parts.root.traverse(part => { if (part instanceof Mesh && part.material === original) part.material = material; });
     }
     book.held = weapon; return weapon;
@@ -59,7 +59,7 @@ export function enterClientHeldMelee(ctx: ShardContext, input: unknown): void {
   if (weapon === null || host === null) throw new Error('Held play feature requires its original equipped controller');
   host.viewmodel.add(weapon.model); ctx.scope.onDispose(() => { weapon.model.removeFromParent(); });
   if (ctx.product.section('look/painted').look.lightScope === 'material') {
-    productPainterLight(ctx.product, weapon.model, ctx.scope); ctx.scope.ownPrimitives(weapon.model);
+    folderPainterLight(ctx.product, weapon.model, ctx.scope); ctx.scope.ownPrimitives(weapon.model);
   }
   const stowedMode = row.stowedMode;
   if (stowedMode !== undefined) weapon.stowed = () => ctx.app.player?.mode === stowedMode;

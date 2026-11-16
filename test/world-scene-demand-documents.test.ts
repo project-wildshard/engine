@@ -10,7 +10,7 @@ import { Rng } from '../src/shared/engine/core/rng';
 import { parseWorldScenes } from '@wildshard/format/worldScenes';
 import { emptyShardfile } from '../src/shared/host/author';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
-import { createShardProduct } from '../src/shared/game/shardfile/shardProduct';
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { installWorldScenes } from '../src/client/game/shardfile/worldScenes';
 import { defineWorldSceneCatalogue } from '../src/client/game/models/worldSceneCatalogue';
 import type { ShardContext } from '../src/client/game/plugin/context';
@@ -38,7 +38,7 @@ function fixture(demand = true, direct = false, corrupt = false) {
   const reads: string[] = [];
   let finish: (() => void) | undefined;
   let waiting: Promise<void> | undefined;
-  const product = createShardProduct({ slug: 'document-fixture', revision: 1, shardfile: emptyShardfile({ slug: 'document-fixture', name: 'Documents', author: 'Test', revision: 1, seed: 1 }),
+  const product = createShardFolder({ slug: 'document-fixture', revision: 1, shardfile: emptyShardfile({ slug: 'document-fixture', name: 'Documents', author: 'Test', revision: 1, seed: 1 }),
     sections: new Map([['world/scenes', section]]), files: inventory, read: async hash => {
       const name = [...inventory].find(([, file]) => file.hash === hash)?.[0];
       if (name === undefined) throw new Error('Missing fixture hash');

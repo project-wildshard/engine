@@ -29,7 +29,7 @@ import {
   plumbingKnob,
 } from '../../src/client/game/shard/declaredPlumbing.ts'
 import { ForwardedStorage } from '../../src/server/engine/saves/forwardedStorage.ts'
-import { loadHeadlessProduct } from '../../src/server/host/headlessProduct.ts'
+import { loadHeadlessFolder } from '../../src/server/host/headlessFolder.ts'
 import { Scope } from '../../src/shared/engine/app/scope.ts'
 import { SaveStore } from '../../src/shared/engine/saves/store.ts'
 import { declaredItemContext } from '../../src/shared/game/shardfile/items.ts'
@@ -463,9 +463,9 @@ timed(
     const saved = { ...TIER_CONFIG },
       savedTier = TIER
     try {
-      const plumbing = (await loadHeadlessProduct('out/pine-hollow')).shardfile
+      const plumbing = (await loadHeadlessFolder('out/pine-hollow')).shardfile
         .plumbing
-      const nine = (await loadHeadlessProduct('out/nine-dragon-stack'))
+      const nine = (await loadHeadlessFolder('out/nine-dragon-stack'))
         .shardfile.plumbing
       assert.equal(plumbingKnob(nine, 'phone', 'nine.paintSize', 'number'), 512)
       assert.equal(

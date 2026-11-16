@@ -5,7 +5,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { isJsonData } from '@wildshard/format/json';
 import { ChapterDirectorSchema, parseChapterDirector } from '@wildshard/format/chapterDirector';
 import { WakeEncounterSchema } from '@wildshard/format/bossEncounter';
-import type { DirectorScriptStageLane, readDirectorProduct } from '../../../shared/game/plugin/director';
+import type { DirectorScriptStageLane, readDirectorDocument } from '../../../shared/game/plugin/director';
 import { mixedPopulation } from '../population/mixedRoster';
 import { installWakeBoss } from '../boss/nativeWake';
 import { installNativeQuestChannels } from './nativeInputs';
@@ -21,7 +21,7 @@ const nativeChapter = v.strictObject({ id: chapterName, rows: ChapterDirectorSch
 
 /** Renderer-free chapter entry. Closed rows borrow actual population, encounter
  * and reward owners; the caller retains its existing step and save envelope. */
-export function installNativeChapterDirector(host: SimHost, director: Awaited<ReturnType<typeof readDirectorProduct>>, input: unknown, restoring = false): {
+export function installNativeChapterDirector(host: SimHost, director: Awaited<ReturnType<typeof readDirectorDocument>>, input: unknown, restoring = false): {
   readonly clock: DirectorScriptStageLane; readonly fast: ChapterClock['fast'];
   /** One tick: `step` is the lead's chapter step, and `quest` names the chapter, so each other player's clock reads its own. */
   readonly update: (dt: number, step?: string, quest?: string) => void;

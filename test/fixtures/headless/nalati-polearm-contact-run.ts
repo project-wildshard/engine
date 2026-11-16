@@ -10,14 +10,14 @@ import {nativeGroupCollection} from '../../../src/server/game/shardfile/groupRun
 import {runTrustedHeadlessTape} from '../../../src/shared/host/headlessTape';
 import type {HeadlessCommand} from '../../../src/shared/host/tickProtocol';
 import {earnNalatiPasture} from './nalati-pasture-session';
-import {beginProductSession} from './productSession';
+import {beginFolderSession} from './folderSession';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 const mode=process.argv[2];if(mode!=='thrust'&&mode!=='javelin')throw new Error('Unknown fixed native polearm proof');
 const {resident,product,population,checkpoint,checkpointTick}=await earnNalatiPasture([
   {x:-135,z:214},{x:-157,z:212,jump:true,jumpAt:7},{x:-175,z:206},
 ]);
-let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginProductSession>>['ready']>>|undefined;
+let replay:Awaited<ReturnType<Awaited<ReturnType<typeof beginFolderSession>>['ready']>>|undefined;
 try{
   const slots=parseHeldSlots(await product.json('held/slots.json')),slot=slots.slots.find(row=>row.kind==='polearm');assert.ok(slot);
   const item=product.shardfile.items.rows.find(row=>row.id===slot.item);assert.ok(item?.kind==='weapon');
@@ -74,7 +74,7 @@ try{
   if(typeof saved!=='string')throw new Error('Missing actual polearm continuation');
   const state=v.parse(v.object({thrusts:v.number(),throws:v.number(),ammo:v.number()}),JSON.parse(saved));
   if(mode==='thrust')assert.ok(state.thrusts>0);else{assert.ok(state.throws>0);assert.equal(state.ammo,thrown.carried-state.throws);}
-  const pending=await beginProductSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();
+  const pending=await beginFolderSession('nalati-grasslands','nalati-predators',checkpoint);replay=await pending.ready();
   const observed=['nalati.predators','nalati.weapons'];
   const report=runTrustedHeadlessTape(resident.host,commands=>resident.step(commands),()=>resident.effects,
     {version:1,observe:observed,segments:[{id:'after-polearm-contact',ticks:1,commands:[]}]});

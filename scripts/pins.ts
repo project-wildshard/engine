@@ -18,7 +18,7 @@
 //   2. This tree's format validator admits it: files, hashes, schemas, budgets (`validateShardfileFolder`).
 //   3. Its product goes to `out/<folder>`, with any pack a tarball left out rebuilt from its members, so a page and the
 //      grid bake read what they would from a build. Its receipt is issued under this tree's validator revision, by this file, only
-//      after step 2 passed, as `productVerdict` earns one for a head a build never made. The cost numbers stay the
+//      after step 2 passed, as `folderVerdict` earns one for a head a build never made. The cost numbers stay the
 //      tarball's: a receipt is static build evidence, never authority (G491).
 //   4. Its mounts, under `mounts/` or as `cook.json` rows over a blob, are published at their URLs under `public/`, because
 //      the cook and the page read `/assets/<shard>/...`.
@@ -264,7 +264,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     }
   }
   dropManifest(root);
-  const productHashes: Record<string, Record<string, string>> = {}, mountHashes: Record<string, string> = {};
+  const folderHashes: Record<string, Record<string, string>> = {}, mountHashes: Record<string, string> = {};
   // The validator hashes most members already; the manifest reuses those digests rather than hashing twice.
   const digests = new WeakMap<Uint8Array, string>();
   const digest = (bytes: Uint8Array): string => { let held = digests.get(bytes); if (held === undefined) { held = sha256(bytes); digests.set(bytes, held); } return held; };
@@ -342,7 +342,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     insideTree(root, 'out', true);
     const target = resolve('out', folder);
     rmSync(target, { recursive: true, force: true });
-    const written: Record<string, string> = productHashes[folder] = {};
+    const written: Record<string, string> = folderHashes[folder] = {};
     let mounts = 0;
     const beforeMounts = published.size;
     for (const [path, body] of files) {
@@ -382,7 +382,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   excludePublished(paths);
   if (remoteSlugs.length > 0) await installSaves(remoteSlugs);
   // The manifest certifies these bytes only for the inputs the install read: a pin or source edited meanwhile changes the key.
-  if (full && failed === 0 && pinsKey(root, shardfileValidationRevision(root)) === key) writeManifest(root, key, productHashes, mountHashes);
+  if (full && failed === 0 && pinsKey(root, shardfileValidationRevision(root)) === key) writeManifest(root, key, folderHashes, mountHashes);
   if (full) pruneStale(root);
   if (full && failed === 0) clearLocalCandidates(root);
   console.log(`${pins.length - failed} of ${pins.length} pins admitted, ${paths.length} mounts published`);

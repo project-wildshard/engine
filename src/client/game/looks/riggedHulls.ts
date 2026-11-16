@@ -32,23 +32,23 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
  * to its hull in the same single draw (`parts`, merged once per variant and flagged `overgrown`), e.g. glowing eyes.
  */
 
-const productFamilies = new Map<string, RiggedHulls>();
+const folderFamilies = new Map<string, RiggedHulls>();
 /** Client-only row admission shared by creature factories and cold specimens.
  * The API takes a product id and reads its typed look section; it installs no per-shard callbacks. */
-export function productRiggedHulls(slug: string): RiggedHulls {
-  const key = slug, cached = productFamilies.get(key);
+export function folderRiggedHulls(slug: string): RiggedHulls {
+  const key = slug, cached = folderFamilies.get(key);
   if (cached !== undefined) return cached;
   let family: RiggedHulls | undefined, loading: Promise<RiggedHulls> | undefined;
   const prepare = (): Promise<RiggedHulls> => {
     loading ??= (async () => {
-      const { loadFirstPartyProduct } = await import('@wildshard/engine/game/shardfile/runtimeProduct');
-      const product = await loadFirstPartyProduct(slug), book = product.section('look/rigged-hulls');
+      const { loadFirstPartyFolder } = await import('@wildshard/engine/game/shardfile/runtimeFolder');
+      const product = await loadFirstPartyFolder(slug), book = product.section('look/rigged-hulls');
       const source = book.tiers[TIER];
       if (book.productFiles) {
         // Only named KTX2 coats use the byte parser. Other image codecs keep their original URL decoder.
         const resources = { ...source, coats: Object.fromEntries(Object.entries(source.coats).map(([name, coat]) =>
           [name, coat.image.startsWith('/') || coat.image.endsWith('.ktx2') ? coat : { ...coat, image: product.url(coat.image) }])) };
-        family = riggedHulls(book.family, resources, productHullTransport(slug));
+        family = riggedHulls(book.family, resources, folderHullTransport(slug));
         return family;
       }
       family = riggedHulls(book.family, source); return family;
@@ -58,7 +58,7 @@ export function productRiggedHulls(slug: string): RiggedHulls {
   const ready = (): RiggedHulls => { if (family === undefined) throw new Error('Rigged hull book is not prepared'); return family; };
   const result: RiggedHulls = { load: async name => (await prepare()).load(name), preload: async kind => (await prepare()).preload(kind),
     hullOf: (kind, variant) => ready().hullOf(kind, variant), skin: (kind, variant, bones) => ready().skin(kind, variant, bones) };
-  productFamilies.set(key, result); return result;
+  folderFamilies.set(key, result); return result;
 }
 
 /** A shard's live rigged-hull family. */
@@ -158,8 +158,8 @@ export function hullMapName(name: string, bytes: Uint8Array, astc: boolean): str
 }
 
 /** The cached family must not retain an admission or its transport bodies after its resident owner retires. */
-function productHullTransport(slug: string): RiggedHullTransport {
-  const read = async () => (await import('@wildshard/engine/game/shardfile/runtimeProduct')).loadFirstPartyProduct(slug);
+function folderHullTransport(slug: string): RiggedHullTransport {
+  const read = async () => (await import('@wildshard/engine/game/shardfile/runtimeFolder')).loadFirstPartyFolder(slug);
   return {
     rig: async name => { const product = await read(); return parseRigFile(await product.file(name), product.url(name)); },
     texture: async name => {

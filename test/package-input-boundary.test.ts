@@ -3,7 +3,7 @@ import {existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,statSync,symlinkSyn
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve only this proof's owned files.
 import {resolve} from 'node:path';
 import {expect,test} from 'vitest';
-import {captureProductInputs,inputRecorderPlugin,productInputKey,recordBundle} from '../scripts/shardfile-inputs.mjs';
+import {captureFolderInputs,inputRecorderPlugin,folderInputKey,recordBundle} from '../scripts/shardfile-inputs.mjs';
 import {InputHashMemo} from '../scripts/input-hash-memo.mjs';
 import {build} from 'vite';
 
@@ -13,7 +13,7 @@ test('a real author bundle retains its receipt after ordinary parent-directory p
   mkdirSync(root);const entry=resolve(root,'entry.ts'),receipt=resolve(root,'receipt.json');
   writeFileSync(entry,'export const answer=42;\n');
   try{
-    await captureProductInputs(root,receipt,async()=>{
+    await captureFolderInputs(root,receipt,async()=>{
       // Vite/Node probe the containing folder while resolving the real author
       // program. Its exact parent is outside the authored input root.
       expect(existsSync(resolve(root,'..'))).toBe(true);
@@ -27,12 +27,12 @@ test('a real author bundle retains its receipt after ordinary parent-directory p
       expect(published).toMatchObject({answer:42});
     });
     const memo=new InputHashMemo(root);
-    expect(productInputKey(root,receipt,[],memo)).toMatch(/^[a-f0-9]{64}$/u);
+    expect(folderInputKey(root,receipt,[],memo)).toMatch(/^[a-f0-9]{64}$/u);
     writeFileSync(entry,'export const answer=43;\n');
-    expect(productInputKey(root,receipt,[],memo)).toBeUndefined();
+    expect(folderInputKey(root,receipt,[],memo)).toBeUndefined();
     writeFileSync(resolve(parent,'outside.txt'),'owned outside fixture');
     symlinkSync(resolve(parent,'outside.txt'),resolve(root,'linked.txt'));
-    await expect(captureProductInputs(root,resolve(root,'linked-receipt.json'),async()=>{
+    await expect(captureFolderInputs(root,resolve(root,'linked-receipt.json'),async()=>{
       readFileSync(resolve(root,'linked.txt'));
       const result=await build({root,configFile:false,publicDir:false,logLevel:'silent',plugins:[inputRecorderPlugin()],build:{write:false,lib:{entry,formats:['es'],fileName:'fixture'}}});
       recordBundle(result);
