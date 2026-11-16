@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import {afterEach,test} from 'vitest';
-import {existsSync,mkdirSync,readFileSync,rmSync,symlinkSync,watch,writeFileSync} from 'node:fs';
+import {chmodSync,existsSync,lstatSync,mkdirSync,readFileSync,rmSync,symlinkSync,watch,writeFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {dirname,resolve,join} from 'node:path';
-import {observerArguments,runObserver} from '../scripts/mmo-release-observer.mjs';
+import {observerArguments,observerIdentities,runObserver} from '../scripts/mmo-release-observer.mjs';
 import {observerCommand} from '../scripts/mmo-observer-client.mjs';
 
 const cleanups:(()=>void|Promise<void>)[]=[];
@@ -57,4 +57,13 @@ test('cancellation kills the owned group including a stubborn descendant and cle
   assert.ok(states===''||states.split('\n').every(state=>state.trim().startsWith('Z')),states);
   assert.equal(existsSync(join(users,`${pids.parent}.json`)),false);assert.equal(readFileSync(join(users,'foreign.json'),'utf8'),'preserve');
  }finally{controller.abort();await completed;}
+});
+
+
+test('private observer identities survive bounded runs and reject exposed files',()=>{
+ const base=folder(),first=observerIdentities(base);
+ assert.deepEqual(observerIdentities(base),first);assert.equal(new Set(first).size,2);
+ assert.equal(lstatSync(join(base,'identities.json')).mode&0o777,0o600);
+ chmodSync(join(base,'identities.json'),0o644);
+ assert.throws(()=>observerIdentities(base),/private/u);
 });

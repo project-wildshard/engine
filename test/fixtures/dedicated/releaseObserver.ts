@@ -27,11 +27,26 @@ export interface ObserverOptions {
  readonly durationMs:number;readonly pollMs?:number;readonly signal?:AbortSignal;
  readonly event?:(phase:string)=>void;
 }
-type Status='observed'|'inconclusive'|'refused'|'cancelled';
+type Status='observed'|'failed'|'inconclusive'|'refused'|'cancelled';
 interface Session {
  readonly label:string;readonly device:string;bot:NativeObserverBot;generation:number;attempts:number;
  first:NativeReading|null;latest:NativeReading|null;moved:boolean;
  before:NativeReading|null;closeAt:number|null;closeReason:string|null;backMs:number|null;
+}
+/** A stricter checkpoint comparison may be inconclusive after legitimate progress changes. */
+function continuityOf(sessions:readonly Session[]):{kind:'restored'|'lost'|'unknown';reason:string|null}{
+ if(sessions.length!==2)return {kind:'unknown',reason:'missing-durable-witness'};
+ for(const session of sessions){
+  const before=session.before,after=session.latest,old=before?.checkpoint,next=after?.checkpoint;
+  if(before===null||after===null||old===undefined||old===null||next===undefined||next===null)
+   return {kind:'unknown',reason:'missing-durable-witness'};
+  if(next.shard!==old.shard)return {kind:'unknown',reason:'checkpoint-shard-changed'};
+  if(next.seq<old.seq||next.ledgerSerial<old.ledgerSerial||
+   (before.coins!==null&&after.coins!==null&&after.coins<before.coins)||
+   (next.seq===old.seq&&next.progressHash!==old.progressHash))return {kind:'lost',reason:'checkpoint-progress-lost'};
+  if(next.progressHash!==old.progressHash)return {kind:'unknown',reason:'checkpoint-progress-changed'};
+ }
+ return {kind:'restored',reason:null};
 }
 const mark=(release:ReleaseFile)=>({serial:release.serial,build:release.engineBuild});
 const identity=(release:ReleaseFile):string=>JSON.stringify([release.serial,release.engineBuild,release.saveEpoch,release.socket,release.bundle,release.shards]);
@@ -66,7 +81,9 @@ export async function observeRelease(options:ObserverOptions){
  const report=(status:Status,reason:string|null)=>({
   status,reason,from:baseline===null?null:mark(baseline.release),to:target===null?null:mark(target.release),
   clientBuild:prepared?.sourceBuild??null,elapsedMs:Math.round(performance.now()-started),
-  continuity:'unknown' as const,failedSaves:null,
+  continuity:target===null?'unknown' as const:continuityOf(sessions).kind,failedSaves:null,
+  checkpointCoverage:['quest-book','owned-store','ledger','native-coins'] as const,
+  saveCompletionTime:null,peerWorkers:{kind:'whole-release' as const,untouchedWorkerEvidence:null},
   bots:sessions.map(session=>({label:session.label,attempts:session.attempts,before:session.before,
    after:session.generation===target?.release.serial?session.latest:null,closeReason:session.closeReason,
    backToMovingObservedMs:session.backMs})),faults,
@@ -138,7 +155,7 @@ export async function observeRelease(options:ObserverOptions){
    for(const session of sessions)sample(session);
    const targetSerial=target?.release.serial;
    if(targetSerial!==undefined&&sessions.every(session=>session.generation===targetSerial&&session.moved&&session.latest?.closed===null))
-    return report('observed',null);
+    {const proof=continuityOf(sessions);return report(proof.kind==='restored'?'observed':proof.kind==='lost'?'failed':'inconclusive',proof.reason);}
    await pause(pollMs,undefined,{signal});
   }
   return report(options.signal?.aborted===true?'cancelled':'inconclusive',options.signal?.aborted===true?'cancelled':target===null?'no-release-change':'redial-incomplete');

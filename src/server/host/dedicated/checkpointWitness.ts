@@ -15,7 +15,7 @@ const digest=(value:unknown):string=>hashImmutableBytes(new TextEncoder().encode
 /** Only the database reader supplies this after reading a current durable document. No timestamp is invented. */
 export function checkpointCertificate(doc:PlayerDoc,seq:number,shard:string):CheckpointCertificate|undefined{
  if(!Number.isSafeInteger(seq)||seq<1||!Number.isSafeInteger(doc.ledger.serial)||doc.ledger.serial<0||
-  !/^[a-z0-9][a-z0-9-]{0,95}$/u.test(shard))return undefined;
+  !/^_?[a-z0-9][a-z0-9-]{0,94}$/u.test(shard))return undefined;
  // Position, health clocks and host seat identity are not persistent progress comparisons.
  const {player:_player,...book}=doc.book;
  const witness:DurableCheckpoint={seq,shard,ledgerSerial:doc.ledger.serial,

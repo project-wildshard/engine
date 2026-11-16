@@ -38,7 +38,7 @@ function checkpointFrom(bytes:ArrayBuffer):DurableCheckpoint|null{
   if(typeof checkpoint!=='object'||checkpoint===null)return null;
   const row=checkpoint as Record<string,unknown>,at=row['at'];
   if(typeof row['seq']!=='number'||!Number.isSafeInteger(row['seq'])||row['seq']<1||
-   typeof row['shard']!=='string'||!/^[a-z0-9][a-z0-9-]{0,95}$/u.test(row['shard'])||
+   typeof row['shard']!=='string'||!/^_?[a-z0-9][a-z0-9-]{0,94}$/u.test(row['shard'])||
    typeof row['ledgerSerial']!=='number'||!Number.isSafeInteger(row['ledgerSerial'])||row['ledgerSerial']<0||
    typeof row['progressHash']!=='string'||!/^[a-f0-9]{64}$/u.test(row['progressHash'])||typeof at!=='object'||at===null)return null;
   const stand=at as Record<string,unknown>;

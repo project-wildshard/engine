@@ -1,6 +1,6 @@
 import {nativeObserverClient} from './fixtures/dedicated/nativeObserverClient';
 import assert from 'node:assert/strict';
-import {afterAll,afterEach,beforeAll,test} from 'vitest';
+import {afterAll,afterEach,beforeAll,test,vi} from 'vitest';
 import {createServer} from 'node:http';
 import {createHash,generateKeyPairSync,sign} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
@@ -8,7 +8,11 @@ import {observeRelease,type PreparedObserver} from './fixtures/dedicated/release
 import {observationInputs} from '../scripts/mmo-release-observer-inputs.mjs';
 import {roomBench} from './fixtures/dedicated/roomBench';
 import {ReleaseWatch} from '../src/server/host/dedicated/releaseFile';
-import {memoryPlayerSaves} from '../src/server/host/dedicated/playerSaves';
+import {openPglite} from './fixtures/pgliteDatabase';
+import {migrate} from '../src/server/host/dedicated/saves/migrate';
+import {PlayerStore} from '../src/server/host/dedicated/playerStore';
+import {RoomBot} from './fixtures/dedicated/roomBot';
+import {playerSavesOver,memoryPlayerSaves} from '../src/server/host/dedicated/playerSaves';
 
 const sourceBuild=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 let connect:PreparedObserver['connect'],prepared:PreparedObserver;
@@ -17,13 +21,31 @@ afterAll(async()=>{await prepared?.dispose?.();});
 
 const closers:(()=>Promise<void>)[]=[];
 afterEach(async()=>{for(const close of closers.splice(0).reverse())await close();});
-async function fixture(){
+async function fixture(durable=false,loseProgress=false,shard=durable?'blender-template':'driftwood-isle',changeProgress=false){
  let restart:()=>void=()=>{throw Error('No promotion installed');};
- const saves=memoryPlayerSaves(),first=await roomBench({build:sourceBuild,saves,workers:1,graceMs:80,restart:()=>{restart();}});
+ const database=durable?await openPglite():null;
+ if(database!==null){closers.push(database.close);await migrate(database);}
+ const saves=database===null?memoryPlayerSaves():playerSavesOver(database,0,()=>{});
+ if(durable){
+  const seed=await roomBench({saves,cells:[shard]});
+  const bots=['device:observer-probe-0','device:observer-probe-1'].map((device,index)=>new RoomBot(seed.url,'bench',device,`seed-${index}`));
+  try{
+   for(const [index,bot] of bots.entries()){
+    assert.equal(await bot.arrived(),true);const room=seed.room(shard),body=room?.bodyOf(`device:observer-probe-${index}`);
+    if(room===undefined||body===undefined)throw Error('Missing seed native body');
+    room.cell.owned.of(body.id).file({grant:'coins',name:'coins',amount:17+index});
+   }
+   // Let the actual initial quest state settle before naming the unchanged-progress control.
+   await vi.waitFor(()=>{assert.ok(bots.every(bot=>(bot.client.latest?.tick??0)>80));},{timeout:5000});
+   assert.equal(await seed.world.drain(),true);
+  }finally{for(const bot of bots)bot.drop();await seed.close();}
+ }
+
+ const first=await roomBench({build:sourceBuild,saves,cells:[shard],workers:1,graceMs:80,restart:()=>{restart();}});
  let current=first,serial=1,firstClosed=false;
  closers.push(async()=>{if(!firstClosed)await first.close();if(current!==first)await current.close();});
  const keys=generateKeyPairSync('ed25519'),bytes=Buffer.from('signed observation fixture artifact');
- const release={channel:'staging' as const,serial:1,saveEpoch:1,engineBuild:sourceBuild,shards:[{slug:'driftwood-isle',revision:1}],
+ const release={channel:'staging' as const,serial:1,saveEpoch:1,engineBuild:sourceBuild,shards:[{slug:shard,revision:1}],
   socket:first.url,bundle:{name:'v0.1.0/server.tar.gz',sha256:createHash('sha256').update(bytes).digest('hex')}};
  const state={signature:null as string|null,healthSerial:null as number|null,hang:false,requested:null as (()=>void)|null};
  const server=createServer((request,response)=>{
@@ -53,7 +75,14 @@ async function fixture(){
  const advanced=new Promise<void>((resolve,reject)=>{done=resolve;failed=reject;});
  restart=()=>{void (async()=>{
   assert.equal(await first.world.drain(),true);await first.close();firstClosed=true;
-  current=await roomBench({build:'b'.repeat(40),saves,workers:1});serial=2;
+  if(loseProgress&&database!==null){
+   const saved=await saves.read('device:observer-probe-0',shard);
+   if(saved.doc===null)throw Error('Missing durable loss control');
+   const store=new PlayerStore(saved.doc.store,()=>{});store.slots.purse.write(0,shard);
+   await database.query('update player_save set doc = $1 where player_id = $2',
+    [JSON.stringify({...saved.doc,store:store.documents()}),'device:observer-probe-0']);
+  }
+  current=await roomBench({build:'b'.repeat(40),saves,cells:[shard],workers:1});serial=2;
  })().then(done,failed);};
  const watcher=new ReleaseWatch({serving:{...release},everyMs:3600000,
   read:async()=>(await inputs.read()).release,failed:error=>{throw error;},
@@ -62,6 +91,11 @@ async function fixture(){
  return {release,state,options,playing,counts:()=>({disposed,connections,closed}),
   async advance(){
    // The signed watch starts the real grace; its expiry drains and boots a new native World.
+   if(changeProgress){
+    const room=first.room(shard),body=room?.bodyOf('device:observer-probe-0');
+    if(!room||!body)throw Error('Missing progress control body');
+    room.cell.owned.of(body.id).file({grant:'coins',name:'coins',amount:1});
+   }
    Object.assign(release,{serial:2,engineBuild:'b'.repeat(40)});
    await watcher.look();
    await advanced;
@@ -71,11 +105,11 @@ async function fixture(){
 test('two real native identities redial after signed serial/build change and clean every client',{timeout:120000},async()=>{
  const f=await fixture();const observed=observeRelease(f.options);
  await Promise.race([f.playing,observed.then(result=>{throw Error('No playing baseline: '+JSON.stringify(result));})]);await f.advance();const result=await observed;
- assert.equal(result.status,'observed',JSON.stringify(result));assert.deepEqual(result.from,{serial:1,build:sourceBuild});
+ assert.equal(result.status,'inconclusive',JSON.stringify(result));assert.equal(result.reason,'missing-durable-witness');assert.deepEqual(result.from,{serial:1,build:sourceBuild});
  assert.deepEqual(result.to,{serial:2,build:'b'.repeat(40)});assert.equal(result.clientBuild,sourceBuild);
  assert.deepEqual(result.bots.map(bot=>bot.attempts),[2,2]);
  assert.ok(result.bots.every(bot=>bot.closeReason==='restart'&&bot.backToMovingObservedMs!==null&&bot.after!==null&&bot.after.tick!==null));
- assert.equal(result.continuity,'unknown');assert.equal(result.failedSaves,null);
+ assert.equal(result.continuity,'unknown');assert.equal(result.failedSaves,null);assert.equal(result.saveCompletionTime,null);assert.equal(result.peerWorkers.untouchedWorkerEvidence,null);
  assert.deepEqual(f.counts(),{disposed:true,connections:4,closed:4});
 });
 test('steady native movement without a serial advance is inconclusive',{timeout:120000},async()=>{
@@ -104,7 +138,7 @@ test('native redial waits for the signed new health identity',{timeout:120000},a
  await new Promise<void>(resolve=>{setTimeout(resolve,100);});
  assert.equal(f.counts().connections,2,'old health must not construct new native clients');
  f.state.healthSerial=2;
- const result=await observed;assert.equal(result.status,'observed',JSON.stringify(result));
+ const result=await observed;assert.equal(result.status,'inconclusive',JSON.stringify(result));assert.equal(result.reason,'missing-durable-witness');
  assert.deepEqual(f.counts(),{disposed:true,connections:4,closed:4});
 });
 test('a bad signed change refuses while both real native links are owned',{timeout:120000},async()=>{
@@ -119,4 +153,29 @@ test('cancellation aborts a hung signed-input read and closes the native pair',{
  const result=await observeRelease({...f.options,signal:controller.signal,event:phase=>{if(phase==='baseline-playing')f.state.hang=true;}});
  assert.equal(result.status,'cancelled',JSON.stringify(result));
  assert.deepEqual(f.counts(),{disposed:true,connections:2,closed:2});
+});
+
+
+test('a signed grace restores both durable checkpoints with native progress',{timeout:120000},async()=>{
+ const f=await fixture(true),observed=observeRelease(f.options);
+ await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);await f.advance();
+ const result=await observed;
+ assert.equal(result.status,'observed',JSON.stringify(result));assert.equal(result.continuity,'restored');
+ assert.ok(result.bots.every(bot=>bot.before?.checkpoint&&bot.after?.checkpoint&&bot.after.coins===bot.before.coins&&bot.backToMovingObservedMs!==null));
+ assert.equal(result.failedSaves,null);assert.equal(result.saveCompletionTime,null);
+ assert.equal(result.peerWorkers.kind,'whole-release');assert.equal(result.peerWorkers.untouchedWorkerEvidence,null);
+});
+test('actual loss in a persisted checkpoint fails the signed native observation',{timeout:120000},async()=>{
+ const f=await fixture(true,true),observed=observeRelease(f.options);
+ await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);await f.advance();
+ const result=await observed;assert.equal(result.status,'failed',JSON.stringify(result));assert.equal(result.reason,'checkpoint-progress-lost');
+ assert.equal(result.continuity,'lost');assert.deepEqual(f.counts(),{disposed:true,connections:4,closed:4});
+});
+
+
+test('new persistent progress is inconclusive rather than guessed',{timeout:120000},async()=>{
+ const f=await fixture(true,false,'blender-template',true),observed=observeRelease(f.options);
+ await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);await f.advance();
+ const result=await observed;assert.equal(result.status,'inconclusive',JSON.stringify(result));
+ assert.equal(result.reason,'checkpoint-progress-changed');assert.equal(result.continuity,'unknown');
 });
