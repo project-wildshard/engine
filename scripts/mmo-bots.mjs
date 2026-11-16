@@ -7,6 +7,7 @@
 //   node scripts/mmo-bots.mjs replica [--remote wildshard] --server-from <main commit> ...   (MP1.2: that commit's server code)
 //   node scripts/mmo-bots.mjs replica --remote wildshard-agent --bots-on-host [--bot-cpus 14-15] ...   (MP1.2: bots on the box too)
 //   node scripts/mmo-bots.mjs staging [--bots 2] [--seconds 60]   (at most 4: one address)
+//   node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60   (TC45: public Tunnel, no private health)
 //   node scripts/mmo-bots.mjs staging --tailnet ...   (NET-LAG NL3: the same, over staging's tailnet Serve address, no Cloudflare)
 // Both read the signed staging release file and check it against the public key setup.sh pins. The bots are built from that
 // release's own commit (its tree, an offline install, build-server's `--entry`), so their build and wire are the server's.
@@ -50,7 +51,10 @@ const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, 
   cells: { type: 'string', default: 'driftwood-isle' }, database: { type: 'string', default: 'memory:' }, keep: { type: 'boolean', default: false },
   remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' },
   'bots-on-host': { type: 'boolean', default: false }, 'bot-cpus': { type: 'string', default: '14-15' }, tailnet: { type: 'boolean', default: false },
-  'work-dir': { type: 'string' }, spread: { type: 'boolean', default: false } } });
+  'work-dir': { type: 'string' }, spread: { type: 'boolean', default: false }, 'outside-proof': { type: 'boolean', default: false } } });
+const outsideProof = values['outside-proof'];
+if (outsideProof && (mode !== 'staging' || values.tailnet || values.remote !== undefined || values['bots-on-host']))
+  throw new Error('--outside-proof is one public staging client, without tailnet, SSH or a replica');
 if (values.spread && (mode !== 'replica' || values.remote !== undefined)) throw new Error('--spread is for a local replica');
 const serverFrom = values['server-from'];
 if (serverFrom !== undefined && (mode !== 'replica' || !/^[0-9a-f]{40}$/u.test(serverFrom))) throw new Error('--server-from is a full commit, for a replica');
@@ -62,11 +66,16 @@ if (!/^[\d,-]+$/u.test(values.cpus) || !/^[\d,-]+$/u.test(values['bot-cpus'])) t
 const botsOnHost = values['bots-on-host'];
 if (botsOnHost && remote === undefined) throw new Error('--bots-on-host needs --remote');
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
-const bots = Number(values.bots ?? (mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
+const bots = Number(values.bots ?? (outsideProof ? 1 : mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
 if (!Number.isInteger(bots) || bots < 1 || bots > 64 || !Number.isFinite(seconds) || seconds < 5 || seconds > 3600) throw new Error('--bots 1..64, --seconds 5..3600');
+if (outsideProof && (bots !== 1 || seconds > 120)) throw new Error('--outside-proof needs --bots 1 and at most 120 seconds');
+const candidate = outsideProof ? execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim() : null;
+if (outsideProof && execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {cwd: ROOT, encoding: 'utf8'}).trim() !== '')
+  throw new Error('Commit the outside proof candidate before observing staging');
 const workRoot = absolute(ROOT, 'tmp'), workBase = absolute(ROOT, values['work-dir'] ?? 'tmp/mmo-bots');
 if (workBase !== workRoot && !workBase.startsWith(`${workRoot}/`)) throw new Error('--work-dir stays under tmp/');
-const stamp = new Date().toISOString().replaceAll(/[-:]/gu, '').replace(/\..*/u, 'Z'), work = join(workBase, stamp), tag = `${mode === 'replica' ? 'r' : 's'}${stamp.slice(9, 15)}`;
+const stamp = new Date().toISOString().replaceAll(/[-:]/gu, '').replace(/\..*/u, 'Z'), work = join(workBase, stamp),
+  tag = outsideProof ? `x${stamp.slice(9, 15)}${randomBytes(3).toString('hex')}` : `${mode === 'replica' ? 'r' : 's'}${stamp.slice(9, 15)}`;
 mkdirSync(work, { recursive: true });
 /** @param {Record<string, unknown>} line */
 const note = line => { const text = JSON.stringify({ at: 'mmo-bots', ...line }); console.info(text); writeFileSync(join(work, 'run.log'), `${text}\n`, { flag: 'a' }); };
@@ -79,6 +88,7 @@ if (!verify(null, Buffer.from(signed.body), createPublicKey({ key: Buffer.from(k
 /** @type {{ channel: string, serial: number, engineBuild: string, saveEpoch: number, shards: { slug: string, revision: number }[], bundle: { name: string, sha256: string }, socket: string }} */
 const release = JSON.parse(signed.body);
 if (release.channel !== 'staging' || !/^[0-9a-f]{40}$/u.test(release.engineBuild)) throw new Error('Unexpected staging release');
+if (outsideProof && release.socket.replace(/\/$/u, '') !== STAGING_SOCKETS[0]) throw new Error('Outside proof requires the signed public staging Tunnel socket');
 note({ step: 'release', channel: release.channel, serial: release.serial, build: release.engineBuild, socket: release.socket });
 
 // --- Staging's seats, before a single hello: people first.
@@ -93,21 +103,25 @@ const stagingRoom = async (/** @type {string} */ when) => {
   const free = STAGING_SEATS - before.players - STAGING_HEADROOM;
   if (bots > free) throw new Error(`Staging has ${String(before.players)} of ${String(STAGING_SEATS)} seats taken; at most ${String(Math.max(0, free))} bots leave ${String(STAGING_HEADROOM)} for people`);
 };
-if (mode === 'staging') await stagingRoom('before the build');
+if (mode === 'staging' && !outsideProof) await stagingRoom('before the build');
 
 // --- The bots, built from the release's own tree with this checkout's entry.
 const tree = join(work, 'src'), out = join(work, 'build');
 const git = (/** @type {string[]} */ args) => execFileSync('git', args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 30 });
+const requireCandidate = () => {
+  if (outsideProof && (git(['rev-parse', 'HEAD']).toString().trim() !== candidate || git(['status', '--porcelain', '--untracked-files=all']).toString().trim() !== ''))
+    throw new Error('Outside proof candidate changed during the run');
+};
 try { git(['cat-file', '-e', `${release.engineBuild}^{commit}`]); } catch { git(['fetch', '--quiet', 'origin', release.engineBuild]); }
 mkdirSync(tree, { recursive: true });
 const source = serverFrom ?? release.engineBuild;
 if (serverFrom !== undefined) try { git(['merge-base', '--is-ancestor', release.engineBuild, serverFrom]); } catch { throw new Error(`--server-from ${serverFrom} does not descend from the release's ${release.engineBuild}`); }
 execFileSync('tar', ['-x', '-C', tree], { input: git(['archive', source]) });
-for (const name of ['mmoBotsEntry.ts', 'mmoBotsGuard.ts', 'mmoBotsStats.ts']) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
+for (const name of ['mmoBotsEntry.ts', 'mmoBotsGuard.ts', 'mmoBotsStats.ts', ...(outsideProof ? ['outsideBotEntry.ts', 'outsideJourney.ts'] : [])]) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
 let begun = performance.now();
 // CI=1 keeps the install non-interactive; --config.ci=false keeps the global store on, which pnpm drops under ci (GVS G9)
 execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent', '--config.ci=false'], { cwd: tree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
-execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', out, '--entry', 'mmoBots=test/fixtures/dedicated/mmoBotsEntry.ts'], { cwd: tree, stdio: ['ignore', 'ignore', 'inherit'] });
+execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', out, '--entry', `mmoBots=test/fixtures/dedicated/${outsideProof ? 'outsideBotEntry' : 'mmoBotsEntry'}.ts`], { cwd: tree, stdio: ['ignore', 'ignore', 'inherit'] });
 note({ step: 'built', seconds: Math.round((performance.now() - begun) / 1000), from: source });
 /** `--server-from`: that commit's server from the bots' own tree, under the release's build name, packed as a release bundle is. */
 let serverBundle = null;
@@ -219,7 +233,8 @@ if (mode === 'replica') {
 }
 
 // --- The bots
-if (mode === 'staging') await stagingRoom('before the first hello');
+requireCandidate();
+if (mode === 'staging' && !outsideProof) await stagingRoom('before the first hello');
 const result = join(work, 'bots.json'), playing = readings.length;
 const botArgs = [url, release.engineBuild, String(bots), String(seconds), tag];
 if (botsOnHost && hostSsh !== null) {
@@ -234,18 +249,20 @@ const code = await new Promise(resolve => {
   child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
   child.on('exit', resolve);
 });
+const exit = typeof code === 'number' ? code : 1;
+requireCandidate();
 if (botsOnHost && hostSsh !== null) writeFileSync(result, hostSsh(`cat ${away}/bots.json`));
-const after = mode === 'staging' ? await health() : null;
+const after = mode === 'staging' && !outsideProof ? await health() : null;
 await stopRoom();
 const full = readings.slice(playing).filter(row => values.spread ? row.players > 0 : row.players === bots);
-const report = { ...JSON.parse(readFileSync(result, 'utf8')), mode, exit: code, ...(serverFrom === undefined ? {} : { serverFrom }), ...(remote === undefined ? {} : { remote, cpus: values.cpus }),
+const report = { ...JSON.parse(readFileSync(result, 'utf8')), mode, exit, ...(outsideProof ? {outsideProof: true, candidate, releaseSerial: release.serial} : {}), ...(serverFrom === undefined ? {} : { serverFrom }), ...(remote === undefined ? {} : { remote, cpus: values.cpus }),
   ...(botsOnHost ? { botsOnHost, botCpus: values['bot-cpus'] } : {}),
   ...(mode === 'staging' ? { stagingAfter: after } : {}),
   ...(full.length === 0 ? {} : { server: { windows: full.length, worstP95: Math.max(...full.map(row => row.p95)), meanP95: Number((full.reduce((sum, row) => sum + row.p95, 0) / full.length).toFixed(3)),
     max: Math.max(...full.map(row => row.max)), drops: full.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...full.map(row => row.ticksPerSecond)), rssMB: Math.round(Math.max(...full.map(row => row.rss)) / 1048576) } }) };
 writeFileSync(join(work, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
-note({ step: 'done', exit: code, seated: report.seated, steady: report.steady, walked: report.walked, sawEveryone: report.sawEveryone, interArrivalMs: report.interArrivalMs ?? null, server: report.server ?? null, report: join(work, 'report.json') });
-process.exitCode = Number(code);
+note({ step: 'done', exit, seated: report.seated, steady: report.steady, walked: report.walked, sawEveryone: report.sawEveryone, interArrivalMs: report.interArrivalMs ?? null, server: report.server ?? null, report: join(work, 'report.json') });
+process.exitCode = exit;
 } finally {
   await stopRoom();
   if (!values.keep) for (const path of [tree, out, join(work, 'server'), join(work, 'server.tar.gz'), join(work, 'packs'), join(work, 'server-from'), join(work, 'server-from.tar.gz')]) rmSync(path, { recursive: true, force: true });

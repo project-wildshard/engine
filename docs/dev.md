@@ -528,3 +528,35 @@ than November 23, 2026. Skipped steps are not green observations.
 The API deployment and normal reviewed pin alignment are tracked by meta
 `test-coverage/MACBOOK-WAITS.md` MW12 and mini QA39. Until they ship, the
 live report can correctly be red while the reader proof passes.
+
+### Hosted outside bot (TC45 / XR-4)
+
+Dispatch `outside-bot.yml` on the candidate branch for the public staging
+path. It records independent fast proof XML and an actual live report;
+inspect both, rather than the report-only job's colour. The driver checks
+the signed staging release and builds the bot from its own engine commit,
+so its wire identity matches the server. The report names that deployed
+build and the clean candidate source commit separately.
+
+The one-bot command is:
+
+```sh
+node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60 --keep --work-dir tmp/tc45-outside/live
+```
+
+This mode refuses replicas, SSH, tailnet, extra clients and a signed
+release naming anything except the public staging Tunnel socket. It
+needs no private rooms health endpoint. It moves through ordinary input,
+requires a settled owned hit plus lower creature health, drops its link,
+resumes the same body and releases its seat. No production socket is
+admitted. A failed/superseded live run cannot count as a complete proof.
+
+Run the fast real-gateway observation explicitly:
+
+```sh
+node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test --test-timeout=10000 test/outside-journey.proof.mjs
+```
+
+The four cases stay outside hooks. Earliest admission review is November
+23, 2026 after their own actual green week; live receipts remain separate
+from the source integration proof and retain fourteen days of artifacts.
