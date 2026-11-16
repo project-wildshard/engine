@@ -15,7 +15,7 @@ valid section, and a `vX.Y.Z` tag whose commit has none.
 - Lamps carried by players and creatures move their light with them, and the 16 nearest lamps light the scene.
 - Brasscap Mesa keeps its far view from the road, and a shard's creatures respawn where they were placed.
 - You can take a melee weapon from its rack, and creatures in a shared shard stay in their own cell.
-- Behind the scenes: each release pins its item list, and cached downloads survive a release.
+- The game's files now come from our content network, so the page is smaller and loads faster, and cached files survive a release.
 
 ## v0.1.22 (2026-11-15)
 
