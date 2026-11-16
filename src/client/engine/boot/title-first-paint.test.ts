@@ -218,7 +218,8 @@ test('QA 11-13: the top-right pill reloads with every bundle missing (plain HTML
   const button = window.document.querySelector('[data-title-shell] button[data-launch-reload]');
   if (!(button instanceof window.HTMLButtonElement)) throw new Error('Missing static reload pill');
   expect(window.document.documentElement.dataset['booted']).toBeUndefined();
-  expect(button.getAttribute('onclick')).toContain('location.reload()');
+  expect(button.getAttribute('onclick')).toContain('location.reload');
+  // STALESHELL: online with a worker, the shell's reload drops the worker first (index.html __wsShellReload); with none it reloads at once
   button.click();
   expect(reload).toHaveBeenCalled();
   expect(button.dataset['reloading']).toBe('');
@@ -242,12 +243,12 @@ test('QA 11-13: the static bar moves from the boot record: files, then the entry
   timing.mark('app:entry-body'); frames.now = 1500; await settle();
   expect(text()).toBe('Starting · 1.5 s');
   frames.now = 9600; await settle();
-  expect(text()).toBe('Still waiting · tap reload · 9.6 s');
+  expect(text()).toBe('Still waiting on the game code · tap reload · 9.6 s');
   expect(shell instanceof window.HTMLElement ? shell.dataset['stalled'] : undefined).toBe('');
   expect(shell?.querySelector('[data-launch-version]')?.textContent).toBe('reload');
   expect(load?.getAttribute('aria-valuenow')).toBe(String(Math.round(80 / files.length + 10)));
   shell?.remove(); frames.now = 9900; await settle();
-  expect(text()).toBe('Still waiting · tap reload · 9.6 s'); // StartTitle removed it: the timer stopped
+  expect(text()).toBe('Still waiting on the game code · tap reload · 9.6 s'); // StartTitle removed it: the timer stopped
 });
 
 test('QA 11-13: a page the entry turns into the title later (a player reload, an unlisted shard) gets the moving bar too', async () => {

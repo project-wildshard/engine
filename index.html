@@ -589,6 +589,16 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
   </head>
   <body>
     <script>
+      // STALESHELL (QA 11-15 row 32): the static shell's own reloads (its pill, the 12 s self-reload) go past the service worker,
+      // so a shell that worker can't finish booting is never served again: drop the registration (1.5 s at most), then reload this
+      // exact URL (Jake, 11-15: a reload keeps /slug/<x>). Offline it is a plain reload, so the cached build still answers.
+      globalThis.__wsShellReload = () => {
+        let gone = false;
+        const leave = () => { if (!gone) { gone = true; location.reload(); } };
+        if (!navigator.serviceWorker || navigator.onLine === false) return leave();
+        setTimeout(leave, 1500);
+        navigator.serviceWorker.getRegistrations().then(all => Promise.all(all.map(one => one.unregister()))).then(leave, leave);
+      };
       // iOS Safari: no rubber-band scroll of the fixed page, no pinch zoom — the game owns every gesture.
       document.addEventListener('touchmove', (e) => { if (!e.target.closest('[data-scroll]')) e.preventDefault(); }, { passive: false });
       document.addEventListener('gesturestart', (e) => e.preventDefault());
@@ -610,7 +620,7 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       <div class="ws-launch-hero" aria-hidden="true"></div>
       <div class="ws-launch-brand">WILDSHARD</div>
       <!-- plain HTML: a reload that works when every bundle failed; pointerup too, as iOS drops a jittered tap's click (Update.ts) -->
-      <button type="button" class="ws-launch-pill" data-launch-reload onclick="this.dataset.reloading='';location.reload()" onpointerup="this.dataset.reloading='';location.reload()"><i></i><span data-launch-version>reload</span></button>
+      <button type="button" class="ws-launch-pill" data-launch-reload onclick="this.dataset.reloading='';(globalThis.__wsShellReload||location.reload.bind(location))()" onpointerup="this.dataset.reloading='';(globalThis.__wsShellReload||location.reload.bind(location))()"><i></i><span data-launch-version>reload</span></button>
       <div class="ws-launch-load" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" data-launch-load><div class="ws-launch-bar"><i data-launch-fill></i></div><span data-launch-step>Loading</span></div>
     </div><!-- /title-shell -->
     <script data-launch-progress>
@@ -642,7 +652,10 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
           const stalled = now - changed > 8000;
           fill.style.width = pct + '%'; load.setAttribute('aria-valuenow', String(pct));
           if (shell.hasAttribute('data-stalled') !== stalled) { shell.toggleAttribute('data-stalled', stalled); version.textContent = name(stalled); }
-          step.textContent = (stalled ? 'Still waiting · tap reload' : opening ? 'Opening the menu' : started ? 'Starting'
+          // STALESHELL: a stall names what it waits on, a file this document names (its hash dropped) or the code it starts
+          const missing = started ? undefined : [...files].find(href => !(t?.resources || []).some(row => row.url === href && row.responseStatus !== 0));
+          const waitingOn = opening ? 'the menu' : missing === undefined ? 'the game code' : (missing.split('/').pop() || '').replace(/-[A-Za-z0-9_-]{8}(?=\.\w+$)/u, '');
+          step.textContent = (stalled ? 'Still waiting on ' + waitingOn + ' · tap reload' : opening ? 'Opening the menu' : started ? 'Starting'
             : got > 0 ? 'Loading · ' + got + ' of ' + files.size + ' files' : 'Loading') + ' · ' + (now / 1000).toFixed(1) + ' s';
         };
         const timer = setInterval(tick, 100); tick();
@@ -694,7 +707,7 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
           if (doc.keys?.['boot.selfReload']) return;
           (doc.keys ??= {})['boot.selfReload'] = { v: 1, data: String(Date.now()) }; sessionStorage.setItem('wildshard.save.v2@1.session', JSON.stringify(doc));
         } catch { return; }
-        location.reload();
+        (globalThis.__wsShellReload || location.reload.bind(location))();
       }, 12000);
     </script>
     <script data-loading-clock>
