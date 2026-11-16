@@ -9,7 +9,7 @@ import { Physics } from '../src/shared/engine/physics/Physics';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { groups } from '../src/shared/engine/physics/groups';
 
-for (const lying of [false, true]) test(`every original native ${lying ? 'lying' : 'upright'} motor move and continuation stays exact`, async () => {
+for (const lying of [false, true]) test(`every allocating-control native ${lying ? 'lying' : 'upright'} motor move and continuation stays exact`, async () => {
   const R = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))), oldWorld = new Physics(R), newWorld = new Physics(R);
   const worlds = [oldWorld, newWorld];
   const decks = worlds.map(({ world }) => {

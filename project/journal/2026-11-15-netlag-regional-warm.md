@@ -51,3 +51,17 @@ became 56/17/33 ms. Record the current rendering RAF instead, counting
 offscreen passes once. Two red-first cases pin irregular capped frames
 and a zero-timestamp start. This corrects measurement; runtime bars
 remain open until a new build and qualification finish.
+
+NL13's captured first miss has equal velocity on both sides but the
+room's motor only grants 35% of the horizontal move on a flat island.
+One captured cuboid and pose reproduce it natively: the requested
+7.17 cm becomes 2.50 cm. The existing floor retry covered only losses
+below 30% freedom. Extend it to partial losses when every contact
+points almost straight up; retain the severe-stall rule on slopes.
+A red-first native case pins that move, and a wall control keeps the
+capsule blocked. Predictor tolerance and correction limits stay fixed.
+Runtime proof is still owed; this does not yet close NL13.
+The allocation-equivalence fixture receives the same behavior fix;
+it keeps independent allocating uploads and all exact state/world
+comparisons, including slopes and moving decks. The separate native
+regression checks the requested movement rather than that fixture.
