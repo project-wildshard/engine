@@ -88,9 +88,10 @@ export async function loadBasisuAstc6(): Promise<Astc6Encode> {
   };
 }
 
-/** A worker thread's loop around `loadBasisuAstc6`; workers inherit the cook's `--import` loader. */
+/** A worker thread's loop around `loadBasisuAstc6`. Module hooks are per thread (mini QA 11-16 row 41): an installed
+ * engine's `.ts` loads only through scripts/format-hook.mjs, so the worker registers it before it imports this file. */
 const WORKER = `const {parentPort, workerData} = process.getBuiltinModule('node:worker_threads');
-import(workerData.module).then(async module => {
+import(workerData.hook).then(() => import(workerData.module)).then(async module => {
   const encode = await module.loadBasisuAstc6();
   parentPort.on('message', ({id, bytes, role}) => { let out; try { out = encode(bytes, role); } catch { out = undefined; } parentPort.postMessage({id, out}); });
   parentPort.postMessage({ready: true});
@@ -152,7 +153,8 @@ export async function wasmAstc6(options: {readonly cacheDir?: string; readonly l
     if (jobs.length === 0) return;
     const count = Math.min(lanes, jobs.length);
     const module = new URL('astc6Wasm.ts', import.meta.url).href;
-    const workers = Array.from({length: count}, () => new Worker(WORKER, {eval: true, workerData: {module}}));
+    const hook = new URL('../../../scripts/format-hook.mjs', import.meta.url).href;
+    const workers = Array.from({length: count}, () => new Worker(WORKER, {eval: true, workerData: {module, hook}}));
     try {
       await Promise.all(workers.map(worker => new Promise<void>((resolve, reject) => {
         let id = 0;
