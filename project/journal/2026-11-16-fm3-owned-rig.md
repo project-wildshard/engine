@@ -44,3 +44,11 @@ explicit loopback port. No unowned endpoint is admitted. Each fresh case
 also owns its guard-fault list; a prior refused request remains a failed
 row instead of relabelling every later context. The first full census is
 kept red; run42/affected cases again before the WebKit census.
+
+The corrected Chromium tail proves42/43/46, with44 and45 remaining real
+UI failures and no harness failures. Its44 shot rejects corrupted bytes
+but shows the generic startup error, not the promised pack screen; the
+protected entry owner must route that failure. Body diagnostics now read
+visible innerText instead of embedded script text. Proxy ports derive
+from the existing explicit WS_RIG_PORTS range, keeping defaults and
+allowing two independent fresh-source browser censuses under admission.

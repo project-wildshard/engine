@@ -36,7 +36,9 @@ import { claimFixture, fixtureKey, fixtureRequestOrigins } from './online-rig-ow
 import { rawLeak, selectCases, verdict } from './failmode-cases.mjs';
 
 process.env.WS_RIG_PORTS ??= '18856';
-const ROOT = absolute(import.meta.dirname, '..'), PROXY_PAGE = 18851, PROXY_WORLD = 18852, SHARD = 'driftwood-isle';
+const rigPort = Number(process.env.WS_RIG_PORTS);
+if (!Number.isSafeInteger(rigPort) || rigPort < 1029 || rigPort > 65532) throw new Error('WS_RIG_PORTS must reserve explicit unprivileged fixture ports');
+const ROOT = absolute(import.meta.dirname, '..'), PROXY_PAGE = rigPort - 5, PROXY_WORLD = rigPort - 4, SHARD = 'driftwood-isle';
 const PAGE_ORIGIN = `http://127.0.0.1:${String(PROXY_PAGE)}`, RELEASE_URL = `${PAGE_ORIGIN}/__release.json`, SOCKET = `ws://127.0.0.1:${String(PROXY_WORLD)}/`;
 const args = process.argv.slice(2), positional = args.filter(value => !value.startsWith('--'));
 /** @param {string} name @param {string} fallback */
@@ -195,7 +197,16 @@ try {
     return null;
   };
   /** What a player reads now, for a case whose screen never came. @param {import('playwright').Page} page */
-  const onScreen = async page => ({ visible: await visibleIds(page), text: (await page.evaluate(() => document.body.textContent).catch(() => '') ?? '').replaceAll(/\s+/gu, ' ').slice(0, 300) });
+  const onScreen = async page => ({ visible: await visibleIds(page), text: (await page.evaluate(() => {
+    const text = [], walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (parent === null || parent.getClientRects().length === 0) continue;
+      const style = getComputedStyle(parent);
+      if (style.display !== 'none' && style.visibility !== 'hidden') text.push(node.textContent ?? '');
+    }
+    return text.join(' ');
+  }).catch(() => '') ?? '').replaceAll(/\s+/gu, ' ').slice(0, 300) });
   /** A shot named for the case. @param {import('playwright').Page} page @param {string} id @param {string} what */
   const shoot = async (page, id, what) => { const file = `${id.replace('/', '-')}-${what}.png`; await page.screenshot({ path: join(shots, file) }); return file; };
   /** Back in play: frames move on and no card or page is up (a notice may be). @param {import('playwright').Page} page @param {number} timeout */
