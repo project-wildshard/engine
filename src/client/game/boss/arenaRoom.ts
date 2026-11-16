@@ -227,7 +227,7 @@ export class ArenaRoomEncounter {
     const answer=fight.takeBoundary();if(answer===null)return;const prompt=this.prompt;if(prompt===null)throw new Error('Missing open arena prompt');
     // the boundary answer's order is arenaBoundary's (renderer-free, CI12)
     const p=this.player.position,scope=this.context.scope;
-    arenaBoundary(answer,this.data.lines,this.data.record,{boss,fight,prompt,player:p,toast:line=>{this.toast(line);},
+    arenaBoundary(answer,this.data.lines,this.data.record,{boss,fight,prompt,player:p,motor:this.player.motor,toast:line=>{this.toast(line);},
       wall:()=>{this.contact('wall',p,this.data.view.wallDamage,this.data.lines.wall);},clear:()=>undefined,
       get persistence(){return enteredAdventurePersistence(scope);}});
   }

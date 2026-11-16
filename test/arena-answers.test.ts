@@ -17,7 +17,7 @@ test('the tie and boundary answers apply as the encounter did', () => {
   for (let n = 0; n < 3000; n++) {
     const answer = defined(answerOf(n)), observed: ArenaTieObservation = { engaged: n % 2 === 0, victory: n % 9 === 0, hit: n % 4 === 1, mounted: n % 3 === 2, storm: n % 5 > 1 };
     const run = (split: boolean): string[] => {
-      const log: string[] = [], fight = { tied: n % 2 === 1 }, prompt = { radius: -1, label: '' }, player = { x: 1, z: 2 };
+      const log: string[] = [], fight = { tied: n % 2 === 1 }, prompt = { radius: -1, label: '' }, player = { x: 1, y: 0, z: 2 };
       const boss = { arm: () => { log.push(`arm ${String(fight.tied)}`); }, disarm: () => { log.push(`disarm ${String(fight.tied)}`); } };
       const toast = (line: string): void => { log.push(`toast ${line}`); };
       const life = { event: (event: string, frame: Readonly<Record<string, number>> = {}): Readonly<Record<string, number>> => { log.push(`event ${event} ${JSON.stringify(frame)}`); return answer; } };
@@ -25,7 +25,7 @@ test('the tie and boundary answers apply as the encounter did', () => {
       const wall = (): void => { log.push(`wall ${player.x},${player.z}`); }, clear = (): void => { log.push('clear'); };
       if (split) {
         arenaTie(life, observed, tieLines, { boss, fight, toast });
-        arenaBoundary(answer, lines, record, { boss, fight, toast, prompt, player, wall, clear, get persistence() { log.push('persistence'); return persistence; } });
+        arenaBoundary(answer, lines, record, { boss, fight, toast, prompt, player, motor: { move: (feet, want) => { feet.x += want.x; feet.z += want.z; return { grounded: false, groundNormalY: 1, downhillX: 0, downhillZ: 0, horizontalFreedom: 1, groundCollider: null }; } }, wall, clear, get persistence() { log.push('persistence'); return persistence; } });
       } else {
         // ArenaRoomEncounter.tie and the boundary half of update before the split (arenaRoom.ts, before CI12)
         const a = life.event('tie', { engaged: Number(observed.engaged), victory: Number(observed.victory), hit: Number(observed.hit), mounted: Number(observed.mounted), storm: Number(observed.storm) });

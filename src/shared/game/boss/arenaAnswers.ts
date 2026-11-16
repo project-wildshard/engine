@@ -5,6 +5,7 @@
  * weather, then the kill and the feat recorded). `ArenaRoomEncounter` (arenaRoom.ts) applies them through these, in this
  * order; a native host passes its own boss, player, weather and persistence.
  */
+import type { CharacterMotor } from '@wildshard/engine/physics/CharacterMotor';
 import type { ProjectedState } from '../population/returnProgram';
 
 type Answer = Readonly<Record<string, number>>;
@@ -18,7 +19,9 @@ export interface ArenaAnswerPorts {
 }
 export interface ArenaBoundaryPorts extends ArenaAnswerPorts {
   readonly prompt: { radius: number; label: string };
-  readonly player: { x: number; z: number };
+  readonly player: { x: number; y: number; z: number };
+  /** Boundary corrections collide just like an ordinary step, including rising terrain. */
+  readonly motor: Pick<CharacterMotor, 'move'>;
   /** the wall hurts the player where they stand */
   readonly wall: () => void;
   /** the storm clears (the encounter's clearing weather) */
@@ -43,7 +46,8 @@ export function arenaBoundary(answer: Answer, lines: ArenaBoundaryLines, record:
   const prompt = ports.prompt;
   prompt.radius = answer['radius'] ?? 0; prompt.label = answer['label'] === 1 ? lines.tieOnFoot : answer['label'] === 2 ? lines.tieQuiet : lines.tie;
   if (answer['disarm'] === 1) { ports.fight.tied = false; ports.boss.disarm(); }
-  const p = ports.player; p.x = answer['x'] ?? p.x; p.z = answer['z'] ?? p.z;
+  const p = ports.player, dx = (answer['x'] ?? p.x) - p.x, dz = (answer['z'] ?? p.z) - p.z;
+  if (dx !== 0 || dz !== 0) ports.motor.move(p, { x: dx, y: 0, z: dz });
   if (answer['hurt'] === 1) ports.wall();
   if (answer['clear'] === 1) { ports.fight.tied = false; ports.clear(); const saved = ports.persistence; saved.kill(record.kind, record.variant); saved.feat(record.kind); }
 }

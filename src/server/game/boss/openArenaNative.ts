@@ -130,7 +130,7 @@ export async function prepareOpenArena(product: Pick<ShardProduct, 'json' | 'sec
           const at=itemPickupFloor(host.physics,fight.rewardPoint());rewardPoint=new Vector3(at.x,at.y+ITEM_PICKUP_HOVER+.5,at.z);reward=true;
         },persist:saved=>{if(!saved.defeated){reward=false;rewardPoint=null;}/* SC10: the heart stands again, its untaken orb goes */records.bosses.write({...records.bosses.read(),[data.definition.id]:saved});},toast,feed},ui,current);
       encounter.boss=boss;room.bind(boss,fight,()=>rewardPoint);first.health.checkpoint(host.scope,()=>room.party.died(boss));
-      const boundaryPorts={boss,fight,prompt,get player(){return room.near.position;},toast,
+      const boundaryPorts={boss,fight,prompt,get player(){return room.near.position;},get motor(){return room.near.motor;},toast,
         wall:()=>{hit('wall',room.near.position,data.view.wallDamage,data.lines.wall);},clear:()=>{actual.storm.weather.force(data.weather.clearing);},
         persistence:records.outcomes};
       // J105: in a room the heart's reward is each earner's own, and it stands until the last of them has taken theirs.
