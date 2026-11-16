@@ -10,7 +10,7 @@ import { PageStorage, assembly, cell, running, start, until, walk } from './fixt
 
 test('a walker off the road into Far Reach stands on its north dock', { timeout: 120_000 }, async () => {
   const far = assembly.cell('far-reach'), edge = far.origin.z + CHUNK_HALF;
-  const storage = new PageStorage(), { shell, stop } = start(storage, { x: far.origin.x, y: 0, z: edge + 9 }), travels: NetTravel[] = [];
+  const storage = new PageStorage(), { shell, stop } = start(storage, { x: far.origin.x, y: 0, z: edge + 9 }, far.slug), travels: NetTravel[] = [];
   shell.client.onTravel(event => { travels.push(event); });
   await shell.booted;
   shell.ready();

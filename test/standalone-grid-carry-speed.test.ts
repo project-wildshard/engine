@@ -6,7 +6,7 @@ import { NEIGHBOUR, PageStorage, cell, running, start, until, walk } from './fix
 // the walker to the destination world's seat. That seat started from rest, so a walk across the line stopped for ~0.3 s while the
 // page's prediction caught the server's standing body (RP1: a 311 ms stop at x -260). The walker keeps their speed across it.
 test('a walker keeps their speed across a crossing from the road into a cell', { timeout: 120_000 }, async () => {
-  const storage = new PageStorage(), { shell, stop } = start(storage, { x: -275, y: 0, z: 0 }), travels: NetTravel[] = [];
+  const storage = new PageStorage(), { shell, stop } = start(storage, { x: -275, y: 0, z: 0 }, NEIGHBOUR), travels: NetTravel[] = [];
   shell.client.onTravel(event => { travels.push(event); });
   await shell.booted;
   shell.ready();
