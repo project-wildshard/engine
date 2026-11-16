@@ -74,7 +74,7 @@ import type { CollisionStrip } from '../../../shared/game/grid/collisionStrips';
 import type { LocalSaveInstance } from '../../../shared/game/instanceSaves';
 import { loadNavmesh } from '@wildshard/engine/physics/navmeshLoad';
 import { enteredRuntime, pickInFrame } from './enteredInteract';
-import { copyPrompts, enteredCopy } from './copyPrompts';
+import { copyPrompts, copySpent, enteredCopy } from './copyPrompts';
 import { yieldGridAdmission, yieldGridConstruction } from './admissionYield';
 import { HybridRuntimeSession, type HybridResident } from '../shardfile/hybrid';
 
@@ -729,7 +729,7 @@ export class LiveGridSession {
         transfer.sync(); this.transferWalls.set(cell.instance, transfer);
         this.regions.set(cell.instance, { spawn: { x: start.at.x, y: undefined, z: start.at.z, yaw: start.yaw },
           // the admitted terrain inside the cell (one source of truth); its strips are road level (the terrain tile ends at the cell edge)
-          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: copyPrompts(copySource), kit: holdsItems(copySource) ? { source: copySource, assets } : null,
+          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: copyPrompts(copySource, copySpent(copySource)), kit: holdsItems(copySource) ? { source: copySource, assets } : null,
           // AU20: the cell's declared audio scene, bound only while the feet stand in it (no entered hooks run here)
           audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(shardProductFromAdmission(retained.admitted, shell.scope))) : null });
         this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: source.entryways });

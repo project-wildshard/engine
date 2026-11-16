@@ -5,6 +5,7 @@ import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { ShardTargets } from '@wildshard/format/targets';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { syncTargetColliders } from '../../../shared/game/shardfile/targets';
+import { rackMeleeRows } from '../../../shared/game/shardfile/items';
 
 type Interaction = ShardTargets['interactions'][number];
 /** The family whose rack take a held copy spends (TE-ENG2's lever-action). */
@@ -21,7 +22,9 @@ export function spentUses(source: Pick<Shardfile, 'targets' | 'hooks' | 'items'>
 }): (row: Interaction) => boolean {
   const conditions = new Map(source.hooks.conditions.map(row => [row.id, row]));
   const levers = new Set<string>(source.items.rows.flatMap(row => row.kind === 'weapon' && row.family === LEVER_FAMILY ? [row.id] : []));
-  const takes = new Map((source.targets.itemActions ?? []).flatMap(row => row.action === 3 && levers.has(row.item) ? [[row.scene, row.item] as const] : []));
+  // TEMPLATE-E2E TC-E4c: a racked melee weapon's rack is spent once it is taken, as a lever's is
+  const racked = rackMeleeRows(source);
+  const takes = new Map((source.targets.itemActions ?? []).flatMap(row => row.action === 3 && (levers.has(row.item) || racked.has(row.item)) ? [[row.scene, row.item] as const] : []));
   for (const row of source.targets.interactions) if (row.unless !== undefined && !conditions.has(row.unless)) throw new Error(`Missing declared condition ${row.unless}`);
   return row => {
     const condition = row.unless === undefined ? undefined : conditions.get(row.unless);
