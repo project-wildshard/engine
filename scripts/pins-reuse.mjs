@@ -203,7 +203,8 @@ function pinHashes(root){
  * The products under `out/` whose receipt names a pin `root`'s pins no longer name (`out/<folder>`, with the revision its
  * receipt says), e.g. a worktree installed before a pin bump and rebased past it. Their mounts under public/ are that old
  * revision's, so the boot stamps gen:inputs writes from public/ would carry the old files (Far Reach rev 1's 21 rows,
- * re-added by lands from such worktrees, 2026-11-14). A tree with no `out/` or no pins file has none.
+ * re-added by lands from such worktrees, 2026-11-14). A tree with no `out/` or no pins file has none, and a format-dependency
+ * product (installed from the frozen format package, named by no pin) is never stale.
  * @param {string} root @returns {{folder:string,revision:unknown}[]}
  */
 export function stalePinProducts(root){
@@ -213,8 +214,11 @@ export function stalePinProducts(root){
  try{folders=readdirSync(join(root,'out'),{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name);}catch{return [];}
  /** @type {{folder:string,revision:unknown}[]} */const stale=[];
  for(const folder of folders.sort()){
-  /** @type {unknown} */let pin;
-  try{pin=JSON.parse(readFileSync(join(root,'out',folder,'validation.json'),'utf8')).pin;}catch{continue;}
+  /** @type {unknown} */let pin,source;
+  try{({pin,source}=JSON.parse(readFileSync(join(root,'out',folder,'validation.json'),'utf8')));}catch{continue;}
+  // A frozen format-dependency product (`pins.ts install --from-format`, Ring 1's blender-template: the format's own Template
+  // 2) is named by no pin on purpose and `pnpm pins` never replaces it, so it is not stale (TEMPLATE-E2E, 2026-11-16).
+  if(typeof source==='object'&&source!==null&&'kind'in source&&source.kind==='format-dependency')continue;
   if(typeof pin!=='object'||pin===null||!('hash'in pin)||typeof pin.hash!=='string')continue;
   if(!want.has(pin.hash))stale.push({folder,revision:'revision'in pin?pin.revision:undefined});
  }

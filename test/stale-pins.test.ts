@@ -12,13 +12,13 @@ import { stalePinProducts } from '../scripts/pins-reuse.mjs';
 // boot stamps (2026-11-14). stalePinProducts names such products, and gen:inputs refuses to stamp until `pnpm pins` runs.
 let root = '';
 afterEach(() => { if (root !== '') rmSync(root, { recursive: true, force: true }); root = ''; });
-function tree(pins: readonly string[], products: Readonly<Record<string, { hash: string; revision: number } | 'unreadable'>>): string {
+function tree(pins: readonly string[], products: Readonly<Record<string, { hash: string; revision: number; source?: { kind: string } } | 'unreadable'>>): string {
   root = mkdtempSync(join(tmpdir(), 'stale-pins-'));
   mkdirSync(join(root, 'test/pins'), { recursive: true });
   writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({ shards: pins.map(hash => ({ slug: hash, hash })) }));
   for (const [folder, pin] of Object.entries(products)) {
     mkdirSync(join(root, 'out', folder), { recursive: true });
-    writeFileSync(join(root, 'out', folder, 'validation.json'), pin === 'unreadable' ? '{' : JSON.stringify({ pin }));
+    writeFileSync(join(root, 'out', folder, 'validation.json'), pin === 'unreadable' ? '{' : JSON.stringify(pin.source === undefined ? { pin } : { pin: { hash: pin.hash, revision: pin.revision }, source: pin.source }));
   }
   return root;
 }
@@ -33,4 +33,10 @@ test('no out/, no pins file, and a folder with no readable receipt are not stale
   expect(stalePinProducts(tree(['far3'], { scratch: 'unreadable' }))).toEqual([]);
   rmSync(join(root, 'test/pins/shardfiles.json'));
   expect(stalePinProducts(root)).toEqual([]);
+});
+
+test('a format-dependency product (Ring 1\'s blender-template, the format\'s Template 2) is named by no pin and is not stale', () => {
+  expect(stalePinProducts(tree(['brasscap9'], { 'blender-template': { hash: 'format1', revision: 1, source: { kind: 'format-dependency' } },
+    'brasscap-mesa': { hash: 'brasscap9', revision: 9 }, 'far-reach': { hash: 'far1', revision: 1, source: { kind: 'api' } } })))
+    .toEqual([{ folder: 'far-reach', revision: 1 }]);
 });
