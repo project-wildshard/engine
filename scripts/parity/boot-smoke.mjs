@@ -60,6 +60,22 @@ export function titleCaptureReady(observation, catalogueOnly = false) {
   return state.pending.length === 0;
 }
 
+/** The preparation view and world title briefly coexist. Capture only after
+ * that handoff leaves one visible title and the loading ledger is gone.
+ * Count and visibility share one browser evaluation, so a changing handoff
+ * cannot race a strict locator query. */
+export function titleViewVisible() {
+  const titles = document.querySelectorAll('.ws-main-logo');
+  if (titles.length !== 1) return false;
+  /** @param {Element|null} node */
+  const visible = node => {
+    if (node === null) return false;
+    const bounds = node.getBoundingClientRect(), style = getComputedStyle(node);
+    return bounds.width > 0 && bounds.height > 0 && style.visibility === 'visible' && style.display !== 'none';
+  };
+  return visible(titles[0] ?? null) && ![...document.querySelectorAll('.ws-load')].some(visible);
+}
+
 /** @param {import('playwright').Page} page @param {string[]} faults @param {(observation:ReturnType<typeof bootObservation>) => Promise<boolean>} condition @param {string} label @param {number} deadline @param {(label:string, observation:Awaited<ReturnType<typeof bootObservation>>)=>void} [observe] */
 async function until(page, faults, condition, label, deadline, observe) {
   while (Date.now() < deadline) {
@@ -455,7 +471,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     if (mode === 'standalone') stallProfile = await startStallProfile(page);
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
     if (mode !== 'arrival') {
-    await until(page, faults, async observed => await page.locator('.ws-main-logo').isVisible() && !(await page.locator('.ws-load').isVisible()) && titleCaptureReady(observed, mode === 'grid'), 'rendered usable title with completed warm-up', deadline);
+    await until(page, faults, async observed => await page.evaluate(titleViewVisible) && titleCaptureReady(observed, mode === 'grid'), 'rendered usable title with completed warm-up', deadline);
     phases.titleMs = Date.now() - started;
     await observeTitleCapture(page, join(out, `${receipt}-title`), () => captureBootFrame(page, 'title', deadline, frames));
     if (mode !== 'grid') {

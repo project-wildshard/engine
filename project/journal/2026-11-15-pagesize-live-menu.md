@@ -55,3 +55,21 @@ already absolute URLs. Its new regression failed first; all 19 content
 and preload tests now pass. Applying that exact stamp to preview's HTML
 with modules blocked restores the actual hero pixels. Final deployed
 first-second paint acceptance remains open until this repair ships.
+
+The hosted run exposed two harness assumptions missed by static import
+selection: its selected-entry VM lacked DOMTokenList.contains and the
+new deferred pack reader; boot smoke queried a strict title locator while
+the preparation and real title coexisted. The fixture retains its memory,
+admission and kit-order assertions. Capture now reads title uniqueness
+and visibility in one browser evaluation, keeping the loading-hidden,
+warm-owner and original deadline checks.
+
+Preparation has its own child scope and retires on the actual world's
+ws:ready, waiting for an active name interaction to settle. That listener
+is installed before imports, so a ready world also retires a late mount.
+A real Dunes Developer boot-smoke passes: correct sunscar-dunes world,
+6,688 ms to gameplay, 8,591 ms total, live frames and zero faults/reports.
+The isolated handoff/name test and entry fixtures pass; 173 focused tests,
+lint, types and check-css pass. Claude reviewed the complete repair with
+no MUST. The earlier _template manual run was not a valid selectable case
+and is excluded from acceptance evidence.

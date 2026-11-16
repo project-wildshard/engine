@@ -271,7 +271,7 @@ function pageTitleImports(): ReturnType<typeof preparePageTitleImports> {
   titleImports ??= preparePageTitleImports();
   return titleImports;
 }
-async function showPageTitle(refusal = '', preparation?: Scope): Promise<void> {
+async function showPageTitle(refusal = '', preparation?: Scope, observeIdle?: (wait: () => Promise<void>) => void): Promise<void> {
   // S20: the title's ended note reads lastEnd(), settled (the imports take longer than the lock query)
   const [[{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }]] = await Promise.all([pageTitleImports().ready(), settleLastEnd()]);
   if (preparation?.disposed === true || preparation?.disposing === true || document.querySelector('.ws-load[data-failed="true"]') !== null) return;
@@ -298,6 +298,7 @@ async function showPageTitle(refusal = '', preparation?: Scope): Promise<void> {
     });
     return menu;
   }, { preparing: preparation !== undefined });
+  observeIdle?.(() => menu?.whenIdle() ?? Promise.resolve());
   preparation?.onDispose(title.dispose);
   // Published cards can arrive after the first menu. Rebuild through the same
   // owner as Developer changes, preserving its selected card and menu screen.
@@ -408,7 +409,10 @@ export async function start(): Promise<void> {
 
 /** An optional runtime menu never delays or refuses world admission. */
 async function showPreparationTitle(owner: Scope): Promise<void> {
-  try { await showPageTitle('', owner); }
+  let whenIdle = (): Promise<void> => Promise.resolve();
+  const retire = (): void => { owner.dispose(); };
+  owner.listen(document, 'ws:ready', () => { void whenIdle().then(retire, retire); }, { once: true });
+  try { await showPageTitle('', owner, wait => { whenIdle = wait; }); }
   catch (error: unknown) {
     if (!owner.disposed && !owner.disposing) console.warn('[title] preparation menu unavailable', error);
   }
@@ -427,7 +431,8 @@ async function startSelected(): Promise<void> {
   const arrival = listed?.shardfile === undefined ? game.shard : { ...game.shard, slug: listed.slug, name: listed.name, shardfile: listed.shardfile };
   const loading = beginLoading({ id: arrival.slug, name: arrival.name, trace: game.shard.boot?.phone?.trace === true });
   if (document.documentElement.classList.contains('boot-menu')) {
-    void showPreparationTitle(loading.scope);
+    const preparation = loading.scope.child('preparation menu');
+    void showPreparationTitle(preparation);
   }
   const moduleText = document.getElementById('boot-module-files')?.textContent;
   const moduleRows: unknown = moduleText === undefined ? undefined : JSON.parse(moduleText);

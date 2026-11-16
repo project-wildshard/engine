@@ -3,6 +3,8 @@ import type { Browser, BrowserContext, Page } from 'playwright';
 
 /** Require both actual warm owners before the native title capture clock starts. */
 export function titleCaptureReady(observation:{appState:string;titlePreparation:unknown},catalogueOnly?:boolean):boolean;
+/** Wait through the owned preparation-title handoff without querying an ambiguous locator. */
+export function titleViewVisible():boolean;
 
 /** Preserve a static-preview error transport's original payload for CI diagnosis, including nonfatal lifecycle diagnostics. */
 export function bootErrorReport(url: string, method: string, body: string | null): unknown;

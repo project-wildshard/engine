@@ -7,6 +7,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {prepareBootImports} from './bootDownloads';
 import {bootAwait,bootMark,bootTask,bootTiming} from '@wildshard/engine/boot/timing';
+import {Scope} from '@wildshard/engine/app/scope';
 
 function deferred(): {ready: Promise<void>; finish: () => void} {
   let finish = (): void => {throw new Error('Missing deferred');};
@@ -18,6 +19,26 @@ function deferred(): {ready: Promise<void>; finish: () => void} {
 function beforeCompletion(gate: Promise<void>, run: Promise<unknown>): Promise<void> {
   return Promise.race([gate, run.then(() => {throw new Error('Continuation ended before its expected gate');})]);
 }
+
+test('the real title retires preparation after its current name interaction settles', async () => {
+  const source = readFileSync(new URL('entry.ts', import.meta.url), 'utf8');
+  const start = source.indexOf('async function showPreparationTitle('), end = source.indexOf('async function startSelected()', start);
+  if (start === -1 || end <= start) throw new Error('Missing preparation title owner');
+  const owner = new Scope('test.preparation-title'), page = new EventTarget(), interaction = deferred();
+  try {
+    const run: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end)}; showPreparationTitle(owner);`), {
+      owner, document: page,
+      showPageTitle: (_refusal: string, actual: Scope, observeIdle: (wait: () => Promise<void>) => void): Promise<void> => {
+        expect(actual).toBe(owner); observeIdle(() => interaction.ready); return Promise.resolve();
+      },
+    });
+    await run;
+    page.dispatchEvent(new Event('ws:ready')); await Promise.resolve();
+    expect(owner.disposed).toBe(false);
+    interaction.finish(); await Promise.resolve(); await Promise.resolve();
+    expect(owner.disposed).toBe(true);
+  } finally { owner.dispose(); }
+});
 
 function continuation(ports: Record<string, unknown>): Promise<unknown> {
   const source = readFileSync(new URL('entry.ts', import.meta.url), 'utf8');
@@ -130,7 +151,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     }},
     '@wildshard/engine/core/workSlice': {yieldTask: resolved},
     '@wildshard/engine/core/clock': {diagnosticNow: () => 0},
-    './assetTables': {prepareAssetPacks: resolved},
+    './assetTables': {prepareAssetPackRead: () => ({ready: resolved})},
     '@wildshard/engine/game/shardfile/product': {},
     '@wildshard/engine/boot/tables': {publicBytes: () => ({})},
   };
@@ -142,7 +163,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
   const result: unknown = runInNewContext(stripTypeScriptTypes(`${body}; startSelected();`), {
     runtimePacksOn: () => packs, search: new URLSearchParams('chunk=example'), unloadedTitleRow: () => undefined,
     prepareBootImports, bootAwait, bootMark, bootTask, bootTiming, entryScope: {child: () => imageOwner}, selectedImages: undefined, crashResume: null,
-    document: {getElementById: (id: string) => authored && id === 'ws-shardfile' ? {} : null, baseURI: 'https://example.invalid/', documentElement: {classList: {remove: noop}}},
+    document: {getElementById: (id: string) => authored && id === 'ws-shardfile' ? {} : null, baseURI: 'https://example.invalid/', documentElement: {classList: {remove: noop, contains: () => false}}},
     performance: {measure: noop},
     load: (name: string): Promise<unknown> => {
       if (name === '@wildshard/engine/game/session/session') {events.push('session:import'); return session;}
