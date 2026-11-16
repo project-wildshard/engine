@@ -24,7 +24,7 @@
  * `PHONE_LAMPS` lamps lit, the nearest (AP28), half the motes, and no bloom or AO.
  */
 import * as THREE from 'three';
-import { currentLampSwings } from '../world/swings';
+import { currentLampSwings, type SwingField } from '../world/swings';
 import type { LookBounce, LookEnvironment, LookLamp, LookLight, LookPools, LookRim } from '@wildshard/format/look-light';
 import type { LookMotes, LookShadow } from '@wildshard/format/look-render';
 import type { ShaderSource } from './shaderPatches';
@@ -183,7 +183,7 @@ export type LampUpdate = (time: number, eye?: THREE.Vector3Like) => void;
  * per lamp, so no two pulse together). It is null when nothing moves: at most `lit` fixed lamps and no flicker, drawn
  * exactly as before.
  */
-export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAMPS): THREE.Group & { update: LampUpdate | null } {
+export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAMPS, swingsOf: () => SwingField | null = currentLampSwings): THREE.Group & { update: LampUpdate | null } {
   const group = Object.assign(new THREE.Group(), { update: null as LampUpdate | null });
   group.name = 'look-light-lamps';
   const rows = lamps.map((lamp, i) => ({ lamp, phase: i * 2.399, at: new THREE.Vector3(...lamp.at), place: new THREE.Vector3(...lamp.at), live: lamp.follow === undefined,
@@ -202,7 +202,7 @@ export function lampLights(lamps: readonly LookLamp[], lit: number = DESKTOP_LAM
   const eyeLocal = new THREE.Vector3(), chosen: typeof rows = [], swung = new THREE.Vector3();
   group.update = (time, eye) => {
     if (swinging.length > 0) {
-      const swings = currentLampSwings();
+      const swings = swingsOf();
       if (swings !== null) group.updateWorldMatrix(true, false);
       for (const row of swinging) {
         if (swings === null || row.lamp.swing === undefined) { row.place.copy(row.at); continue; }

@@ -20,7 +20,7 @@ import { decodeTerrainTile, type TerrainTileData } from '@wildshard/format/terra
 import { refreshTerrainTile } from '@wildshard/engine/world/terrainTileView';
 import type { DevGameplay, DevPlace, DevRestarted } from '@wildshard/engine/game/devGameplay';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
-import { SwingField, createSwingUniforms, setLampSwings, swingQuaternion, type SwingRow } from '@wildshard/engine/world/swings';
+import { SwingField, createSwingUniforms, swingQuaternion, type SwingRow } from '@wildshard/engine/world/swings';
 
 /**
  * SHARD-SOURCE AP5 (J347: engine is the deployed client and server; dev tooling is sharddev's). The dev hook: the one thing
@@ -214,14 +214,13 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
   /**
    * SS8f: a watched part's lanterns swing as a built page's do (client.ts, SS8c): one `SwingField` over the part's rows,
    * kicked by the player; its draws turn whole round their pivot on the CPU (a dev part's surfaces have no swing channel)
-   * and its sprites and lamps hang off the same pivots. The lamps read the field the page lent last
-   * (`setLampSwings`): one swinging part a page lights right, which is every watched scene so far.
+   * and its sprites and lamps hang off the same pivots (the part's lamps read its own field, numbered in the part).
    */
-  const hangSwings = (part: DevPart, group: THREE.Group, partScope: Scope): void => {
+  const hangSwings = (part: DevPart, group: THREE.Group, partScope: Scope): SwingField | null => {
     const rows = part.swings ?? [];
-    if (rows.length === 0) return;
+    if (rows.length === 0) return null;
     const field = new SwingField(rows, createSwingUniforms(), group);
-    partScope.onDispose(setLampSwings(field)); partScope.onDispose(() => { field.dispose(); });
+    partScope.onDispose(() => { field.dispose(); });
     const draws = part.draws.flatMap((draw, i) => {
       const mesh = group.children[i];
       return draw.swing === undefined || draw.swing >= rows.length || mesh === undefined ? [] : [{ object: mesh, base: mesh.matrix.clone(), swing: draw.swing }];
@@ -244,6 +243,7 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
       }
       for (const { object, rest, swing } of cards) field.place(swing, rest, object.position);
     }));
+    return field;
   };
 
   /** One part under its own scope, not yet in the scene; on a throw, everything it took is given back first. */
@@ -285,10 +285,10 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
         card.position.set(...sprite.position); card.scale.set(sprite.scale[0], sprite.scale[1], 1); card.center.set(...sprite.center);
         group.add(card);
       }
-      hangSwings(part, group, partScope);
+      const swings = hangSwings(part, group, partScope);
       if (part.lamps.length > 0) {
         // the look's own lamp lights (B2, M4.3): what a baked shard's `look.light.lamps` draws
-        const lamps = lampLights(part.lamps);
+        const lamps = lampLights(part.lamps, undefined, swings === null ? undefined : () => swings);
         group.add(lamps);
         owned.push({ dispose: () => { for (const light of lamps.children) if (light instanceof THREE.Light) light.dispose(); } });
         const { update } = lamps;
