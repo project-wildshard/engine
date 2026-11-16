@@ -8,8 +8,9 @@
  *   splash.update(dt, [{ id: 'player', x, y, z }]);   // every frame
  *
  * A mover is in a pool when it stands inside the outline with its feet at most `FOOT` above the surface and no deeper
- * than `DEPTH` below it. Crossing in or out throws a burst and a wide ring; moving faster than `WADE_SPEED` inside
- * throws a small ring and a few drops every `WADE_EVERY` seconds. Nothing runs on the server: it is look only.
+ * than `DEPTH` below it. Crossing in or out throws a burst and a wide ring (none on a teleport); averaging faster than
+ * `WADE_SPEED` inside throws a small ring and a few drops every `WADE_EVERY` seconds. Both draw after the water (renderOrder 2).
+ * Nothing runs on the server: it is look only.
  */
 import * as THREE from 'three';
 
@@ -19,6 +20,10 @@ export interface SplashMover { readonly id: string; readonly x: number; readonly
 /** droplet and ring slots a tier holds (the phone half) */
 export const SPLASH_SLOTS = { desktop: { drops: 192, rings: 24 }, phone: { drops: 96, rings: 12 } } as const;
 export const FOOT = 0.35, DEPTH = 3, WADE_SPEED = 0.6, WADE_EVERY = 0.4;
+/** a step longer than this in one frame is a teleport (a respawn, a pose): it moves the mover and throws nothing */
+export const TELEPORT = 2;
+/** where a spent droplet waits: far under any floor, so it is never drawn in view */
+const PARKED_Y = -1000;
 const DROP_LIFE = 0.9, RING_LIFE = 1.3, GRAVITY = 9.8;
 const BURST = { enter: 18, leave: 10, wade: 4 } as const;
 const RING = { enter: [0.25, 2.2], leave: [0.2, 1.6], wade: [0.15, 1.1] } as const;
@@ -32,6 +37,7 @@ function dropTexture(): THREE.DataTexture {
     pixels.set([255, 255, 255, Math.round(a * 255)], (y * size + x) * 4);
   }
   const texture = new THREE.DataTexture(pixels, size, size);
+  texture.magFilter = THREE.LinearFilter; texture.minFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
   return texture;
 }
@@ -58,7 +64,7 @@ function stream(seed: number): () => number {
   };
 }
 
-interface Wader { pool: SplashPool | null; x: number; z: number; wade: number; seen: boolean }
+interface Wader { pool: SplashPool | null; x: number; z: number; wade: number; walked: number; seen: boolean }
 
 export class WaterSplash {
   /** every droplet, one draw */
@@ -91,20 +97,24 @@ export class WaterSplash {
     this.dropLife = new Float32Array(slots.drops);
     this.dropFloor = new Float32Array(slots.drops);
     this.dropColour = new Float32Array(slots.drops * 3);
+    for (let i = 0; i < slots.drops; i++) this.dropAt[i * 3 + 1] = PARKED_Y;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(this.dropAt, 3).setUsage(THREE.DynamicDrawUsage));
     geometry.setAttribute('color', new THREE.BufferAttribute(this.dropColour, 3).setUsage(THREE.DynamicDrawUsage));
-    // additive: a spent droplet is black, so it adds nothing
-    this.drops = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.08, map: dropTexture(), alphaTest: 0.02, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    // additive, so no fog (fog would add the fog colour to a faded droplet); a spent droplet is black and parked far under
+    this.drops = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.08, map: dropTexture(), alphaTest: 0.02, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.drops.name = 'water:splash';
     this.drops.frustumCulled = false;
+    // after the water surfaces (clientWater's renderOrder 1, transparent, no depth write), so the water never blends over them
+    this.drops.renderOrder = 2;
     this.ringAge = new Float32Array(slots.rings).fill(RING_LIFE);
     this.ringSpan = new Float32Array(slots.rings * 2);
     this.ringSeat = new Float32Array(slots.rings * 3);
     const ring = new THREE.RingGeometry(0.93, 1, 48, 1).rotateX(-Math.PI / 2);
-    this.rings = new THREE.InstancedMesh(ring, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: true }), slots.rings);
+    this.rings = new THREE.InstancedMesh(ring, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }), slots.rings);
     this.rings.name = 'water:rings';
     this.rings.frustumCulled = false;
+    this.rings.renderOrder = 2;
     this.rings.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < slots.rings; i++) { this.rings.setMatrixAt(i, this.matrix.makeScale(0, 0, 0)); this.rings.setColorAt(i, this.colour.setRGB(0, 0, 0)); }
   }
@@ -142,19 +152,26 @@ export class WaterSplash {
     let wader = this.waders.get(mover.id);
     if (wader === undefined) {
       // a mover first seen already in water (a spawn in the pond) throws nothing until it moves
-      wader = { pool, x: mover.x, z: mover.z, wade: 0, seen: true };
+      wader = { pool, x: mover.x, z: mover.z, wade: 0, walked: 0, seen: true };
       this.waders.set(mover.id, wader);
       return;
     }
     wader.seen = true;
-    const speed = dt > 0 ? Math.hypot(mover.x - wader.x, mover.z - wader.z) / dt : 0;
+    const step = Math.hypot(mover.x - wader.x, mover.z - wader.z);
     if (pool !== wader.pool) {
-      const at = pool ?? wader.pool;
-      if (at !== null) this.throw(pool === null ? 'leave' : 'enter', mover.x, mover.z, at.level);
-      wader.wade = 0;
-    } else if (pool !== null && speed > WADE_SPEED) {
-      wader.wade += dt;
-      if (wader.wade >= WADE_EVERY) { wader.wade = 0; this.throw('wade', mover.x, mover.z, pool.level); }
+      // in at the new point; out at the last point still in the water
+      if (step <= TELEPORT) {
+        if (pool !== null) this.throw('enter', mover.x, mover.z, pool.level);
+        else if (wader.pool !== null) this.throw('leave', wader.x, wader.z, wader.pool.level);
+      }
+      wader.wade = 0; wader.walked = 0;
+    } else if (pool !== null) {
+      // time and distance over the whole stretch: the player moves per fixed step, so one frame's speed flickers
+      wader.wade += dt; wader.walked += Math.min(step, TELEPORT);
+      if (wader.wade >= WADE_EVERY) {
+        if (wader.walked / wader.wade > WADE_SPEED) this.throw('wade', mover.x, mover.z, pool.level);
+        wader.wade = 0; wader.walked = 0;
+      }
     }
     wader.pool = pool; wader.x = mover.x; wader.z = mover.z;
   }
@@ -173,10 +190,11 @@ export class WaterSplash {
   }
 
   private stepDrops(dt: number): void {
-    const position = this.drops.geometry.getAttribute('position'), colour = this.drops.geometry.getAttribute('color');
+    let moved = false;
     for (let i = 0; i < this.dropLife.length; i++) {
       const life = this.dropLife[i] ?? 0;
       if (life <= 0) continue;
+      moved = true;
       const v = i * 3, vy = (this.dropVelocity[v + 1] ?? 0) - GRAVITY * dt;
       this.dropVelocity[v + 1] = vy;
       this.dropAt[v] = (this.dropAt[v] ?? 0) + (this.dropVelocity[v] ?? 0) * dt;
@@ -184,10 +202,12 @@ export class WaterSplash {
       this.dropAt[v + 2] = (this.dropAt[v + 2] ?? 0) + (this.dropVelocity[v + 2] ?? 0) * dt;
       const left = (this.dropAt[v + 1] ?? 0) < (this.dropFloor[i] ?? 0) - 0.02 ? 0 : life - dt;
       this.dropLife[i] = Math.max(0, left);
+      if (left <= 0) this.dropAt[v + 1] = PARKED_Y;
       const fade = Math.max(0, left) / DROP_LIFE;
       this.dropColour[v] = DROP_COLOUR.r * fade; this.dropColour[v + 1] = DROP_COLOUR.g * fade; this.dropColour[v + 2] = DROP_COLOUR.b * fade;
     }
-    position.needsUpdate = true; colour.needsUpdate = true;
+    // upload only while something flies (or just landed): a still pond costs no buffer upload
+    if (moved) { this.drops.geometry.getAttribute('position').needsUpdate = true; this.drops.geometry.getAttribute('color').needsUpdate = true; }
   }
 
   private stepRings(dt: number): void {
@@ -198,7 +218,7 @@ export class WaterSplash {
       const next = age + dt, t = Math.min(1, next / RING_LIFE);
       this.ringAge[k] = next; moved = true;
       if (t >= 1) { this.rings.setMatrixAt(k, this.matrix.makeScale(0, 0, 0)); this.rings.setColorAt(k, this.colour.setRGB(0, 0, 0)); continue; }
-      const [r0 = 0, r1 = 1] = [this.ringSpan[k * 2], this.ringSpan[k * 2 + 1]], radius = r0 + (r1 - r0) * Math.sqrt(t), fade = (1 - t) * (1 - t) * 0.6;
+      const r0 = this.ringSpan[k * 2] ?? 0, r1 = this.ringSpan[k * 2 + 1] ?? 1, radius = r0 + (r1 - r0) * Math.sqrt(t), fade = (1 - t) * (1 - t) * 0.6;
       this.matrix.makeScale(radius, 1, radius).setPosition(this.ringSeat[k * 3] ?? 0, this.ringSeat[k * 3 + 1] ?? 0, this.ringSeat[k * 3 + 2] ?? 0);
       this.rings.setMatrixAt(k, this.matrix);
       this.rings.setColorAt(k, this.colour.copy(RING_COLOUR).multiplyScalar(fade));

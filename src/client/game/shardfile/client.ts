@@ -300,14 +300,22 @@ export class ShardfileClient {
     // SHARD-SOURCE SS6: a scene pool splashes and rings when the player walks in, wades or walks out
     installClientSplash(this.source.water, { root: ctx.root, scope: ctx.scope, phone: TIER === 'phone',
       // the player and every declared creature with a body (SS6c): a creature wading the pond splashes as the player does
-      movers: () => {
-        const at = world.player.position, movers = [{ id: 'player', x: at.x, y: at.y, z: at.z }];
-        for (const spawn of this.source.creatures.spawns) {
-          const body = wirePage.namedBody(spawn.id);
-          if (body !== null && body.mesh.parent !== null) movers.push({ id: spawn.id, x: body.mesh.position.x, y: body.mesh.position.y, z: body.mesh.position.z });
-        }
-        return movers;
-      },
+      // one array and one row a mover, rewritten in place each frame; a creature's id is prefixed so a spawn named 'player' is its own
+      movers: (() => {
+        const player = { id: 'player', x: 0, y: 0, z: 0 }, live: (typeof player)[] = [];
+        const rows = this.source.creatures.spawns.map((spawn) => ({ spawn: spawn.id, row: { id: `creature:${spawn.id}`, x: 0, y: 0, z: 0 } }));
+        return () => {
+          live.length = 0;
+          const at = world.player.position;
+          player.x = at.x; player.y = at.y; player.z = at.z; live.push(player);
+          rows.forEach(({ spawn, row }) => {
+            const body = wirePage.namedBody(spawn);
+            if (body === null || body.mesh.parent === null) return;
+            row.x = body.mesh.position.x; row.y = body.mesh.position.y; row.z = body.mesh.position.z; live.push(row);
+          });
+          return live;
+        };
+      })(),
       frame: (run) => { ctx.system({ id: 'game.shardfile.splash', phase: 'update', run }); } });
     const nativeWorld = this.nativeFeatures || this.mode === 'presentation';
     const start = nativeWorld ? ctx.manifest.spawn : this.source.spawn;

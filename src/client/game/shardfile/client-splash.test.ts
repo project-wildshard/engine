@@ -36,7 +36,7 @@ test('a creature wading in splashes on its own while the player stands dry (SS6c
   const root = new THREE.Group(), frames: ((dt: number) => void)[] = [];
   let x = -6;
   const splash = installClientSplash(water, { root, scope: { onDispose: () => undefined } as never, phone: false,
-    movers: () => [{ id: 'player', x: -9, y: 0.2, z: 0 }, { id: 'heron', x, y: 0.2, z: 1 }], frame: (run) => { frames.push(run); } });
+    movers: () => [{ id: 'player', x: -9, y: 0.2, z: 0 }, { id: 'creature:heron', x, y: 0.2, z: 1 }], frame: (run) => { frames.push(run); } });
   for (; x < -2; x += 0.1) for (const run of frames) run(1 / 60);
   expect(splash?.live().rings).toBe(1);
   expect(splash?.live().drops).toBeGreaterThan(10);

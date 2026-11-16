@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { FOOT, SPLASH_SLOTS, WADE_EVERY, WaterSplash, insideOutline, type SplashPool } from './waterSplash';
+import { FOOT, SPLASH_SLOTS, TELEPORT, WADE_EVERY, WaterSplash, insideOutline, type SplashPool } from './waterSplash';
 
 // Meta SHARD-SOURCE SS6: a mover entering, wading in and leaving a pool throws droplets and rings.
 
@@ -43,8 +43,30 @@ test('wading throws a ring every WADE_EVERY seconds; a slow step does not', () =
   expect(splash.live().rings).toBe(0);
   walk(splash, [-4, 0], [-4, 3 * 0.3], 3); // 0.3 m/s
   expect(splash.live().rings).toBe(0);
-  walk(splash, [-4, 0.9], [3, 0.9], 2); // 3.5 m/s for 2 s
-  expect(splash.live().rings).toBeGreaterThanOrEqual(Math.floor(1.3 / WADE_EVERY) - 1);
+  walk(splash, [-4, 0.9], [3, 0.9], 2); // 3.5 m/s for 2 s: a ring every 0.4 s, each living 1.3 s
+  expect(splash.live().rings).toBeGreaterThanOrEqual(3);
+  expect(splash.live().rings).toBeLessThanOrEqual(Math.ceil(1.3 / WADE_EVERY));
+});
+
+test('wading counts the stretch, not the frame: a step every other frame still rings every WADE_EVERY seconds', () => {
+  const splash = new WaterSplash([POND], { phone: false });
+  splash.update(1 / 120, [{ id: 'p', x: -4, y: 0, z: 0 }]);
+  // 120 Hz display, 60 Hz fixed step: the mover moves 2 m/s on alternate frames only
+  let x = -4, rings = 0;
+  for (let i = 0; i < 120 * 0.85; i++) { if (i % 2 === 0) x += 2 / 60; splash.update(1 / 120, [{ id: 'p', x, y: 0, z: 0 }]); rings = splash.live().rings; }
+  expect(rings).toBe(2);
+});
+
+test('a teleport in or out of the water throws nothing; a leave splashes at the last point in the water', () => {
+  const splash = new WaterSplash([POND], { phone: false });
+  splash.update(1 / 60, [{ id: 'p', x: -20, y: 0, z: 0 }]);
+  splash.update(1 / 60, [{ id: 'p', x: 0, y: 0, z: 0 }]); // a respawn into the pond
+  splash.update(1 / 60, [{ id: 'p', x: 0, y: 0, z: 20 }]); // and out of it
+  expect(splash.live()).toEqual({ drops: 0, rings: 0 });
+  expect(TELEPORT).toBe(2);
+  splash.update(1 / 60, [{ id: 'q', x: 4.9, y: 0, z: 0 }]);
+  splash.update(1 / 60, [{ id: 'q', x: 6.4, y: 0, z: 0 }]); // out by 1.5 m: the ring sits where it left the water
+  expect(splash.rings.instanceMatrix.array[12]).toBeCloseTo(4.9, 5); // ring slot 0's x
 });
 
 test('the phone holds half the slots, and every splash is two draws whatever the count', () => {
@@ -55,10 +77,10 @@ test('the phone holds half the slots, and every splash is two draws whatever the
   expect(SPLASH_SLOTS.phone.rings * 2).toBe(SPLASH_SLOTS.desktop.rings);
   // ten movers splashing at once reuse the same two objects
   const movers = (x: number): { id: string; x: number; y: number; z: number }[] => Array.from({ length: 10 }, (_, i) => ({ id: `m${i}`, x, y: 0, z: i - 4.5 }));
-  desk.update(1 / 60, movers(-8)); desk.update(1 / 60, movers(-4));
+  desk.update(1 / 60, movers(-5.5)); desk.update(1 / 60, movers(-4.5));
   expect(desk.live()).toEqual({ drops: 180, rings: 10 });
   // they all step out at once: 100 more droplets, and the oldest slots are reused, never a new draw
-  desk.update(1 / 60, movers(-8));
+  desk.update(1 / 60, movers(-5.5));
   expect(desk.live().drops).toBe(SPLASH_SLOTS.desktop.drops);
   expect(desk.live().rings).toBe(20);
   expect([desk.drops.type, desk.rings.type]).toEqual(['Points', 'Mesh']);
