@@ -81,7 +81,7 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename
       if (readFileSync(row.file, 'utf8') !== row.declaration) throw new Error(`Stale JSON declaration: ${row.file}`);
     } else writeFileSync(row.file, row.declaration);
   }
-  for (const config of ['tsconfig.shards.json', 'test/tsconfig.json']) {
+  for (const config of [...(existsSync('tsconfig.shards.json') ? ['tsconfig.shards.json'] : []), 'test/tsconfig.json']) {
     const input = ts.parseConfigFileTextToJson(config, readFileSync(config, 'utf8'));
     if (input.error) throw new Error(`Invalid config: ${config}`);
     const data = input.config;

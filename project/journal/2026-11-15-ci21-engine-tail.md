@@ -142,3 +142,10 @@ main's existing Bash4 and absolute-temp fixes; preserve those implementations.
 Normal pins install verified9,218 files/1,660MiB, frozen dependencies refreshed
 to format0.5.10. Rebased 13-file regression107 cases, layer compiler and
 focused typed lint pass; input generation left no tracked changes.
+
+The first full gate passed8,843 cases and found one missing large-JSON
+companion for the complete frozen dressing page. Generate its exact native
+compiler type and retain the negative/mutable declaration proof. The
+inherited CLI still required the removed tsconfig.shards.json; process
+that historical config only when present, retaining mandatory test config
+checks. Ordinary generation and --check now work in the engine checkout.
