@@ -127,6 +127,7 @@ export const DONE = {
     'src/client/engine/world/Boundary.ts': { why: "the shard's edge — cliffs, walls, the sea wall: world, welded to the ground", counts: { mergeGeometries: 6 } },
     'src/client/engine/world/forest/Forest.ts': { why: 'the forest field: a scatter (world, §1); Pine Hollow places its trees as the forest tree model, the other forests are the field', counts: { InstancedMesh: 1, BatchedMesh: 1 } },
     'src/client/engine/world/Grass.ts': { why: 'the grass blades: a shader-drawn field (world, §1)', counts: { InstancedMesh: 2 } },
+    'src/client/engine/world/waterSplash.ts': { why: 'water splash rings: one InstancedMesh of reused ring slots for every pool and mover, look only (world, §1; SHARD-SOURCE SS6a)', counts: { InstancedMesh: 1 } },
     'src/client/engine/world/detailLayer.ts': { why: 'a shard detail layer: one InstancedMesh fed by a camera ring of seeded clumps (world, §1; SHARD-SOURCE AP32b)', counts: { InstancedMesh: 1 } },
     'src/client/engine/render/streamedInstances.ts': { why: "G475 streamed cover: the existing twin instance tier draws a scatter field from admitted rows; streamed kinds have no fixed copies for place() to count", counts: { InstancedMesh: 1 } },
     'src/client/game/systems/looks/particles.ts': { why: 'mist and needle fall: an effect', counts: { InstancedMesh: 2 } },
