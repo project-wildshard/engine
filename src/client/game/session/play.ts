@@ -91,6 +91,7 @@ import { Hands, type SwimArms } from '@wildshard/engine/player/Hands';
 import { Combat, aimReadout } from '@wildshard/engine/ui/Combat';
 import { DeathFade } from '@wildshard/engine/ui/DeathFade';
 import { FirstHints } from '@wildshard/engine/ui/FirstHints';
+import { firstPlayCardUp } from '@wildshard/engine/boot/firstPlayMark';
 import { HurtArc, deathCause, respawnWhere } from '@wildshard/engine/ui/HurtArc';
 import { LockOn } from '@wildshard/engine/ui/LockOn';
 import { FullMap } from '@wildshard/engine/ui/Map';
@@ -511,7 +512,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // ── first-time control hints (E308, src/client/engine/ui/FirstHints.ts: every shard's one system; after main's onJump / onDodge, which
   // it chains): a label + pulsing ring on the touch control the first time it matters. Driftwood feeds its six triggers
   // (src/shards/driftwood-isle/firstMinutes.ts); another shard shows none until it feeds its own ──
-  const firstHints = new FirstHints(player, { touch: touchControls.active, paused: () => !hud.entered || hud.paused || deathFade.active || away() || world.freeCamera || world.tour.active });
+  const firstHints = new FirstHints(player, { touch: touchControls.active, paused: () => !hud.entered || hud.paused || deathFade.active || away() || world.freeCamera || world.tour.active || firstPlayCardUp() });
   game.onUpdate((dt) => { firstHints.update(dt); }, 'first hints');
 
   // ── menu ↔ world: the world is fully loaded, then sits frozen and silent under the menu (hero art

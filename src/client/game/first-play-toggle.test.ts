@@ -2,7 +2,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import { withOwner } from '@wildshard/engine/app/ownership';
-import { finishFirstPlay, firstPlayDone, resetFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
+import { finishFirstPlay, firstPlayCardUp, firstPlayDone, resetFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
 import { graphicsMode, saveGraphicsMode } from '@wildshard/engine/core/graphicsMode';
 import { presetLabel, resetKnobs, saveFlag, saveWorldToggle } from '@wildshard/engine/core/graphicsQuality';
 import { installFirstPlay, PEAK_OPACITY, REST_OPACITY, FADE_MS } from './firstPlay';
@@ -54,4 +54,19 @@ test('rule 6: the in-world toggle follows Low · High · Custom: on Custom it sa
   expect(presetLabel()).toBe('high');
   expect(box?.dataset['mode']).toBe('high');
   expect(box?.querySelector('[data-v="high"]')?.getAttribute('aria-pressed')).toBe('true');
+});
+
+test('SB9: while the card is up the hints and the voice tip wait; DONE and the In-world off both take the flag down', () => {
+  finishFirstPlay(); saveWorldToggle(true);
+  expect(firstPlayCardUp()).toBe(false);
+  const root = mount();
+  expect(firstPlayCardUp()).toBe(true);
+  tap(root.querySelector('.ws-firstplay-vdone'));
+  expect(firstPlayCardUp()).toBe(false);
+  saveWorldToggle(false); saveWorldToggle(true);
+  const again = mount();
+  expect(firstPlayCardUp()).toBe(true);
+  saveWorldToggle(false);
+  expect(again.querySelector('.ws-firstplay-va')).toBeNull();
+  expect(firstPlayCardUp()).toBe(false);
 });

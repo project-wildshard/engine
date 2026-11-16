@@ -41,3 +41,15 @@ export function firstPlayPending(destination: string, now: number = Date.now()):
 export function takeFirstPlay(): void { dropFirstPlay(); }
 /** DONE: the device has had its first play. */
 export function finishFirstPlay(): void { try { done.write(true); } catch { /* storage blocked: the title asks again next time */ } dropFirstPlay(); }
+
+/** STAGING-BUGBASH SB9: the Graphics card is on screen (firstPlay.ts `showToggle`). Arrival shows one popup at a time: the
+ *  control hints and the voice tip wait until the card is done. */
+let cardsUp = 0;
+/** The card went up; the returned function takes it down (once). */
+export function firstPlayCardShown(): () => void {
+  cardsUp++;
+  let down = false;
+  return () => { if (!down) { down = true; cardsUp--; } };
+}
+/** Whether a Graphics card is on screen now. */
+export function firstPlayCardUp(): boolean { return cardsUp > 0; }

@@ -1,7 +1,7 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import { listenTap } from '@wildshard/engine/input/dom';
 import { mountUi } from '@wildshard/engine/ui/ownership';
-import { FIRST_PLAY_EVENT, finishFirstPlay, firstPlayPending, takeFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
+import { FIRST_PLAY_EVENT, finishFirstPlay, firstPlayCardShown, firstPlayPending, takeFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
 import { lowPowerOn, lowPowerRefusal, PIXELS_EVENT, type GraphicsMode } from '@wildshard/engine/core/graphicsMode';
 import { applyPreset, modeLine, presetLabel, PROTO_EVENT, worldToggleOn } from '@wildshard/engine/core/graphicsQuality';
 import './firstPlay.css';
@@ -54,6 +54,7 @@ export function installFirstPlay(scope: Scope, root: HTMLElement, slug: string):
 /** The toggle, in a scope of its own that DONE disposes (exported for its test and the worst-case HUD). */
 export function showToggle(parent: Scope, root: HTMLElement, closed: () => void = () => undefined): HTMLElement {
   const scope = parent.child('gfx-toggle');
+  scope.onDispose(firstPlayCardShown()); // SB9: the hints and the voice tip wait for DONE
   const el = (tag: string, cls: string, text = ''): HTMLElement => { const n = document.createElement(tag); n.className = cls; n.textContent = text; return n; };
   const box = el('section', 'ws-firstplay-v ws-firstplay-va');
   box.setAttribute('role', 'group'); box.setAttribute('aria-label', COPY.title);
