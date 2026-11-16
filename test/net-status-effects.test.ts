@@ -50,7 +50,9 @@ test('in a room the whip heavy poisons a creature: the row\'s damage on the row\
   const one = directLoopback(), two = directLoopback(), attacker = new NetClient(one.client), watcher = new NetClient(two.client);
   try {
     room.join(one.server); attacker.hello(); one.pump(); room.open(); one.pump();
-    const second = host.addPlayer('bot:watcher', { x: lead.position.x + 3, y: lead.position.y, z: lead.position.z });
+    // Template rev 7 brings creatures to the spawn yard (grey-blob:3 at [8, 0, 2] strikes; the bog-wisps orbit [-19.4, 0] and
+    // notice at 18 m), so the watcher stands 20 m south, past every notice radius, where only the poison under test can hurt it.
+    const second = host.addPlayer('bot:watcher', { x: lead.position.x + 3, y: lead.position.y, z: lead.position.z + 20 });
     room.join(two.server, world.playerOf(second.id)); watcher.hello('', { player: 'device:watcher', name: 'Watcher' }); two.pump();
     const pump = (): void => { room.tick(); one.pump(); two.pump(); };
     for (let i = 0; i < 4; i++) pump();

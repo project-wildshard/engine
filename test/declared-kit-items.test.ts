@@ -54,8 +54,14 @@ test('a whip press strikes with the declared runtime, and the lantern burns and 
   tick(sim, kit, command({ attack: close() }));
   expect(blob.hp).toBe(hp - 18); // the whip's light blow, not the host's zero-damage probe
 
-  // A swap by slot is the sword's, and a heavy press is the sword's heavy.
+  // Template rev 7 (TC-M5b, J361): the sword is found on a rack, not in the loadout. A swap to its slot is spent while it hangs
+  // there; the rack's prompt puts it in hand, and then a heavy press is the sword's heavy.
   expect(kit.equip(PLAYER, 1)).toBe(true);
+  tick(sim, kit);
+  expect(player.held).toBe(0);
+  player.position.set(1, player.position.y, -11); player.motor.resetAt(player.position); // template.rack.use, at [1, 1, -12]
+  expect(kit.scene(PLAYER, 'template.rack.use')).toBe(true);
+  tick(sim, kit);
   expect(player.held).toBe(1);
   expect(kit.equip(PLAYER, 9)).toBe(false);
   for (let i = 0; i < 30; i++) tick(sim, kit);

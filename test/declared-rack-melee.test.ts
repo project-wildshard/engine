@@ -83,8 +83,9 @@ test('a melee weapon on a rack: no swap to it, taken near its rack into the hand
 });
 
 test('a melee weapon with no rack take, or the loadout primary, is never racked', async () => {
-  const { shard, sim } = await withRack();
-  const bare = { ...shard, targets: { ...shard.targets, itemActions: (shard.targets.itemActions ?? []).filter(row => row.scene !== SCENE) } };
+  const { shard, sim, sword } = await withRack();
+  // Template rev 7 racks the sword itself (`template.rack.take`, TC-M5b), so "no rack take" drops that take too.
+  const bare = { ...shard, targets: { ...shard.targets, itemActions: (shard.targets.itemActions ?? []).filter(row => row.action !== 3 || row.item !== sword) } };
   expect(rackMeleeRows(bare).size).toBe(0);
   const primary = shard.items.loadout.primary;
   if (primary === null) throw new Error('Template has a primary');
