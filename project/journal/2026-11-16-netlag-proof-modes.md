@@ -15,16 +15,20 @@ the span. Missing telemetry, unexercised reconciliation, no rendered
 slow frames, a fall or a missed route cannot qualify B4.
 
 Review caught a vacuous dependency on natural corrections. The proof
-now reads the main NetClient via a developer-only accessor, removed
-with the page's scope. The real online shell refuses a second bot;
-the failed attempt is retained and no bot is created by this proof.
-Public frame observers replace only the latest
-owner block with a copied block 0.3 m lower outbound and 1 m lower on
-return. Saved wire frames stay intact. Each injection counts only
-after the predictor's correction observer confirms that exact tick.
-This works when a batch discards older packets and needs no shipped
-gameplay switch. A serialized-hook regression proves copy isolation,
-newest-block selection, confirmation and observer cleanup.
+now reads the actual client and predictor via a developer-only
+accessor, removed with the page's scope. The online shell refuses a
+second bot; that failed attempt is retained, and no bot is created.
+
+The first four-way bridge matrix crossed in every variant with no
+fall or sampled feet under the existing threshold, but confirmed no
+injection and correctly failed B4. Live input reconciles within an
+earlier frame listener, before a later observer can replace latest.
+The proof now wraps the actual predictor reconcile call, lowering a
+copied owner argument by 0.3 m outbound and 1 m returning. Neither
+latest nor saved wire frames change. Each injection counts only when
+the real correction observer confirms that exact tick. Serialized
+regressions cover synchronous live delivery and newest-only render
+delivery, copy isolation, confirmation and restoration of the method.
 
 The timeout scale affects only startup and route waits. It leaves
 physics, the 180 ms link, the timed phase length and all B1/B2/B3

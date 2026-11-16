@@ -8,34 +8,39 @@ export function bridgeVerdict(sample) {
     && Number(sample.spanSamples) > 0 && typeof sample.lowest === 'number' && Number.isFinite(sample.lowest) };
 }
 
-/** Observe the developer probe's actual room client. Self-contained for page.evaluate. */
+/** Intercept actual reconciliation, including live input's synchronous frame
+ * delivery path. Only a copied owner argument changes; wire caches stay intact.
+ * Self-contained for page.evaluate. */
 export function installBridgeCorrections() {
-  const W = /** @type {any} */ (window), state = W.__netLag, client = W.__workerClientNet?.();
-  if (client === undefined) throw new Error('Missing developer NetClient probe');
+  const W = /** @type {any} */ (window), state = W.__netLag, observed = W.__workerClientNet?.();
+  if (observed === undefined) throw new Error('Missing developer prediction probe');
+  const { client, predictor } = observed, original = predictor.reconcile;
   const player = W.__wildshard.world.player;
   const fault = state.bridgeFault = { ready: false, armed: 0, confirmed: /** @type {any[]} */ ([]), cleanup: () => undefined };
   const pending = new Map();
-  // Discover py through the public decoder rather than pinning a wire index.
   const marker = Float64Array.from({ length: client.latest?.owner.length ?? 0 }, (_, index) => index + 1000);
   const py = marker.indexOf(client.owner({ owner: marker }).py);
   if (py === -1) throw new Error('Cannot locate owner feet column');
-  const offFrame = client.onFrame((/** @type {any} */ frame) => {
-    if (fault.armed === 0 || state.slowMs !== 60 || client.latest !== frame) return;
+  /** @this {any} @param {number} seq @param {ArrayLike<number>} owner @param {number|undefined} tick @param {ArrayLike<number>|null|undefined} ride */
+  function inject(seq, owner, tick, ride) {
     const at = player.position, along = ((at.x - 15.29) + (at.z - 13.29)) / (2 * (34.38 - 15.29));
-    if (along <= 0.2 || along >= 0.8) return;
-    const owner = new Float64Array(frame.owner), fromY = client.owner(frame).py;
-    owner[py] = (owner[py] ?? 0) - fault.armed;
-    const replacement = { ...frame, owner }, toY = client.owner(replacement).py;
-    if (Math.abs(fromY - toY - fault.armed) > 1e-6) throw new Error('Owner feet encoding changed');
-    client.latest = replacement;
-    pending.set(frame.tick, { sink: fault.armed, tick: frame.tick, fromY, toY });
-  });
+    if (fault.armed !== 0 && state.slowMs === 60 && Number.isSafeInteger(tick) && along > 0.2 && along < 0.8) {
+      const copy = new Float64Array(owner), fromY = client.owner({ owner }).py;
+      copy[py] = (copy[py] ?? 0) - fault.armed;
+      const toY = client.owner({ owner: copy }).py;
+      if (Math.abs(fromY - toY - fault.armed) > 1e-6) throw new Error('Owner feet encoding changed');
+      pending.set(tick, { sink: fault.armed, tick, fromY, toY });
+      return original.call(this, seq, copy, tick, ride);
+    }
+    return original.call(this, seq, owner, tick, ride);
+  }
   const offCorrection = client.onCorrection((/** @type {any} */ row) => {
     const injected = pending.get(row.tick);
     if (injected === undefined || fault.armed === 0) return;
     fault.confirmed.push({ ...injected, offset: row.offset }); fault.armed = 0; pending.clear();
   });
-  fault.cleanup = () => { offFrame(); offCorrection(); pending.clear(); };
+  fault.cleanup = () => { if (predictor.reconcile === inject) predictor.reconcile = original; offCorrection(); pending.clear(); };
+  predictor.reconcile = inject;
   fault.ready = true;
 }
 

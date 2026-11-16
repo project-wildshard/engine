@@ -30,21 +30,23 @@ test('timing qualification still requires every requested bar', () => {
   expect(proofVerdict({ b4: bridgeVerdict(crossing), errors: ['uncaught page error'] }, 'correctness').ok).toBe(false);
 });
 
-test('bridge faults replace only selected owner frames and require observed replay', () => {
+test.each(['live', 'render'])('bridge faults intercept the actual %s reconciliation without changing wire frames', mode => {
   interface Frame { tick: number; owner: Float64Array }
   class Client {
     latest: Frame = { tick: 1, owner: new Float64Array([0, 6, 0]) };
-    frames = new Set<(frame: Frame) => void>();
     corrections = new Set<(row: { tick: number; offset: number }) => void>();
-    rendered(): void {}
     owner(frame: { owner: Float64Array }): { py: number } { return { py: frame.owner[1] ?? 0 }; }
-    onFrame(fn: (frame: Frame) => void): () => void { this.frames.add(fn); return () => { this.frames.delete(fn); }; }
     onCorrection(fn: (row: { tick: number; offset: number }) => void): () => void { this.corrections.add(fn); return () => { this.corrections.delete(fn); }; }
-    receive(frame: Frame): void { this.latest = frame; for (const fn of this.frames) fn(frame); }
   }
   const main = new Client(), unavailableBot = vi.fn(() => { throw new Error('A second client belongs to a server in this page'); });
-  const state = { slowMs: 60, bridgeFault: undefined as undefined | { ready: boolean; armed: number; confirmed: { sink: number }[]; cleanup: () => void } };
-  runInNewContext(`(${installBridgeCorrections.toString()})()`, { window: { __netLag: state, __wildshard: { world: { player: { position: { x: 25, y: 6, z: 23 } } } }, __workerClientNet: () => main, __workerClientBot: unavailableBot } });
+  const original = vi.fn((_seq: number, owner: Float64Array, tick: number, _ride: unknown) => {
+    const sink = 6 - (owner[1] ?? 0);
+    if (sink > 0) for (const fn of main.corrections) fn({ tick, offset: sink });
+    return sink > 0;
+  });
+  const predictor = { reconcile: original };
+  const state = { slowMs: 60, bridgeFault: undefined as undefined | { ready: boolean; armed: number; confirmed: { sink: number; tick: number }[]; cleanup: () => void } };
+  runInNewContext(`(${installBridgeCorrections.toString()})()`, { window: { __netLag: state, __wildshard: { world: { player: { position: { x: 25, y: 6, z: 23 } } } }, __workerClientNet: () => ({ client: main, predictor }), __workerClientBot: unavailableBot } });
   expect(unavailableBot).not.toHaveBeenCalled();
   const fault = state.bridgeFault; expect(fault?.ready).toBe(true);
   if (fault === undefined) throw new Error('Missing hook');
@@ -53,14 +55,18 @@ test('bridge faults replace only selected owner frames and require observed repl
       fault.armed = sink;
       const discarded = { tick: 2 + index * 2, owner: new Float64Array([0, 6, 0]) };
       const selected = { tick: discarded.tick + 1, owner: new Float64Array([0, 6, 0]) };
-      main.receive(discarded); main.receive(selected);
+      main.latest = discarded;
+      // Live device input reconciles synchronously on receipt, before later frame listeners.
+      if (mode === 'live') predictor.reconcile(discarded.tick, discarded.owner, discarded.tick, null);
+      main.latest = selected;
+      predictor.reconcile(selected.tick, selected.owner, selected.tick, null);
+      expect(main.latest).toBe(selected);
       expect(selected.owner[1]).toBe(6); expect(discarded.owner[1]).toBe(6);
-      expect(main.latest.owner[1]).toBeCloseTo(6 - sink);
-      expect(fault.confirmed).toHaveLength(index);
-      for (const fn of main.corrections) fn({ tick: selected.tick, offset: sink });
+      expect(fault.confirmed).toHaveLength(index + 1);
+      expect(fault.confirmed[index]?.tick).toBe(mode === 'live' ? discarded.tick : selected.tick);
       expect(fault.armed).toBe(0);
     }
     expect(fault.confirmed.map(row => row.sink)).toEqual([0.3, 1]);
   } finally { fault.cleanup(); }
-  expect(main.frames.size).toBe(0); expect(main.corrections.size).toBe(0);
+  expect(predictor.reconcile).toBe(original); expect(main.corrections.size).toBe(0);
 });
