@@ -77,7 +77,7 @@ jobs:
       - uses: ./.github/actions/ring-setup
       - run: node scripts/pins.ts install --ring 1
       - run: bash scripts/ci-playwright-install.sh webkit
-      # This worker does not consume boot tables. Generation after the frozen Ring 1 install would dirty them.
+      # Both sides use committed boot tables. Generation after the frozen Ring 1 install would dirty them.
       - name: Compare the same real tape in Node and a WebKit worker
         run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs scripts/determinism/report.ts
         env:

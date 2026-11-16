@@ -30,3 +30,11 @@ frozen Ring 1 install. Those tables are not worker inputs; the worker
 needs only installed pins and committed source. Remove that generation
 step, retain dirty paths in the report, and refuse a dirty tree outright.
 The next hosted witness must prove this clean setup independently.
+
+The clean repeat at 7155e50f passes: hosted job 133073507382 / run
+43798211703, WebKit 27.2 versus Node v24.22.2, eight exact 48-tick pairs,
+reversed input rejected at tick one, dirty false / no dirty paths. The
+whole workflow is not green: existing released-save checks fail in its
+separate report job; the catalogue was cancelled after preserving this
+worker witness. Final metadata correction preserves porcelain's leading
+status space instead of trimming it. No simulation bytes changed.

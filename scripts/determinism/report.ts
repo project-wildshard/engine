@@ -37,7 +37,6 @@ const sha = (bytes: string | Uint8Array): string =>
   createHash("sha256").update(bytes).digest("hex");
 const buildId = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 const dirtyPaths = execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" })
-  .trim()
   .split("\n")
   .filter(Boolean);
 const dirty = dirtyPaths.length > 0;
