@@ -299,7 +299,15 @@ export class ShardfileClient {
       viewer: () => runtime.viewer(), frame: (run) => { ctx.system({ id: 'game.shardfile.details', phase: 'late', run }); } });
     // SHARD-SOURCE SS6: a scene pool splashes and rings when the player walks in, wades or walks out
     installClientSplash(this.source.water, { root: ctx.root, scope: ctx.scope, phone: TIER === 'phone',
-      movers: () => { const at = world.player.position; return [{ id: 'player', x: at.x, y: at.y, z: at.z }]; },
+      // the player and every declared creature with a body (SS6c): a creature wading the pond splashes as the player does
+      movers: () => {
+        const at = world.player.position, movers = [{ id: 'player', x: at.x, y: at.y, z: at.z }];
+        for (const spawn of this.source.creatures.spawns) {
+          const body = wirePage.namedBody(spawn.id);
+          if (body !== null && body.mesh.parent !== null) movers.push({ id: spawn.id, x: body.mesh.position.x, y: body.mesh.position.y, z: body.mesh.position.z });
+        }
+        return movers;
+      },
       frame: (run) => { ctx.system({ id: 'game.shardfile.splash', phase: 'update', run }); } });
     const nativeWorld = this.nativeFeatures || this.mode === 'presentation';
     const start = nativeWorld ? ctx.manifest.spawn : this.source.spawn;
