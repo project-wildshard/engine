@@ -115,7 +115,8 @@ try {
       await page.keyboard.down('KeyW');
       // a body held by a post or rail (the local rig's fresh seat spawns on Driftwood's pier) hops it: no 0.5 m in a second jumps
       for (let ends = Date.now() + 90_000, near = Infinity, last = { x: Infinity, z: Infinity, t: Date.now() }; Date.now() < ends && near > 3; await sleep(250)) {
-        const at = await sample(); near = Math.hypot(at.x - x, at.z - z); await face(Math.atan2(at.x - x, at.z - z));
+        const at = await sample(); if (at === undefined) continue; // no clean sample yet (WebKit's slower first frames)
+        near = Math.hypot(at.x - x, at.z - z); await face(Math.atan2(at.x - x, at.z - z));
         if (Math.hypot(at.x - last.x, at.z - last.z) >= 0.5) last = { x: at.x, z: at.z, t: Date.now() };
         else if (Date.now() - last.t > 1000) { await page.keyboard.press('Space'); last.t = Date.now(); }
       }
