@@ -12239,5 +12239,703 @@
         ]
       }
     ]
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/defined-sections.test.ts",
+    "outcome": "migrated",
+    "target": "test/defined-sections.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "custom definition and emission APIs are absent",
+      "named build and native validators retain strict shape and numeric checks",
+      "paced named validation preserves cancellation and async refusal",
+      "named disk schemas refuse corrupt UTF8, external code and unknown checks"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "1eaf0996615dc0ab98d3d2e82ebdc03010c8ad22",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/defined-sections.test.ts",
+        "targetBlob": "0d9ed35506b7a9af38e1e560cd849b73047b7741",
+        "tests": [
+          "custom definition and emission APIs are absent",
+          "named build and native validators retain strict shape and numeric checks",
+          "paced named validation preserves cancellation and async refusal",
+          "named disk schemas refuse corrupt UTF8, external code and unknown checks"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "test/defined-sections.test.ts",
+        "originalTests": [
+          "custom definition and emission APIs are absent",
+          "named build and native validators retain strict shape and numeric checks",
+          "paced named validation preserves cancellation and async refusal",
+          "named disk schemas refuse corrupt UTF8, external code and unknown checks"
+        ]
+      }
+    ]
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/named-json-admission.test.ts",
+    "outcome": "migrated",
+    "target": "test/named-json-admission.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "named JSON retains its byte-bound contract above the custom-section node cap",
+      "a paced named read pauses between its steps and compiles each schema once",
+      "each inline schema keeps the existing independent plain-JSON cap",
+      "a first-party build's named JSON parses without its schema; an external product's validates"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "1f07c315f69f0d13f716921f01f7d67bfc8fdb70",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/named-json-admission.test.ts",
+        "targetBlob": "c025464cdf3975da68991a70821698f28039c1af",
+        "tests": [
+          "named JSON retains its byte-bound contract above the custom-section node cap",
+          "a paced named read pauses between its steps and compiles each schema once",
+          "each inline schema keeps the existing independent plain-JSON cap",
+          "a first-party build's named JSON parses without its schema; an external product's validates"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "test/named-json-admission.test.ts",
+        "originalTests": [
+          "named JSON retains its byte-bound contract above the custom-section node cap",
+          "a paced named read pauses between its steps and compiles each schema once",
+          "each inline schema keeps the existing independent plain-JSON cap",
+          "a first-party build's named JSON parses without its schema; an external product's validates"
+        ]
+      }
+    ]
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/registered-json.test.ts",
+    "outcome": "migrated",
+    "target": "test/registered-json.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "registered names use exact defining format schemas without changing the old schema document",
+      "defining validation preserves the owned value and original semantic refusals",
+      "a registered read refuses missing or foreign metadata before reading any bytes",
+      "external reads retain schema admission, defining semantic checks, identity and optional freezing",
+      "trusted built reads keep canonical parsing and do not invoke the external checker",
+      "retired private documents refuse their old checked bridge and keep missing-file refusal",
+      "author and independent output admission enforce the registered semantic contract"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "9a431ded34032e0d1bedf1c766fbf896754543c1",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/registered-json.test.ts",
+        "targetBlob": "354e71e3098726fdaf86bb8107b14f656fdc30bd",
+        "tests": [
+          "registered names use exact defining format schemas without changing the old schema document",
+          "defining validation preserves the owned value and original semantic refusals",
+          "a registered read refuses missing or foreign metadata before reading any bytes",
+          "external reads retain schema admission, defining semantic checks, identity and optional freezing",
+          "trusted built reads keep canonical parsing and do not invoke the external checker",
+          "retired private documents refuse their old checked bridge and keep missing-file refusal",
+          "author and independent output admission enforce the registered semantic contract"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "test/registered-json.test.ts",
+        "originalTests": [
+          "registered names use exact defining format schemas without changing the old schema document",
+          "defining validation preserves the owned value and original semantic refusals",
+          "a registered read refuses missing or foreign metadata before reading any bytes",
+          "external reads retain schema admission, defining semantic checks, identity and optional freezing",
+          "trusted built reads keep canonical parsing and do not invoke the external checker",
+          "retired private documents refuse their old checked bridge and keep missing-file refusal",
+          "author and independent output admission enforce the registered semantic contract"
+        ]
+      }
+    ]
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/world-assembly-schema.test.ts",
+    "outcome": "migrated",
+    "target": "test/world-assembly-schema.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "the defining assembly root emits structural rows and retains its explicit admission checks",
+      "assembly emission does not grant a bridge to a foreign custom predicate",
+      "arena room variants retain the original open wire and refuse mixed room resources"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "c46643aa0cc484736405de1dbc3dfe4ca7a336cc",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/world-assembly-schema.test.ts",
+        "targetBlob": "bbdb30a71b5945406516853a64f4383f04846589",
+        "tests": [
+          "the defining assembly root emits structural rows and retains its explicit admission checks",
+          "assembly emission does not grant a bridge to a foreign custom predicate",
+          "arena room variants retain the original open wire and refuse mixed room resources"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "test/world-assembly-schema.test.ts",
+        "originalTests": [
+          "the defining assembly root emits structural rows and retains its explicit admission checks",
+          "assembly emission does not grant a bridge to a foreign custom predicate",
+          "arena room variants retain the original open wire and refuse mixed room resources"
+        ]
+      }
+    ]
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/nalati-carried-terrain-ports.test.ts",
+    "outcome": "migrated",
+    "target": "test/carried-terrain-ports.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "carried quest admission retains full native output and continuation refusals",
+      "terrain authors receive the exact native channel layout, sizes and fills"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "2dbe0713c3a67d3df2c09ba92ed56cf649ecd619",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/carried-terrain-ports.test.ts",
+        "targetBlob": "52f29401f1cc134e61197f95056e0682a932f12b",
+        "tests": [
+          "carried quest admission retains full native output and continuation refusals",
+          "terrain authors receive the exact native channel layout, sizes and fills"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "test/carried-terrain-ports.test.ts",
+        "originalTests": [
+          "carried quest admission retains full native output and continuation refusals",
+          "terrain authors receive the exact native channel layout, sizes and fills"
+        ]
+      }
+    ]
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/output-runtime.test.ts",
+    "outcome": "migrated",
+    "target": "test/output-runtime.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "ships no runtime TypeScript: declarations pass, a stale runtime output is cleared and other outputs stay",
+      "uses the ruler comment law for templates, regexes, strings and multiline comments",
+      "refuses executable source, non-TS and symlinks before changing a previous output (LD9: no copied runtime entry)",
+      "supports data-only projects and refuses overlapping output",
+      "checks copied constants against unchanged mirrors without a custom registry",
+      "admits the compiled Driftwood source without copying retired runtime data",
+      "refuses retired custom registry %s before deleting any output"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "68b47d3049f1a1b0910d720ad2bbf801d3d5176a",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/output-runtime.test.ts",
+        "targetBlob": "0fde9f3ab5bab203cfe19d0bc68ac1e957697169",
+        "tests": [
+          "ships no runtime TypeScript: declarations pass, a stale runtime output is cleared and other outputs stay",
+          "uses the ruler comment law for templates, regexes, strings and multiline comments",
+          "refuses executable source, non-TS and symlinks before changing a previous output (LD9: no copied runtime entry)",
+          "supports data-only projects and refuses overlapping output",
+          "checks copied constants against unchanged mirrors without a custom registry",
+          "admits the compiled SDK Template source without copying retired runtime data",
+          "refuses retired custom registry %s before deleting any output"
+        ],
+        "branch": "main",
+        "originalCaseTitleMap": {
+          "ships no runtime TypeScript: declarations pass, a stale runtime output is cleared and other outputs stay": "ships no runtime TypeScript: declarations pass, a stale runtime output is cleared and other outputs stay",
+          "uses the ruler comment law for templates, regexes, strings and multiline comments": "uses the ruler comment law for templates, regexes, strings and multiline comments",
+          "refuses executable source, non-TS and symlinks before changing a previous output (LD9: no copied runtime entry)": "refuses executable source, non-TS and symlinks before changing a previous output (LD9: no copied runtime entry)",
+          "supports data-only projects and refuses overlapping output": "supports data-only projects and refuses overlapping output",
+          "checks copied constants against unchanged mirrors without a custom registry": "checks copied constants against unchanged mirrors without a custom registry",
+          "admits the compiled Driftwood source without copying retired runtime data": "admits the compiled SDK Template source without copying retired runtime data",
+          "refuses retired custom registry %s before deleting any output": "refuses retired custom registry %s before deleting any output"
+        },
+        "repo": "sharddev",
+        "target": "test/output-runtime.test.ts",
+        "originalTests": [
+          "ships no runtime TypeScript: declarations pass, a stale runtime output is cleared and other outputs stay",
+          "uses the ruler comment law for templates, regexes, strings and multiline comments",
+          "refuses executable source, non-TS and symlinks before changing a previous output (LD9: no copied runtime entry)",
+          "supports data-only projects and refuses overlapping output",
+          "checks copied constants against unchanged mirrors without a custom registry",
+          "admits the compiled Driftwood source without copying retired runtime data",
+          "refuses retired custom registry %s before deleting any output"
+        ]
+      }
+    ]
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/script-v2-radial.test.ts",
+    "outcome": "migrated",
+    "target": "src/sharddev/bake/script-v2-radial.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "admitted project radial math is finite and close to native geometry"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "531debf7aa70c4802d1b615a78b4f7f6b92e9cc9",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "src/sharddev/bake/script-v2-radial.test.ts",
+        "targetBlob": "ea3063772987cd827db07375b69bac8e2c454478",
+        "tests": [
+          "admitted project radial math is finite and close to native geometry"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "src/sharddev/bake/script-v2-radial.test.ts",
+        "originalTests": [
+          "admitted project radial math is finite and close to native geometry"
+        ]
+      }
+    ]
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/return-projection-inventory.test.ts",
+    "outcome": "migrated",
+    "target": "test/return-projection-inventory.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "project ABI survives named reconstruction, disk, browser and native without scheduling",
+      "missing or mismatched project contracts refuse without guessing the ABI",
+      "legacy return inventories keep the original parser normalization and refusals"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "c5aacdb98893549e7b71cfe6716db07f5351e947",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/return-projection-inventory.test.ts",
+        "targetBlob": "98c4c6cfa5aee9737b6265a09e903f84168b554a",
+        "tests": [
+          "project ABI survives named reconstruction, disk, browser and native without scheduling",
+          "missing or mismatched project contracts refuse without guessing the ABI",
+          "legacy return inventories keep the original parser normalization and refusals"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "test/return-projection-inventory.test.ts",
+        "originalTests": [
+          "project ABI survives named reconstruction, disk, browser and native without scheduling",
+          "missing or mismatched project contracts refuse without guessing the ABI",
+          "legacy return inventories keep the original parser normalization and refusals"
+        ]
+      }
+    ]
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/species-barrel-author-ports.test.ts",
+    "outcome": "migrated",
+    "target": "test/species-barrel-author-ports.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "finite species-field readers retain complete defining types, strict grammar and issue order",
+      "barrel metadata preserves native complete identity and stays renderer-free",
+      "complete ecology, barrel bodies/floors and watch decision retain original wires"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "cfb067d11d760ba117fcefe317803c43253504c8",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/species-barrel-author-ports.test.ts",
+        "targetBlob": "d898960a2aa7b9c8b53841cc91e38f71db0b3b3b",
+        "tests": [
+          "finite species-field readers retain complete defining types, strict grammar and issue order",
+          "barrel metadata preserves native complete identity and stays renderer-free"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "test/species-barrel-author-ports.test.ts",
+        "originalTests": [
+          "finite species-field readers retain complete defining types, strict grammar and issue order",
+          "barrel metadata preserves native complete identity and stays renderer-free"
+        ]
+      },
+      {
+        "repository": "project-wildshard/shard-nalati",
+        "targetPath": "test/nalati-ecology-wire.test.ts",
+        "revision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+        "targetBlob": "fc9e4eb70f2663779703b3a78d310d97d6016e5f",
+        "originalTests": [
+          "complete ecology, barrel bodies/floors and watch decision retain original wires"
+        ],
+        "wireKeys": [
+          "ecology"
+        ],
+        "fixturePath": "test/fixtures/species-barrel-author-original.json",
+        "fixtureBlob": "62009c0307777eddf73066575f68f7730e03d67a",
+        "branch": "main",
+        "repo": "shard-nalati",
+        "target": "test/nalati-ecology-wire.test.ts"
+      },
+      {
+        "repository": "project-wildshard/shard-driftwood",
+        "targetPath": "test/driftwood-barrel-wire.test.ts",
+        "revision": "5b63092793dae46ce2a3d458462ec17a41ee9d5c",
+        "targetBlob": "98f069a391656000b381895d3043b474ba615e10",
+        "originalTests": [
+          "complete ecology, barrel bodies/floors and watch decision retain original wires"
+        ],
+        "wireKeys": [
+          "bodies",
+          "decision"
+        ],
+        "fixturePath": "test/fixtures/species-barrel-author-original.json",
+        "fixtureBlob": "62009c0307777eddf73066575f68f7730e03d67a",
+        "branch": "main",
+        "repo": "shard-driftwood",
+        "target": "test/driftwood-barrel-wire.test.ts"
+      }
+    ],
+    "wireSplit": {
+      "originalTest": "complete ecology, barrel bodies/floors and watch decision retain original wires",
+      "requiredKeys": [
+        "ecology",
+        "bodies",
+        "decision"
+      ],
+      "fixtureSourcePath": "test/fixtures/species-barrel-author-original.json",
+      "fixtureBlob": "62009c0307777eddf73066575f68f7730e03d67a"
+    }
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/view-author-metadata.test.ts",
+    "outcome": "migrated",
+    "target": "test/view-author-metadata.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "view declarations and fire fields retain complete native contracts and metadata identity",
+      "complete Titan, elite and four fire-profile wires retain every original field and order"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "515eaa3b4ea66dac2a5dcf15d28b96eec39f3aaf",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/view-author-metadata.test.ts",
+        "targetBlob": "788be41fba3c836b5e6ea5ab8fad44e1848b76fd",
+        "tests": [
+          "view declarations and fire fields retain complete native contracts and metadata identity"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "test/view-author-metadata.test.ts",
+        "originalTests": [
+          "view declarations and fire fields retain complete native contracts and metadata identity"
+        ]
+      },
+      {
+        "repository": "project-wildshard/shard-nalati",
+        "targetPath": "test/nalati-view-wires.test.ts",
+        "revision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+        "targetBlob": "a0574b944d85f83d2b6389a87caeea8f9fea0b7c",
+        "originalTests": [
+          "complete Titan, elite and four fire-profile wires retain every original field and order"
+        ],
+        "wireKeys": [
+          "titan",
+          "elite"
+        ],
+        "fixturePath": "test/fixtures/view-author-original.json",
+        "fixtureBlob": "723fd5778f4428b752956b6fe12be0b77cd3ffd0",
+        "branch": "main",
+        "repo": "shard-nalati",
+        "target": "test/nalati-view-wires.test.ts"
+      },
+      {
+        "repository": "project-wildshard/shard-dunes",
+        "targetPath": "test/sunscar-fire-wires.test.ts",
+        "revision": "6ca348a9f59b1f304be34bb9fa3c49fa8e95b0fa",
+        "targetBlob": "57c8cfbcf928d3399962cfb06093295bf9bc507d",
+        "originalTests": [
+          "complete Titan, elite and four fire-profile wires retain every original field and order"
+        ],
+        "wireKeys": [
+          "fires"
+        ],
+        "fixturePath": "test/fixtures/view-author-original.json",
+        "fixtureBlob": "723fd5778f4428b752956b6fe12be0b77cd3ffd0",
+        "branch": "main",
+        "repo": "shard-dunes",
+        "target": "test/sunscar-fire-wires.test.ts"
+      }
+    ],
+    "wireSplit": {
+      "originalTest": "complete Titan, elite and four fire-profile wires retain every original field and order",
+      "requiredKeys": [
+        "titan",
+        "elite",
+        "fires"
+      ],
+      "fixtureSourcePath": "test/fixtures/view-author-original.json",
+      "fixtureBlob": "723fd5778f4428b752956b6fe12be0b77cd3ffd0"
+    }
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/nalati-field-author-ports.test.ts",
+    "outcome": "migrated",
+    "target": "test/terrain-field-author-port.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "native field and planting metadata retain complete signatures, mandatory dimensions and identity",
+      "all twenty original spruce geometries retain every channel bit, group and bound"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "b5c5e58bfb85e8b232102843819f853700acea16",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/terrain-field-author-port.test.ts",
+        "targetBlob": "85ec5ba9e392465170eafdefca3392d99566d6ad",
+        "tests": [
+          "native field and planting metadata retain complete signatures, mandatory dimensions and identity"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "test/terrain-field-author-port.test.ts",
+        "originalTests": [
+          "native field and planting metadata retain complete signatures, mandatory dimensions and identity"
+        ]
+      },
+      {
+        "repository": "project-wildshard/shard-nalati",
+        "targetPath": "test/nalati-field-author-ports.test.ts",
+        "branch": "main",
+        "revision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+        "targetBlob": "79cc35d19ac69d154e911d4df92c6b7707064a13",
+        "originalTests": [
+          "all twenty original spruce geometries retain every channel bit, group and bound"
+        ],
+        "scope": "Full original twenty-spruce geometry/channel/index/group/bound golden, exact original fixture/helper and disposal; default suite/compiler/typed lint/retention admission.",
+        "repo": "shard-nalati",
+        "target": "test/nalati-field-author-ports.test.ts"
+      }
+    ],
+    "caseSplit": true
+  },
+  {
+    "repo": "sharddev",
+    "file": "test/scripts/_template-boss.test.ts",
+    "outcome": "migrated",
+    "target": "test/scripts/_template-boss.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. Assertions are retained except the explicitly recorded Jake-authorized current Warden replacements. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "Template boss runs published Wasm decisions and resumes a logical save"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "0d2bc0982bc672b6579698e64310b6e2da70f55c",
+    "destinationRevision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/sharddev",
+        "revision": "4d25fcda6e3c53cc03ceb4bfe904b380ffcc8293",
+        "targetPath": "test/scripts/_template-boss.test.ts",
+        "targetBlob": "d3ca97aaaccef398c3df9229fc7ddc383fe055e8",
+        "tests": [
+          "Template boss runs published Wasm decisions and resumes a logical save"
+        ],
+        "branch": "main",
+        "repo": "sharddev",
+        "target": "test/scripts/_template-boss.test.ts",
+        "originalTests": [
+          "Template boss runs published Wasm decisions and resumes a logical save"
+        ]
+      }
+    ],
+    "authorization": {
+      "by": "Jake",
+      "date": "2026-11-16",
+      "words": "Test today\u2019s Warden (Recommended)",
+      "scope": "CI21 Template boss current-product oracle update"
+    },
+    "legacyExpectationsReplaced": [
+      "approach/bump and1s/0.5s beats: replaced by current slam/sweep/stone and1.6s/0.9s guard-window cadence",
+      "silent repeat start and stop-reset-to-phase0: replaced by current health-derived rearm/retry and retained authored phase/beat state",
+      "restart after death: replaced by terminal phase3 refusal to restart, as current source requires"
+    ]
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-loft-author.test.ts",
+    "outcome": "migrated",
+    "target": "test/nalati-loft-author.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "the owned loft compiler retains every original ambient channel, bound and topology bit"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "eb86b560e89c2e0498b7213457c4b8ebbeec9ec9",
+    "destinationRevision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/shard-nalati",
+        "revision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+        "targetPath": "test/nalati-loft-author.test.ts",
+        "originalTests": [
+          "the owned loft compiler retains every original ambient channel, bound and topology bit"
+        ],
+        "fixturePath": "test/fixtures/nalati-ambient-original.json",
+        "fixtureBlob": "4de13fb18556107c236d01eb8614076da5da560a",
+        "observationHelper": {
+          "sourcePath": "test/fixtures/nalati-ambient-observation.ts",
+          "sourceBlob": "8e6f7ca0bf50765eb0ce59ce1642bee9124e0bfe",
+          "targetPath": "test/fixtures/nalati-ambient-observation.ts",
+          "changes": "Only owner imports rewritten; original observation/byte/hash/bound/topology/disposal logic unchanged. Actual module runner executes offline author code without a simulation-closure claim.",
+          "targetBlob": "190f8de06f5659bbebf346acc81687a2c2b6ed1b"
+        },
+        "targetBlob": "82fbd4bee7cce7a823070038d9e14b2aa2c939e4",
+        "changes": "Original complete toEqual(original) assertion; actual helper executes through the normal module runner or native V8 process boundary. Test compiler/lint checks the boundary; legacy producer/helper closure stays row36/H4. New cap10s replaces original engine default30s; geometry child cap9s. No oracle or result field normalized.",
+        "branch": "main",
+        "repo": "shard-nalati",
+        "target": "test/nalati-loft-author.test.ts"
+      }
+    ]
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-geometry-cache-ports.test.ts",
+    "outcome": "migrated",
+    "target": "test/nalati-geometry-cache-ports.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "granite and ordinary/scrambled blobs retain all original geometry bits and stream state"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "4adac6a1b4d4cc8dd94addc59298018d4252d90f",
+    "destinationRevision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/shard-nalati",
+        "revision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+        "targetPath": "test/nalati-geometry-cache-ports.test.ts",
+        "originalTests": [
+          "granite and ordinary/scrambled blobs retain all original geometry bits and stream state"
+        ],
+        "fixturePath": "test/fixtures/geometry-cache-author-original.json",
+        "fixtureBlob": "091fea54db11679ebdc852c0a241033bca4fc752",
+        "observationHelper": {
+          "sourcePath": "test/fixtures/geometry-cache-author-observation.ts",
+          "sourceBlob": "701c2b37b486ef87ce8f2396400511457b7ca457",
+          "targetPath": "test/fixtures/geometry-cache-author-observation.ts",
+          "changes": "Only owner imports rewritten. Original observation/byte/hash/bound/topology/stream/disposal logic unchanged; native V8 transport preserves signed zero and typed arrays.",
+          "targetBlob": "73419896a3b706aba683b2a36f07d5ff3883bf8f"
+        },
+        "targetBlob": "a50234ba9a9eecd72d68062901833df7b088164c",
+        "changes": "Original complete toEqual(original) assertion; actual helper executes through the normal module runner or native V8 process boundary. Test compiler/lint checks the boundary; legacy producer/helper closure stays row36/H4. New cap10s replaces original engine default30s; geometry child cap9s. No oracle or result field normalized.",
+        "branch": "main",
+        "repo": "shard-nalati",
+        "target": "test/nalati-geometry-cache-ports.test.ts"
+      }
+    ]
+  },
+  {
+    "repo": "shard-nalati",
+    "file": "test/nalati-original-species.test.ts",
+    "outcome": "migrated",
+    "target": "test/nalati-original-species.test.ts",
+    "decision": "CI21 SDK-tail verified destination landing: every original case has complete blocking owner proof. All original assertions are retained; no oracle change occurs here. No case retirement; paired excluded engine original removed only after all pinned destination heads landed.",
+    "originalTests": [
+      "cold source oracle and every detached warm loan retain all five complete original files",
+      "individual original file loans are detached and unknown names refuse"
+    ],
+    "sourceRevision": "de22e1a170f7b1cff4069ef6623145d6180a6990",
+    "sourceBlob": "eff8a3c90a44c586236a903dbe2ac4f70e64cc7d",
+    "destinationRevision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+    "retirementProof": "No cases retired. Source/destination/oracle/helper blobs and explicit retained title mapping in test/ci21-sdk-tail-held.json, SDK and shard manifests. Exact green CI43860478486/43860335270/43847715513/43845349651/43845353198 plus normal lands.",
+    "assertionDestinations": [
+      {
+        "repository": "project-wildshard/shard-nalati",
+        "revision": "020c7a7ecefea0c0e128df9f972df81bb580f0f6",
+        "targetPath": "test/nalati-original-species.test.ts",
+        "targetBlob": "7d7b737dc89fca19ccf425a18356d6c7931fff9e",
+        "originalTests": [
+          "cold source oracle and every detached warm loan retain all five complete original files",
+          "individual original file loans are detached and unknown names refuse"
+        ],
+        "fixturePath": "test/fixtures/nalati-species-files.json",
+        "fixtureBlob": "17924d4f6b5bb91a750ddd69699b1745dffa61a0",
+        "fixtureSourceRepository": "project-wildshard/shard-nalati",
+        "fixtureSourceRevision": "aa2a7d1153588897c87d4bad724f6f47e6909972",
+        "observationHelper": {
+          "sourcePath": "test/fixtures/nalati-original-species.ts",
+          "sourceRepository": "project-wildshard/shard-nalati",
+          "sourceRevision": "aa2a7d1153588897c87d4bad724f6f47e6909972",
+          "sourceBlob": "a37da4cc06128e9815126edfc9ea51a70f5067a6",
+          "targetPath": "test/fixtures/nalati-original-species.ts",
+          "targetBlob": "e1bf905559a65f78370d78765ef47773f2bcfc57",
+          "changes": "Public installed bake-loader and14s compiler-child caps; optional private directory memoizes one full checked map per absolute root. Both default/private paths use the same bytes.slice loan. Caller explicitly releases private memo and disk root afterAll. No fallback or pin changes."
+        },
+        "preparationHelper": {
+          "targetPath": "test/fixtures/prepare-nalati-original-species.ts",
+          "targetBlob": "78ade7c29e8a0081d7333e46ea7bdb112b80fb96"
+        },
+        "changes": "Every original assertion retained in Happy DOM20.14.5. Cold source cache and loan source cache are independently constructed. Both tests loan from one memoized private map; removing slice fails case2. Cold cache cleans in finally, shared loan cache/memo clean afterAll. Original30s case cap,14s per compiler child (two cold builds fit inside28s plus assertions). Existing Ring2 only: hosted x64 run43845352388 timed out both cold source constructions at the newly introduced9s child fence; Mac mini cold constructions take3.6s each. Full five files/8.34MB and both independent real compilers retained; no production budget or other case cap changes.",
+        "compilerSupport": [
+          "test/fixtures/nalati-original-species.ts"
+        ],
+        "branch": "main",
+        "repo": "shard-nalati",
+        "target": "test/nalati-original-species.test.ts"
+      }
+    ]
   }
 ]
