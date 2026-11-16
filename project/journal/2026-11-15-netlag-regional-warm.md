@@ -84,3 +84,9 @@ and read the live grid's retained crossing phases and runtime hooks
 on their own performance clock. Missing/reversed telemetry fails;
 a completed leg without a retained transition also fails. Four pure
 reader cases pass. A new crossing replay is still owed.
+
+The projection's tick phase must match the room: SimHost moves the
+player before creatures, so command N meets the creature's N-1 pose.
+The first implementation read N. A red-first half-metre difference
+in the linear-motion case pins N-1 for both live steps and replay.
+The existing sample remains unchanged for rendering after projection.

@@ -36,9 +36,10 @@ test('a creature that moved clear no longer blocks a future command at its displ
   try {
     f.interpolator.push(frame(100, 0)); f.interpolator.push(frame(102, 1));
     f.world.frame(100, 1); f.world.syncRows(f.rows, f.feet); f.physics.step();
-    f.world.poseFor(7, false); // command tick 106: the creature is at x 3
+    f.world.poseFor(7, false); // command tick 106 sees the creature's completed tick 105
     f.motor.move(f.feet, { x: 0, y: -22 / 3600, z: -4.3 / 60 });
     expect(f.feet.z).toBeLessThan(-.07);
+    expect(Math.abs(Number(f.interpolator.fields(7, 100)?.['x']))).toBeLessThan(.01);
   } finally { f.dispose(); }
 });
 
@@ -48,7 +49,7 @@ test('replay reposes the collision proxy at the acknowledged command tick', () =
     f.interpolator.push(frame(100, 0)); f.interpolator.push(frame(102, 1));
     f.world.frame(100, 1);
     f.world.poseFor(7, false);
-    expect(f.rows[0]?.x).toBeCloseTo(3, 1);
+    expect(f.rows[0]?.x).toBeCloseTo(2.5, 1);
     f.world.poseFor(1, true);
     expect(Math.abs(f.rows[0]?.x ?? Infinity)).toBeLessThan(.01);
   } finally { f.dispose(); }
@@ -84,9 +85,9 @@ test('dead or departed rows release their collision proxy', () => {
     f.interpolator.push(frame(100, 0));
     f.world.frame(100, 1); f.world.poseFor(1, false);
     expect(f.world.capsuleCount).toBe(1);
-    f.interpolator.push(frame(102, 0, false)); f.world.poseFor(3, false);
+    f.interpolator.push(frame(102, 0, false)); f.world.poseFor(4, false);
     expect(f.world.capsuleCount).toBe(0);
-    f.interpolator.push(frame(104, 0)); f.world.poseFor(5, false);
+    f.interpolator.push(frame(104, 0)); f.world.poseFor(6, false);
     expect(f.world.capsuleCount).toBe(1);
     f.interpolator.clear(); f.world.poseFor(7, false);
     expect(f.world.capsuleCount).toBe(0);

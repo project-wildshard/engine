@@ -17,7 +17,9 @@ export class CreaturePrediction implements PredictedMover {
       private readonly rows: CreaturePredictionRow[], private readonly feet: { readonly x: number; readonly z: number }) {}
   at(tick: number): void {
     for (const creature of this.rows) {
-      if (!this.interpolator.project(creature.handle, tick, this.row, RUN_ON_TICKS)) { creature.alive = false; continue; }
+      // SimHost moves players before stepping creatures. A row stamped N is
+      // the creature after that step; command N therefore meets its N-1 pose.
+      if (!this.interpolator.project(creature.handle, tick - 1, this.row, RUN_ON_TICKS)) { creature.alive = false; continue; }
       creature.x = this.row[X] ?? 0; creature.y = this.row[Y] ?? 0; creature.z = this.row[Z] ?? 0;
       creature.alive = this.row[ALIVE] === 1;
     }
