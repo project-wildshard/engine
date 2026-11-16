@@ -52,19 +52,26 @@ test('enter freezes a walker in Sunscar\'s buffer, and is refused short of it an
   const frozen = road.bodyOf('device:a');
   if (frozen === undefined) throw new Error('the frozen body stands on the road');
   await new Promise(resolve => { setTimeout(resolve, 200); });
-  const still = { x: frozen.position.x, z: frozen.position.z };
-  // 1.5 s of every input: back east at a sprint, then west into the gate with a jump; nothing moves it (unfrozen, a sprint leg is ~5 m)
-  let drift = 0;
+  const still = { x: frozen.position.x, z: frozen.position.z }, t0 = Date.now(), trace: string[] = [];
+  // 1.5 s of every input: back east at a sprint, then west into the gate with a jump; nothing moves it (unfrozen, a sprint leg is ~5 m).
+  // Main ci 43961757496 drifted 0.07 m once and never locally: a thaw in the window's last tick moves that much, so each sample says
+  // whether the road still holds the freeze, and a lifted freeze fails as itself, with the door's answer, before the drift does.
+  let drift = 0, thawedAt: number | null = null;
   for (const [thumb, ms] of [[run(-Math.PI / 2), 750], [run(Math.PI / 2, NET_BUTTONS.sprint | NET_BUTTONS.jump), 750]] as const) {
     a.thumb = thumb;
     for (const ends = Date.now() + ms; Date.now() < ends;) {
       await new Promise(resolve => { setTimeout(resolve, 50); });
-      drift = Math.max(drift, Math.hypot(frozen.position.x - still.x, frozen.position.z - still.z));
+      const moved = Math.hypot(frozen.position.x - still.x, frozen.position.z - still.z), held = road.entering('device:a') === WEST;
+      if (!held) thawedAt ??= Date.now() - t0;
+      if (moved > 0.001 || !held) trace.push(`${Date.now() - t0}ms ${moved.toFixed(3)}m${held ? '' : ' thawed'}`);
+      drift = Math.max(drift, moved);
     }
   }
-  expect(drift, 'frozen: inputs move nothing').toBeLessThan(0.05);
+  const why = `answers ${JSON.stringify(answers)}, socket closes ${closes}, samples ${trace.join(', ') || 'none moved'}`;
+  expect(thawedAt, `the freeze holds through every input (${why})`).toBeNull();
+  expect(answers, `the entry was taken, not refused (${why})`).toHaveLength(2);
+  expect(drift, `frozen: inputs move nothing (${why})`).toBeLessThan(0.05);
   expect(frozen.led, 'led on the wire, so the page predicts no step').toBe(true);
-  expect(answers, 'the entry was taken, not refused').toHaveLength(2);
   // A second word while entering is refused; the seat stays frozen on Driftwood's road, on one socket
   enter(WEST);
   await vi.waitFor(() => { expect(answers.at(-1)).toEqual({ cell: WEST, refused: 'entering' }); }, { timeout: 5000, interval: 20 });
