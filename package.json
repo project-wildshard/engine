@@ -1313,6 +1313,7 @@
     "./net/ledgerWire": "./src/shared/engine/net/ledgerWire.ts",
     "./net/chatFilter": "./src/shared/engine/net/chatFilter.ts",
     "./net/redial": "./src/client/engine/net/redial.ts",
+    "./net/socketClose": "./src/shared/engine/net/socketClose.ts",
     "./net/socketFrames": "./src/shared/engine/net/socketFrames.ts",
     "./net/deviceWord": "./src/shared/engine/net/deviceWord.ts",
     "./net/webSocketTransport": "./src/client/engine/net/webSocketTransport.ts",

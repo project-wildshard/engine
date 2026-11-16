@@ -2,6 +2,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { CLIENT_FLOOD_DEBT, CLIENT_MESSAGES_PER_TICK, MAX_CLIENT_MESSAGES, MAX_CLIENT_MESSAGE_BYTES } from '@wildshard/engine/net/room';
 import { channelPrefix, closeCode, closeReason, controlPrefix, decodePing, encodePong, FRAME_SKIP_BYTES, framed, PING_FLOOR_MS, SILENCE_MS, SOCKET_DEVICE, SOCKET_ENTER, SOCKET_PING, SOCKET_PLAYTEST, SOCKET_READY, SOCKET_RELIABLE, SOCKET_UNRELIABLE, SOCKET_VOICE, STALL_CLOSE_BYTES, type SocketControl } from '@wildshard/engine/net/socketFrames';
+import { encodeSocketCloseInfo, type SocketCloseInfo } from '@wildshard/engine/net/socketClose';
 import type { NetChannel, Transport, TransportStats } from '@wildshard/engine/net/transport';
 import type { RawData, ServerOptions, WebSocket } from 'ws';
 
@@ -77,9 +78,9 @@ export class SocketTransport implements Transport {
   /** Subscribe to the client's control messages; returns the unsubscribe. */
   onControl(listener: (control: SocketControl, bytes: ArrayBuffer) => void): () => void { this.controls.add(listener); return () => { this.controls.delete(listener); }; }
   onClose(listener: (reason: string) => void): () => void { if (this.ended) { listener(this.endReason); return () => undefined; } this.closes.add(listener); return () => { this.closes.delete(listener); }; }
-  close(reason = 'closed'): void {
+  close(reason = 'closed', info?: SocketCloseInfo): void {
     if (this.ended) return;
-    this.socket.close(closeCode(reason));
+    this.socket.close(closeCode(reason), encodeSocketCloseInfo(reason, info));
     this.end(reason);
   }
   private write(bytes: Uint8Array): void { this.sentBytes += bytes.byteLength; this.socket.send(bytes, { binary: true }); }

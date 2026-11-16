@@ -1,3 +1,5 @@
+import type { SocketCloseInfo } from './socketClose';
+
 // P1-E5.2 (E5-REPLICATION §4.1): the one seam between the game protocol and whatever carries it. The worker loopback
 // implements it now and a WebSocket implements it later, with no change to game code. It carries bytes, never objects,
 // so the loopback exercises the real codec and the real byte counts.
@@ -12,8 +14,9 @@ export interface Transport {
   send: (channel: NetChannel, bytes: ArrayBuffer) => void;
   /** Subscribe to incoming messages; returns the unsubscribe. */
   onMessage: (listener: (channel: NetChannel, bytes: ArrayBuffer) => void) => () => void;
-  /** Subscribe to the connection ending; returns the unsubscribe. */
-  onClose: (listener: (reason: string) => void) => () => void;
+  /** Subscribe to the connection ending; returns the unsubscribe. A socket may add validated terminal/queue facts.
+   * Worker/legacy ends omit them; absence never implies a queue position, ETA or auth result. */
+  onClose: (listener: (reason: string, info?: SocketCloseInfo | null) => void) => () => void;
   readonly stats: TransportStats;
   close: (reason?: string) => void;
 }

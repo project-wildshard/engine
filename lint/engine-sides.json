@@ -1511,6 +1511,7 @@
     "src/shared/engine/net/playerNet.ts": "shared",
     "src/shared/engine/net/schema.ts": "shared",
     "src/shared/engine/net/shardNet.ts": "shared",
+    "src/shared/engine/net/socketClose.ts": "shared",
     "src/shared/engine/net/socketFrames.ts": "shared",
     "src/shared/engine/net/deviceWord.ts": "shared",
     "src/shared/engine/net/transport.ts": "shared",

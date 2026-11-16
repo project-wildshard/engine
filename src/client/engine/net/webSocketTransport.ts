@@ -1,6 +1,7 @@
 import { Scope } from '../../../shared/engine/app/scope';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { channelPrefix, closeCode, closeReason, COMMAND_SKIP_BYTES, controlPrefix, decodePong, encodePing, framed, PING_MS, SOCKET_ARRIVE, SOCKET_COUNTDOWN, SOCKET_ENTER, SOCKET_PLAYTEST, SOCKET_PONG, SOCKET_RELIABLE, SOCKET_RESUME, SOCKET_UNRELIABLE, SOCKET_VOICE, SOCKET_WORLD, type SocketControl } from '../../../shared/engine/net/socketFrames';
+import { decodeSocketCloseInfo, type SocketCloseInfo } from '../../../shared/engine/net/socketClose';
 import type { NetChannel, Transport, TransportStats } from '../../../shared/engine/net/transport';
 
 /** The code a browser reports for a link that died with no close frame. */
@@ -27,7 +28,7 @@ export class WebSocketTransport implements Transport {
   private readonly now: () => number;
   private readonly messages = new Set<(channel: NetChannel, bytes: ArrayBuffer) => void>();
   private readonly controls = new Set<(control: SocketControl, bytes: ArrayBuffer) => void>();
-  private readonly closes = new Set<(reason: string) => void>();
+  private readonly closes = new Set<(reason: string, info?: SocketCloseInfo | null) => void>();
   private readonly waiting: Uint8Array<ArrayBuffer>[] = [];
   private readonly scope = new Scope('net.socket');
   private ended = false;
@@ -41,7 +42,10 @@ export class WebSocketTransport implements Transport {
     this.socket.binaryType = 'arraybuffer';
     this.scope.listen(this.socket, 'open', () => { this.opened(); });
     this.scope.listen(this.socket, 'message', (event: MessageEvent<unknown>) => { if (event.data instanceof ArrayBuffer) this.receive(event.data); });
-    this.scope.listen(this.socket, 'close', event => { this.end(closeReason(codeOf(event))); });
+    this.scope.listen(this.socket, 'close', event => {
+      const reason = closeReason(codeOf(event));
+      this.end(reason, decodeSocketCloseInfo(reason, 'reason' in event && typeof event.reason === 'string' ? event.reason : ''));
+    });
   }
   /** The socket has opened, and has not ended. */
   get open(): boolean { return !this.ended && this.socket.readyState === WebSocket.OPEN; }
@@ -56,7 +60,7 @@ export class WebSocketTransport implements Transport {
   onMessage(listener: (channel: NetChannel, bytes: ArrayBuffer) => void): () => void { this.messages.add(listener); return () => { this.messages.delete(listener); }; }
   /** Subscribe to the server's control messages; returns the unsubscribe. */
   onControl(listener: (control: SocketControl, bytes: ArrayBuffer) => void): () => void { this.controls.add(listener); return () => { this.controls.delete(listener); }; }
-  onClose(listener: (reason: string) => void): () => void { this.closes.add(listener); return () => { this.closes.delete(listener); }; }
+  onClose(listener: (reason: string, info?: SocketCloseInfo | null) => void): () => void { this.closes.add(listener); return () => { this.closes.delete(listener); }; }
   close(reason = 'closed'): void {
     if (this.ended) return;
     this.socket.close(closeCode(reason));
@@ -81,11 +85,11 @@ export class WebSocketTransport implements Transport {
     else if (prefix === SOCKET_PONG) { const pong = decodePong(view); if (pong !== null) { this.rttMs = this.now() - pong.clock; this.lossPct = pong.lossPct; } }
     else if (prefix === SOCKET_RESUME || prefix === SOCKET_COUNTDOWN || prefix===SOCKET_PLAYTEST || prefix === SOCKET_VOICE || prefix === SOCKET_WORLD || prefix === SOCKET_ENTER || prefix === SOCKET_ARRIVE) for (const listener of this.controls) listener(prefix === SOCKET_RESUME ? 'resume' : prefix===SOCKET_PLAYTEST?'playtest':prefix === SOCKET_VOICE ? 'voice' : prefix === SOCKET_WORLD ? 'world' : prefix === SOCKET_ENTER ? 'enter' : prefix === SOCKET_ARRIVE ? 'arrive' : 'countdown', body);
   }
-  private end(reason: string): void {
+  private end(reason: string, info: SocketCloseInfo | null = null): void {
     if (this.ended) return;
     this.ended = true;
     this.scope.dispose();
-    for (const listener of this.closes) listener(reason);
+    for (const listener of this.closes) listener(reason, info);
     this.closes.clear();
   }
 }
