@@ -36,10 +36,11 @@ assert.ok(["webkit", "chromium"].includes(engine));
 const sha = (bytes: string | Uint8Array): string =>
   createHash("sha256").update(bytes).digest("hex");
 const buildId = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
-const dirty =
-  execFileSync("git", ["status", "--porcelain"], {
-    encoding: "utf8",
-  }).trim() !== "";
+const dirtyPaths = execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" })
+  .trim()
+  .split("\n")
+  .filter(Boolean);
+const dirty = dirtyPaths.length > 0;
 assert.equal(process.env.WILDSHARD_RING, "1", "Use the installed Ring 1 pin graph");
 const ring = v.parse(
   v.object({ "1": v.object({ products: v.array(v.string()), slices: v.array(v.string()) }) }),
@@ -91,6 +92,7 @@ interface Result {
 interface Report {
   source: string;
   dirty: boolean;
+  dirtyPaths: string[];
   engine: string;
   tape: string;
   inputs: typeof inputs;
@@ -113,6 +115,7 @@ const report: Report = {
   nodeVersion: process.version,
   completeRing: slugs.length === allSlugs.length,
   dirty,
+  dirtyPaths,
   engine,
   tape: sha(JSON.stringify(tape)),
   inputs,
@@ -121,6 +124,7 @@ const report: Report = {
   ok: false,
 };
 try {
+  assert.equal(dirty, false, "Parity requires committed source and ordinary generated tables");
   // Transport the pin's exact admitted files in a server book. This does not cook/re-encode a product:
   // book offsets only frame immutable bytes; readServerProduct performs ordinary admission on both sides.
   for (const slug of slugs) {

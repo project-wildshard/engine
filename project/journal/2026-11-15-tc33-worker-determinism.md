@@ -22,3 +22,11 @@ solids and a pageless fresh world. It covers neither near-solid streaming
 nor progress seeded from a prior page. TC33 needs the hosted artifact to
 say WebKit, completeRing/ok true, dirty false, eight products and a real
 browser version/user agent; the Chromium control cannot close it.
+
+The first hosted WebKit 27.2 witness matched every product and detected
+reversed input at tick one. Qualification correctly remained open: the
+extra gen:inputs step had rewritten three tracked boot tables after the
+frozen Ring 1 install. Those tables are not worker inputs; the worker
+needs only installed pins and committed source. Remove that generation
+step, retain dirty paths in the report, and refuse a dirty tree outright.
+The next hosted witness must prove this clean setup independently.
