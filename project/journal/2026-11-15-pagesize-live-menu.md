@@ -45,3 +45,13 @@ the reviewed milestone passes lint, types, CSS and 137 related tests.
 Entry now treats preparation UI as optional and checks its owner after
 imports. Late placements refresh only a changed catalogue after naming
 is idle, preserving the current screen and the player's pending choice.
+
+PZ19's deployed screencast found the first hero still blank at 996 ms,
+though its preload had completed. Minification removes CSS URL quotes;
+the content-base stamp handled only single-quoted CSS. The shell then
+asked the page origin for content that now lives on the CDN. The stamp
+now handles unquoted and either quoted form, preserving unrelated and
+already absolute URLs. Its new regression failed first; all 19 content
+and preload tests now pass. Applying that exact stamp to preview's HTML
+with modules blocked restores the actual hero pixels. Final deployed
+first-second paint acceptance remains open until this repair ships.

@@ -20,7 +20,7 @@ export function stampContentBase(html, base) {
   return base === '' ? stamped : titleArtOn(stamped, new URL(base).href);
 }
 
-/** The document's title art on the base: `href="/assets/title/…"`, CSS `url('/assets/title/…')` and the values of the
+/** The document's title art on the base: `href="/assets/title/…"`, CSS URLs (quoted or minified) and the values of the
  * `BEGIN TITLE URLS` table. Its keys, and the scripts' lookups by them, keep the logical page paths.
  * @param {string} html @param {string} base */
 function titleArtOn(html, base) {
@@ -30,5 +30,5 @@ function titleArtOn(html, base) {
     /** @type {Record<string, string>} */ const urls = JSON.parse(table);
     return `${head}${JSON.stringify(Object.fromEntries(Object.entries(urls).map(([key, url]) => [key, url.startsWith('/assets/title/') ? on(url) : url])))}${tail}`;
   });
-  return tabled.replaceAll(/(href="|url\(')(\/assets\/title\/[^"')]+)/gu, (_all, /** @type {string} */ lead, /** @type {string} */ path) => `${lead}${on(path)}`);
+  return tabled.replaceAll(/(href="|url\(\s*["']?)(\/assets\/title\/[^"'()\s<>]+)/gu, (_all, /** @type {string} */ lead, /** @type {string} */ path) => `${lead}${on(path)}`);
 }

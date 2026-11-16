@@ -90,6 +90,17 @@ test('the stamp names a set path and points the document title art at it', () =>
   expect(same).toContain(`const titleAssetURLs = {"/assets/title/hero.jpg":"/assets/title/hero-1.jpg"};`);
 });
 
+test('minified and quoted CSS title art uses the CDN without moving unrelated URLs', () => {
+  const css = `<style>.a{background:url(/assets/title/hero-1.jpg)}.b{background:url("/assets/title/hero-2.jpg")}.c{background:url('/assets/title/hero-3.jpg')}.d{background:url(/assets/other.jpg)}.e{background:url(https://other.test/assets/title/hero.jpg)}</style>`;
+  const html = stampContentBase(DOCUMENT.replace('</head>', `${css}</head>`), SET);
+  for (const [quote, file] of [['', 'hero-1.jpg'], ['"', 'hero-2.jpg'], ["'", 'hero-3.jpg']]) {
+    expect(html).toContain(`url(${quote}${SET}assets/title/${file}${quote})`);
+  }
+  expect(html).toContain('url(/assets/other.jpg)');
+  expect(html).toContain('url(https://other.test/assets/title/hero.jpg)');
+  expect(stampContentBase(DOCUMENT.replace('</head>', `${css}</head>`), '')).toContain(css);
+});
+
 test('the solo server worker reads its book and parts under a set path', async () => {
   bank({contentBase: SET});
   const base = contentURL('/shardfiles/driftwood-isle/'), asked: string[] = [];
