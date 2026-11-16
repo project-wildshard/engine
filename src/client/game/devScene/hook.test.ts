@@ -262,3 +262,27 @@ test('AP19: a soft restart restarts the server with the player where the page ha
   expect((await createDevHook(ports).restartGameplay({ quests })).ok).toBe(false);
   ports.scope.dispose();
 });
+
+test('SS8f: a watched lantern swings when the player walks into it, its draw whole round the pivot, its lamp with it', async () => {
+  const { ports, frames } = await page(), feet = { x: 0, y: 0, z: 3 };
+  const hook = createDevHook({ ...ports, player: () => ({ position: feet, yaw: 0, pitch: 0, spawn: { x: 0, y: 0, z: 0, yaw: 0 } }) as never });
+  const hang = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.6, 0, 1];
+  hook.addPart('post', { ...hut([1, 0.5, 0]), water: [], lamps: [{ at: [0, 1.6, 0], colour: [1, 0.6, 0.3], intensity: 4, distance: 6, swing: 0 }],
+    draws: [{ geometry: 'g1', material: 'roof', matrix: hang, instances: null, castShadow: false, receiveShadow: false, swing: 0 }],
+    swings: [{ pivot: [0, 2.3, 0], length: 0.7, rate: 0.6, amount: 0, reach: 0.35 }] });
+  const lantern = meshes(hook.root)[0], light = (): THREE.Vector3 => { let at = new THREE.Vector3(); hook.root.traverse(o => { if (o instanceof THREE.PointLight) at = o.position.clone(); }); return at; };
+  const step = (n: number): void => { for (let i = 0; i < n; i++) for (const fn of frames) fn(1 / 60); };
+  step(30);
+  expect(lantern?.matrix.elements[12]).toBeCloseTo(0, 6); expect(lantern?.matrix.elements[13]).toBeCloseTo(1.6, 6);
+  // the player walks through it toward -z
+  for (let i = 0; i < 60; i++) { feet.z -= 0.1; step(1); }
+  let furthest = 0;
+  for (let i = 0; i < 60; i++) { step(1); furthest = Math.max(furthest, Math.hypot(lantern?.matrix.elements[12] ?? 0, (lantern?.matrix.elements[14] ?? 0))); }
+  expect(furthest).toBeGreaterThan(0.05);
+  // the turn is rigid round the pivot: the draw's origin stays 0.7 m below it
+  const origin = new THREE.Vector3().setFromMatrixPosition(lantern?.matrix ?? new THREE.Matrix4());
+  expect(origin.distanceTo(new THREE.Vector3(0, 2.3, 0))).toBeCloseTo(0.7, 5);
+  expect(light().distanceTo(new THREE.Vector3(0, 1.6, 0))).toBeGreaterThan(0);
+  hook.removePart('post');
+  ports.scope.dispose();
+});

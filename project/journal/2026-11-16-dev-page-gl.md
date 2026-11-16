@@ -11,3 +11,4 @@
   keeper scene the failing draws went from 48 to 0, and the page logs no WebGL line in 15 s.
 - `Game.clock` is a small `FrameClock` (start, getDelta, elapsedTime) instead of three's deprecated `Clock`, which
   warned on every page load.
+- opus-ss16n, SS8f: a watched part's `swings` rows (`DevPart.swings`, a draw's or sprite's `swing`) drive one `SwingField` a part; its draws turn whole round the pivot on the CPU, its cards and lamps hang off it. Additive, so `DEV_HOOK_VERSION` stays 4.

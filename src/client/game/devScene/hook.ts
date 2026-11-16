@@ -20,6 +20,7 @@ import { decodeTerrainTile, type TerrainTileData } from '@wildshard/format/terra
 import { refreshTerrainTile } from '@wildshard/engine/world/terrainTileView';
 import type { DevGameplay, DevPlace, DevRestarted } from '@wildshard/engine/game/devGameplay';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { SwingField, createSwingUniforms, setLampSwings, swingQuaternion, type SwingRow } from '@wildshard/engine/world/swings';
 
 /**
  * SHARD-SOURCE AP5 (J347: engine is the deployed client and server; dev tooling is sharddev's). The dev hook: the one thing
@@ -109,9 +110,13 @@ export interface DevDraw {
   readonly instances: { readonly count: number; readonly matrices: ArrayLike<number>; readonly colours: ArrayLike<number> | null } | null;
   readonly castShadow: boolean;
   readonly receiveShadow: boolean;
+  /** SS8f: the part's `swings` row the draw hangs from, whole; absent: it does not swing */
+  readonly swing?: number;
 }
 
-export interface DevSprite { readonly material: string; readonly position: readonly [number, number, number]; readonly scale: readonly [number, number]; readonly center: readonly [number, number] }
+export interface DevSprite { readonly material: string; readonly position: readonly [number, number, number]; readonly scale: readonly [number, number]; readonly center: readonly [number, number];
+  /** SS8f: as a draw's */
+  readonly swing?: number }
 
 /** One part, decoded: every colour linear, every matrix column-major in world metres. Colliders come by `swapColliders`. */
 export interface DevPart {
@@ -124,6 +129,12 @@ export interface DevPart {
   readonly lamps: readonly LookLamp[];
   /** the shardfile's water rows, drawn as the client draws a shard's water */
   readonly water: ShardWater;
+  /**
+   * SHARD-SOURCE SS8f: the part's hung bodies (`look.light.swings` rows, pivots in the page's metres); a draw, sprite or
+   * lamp's `swing` names one. Optional and additive, so `DEV_HOOK_VERSION` stays: an older sharddev sends none and an
+   * older page draws the part still.
+   */
+  readonly swings?: readonly SwingRow[];
 }
 
 /** The look a watched page takes live: its day keys, and (v2, AP17) the whole look section the page's shardfile would carry. */
@@ -200,6 +211,41 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
   };
   const release = (live: LivePart): void => { live.scope.dispose(); drop(geometries, live.geometries); drop(textures, live.textures); };
 
+  /**
+   * SS8f: a watched part's lanterns swing as a built page's do (client.ts, SS8c): one `SwingField` over the part's rows,
+   * kicked by the player; its draws turn whole round their pivot on the CPU (a dev part's surfaces have no swing channel)
+   * and its sprites and lamps hang off the same pivots. The lamps read the field the page lent last
+   * (`setLampSwings`): one swinging part a page lights right, which is every watched scene so far.
+   */
+  const hangSwings = (part: DevPart, group: THREE.Group, partScope: Scope): void => {
+    const rows = part.swings ?? [];
+    if (rows.length === 0) return;
+    const field = new SwingField(rows, createSwingUniforms(), group);
+    partScope.onDispose(setLampSwings(field)); partScope.onDispose(() => { field.dispose(); });
+    const draws = part.draws.flatMap((draw, i) => {
+      const mesh = group.children[i];
+      return draw.swing === undefined || draw.swing >= rows.length || mesh === undefined ? [] : [{ object: mesh, base: mesh.matrix.clone(), swing: draw.swing }];
+    });
+    const cards = part.sprites.flatMap((sprite, i) => {
+      const card = group.children[part.draws.length + i];
+      return sprite.swing === undefined || sprite.swing >= rows.length || card === undefined ? [] : [{ object: card, rest: card.position.clone(), swing: sprite.swing }];
+    });
+    const q = new THREE.Quaternion(), turn = new THREE.Matrix4(), at = new THREE.Vector3(), turned = new THREE.Vector3(), player = { id: 'player', x: 0, y: 0, z: 0, radius: 0.45 };
+    partScope.onDispose(ports.watchFrames(dt => {
+      const feet = ports.player?.()?.position;
+      if (feet !== undefined) { player.x = feet.x; player.y = feet.y; player.z = feet.z; }
+      field.update(dt, feet === undefined ? [] : [player]);
+      for (const { object, base, swing } of draws) {
+        const tilt = field.tilt(swing), pivot = rows[swing]?.pivot ?? [0, 0, 0];
+        swingQuaternion(tilt.x, tilt.z, q);
+        // the draw turns rigidly round its pivot: T(pivot) R T(-pivot) base, in the part's frame (the page's metres)
+        turn.makeRotationFromQuaternion(q).setPosition(at.set(...pivot).sub(turned.set(...pivot).applyQuaternion(q)));
+        object.matrix.multiplyMatrices(turn, base); object.matrixWorldNeedsUpdate = true;
+      }
+      for (const { object, rest, swing } of cards) field.place(swing, rest, object.position);
+    }));
+  };
+
   /** One part under its own scope, not yet in the scene; on a throw, everything it took is given back first. */
   const build = (name: string, part: DevPart): { live: LivePart; group: THREE.Group } => {
     const partScope = scope.child(`devScene.${name}`), group = new THREE.Group(), owned: { dispose: () => void }[] = [];
@@ -239,6 +285,7 @@ export function createDevHook(ports: DevHookPorts): DevHook & { readonly root: T
         card.position.set(...sprite.position); card.scale.set(sprite.scale[0], sprite.scale[1], 1); card.center.set(...sprite.center);
         group.add(card);
       }
+      hangSwings(part, group, partScope);
       if (part.lamps.length > 0) {
         // the look's own lamp lights (B2, M4.3): what a baked shard's `look.light.lamps` draws
         const lamps = lampLights(part.lamps);
