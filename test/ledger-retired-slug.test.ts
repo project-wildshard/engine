@@ -13,7 +13,7 @@ const rules: LedgerRule[] = [
   { fact: 'bounty.badge', origin, rewards: [{ kind: 'catalogue', item: 'badge', tier: 0, quantity: 1 }] },
 ];
 const catalogue: LedgerCatalogueItem[] = [{ id: 'badge', maxTier: 0 }];
-const fact = (shard: string, name: string, tick: number) => ({ instance: INSTANCE, shard, revision: 3, entity: 'player', tick, ordinal: 0, name, origin });
+const fact = (shard: string, name: string, tick: number, instance = INSTANCE) => ({ instance, shard, revision: 3, entity: 'player', tick, ordinal: 0, name, origin });
 const input = (slug: string) => ({ shard: { identity: { slug, revision: 3 }, ledger: rules }, catalogue }) as unknown as HeadlessRuntimeInput;
 
 test('an achievement and an entitlement earned under the retired slug count under its replacement', () => {
@@ -44,4 +44,30 @@ test('a new slug keeps its own progress, and a profile with nothing retired is l
   expect(carryRetiredLedger(state, [[OLD, NEW]]), 'a second pass adds nothing').toBe(false);
   const other: LedgerState = { facts: {}, entitlements: { 'not json': { grants: 1, lastTick: 0 } }, items: {}, achievements: {} };
   expect(carryRetiredLedger(other, [[OLD, NEW]])).toBe(false);
+});
+
+test('a dedicated room named after the retired slug pays nothing twice once it carries the new name', () => {
+  const before = new PlayerStore({}, () => undefined);
+  for (const instance of [OLD, `${OLD}-solo`]) {
+    const old = new Ledger(before.saves, [{ id: instance, shard: OLD }], [{ shard: OLD, revision: 3, rules }], catalogue);
+    expect(old.record(fact(OLD, 'bounty.badge', 2, instance)).status).toBe('granted');
+  }
+  for (const instance of [NEW, `${NEW}-solo`]) {
+    const after = new PlayerStore(before.documents(), () => undefined);
+    const ledger = new Ledger(after.saves, [{ id: instance, shard: NEW }], [{ shard: NEW, revision: 3, rules }], catalogue);
+    expect(ledger.record(fact(NEW, 'bounty.badge', 6, instance)).status, `${instance} pays the badge once`).toBe('duplicate');
+  }
+});
+
+test('a retitled achievement carries under its new title, and one the reader does not declare waits', () => {
+  const before = new PlayerStore({}, () => undefined);
+  const old = new Ledger(before.saves, [{ id: INSTANCE, shard: OLD }], [{ shard: OLD, revision: 3, rules }], catalogue);
+  expect(old.record(fact(OLD, 'bounty.wyrm', 1)).status).toBe('granted');
+  const retitled: LedgerRule[] = [{ fact: 'bounty.wyrm', origin, rewards: [{ kind: 'achievement', id: 'wyrm-slayer', title: 'Wyrm Hunter', threshold: 2 }] }];
+  const after = new PlayerStore(before.documents(), () => undefined);
+  const ledger = new Ledger(after.saves, [{ id: INSTANCE, shard: NEW }], [{ shard: NEW, revision: 3, rules: retitled }], catalogue);
+  expect(ledger.record(fact(NEW, 'bounty.wyrm', 5)).status, 'no identity refusal; once earned, earned').toBe('duplicate');
+  expect(ledger.state().achievements[JSON.stringify([NEW, 'wyrm-slayer'])]).toEqual({ shard: NEW, id: 'wyrm-slayer', title: 'Wyrm Hunter', count: 1, threshold: 2, earned: true });
+  const other = new Ledger(new PlayerStore(before.documents(), () => undefined).saves, [], [], []);
+  expect(other.state().achievements[JSON.stringify([NEW, 'wyrm-slayer'])], 'a reader without the rule carries nothing').toBeUndefined();
 });

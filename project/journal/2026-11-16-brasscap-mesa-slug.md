@@ -42,3 +42,7 @@ is the reviewed first pin.
   replacement (the new slug's own entries win, the old ones stay), so the
   server's profile read and the next grant both see them. The retired-slug map
   moved to `src/shared/game/slugNames.json` (`game/slugNames`) for both.
+  From its review: an entitlement also carries under the instance renamed (a
+  dedicated room named after the old slug, or its -solo twin), and an
+  achievement carries only when the reading ledger declares it, under the
+  declared title and threshold, so a retitled one never trips the refusal.

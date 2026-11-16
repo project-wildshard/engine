@@ -15,21 +15,36 @@ const ledgerSave = { key: 'platform.ledger', scope: 'profile' as const, version:
 const entitlementKey = (name: string): unknown[] | null => {
   try { const parsed: unknown = JSON.parse(name); return Array.isArray(parsed) ? parsed : null; } catch { return null; }
 };
+/** An instance named after a retired slug (a dedicated room's slug, `blender-template-solo`) under its new name. */
+const renamedInstance = (instance: string, old: string, now: string): string =>
+  instance === old ? now : instance.startsWith(`${old}-`) ? `${now}${instance.slice(old.length)}` : instance;
+/** What an achievement is today, by its new slug and id; undefined when the reader holds no such rule. */
+export type AchievementRule = (shard: string, id: string) => { readonly title: string; readonly threshold: number } | undefined;
 /** A renamed shard keeps its profile progress (TC-SHIP-g): achievements and catalogue entitlements saved under a retired
  *  slug also count under its replacement (Brasscap Mesa's blender-template). Entries already under the new slug win and
- *  the old entries stay, as the page's shard saves do (TC-SHIP-a). Returns whether it added anything. */
-export function carryRetiredLedger(state: LedgerState, retired: readonly (readonly [string, string])[] = retiredSlugs()): boolean {
+ *  the old entries stay, as the page's shard saves do (TC-SHIP-a). An entitlement carries its grants and repeat window
+ *  under the instance as it was and as renamed, so neither key pays twice. With `rule`, an achievement carries only when
+ *  the reader declares it, under the declared title and threshold (a renamed shard may retitle one, and the next grant
+ *  refuses a changed identity). Returns whether it added anything. */
+export function carryRetiredLedger(state: LedgerState, retired: readonly (readonly [string, string])[] = retiredSlugs(), rule?: AchievementRule): boolean {
   let changed = false;
   for (const [old, now] of retired) {
     for (const row of Object.values(state.achievements)) {
       const key = JSON.stringify([now, row.id]);
-      if (row.shard === old && state.achievements[key] === undefined) { state.achievements[key] = { ...row, shard: now }; changed = true; }
+      if (row.shard !== old || state.achievements[key] !== undefined) continue;
+      const declared = rule === undefined ? row : rule(now, row.id);
+      if (declared === undefined) continue;
+      const count = Math.min(row.count, declared.threshold);
+      state.achievements[key] = { shard: now, id: row.id, title: declared.title, count, threshold: declared.threshold, earned: row.earned || count === declared.threshold };
+      changed = true;
     }
     for (const [name, grant] of Object.entries(state.entitlements)) {
       const parsed = entitlementKey(name);
-      if (parsed === null || parsed.length !== 3 || parsed[1] !== old) continue;
-      const key = JSON.stringify([parsed[0], now, parsed[2]]);
-      if (state.entitlements[key] === undefined) { state.entitlements[key] = { ...grant }; changed = true; }
+      if (parsed === null || parsed.length !== 3 || parsed[1] !== old || typeof parsed[0] !== 'string') continue;
+      for (const instance of new Set([parsed[0], renamedInstance(parsed[0], old, now)])) {
+        const key = JSON.stringify([instance, now, parsed[2]]);
+        if (state.entitlements[key] === undefined) { state.entitlements[key] = { ...grant }; changed = true; }
+      }
     }
   }
   return changed;
@@ -66,6 +81,7 @@ export class Ledger {
   private readonly slot: SaveSlot<LedgerState>;
   private readonly instances: Map<string, string>;
   private readonly rules: Map<string, { revision: number; rule: LedgerRule }>;
+  private readonly achievementRules = new Map<string, { title: string; threshold: number }>();
   private readonly pending = new Set<string>();
   private records = 0;
   private readonly catalogue: ReadonlyMap<string, LedgerRewardPolicy>;
@@ -85,6 +101,7 @@ export class Ledger {
         const key = JSON.stringify([mapping.shard, mapping.revision, rule.fact]);
         if (this.rules.has(key)) throw new Error('Duplicate ledger mapping');
         this.rules.set(key, { revision: mapping.revision, rule });
+        for (const reward of rule.rewards) if (reward.kind === 'achievement') this.achievementRules.set(JSON.stringify([mapping.shard, reward.id]), reward);
       }
     }
     this.slot = store.define(ledgerSave);
@@ -92,7 +109,11 @@ export class Ledger {
   /** Includes pending in-memory saves, following SaveStore's offline fallback; receipts distinguish durability. */
   state(): LedgerState { return this.read(); }
   /** The saved slot with a renamed shard's progress under its new slug (TC-SHIP-g); the next grant's write keeps it. */
-  private read(): LedgerState { const state = this.slot.read(); carryRetiredLedger(state); return state; }
+  private read(): LedgerState {
+    const state = this.slot.read();
+    carryRetiredLedger(state, retiredSlugs(), (shard, id) => this.achievementRules.get(JSON.stringify([shard, id])));
+    return state;
+  }
   /** Inspect the saved slot before a dedicated host permits any fallback or write. */
   get admitted(): boolean { const status = this.slot.status?.(); return status === 'absent' || status === 'valid'; }
   /** Facts offered so far (recorded or not): a checkpoint that skips idle writes treats any as a change. */
