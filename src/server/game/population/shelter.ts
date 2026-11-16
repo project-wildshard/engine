@@ -45,7 +45,10 @@ export class HerdShelter<T extends Tree> {
   }
 
   private pick(hd: Herd): { x: number; z: number } | null {
-    const selected = projectedSite(this.big, this.program, { signal: 'shelterScore', limit: 16384, origin: { x: hd.cx, z: hd.cz }, minimum: 0,
+    // The shipped combined life guest spends 323,911 fuel on four sites;
+    // seven sites exceed the unchanged 400,000 request allowance. Shelter
+    // scores sites independently, with source-order ties and no random read.
+    const selected = projectedSite(this.big, this.program, { signal: 'shelterScore', limit: 16384, batchSize: 4, origin: { x: hd.cx, z: hd.cz }, minimum: 0,
       maximum: this.look.reach, observations: { heightBias: this.look.heightBias, coverBias: this.look.coverBias } });
     if (selected === null) return null;
     const t = selected.site;
