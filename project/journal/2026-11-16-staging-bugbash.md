@@ -20,3 +20,6 @@
 - SB10 (opus-ss16p): the staging mark sat on the move stick and ATTACK in play and on the last Settings row. It is now one
   word, STAGING, at the top left under the HUD Settings button, and in the strip above an open menu sheet; the full sentence
   is its accessible name. T1 phone spec mounts the real rule and words and checks no tappable control under it.
+- SB14 (opus-ss16p): mid-swipe ghosting on Shard Select was the off-middle card at opacity 0.55 showing the hero through it.
+  Cards off the middle are now dimmed with a filter (solid), `place` lights the card nearest the middle while a finger drags,
+  and the snap is 0.24 s. T1 journey spec swipes with CDP touch and checks one lit solid card per frame.
