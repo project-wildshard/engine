@@ -30,7 +30,7 @@ for(const run of page.workflow_runs.filter(row=>row.status==='completed')){
     catch{completeHistory=false;continue;}
   }
   if(hash(committed)!==sourceHash)continue;
-  /** @type {{id:number,steps?:{name:string,conclusion:string,started_at:string,completed_at:string}[]}[]} */
+  /** @type {{id:number,steps?:{name:string,conclusion:string,started_at?:string|null,completed_at?:string|null}[]}[]} */
   const jobs=api(`repos/project-wildshard/engine/actions/runs/${run.id}/jobs?per_page=100`).jobs;
   const matches=jobs.flatMap(job=>(job.steps??[]).filter(step=>step.name==='Soak actual host, door, format and outside-author contracts').map(step=>({job,step})));
   if(matches.length!==1){observations.push({run:run.id,sha:run.head_sha,started:run.run_started_at??run.created_at,completed:run.updated_at,ok:false,error:'Expected exactly one soak step'});continue;}
@@ -40,7 +40,7 @@ for(const run of page.workflow_runs.filter(row=>row.status==='completed')){
   const end=begin===-1?-1:log.indexOf('##[group]',begin+10),body=begin===-1?'':log.slice(begin,end===-1?undefined:end);
   const counts=Object.fromEntries(['tests','pass','fail','skipped','cancelled','todo'].map(name=>[name,Number(new RegExp(`(?:#|ℹ)\\s+${name}\\s+(\\d+)`,'u').exec(body)?.[1]??'NaN')]));
   const ok=step.conclusion==='success'&&counts.tests===expected.length&&counts.pass===expected.length&&counts.fail===0&&counts.skipped===0&&counts.cancelled===0&&counts.todo===0;
-  observations.push({run:run.id,sha:run.head_sha,job:job.id,started:step.started_at,completed:step.completed_at,ok,counts,logHash:hash(body)});
+  observations.push({run:run.id,sha:run.head_sha,job:job.id,started:step.started_at??run.run_started_at??run.created_at,completed:step.completed_at??run.updated_at,ok,counts,logHash:hash(body)});
 }
 observations.sort((a,b)=>Date.parse(a.started??'')-Date.parse(b.started??''));
 const lastFailure=observations.reduce((last,row,index)=>row.ok?last:index,-1),clean=observations.slice(lastFailure+1).filter(row=>row.ok);
