@@ -25,3 +25,11 @@ Debug hold retains the full controls. Seventy focused tests, lint, types
 and check-css pass. WebKit exercised native input with modules held,
 runtime adoption, menu navigation during load and eventual world reveal:
 217 ms first native interaction, no full-screen card frames or errors.
+
+PZ27c: reading and verifying pack metadata now overlaps memory-bank
+reservation; only the original post-bank barrier publishes it. The
+existing pack readers retain hash/size/schema checks and share one read.
+A test waits for the digest to finish and confirms the table is still
+unpublished until readiness is requested. Preparing the menu overlaps
+mandatory imports, and its small hero avoids competing with world bytes.
+The three staging world-stage timings still require the deployed build.

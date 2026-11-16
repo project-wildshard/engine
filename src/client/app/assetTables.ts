@@ -1,6 +1,7 @@
 import { installAssetTables, publicBytes, assetVersions, musicManifests, sfxManifests, bootPacks, type AssetTables, type PackDef, type PackFile, type PackPart } from '@wildshard/engine/boot/tables';
 import { readContent } from '@wildshard/engine/boot/contentRead';
 import { contentURL } from '@wildshard/engine/boot/contentBase';
+import { prepareBootImports } from './bootDownloads';
 
 /** Exact compiler address consumed by the existing size/hash-verified table reader. */
 export interface AssetTableAddress { readonly url: string; readonly bytes: number; readonly sha256: string }
@@ -47,22 +48,36 @@ export function prepareAssetTables(): Promise<void> {
   return pending;
 }
 
-const packReads = new Map<string, Promise<void>>();
-async function loadPacks(address: AssetTableAddress): Promise<void> {
+const packReads = new Map<string, Promise<AssetTables>>();
+async function loadPacks(address: AssetTableAddress): Promise<AssetTables> {
   try {
-
-    const incoming = await readAssetTables(address, (url, init) => fetch(url, init));
-    installAssetTables({ bytes: publicBytes(), versions: assetVersions(), music: musicManifests(), sfx: sfxManifests(),
-      packs: { ...bootPacks(), ...incoming.packs } });
+    return await readAssetTables(address, (url, init) => fetch(url, init));
   } catch (error) { packReads.delete(address.url); throw error; }
 }
 /** Before session data or background downloads can call packFor. A grid/desktop
  * page borrows the complete pack bank; a standalone phone borrows only its own. */
-export async function prepareAssetPacks(key?: string): Promise<void> {
+async function readPackTables(key?: string): Promise<AssetTables | undefined> {
   await prepareAssetTables();
   const address = key === undefined ? __BOOT_TABLE_ASSETS__.all : __BOOT_TABLE_ASSETS__.packs[key];
-  if (address === undefined) return; // The original packFor returns null for an unpacked shard.
+  if (address === undefined) return undefined; // The original packFor returns null for an unpacked shard.
   let reading = packReads.get(address.url);
   if (reading === undefined) { reading = loadPacks(address); packReads.set(address.url, reading); }
-  await reading;
+  return reading;
+}
+/** Begin verified metadata IO alongside memory reservation, but publish only
+ * when the caller crosses its original admission barrier. Early failures are
+ * captured until that barrier and cannot become an unhandled rejection. */
+export function prepareAssetPackRead(key?: string): { readonly ready: () => Promise<void> } {
+  const read = prepareBootImports(readPackTables(key));
+  let installed = false;
+  return { ready: async () => {
+    const incoming = await read.ready();
+    if (incoming === undefined || installed) return;
+    installAssetTables({ bytes: publicBytes(), versions: assetVersions(), music: musicManifests(), sfx: sfxManifests(),
+      packs: { ...bootPacks(), ...incoming.packs } });
+    installed = true;
+  } };
+}
+export async function prepareAssetPacks(key?: string): Promise<void> {
+  await prepareAssetPackRead(key).ready();
 }

@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { assetTableAsset, assetTableBanks, selectedPackTables } from '../scripts/app-build/assetTables.mjs';
-import { prepareAssetTables, prepareAssetPacks, readAssetTables } from '../src/client/app/assetTables';
+import { prepareAssetTables, prepareAssetPackRead, prepareAssetPacks, readAssetTables } from '../src/client/app/assetTables';
 import { installAssetTables, publicBytes } from '../src/shared/engine/boot/tables';
 import { openTitleSettings } from '../src/client/app/titleSettings';
 
@@ -109,6 +109,7 @@ test('concurrent entry callers await one complete read before synchronous tables
     ['__BOOT_TABLE_ASSETS__', { common: common.address, all: f.asset.address, packs: { legacy: f.asset.address } }]];
   const originals = new Map(globals.map(([name]) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
   for (const [name, value] of globals) Reflect.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  const digest = vi.spyOn(crypto.subtle, 'digest');
   try {
     const first = prepareAssetTables(), second = prepareAssetTables();
     expect(first).toBe(second); expect(read).toHaveBeenCalledTimes(1);
@@ -116,9 +117,17 @@ test('concurrent entry callers await one complete read before synchronous tables
     finish(new Response(common.source)); await first;
     expect(Reflect.get(globalThis, slot)).toEqual(shared);
     await prepareAssetPacks('unpacked'); expect(read).toHaveBeenCalledTimes(1);
-    await prepareAssetPacks('legacy'); await prepareAssetPacks('legacy'); expect(read).toHaveBeenCalledTimes(2);
+    digest.mockClear();
+    const ahead = prepareAssetPackRead('legacy');
+    await vi.waitFor(() => { expect(digest).toHaveBeenCalledTimes(1); });
+    const checked = digest.mock.results[0];
+    if (checked === undefined || checked.type !== 'return') throw new Error('Missing verified pack read');
+    await checked.value; await Promise.resolve();
+    expect(Reflect.get(globalThis, slot)).toEqual(shared);
+    await ahead.ready(); await ahead.ready(); await prepareAssetPacks('legacy'); expect(read).toHaveBeenCalledTimes(2);
     expect(Reflect.get(globalThis, slot)).toEqual(f.data);
   } finally {
+    digest.mockRestore();
     Reflect.set(globalThis, slot, previous);
     for (const [name, descriptor] of originals) {
       if (descriptor === undefined) Reflect.deleteProperty(globalThis, name); else Reflect.defineProperty(globalThis, name, descriptor);
