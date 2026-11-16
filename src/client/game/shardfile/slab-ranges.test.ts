@@ -174,7 +174,8 @@ function fakeRenderer(multi: boolean) {
     const scene = new Scene(), { geometry } = part;
     part.onBeforeRender(renderer as never, scene, view, geometry, part.material as never, undefined as never);
     const count = Math.min(geometry.drawRange.count, (geometry.index?.count ?? 0) - geometry.drawRange.start);
-    gl.drawElementsInstanced(4, count, gl.UNSIGNED_INT, geometry.drawRange.start * 4, 1);
+    // three's renderInstances: no call for zero copies
+    if (part.count > 0) gl.drawElementsInstanced(4, count, gl.UNSIGNED_INT, geometry.drawRange.start * 4, part.count);
     part.onAfterRender(renderer as never, scene, view, geometry, part.material as never, undefined as never);
   };
   return { gl, calls, draw, renderer, info, extension };
@@ -286,4 +287,23 @@ test('a plain mesh (drawn with drawElements) keeps the run, and a wrapper laid o
   gl.drawElementsInstanced(4, 6, gl.UNSIGNED_INT, 0, 1);
   expect(calls.map(call => call.kind)).toEqual(['multi', 'multi', 'plain']);
   expect(seen).toEqual([6]);
+});
+
+test('a chunk with nothing in view draws its first leaf once (the warm), then issues no draw until it is in view', () => {
+  for (const multi of [true, false]) {
+    const geometry = ledgedStreet(), ranges = spatialSlabRanges(geometry);
+    if (ranges === null) throw new Error('expected ranges');
+    const part = new InstancedMesh(geometry, new MeshBasicMaterial(), 1), { calls, draw } = fakeRenderer(multi);
+    part.updateMatrixWorld(true);
+    cullSlabRanges(part, ranges, PHONE_ANGLE);
+    // the street runs along x at z -6 to 0; from z 20 looking away from it (+z) nothing is in view
+    const away = camera(0, Math.PI);
+    draw(part, away);
+    expect(calls).toHaveLength(1);
+    draw(part, away);
+    expect(calls).toHaveLength(1);
+    expect(part.count).toBe(1);
+    draw(part, camera(-190, 0.1));
+    expect(calls).toHaveLength(2);
+  }
 });

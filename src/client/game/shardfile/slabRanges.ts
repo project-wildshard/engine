@@ -143,6 +143,8 @@ function thicknessOf(xyz: ArrayLike<number>, a: number, b: number, c: number): n
 }
 
 const frustum = new Frustum(), clip = new Matrix4();
+/** whether the last `visibleSlabRun` or `visibleSlabDraws` found nothing to draw (and fell back to the first leaf) */
+let nothingInView = false;
 function visible(boxes: Float32Array, node: number): boolean {
   for (const plane of frustum.planes) {
     const { x, y, z } = plane.normal, at = node * 6;
@@ -175,6 +177,7 @@ export function visibleSlabRun(ranges: SlabRanges, world: Matrix4, camera: Camer
   clip.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(world);
   frustum.setFromProjectionMatrix(clip, WebGLCoordinateSystem, camera.reversedDepth);
   const start = first(ranges, 0);
+  nothingInView = start < 0;
   if (start < 0) { let node = 0; while ((ranges.nodes[node * 4] ?? -1) >= 0) node = ranges.nodes[node * 4] ?? 0; return [ranges.nodes[node * 4 + 2] ?? 0, ranges.nodes[node * 4 + 3] ?? 0]; }
   return [start, Math.max(start, last(ranges, 0))];
 }
@@ -233,6 +236,7 @@ export function visibleSlabDraws(ranges: SlabRanges, world: Matrix4, camera: Cam
   local.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(inverse.copy(world).invert());
   out.n = 0; out.total = 0;
   collect(ranges, 0, angle, out);
+  nothingInView = out.n === 0;
   if (out.n === 0) { let node = 0; while ((ranges.nodes[node * 4] ?? -1) >= 0) node = ranges.nodes[node * 4] ?? 0; push(out, ranges.nodes[node * 4 + 2] ?? 0, ranges.nodes[node * 4 + 3] ?? 0); }
   return out;
 }
@@ -305,16 +309,28 @@ function hookOf(gl: MultiDrawGl): DrawHook {
 export function cullSlabRanges(part: Object3D & { geometry: BufferGeometry }, ranges: SlabRanges, angle = 0): void {
   const geometry = part.geometry, { start, count } = geometry.drawRange;
   const instanced = (part as Object3D & { isInstancedMesh?: boolean }).isInstancedMesh === true;
-  let hook: DrawHook | null = null;
+  const copies = part as Object3D & { count?: number };
+  let hook: DrawHook | null = null, drawn = false, held = -1;
+  /** mini-nb8e: a chunk that has drawn once (its pipeline is built) and has nothing in view issues no draw: three skips an
+   *  instanced draw of zero copies (no GL call, no count), and the copies come back after it. Its first draw stays the
+   *  first leaf, so a parked warm still builds its pipeline */
+  const skip = (): boolean => {
+    if (!instanced || !nothingInView || !drawn) { drawn = true; return false; }
+    held = copies.count ?? 1; copies.count = 0;
+    return true;
+  };
   part.onBeforeRender = drawNeutral((renderer: unknown, _scene: unknown, camera: Camera): void => {
     if (hook !== null) { hook.armed = null; hook = null; }
+    if (held >= 0) { copies.count = held; held = -1; }
     const extension = angle > 0 && instanced && geometry.groups.length === 0 ? multiDrawOf(renderer) : null;
     if (extension === null) {
       const [from, to] = visibleSlabRun(ranges, part.matrixWorld, camera);
       geometry.setDrawRange(from * 3, (to - from) * 3);
+      skip();
       return;
     }
     const out = visibleSlabDraws(ranges, part.matrixWorld, camera, angle, draws);
+    if (skip()) return;
     if (out.n === 1) { geometry.setDrawRange((out.starts[0] ?? 0) * 3, (out.counts[0] ?? 0) * 3); return; }
     geometry.setDrawRange(0, out.total * 3);
     const info = (renderer as SlabRenderer).info?.render;
@@ -323,6 +339,7 @@ export function cullSlabRanges(part: Object3D & { geometry: BufferGeometry }, ra
   });
   part.onAfterRender = drawNeutral((): void => {
     if (hook !== null) { hook.armed = null; hook = null; }
+    if (held >= 0) { copies.count = held; held = -1; }
     geometry.setDrawRange(start, count);
   });
 }

@@ -20,3 +20,8 @@ and its leaf tree is a sliced job after the loader's settle. The leaf cut
 draws only visible leaves, so the bigger chunk costs no triangles, only
 saves draws (Nine's 12 plain chunks become 1). Desktop and a phone without
 the extension keep their chunks.
+
+Empty chunks: a chunk whose sphere passes three's frustum test but with
+no leaf in view drew its first leaf every frame (kept so a parked warm
+builds its pipeline). After its first draw it now draws zero copies
+(three issues no call) and gets its copies back after the draw.
