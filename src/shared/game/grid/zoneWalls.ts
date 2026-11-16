@@ -50,6 +50,19 @@ export function walledCells<Cell extends Readonly<{ instance: string }>>(assembl
   return assembly.cells.filter(cell => cell.instance !== home.instance);
 }
 
+/** ZE10b: how far in from the cell's edge line a zone entry sets the traveller down: past the gate (`BUFFER_DEPTH`), on the entry
+ *  asphalt (15 m deep), so the first step is into the cell and a step back is a free walk out of the new home onto the road. */
+export const ARRIVAL_DEPTH = 14;
+
+/** ZE10b (J352: "you go back into that zone"): where a zone entry from `feet` (grid metres, in `cell`'s buffer) arrives, in the cell's
+ *  own frame: the centre line of the entryway the feet stood in, `ARRIVAL_DEPTH` in from the edge, facing the cell's centre
+ *  (`Player.forward` is (−sin yaw, −cos yaw)). */
+export function arrivalPose(cell: Readonly<{ origin: Readonly<{ x: number; z: number }> }>, feet: Readonly<{ x: number; z: number }>): { x: number; z: number; yaw: number } {
+  const x = feet.x - cell.origin.x, z = feet.z - cell.origin.z, depth = CHUNK_HALF - ARRIVAL_DEPTH;
+  const at = Math.abs(x) >= Math.abs(z) ? { x: Math.sign(x || 1) * depth, z: 0 } : { x: 0, z: Math.sign(z || 1) * depth };
+  return { ...at, yaw: Math.atan2(at.x, at.z) };
+}
+
 /** ZE8: the walled cell whose buffer the feet (grid metres) stand in, or null. The buffer is the 8 m wide pocket from an entryway's
  *  edge line to its gate, in the cell's own frame; the home has none. */
 export function bufferAt<Cell extends Readonly<{ instance: string; origin: Readonly<{ x: number; z: number }> }>>(cells: readonly Cell[], home: Readonly<{ instance: string }>, feet: Readonly<{ x: number; z: number }>): Cell | null {

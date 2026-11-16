@@ -10,3 +10,5 @@ ZE7, the grey stand-ins seen from the turn-ins:
 - `turn-in-shots.mjs --card --self` shoots any home's own turn-ins: the live target a placeholder is held to.
 - ZE12's review note (GC13's loading limit has no caller): J352 builds one world at a time, so no world is ever prepared
   beside a kept one. `canPrepareAlongside`, `loadingEnvelope` and `pageLoadingBytes` are deleted with their tests.
+- ZE10b: the gate's 0 hands `enterZone` an arrival pose (`arrivalPose`: the entryway's centre line, 14 m in, past the
+  gate, facing the centre) and the reload form carries it in the travel handoff's `arrive`, which the target's spawn reads.

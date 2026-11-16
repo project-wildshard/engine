@@ -51,7 +51,7 @@ import { WATER_UNBOUNDED, waterExtent } from '@wildshard/engine/world/waves';
 import type { Renderer } from '@wildshard/engine/render/renderer';
 import { generatePlatform, generatePlatformSliced, type GeneratedStrip, type PlatformCell, type StripProfile } from '@wildshard/engine/sim/strips';
 import { GridAssembly, type GridCell } from '../../../shared/game/grid/assembly';
-import { bufferAt, walledCells, zoneWallEdges } from '../../../shared/game/grid/zoneWalls';
+import { arrivalPose, bufferAt, walledCells, zoneWallEdges } from '../../../shared/game/grid/zoneWalls';
 import { GateCount, type GateCountState } from '../../../shared/game/grid/gateCount';
 import { GateCard } from './gateCard';
 import { DEVSERVER, gridMode } from './menu';
@@ -166,7 +166,8 @@ export interface GridSessionHost {
    * in-world screen. Disabled in the same frame the crossing settles. */
   readonly heldFrame?: { enabled: boolean };
   /** ZE8: a gate's count reached 0 for this walled cell (ZE10 opens the loading screen and makes it the home) */
-  readonly enterZone?: (instance: string) => void;
+  /** ZE10b: `arrive` is the arrival pose in the target cell's own frame (`arrivalPose`) */
+  readonly enterZone?: (instance: string, arrive: { readonly x: number; readonly z: number; readonly yaw: number }) => void;
   /** Register once per fixed step (the page's one fixed step; never a second loop). */
   readonly onFixed: (fn: (dt: number) => void) => void;
   /** SF19a's one frame: the camera, composer and grade effects, and the page's late phase (absent: never built) */
@@ -1115,7 +1116,7 @@ export class GridSession {
   private stepGate(at: { x: number; z: number }): void {
     const buffer = bufferAt(this.assembly.cells, this.home, at);
     this.gateState = this.gate.step(buffer?.instance ?? null, diagnosticNow());
-    if (this.gateState.fire !== null) this.host.enterZone?.(this.gateState.fire);
+    if (this.gateState.fire !== null && buffer !== null) this.host.enterZone?.(this.gateState.fire, arrivalPose(buffer, at));
   }
   private shardName(instance: string): string { const slug = this.assembly.cell(instance).slug; return this.names.get(slug) ?? slug; }
   private drawGate(at: { x: number; z: number }): void {

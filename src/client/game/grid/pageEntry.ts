@@ -145,7 +145,7 @@ export function enterGrid(): void {
  *  enters that cell as Shard select enters it: the full loading screen at once, then a fresh page whose home is the target (so its
  *  walls move), with a goto asking the world (or the in-page server, J311) to seat it there. The plan's marked-reload form: one world
  *  in memory by construction, the old home released with its document. */
-export function enterZone(instance: string): void {
+export function enterZone(instance: string, arrive?: { readonly x: number; readonly z: number; readonly yaw: number }): void {
   if (navigating !== null && !navigating.disposed) return;
   const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
   if (cell === undefined || target === undefined) return; // a cell this build can't open stays behind its gate
@@ -157,7 +157,8 @@ export function enterZone(instance: string): void {
     if (!gridRecovery(saves).clearLoop()) throw new Error('Grid recovery guard could not be cleared');
     clearGridRecovery();
     pageGridIntents().set({ instance: cell.instance, slug: target.slug, goto: true });
-    travel({ to: target.slug, mode: 'enter', shown });
+    // ZE10b: the target's own spawn reads `arrive` (play.ts `arrivalSpawn`): the entryway's centre line past the gate, facing in
+    travel({ to: target.slug, mode: 'enter', shown, ...(arrive === undefined ? {} : { arrive: { x: arrive.x, z: arrive.z, yaw: arrive.yaw } }) });
   }, null);
 }
 
