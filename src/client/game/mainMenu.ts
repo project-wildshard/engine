@@ -84,6 +84,8 @@ export interface TitleMenu {
   /** the screen on show (tests, the proof script) */
   readonly screen: MainMenuScreen;
   readonly show: (next: MainMenuScreen) => void;
+  /** Let an open first-play name prompt complete before replacing this view. */
+  readonly whenIdle: () => Promise<void>;
 }
 
 function required<T extends HTMLElement>(root: ParentNode, selector: string, type: new () => T): T {
@@ -191,12 +193,15 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   // MMO-PLAN MP2.4 (Jake, 2026-11-11: "Ask the user for their name… after they hit play but before we pop them into the world"):
   // a device's first PLAY (or INFINITE WILDSHARD) asks for the Name once, then goes on; every later one goes straight through
   let naming = false;
+  let nameIdle = Promise.resolve();
   const named = async (next: () => void): Promise<void> => {
     if (naming) return;
     if (!nameAskDue()) { next(); return; }
     naming = true;
+    let finishName: () => void = () => undefined;
+    nameIdle = new Promise<void>(resolve => { finishName = resolve; });
     let answered = false;
-    try { answered = await askNameOnce(owner, { parent: document.body }); } finally { naming = false; }
+    try { answered = await askNameOnce(owner, { parent: document.body }); } finally { naming = false; finishName(); }
     if (answered && !owner.disposed) next();
   };
   const enterPlay = (): void => {
@@ -251,6 +256,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     get index() { return deck.index; },
     get screen() { return viewScreen; },
     show,
+    whenIdle: () => nameIdle,
     // the HUD's arrow keys move the deck; on the main menu they wait for SHARD SELECT
     select: (i, smooth) => { deck.select(i, smooth); },
     // the HUD's confirm / any key: the main menu's first card opens the deck, the deck enters its card

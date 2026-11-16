@@ -2,8 +2,8 @@
 import '@wildshard/engine/core/portableMathFirst';
 // oxlint-disable-next-line import/no-unassigned-import -- evaluated for its effect: the app identity is installed before any other module body runs (E414)
 import './identity';
-import { findTitleManifest, installTitleManifests, readTitleRows, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
-import { installInlineCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
+import { findTitleManifest, installTitleManifests, readTitleRows, titleManifests, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
+import { installedCatalogue, installInlineCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { installOfflineDownload } from '@wildshard/engine/ui/offlineDownload';
 import { startPageServices } from './pageServices';
 import { persistHomeScreen, saves } from '@wildshard/engine/saves/runtime';
@@ -274,6 +274,8 @@ function pageTitleImports(): ReturnType<typeof preparePageTitleImports> {
 async function showPageTitle(refusal = '', preparation?: Scope): Promise<void> {
   // S20: the title's ended note reads lastEnd(), settled (the imports take longer than the lock query)
   const [[{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }]] = await Promise.all([pageTitleImports().ready(), settleLastEnd()]);
+  if (preparation?.disposed === true || preparation?.disposing === true || document.querySelector('.ws-load[data-failed="true"]') !== null) return;
+  const mountedCatalogue = installedCatalogue(), mountedTitles = titleManifests();
   // SF21a: a tap or validated recovery selects a grid; unrecorded process loss returns to title
   const grid = installGridTitle({ preserveIntent: preparation !== undefined });
   let earlySelect = document.querySelector<HTMLDetailsElement>('[data-launch-menu]')?.open === true;
@@ -299,7 +301,12 @@ async function showPageTitle(refusal = '', preparation?: Scope): Promise<void> {
   preparation?.onDispose(title.dispose);
   // Published cards can arrive after the first menu. Rebuild through the same
   // owner as Developer changes, preserving its selected card and menu screen.
-  void placedCells.then(title.refresh);
+  void (async (): Promise<void> => {
+    await placedCells;
+    if (installedCatalogue() === mountedCatalogue && titleManifests() === mountedTitles) return;
+    await menu?.whenIdle();
+    title.refresh();
+  })();
   if (preparation !== undefined) return;
   // DL10 (Debug 'Early shader compile', default off): after the title's first frames, one trivial shader link starts the
   // GPU process's compiler, so a cold entry's first program does not pay its 1-1.4 s start-up
@@ -399,6 +406,13 @@ export async function start(): Promise<void> {
   }
 }
 
+/** An optional runtime menu never delays or refuses world admission. */
+async function showPreparationTitle(owner: Scope): Promise<void> {
+  try { await showPageTitle('', owner); }
+  catch (error: unknown) {
+    if (!owner.disposed && !owner.disposing) console.warn('[title] preparation menu unavailable', error);
+  }
+}
 async function startSelected(): Promise<void> {
   const selected = bootAwait('app:selected-discovery', import('./shardSelection').then(async selection => {
     await selection.prepareSelectedShard();
@@ -412,7 +426,9 @@ async function startSelected(): Promise<void> {
   const listed = unloadedTitleRow(search.get('chunk'), game.shard);
   const arrival = listed?.shardfile === undefined ? game.shard : { ...game.shard, slug: listed.slug, name: listed.name, shardfile: listed.shardfile };
   const loading = beginLoading({ id: arrival.slug, name: arrival.name, trace: game.shard.boot?.phone?.trace === true });
-  const preparingTitle = document.documentElement.classList.contains('boot-menu') ? prepareBootImports(showPageTitle('', loading.scope)) : null;
+  if (document.documentElement.classList.contains('boot-menu')) {
+    void showPreparationTitle(loading.scope);
+  }
   const moduleText = document.getElementById('boot-module-files')?.textContent;
   const moduleRows: unknown = moduleText === undefined ? undefined : JSON.parse(moduleText);
   const gridEntryModule = import('@wildshard/engine/game/grid/pageEntry');
@@ -482,7 +498,6 @@ async function startSelected(): Promise<void> {
   const imageOwner = entryScope.child('manifest images');
   try {
     imports.check();
-    await preparingTitle?.ready();
     loading.setPrefetchSource(gridPrefetchStatus);
     const source = pageGridRecovery() === null ? await bootTask('app:product-source-and-read', () => configuredShardfile(document, browserShardfileOptions(document.baseURI, inlineOwner))) : null;
     page = preparePageResidency(arrival, source?.identity.slug);

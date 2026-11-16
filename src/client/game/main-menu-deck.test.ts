@@ -6,6 +6,7 @@ import { installShards } from './shard/list';
 import { buildTitleMenu, installGridTitle } from './mainMenu';
 import { pageGridIntents } from './grid/intent';
 import type { TitleCard } from './titleDeck';
+import { saveStorage } from '@wildshard/engine/saves/slots';
 
 /** Jake, 2026-11-12 09:03 Cancún ("That shard select insta loads driftwood bug is still here"): on a phone, SHARD SELECT
  *  went straight to "Loading Driftwood Isle". The MG5 first-play skip entered deck card 0 on every tap until the in-world
@@ -69,6 +70,22 @@ test('preparation keeps the small hero off the mandatory world download connecti
   const hero = view.root.querySelector<HTMLElement>('.ws-main-hero');
   expect(hero?.style.getPropertyValue('--ws-hero-square')).toContain('square-first');
   expect(hero?.style.getPropertyValue('--ws-hero-landscape')).toContain('landscape-first');
+});
+
+test('a late catalogue owner can await first-play naming without replacing the prompt', async () => {
+  saveStorage('device').removeItem('nameAsked');
+  const view = menu(() => undefined);
+  tap(view.root.querySelector('.ws-main-select'));
+  await vi.waitFor(() => { expect(document.querySelector('#ws-name-box')).not.toBeNull(); });
+  let idle = false;
+  const pending = (async (): Promise<void> => { await view.whenIdle(); idle = true; })();
+  await Promise.resolve();
+  expect(idle).toBe(false);
+  const skip = document.querySelector<HTMLButtonElement>('.ws-name-skip');
+  if (skip === null) throw new Error('Missing naming choice');
+  skip.click(); await pending;
+  expect(idle).toBe(true);
+  expect(document.querySelector('#ws-name-box')).toBeNull();
 });
 
 for (const visit of ['a fresh phone (no first-play mark)', 'a return visit (first play done)'] as const) {

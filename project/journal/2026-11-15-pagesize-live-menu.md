@@ -42,3 +42,6 @@ optional for admission, and refuses a late mount on a retired owner.
 Catalogue refresh checks actual installed identities and waits for any
 first-play name prompt to complete. Tests cover these ownership cases;
 the reviewed milestone passes lint, types, CSS and 137 related tests.
+Entry now treats preparation UI as optional and checks its owner after
+imports. Late placements refresh only a changed catalogue after naming
+is idle, preserving the current screen and the player's pending choice.
