@@ -59,3 +59,15 @@ admits exactly the variants named by its actual guest spawn programs;
 all three real guest cases pass. Production validation remains strict,
 and the full-world unseen-variant regression stays required. This
 changes no production source or health defaults.
+
+## M1 rebase, 2026-11-16
+
+Mainc7a984fa carries format0.12 and attaches admitted harvest/cap
+metadata through the native roster's species input. The conflict
+resolution keeps that input alongside this branch's complete variant
+recipes. No health fallback, geometry relaxation or budget increases.
+The three focused elite-data cases pass after the combined rebase.
+The final hosted native and shard journeys must qualify this SHA;
+all prior83ea receipts remain historical. Frozen install/pins pass.
+Normal land uses --no-preflight to avoid a local cook, preserving
+normal hooks and exact hosted CI. Main stays held behind TC40.
