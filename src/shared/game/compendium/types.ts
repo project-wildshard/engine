@@ -12,6 +12,8 @@ import type { IconId } from '@wildshard/engine/ui/icons';
 
 /** what an entry is: a species page, a named variant, an elite, the boss, a place */
 export type EntryKind = 'species' | 'variant' | 'elite' | 'boss' | 'place';
+/** An admitted image URL or the older glyph, retained until source migration. */
+export type CompendiumIcon = IconId | { readonly image: string };
 
 /**
  * An entry's state, in order — it only ever moves forward:
@@ -86,7 +88,7 @@ interface CompendiumSkin {
   /** the stats row: 3–4 label / value pairs */
   stats: (e: EntryDef, s: EntryStats) => { label: string; value: string }[];
   /** the FINDS sticker's glyph for an entry (the content's icons); a pin for a place, a dot otherwise when absent */
-  icon?: (e: EntryDef) => IconId | undefined;
+  icon?: (e: EntryDef) => CompendiumIcon | undefined;
   /** the chalk outline atlas (public path) and its cells, for the trophy wall */
   chalk?: { atlas: string; cells: Record<string, { x: number; y: number; w: number; h: number }> };
 }

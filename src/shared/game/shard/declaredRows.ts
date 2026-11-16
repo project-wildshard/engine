@@ -52,16 +52,14 @@ function journalStats(rules: JournalRow['stats']['default'], entry: EntryDef, st
 }
 function declaredJournal(row: JournalRow, image?: (ref: string) => string): ShardCompendium {
   if (image === undefined) throw new Error('Rich journal requires admitted image URLs');
+  const icons = row.icons.map(rule => ({ ...rule, resolved: 'image' in rule ? { image: image(rule.image) } : rule.icon }));
   const entries = row.entries.map(entry => ({ ...entry, plate: { ...entry.plate, sketch: image(entry.plate.sketch),
     ...(entry.plate.silhouette === undefined ? {} : { silhouette: image(entry.plate.silhouette) }) } }));
   return { chunkId: row.chunkId, skin: { className: row.className, title: row.title, tabs: row.tabs,
     ...(row.trophyTab === undefined ? {} : { trophyTab: row.trophyTab }),
     stamp: entry => entry.kind === 'place' ? row.stamp.place : row.stamp.default,
-    icon: entry => {
-      const rule = row.icons.find(value => (value.entryKind === undefined || value.entryKind === entry.kind)
-        && (value.matchKind === undefined || value.matchKind === entry.match?.kind));
-      return rule !== undefined && 'icon' in rule ? rule.icon : undefined;
-    },
+    icon: entry => icons.find(rule => (rule.entryKind === undefined || rule.entryKind === entry.kind)
+      && (rule.matchKind === undefined || rule.matchKind === entry.match?.kind))?.resolved,
     stats: (entry, state) => journalStats(entry.kind === 'place' ? row.stats.place : row.stats.default, entry, state),
     ...(row.chalk === undefined ? {} : { chalk: { ...row.chalk, atlas: image(row.chalk.atlas) } }) }, entries,
     ...(row.trophies === undefined ? {} : { trophies: row.trophies }), ...(row.wall === undefined ? {} : { wall: row.wall }) };
@@ -72,6 +70,7 @@ export function declaredProductCompendium(product: ShardProduct, id: string, ske
   const rows = product.shardfile.rows, row = product.section('ui/compendium').rows.compendiums.find(value => value.id === id);
   if (row === undefined) throw new Error('Missing admitted compendium row');
   return declaredCompendium(row, rows, product.slug, ref => {
+    if (ref.startsWith('data:image/svg+xml,') && sketchReference(ref)) return sketches.get(ref)?.data ?? ref;
     if (!('kind' in row)) {
       const sketch = sketches.get(ref); if (sketch !== undefined) return sketch.data;
       if (ref.startsWith('data:image/svg+xml,') && sketchReference(ref)) return ref;
