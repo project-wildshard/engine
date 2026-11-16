@@ -92,6 +92,9 @@ test('original table failure wins over concurrent tier setup failure', async () 
   }})).rejects.toBe(tableError);
 });
 
+/** The memory bank's reserves in `selectedEntry`: how many, each one's cost on the boot clock, and the yields they took. */
+const reserveClock = {now: 0, reserveMs: 0, reserves: 0, turns: 0};
+
 /** Execute the actual selected-entry body with finite service/admission ports.
  * These gates exercise its order without constructing a browser or renderer. */
 function selectedEntry(admissionFailure?: Error, packs = false, authored = false, devserver = authored) {
@@ -135,11 +138,13 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     '@wildshard/engine/game/shardfile/runtimeProduct': {browserShardfileOptions: (_base: string, firstParty = false) => {firstParties.push(firstParty); return {};}},
     '@wildshard/engine/game/boot/loadingPaths': {loadingPath: noop},
     '@wildshard/engine/game/grid/prefetch': {gridPrefetchStatus: noop},
-    '@wildshard/engine/script/moduleV2': {prepareScriptMemoryBank: async () => {
-      events.push('memory:start'); memoryStarted.finish(); await memory.ready; events.push('memory:end');
+    '@wildshard/engine/script/moduleV2': {prepareScriptMemoryBank: async (_counts: unknown, yieldTurn: () => Promise<void>) => {
+      events.push('memory:start'); memoryStarted.finish(); await memory.ready;
+      for (let n = 0; n < reserveClock.reserves; n++) { reserveClock.now += reserveClock.reserveMs; await yieldTurn(); }
+      events.push('memory:end');
     }},
-    '@wildshard/engine/core/workSlice': {yieldTask: resolved},
-    '@wildshard/engine/core/clock': {diagnosticNow: () => 0},
+    '@wildshard/engine/core/workSlice': {yieldTask: () => { reserveClock.turns++; return resolved(); }},
+    '@wildshard/engine/core/clock': {diagnosticNow: () => reserveClock.now},
     './assetTables': {prepareAssetPackRead: () => ({ready: resolved})},
     '@wildshard/engine/game/shardfile/product': {},
     '@wildshard/engine/boot/tables': {publicBytes: () => ({})},
@@ -174,6 +179,16 @@ test.each([false, true])('early session code waits for the original memory, admi
   f.admission.finish(); await f.run;
   expect(f.events).toEqual(['session:import', 'memory:start', 'memory:end', 'admission:start', 'admission:end',
     'kit:species', 'kit:icons', 'kit:pickup:prepare', 'kit:pickup:install', 'kit:props', 'session:start']);
+});
+
+// NINE-DRAGON-BENCHMAX NB4: cheap reserves share an 8 ms slice (Chromium's 45 cost 0.6 ms; a yield after each was the whole
+// 0.35 s span at CPU x4); a reserve that spends its slice (a JSC full GC) still ends its own task.
+test.each([{reserveMs: 0.02, turns: 0}, {reserveMs: 3, turns: 15}, {reserveMs: 25, turns: 45}])('the memory bank yields once per spent 8 ms slice (%j)', async ({reserveMs, turns}) => {
+  Object.assign(reserveClock, {now: 0, reserveMs, reserves: 45, turns: 0});
+  try {
+    const f = selectedEntry(); f.acceptSession(); f.memory.finish(); f.admission.finish(); await f.run;
+    expect(reserveClock.turns).toBe(turns);
+  } finally { Object.assign(reserveClock, {now: 0, reserveMs: 0, reserves: 0, turns: 0}); }
 });
 
 // SA15: `wildshard dev`'s page (a devserver build with the author's shard inline) reads and installs that shard as the

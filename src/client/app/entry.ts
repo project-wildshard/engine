@@ -592,10 +592,14 @@ async function startSelected(): Promise<void> {
       import('@wildshard/engine/core/clock'),
     ]);
     const memoryStartedAt = diagnosticNow();
-    let memoryTurns = 0, memoryWaitMs = 0;
+    // NB4: a reserve yields once its slice has run 8 ms, not after every reserve. In Chromium the 45 reserves cost
+    // 0.6 ms together; the 45 timer turns between them were the whole 0.35 s of this span at CPU x4 (NB1). A reserve
+    // that does cost JSC a full GC still spends its slice, so it still ends its own task.
+    let memoryTurns = 0, memoryWaitMs = 0, memorySliceAt = diagnosticNow();
     await bootTask('app:script-memory-reservation', () => prepareScriptMemoryBank(grid ? [35, 0, 1, 0] : [4, 0, 1, 0], async () => {
-      // Each native reserve gets its own task, even when the CPU budget is free.
-      memoryTurns++; const at = diagnosticNow(); await yieldTask(entryScope); memoryWaitMs += diagnosticNow() - at;
+      if (diagnosticNow() - memorySliceAt >= 8) {
+        memoryTurns++; const at = diagnosticNow(); await yieldTask(entryScope); memorySliceAt = diagnosticNow(); memoryWaitMs += memorySliceAt - at;
+      }
       if (entryScope.disposed || entryScope.disposing) throw new Error('Entry memory preparation ended');
     }, grid ? [{ initial: 1, maximum: 2, count: 5 }, { initial: 1, maximum: 64, count: 4 }] : [{ initial: 1, maximum: 2, count: 1 }, { initial: 1, maximum: 64, count: 1 }]));
     performance.measure('wildshard.prepare:boot.script-memory-bank', { start: memoryStartedAt, end: diagnosticNow(),
