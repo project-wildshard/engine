@@ -27,7 +27,7 @@ export function uploadActivator(ports: UploadActivationPorts): (notice: UploadAc
     if (placement.channel !== ports.channel || placement.serial < seen) throw new Error('Stale activation placement');
     seen = placement.serial;
     const rows = placement.cells.filter(row => new Set([notice.slug]).has(row.slug));
-    if (rows.length === 0 || rows.some(row => row.hash !== notice.hash)) throw new Error('Placement does not publish the upload hash');
+    if ((rows.length === 0 && notice.place !== false) || rows.some(row => row.hash !== notice.hash)) throw new Error('Placement does not publish the upload hash');
     await ports.preload(notice.slug, notice.hash);
     for (const row of rows) ports.place(row);
     const instances = rows.map(row => row.instance);

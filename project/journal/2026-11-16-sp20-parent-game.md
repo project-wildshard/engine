@@ -41,3 +41,9 @@ inputs; author inline candidates retain their existing source reader.
 After rebasing onto current main, the additive-version cook control uses the
 mandatory full-check port too. Refresh the frozen dependency graph before
 qualification: main now requires format 0.12 compatibility helpers.
+
+The recorded no-place choice travels on the protected activation notice. An
+unplaced upload still preloads its exact pack, but needs no cell opening. A
+missing placement without that authenticated opt-out still refuses. The first
+land attempt was stopped in local preflight, before its branch push, to add
+this control; it did not land or spend a hosted run.

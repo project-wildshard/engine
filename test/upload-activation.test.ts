@@ -29,6 +29,14 @@ describe('the real game activation gate', () => {
     await expect(uploadActivator({...options, ...overrides})(notice)).rejects.toThrow();
   });
 
+  it('honours a recorded placement opt-out only after exact pack preload', async () => {
+    const preload = vi.fn(() => Promise.resolve());
+    const activate = uploadActivator(ports({read: () => Promise.resolve({...placed, cells: []}), preload}));
+    await expect(activate(notice)).rejects.toThrow('does not publish');
+    expect(await activate({...notice, place: false})).toMatchObject({preloaded: true, instances: [], place: false});
+    expect(preload).toHaveBeenCalledWith(notice.slug, notice.hash);
+  });
+
   it('does not believe an older signed placement after a newer one', async () => {
     let serial = 4;
     const activate = uploadActivator(ports({read: () => Promise.resolve({...placed, serial})}));

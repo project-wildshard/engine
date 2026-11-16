@@ -14,9 +14,9 @@ import {readCapped, type CookRow, type CookWorker, type ShardfileSource} from '.
 const Id = v.pipe(v.string(), v.regex(/^[a-f0-9-]{36}$/u));
 const identity = {uploadId: Id, hash: ShardfileHashSchema, slug: ShardSlugSchema};
 const Pending: v.GenericSchema<PendingUpload> = v.object({...identity, revision: v.pipe(v.number(), v.safeInteger(), v.minValue(1)), formatVersion: v.string()});
-const Activation: v.GenericSchema<ActivationNotice> = v.object({...identity, channels: v.array(v.picklist(['preview', 'staging', 'production']))});
+const Activation: v.GenericSchema<ActivationNotice> = v.object({...identity, channels: v.array(v.picklist(['preview', 'staging', 'production'])), place: v.optional(v.boolean())});
 export interface PendingUpload {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly revision: number; readonly formatVersion: string}
-export interface ActivationNotice {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly channels: readonly ('preview' | 'staging' | 'production')[]}
+export interface ActivationNotice {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly channels: readonly ('preview' | 'staging' | 'production')[]; readonly place?: boolean | undefined}
 export interface UploadVerdict {readonly hash: string; readonly result: 'cooked' | 'refused'; readonly build?: string; readonly report: Readonly<Record<string, unknown>>}
 export interface CookApi {
   readonly pending: () => AsyncIterable<PendingUpload>;
@@ -203,11 +203,11 @@ export function gameActivationClient(receivers: Readonly<Partial<Record<'staging
     const receiver = receivers[channel]; if (receiver === undefined) throw new Error('No local game receiver for activation');
     const url = new URL(receiver.url);
     if (url.protocol !== 'http:' || !new Set(['localhost', '127.0.0.1', '[::1]']).has(url.hostname) || url.username !== '' || url.password !== '') throw new Error('The game activation receiver must be loopback');
-    const body = JSON.stringify({uploadId: notice.uploadId, hash: notice.hash, slug: notice.slug, channel});
+    const body = JSON.stringify({uploadId: notice.uploadId, hash: notice.hash, slug: notice.slug, channel, ...(notice.place === undefined ? {} : {place: notice.place})});
     const response = await read(new URL('/internal/upload-activation', url), {method: 'POST', redirect: 'error', headers: {authorization: `Bearer ${receiver.token}`, 'content-type': 'application/json'}, body, signal: AbortSignal.timeout(120_000)});
     if (response.status !== 200) throw new Error(`Game activation answered ${response.status}`);
     const value = v.parse(UploadActivationAckSchema, JSON.parse(new TextDecoder().decode(await readCapped(response, 64_000))));
-    if (value.uploadId !== notice.uploadId || value.hash !== notice.hash || !new Set([notice.slug]).has(value.slug) || value.channel !== channel || value.build !== build || value.instances.length === 0) throw new Error('Game acknowledged another activation');
+    if (value.uploadId !== notice.uploadId || value.hash !== notice.hash || !new Set([notice.slug]).has(value.slug) || value.channel !== channel || value.build !== build || (value.place ?? true) !== (notice.place ?? true) || (notice.place !== false && value.instances.length === 0)) throw new Error('Game acknowledged another activation');
   }};
 }
 /** Published notices remain in the API until every required real game receiver agrees. */
