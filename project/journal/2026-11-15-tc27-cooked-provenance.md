@@ -78,3 +78,9 @@ which exact-row precedence correctly selected on the store origin.
 Retirement now clears both default and whole rows, plus recorded-program
 flags, only for the three selected products. Production attachment alone
 then writes their current rows.
+
+Keep the normal hook case count fixed (J186): the one existing positive
+book case now asks by authored alias in the default book, then has
+distinct exact and bare rows in the whole book. It checks both fallback
+and exact-row precedence in one real download, instead of adding cases.
+The nine new fire-drill cases remain outside hooks, in non-blocking soak.

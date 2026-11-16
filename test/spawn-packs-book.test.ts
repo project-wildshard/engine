@@ -60,10 +60,10 @@ test('a whole-level address whose manifest has no part table is refused', async 
   expect(reads.map(url => new URL(url).pathname)).not.toContain(file.url);
 });
 
-test.each(['book-good', '_book-alias', '_book-collision'])('this build\'s packs book runs %s to whole-level completion', async slug => {
-  const bare = slug.replace(/^_/u, ''), stored = slug === '_book-collision' ? slug : bare;
+test('this build\'s packs book resolves the authored route and keeps its exact whole row', async () => {
+  const slug = '_book-good', stored = 'book-good';
   const {download, reads} = run(slug, (whole, fallback) => Response.json({book: 'packs', build: `build-${slug}`, client: {
-    ...(slug === '_book-collision' ? {[bare]: {phone: fallback}} : {}), [stored]: {phone: whole},
+    [stored]: {phone: fallback}, [slug]: {phone: whole},
   }}), true, stored);
   await download.ready;
   expect(download.snapshot()).toMatchObject({complete: true, error: null, filesDone: 1});
