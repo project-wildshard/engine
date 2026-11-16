@@ -140,9 +140,12 @@ export function treeSetModel(rows: TreeSetRows): { readonly model: ModelDef<Tree
       const c = trunkCapsule(p), s = p.scale;
       return [{ kind: 'capsule', x: 0, y: c.y / s, z: 0, halfHeight: c.halfHeight / s, radius: c.radius / s }];
     },
+    // the bands are the tier's own (phone 80 / 130 m) and the forest's dissolve shaders fade on them (Forest.ts `fade`), so
+    // the tier's placedLodScale stays off them (QA 2026-11-15-mini 42: at 0.6 the phone drew the impostor 52 m early,
+    // purple blocks on Pine Hollow's far trees, and the lo cards from 48 m)
     lods: [
-      { get from() { return FOREST_BANDS.hi; }, build: (ctx, p) => band(ctx, p.v, 'far') },
-      { get from() { return FOREST_BANDS.far; }, fade: FOREST_BANDS.fade, build: (ctx, p) => band(ctx, p.v, 'impostor') },
+      { get from() { return FOREST_BANDS.hi; }, tierScaled: false, build: (ctx, p) => band(ctx, p.v, 'far') },
+      { get from() { return FOREST_BANDS.far; }, fade: FOREST_BANDS.fade, tierScaled: false, build: (ctx, p) => band(ctx, p.v, 'impostor') },
     ],
   });
   return { model, use: (ctx, factory) => { ctx.once(key, () => factory); } };

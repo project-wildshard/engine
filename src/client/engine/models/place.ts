@@ -424,11 +424,13 @@ function collideCopy<P extends object>(def: ModelDef<P>, params: P, pose: Pose, 
   }
 }
 
-/** level start distances: 0 for the model's own parts, then each LOD's `from`, times the tier's `placedLodScale` (NB5: the
- *  phone's smaller pixels per metre switch levels nearer; the desktop's 1 keeps the authored distances) */
-const levelsOf = <P extends object>(def: ModelDef<P>): number[] => [0, ...(def.lods ?? []).map((l) => l.from * TIER_CONFIG.placedLodScale)];
+/** a level's share of the tier's `placedLodScale` (NB5: the phone's smaller pixels per metre switch levels nearer; the
+ *  desktop's 1 keeps the authored distances); 1 for a level that keeps its authored distances (`tierScaled: false`) */
+const lodScale = (l: { readonly tierScaled?: false }): number => l.tierScaled === false ? 1 : TIER_CONFIG.placedLodScale;
+/** level start distances: 0 for the model's own parts, then each LOD's `from`, times its `lodScale` */
+const levelsOf = <P extends object>(def: ModelDef<P>): number[] => [0, ...(def.lods ?? []).map((l) => l.from * lodScale(l))];
 /** each level's dissolve band before its start (`ModelLod.fade`; level 0 has none), scaled with its start */
-const fadesOf = <P extends object>(def: ModelDef<P>): number[] => [0, ...(def.lods ?? []).map((l) => (l.fade ?? 0) * TIER_CONFIG.placedLodScale)];
+const fadesOf = <P extends object>(def: ModelDef<P>): number[] => [0, ...(def.lods ?? []).map((l) => (l.fade ?? 0) * lodScale(l))];
 
 /** A callback belongs to one place call, so nested builders cannot mix their copies. */
 type BuildOptions<P extends object> = PlaceOptions & { readonly visitBuild?: (build: ModelBuildVisit<P>) => void };
@@ -910,7 +912,7 @@ function drawSingle<P extends object>(def: ModelDef<P>, pls: readonly Placement<
       lod.addLevel(obj, 0);
       (def.lods ?? []).forEach((l, k) => {
         const lp = partsOf(buildModel(def, o, p, new Rng(seedOf(def) ^ Math.imul(k + 1, 0x9e3779b9)), pls.slice(i, i + 1), k + 1), def.id, o.draw);
-        lod.addLevel(lp.length === 0 ? new THREE.Object3D() : wrap(lp.map((x) => meshOf(x)), `${def.id}:lod${k + 1}`), l.from * TIER_CONFIG.placedLodScale);
+        lod.addLevel(lp.length === 0 ? new THREE.Object3D() : wrap(lp.map((x) => meshOf(x)), `${def.id}:lod${k + 1}`), l.from * lodScale(l));
       });
       obj = lod;
     }

@@ -211,6 +211,12 @@ interface ModelLod<P> {
    * one into the other (the forest's impostor, E94). Default 0: a clean switch
    */
   readonly fade?: number;
+  /**
+   * false keeps `from` and `fade` as authored on every tier, past the tier's `placedLodScale` (NB5): for a level whose
+   * distances are already the tier's own and whose shaders dissolve on those same distances (the forest's tree set, its
+   * bands `FOREST_BANDS` and its fades the tree materials' dither). Default: scaled
+   */
+  readonly tierScaled?: false;
   readonly build: (ctx: ModelContext, params: P, rng: Rng) => readonly ModelPart[];
 }
 
