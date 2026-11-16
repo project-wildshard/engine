@@ -68,6 +68,7 @@ import { createShardfileClientScripts, captureClientScriptPosition } from './cli
 
 import { installClientWater, undrawnWater } from './clientWater';
 import { detailLayerFiles, installClientDetails } from './clientDetails';
+import { trample, TRAMPLE_GLSL } from '../systems/looks/trample';
 import { installClientSplash } from './clientSplash';
 import { standaloneClientTiles } from './tileContent';
 import { tileRing } from './tileDriver';
@@ -295,8 +296,26 @@ export class ShardfileClient {
     if (waterClocks.length > 0) ctx.system({ id: 'game.shardfile.water', phase: 'update', run: (dt) => { for (const run of waterClocks) run(dt); } });
     // SHARD-SOURCE AP32d1: the look's detail layers (grass, ferns), each a camera ring of seeded clumps from its library files
     const details = this.source.look.details;
+    // SHARD-SOURCE SS7: they part round the player and every creature body on the page's trample field, and spring back; the
+    // page drives the field unless another system already owns it (a native forest's grass pushes and advances it)
+    const ownTrample = (details?.length ?? 0) > 0 && ctx.app.world.trample === null;
+    if (ownTrample) ctx.app.registerTrample(trample, ctx.scope);
     installClientDetails(details, await detailLayerFiles(details, this.assets.retained, (hash) => this.assets.read(hash)), { root: ctx.root, scope: ctx.scope, materials: presentation.materials, phone: TIER === 'phone',
-      viewer: () => runtime.viewer(), frame: (run) => { ctx.system({ id: 'game.shardfile.details', phase: 'late', run }); } });
+      viewer: () => runtime.viewer(), frame: (run) => { ctx.system({ id: 'game.shardfile.details', phase: 'late', run }); },
+      trample: { field: trample, uniforms: trample.uniforms, glsl: TRAMPLE_GLSL, movers: ownTrample ? (() => {
+        const player = { id: 'player', x: 0, z: 0, radius: 0.55 }, live: (typeof player)[] = [];
+        const rows = this.source.creatures.spawns.map((spawn) => ({ spawn: spawn.id, row: { id: `creature:${spawn.id}`, x: 0, z: 0, radius: 0.7 } }));
+        return () => {
+          live.length = 0;
+          player.x = world.player.position.x; player.z = world.player.position.z; live.push(player);
+          for (const { spawn, row } of rows) {
+            const body = wirePage.namedBody(spawn);
+            if (body === null || body.mesh.parent === null) continue;
+            row.x = body.mesh.position.x; row.z = body.mesh.position.z; live.push(row);
+          }
+          return live;
+        };
+      })() : null } });
     // SHARD-SOURCE SS6: a scene pool splashes and rings when the player walks in, wades or walks out
     installClientSplash(this.source.water, { root: ctx.root, scope: ctx.scope, phone: TIER === 'phone',
       // the player and every declared creature with a body (SS6c): a creature wading the pond splashes as the player does

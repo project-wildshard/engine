@@ -4,16 +4,33 @@
  *
  *   installClientDetails(source.look.details, assets, { root, scope, materials, viewer, frame, phone });
  *
+ * With `trample` (meta SHARD-SOURCE SS7) every layer bends on the page's trample field, and when the page owns the field the
+ * frame pushes each mover (the player, then the creatures) and advances it: the cards part round a body and spring back.
+ *
  * The three files are library binaries (the charged library: the page has them before the world draws). A row whose files
  * do not match its counts, or whose material did not compile, is refused loudly: never a silently missing meadow.
  */
 import { SRGBColorSpace, Color, type Material, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { detailFileFaults, type LookDetail } from '@wildshard/format/look-details';
-import { DetailLayer } from '@wildshard/engine/world/detailLayer';
+import { DetailLayer, type DetailTrample } from '@wildshard/engine/world/detailLayer';
 import type { DetailLayerSource } from '@wildshard/engine/world/detailRing';
 
 type Rgb = readonly [number, number, number];
+
+/** A body the grass parts round: `radius` metres (the trample field's push radius; the bend reaches 1.6 times it). */
+export interface DetailMover { readonly id: string; readonly x: number; readonly z: number; readonly radius: number }
+
+/** The page's trample field for the layers (the engine's `systems/looks/trample.ts`). */
+export interface DetailTramplePort extends DetailTrample {
+  readonly field: { push: (x: number, z: number, radius: number, strength?: number, vx?: number, vz?: number) => void; update: (dt: number, playerPos: { x: number; z: number }) => void };
+  /** the movers to push each frame, the player first; null when another system on the page owns the field (it pushes and
+   *  advances it), so the layers only bend on it */
+  readonly movers: (() => Iterable<DetailMover>) | null;
+}
+
+/** A step faster than this (m/s) is a teleport or a respawn: pushed with no velocity (Grass.ts's 30 m/s). */
+const TELEPORT_SPEED = 30;
 
 /** The format's tint is two sRGB multipliers; the ring writes them to `instanceColor`, which three reads as linear. */
 export function linearTint(tint: readonly [Rgb, Rgb]): readonly [Rgb, Rgb] {
@@ -29,10 +46,12 @@ export interface ClientDetailPorts {
   readonly materials: ReadonlyMap<string, Material>;
   /** where the camera's player stands, read each frame */
   readonly viewer: () => { readonly x: number; readonly z: number };
-  /** runs `run` every frame for the scope's life */
-  readonly frame: (run: () => void) => void;
+  /** runs `run` every frame for the scope's life, with the frame's seconds */
+  readonly frame: (run: (dt: number) => void) => void;
   /** the phone tier grows half the radius and half the slots */
   readonly phone: boolean;
+  /** SS7: the field the cards bend on; omitted, they only sway */
+  readonly trample?: DetailTramplePort;
 }
 
 /**
@@ -60,11 +79,26 @@ export function installClientDetails(rows: readonly LookDetail[] | undefined, as
     const material = ports.materials.get(row.material);
     if (material === undefined) throw new Error(`Detail layer ${row.id}: material ${row.material} did not compile`);
     const source: DetailLayerSource = { ...row, tint: linearTint(row.tint) };
-    const layer = new DetailLayer(source, files, material, { phone: ports.phone });
+    const layer = new DetailLayer(source, files, material, { phone: ports.phone, ...(ports.trample === undefined ? {} : { trample: ports.trample }) });
     ports.root.add(layer.mesh);
     ports.scope.onDispose(() => { layer.mesh.removeFromParent(); layer.dispose(); });
     return layer;
   });
-  ports.frame(() => { const eye = ports.viewer(); for (const layer of layers) layer.update(eye); });
+  const movers = ports.trample?.movers ?? null, field = ports.trample?.field, last = new Map<string, { x: number; z: number }>();
+  ports.frame((dt) => {
+    const eye = ports.viewer();
+    for (const layer of layers) layer.update(eye);
+    if (movers === null || field === undefined) return;
+    let player: { x: number; z: number } | null = null;
+    for (const mover of movers()) {
+      const before = last.get(mover.id);
+      let vx = before === undefined || dt <= 0 ? 0 : (mover.x - before.x) / dt, vz = before === undefined || dt <= 0 ? 0 : (mover.z - before.z) / dt;
+      if (vx * vx + vz * vz > TELEPORT_SPEED * TELEPORT_SPEED) { vx = 0; vz = 0; }
+      field.push(mover.x, mover.z, mover.radius, 1, vx, vz);
+      if (before === undefined) last.set(mover.id, { x: mover.x, z: mover.z }); else { before.x = mover.x; before.z = mover.z; }
+      player ??= mover;
+    }
+    field.update(dt, player ?? eye);
+  });
   return layers;
 }
