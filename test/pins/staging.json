@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "79aab81da46cddc9861ac2b7cdd5c5e98771cc6c4e18444fdb9cce33d3ad3a5d",
+  "catalogueHash": "a66a6910b057fc01fb62703097a6d33f4e539b450d040d89e940ef2c71e4ac4c",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -115,7 +115,7 @@
       },
       {
         "instance": "blender-template-solo",
-        "slug": "blender-template",
+        "slug": "brasscap-mesa",
         "cell": [
           -1,
           -1
@@ -564,7 +564,7 @@
         },
         {
           "instance": "blender-template",
-          "slug": "blender-template",
+          "slug": "brasscap-mesa",
           "cell": [
             -1,
             -1
@@ -764,10 +764,10 @@
     },
     "shards": [
       {
-        "slug": "blender-template",
+        "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 9,
-        "hash": "1a8dad51ad26237bcf6f3c8cd737f7698ac279b38a8fc510159e0ff7933759d9"
+        "revision": 3,
+        "hash": "79d71535ef84351dcca74abd7322049a779127f59d82d4afa74cbad526458dbd"
       },
       {
         "slug": "driftwood-isle",
@@ -928,18 +928,18 @@
       {
         "slug": "template",
         "name": "Template shard",
-        "revision": 8,
-        "hash": "5d1f95f17fb0a7681fab74aa029618e1bd2d22976a4051d8432c939ace60316f"
+        "revision": 9,
+        "hash": "6016f17082d028aa64bae79373759595dd7a82b1033c4393ccd2070a57a62f48"
       }
     ],
     "missing": []
   },
   "shards": [
     {
-      "slug": "blender-template",
-      "revision": 9,
-      "hash": "1a8dad51ad26237bcf6f3c8cd737f7698ac279b38a8fc510159e0ff7933759d9",
-      "bytes": 20504064
+      "slug": "brasscap-mesa",
+      "revision": 3,
+      "hash": "79d71535ef84351dcca74abd7322049a779127f59d82d4afa74cbad526458dbd",
+      "bytes": 21882880
     },
     {
       "slug": "driftwood-isle",
@@ -1099,9 +1099,9 @@
     },
     {
       "slug": "template",
-      "revision": 8,
-      "hash": "5d1f95f17fb0a7681fab74aa029618e1bd2d22976a4051d8432c939ace60316f",
-      "bytes": 16329728
+      "revision": 9,
+      "hash": "6016f17082d028aa64bae79373759595dd7a82b1033c4393ccd2070a57a62f48",
+      "bytes": 16331264
     }
   ]
 }
