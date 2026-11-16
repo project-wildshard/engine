@@ -32,6 +32,7 @@ import { cellName, cellShard, gridAssembly, placedCells, roadHome } from './grid
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
 import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, trustedAddress, type TrustProxy } from './doorTrust';
 import {checkpointWord,type CheckpointCertificate} from './checkpointWitness';
+import type { PersistenceStatus } from './saves/persistenceStatus';
 
 /** J174: what a deploy gives everyone before they move together. */
 export const GRACE_MS = 60_000;
@@ -86,6 +87,8 @@ export interface PlayerSaves {
   /** Promote a previous copy only after a room imports it, and only while its sequence is unchanged. */
   recover?: (device: string, shard: string, seq: number) => Promise<void>;
   write: (write: SaveWrite) => void;
+  /** Actual durable transaction observations. Memory-only stores omit this capability. */
+  onSave?: (listener: (status: PersistenceStatus) => void) => () => void;
   report: (report: ChatReport, shard: string) => boolean;
   /** MP2.4: claim a cleaned Name for this device and answer what everyone reads (`Name#1234`). Left out, the Name goes as typed. */
   name?: (device: string, name: string) => Promise<string>;

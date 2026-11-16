@@ -59,18 +59,21 @@ const HEAL = 'update player_save set doc = previous, previous = doc where player
 
 /** Where a doc stands, if it says: a room's doc always does. */
 function poseOf(doc: unknown): unknown { return typeof doc === 'object' && doc !== null && 'at' in doc ? doc.at ?? null : null; }
-/** Write a player's doc and its receipts in one transaction. Receipts stand even if an older doc doesn't land: they are facts. */
-export async function writeSave(db: Database, epoch: number, write: SaveWrite): Promise<void> {
+/** Write a doc and its receipts atomically. True means this document won and the transaction acknowledged its commit.
+ * A stale doc can still file receipts, but does not confirm a new document or move the player. Lost acknowledgement rejects. */
+export async function writeSave(db: Database, epoch: number, write: SaveWrite): Promise<boolean> {
   if (write.shard === PLATFORM_SHARD) throw new Error(`A shard save can't be filed as ${PLATFORM_SHARD}`);
   const minted = write.receipts.find(row => !SHARD_GRANTS.has(row.grant));
   if (minted !== undefined) throw new Error(`A shard save can't file a ${minted.grant} grant`);
-  await db.transaction(async (sql: Sql) => {
+  const documentLanded = await db.transaction(async (sql: Sql) => {
     await sql.query(WRITE_PLAYER, [write.player, write.name]);
     const landed = await sql.query(WRITE_SAVE, [write.player, epoch, write.shard, write.build, write.saveVersion, write.seq, write.reason, JSON.stringify(write.doc)]);
     // An older doc that doesn't land doesn't move the player either.
     if (landed.rows.length > 0) await sql.query(WRITE_PLACE, [write.player, epoch, write.cell ?? write.shard, JSON.stringify(poseOf(write.doc)), write.reason]);
     for (const row of write.receipts) await sql.query(WRITE_RECEIPT, [write.player, epoch, write.shard, row.serial, row.factId, row.grant, row.name, row.amount]);
+    return landed.rows.length > 0;
   });
+  return documentLanded;
 }
 /** The answer, or a rejection once `ms` has passed. */
 export async function within<Result>(ms: number, read: () => Promise<Result>): Promise<Result> {
