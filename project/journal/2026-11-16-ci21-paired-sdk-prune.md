@@ -38,3 +38,13 @@ geometry-cache-author, nalati-ambient, species-barrel-author, spruce-author
 and view-author now have no active engine-test reader. They remain as
 cited originals in this scope (three observation files still compile).
 TC48 queues a separate proof/typing cleanup after the paired land.
+
+Hosted CI43865912818 found one stale layout guard: it opened the migrated
+Template boss source. Reproduced ENOENT locally (10/11 guards passed).
+Retarget its unchanged built-product/no-build/no-server assertions to the
+existing Template/Brasscap native strike suite, register both exact disk
+products, and explicitly refuse selection of the migrated author scenario.
+All11 guards now pass; no missing-file skip or original case removal.
+Remove the15 obsolete exclusions from each compiler project now that those
+physical files are gone; every remaining compiler exclusion is unchanged.
+The43 migrated source declarations and four native companions are intact.

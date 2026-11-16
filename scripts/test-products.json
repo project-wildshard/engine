@@ -219,8 +219,9 @@
     "sunscar-dunes",
     "far-reach"
   ],
-  "test/scripts/_template-boss.test.ts": [
-    "_template"
+  "test/template-strikes-hurt.test.ts": [
+    "_template",
+    "blender-template"
   ],
   "test/scripts/far-reach-roc.test.ts": [
     "far-reach"

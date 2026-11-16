@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 
 test.each([
   'ground-borrowed-body', 'matriarch-borrowed-body', 'roc-borrowed-body',
-  'scripts/_template-boss', 'scripts/ground-encounters', 'scripts/sunscar-matriarch',
+  'template-strikes-hurt', 'scripts/ground-encounters', 'scripts/sunscar-matriarch',
   'scripts/far-reach-roc', 'scripts/skitterer-pack',
   'mover-carry',
 ])('%s consumes an existing product without building an app or starting a server', name => {
@@ -21,7 +21,7 @@ import json, runpy
 select = runpy.run_path('scripts/test_products.py')['required_test_products']
 registry = json.load(open('scripts/test-products.json'))
 cases = [
- ['test/scripts/_template-boss.test.ts'],
+ ['test/template-strikes-hurt.test.ts'],
  ['test/unit.test.ts', 'test/scripts/far-reach-roc.test.ts'],
  ['src/sharddev/bake/script-scenario.test.ts', 'test/shard-headless.test.ts'],
  [], ['test/scripts-not-a-scenario.test.ts'],
@@ -31,16 +31,17 @@ cases = [
  ['test/mover-carry.test.ts'],
 ]
 print(json.dumps([select(case, registry) for case in cases], separators=(',', ':')))
-try:
- select(['test/scripts/unregistered.test.ts'], registry)
- raise AssertionError('An unregistered scenario must refuse')
-except ValueError:
- pass
+for unregistered in ['test/scripts/unregistered.test.ts', 'test/scripts/_template-boss.test.ts']:
+ try:
+  select([unregistered], registry)
+  raise AssertionError('An unregistered or migrated scenario must refuse')
+ except ValueError:
+  pass
 from pathlib import Path
 assert all(str(path) in registry for path in Path('test/scripts').glob('*.test.ts'))
 `], { encoding: 'utf8' });
   expect(JSON.parse(result)).toEqual([
-    ['_template'], ['far-reach'],
+    ['_template', 'blender-template'], ['far-reach'],
     ['_template', 'driftwood-isle', 'far-reach', 'nalati-grasslands', 'nine-dragon-stack', 'pastel-plain', 'pine-hollow', 'sunscar-dunes'],
     [], [], [], [], ['driftwood-isle', 'pine-hollow'], [], ['pine-hollow'],
   ]);
