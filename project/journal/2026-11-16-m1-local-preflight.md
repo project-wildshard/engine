@@ -13,3 +13,12 @@ Use land --no-preflight to reuse that completed local proof instead of
 repeating the same broad suite. This is the named escape hatch (J381).
 Normal split pre-push and exact branch CI remain mandatory; no hook or
 hosted test is bypassed. The native contact patch remains unapplied.
+
+The first hosted run exposed the real older-kind death selector regression.
+After correction, both unchanged declared journeys and 21 combat/harvest/
+native controls pass. The complete local CI static code suite passes,
+including every standalone proof, hooks and parity. Actual package gates
+and actionlint pass for the compiler input graph. The latest-main rebase
+then passes fresh pins, game lint, types, CSS, saves and both focused paths.
+The retry reuses these completed checks with --no-preflight; normal split
+pre-push and exact branch CI remain required.
