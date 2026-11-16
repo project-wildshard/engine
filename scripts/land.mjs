@@ -19,7 +19,7 @@
 // locally, each after a push and a wait). --no-preflight skips it.
 // Main's CI runs after every landing; if it goes red, the lane that landed last fixes it forward or reverts it.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
-import {keepCopy,worktreeState} from './keep-copy.mjs';
+import {keepCopy,worktreeState} from './pin-keep-copy.mjs';
 import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,realpathSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {dirname,join,resolve} from 'node:path';

@@ -65,14 +65,14 @@ function bytes(path, files) {
 }
 
 /** Include ignored evidence without walking known generated outputs or symlinks.
- * @param {string} root */
-function recoverableFiles(root) {
-  const files = new Set(text(root, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean));
+ * @param {string} root @param {ReadonlySet<string>} regenerableFiles */
+function recoverableFiles(root, regenerableFiles) {
+  const files = new Set(text(root, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0').filter(file => file && !regenerableFiles.has(file)));
   const visit = (/** @type {string} */ file) => {
     const info = lstatSync(join(root, file));
     if (info.isDirectory()) {
       for (const name of readdirSync(join(root, file))) visit(join(file, name));
-    } else if (info.isFile() || info.isSymbolicLink()) files.add(file);
+    } else if (info.isFile() || info.isSymbolicLink()) { if (!regenerableFiles.has(file)) files.add(file); }
     else throw new Error(`keep-copy: cannot preserve ${file}; source must be kept`);
   };
   for (const file of text(root, ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '--no-empty-directory', '-z']).split('\0').filter(Boolean))
@@ -84,10 +84,11 @@ function recoverableFiles(root) {
 
 /** Snapshot every recoverable byte before copying and again after stopping
  * writers. Status alone misses edits within an existing untracked folder.
- * @param {string} root */
-export function worktreeState(root) {
+ * Callers may omit exact regular outputs only after verifying their current bytes.
+ * @param {string} root @param {{regenerableFiles?:ReadonlySet<string>}} [options] */
+export function worktreeState(root, { regenerableFiles = new Set() } = {}) {
   const hash = createHash('sha256');
-  for (const file of recoverableFiles(root)) {
+  for (const file of recoverableFiles(root, regenerableFiles)) {
     const path = join(root, file), info = lstatSync(path);
     if (!info.isFile() && !info.isSymbolicLink()) throw new Error(`cannot snapshot ${file}`);
     hash.update(JSON.stringify([file, info.mode, info.size]));
@@ -102,14 +103,15 @@ export function worktreeState(root) {
 }
 
 /** Copy recoverable Git worktree state. It never deletes or mutates `path`.
- * @param {string} path @param {{keepRoot?: string, now?: Date}} [options] */
-export function keepCopy(path, { keepRoot = DEFAULT_KEEP_ROOT, now = new Date() } = {}) {
+ * Caller-verified regenerableFiles are exact paths, never directory prefixes.
+ * @param {string} path @param {{keepRoot?: string, now?: Date, regenerableFiles?:ReadonlySet<string>}} [options] */
+export function keepCopy(path, { keepRoot = DEFAULT_KEEP_ROOT, now = new Date(), regenerableFiles = new Set() } = {}) {
   const root = resolve(path);
   if (!existsSync(root)) throw new Error(`keep-copy: ${root} does not exist`);
   const repo = text(root, ['rev-parse', '--show-toplevel']).trim();
   const source = realpathSync(root);
   requireExternalCopy(source, physicalPath(keepRoot));
-  const files = recoverableFiles(root);
+  const files = recoverableFiles(root, regenerableFiles);
   const dir = destination(root, resolve(keepRoot), now);
   mkdirSync(dir, { recursive: true });
   requireExternalCopy(source, realpathSync(dir));
