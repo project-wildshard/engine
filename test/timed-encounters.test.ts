@@ -17,6 +17,7 @@ import { lendLooks } from '../src/client/game/shardfile/lentLooks';
 import {frozenNight as nightInput} from './fixtures/frozen/runtimeBehavior';
 import {withWeatherWitness} from './fixtures/weatherInlineWitness';
 import {frozenNalatiJson} from './fixtures/frozen/nalati';
+
 const strikes=parse(object({arrow:unknown()}),frozenNalatiJson('nalati-strikeProfiles-original.json'));
 
 // Match the emitted combat wire; CueDirector borrows the separate presentation cues.
