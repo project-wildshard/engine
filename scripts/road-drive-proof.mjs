@@ -182,7 +182,21 @@ try {
       }
       q.samples.push({ t: Math.round(performance.now()), x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), seg: q.wps[q.at]?.seg ?? -3, inside: st.inside, card: st.cellLoading ?? null, stage: st.cellStage ?? null,
         res: st.live?.live?.residents ?? null, home: (st.live?.live?.residents ?? []).includes(homeSlug), mb: st.playingMB ?? null });
-      for (const program of renderer?.info?.programs ?? []) if (!known.has(program)) { known.add(program); q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: String(program.cacheKey ?? '').slice(0, 300) }); }
+      for (const program of renderer?.info?.programs ?? []) if (!known.has(program)) {
+        known.add(program);
+        // who drew it (ZE3b: a program met first on the road is a warm-up miss; its owner names what to warm)
+        const owners = /** @type {string[]} */ ([]);
+        W.__wildshard.world.game.scene.traverse((/** @type {any} */ o) => {
+          if (owners.length >= 4 || o.material === undefined) return;
+          for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+            if (renderer.properties.get(m)?.currentProgram !== program) continue;
+            const names = []; for (let node = o; node !== null && node !== undefined && names.length < 6; node = node.parent) names.push(String(node.name === '' ? node.type : node.name));
+            const label = `${names.join('<')} [${String(m.name === '' ? m.type : m.name)}] visible=${String(o.visible)}`.slice(0, 260);
+            if (!owners.includes(label)) owners.push(label);
+          }
+        });
+        q.programs.push({ t: Math.round(performance.now()), name: String(program.name ?? ''), key: String(program.cacheKey ?? '').slice(0, 300), owners });
+      }
     } catch (error) { q.samples.push({ err: String(error).slice(0, 160) }); } }, 50);
   }, { wps: route, homeSlug: home.slug });
   // --profile (Chromium): the page thread's CPU profile over the measured drive, for a long frame's cause
@@ -259,7 +273,8 @@ try {
   const phoneBar = device !== '' ? 1 : 0, over50 = driven.reduce((sum, row) => sum + Number(row.over50), 0);
   result.summary = { driveMs, from, segments: legs - from, driven: driven.length, over50, worstFrameMs: Math.max(0, ...driven.map(row => Number(row.worstFrameMs))), worstStopMs: Math.max(0, ...driven.map(row => Number(row.worstStopMs))),
     worstRampMs: Math.max(0, ...driven.map(row => Number(row.rampMs ?? 0))),
-    cardMs: allCards.length * 50, cards: [...new Set(allCards.map((/** @type {any} */ r) => `${String(r.card)}:${String(r.stage)}`))], homeResident: allHome, homeKeptToM: KEEP_M, longFrames, mbGrowth: mbAll.length === 0 ? null : Math.max(...mbAll) - (/** @type {any} */ (driven[0]?.mb)?.min ?? 0),
+    cardMs: allCards.length * 50, cards: [...new Set(allCards.map((/** @type {any} */ r) => `${String(r.card)}:${String(r.stage)}`))], homeResident: allHome, homeKeptToM: KEEP_M, longFrames,
+    newPrograms: programs.map((/** @type {any} */ r) => ({ t: r.t, seg: samples.find((/** @type {any} */ x) => x.t >= r.t)?.seg ?? null, name: r.name, owners: r.owners, key: r.key })), mbGrowth: mbAll.length === 0 ? null : Math.max(...mbAll) - (/** @type {any} */ (driven[0]?.mb)?.min ?? 0),
     bar: driven.length === legs - from && over50 <= phoneBar && driven.every(row => Number(row.worstStopMs) <= 250 && Number(row.rampMs ?? 0) <= RAMP_MS) && allCards.length === 0 && allHome && result.errors.length === 0 };
   console.log(`${result.summary.bar === true ? 'ok  ' : 'FAIL'} ${homeName} drive ${JSON.stringify(result.summary)}`);
   console.log(`${result.back.inside === true && result.back.cardMs === 0 ? 'ok  ' : 'FAIL'} ${homeName} back in ${JSON.stringify(result.back)}`);

@@ -4,10 +4,12 @@
 // one shot: what a player on the road sees of the 24 placeholders (no grey or snow-white stand-in within sight of the road).
 //   scripts/browser-lane.sh node scripts/turn-in-shots.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood]
 //     [--card='<Shard Select card>' --self] [--engine=chromium|webkit] [--device='iPhone 15 Pro'] [--viewport=2992x1434@2] [--cells=slug,slug] [--settle=3000]
+//     [--pick=0.39,0.45] (what draws that point of each shot: hide scene nodes one at a time, keep the ones whose hiding changes it)
 // Writes <out>/<engine>[-phone]-<slug>-<side>.jpg and turn-ins.json. Preview or a loopback page only (the harness pose).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from 'playwright';
+import sharp from 'sharp';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 
@@ -15,6 +17,7 @@ import { saveFixture } from './debug-settings.mjs';
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', '');
 const settle = Number(flag('settle', '3000')), only = flag('cells', '').split(',').filter(Boolean);
+const pickAt = flag('pick', '').split(',').filter(Boolean).map(Number);
 if (!/^https:\/\/preview\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: turn-in-shots.mjs --base=<preview or loopback url> --out=<dir> [--home=driftwood] [--engine=chromium|webkit] [--device=...]');
 const HOMES = /** @type {Record<string, { slug: string, card: string }>} */ ({ driftwood: { slug: 'driftwood-isle', card: 'Driftwood Isle' }, nalati: { slug: 'nalati-grasslands', card: 'Nalati Grasslands' } });
 // --card names any other home by its Shard Select card (--home=<slug> --card='Pastel Plain'); --self also shoots the home's own
@@ -28,6 +31,46 @@ const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(
 const HALF = 250, GAP_HALF = 31.25;
 const SIDES = /** @type {const} */ ([['north', 0, 1], ['east', 1, 0], ['south', 0, -1], ['west', -1, 0]]);
 mkdirSync(out, { recursive: true });
+
+/**
+ * ZE7: what draws the point (fx, fy) of the frame. Each scene node with drawn meshes under it is hidden in turn; a node whose
+ * hiding moves that 24 px patch by more than 6 (mean RGB) draws it, and the walk goes on into its children. Returns the
+ * deepest drawing nodes, each by its ancestry and its meshes' materials.
+ * @param {import('playwright').Page} page @param {number} fx @param {number} fy
+ */
+async function pick(page, fx, fy) {
+  const size = page.viewportSize() ?? { width: 1, height: 1 }, clip = { x: Math.round(fx * size.width) - 12, y: Math.round(fy * size.height) - 12, width: 24, height: 24 };
+  const patch = async () => { await sleep(250); const png = await page.screenshot({ clip, type: 'png' }); return png; };
+  // the mean absolute RGB difference of two PNG patches
+  const differs = async (/** @type {Buffer} */ a, /** @type {Buffer} */ b) => {
+    const [p, q] = await Promise.all([a, b].map(png => sharp(png).removeAlpha().raw().toBuffer()));
+    let d = 0; const n = Math.min(p.length, q.length); for (let i = 0; i < n; i++) d += Math.abs((p[i] ?? 0) - (q[i] ?? 0)); return d / Math.max(1, n);
+  };
+  const before = await patch(), found = /** @type {string[]} */ ([]);
+  /** @param {number[]} path */
+  const kids = (path) => page.evaluate((at) => {
+    const W = /** @type {any} */ (window); let node = W.__wildshard.world.game.scene; for (const i of at) node = node.children[i];
+    return node.children.map((/** @type {any} */ c, /** @type {number} */ i) => {
+      let meshes = 0; const mats = new Set(); c.traverse((/** @type {any} */ o) => { if (o.isMesh === true && o.visible) { meshes++; for (const m of [o.material].flat()) mats.add(String((m?.name ?? '') === '' ? m?.type : m.name)); } });
+      return { i, name: String(c.name === '' ? c.type : c.name), visible: c.visible === true, meshes, mats: [...mats].slice(0, 6) };
+    }).filter((/** @type {any} */ r) => r.visible && r.meshes > 0);
+  }, path);
+  const hide = (/** @type {number[]} */ path, /** @type {boolean} */ on) => page.evaluate(([at, v]) => { const W = /** @type {any} */ (window); let node = W.__wildshard.world.game.scene; for (const i of /** @type {number[]} */ (at)) node = node.children[i]; node.visible = v; }, [path, on]);
+  /** @param {number[]} path @param {string} label @param {number} depth */
+  const walk = async (path, label, depth) => {
+    const rows = await kids(path); let deeper = false;
+    for (const row of rows) {
+      const at = [...path, row.i];
+      await hide(at, false); const d = await differs(before, await patch()); await hide(at, true);
+      if (d < 6) continue;
+      const here = `${label}<${row.name}`; deeper = true;
+      if (depth < 8 && row.meshes > 1) await walk(at, here, depth + 1); else found.push(`${here} meshes=${String(row.meshes)} [${row.mats.join(',')}] diff=${d.toFixed(1)}`);
+    }
+    if (!deeper && path.length > 0) found.push(`${label} (no single child; parts together)`);
+  };
+  await walk([], 'scene', 0);
+  return found;
+}
 
 const tag = `${engineName}${device === '' ? '' : '-phone'}${self ? `-from-${home.slug}` : ''}`;
 const result = { base, home: home.slug, engine: engineName, device, at: new Date().toISOString(), build: '', shots: /** @type {Record<string, unknown>[]} */ ([]), errors: /** @type {string[]} */ ([]), note: '' };
@@ -73,7 +116,8 @@ try {
       const file = `${tag}-${cell.slug}-${side}.jpg`;
       await page.screenshot({ path: join(out, file), type: 'jpeg', quality: 70 });
       const seen = await page.evaluate(() => { const st = /** @type {any} */ (window).__wildshard.shard.grid.state(); return { inside: st.inside ?? null, card: st.cellLoading ?? null, mb: st.playingMB ?? null }; });
-      result.shots.push({ cell: cell.slug, side, file, ...seen });
+      const picked = pickAt.length === 2 ? await pick(page, pickAt[0] ?? 0.5, pickAt[1] ?? 0.5) : undefined;
+      result.shots.push({ cell: cell.slug, side, file, ...seen, ...(picked === undefined ? {} : { picked }) });
       console.log(`shot ${cell.slug} ${side}`);
     }
   }
