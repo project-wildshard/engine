@@ -29,6 +29,13 @@ describe('the shared full shard check (SP19a)', () => {
     expect(author.performance.scripts.scripts.samples).toBe(0);
   });
 
+  it('labels a host worker failure separately from hostile-byte refusal', async () => {
+    const error = Object.assign(new Error('Worker ran out of memory'), {code: 'ERR_WORKER_OUT_OF_MEMORY'});
+    const report = await checkShardfile(source(), new Map(), {validate: () => Promise.reject(error)});
+    expect(report.pass).toBe(false);
+    expect(report.failures).toContainEqual({code: 'check-infrastructure', message: error.message});
+  });
+
   it('does not manufacture measured native execution or trusted recipes (J370)', async () => {
     const shard = source(); shard.runtime = {kind: 'client-plan', cost: FIXTURE_RUNTIME_COST, binds: []};
     const validate = vi.fn(() => Promise.resolve(measured()));

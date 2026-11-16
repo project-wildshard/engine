@@ -103,13 +103,15 @@ describe('the cook worker', () => {
 
   it('gives a job no files outside its folder, no children and no credentials', async () => {
     process.env['R2_PACKS_SECRET_ACCESS_KEY'] = 'hunter2';
+    process.env['COOK_SIGNING_KEY'] = 'fixture-parent-signing-key-not-for-child';
     const outcome = await job('probe.mjs', `import {readFileSync, writeFileSync} from 'node:fs'; import {spawnSync} from 'node:child_process'; import {homedir} from 'node:os';
       const denied = run => { try { run(); return false; } catch (error) { return error.code === 'ERR_ACCESS_DENIED'; } };
-      console.log(JSON.stringify({refused: JSON.stringify({home: denied(() => readFileSync(homedir() + '/.ssh/config')), hosts: denied(() => readFileSync('/etc/hosts')), write: denied(() => writeFileSync('/tmp/cook-escape', 'x')), child: denied(() => spawnSync('/bin/ls')), secret: process.env.R2_PACKS_SECRET_ACCESS_KEY ?? null, token: process.env.HOME ?? null})}));
+      console.log(JSON.stringify({refused: JSON.stringify({home: denied(() => readFileSync(homedir() + '/.ssh/config')), hosts: denied(() => readFileSync('/etc/hosts')), write: denied(() => writeFileSync('/tmp/cook-escape', 'x')), child: denied(() => spawnSync('/bin/ls')), secret: process.env.R2_PACKS_SECRET_ACCESS_KEY ?? null, cookKey: process.env.COOK_SIGNING_KEY ?? null, token: process.env.HOME ?? null})}));
       process.exit(3);`);
     delete process.env['R2_PACKS_SECRET_ACCESS_KEY'];
+    delete process.env['COOK_SIGNING_KEY'];
     expect(outcome.kind).toBe('refused');
-    expect(JSON.parse(outcome.kind === 'refused' ? outcome.reason : '{}')).toEqual({home: true, hosts: true, write: true, child: true, secret: null, token: null});
+    expect(JSON.parse(outcome.kind === 'refused' ? outcome.reason : '{}')).toEqual({home: true, hosts: true, write: true, child: true, secret: null, cookKey: null, token: null});
   }, 30_000);
 
   it('takes a job off the network through the host wrap', async () => {

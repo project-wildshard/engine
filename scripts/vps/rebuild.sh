@@ -403,7 +403,7 @@ fi # COOK_ONLY: --cook skips steps 1 to 3
 have_cook_user() { id wildshard-cook >/dev/null 2>&1 && getent group wildshard-cook >/dev/null; }
 make_cook_user() { useradd --system --user-group --home-dir "$COOK_HOME" --shell /usr/sbin/nologin wildshard-cook; }
 step 'user wildshard-cook' have_cook_user make_cook_user
-COOK_FOLDERS=("$COOK_HOME" "$COOK_HOME/scratch" "$COOK_HOME/server" "$COOK_HOME/store")
+COOK_FOLDERS=("$COOK_HOME" "$COOK_HOME/scratch" "$COOK_HOME/server" "$COOK_HOME/store" "$COOK_HOME/verdicts")
 have_cook_folders() { local path; for path in "${COOK_FOLDERS[@]}"; do [ -d "$path" ] && metadata_ok "$path" 750 wildshard-cook:wildshard-cook || return 1; done; }
 make_cook_folders() { install -d -m 750 -o wildshard-cook -g wildshard-cook "${COOK_FOLDERS[@]}"; }
 step 'cook folders' have_cook_folders make_cook_folders
@@ -427,6 +427,9 @@ elif put_once "$COOK_ENV" 600 root:root <<'EOF'
 # Only credentials belong here; run rebuild.sh again after filling them.
 # The bearer token api-server's notify call sends (J30). The same value goes in api-server's settings.
 COOK_NOTIFY_TOKEN=
+# SP22 enables these parent-only credentials with wildshard-config async-upload staging.
+COOK_SIGNING_KEY=
+COOK_STAGING_ACTIVATION_TOKEN=
 # Where packs go: the four R2 rows, or, on a scratch box only, COOK_STORE_DIR (a folder under /var/lib/wildshard-cook).
 R2_ACCOUNT_ID=
 R2_BUCKET_PACKS=wildshard-packs
@@ -560,6 +563,8 @@ Environment=COOK_PORT=$COOK_PORT
 Environment=COOK_HOST=127.0.0.1
 Environment=COOK_SCRATCH=$COOK_HOME/scratch
 Environment=COOK_SERVER_PACKS=$COOK_HOME/server
+Environment=COOK_OUTBOX=$COOK_HOME/verdicts
+Environment=COOK_STAGING_ACTIVATION_URL=http://127.0.0.1:8791
 # Each job's prefix: a user and network namespace of its own, so nothing that reads a shardfile has a route out. The single
 # quotes keep the JSON's double quotes, which systemd would otherwise strip.
 Environment='COOK_JOB_WRAP=["$COOK_LIB/unshare","--user","--map-root-user","--net"]'

@@ -72,7 +72,14 @@ export function gridAssembly(placedToo = true): GridAssembly {
   return assembly;
 }
 /** What a worker thread is booted with, so its rooms name, frame and load a placed cell as the door does. */
-export function placedCells(): readonly PlacedCell[] { return placed.map(row => { const hash = hashes.get(row.slug); return hash === undefined ? row : { ...row, hash }; }); }
+export function placedCells(): readonly PlacedCell[] {
+  // An activated revision of a baked-grid slug also reaches existing and newly booted workers.
+  const baked: PlacedCell[] = gridAssembly(false).cells.flatMap(row => {
+    const hash = hashes.get(row.slug);
+    return hash === undefined ? [] : [{instance: row.instance, slug: row.slug, cell: [row.cell[0], row.cell[1]], hash}];
+  });
+  return [...baked, ...placed.map(row => {const hash = hashes.get(row.slug); return hash === undefined ? row : {...row, hash};})];
+}
 /** Tests only: forget every placed cell. */
 export function forgetPlacedCells(): void { placed.length = 0; hashes.clear(); read = null; assembled = null; }
 

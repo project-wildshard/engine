@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Test keys only; the release key is never on a test box.
 import { generateKeyPairSync, sign } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- A made-up /etc in the checkout's tmp/.
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- As above.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
@@ -370,4 +370,31 @@ test("the agent logs in by root's copy of its key only, and sshd lets in raynos 
   expect(key[0]).not.toContain('PRIVATE');
   // sudo and SSH sessions reach Sentry through PAM for every account, the agent's too (VH14).
   expect(harden).toMatch(/for service in sshd sudo login; do/u);
+});
+
+
+test('async upload provisions staging credentials from stdin, keeps them private and rolls back on health failure', () => {
+  const root = etc(), path = join(root, 'etc/wildshard'), rebuild = join(root, 'rebuild.sh');
+  writeFileSync(join(path, 'cook.env'), 'R2_BUCKET_PACKS=fixture\n');
+  writeFileSync(rebuild, '#!/usr/bin/env bash\nexit 0\n');
+  const before = read(root, 'production.env');
+  const payload = JSON.stringify({cookKey: 'a'.repeat(64), activationToken: 'b'.repeat(64)});
+  const run = (input: string, healthy = '1', channel = 'staging') => spawnSync('python3', [CONFIG, 'async-upload', channel], {input, encoding: 'utf8', env: {PATH: process.env['PATH'] ?? '', WILDSHARD_CONFIG_TEST_ROOT: root, WILDSHARD_CONFIG_TEST_RUNNING: '1', WILDSHARD_CONFIG_TEST_HEALTHY: healthy, WILDSHARD_CONFIG_TEST_REBUILD: rebuild}});
+  const success = run(payload);
+  expect(success.status, success.stderr).toBe(0);
+  expect(success.stdout + success.stderr).not.toContain('a'.repeat(64));
+  expect(success.stdout + success.stderr).not.toContain('b'.repeat(64));
+  expect(read(root, 'staging.env')).toContain(`COOK_ACTIVATION_TOKEN=${'b'.repeat(64)}`);
+  expect(read(root, 'cook.env')).toContain(`COOK_SIGNING_KEY=${'a'.repeat(64)}`);
+  expect(read(root, 'cook.env')).toContain(`COOK_STAGING_ACTIVATION_TOKEN=${'b'.repeat(64)}`);
+  expect(statSync(join(path, 'staging.env')).mode & 0o777).toBe(0o600);
+  expect(statSync(join(path, 'cook.env')).mode & 0o777).toBe(0o600);
+  expect(config(root, 'show', 'staging').out).not.toContain('COOK_ACTIVATION_TOKEN');
+  const kept = [read(root, 'staging.env'), read(root, 'cook.env')];
+  const failed = run(JSON.stringify({cookKey: 'c'.repeat(64), activationToken: 'd'.repeat(64)}), '0');
+  expect(failed.status).toBe(2);
+  expect([read(root, 'staging.env'), read(root, 'cook.env')]).toEqual(kept);
+  expect(run(payload, '1', 'production').status).toBe(1);
+  expect(run(JSON.stringify({cookKey: 'short', activationToken: 'b'.repeat(64)})).status).toBe(1);
+  expect(read(root, 'production.env')).toBe(before);
 });

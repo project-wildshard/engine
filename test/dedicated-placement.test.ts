@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { cellFrame, cellName, cellShard, forgetPlacedCells, placeCell, placedCells, placedHash, type PlacedCell } from '../src/server/host/dedicated/gridCells';
 import { readPackProduct, type PackReaderOptions, type PackReads } from '../src/server/host/dedicated/packReader';
+import {uploadActivator} from '../src/server/host/dedicated/uploadActivation';
 import { PlacementWatch, readPlacementFile } from '../src/server/host/dedicated/placementFile';
 import type { PlacementFile } from '../src/shared/game/grid/placementRows';
 import { cookIndexPath, serverPackBookPath, type ServerPack } from '../src/shared/game/shardfile/serverPack';
@@ -161,6 +162,8 @@ test('SA47: the book still wins when it has the slug', { timeout: 120_000 }, asy
     // An index that names a pack no one wrote: only the book's row can open it.
     write(cookIndexPath(BUILD, 'e'.repeat(64)), { version: 1, build: BUILD, slug: PLACED.slug, hash: 'e'.repeat(64), serverPack: { index: `/assets/spawn/server-${PLACED.slug}-ffffffffffffffff.json` } });
     expect((await readPackProduct(PLACED.slug, BUILD, rapier, options(), fresh(), 'e'.repeat(64))).shard.identity.slug).toBe(PLACED.slug);
+    await expect(readPackProduct(PLACED.slug, BUILD, rapier, options(), fresh(), 'e'.repeat(64), [], true), 'SP20: exact activation cannot fall back to the old release or loose header').rejects.toThrow();
+    expect((await readPackProduct(PLACED.slug, BUILD, rapier, options(), fresh(), HASH, [], true)).shard.identity.slug).toBe(PLACED.slug);
   } finally { book(false); }
 });
 
@@ -174,7 +177,15 @@ test('SA47: a placed cell whose pack only the cook has opens on a running world,
   expect(placeCell({ ...PLACED, hash: 'f'.repeat(64) }), 'a new upload of a placed slug moves its hash, not its cell').toBe(false);
   expect([placedHash(PLACED.slug), placedCells().at(-1)?.hash]).toEqual(['f'.repeat(64), 'f'.repeat(64)]);
   expect(placeCell({ ...PLACED, hash: HASH })).toBe(false);
-  expect(await bench.world.openCells([PLACED.instance])).toEqual([PLACED.instance]);
+  const playing = bench.world;
+  const activate = uploadActivator({channel: 'staging', build: BUILD,
+    read: () => Promise.resolve(readPlacementFile(signed(JSON.stringify(file(8, [{...PLACED, hash: HASH}]))), KEY)),
+    preload: async (slug, hash) => {await readPackProduct(slug, BUILD, rapier, options(), reads, hash, [], true);},
+    place: row => {placeCell(row);}, open: instances => playing.activateCells(instances), opened: instance => Object.hasOwn(playing.health().table, instance),
+  });
+  const activated = {uploadId: '11111111-1111-1111-1111-111111111111', slug: PLACED.slug, hash: HASH, channel: 'staging' as const};
+  expect(await activate(activated)).toMatchObject({...activated, build: BUILD, instances: [PLACED.instance]});
+  expect(await activate(activated), 'lost acknowledgement retries the real opened world').toMatchObject({preloaded: true, instances: [PLACED.instance]});
   const comer = bot(`${bench.url}?chunk=${PLACED.instance}`, 'bench', 'device:comer');
   expect(await comer.arrived()).toBe(true);
   expect(JSON.parse(comer.resume ?? '{}')).toMatchObject({ shard: PLACED.slug, cell: PLACED.instance });

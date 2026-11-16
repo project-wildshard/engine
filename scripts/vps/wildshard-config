@@ -12,7 +12,8 @@
 #   wildshard-config saves delete-test <id>... [--production] [--yes]
 #                                                                   a test or bot player's rows, a dry run unless --yes
 # Settings live in /etc/wildshard/<channel>.settings (640 root:wildshard-<channel>), which the units read after <channel>.env.
-# Secrets stay in the root-only .env, and this never prints one or writes one (it reads only the placement rows there, for
+# Secrets stay in the root-only .env. The dedicated async-upload staging verb writes only its two fixed credentials
+# from stdin; it never prints them. Other verbs never write secrets (they read only the placement rows there, for
 # the pair check below): only the keys in SETTINGS below, each
 # checked by its own rule. A production change needs --production, so no one changes the live world by a slip.
 # The two placement keys (SA33, GC33) go together: the server throws at boot on one without the other, so a `set` that would
@@ -377,9 +378,76 @@ select 'changed', 0;
     return 0
 
 
+def write_secret_rows(path, rows):
+    """Atomic root-only env update. Never print a credential or accept an arbitrary key."""
+    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix='.async-upload.')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            handle.write('\n'.join(rows) + '\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o600)
+        if not TEST:
+            os.chown(temporary, 0, 0)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def async_upload(args):
+    """SP22's staging-only credential seam; two fixed secrets arrive on stdin, never argv."""
+    if args != ['async-upload', 'staging']:
+        stop('usage: wildshard-config async-upload staging < private-credentials.json')
+    import json, fcntl
+    try:
+        payload = sys.stdin.read(4097)
+        values = json.loads(payload)
+        if len(payload) > 4096 or not isinstance(values, dict) or set(values) != {'cookKey', 'activationToken'}:
+            raise ValueError()
+        if any(not isinstance(value, str) or re.fullmatch('[0-9a-f]{64}', value) is None for value in values.values()):
+            raise ValueError()
+        if values['cookKey'] == values['activationToken']:
+            raise ValueError()
+    except (ValueError, TypeError):
+        stop('invalid async-upload credential document')
+    lock = os.fdopen(os.open(f'{ETC}/.async-upload.lock', os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'w')
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    paths = [f'{ETC}/staging.env', f'{ETC}/cook.env']
+    before = [read_rows(path) for path in paths]
+    if not all(before) or not running('staging'):
+        stop('async upload needs an installed running staging server and cook env')
+    replacements = [{'COOK_ACTIVATION_TOKEN': values['activationToken']},
+                    {'COOK_SIGNING_KEY': values['cookKey'], 'COOK_STAGING_ACTIVATION_TOKEN': values['activationToken']}]
+    rows = [[row for row in old if key_of(row) not in change] + [f'{key}={value}' for key, value in change.items()]
+            for old, change in zip(before, replacements)]
+    if rows == before:
+        say('ok      staging async credentials already installed')
+        return 0
+    import signal
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+    try:
+        for path, value in zip(paths, rows):
+            write_secret_rows(path, value)
+        if restart('staging') and cook_rebuild():
+            say('ok      staging async credentials installed; production unchanged')
+            return 0
+    except BaseException:
+        pass
+    for path, value in zip(paths, before):
+        write_secret_rows(path, value)
+    restart('staging')
+    cook_rebuild()
+    say('undo    async upload failed health; previous staging/cook credentials restored', error=True)
+    return 2
+
+
 def main(argv):
     production = '--production' in argv
     args = [arg for arg in argv if arg != '--production']
+    if args and args[0] == 'async-upload':
+        return async_upload(args)
     if args and args[0] == 'saves':
         return saves(args, production)
     if args and args[0] == 'cook':

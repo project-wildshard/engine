@@ -66,8 +66,8 @@ export function readPackGrid(build: string, options: PackReaderOptions, reads: P
   return readGridCollisionPack(new URL('shards/', options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, build, packRead(options, reads));
 }
 /** One shard's server inputs, through its build's book, or for a placed slug the book lacks, the cook's index of `hash` (SA47). */
-export async function readPackProduct(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads, hash?: string, catalogue: readonly LedgerCatalogueItem[] = []): Promise<HeadlessRuntimeInput> {
-  const input = await readServerProduct(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, () => build, packRead(options, reads), rapier, undefined, hash);
+export async function readPackProduct(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads, hash?: string, catalogue: readonly LedgerCatalogueItem[] = [], exactHash?: boolean): Promise<HeadlessRuntimeInput> {
+  const input = await readServerProduct(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, () => build, packRead(options, reads), rapier, undefined, hash, undefined, false, exactHash);
   admitLedgerRewards(input.shard.ledger, catalogue);
   return { ...input, catalogue };
 }

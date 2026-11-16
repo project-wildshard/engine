@@ -25,6 +25,12 @@ function proofOf(row: CheckObservations): ShardfileEntryProof | 'unmeasured' {
     ...(row.portalTransfers === undefined ? {} : {portalTransfers: row.portalTransfers})};
 }
 
+function infrastructureFailure(error: unknown): boolean {
+  const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+  if (new Set(['ERR_WORKER_OUT_OF_MEMORY', 'ENOENT', 'EACCES', 'EMFILE', 'ENFILE', 'ERR_ACCESS_DENIED']).has(String(code))) return true;
+  return error instanceof Error && /^(?:SDK (?:physics binary|headless worker) missing|Headless worker (?:exited:|request deadline exceeded|unavailable or busy))/u.test(error.message);
+}
+
 async function evidence(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, options: ShardfileCheckOptions): Promise<Evidence> {
   // J370: no trusted recipes are invented for a native client plan.
   if (shard.runtime !== null) return {proof: 'unmeasured', observed: unmeasured(), failures: []};
@@ -33,7 +39,7 @@ async function evidence(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array
     const observed = await (options.validate ?? validateSimulation)(shard, assets, options.sections);
     return {proof: proofOf(observed), observed: {scripts: observed.scripts, fuel: observed.fuel}, failures: []};
   } catch (error) {
-    return {proof: 'refused', observed: unmeasured(), failures: [{code: 'check-execution', message: error instanceof Error ? error.message : String(error)}]};
+    return {proof: 'refused', observed: unmeasured(), failures: [{code: infrastructureFailure(error) ? 'check-infrastructure' : 'check-execution', message: error instanceof Error ? error.message : String(error)}]};
   }
 }
 

@@ -38,7 +38,7 @@ runCells(port as unknown as CellPort, { slugs, build, developerBoost: process.en
     return strips;
   } } : {}),
   load: async slug => {
-    const input = await readPackProduct(slug, build, rapier, { origin, cache }, reads, placedHash(slug), catalogue);
+    const input = await readPackProduct(slug, build, rapier, { origin, cache }, reads, placedHash(slug), catalogue, placedHash(slug) !== undefined);
     console.info(JSON.stringify({ at: 'cell.pack', slug, ...reads }));
     return input;
   } });

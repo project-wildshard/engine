@@ -29,6 +29,7 @@ import { worldSettings } from './workerTable';
 import { doorTrust } from './doorTrust';
 import { WHOLE_GRID, cellShard, placeCell, placedCells, worldCells } from './gridCells';
 import { PlacementWatch, fetchPlacementFile } from './placementFile';
+import {uploadActivator, uploadActivationReceiver} from './uploadActivation';
 
 declare const __BUILD_ID__: string;
 /** scripts/build-server.mjs: package.json's version, the Sentry release (S8). */
@@ -112,7 +113,9 @@ const world: World = await World.open({ build, cells, roads: crossing, ...worldS
   restart: () => { stop(0); } });
 /** SA33's watch, once the door listens; `/health` names its serial. */
 let placements: PlacementWatch | null = null;
+let activationReceiver: ReturnType<typeof uploadActivationReceiver> | undefined;
 const server = createServer((request, response) => {
+  if (activationReceiver?.(request, response)) return;
   if (request.url !== '/health') { response.writeHead(404).end(); return; }
   // E7.5 prep: any page may read it (no player data), so the Connection doctor sees the build; `now` lets it read a phone's clock.
   response.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' }).end(JSON.stringify({ ...world.health(), serial: release.serial, ...(placements === null ? {} : { placements: placements.serial }), uptime: Math.round((Date.now() - started) / 1000), now: Date.now() }));
@@ -162,5 +165,15 @@ placements = placementAt === undefined || placementKey === undefined || listed.t
     }
     return ready.length === 0 ? [] : world.openCells(ready);
   } });
+const activationToken = setting('COOK_ACTIVATION_TOKEN');
+if (activationToken !== undefined) {
+  if (placementAt === undefined || placementKey === undefined || listed.trim() !== WHOLE_GRID) throw new Error('Upload activation needs a whole-grid placement receiver');
+  activationReceiver = uploadActivationReceiver(activationToken, uploadActivator({channel: release.channel, build,
+    read: () => fetchPlacementFile(placementAt, placementKey),
+    preload: async (slug, hash) => {await readPackProduct(slug, build, await rapier(), {origin, cache}, reads, hash, catalogue, true);},
+    place: row => {placeCell(row);}, open: instances => world.activateCells(instances),
+    opened: instance => Object.hasOwn(world.health().table, instance),
+  }));
+}
 void placements?.look();
 process.once('SIGTERM', () => { watch.dispose(); placements?.dispose(); stop(0); });

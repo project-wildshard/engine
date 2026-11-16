@@ -154,7 +154,7 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
   const cache = join(dirname(work), 'cache');
   // Node takes a path that doesn't exist yet for a file, which would deny the folder.
   mkdirSync(cache, {recursive: true});
-  const node = [execPath, '--permission', `--allow-fs-read=${root}`, ...installedRuntimeReads(launcher,root).map(path=>`--allow-fs-read=${path}`), `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, '--allow-worker',
+  const node = [execPath, '--experimental-transform-types', '--permission', `--allow-fs-read=${root}`, ...installedRuntimeReads(launcher,root).map(path=>`--allow-fs-read=${path}`), `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, '--allow-worker',
     `--max-old-space-size=${limits.heapMB}`, '--stack-size=4000', '--no-warnings', '--import', loader, script, tarball, out, ...expectedSlug === undefined ? [] : [expectedSlug]];
   const [command = '', ...args] = [...wrap, ...node];
   return new Promise(resolve => {
@@ -180,7 +180,10 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
       scope.dispose();
       const resultFile = `${out}.result.json`;
       let last: string;
-      try { last = existsSync(resultFile) ? readFileSync(resultFile, 'utf8') : stdout.trim().split('\n').at(-1) ?? ''; }
+      try {
+        if (existsSync(resultFile) && statSync(resultFile).size > 16_777_216) throw new Error('Cook result exceeds transport capacity');
+        last = existsSync(resultFile) ? readFileSync(resultFile, 'utf8') : stdout.trim().split('\n').at(-1) ?? '';
+      }
       catch { resolve({kind: 'killed', reason: 'Unreadable cook result'}); return; }
       if (why !== undefined) { resolve({kind: 'killed', reason: why}); return; }
       if (code === 3) { resolve(refusal(last)); return; }
@@ -396,7 +399,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   };
   const cookOnce = async (head: {readonly slug: string; readonly hash: string}): Promise<CookRow> => {
     const known = verdicts.get(head.hash);
-    if (known?.state === 'refused') return known;
+    if (known?.state === 'refused' && new Set([head.slug]).has(known.slug)) return known;
     const held = await store.get(indexKey(build, head.hash));
     if (held !== undefined) {
       const index = JSON.parse(new TextDecoder().decode(held)) as CookIndex;

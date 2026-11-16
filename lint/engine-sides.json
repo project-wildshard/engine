@@ -1870,6 +1870,9 @@
     "src/shared/host/standalone/netInput.ts": "shared",
     "src/shared/host/standalone/workerLoopback.ts": "shared",
     "src/shared/host/tickProtocol.ts": "shared",
-    "src/server/engine/sim/stateAdapter.ts": "server"
+    "src/server/engine/sim/stateAdapter.ts": "server",
+    "src/cook/game/uploadTransport.ts": "cook",
+    "src/server/host/dedicated/uploadActivation.ts": "server",
+    "src/shared/game/shardfile/uploadActivation.ts": "shared"
   }
 }

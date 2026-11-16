@@ -96,6 +96,7 @@ export function cookReceipt(files: ReadonlyMap<string, Uint8Array>): CookReceipt
 async function checked(product: ValidatedProduct, ports: CookJobPorts): Promise<ShardfileCheckReport> {
   const report = await ports.check(product.shard, product.assets, product.sections);
   if (!new Set([product.index.identity.slug]).has(report.slug)) throw new Error('The check reported another shard');
+  if (report.failures.some(row => row.code === 'check-infrastructure')) throw new Error(report.failures.map(row => row.message).join('\n'));
   if (!report.pass || report.proof === 'refused') {
     throw new ShardfileRefusedError(report.failures.map(row => row.message).join('\n') || 'Full shardfile check refused', {report});
   }

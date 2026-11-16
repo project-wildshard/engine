@@ -261,6 +261,19 @@ export class World {
     await this.bootWorker(slugs, false, index);
     this.openRoads();
   }
+  /** SP20: publish the new placement hashes to every live worker before acknowledging activation.
+   * Occupied rooms keep their lifetime; the next room boot uses the exact newly preloaded hash. */
+  async activateCells(cells: readonly string[]): Promise<readonly string[]> {
+    if (this.draining) throw new Error('The world is draining');
+    const updates = [...this.up].map(link => {
+      const id = ++this.asked;
+      const answer = new Promise<{readonly opened: readonly string[]; readonly error?: string}>(resolve => {this.placings.set(id, resolve);});
+      link.send({kind: 'place', id, cells: placedCells(), open: []});
+      return answer.then(row => {if (row.error !== undefined) throw new Error(row.error); return undefined;});
+    });
+    await Promise.all(updates);
+    return this.openCells(cells);
+  }
   /**
    * SA33: open cells on a running world (a placement the API made, J314) on a worker of their own. No other worker is told anything, so every
    * player in another cell stays where they are, and the door seats a player in a new cell only once its worker has booted. A cell this world

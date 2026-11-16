@@ -1218,6 +1218,7 @@
     "./host/shardfile": "./src/shared/host/shardfile.ts",
     "./host/headless": "./src/server/host/headless.ts",
     "./host/checkShardfile": "./src/server/host/checkShardfile.ts",
+    "./game/shardfile/uploadActivation": "./src/shared/game/shardfile/uploadActivation.ts",
     "./game/shardfile/checkReport": "./src/shared/game/shardfile/checkReport.ts",
     "./host/headlessObservation": "./src/shared/host/headlessObservation.ts",
     "./host/headlessJourney": "./src/shared/host/headlessJourney.ts",

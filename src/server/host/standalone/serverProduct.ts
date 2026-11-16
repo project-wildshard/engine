@@ -98,12 +98,13 @@ export async function readGridCollisionPack(root: string, build: string, read: S
 /** C2: reads a server file from its product's pack, fetching the book once and a part only for a file it holds. The browser
  *  undoes `br`. A read file is copied out and its part left to the collector: a phone's worker shouldn't hold a level's worth
  *  of them, and reading one again is a cache hit. */
-function serverPackReader(root: string, slug: string, build: () => string, source: ServerRead, hash?: string): (path: string) => Promise<Uint8Array> {
+function serverPackReader(root: string, slug: string, build: () => string, source: ServerRead, hash?: string, exactHash?: boolean): (path: string) => Promise<Uint8Array> {
   const opening = new Map<string, Promise<Uint8Array>>(), opened = new Map<string, WeakRef<Uint8Array>>();
   let pack: Promise<ServerPack> | undefined, book: Promise<ServerPackBook> | undefined;
   // SA47: the book wins; only a slug it has no row for, with the shardfile hash its placement names, reads the cook's index. The book
   // is read once, as before SA47; only a refused index is asked again (review)
   const packOf = async (): Promise<ServerPack> => {
+    if (exactHash && hash !== undefined) return cookedPack(root, slug, {build: build(), hash}, source);
     const row = (await (book ??= serverBook(root, build(), source))).shards[slug];
     if (row !== undefined) return row;
     if (hash === undefined) throw new Error(`No server pack for ${slug}`);
@@ -139,18 +140,20 @@ export function fetchServerProduct(base: string, rapier: Rapier, held?: HeldRead
 /** A shard's server inputs under `root`, whichever server is reading: `source` is what differs. `hash`, a placed slug's shardfile (SA47),
  *  lets a slug the build's book lacks open from the cook's index. `patch` (DEVSERVER, SHARD-SOURCE AP19: `withDevGameplay`) changes
  *  the read shardfile before the product is made of it. */
-export async function readServerProduct(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead, hash?: string, patch?: (shard: Shardfile) => Shardfile, ownServer = false): Promise<HeadlessRuntimeInput> {
+export async function readServerProduct(root: string, build: () => string, source: ServerRead, rapier: Rapier, held?: HeldRead, hash?: string, patch?: (shard: Shardfile) => Shardfile, ownServer = false, exactHash?: boolean): Promise<HeadlessRuntimeInput> {
   const slug = new URL('.', root).pathname.split('/').at(-2) ?? '';
   // C2: all of it is in the pack this build's book names, the server class only there (J91). The page lends what it holds
   // (DL25), so that moves no bytes. A host with no book, or one offline after a new build, reads what the device kept.
   // NB19: an author's own inline candidate has no pack yet (the book names the pinned revision's): it is read beside `root`,
   // and every byte is still verified against its descriptor below.
-  const serverFile = ownServer ? (path: string): Promise<Uint8Array> => source(new URL(path, root), path) : serverPackReader(root, slug, build, source, hash);
+  // Exact cooked hashes always use their index, including when a caller also requests inline author inputs.
+  const serverFile = ownServer && !exactHash ? (path: string): Promise<Uint8Array> => source(new URL(path, root), path) : serverPackReader(root, slug, build, source, hash, exactHash);
   const read = async (path: string): Promise<Uint8Array> => {
     if (path.startsWith('server/')) return serverFile(path);
     const url = new URL(path, root), lent = await held?.(url.href);
     if (lent !== undefined && lent !== null) return new Uint8Array(lent);
-    return serverFile(path).catch(() => source(url, path));
+    // Activation must never fall back to an unrelated loose header after exact-pack refusal.
+    return exactHash ? serverFile(path) : serverFile(path).catch(() => source(url, path));
   };
   const input: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await read('shard.json')));
   if (!isOutputIndex(input)) throw new Error('Standalone needs a format-2 output');

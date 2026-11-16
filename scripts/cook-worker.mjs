@@ -16,7 +16,8 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const { apiSource, bootCook, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, PACK_BUDGET_BYTES, POLL_EVERY_MS, storeUsage } = await import('../src/cook/game/cookWorker.ts');
+const { apiSource, bootCook, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, pollCatalogue, PACK_BUDGET_BYTES, POLL_EVERY_MS, storeUsage } = await import('../src/cook/game/cookWorker.ts');
+const {activationDelivery, gameActivationClient, cookApi, pendingSource, uploadDelivery, VerdictOutbox} = await import('../src/cook/game/uploadTransport.ts');
 const { MAX_SHARDFILE_BYTES } = await import('../src/cook/game/cookJob.ts');
 const { addStoredShards } = await import('./app-build/catalogue.ts');
 const { refreshServiceWorker } = await import('./app-build/serviceWorker.ts');
@@ -39,8 +40,12 @@ const renderer = (() => { try { return rendererRevision(root); } catch { return 
 /** SA48: the validator each job validates with; an index stamped with it lets a page of the same validator admit the shard. */
 const validator = (() => { try { return shardfileValidationRevision(root); } catch { return undefined; } })();
 if (validator === undefined) console.warn('cook-worker: no shardfile validator revision, so no index carries a verdict and no page enters a placed slug from it (SA48)');
+const uploadApi = env.COOK_SIGNING_KEY === undefined || env.COOK_SIGNING_KEY === '' ? undefined : cookApi(need('WILDSHARD_API_URL'), env.COOK_SIGNING_KEY, fetch, Date.now, maxBytes);
+const publicSource = apiSource(env.WILDSHARD_API_URL ?? 'https://api.wildshard.io', fetch, maxBytes);
+const privateSource = uploadApi === undefined ? undefined : pendingSource(uploadApi, publicSource);
+const uploadSource = privateSource ?? publicSource;
 const worker = () => createCookWorker({
-  build: need('WILDSHARD_BUILD'), store, source: apiSource(need('WILDSHARD_API_URL'), fetch, maxBytes), log: line => { console.log(line); },
+  build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); },
   serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch: resolve(env.COOK_SCRATCH ?? 'tmp/cook/scratch'),
   ...(validator === undefined ? {} : { validator }),
   launcher: {
@@ -60,6 +65,21 @@ if (command === 'serve') {
   const everyMs = Math.min(60, Math.max(30, Number.isFinite(seconds) ? seconds : POLL_EVERY_MS / 1000)) * 1000;
   console.log(`cook worker polls the catalogue every ${everyMs / 1000} s`);
   bootCook(cook, { everyMs, log: line => { console.log(line); } });
+  if (uploadApi !== undefined && privateSource !== undefined) {
+    // The initial rollout is staging only; production keeps its existing upload law.
+    need('COOK_STAGING_ACTIVATION_URL'); need('COOK_STAGING_ACTIVATION_TOKEN');
+    const delivery = uploadDelivery({api: uploadApi, source: privateSource, worker: cook, build: need('WILDSHARD_BUILD'), outbox: new VerdictOutbox(resolve(need('COOK_OUTBOX'))), log: line => {console.log(line);}});
+    // Independent discovery: public recooks cannot hold the private pending feed.
+    pollCatalogue({sweep: async () => {await delivery.sweep(); return [];}}, {everyMs, log: line => {console.log(line);}});
+    /** @type {Partial<Record<'staging'|'production', {url:string, token:string}>>} */
+    const receivers = {};
+    for (const channel of /** @type {const} */ (['staging', 'production'])) {
+      const prefix = `COOK_${channel.toUpperCase()}_ACTIVATION`;
+      if (env[`${prefix}_URL`] !== undefined && env[`${prefix}_URL`] !== '') receivers[channel] = {url: need(`${prefix}_URL`), token: need(`${prefix}_TOKEN`)};
+    }
+    const activations = activationDelivery(uploadApi, gameActivationClient(receivers, need('WILDSHARD_BUILD')), line => {console.log(line);});
+    pollCatalogue({sweep: async () => {await activations.sweep(); return [];}}, {everyMs, log: line => {console.log(line);}});
+  }
 } else if (command === 'recook') {
   const cook = worker(), rows = await cook.recook(['live']), preview = await cook.recook(['preview', 'staging']);
   console.log(JSON.stringify([...rows, ...preview]));
