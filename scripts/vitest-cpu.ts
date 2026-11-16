@@ -1,5 +1,6 @@
 import {afterAll,expect} from 'vitest';
 import {relative} from 'node:path';
+import process from 'node:process';
 import {holdCpu,parentCpuContext,PARENT_CONTEXT} from './cpu-admission.mjs';
 import {assertHeavyLease} from './heavy-lane-lease.mjs';
 import {CI_SERIAL_TESTS,CPU_EXCLUSIVE_TESTS} from './vitest-ci-files.ts';
@@ -11,6 +12,17 @@ const {WS_CPU_ADMISSION:enabled}=process.env;
 const COOK_WORKER_TESTS=new Set(['test/cook-worker.test.ts','test/cook-worker-publish.test.ts','test/cook-worker-limits.test.ts']);
 if(enabled==='1'||(!process.env.CI&&!process.env.GITHUB_ACTIONS)){
   if(enabled==='1')assertHeavyLease('full-test');
+  // Reused workers can return after failed collection or a fixture can
+  // restore an old environment snapshot. Drain only this worker's own file
+  // grants, then remove only contexts it actually published itself.
+  const held=heldGrants(),published=publishedContexts();
+  for(const cleanup of held)await cleanup();
+  const seen=new Set<string>();
+  for(let current=process.env[PARENT_CONTEXT];current!==undefined&&published.has(current)&&!seen.has(current);current=process.env[PARENT_CONTEXT]){
+    seen.add(current);
+    const previous=published.get(current);
+    if(previous===undefined)delete process.env[PARENT_CONTEXT];else process.env[PARENT_CONTEXT]=previous;
+  }
   const filename=expect.getState().testPath;
   if(filename===undefined)throw new Error('Missing CPU-admitted test file');
   const file=relative(process.cwd(),filename).replaceAll('\\','/');
@@ -22,7 +34,12 @@ if(enabled==='1'||(!process.env.CI&&!process.env.GITHUB_ACTIONS)){
   const lease=await holdCpu(exclusive?'all':cook?PUSH_BUDGET.cookSlots:native?2:1,{inherit:true});
   const cookEnvironment:CookEnvironment=process.env,previousCookGrant=cookEnvironment.WS_CPU_SLOTS;
   const previousParentGrant=process.env[PARENT_CONTEXT];
-  try{process.env[PARENT_CONTEXT]=('parentContext' in lease?lease.parentContext:undefined)??parentCpuContext(lease.proof);}
+  try{
+    const inherited='parentContext' in lease?lease.parentContext:undefined;
+    const current=inherited??parentCpuContext(lease.proof);
+    process.env[PARENT_CONTEXT]=current;
+    if(inherited===undefined)published.set(current,previousParentGrant);
+  }
   catch(error){await lease.release();throw error;}
   if(cook)cookEnvironment.WS_CPU_SLOTS=String(lease.proof.slots);
   const restoreCookGrant=():void=>{
@@ -34,17 +51,24 @@ if(enabled==='1'||(!process.env.CI&&!process.env.GITHUB_ACTIONS)){
   // inside the grant. Default stacked afterAll runs this after file cleanup.
   // A shared worker (VB14 `isolate: false`) re-runs this setup per file: one exit
   // listener per process releases whatever grant the current file still holds.
-  const held=heldGrants();
-  const exit=():void=>{restoreCookGrant();void lease.release();};
-  held.add(exit);
-  afterAll(async()=>{try{await lease.release();}finally{held.delete(exit);restoreCookGrant();}});
+  let closing:Promise<void>|undefined;
+  const cleanup=():Promise<void>=>{
+    closing??=(async()=>{try{await lease.release();}finally{held.delete(cleanup);restoreCookGrant();}})();
+    return closing;
+  };
+  held.add(cleanup);
+  afterAll(cleanup);
 }
-function heldGrants():Set<()=>void>{
-  const registry=globalThis as typeof globalThis&{__wildshardHeldCpuGrants?:Set<()=>void>};
+function heldGrants():Set<()=>Promise<void>>{
+  const registry=globalThis as typeof globalThis&{__wildshardHeldCpuGrants?:Set<()=>Promise<void>>};
   const existing=registry.__wildshardHeldCpuGrants;
   if(existing!==undefined)return existing;
-  const created=new Set<()=>void>();
+  const created=new Set<()=>Promise<void>>();
   registry.__wildshardHeldCpuGrants=created;
-  process.once('exit',()=>{for(const exit of created)exit();});
+  process.once('exit',()=>{for(const cleanup of created)void cleanup();});
   return created;
+}
+function publishedContexts():Map<string,string|undefined>{
+  const registry=globalThis as typeof globalThis&{__wildshardCpuPublishedContexts?:Map<string,string|undefined>};
+  return (registry.__wildshardCpuPublishedContexts??=new Map<string,string|undefined>());
 }

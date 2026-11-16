@@ -620,7 +620,7 @@ async function main() {
   const interrupt = () => stop('SIGINT'), terminate = () => stop('SIGTERM');
   if (rendererReport !== undefined) { process.on('SIGINT', interrupt); process.on('SIGTERM', terminate); }
   try {
-    preview = external === undefined ? await serve(root, '', true, { signal: controller.signal, telemetryDir: join(out, 'telemetry') }) : null;
+    preview = external === undefined ? await serve(root, '', true, { signal: controller.signal, ...(rendererReport === undefined ? {} : {telemetryDir: join(out, 'telemetry')}) }) : null;
     active();
     const base = external ?? preview?.url;
     if (!base) throw new Error('No built preview');

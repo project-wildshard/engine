@@ -1,6 +1,7 @@
 import { parseCLI } from 'vitest/node';
 import { assertHeavyLease } from './heavy-lane-lease.mjs';
 import { PUSH_BUDGET, PUSH_PROFILE } from './push-budget.mjs';
+import { ancestorCpuBudget, PARENT_CONTEXT } from './cpu-admission.mjs';
 
 /** Node 24 shares WASM import wrappers across isolates but can reclaim a dying
  * wrapper twice after worker retirement (nodejs/node#66366). Keep code alive for
@@ -14,8 +15,11 @@ export function vitestNodeExecArgv(version: string = process.versions.node): str
  * spawning 6 workers put 18 workers on 18 cores); CI retains Vitest's runner default. */
 interface VitestEnvironment extends NodeJS.ProcessEnv { WS_PUSH_GATE_PROFILE?: string }
 export function vitestMaxWorkers(env: VitestEnvironment = process.env): number | undefined {
+  if (env.WS_PUSH_GATE_PROFILE === PUSH_PROFILE) assertHeavyLease('full-test', env);
+  // A nested fixture spends one actual held budget. Run one file at a time:
+  // concurrent borrowed workers must not each spend that entire parent budget.
+  if (env[PARENT_CONTEXT] !== undefined && ancestorCpuBudget(env) !== null) return 1;
   if (env.WS_PUSH_GATE_PROFILE === PUSH_PROFILE) {
-    assertHeavyLease('full-test', env);
     return PUSH_BUDGET.workers;
   }
   const { WS_VITEST_MAX_WORKERS: requested, CI: ci, GITHUB_ACTIONS: actions, WS_COMMIT_RELATED_TOKEN: commit } = env;

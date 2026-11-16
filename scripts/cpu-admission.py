@@ -320,8 +320,13 @@ def main():
             return 2
         except KeyboardInterrupt:
             return 130
+    try:
+        ancestor = ancestor_cpu_budget() if args.mode == 'run' else None
+    except RuntimeError:
+        print(PARENT_REFUSAL, file=sys.stderr)
+        return 2
     maximum = max(1, (os.cpu_count() or 1) - 2)
-    capacity = args.capacity if args.capacity is not None else maximum
+    capacity = args.capacity if args.capacity is not None else ancestor['capacity'] if ancestor is not None else maximum
     if not 1 <= capacity <= maximum:
         parser.error('capacity may only lower the machine budget')
     slots = capacity if args.slots == 'all' else int(args.slots)
@@ -342,6 +347,19 @@ def main():
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGINT, interrupted)
     try:
+        if ancestor is not None:
+            if capacity != ancestor['capacity'] or slots > ancestor['slots']:
+                raise RuntimeError('Inherited CPU budget cannot satisfy this workload')
+            # Nested command wrappers spend the verified held budget, never
+            # wait for another FIFO grant while their parent holds one.
+            child = subprocess.Popen(command, env={**os.environ, 'WS_CPU_SLOTS': str(ancestor['slots'])}, start_new_session=True)
+            while True:
+                try:
+                    code = child.wait(timeout=.2)
+                    return code if code >= 0 else 128 - code
+                except subprocess.TimeoutExpired:
+                    if ancestor_cpu_budget() != ancestor:
+                        raise RuntimeError(PARENT_REFUSAL)
         while True:
             if os.getppid() != owner:
                 return 130
@@ -355,7 +373,8 @@ def main():
             # The actual worker owns this pipe. EOF releases even after a kill.
             sys.stdin.buffer.read()
             return 0
-        env = {**os.environ, 'WS_CPU_SLOTS': str(slots)}
+        env = {**os.environ, 'WS_CPU_SLOTS': str(slots),
+               PARENT_CONTEXT: parent_cpu_context({'lease': entry['token']}, owner_pid=owner)}
         child = subprocess.Popen(command, env=env, start_new_session=True)
         code = child.wait()
         return code if code >= 0 else 128 - code
@@ -363,10 +382,12 @@ def main():
         lane.terminate(child)
         return 130
     except (TimeoutError, RuntimeError) as error:
+        lane.terminate(child)
         print(str(error), file=sys.stderr)
         return 1
     finally:
-        release_cpu(root, entry['token'])
+        if ancestor is None:
+            release_cpu(root, entry['token'])
 
 
 if __name__ == '__main__':

@@ -212,7 +212,7 @@ function recordTrace(name: string, hashes: string[]): void {
     try { mkdirSync(lock); break; }
     catch (error) {
       if (!(error instanceof Error) || !('code' in error) || error.code !== 'EEXIST') throw error;
-      if (Date.now() >= deadline) throw new Error('Motion baseline recording lock is held');
+      if (Date.now() >= deadline) throw new Error(`Motion baseline recording lock is held: ${lock}; check for an active recorder before removing it`);
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
     }
   }
