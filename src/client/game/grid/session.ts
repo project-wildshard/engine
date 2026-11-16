@@ -103,6 +103,7 @@ import { setBuildHeldTimed } from '@wildshard/engine/core/heldTiming';
 import { setBuildUrgent } from '@wildshard/engine/core/framePacing';
 import { NeighbourLife, type NeighbourLifeCell } from './neighbourLife';
 import { NeighbourPanels } from './neighbourPanels';
+import { talkStandIns } from '../shardfile/declaredTalks';
 import { copyMarks } from './copyIdentity';
 import { CellMinimaps } from './minimapBlend';
 import { leaseMapImage } from '../shardfile/mapImage';
@@ -960,6 +961,7 @@ export class GridSession {
           const bytes = retained.admitted.assets;
           try { await this.life.admit(cell, root, source, bytes, compile, skins); } catch (error) { console.warn(`[grid] ${cell.instance} stays still (client scripts):`, error); }
           try { await this.panels.admit(cell, root, source, bytes, views); } catch (error) { console.warn(`[grid] ${cell.instance} draws no doors (declared panels):`, error); }
+          talkStandIns(source, root, scope); // TC-E8: its figure-less quest-givers stand in the cell
         } finally {
           try { await retained.releaseInputs(); } finally { if (!pageOwned) retained.release(); }
         }

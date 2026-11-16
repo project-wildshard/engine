@@ -47,6 +47,16 @@ function standIn(scope: Scope): Group {
   return figure;
 }
 
+/** TEMPLATE-E2E TC-E8: a grid cell's figure-less talks stand in its own render root, once each (named by the talk), drawn with
+ *  its tiles; the cell's prompts and dialogue are `grid/dataCellTalks.ts`'s. */
+export function talkStandIns(source: Pick<Shardfile, 'targets'>, root: Object3D, scope: Scope): void {
+  for (const talk of source.targets.talks ?? []) {
+    const name = `talk:${talk.id}`;
+    if (talk.figure !== undefined || root.getObjectByName(name) !== undefined) continue;
+    const figure = standIn(scope); figure.name = name; figure.position.set(...talk.at); root.add(figure);
+  }
+}
+
 /** How long an answer waits for the server's next node before the page stops waiting (a refused answer moves nothing). */
 const ANSWER_WAIT = 3;
 
