@@ -42,3 +42,21 @@ normal full pins, followed by strict input generation, before checkpoint.
 The Ring 1 selection parses its manifest with the existing Valibot intake.
 Malformed configuration cannot silently opt back into complete products.
 Root-config focused lint and the layer typecheck pass.
+
+A second admission probe used the landing CI run 43777094846 (d8d0672a)
+to identify 52 more excluded files measured below ten seconds. On the
+actual reduced Ring 1 inputs, 18 files / 173 cases passed in a 70.46 s
+named-file run (maximum case 3.02 s). Those join the first five suites:
+23 existing files / 190 cases promoted in total. The 34 refusing files
+remain excluded. Their client GLB/image/audio, extra-head or complete
+catalogue requirements were observed, not replaced with stand-ins.
+Physics routes whose setup refused and skipped every case remain red;
+no skipped route is claimed as a sliced execution. Their existing
+beginProductSession explicitly requests admittedProduct's full assets.
+
+The final slow list has 88 files: 34 observed full-context refusals,
+53 files over ten seconds in the actual Linux receipts, and the new
+full-pin consumer control. J186 requires a reason for slower work in
+Ring 2, so measured cold/native/process work remains beside client-art
+work. No deadline, golden, assertion or native serial group is weakened.
+All five H1/H4/H5 fixture/export filesets stay untouched.
