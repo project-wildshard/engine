@@ -36,3 +36,13 @@ runs240 simulation ticks/92 lanes, and retains the uploaded header bytes.
 It reports stale preparation (fixture renderer), so this is a format/cook
 proof, not permission to move a channel or bless a production renderer.
 Rebased on main8883790a; lint/types and97 touched cases pass before land.
+
+The normal expanded land preflight found nine JSON Schema projection
+failures, all from StrikeDebris's custom plain-data preflight (not the
+format version reader). Reuse ONE-FORMAT's defining fix, published npm
+format0.11.0, and its exact-identity StrikeDebrisJsonGuard bridge from
+engine de6166a9. JSON text already excludes accessors/functions; the
+structural policy still checks its strict shape and surface picklist.
+No global custom-schema fallback is added. All109 cases in the three
+originally failing consumers plus reader/output-descriptor suites pass;
+full types and game lint pass. The library retains format0.1.0.1.
