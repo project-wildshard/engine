@@ -24,3 +24,14 @@ before this change with Decision fuel exhausted. The proof remains out
 of ordinary discovery and hooks under J186; hosted CI retains its actual
 criteria receipt. Whole Pine row credit additionally needs its complete
 content and long population candidate journeys in the shard repo.
+
+J206 read-only Opus review is CLEAR. Its optional witness hardening is
+included: assert every selection-test tree survives the real filters,
+and observe actual natural-rain shelter continuations. The fresh world
+reaches tick 60,000, first observes shelter at 33,000, with 50 herds
+sheltered at peak. Both cases pass in 8.606 seconds under concurrent work.
+
+The first normal push completed its checks (86.0 seconds) but refused
+publication because I edited the proof while it ran. No commit reached
+origin. This second commit freezes that final proof before retrying the
+normal gate; no escape hatch is needed or used.
