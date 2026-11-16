@@ -198,7 +198,7 @@ export class DedicatedRoom implements CrossTarget {
     const held = this.seats.get(entry.device);
     if (held !== undefined) { this.rejoin(held, transport, hello); return; }
     if (entry.held === true) { transport.close('stalled'); return; } // its hold ended on the way here, and its save is what it comes back to
-    const placed = this.place(entry, transport);
+    const placed = this.place(entry, transport, entry.arrival);
     if (typeof placed === 'string') { this.refused(entry, transport, hello, placed); return; }
     this.settle(placed);
     this.link(placed, transport, hello);

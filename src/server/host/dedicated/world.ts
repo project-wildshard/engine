@@ -179,6 +179,8 @@ export class World {
   private readonly leftCrossing = new Set<string>();
   /** ZE9b (J352): seats frozen at a gate whose page was told `arrive` and is loading the cell: the road, the cell and the pose past the gate. */
   private readonly entries = new Map<string, { readonly from: string; readonly to: string; readonly at: ResumeAt }>();
+  /** ZE9c: entries whose socket went mid-load: a redial while the road still holds the frozen body is seated in the cell past its gate. */
+  private readonly redials = new Map<string, { readonly from: string; readonly to: string; readonly at: ResumeAt }>();
   private asked = 0;
   /** SA33: cells whose late worker is booting, so a second open of the same cell boots nothing. */
   private readonly booting = new Set<string>();
@@ -454,6 +456,11 @@ export class World {
     const said = v.safeParse(NetIdentitySchema, { player: hello.player, name: hello.name });
     if (!said.success) { this.refuse('identity'); end.close('refused'); return; }
     const device = said.output.player, typed = cleanName(said.output.name), body = bodyId(this.options.secret, device), { saves } = this.options, holding = this.seated.get(device);
+    // ZE9c: a zone entry this device's last socket left mid-load, while its road still holds the body: it goes on into the cell, as a goto
+    const redial = this.redials.get(device);
+    this.redials.delete(device);
+    const arrival = redial !== undefined && redial.from === holding && this.links.has(redial.to) ? redial : undefined;
+    const aim = arrival?.to ?? goto;
     // DT4: the Name everyone sees and the secret-keyed body id; never the raw player id, which is a bearer credential
     this.devicePlayer(end, { name: this.names.get(device) ?? typed, body });
     // GC15: a seat mid-crossing is in neither cell for the door to ask: the client dials again in a moment.
@@ -465,7 +472,7 @@ export class World {
       if (found.held && this.quits.has(end)) { this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
       if (!end.isOpen || this.draining) return;
       // GO7: Shard select chose another cell this world opens. The held body leaves cleanly (saved), and the door admits them there.
-      const moving = goto !== null && cellName(goto) !== holding && this.links.has(cellName(goto));
+      const moving = aim !== null && cellName(aim) !== holding && this.links.has(cellName(aim));
       // `leaveHeld` transfers the hello it is given, and this hello still seats them in the new cell: it gets a copy.
       if (found.held && moving) this.leaveHeld(holding, { device, name, body, doc: null, seq: 0, held: true }, bytes.slice(0));
       else if (found.held) { this.seat(holding, end, { device, name, body, doc: null, seq: 0, held: true }, bytes); return; }
@@ -480,12 +487,12 @@ export class World {
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const last = await saves.where(device);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
-    const slug = this.cellFor(last, goto), saved = await saves.read(device, cellShard(slug));
+    const slug = this.cellFor(last, aim), saved = await saves.read(device, cellShard(slug)), at = arrival?.at; // the cell it was entering: `aim`, which this world opens
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const { spawn } = await this.ask(slug, device, end);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     // GO3: `shard` is what a one-shard page loads, `cell` the grid instance a grid page stands in.
-    end.control('resume', new TextEncoder().encode(JSON.stringify({ shard: cellShard(slug), cell: slug, at: saved.doc?.at ?? spawn })).buffer);
+    end.control('resume', new TextEncoder().encode(JSON.stringify({ shard: cellShard(slug), cell: slug, at: at ?? saved.doc?.at ?? spawn })).buffer);
     this.sayCountdown(end);
     await new Promise<void>(resolve => {
       const timer = this.scope.timeout(this.options.readyMs ?? READY_MS, () => { this.refuse('ready-timeout'); end.close('refused'); resolve(); });
@@ -494,7 +501,7 @@ export class World {
     });
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     this.pending.delete(device);
-    this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }) }, bytes);
+    this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }), ...(at === undefined ? {} : { arrival: at }) }, bytes);
   }
   /**
    * GC15: a seat's feet left cell `from` for `to`. On the same worker the door reads their save on `to`'s shard and orders the move, which
@@ -564,7 +571,9 @@ export class World {
     });
     if (this.entries.get(device) !== entry) return;
     this.entries.delete(device);
-    if (!readied) { this.refuse('enter-timeout'); this.thaw(from, device, to, end.isOpen ? 'timeout' : null); return; }
+    // ZE9c: the socket went mid-load. The road holds the frozen body as it holds any dropped seat; a redial in that time arrives past the gate
+    if (!readied && !end.isOpen && !this.draining) { this.redials.set(device, entry); return; }
+    if (!readied) { this.refuse('enter-timeout'); this.thaw(from, device, to, 'timeout'); return; }
     if (this.seated.get(device) !== from || this.draining) { this.thaw(from, device, to, 'moved'); return; }
     this.options.log({ at: 'cell.entering', device, from, to });
     await this.crossing(from, device, to, at);

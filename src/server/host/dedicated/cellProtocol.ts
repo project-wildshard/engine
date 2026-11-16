@@ -24,6 +24,8 @@ export interface SeatEntry {
   readonly held?: boolean;
   /** ZE6: the cell a seat walks onto the road from (the worker sets it on the road's crossing): the road's walls stand open for it there. */
   readonly home?: string;
+  /** ZE9c: a zone entry's redial mid-load: the pose past the gate it stands at in this cell, whatever its doc says. */
+  readonly arrival?: ResumeAt;
 }
 /** What the door says to a worker. */
 export type CellOrder =

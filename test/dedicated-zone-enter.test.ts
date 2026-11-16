@@ -138,3 +138,31 @@ test('a page that never says ready in time: the freeze lifts in the buffer and t
   expect(bench.room(WEST)?.holds('device:a'), 'never moved into Sunscar').toBe(false);
   expect(heard.closes(), 'one socket').toBe(0);
 });
+
+for (const [to, side, worker] of [[WEST, -1, 'its own worker'], [EAST, 1, 'the other worker']] as const) {
+  test(`a redial mid-load arrives past ${to}'s gate on ${worker}`, { timeout: 180_000 }, async () => {
+    bench = await roomBench({ cells: CELLS, workers: 2, crossing: true });
+    const a = new RoomBot(bench.url, 'bench', 'device:a', 'A'); bots.push(a);
+    expect(await a.arrived()).toBe(true);
+    const heard = listen(a), road = await toGate(bench, a, side);
+    heard.enter(to);
+    await vi.waitFor(() => { expect(heard.arrivals).toHaveLength(1); }, { timeout: 5000, interval: 20 });
+    // The link dies while the page loads the cell: the road holds the frozen body
+    a.drop();
+    await vi.waitFor(() => { expect(road.holding, 'held on the road').toBe(1); }, { timeout: 5000, interval: 20 });
+    expect(road.entering('device:a')).toBe(to);
+    // The page dials again: told to load the cell at the pose past the gate, and seated there
+    const b = new RoomBot(bench.url, 'bench', 'device:a', 'A'); bots.push(b);
+    expect(await b.arrived()).toBe(true);
+    const inX = -side * (CHUNK_HALF - ARRIVAL_DEPTH), resume = JSON.parse(b.resume ?? '{}') as { cell?: string; at?: { x: number; z: number } };
+    expect(resume.cell).toBe(to);
+    expect(resume.at?.x).toBeCloseTo(inX, 5);
+    const target = bench.room(to);
+    await vi.waitFor(() => { expect(target?.holds('device:a'), `seated in ${to}`).toBe(true); }, { timeout: 10_000, interval: 50 });
+    const feet = target?.bodyOf('device:a')?.position;
+    expect(Math.abs((feet?.x ?? Infinity) - inX), 'past the gate, ARRIVAL_DEPTH in').toBeLessThan(1.5);
+    expect(Math.abs(feet?.z ?? Infinity), 'on the entryway\'s centre line').toBeLessThan(1.5);
+    await vi.waitFor(() => { expect(road.holds('device:a'), 'the road let the held body go').toBe(false); }, { timeout: 5000, interval: 20 });
+    expect(b.client.latest?.cell).toBe(cellFrame(to));
+  });
+}
