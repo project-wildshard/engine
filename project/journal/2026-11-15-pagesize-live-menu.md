@@ -33,3 +33,12 @@ A test waits for the digest to finish and confirms the table is still
 unpublished until readiness is requested. Preparing the menu overlaps
 mandatory imports, and its small hero avoids competing with world bytes.
 The three staging world-stage timings still require the deployed build.
+
+The one Claude diff review found seven concerns. Title-only pages now
+keep the inactive ledger hidden; real failure and Debug controls remain
+expanded. A navigation attempt owns HUD input even with a thin bar.
+Preparation never adds intro state or marks the world title ready, is
+optional for admission, and refuses a late mount on a retired owner.
+Catalogue refresh checks actual installed identities and waits for any
+first-play name prompt to complete. Tests cover these ownership cases;
+the reviewed milestone passes lint, types, CSS and 137 related tests.

@@ -73,6 +73,9 @@ test('plain launch paints its hero and a working HTML menu without application m
   expect(preload?.getAttribute('href')).toMatch(/^\/assets\/title\/main-crossroads-square-first-[a-f0-9]{16}\.jpg$/u);
   expect(preload?.getAttribute('fetchpriority')).toBe('low');
   expect(window.document.querySelector('#hud')?.childElementCount).toBe(0);
+  const progress = window.document.querySelector('.ws-load');
+  if (!(progress instanceof window.HTMLElement)) throw new Error('Missing retained ledger');
+  expect(window.getComputedStyle(progress).display).toBe('none');
 });
 
 test('HTML Shard Select and Back respond before any module and expose native shard links', () => {
@@ -132,6 +135,9 @@ test('thin progress retains the full ledger and an explicitly held Debug load ke
   delete root.dataset['shell'];
   expect(window.getComputedStyle(root).height).toBe('3px');
   root.dataset['hold'] = '';
+  visible();
+  delete root.dataset['hold'];
+  root.dataset['failed'] = 'true';
   visible();
   for (const dead of ['.ws-load-simple', '.ws-load-diagnostics', '[data-el="line"]']) expect(root.querySelector(dead)).toBeNull();
 });
@@ -217,6 +223,7 @@ test('a menu covering preparation cannot publish world readiness', () => {
     const title = showStartTitle(() => ({ root: document.createElement('div'), cards: [], index: 0,
       select: () => undefined, activate: () => undefined, start: () => undefined, dispose: () => undefined }), { preparing: true });
     expect(ready).not.toHaveBeenCalled();
+    expect(document.getElementById('hud')?.classList.contains('intro')).toBe(false);
     title.dispose();
   } finally { document.removeEventListener('ws:ready', ready); }
 });

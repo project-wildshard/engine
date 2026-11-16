@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
-import { loadShellTemplate, startShellClock, stopShellClock } from './shell';
+import { beginNavigationShell, loadShellTemplate, startShellClock, stopShellClock } from './shell';
 import { saveStorage } from '../saves/slots';
 
 // DL21 (E526): Jake's card sat at 00:00.0 with no shard or tier while ~1.5 MB of boot code arrived (about 3 s on the
@@ -15,6 +15,16 @@ beforeEach(() => {
 afterEach(() => {
   stopShellClock(); owner.dispose();
   saveStorage('session').removeItem('titleArrival'); saveStorage('device').removeItem('titleArrival.once');
+});
+
+test.each([false, true])('navigation owns HUD input and restores prior inert=%s on cancellation', prior => {
+  const hud = document.createElement('div'); hud.id = 'hud'; hud.inert = prior; document.body.append(hud);
+  let navigations = 0;
+  const attempt = beginNavigationShell('Destination', owner, () => { navigations++; });
+  expect(hud.inert).toBe(true);
+  attempt.dispose();
+  expect(hud.inert).toBe(prior);
+  expect(navigations).toBe(0);
 });
 
 test('the static card counts from the title tap and names the shard, its tier and the code wait', () => {

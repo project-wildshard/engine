@@ -15,7 +15,7 @@ export function showStartTitle(buildDeck: StartTitleDeck, options: { readonly pr
   const scope = pageScope.child('ui.StartTitle'), slots = new HudSlots();
   const hud = document.getElementById('hud');
   if (hud === null) throw new Error('Start title: missing #hud');
-  hud.classList.add('intro');
+  if (options.preparing !== true) hud.classList.add('intro');
   const interrupted = previousBootLine();
   let deck: TitleDeckView | undefined;
   const refresh = (): void => {
@@ -31,7 +31,7 @@ export function showStartTitle(buildDeck: StartTitleDeck, options: { readonly pr
     if (index !== -1) deck.select(index, false);
     deck.start();
     document.querySelector('[data-title-shell]')?.remove();
-    performance.mark('wildshard.title'); // MF3: the live title is up (the Simulator bar reads it)
+    performance.mark(options.preparing === true ? 'wildshard.preparation-menu' : 'wildshard.title');
   };
   refresh();
   scope.onDispose(onDev(refresh));

@@ -345,19 +345,19 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
 /* PZ27: the live menu owns the screen during player boot. Keep Loading's real
    phase/bar and diagnostics owners; only its active bar occupies the screen.
    An explicitly held Debug load retains its diagnostic controls. */
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) { inset: auto 24px calc(12px + env(safe-area-inset-bottom, 0px)); height: 3px; z-index: calc(var(--ws-layer-menu) + 1); display: block; background: none; pointer-events: none; overflow: hidden; }
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-head,
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-foot,
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-title,
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-meta,
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-track-row,
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-log,
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-hold { display: none; }
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-body,
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-panel { display: contents; }
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-phase { display: none; padding: 0; border: 0; margin: 0; background: none; }
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-phase[data-state="on"] { display: block; }
-html.boot-menu .ws-load:not([data-hold]):not([data-inset]) .ws-load-bar { height: 3px; margin: 0; }
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) { inset: auto 24px calc(12px + env(safe-area-inset-bottom, 0px)); height: 3px; z-index: calc(var(--ws-layer-menu) + 1); display: block; background: none; pointer-events: none; overflow: hidden; }
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-head,
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-foot,
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-title,
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-meta,
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-track-row,
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-log,
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-hold { display: none; }
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-body,
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-panel { display: contents; }
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-phase { display: none; padding: 0; border: 0; margin: 0; background: none; }
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-phase[data-state="on"] { display: block; }
+html.boot-menu:not(.title-first) .ws-load:not([data-hold]):not([data-inset]):not([data-failed="true"]) .ws-load-bar { height: 3px; margin: 0; }
 .ws-load .ws-load-play { display: block; width: 100%; min-height: 48px; margin-top: 18px; border: 1px solid var(--ws-cyan); background: rgba(9, 22, 36, 0.88); color: var(--ws-cyan); font: 700 18px var(--ws-display); letter-spacing: 0.18em; cursor: pointer; touch-action: manipulation; }
 .ws-load .ws-load-play:focus-visible { outline: 2px solid var(--ws-cyan); outline-offset: 3px; }
 .ws-load[data-hold] .ws-load-head, .ws-load[data-hold] .ws-load-foot { flex-shrink: 0; }

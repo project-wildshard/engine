@@ -118,11 +118,14 @@ export function beginNavigationShell(name: string, owner: Scope, navigate: () =>
   if (existing === null) { root.className = 'ws-load'; root.dataset['shell'] = ''; root.innerHTML = loadShellTemplate(); slots.widget('band.1', root, 0, attempt, document.body); }
   const hidden = root.classList.contains('hide'), nameField = root.querySelector<HTMLElement>('[data-el="slug"]');
   const previousName = nameField?.textContent ?? '', disabled = card?.disabled ?? false, busy = card?.getAttribute('aria-busy') ?? null;
+  const hud = document.getElementById('hud'), inert = hud?.inert ?? false;
+  if (hud !== null) hud.inert = true;
   if (nameField !== null) nameField.textContent = name;
   root.classList.remove('hide'); root.dataset['navigation'] = '';
   html.classList.remove('title-first');
   if (card !== undefined && card !== null) { card.disabled = true; card.setAttribute('aria-busy', 'true'); }
   attempt.onDispose(() => {
+    if (hud !== null) hud.inert = inert;
     if (existing === null) slots.discard(root);
     else { root.classList.toggle('hide', hidden); delete root.dataset['navigation']; if (nameField !== null) nameField.textContent = previousName; }
     html.classList.toggle('title-first', title);
