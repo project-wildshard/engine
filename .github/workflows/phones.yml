@@ -78,6 +78,9 @@ jobs:
       - name: Boot an Android emulator with Chrome
         run: |
           bin="$ANDROID_HOME/cmdline-tools/latest/bin" adb="$ANDROID_HOME/platform-tools/adb"
+          # avdmanager and the emulator look in different homes unless told one
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           image=$("$bin/sdkmanager" --list 2>/dev/null | grep -oE 'system-images;android-[0-9.]+;google_apis;x86_64' | sort -uV | tail -1)
           echo "image $image"
           yes | "$bin/sdkmanager" --install emulator platform-tools "$image" > /dev/null
