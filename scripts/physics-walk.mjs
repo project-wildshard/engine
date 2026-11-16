@@ -11,13 +11,22 @@ export async function walkPhysicsLeg(legIn) {
     if (hit) p.position.y = Math.max(p.position.y, top - hit.timeOfImpact);
     p.prevFeet?.copy(p.position);
   };
+  // A worker page's server owns the player (SH-sky-3): it must hear where the walk put the player, as the probe's pose
+  // tells it, or its next state puts the player back where the last leg ended. Its board is a press the server hears a
+  // command later, so the start asks until the server holds it, as the goldens capture's `board` does.
+  const told = () => { p.link?.place?.(p.position.x, p.position.y, p.position.z, p.yaw); };
+  const wait = (n) => new Promise((resolve) => { const from = w.game.frameCount, f = () => { if (w.game.frameCount >= from + n) resolve(undefined); else requestAnimationFrame(f); }; f(); });
+  const board = async (on) => { for (let asked = 0; asked < 4; asked++) { await wait(15); if (p.hover === on) return; p.setHover(on); } await wait(15); };
+  const served = typeof p.link?.place === 'function';
+  if (served && p.hover) await board(false);
   p.spawn(legIn.start.x, legIn.start.z, legIn.start.yaw);
   if (typeof legIn.start.y === 'number') p.position.y = legIn.start.y; // a deck start names its floor
   else land();
+  told();
   p.pitch = -0.12;
-  if (legIn.start.hover === true) p.setHover(true);
+  if (legIn.start.hover === true) { if (served) await board(true); else p.setHover(true); }
   if (w.animals.__frozen !== true) { w.animals.update = () => undefined; w.animals.__frozen = true; } // no creature in the way of the route (they are the poses' job)
-  await new Promise((resolve) => { setTimeout(resolve, 600); }); // land, settle the camera
+  await new Promise((resolve) => { setTimeout(resolve, served ? 2000 : 600); }); // land, settle the camera (a served page streams its new ground)
   const trace = [], stuck = [];
   let wi = 0, t = 0, jumpT = 0, jump2 = false, lastProg = { t: 0, d: Infinity }, out = 0, complete = false, timedOut = false;
   const box = legIn.inside ?? null;
@@ -63,7 +72,7 @@ export async function walkPhysicsLeg(legIn) {
         // readiness gate before its fixed-step interior event. Preserve the
         // refusal at the real feet instead of manufacturing that activation.
         if (grid !== undefined) { finish(false); return; }
-        p.spawn(wp.x, wp.z, p.yaw); land(); wi++; lastProg = { t, d: Infinity }; return;
+        p.spawn(wp.x, wp.z, p.yaw); land(); told(); wi++; lastProg = { t, d: Infinity }; return;
       }
       p.yaw = Math.atan2(-dx, -dz);
       w.game.app.input.setHeld('move.forward', true);

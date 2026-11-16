@@ -22,6 +22,7 @@
 //   node scripts/physics-baseline.mjs --no-build --mode=walk
 //   node scripts/physics-baseline.mjs --label=p2 --mode=walk
 //   node scripts/physics-baseline.mjs --no-build --mode=walk --trails --video
+//   node scripts/physics-baseline.mjs --mode=walk --gpu --shard=far-reach --url=http://127.0.0.1:4400  # the fixed legs on the GPU
 //   node scripts/physics-baseline.mjs --no-build --mode=walk --route=progress/shard-platform/sf46/entries-route.json  # a row's own legs
 //   node scripts/physics-baseline.mjs --compare progress/physics/p0-x.json progress/physics/p2-y.json
 //   node scripts/physics-baseline.mjs --mode=walk --trails --shard=nalati-grasslands --url=http://127.0.0.1:5188
@@ -122,6 +123,8 @@ const VIDEO = has('video');
 // --trails: instead of the fixed route, walk every path of the shard (its TRAILS after the entry roads) end to end,
 // both ways, a waypoint every 3 m — the stricter 0.35 m / 40° controller must not get stuck on a path players use
 const TRAILS = has('trails');
+// --gpu: walk the fixed route itself in that browser on the host GPU (the real-GPU walk report, SH-sky-3), not the Node harness
+const GPU_WALK = has('gpu');
 const SERVE = resolvePath(flag('serve', ROOT)); // the checkout whose dist/ is served (a clean export of an older commit, for a same-session before / after)
 if (flag('set', '') === 'ph') POSES.splice(0, POSES.length, ...PH_POSES); // --set=ph: Pine Hollow's poses
 // --url: walk / pose against a server that is already running (a served build: no build or preview started here)
@@ -141,7 +144,7 @@ const EXPECTED_SYSTEMS = argv.filter((arg) => arg.startsWith('--expect-system=')
   if (!match) throw new Error('Expected system must name shard:system=on|off');
   return { shard: match[1], id: match[2], present: match[3] === 'on' };
 });
-const nativeWalk=MODE.includes('walk')&&!TRAILS?runNativePhysicsWalk(ROOT,argv):undefined;
+const nativeWalk=MODE.includes('walk')&&!TRAILS&&!GPU_WALK?runNativePhysicsWalk(ROOT,argv):undefined;
 if(nativeWalk!==undefined){
   if(nativeWalk.status!==0)process.exit(nativeWalk.status);
   if(MODE.length===1)process.exit(0);
@@ -307,7 +310,7 @@ if (MODE.includes('poses')) {
 }
 
 // ── walk ──
-if (MODE.includes('walk')&&TRAILS) {
+if (MODE.includes('walk')&&(TRAILS||GPU_WALK)) {
   // --route=<file>: another route file in the same shape (a row's own legs, e.g. SF46's entries), default the shared one
   const route = JSON.parse(readFileSync(resolvePath(ROOT, flag('route', 'scripts/physics-route.json')), 'utf8'));
   for (const [shard, legs] of Object.entries(route)) {

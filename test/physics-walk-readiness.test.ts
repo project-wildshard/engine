@@ -68,3 +68,25 @@ test('a closed frame gate still reaches the same wall-clock deadline without mor
   expect(await f.result).toMatchObject({ trace: [], stuck: [], complete: false, timedOut: true });
   expect(f.stopped()).toBe(true);
 });
+
+test('a worker page hears the leg start, so the next server state keeps the posed player', async () => {
+  vi.useFakeTimers();
+  const position = { x: 0, y: 0.55, z: 0 }, placed: number[][] = [];
+  let tick: ((dt: number) => void) | undefined;
+  const player = { position, velocity: { y: 0, set: () => undefined }, yaw: 0, pitch: 0, hover: false,
+    spawn: (x: number, z: number, yaw: number) => { position.x = x; position.z = z; player.yaw = yaw; },
+    link: { place: (x: number, y: number, z: number, yaw: number) => { placed.push([x, y, z, yaw]); } },
+    waterSurfaceAt: () => null, motor: { result: { groundCollider: null }, snapshot: () => ({}) } };
+  const physics = { R: { Ray, QueryFilterFlags: { EXCLUDE_SENSORS: 1 } }, world: { castRay: () => null }, colliderTag: () => undefined };
+  const world = { player, physics, animals: { update: () => undefined }, game: {
+    app: { input: { clear: () => undefined, setHeld: () => undefined } },
+    watchFrames: (run: (dt: number) => void) => { tick = run; return () => undefined; } } };
+  Object.defineProperty(window, '__wildshard', { configurable: true, value: { world } });
+  const result = walkPhysicsLeg({ start: { x: 0, z: 198, y: 25.3, yaw: 0 }, waypoints: [{ x: 0, z: 199 }], timeout: 8 });
+  await vi.advanceTimersByTimeAsync(600);
+  expect(tick).toBeUndefined(); // a served page waits for its new ground to stream before walking
+  await vi.advanceTimersByTimeAsync(1_400);
+  expect(placed).toEqual([[0, 25.3, 198, 0]]);
+  position.z = 199; tick?.(1); tick?.(1);
+  expect(await result).toMatchObject({ stuck: [], complete: true });
+});
