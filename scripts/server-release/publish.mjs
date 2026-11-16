@@ -106,6 +106,20 @@ function isAncestor(older, newer) {
   return result.status === 0;
 }
 
+/** Main publishes policy; release refs may own a newer source tree.
+ * @param {string} build @param {string} head @param {string | undefined} channel @param {string | undefined} tag */
+function releaseHistoryContains(build, head, channel, tag) {
+  if (isAncestor(build, head)) return true;
+  const refs = execFileSync('git', ['for-each-ref', '--format=%(refname:short) %(objectname)', 'refs/remotes/origin/release/'], { encoding: 'utf8' }).trim().split('\n')
+    .map(line => line.split(' ')).filter(([ref = '']) => /^origin\/release\/v\d+\.\d+\.\d+$/u.test(ref));
+  if (channel === 'staging') return tag === `server-staging-${build}` && refs.some(([, tip]) => tip === build);
+  if (channel !== 'production' || tag === undefined || !/^v\d+\.\d+\.\d+$/u.test(tag)) return false;
+  try {
+    if (execFileSync('git', ['rev-parse', '--verify', `refs/tags/${tag}^{commit}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() !== build) return false;
+  } catch { return false; }
+  return refs.some(([ref, tip]) => ref === `origin/release/${tag}` && tip !== undefined && isAncestor(build, tip));
+}
+
 /** CLI runs only after CI has uploaded the exact immutable asset. @returns {Promise<void>} */
 async function main() {
   const { values } = parseArgs({ options: { channel: { type: 'string' }, build: { type: 'string' }, tag: { type: 'string' }, bundle: { type: 'string' }, out: { type: 'string' }, check: { type: 'boolean', default: false },
@@ -114,7 +128,7 @@ async function main() {
   // The build's epoch and pins are read from that commit; the workflow builds its bundle in its own tree and checks the tag's asset.
   // `--align` (staging only) is a person naming a build, never older than the live one.
   const align = values.align, head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-  if (values.build === undefined || !COMMIT.test(values.build) || !isAncestor(values.build, head)) throw new Error('The build must be a full commit on the checked-out main');
+  if (values.build === undefined || !COMMIT.test(values.build) || !releaseHistoryContains(values.build, head, values.channel, values.tag)) throw new Error('The build must be a full commit in published main or release history');
   if (align && values.channel !== 'staging') throw new Error('--align is staging only');
   /** @param {string} path @returns {string} */
   const sourceFile = path => execFileSync('git', ['show', `${values.build ?? ''}:${path}`], { encoding: 'utf8' });

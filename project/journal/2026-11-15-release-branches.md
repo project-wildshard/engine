@@ -26,3 +26,16 @@
   other manifest edits keep the normal gate. Managed release-branch
   deletion sends no commit and needs no suite; main-watch still follows
   the merge-back's main CI with a clean Git environment.
+
+- Transition: v0.1.23 is already preparing on main under the coordinator's
+  hold. Preserve explicit staging alignment for an exact version prepare
+  commit published on main with matching manifest and green CI. Automatic
+  main CI events stay outside staging; ordinary main commits cannot use
+  this exception. Its staging asset admits that same prepared source.
+
+- One-shot review used the repository wrapper's read-only Codex fallback
+  because Claude quota was unverified. Two MUSTs: the publisher CLI still
+  required main ancestry after source selection, and the helper's prepare
+  body exceeded 72 columns. Admit the published release source at the
+  publisher while retaining publishChannel's forward-only rule; wrap the
+  helper body and prove preparation through the actual commit-msg hook.

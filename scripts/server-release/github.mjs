@@ -27,7 +27,7 @@ async function api(path, options = {}) {
 /** @param {string[]} args @returns {string} */
 const git = args => execFileSync('git', args, { encoding: 'utf8' }).trim();
 
-/** No fork or PR event is allowed to reach a signing job. @returns {{sha: string, channel: string, tag: string, branches: string[], align?: true} | null} */
+/** No fork or PR event is allowed to reach a signing job. @returns {{sha: string, channel: string, tag: string, branches: string[], align?: true, legacy?: true} | null} */
 function candidate() {
   if (process.env.GITHUB_REPOSITORY !== REPOSITORY) return null;
   const eventName = process.env.GITHUB_EVENT_NAME;
@@ -37,8 +37,12 @@ function candidate() {
     if (process.env.GITHUB_REF !== 'refs/heads/main') throw new Error('Staging alignment runs from main only');
     if (!COMMIT.test(sha)) throw new Error('Staging alignment needs a full 40-character build SHA');
     const branches = git(['for-each-ref', '--format=%(refname:short)', '--contains', sha, 'refs/remotes/origin/release/']).split('\n')
-      .map(ref => ref.replace(/^origin\//u, '')).filter(ref => RELEASE_BRANCH.test(ref));
-    if (branches.length === 0) throw new Error('Staging alignment needs a published release-branch build');
+      .map(ref => ref.replace(/^origin\//u, '')).filter(ref => RELEASE_BRANCH.test(ref) && git(['rev-parse', `refs/remotes/origin/${ref}^{commit}`]) === sha);
+    if (branches.length === 0) {
+      const prepared = publishedMainRelease(sha);
+      if (prepared === null) throw new Error('Staging alignment needs a published release-branch build');
+      return { sha, channel: 'staging', tag: `server-staging-${sha}`, branches: [`release/${prepared}`, 'main'], align: true, legacy: true };
+    }
     return { sha, channel: 'staging', tag: `server-staging-${sha}`, branches, align: true };
   }
   if (eventName === 'workflow_run') {
@@ -64,6 +68,16 @@ function reachable(sha, branch) {
   catch { return false; }
 }
 
+/** Let a release already prepared on main finish through explicit alignment.
+ * Ordinary main CI events never enter this path. @param {string} sha @returns {string | null} */
+function publishedMainRelease(sha) {
+  if (!reachable(sha, 'main')) return null;
+  try {
+    const tag = /^chore\(release\): (v\d+\.\d+\.\d+)$/u.exec(git(['log', '-1', '--format=%s', sha]))?.[1];
+    return tag !== undefined && JSON.parse(git(['show', `${sha}:package.json`])).version === tag.slice(1) ? tag : null;
+  } catch { return null; }
+}
+
 /** Exact-SHA push CI on an admitted branch; PRs and plan branches cannot authorize a release.
  * @param {string} sha @param {string[]} branches @returns {Promise<'green' | 'pending' | 'red'>} */
 async function checks(sha, branches) {
@@ -79,7 +93,7 @@ async function checks(sha, branches) {
 /** @returns {Promise<void>} */
 async function select() {
   const source = candidate(); if (source === null) return;
-  if (source.channel === 'staging' && !source.branches.some(branch => {
+  if (source.channel === 'staging' && source.legacy !== true && !source.branches.some(branch => {
     try { return git(['rev-parse', '--verify', `refs/remotes/origin/${branch}^{commit}`]) === source.sha; } catch { return false; }
   })) {
     if (source.align === true) throw new Error('Staging alignment needs the current release-branch head');
@@ -88,7 +102,7 @@ async function select() {
   const published = source.branches.some(branch => reachable(source.sha, branch));
   if (!published) throw new Error('Release source is unreachable from its published release branch or main');
   // A completed release keeps its exact-SHA branch proof after merge-back deletes the branch.
-  const proofBranches = source.channel === 'production' ? source.branches : source.branches.filter(branch => reachable(source.sha, branch));
+  const proofBranches = source.channel === 'production' || source.legacy === true ? source.branches : source.branches.filter(branch => reachable(source.sha, branch));
   // A late workflow_run from before this producer existed is not a release candidate.
   if (execFileSync('git', ['ls-tree', '--name-only', source.sha, 'scripts/server-release/publish.mjs'], { encoding: 'utf8' }).trim() === '') return;
   const deadline = Date.now() + 40 * 60_000;
@@ -119,8 +133,9 @@ async function asset(tag, sha, archive, channel) {
   if (!COMMIT.test(sha) || !(VERSION.test(tag) && channel === 'production' || tag === `server-staging-${sha}` && channel === 'staging')) throw new Error('Invalid server release tag');
   if (git(['rev-parse', 'HEAD']) !== sha) throw new Error('Bundle checkout differs from release source');
   const releaseBranches = channel === 'production' ? [`release/${tag}`] : git(['for-each-ref', '--format=%(refname:short)', '--contains', sha, 'refs/remotes/origin/release/']).split('\n').map(ref => ref.replace(/^origin\//u, '')).filter(ref => RELEASE_BRANCH.test(ref));
-  if ((channel === 'production' ? [...releaseBranches, 'main'] : releaseBranches).every(branch => !reachable(sha, branch))) throw new Error('Server asset source is unreachable from release history');
-  if (channel === 'staging' && !releaseBranches.some(branch => git(['rev-parse', `refs/remotes/origin/${branch}^{commit}`]) === sha)) throw new Error('Staging asset must name the current release-branch head');
+  const legacy = channel === 'staging' && publishedMainRelease(sha) !== null;
+  if ((channel === 'production' || legacy ? [...releaseBranches, 'main'] : releaseBranches).every(branch => !reachable(sha, branch))) throw new Error('Server asset source is unreachable from release history');
+  if (channel === 'staging' && !legacy && !releaseBranches.some(branch => git(['rev-parse', `refs/remotes/origin/${branch}^{commit}`]) === sha)) throw new Error('Staging asset must name the current release-branch head');
   /** @type {v.InferOutput<typeof Release>} */
   let release;
   try { release = v.parse(Release, await api(`releases/tags/${encodeURIComponent(tag)}`)); }

@@ -349,3 +349,76 @@ globalThis.fetch = async (input) => {
     expect(refused.output).toBe('');
   } finally { repo.cleanup(); }
 });
+
+test('an already prepared main release finishes explicit staging alignment and asset publication', () => {
+  const repo = createTempRepo();
+  try {
+    repo.commit({ 'package.json': JSON.stringify({ version: '1.2.2' }), 'scripts/server-release/publish.mjs': '// released publisher' }, 'Main source');
+    const prepared = repo.commit({ 'package.json': JSON.stringify({ version: '1.2.3' }) }, 'chore(release): v1.2.3');
+    const later = repo.commit({ 'later.txt': 'main keeps moving' }, 'Ordinary main source');
+    repo.git(['update-ref', 'refs/remotes/origin/main', later]);
+    // A newer release branch contains the old prepare; it does not make that
+    // old prepare its current head or prevent the in-flight release finishing.
+    repo.git(['update-ref', 'refs/remotes/origin/release/v1.2.4', later]);
+    const transport = join(repo.dir, 'transport.mjs'), output = join(repo.dir, 'outputs'), event = join(repo.dir, 'event.json');
+    writeFileSync(transport, `
+import assert from 'node:assert/strict';
+const sha = process.env.FIXTURE_SHA;
+globalThis.fetch = async input => {
+  const url = new URL(input);
+  if (url.origin === 'https://uploads.github.com') return Response.json({});
+  assert.equal(url.origin, 'https://api.github.com');
+  if (url.pathname.includes('/actions/')) return Response.json({ workflow_runs: [{ id: 1, head_sha: sha, head_branch: 'main', event: 'push', status: 'completed', conclusion: 'success' }] });
+  if (url.pathname.includes('/releases/tags/')) return Response.json({ id: 1, upload_url: 'https://uploads.github.com/releases/1/assets{?name}', assets: [] });
+  return Response.json({ object: { type: 'commit', sha } });
+};
+`);
+    const invoke = (sha: string, mode = 'workflow_dispatch'): { status: number | null; stderr: string; output: string } => {
+      writeFileSync(output, '');
+      writeFileSync(event, JSON.stringify({ workflow_run: { id: 1, head_sha: sha, head_branch: 'main', event: 'push', status: 'completed', conclusion: 'success', head_repository: { full_name: 'project-wildshard/engine' } } }));
+      const result = spawnSync(process.execPath, ['--import', transport, resolve('scripts/server-release/github.mjs'), 'select'], { cwd: repo.dir, encoding: 'utf8', timeout: 5000,
+        env: { PATH: process.env['PATH'], GH_TOKEN: 'fixture', FIXTURE_SHA: sha, GITHUB_REPOSITORY: 'project-wildshard/engine', GITHUB_EVENT_NAME: mode, GITHUB_REF: 'refs/heads/main', ALIGN_BUILD: sha, GITHUB_EVENT_PATH: event, GITHUB_OUTPUT: output } });
+      return { status: result.status, stderr: result.stderr, output: readFileSync(output, 'utf8') };
+    };
+    const admitted = invoke(prepared);
+    expect(admitted.status, admitted.stderr).toBe(0);
+    expect(admitted.output).toContain('ready=true');
+    expect(invoke(prepared, 'workflow_run').output).toBe('');
+    const refused = invoke(later);
+    expect(refused.status).toBe(1);
+    expect(refused.output).toBe('');
+    const archive = join(repo.dir, `engine-server-${prepared}.tar.gz`);
+    writeFileSync(archive, 'prepared legacy bundle');
+    repo.git(['switch', '--detach', prepared]);
+    const asset = spawnSync(process.execPath, ['--import', transport, resolve('scripts/server-release/github.mjs'), 'asset', `server-staging-${prepared}`, prepared, archive, 'staging'],
+      { cwd: repo.dir, encoding: 'utf8', timeout: 5000, env: { PATH: process.env['PATH'], GH_TOKEN: 'fixture', FIXTURE_SHA: prepared } });
+    expect(asset.status, asset.stderr).toBe(0);
+  } finally { repo.cleanup(); }
+});
+
+test('the main publisher admits an unmerged release head and refuses unreachable source bytes', () => {
+  const repo = createTempRepo();
+  try {
+    const main = repo.commit({ 'save-epoch.json': JSON.stringify({ saveEpoch: 1 }), 'test/pins/shardfiles.json': JSON.stringify({ shards: [{ slug: 'driftwood-isle', revision: 1 }] }) }, 'Main publisher source');
+    repo.git(['switch', '-c', 'release/v1.2.3']);
+    const build = repo.commit({ 'release.txt': 'version and notes' }, 'chore(release): v1.2.3');
+    repo.git(['tag', 'v1.2.3', build]);
+    repo.git(['update-ref', 'refs/remotes/origin/release/v1.2.3', build]);
+    repo.git(['update-ref', 'refs/remotes/origin/main', main]);
+    repo.git(['switch', 'main']);
+    const archive = join(repo.dir, `engine-server-${build}.tar.gz`);
+    writeFileSync(archive, 'exact immutable release bundle');
+    const invoke = (channel: string): { status: number | null; stdout: string; stderr: string } => spawnSync(process.execPath, [resolve('scripts/server-release/publish.mjs'), '--check', '--channel', channel, '--build', build,
+      '--tag', channel === 'staging' ? `server-staging-${build}` : 'v1.2.3', '--bundle', archive, '--out', join(repo.dir, 'release.json')],
+    { cwd: repo.dir, encoding: 'utf8', timeout: 5000, env: { PATH: process.env['PATH'], E7_RELEASE_SIGNING_KEY: pem, E7_RELEASE_PUBLIC_KEY: publicKey,
+      E7_RELEASE_SOCKET: 'wss://stage.example.test/', E7_SERVER_SHARDS: 'driftwood-isle', R2_ACCOUNT_ID: 'a'.repeat(32), R2_BUCKET_PACKS: 'wildshard-packs', R2_PACKS_ACCESS_KEY_ID: 'fixture', R2_PACKS_SECRET_ACCESS_KEY: 'fixture' } });
+    for (const channel of ['staging', 'production']) {
+      const admitted = invoke(channel);
+      expect(admitted.status, String(admitted.stderr)).toBe(0);
+      expect(String(admitted.stdout)).toContain('Server release configuration admitted');
+    }
+    repo.git(['update-ref', '-d', 'refs/remotes/origin/release/v1.2.3']);
+    expect(invoke('staging').status).toBe(1);
+    expect(invoke('production').status).toBe(1);
+  } finally { repo.cleanup(); }
+});
