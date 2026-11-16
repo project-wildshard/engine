@@ -2,6 +2,7 @@ import {spawn} from 'node:child_process';
 import {createConnection} from 'node:net';
 import {homedir} from 'node:os';
 import {resolve as resolvePath} from 'node:path';
+import {realpathSync} from 'node:fs';
 import * as v from 'valibot';
 
 const endpointSchema=v.object({port:v.pipe(v.number(),v.integer(),v.minValue(1),v.maxValue(65535)),token:v.string()});
@@ -27,7 +28,7 @@ export async function startCpuBroker(options={}){
  const lost=ended.then(()=>{if(!closing)throw new Error(`CPU broker exited before its owner: ${errors}`);return undefined;});
  // Consumers observe loss explicitly; installing a handler also covers early failure.
  void lost.catch(()=>undefined);
- return {environment:JSON.stringify(endpoint),pid:child.pid,lost,close:async()=>{
+ return {environment:JSON.stringify({...endpoint,root:realpathSync(root)}),pid:child.pid,lost,close:async()=>{
   if(!closing){closing=true;child.stdin.end();}await ended;
   if(child.exitCode!==0)throw new Error(`CPU broker cleanup failed (${child.exitCode}): ${errors}`);
  }};

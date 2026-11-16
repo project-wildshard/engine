@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import select
 import signal
 import stat
 import subprocess
@@ -271,9 +272,28 @@ def ancestor_cpu_budget(env=None, requester=None):
     except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
         raise RuntimeError(PARENT_REFUSAL) from None
 
+
+def borrow_parent(weight):
+    """A pipe watches an existing ancestor grant; it never enters the FIFO."""
+    budget = ancestor_cpu_budget(requester=os.getppid())
+    if budget is None:
+        raise RuntimeError(PARENT_REFUSAL)
+    slots = budget['capacity'] if weight == 'all' else int(weight)
+    if not 1 <= slots <= budget['slots']:
+        raise RuntimeError('Inherited CPU budget cannot satisfy this workload')
+    context = json.loads(os.environ[PARENT_CONTEXT])
+    print(json.dumps({'lease': context['lease'], 'slots': budget['slots'],
+                      'capacity': budget['capacity'], 'queueSeconds': 0}), flush=True)
+    while True:
+        ready, _, _ = select.select([sys.stdin], [], [], .2)
+        if ready and not os.read(sys.stdin.fileno(), 1):
+            return 0
+        if ancestor_cpu_budget(requester=os.getppid()) != budget:
+            raise RuntimeError(PARENT_REFUSAL)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=['hold', 'run', 'inspect-parent'])
+    parser.add_argument('mode', choices=['hold', 'run', 'inspect-parent', 'borrow'])
     parser.add_argument('--slots', default='1')
     parser.add_argument('--repo', default=os.getcwd())
     parser.add_argument('--capacity', type=int)
@@ -288,6 +308,18 @@ def main():
         except RuntimeError:
             print(PARENT_REFUSAL, file=sys.stderr)
             return 2
+    if args.mode == 'borrow':
+        def cancelled(_signal, _frame):
+            raise KeyboardInterrupt
+        signal.signal(signal.SIGTERM, cancelled)
+        signal.signal(signal.SIGINT, cancelled)
+        try:
+            return borrow_parent(args.slots)
+        except (RuntimeError, ValueError):
+            print(PARENT_REFUSAL, file=sys.stderr)
+            return 2
+        except KeyboardInterrupt:
+            return 130
     maximum = max(1, (os.cpu_count() or 1) - 2)
     capacity = args.capacity if args.capacity is not None else maximum
     if not 1 <= capacity <= maximum:
