@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "8af3bb4a7380d5f161751e1d359fe3e48b8f46cf11109efb92b498e7ec3f25c0",
+  "catalogueHash": "79aab81da46cddc9861ac2b7cdd5c5e98771cc6c4e18444fdb9cce33d3ad3a5d",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -733,6 +733,14 @@
             0,
             3
           ]
+        },
+        {
+          "instance": "mu9-auto-20261116",
+          "slug": "mu9-auto-20261116",
+          "cell": [
+            1,
+            3
+          ]
         }
       ],
       "emptyNeighbour": {
@@ -778,6 +786,12 @@
         "name": "Ink & Cel Valley",
         "revision": 1,
         "hash": "5764c86a258ac664ced0ba46860089738cca44d2f27a3f84abdd9ad80f79b0c3"
+      },
+      {
+        "slug": "mu9-auto-20261116",
+        "name": "mu9-auto-20261116",
+        "revision": 1,
+        "hash": "25fa04cd98ced6a8fd14b7d267a434aab15dec3920f4d0cb30b22ba7471a9ba0"
       },
       {
         "slug": "nalati-grasslands",
@@ -908,8 +922,8 @@
       {
         "slug": "sunscar-dunes",
         "name": "Signal Dunes",
-        "revision": 1,
-        "hash": "2e78b39ea7b91902829cb08ee7466b4d7127cda7bc4bb98664a42c3e1a89151d"
+        "revision": 2,
+        "hash": "f4a1d611ccccb29e8b277d43b2ccca5fa574913410426065e5ee0e312e508538"
       },
       {
         "slug": "template",
@@ -944,6 +958,12 @@
       "revision": 1,
       "hash": "5764c86a258ac664ced0ba46860089738cca44d2f27a3f84abdd9ad80f79b0c3",
       "bytes": 7011840
+    },
+    {
+      "slug": "mu9-auto-20261116",
+      "revision": 1,
+      "hash": "25fa04cd98ced6a8fd14b7d267a434aab15dec3920f4d0cb30b22ba7471a9ba0",
+      "bytes": 436736
     },
     {
       "slug": "nalati-grasslands",
@@ -1073,9 +1093,9 @@
     },
     {
       "slug": "sunscar-dunes",
-      "revision": 1,
-      "hash": "2e78b39ea7b91902829cb08ee7466b4d7127cda7bc4bb98664a42c3e1a89151d",
-      "bytes": 11275264
+      "revision": 2,
+      "hash": "f4a1d611ccccb29e8b277d43b2ccca5fa574913410426065e5ee0e312e508538",
+      "bytes": 11470848
     },
     {
       "slug": "template",
