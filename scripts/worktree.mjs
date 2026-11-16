@@ -237,8 +237,43 @@ const BUSY_GIT=['index.lock','MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','BISE
  * untracked file and never autostashes. A terminal or dev server sitting in the folder doesn't stop it (coordinator,
  * 2026-11-11: that check skipped every land, mostly for stale preview servers). Anything else is one line saying why
  * it was left alone, never a reset.
- * @param {string} canonical @param {string} base origin/main @returns {string} what it did, for the step line */
-export function followMain(canonical,base){
+ * Once main is current, the canonical install follows its lockfile too (refreshCanonicalInstall).
+ * @param {string} canonical @param {string} base origin/main
+ * @param {{env?:NodeJS.ProcessEnv,install?:(cwd:string)=>void}} [options] @returns {string} what it did, for the step line */
+export function followMain(canonical,base,options={}){
+ const moved=followMainRef(canonical,base);
+ if(!/fast-forwarded|main current$/u.test(moved))return moved;
+ const refreshed=refreshCanonicalInstall(canonical,options);
+ return refreshed===''?moved:`${moved}; ${refreshed}`;
+}
+
+/** Where the canonical install records the pnpm-lock.yaml blob it was installed from. */
+export const INSTALLED_LOCK='node_modules/.ws-installed-lock';
+
+/** The canonical checkout's node_modules must match its pnpm-lock.yaml. Build mirrors and serve-build link it (E432),
+ * so a stale install builds main with old dependencies: on 2026-11-16 it kept shard-format 0.5.7 hours after the lock
+ * moved to 0.7.0, and every shared preview refused Template rev 8 (`Invalid key ... "respawn"`). When the lockfile blob
+ * at HEAD differs from the one recorded at the last install, run `pnpm install --frozen-lockfile --offline` (about 1 s
+ * when nothing changed) under the store-prune guard and record it. A checkout with no node_modules is left alone. Never
+ * throws: a failed install is a loud line naming the command.
+ * @param {string} canonical @param {{env?:NodeJS.ProcessEnv,install?:(cwd:string)=>void}} [options] @returns {string} */
+export function refreshCanonicalInstall(canonical,{env=process.env,install}={}){
+ if(!existsSync(join(canonical,'node_modules')))return '';
+ const lock=tryGit(canonical,['rev-parse','--verify','--quiet','HEAD:pnpm-lock.yaml']).stdout.trim();
+ if(lock==='')return '';
+ const marker=join(canonical,INSTALLED_LOCK);
+ let recorded='';
+ try{recorded=readFileSync(marker,'utf8').trim();}catch{/* Never recorded: install once. */}
+ if(recorded===lock)return '';
+ const doInstall=install??((/** @type {string} */cwd)=>run(cwd,'pnpm',['install','--frozen-lockfile','--offline'],env));
+ try{withStoreUse(env,'canonical install',()=>doInstall(canonical));}
+ catch(error){return `CANONICAL INSTALL STALE: pnpm install --frozen-lockfile failed (${error instanceof Error?error.message.split('\n')[0]:String(error)}); run it in ${canonical}`;}
+ writeFileSync(marker,`${lock}\n`);
+ return `canonical install refreshed for pnpm-lock.yaml ${lock.slice(0,10)}`;
+}
+
+/** followMain's git half: the fast-forward. @param {string} canonical @param {string} base */
+function followMainRef(canonical,base){
  const branch=tryGit(canonical,['symbolic-ref','--quiet','HEAD']).stdout.trim();
  if(branch!=='refs/heads/main')return `canonical not on main (${branch===''?'detached':branch}); left alone`;
  const head=git(canonical,['rev-parse','HEAD']).trim();

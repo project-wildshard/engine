@@ -4,7 +4,7 @@ import {spawn, spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
-import {SLUG, parseArgs, withStoreUse} from '../../scripts/worktree.mjs';
+import {INSTALLED_LOCK, SLUG, followMain, parseArgs, refreshCanonicalInstall, withStoreUse} from '../../scripts/worktree.mjs';
 
 const SCRIPT = resolve(import.meta.dirname, '../../scripts/worktree.mjs');
 /** @type {string[]} */
@@ -327,5 +327,58 @@ describe('worktree install and the store prune reservation (GVS G10)', () => {
     const {reservation, env} = box();
     writeFileSync(reservation, '');
     expect(withStoreUse(env, 'worktree install', () => 'ok')).toBe('ok');
+  });
+});
+
+// 2026-11-16: the canonical install kept shard-format 0.5.7 hours after pnpm-lock.yaml moved to 0.7.0, and every shared
+// preview (which links the canonical node_modules) refused Template rev 8. followMain now refreshes the install.
+describe('followMain keeps the canonical install on its lockfile', () => {
+  const canonicalWithLock = () => {
+    const {origin, base} = repos();
+    const seed = join(base, 'seed');
+    put(seed, 'pnpm-lock.yaml', 'lockfileVersion: 9.0\n# v1\n');
+    git(seed, ['add', 'pnpm-lock.yaml']);
+    git(seed, ['commit', '-q', '-m', 'lock v1', '--', 'pnpm-lock.yaml']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    const canonical = join(base, 'fresh');
+    git(base, ['clone', '-q', origin, canonical]);
+    const store = join(base, 'store-users');
+    return {seed, canonical, env: {...ENV, WS_STORE_USERS: store, WS_STORE_RESERVATION: join(base, 'no-prune.lock')}};
+  };
+  test('installs once when the lockfile moved, records it, and skips it next time', () => {
+    const {seed, canonical, env} = canonicalWithLock();
+    mkdirSync(join(canonical, 'node_modules'));
+    /** @type {string[]} */ const installs = [];
+    const install = (/** @type {string} */ cwd) => { installs.push(cwd); };
+    const lock1 = git(canonical, ['rev-parse', 'HEAD:pnpm-lock.yaml']);
+    expect(followMain(canonical, git(canonical, ['rev-parse', 'origin/main']), {env, install})).toBe(`canonical main current; canonical install refreshed for pnpm-lock.yaml ${lock1.slice(0, 10)}`);
+    expect(readFileSync(join(canonical, INSTALLED_LOCK), 'utf8')).toBe(`${lock1}\n`);
+    expect(followMain(canonical, git(canonical, ['rev-parse', 'origin/main']), {env, install})).toBe('canonical main current');
+    expect(installs).toEqual([canonical]);
+    // A land moves main with a new lockfile: the fast-forward brings the install along.
+    put(seed, 'pnpm-lock.yaml', 'lockfileVersion: 9.0\n# v2: shard-format 0.7.0\n');
+    git(seed, ['commit', '-q', '-m', 'lock v2', '--', 'pnpm-lock.yaml']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    git(canonical, ['fetch', '-q', 'origin', 'main']);
+    const lock2 = git(canonical, ['rev-parse', 'origin/main:pnpm-lock.yaml']);
+    expect(followMain(canonical, git(canonical, ['rev-parse', 'origin/main']), {env, install})).toBe(`canonical main fast-forwarded 1 commit(s); canonical install refreshed for pnpm-lock.yaml ${lock2.slice(0, 10)}`);
+    expect(installs).toHaveLength(2);
+  });
+  test('no node_modules, no install; a failed install is a loud line, never a throw, and is retried next time', () => {
+    const {canonical, env} = canonicalWithLock();
+    const base = git(canonical, ['rev-parse', 'origin/main']);
+    const never = () => { throw new Error('must not install'); };
+    expect(refreshCanonicalInstall(canonical, {env, install: never})).toBe('');
+    mkdirSync(join(canonical, 'node_modules'));
+    const fail = () => { throw new Error('pnpm: lockfile out of date'); };
+    expect(followMain(canonical, base, {env, install: fail})).toMatch(/^canonical main current; CANONICAL INSTALL STALE: pnpm install --frozen-lockfile failed \(pnpm: lockfile out of date\); run it in /u);
+    expect(existsSync(join(canonical, INSTALLED_LOCK))).toBe(false);
+  });
+  test('a checkout left alone (not on main) is not installed into', () => {
+    const {canonical, env} = canonicalWithLock();
+    mkdirSync(join(canonical, 'node_modules'));
+    git(canonical, ['switch', '-q', '-c', 'side']);
+    const never = () => { throw new Error('must not install'); };
+    expect(followMain(canonical, git(canonical, ['rev-parse', 'origin/main']), {env, install: never})).toMatch(/^canonical not on main \(refs\/heads\/side\); left alone$/u);
   });
 });
