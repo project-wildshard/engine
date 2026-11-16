@@ -262,7 +262,6 @@
  "src/server/game/grid/cell-cover-own-ground.test.ts",
  "src/server/game/grid/grid-admission-priority.test.ts",
  "src/server/game/grid/grid-far-ring.test.ts",
- "src/server/game/grid/grid-preparation-budget.test.ts",
  "src/server/game/grid/grid-rings-ready.test.ts",
  "src/server/game/grid/home-metadata.test.ts",
  "src/server/game/grid/seam-data.test.ts",

@@ -100,23 +100,16 @@ export class ResidencyAllocator {
   private evictableCredit = 0;
 
   private readonly playing: number;
-  /** GC13: the most two worlds may hold at once while one is built beside another (`canPrepareAlongside`'s caller) */
-  private readonly loading: number;
   private generation = 0;
   private evicting = false;
-  constructor(options: { playing?: number; loading?: number; memory?: MemoryAdmission } = {}) {
+  constructor(options: { playing?: number; memory?: MemoryAdmission } = {}) {
     this.memory = options.memory ?? new MemoryAdmission();
     this.playing = options.playing ?? CONTENT_CAPS.playing;
-    this.loading = options.loading ?? Math.max(CONTENT_CAPS.loading, this.playing);
     if (!Number.isFinite(this.playing) || this.playing <= 0) throw new RangeError('Invalid residency envelope');
-    if (!Number.isFinite(this.loading) || this.loading < this.playing) throw new RangeError('Invalid residency loading envelope');
   }
 
   /** The playing envelope this allocator admits against (the tier's, else §3.2's). */
   envelope(): number { return this.playing; }
-  /** GC13: the transient envelope a world built beside the kept one may reach (§3.2's loading cap; a phone's is its playing
-   *  envelope, so the world left is released before the next is built). */
-  loadingEnvelope(): number { return this.loading; }
 
   /** Admit a claim, or share one already held under the same id; null when it cannot fit even after eviction. */
   reserve(claim: ResidencyClaim): ResidencyLease | null { return this.reserveClaim(claim, 0); }
@@ -200,20 +193,6 @@ export class ResidencyAllocator {
   /** One owner's full playing envelope, including the calibrated shared page.
    * Retention uses this strict ruler even when ordinary admission only reports. */
   ownerCost(owner: string): ReturnType<typeof shardCost> { return shardCost(this.ownerTotal(owner), this.input()); }
-
-  /** G723: read-only eligibility for speculative preparation beside a kept world.
-   * Existing claims and page costs stay charged; the incoming sim adds its whole
-   * admitted cost without assuming future coverage credit or eviction. Failure
-   * defers this optimization, never changes ordinary G556 admission policy. */
-  canPrepareAlongside(kept: string, incoming: string, bytes: number, limits: { readonly playing: number; readonly loading: number }): boolean {
-    if (kept.length === 0 || incoming.length === 0 || kept === incoming
-      || !Number.isSafeInteger(bytes) || bytes < 0 || !Number.isFinite(limits.playing) || limits.playing <= 0
-      || !Number.isFinite(limits.loading) || limits.loading <= 0) return false;
-    const input = this.input();
-    return contentCost({ ...input, sims: input.sims + bytes }).loading <= limits.loading
-      && shardCost(this.ownerTotal(kept), input).playing <= limits.playing
-      && shardCost(this.ownerTotal(incoming) + bytes, input).playing <= limits.playing;
-  }
 
   /** O14: every held claim's id, owner and bytes in admission order, unsorted and unsnapshotted: for per-tick totals (the
    * cell screens' claimed bytes) that `entries()` re-sorted and froze for every row while a cell's claims came and went. */
