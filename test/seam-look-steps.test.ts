@@ -22,7 +22,7 @@ function strip(seed: number, ox: number, oz: number): SeamPiece {
     features: [{ kind: 'deck', firstIndex: 0, indexCount: third }, { kind: 'cliff', firstIndex: third, indexCount: third }, { kind: 'road-wall', firstIndex: 2 * third, indexCount: third }] };
 }
 
-test('the seam merge in steps yields between strips and keeps three\'s own normal and bounding-sphere bytes', () => {
+test('the seam merge in steps yields between strips and keeps three\'s own per-strip normal and bounding-sphere bytes', () => {
   const pieces = [strip(1, 0, 0), strip(2, 40, -12), strip(3, -25, 31)], home = { origin: { x: 5, z: -3 } };
   const steps = seamLookGeometrySteps(pieces, home, undefined, 562.5);
   let yields = 0, result: ReturnType<typeof steps.next>;
@@ -34,8 +34,14 @@ test('the seam merge in steps yields between strips and keeps three\'s own norma
   const index = geometry.getIndex();
   if (index === null) throw new Error('Missing merged index');
   const reference = new BufferGeometry().setAttribute('position', geometry.getAttribute('position').clone()).setIndex(index.clone());
-  reference.computeVertexNormals(); reference.computeBoundingSphere();
-  expect(Buffer.from(new Float32Array(geometry.getAttribute('normal').array).buffer)).toEqual(Buffer.from(new Float32Array(reference.getAttribute('normal').array).buffer));
+  reference.computeBoundingSphere();
+  // ZE4: each strip's normals are three's on that strip's own mesh in its own frame, so every home that draws it (and the
+  // cook's shared block) has the same bytes
+  const normals = pieces.flatMap(piece => {
+    const own = new BufferGeometry().setAttribute('position', new BufferAttribute(piece.mesh.positions.slice(), 3)).setIndex(new BufferAttribute(piece.mesh.indices.slice(), 1));
+    own.computeVertexNormals(); return [...new Float32Array(own.getAttribute('normal').array)];
+  });
+  expect(Buffer.from(new Float32Array(geometry.getAttribute('normal').array).buffer)).toEqual(Buffer.from(Float32Array.from(normals).buffer));
   expect(geometry.boundingSphere?.center.toArray()).toEqual(reference.boundingSphere?.center.toArray());
   expect(geometry.boundingSphere?.radius).toBe(reference.boundingSphere?.radius);
   expect(geometry.getAttribute('normal')).toBeInstanceOf(BufferAttribute);

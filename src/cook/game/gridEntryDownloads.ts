@@ -7,8 +7,8 @@ import {createHash} from 'node:crypto';
 import * as v from 'valibot';
 import {parseCompiledGridDirectory, type CompiledGridAddress} from '../../shared/game/grid/compiledStrips';
 
-/** Exact original initial-page addresses, selected by the same three grid
- * catalogue switches. No mesh is rebuilt, widened or re-encoded here. */
+/** Exact initial-block addresses (ZE4's shared blocks a home's ring reads), selected by
+ * the same three grid catalogue switches. No mesh is rebuilt, widened or re-encoded here. */
 export function gridEntryDownloads(root: string): Readonly<Record<string, Readonly<Record<string, readonly CompiledGridAddress[]>>>> {
   const folder = join(root, 'out/.app'), file = join(folder, 'grid-strip-index.json');
   if (!existsSync(file)) return {};
@@ -24,8 +24,8 @@ export function gridEntryDownloads(root: string): Readonly<Record<string, Readon
   const result: Record<string, Record<string, readonly CompiledGridAddress[]>> = {};
   for (const [mode, source] of Object.entries(modes)) {
     const homes: Record<string, readonly CompiledGridAddress[]> = {};
-    for (const page of book.pages) if (page.source === source && !page.home.endsWith(':outer') && index.geometry.homes.includes(page.home)) {
-      homes[page.home] = [address, page.header, page.body];
+    for (const row of book.homes) if (row.source === source && index.geometry.homes.includes(row.home)) {
+      homes[row.home] = [address, ...row.initial.flatMap(at => { const block = book.blocks[at]; return block === undefined ? [] : [block.header, block.body]; })];
     }
     result[mode] = homes;
   }

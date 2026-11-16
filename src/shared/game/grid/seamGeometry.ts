@@ -19,20 +19,23 @@ export type SeamSurfaces = (name: string) => readonly [number, number, number] |
 /** The readout: triangles and draws per material (the road's tight budget, G101). */
 export interface SeamLookState { readonly triangles: number; readonly draws: number; readonly buckets: Readonly<Partial<Record<SeamBucket, number>>> }
 
-/** Exact author-built channels for this ordered ring and home frame; colours remain runtime-owned. */
+/** Exact author-built channels for these ordered strips (ZE4: frame-free, so one bake serves every home; the uv and the
+ *  bounding sphere are the home frame's and are made on the page). Colours remain runtime-owned under a surface resolver. */
 export interface SeamGeometryChannels {
-  readonly origin: { readonly x: number; readonly z: number }; readonly pitch: number;
-  readonly normals: Float32Array; readonly uvs: Float32Array;
+  readonly pitch: number;
+  /** Each strip's own vertex normals (`stripNormalSteps`), in strip order. */
+  readonly normals: Float32Array;
   /** Default palette only; an explicit runtime surface resolver still builds its own colours. */
   readonly colours?: Float32Array;
-  readonly sphere: { readonly centre: readonly [number, number, number]; readonly radius: number };
 }
+/** three's bounding sphere, as the seam mesh carries it. */
+export interface SeamSphere { readonly centre: readonly [number, number, number]; readonly radius: number }
 
 /** One home-frame mesh in plain arrays, its index grouped by material. */
 export interface SeamMesh {
   readonly position: Float32Array; readonly colour: Float32Array; readonly normal: Float32Array; readonly uv: Float32Array; readonly index: Uint32Array;
   readonly groups: readonly { readonly start: number; readonly count: number; readonly bucket: SeamBucket }[];
-  readonly sphere: SeamGeometryChannels['sphere']; readonly state: SeamLookState;
+  readonly sphere: SeamSphere; readonly state: SeamLookState;
 }
 
 /** What the look reads from a generated strip (`GeneratedStrip` fits it): its mesh and its ordered feature ranges. */
@@ -50,14 +53,13 @@ const fromRoad = (v: number, pitch: number): number => Math.abs(v - (Math.round(
  * Merge every strip into one home-frame geometry whose index buffer is grouped by material. Pure (no GPU): the vertices are
  * the generator's own, translated; `uv` is world-planar (top faces xz, walls along × height) so textures tile across strips.
  * In steps (D12: the whole merge was one 104 ms task of the road's sliced install on the phone tier): a step a strip, then
- * three's vertex normals and bounding sphere in the engine's exact steps, so the same bytes.
+ * three's vertex normals on each strip's own mesh (`stripNormalSteps`) and three's bounding sphere, so the same bytes.
  */
 export function* seamMeshSteps(pieces: readonly SeamPiece[], home: { readonly origin: { readonly x: number; readonly z: number } }, surfaces?: SeamSurfaces, pitch: number = CONTENT_CAPS.pitch, channels?: SeamGeometryChannels): Generator<void, SeamMesh> {
   let vertices = 0;
   for (const { mesh } of pieces) vertices += mesh.positions.length / 3;
-  if (channels !== undefined && (!Object.is(channels.origin.x, home.origin.x) || !Object.is(channels.origin.z, home.origin.z)
-    || channels.pitch !== pitch || channels.normals.length !== vertices * 3 || channels.uvs.length !== vertices * 2
-    || channels.colours !== undefined && channels.colours.length !== vertices * 3)) throw new Error('Baked seam channels differ from the home frame');
+  if (channels !== undefined && (channels.pitch !== pitch || channels.normals.length !== vertices * 3
+    || channels.colours !== undefined && channels.colours.length !== vertices * 3)) throw new Error('Baked seam channels differ from these strips');
   const bakedColours = surfaces === undefined ? channels?.colours : undefined;
   const position = new Float32Array(vertices * 3), colour = bakedColours ?? new Float32Array(vertices * 3), bucketOf = new Int8Array(vertices).fill(-1);
   const lists = new Map<SeamBucket, number[]>(SEAM_BUCKETS.map((b) => [b, []]));
@@ -111,49 +113,56 @@ export function* seamMeshSteps(pieces: readonly SeamPiece[], home: { readonly or
     groups.push({ start: cursor, count: list.length, bucket });
     index.set(list, cursor); cursor += list.length;
   }
-  // the zeroed normal three's computeVertexNormals makes, then its arithmetic in steps
+  // the zeroed normal three's computeVertexNormals makes, then its arithmetic in steps, strip by strip
   const normal = channels?.normals ?? new Float32Array(vertices * 3);
   yield;
-  if (channels === undefined) yield* normalSteps(position, normal, index);
+  if (channels === undefined) yield* stripNormalSteps(pieces, normal);
   yield;
-  const uv = channels?.uvs ?? planarUv(position, normal, bucketOf);
+  const uv = planarUv(position, normal, bucketOf);
   yield;
-  const sphere = channels?.sphere ?? boundingSphere(position);
+  const sphere = boundingSphere(position);
   const buckets: Partial<Record<SeamBucket, number>> = {};
   for (const g of groups) buckets[g.bucket] = g.count / 3;
   return { position, colour, normal, uv, index, groups, sphere, state: { triangles: index.length / 3, draws: groups.length, buckets } };
 }
 
 const NORMAL_STEP = 8192;
-/** three's `computeVertexNormals` on an indexed mesh, by the numbers: accumulate each face's cross product in float32, then
- *  normalise. The same operations in the same order, so the same bytes (`vertexNormalSteps` is its page-side twin). */
-function* normalSteps(p: Float32Array, n: Float32Array, index: Uint32Array): Generator<void, void, undefined> {
-  yield;
-  for (let i = 0; i < index.length; i += 3) {
-    if (i > 0 && i % (NORMAL_STEP * 3) === 0) yield;
-    const a = (index[i] ?? 0) * 3, b = (index[i + 1] ?? 0) * 3, c = (index[i + 2] ?? 0) * 3;
-    const bx = p[b] ?? Number.NaN, by = p[b + 1] ?? Number.NaN, bz = p[b + 2] ?? Number.NaN;
-    const cx = (p[c] ?? Number.NaN) - bx, cy = (p[c + 1] ?? Number.NaN) - by, cz = (p[c + 2] ?? Number.NaN) - bz;
-    const ax = (p[a] ?? Number.NaN) - bx, ay = (p[a + 1] ?? Number.NaN) - by, az = (p[a + 2] ?? Number.NaN) - bz;
-    const nx = cy * az - cz * ay, ny = cz * ax - cx * az, nz = cx * ay - cy * ax;
-    // Read all corners before any write, including a triangle with repeated indices.
-    const nax = n[a] ?? Number.NaN, nay = n[a + 1] ?? Number.NaN, naz = n[a + 2] ?? Number.NaN;
-    const nbx = n[b] ?? Number.NaN, nby = n[b + 1] ?? Number.NaN, nbz = n[b + 2] ?? Number.NaN;
-    const ncx = n[c] ?? Number.NaN, ncy = n[c + 1] ?? Number.NaN, ncz = n[c + 2] ?? Number.NaN;
-    n[a] = nax + nx; n[a + 1] = nay + ny; n[a + 2] = naz + nz;
-    n[b] = nbx + nx; n[b + 1] = nby + ny; n[b + 2] = nbz + nz;
-    n[c] = ncx + nx; n[c + 1] = ncy + ny; n[c + 2] = ncz + nz;
-  }
-  yield;
-  for (let i = 0; i < n.length; i += 3) {
-    if (i > 0 && i % (NORMAL_STEP * 6) === 0) yield;
-    const x = n[i] ?? 0, y = n[i + 1] ?? 0, z = n[i + 2] ?? 0, scale = 1 / (Math.sqrt(x * x + y * y + z * z) || 1);
-    n[i] = x * scale; n[i + 1] = y * scale; n[i + 2] = z * scale;
+/**
+ * three's `computeVertexNormals` on each strip's own indexed mesh in its own frame, by the numbers: accumulate each face's
+ * cross product in float32, then normalise; the same operations in the same order as three, so the same bytes
+ * (`vertexNormalSteps` is its page-side twin). A strip's vertices are its own, so its normals read nothing of the other
+ * strips or of the home's frame (ZE4): the cook bakes them once per strip and every home that draws it gets these bytes.
+ */
+export function* stripNormalSteps(pieces: readonly SeamPiece[], n: Float32Array): Generator<void, void, undefined> {
+  let base = 0, faces = 0;
+  for (const { mesh } of pieces) {
+    const p = mesh.positions, index = mesh.indices, at = base * 3;
+    for (let i = 0; i < index.length; i += 3) {
+      if (++faces % NORMAL_STEP === 0) yield;
+      const a = (index[i] ?? 0) * 3, b = (index[i + 1] ?? 0) * 3, c = (index[i + 2] ?? 0) * 3;
+      const bx = p[b] ?? Number.NaN, by = p[b + 1] ?? Number.NaN, bz = p[b + 2] ?? Number.NaN;
+      const cx = (p[c] ?? Number.NaN) - bx, cy = (p[c + 1] ?? Number.NaN) - by, cz = (p[c + 2] ?? Number.NaN) - bz;
+      const ax = (p[a] ?? Number.NaN) - bx, ay = (p[a + 1] ?? Number.NaN) - by, az = (p[a + 2] ?? Number.NaN) - bz;
+      const nx = cy * az - cz * ay, ny = cz * ax - cx * az, nz = cx * ay - cy * ax;
+      // Read all corners before any write, including a triangle with repeated indices.
+      const nax = n[at + a] ?? Number.NaN, nay = n[at + a + 1] ?? Number.NaN, naz = n[at + a + 2] ?? Number.NaN;
+      const nbx = n[at + b] ?? Number.NaN, nby = n[at + b + 1] ?? Number.NaN, nbz = n[at + b + 2] ?? Number.NaN;
+      const ncx = n[at + c] ?? Number.NaN, ncy = n[at + c + 1] ?? Number.NaN, ncz = n[at + c + 2] ?? Number.NaN;
+      n[at + a] = nax + nx; n[at + a + 1] = nay + ny; n[at + a + 2] = naz + nz;
+      n[at + b] = nbx + nx; n[at + b + 1] = nby + ny; n[at + b + 2] = nbz + nz;
+      n[at + c] = ncx + nx; n[at + c + 1] = ncy + ny; n[at + c + 2] = ncz + nz;
+    }
+    for (let i = at; i < at + p.length; i += 3) {
+      const x = n[i] ?? 0, y = n[i + 1] ?? 0, z = n[i + 2] ?? 0, scale = 1 / (Math.sqrt(x * x + y * y + z * z) || 1);
+      n[i] = x * scale; n[i + 1] = y * scale; n[i + 2] = z * scale;
+    }
+    base += p.length / 3;
+    yield;
   }
 }
 
 /** three's bounding sphere: the box's centre and the farthest point from it. */
-function boundingSphere(p: Float32Array): SeamGeometryChannels['sphere'] {
+function boundingSphere(p: Float32Array): SeamSphere {
   if (p.length === 0) return { centre: [0, 0, 0], radius: 0 };
   let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
   for (let i = 0; i < p.length; i += 3) {

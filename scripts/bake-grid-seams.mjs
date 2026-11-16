@@ -17,8 +17,8 @@ import { platformInputs } from '../src/shared/game/grid/platformInputs.ts';
 import { generatePlatform } from '../src/shared/engine/sim/strips.ts';
 import { platformGeometrySource } from '../src/shared/game/grid/compiledStrips.ts';
 import { writeGridCollision } from '../src/cook/game/gridCollision.ts';
-import { encodeGridStripPage, GridStripTransportLimitError, writeGridStripPages } from '../src/cook/game/gridStripPages.ts';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { writeGridStripBlocks } from '../src/cook/game/gridStripPages.ts';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const root = process.cwd(), outputRoot = resolve(process.argv[2] ?? root), base = 'https://build.invalid/';
 // Native worker proofs consume only the plain-grid collider files. The normal
@@ -36,8 +36,9 @@ const fetchFile = async path => {
   catch (error) { if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') return new Response(null, { status: 404 }); throw error; }
 };
 const plans = new Map(), seen = new Map(), products = new Map(), sources = new Map(), entryModes = new Map();
-/** @type {import('../src/cook/game/gridStripPages.ts').CompiledGridCandidate[]} */
+/** ZE4: each source's whole road, baked once as shared blocks. @type {import('../src/cook/game/gridStripPages.ts').GridStripSource[]} */
 const compiled = [];
+let reach = 0;
 const modes = collisionOnly ? [false] : [false, true];
 for (const developer of modes) for (const devserver of modes) for (const nineDragon of modes) {
   const assembly = new GridAssembly({ developer, devserver, nineDragon });
@@ -76,23 +77,13 @@ for (const developer of modes) for (const devserver of modes) for (const nineDra
   let cells = input.cells, strips;
   try { strips = generatePlatform(cells, input.empty, plans); }
   catch (error) { console.error(`[grid bake] road-level fallback: ${String(error)}`); cells = input.flat; strips = generatePlatform(cells, input.empty, plans); }
-  const source = await platformGeometrySource(cells, input.empty), reach = 1.5 * assembly.pitch + 1;
+  const source = await platformGeometrySource(cells, input.empty);
+  reach = 1.5 * assembly.pitch + 1; // the session's ring (session.ts): what a home builds before control
   seen.set(key, source); entryModes.set(mode, source);
   // C2: the worker's road is the page's, from the catalogue a plain visit reads.
   if (mode === '000') writeGridCollision(outputRoot, source, strips);
   if (collisionOnly) continue;
-  for (const home of assembly.cells) {
-    /** @param {import('../src/shared/engine/sim/strips.ts').GeneratedStrip} strip */
-    const within = strip => Math.abs(strip.mesh.origin.x - home.origin.x) <= reach && Math.abs(strip.mesh.origin.z - home.origin.z) <= reach;
-    const initial = strips.filter(within);
-    compiled.push(encodeGridStripPage(source, home.instance, home.slug, initial, 'initial', { origin: home.origin, pitch: assembly.pitch }));
-    if (!existsSync(resolve(root, 'out', home.slug, 'shard.json'))) continue;
-    try { compiled.push(encodeGridStripPage(source, home.instance, home.slug, strips.filter(strip => !within(strip)), 'outer')); }
-    catch (error) {
-      if (!(error instanceof GridStripTransportLimitError)) throw error;
-      console.error(`[grid bake] ${home.instance} outer retains native construction: ${String(error)}`);
-    }
-  }
+  compiled.push({ source, pitch: assembly.pitch, strips, homes: assembly.cells.map(cell => ({ instance: cell.instance, slug: cell.slug, origin: cell.origin })) });
 }
 // Edge reads complete concurrently. Their completion order must not change the
 // content URL (and every importing chunk) when all certified values are equal.
@@ -100,11 +91,11 @@ for (const developer of modes) for (const devserver of modes) for (const nineDra
 const ordered = rows => [...rows].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
 const output = JSON.stringify({ plans: ordered(plans), edges: ordered(sources) });
 if (!collisionOnly) {
-  const { room } = JSON.parse(readFileSync(resolve(root, 'budgets/grid-strip-room.json'), 'utf8'));
-  const pages = writeGridStripPages(outputRoot, createHash('sha256').update(output).digest('hex'), compiled, room);
-  // Addressing only: all original strip bytes, hashes and room selection stay in
-  // writeGridStripPages. The title can request its exact existing initial page.
+  const { set } = JSON.parse(readFileSync(resolve(root, 'budgets/grid-strip-room.json'), 'utf8'));
+  const pages = writeGridStripBlocks(outputRoot, createHash('sha256').update(output).digest('hex'), compiled, reach, set);
+  // Addressing only: all original strip bytes and hashes stay in writeGridStripBlocks.
+  // The title can request a home's exact initial blocks.
   writeFileSync(resolve(outputRoot, 'out/.app/grid-strip-entry-modes.json'), JSON.stringify(Object.fromEntries(entryModes)));
-  for (const row of pages.rows) console.error(`[grid strip wire] ${row.home} source=${row.source.slice(0, 8)} added=${row.added} room=${String(row.room)} ${row.included ? 'compiled' : 'native'}${row.outer ? '+outer' : ''}`);
+  for (const row of pages.rows) console.error(`[grid strip wire] ${row.home} source=${row.source.slice(0, 8)} added=${row.added} set=${String(row.set)} ${row.included ? 'compiled' : 'native'}${row.outer ? '+outer' : ''}`);
 }
 process.stdout.write(output);

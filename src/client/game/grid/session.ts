@@ -211,6 +211,8 @@ export interface GridSessionState {
   readonly road: RoadLookState;
   /** the seams' materials: triangles and draws per material (phase 2, G90 / G91 / G101) */
   readonly seams: SeamLookState;
+  /** ZE4: where the home's initial seams came from: its shared strip blocks, or generation on the page (a missing block). */
+  readonly seamSource: 'compiled' | 'native' | null;
   /** G85's soft walls: how many edges are closed */
   readonly softWalls: SoftWallState;
   /** ZE8: the buffer the feet stand in and its count (null: none), and the card's text while it shows */
@@ -365,6 +367,7 @@ export class GridSession {
   /** the road system's readouts: empty until its install (`create` runs it beside the next loading steps) lands */
   private road: RoadLookState = { segments: 0, junctions: 0, roundabouts: 0, signs: 0, lights: 0, draws: 0 };
   private seams: SeamLookState = { triangles: 0, draws: 0, buckets: {} };
+  private readonly seamSource: 'compiled' | 'native' | null;
   private roadRoots: readonly Object3D[] = [];
   /** whether the road install has landed (or failed: the reveal never waits on a road that cannot come) */
   private roadSettled = false;
@@ -494,7 +497,7 @@ export class GridSession {
     const compiled = await readCompiledGridStrips(address.geometry, original, instance, { scope: host.scope, allocator },
       (url, signal) => fetch(url, { signal }), async () => {
         progress?.detail(`Terrain seams · ${++batches} verified shapes`); await construction.check();
-      });
+      }, ring); // ZE4: the home's shared blocks, keeping its ring's strips
     const fallbackPlans = compiled === null ? await seamPlans() : undefined;
     let flatPlatform = false;
     const preparedOuter = compiled?.readOuter;
@@ -526,7 +529,7 @@ export class GridSession {
       };
       if (preparedOuter !== undefined) return preparedOuter(owner, pause);
       const compiledOuter = await readCompiledGridStrips(address.geometry, source, instance, { scope: owner, allocator },
-        (url, signal) => fetch(url, { signal }), pause, 'outer');
+        (url, signal) => fetch(url, { signal }), pause, (x, z) => !ring(x, z), 'outer');
       return compiledOuter?.strips ?? generatePlatformSliced(source.cells, source.empty, pause, OUTER_RING_STRETCH_MS, await seamPlans(), (x, z) => !ring(x, z)); // T10: built in play after controls, short stretches beside the frame
     };
     const maps = new RoadMapShare();
@@ -569,7 +572,7 @@ export class GridSession {
       }
       if (host.scope.disposed || host.scope.disposing) throw new Error('Grid session left during collider preparation');
       timing?.mark('collider-join');
-      const session = new GridSession(host, edges, allocator, strips, { road, outer, outerStrips, publishStrips: added => { strips.push(...added); }, plans, collidersInstalled: true });
+      const session = new GridSession(host, edges, allocator, strips, { road, outer, outerStrips, publishStrips: added => { strips.push(...added); }, plans, collidersInstalled: true, seamSource: compiled === null ? 'native' : 'compiled' });
       session.initialHomeMetadata = metadata ?? null;
       timing?.mark('session');
       progress?.set(3, 3, `${assembly.cells.length} cells · ${strips.length} seams`);
@@ -585,10 +588,11 @@ export class GridSession {
     return completed;
   }
 
-  constructor(host: GridSessionHost, edges?: readonly PlatformCell[], allocator?: ResidencyAllocator, prebuilt?: readonly GeneratedStrip[], preparedRoad?: { readonly road: PlatformRoad | Promise<PlatformRoad>; readonly outer?: () => Promise<PlatformRoad>; readonly outerStrips?: (scope: Scope) => Promise<readonly GeneratedStrip[]>; readonly publishStrips?: (strips: readonly GeneratedStrip[]) => void; readonly plans: Map<Mesh, CullPlan>; readonly collidersInstalled?: true }) {
+  constructor(host: GridSessionHost, edges?: readonly PlatformCell[], allocator?: ResidencyAllocator, prebuilt?: readonly GeneratedStrip[], preparedRoad?: { readonly road: PlatformRoad | Promise<PlatformRoad>; readonly outer?: () => Promise<PlatformRoad>; readonly outerStrips?: (scope: Scope) => Promise<readonly GeneratedStrip[]>; readonly publishStrips?: (strips: readonly GeneratedStrip[]) => void; readonly plans: Map<Mesh, CullPlan>; readonly collidersInstalled?: true; readonly seamSource?: 'compiled' | 'native' }) {
     this.constructorTiming?.('fields');
     this.host = host;
     this.roadPlans = preparedRoad?.plans ?? new Map<Mesh, CullPlan>();
+    this.seamSource = preparedRoad?.seamSource ?? null;
     // before the page's first render: the lights a region's own pool shows through (regionalWorld `mirrorInto`)
     if (isScene(host.scene)) {
       LightPool.for(host.scene).reserve(GRID_REGION_POINT_LIGHTS);
@@ -1285,7 +1289,7 @@ export class GridSession {
       pitch: this.assembly.pitch,
       home: this.home.instance, inside: gridCells.cell?.instance ?? null, feet: { x: Math.round(at.x * 100) / 100, z: Math.round(at.z * 100) / 100 },
       cells: this.assembly.cells.map((cell) => { const d = drawn(cell.instance); return { instance: cell.instance, slug: cell.slug, cell: cell.cell, shows: shows(cell.instance, d), drawn: d }; }),
-      strips: this.strips.length, road: this.road, seams: this.seams, softWalls: this.softWalls.state(), gate: { cell: this.gateState.cell, count: this.gateState.count, card: this.gateCard?.text ?? null }, shimmer: this.shimmer.state(), cellLoading: null, cellStage: null, cellStep: null, hybrid: this.live?.hybridState() ?? null, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
+      strips: this.strips.length, road: this.road, seams: this.seams, seamSource: this.seamSource, softWalls: this.softWalls.state(), gate: { cell: this.gateState.cell, count: this.gateState.count, card: this.gateCard?.text ?? null }, shimmer: this.shimmer.state(), cellLoading: null, cellStage: null, cellStep: null, hybrid: this.live?.hybridState() ?? null, ringsReady: this.rings.ready(), ringsWait: { cells: this.rings.waiting(), far: this.rings.farPlan(), preparation: this.farPreparation(), waits: { count: pending.length, oldest: pending.map(({ label, kind, ageMs }) => ({ label, kind, ageMs })).sort((a, b) => b.ageMs - a.ageMs).slice(0, 16) } },
       residentMB: Math.round(cost.accounted / 1e4) / 100, playingMB: Math.round(cost.playing / 1e4) / 100, envelopeMB: Math.round(this.allocator.envelope() / 1e4) / 100,
       accountedBytes: cost.accounted,
       rings: { frame: stats.frame, far: stats.resident.far, l1: stats.resident.l1, l0: stats.resident.l0, refused: stats.refused, inFlight: stats.inFlight, queued: stats.queued,

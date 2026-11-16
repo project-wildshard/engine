@@ -5,7 +5,9 @@
 // road's share: the grid strip book, page and mesh and the seams), what the grid had built at control (strips, road look), and
 // the walk: the time from the feet leaving the cell (|x| > 250) to 12 m onto the deck, and the worst stop on the way.
 // Headless WebKit (or Chromium) at Jake's phone layout, 402×874 with touch. Never production.
-//   node scripts/road-preload-proof.mjs <out dir> --base=<preview url> [--engine=webkit|chromium] [--card=Driftwood Isle]
+//   node scripts/road-preload-proof.mjs <out dir> --base=<preview url> [--engine=webkit|chromium] [--card=Driftwood Isle] [--no-walk]
+// --no-walk (ZONE-ENTRY ZE4, any card): stop at control; the result still says what DOWNLOAD fetched for the road and how LOAD
+// made its seams (`seams`: the loading card's `Terrain seams` lines; `batches` is native generation on the page, ZE4's miss).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, webkit } from 'playwright';
@@ -19,7 +21,7 @@ const base = flag('base', '').replace(/\/$/u, ''), engineName = flag('engine', '
 if (out === absolute('') || base === '') throw new Error('usage: road-preload-proof.mjs <out dir> --base=<preview url> [--engine=webkit|chromium]');
 if (/play\.wildshard\.io|^https?:\/\/(?:www\.)?wildshard\.io/u.test(base)) throw new Error('Never production (J205)');
 mkdirSync(out, { recursive: true });
-const CARD = flag('card', 'Driftwood Isle'), HALF = 250, ONTO = 12, STUCK_MS = 1500, WALK_MS = 60_000;
+const CARD = flag('card', 'Driftwood Isle'), WALK = !process.argv.includes('--no-walk'), HALF = 250, ONTO = 12, STUCK_MS = 1500, WALK_MS = 60_000;
 /** @param {number} ms */
 const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 const roadAsset = (/** @type {string} */ url) => /\/assets\/grid-(?:strip-(?:book|page|mesh)|seams|seam-plans)-/u.test(url);
@@ -51,10 +53,16 @@ try {
   if (await page.locator('#ws-name-box input').waitFor({ timeout: 20_000 }).then(() => true).catch(() => false)) { await page.locator('#ws-name-box input').fill('walker'); await page.locator('#ws-name-box button[type=submit]').click(); }
   await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
   const index = await page.evaluate(card => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes(card)), CARD);
-  if (index < 0) throw new Error(`No ${CARD} card`);
+  if (index < 0) throw new Error(`No ${CARD} card in ${JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('.ws-menu-card')].map(row => (row.textContent ?? '').slice(0, 40))))}`);
   await page.locator('.ws-menu-dots i').nth(index).click();
   await page.waitForFunction(card => [...document.querySelectorAll('.ws-menu-card')].some(row => (row.textContent ?? '').includes(card) && row.getBoundingClientRect().left >= 0 && row.getBoundingClientRect().right <= innerWidth + 1), CARD, { timeout: 10_000 });
   const played = Date.now();
+  // ZE4: every seam progress line the loading card shows until control (native generation says `batches`)
+  await page.evaluate(() => {
+    const seen = /** @type {string[]} */ ([]); /** @type {any} */ (window).__roadSeams = seen;
+    const look = () => { for (const line of (document.body.textContent ?? '').match(/Terrain seams · \d+ (?:batches|verified shapes)/gu) ?? []) if (seen.at(-1) !== line) seen.push(line); };
+    new MutationObserver(look).observe(document.body, { subtree: true, childList: true, characterData: true });
+  });
   await page.locator('.ws-menu-play').click();
   await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 240_000, polling: 100 });
   result.playToControlMs = Date.now() - played;
@@ -62,7 +70,7 @@ try {
   // What the grid had at control: its collision strips and whether the road look had landed.
   result.atControl = await page.evaluate(() => {
     const st = /** @type {any} */ (window).__wildshard.shard.grid.state();
-    return { inside: st.inside, strips: st.strips, road: st.road, ringsReady: st.ringsReady };
+    return { inside: st.inside, strips: st.strips, road: st.road, ringsReady: st.ringsReady, seamSource: st.seamSource };
   });
   await Promise.all(sizing);
   const entry = fetched.filter(row => row.phase === 'entry');
@@ -70,7 +78,14 @@ try {
   result.download = { entryBytes: entry.reduce((sum, row) => sum + row.bytes, 0), files: entry.length,
     roadBytes: road.reduce((sum, row) => sum + row.bytes, 0), road: road.map(row => ({ url: row.url, bytes: row.bytes })),
     largest: [...entry].sort((a, b) => b.bytes - a.bytes).slice(0, 12).map(row => ({ url: row.url.slice(0, 120), bytes: row.bytes })) };
-  console.log(`control after ${String(result.playToControlMs)} ms; entry ${String(entry.length)} files; road ${String(road.length)} page-visible files`);
+  const seams = /** @type {string[]} */ (await page.evaluate(() => /** @type {any} */ (window).__roadSeams ?? []));
+  // the page's own resource timing sees what the service worker answered too (WebKit fires no request events for those)
+  result.roadResources = await page.evaluate(() => performance.getEntriesByType('resource').map(row => row.name.replace(location.origin, ''))
+    .filter(name => /\/assets\/grid-(?:strip-(?:book|page|mesh)|seams|seam-plans)-/u.test(name)));
+  const native = seams.some(line => /\d+ batches/u.test(line)) || /** @type {any} */ (result.atControl).seamSource !== 'compiled';
+  result.seams = { lines: seams.slice(-6), native };
+  console.log(`control after ${String(result.playToControlMs)} ms; entry ${String(entry.length)} files; road ${String(road.length)} page-visible files; seams ${seams.at(-1) ?? 'none shown'}, ${String(/** @type {any} */ (result.atControl).seamSource)}`);
+  if (!WALK) { code = native ? 1 : 0; console.log(code === 0 ? 'PASS no native seam generation in LOAD' : 'FAIL native seam batches in LOAD'); throw new Error('no walk'); }
   await sleep(1500);
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
   await page.evaluate(() => {
@@ -162,6 +177,6 @@ try {
   const pageRow = /** @type {{ edgeToRoadMs: number | null, stops: unknown[], lowestOnDeck: number | null, nearEdgeFrames: unknown[] }} */ (result.page);
   code = pageRow.edgeToRoadMs !== null && (pageRow.lowestOnDeck ?? -1) > -0.5 && pageRow.stops.length === 0 && pageRow.nearEdgeFrames.length === 0 ? 0 : 1;
   console.log(code === 0 ? 'PASS onto the road with no stop' : 'FAIL a stop, a long frame or no road (see page)');
-} catch (error) { result.error = String(error); console.log(`FAIL ${String(error)}`); }
+} catch (error) { if (String(error) !== 'Error: no walk') { result.error = String(error); console.log(`FAIL ${String(error)}`); } }
 finally { await browser.close(); writeFileSync(join(out, `${engineName}.json`), JSON.stringify(result, null, 2)); }
 process.exit(code);

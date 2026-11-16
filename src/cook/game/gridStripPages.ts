@@ -12,8 +12,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { StripPackWriter } from './stripPack';
 import { gridLookBytes } from './encodedBytes';
 import type { GeneratedStrip } from '@wildshard/engine/sim/strips';
-import { GRID_STRIP_FEATURE_KINDS, decodeCompiledGridLook, gridStripPageKey, parseCompiledGridHeader, type CompiledGridAddress, type CompiledGridHeader, type CompiledGridPage, type CompiledGridSelector, type GridStripPhase } from '../../shared/game/grid/compiledStrips';
-import { seamMeshSteps, type SeamGeometryChannels } from '../../shared/game/grid/seamGeometry';
+import { GRID_STRIP_FEATURE_KINDS, decodeCompiledGridBlock, mergeGridBlocks, parseCompiledGridDirectory, parseCompiledGridHeader, type CompiledGridAddress, type CompiledGridDirectory, type CompiledGridHeader, type CompiledGridSelector, type DecodedGridBlock } from '../../shared/game/grid/compiledStrips';
+import { seamMeshSteps } from '../../shared/game/grid/seamGeometry';
 import { BrotliSizeCache } from './brotliSizeCache.mjs';
 
 // What a deploy sends for these bytes, the page host's on-the-fly Brotli.
@@ -21,8 +21,13 @@ const wireSizes = new BrotliSizeCache(process.env['WILDSHARD_WIRE_SIZE_CACHE'] ?
 const servedBytes = (bytes: Uint8Array): number => wireSizes.bytes(bytes);
 
 export interface CompiledGridArtifact { readonly address: CompiledGridAddress; readonly bytes: Uint8Array }
-export interface CompiledGridCandidate { readonly page: CompiledGridPage; readonly owner: string; readonly phase: GridStripPhase; readonly slug: string; readonly header: CompiledGridArtifact; readonly body: CompiledGridArtifact }
-export interface GridStripWireRow { readonly source: string; readonly home: string; readonly slug: string; readonly added: number; readonly room: number | null; readonly included: boolean; readonly outer: boolean }
+/** One encoded shared block (ZONE-ENTRY ZE4). */
+export interface CompiledGridBlockFile { readonly block: string; readonly header: CompiledGridArtifact; readonly body: CompiledGridArtifact }
+/** One home's road as a build row: `added` is the wire of its directory and its blocks, `set` the whole block set's ratchet. */
+export interface GridStripWireRow { readonly source: string; readonly home: string; readonly slug: string; readonly added: number; readonly set: number; readonly included: boolean; readonly outer: boolean }
+/** One seam source's whole native road and the homes that read it. */
+export interface GridStripSource { readonly source: string; readonly pitch: number; readonly strips: readonly GeneratedStrip[];
+  readonly homes: readonly { readonly instance: string; readonly slug: string; readonly origin: { readonly x: number; readonly z: number } }[] }
 export interface CompiledGridBuild {
   readonly geometry?: CompiledGridSelector; readonly files: readonly CompiledGridAddress[]; readonly rows: readonly GridStripWireRow[];
 }
@@ -56,30 +61,32 @@ function artifact(bytes: Uint8Array, extension: 'json' | 'bin', kind: 'book' | '
   return { bytes, address: { url: `/assets/grid-strip-${kind}-${sha256.slice(0, 8)}.${extension}`, bytes: bytes.length, sha256 } };
 }
 
-function bakeLookChannels(strips: readonly GeneratedStrip[], frame: Pick<SeamGeometryChannels, 'origin' | 'pitch'>): SeamGeometryChannels {
-  const steps = seamMeshSteps(strips, { origin: frame.origin }, undefined, frame.pitch);
-  for (;;) {
-    const next = steps.next(); if (!next.done) continue;
-    const { normal, uv, colour, sphere } = next.value;
-    return { origin: { x: frame.origin.x, z: frame.origin.z }, pitch: frame.pitch, normals: normal, uvs: uv, colours: colour, sphere };
-  }
+/** A strip's block: the pitch square its origin stands in (blocks are storage; each home keeps the strips its ring selects). */
+export function gridStripBlockKey(origin: { readonly x: number; readonly z: number }, pitch: number): string {
+  return `${String(Math.floor(origin.x / pitch))},${String(Math.floor(origin.z / pitch))}`;
 }
 
-function encodeLookChannels(look: SeamGeometryChannels): Uint8Array {
-  const bytes = new Uint8Array(look.normals.byteLength + look.uvs.byteLength + (look.colours?.byteLength ?? 0));
-  bytes.set(new Uint8Array(look.normals.buffer, look.normals.byteOffset, look.normals.byteLength));
-  bytes.set(new Uint8Array(look.uvs.buffer, look.uvs.byteOffset, look.uvs.byteLength), look.normals.byteLength);
-  if (look.colours !== undefined) bytes.set(new Uint8Array(look.colours.buffer, look.colours.byteOffset, look.colours.byteLength), look.normals.byteLength + look.uvs.byteLength);
+function encodeLookChannels(normals: Float32Array, colours: Float32Array | undefined): Uint8Array {
+  const bytes = new Uint8Array(normals.byteLength + (colours?.byteLength ?? 0));
+  bytes.set(new Uint8Array(normals.buffer, normals.byteOffset, normals.byteLength));
+  if (colours !== undefined) bytes.set(new Uint8Array(colours.buffer, colours.byteOffset, colours.byteLength), normals.byteLength);
   return gridLookBytes.encode(bytes);
 }
 
-/** Store the original indexed words, never deduplicate vertices or quantize them. */
-export function encodeGridStripPage(source: string, home: string, slug: string, strips: readonly GeneratedStrip[], phase: GridStripPhase = 'initial', frame?: Pick<SeamGeometryChannels, 'origin' | 'pitch'>): CompiledGridCandidate {
-  const keyHome = gridStripPageKey(home, phase);
+/** The frame-free look of these strips, as the page's own merge makes it: each strip's normals and default colours. */
+function blockLook(strips: readonly GeneratedStrip[], pitch: number): { readonly normals: Float32Array; readonly colours: Float32Array } {
+  const steps = seamMeshSteps(strips, { origin: { x: 0, z: 0 } }, undefined, pitch);
+  for (;;) { const next = steps.next(); if (next.done) return { normals: next.value.normal, colours: next.value.colour }; }
+}
+
+const sameWords = (a: ArrayBufferView, b: ArrayBufferView): boolean => Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(Buffer.from(b.buffer, b.byteOffset, b.byteLength));
+
+/** One shared block: the strips' original indexed words, never deduplicated or quantized, each with its native order. */
+export function encodeGridStripBlock(block: string, strips: readonly { readonly strip: GeneratedStrip; readonly order: number }[], pitch?: number): CompiledGridBlockFile {
   const writer = new StripPackWriter(), indices = new Map<string, number>(), shapes: CompiledGridHeader['shapes'][number][] = [];
   const rows: CompiledGridHeader['strips'][number][] = [];
   const featureWords: number[] = [], surfaces: string[] = [], surfaceCodes = new Map<string, number>();
-  for (const strip of strips) {
+  for (const { strip, order } of strips) {
     const { mesh, features, turnIn } = strip;
     const digest = createHash('sha256');
     digest.update(json([mesh.positions.length, mesh.colours.length, mesh.indices.length]));
@@ -102,51 +109,53 @@ export function encodeGridStripPage(source: string, home: string, slug: string, 
     }
     const duplicates: CompiledGridHeader['strips'][number]['duplicates'][number][] = [];
     for (const duplicate of strip.duplicates) {
-      for (const field of ['positions', 'colours', 'indices'] as const) {
-        const a = mesh[field], b = duplicate.mesh[field];
-        if (!Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(Buffer.from(b.buffer, b.byteOffset, b.byteLength))) throw new Error('Grid strip duplicate changed native words');
-      }
+      for (const field of ['positions', 'colours', 'indices'] as const) if (!sameWords(mesh[field], duplicate.mesh[field])) throw new Error('Grid strip duplicate changed native words');
       duplicates.push({ instance: duplicate.instance, origin: { ...duplicate.mesh.origin } });
     }
-    rows.push({ id: strip.id, shape, origin: { ...mesh.origin }, duplicates });
+    rows.push({ id: strip.id, order, shape, origin: { ...mesh.origin }, duplicates });
   }
   const geometry = writer.bytes(), featureStart = Math.ceil(geometry.length / 8) * 8;
   const featureEnd = featureStart + featureWords.length * 8;
-  let look = frame === undefined ? undefined : bakeLookChannels(strips, frame);
-  if (look !== undefined && look.normals.byteLength + look.uvs.byteLength + (look.colours?.byteLength ?? 0) > 16 * 1024 * 1024) {
-    look = { origin: look.origin, pitch: look.pitch, normals: look.normals, uvs: look.uvs, sphere: look.sphere };
-  }
+  const native = strips.map(row => row.strip);
+  let look = pitch === undefined ? undefined : blockLook(native, pitch);
+  let withColours = look !== undefined;
+  if (look !== undefined && look.normals.byteLength + look.colours.byteLength > 16 * 1024 * 1024) withColours = false;
   // Optional render channels cannot remove a native triangle bank that fits.
-  if (look !== undefined && look.normals.byteLength + look.uvs.byteLength > 16 * 1024 * 1024) look = undefined;
-  let lookBytes = look === undefined ? new Uint8Array() : encodeLookChannels(look);
+  if (look !== undefined && look.normals.byteLength > 16 * 1024 * 1024) look = undefined;
+  let lookBytes = look === undefined ? new Uint8Array() : encodeLookChannels(look.normals, withColours ? look.colours : undefined);
   if (featureEnd + lookBytes.length > 16 * 1024 * 1024) { look = undefined; lookBytes = new Uint8Array(); }
   const packed = new Uint8Array(featureEnd + lookBytes.length); packed.set(geometry);
   const view = new DataView(packed.buffer);
   for (const [index, value] of featureWords.entries()) view.setFloat64(featureStart + index * 8, value, true);
   packed.set(lookBytes, featureEnd);
-  const header = artifact(json({ version: 1, source, home: keyHome, rows: writer.rows(), surfaces, shapes, strips: rows,
-    ...(look === undefined ? {} : { look: { origin: look.origin, pitch: look.pitch, vertices: look.normals.length / 3, offset: featureEnd, sphere: look.sphere, codec: 'deflate' as const,
-      ...(look.colours === undefined ? {} : { colours: true as const }) } }) } satisfies CompiledGridHeader), 'json', 'page');
+  const header = artifact(json({ version: 2, block, rows: writer.rows(), surfaces, shapes, strips: rows,
+    ...(look === undefined || pitch === undefined ? {} : { look: { pitch, vertices: look.normals.length / 3, offset: featureEnd, codec: 'deflate' as const,
+      ...(withColours ? { colours: true as const } : {}) } }) } satisfies CompiledGridHeader), 'json', 'page');
   // Exercise the same valibot grammar the runtime admits, including signed zero.
   parseCompiledGridHeader(JSON.parse(new TextDecoder().decode(header.bytes)));
   const body = artifact(packed, 'bin', 'mesh');
   // Certify the bytes that will ship against this build's actual native output.
-  const decoded = decodeCompiledGridLook(JSON.parse(new TextDecoder().decode(header.bytes)), body.bytes, source, keyHome);
+  const decoded = decodeCompiledGridBlock(JSON.parse(new TextDecoder().decode(header.bytes)), body.bytes);
+  certifyStrips(decoded.strips.map(row => row.strip), native);
+  for (const [index, row] of decoded.strips.entries()) if (row.order !== strips[index]?.order) throw new Error('Grid strip bake changed its order');
   if (look !== undefined) {
-    const copy = decoded.look; if (copy === undefined || !isDeepStrictEqual(copy.sphere, look.sphere)) throw new Error('Grid strip bake changed look bounds');
-    for (const channel of ['normals', 'uvs', 'colours'] as const) {
-      const a = look[channel], b = copy[channel];
-      if (a === undefined && b === undefined) continue;
-      if (a === undefined || b === undefined) throw new Error('Grid strip bake changed look channels');
-      if (!Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(Buffer.from(b.buffer, b.byteOffset, b.byteLength))) throw new Error('Grid strip bake changed look words');
+    let at = 0;
+    for (const row of decoded.strips) {
+      const count = row.strip.mesh.positions.length;
+      if (row.normals === undefined || !sameWords(row.normals, look.normals.subarray(at, at + count))) throw new Error('Grid strip bake changed look words');
+      if (withColours && (row.colours === undefined || !sameWords(row.colours, look.colours.subarray(at, at + count)))) throw new Error('Grid strip bake changed look words');
+      at += count;
     }
   }
+  return { block, header, body };
+}
+
+/** Exact strip equality: order, ids, original words, placement, features and duplicates. */
+function certifyStrips(decoded: readonly GeneratedStrip[], strips: readonly GeneratedStrip[]): void {
+  if (decoded.length !== strips.length) throw new Error('Grid strip bake changed its order');
   for (const [index, original] of strips.entries()) {
-    const copy = decoded.strips[index]; if (copy === undefined || copy.id !== original.id) throw new Error('Grid strip bake changed its order');
-    for (const field of ['positions', 'colours', 'indices'] as const) {
-      const a = original.mesh[field], b = copy.mesh[field];
-      if (!Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(Buffer.from(b.buffer, b.byteOffset, b.byteLength))) throw new Error('Grid strip bake changed native words');
-    }
+    const copy = decoded[index]; if (copy === undefined || copy.id !== original.id) throw new Error('Grid strip bake changed its order');
+    for (const field of ['positions', 'colours', 'indices'] as const) if (!sameWords(original.mesh[field], copy.mesh[field])) throw new Error('Grid strip bake changed native words');
     const facts = (strip: GeneratedStrip): unknown => ({ origin: strip.mesh.origin, features: strip.features,
       turnIn: strip.turnIn ?? null, duplicates: strip.duplicates.map(row => ({ instance: row.instance, origin: row.mesh.origin })) });
     const before = facts(original), after = facts(copy);
@@ -157,83 +166,72 @@ export function encodeGridStripPage(source: string, home: string, slug: string, 
     if (!direct && !isDeepStrictEqual(JSON.parse(new TextDecoder().decode(json(before))),
       JSON.parse(new TextDecoder().decode(json(after))))) throw new Error('Grid strip bake changed physical placement or features');
   }
-  return { slug, owner: home, phase, page: { source, home: keyHome, header: header.address, body: body.address }, header, body };
 }
 
-/** What two rows for one page must agree on. */
-const pageIdentity = (row: CompiledGridCandidate): string => JSON.stringify([row.owner, row.phase, row.slug, row.page.body.sha256, row.page.header.sha256]);
-
-/** Choose only pages whose added directory/header/body wire fits their shard's room (budgets/grid-strip-room.json). */
-export function writeGridStripPages(root: string, seams: string, candidates: readonly CompiledGridCandidate[], rooms: Readonly<Record<string, number>>): CompiledGridBuild {
-  const unique = new Map<string, CompiledGridCandidate>();
-  for (const candidate of candidates) {
-    const key = `${candidate.page.source}/${candidate.page.home}`, previous = unique.get(key);
-    if (previous !== undefined && pageIdentity(previous) !== pageIdentity(candidate)) throw new Error('Grid strip page is not deterministic');
-    unique.set(key, candidate);
-  }
-  const all = [...unique.values()].sort((a, b) => `${a.page.source}/${a.page.home}`.localeCompare(`${b.page.source}/${b.page.home}`));
-  const ownerKey = (candidate: CompiledGridCandidate): string => `${candidate.page.source}/${candidate.owner}`;
-  const groups = new Map<string, CompiledGridCandidate[]>();
-  for (const candidate of all) {
-    const key = ownerKey(candidate), rows = groups.get(key) ?? [];
-    rows.push(candidate); groups.set(key, rows);
-  }
-  for (const rows of groups.values()) if (new Set(rows.map(row => row.slug)).size !== 1) throw new Error('Grid strip owner differs');
-  const roomOf = new Map(Object.entries(rooms));
-  const measured = new Map<string, number>();
-  const wireOf = (file: CompiledGridArtifact): number => {
-    let wire = measured.get(file.address.sha256);
-    if (wire === undefined) { wire = servedBytes(file.bytes); measured.set(file.address.sha256, wire); }
-    return wire;
-  };
-  const ownWire = new Map(all.map(candidate => [candidate, wireOf(candidate.header) + wireOf(candidate.body)]));
-  let selected = all.filter(candidate => { const room = roomOf.get(candidate.slug); return room !== undefined && (ownWire.get(candidate) ?? 0) <= room; });
-  let directory = artifact(json({ version: 1, pages: selected.map(candidate => candidate.page) }), 'json', 'book');
-  for (;;) {
-    const wire = servedBytes(directory.bytes), blockedHomes = new Set(all.filter(candidate => {
-      const room = roomOf.get(candidate.slug); return room === undefined || wire > room;
-    }).map(candidate => candidate.owner));
-    const costs = new Map<string, number>(), hasOuter = new Set<string>();
-    for (const candidate of selected) {
-      const key = ownerKey(candidate); costs.set(key, (costs.get(key) ?? 0) + (ownWire.get(candidate) ?? 0));
-      if (candidate.phase === 'outer') hasOuter.add(key);
+/**
+ * Bake every source's road as shared blocks and one directory, certify each home's two phases against native, and write
+ * them under out/.app/grid-strip-pages. `reach` is the session's ring (a strip whose origin is within it of the home is
+ * initial, the rest outer); `set` is the whole block set's wire ratchet (budgets/grid-strip-room.json).
+ */
+export function writeGridStripBlocks(root: string, seams: string, sources: readonly GridStripSource[], reach: number, set: number): CompiledGridBuild {
+  if (new Set(sources.map(row => row.source)).size !== sources.length) throw new Error('Grid strip source is not deterministic');
+  const blocks: CompiledGridBlockFile[] = [], blockIndex = new Map<string, number>(), decodedBlocks: DecodedGridBlock[] = [];
+  const homes: CompiledGridDirectory['homes'][number][] = [], owners: { readonly source: string; readonly home: string; readonly slug: string }[] = [];
+  for (const source of [...sources].sort((a, b) => a.source.localeCompare(b.source))) {
+    const groups = new Map<string, { strip: GeneratedStrip; order: number }[]>();
+    for (const [order, strip] of source.strips.entries()) {
+      const key = gridStripBlockKey(strip.mesh.origin, source.pitch), rows = groups.get(key) ?? [];
+      rows.push({ strip, order }); groups.set(key, rows);
     }
-    const next = selected.filter(candidate => {
-      const room = roomOf.get(candidate.slug), key = ownerKey(candidate);
-      if (blockedHomes.has(candidate.owner) || room === undefined) return false;
-      if ((costs.get(key) ?? 0) + wire <= room) return true;
-      // Keep initial readiness first. An outer bank cannot consume its headroom.
-      return candidate.phase === 'initial' && hasOuter.has(key);
-    });
-    if (next.length === selected.length) break;
-    selected = next; directory = artifact(json({ version: 1, pages: selected.map(candidate => candidate.page) }), 'json', 'book');
+    const sourceBlocks = new Map<string, number>();
+    for (const [key, rows] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
+      const file = encodeGridStripBlock(key, rows, source.pitch), identity = `${file.header.address.sha256}/${file.body.address.sha256}`;
+      let index = blockIndex.get(identity);
+      if (index === undefined) {
+        index = blocks.length; blocks.push(file); blockIndex.set(identity, index);
+        decodedBlocks.push(decodeCompiledGridBlock(JSON.parse(new TextDecoder().decode(file.header.bytes)), file.body.bytes));
+      }
+      sourceBlocks.set(key, index);
+    }
+    for (const home of [...source.homes].sort((a, b) => a.instance.localeCompare(b.instance))) {
+      const within = (x: number, z: number): boolean => Math.abs(x - home.origin.x) <= reach && Math.abs(z - home.origin.z) <= reach;
+      const initial = new Set<number>(), outer = new Set<number>();
+      for (const strip of source.strips) {
+        const index = sourceBlocks.get(gridStripBlockKey(strip.mesh.origin, source.pitch)); if (index === undefined) throw new Error('Missing grid strip block');
+        (within(strip.mesh.origin.x, strip.mesh.origin.z) ? initial : outer).add(index);
+      }
+      const row = { source: source.source, home: home.instance, initial: [...initial].sort((a, b) => a - b), outer: [...outer].sort((a, b) => a - b) };
+      // Certify the page's own merge for both phases against this build's native road.
+      for (const [phase, keep] of [['initial', within], ['outer', (x: number, z: number) => !within(x, z)]] as const) {
+        const merged = mergeGridBlocks(row[phase].map(index => { const block = decodedBlocks[index]; if (block === undefined) throw new Error('Missing grid strip block'); return block; }), keep);
+        certifyStrips(merged.strips, source.strips.filter(strip => keep(strip.mesh.origin.x, strip.mesh.origin.z)));
+      }
+      homes.push(row); owners.push({ source: source.source, home: home.instance, slug: home.slug });
+    }
   }
-  const homes = [...new Set(selected.map(candidate => candidate.page.home))].sort();
-  const directoryWire = servedBytes(directory.bytes);
-  // A directory may be fetched on another mode of an eligible home even if that mode has no body entry.
-  for (const candidate of all) if (homes.includes(candidate.page.home)) {
-    const room = roomOf.get(candidate.slug);
-    if (room === undefined || directoryWire > room) throw new Error(`Grid strip directory exceeds ${candidate.slug}'s room`);
-  }
-  const chosen = new Set(selected), artifacts = selected.flatMap(candidate => [candidate.header, candidate.body]);
-  if (selected.length > 0) artifacts.push(directory);
-  const files = new Map<string, CompiledGridAddress>();
-  const folder = join(root, 'out/.app/grid-strip-pages'); rmSync(folder, { recursive: true, force: true }); mkdirSync(folder, { recursive: true });
-  for (const file of artifacts) {
+  const book = { version: 2 as const, blocks: blocks.map(file => ({ header: file.header.address, body: file.body.address })), homes };
+  parseCompiledGridDirectory(JSON.parse(new TextDecoder().decode(json(book))));
+  const directory = artifact(json(book), 'json', 'book');
+  const files = new Map<string, CompiledGridArtifact>();
+  for (const file of blocks.length === 0 ? [] : [directory, ...blocks.flatMap(block => [block.header, block.body])]) {
     const previous = files.get(file.address.url);
-    if (previous !== undefined && previous.sha256 !== file.address.sha256) throw new Error('Grid strip content URL collision');
-    files.set(file.address.url, file.address);
-    writeFileSync(join(folder, basename(file.address.url)), file.bytes);
+    if (previous !== undefined && previous.address.sha256 !== file.address.sha256) throw new Error('Grid strip content URL collision');
+    files.set(file.address.url, file);
   }
-  const rows: GridStripWireRow[] = [...groups.values()].map(group => {
-    const candidate = group[0]; if (candidate === undefined) throw new Error('Missing grid page owner');
-    const included = group.some(part => part.phase === 'initial' && chosen.has(part)), outer = group.some(part => part.phase === 'outer' && chosen.has(part));
-    const readsDirectory = homes.includes(gridStripPageKey(candidate.owner, 'initial')) || homes.includes(gridStripPageKey(candidate.owner, 'outer'));
-    return { source: candidate.page.source, home: candidate.owner, slug: candidate.slug, included, outer,
-      room: roomOf.get(candidate.slug) ?? null,
-      added: (readsDirectory ? directoryWire : 0) + group.reduce((sum, part) => sum + (chosen.has(part) ? ownWire.get(part) ?? 0 : 0), 0) };
+  const wire = new Map([...files.values()].map(file => [file.address.sha256, servedBytes(file.bytes)]));
+  const total = [...wire.values()].reduce((sum, bytes) => sum + bytes, 0);
+  if (total > set) throw new Error(`Grid strip blocks are ${String(total)} wire bytes, over the ${String(set)} in budgets/grid-strip-room.json`);
+  const folder = join(root, 'out/.app/grid-strip-pages'); rmSync(folder, { recursive: true, force: true }); mkdirSync(folder, { recursive: true });
+  for (const file of files.values()) writeFileSync(join(folder, basename(file.address.url)), file.bytes);
+  const blockWire = (index: number): number => { const block = blocks[index]; return block === undefined ? 0 : (wire.get(block.header.address.sha256) ?? 0) + (wire.get(block.body.address.sha256) ?? 0); };
+  const rows: GridStripWireRow[] = homes.map((row, index) => {
+    const owner = owners[index]; if (owner === undefined) throw new Error('Missing grid page owner');
+    return { source: row.source, home: row.home, slug: owner.slug, included: row.initial.length > 0, outer: row.outer.length > 0, set,
+      added: (wire.get(directory.address.sha256) ?? 0) + [...new Set([...row.initial, ...row.outer])].reduce((sum, block) => sum + blockWire(block), 0) };
   });
-  const result: CompiledGridBuild = { ...(selected.length === 0 ? {} : { geometry: { directory: directory.address, homes } }), files: [...files.values()], rows };
+  const homesWithRows = [...new Set(homes.map(row => row.home))].sort();
+  const result: CompiledGridBuild = { ...(blocks.length === 0 ? {} : { geometry: { directory: directory.address, homes: homesWithRows } }),
+    files: [...files.values()].map(file => file.address), rows };
   writeFileSync(join(root, 'out/.app/grid-strip-index.json'), JSON.stringify({ seams, ...result }));
   return result;
 }

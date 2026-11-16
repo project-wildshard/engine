@@ -113,7 +113,7 @@ test('plain build publishes exact tier spawn files and rejects changed section b
   } finally {rmSync(root, {recursive: true, force: true});}
 });
 
-test('grid tap selects only its original mode/home page, never outer or another layout', () => {
+test('grid tap selects only its mode/home initial blocks, never outer or another layout', () => {
   mkdirSync('tmp/entry-downloads', {recursive: true});
   const root=mkdtempSync(resolve('tmp/entry-downloads/grid-')),folder=resolve(root,'out/.app');
   const digest=(value:string):string=>createHash('sha256').update(value).digest('hex');
@@ -122,10 +122,10 @@ test('grid tap selects only its original mode/home page, never outer or another 
     const source=digest('layout'),other=digest('other-layout');
     const header={url:`/assets/grid-strip-page-${digest('header').slice(0,8)}.json`,bytes:3,sha256:digest('header')};
     const body={url:`/assets/grid-strip-mesh-${digest('body').slice(0,8)}.bin`,bytes:3,sha256:digest('body')};
-    const text=JSON.stringify({version:1,pages:[{source,home:'example',header,body},{source,home:'example:outer',header,body}]});
+    const text=JSON.stringify({version:2,blocks:[{header,body}],homes:[{source,home:'example',initial:[0],outer:[0]}]});
     const directory={url:`/assets/grid-strip-book-${digest(text).slice(0,8)}.json`,bytes:Buffer.byteLength(text),sha256:digest(text)};
     writeFileSync(resolve(folder,'grid-strip-pages',directory.url.split('/').at(-1)??''),text);
-    writeFileSync(resolve(folder,'grid-strip-index.json'),JSON.stringify({geometry:{directory,homes:['example','example:outer']}}));
+    writeFileSync(resolve(folder,'grid-strip-index.json'),JSON.stringify({geometry:{directory,homes:['example']}}));
     writeFileSync(resolve(folder,'grid-strip-entry-modes.json'),JSON.stringify({'100':source,'000':other}));
     const rows=gridEntryDownloads(root);
     expect(rows['100']).toEqual({example:[directory,header,body]});expect(rows['000']).toEqual({});
